@@ -1,0 +1,51 @@
+# Code Strategy PoC
+
+A persistent, real-time strategy world where players control their units with scripts written
+in our own small language. The server runs every unit's script once per tick (1 tick per second)
+with a step budget, then resolves all requested actions together.
+
+Design decisions: `decisions/tech-stack-and-script-language.md` in the project folder.
+
+## Layout
+
+| Path              | What it is                                                                   |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `packages/lang`   | The script language: lexer, parser, interpreter (public surface only so far) |
+| `packages/shared` | World types and the WebSocket protocol, shared by server and client          |
+| `apps/server`     | Fastify HTTP API, `ws` tick stream, the simulation loop, SQLite via Drizzle  |
+| `apps/web`        | Vite + React client: PixiJS tile map and a CodeMirror script editor          |
+
+## Getting started
+
+Needs Node 22+ and pnpm 10.
+
+```sh
+pnpm install
+pnpm dev        # server on :3000, client on http://localhost:5173 (proxies /api and /ws)
+```
+
+Other scripts:
+
+```sh
+pnpm build      # type-check and compile all packages, bundle the client
+pnpm start      # run the compiled server
+pnpm test       # Vitest
+pnpm lint       # ESLint
+pnpm format     # Prettier
+```
+
+The server stores the world in `data/world.db` (override with `DB_PATH`). It writes a snapshot
+every 10 ticks and on shutdown, and resumes from the latest one on start. After changing
+`apps/server/src/db/schema.ts`, run `pnpm --filter @csp/server db:generate` to add a migration;
+migrations run on startup.
+
+## How packages resolve each other
+
+Workspace packages export a `source` condition pointing at `src/index.ts`. Vite, Vitest and
+`tsx` use it, so dev needs no build step. `tsc -b` builds `dist/` for `pnpm start`.
+
+## Status
+
+- The tick loop, persistence and live map work end to end.
+- Units move randomly as a stand-in until the interpreter exists.
+- `checkScript` in `packages/lang` is a stub; the parser and interpreter are next.

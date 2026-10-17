@@ -1,0 +1,59 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #181a1f;
+  color: #e6e6e6;
+}
+body {
+  margin: 0;
+}
+.layout header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #2c2f36;
+}
+.layout h1 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+.status {
+  font-size: 0.85rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: #3a3d45;
+}
+.status.open {
+  background: #24502f;
+}
+.status.closed {
+  background: #5a2626;
+}
+main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+}
+.map canvas {
+  display: block;
+  max-width: 100%;
+}
+.editor-panel {
+  flex: 1;
+  min-width: 320px;
+}
+.editor-panel h2 {
+  font-size: 0.95rem;
+  margin: 0 0 0.5rem;
+}
+.editor {
+  border: 1px solid #2c2f36;
+}
+.diagnostics {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  color: #9aa0a6;
+}
