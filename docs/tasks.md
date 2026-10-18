@@ -18,6 +18,7 @@ I sleep.
 ## Now
 
 ### 0. Project setup
+
 - [x] Push to GitHub (`origin` = dasanten/strategy-code-poc)
 - [x] CI on GitHub Actions: lint, typecheck, test on every push
 - [ ] **Daniel:** create a Sentry project (server + browser), put the DSN in `.env`
@@ -27,6 +28,7 @@ I sleep.
 - [x] Tick-health reporting (duration, resident and action counts), alert above 800 ms
 
 ### 1. World map
+
 - [ ] Seeded generator for a disc map with Plains, Forest, Hills, Mountain, Lake, Sea
 - [ ] Size so an unloaded resident on plains crosses it in ~12 real hours
 - [ ] Resource nodes (forest, stone, iron ore, gold ore) placed by terrain
@@ -34,6 +36,7 @@ I sleep.
 - Done when: a fresh world shows a believable disc of terrain you can explore in the browser.
 
 ### 2. Residents and the starting city
+
 - [ ] Resident with base stats, trained bonus, skills, health, hunger, age
 - [ ] Player login creates a Leader and a starting city (≈8 residents, wooden wall, farm, food,
       horse, carriage) far from other Players
@@ -41,6 +44,7 @@ I sleep.
 - Done when: two Players log in and each sees their own city, far apart.
 
 ### 3. Survive
+
 - [ ] Game time (1 day = 1 hour, 1 year = 1 real day)
 - [ ] Hunger and eating from storage; starvation after ~2 game days
 - [ ] Farm produces food from its workers; spoilage
@@ -50,20 +54,24 @@ I sleep.
 ## Next
 
 ### 4. Move and carry
+
 - [ ] Orders: walk to, pick up, drop
 - [ ] Terrain speed and food cost, Agility/Endurance modifiers
 - [ ] Weight of goods, carry capacity from Strength
 
 ### 5. Workplaces on resource nodes
+
 - [ ] Build mine / quarry / lumber camp on a node; smelter; mint
 - [ ] Assign workers; output from Strength and skill, capped by max workers
 - [ ] Holding a workplace = whoever works it
 
 ### 6. Carriages and supply routes
+
 - [ ] Horses (stable, eating) and carriages (Driving skill, terrain limits)
 - [ ] Repeating "haul from A to B" order
 
 ### 7. Pairing and children
+
 - [ ] Pairing order, housing, food surplus, cooldown
 - [ ] Inheritance of base stats, growing up
 

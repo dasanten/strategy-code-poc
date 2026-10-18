@@ -17,7 +17,16 @@ Design decisions live in `docs/adr/`; the domain glossary is `CONTEXT.md`.
 
 ## Getting started
 
-Needs Node 22.12+ (Vite 8 needs it) and pnpm 10. Copy `.env.example` to `.env` for local settings.
+Needs Node 22.12+ (Vite 8 needs it) and pnpm 10. The exact Node version is pinned in
+`.node-version` and pnpm in `package.json` (`packageManager`). With fnm and corepack:
+
+```sh
+fnm use            # picks up .node-version (fnm install first if it's missing)
+corepack enable    # makes `pnpm` the pinned 10.x
+```
+
+An older Node makes `pnpm install` stop with an error. No native build tools are needed:
+better-sqlite3 ships prebuilt binaries. Copy `.env.example` to `.env` for local settings.
 
 ```sh
 pnpm install

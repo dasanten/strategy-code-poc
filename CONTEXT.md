@@ -19,15 +19,15 @@ The shared language of the game. Domain terms only — no implementation details
   food they burn there (relative to plains). Agility softens the speed penalty, Endurance the
   food penalty.
 
-  | Terrain  | Speed      | Food | Notes                                         |
-  | -------- | ---------- | ---- | --------------------------------------------- |
-  | Plains   | 100%       | 100% | Farmland                                      |
-  | Forest   | ~70%       | 100% | Wood                                          |
-  | Hills    | ~70%       | 130% | Stone, some ore                               |
-  | Mountain | ~35%       | 200% | Ore-rich; walkers only, no carriages          |
-  | Lake     | impassable | —    | Inland water                                  |
-  | Sea      | impassable | —    | Along parts of the edge                       |
-  | Road     | ~130%      | 100% | Built by Players on top of passable land      |
+  | Terrain  | Speed      | Food | Notes                                    |
+  | -------- | ---------- | ---- | ---------------------------------------- |
+  | Plains   | 100%       | 100% | Farmland                                 |
+  | Forest   | ~70%       | 100% | Wood                                     |
+  | Hills    | ~70%       | 130% | Stone, some ore                          |
+  | Mountain | ~35%       | 200% | Ore-rich; walkers only, no carriages     |
+  | Lake     | impassable | —    | Inland water                             |
+  | Sea      | impassable | —    | Along parts of the edge                  |
+  | Road     | ~130%      | 100% | Built by Players on top of passable land |
 
 - No rivers and no water vehicles (for now).
 
@@ -111,6 +111,7 @@ The shared language of the game. Domain terms only — no implementation details
   lost too many, it hires mercenaries itself. Its warehouses refill goods, never people.
 
 ## Crime and reputation
+
 - **Crime:** theft, attack or killing against another organization.
 - **Witness:** a resident who sees a crime (within sight range), or a victim who survives it. A
   crime only becomes known when a witness physically brings the news home. No witness, no
