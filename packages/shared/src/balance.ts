@@ -41,3 +41,14 @@ export const NODE_DENSITY = {
 
 /** No two resource nodes lie closer than this many tiles (in either direction). */
 export const NODE_MIN_SPACING = 4
+
+/**
+ * How fast an unloaded resident crosses each terrain, relative to Plains (`CONTEXT.md`:
+ * Terrain). Agility softens the penalty; that comes with walking (T4.2).
+ */
+export const TERRAIN_SPEED = {
+  [Terrain.Plains]: 1,
+  [Terrain.Forest]: 0.7,
+  [Terrain.Hills]: 0.7,
+  [Terrain.Mountain]: 0.35,
+} as const satisfies Partial<Record<Terrain, number>>
