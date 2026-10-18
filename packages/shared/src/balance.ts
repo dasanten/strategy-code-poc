@@ -1,3 +1,5 @@
+import { Terrain } from './terrain.js'
+
 /**
  * Balance numbers: how much, how fast, how often. The rules (what happens) are in `CONTEXT.md`;
  * these are the values Daniel tunes. One commented constant each.
@@ -24,3 +26,14 @@ export const TERRAIN_SHARES = {
 
 /** Share of the disc's edge that is coast (Sea); the rest of the edge is land. */
 export const SEA_EDGE_SHARE = 0.4
+
+/**
+ * How fast an unloaded resident crosses each terrain, relative to Plains (`CONTEXT.md`:
+ * Terrain). Agility softens the penalty; that comes with walking (T4.2).
+ */
+export const TERRAIN_SPEED = {
+  [Terrain.Plains]: 1,
+  [Terrain.Forest]: 0.7,
+  [Terrain.Hills]: 0.7,
+  [Terrain.Mountain]: 0.35,
+} as const satisfies Partial<Record<Terrain, number>>
