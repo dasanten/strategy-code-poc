@@ -14,6 +14,7 @@ import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
 import { foundStartingCity } from './starting-city.js'
+import { eventsFor } from './events.js'
 import { entitiesInSight, type SightTracker } from './sight.js'
 import { ClientView } from './sync.js'
 
@@ -34,11 +35,14 @@ interface Client {
   userId: number
   realmId: string
   view: ClientView
+  /** The number of the last realm event sent, so each tick sends only newer ones. */
+  lastEventSeq: number
 }
 
 /**
  * The WebSocket side (ADR 0006): only logged-in sessions connect; each client gets what its
- * Player sees on connect and the changes every tick; orders come back the same way.
+ * Player sees and their realm log on connect, then the changes every tick; orders come back the
+ * same way.
  */
 export function attachRealtime(
   server: Server,
@@ -77,11 +81,14 @@ export function attachRealtime(
       userId: user.id,
       realmId: realm.id,
       view: new ClientView(),
+      lastEventSeq: 0,
     }
     clients.set(socket, client)
     const city = world.cities.find((c) => c.realmId === realm.id)!
     const [cx, cy] = [city.x + Math.floor(city.size / 2), city.y + Math.floor(city.size / 2)]
     const entities = client.view.initial(entitiesInSight(world, opts.terrain, realm.id))
+    const events = eventsFor(world, user.id)
+    client.lastEventSeq = events.at(-1)?.seq ?? 0
     send(socket, {
       type: 'welcome',
       account: client.account,
@@ -90,6 +97,7 @@ export function attachRealtime(
       exploredChunks: opts.explored.exploredChunks(user),
       home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city.id, x: cx, y: cy },
       entities,
+      events,
     })
 
     socket.on('message', (raw) => {
@@ -110,14 +118,17 @@ export function attachRealtime(
   return {
     /**
      * Sends every client the changes in its sight since the last tick, and the chunks whose
-     * explored terrain grew for its Player (`explored`, from `SightTracker.update`).
+     * explored terrain grew for its Player (`explored`, from `SightTracker.update`), and its
+     * Player's new realm events: each Player gets only their own.
      */
     broadcastTick(explored: Map<number, Set<number>> = new Map()) {
       for (const [socket, client] of clients) {
         const inSight = entitiesInSight(world, opts.terrain, client.realmId)
         const { changed, gone } = client.view.diff(inSight)
         const grown = [...(explored.get(client.userId) ?? [])]
-        send(socket, { type: 'tick', tick: world.tick, changed, gone, explored: grown })
+        const events = eventsFor(world, client.userId, client.lastEventSeq)
+        client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq
+        send(socket, { type: 'tick', tick: world.tick, changed, gone, explored: grown, events })
       }
     },
     close() {

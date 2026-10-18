@@ -6,7 +6,7 @@ import { drawLifespan, mulberry32 } from './residents.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 9
+export const WORLD_FORMAT_VERSION = 10
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -46,6 +46,8 @@ export const migrations: Record<number, MigrationStep> = {
       residents: s.residents.map((r) => ({ ...r, lifespan: drawLifespan(mulberry32(hash(r.id))) })),
     }
   },
+  // Players got realm logs; what happened before is not known, so every log starts empty.
+  9: (state) => ({ ...(state as object), events: [] }),
 }
 
 /** A string's FNV-1a hash, as a seed. */

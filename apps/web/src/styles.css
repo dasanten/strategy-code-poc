@@ -447,3 +447,43 @@ button.residents-row:hover {
   min-height: 44px;
   min-width: 96px;
 }
+.realm-log h2 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa3a8;
+}
+.realm-log .panel-head span {
+  font-size: 0.75rem;
+  color: #9aa3a8;
+}
+.realm-log-list {
+  list-style: none;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+}
+.realm-log-list li {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 10px;
+  padding: 3px 8px;
+  border-left: 3px solid #3a3d45;
+}
+.realm-log-list li time {
+  color: #9aa3a8;
+  font-size: 0.75rem;
+}
+.realm-log-list li.warn {
+  border-left-color: #e8a33d;
+}
+.realm-log-list li.bad {
+  border-left-color: #c94a4a;
+}

@@ -22,6 +22,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     horses: [],
     carriages: [],
     piles: [],
+    events: [],
   }
 }
 

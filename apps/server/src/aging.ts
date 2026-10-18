@@ -27,7 +27,7 @@ export interface AgingResult {
  */
 export function stepAging(world: WorldState): AgingResult {
   const died = world.residents.filter((r) => ageInYears(r, world.tick) >= r.lifespan)
-  const ended = dieAll(world, died)
+  const ended = dieAll(world, died, 'oldAge')
   for (const r of world.residents) dropExcess(world, r)
   return { died, ended }
 }

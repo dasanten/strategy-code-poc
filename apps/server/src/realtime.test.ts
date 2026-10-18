@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { WebSocket } from 'ws'
 import { SESSION_COOKIE, WS_PATH, chunksAcross, type ServerMessage } from '@csp/shared'
 import { buildApp } from './app.js'
-import { createAdmin, createSession } from './auth.js'
+import { createAdmin, createInviteCode, createSession, signUp } from './auth.js'
+import { recordEvent } from './events.js'
 import { ExploredTerrain } from './explored.js'
 import { openDb, schema } from './db/index.js'
 import { OrderQueue } from './orders.js'
+import { realmOf } from './starting-city.js'
 import { SightTracker } from './sight.js'
 import { attachRealtime } from './realtime.js'
 import { cityTerrain } from './test-terrain.js'
@@ -46,6 +48,8 @@ async function start() {
   await createAdmin(opened.db, 'Daniel', 'admin password')
   const user = opened.db.select().from(schema.users).get()!
   return {
+    db: opened.db,
+    userId: user.id,
     world,
     realtime,
     url: `ws://127.0.0.1:${port}${WS_PATH}`,
@@ -118,6 +122,7 @@ describe('realtime', () => {
       changed: [],
       gone: [],
       explored: [],
+      events: [],
     })
 
     stepWorld(world, terrain)
@@ -147,5 +152,45 @@ describe('realtime', () => {
       requestId: 'r1',
       reason: 'unknown order: fly',
     })
+  })
+
+  it('sends each Player only their own realm events, each once, and the log on connect', async () => {
+    const { url, token, db, userId, world, realtime } = await start()
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const daniel = connect(url, token)
+    const mara = connect(url, createSession(db, other.id))
+    expect(await daniel.next('welcome')).toMatchObject({ events: [] })
+    expect(await mara.next('welcome')).toMatchObject({ events: [] })
+
+    const danielsRealm = realmOf(world, userId)!
+    const danielsLeader = world.residents.find((r) => r.id === danielsRealm.leaderId)!
+    recordEvent(world, danielsRealm.id, {
+      kind: 'hungry',
+      residentId: danielsLeader.id,
+      name: danielsLeader.name,
+    })
+    recordEvent(world, realmOf(world, other.id)!.id, { kind: 'foodSpoiled', units: 3 })
+    realtime.broadcastTick()
+    const danielsTick = await daniel.next('tick')
+    const marasTick = await mara.next('tick')
+    expect(danielsTick.type === 'tick' && danielsTick.events).toEqual([
+      expect.objectContaining({ kind: 'hungry', userId, residentId: danielsLeader.id }),
+    ])
+    expect(marasTick.type === 'tick' && marasTick.events).toEqual([
+      expect.objectContaining({ kind: 'foodSpoiled', userId: other.id, units: 3 }),
+    ])
+
+    // Nothing new happened, so nothing is sent again.
+    realtime.broadcastTick()
+    const again = await daniel.next('tick')
+    expect(again.type === 'tick' && again.events).toEqual([])
+
+    // Logging in again brings the Player's log as kept, and only theirs.
+    const welcome = await connect(url, token).next('welcome')
+    expect(welcome.type === 'welcome' && welcome.events.map((e) => e.kind)).toEqual(['hungry'])
   })
 })

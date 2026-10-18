@@ -234,3 +234,9 @@ export function walkSpeed(resident: Resident, terrain: number, tick: number): nu
  * bad each game day (`CONTEXT.md`: Spoilage). About a third of a stock is lost over a game year.
  */
 export const FOOD_SPOIL_PER_DAY = 0.02
+
+/**
+ * Events kept in each Player's realm log; the oldest go first. A Player who logs
+ * in sees these, so a few game days of a busy realm should fit.
+ */
+export const REALM_LOG_LENGTH = 100
