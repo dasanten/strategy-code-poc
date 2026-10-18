@@ -36,13 +36,18 @@ export function createWorld(seed = 1): WorldState {
     } while (tiles[y * MAP_WIDTH + x] !== 'grass')
     units.push({ id: `u${i + 1}`, owner: i < 3 ? 'red' : 'blue', x, y, hp: 10 })
   }
-  return { tick: 0, width: MAP_WIDTH, height: MAP_HEIGHT, tiles, units }
+  return { tick: 0, seed, width: MAP_WIDTH, height: MAP_HEIGHT, tiles, units }
 }
 
 export function isWalkable(world: WorldState, x: number, y: number): boolean {
   if (x < 0 || y < 0 || x >= world.width || y >= world.height) return false
   const tile = world.tiles[y * world.width + x]
   return tile === 'grass' || tile === 'resource'
+}
+
+export interface StepResult {
+  /** Actions requested this tick. */
+  actions: number
 }
 
 const DIRS: Record<Direction, [number, number]> = {
@@ -55,8 +60,9 @@ const DIRS: Record<Direction, [number, number]> = {
 /**
  * Advances the world by one tick. Until the interpreter exists, every unit asks for a
  * random move; the moves are collected first and then resolved together, as scripts will be.
+ * Returns what happened this tick, for tick-health reporting.
  */
-export function stepWorld(world: WorldState, rand: () => number = Math.random): void {
+export function stepWorld(world: WorldState, rand: () => number = Math.random): StepResult {
   const dirs = Object.keys(DIRS) as Direction[]
   const requested = world.units.map((u) => ({
     unit: u,
@@ -75,6 +81,7 @@ export function stepWorld(world: WorldState, rand: () => number = Math.random): 
     unit.y = ny
   }
   world.tick++
+  return { actions: requested.length }
 }
 
 export function loadLatestWorld(db: Db): WorldState | undefined {
@@ -84,7 +91,10 @@ export function loadLatestWorld(db: Db): WorldState | undefined {
     .orderBy(desc(schema.worldSnapshots.tick))
     .limit(1)
     .get()
-  return row?.state as WorldState | undefined
+  const world = row?.state as WorldState | undefined
+  // Snapshots from before the seed was stored all came from the default seed.
+  if (world && world.seed === undefined) world.seed = 1
+  return world
 }
 
 export function saveWorld(db: Db, world: WorldState): void {

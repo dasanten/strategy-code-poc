@@ -18,13 +18,13 @@ I sleep.
 ## Now
 
 ### 0. Project setup
-- [ ] Push to GitHub (`origin` = dasanten/strategy-code-poc)
-- [ ] CI on GitHub Actions: lint, typecheck, test on every push
+- [x] Push to GitHub (`origin` = dasanten/strategy-code-poc)
+- [x] CI on GitHub Actions: lint, typecheck, test on every push
 - [ ] **Daniel:** create a Sentry project (server + browser), put the DSN in `.env`
-- [ ] Sentry SDK on server and client, events tagged with tick, world seed and entity IDs
-- [ ] pino structured logging on the server
-- [ ] Invariant framework: checks run every tick in dev, sampled in prod, violations → Sentry
-- [ ] Tick-health reporting (duration, resident and action counts), alert above 800 ms
+- [x] Sentry SDK on server and client, events tagged with tick, world seed and entity IDs
+- [x] pino structured logging on the server
+- [x] Invariant framework: checks run every tick in dev, sampled in prod, violations → Sentry
+- [x] Tick-health reporting (duration, resident and action counts), alert above 800 ms
 
 ### 1. World map
 - [ ] Seeded generator for a disc map with Plains, Forest, Hills, Mountain, Lake, Sea

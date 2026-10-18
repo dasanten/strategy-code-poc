@@ -17,7 +17,7 @@ Design decisions live in `docs/adr/`; the domain glossary is `CONTEXT.md`.
 
 ## Getting started
 
-Needs Node 22+ and pnpm 10.
+Needs Node 22.12+ (Vite 8 needs it) and pnpm 10. Copy `.env.example` to `.env` for local settings.
 
 ```sh
 pnpm install
@@ -38,6 +38,15 @@ The server stores the world in `data/world.db` (override with `DB_PATH`). It wri
 every 10 ticks and on shutdown, and resumes from the latest one on start. After changing
 `apps/server/src/db/schema.ts`, run `pnpm --filter @csp/server db:generate` to add a migration;
 migrations run on startup.
+
+## Monitoring
+
+See ADR 0004. The server logs JSON lines with pino (pretty-printed outside production; level via
+`LOG_LEVEL`). Set `SENTRY_DSN` (server) and `VITE_SENTRY_DSN` (client) to report to Sentry;
+without them reporting is off. Each tick runs the invariant checks in `apps/server/src/invariants.ts`
+(every tick in dev, 10% of ticks in production, `INVARIANT_SAMPLE_RATE` overrides) and reports tick
+duration and unit and action counts; a tick above 800 ms is logged and sent to Sentry as a warning.
+CI on GitHub Actions runs lint, typecheck and test on every push.
 
 ## How packages resolve each other
 
