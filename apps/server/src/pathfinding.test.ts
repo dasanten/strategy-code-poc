@@ -1,4 +1,4 @@
-import { OFF_MAP, Terrain, isPassableTerrain, terrainAt, type TerrainMap } from '@csp/shared'
+import { Terrain, isPassableTerrain, terrainAt, wrapDelta, type TerrainMap } from '@csp/shared'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   CARRIAGE_COSTS,
@@ -10,7 +10,7 @@ import {
 import { generateTerrain } from './terrain-gen.js'
 import { nearestFreeTile } from './world.js'
 
-/** A map drawn as text: . plains, f forest, h hills, m mountain, ~ lake, x outside. */
+/** A square map drawn as text (its sides join): . plains, f forest, h hills, m mountain, ~ lake. */
 function draw(rows: string[]): TerrainMap {
   const codes: Record<string, number> = {
     '.': Terrain.Plains,
@@ -18,18 +18,19 @@ function draw(rows: string[]): TerrainMap {
     h: Terrain.Hills,
     m: Terrain.Mountain,
     '~': Terrain.Lake,
-    x: OFF_MAP,
   }
-  const d = rows.length
-  return { diameter: d, tiles: Uint8Array.from(rows.join('').split(''), (c) => codes[c]!) }
+  return { size: rows.length, tiles: Uint8Array.from(rows.join('').split(''), (c) => codes[c]!) }
 }
 
-/** Checks a path step by step: neighbouring tiles only, all enterable, ending at the goal. */
+/**
+ * Checks a path step by step: neighbouring tiles only (across the joins too), all enterable,
+ * ending at the goal.
+ */
 function checkPath(map: TerrainMap, from: Point, to: Point, path: Point[], costs: TerrainCosts) {
   let [x, y] = from
   let cost = 0
   for (const [nx, ny] of path) {
-    expect(Math.abs(nx - x) + Math.abs(ny - y)).toBe(1)
+    expect(Math.abs(wrapDelta(x, nx, map.size)) + Math.abs(wrapDelta(y, ny, map.size))).toBe(1)
     const t = terrainAt(map, nx, ny)
     expect(isPassableTerrain(t)).toBe(true)
     expect(costs[t]).toBeLessThan(Infinity)
@@ -41,22 +42,22 @@ function checkPath(map: TerrainMap, from: Point, to: Point, path: Point[], costs
 }
 
 describe('PathFinder on a drawn map', () => {
-  // The middle of a 9×9 disc; the corners are outside it.
+  // Lake along the top and bottom rows, so no way leads round the north–south join.
   const map = draw([
-    'xx.....xx',
-    'x.......x',
+    '~~~~~~~~~',
+    '.........',
     '...mmm...',
     '...m~m...',
     '...m~m...',
     '...m~m...',
     '...fff...',
-    'x.......x',
-    'xx.....xx',
+    '.........',
+    '~~~~~~~~~',
   ])
 
   it('takes the cheapest way, not the shortest', () => {
     const finder = new PathFinder(map)
-    // Straight down is lake; over the mountains costs ~16, around them on plains 12.
+    // Straight down is lake; over the mountains costs ~16, around them on plains 10.
     const r = finder.findPath([4, 1], [4, 7])
     expect(r.status).toBe('found')
     if (r.status !== 'found') return
@@ -65,10 +66,10 @@ describe('PathFinder on a drawn map', () => {
     expect(r.path.some(([x, y]) => terrainAt(map, x, y) === Terrain.Mountain)).toBe(false)
   })
 
-  it('never puts lakes, sea or off-map tiles on a path, and says when there is no way', () => {
+  it('never puts lakes or sea on a path, and says when there is no way', () => {
     const finder = new PathFinder(map)
     expect(finder.findPath([4, 1], [4, 4]).status).toBe('unreachable') // into the lake
-    expect(finder.findPath([4, 1], [0, 0]).status).toBe('unreachable') // off the disc
+    expect(finder.findPath([4, 1], [0, 0]).status).toBe('unreachable') // onto the lake row
     expect(finder.findPath([4, 1], [4, 1])).toEqual({ status: 'found', path: [], cost: 0 })
   })
 
@@ -76,6 +77,25 @@ describe('PathFinder on a drawn map', () => {
     const finder = new PathFinder(map)
     expect(finder.findPath([4, 1], [4, 2], CARRIAGE_COSTS).status).toBe('unreachable')
     expect(finder.findPath([4, 1], [4, 2], WALKING_COSTS).status).toBe('found')
+  })
+
+  it('takes the short way across a join', () => {
+    // Lake everywhere between the two plains columns, which meet across the east–west join.
+    const strip = draw([
+      '.~~~~~~~.',
+      '.~~~~~~~.',
+      '.~~~~~~~.',
+      '.~~~~~~~.',
+      '.~~~~~~~.',
+      '.~~~~~~~.',
+      '.~~~~~~~.',
+      '.~~~~~~~.',
+      '.~~~~~~~.',
+    ])
+    const r = new PathFinder(strip).findPath([0, 4], [8, 4])
+    expect(r).toEqual({ status: 'found', path: [[8, 4]], cost: 1 })
+    // Coordinates past a side mean the same tiles.
+    expect(new PathFinder(strip).findPath([9, 4], [-1, 4])).toEqual(r)
   })
 
   it('hands out each finished result once and forgets cancelled requests', () => {
@@ -92,18 +112,19 @@ describe('PathFinder on a drawn map', () => {
   })
 })
 
-describe('PathFinder across the full disc', () => {
+describe('PathFinder across the full map', () => {
   let map: TerrainMap
   let west: Point
   let east: Point
 
   beforeAll(() => {
     map = generateTerrain(1)
-    west = nearestFreeTile(map, new Set(), 60, 720)
-    east = nearestFreeTile(map, new Set(), 1380, 720)
+    // As far apart as two places get: half the map along each direction.
+    west = nearestFreeTile(map, new Set(), 100, 100)
+    east = nearestFreeTile(map, new Set(), 820, 820)
   }, 120_000)
 
-  it('finds a path across the whole disc in steps that stay within the tick budget', () => {
+  it('finds a path between the farthest places in steps that stay within the tick budget', () => {
     const finder = new PathFinder(map)
     const budgetMs = 20
     finder.request('across', west, east)

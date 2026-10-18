@@ -1,10 +1,11 @@
 import {
-  MAP_DIAMETER,
-  OFF_MAP,
-  SEA_EDGE_SHARE,
+  MAP_SIZE,
+  SEA_COUNT,
   TERRAIN_SHARES,
   Terrain,
-  isInsideDisc,
+  isPassableTerrain,
+  wrap,
+  wrapDelta,
   type TerrainMap,
 } from '@csp/shared'
 
@@ -16,49 +17,55 @@ export function hash(x: number, y: number, seed: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
 }
 
-/** Smooth value noise in [0, 1) with features about `1 / freq` tiles apart. */
-function valueNoise(x: number, y: number, freq: number, seed: number): number {
-  const fx = x * freq
-  const fy = y * freq
+/**
+ * Smooth value noise in [0, 1) on a lattice of `cells` × `cells` points spread over the map. The
+ * lattice repeats every `cells` points, so the noise joins seamlessly where the map's sides do.
+ */
+function valueNoise(x: number, y: number, size: number, cells: number, seed: number): number {
+  const fx = (x / size) * cells
+  const fy = (y / size) * cells
   const ix = Math.floor(fx)
   const iy = Math.floor(fy)
   const tx = fx - ix
   const ty = fy - iy
   const sx = tx * tx * (3 - 2 * tx)
   const sy = ty * ty * (3 - 2 * ty)
-  const a = hash(ix, iy, seed)
-  const b = hash(ix + 1, iy, seed)
-  const c = hash(ix, iy + 1, seed)
-  const d = hash(ix + 1, iy + 1, seed)
+  const x0 = wrap(ix, cells)
+  const y0 = wrap(iy, cells)
+  const x1 = wrap(ix + 1, cells)
+  const y1 = wrap(iy + 1, cells)
+  const a = hash(x0, y0, seed)
+  const b = hash(x1, y0, seed)
+  const c = hash(x0, y1, seed)
+  const d = hash(x1, y1, seed)
   const top = a + (b - a) * sx
   const bottom = c + (d - c) * sx
   return top + (bottom - top) * sy
 }
 
-/** Layered value noise in [0, 1): coarse shapes with finer detail on top. */
-function fbm(x: number, y: number, freq: number, octaves: number, seed: number): number {
+/**
+ * Layered seamless noise in [0, 1): coarse shapes with finer detail on top. Features are about
+ * `spacing` tiles apart (rounded so a whole number of them fits around the map).
+ */
+function fbm(
+  x: number,
+  y: number,
+  size: number,
+  spacing: number,
+  octaves: number,
+  seed: number,
+): number {
+  let cells = Math.max(1, Math.round(size / spacing))
   let sum = 0
   let amp = 1
   let total = 0
   for (let o = 0; o < octaves; o++) {
-    sum += valueNoise(x, y, freq, seed + o * 1013) * amp
+    sum += valueNoise(x, y, size, cells, seed + o * 1013) * amp
     total += amp
     amp *= 0.5
-    freq *= 2
+    cells *= 2
   }
   return sum / total
-}
-
-/** A smooth periodic function of the angle around the disc, for where the sea lies. */
-function coastline(seed: number): (angle: number) => number {
-  let s = seed
-  const rand = () => hash(s++, 7, seed)
-  const waves = [2, 3, 5, 8, 13].map((f, i) => ({
-    f,
-    amp: 1 / (i + 1),
-    phase: rand() * Math.PI * 2,
-  }))
-  return (angle) => waves.reduce((sum, w) => sum + w.amp * Math.sin(w.f * angle + w.phase), 0)
 }
 
 /** The value below which `share` of `values` lie. */
@@ -69,172 +76,187 @@ function quantile(values: Float32Array, share: number): number {
   return sorted[i]!
 }
 
-/** Tiles further than this inside the deepest sea may hold lakes, so lakes stay inland. */
+/** The four tiles sharing a side with tile `t`, across the joins. */
+export function neighbours(size: number, t: number): [number, number, number, number] {
+  const x = t % size
+  const y = (t - x) / size
+  return [
+    y * size + wrap(x + 1, size),
+    y * size + wrap(x - 1, size),
+    wrap(y + 1, size) * size + x,
+    wrap(y - 1, size) * size + x,
+  ]
+}
+
+/** Steps from every tile to the nearest tile where `from` is true (4 neighbours, across joins). */
+function stepsFrom(size: number, from: (t: number) => boolean): Int32Array {
+  const dist = new Int32Array(size * size).fill(-1)
+  const queue = new Int32Array(size * size)
+  let head = 0
+  let tail = 0
+  for (let t = 0; t < size * size; t++) {
+    if (from(t)) {
+      dist[t] = 0
+      queue[tail++] = t
+    }
+  }
+  while (head < tail) {
+    const t = queue[head++]!
+    for (const n of neighbours(size, t)) {
+      if (dist[n] === -1) {
+        dist[n] = dist[t]! + 1
+        queue[tail++] = n
+      }
+    }
+  }
+  return dist
+}
+
+/** Labels each passable tile with its connected group; returns the labels and group sizes. */
+export function landGroups(map: TerrainMap): { group: Int32Array; sizes: number[] } {
+  const { size, tiles } = map
+  const group = new Int32Array(size * size).fill(-1)
+  const sizes: number[] = []
+  const stack: number[] = []
+  for (let start = 0; start < size * size; start++) {
+    if (group[start] !== -1 || !isPassableTerrain(tiles[start]!)) continue
+    const g = sizes.length
+    let count = 0
+    group[start] = g
+    stack.push(start)
+    while (stack.length > 0) {
+      const t = stack.pop()!
+      count++
+      for (const n of neighbours(size, t)) {
+        if (group[n] === -1 && isPassableTerrain(tiles[n]!)) {
+          group[n] = g
+          stack.push(n)
+        }
+      }
+    }
+    sizes.push(count)
+  }
+  return { group, sizes }
+}
+
+/** Lakes stay at least this many tiles from the sea, so they are inland. */
 const LAKE_COAST_MARGIN = 12
 
 /**
- * Generates the disc map from a seed (`CONTEXT.md`: Map, Terrain). Sea lies along parts of the
- * edge, lakes are inland, mountains form ranges with hills around them, forests grow in patches
- * and plains fill the rest. Terrain shares come from the balance file.
+ * Generates the map from a seed (`CONTEXT.md`: Map, Terrain): a square whose opposite sides
+ * join, so every pattern runs on seamlessly across them. A few large seas, small lakes inland,
+ * mountains in ranges with hills around them, forests in patches and plains in between. Land
+ * cut off from the rest becomes water, so all land stays joined. Shares come from the balance
+ * file.
  */
-export function generateTerrain(seed: number, diameter = MAP_DIAMETER): TerrainMap {
-  const n = diameter * diameter
-  const tiles = new Uint8Array(n).fill(OFF_MAP)
-  const r = diameter / 2
+export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
+  const n = size * size
+  const tiles = new Uint8Array(n)
+  const xOf = (t: number) => t % size
+  const yOf = (t: number) => Math.floor(t / size)
 
-  // Disc tiles, with their distance in from the edge and their angle around the centre.
-  const index: number[] = []
-  for (let y = 0; y < diameter; y++) {
-    for (let x = 0; x < diameter; x++) {
-      if (isInsideDisc(diameter, x, y)) index.push(y * diameter + x)
+  // Seas: a few large blobs with ragged coasts. Each tile scores by how deep it lies inside the
+  // nearest blob; the deepest share becomes sea.
+  let s = 0
+  const rand = () => hash(s++, 11, seed)
+  const seas = Array.from({ length: SEA_COUNT }, () => ({
+    x: rand() * size,
+    y: rand() * size,
+    r: size * (0.12 + rand() * 0.08),
+  }))
+  const seaScore = new Float32Array(n)
+  for (let t = 0; t < n; t++) {
+    const x = xOf(t)
+    const y = yOf(t)
+    let deepest = -Infinity
+    for (const sea of seas) {
+      const d = Math.hypot(wrapDelta(sea.x, x, size), wrapDelta(sea.y, y, size))
+      deepest = Math.max(deepest, 1 - d / sea.r)
     }
+    seaScore[t] = deepest + (fbm(x, y, size, 60, 4, seed + 5) - 0.5) * 0.6
   }
-  const count = index.length
-  const edgeDist = new Float32Array(count)
-  const angle = new Float32Array(count)
-  for (let i = 0; i < count; i++) {
-    const t = index[i]!
-    const dx = (t % diameter) + 0.5 - r
-    const dy = Math.floor(t / diameter) + 0.5 - r
-    edgeDist[i] = r - Math.sqrt(dx * dx + dy * dy)
-    angle[i] = Math.atan2(dy, dx)
-  }
+  const seaCut = quantile(seaScore, 1 - TERRAIN_SHARES.sea)
+  for (let t = 0; t < n; t++) if (seaScore[t]! >= seaCut) tiles[t] = Terrain.Sea
 
-  // Sea: where the coastline function is high, a band reaching in from the edge. Its threshold
-  // sets how much of the edge is coast; its depth scale sets how much of the disc is sea.
-  const coast = coastline(seed)
-  const samples = new Float32Array(3600)
-  for (let i = 0; i < samples.length; i++) samples[i] = coast((i / samples.length) * Math.PI * 2)
-  const coastCut = quantile(samples, 1 - SEA_EDGE_SHARE)
-  const seaReach = new Float32Array(count).fill(Infinity)
-  const reaches: number[] = []
-  for (let i = 0; i < count; i++) {
-    const c = coast(angle[i]!) - coastCut
-    if (c > 0) {
-      seaReach[i] = edgeDist[i]! / c
-      reaches.push(seaReach[i]!)
-    }
-  }
-  const seaCut = quantile(Float32Array.from(reaches), (TERRAIN_SHARES.sea * count) / reaches.length)
-  let deepestSea = 0
-  const land = new Uint8Array(count).fill(1)
-  for (let i = 0; i < count; i++) {
-    if (seaReach[i]! < seaCut) {
-      tiles[index[i]!] = Terrain.Sea
-      land[i] = 0
-      deepestSea = Math.max(deepestSea, edgeDist[i]!)
-    }
-  }
-  // A sea tile cut off from the edge by rounding at a narrow tip becomes land.
-  const seaReached = seaFromEdge({ diameter, tiles })
-  for (let i = 0; i < count; i++) {
-    if (!land[i] && !seaReached[index[i]!]) land[i] = 1
-  }
-
-  // Lakes: the lowest spots of a blobby field, only well inside the deepest sea.
-  const lakeField: number[] = []
+  // Lakes: the lowest spots of a blobby field, only well away from the sea.
+  const fromSea = stepsFrom(size, (t) => tiles[t] === Terrain.Sea)
   const lakeAt: number[] = []
-  for (let i = 0; i < count; i++) {
-    if (!land[i] || edgeDist[i]! <= deepestSea + LAKE_COAST_MARGIN) continue
-    const t = index[i]!
-    lakeField.push(fbm(t % diameter, Math.floor(t / diameter), 1 / 90, 3, seed + 1))
-    lakeAt.push(i)
+  const lakeField: number[] = []
+  for (let t = 0; t < n; t++) {
+    if (tiles[t] === Terrain.Sea || fromSea[t]! <= LAKE_COAST_MARGIN) continue
+    lakeAt.push(t)
+    lakeField.push(fbm(xOf(t), yOf(t), size, 90, 3, seed + 1))
   }
   const lakeCut = quantile(
     Float32Array.from(lakeField),
-    (TERRAIN_SHARES.lake * count) / lakeField.length,
+    (TERRAIN_SHARES.lake * n) / lakeField.length,
   )
   for (let k = 0; k < lakeAt.length; k++) {
-    if (lakeField[k]! < lakeCut) {
-      tiles[index[lakeAt[k]!]!] = Terrain.Lake
-      land[lakeAt[k]!] = 0
-    }
+    if (lakeField[k]! < lakeCut) tiles[lakeAt[k]!] = Terrain.Lake
   }
 
   // Mountains and hills: ridges of a noise field, strongest where a coarse mask lets ranges form.
   // The highest ridge tiles are mountains, the band below them hills.
-  const relief = new Float32Array(count)
+  const isLand = (t: number) => tiles[t] !== Terrain.Sea && tiles[t] !== Terrain.Lake
+  const relief = new Float32Array(n)
   const landRelief: number[] = []
-  for (let i = 0; i < count; i++) {
-    if (!land[i]) continue
-    const t = index[i]!
-    const x = t % diameter
-    const y = Math.floor(t / diameter)
-    const ridge = 1 - Math.abs(2 * fbm(x, y, 1 / 160, 4, seed + 2) - 1)
-    const mask = fbm(x, y, 1 / 400, 2, seed + 3)
-    relief[i] = ridge * ridge * mask
-    landRelief.push(relief[i]!)
+  for (let t = 0; t < n; t++) {
+    if (!isLand(t)) continue
+    const ridge = 1 - Math.abs(2 * fbm(xOf(t), yOf(t), size, 160, 4, seed + 2) - 1)
+    const mask = fbm(xOf(t), yOf(t), size, 400, 2, seed + 3)
+    relief[t] = ridge * ridge * mask
+    landRelief.push(relief[t]!)
   }
-  const landCount = landRelief.length
   const reliefSorted = Float32Array.from(landRelief)
-  const mountainCut = quantile(reliefSorted, 1 - (TERRAIN_SHARES.mountain * count) / landCount)
+  const landCount = landRelief.length
+  const mountainCut = quantile(reliefSorted, 1 - (TERRAIN_SHARES.mountain * n) / landCount)
   const hillsCut = quantile(
     reliefSorted,
-    1 - ((TERRAIN_SHARES.mountain + TERRAIN_SHARES.hills) * count) / landCount,
+    1 - ((TERRAIN_SHARES.mountain + TERRAIN_SHARES.hills) * n) / landCount,
   )
 
   // Forest: patches of a separate field among the remaining land; plains everywhere else.
-  const growth = new Float32Array(count)
+  const growth = new Float32Array(n)
   const flatGrowth: number[] = []
-  for (let i = 0; i < count; i++) {
-    if (!land[i] || relief[i]! >= hillsCut) continue
-    const t = index[i]!
-    growth[i] = fbm(t % diameter, Math.floor(t / diameter), 1 / 70, 4, seed + 4)
-    flatGrowth.push(growth[i]!)
+  for (let t = 0; t < n; t++) {
+    if (!isLand(t) || relief[t]! >= hillsCut) continue
+    growth[t] = fbm(xOf(t), yOf(t), size, 70, 4, seed + 4)
+    flatGrowth.push(growth[t]!)
   }
   const forestCut = quantile(
     Float32Array.from(flatGrowth),
-    1 - (TERRAIN_SHARES.forest * count) / flatGrowth.length,
+    1 - (TERRAIN_SHARES.forest * n) / flatGrowth.length,
   )
-
-  for (let i = 0; i < count; i++) {
-    if (!land[i]) continue
-    tiles[index[i]!] =
-      relief[i]! >= mountainCut
+  for (let t = 0; t < n; t++) {
+    if (!isLand(t)) continue
+    tiles[t] =
+      relief[t]! >= mountainCut
         ? Terrain.Mountain
-        : relief[i]! >= hillsCut
+        : relief[t]! >= hillsCut
           ? Terrain.Hills
-          : growth[i]! >= forestCut
+          : growth[t]! >= forestCut
             ? Terrain.Forest
             : Terrain.Plains
   }
 
-  return { diameter, tiles }
-}
-
-/** The four tiles sharing a side with tile index `t`. */
-function neighbours(diameter: number, t: number): [number, number][] {
-  const x = t % diameter
-  const y = Math.floor(t / diameter)
-  return [
-    [x + 1, y],
-    [x - 1, y],
-    [x, y + 1],
-    [x, y - 1],
-  ]
-}
-
-/** Marks every sea tile joined to the disc's edge through sea. */
-function seaFromEdge({ diameter, tiles }: TerrainMap): Uint8Array {
-  const reached = new Uint8Array(tiles.length)
-  const queue: number[] = []
-  for (let t = 0; t < tiles.length; t++) {
-    if (tiles[t] !== Terrain.Sea) continue
-    if (neighbours(diameter, t).some(([nx, ny]) => !isInsideDisc(diameter, nx, ny))) {
-      reached[t] = 1
-      queue.push(t)
+  // All land joined: land cut off from the largest stretch becomes water as a whole, sea if it
+  // touches the sea anywhere, lake otherwise.
+  const map: TerrainMap = { size, tiles }
+  const { group, sizes } = landGroups(map)
+  const main = sizes.indexOf(Math.max(...sizes))
+  const bySea = new Uint8Array(sizes.length)
+  for (let t = 0; t < n; t++) {
+    const g = group[t]!
+    if (g !== -1 && g !== main && neighbours(size, t).some((nb) => tiles[nb] === Terrain.Sea)) {
+      bySea[g] = 1
     }
   }
-  while (queue.length > 0) {
-    for (const [nx, ny] of neighbours(diameter, queue.pop()!)) {
-      const nt = ny * diameter + nx
-      if (isInsideDisc(diameter, nx, ny) && tiles[nt] === Terrain.Sea && !reached[nt]) {
-        reached[nt] = 1
-        queue.push(nt)
-      }
-    }
+  for (let t = 0; t < n; t++) {
+    const g = group[t]!
+    if (g === -1 || g === main) continue
+    tiles[t] = bySea[g] ? Terrain.Sea : Terrain.Lake
   }
-  return reached
+  return map
 }
 
 /** A rule a generated map must keep, broken. */
@@ -244,36 +266,29 @@ export interface TerrainProblem {
 }
 
 /**
- * Checks the rules every generated map keeps (ADR 0004): nothing outside the disc exists or is
- * passable, every sea tile reaches the edge, and no lake touches the sea or the edge.
+ * Checks the rules every generated map keeps (ADR 0004): every tile holds a known terrain, no
+ * lake touches the sea, and all land is joined.
  */
 export function checkTerrain(map: TerrainMap): TerrainProblem[] {
-  const { diameter, tiles } = map
+  const { size, tiles } = map
   const problems: TerrainProblem[] = []
+  const known = new Set<number>(Object.values(Terrain))
   for (let t = 0; t < tiles.length; t++) {
-    const x = t % diameter
-    const y = Math.floor(t / diameter)
-    const inside = isInsideDisc(diameter, x, y)
-    if (!inside && tiles[t] !== OFF_MAP) {
-      problems.push({ rule: 'nothing-off-map', message: `tile (${x}, ${y}) lies outside the disc` })
+    const at = `(${t % size}, ${Math.floor(t / size)})`
+    if (!known.has(tiles[t]!)) {
+      problems.push({ rule: 'known-terrain', message: `tile ${at} holds ${tiles[t]}` })
     }
-    if (inside && tiles[t] === Terrain.Lake) {
-      const shore = neighbours(diameter, t).map(([nx, ny]) =>
-        isInsideDisc(diameter, nx, ny) ? tiles[ny * diameter + nx] : OFF_MAP,
-      )
-      if (shore.some((s) => s === Terrain.Sea || s === OFF_MAP)) {
-        problems.push({ rule: 'lakes-inland', message: `lake at (${x}, ${y}) touches sea or edge` })
-      }
+    if (tiles[t] === Terrain.Lake && neighbours(size, t).some((nb) => tiles[nb] === Terrain.Sea)) {
+      problems.push({ rule: 'lakes-inland', message: `lake at ${at} touches the sea` })
     }
   }
-
-  const seaReached = seaFromEdge(map)
-  for (let t = 0; t < tiles.length; t++) {
-    if (tiles[t] === Terrain.Sea && !seaReached[t]) {
-      const x = t % diameter
-      const y = Math.floor(t / diameter)
-      problems.push({ rule: 'sea-at-edge', message: `sea at (${x}, ${y}) does not reach the edge` })
-    }
+  const { sizes } = landGroups(map)
+  if (sizes.length > 1) {
+    const largest = [...sizes].sort((a, b) => b - a).slice(0, 5)
+    problems.push({
+      rule: 'land-joined',
+      message: `land falls into ${sizes.length} parts (${largest.join(', ')}, …)`,
+    })
   }
   return problems
 }

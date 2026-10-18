@@ -1,4 +1,4 @@
-import { isPassableTerrain, terrainAt, type TerrainMap, type WorldState } from '@csp/shared'
+import { isPassableTerrain, terrainAt, wrap, type TerrainMap, type WorldState } from '@csp/shared'
 import { placeResourceNodes } from './node-gen.js'
 
 /**
@@ -25,7 +25,8 @@ export function isWalkable(terrain: TerrainMap, x: number, y: number): boolean {
 }
 
 /**
- * The walkable tile not in `occupied` closest to (x, y), searching outwards ring by ring.
+ * The walkable tile not in `occupied` closest to (x, y), searching outwards ring by ring across
+ * the map's joins.
  * Throws if the whole map is full, which a real map never is.
  */
 export function nearestFreeTile(
@@ -36,11 +37,12 @@ export function nearestFreeTile(
 ): [number, number] {
   const free = (tx: number, ty: number) =>
     isWalkable(terrain, tx, ty) && !occupied.has(`${tx},${ty}`)
-  for (let r = 0; r < terrain.diameter; r++) {
+  for (let r = 0; r < terrain.size; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
-        if (free(x + dx, y + dy)) return [x + dx, y + dy]
+        const [tx, ty] = [wrap(x + dx, terrain.size), wrap(y + dy, terrain.size)]
+        if (free(tx, ty)) return [tx, ty]
       }
     }
   }

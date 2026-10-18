@@ -6,15 +6,15 @@ import type { ResourceKind } from './world.js'
  * these are the values Daniel tunes. One commented constant each.
  */
 
-/** Tiles across the map disc: a ~12 h walk at ~30 s per plains tile (`CONTEXT.md`: Tile). */
-export const MAP_DIAMETER = 1440
+/** Tiles along each side of the map: once around is a ~12 h walk at ~30 s per plains tile. */
+export const MAP_SIZE = 1440
 
 /**
- * Share of the disc's tiles each terrain covers in a freshly generated map. Plains take the rest.
+ * Share of the map's tiles each terrain covers in a freshly generated map. Plains take the rest.
  * The generator hits these closely; the map test checks them.
  */
 export const TERRAIN_SHARES = {
-  /** Along parts of the edge. */
+  /** A few large bodies of water. */
   sea: 0.08,
   /** Inland water, a few scattered lakes. */
   lake: 0.025,
@@ -24,9 +24,6 @@ export const TERRAIN_SHARES = {
   hills: 0.13,
   forest: 0.25,
 } as const
-
-/** Share of the disc's edge that is coast (Sea); the rest of the edge is land. */
-export const SEA_EDGE_SHARE = 0.4
 
 /**
  * Resource nodes per tile of each terrain they lie on, when the world is created. Ore is denser
@@ -90,9 +87,6 @@ export const START_SPARE_HOUSES = 1
 /** Food in a starting city's storage, in kg. */
 export const START_FOOD = 200
 
-/** A starting city keeps at least this many tiles from the edge of the world. */
-export const CITY_EDGE_MARGIN = 80
-
 /**
  * Starting cities lie at least this many tiles apart (about 2.5 hours' walk on plains), when the
  * map has room; otherwise as far apart as it allows.
@@ -101,3 +95,6 @@ export const CITY_MIN_DISTANCE = 300
 
 /** Tiles around a new starting city that its Player has explored from the start. */
 export const START_EXPLORED_RADIUS = 24
+
+/** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
+export const SEA_COUNT = 3

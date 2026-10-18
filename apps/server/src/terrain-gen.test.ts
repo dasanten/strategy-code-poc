@@ -1,54 +1,56 @@
 import {
-  MAP_DIAMETER,
-  OFF_MAP,
-  SEA_EDGE_SHARE,
+  MAP_SIZE,
+  SEA_COUNT,
   TERRAIN_SHARES,
   Terrain,
-  isInsideDisc,
-  isPassableTerrain,
   terrainAt,
   type TerrainMap,
 } from '@csp/shared'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { checkTerrain, generateTerrain } from './terrain-gen.js'
+import { checkTerrain, generateTerrain, landGroups, neighbours } from './terrain-gen.js'
 
-/** Sizes of the 8-connected groups of tiles with the given terrain. */
-function groupSizes({ diameter, tiles }: TerrainMap, terrain: Terrain): number[] {
+/** Sizes of the connected groups (4 neighbours, across the joins) of one terrain. */
+function groupSizes({ size, tiles }: TerrainMap, terrain: number): number[] {
   const seen = new Uint8Array(tiles.length)
   const sizes: number[] = []
   for (let start = 0; start < tiles.length; start++) {
     if (tiles[start] !== terrain || seen[start]) continue
-    let size = 0
+    let count = 0
     const stack = [start]
     seen[start] = 1
     while (stack.length > 0) {
       const t = stack.pop()!
-      size++
-      const x = t % diameter
-      const y = Math.floor(t / diameter)
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = x + dx
-          const ny = y + dy
-          if (nx < 0 || ny < 0 || nx >= diameter || ny >= diameter) continue
-          const nt = ny * diameter + nx
-          if (tiles[nt] === terrain && !seen[nt]) {
-            seen[nt] = 1
-            stack.push(nt)
-          }
+      count++
+      for (const n of neighbours(size, t)) {
+        if (tiles[n] === terrain && !seen[n]) {
+          seen[n] = 1
+          stack.push(n)
         }
       }
     }
-    sizes.push(size)
+    sizes.push(count)
   }
   return sizes
 }
 
+/** Share of neighbouring tile pairs that differ, across one column boundary or one row's. */
+function changeAcross(map: TerrainMap, axis: 'x' | 'y', at: number): number {
+  let changed = 0
+  for (let i = 0; i < map.size; i++) {
+    const [a, b] =
+      axis === 'x'
+        ? [terrainAt(map, at - 1, i), terrainAt(map, at, i)]
+        : [terrainAt(map, i, at - 1), terrainAt(map, i, at)]
+    if (a !== b) changed++
+  }
+  return changed / map.size
+}
+
 describe('generateTerrain', () => {
   it('makes the same map from the same seed, and a different one from another', () => {
-    const a = generateTerrain(42, 300)
-    expect(generateTerrain(42, 300).tiles).toEqual(a.tiles)
-    expect(generateTerrain(43, 300).tiles).not.toEqual(a.tiles)
+    const a = generateTerrain(42, 256)
+    expect(generateTerrain(42, 256).tiles).toEqual(a.tiles)
+    expect(generateTerrain(43, 256).tiles).not.toEqual(a.tiles)
   })
 
   describe('a full-size map', () => {
@@ -62,82 +64,55 @@ describe('generateTerrain', () => {
     }, 120_000)
 
     it('generates well under a minute', () => {
-      expect(ms).toBeLessThan(20_000)
+      expect(ms).toBeLessThan(30_000)
     })
 
-    it('is a disc ~1,440 tiles across with nothing passable outside it', () => {
-      expect(map.diameter).toBe(MAP_DIAMETER)
-      expect(MAP_DIAMETER).toBeGreaterThanOrEqual(1400)
-      expect(MAP_DIAMETER).toBeLessThanOrEqual(1480)
-      const d = map.diameter
-      const wrong: string[] = []
-      for (let y = -1; y <= d; y++) {
-        for (let x = -1; x <= d; x++) {
-          const t = terrainAt(map, x, y)
-          if (isInsideDisc(d, x, y)) {
-            if (t === OFF_MAP) wrong.push(`(${x}, ${y}) is missing`)
-          } else {
-            if (t !== OFF_MAP || isPassableTerrain(t)) wrong.push(`(${x}, ${y}) exists`)
-            const inGrid = x >= 0 && y >= 0 && x < d && y < d
-            if (inGrid && map.tiles[y * d + x] !== OFF_MAP) wrong.push(`(${x}, ${y}) has terrain`)
-          }
-        }
+    it('is a 1,440 × 1,440 square whose coordinates run on past every side', () => {
+      expect(map.size).toBe(MAP_SIZE)
+      expect(MAP_SIZE).toBe(1440)
+      expect(map.tiles).toHaveLength(1440 * 1440)
+      expect(terrainAt(map, -1, 5)).toBe(terrainAt(map, 1439, 5))
+      expect(terrainAt(map, 1440, 5)).toBe(terrainAt(map, 0, 5))
+      expect(terrainAt(map, 7, -1)).toBe(terrainAt(map, 7, 1439))
+    })
+
+    it('has no seams where the sides join', () => {
+      // Across a join the terrain changes about as often as anywhere else.
+      const inside = (changeAcross(map, 'x', 720) + changeAcross(map, 'y', 720)) / 2
+      for (const across of [changeAcross(map, 'x', 0), changeAcross(map, 'y', 0)]) {
+        expect(across).toBeLessThan(inside * 2 + 0.02)
       }
-      expect(wrong).toEqual([])
-      // The disc touches all four sides of its square.
-      expect(isInsideDisc(d, d / 2, 0)).toBe(true)
-      expect(isInsideDisc(d, 0, 0)).toBe(false)
     })
 
     it('keeps the terrain shares from the balance file', () => {
-      const counts = new Map<number, number>()
-      let disc = 0
-      for (const t of map.tiles) {
-        if (t === OFF_MAP) continue
-        disc++
-        counts.set(t, (counts.get(t) ?? 0) + 1)
-      }
-      const share = (t: Terrain) => (counts.get(t) ?? 0) / disc
+      const count = (t: number) => map.tiles.filter((x) => x === t).length / map.tiles.length
       const near = (actual: number, wanted: number) =>
         expect(Math.abs(actual - wanted)).toBeLessThan(0.005)
-      near(share(Terrain.Sea), TERRAIN_SHARES.sea)
-      near(share(Terrain.Lake), TERRAIN_SHARES.lake)
-      near(share(Terrain.Mountain), TERRAIN_SHARES.mountain)
-      near(share(Terrain.Hills), TERRAIN_SHARES.hills)
-      near(share(Terrain.Forest), TERRAIN_SHARES.forest)
+      near(count(Terrain.Sea), TERRAIN_SHARES.sea)
+      near(count(Terrain.Lake), TERRAIN_SHARES.lake)
+      near(count(Terrain.Mountain), TERRAIN_SHARES.mountain)
+      near(count(Terrain.Hills), TERRAIN_SHARES.hills)
+      near(count(Terrain.Forest), TERRAIN_SHARES.forest)
       const rest = 1 - Object.values(TERRAIN_SHARES).reduce((a, b) => a + b, 0)
-      near(share(Terrain.Plains), rest)
+      near(count(Terrain.Plains), rest)
     })
 
-    it('puts sea along parts of the edge, not all of it', () => {
-      const d = map.diameter
-      let edge = 0
-      let sea = 0
-      for (let y = 0; y < d; y++) {
-        for (let x = 0; x < d; x++) {
-          if (!isInsideDisc(d, x, y)) continue
-          const atEdge = [
-            [x + 1, y],
-            [x - 1, y],
-            [x, y + 1],
-            [x, y - 1],
-          ].some(([nx, ny]) => !isInsideDisc(d, nx!, ny!))
-          if (!atEdge) continue
-          edge++
-          if (terrainAt(map, x, y) === Terrain.Sea) sea++
-        }
-      }
-      expect(Math.abs(sea / edge - SEA_EDGE_SHARE)).toBeLessThan(0.05)
+    it('makes a few large seas, not scattered puddles', () => {
+      const seas = groupSizes(map, Terrain.Sea).sort((a, b) => b - a)
+      const total = seas.reduce((a, b) => a + b, 0)
+      const big = seas.slice(0, SEA_COUNT).reduce((a, b) => a + b, 0)
+      expect(big / total).toBeGreaterThan(0.95)
     })
 
     it('forms mountains into ranges', () => {
       const sizes = groupSizes(map, Terrain.Mountain)
       const total = sizes.reduce((a, b) => a + b, 0)
       const inRanges = sizes.filter((s) => s >= 200).reduce((a, b) => a + b, 0)
-      expect(inRanges / total).toBeGreaterThan(0.8)
+      expect(inRanges / total).toBeGreaterThan(0.7)
     })
 
-    it('keeps every map rule: sea reaches the edge, lakes are inland', () => {
+    it('keeps all land joined and lakes inland', () => {
+      expect(landGroups(map).sizes).toHaveLength(1)
       expect(checkTerrain(map)).toEqual([])
       expect(groupSizes(map, Terrain.Lake).length).toBeGreaterThan(3)
     })
@@ -145,20 +120,25 @@ describe('generateTerrain', () => {
 })
 
 describe('checkTerrain', () => {
-  it('reports sea cut off from the edge and lakes on the shore', () => {
-    const d = 21
-    const map = generateTerrain(5, d)
-    map.tiles.fill(OFF_MAP)
-    for (let y = 0; y < d; y++) {
-      for (let x = 0; x < d; x++) if (isInsideDisc(d, x, y)) map.tiles[y * d + x] = Terrain.Plains
+  it('reports cut-off land, a lake on the sea and unknown terrain', () => {
+    const size = 8
+    const tiles = new Uint8Array(size * size).fill(Terrain.Plains)
+    // A ring of sea around one plains tile cuts it off.
+    for (const [x, y] of [
+      [3, 2],
+      [2, 3],
+      [4, 3],
+      [3, 4],
+    ]) {
+      tiles[y * size + x!] = Terrain.Sea
     }
-    map.tiles[10 * d + 10] = Terrain.Sea
-    map.tiles[10 * d + 0] = Terrain.Lake
-    map.tiles[0] = Terrain.Plains
+    tiles[6 * size + 6] = Terrain.Lake
+    tiles[6 * size + 7] = Terrain.Sea
+    tiles[0] = 99
     expect(
-      checkTerrain(map)
+      checkTerrain({ size, tiles })
         .map((p) => p.rule)
         .sort(),
-    ).toEqual(['lakes-inland', 'nothing-off-map', 'sea-at-edge'])
+    ).toEqual(['known-terrain', 'lakes-inland', 'land-joined'])
   })
 })

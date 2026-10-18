@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js'
 import {
   CHUNK_SIZE,
-  OFF_MAP,
   TERRAIN_SPEED,
   Terrain,
   chunksAcross,
+  wrapDelta,
   type KnownNode,
   type TerrainChunk,
 } from '@csp/shared'
 import {
   CLOSE_SCALE,
   FAR_SCALE,
+  chunkToScreen,
   clampScale,
   panBy,
   screenToTile,
@@ -64,7 +65,7 @@ export function MapView({ world }: { world: ClientWorld }) {
   const controlsRef = useRef<{ zoom(factor: number): void; centre(): void } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
-  const { diameter } = world.map
+  const mapSize = world.map.size
   const explored = world.exploredChunks
 
   // The residents change every tick; the scene reads the latest through the ref.
@@ -75,7 +76,7 @@ export function MapView({ world }: { world: ClientWorld }) {
 
   useEffect(() => {
     const host = hostRef.current!
-    const across = chunksAcross(diameter)
+    const across = chunksAcross(mapSize)
     const app = new Application()
     const sprites = new Map<number, Sprite>()
     const nodes: KnownNode[][] = []
@@ -89,7 +90,6 @@ export function MapView({ world }: { world: ClientWorld }) {
 
     const store = new ChunkStore(explored, across, (chunk) => {
       const sprite = new Sprite(chunkTexture(chunk))
-      sprite.position.set(chunk.cx * CHUNK_SIZE, chunk.cy * CHUNK_SIZE)
       terrainLayer.addChild(sprite)
       sprites.set(chunk.cy * across + chunk.cx, sprite)
       nodes[chunk.cy * across + chunk.cx] = chunk.nodes
@@ -107,41 +107,39 @@ export function MapView({ world }: { world: ClientWorld }) {
 
     function draw() {
       const view = size()
-      terrainLayer.scale.set(cam.scale)
-      terrainLayer.position.set(
-        view.width / 2 - cam.x * cam.scale,
-        view.height / 2 - cam.y * cam.scale,
-      )
-      // Only chunks on screen are drawn; nearer ones are loaded first.
-      const onScreen = visibleChunks(cam, view, diameter)
+      // Only chunks on screen are drawn, each at its copy nearest the view's centre (the map's
+      // sides join); nearer chunks are loaded first.
+      const onScreen = visibleChunks(cam, view, mapSize)
       const shown = new Set(onScreen)
-      for (const [i, sprite] of sprites) sprite.visible = shown.has(i)
-      const cx = Math.floor(cam.x / CHUNK_SIZE)
-      const cy = Math.floor(cam.y / CHUNK_SIZE)
-      store.want(
-        [...onScreen].sort(
-          (a, b) =>
-            Math.hypot((a % across) - cx, Math.floor(a / across) - cy) -
-            Math.hypot((b % across) - cx, Math.floor(b / across) - cy),
-        ),
-      )
+      for (const [i, sprite] of sprites) {
+        sprite.visible = shown.has(i)
+        if (!sprite.visible) continue
+        sprite.position.set(
+          ...chunkToScreen(cam, view, mapSize, i % across, Math.floor(i / across)),
+        )
+        sprite.scale.set(cam.scale)
+      }
+      const away = (i: number) =>
+        Math.hypot(
+          wrapDelta(cam.x, ((i % across) + 0.5) * CHUNK_SIZE, mapSize),
+          wrapDelta(cam.y, (Math.floor(i / across) + 0.5) * CHUNK_SIZE, mapSize),
+        )
+      store.want([...onScreen].sort((a, b) => away(a) - away(b)))
       drawOverlay(overlay, cam, view, onScreen)
     }
 
     function drawOverlay(g: Graphics, cam: Camera, view: Size, onScreen: number[]) {
       g.clear()
-      const [ex, ey] = tileToScreen(cam, view, diameter / 2, diameter / 2)
-      g.circle(ex, ey, (diameter / 2) * cam.scale).stroke({ width: 1.5, color: 0x5e676e })
       if (cam.scale < FAR_SCALE) return
 
       if (cam.scale >= CLOSE_SCALE) {
-        const { x0, y0, x1, y1 } = visibleTiles(cam, view, diameter)
+        const { x0, y0, x1, y1 } = visibleTiles(cam, view)
         for (let x = x0; x <= x1 + 1; x++) {
-          const [sx] = tileToScreen(cam, view, x, 0)
+          const sx = (x - cam.x) * cam.scale + view.width / 2
           g.moveTo(sx, 0).lineTo(sx, view.height)
         }
         for (let y = y0; y <= y1 + 1; y++) {
-          const [, sy] = tileToScreen(cam, view, 0, y)
+          const sy = (y - cam.y) * cam.scale + view.height / 2
           g.moveTo(0, sy).lineTo(view.width, sy)
         }
         g.stroke({ width: 1, color: 0x000000, alpha: 0.12 })
@@ -150,7 +148,7 @@ export function MapView({ world }: { world: ClientWorld }) {
       const r = Math.max(4, Math.min(9, cam.scale * 0.35))
       for (const i of onScreen) {
         for (const n of nodes[i] ?? []) {
-          const [sx, sy] = tileToScreen(cam, view, n.x + 0.5, n.y + 0.5)
+          const [sx, sy] = tileToScreen(cam, view, mapSize, n.x + 0.5, n.y + 0.5)
           g.poly([sx, sy - r, sx + r, sy, sx, sy + r, sx - r, sy])
             .fill(NODE_COLORS[n.kind])
             .stroke({ width: 2, color: 0x121518 })
@@ -162,7 +160,7 @@ export function MapView({ world }: { world: ClientWorld }) {
       const { home } = worldRef.current
       const dot = Math.max(3, Math.min(8, cam.scale * 0.3))
       for (const u of worldRef.current.residents) {
-        const [sx, sy] = tileToScreen(cam, view, u.x + 0.5, u.y + 0.5)
+        const [sx, sy] = tileToScreen(cam, view, mapSize, u.x + 0.5, u.y + 0.5)
         if (sx < -dot || sy < -dot || sx > view.width + dot || sy > view.height + dot) continue
         const color =
           u.id === home.leaderId ? LEADER_COLOR : u.owner === home.realmId ? OWN_COLOR : OTHER_COLOR
@@ -177,14 +175,12 @@ export function MapView({ world }: { world: ClientWorld }) {
     }
 
     function hoverAt(sx: number, sy: number) {
-      const [tx, ty] = screenToTile(cam, size(), sx, sy).map(Math.floor) as [number, number]
+      const [tx, ty] = screenToTile(cam, size(), mapSize, sx, sy).map(Math.floor) as [
+        number,
+        number,
+      ]
       const chunk = store.get(Math.floor(ty / CHUNK_SIZE) * across + Math.floor(tx / CHUNK_SIZE))
-      const inside = tx >= 0 && ty >= 0 && tx < diameter && ty < diameter
-      const byte = !inside
-        ? OFF_MAP
-        : chunk
-          ? chunk.tiles[(ty % CHUNK_SIZE) * CHUNK_SIZE + (tx % CHUNK_SIZE)]!
-          : undefined
+      const byte = chunk?.tiles[(ty % CHUNK_SIZE) * CHUNK_SIZE + (tx % CHUNK_SIZE)]
       const node = chunk?.nodes.find((n) => n.x === tx && n.y === ty)
       setHover({
         x: tx,
@@ -216,15 +212,15 @@ export function MapView({ world }: { world: ClientWorld }) {
       const prev = pointers.get(e.pointerId)
       if (!prev) return hoverAt(p.x, p.y)
       if (pointers.size === 1) {
-        setCam(panBy(cam, diameter, p.x - prev.x, p.y - prev.y))
+        setCam(panBy(cam, mapSize, p.x - prev.x, p.y - prev.y))
       } else if (pointers.size === 2) {
         const other = [...pointers].find(([id]) => id !== e.pointerId)![1]
         const before = Math.hypot(prev.x - other.x, prev.y - other.y)
         const after = Math.hypot(p.x - other.x, p.y - other.y)
         const mid = { x: (p.x + other.x) / 2, y: (p.y + other.y) / 2 }
         const prevMid = { x: (prev.x + other.x) / 2, y: (prev.y + other.y) / 2 }
-        const zoomed = zoomAt(cam, size(), diameter, after / Math.max(1, before), mid.x, mid.y)
-        setCam(panBy(zoomed, diameter, (mid.x - prevMid.x) / 2, (mid.y - prevMid.y) / 2))
+        const zoomed = zoomAt(cam, size(), mapSize, after / Math.max(1, before), mid.x, mid.y)
+        setCam(panBy(zoomed, mapSize, (mid.x - prevMid.x) / 2, (mid.y - prevMid.y) / 2))
       }
       pointers.set(e.pointerId, p)
     }
@@ -232,13 +228,13 @@ export function MapView({ world }: { world: ClientWorld }) {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       const p = local(e)
-      setCam(zoomAt(cam, size(), diameter, Math.exp(-e.deltaY * 0.0015), p.x, p.y))
+      setCam(zoomAt(cam, size(), mapSize, Math.exp(-e.deltaY * 0.0015), p.x, p.y))
     }
 
     controlsRef.current = {
       zoom: (factor) => {
         const view = size()
-        setCam(zoomAt(cam, view, diameter, factor, view.width / 2, view.height / 2))
+        setCam(zoomAt(cam, view, mapSize, factor, view.width / 2, view.height / 2))
       },
       centre: () => setCam({ ...cam, ...homeCentre(worldRef.current) }),
     }
@@ -260,7 +256,7 @@ export function MapView({ world }: { world: ClientWorld }) {
       app.renderer.on('resize', redraw)
       app.stage.addChild(terrainLayer, overlay)
       ready = true
-      setCam({ ...cam, scale: clampScale(cam.scale, diameter, size()) })
+      setCam({ ...cam, scale: clampScale(cam.scale, mapSize, size()) })
     })
 
     return () => {
@@ -274,7 +270,7 @@ export function MapView({ world }: { world: ClientWorld }) {
         app.destroy(true, { children: true })
       }
     }
-  }, [diameter, explored])
+  }, [mapSize, explored])
 
   return (
     <div className="map-view">
@@ -358,8 +354,9 @@ function homeCentre(world: ClientWorld): { x: number; y: number } {
 function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld) {
   const { cities, buildings, horses, carriages } = world.structures
   const tile = cam.scale
+  const size = world.map.size
   const box = (x: number, y: number, inset = 0) => {
-    const [sx, sy] = tileToScreen(cam, view, x, y)
+    const [sx, sy] = tileToScreen(cam, view, size, x, y)
     return [
       sx + inset * tile,
       sy + inset * tile,
@@ -368,7 +365,7 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
     ] as const
   }
   for (const c of cities) {
-    const [sx, sy] = tileToScreen(cam, view, c.x, c.y)
+    const [sx, sy] = tileToScreen(cam, view, size, c.x, c.y)
     if (sx > view.width || sy > view.height || sx + c.size * tile < 0 || sy + c.size * tile < 0) {
       continue
     }
@@ -392,7 +389,7 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
       .fill(BUILDING_COLORS[b.kind])
       .stroke({ width: 1, color: 0x4f3a22 })
   }
-  for (const h of horses) g.circle(...centre(cam, view, h), tile * 0.22).fill(HORSE_COLOR)
+  for (const h of horses) g.circle(...centre(cam, view, size, h), tile * 0.22).fill(HORSE_COLOR)
   for (const k of carriages) {
     g.rect(...box(k.x, k.y, 0.22))
       .fill(CARRIAGE_COLOR)
@@ -400,8 +397,8 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
   }
 }
 
-const centre = (cam: Camera, view: Size, e: { x: number; y: number }) =>
-  tileToScreen(cam, view, e.x + 0.5, e.y + 0.5)
+const centre = (cam: Camera, view: Size, size: number, e: { x: number; y: number }) =>
+  tileToScreen(cam, view, size, e.x + 0.5, e.y + 0.5)
 
 /** One pixel per tile; scaled up with nearest-neighbour sampling, so tiles stay crisp. */
 function chunkTexture(chunk: TerrainChunk): Texture {
@@ -415,7 +412,7 @@ function chunkTexture(chunk: TerrainChunk): Texture {
     image.data[i * 4] = c >> 16
     image.data[i * 4 + 1] = (c >> 8) & 0xff
     image.data[i * 4 + 2] = c & 0xff
-    image.data[i * 4 + 3] = t === OFF_MAP ? 0 : 255
+    image.data[i * 4 + 3] = 255
   })
   ctx.putImageData(image, 0, 0)
   const texture = Texture.from(canvas)

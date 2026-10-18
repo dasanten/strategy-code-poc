@@ -1,11 +1,10 @@
 import { sql } from 'drizzle-orm'
 import {
   CHUNK_SIZE,
-  OFF_MAP,
   UNEXPLORED,
   chunksAcross,
   encodeChunk,
-  isInsideDisc,
+  tileIndex,
   type ResourceNode,
   type TerrainMap,
 } from '@csp/shared'
@@ -31,7 +30,7 @@ export class ExploredTerrain {
     private terrain: TerrainMap,
     nodes: ResourceNode[] = [],
   ) {
-    const n = chunksAcross(terrain.diameter)
+    const n = chunksAcross(terrain.size)
     for (const node of nodes) {
       const c = Math.floor(node.y / CHUNK_SIZE) * n + Math.floor(node.x / CHUNK_SIZE)
       this.nodesByChunk.set(c, [...(this.nodesByChunk.get(c) ?? []), node])
@@ -63,20 +62,20 @@ export class ExploredTerrain {
     this.dirty.clear()
   }
 
-  /** Marks every disc tile within `radius` of (x, y) as explored by the Player. */
+  /** Marks every tile within `radius` of (x, y) as explored by the Player, across the joins. */
   explore(userId: number, x: number, y: number, radius: number): void {
-    const { diameter } = this.terrain
+    const { size } = this.terrain
     let bits = this.bits.get(userId)
     if (!bits) {
-      bits = new Uint8Array(Math.ceil((diameter * diameter) / 8))
+      bits = new Uint8Array(Math.ceil((size * size) / 8))
       this.bits.set(userId, bits)
     }
     for (let ty = y - radius; ty <= y + radius; ty++) {
       for (let tx = x - radius; tx <= x + radius; tx++) {
         const dx = tx - x
         const dy = ty - y
-        if (dx * dx + dy * dy > radius * radius || !isInsideDisc(diameter, tx, ty)) continue
-        const t = ty * diameter + tx
+        if (dx * dx + dy * dy > radius * radius) continue
+        const t = tileIndex(size, tx, ty)
         bits[t >> 3]! |= 1 << (t & 7)
       }
     }
@@ -84,11 +83,9 @@ export class ExploredTerrain {
   }
 
   isExplored(viewer: Viewer, x: number, y: number): boolean {
-    const { diameter } = this.terrain
-    if (!isInsideDisc(diameter, x, y)) return false
     if (viewer.isAdmin) return true
     const bits = this.bits.get(viewer.id)
-    const t = y * diameter + x
+    const t = tileIndex(this.terrain.size, x, y)
     return bits !== undefined && (bits[t >> 3]! & (1 << (t & 7))) !== 0
   }
 
@@ -98,11 +95,11 @@ export class ExploredTerrain {
    * (they stay known like the terrain). Undefined when they have explored nothing in it.
    */
   chunk(viewer: Viewer, cx: number, cy: number): Uint8Array | undefined {
-    const n = chunksAcross(this.terrain.diameter)
+    const n = chunksAcross(this.terrain.size)
     if (!Number.isInteger(cx) || !Number.isInteger(cy) || cx < 0 || cy < 0 || cx >= n || cy >= n) {
       return undefined
     }
-    const { diameter, tiles } = this.terrain
+    const { size, tiles } = this.terrain
     const out = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE)
     let any = false
     for (let dy = 0; dy < CHUNK_SIZE; dy++) {
@@ -110,10 +107,11 @@ export class ExploredTerrain {
         const x = cx * CHUNK_SIZE + dx
         const y = cy * CHUNK_SIZE + dy
         const i = dy * CHUNK_SIZE + dx
-        if (!isInsideDisc(diameter, x, y)) {
-          out[i] = OFF_MAP
+        // A map whose side isn't a whole number of chunks leaves its last chunks part empty.
+        if (x >= size || y >= size) {
+          out[i] = UNEXPLORED
         } else if (this.isExplored(viewer, x, y)) {
-          out[i] = tiles[y * diameter + x]!
+          out[i] = tiles[y * size + x]!
           any = true
         } else {
           out[i] = UNEXPLORED
@@ -129,11 +127,12 @@ export class ExploredTerrain {
 
   /** The chunks in which the Player has explored at least one tile (see `chunksAcross`). */
   exploredChunks(viewer: Viewer): number[] {
-    const { diameter } = this.terrain
-    const n = chunksAcross(diameter)
+    const { size } = this.terrain
+    const n = chunksAcross(size)
+    if (viewer.isAdmin) return [...Array(n * n).keys()]
     const found = new Set<number>()
-    for (let y = 0; y < diameter; y++) {
-      for (let x = 0; x < diameter; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
         const c = Math.floor(y / CHUNK_SIZE) * n + Math.floor(x / CHUNK_SIZE)
         if (!found.has(c) && this.isExplored(viewer, x, y)) found.add(c)
       }

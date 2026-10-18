@@ -8,12 +8,12 @@ let medium: TerrainMap | undefined
 
 /** A small generated map for tests, so they don't pay for a full-size one. */
 export function smallTerrain(): TerrainMap {
-  return (small ??= generateTerrain(1, 120))
+  return (small ??= generateTerrain(1, 128))
 }
 
 /** A map big enough for a few starting cities, still quick to generate. */
 export function cityTerrain(): TerrainMap {
-  return (medium ??= generateTerrain(1, 400))
+  return (medium ??= generateTerrain(1, 384))
 }
 
 /** A fresh world on `cityTerrain` where Player 1 has founded their starting city. */

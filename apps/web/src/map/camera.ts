@@ -1,6 +1,9 @@
-import { CHUNK_SIZE, chunksAcross } from '@csp/shared'
+import { CHUNK_SIZE, chunksAcross, wrap, wrapDelta } from '@csp/shared'
 
-/** Where the map view looks: the tile at the centre of the screen and the pixels per tile. */
+/**
+ * Where the map view looks: the tile at the centre of the screen and the pixels per tile. The
+ * map's opposite sides join, so the centre always lies on the map (`0 ≤ x, y < size`).
+ */
 export interface Camera {
   x: number
   y: number
@@ -19,78 +22,105 @@ export const FAR_SCALE = 3
 /** From this many pixels per tile up, the tile grid is drawn. */
 export const CLOSE_SCALE = 14
 
-/** The furthest zoom: the whole disc fits on screen with a little room. */
-export function minScale(diameter: number, view: Size): number {
-  return Math.min(view.width, view.height) / (diameter * 1.1)
+/**
+ * The furthest zoom: the map just fills the screen's longer side. Never further, so the screen
+ * holds at most one copy of each tile and every tile has one place on it.
+ */
+export function minScale(size: number, view: Size): number {
+  return Math.max(view.width, view.height) / size
 }
 
-export function clampScale(scale: number, diameter: number, view: Size): number {
-  return Math.min(MAX_SCALE, Math.max(minScale(diameter, view), scale))
+export function clampScale(scale: number, size: number, view: Size): number {
+  return Math.min(MAX_SCALE, Math.max(minScale(size, view), scale))
 }
 
-/** The tile position (fractional) under a point on screen. */
-export function screenToTile(cam: Camera, view: Size, sx: number, sy: number): [number, number] {
-  return [cam.x + (sx - view.width / 2) / cam.scale, cam.y + (sy - view.height / 2) / cam.scale]
+/** The tile position (fractional, on the map) under a point on screen. */
+export function screenToTile(
+  cam: Camera,
+  view: Size,
+  size: number,
+  sx: number,
+  sy: number,
+): [number, number] {
+  return [
+    wrap(cam.x + (sx - view.width / 2) / cam.scale, size),
+    wrap(cam.y + (sy - view.height / 2) / cam.scale, size),
+  ]
 }
 
-/** Where a tile position appears on screen. */
-export function tileToScreen(cam: Camera, view: Size, tx: number, ty: number): [number, number] {
-  return [(tx - cam.x) * cam.scale + view.width / 2, (ty - cam.y) * cam.scale + view.height / 2]
+/** Where a tile position appears on screen: its copy nearest the centre of the view. */
+export function tileToScreen(
+  cam: Camera,
+  view: Size,
+  size: number,
+  tx: number,
+  ty: number,
+): [number, number] {
+  return [
+    wrapDelta(cam.x, tx, size) * cam.scale + view.width / 2,
+    wrapDelta(cam.y, ty, size) * cam.scale + view.height / 2,
+  ]
 }
 
 /** Zooms by `factor` keeping the tile under the screen point (sx, sy) where it is. */
 export function zoomAt(
   cam: Camera,
   view: Size,
-  diameter: number,
+  size: number,
   factor: number,
   sx: number,
   sy: number,
 ): Camera {
-  const scale = clampScale(cam.scale * factor, diameter, view)
-  const [tx, ty] = screenToTile(cam, view, sx, sy)
-  return keepOnMap(
-    {
-      x: tx - (sx - view.width / 2) / scale,
-      y: ty - (sy - view.height / 2) / scale,
-      scale,
-    },
-    diameter,
-  )
-}
-
-/** Moves the view by a screen distance, as dragging the map does. */
-export function panBy(cam: Camera, diameter: number, dx: number, dy: number): Camera {
-  return keepOnMap({ ...cam, x: cam.x - dx / cam.scale, y: cam.y - dy / cam.scale }, diameter)
-}
-
-/** Keeps the centre of the view over the disc's square, so the map can't be lost off-screen. */
-export function keepOnMap(cam: Camera, diameter: number): Camera {
-  const clamp = (v: number) => Math.min(diameter, Math.max(0, v))
-  return { ...cam, x: clamp(cam.x), y: clamp(cam.y) }
-}
-
-/** The tile rectangle on screen, whole tiles, clipped to the map's square. */
-export function visibleTiles(cam: Camera, view: Size, diameter: number) {
-  const [x0, y0] = screenToTile(cam, view, 0, 0)
-  const [x1, y1] = screenToTile(cam, view, view.width, view.height)
+  const scale = clampScale(cam.scale * factor, size, view)
+  const ox = (sx - view.width / 2) / cam.scale
+  const oy = (sy - view.height / 2) / cam.scale
   return {
-    x0: Math.max(0, Math.floor(x0)),
-    y0: Math.max(0, Math.floor(y0)),
-    x1: Math.min(diameter - 1, Math.floor(x1)),
-    y1: Math.min(diameter - 1, Math.floor(y1)),
+    x: wrap(cam.x + ox - (ox * cam.scale) / scale, size),
+    y: wrap(cam.y + oy - (oy * cam.scale) / scale, size),
+    scale,
+  }
+}
+
+/** Moves the view by a screen distance, as dragging the map does; it never stops at a side. */
+export function panBy(cam: Camera, size: number, dx: number, dy: number): Camera {
+  return { ...cam, x: wrap(cam.x - dx / cam.scale, size), y: wrap(cam.y - dy / cam.scale, size) }
+}
+
+/**
+ * The tiles on screen as a rectangle in unwrapped coordinates: they may run below 0 or past
+ * `size`, and `wrap` brings each back onto the map.
+ */
+export function visibleTiles(cam: Camera, view: Size) {
+  return {
+    x0: Math.floor(cam.x - view.width / 2 / cam.scale),
+    y0: Math.floor(cam.y - view.height / 2 / cam.scale),
+    x1: Math.floor(cam.x + view.width / 2 / cam.scale),
+    y1: Math.floor(cam.y + view.height / 2 / cam.scale),
   }
 }
 
 /** The chunks on screen, as chunk indices (`i = cy * n + cx`, see `chunksAcross`). */
-export function visibleChunks(cam: Camera, view: Size, diameter: number): number[] {
-  const n = chunksAcross(diameter)
-  const { x0, y0, x1, y1 } = visibleTiles(cam, view, diameter)
-  const out: number[] = []
+export function visibleChunks(cam: Camera, view: Size, size: number): number[] {
+  const n = chunksAcross(size)
+  const { x0, y0, x1, y1 } = visibleTiles(cam, view)
+  const out = new Set<number>()
   for (let cy = Math.floor(y0 / CHUNK_SIZE); cy <= Math.floor(y1 / CHUNK_SIZE); cy++) {
     for (let cx = Math.floor(x0 / CHUNK_SIZE); cx <= Math.floor(x1 / CHUNK_SIZE); cx++) {
-      out.push(cy * n + cx)
+      out.add(wrap(cy, n) * n + wrap(cx, n))
     }
   }
-  return out
+  return [...out]
+}
+
+/** Where a chunk's top-left tile appears on screen: the copy nearest the centre of the view. */
+export function chunkToScreen(
+  cam: Camera,
+  view: Size,
+  size: number,
+  cx: number,
+  cy: number,
+): [number, number] {
+  const half = CHUNK_SIZE / 2
+  const [mx, my] = tileToScreen(cam, view, size, cx * CHUNK_SIZE + half, cy * CHUNK_SIZE + half)
+  return [mx - half * cam.scale, my - half * cam.scale]
 }
