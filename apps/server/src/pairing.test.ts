@@ -280,8 +280,13 @@ describe('births', () => {
   })
 
   it('happens in the running world: a fed pair at home has a child after a game year', () => {
-    const { world, terrain, queue, residents } = setup(3000)
+    const { world, terrain, city, queue, residents } = setup(3000)
     const [a, b] = residents as [Resident, Resident]
+    // Starting residents work the farm outside the wall; the pair stays at home to eat.
+    for (const r of [a, b]) {
+      r.x = city.x + 1
+      r.y = city.y + city.size - 2
+    }
     pairUp(world, queue, a, b)
     const before = world.residents.length
     for (let t = 0; t < TICKS_PER_GAME_YEAR + 1; t++) stepWorld(world, terrain)

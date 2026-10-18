@@ -29,6 +29,7 @@ describe('invariants', () => {
     const tile = terrain.tiles.indexOf(kind)
     expect(tile).toBeGreaterThanOrEqual(0)
     const resident = world.residents[0]!
+    resident.order = null
     resident.x = tile % terrain.size
     resident.y = Math.floor(tile / terrain.size)
     expect(checkInvariants(world, terrain)).toEqual([
@@ -53,6 +54,7 @@ describe('invariants', () => {
   it('catch a position stored past a side of the map', () => {
     const world = worldWithCity().world
     const resident = world.residents[0]!
+    resident.order = null
     resident.x -= terrain.size // the same tile, under another name
     expect(checkInvariants(world, terrain)).toEqual([
       expect.objectContaining({ invariant: 'positions-on-map', entityIds: [resident.id] }),

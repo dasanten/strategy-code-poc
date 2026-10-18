@@ -49,6 +49,8 @@ The shared language of the game. Domain terms only — no implementation details
   Strength and skill and is limited by the workplace's maximum number of workers. Kinds:
   - **Mine / Quarry / Lumber camp:** built on a resource node.
   - **Farm:** built on plains, produces Food. Not tied to a node, but each farm has a cap.
+    Its output goes into its workers' hands, as far as they can carry it; the rest is left in a
+    pile on the farm's tile. Getting it to a storage takes carrying it there.
   - **Smelter:** turns ore into metal (Iron ore → Iron).
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
@@ -196,7 +198,7 @@ The shared language of the game. Domain terms only — no implementation details
 - **Base value:** what a resident is born with. The only part children inherit.
 - **Trained bonus:** what training adds on top of the base value. Capped relative to the base,
   so birth still matters. Never inherited.
-- **Skill:** something learned by doing or training (Mining, Construction, Combat, Driving, …). Starts at 0,
+- **Skill:** something learned by doing or training (Mining, Construction, Farming, Combat, Driving, …). Starts at 0,
   never inherited. Not a stat.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
@@ -213,8 +215,11 @@ The shared language of the game. Domain terms only — no implementation details
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and
   less with high Endurance. An empty hunger meter costs health; without food a resident dies
   after about 2 game days. While the meter isn't empty, lost health slowly comes back.
-- **Eating:** a resident eats from what they carry, or from their city's storage while at home.
-  Away from home they need food on them or a delivery.
+- **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
+  straight from a storage.
+- **Refilling at home:** a resident inside their own city's walls who is running low on food
+  takes a meal from the city's storage into their hands, without an order. Away from home (on
+  the farm, travelling) there is no refill: they need food on them or a delivery.
 
 ## Transport
 
@@ -229,7 +234,7 @@ The shared language of the game. Domain terms only — no implementation details
 - **Starting city:** what a Leader spawns with, far from other Players: about 8 residents with
   random stats (one of them the Leader), a wooden wall, houses for everyone with a little room
   to spare, a storage with a small food stock, one farm outside the wall, one horse and one
-  carriage.
+  carriage. The residents start on the farm, working it, each with a little food on them.
 
 ## Control
 

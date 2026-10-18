@@ -131,6 +131,12 @@ export const START_SPARE_HOUSES = 1
 export const START_FOOD = 200
 
 /**
+ * Food each resident of a starting city carries, in units: two game days' meals, so they have
+ * something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
+ */
+export const START_CARRIED_FOOD = 4
+
+/**
  * Starting cities lie at least this many tiles apart (about 2.5 hours' walk on plains), when the
  * map has room; otherwise as far apart as it allows.
  */
@@ -177,6 +183,15 @@ export function carryCapacity(resident: Resident, tick: number): number {
 
 /** Food a resident of average Endurance eats per game day, in units (`CONTEXT.md`: Hunger). */
 export const FOOD_PER_DAY = 2
+
+/**
+ * A resident at home is running low on food when they carry fewer units than this: less than a
+ * game day's meals (`CONTEXT.md`: Eating). They then take meals from their city's storage.
+ */
+export const HOME_FOOD_LOW = 2
+
+/** Units of food in one meal, what a resident at home takes from storage at a time. */
+export const MEAL_UNITS = 1
 
 /** Game days a full hunger meter lasts without eating, at average Endurance. */
 export const HUNGER_DAYS = 1
@@ -340,3 +355,51 @@ export function constructionLearned(resident: Resident, tick: number): number {
   const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
   return (CONSTRUCTION_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
 }
+
+/** Most residents who can work one farm at a time (`CONTEXT.md`: Workplace, Farm). */
+export const FARM_MAX_WORKERS = 10
+
+/**
+ * Food one farm worker of average Strength and no Farming skill makes per game day, in units.
+ * More than the `FOOD_PER_DAY` a resident eats, so a farm feeds its workers with some to spare.
+ */
+export const FARM_FOOD_PER_DAY = 3
+
+/** The Strength at which a farm worker makes `FARM_FOOD_PER_DAY`. */
+export const FARM_STRENGTH_AVERAGE = 10
+
+/** How much more food each point of Farming skill makes. */
+export const FARMING_SKILL_EFFECT = 0.05
+
+/** Farming skill a resident of average Intellect gains per game day of farm work. */
+export const FARMING_SKILL_PER_DAY = 1
+
+/**
+ * Food a farm worker makes per tick at the given tick (`CONTEXT.md`: Workplace): in proportion to
+ * Strength, plus `FARMING_SKILL_EFFECT` for each point of Farming.
+ */
+export function farmOutput(resident: Resident, tick: number): number {
+  const strength = statValue(resident, 'strength', tick) / FARM_STRENGTH_AVERAGE
+  const skill = 1 + (resident.skills.farming ?? 0) * FARMING_SKILL_EFFECT
+  return (FARM_FOOD_PER_DAY / TICKS_PER_GAME_DAY) * strength * skill
+}
+
+/**
+ * Farming skill a resident learns from one tick of farm work (`CONTEXT.md`: Skill, learned by
+ * doing), faster with more Intellect.
+ */
+export function farmingLearned(resident: Resident, tick: number): number {
+  const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
+  return (FARMING_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
+}
+/**
+ * Tearing down takes less work than building (`CONTEXT.md`: Tearing down): this share of the
+ * building's `BUILD_WORK`, or of the work put into an unfinished site so far.
+ */
+export const TEARDOWN_WORK_SHARE = 0.5
+
+/**
+ * Share of a finished building's materials left on the tile when it is torn down, rounded down
+ * to whole units. An unfinished site leaves all its delivered materials.
+ */
+export const TEARDOWN_MATERIALS_RETURNED = 0.5

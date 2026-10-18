@@ -2,8 +2,13 @@ import {
   BUILDABLE,
   BUILD_MATERIALS,
   BUILD_WORK,
+  MAX_WORKERS,
+  HOME_FOOD_LOW,
+  MEAL_UNITS,
+  unitsThatFit,
   NODE_WORKPLACE,
   materialsNeeded,
+  teardownWork,
   workNeeded,
   type Good,
   LIFESPAN_MAX,
@@ -26,6 +31,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { homeStorage } from './survival.js'
 import { isWalkable } from './world.js'
 
 /**
@@ -380,6 +386,52 @@ export const buildOrdersOnSites: Invariant = {
 }
 
 /**
+ * Tearing down (`CONTEXT.md`: Tearing down): only what can be built is ever being torn down, and
+ * its tear-down work stays between 0 and what it needs (`teardownWork`); one that has all its
+ * work in is gone.
+ */
+export const teardownsWithinNeeds: Invariant = {
+  name: 'teardowns-within-needs',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (id: string, message: string) =>
+      out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
+    for (const b of world.buildings) {
+      if (b.teardown === undefined) continue
+      if (!BUILDABLE.includes(b.kind)) fail(b.id, `is a ${b.kind} being torn down`)
+      const work = teardownWork(b)
+      if (!(b.teardown >= 0 && b.teardown < work)) {
+        fail(b.id, `has tear-down work ${b.teardown} of ${work}`)
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * After a tick, a resident with a tear-down order stands on that building or site, and it is
+ * still there (`resolveTearingDown` ends the orders on one that is gone).
+ */
+export const tearDownOrdersOnBuildings: Invariant = {
+  name: 'tear-down-orders-on-buildings',
+  check(world) {
+    return world.residents.flatMap((r) => {
+      const o = r.order
+      if (o?.kind !== 'tearDown') return []
+      const b = world.buildings.find((x) => x.id === o.buildingId)
+      if (b && b.x === r.x && b.y === r.y) return []
+      return [
+        {
+          invariant: this.name,
+          message: `resident ${r.id} tears down ${o.buildingId}, which is not on their tile`,
+          entityIds: [r.id, o.buildingId],
+        },
+      ]
+    })
+  },
+}
+
+/**
  * Realm logs stay in order and in bounds: events are numbered in the order they happened, below
  * the next id and not after the current tick, and no Player keeps more than `REALM_LOG_LENGTH`.
  */
@@ -401,6 +453,70 @@ export const realmLogsInOrder: Invariant = {
       if (n > REALM_LOG_LENGTH) fail(`Player ${userId} keeps ${n} events, over ${REALM_LOG_LENGTH}`)
     }
     return out
+  },
+}
+
+/**
+ * After a tick, a resident with a work-at order stands on the finished workplace it names, their
+ * share of the next unit is between 0 and 1, and no workplace has more workers than it takes
+ * (`resolveWork` ends the orders that no longer fit).
+ */
+export const workOrdersOnWorkplaces: Invariant = {
+  name: 'work-orders-on-workplaces',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const workers = new Map<string, number>()
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'workAt') continue
+      const fail = (message: string) =>
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} works ${o.buildingId}, ${message}`,
+          entityIds: [r.id, o.buildingId],
+        })
+      const place = world.buildings.find((b) => b.id === o.buildingId)
+      if (!place || place.site || MAX_WORKERS[place.kind] === undefined)
+        fail('which is no finished workplace')
+      else if (place.x !== r.x || place.y !== r.y || o.at.x !== r.x || o.at.y !== r.y)
+        fail('which is not on their tile')
+      if (!(o.progress >= 0 && o.progress < 1)) fail(`with progress ${o.progress}`)
+      workers.set(o.buildingId, (workers.get(o.buildingId) ?? 0) + 1)
+    }
+    for (const [id, n] of workers) {
+      const place = world.buildings.find((b) => b.id === id)
+      const max = place ? MAX_WORKERS[place.kind] : undefined
+      if (max !== undefined && n > max) {
+        out.push({
+          invariant: this.name,
+          message: `${id} has ${n} workers, over ${max}`,
+          entityIds: [id],
+        })
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * After a tick, nobody at home runs low on food while their city's storage still has some and a
+ * meal would fit (`stepHomeRefill`, `CONTEXT.md`: Eating).
+ */
+export const refilledAtHome: Invariant = {
+  name: 'refilled-at-home',
+  check(world) {
+    return world.residents
+      .filter(
+        (r) =>
+          (r.carried.food ?? 0) < HOME_FOOD_LOW &&
+          homeStorage(world, r) !== undefined &&
+          unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
+      )
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} is at home with ${r.carried.food ?? 0} food, storage has more`,
+        entityIds: [r.id],
+      }))
   },
 }
 
@@ -468,6 +584,10 @@ export const worldInvariants: Invariant[] = [
   carryOrdersDone,
   sitesWithinNeeds,
   buildOrdersOnSites,
+  workOrdersOnWorkplaces,
+  refilledAtHome,
+  teardownsWithinNeeds,
+  tearDownOrdersOnBuildings,
   nodesOnFittingTerrain,
   realmLogsInOrder,
   residentsInCities,

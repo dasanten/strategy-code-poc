@@ -22,7 +22,7 @@ describe('realm events', () => {
     const { world } = worldWithCity()
     const realm = world.realms[0]!
     const people = world.residents.map((r) => r.id)
-    storageOf(world).stock = {}
+    for (const r of world.residents) r.carried = {}
     const deaths: { id: string; tick: number }[] = []
     for (let t = 0; t < 3 * TICKS_PER_GAME_DAY; t++) {
       for (const r of stepSurvival(world, terrain).died) deaths.push({ id: r.id, tick: world.tick })
