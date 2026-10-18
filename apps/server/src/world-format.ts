@@ -1,11 +1,12 @@
 import type { TerrainMap, WorldState } from '@csp/shared'
+import { drawLifespan, mulberry32 } from './residents.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 8
+export const WORLD_FORMAT_VERSION = 9
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -37,6 +38,21 @@ export const migrations: Record<number, MigrationStep> = {
     const s = state as { residents: object[] }
     return { ...s, residents: s.residents.map((r) => ({ ...r, order: null })) }
   },
+  // Residents got a lifespan, drawn from their id so the same save always migrates the same way.
+  8: (state) => {
+    const s = state as { residents: { id: string }[] }
+    return {
+      ...s,
+      residents: s.residents.map((r) => ({ ...r, lifespan: drawLifespan(mulberry32(hash(r.id))) })),
+    }
+  },
+}
+
+/** A string's FNV-1a hash, as a seed. */
+function hash(text: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193)
+  return h >>> 0
 }
 
 export class WorldFormatError extends Error {}

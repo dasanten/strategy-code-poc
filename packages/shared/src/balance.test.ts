@@ -9,7 +9,7 @@ import {
 import type { Resident } from './world.js'
 
 const withStrength = (base: number, trained: number) =>
-  ({ stats: { strength: { base, trained } } }) as unknown as Resident
+  ({ stats: { strength: { base, trained } }, bornAt: 0 }) as unknown as Resident
 
 describe('goods and carrying', () => {
   it('weighs goods by their unit weights', () => {
@@ -21,8 +21,10 @@ describe('goods and carrying', () => {
   })
 
   it('sets carry capacity from effective Strength', () => {
-    expect(carryCapacity(withStrength(10, 0))).toBe(CARRY_BASE + 10 * CARRY_PER_STRENGTH)
-    expect(carryCapacity(withStrength(10, 3))).toBe(CARRY_BASE + 13 * CARRY_PER_STRENGTH)
-    expect(carryCapacity(withStrength(15, 0))).toBeGreaterThan(carryCapacity(withStrength(5, 0)))
+    expect(carryCapacity(withStrength(10, 0), 0)).toBe(CARRY_BASE + 10 * CARRY_PER_STRENGTH)
+    expect(carryCapacity(withStrength(10, 3), 0)).toBe(CARRY_BASE + 13 * CARRY_PER_STRENGTH)
+    expect(carryCapacity(withStrength(15, 0), 0)).toBeGreaterThan(
+      carryCapacity(withStrength(5, 0), 0),
+    )
   })
 })

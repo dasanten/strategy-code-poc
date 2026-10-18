@@ -103,8 +103,8 @@ describe('walking', () => {
     // Agility softens the terrain's slowdown too.
     const r = oneWalker(forest, 0, 0, 20).r
     const s = oneWalker(forest, 0, 0, 10).r
-    expect(walkSpeed(r, Terrain.Forest) / walkSpeed(r, Terrain.Plains)).toBeGreaterThan(
-      walkSpeed(s, Terrain.Forest) / walkSpeed(s, Terrain.Plains),
+    expect(walkSpeed(r, Terrain.Forest, 0) / walkSpeed(r, Terrain.Plains, 0)).toBeGreaterThan(
+      walkSpeed(s, Terrain.Forest, 0) / walkSpeed(s, Terrain.Plains, 0),
     )
   })
 
