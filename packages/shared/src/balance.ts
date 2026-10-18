@@ -1,0 +1,26 @@
+/**
+ * Balance numbers: how much, how fast, how often. The rules (what happens) are in `CONTEXT.md`;
+ * these are the values Daniel tunes. One commented constant each.
+ */
+
+/** Tiles across the map disc: a ~12 h walk at ~30 s per plains tile (`CONTEXT.md`: Tile). */
+export const MAP_DIAMETER = 1440
+
+/**
+ * Share of the disc's tiles each terrain covers in a freshly generated map. Plains take the rest.
+ * The generator hits these closely; the map test checks them.
+ */
+export const TERRAIN_SHARES = {
+  /** Along parts of the edge. */
+  sea: 0.08,
+  /** Inland water, a few scattered lakes. */
+  lake: 0.025,
+  /** In ranges. */
+  mountain: 0.07,
+  /** Mostly around the ranges. */
+  hills: 0.13,
+  forest: 0.25,
+} as const
+
+/** Share of the disc's edge that is coast (Sea); the rest of the edge is land. */
+export const SEA_EDGE_SHARE = 0.4

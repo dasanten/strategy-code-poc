@@ -1,3 +1,5 @@
 export * from './world.js'
 export * from './api.js'
 export * from './protocol.js'
+export * from './terrain.js'
+export * from './balance.js'
