@@ -1,7 +1,7 @@
 import {
-  FARM_FOOD_PER_DAY,
-  FARM_MAX_WORKERS,
-  FARMING_SKILL_EFFECT,
+  WORK_OUTPUT_PER_DAY,
+  WORKPLACE_MAX_WORKERS,
+  WORK_SKILL_EFFECT,
   MAX_HEALTH,
   START_CARRIED_FOOD,
   START_RESIDENTS,
@@ -9,7 +9,10 @@ import {
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   carryCapacity,
-  farmOutput,
+  workOutput,
+  type BuildingKind,
+  type Resident,
+  type ResourceKind,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -20,7 +23,14 @@ import { mulberry32, newResident } from './residents.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
 
+/** Plains, with Forest at (3, 1) and Hills at (5, 1) and (7, 1) for the workplaces on nodes. */
 const terrain: TerrainMap = { size: 16, tiles: new Uint8Array(16 * 16).fill(Terrain.Plains) }
+terrain.tiles[1 * 16 + 3] = Terrain.Forest
+terrain.tiles[1 * 16 + 5] = Terrain.Hills
+terrain.tiles[1 * 16 + 7] = Terrain.Hills
+const FARM_MAX_WORKERS = WORKPLACE_MAX_WORKERS.farm!
+const FARM_FOOD_PER_DAY = WORK_OUTPUT_PER_DAY.food!
+const farmOutput = (r: Resident, tick: number) => workOutput(r, 'food', 'farming', tick)
 const me = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 const stranger = { userId: 8, account: { name: 'Tobin', isAdmin: false } }
 
@@ -163,7 +173,7 @@ describe('farm work', () => {
     expect(farmOutput(r, 0)).toBeCloseTo(base * 2)
     r.stats.strength = { base: 10, trained: 0 }
     r.skills.farming = 10
-    expect(farmOutput(r, 0)).toBeCloseTo(base * (1 + 10 * FARMING_SKILL_EFFECT))
+    expect(farmOutput(r, 0)).toBeCloseTo(base * (1 + 10 * WORK_SKILL_EFFECT))
   })
 
   it('hands each unit to the worker carrying the least food', () => {
@@ -201,6 +211,97 @@ describe('farm work', () => {
     }
     expect(workOrdersOnWorkplaces.check(world, terrain)).toEqual([
       expect.objectContaining({ entityIds: ['farm'] }),
+    ])
+  })
+})
+
+/**
+ * Adds a finished workplace of `kind` on a node of `node` at (x, 1) and puts w1 on it, with an
+ * order to work it.
+ */
+function onNode(kind: BuildingKind, node: ResourceKind, x: number) {
+  const s = setup()
+  s.world.nodes.push({ id: `n${x}`, kind: node, x, y: 1 })
+  s.world.buildings.push({ id: kind, kind, cityId: null, x, y: 1 })
+  s.r.x = x
+  s.r.y = 1
+  expect(order(s.world, s.queue)).toEqual({ type: 'ack', requestId: 'q' })
+  return s
+}
+
+describe('workplaces on nodes', () => {
+  it.each([
+    ['lumberCamp', 'forest', 3, 'wood', 'woodcutting'],
+    ['quarry', 'stone', 5, 'stone', 'mining'],
+    ['mine', 'ironOre', 7, 'ironOre', 'mining'],
+    ['mine', 'goldOre', 7, 'goldOre', 'mining'],
+  ] as const)(
+    'a %s on %s makes %s into the worker’s hands and teaches %s',
+    (kind, node, x, good, skill) => {
+      const { world, r } = onNode(kind, node, x)
+      run(world, TICKS_PER_GAME_DAY - 2)
+      const o = r.order!
+      expect(o).toMatchObject({ kind: 'workAt', buildingId: kind })
+      const made = (o.kind === 'workAt' ? o.progress : 0) + (r.carried[good] ?? 0)
+      expect(made).toBeCloseTo(WORK_OUTPUT_PER_DAY[good]!, 0)
+      expect(r.skills[skill]).toBeCloseTo(1, 1)
+      expect(r.skills.farming ?? 0).toBe(0)
+      expect(checkInvariants(world, terrain)).toEqual([])
+    },
+  )
+
+  it('makes more with Strength and the workplace’s skill', () => {
+    const { r } = setup()
+    const base = workOutput(r, 'ironOre', 'mining', 0)
+    expect(base * TICKS_PER_GAME_DAY).toBeCloseTo(WORK_OUTPUT_PER_DAY.ironOre!)
+    r.skills.farming = 10
+    expect(workOutput(r, 'ironOre', 'mining', 0)).toBeCloseTo(base)
+    r.skills.mining = 10
+    expect(workOutput(r, 'ironOre', 'mining', 0)).toBeCloseTo(base * (1 + 10 * WORK_SKILL_EFFECT))
+  })
+
+  it.each(['lumberCamp', 'quarry', 'mine'] as const)(
+    'takes at most its cap of workers on a %s',
+    (kind) => {
+      const max = WORKPLACE_MAX_WORKERS[kind]!
+      const node = ({ lumberCamp: 'forest', quarry: 'stone', mine: 'ironOre' } as const)[kind]
+      const { world, queue } = onNode(kind, node, 3)
+      for (let i = 2; i <= max; i++) resident(world, `w${i}`, 3, 1)
+      for (const r of world.residents.slice(1))
+        queue.receive(world, me, 'q', { kind: 'workAt', residentId: r.id })
+      queue.applyAll(world)
+      run(world)
+      const extra = resident(world, 'extra', 3, 1)
+      expect(queue.receive(world, me, 'q', { kind: 'workAt', residentId: extra.id })).toMatchObject(
+        {
+          type: 'rejected',
+          reason: `it already has ${max} workers`,
+        },
+      )
+    },
+  )
+
+  it('leaves what the workers can’t carry in a pile on the workplace’s tile', () => {
+    const { world, r } = onNode('lumberCamp', 'forest', 3)
+    r.carried = { food: carryCapacity(r, 0) }
+    run(world, TICKS_PER_GAME_DAY / 2)
+    expect(r.carried.wood ?? 0).toBe(0)
+    expect(world.piles).toEqual([expect.objectContaining({ x: 3, y: 1, goods: { wood: 2 } })])
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('stops when the workplace is torn down', () => {
+    const { world, r } = onNode('quarry', 'stone', 5)
+    world.buildings = world.buildings.filter((b) => b.kind !== 'quarry')
+    run(world)
+    expect(r.order).toBeNull()
+  })
+
+  it('catches a work order for a workplace without a node to work', () => {
+    const { world } = onNode('mine', 'ironOre', 7)
+    world.nodes = []
+    expect(workOrdersOnWorkplaces.check(world, terrain)).toEqual([
+      expect.objectContaining({ entityIds: ['w1', 'mine'] }),
     ])
   })
 })

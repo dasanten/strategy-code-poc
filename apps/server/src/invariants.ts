@@ -10,6 +10,7 @@ import {
   materialsNeeded,
   teardownWork,
   workNeeded,
+  workplaceGood,
   type Good,
   LIFESPAN_MAX,
   LIFESPAN_MIN,
@@ -476,7 +477,12 @@ export const workOrdersOnWorkplaces: Invariant = {
           entityIds: [r.id, o.buildingId],
         })
       const place = world.buildings.find((b) => b.id === o.buildingId)
-      if (!place || place.site || MAX_WORKERS[place.kind] === undefined)
+      if (
+        !place ||
+        place.site ||
+        MAX_WORKERS[place.kind] === undefined ||
+        !workplaceGood(world, place)
+      )
         fail('which is no finished workplace')
       else if (place.x !== r.x || place.y !== r.y || o.at.x !== r.x || o.at.y !== r.y)
         fail('which is not on their tile')
