@@ -39,6 +39,8 @@ The shared language of the game. Domain terms only — no implementation details
   weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coins.
 - **Resource node:** a spot on the map that never runs out (forest, stone, iron ore, gold ore).
   Produces nothing on its own; it needs a workplace built on it and residents working there.
+  Nodes lie on terrain that fits them: forest nodes in Forest, stone in Hills, ore in Hills and
+  (more of it) Mountain.
 - **Workplace:** a building where residents produce goods. Output depends on the workers'
   Strength and skill and is limited by the workplace's maximum number of workers. Kinds:
   - **Mine / Quarry / Lumber camp:** built on a resource node.
@@ -49,6 +51,23 @@ The shared language of the game. Domain terms only — no implementation details
 - **Spoilage:** Food slowly goes bad. Other goods don't.
 - **Coins:** money, and just another good. Made from Gold ore at a **Mint**, which anyone can
   build. No special currency rules.
+
+## Building
+
+- **Construction site:** a building that has been ordered but isn't finished yet. It becomes the
+  building once its **materials** (the goods that kind of building needs) have been carried to
+  the site and residents working there have put in enough **work**. More or stronger workers
+  finish it sooner. Any adult resident can build; how fast depends on Strength and the
+  Construction skill, which also covers tearing down. Materials delivered to a site are goods like any others and can be taken.
+  A resident has to be on the tile to lay out a site. Like a workplace, a site has no owner:
+  whoever works on it holds it, and an unattended site can be finished by anyone.
+- **Tearing down:** anyone with residents on the tile can tear down a building or construction
+  site. It takes work, less than building; part of a building's materials (all of an unfinished
+  site's) are left on the tile as goods, and the tile is free again.
+- **Where buildings go:** one building per tile, on passable terrain only. Mines, quarries and
+  lumber camps go on a resource node of their kind; farms and stables on Plains; everything else
+  on any passable terrain except Mountain. Anyone can build anywhere else, including in another
+  Organization's territory.
 
 ## Trade Organization
 
@@ -123,7 +142,7 @@ The shared language of the game. Domain terms only — no implementation details
 
 ## Crime and reputation
 
-- **Crime:** theft, attack or killing against another organization.
+- **Crime:** theft, attack, killing or tearing down buildings against another organization.
 - **Witness:** a resident who sees a crime (within sight range), or a victim who survives it. A
   crime only becomes known when a witness physically brings the news home. No witness, no
   consequences.
@@ -163,7 +182,7 @@ The shared language of the game. Domain terms only — no implementation details
 - **Base value:** what a resident is born with. The only part children inherit.
 - **Trained bonus:** what training adds on top of the base value. Capped relative to the base,
   so birth still matters. Never inherited.
-- **Skill:** something learned by doing or training (Mining, Combat, Driving, …). Starts at 0,
+- **Skill:** something learned by doing or training (Mining, Construction, Combat, Driving, …). Starts at 0,
   never inherited. Not a stat.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
