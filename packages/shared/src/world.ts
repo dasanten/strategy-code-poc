@@ -26,8 +26,8 @@ export type SkillName = 'mining' | 'construction' | 'combat' | 'driving'
 export interface Resident {
   id: string
   name: string
-  /** Who controls this resident. A placeholder side until Realms exist (T2.2). */
-  owner: string
+  /** The realm the resident belongs to; null when it belongs to nobody (after Leader death). */
+  owner: string | null
   x: number
   y: number
   stats: Record<StatName, Stat>
@@ -105,7 +105,8 @@ export interface Realm {
 export interface City {
   id: string
   name: string
-  realmId: string
+  /** The realm it belongs to; null when it belongs to nobody (after Leader death). */
+  realmId: string | null
   /** Top-left tile of the square, wall included. */
   x: number
   y: number
@@ -131,7 +132,8 @@ export interface Building {
 /** An animal that pulls a carriage (`CONTEXT.md`: Horse). */
 export interface Horse {
   id: string
-  realmId: string
+  /** The realm it belongs to; null when it belongs to nobody (after Leader death). */
+  realmId: string | null
   x: number
   y: number
   /** The hunger meter, as for residents. */
@@ -141,7 +143,8 @@ export interface Horse {
 /** A horse-drawn cart (`CONTEXT.md`: Carriage). */
 export interface Carriage {
   id: string
-  realmId: string
+  /** The realm it belongs to; null when it belongs to nobody (after Leader death). */
+  realmId: string | null
   x: number
   y: number
   /** Goods on board. */

@@ -29,6 +29,7 @@ export function entitiesInSight(
   terrain: TerrainMap,
   realmId: string | undefined,
 ): SeenEntity[] {
+  if (realmId === undefined) return []
   const observers = world.residents.filter((r) => r.owner === realmId)
   if (observers.length === 0) return []
   const size = terrain.size
@@ -60,7 +61,7 @@ export class SightTracker {
     const alive = new Set<string>()
     for (const r of world.residents) {
       alive.add(r.id)
-      const userId = userOf.get(r.owner)
+      const userId = r.owner === null ? undefined : userOf.get(r.owner)
       const here = `${r.x},${r.y}`
       if (userId === undefined || this.lastSeenFrom.get(r.id) === here) continue
       this.lastSeenFrom.set(r.id, here)

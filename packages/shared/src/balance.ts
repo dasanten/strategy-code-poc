@@ -131,3 +131,34 @@ export function stockWeight(stock: Stock): number {
 export function carryCapacity(resident: Resident): number {
   return CARRY_BASE + CARRY_PER_STRENGTH * effective(resident.stats.strength)
 }
+
+/** Food a resident of average Endurance eats per game day, in units (`CONTEXT.md`: Hunger). */
+export const FOOD_PER_DAY = 2
+
+/** Game days a full hunger meter lasts without eating, at average Endurance. */
+export const HUNGER_DAYS = 1
+
+/** Game days an empty hunger meter takes to cost a resident all their health. */
+export const STARVE_DAYS = 1
+
+/** Game days a fed resident takes to heal from no health back to full. */
+export const HEAL_DAYS = 3
+
+/** The Endurance at which a resident needs exactly `FOOD_PER_DAY`. */
+export const HUNGER_ENDURANCE_AVERAGE = 10
+
+/** How much less food each point of Endurance above average needs (more below it). */
+export const HUNGER_ENDURANCE_EFFECT = 0.02
+
+/** The furthest Endurance moves the food a resident needs, either way. */
+export const HUNGER_ENDURANCE_LIMIT = 0.3
+
+/** How much of the usual food a resident needs, from their effective Endurance. */
+export function hungerFactor(resident: Resident): number {
+  const away = effective(resident.stats.endurance) - HUNGER_ENDURANCE_AVERAGE
+  const change = Math.max(
+    -HUNGER_ENDURANCE_LIMIT,
+    Math.min(HUNGER_ENDURANCE_LIMIT, away * HUNGER_ENDURANCE_EFFECT),
+  )
+  return 1 - change
+}
