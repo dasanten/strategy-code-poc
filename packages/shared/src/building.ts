@@ -1,9 +1,9 @@
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
-  FARM_MAX_WORKERS,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
+  WORKPLACE_MAX_WORKERS,
 } from './balance.js'
 import {
   NODE_WORKPLACE,
@@ -12,6 +12,7 @@ import {
   type BuildingKind,
   type Good,
   type Resident,
+  type ResourceKind,
   type Stock,
   type WorldState,
 } from './world.js'
@@ -65,7 +66,26 @@ export function buildProblem(
 }
 
 /** Most workers each kind of workplace takes, for the kinds residents can work so far. */
-export const MAX_WORKERS: Partial<Record<BuildingKind, number>> = { farm: FARM_MAX_WORKERS }
+export const MAX_WORKERS: Partial<Record<BuildingKind, number>> = WORKPLACE_MAX_WORKERS
+
+/** The good each kind of node yields once worked (`CONTEXT.md`: Resource node). */
+export const NODE_GOOD: Record<ResourceKind, Good> = {
+  forest: 'wood',
+  stone: 'stone',
+  ironOre: 'ironOre',
+  goldOre: 'goldOre',
+}
+
+/**
+ * The good a workplace makes (`CONTEXT.md`: Workplace): Food on a farm; on a resource node, what
+ * the node yields, so a mine makes iron ore or gold ore by the node it stands on.
+ */
+export function workplaceGood(world: WorldState, workplace: Building): Good | undefined {
+  if (workplace.kind === 'farm') return 'food'
+  if (MAX_WORKERS[workplace.kind] === undefined) return undefined
+  const node = world.nodes.find((n) => n.x === workplace.x && n.y === workplace.y)
+  return node ? NODE_GOOD[node.kind] : undefined
+}
 
 /** The residents working a workplace: holding a work-at order for it and standing on it. */
 export function workersOf(world: WorldState, workplace: Building): Resident[] {
@@ -85,7 +105,9 @@ export function workersOf(world: WorldState, workplace: Building): Resident[] {
 export function workProblem(world: WorldState, resident: Resident): string | undefined {
   const here = buildingAt(world, resident.x, resident.y)
   const max = here && MAX_WORKERS[here.kind]
-  if (!here || max === undefined) return 'there is no workplace to work here'
+  if (!here || max === undefined || !workplaceGood(world, here)) {
+    return 'there is no workplace to work here'
+  }
   if (here.site) return 'it is still a construction site'
   if (resident.order?.kind === 'workAt' && resident.order.buildingId === here.id) {
     return 'already working here'

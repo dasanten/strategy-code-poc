@@ -7,7 +7,9 @@ import {
   MAX_HEALTH,
   MAX_HUNGER,
   MAX_WORKERS,
-  FARM_FOOD_PER_DAY,
+  NODE_GOOD,
+  WORK_OUTPUT_PER_DAY,
+  WORKPLACE_SKILL,
   STAT_NAMES,
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
@@ -61,6 +63,7 @@ const STAT_LABELS: Record<StatName, string> = {
 
 const SKILL_LABELS: Record<SkillName, string> = {
   mining: 'Mining',
+  woodcutting: 'Woodcutting',
   construction: 'Construction',
   farming: 'Farming',
   combat: 'Combat',
@@ -91,7 +94,7 @@ function doing(r: Resident): string {
     const what = BUILDING_NAMES[o.building].toLowerCase()
     return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
   }
-  if (o?.kind === 'workAt') return 'Working the farm'
+  if (o?.kind === 'workAt') return 'Working'
   if (o?.kind === 'pair') return 'Paired'
   return 'Idle'
 }
@@ -349,7 +352,14 @@ export function ResidentInspector({
       </section>
 
       <BuildBlock resident={r} tick={tick} building={building} node={node} onBuild={onBuild} />
-      <WorkBlock resident={r} tick={tick} building={building} workers={workers} onWork={onWork} />
+      <WorkBlock
+        resident={r}
+        tick={tick}
+        building={building}
+        node={node}
+        workers={workers}
+        onWork={onWork}
+      />
       <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
       <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
 
@@ -468,24 +478,28 @@ function BuildBlock({
 }
 
 /**
- * Working the workplace on the resident's tile, for now a farm (`CONTEXT.md`: Workplace): how
- * many work it, and a button to join them. The food goes into the workers' hands.
+ * Working the workplace on the resident’s tile (`CONTEXT.md`: Workplace): how
+ * many work it, and a button to join them. The output goes into the workers’ hands.
  */
 function WorkBlock({
   resident,
   tick,
   building,
+  node,
   workers,
   onWork,
 }: {
   resident: Resident
   tick: number
   building: Building | undefined
+  node: KnownNode | undefined
   workers: number
   onWork: () => void
 }) {
   const max = building && !building.site ? MAX_WORKERS[building.kind] : undefined
-  if (!building || max === undefined) return null
+  const skill = building && WORKPLACE_SKILL[building.kind]
+  const good = building?.kind === 'farm' ? 'food' : node && NODE_GOOD[node.kind]
+  if (!building || max === undefined || !skill || !good) return null
   const o = resident.order
   const working = o?.kind === 'workAt' && o.buildingId === building.id
   return (
@@ -507,9 +521,9 @@ function WorkBlock({
         </button>
       </div>
       <p className="muted small">
-        A worker of average Strength makes about {FARM_FOOD_PER_DAY} food a game day, more with
-        Farming skill. It goes into the workers’ hands as far as they can carry; the rest is left on
-        the ground here.
+        A worker of average Strength makes about {WORK_OUTPUT_PER_DAY[good] ?? 0}{' '}
+        {GOOD_LABELS[good].toLowerCase()} a game day, more with {SKILL_LABELS[skill]} skill. It goes
+        into the workers’ hands as far as they can carry; the rest is left on the ground here.
       </p>
     </section>
   )

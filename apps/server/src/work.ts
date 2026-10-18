@@ -1,13 +1,16 @@
 import {
   MAX_WORKERS,
+  WORKPLACE_SKILL,
   buildingAt,
   canWork,
-  farmOutput,
-  farmingLearned,
   unitsThatFit,
+  workLearned,
+  workOutput,
   workProblem,
   workersOf,
+  workplaceGood,
   type Building,
+  type Good,
   type OrderRequest,
   type Resident,
   type WorldState,
@@ -32,7 +35,8 @@ interface WorkRequest extends OrderRequest {
 
 /**
  * The work-at order (`CONTEXT.md`: Workplace): one of the Player's adult residents works the
- * finished workplace on the tile they stand on, for now a farm, until given another order.
+ * finished workplace on the tile they stand on (a farm, lumber camp, quarry or mine) until given
+ * another order.
  */
 export const workAt: OrderKind = {
   validate(world, sender, order) {
@@ -64,11 +68,12 @@ export function requestWork(world: WorldState): WorkAction[] {
 }
 
 /**
- * Resolves work actions (ADR 0002), one after another (`CONTEXT.md`: Workplace, Farm). A resident
- * who has left the tile, whose workplace is gone or not finished, or who would be one worker too
- * many stops. Otherwise their work adds to their share of the next unit of Food (from Strength and
- * Farming skill) and teaches Farming. Each whole unit goes to the farm's worker carrying the least
- * food who still has room for it; when nobody has, it is left in the pile on the farm's tile.
+ * Resolves work actions (ADR 0002), one after another (`CONTEXT.md`: Workplace). A resident who
+ * has left the tile, whose workplace is gone or not finished, or who would be one worker too many
+ * stops. Otherwise their work adds to their share of the next unit of the workplace's good (from
+ * Strength and the workplace's skill) and teaches that skill. Each whole unit goes to the
+ * workplace's worker carrying the least of that good who still has room for it; when nobody has,
+ * it is left in the pile on the workplace's tile.
  */
 export function resolveWork(world: WorldState, actions: WorkAction[]): void {
   const workers = new Map<string, number>()
@@ -76,29 +81,31 @@ export function resolveWork(world: WorldState, actions: WorkAction[]): void {
     const r = world.residents.find((x) => x.id === a.residentId)
     const o = r?.order
     if (!r || o?.kind !== 'workAt') continue
-    const farm = world.buildings.find((b) => b.id === o.buildingId)
+    const place = world.buildings.find((b) => b.id === o.buildingId)
     const count = workers.get(o.buildingId) ?? 0
-    const max = farm ? (MAX_WORKERS[farm.kind] ?? 0) : 0
-    const onIt = farm && !farm.site && farm.x === r.x && farm.y === r.y
-    if (!farm || !onIt || r.x !== o.at.x || r.y !== o.at.y || count >= max) {
+    const max = place ? (MAX_WORKERS[place.kind] ?? 0) : 0
+    const good = place && workplaceGood(world, place)
+    const skill = place && WORKPLACE_SKILL[place.kind]
+    const onIt = place && !place.site && place.x === r.x && place.y === r.y
+    if (!place || !onIt || !good || !skill || r.x !== o.at.x || r.y !== o.at.y || count >= max) {
       r.order = null
       continue
     }
     workers.set(o.buildingId, count + 1)
-    o.progress += farmOutput(r, world.tick)
-    r.skills.farming = (r.skills.farming ?? 0) + farmingLearned(r, world.tick)
+    o.progress += workOutput(r, good, skill, world.tick)
+    r.skills[skill] = (r.skills[skill] ?? 0) + workLearned(r, world.tick)
     while (o.progress >= 1) {
       o.progress -= 1
-      harvest(world, farm)
+      produce(world, place, good)
     }
   }
 }
 
-/** One unit of Food from a farm: into the hands of a worker with room, else on the ground. */
-function harvest(world: WorldState, farm: Building): void {
-  const taker = workersOf(world, farm)
-    .filter((w) => unitsThatFit(w, 'food', world.tick) >= 1)
-    .sort((a, b) => (a.carried.food ?? 0) - (b.carried.food ?? 0))[0]
-  if (taker) taker.carried.food = (taker.carried.food ?? 0) + 1
-  else dropGoods(world, farm.x, farm.y, { food: 1 })
+/** One unit of a workplace's good: into the hands of a worker with room, else on the ground. */
+function produce(world: WorldState, place: Building, good: Good): void {
+  const taker = workersOf(world, place)
+    .filter((w) => unitsThatFit(w, good, world.tick) >= 1)
+    .sort((a, b) => (a.carried[good] ?? 0) - (b.carried[good] ?? 0))[0]
+  if (taker) taker.carried[good] = (taker.carried[good] ?? 0) + 1
+  else dropGoods(world, place.x, place.y, { [good]: 1 })
 }

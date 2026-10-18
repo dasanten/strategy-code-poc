@@ -7,6 +7,7 @@ import {
   type Good,
   type ResourceKind,
   type Resident,
+  type SkillName,
   type StatName,
   type Stock,
 } from './world.js'
@@ -356,41 +357,68 @@ export function constructionLearned(resident: Resident, tick: number): number {
   return (CONSTRUCTION_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
 }
 
-/** Most residents who can work one farm at a time (`CONTEXT.md`: Workplace, Farm). */
-export const FARM_MAX_WORKERS = 10
-
 /**
- * Food one farm worker of average Strength and no Farming skill makes per game day, in units.
- * More than the `FOOD_PER_DAY` a resident eats, so a farm feeds its workers with some to spare.
+ * Most residents who can work each kind of workplace at a time (`CONTEXT.md`: Workplace). A farm
+ * has room for a whole starting city; the workplaces on nodes for a smaller crew.
  */
-export const FARM_FOOD_PER_DAY = 3
-
-/** The Strength at which a farm worker makes `FARM_FOOD_PER_DAY`. */
-export const FARM_STRENGTH_AVERAGE = 10
-
-/** How much more food each point of Farming skill makes. */
-export const FARMING_SKILL_EFFECT = 0.05
-
-/** Farming skill a resident of average Intellect gains per game day of farm work. */
-export const FARMING_SKILL_PER_DAY = 1
-
-/**
- * Food a farm worker makes per tick at the given tick (`CONTEXT.md`: Workplace): in proportion to
- * Strength, plus `FARMING_SKILL_EFFECT` for each point of Farming.
- */
-export function farmOutput(resident: Resident, tick: number): number {
-  const strength = statValue(resident, 'strength', tick) / FARM_STRENGTH_AVERAGE
-  const skill = 1 + (resident.skills.farming ?? 0) * FARMING_SKILL_EFFECT
-  return (FARM_FOOD_PER_DAY / TICKS_PER_GAME_DAY) * strength * skill
+export const WORKPLACE_MAX_WORKERS: Partial<Record<BuildingKind, number>> = {
+  farm: 10,
+  lumberCamp: 6,
+  quarry: 6,
+  mine: 8,
 }
 
 /**
- * Farming skill a resident learns from one tick of farm work (`CONTEXT.md`: Skill, learned by
+ * The skill each kind of workplace uses and teaches (`CONTEXT.md`: Skill): Farming on a farm,
+ * Woodcutting in a lumber camp, Mining in quarries and mines.
+ */
+export const WORKPLACE_SKILL: Partial<Record<BuildingKind, SkillName>> = {
+  farm: 'farming',
+  lumberCamp: 'woodcutting',
+  quarry: 'mining',
+  mine: 'mining',
+}
+
+/**
+ * Units of each good one worker of average Strength and no skill makes per game day. Food is more
+ * than the `FOOD_PER_DAY` a resident eats, so a farm feeds its workers with some to spare; ore is
+ * slow, and gold ore slowest.
+ */
+export const WORK_OUTPUT_PER_DAY: Partial<Record<Good, number>> = {
+  food: 3,
+  wood: 4,
+  stone: 3,
+  ironOre: 2,
+  goldOre: 1,
+}
+
+/** The Strength at which a worker makes `WORK_OUTPUT_PER_DAY`. */
+export const WORK_STRENGTH_AVERAGE = 10
+
+/** How much more each point of the workplace's skill makes. */
+export const WORK_SKILL_EFFECT = 0.05
+
+/** Skill a worker of average Intellect gains per game day of work at a workplace. */
+export const WORK_SKILL_PER_DAY = 1
+
+/**
+ * How much of a unit of `good` a worker makes per tick at the given tick, using `skill`
+ * (`CONTEXT.md`: Workplace): in proportion to Strength, plus `WORK_SKILL_EFFECT` for each point
+ * of the skill.
+ */
+export function workOutput(resident: Resident, good: Good, skill: SkillName, tick: number): number {
+  const strength = statValue(resident, 'strength', tick) / WORK_STRENGTH_AVERAGE
+  const skilled = 1 + (resident.skills[skill] ?? 0) * WORK_SKILL_EFFECT
+  return ((WORK_OUTPUT_PER_DAY[good] ?? 0) / TICKS_PER_GAME_DAY) * strength * skilled
+}
+
+/**
+ * Skill a worker learns from one tick of work at a workplace (`CONTEXT.md`: Skill, learned by
  * doing), faster with more Intellect.
  */
-export function farmingLearned(resident: Resident, tick: number): number {
+export function workLearned(resident: Resident, tick: number): number {
   const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
-  return (FARMING_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
+  return (WORK_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
 }
 /**
  * Tearing down takes less work than building (`CONTEXT.md`: Tearing down): this share of the

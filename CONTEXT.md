@@ -46,11 +46,14 @@ The shared language of the game. Domain terms only — no implementation details
   Nodes lie on terrain that fits them: forest nodes in Forest, stone in Hills, ore in Hills and
   (more of it) Mountain.
 - **Workplace:** a building where residents produce goods. Output depends on the workers'
-  Strength and skill and is limited by the workplace's maximum number of workers. Kinds:
-  - **Mine / Quarry / Lumber camp:** built on a resource node.
-  - **Farm:** built on plains, produces Food. Not tied to a node, but each farm has a cap.
-    Its output goes into its workers' hands, as far as they can carry it; the rest is left in a
-    pile on the farm's tile. Getting it to a storage takes carrying it there.
+  Strength and skill and is limited by the workplace's maximum number of workers. Working there
+  teaches its skill. Its output goes into its workers' hands, as far as they can carry it; the
+  rest is left in a pile on the workplace's tile. Getting it to a storage takes carrying it there.
+  Kinds:
+  - **Mine / Quarry / Lumber camp:** built on a resource node; makes what the node yields (a mine
+    iron ore or gold ore). Lumber camps teach Woodcutting, quarries and mines Mining.
+  - **Farm:** built on plains, produces Food and teaches Farming. Not tied to a node, but each
+    farm has a cap.
   - **Smelter:** turns ore into metal (Iron ore → Iron).
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
@@ -198,7 +201,7 @@ The shared language of the game. Domain terms only — no implementation details
 - **Base value:** what a resident is born with. The only part children inherit.
 - **Trained bonus:** what training adds on top of the base value. Capped relative to the base,
   so birth still matters. Never inherited.
-- **Skill:** something learned by doing or training (Mining, Construction, Farming, Combat, Driving, …). Starts at 0,
+- **Skill:** something learned by doing or training (Mining, Woodcutting, Construction, Farming, Combat, Driving, …). Starts at 0,
   never inherited. Not a stat.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
