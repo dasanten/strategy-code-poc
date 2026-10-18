@@ -4,8 +4,8 @@ Status: decided (2026-10-18, with Daniel). Replaces the storage and map parts of
 
 ## Decisions
 
-- **Scale:** a tile is about 40 m and takes an unloaded resident ~30 s on plains, so the disc is
-  about 1,440 tiles across (~1.6 million tiles).
+- **Scale:** a tile is about 40 m and takes an unloaded resident ~30 s on plains, so the map is
+  1,440 × 1,440 tiles (~2.1 million tiles), joined at opposite sides (a torus; `CONTEXT.md`: Map).
 - **Terrain** is generated once from the seed when a world is created and stored as a binary blob
   (one byte per tile) in SQLite. The server keeps it in memory; roads change it in place. Later
   changes to the generator never reshape an existing world.
@@ -36,3 +36,10 @@ the world is persistent from the start, accepting the extra work per change.
 - Every change to world state types needs a migration and a test.
 - The per-Player view built for sync is the same view scripts will query later.
 - Sending only what's in sight means the client can never show more than the Player knows.
+
+## Exception: the one reset (2026-10-18)
+
+The map changed from a disc to a torus before anyone played for real. Daniel chose to reset the
+world once instead of migrating it: terrain, world saves and explored terrain were deleted, while
+accounts, sessions, invite codes and scripts were kept, and every Player got a new starting city
+on their next login. From then on the rule above holds again: no resets, migrations only.

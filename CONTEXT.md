@@ -10,13 +10,14 @@ The shared language of the game. Domain terms only — no implementation details
 ## World
 
 - **World:** one persistent world that keeps running while nobody is online.
-- **Map:** a flat disc with an edge; the edge is the end of the world. An unloaded resident
-  walking across the full diameter on flat land takes about **12 real hours**.
+- **Map:** a rectangle whose opposite sides join: walk off the east side and you come back in from
+  the west, off the north and you come back from the south. The world has no edge and no centre.
+  An unloaded resident walking once around it on flat land takes about **12 real hours**.
 - **Game time:** 1 game day = 1 real hour; 1 game year = 1 real day. Crossing the map takes about
   12 game days.
 - **Tile:** one cell of the map, about 40 m across, with one terrain type. An unloaded resident
-  walks one plains tile in about 30 seconds, so the disc is about 1,440 tiles across. A building
-  fills one tile. Only tiles inside the disc exist.
+  walks one plains tile in about 30 seconds, so the map is 1,440 × 1,440 tiles. A building fills
+  one tile. Every tile exists; two places are at most 720 tiles apart along each direction.
 - **Terrain:** what a tile is made of. It sets how fast residents move across it and how much
   food they burn there (relative to plains). Agility softens the speed penalty, Endurance the
   food penalty.
@@ -27,11 +28,12 @@ The shared language of the game. Domain terms only — no implementation details
   | Forest   | ~70%       | 100% | Wood                                     |
   | Hills    | ~70%       | 130% | Stone, some ore                          |
   | Mountain | ~35%       | 200% | Ore-rich; walkers only, no carriages     |
-  | Lake     | impassable | —    | Inland water                             |
-  | Sea      | impassable | —    | Along parts of the edge                  |
+  | Lake     | impassable | —    | Small inland water                       |
+  | Sea      | impassable | —    | A few large bodies of water              |
   | Road     | ~130%      | 100% | Built by Players on top of passable land |
 
-- No rivers and no water vehicles (for now).
+- No rivers and no water vehicles (for now), so all land is joined: any tile can be reached on
+  foot from any other, if only the long way round.
 
 ## Resources and goods
 
