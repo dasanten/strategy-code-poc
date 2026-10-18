@@ -433,3 +433,8 @@ button.residents-row:hover {
   border-radius: 999px;
   font-size: 0.75rem;
 }
+.clock {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+  font-weight: 500;
+}

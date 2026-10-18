@@ -2,7 +2,6 @@ import type { Server } from 'node:http'
 import { WebSocket, WebSocketServer } from 'ws'
 import {
   SESSION_COOKIE,
-  START_EXPLORED_RADIUS,
   WS_PATH,
   type Account,
   type ClientMessage,
@@ -14,8 +13,9 @@ import { getSessionUser, type SessionUser } from './auth.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
-import { foundStartingCity, realmOf } from './starting-city.js'
-import { ClientView, entitiesInSight } from './sync.js'
+import { foundStartingCity } from './starting-city.js'
+import { entitiesInSight, type SightTracker } from './sight.js'
+import { ClientView } from './sync.js'
 
 function readCookie(header: string | undefined, name: string): string | undefined {
   for (const part of header?.split(';') ?? []) {
@@ -31,6 +31,8 @@ function send(socket: WebSocket, msg: ServerMessage) {
 
 interface Client {
   account: Account
+  userId: number
+  realmId: string
   view: ClientView
 }
 
@@ -45,6 +47,7 @@ export function attachRealtime(
     world: WorldState
     terrain: TerrainMap
     explored: ExploredTerrain
+    sight: SightTracker
     orders: OrderQueue
   },
 ) {
@@ -65,19 +68,20 @@ export function attachRealtime(
 
   wss.on('connection', (socket, req) => {
     const user = users.get(req)!
+    // A Player without a realm (new, or from before realms) gets their starting city now, and
+    // their residents look around before the welcome goes out.
+    const realm = foundStartingCity(world, opts.terrain, user.id)
+    opts.sight.update(world, opts.explored)
     const client: Client = {
       account: { name: user.name, isAdmin: user.isAdmin },
+      userId: user.id,
+      realmId: realm.id,
       view: new ClientView(),
     }
     clients.set(socket, client)
-    // A Player without a realm (new, or from before realms) gets their starting city now.
-    const hadRealm = realmOf(world, user.id) !== undefined
-    const realm = foundStartingCity(world, opts.terrain, user.id)
     const city = world.cities.find((c) => c.realmId === realm.id)!
     const [cx, cy] = [city.x + Math.floor(city.size / 2), city.y + Math.floor(city.size / 2)]
-    if (!hadRealm) opts.explored.explore(user.id, cx, cy, START_EXPLORED_RADIUS)
-    const entities = client.view.initial(entitiesInSight(world, client.account))
-    const { cities, buildings, horses, carriages } = world
+    const entities = client.view.initial(entitiesInSight(world, opts.terrain, realm.id))
     send(socket, {
       type: 'welcome',
       account: client.account,
@@ -85,7 +89,6 @@ export function attachRealtime(
       map: { seed: world.seed, size: opts.terrain.size },
       exploredChunks: opts.explored.exploredChunks(user),
       home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city.id, x: cx, y: cy },
-      structures: { cities, buildings, horses, carriages },
       entities,
     })
 
@@ -104,11 +107,16 @@ export function attachRealtime(
   })
 
   return {
-    /** Sends every client the changes in its sight since the last tick. */
-    broadcastTick() {
+    /**
+     * Sends every client the changes in its sight since the last tick, and the chunks whose
+     * explored terrain grew for its Player (`explored`, from `SightTracker.update`).
+     */
+    broadcastTick(explored: Map<number, Set<number>> = new Map()) {
       for (const [socket, client] of clients) {
-        const { changed, gone } = client.view.diff(entitiesInSight(world, client.account))
-        send(socket, { type: 'tick', tick: world.tick, changed, gone })
+        const inSight = entitiesInSight(world, opts.terrain, client.realmId)
+        const { changed, gone } = client.view.diff(inSight)
+        const grown = [...(explored.get(client.userId) ?? [])]
+        send(socket, { type: 'tick', tick: world.tick, changed, gone, explored: grown })
       }
     },
     close() {

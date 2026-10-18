@@ -1,12 +1,4 @@
-import type { Account, Resident, WorldState } from '@csp/shared'
-
-/**
- * What a Player currently sees (CONTEXT.md, Sight). Placeholder: everything, until residents
- * with a sight range exist (slice 2). The sync below already sends only what this returns.
- */
-export function entitiesInSight(world: WorldState, _account: Account): Resident[] {
-  return world.residents
-}
+import type { SeenEntity } from '@csp/shared'
 
 /**
  * What one connection has been sent so far, so each tick only sends the difference
@@ -16,14 +8,14 @@ export class ClientView {
   private sent = new Map<string, string>()
 
   /** Everything in sight, for the welcome message; remembers it as sent. */
-  initial(entities: Resident[]): Resident[] {
+  initial(entities: SeenEntity[]): SeenEntity[] {
     this.sent.clear()
     for (const e of entities) this.sent.set(e.id, JSON.stringify(e))
     return entities
   }
 
-  diff(entities: Resident[]): { changed: Resident[]; gone: string[] } {
-    const changed: Resident[] = []
+  diff(entities: SeenEntity[]): { changed: SeenEntity[]; gone: string[] } {
+    const changed: SeenEntity[] = []
     const seen = new Set<string>()
     for (const e of entities) {
       seen.add(e.id)

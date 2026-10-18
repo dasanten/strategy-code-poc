@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { checkScript, type Diagnostic } from '@csp/lang'
-import type { Account } from '@csp/shared'
+import { formatGameTime, type Account } from '@csp/shared'
 import { AdminPanel } from './AdminPanel.js'
 import { api } from './api.js'
 import { Login } from './Login.js'
@@ -29,7 +29,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const own = world ? world.residents.filter((r) => r.owner === world.home.realmId) : []
   const selected = own.find((r) => r.id === selectedId)
-  const homeCity = world?.structures.cities.find((c) => c.id === world.home.cityId)
+  const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -40,6 +40,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     <div className="layout">
       <header>
         <h1>Code Strategy</h1>
+        {world && (
+          <span className="clock" title="1 game day = 1 real hour; 1 game year = 1 real day">
+            {formatGameTime(world.tick)}
+          </span>
+        )}
         <span className={`status ${status}`}>
           {status === 'open' ? `tick ${world?.tick ?? '…'}` : status}
         </span>

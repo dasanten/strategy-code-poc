@@ -93,8 +93,8 @@ export const START_FOOD = 200
  */
 export const CITY_MIN_DISTANCE = 300
 
-/** Tiles around a new starting city that its Player has explored from the start. */
-export const START_EXPLORED_RADIUS = 24
+/** How far a resident sees, in tiles (`CONTEXT.md`: Sight). */
+export const SIGHT_RANGE = 12
 
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
