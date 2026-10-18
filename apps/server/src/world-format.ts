@@ -1,4 +1,5 @@
 import type { TerrainMap, Unit, WorldState } from '@csp/shared'
+import { placeResourceNodes } from './node-gen.js'
 import { nearestFreeTile } from './world.js'
 
 /**
@@ -6,7 +7,7 @@ import { nearestFreeTile } from './world.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world.
  */
-export const WORLD_FORMAT_VERSION = 2
+export const WORLD_FORMAT_VERSION = 3
 
 /** What a migration step may look at besides the save itself. */
 export interface MigrationContext {
@@ -35,6 +36,11 @@ export const migrations: Record<number, MigrationStep> = {
       return { ...u, x, y }
     })
     return { tick, seed, units: moved }
+  },
+  // Resource nodes arrived; an existing world gets the ones a new world with its seed would.
+  2: (state, { terrain }) => {
+    const s = state as { seed: number }
+    return { ...s, nodes: placeResourceNodes(terrain, s.seed) }
   },
 }
 
