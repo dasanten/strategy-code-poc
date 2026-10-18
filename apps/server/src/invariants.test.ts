@@ -164,6 +164,37 @@ describe('invariants', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
+  it('catch a resident living in a city that does not exist', () => {
+    const world = worldWithCity().world
+    const r = world.residents[0]!
+    r.cityId = 'nowhere'
+    expect(checkInvariants(world, terrain)).toEqual([
+      expect.objectContaining({ invariant: 'residents-in-cities', entityIds: [r.id] }),
+    ])
+  })
+
+  it('catch a pair that does not hold together', () => {
+    const world = worldWithCity().world
+    const [a, b, c] = world.residents as [Resident, Resident, Resident]
+    const pairs = () =>
+      checkInvariants(world, terrain).filter((v) => v.invariant === 'pairs-hold-together')
+    a.order = { kind: 'pair', partnerId: b.id, since: world.tick }
+    b.order = { kind: 'pair', partnerId: a.id, since: world.tick }
+    expect(pairs()).toEqual([])
+    c.order = { kind: 'pair', partnerId: a.id, since: world.tick }
+    expect(pairs().map((v) => v.message)).toEqual([expect.stringMatching(/doesn't pair back/)])
+    c.order = null
+    b.order.since = world.tick + 1
+    expect(pairs().map((v) => v.message)).toEqual([
+      expect.stringMatching(/pairs since/),
+      expect.stringMatching(/pairs since/),
+      expect.stringMatching(/after now/),
+    ])
+    b.order.since = world.tick
+    b.bornAt = world.tick
+    expect(pairs().map((v) => v.message)).toEqual([expect.stringMatching(/as a child/)])
+  })
+
   it('are checked every tick at rate 1 and sampled below it', () => {
     expect(shouldCheckInvariants(1, () => 0.99)).toBe(true)
     expect(shouldCheckInvariants(0.1, () => 0.05)).toBe(true)

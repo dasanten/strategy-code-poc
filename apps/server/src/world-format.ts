@@ -1,12 +1,12 @@
-import type { TerrainMap, WorldState } from '@csp/shared'
-import { drawLifespan, mulberry32 } from './residents.js'
+import { wrapDistance, type City, type TerrainMap, type WorldState } from '@csp/shared'
+import { drawLifespan, hash, mulberry32 } from './residents.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 10
+export const WORLD_FORMAT_VERSION = 11
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -48,13 +48,29 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Players got realm logs; what happened before is not known, so every log starts empty.
   9: (state) => ({ ...(state as object), events: [] }),
-}
-
-/** A string's FNV-1a hash, as a seed. */
-function hash(text: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193)
-  return h >>> 0
+  // Residents got a city to live in, for housing and pairing. Everyone so far came with a
+  // starting city, so each lives in the nearest city of their realm, or, when their realm has
+  // ended, in the nearest city of all.
+  10: (state, ctx) => {
+    const s = state as { residents: { owner: string | null; x: number; y: number }[] } & {
+      cities: City[]
+    }
+    const nearest = (r: { x: number; y: number }, cities: City[]) =>
+      cities
+        .map((c) => ({
+          c,
+          d: wrapDistance(ctx.terrain.size, r, { x: c.x + c.size / 2, y: c.y + c.size / 2 }),
+        }))
+        .sort((p, q) => p.d - q.d)[0]?.c
+    return {
+      ...s,
+      residents: s.residents.map((r) => {
+        const own = s.cities.filter((c) => r.owner !== null && c.realmId === r.owner)
+        const city = nearest(r, own.length > 0 ? own : s.cities)
+        return { ...r, cityId: city?.id ?? null }
+      }),
+    }
+  },
 }
 
 export class WorldFormatError extends Error {}

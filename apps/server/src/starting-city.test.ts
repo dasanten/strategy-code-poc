@@ -1,7 +1,7 @@
 import {
   ADULT_AGE,
   CITY_MIN_DISTANCE,
-  HOUSE_CAPACITY,
+  HOUSING_ROOM,
   MAX_HEALTH,
   MAX_HUNGER,
   START_CARRIED_FOOD,
@@ -42,6 +42,7 @@ describe('foundStartingCity', () => {
     // Everyone starts on the farm, working it, with a little food on them.
     const farm = world.buildings.find((b) => b.kind === 'farm')!
     for (const r of residents) {
+      expect(r.cityId).toBe(city!.id)
       expect(r).toMatchObject({ x: farm.x, y: farm.y, carried: { food: START_CARRIED_FOOD } })
       expect(r.order).toEqual({
         kind: 'workAt',
@@ -60,7 +61,7 @@ describe('foundStartingCity', () => {
 
     const kinds = world.buildings.map((b) => b.kind)
     const houses = kinds.filter((k) => k === 'house').length
-    expect(houses * HOUSE_CAPACITY).toBeGreaterThan(START_RESIDENTS)
+    expect(houses * HOUSING_ROOM.house!).toBeGreaterThan(START_RESIDENTS)
     expect(kinds.filter((k) => k === 'storage')).toHaveLength(1)
     expect(kinds.filter((k) => k === 'farm')).toHaveLength(1)
     expect(world.buildings.find((b) => b.kind === 'storage')!.stock).toEqual({ food: START_FOOD })

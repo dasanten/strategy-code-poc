@@ -8,6 +8,7 @@ import { stepSpoilage } from './spoilage.js'
 import { stepHomeRefill, stepSurvival, type SurvivalResult } from './survival.js'
 import { stepAging, type AgingResult } from './aging.js'
 import { requestWork, resolveWork } from './work.js'
+import { requestBirths, resolveBirths } from './pairing.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -72,7 +73,7 @@ export interface StepResult {
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; food
  * spoils at the end of each game day; then their orders request actions (steps, then taking and
  * putting down goods, then laying out and working on construction sites, then tearing down, then
- * working workplaces), and the world resolves them together. As the next tick begins, residents
+ * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; then residents at
  * home who run low on food take meals from their city's storage. Without `walking` nobody moves.
  */
@@ -89,9 +90,12 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveTearingDown(world, teardowns)
   const work = requestWork(world)
   resolveWork(world, work)
+  const births = requestBirths(world)
+  resolveBirths(world, births)
   world.tick++
   const aging = stepAging(world)
   stepHomeRefill(world)
-  const actions = steps.length + carries.length + builds.length + teardowns.length + work.length
+  const actions =
+    steps.length + carries.length + builds.length + teardowns.length + work.length + births.length
   return { actions, survival, aging }
 }

@@ -1,6 +1,6 @@
 import {
   CITY_MIN_DISTANCE,
-  HOUSE_CAPACITY,
+  HOUSING_ROOM,
   MAX_HUNGER,
   START_CARRIED_FOOD,
   START_CITY_SIZE,
@@ -148,7 +148,7 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
     x: bx,
     y: by,
   })
-  const houses = Math.ceil(START_RESIDENTS / HOUSE_CAPACITY) + START_SPARE_HOUSES
+  const houses = Math.ceil(START_RESIDENTS / HOUSING_ROOM.house!) + START_SPARE_HOUSES
   const buildings: Building[] = [
     { ...building('storage', x + mid, y + mid), stock: { food: START_FOOD } },
     ...Array.from({ length: houses }, (_, i) => building('house', x + 1 + i * 2, y + 1)),
@@ -162,6 +162,7 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
     const r = newResident(rand, {
       id: newId(world, 'r'),
       owner: realmId,
+      cityId: city.id,
       x: fx,
       y: fy,
       tick: world.tick,

@@ -70,6 +70,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'tearDown', residentId: selected.id, buildingId }))
   }
+  /** Orders the picked resident to pair with another resident of their city. */
+  async function pair(partnerId: string) {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'pair', residentId: selected.id, partnerId }))
+  }
   const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
   const onNodesLoaded = useCallback(
     (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
@@ -151,6 +156,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               workers={workersHere(world.residents, onTile(world.buildings))}
               onWork={work}
               onTearDown={tearDown}
+              residents={own}
+              onPair={pair}
             />
           )}
           {world && <RealmLog events={world.events} />}

@@ -15,6 +15,7 @@ import {
   LIFESPAN_MIN,
   MAX_HEALTH,
   ageInYears,
+  canWork,
   MAX_HUNGER,
   NODE_TERRAINS,
   REALM_LOG_LENGTH,
@@ -519,6 +520,56 @@ export const refilledAtHome: Invariant = {
   },
 }
 
+/** Every resident lives in a city that exists, or in none. */
+export const residentsInCities: Invariant = {
+  name: 'residents-in-cities',
+  check(world) {
+    const cities = new Set(world.cities.map((c) => c.id))
+    return world.residents
+      .filter((r) => r.cityId !== null && !cities.has(r.cityId))
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} lives in city ${r.cityId}, which doesn't exist`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
+/**
+ * After a tick, pairs hold together (`CONTEXT.md`: Pairing): a resident's partner pairs back
+ * with the same `since`, which is not after now; both are adults of the same city. Broken pairs
+ * end in `requestBirths`.
+ */
+export const pairsHoldTogether: Invariant = {
+  name: 'pairs-hold-together',
+  check(world) {
+    const byId = new Map(world.residents.map((r) => [r.id, r]))
+    return world.residents.flatMap((r) => {
+      const o = r.order
+      if (o?.kind !== 'pair') return []
+      const partner = byId.get(o.partnerId)
+      const back = partner?.order
+      const problems: string[] = []
+      if (!partner || back?.kind !== 'pair' || back.partnerId !== r.id) {
+        problems.push(`pairs with ${o.partnerId}, who doesn't pair back`)
+      } else {
+        if (back.since !== o.since)
+          problems.push(`pairs since ${o.since}, ${partner.id} since ${back.since}`)
+        if (partner.cityId !== r.cityId) problems.push(`pairs with ${partner.id} of another city`)
+        if (partner === r) problems.push('pairs with themselves')
+      }
+      if (r.cityId === null) problems.push('pairs but lives in no city')
+      if (!canWork(r, world.tick)) problems.push('pairs as a child')
+      if (o.since > world.tick) problems.push(`pairs since ${o.since}, after now`)
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `resident ${r.id} ${p}`,
+        entityIds: [r.id, o.partnerId],
+      }))
+    })
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -539,6 +590,8 @@ export const worldInvariants: Invariant[] = [
   tearDownOrdersOnBuildings,
   nodesOnFittingTerrain,
   realmLogsInOrder,
+  residentsInCities,
+  pairsHoldTogether,
 ]
 
 export function checkInvariants(

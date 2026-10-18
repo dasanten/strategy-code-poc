@@ -116,8 +116,13 @@ export const START_CITY_SIZE = 7
 /** Residents in a starting city, the Leader included. */
 export const START_RESIDENTS = 8
 
-/** Residents one house holds. */
-export const HOUSE_CAPACITY = 4
+/**
+ * Residents each kind of building houses (`CONTEXT.md`: House, Free housing). Only houses so far;
+ * later housing buildings (a palace, a castle) add their room here.
+ */
+export const HOUSING_ROOM: Partial<Record<BuildingKind, number>> = {
+  house: 4,
+}
 
 /** Houses a starting city gets beyond what its residents need. */
 export const START_SPARE_HOUSES = 1
@@ -244,6 +249,18 @@ export function foodUse(resident: Resident, terrain: number, tick: number): numb
   )
   return hungerFactor(resident, tick) * (1 + extra * (1 - soften))
 }
+
+/**
+ * A city has a food surplus when its storages hold more Food than all its residents eat in this
+ * many game days (`CONTEXT.md`: Food surplus). Food residents carry doesn't count.
+ */
+export const FOOD_SURPLUS_DAYS = 10
+
+/**
+ * A child's base stats are the parents' average, rounded, plus a whole random amount of at most
+ * this much either way (`CONTEXT.md`: Child), and never below 1.
+ */
+export const CHILD_STAT_SPREAD = 2
 
 /** Ticks (real seconds) an unloaded resident of average Agility takes to walk a plains tile. */
 export const WALK_TICKS_PER_TILE = 30

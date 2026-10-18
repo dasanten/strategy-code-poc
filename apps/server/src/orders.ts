@@ -2,6 +2,7 @@ import type { Account, OrderRequest, ServerMessage, WorldState } from '@csp/shar
 import { build } from './building.js'
 import { tearDown } from './teardown.js'
 import { drop, pickUp } from './carrying.js'
+import { pair } from './pairing.js'
 import { walkTo } from './walking.js'
 import { workAt } from './work.js'
 
@@ -29,6 +30,7 @@ export const orderKinds: Record<string, OrderKind> = {
   build,
   tearDown,
   workAt,
+  pair,
 }
 
 interface Pending {
