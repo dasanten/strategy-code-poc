@@ -90,7 +90,7 @@ describe('realtime', () => {
     const welcome = await next('welcome')
     expect(welcome).toMatchObject({ type: 'welcome', account: { name: 'Daniel' }, tick: 0 })
     if (welcome.type === 'welcome') {
-      expect(welcome.entities).toHaveLength(world.units.length)
+      expect(welcome.entities).toHaveLength(world.residents.length)
       // Daniel is an admin, so the whole map counts as explored.
       const n = chunksAcross(terrain.diameter)
       expect(welcome.exploredChunks).toEqual([...Array(n * n).keys()])
@@ -99,7 +99,7 @@ describe('realtime', () => {
     realtime.broadcastTick()
     expect(await next('tick')).toEqual({ type: 'tick', tick: 0, changed: [], gone: [] })
 
-    stepWorld(world, terrain, () => 0)
+    stepWorld(world, terrain)
     realtime.broadcastTick()
     const tick = await next('tick')
     if (tick.type === 'tick') expect(tick.tick).toBe(1)

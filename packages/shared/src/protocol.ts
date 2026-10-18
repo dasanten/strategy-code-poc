@@ -1,5 +1,5 @@
 import type { Account } from './api.js'
-import type { Unit } from './world.js'
+import type { Resident } from './world.js'
 
 /**
  * A window of terrain around the residents, as the client draws it. A stopgap until the client
@@ -37,10 +37,10 @@ export type ServerMessage =
       map: MapInfo
       /** Chunks with explored terrain, to load from `terrainChunkPath` (see `chunksAcross`). */
       exploredChunks: number[]
-      entities: Unit[]
+      entities: Resident[]
     }
   /** Every tick: entities in sight that changed, and ids that left sight. */
-  | { type: 'tick'; tick: number; changed: Unit[]; gone: string[] }
+  | { type: 'tick'; tick: number; changed: Resident[]; gone: string[] }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }
 

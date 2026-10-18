@@ -17,7 +17,7 @@ const OWNER_COLORS: Record<string, number> = { red: 0xe0524a, blue: 0x4aa3e0 }
 
 export function MapView({ world }: { world: ClientWorld }) {
   const hostRef = useRef<HTMLDivElement>(null)
-  const appRef = useRef<{ app: Application; tiles: Graphics; units: Container } | null>(null)
+  const appRef = useRef<{ app: Application; tiles: Graphics; residents: Container } | null>(null)
   const { map } = world
 
   // Create the Pixi application once per map window.
@@ -34,11 +34,11 @@ export function MapView({ world }: { world: ClientWorld }) {
         }
         host.appendChild(app.canvas)
         const tiles = new Graphics()
-        const units = new Container()
-        app.stage.addChild(tiles, units)
-        appRef.current = { app, tiles, units }
+        const residents = new Container()
+        app.stage.addChild(tiles, residents)
+        appRef.current = { app, tiles, residents }
         drawTiles(tiles, map)
-        drawUnits(units, world)
+        drawResidents(residents, world)
       })
     return () => {
       disposed = true
@@ -50,7 +50,7 @@ export function MapView({ world }: { world: ClientWorld }) {
   }, [map])
 
   useEffect(() => {
-    if (appRef.current) drawUnits(appRef.current.units, world)
+    if (appRef.current) drawResidents(appRef.current.residents, world)
   }, [world])
 
   return <div ref={hostRef} className="map" />
@@ -65,10 +65,10 @@ function drawTiles(g: Graphics, map: MapInfo) {
   })
 }
 
-/** Units are drawn relative to the map window; ones that walked out of it are not drawn. */
-function drawUnits(layer: Container, { map, units }: ClientWorld) {
+/** Residents are drawn relative to the map window; ones that walked out of it are not drawn. */
+function drawResidents(layer: Container, { map, residents }: ClientWorld) {
   layer.removeChildren().forEach((c) => c.destroy())
-  for (const u of units) {
+  for (const u of residents) {
     const x = u.x - map.x
     const y = u.y - map.y
     if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue

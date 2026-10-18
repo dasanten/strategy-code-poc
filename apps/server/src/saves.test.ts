@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm'
 import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
 import { gzipSync } from 'node:zlib'
-import type { TerrainMap } from '@csp/shared'
+import { ADULT_AGE, ageInYears, type TerrainMap } from '@csp/shared'
 import { checkInvariants } from './invariants.js'
 import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
@@ -78,17 +78,17 @@ describe('world saves', () => {
     const { world, terrain: stored } = loadOrCreateWorld(db, generate)
     expect(seeds).toEqual([1])
     expect(loadTerrain(db)?.seed).toBe(1)
-    expect(Object.keys(world).sort()).toEqual(['nodes', 'seed', 'tick', 'units'])
+    expect(Object.keys(world).sort()).toEqual(['nodes', 'residents', 'seed', 'tick'])
     expect(world.tick).toBe(900)
-    expect(world.units.map((u) => u.hp)).toEqual([10, 10, 7])
+    expect(world.residents.map((r) => r.health)).toEqual([100, 100, 70])
     expect(checkInvariants(world, stored)).toEqual([])
     // Still near the centre and roughly where they were relative to each other.
     const centre = stored.diameter / 2
-    for (const u of world.units) {
+    for (const u of world.residents) {
       expect(Math.abs(u.x - centre)).toBeLessThan(25)
       expect(Math.abs(u.y - centre)).toBeLessThan(25)
     }
-    const [u1, , u3] = world.units
+    const [u1, , u3] = world.residents
     expect(u3!.x - u1!.x).toBeGreaterThan(20)
     close()
   })
@@ -98,7 +98,38 @@ describe('world saves', () => {
     const world = migrateWorld(v2, 2, { terrain })
     expect(world.nodes).toEqual(createWorld(terrain, 1).nodes)
     expect(world.nodes.length).toBeGreaterThan(0)
-    expect({ ...world, nodes: [] }).toEqual({ ...v2, nodes: [] })
+    expect(world).toMatchObject({ tick: 50, seed: 1 })
+  })
+
+  it("turns a format-3 world's units into residents (migration 3 → 4)", () => {
+    const v3 = {
+      tick: 5000,
+      seed: 1,
+      nodes: [],
+      units: [
+        { id: 'u1', owner: 'red', x: 60, y: 60, hp: 10 },
+        { id: 'u2', owner: 'blue', x: 61, y: 60, hp: 3 },
+      ],
+    }
+    const world = migrateWorld(v3, 3, { terrain })
+    expect(Object.keys(world).sort()).toEqual(['nodes', 'residents', 'seed', 'tick'])
+    expect(
+      world.residents.map(({ id, owner, x, y, health }) => ({ id, owner, x, y, health })),
+    ).toEqual([
+      { id: 'u1', owner: 'red', x: 60, y: 60, health: 100 },
+      { id: 'u2', owner: 'blue', x: 61, y: 60, health: 30 },
+    ])
+    expect(
+      checkInvariants(world, terrain).filter(
+        (v) => v.invariant !== 'nothing-on-impassable-terrain',
+      ),
+    ).toEqual([])
+    for (const r of world.residents) {
+      expect(ageInYears(r, world.tick)).toBeGreaterThanOrEqual(ADULT_AGE)
+      expect(r).not.toHaveProperty('hp')
+    }
+    // Same save, same residents.
+    expect(migrateWorld(structuredClone(v3), 3, { terrain })).toEqual(world)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

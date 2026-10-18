@@ -30,7 +30,7 @@ describe('runTick', () => {
       slowTickMs: 800,
       now: clock(5),
     })
-    expect(health).toEqual({ tick: 1, durationMs: 5, units: 6, actions: 6, slow: false })
+    expect(health).toEqual({ tick: 1, durationMs: 5, residents: 6, actions: 0, slow: false })
     expect(reporter.tickHealth).toHaveBeenCalledWith(world, health)
     expect(reporter.invariantViolations).not.toHaveBeenCalled()
   })
@@ -48,7 +48,7 @@ describe('runTick', () => {
   it('reports invariant violations on checked ticks only', () => {
     const world = createWorld(terrain)
     // Every unit outside the disc, in its corner: no move can make that legal again.
-    for (const u of world.units) Object.assign(u, { x: 0, y: 0 })
+    for (const u of world.residents) Object.assign(u, { x: 0, y: 0 })
     const reporter = fakeReporter()
 
     runTick(world, terrain, { reporter, invariantSampleRate: 0, slowTickMs: 800 })
@@ -64,7 +64,7 @@ describe('runTick', () => {
   })
 
   it('reports an error instead of throwing', () => {
-    const broken = { ...createWorld(terrain), units: null } as unknown as WorldState
+    const broken = { ...createWorld(terrain), residents: null } as unknown as WorldState
     const reporter = fakeReporter()
     expect(
       runTick(broken, terrain, { reporter, invariantSampleRate: 1, slowTickMs: 800 }),

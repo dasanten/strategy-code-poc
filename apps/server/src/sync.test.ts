@@ -3,11 +3,13 @@ import { OFF_MAP, terrainAt, type Account, type OrderRequest } from '@csp/shared
 import { OrderQueue, type OrderKind } from './orders.js'
 import { ClientView, mapWindow } from './sync.js'
 import { smallTerrain } from './test-terrain.js'
+import { mulberry32, newResident } from './residents.js'
 import { createWorld } from './world.js'
 
 const terrain = smallTerrain()
 
-const unit = (id: string, x: number) => ({ id, owner: 'red', x, y: 0, hp: 10 })
+const unit = (id: string, x: number) =>
+  newResident(mulberry32(1), { id, owner: 'red', x, y: 0, tick: 0 })
 
 describe('ClientView', () => {
   it('sends only what changed and what left sight', () => {

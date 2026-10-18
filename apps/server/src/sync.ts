@@ -3,7 +3,7 @@ import {
   type Account,
   type MapInfo,
   type TerrainMap,
-  type Unit,
+  type Resident,
   type WorldState,
 } from '@csp/shared'
 
@@ -15,7 +15,7 @@ const WINDOW_HEIGHT = 30
  * A window of terrain centred on the given units, for the client to draw. A stopgap until
  * explored terrain is served in chunks (T1.4); it does not check sight yet.
  */
-export function mapWindow(terrain: TerrainMap, seed: number, units: Unit[]): MapInfo {
+export function mapWindow(terrain: TerrainMap, seed: number, units: Resident[]): MapInfo {
   const centre = Math.floor(terrain.diameter / 2)
   const cx = units.length ? Math.round(units.reduce((s, u) => s + u.x, 0) / units.length) : centre
   const cy = units.length ? Math.round(units.reduce((s, u) => s + u.y, 0) / units.length) : centre
@@ -40,8 +40,8 @@ export function mapWindow(terrain: TerrainMap, seed: number, units: Unit[]): Map
  * What a Player currently sees (CONTEXT.md, Sight). Placeholder: everything, until residents
  * with a sight range exist (slice 2). The sync below already sends only what this returns.
  */
-export function entitiesInSight(world: WorldState, _account: Account): Unit[] {
-  return world.units
+export function entitiesInSight(world: WorldState, _account: Account): Resident[] {
+  return world.residents
 }
 
 /**
@@ -52,14 +52,14 @@ export class ClientView {
   private sent = new Map<string, string>()
 
   /** Everything in sight, for the welcome message; remembers it as sent. */
-  initial(entities: Unit[]): Unit[] {
+  initial(entities: Resident[]): Resident[] {
     this.sent.clear()
     for (const e of entities) this.sent.set(e.id, JSON.stringify(e))
     return entities
   }
 
-  diff(entities: Unit[]): { changed: Unit[]; gone: string[] } {
-    const changed: Unit[] = []
+  diff(entities: Resident[]): { changed: Resident[]; gone: string[] } {
+    const changed: Resident[] = []
     const seen = new Set<string>()
     for (const e of entities) {
       seen.add(e.id)

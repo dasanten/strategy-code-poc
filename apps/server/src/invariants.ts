@@ -1,4 +1,13 @@
-import { NODE_TERRAINS, terrainAt, type TerrainMap, type WorldState } from '@csp/shared'
+import {
+  MAX_HEALTH,
+  MAX_HUNGER,
+  NODE_TERRAINS,
+  STAT_NAMES,
+  terrainAt,
+  trainedCap,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
 import { isWalkable } from './world.js'
 
 /**
@@ -21,30 +30,46 @@ export interface InvariantViolation {
 export const nothingOnImpassableTerrain: Invariant = {
   name: 'nothing-on-impassable-terrain',
   check(world, terrain) {
-    return world.units
-      .filter((u) => !isWalkable(terrain, u.x, u.y))
-      .map((u) => ({
+    return world.residents
+      .filter((r) => !isWalkable(terrain, r.x, r.y))
+      .map((r) => ({
         invariant: this.name,
-        message: `unit ${u.id} stands on impassable terrain at (${u.x}, ${u.y})`,
-        entityIds: [u.id],
+        message: `resident ${r.id} stands on impassable terrain at (${r.x}, ${r.y})`,
+        entityIds: [r.id],
       }))
   },
 }
 
-export const oneUnitPerTile: Invariant = {
-  name: 'one-unit-per-tile',
+/** Every stat has a positive base and a trained bonus between 0 and its cap. */
+export const trainedWithinCap: Invariant = {
+  name: 'trained-within-cap',
   check(world) {
-    const byTile = new Map<string, string[]>()
-    for (const u of world.units) {
-      const key = `${u.x},${u.y}`
-      byTile.set(key, [...(byTile.get(key) ?? []), u.id])
-    }
-    return [...byTile]
-      .filter(([, ids]) => ids.length > 1)
-      .map(([tile, ids]) => ({
+    return world.residents.flatMap((r) =>
+      STAT_NAMES.filter((s) => {
+        const { base, trained } = r.stats[s]
+        return !(base > 0 && trained >= 0 && trained <= trainedCap(base))
+      }).map((s) => ({
         invariant: this.name,
-        message: `units ${ids.join(', ')} share tile (${tile})`,
-        entityIds: ids,
+        message: `resident ${r.id} has ${s} ${r.stats[s].base} + ${r.stats[s].trained} trained (cap ${trainedCap(r.stats[s].base)})`,
+        entityIds: [r.id],
+      })),
+    )
+  },
+}
+
+/** Health and the hunger meter stay within their ranges. */
+export const healthAndHungerInRange: Invariant = {
+  name: 'health-and-hunger-in-range',
+  check(world) {
+    return world.residents
+      .filter(
+        (r) =>
+          !(r.health >= 0 && r.health <= MAX_HEALTH && r.hunger >= 0 && r.hunger <= MAX_HUNGER),
+      )
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} has health ${r.health} and hunger ${r.hunger}`,
+        entityIds: [r.id],
       }))
   },
 }
@@ -65,7 +90,8 @@ export const nodesOnFittingTerrain: Invariant = {
 
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
-  oneUnitPerTile,
+  trainedWithinCap,
+  healthAndHungerInRange,
   nodesOnFittingTerrain,
 ]
 

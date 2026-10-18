@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { WS_PATH, type MapInfo, type ServerMessage, type Unit } from '@csp/shared'
+import { WS_PATH, type MapInfo, type ServerMessage, type Resident } from '@csp/shared'
 import { api } from './api.js'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed'
@@ -8,7 +8,7 @@ export type ConnectionStatus = 'connecting' | 'open' | 'closed'
 export interface ClientWorld {
   tick: number
   map: MapInfo
-  units: Unit[]
+  residents: Resident[]
 }
 
 /**
@@ -24,7 +24,7 @@ export function useWorld(onLoggedOut: () => void) {
     let socket: WebSocket | null = null
     let retry: ReturnType<typeof setTimeout> | undefined
     let stopped = false
-    let entities = new Map<string, Unit>()
+    let entities = new Map<string, Resident>()
 
     const connect = () => {
       setStatus('connecting')
@@ -35,11 +35,11 @@ export function useWorld(onLoggedOut: () => void) {
         const msg = JSON.parse(ev.data as string) as ServerMessage
         if (msg.type === 'welcome') {
           entities = new Map(msg.entities.map((e) => [e.id, e]))
-          setWorld({ map: msg.map, tick: msg.tick, units: [...entities.values()] })
+          setWorld({ map: msg.map, tick: msg.tick, residents: [...entities.values()] })
         } else if (msg.type === 'tick') {
           for (const e of msg.changed) entities.set(e.id, e)
           for (const id of msg.gone) entities.delete(id)
-          setWorld((w) => (w ? { ...w, tick: msg.tick, units: [...entities.values()] } : w))
+          setWorld((w) => (w ? { ...w, tick: msg.tick, residents: [...entities.values()] } : w))
         }
       }
       socket.onclose = () => {

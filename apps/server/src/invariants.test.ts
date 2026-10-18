@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Terrain } from '@csp/shared'
+import { MAX_HEALTH, MAX_HUNGER, Terrain, trainedCap, type Resident } from '@csp/shared'
 import { checkInvariants, shouldCheckInvariants } from './invariants.js'
 import { smallTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
@@ -17,15 +17,18 @@ describe('invariants', () => {
   it.each([
     ['lake', Terrain.Lake],
     ['sea', Terrain.Sea],
-  ])('catch a unit on impassable terrain (%s)', (_, kind) => {
+  ])('catch a resident on impassable terrain (%s)', (_, kind) => {
     const world = createWorld(terrain)
     const tile = terrain.tiles.indexOf(kind)
     expect(tile).toBeGreaterThanOrEqual(0)
-    const unit = world.units[0]!
-    unit.x = tile % terrain.diameter
-    unit.y = Math.floor(tile / terrain.diameter)
+    const resident = world.residents[0]!
+    resident.x = tile % terrain.diameter
+    resident.y = Math.floor(tile / terrain.diameter)
     expect(checkInvariants(world, terrain)).toEqual([
-      expect.objectContaining({ invariant: 'nothing-on-impassable-terrain', entityIds: [unit.id] }),
+      expect.objectContaining({
+        invariant: 'nothing-on-impassable-terrain',
+        entityIds: [resident.id],
+      }),
     ])
   })
 
@@ -40,23 +43,44 @@ describe('invariants', () => {
     ])
   })
 
-  it('catch a unit outside the disc', () => {
+  it('catch a resident outside the disc', () => {
     const world = createWorld(terrain)
-    const unit = world.units[0]!
-    unit.x = 0
-    unit.y = 0
+    const resident = world.residents[0]!
+    resident.x = 0
+    resident.y = 0
     expect(checkInvariants(world, terrain)).toEqual([
-      expect.objectContaining({ invariant: 'nothing-on-impassable-terrain', entityIds: [unit.id] }),
+      expect.objectContaining({
+        invariant: 'nothing-on-impassable-terrain',
+        entityIds: [resident.id],
+      }),
     ])
   })
 
-  it('catch two units on one tile', () => {
+  it('catch a trained bonus above its cap, below zero, or on a base of nothing', () => {
     const world = createWorld(terrain)
-    const [a, b] = world.units as [(typeof world.units)[0], (typeof world.units)[0]]
-    b.x = a.x
-    b.y = a.y
+    const [a, b, c] = world.residents as [Resident, Resident, Resident]
+    a.stats.strength = { base: 10, trained: trainedCap(10) }
+    expect(checkInvariants(world, terrain)).toEqual([])
+    a.stats.strength.trained++
+    b.stats.agility.trained = -1
+    c.stats.intellect = { base: 0, trained: 0 }
     expect(checkInvariants(world, terrain)).toEqual([
-      expect.objectContaining({ invariant: 'one-unit-per-tile', entityIds: [a.id, b.id] }),
+      expect.objectContaining({ invariant: 'trained-within-cap', entityIds: [a.id] }),
+      expect.objectContaining({ invariant: 'trained-within-cap', entityIds: [b.id] }),
+      expect.objectContaining({ invariant: 'trained-within-cap', entityIds: [c.id] }),
+    ])
+  })
+
+  it('catch health or hunger out of range', () => {
+    const world = createWorld(terrain)
+    const [a, b, c] = world.residents as [Resident, Resident, Resident]
+    a.health = MAX_HEALTH + 1
+    b.hunger = -1
+    c.hunger = MAX_HUNGER
+    c.health = 0
+    expect(checkInvariants(world, terrain)).toEqual([
+      expect.objectContaining({ invariant: 'health-and-hunger-in-range', entityIds: [a.id] }),
+      expect.objectContaining({ invariant: 'health-and-hunger-in-range', entityIds: [b.id] }),
     ])
   })
 

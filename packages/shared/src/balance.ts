@@ -52,3 +52,25 @@ export const TERRAIN_SPEED = {
   [Terrain.Hills]: 0.7,
   [Terrain.Mountain]: 0.35,
 } as const satisfies Partial<Record<Terrain, number>>
+
+/** A resident's base stats are drawn from this range when no parents pass theirs on. */
+export const STAT_BASE_MIN = 5
+export const STAT_BASE_MAX = 15
+
+/** Training can add at most this share of a stat's base value (`CONTEXT.md`: Trained bonus). */
+export const TRAINED_CAP_SHARE = 0.5
+
+/** Most health a resident can have. */
+export const MAX_HEALTH = 100
+
+/** A full hunger meter. */
+export const MAX_HUNGER = 100
+
+/** Placeholder residents (until starting cities, T2.2) are this many game years old. */
+export const START_AGE_MIN = 16
+export const START_AGE_MAX = 45
+
+/** The most a stat's trained bonus can be, for a given base value. */
+export function trainedCap(base: number): number {
+  return Math.floor(base * TRAINED_CAP_SHARE)
+}
