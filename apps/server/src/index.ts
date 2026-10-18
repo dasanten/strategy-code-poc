@@ -33,7 +33,7 @@ const {
     : undefined,
 })
 const { world, terrain } = loadOrCreateWorld(db, (seed) => generateTerrain(seed))
-const explored = ExploredTerrain.load(db, terrain)
+const explored = ExploredTerrain.load(db, terrain, world.nodes)
 tagWorld(world)
 
 const app = await buildApp({

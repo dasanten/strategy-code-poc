@@ -4,10 +4,12 @@ import { api } from './api.js'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed'
 
-/** What the client knows of the world: the terrain it was sent and the entities in sight. */
+/** What the client knows of the world: the map, which chunks it may load and the entities in sight. */
 export interface ClientWorld {
   tick: number
   map: MapInfo
+  /** Chunks with explored terrain, loaded on demand from `terrainChunkPath`. */
+  exploredChunks: ReadonlySet<number>
   residents: Resident[]
 }
 
@@ -35,7 +37,12 @@ export function useWorld(onLoggedOut: () => void) {
         const msg = JSON.parse(ev.data as string) as ServerMessage
         if (msg.type === 'welcome') {
           entities = new Map(msg.entities.map((e) => [e.id, e]))
-          setWorld({ map: msg.map, tick: msg.tick, residents: [...entities.values()] })
+          setWorld({
+            map: msg.map,
+            exploredChunks: new Set(msg.exploredChunks),
+            tick: msg.tick,
+            residents: [...entities.values()],
+          })
         } else if (msg.type === 'tick') {
           for (const e of msg.changed) entities.set(e.id, e)
           for (const id of msg.gone) entities.delete(id)
