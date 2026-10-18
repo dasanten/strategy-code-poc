@@ -26,12 +26,24 @@ I sleep.
 - [x] pino structured logging on the server
 - [x] Invariant framework: checks run every tick in dev, sampled in prod, violations → Sentry
 - [x] Tick-health reporting (duration, resident and action counts), alert above 800 ms
+- [ ] Accounts (ADR 0005): sign-up with invite code, login, logout, 30-day sessions, rate limit
+- [ ] Admin: `admin:create` command, create invite codes, reset passwords
+- [ ] WebSocket accepts only logged-in sessions; login screen in the client
+- [ ] Rolling compressed snapshots with pruning; world format version and migration chain
+      (ADR 0006)
+- [ ] SQLite backups before migrating on start and daily, 14 days kept
+- [ ] Protocol: per-Player sync (in sight on connect, changes and left-sight ids per tick),
+      orders with request id and ack/error
+- [ ] Deploy (ADR 0007): Dockerfile, compose with Caddy, GHCR + SSH workflow after CI on main
+- [ ] **Daniel:** server with Docker, DNS record, GitHub secrets, `.env` on the server
 
 ### 1. World map
 
 - [ ] Seeded generator for a disc map with Plains, Forest, Hills, Mountain, Lake, Sea
-- [ ] Size so an unloaded resident on plains crosses it in ~12 real hours
+- [ ] Disc ~1,440 tiles across (a tile ≈ 40 m, ~30 s to walk on plains)
+- [ ] Terrain stored once as a binary blob, kept in memory (ADR 0006)
 - [ ] Resource nodes (forest, stone, iron ore, gold ore) placed by terrain
+- [ ] Explored terrain per Player; terrain served in 32×32 chunks, only explored ones
 - [ ] PixiJS view with pan and zoom; only visible tiles rendered
 - Done when: a fresh world shows a believable disc of terrain you can explore in the browser.
 
@@ -40,7 +52,8 @@ I sleep.
 - [ ] Resident with base stats, trained bonus, skills, health, hunger, age
 - [ ] Player login creates a Leader and a starting city (≈8 residents, wooden wall, farm, food,
       horse, carriage) far from other Players
-- [ ] Inspect a resident in the UI
+- [ ] Sight: residents see within a sight range; the sync sends only what is in sight
+- [ ] Inspect a resident in the UI (design: the "Main Game Screen" canvas)
 - Done when: two Players log in and each sees their own city, far apart.
 
 ### 3. Survive
