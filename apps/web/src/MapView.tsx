@@ -58,9 +58,22 @@ interface Hover {
  * terrain; closer in it adds resource nodes and residents, and up close the tile grid.
  * Drag or swipe to pan; wheel, pinch or the buttons to zoom.
  */
-export function MapView({ world }: { world: ClientWorld }) {
+export function MapView({
+  world,
+  selectedId,
+  onSelect,
+}: {
+  world: ClientWorld
+  /** The resident shown with a ring, if any. */
+  selectedId?: string
+  /** Called with a resident of the Player's realm clicked on the map. */
+  onSelect?: (id: string) => void
+}) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef(world)
+  const selectedRef = useRef(selectedId)
+  const onSelectRef = useRef(onSelect)
+  onSelectRef.current = onSelect
   const redrawRef = useRef<() => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
   const controlsRef = useRef<{ zoom(factor: number): void; centre(): void } | null>(null)
@@ -69,6 +82,11 @@ export function MapView({ world }: { world: ClientWorld }) {
   const mapSize = world.map.size
 
   // What is in sight changes every tick; the scene reads the latest through the ref.
+  useEffect(() => {
+    selectedRef.current = selectedId
+    redrawRef.current()
+  }, [selectedId])
+
   useEffect(() => {
     worldRef.current = world
     if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
@@ -180,6 +198,9 @@ export function MapView({ world }: { world: ClientWorld }) {
         const color =
           u.id === home.leaderId ? LEADER_COLOR : u.owner === home.realmId ? OWN_COLOR : OTHER_COLOR
         g.circle(sx, sy, dot).fill(color).stroke({ width: 2, color: 0x121518 })
+        if (u.id === selectedRef.current) {
+          g.circle(sx, sy, dot + 4).stroke({ width: 2.5, color: LEADER_COLOR })
+        }
       }
     }
 
@@ -207,6 +228,8 @@ export function MapView({ world }: { world: ClientWorld }) {
 
     // Pointer input: one pointer pans, two pinch-zoom; works for mouse, pen and touch alike.
     const pointers = new Map<number, { x: number; y: number }>()
+    let pressedAt = { x: 0, y: 0 }
+    let dragged = 0
     const local = (e: PointerEvent | WheelEvent) => {
       const rect = app.canvas.getBoundingClientRect()
       return { x: e.clientX - rect.left, y: e.clientY - rect.top }
@@ -219,6 +242,8 @@ export function MapView({ world }: { world: ClientWorld }) {
         // dragging still works while over the canvas
       }
       pointers.set(e.pointerId, local(e))
+      pressedAt = local(e)
+      dragged = 0
     }
     const onMove = (e: PointerEvent) => {
       const p = local(e)
@@ -226,6 +251,7 @@ export function MapView({ world }: { world: ClientWorld }) {
       if (e.buttons === 0) pointers.delete(e.pointerId)
       const prev = pointers.get(e.pointerId)
       if (!prev) return hoverAt(p.x, p.y)
+      dragged = Math.max(dragged, Math.hypot(p.x - pressedAt.x, p.y - pressedAt.y))
       if (pointers.size === 1) {
         setCam(panBy(cam, mapSize, p.x - prev.x, p.y - prev.y))
       } else if (pointers.size === 2) {
@@ -239,7 +265,29 @@ export function MapView({ world }: { world: ClientWorld }) {
       }
       pointers.set(e.pointerId, p)
     }
-    const onUp = (e: PointerEvent) => pointers.delete(e.pointerId)
+    const onUp = (e: PointerEvent) => {
+      const wasPressed = pointers.delete(e.pointerId)
+      // A press that hardly moved is a click: pick the own resident under it, if any.
+      if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && dragged < 6) {
+        const p = local(e)
+        const id = residentAt(p.x, p.y)
+        if (id) onSelectRef.current?.(id)
+      }
+    }
+
+    function residentAt(sx: number, sy: number): string | undefined {
+      const view = size()
+      const { home, residents } = worldRef.current
+      const reach = Math.max(10, cam.scale * 0.6)
+      let best: { id: string; d: number } | undefined
+      for (const r of residents) {
+        if (r.owner !== home.realmId) continue
+        const [rx, ry] = tileToScreen(cam, view, mapSize, r.x + 0.5, r.y + 0.5)
+        const d = Math.hypot(rx - sx, ry - sy)
+        if (d <= reach && (!best || d < best.d)) best = { id: r.id, d }
+      }
+      return best?.id
+    }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       const p = local(e)

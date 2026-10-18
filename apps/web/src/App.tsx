@@ -5,6 +5,7 @@ import { AdminPanel } from './AdminPanel.js'
 import { api } from './api.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
+import { ResidentInspector, ResidentsList } from './Residents.js'
 import { ScriptEditor } from './ScriptEditor.js'
 import { useWorld } from './useWorld.js'
 
@@ -25,6 +26,10 @@ export function App() {
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
   const { world, status } = useWorld(onLoggedOut)
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([])
+  const [selectedId, setSelectedId] = useState<string | undefined>()
+  const own = world ? world.residents.filter((r) => r.owner === world.home.realmId) : []
+  const selected = own.find((r) => r.id === selectedId)
+  const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -50,19 +55,44 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </button>
       </header>
       <main>
-        <section className="map-panel">
-          {world ? <MapView world={world} /> : <p>Waiting for the server…</p>}
-        </section>
-        <section className="editor-panel">
-          <h2>Resident script</h2>
-          <ScriptEditor onChange={(src) => setDiagnostics(checkScript(src))} />
-          <p className="diagnostics">
-            {diagnostics.length === 0
-              ? 'No syntax errors.'
-              : diagnostics.map((d) => `${d.line}:${d.column} ${d.message}`).join('\n')}
-          </p>
-          {account.isAdmin && <AdminPanel />}
-        </section>
+        <div className="play-column">
+          <section className="map-panel">
+            {world ? (
+              <MapView world={world} selectedId={selectedId} onSelect={setSelectedId} />
+            ) : (
+              <p>Waiting for the server…</p>
+            )}
+          </section>
+          {world && (
+            <ResidentsList
+              residents={own}
+              leaderId={world.home.leaderId}
+              tick={world.tick}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+            />
+          )}
+        </div>
+        <div className="side-column">
+          {world && (
+            <ResidentInspector
+              resident={selected}
+              leaderId={world.home.leaderId}
+              cityName={homeCity?.name}
+              tick={world.tick}
+            />
+          )}
+          <section className="editor-panel">
+            <h2>Resident script</h2>
+            <ScriptEditor onChange={(src) => setDiagnostics(checkScript(src))} />
+            <p className="diagnostics">
+              {diagnostics.length === 0
+                ? 'No syntax errors.'
+                : diagnostics.map((d) => `${d.line}:${d.column} ${d.message}`).join('\n')}
+            </p>
+            {account.isAdmin && <AdminPanel />}
+          </section>
+        </div>
       </main>
     </div>
   )
