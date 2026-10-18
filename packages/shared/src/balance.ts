@@ -323,3 +323,15 @@ export function constructionLearned(resident: Resident, tick: number): number {
   const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
   return (CONSTRUCTION_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
 }
+
+/**
+ * Tearing down takes less work than building (`CONTEXT.md`: Tearing down): this share of the
+ * building's `BUILD_WORK`, or of the work put into an unfinished site so far.
+ */
+export const TEARDOWN_WORK_SHARE = 0.5
+
+/**
+ * Share of a finished building's materials left on the tile when it is torn down, rounded down
+ * to whole units. An unfinished site leaves all its delivered materials.
+ */
+export const TEARDOWN_MATERIALS_RETURNED = 0.5

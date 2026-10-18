@@ -58,6 +58,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'build', residentId: selected.id, building }))
   }
+  /** Orders the picked resident to tear down the building or site on their tile. */
+  async function tearDown(buildingId: string) {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'tearDown', residentId: selected.id, buildingId }))
+  }
   const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
   const onNodesLoaded = useCallback(
     (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
@@ -136,6 +141,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
               onDrop={(spot, goods) => carry('drop', spot, goods)}
               onBuild={build}
+              onTearDown={tearDown}
             />
           )}
           {world && <RealmLog events={world.events} />}
