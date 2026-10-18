@@ -447,6 +447,20 @@ button.residents-row:hover {
   min-height: 44px;
   min-width: 96px;
 }
+.goods-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.goods-row .buttons {
+  display: flex;
+  gap: 6px;
+}
+.goods-row button {
+  min-height: 36px;
+  min-width: 64px;
+}
 .realm-log h2 {
   margin: 0;
   font-size: 0.8rem;

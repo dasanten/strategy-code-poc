@@ -239,7 +239,10 @@ export const carriedWithinCapacity: Invariant = {
   },
 }
 
-/** Goods are never negative wherever they are, and a pile is never empty; one pile per tile. */
+/**
+ * Goods are never negative wherever they are, only storages among buildings hold any, and a pile
+ * is never empty; one pile per tile.
+ */
 export const goodsInPlace: Invariant = {
   name: 'goods-in-place',
   check(world) {
@@ -248,6 +251,10 @@ export const goodsInPlace: Invariant = {
       out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
     const negative = (stock: Stock) => Object.values(stock).some((n) => !(n >= 0))
     for (const r of world.residents) if (negative(r.carried)) fail(r.id, 'carries negative goods')
+    for (const b of world.buildings) {
+      const holds = Object.values(b.stock ?? {}).some((n) => n > 0)
+      if (holds && b.kind !== 'storage') fail(b.id, `is a ${b.kind} holding goods`)
+    }
     const tiles = new Set<string>()
     for (const p of world.piles) {
       if (negative(p.goods)) fail(p.id, 'holds negative goods')
@@ -279,6 +286,23 @@ export const goodsInWholeUnits: Invariant = {
         invariant: this.name,
         message: `${id} holds part of a unit: ${JSON.stringify(stock)}`,
         entityIds: [id],
+      }))
+  },
+}
+
+/**
+ * Pick-up and drop orders are done within the tick they start (`resolveCarrying`), so after a
+ * tick no resident still holds one.
+ */
+export const carryOrdersDone: Invariant = {
+  name: 'carry-orders-done',
+  check(world) {
+    return world.residents
+      .filter((r) => r.order?.kind === 'pickUp' || r.order?.kind === 'drop')
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} still holds a ${r.order!.kind} order after the tick`,
+        entityIds: [r.id],
       }))
   },
 }
@@ -319,6 +343,7 @@ export const worldInvariants: Invariant[] = [
   carriedWithinCapacity,
   goodsInPlace,
   goodsInWholeUnits,
+  carryOrdersDone,
   nodesOnFittingTerrain,
   realmLogsInOrder,
 ]

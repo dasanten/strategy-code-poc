@@ -1,5 +1,6 @@
 import { isPassableTerrain, terrainAt, wrap, type TerrainMap, type WorldState } from '@csp/shared'
 import { placeResourceNodes } from './node-gen.js'
+import { requestCarrying, resolveCarrying } from './carrying.js'
 import type { Walking } from './walking.js'
 import { stepSpoilage } from './spoilage.js'
 import { stepSurvival, type SurvivalResult } from './survival.js'
@@ -66,8 +67,9 @@ export interface StepResult {
 
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; food
- * spoils at the end of each game day; then their orders request actions (steps, for now), and
- * the world resolves them together. As the next tick begins, residents age: the old die, and
+ * spoils at the end of each game day; then their orders request actions (steps, then taking and
+ * putting down goods), and the world resolves them together. As the next tick begins, residents
+ * age: the old die, and
  * loads too heavy for declining Strength are put down. Without `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, _terrain: TerrainMap, walking?: Walking): StepResult {
@@ -75,7 +77,9 @@ export function stepWorld(world: WorldState, _terrain: TerrainMap, walking?: Wal
   stepSpoilage(world)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
+  const carries = requestCarrying(world)
+  resolveCarrying(world, carries)
   world.tick++
   const aging = stepAging(world)
-  return { actions: steps.length, survival, aging }
+  return { actions: steps.length + carries.length, survival, aging }
 }

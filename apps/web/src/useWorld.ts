@@ -7,6 +7,7 @@ import {
   type Horse,
   type MapInfo,
   type OrderRequest,
+  type Pile,
   type RealmEvent,
   type Resident,
   type SeenEntity,
@@ -33,6 +34,7 @@ export interface ClientWorld {
   buildings: Building[]
   horses: Horse[]
   carriages: Carriage[]
+  piles: Pile[]
   /** The Player's realm log, oldest first. */
   events: RealmEvent[]
 }
@@ -45,13 +47,15 @@ function byKind(entities: Iterable<SeenEntity>) {
     buildings: [] as Building[],
     horses: [] as Horse[],
     carriages: [] as Carriage[],
+    piles: [] as Pile[],
   }
   for (const { is, ...e } of entities) {
     if (is === 'resident') out.residents.push(e as Resident)
     else if (is === 'city') out.cities.push(e as City)
     else if (is === 'building') out.buildings.push(e as Building)
     else if (is === 'horse') out.horses.push(e as Horse)
-    else out.carriages.push(e as Carriage)
+    else if (is === 'carriage') out.carriages.push(e as Carriage)
+    else out.piles.push(e as Pile)
   }
   return out
 }

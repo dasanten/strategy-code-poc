@@ -1,5 +1,5 @@
 import type { Account } from './api.js'
-import type { Building, Carriage, City, Horse, RealmEvent, Resident } from './world.js'
+import type { Building, Carriage, City, Horse, Pile, RealmEvent, Resident } from './world.js'
 
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
 export interface MapInfo {
@@ -27,6 +27,7 @@ export type SeenEntity =
   | ({ is: 'city' } & City)
   | ({ is: 'horse' } & Horse)
   | ({ is: 'carriage' } & Carriage)
+  | ({ is: 'pile' } & Pile)
 
 /** Messages the server pushes over the WebSocket (ADR 0006). */
 export type ServerMessage =

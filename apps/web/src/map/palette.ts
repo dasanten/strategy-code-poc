@@ -52,5 +52,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
 }
 export const HORSE_COLOR = 0x6b4f2e
 export const CARRIAGE_COLOR = 0xb79a6e
+/** Goods lying on the ground. */
+export const PILE_COLOR = 0xd9c27a
 
 export const css = (color: number) => `#${color.toString(16).padStart(6, '0')}`

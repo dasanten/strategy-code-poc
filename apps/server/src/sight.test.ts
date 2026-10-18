@@ -34,6 +34,18 @@ describe('entitiesInSight', () => {
     expect(entitiesInSight(world, terrain, realm.id).map((e) => e.id)).toContain(storage.id)
   })
 
+  it('shows piles on the ground within sight range', () => {
+    const { world } = worldWithCity()
+    const realm = world.realms[0]!
+    const r = world.residents[0]!
+    world.piles.push(
+      { id: 'near', x: r.x, y: r.y, goods: { wood: 2 } },
+      { id: 'far', x: (r.x + 150) % terrain.size, y: r.y, goods: { wood: 2 } },
+    )
+    const piles = entitiesInSight(world, terrain, realm.id).filter((e) => e.is === 'pile')
+    expect(piles.map((p) => p.id)).toEqual(['near'])
+  })
+
   it('lets two Players far apart see nothing of each other', () => {
     const world = createWorld(terrain)
     foundStartingCity(world, terrain, 1)
