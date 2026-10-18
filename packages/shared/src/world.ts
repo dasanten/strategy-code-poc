@@ -41,7 +41,25 @@ export interface Resident {
   bornAt: number
   /** Goods the resident carries, up to their carry capacity. */
   carried: Stock
+  /** What the resident was ordered to do, as plain data; null when idle (ADR 0002). */
+  order: ResidentOrder | null
 }
+
+/**
+ * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
+ * arrives; until then it is null. `progress` is how far into the next step the resident is, in
+ * tiles; at 1 they request the step.
+ */
+export interface WalkOrder {
+  kind: 'walkTo'
+  target: { x: number; y: number }
+  /** The tiles still to walk, in order; null while the path is being found. */
+  path: [number, number][] | null
+  progress: number
+}
+
+/** Any order a resident can hold. */
+export type ResidentOrder = WalkOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {

@@ -5,7 +5,7 @@ import type { TerrainMap, WorldState } from '@csp/shared'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 7
+export const WORLD_FORMAT_VERSION = 8
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -31,6 +31,11 @@ export const migrations: Record<number, MigrationStep> = {
   6: (state) => {
     const s = state as { residents: object[] }
     return { ...s, residents: s.residents.map((r) => ({ ...r, carried: {} })), piles: [] }
+  },
+  // Residents got orders; everyone starts idle.
+  7: (state) => {
+    const s = state as { residents: object[] }
+    return { ...s, residents: s.residents.map((r) => ({ ...r, order: null })) }
   },
 }
 

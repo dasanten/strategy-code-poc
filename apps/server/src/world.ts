@@ -1,5 +1,6 @@
 import { isPassableTerrain, terrainAt, wrap, type TerrainMap, type WorldState } from '@csp/shared'
 import { placeResourceNodes } from './node-gen.js'
+import type { Walking } from './walking.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -56,10 +57,12 @@ export interface StepResult {
 }
 
 /**
- * Advances the world by one tick. Nothing requests actions yet: orders and scripts will, and
- * the world resolves them here (ADR 0002).
+ * Advances the world by one tick (ADR 0002): residents' orders request actions (steps, for
+ * now), and the world resolves them together. Without `walking` nobody moves.
  */
-export function stepWorld(world: WorldState, _terrain: TerrainMap): StepResult {
+export function stepWorld(world: WorldState, _terrain: TerrainMap, walking?: Walking): StepResult {
+  const steps = walking?.requestSteps(world) ?? []
+  walking?.resolve(world, steps)
   world.tick++
-  return { actions: 0 }
+  return { actions: steps.length }
 }

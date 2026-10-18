@@ -438,3 +438,12 @@ button.residents-row:hover {
   font-size: 0.9rem;
   font-weight: 500;
 }
+.order-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.order-buttons button {
+  min-height: 44px;
+  min-width: 96px;
+}

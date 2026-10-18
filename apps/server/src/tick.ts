@@ -1,6 +1,7 @@
 import type { TerrainMap, WorldState } from '@csp/shared'
 import { checkInvariants, shouldCheckInvariants, type InvariantViolation } from './invariants.js'
 import type { OrderQueue } from './orders.js'
+import type { Walking } from './walking.js'
 import { stepWorld } from './world.js'
 
 /** How one tick went, reported as performance data (ADR 0004). */
@@ -24,6 +25,8 @@ export interface TickOptions {
   reporter: TickReporter
   invariantSampleRate: number
   slowTickMs: number
+  /** Turns walk orders into steps; without it nobody walks. */
+  walking?: Walking
   /** Orders accepted since the last tick; applied before the world steps. */
   orders?: OrderQueue
   now?: () => number
@@ -44,7 +47,7 @@ export function runTick(
   try {
     const start = now()
     opts.orders?.applyAll(world)
-    const { actions } = stepWorld(world, terrain)
+    const { actions } = stepWorld(world, terrain, opts.walking)
     if (shouldCheckInvariants(opts.invariantSampleRate, opts.rand)) {
       const violations = checkInvariants(world, terrain)
       if (violations.length > 0) opts.reporter.invariantViolations(world, violations)

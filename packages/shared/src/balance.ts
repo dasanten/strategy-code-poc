@@ -41,7 +41,7 @@ export const NODE_MIN_SPACING = 4
 
 /**
  * How fast an unloaded resident crosses each terrain, relative to Plains (`CONTEXT.md`:
- * Terrain). Agility softens the penalty; that comes with walking (T4.2).
+ * Terrain). Agility softens the penalty (`walkSpeed`).
  */
 export const TERRAIN_SPEED = {
   [Terrain.Plains]: 1,
@@ -130,4 +130,34 @@ export function stockWeight(stock: Stock): number {
 /** The most weight a resident can carry, in kg (`CONTEXT.md`: Carry capacity). */
 export function carryCapacity(resident: Resident): number {
   return CARRY_BASE + CARRY_PER_STRENGTH * effective(resident.stats.strength)
+}
+
+/** Ticks (real seconds) an unloaded resident of average Agility takes to walk a plains tile. */
+export const WALK_TICKS_PER_TILE = 30
+
+/** The Agility at which a resident walks at the usual speed. */
+export const AGILITY_AVERAGE = 10
+
+/** How much faster each point of Agility above average walks (slower below). */
+export const AGILITY_SPEED_EFFECT = 0.02
+
+/** How much of a terrain's slowdown each point of Agility above average takes away. */
+export const AGILITY_TERRAIN_EFFECT = 0.03
+
+/** The furthest Agility moves either effect, up or down. */
+export const AGILITY_LIMIT = 0.3
+
+/**
+ * How many tiles per tick a resident walks onto a tile of the given terrain (`CONTEXT.md`:
+ * Terrain, Stats): plains speed from Agility, and the terrain's slowdown softened by Agility.
+ * Zero for terrain nobody can enter.
+ */
+export function walkSpeed(resident: Resident, terrain: number): number {
+  const base = (TERRAIN_SPEED as Partial<Record<number, number>>)[terrain]
+  if (!base) return 0
+  const away = effective(resident.stats.agility) - AGILITY_AVERAGE
+  const clamp = (v: number) => Math.max(-AGILITY_LIMIT, Math.min(AGILITY_LIMIT, v))
+  const pace = 1 + clamp(away * AGILITY_SPEED_EFFECT)
+  const slowdown = (1 - base) * (1 - clamp(away * AGILITY_TERRAIN_EFFECT))
+  return (pace * (1 - slowdown)) / WALK_TICKS_PER_TILE
 }

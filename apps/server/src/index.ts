@@ -16,6 +16,7 @@ import { OrderQueue } from './orders.js'
 import { ExploredTerrain } from './explored.js'
 import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
+import { Walking } from './walking.js'
 import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { generateTerrain } from './terrain-gen.js'
 import { runTick } from './tick.js'
@@ -50,6 +51,7 @@ if (sentryOn) setupFastifyErrorHandler(app)
 
 const orders = new OrderQueue()
 const sight = new SightTracker()
+const walking = new Walking(terrain)
 const realtime = attachRealtime(app.server, { db, world, terrain, explored, sight, orders })
 
 const reporter = createTickReporter(logger)
@@ -57,6 +59,7 @@ const loop = setInterval(() => {
   runTick(world, terrain, {
     reporter,
     orders,
+    walking,
     invariantSampleRate: config.invariantSampleRate,
     slowTickMs: config.slowTickMs,
   })

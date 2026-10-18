@@ -7,6 +7,7 @@ import {
   chunksAcross,
   wrapDelta,
   type KnownNode,
+  type Resident,
   type TerrainChunk,
 } from '@csp/shared'
 import {
@@ -62,18 +63,28 @@ export function MapView({
   world,
   selectedId,
   onSelect,
+  picking = false,
+  onPickTile,
 }: {
   world: ClientWorld
   /** The resident shown with a ring, if any. */
   selectedId?: string
   /** Called with a resident of the Player's realm clicked on the map. */
   onSelect?: (id: string) => void
+  /** Waiting for a tile: the next click picks one instead of selecting. */
+  picking?: boolean
+  /** Called with a tile picked by click (while `picking`) or by right-click. */
+  onPickTile?: (x: number, y: number) => void
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef(world)
   const selectedRef = useRef(selectedId)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const pickingRef = useRef(picking)
+  pickingRef.current = picking
+  const onPickTileRef = useRef(onPickTile)
+  onPickTileRef.current = onPickTile
   const redrawRef = useRef<() => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
   const controlsRef = useRef<{ zoom(factor: number): void; centre(): void } | null>(null)
@@ -200,6 +211,7 @@ export function MapView({
         g.circle(sx, sy, dot).fill(color).stroke({ width: 2, color: 0x121518 })
         if (u.id === selectedRef.current) {
           g.circle(sx, sy, dot + 4).stroke({ width: 2.5, color: LEADER_COLOR })
+          drawPath(g, cam, view, mapSize, u)
         }
       }
     }
@@ -267,9 +279,18 @@ export function MapView({
     }
     const onUp = (e: PointerEvent) => {
       const wasPressed = pointers.delete(e.pointerId)
-      // A press that hardly moved is a click: pick the own resident under it, if any.
+      // A press that hardly moved is a click: while picking it picks the tile, otherwise it
+      // picks the own resident under it, if any. A right-click always picks the tile.
       if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && dragged < 6) {
         const p = local(e)
+        if (pickingRef.current || e.button === 2) {
+          const [tx, ty] = screenToTile(cam, size(), mapSize, p.x, p.y).map(Math.floor) as [
+            number,
+            number,
+          ]
+          onPickTileRef.current?.(tx, ty)
+          return
+        }
         const id = residentAt(p.x, p.y)
         if (id) onSelectRef.current?.(id)
       }
@@ -316,6 +337,7 @@ export function MapView({
       app.canvas.addEventListener('lostpointercapture', onUp)
       app.canvas.addEventListener('pointerleave', () => setHover(null))
       app.canvas.addEventListener('wheel', onWheel, { passive: false })
+      app.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
       app.renderer.on('resize', redraw)
       app.stage.addChild(terrainLayer, overlay)
       ready = true
@@ -407,6 +429,26 @@ function Legend() {
       ))}
     </div>
   )
+}
+
+/** The selected resident's way ahead, as a dashed line to the target (design: Main Game Screen). */
+function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: Resident) {
+  const o = r.order
+  if (o?.kind !== 'walkTo') return
+  const [tx, ty] = tileToScreen(cam, view, size, o.target.x + 0.5, o.target.y + 0.5)
+  if (o.path) {
+    // Dashes: every other step of the way, from the resident on.
+    let [px, py] = tileToScreen(cam, view, size, r.x + 0.5, r.y + 0.5)
+    o.path.forEach(([x, y], i) => {
+      const [nx, ny] = tileToScreen(cam, view, size, x + 0.5, y + 0.5)
+      // A step across a join shows up far away on screen; don't draw a line across the map.
+      if (i % 2 === 0 && Math.hypot(nx - px, ny - py) < cam.scale * 1.5)
+        g.moveTo(px, py).lineTo(nx, ny)
+      ;[px, py] = [nx, ny]
+    })
+    g.stroke({ width: 2.5, color: LEADER_COLOR, cap: 'round' })
+  }
+  g.circle(tx, ty, 5).fill(LEADER_COLOR)
 }
 
 /** Where the view starts and re-centres: the middle of the Player's home city. */

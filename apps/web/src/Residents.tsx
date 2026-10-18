@@ -35,8 +35,13 @@ function meterClass(share: number): string {
 
 const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
 
-/** What a resident is doing. Nothing yet: orders come with walking and work (T4.2, T5.3). */
-function doing(_r: Resident): string {
+/** What a resident is doing, from their order. */
+function doing(r: Resident): string {
+  const o = r.order
+  if (o?.kind === 'walkTo') {
+    if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
+    return `Walking to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
+  }
   return 'Idle'
 }
 
@@ -104,11 +109,20 @@ export function ResidentInspector({
   leaderId,
   cityName,
   tick,
+  picking,
+  onWalkTo,
+  orderError,
 }: {
   resident: Resident | undefined
   leaderId: string
   cityName: string | undefined
   tick: number
+  /** The map is waiting for a tile to walk to. */
+  picking: boolean
+  /** Starts (or cancels) picking a tile to walk to. */
+  onWalkTo: () => void
+  /** Why the last order was turned down, if it was. */
+  orderError: string | undefined
 }) {
   if (!resident) {
     return (
@@ -150,7 +164,23 @@ export function ResidentInspector({
           <h3>Order</h3>
         </div>
         <div className="doing-now">{doing(r)}</div>
-        <p className="muted small">Orders come with walking and work.</p>
+        <div className="order-buttons">
+          <button
+            type="button"
+            className={picking ? 'primary' : ''}
+            onClick={onWalkTo}
+            aria-pressed={picking}
+          >
+            {picking ? 'Pick a tile…' : 'Walk to'}
+          </button>
+        </div>
+        <p className="muted small" role="status">
+          {orderError
+            ? `Order turned down: ${orderError}`
+            : picking
+              ? 'Tap a tile on the map, or press Walk to again to cancel.'
+              : 'Right-click the map to walk there.'}
+        </p>
       </section>
 
       <section className="inspector-block" aria-label="Stats">
