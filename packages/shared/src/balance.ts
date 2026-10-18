@@ -1,5 +1,5 @@
 import { Terrain } from './terrain.js'
-import type { ResourceKind } from './world.js'
+import { effective, type Good, type ResourceKind, type Resident, type Stock } from './world.js'
 
 /**
  * Balance numbers: how much, how fast, how often. The rules (what happens) are in `CONTEXT.md`;
@@ -98,3 +98,36 @@ export const SIGHT_RANGE = 12
 
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
+
+/**
+ * What one unit of each good weighs, in kg (`CONTEXT.md`: Good). Coins are light but not
+ * weightless, so a fortune still has to be carried.
+ */
+export const GOOD_WEIGHT: Record<Good, number> = {
+  food: 1,
+  wood: 1,
+  stone: 1,
+  ironOre: 1,
+  iron: 1,
+  goldOre: 1,
+  coins: 0.02,
+}
+
+/** Carry capacity of a resident with no Strength at all, in kg. */
+export const CARRY_BASE = 10
+
+/** Carry capacity each point of effective Strength adds, in kg. */
+export const CARRY_PER_STRENGTH = 2
+
+/** What some goods weigh together, in kg. */
+export function stockWeight(stock: Stock): number {
+  return (Object.entries(stock) as [Good, number][]).reduce(
+    (kg, [good, units]) => kg + units * GOOD_WEIGHT[good],
+    0,
+  )
+}
+
+/** The most weight a resident can carry, in kg (`CONTEXT.md`: Carry capacity). */
+export function carryCapacity(resident: Resident): number {
+  return CARRY_BASE + CARRY_PER_STRENGTH * effective(resident.stats.strength)
+}

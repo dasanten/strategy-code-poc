@@ -39,6 +39,8 @@ export interface Resident {
   hunger: number
   /** The tick the resident was born; may be before the world began. Age follows from it. */
   bornAt: number
+  /** Goods the resident carries, up to their carry capacity. */
+  carried: Stock
 }
 
 /** A stat's effective value: base and trained bonus together. */
@@ -69,12 +71,22 @@ export interface WorldState {
   buildings: Building[]
   horses: Horse[]
   carriages: Carriage[]
+  /** Goods lying on the ground, at most one pile per tile. */
+  piles: Pile[]
 }
 
-/** PoC goods (`CONTEXT.md`: Good). Amounts are in kg. */
+/** Goods lying on the ground on one tile, for anyone to take (`CONTEXT.md`: Pile). */
+export interface Pile {
+  id: string
+  x: number
+  y: number
+  goods: Stock
+}
+
+/** PoC goods (`CONTEXT.md`: Good). Amounts are counted in units; `GOOD_WEIGHT` weighs them. */
 export type Good = 'food' | 'wood' | 'stone' | 'ironOre' | 'iron' | 'goldOre' | 'coins'
 
-/** Goods by kind, in kg; a missing good is 0. */
+/** Goods by kind, as unit counts; a missing good is 0. */
 export type Stock = Partial<Record<Good, number>>
 
 /** Everything one Player controls through their Leader (`CONTEXT.md`: Realm). */
@@ -132,7 +144,7 @@ export interface Carriage {
   realmId: string
   x: number
   y: number
-  /** Goods on board, in kg. */
+  /** Goods on board. */
   load: Stock
 }
 

@@ -87,6 +87,16 @@ describe('world saves', () => {
     close()
   })
 
+  it('gives residents empty hands and the world no piles (migration 6 → 7)', () => {
+    const resident = { id: 'r1', name: 'Mara', owner: 'realm1', x: 1, y: 2 }
+    const v6 = { tick: 10, seed: 1, residents: [resident], cities: [] }
+    expect(migrateWorld(v6, 6, { terrain })).toEqual({
+      ...v6,
+      residents: [{ ...resident, carried: {} }],
+      piles: [],
+    })
+  })
+
   it('keeps the newest saves and one per hour for a week', async () => {
     const { db, close } = await openDb(':memory:')
     const now = 1_000_000_000

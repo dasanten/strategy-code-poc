@@ -22,6 +22,7 @@ describe('world', () => {
       buildings: [],
       horses: [],
       carriages: [],
+      piles: [],
     })
   })
 
