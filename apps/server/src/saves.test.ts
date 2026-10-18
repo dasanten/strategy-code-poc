@@ -78,7 +78,7 @@ describe('world saves', () => {
     const { world, terrain: stored } = loadOrCreateWorld(db, generate)
     expect(seeds).toEqual([1])
     expect(loadTerrain(db)?.seed).toBe(1)
-    expect(Object.keys(world).sort()).toEqual(['seed', 'tick', 'units'])
+    expect(Object.keys(world).sort()).toEqual(['nodes', 'seed', 'tick', 'units'])
     expect(world.tick).toBe(900)
     expect(world.units.map((u) => u.hp)).toEqual([10, 10, 7])
     expect(checkInvariants(world, stored)).toEqual([])
@@ -91,6 +91,14 @@ describe('world saves', () => {
     const [u1, , u3] = world.units
     expect(u3!.x - u1!.x).toBeGreaterThan(20)
     close()
+  })
+
+  it('gives a format-2 world the resource nodes a new world would get (migration 2 → 3)', () => {
+    const v2 = { tick: 50, seed: 1, units: [{ id: 'u1', owner: 'red', x: 60, y: 60, hp: 10 }] }
+    const world = migrateWorld(v2, 2, { terrain })
+    expect(world.nodes).toEqual(createWorld(terrain, 1).nodes)
+    expect(world.nodes.length).toBeGreaterThan(0)
+    expect({ ...world, nodes: [] }).toEqual({ ...v2, nodes: [] })
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

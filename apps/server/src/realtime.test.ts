@@ -1,9 +1,10 @@
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WebSocket } from 'ws'
-import { SESSION_COOKIE, WS_PATH, type ServerMessage } from '@csp/shared'
+import { SESSION_COOKIE, WS_PATH, chunksAcross, type ServerMessage } from '@csp/shared'
 import { buildApp } from './app.js'
 import { createAdmin, createSession } from './auth.js'
+import { ExploredTerrain } from './explored.js'
 import { openDb, schema } from './db/index.js'
 import { OrderQueue } from './orders.js'
 import { attachRealtime } from './realtime.js'
@@ -30,6 +31,7 @@ async function start() {
     db: opened.db,
     world,
     terrain,
+    explored: new ExploredTerrain(terrain),
     orders: new OrderQueue(),
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
@@ -87,7 +89,12 @@ describe('realtime', () => {
     const { next } = connect(url, token)
     const welcome = await next('welcome')
     expect(welcome).toMatchObject({ type: 'welcome', account: { name: 'Daniel' }, tick: 0 })
-    if (welcome.type === 'welcome') expect(welcome.entities).toHaveLength(world.units.length)
+    if (welcome.type === 'welcome') {
+      expect(welcome.entities).toHaveLength(world.units.length)
+      // Daniel is an admin, so the whole map counts as explored.
+      const n = chunksAcross(terrain.diameter)
+      expect(welcome.exploredChunks).toEqual([...Array(n * n).keys()])
+    }
 
     realtime.broadcastTick()
     expect(await next('tick')).toEqual({ type: 'tick', tick: 0, changed: [], gone: [] })

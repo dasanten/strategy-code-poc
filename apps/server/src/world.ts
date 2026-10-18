@@ -6,6 +6,7 @@ import {
   type Unit,
   type WorldState,
 } from '@csp/shared'
+import { placeResourceNodes } from './node-gen.js'
 
 /** Small seeded PRNG so a fresh world always looks the same. */
 function mulberry32(seed: number) {
@@ -33,7 +34,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     occupied.add(`${ux},${uy}`)
     units.push({ id: `u${i + 1}`, owner: i < 3 ? 'red' : 'blue', x: ux, y: uy, hp: 10 })
   }
-  return { tick: 0, seed, units }
+  return { tick: 0, seed, units, nodes: placeResourceNodes(terrain, seed) }
 }
 
 export function isWalkable(terrain: TerrainMap, x: number, y: number): boolean {

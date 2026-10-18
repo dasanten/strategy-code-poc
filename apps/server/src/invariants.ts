@@ -1,4 +1,4 @@
-import type { TerrainMap, WorldState } from '@csp/shared'
+import { NODE_TERRAINS, terrainAt, type TerrainMap, type WorldState } from '@csp/shared'
 import { isWalkable } from './world.js'
 
 /**
@@ -49,7 +49,25 @@ export const oneUnitPerTile: Invariant = {
   },
 }
 
-export const worldInvariants: Invariant[] = [nothingOnImpassableTerrain, oneUnitPerTile]
+/** Every resource node lies on terrain that fits its kind. */
+export const nodesOnFittingTerrain: Invariant = {
+  name: 'nodes-on-fitting-terrain',
+  check(world, terrain) {
+    return world.nodes
+      .filter((n) => !(NODE_TERRAINS[n.kind] as number[]).includes(terrainAt(terrain, n.x, n.y)))
+      .map((n) => ({
+        invariant: this.name,
+        message: `${n.kind} node ${n.id} lies on unfitting terrain at (${n.x}, ${n.y})`,
+        entityIds: [n.id],
+      }))
+  },
+}
+
+export const worldInvariants: Invariant[] = [
+  nothingOnImpassableTerrain,
+  oneUnitPerTile,
+  nodesOnFittingTerrain,
+]
 
 export function checkInvariants(
   world: WorldState,

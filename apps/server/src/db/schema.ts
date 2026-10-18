@@ -69,6 +69,18 @@ export const terrain = sqliteTable('terrain', {
 })
 
 /**
+ * Each Player's explored terrain (`CONTEXT.md`: Explored terrain): one bit per tile of the
+ * terrain grid, row-major. Saved together with the world.
+ */
+export const explored = sqliteTable('explored', {
+  userId: integer('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  data: blob('data', { mode: 'buffer' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
+/**
  * Rolling saves of the world's entities as gzipped JSON (ADR 0006). `version` is the world
  * format the state was written in; loading migrates it to the current one.
  */
