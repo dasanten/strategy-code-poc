@@ -1,6 +1,7 @@
 import { isPassableTerrain, terrainAt, wrap, type TerrainMap, type WorldState } from '@csp/shared'
 import { placeResourceNodes } from './node-gen.js'
 import type { Walking } from './walking.js'
+import { stepSurvival, type SurvivalResult } from './survival.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -54,15 +55,19 @@ export function nearestFreeTile(
 export interface StepResult {
   /** Actions requested this tick. */
   actions: number
+  /** Who died and which realms ended this tick. */
+  survival: SurvivalResult
 }
 
 /**
- * Advances the world by one tick (ADR 0002): residents' orders request actions (steps, for
- * now), and the world resolves them together. Without `walking` nobody moves.
+ * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; then
+ * their orders request actions (steps, for now), and the world resolves them together. Without
+ * `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, _terrain: TerrainMap, walking?: Walking): StepResult {
+  const survival = stepSurvival(world)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
   world.tick++
-  return { actions: steps.length }
+  return { actions: steps.length, survival }
 }

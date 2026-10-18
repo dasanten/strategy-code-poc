@@ -175,7 +175,7 @@ The shared language of the game. Domain terms only — no implementation details
   except that the Player controls their cities and residents only while their Leader lives.
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
   Leader was. Their cities become self-managed. The Player respawns as a new Leader with a fresh
-  starting city.
+  starting city on their next login.
 - **Self-managed city:** a city with no living Leader in charge. It runs on its own behaviour and
   can be traded with, contracted, conquered or integrated by anyone, including its former Player.
 
@@ -205,7 +205,7 @@ The shared language of the game. Domain terms only — no implementation details
   around 60 game years. Children are grown after about 14 game years.
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and
   less with high Endurance. An empty hunger meter costs health; without food a resident dies
-  after about 2 game days.
+  after about 2 game days. While the meter isn't empty, lost health slowly comes back.
 - **Eating:** a resident eats from what they carry, or from their city's storage while at home.
   Away from home they need food on them or a delivery.
 
