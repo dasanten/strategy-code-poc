@@ -16,6 +16,8 @@ export interface Unit {
 
 export interface WorldState {
   tick: number
+  /** The seed the map was generated from. */
+  seed: number
   width: number
   height: number
   /** Row-major tile grid: tiles[y * width + x]. */
