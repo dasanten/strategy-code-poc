@@ -2,6 +2,10 @@ import {
   BUILDABLE,
   BUILD_MATERIALS,
   BUILD_WORK,
+  MAX_WORKERS,
+  HOME_FOOD_LOW,
+  MEAL_UNITS,
+  unitsThatFit,
   NODE_WORKPLACE,
   materialsNeeded,
   teardownWork,
@@ -26,6 +30,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { homeStorage } from './survival.js'
 import { isWalkable } from './world.js'
 
 /**
@@ -450,6 +455,70 @@ export const realmLogsInOrder: Invariant = {
   },
 }
 
+/**
+ * After a tick, a resident with a work-at order stands on the finished workplace it names, their
+ * share of the next unit is between 0 and 1, and no workplace has more workers than it takes
+ * (`resolveWork` ends the orders that no longer fit).
+ */
+export const workOrdersOnWorkplaces: Invariant = {
+  name: 'work-orders-on-workplaces',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const workers = new Map<string, number>()
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'workAt') continue
+      const fail = (message: string) =>
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} works ${o.buildingId}, ${message}`,
+          entityIds: [r.id, o.buildingId],
+        })
+      const place = world.buildings.find((b) => b.id === o.buildingId)
+      if (!place || place.site || MAX_WORKERS[place.kind] === undefined)
+        fail('which is no finished workplace')
+      else if (place.x !== r.x || place.y !== r.y || o.at.x !== r.x || o.at.y !== r.y)
+        fail('which is not on their tile')
+      if (!(o.progress >= 0 && o.progress < 1)) fail(`with progress ${o.progress}`)
+      workers.set(o.buildingId, (workers.get(o.buildingId) ?? 0) + 1)
+    }
+    for (const [id, n] of workers) {
+      const place = world.buildings.find((b) => b.id === id)
+      const max = place ? MAX_WORKERS[place.kind] : undefined
+      if (max !== undefined && n > max) {
+        out.push({
+          invariant: this.name,
+          message: `${id} has ${n} workers, over ${max}`,
+          entityIds: [id],
+        })
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * After a tick, nobody at home runs low on food while their city's storage still has some and a
+ * meal would fit (`stepHomeRefill`, `CONTEXT.md`: Eating).
+ */
+export const refilledAtHome: Invariant = {
+  name: 'refilled-at-home',
+  check(world) {
+    return world.residents
+      .filter(
+        (r) =>
+          (r.carried.food ?? 0) < HOME_FOOD_LOW &&
+          homeStorage(world, r) !== undefined &&
+          unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
+      )
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} is at home with ${r.carried.food ?? 0} food, storage has more`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -464,6 +533,8 @@ export const worldInvariants: Invariant[] = [
   carryOrdersDone,
   sitesWithinNeeds,
   buildOrdersOnSites,
+  workOrdersOnWorkplaces,
+  refilledAtHome,
   teardownsWithinNeeds,
   tearDownOrdersOnBuildings,
   nodesOnFittingTerrain,

@@ -5,8 +5,9 @@ import { requestTearingDown, resolveTearingDown } from './teardown.js'
 import { requestCarrying, resolveCarrying } from './carrying.js'
 import type { Walking } from './walking.js'
 import { stepSpoilage } from './spoilage.js'
-import { stepSurvival, type SurvivalResult } from './survival.js'
+import { stepHomeRefill, stepSurvival, type SurvivalResult } from './survival.js'
 import { stepAging, type AgingResult } from './aging.js'
+import { requestWork, resolveWork } from './work.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -70,9 +71,10 @@ export interface StepResult {
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; food
  * spoils at the end of each game day; then their orders request actions (steps, then taking and
- * putting down goods, then laying out and working on construction sites, then tearing down), and
- * the world resolves them together. As the next tick begins, residents age: the old die, and
- * loads too heavy for declining Strength are put down. Without `walking` nobody moves.
+ * putting down goods, then laying out and working on construction sites, then tearing down, then
+ * working workplaces), and the world resolves them together. As the next tick begins, residents
+ * age: the old die, and loads too heavy for declining Strength are put down; then residents at
+ * home who run low on food take meals from their city's storage. Without `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
@@ -85,8 +87,11 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveBuilding(world, builds)
   const teardowns = requestTearingDown(world)
   resolveTearingDown(world, teardowns)
+  const work = requestWork(world)
+  resolveWork(world, work)
   world.tick++
   const aging = stepAging(world)
-  const actions = steps.length + carries.length + builds.length + teardowns.length
+  stepHomeRefill(world)
+  const actions = steps.length + carries.length + builds.length + teardowns.length + work.length
   return { actions, survival, aging }
 }

@@ -6,6 +6,8 @@ import {
   NODE_WORKPLACE,
   MAX_HEALTH,
   MAX_HUNGER,
+  MAX_WORKERS,
+  FARM_FOOD_PER_DAY,
   STAT_NAMES,
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
@@ -58,6 +60,7 @@ const STAT_LABELS: Record<StatName, string> = {
 const SKILL_LABELS: Record<SkillName, string> = {
   mining: 'Mining',
   construction: 'Construction',
+  farming: 'Farming',
   combat: 'Combat',
   driving: 'Driving',
 }
@@ -86,6 +89,7 @@ function doing(r: Resident): string {
     const what = BUILDING_NAMES[o.building].toLowerCase()
     return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
   }
+  if (o?.kind === 'workAt') return 'Working the farm'
   return 'Idle'
 }
 
@@ -163,6 +167,8 @@ export function ResidentInspector({
   building,
   node,
   onBuild,
+  workers,
+  onWork,
   onTearDown,
 }: {
   resident: Resident | undefined
@@ -189,6 +195,10 @@ export function ResidentInspector({
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
   onBuild: (kind: BuildingKind) => void
+  /** Residents in sight working the building on the resident's tile. */
+  workers: number
+  /** Orders the resident to work the workplace on their tile. */
+  onWork: () => void
   /** Orders the resident to tear down the building or site on their tile. */
   onTearDown: (buildingId: string) => void
 }) {
@@ -303,7 +313,7 @@ export function ResidentInspector({
         </div>
         {carried.length === 0 && (
           <p className="muted">
-            Nothing.{cityName ? ` Eats from ${cityName} storage while at home.` : ''}
+            Nothing. Residents eat only what they carry; at home they take meals from storage.
           </p>
         )}
         {carried.map(([good, units]) => (
@@ -330,6 +340,7 @@ export function ResidentInspector({
       </section>
 
       <BuildBlock resident={r} tick={tick} building={building} node={node} onBuild={onBuild} />
+      <WorkBlock resident={r} tick={tick} building={building} workers={workers} onWork={onWork} />
       <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
 
       {(pile || storage || site) && (
@@ -444,6 +455,54 @@ function BuildBlock({
     )
   }
   return null
+}
+
+/**
+ * Working the workplace on the resident's tile, for now a farm (`CONTEXT.md`: Workplace): how
+ * many work it, and a button to join them. The food goes into the workers' hands.
+ */
+function WorkBlock({
+  resident,
+  tick,
+  building,
+  workers,
+  onWork,
+}: {
+  resident: Resident
+  tick: number
+  building: Building | undefined
+  workers: number
+  onWork: () => void
+}) {
+  const max = building && !building.site ? MAX_WORKERS[building.kind] : undefined
+  if (!building || max === undefined) return null
+  const o = resident.order
+  const working = o?.kind === 'workAt' && o.buildingId === building.id
+  return (
+    <section className="inspector-block" aria-label="Work">
+      <div className="panel-head">
+        <h3>{BUILDING_NAMES[building.kind]}</h3>
+        <span className="mono small">
+          {workers} / {max} workers
+        </span>
+      </div>
+      <div className="order-buttons">
+        <button
+          type="button"
+          className="primary"
+          disabled={!canWork(resident, tick) || working || workers >= max}
+          onClick={onWork}
+        >
+          {working ? 'Working…' : 'Work here'}
+        </button>
+      </div>
+      <p className="muted small">
+        A worker of average Strength makes about {FARM_FOOD_PER_DAY} food a game day, more with
+        Farming skill. It goes into the workers’ hands as far as they can carry; the rest is left on
+        the ground here.
+      </p>
+    </section>
+  )
 }
 
 /**

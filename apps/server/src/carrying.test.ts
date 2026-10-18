@@ -228,6 +228,7 @@ describe('carrying in a real city', () => {
       queue.applyAll(world)
       stepWorld(world, terrain)
     }
+    Object.assign(r, { order: null, carried: {} })
     r.x = storage.x
     r.y = storage.y
     const before = total(world)

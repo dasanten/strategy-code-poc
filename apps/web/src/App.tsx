@@ -3,9 +3,11 @@ import { checkScript, type Diagnostic } from '@csp/lang'
 import {
   formatGameTime,
   type Account,
+  type Building,
   type BuildingKind,
   type GoodsSpot,
   type KnownNode,
+  type Resident,
   type Stock,
 } from '@csp/shared'
 import { AdminPanel } from './AdminPanel.js'
@@ -57,6 +59,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function build(building: BuildingKind) {
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'build', residentId: selected.id, building }))
+  }
+  /** Orders the picked resident to work the workplace on their tile. */
+  async function work() {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'workAt', residentId: selected.id }))
   }
   /** Orders the picked resident to tear down the building or site on their tile. */
   async function tearDown(buildingId: string) {
@@ -141,6 +148,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
               onDrop={(spot, goods) => carry('drop', spot, goods)}
               onBuild={build}
+              workers={workersHere(world.residents, onTile(world.buildings))}
+              onWork={work}
               onTearDown={tearDown}
             />
           )}
@@ -159,4 +168,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       </main>
     </div>
   )
+}
+
+/** How many of the residents in sight work the building, if there is one. */
+function workersHere(residents: Resident[], building: Building | undefined): number {
+  if (!building) return 0
+  return residents.filter((r) => r.order?.kind === 'workAt' && r.order.buildingId === building.id)
+    .length
 }

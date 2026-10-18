@@ -1,6 +1,7 @@
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
+  FARM_MAX_WORKERS,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
 } from './balance.js'
@@ -10,6 +11,7 @@ import {
   type Building,
   type BuildingKind,
   type Good,
+  type Resident,
   type Stock,
   type WorldState,
 } from './world.js'
@@ -59,6 +61,36 @@ export function buildProblem(
     return `a ${kind} goes on a fitting resource node`
   if (buildingAt(world, x, y)) return 'there is already a building on this tile'
   if (world.cities.some((c) => isWallTile(c, x, y))) return 'nothing can be built on a wall'
+  return undefined
+}
+
+/** Most workers each kind of workplace takes, for the kinds residents can work so far. */
+export const MAX_WORKERS: Partial<Record<BuildingKind, number>> = { farm: FARM_MAX_WORKERS }
+
+/** The residents working a workplace: holding a work-at order for it and standing on it. */
+export function workersOf(world: WorldState, workplace: Building): Resident[] {
+  return world.residents.filter(
+    (r) =>
+      r.order?.kind === 'workAt' &&
+      r.order.buildingId === workplace.id &&
+      r.x === workplace.x &&
+      r.y === workplace.y,
+  )
+}
+
+/**
+ * Why a resident can't start working the building on their tile, or undefined if they can: it
+ * has to be a finished workplace residents can work, with room for one more worker.
+ */
+export function workProblem(world: WorldState, resident: Resident): string | undefined {
+  const here = buildingAt(world, resident.x, resident.y)
+  const max = here && MAX_WORKERS[here.kind]
+  if (!here || max === undefined) return 'there is no workplace to work here'
+  if (here.site) return 'it is still a construction site'
+  if (resident.order?.kind === 'workAt' && resident.order.buildingId === here.id) {
+    return 'already working here'
+  }
+  if (workersOf(world, here).length >= max) return `it already has ${max} workers`
   return undefined
 }
 

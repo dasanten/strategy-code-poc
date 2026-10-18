@@ -4,6 +4,7 @@ import {
   HOUSE_CAPACITY,
   MAX_HEALTH,
   MAX_HUNGER,
+  START_CARRIED_FOOD,
   START_CITY_SIZE,
   START_FOOD,
   START_RESIDENTS,
@@ -38,8 +39,16 @@ describe('foundStartingCity', () => {
     const residents = world.residents.filter((r) => r.owner === realm.id)
     expect(residents).toHaveLength(START_RESIDENTS)
     expect(residents.map((r) => r.id)).toContain(realm.leaderId)
+    // Everyone starts on the farm, working it, with a little food on them.
+    const farm = world.buildings.find((b) => b.kind === 'farm')!
     for (const r of residents) {
-      expect(isInsideWalls(city!, r.x, r.y)).toBe(true)
+      expect(r).toMatchObject({ x: farm.x, y: farm.y, carried: { food: START_CARRIED_FOOD } })
+      expect(r.order).toEqual({
+        kind: 'workAt',
+        buildingId: farm.id,
+        at: { x: farm.x, y: farm.y },
+        progress: 0,
+      })
       expect(r.health).toBe(MAX_HEALTH)
       expect(r.hunger).toBe(MAX_HUNGER)
       expect(ageInYears(r, world.tick)).toBeGreaterThanOrEqual(ADULT_AGE)
@@ -55,7 +64,6 @@ describe('foundStartingCity', () => {
     expect(kinds.filter((k) => k === 'storage')).toHaveLength(1)
     expect(kinds.filter((k) => k === 'farm')).toHaveLength(1)
     expect(world.buildings.find((b) => b.kind === 'storage')!.stock).toEqual({ food: START_FOOD })
-    const farm = world.buildings.find((b) => b.kind === 'farm')!
     expect(isInsideWalls(city!, farm.x, farm.y)).toBe(false)
     expect(terrainAt(terrain, farm.x, farm.y)).toBe(Terrain.Plains)
     expect(world.horses).toEqual([expect.objectContaining({ realmId: realm.id })])
