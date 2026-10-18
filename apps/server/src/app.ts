@@ -19,6 +19,7 @@ import {
   type SessionUser,
 } from './auth.js'
 import type { Db } from './db/index.js'
+import type { ExploredTerrain } from './explored.js'
 import type { Logger } from './log.js'
 
 export interface AppOptions {
@@ -30,6 +31,8 @@ export interface AppOptions {
   webDist?: string
   /** Current tick, for the health check. */
   tick?: () => number
+  /** Every Player's explored terrain, served in chunks. Without it there is no terrain API. */
+  explored?: ExploredTerrain
   /** Login and sign-up attempts allowed per IP and minute. */
   authRateLimit?: number
 }
@@ -48,6 +51,7 @@ const STATUS: Record<ApiError['error'], number> = {
   'not-logged-in': 401,
   'not-admin': 403,
   'not-found': 404,
+  'not-explored': 403,
   'rate-limited': 429,
 }
 
@@ -128,6 +132,17 @@ export async function buildApp(opts: AppOptions) {
     if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
     return publicAccount(req.user)
   })
+
+  // Explored terrain, one chunk at a time (ADR 0006); unexplored chunks are refused.
+  const { explored } = opts
+  if (explored) {
+    app.get<{ Params: { cx: string; cy: string } }>('/api/terrain/:cx/:cy', async (req, reply) => {
+      if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
+      const chunk = explored.chunk(req.user, Number(req.params.cx), Number(req.params.cy))
+      if (!chunk) return fail(reply, 'not-explored', 'You have not explored that terrain.')
+      return reply.type('application/octet-stream').send(Buffer.from(chunk))
+    })
+  }
 
   // Admin routes: invite codes and password resets.
   app.register(async (admin) => {

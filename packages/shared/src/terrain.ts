@@ -46,3 +46,19 @@ export function isPassableTerrain(t: Terrain | typeof OFF_MAP): boolean {
     t === Terrain.Plains || t === Terrain.Forest || t === Terrain.Hills || t === Terrain.Mountain
   )
 }
+
+/** Terrain is served to clients in square chunks of this many tiles a side (ADR 0006). */
+export const CHUNK_SIZE = 32
+
+/** The byte for a tile in a served chunk that the Player hasn't explored. */
+export const UNEXPLORED = 254
+
+/** How many chunks fit across a map of the given diameter. Chunk `i` is at `(i % n, ⌊i / n⌋)`. */
+export function chunksAcross(diameter: number): number {
+  return Math.ceil(diameter / CHUNK_SIZE)
+}
+
+/** Where the client loads one chunk of explored terrain: `CHUNK_SIZE`² bytes, row-major. */
+export function terrainChunkPath(cx: number, cy: number): string {
+  return `/api/terrain/${cx}/${cy}`
+}

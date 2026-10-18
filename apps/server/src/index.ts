@@ -13,6 +13,7 @@ import {
 } from './monitoring.js'
 import { openDb } from './db/index.js'
 import { OrderQueue } from './orders.js'
+import { ExploredTerrain } from './explored.js'
 import { attachRealtime } from './realtime.js'
 import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { generateTerrain } from './terrain-gen.js'
@@ -32,10 +33,12 @@ const {
     : undefined,
 })
 const { world, terrain } = loadOrCreateWorld(db, (seed) => generateTerrain(seed))
+const explored = ExploredTerrain.load(db, terrain)
 tagWorld(world)
 
 const app = await buildApp({
   db,
+  explored,
   logger,
   secureCookies: config.secureCookies,
   trustProxy: config.trustProxy,
@@ -45,7 +48,7 @@ const app = await buildApp({
 if (sentryOn) setupFastifyErrorHandler(app)
 
 const orders = new OrderQueue()
-const realtime = attachRealtime(app.server, { db, world, terrain, orders })
+const realtime = attachRealtime(app.server, { db, world, terrain, explored, orders })
 
 const reporter = createTickReporter(logger)
 const loop = setInterval(() => {
@@ -59,6 +62,7 @@ const loop = setInterval(() => {
   realtime.broadcastTick()
   if (world.tick % config.saveEveryTicks === 0) {
     saveWorld(db, world)
+    explored.save(db)
     pruneSaves(db)
   }
 }, TICK_MS)
@@ -77,6 +81,7 @@ async function shutdown() {
   clearInterval(loop)
   clearInterval(daily)
   saveWorld(db, world)
+  explored.save(db)
   realtime.close()
   await app.close()
   closeDb()

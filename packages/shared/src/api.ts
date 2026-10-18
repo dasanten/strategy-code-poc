@@ -33,6 +33,7 @@ export type ApiErrorCode =
   | 'not-logged-in'
   | 'not-admin'
   | 'not-found'
+  | 'not-explored'
   | 'rate-limited'
 
 export interface ApiError {
