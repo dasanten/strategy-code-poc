@@ -1,6 +1,7 @@
 import { isPassableTerrain, terrainAt, wrap, type TerrainMap, type WorldState } from '@csp/shared'
 import { placeResourceNodes } from './node-gen.js'
 import { requestBuilding, resolveBuilding } from './building.js'
+import { requestTearingDown, resolveTearingDown } from './teardown.js'
 import { requestCarrying, resolveCarrying } from './carrying.js'
 import type { Walking } from './walking.js'
 import { stepSpoilage } from './spoilage.js'
@@ -70,9 +71,9 @@ export interface StepResult {
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; food
  * spoils at the end of each game day; then their orders request actions (steps, then taking and
- * putting down goods, then laying out and working on construction sites, then working workplaces), and the world resolves
- * them together. As the next tick begins, residents age: the old die, and loads too heavy for
- * declining Strength are put down. Without `walking` nobody moves.
+ * putting down goods, then laying out and working on construction sites, then tearing down, then
+ * working workplaces), and the world resolves them together. As the next tick begins, residents
+ * age: the old die, and loads too heavy for declining Strength are put down. Without `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
@@ -83,9 +84,12 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveCarrying(world, carries)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds)
+  const teardowns = requestTearingDown(world)
+  resolveTearingDown(world, teardowns)
   const work = requestWork(world)
   resolveWork(world, work)
   world.tick++
   const aging = stepAging(world)
-  return { actions: steps.length + carries.length + builds.length + work.length, survival, aging }
+  const actions = steps.length + carries.length + builds.length + teardowns.length + work.length
+  return { actions, survival, aging }
 }

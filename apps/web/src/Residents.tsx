@@ -1,6 +1,7 @@
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
+  BUILDABLE,
   GOODS,
   NODE_WORKPLACE,
   MAX_HEALTH,
@@ -15,6 +16,8 @@ import {
   canWork,
   carryCapacity,
   materialsNeeded,
+  teardownReturns,
+  teardownWork,
   stockWeight,
   trainedCap,
   type Building,
@@ -81,6 +84,7 @@ function doing(r: Resident): string {
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
+  if (o?.kind === 'tearDown') return 'Tearing down'
   if (o?.kind === 'build') {
     const what = BUILDING_NAMES[o.building].toLowerCase()
     return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
@@ -165,6 +169,7 @@ export function ResidentInspector({
   onBuild,
   workers,
   onWork,
+  onTearDown,
 }: {
   resident: Resident | undefined
   leaderId: string
@@ -194,6 +199,8 @@ export function ResidentInspector({
   workers: number
   /** Orders the resident to work the workplace on their tile. */
   onWork: () => void
+  /** Orders the resident to tear down the building or site on their tile. */
+  onTearDown: (buildingId: string) => void
 }) {
   if (!resident) {
     return (
@@ -332,6 +339,7 @@ export function ResidentInspector({
 
       <BuildBlock resident={r} tick={tick} building={building} node={node} onBuild={onBuild} />
       <WorkBlock resident={r} tick={tick} building={building} workers={workers} onWork={onWork} />
+      <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
 
       {(pile || storage || site) && (
         <section className="inspector-block" aria-label="On this tile">
@@ -491,6 +499,59 @@ function WorkBlock({
         Farming skill. It goes into the workers’ hands as far as they can carry; the rest is left on
         the ground here.
       </p>
+    </section>
+  )
+}
+
+/**
+ * Tearing down the building or construction site on the resident's tile (`CONTEXT.md`: Tearing
+ * down): how far it has come, what it leaves on the tile, and a button to start or join.
+ */
+function TearDownBlock({
+  resident,
+  tick,
+  building,
+  onTearDown,
+}: {
+  resident: Resident
+  tick: number
+  building: Building | undefined
+  onTearDown: (buildingId: string) => void
+}) {
+  if (!building || !BUILDABLE.includes(building.kind)) return null
+  const name = BUILDING_NAMES[building.kind].toLowerCase()
+  const what = building.site ? `${name} site` : name
+  const work = teardownWork(building)
+  const share = work > 0 ? (building.teardown ?? 0) / work : 0
+  const leaves = goodsIn(teardownReturns(building))
+  const o = resident.order
+  const joined = o?.kind === 'tearDown' && o.buildingId === building.id
+  return (
+    <section className="inspector-block" aria-label="Tear down">
+      <div className="panel-head">
+        <h3>Tear down</h3>
+        <span className="small muted">{what}</span>
+      </div>
+      {building.teardown !== undefined && (
+        <Meter label="Torn down" value={pct(share)} share={share} />
+      )}
+      <p className="muted small">
+        Takes about {Math.ceil((work / TICKS_PER_GAME_DAY) * 10) / 10} game days of one resident’s
+        work and leaves{' '}
+        {leaves.length === 0
+          ? 'nothing'
+          : leaves.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')}{' '}
+        on the tile.
+      </p>
+      <div className="order-buttons">
+        <button
+          type="button"
+          disabled={!canWork(resident, tick) || joined}
+          onClick={() => onTearDown(building.id)}
+        >
+          {joined ? 'Tearing down…' : `Tear down ${what}`}
+        </button>
+      </div>
     </section>
   )
 }
