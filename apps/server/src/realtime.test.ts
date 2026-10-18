@@ -7,6 +7,7 @@ import { createAdmin, createSession } from './auth.js'
 import { ExploredTerrain } from './explored.js'
 import { openDb, schema } from './db/index.js'
 import { OrderQueue } from './orders.js'
+import { SightTracker } from './sight.js'
 import { attachRealtime } from './realtime.js'
 import { cityTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
@@ -32,6 +33,7 @@ async function start() {
     world,
     terrain,
     explored: new ExploredTerrain(terrain),
+    sight: new SightTracker(),
     orders: new OrderQueue(),
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
@@ -96,15 +98,27 @@ describe('realtime', () => {
       expect(welcome.home).toMatchObject({ realmId: world.realms[0]!.id, cityId: city.id })
       expect(welcome.home.x).toBeGreaterThan(city.x)
       expect(welcome.home.x).toBeLessThan(city.x + city.size)
-      expect(welcome.structures.cities).toEqual([city])
-      expect(welcome.entities).toHaveLength(world.residents.length)
-      // Daniel is an admin, so the whole map counts as explored.
+      // Daniel sees his city and everything in it, through his residents' eyes.
+      const kinds = welcome.entities.map((e) => e.is)
+      expect(kinds.filter((k) => k === 'resident')).toHaveLength(world.residents.length)
+      expect(kinds.filter((k) => k === 'city')).toHaveLength(1)
+      expect(kinds.filter((k) => k === 'building')).toHaveLength(world.buildings.length)
+      expect(kinds).toContain('horse')
+      expect(kinds).toContain('carriage')
+      // Explored terrain: what the residents see around the city, not the whole map, admin or not.
       const n = chunksAcross(terrain.size)
-      expect(welcome.exploredChunks).toEqual([...Array(n * n).keys()])
+      expect(welcome.exploredChunks.length).toBeGreaterThan(0)
+      expect(welcome.exploredChunks.length).toBeLessThan(n * n)
     }
 
     realtime.broadcastTick()
-    expect(await next('tick')).toEqual({ type: 'tick', tick: 0, changed: [], gone: [] })
+    expect(await next('tick')).toEqual({
+      type: 'tick',
+      tick: 0,
+      changed: [],
+      gone: [],
+      explored: [],
+    })
 
     stepWorld(world, terrain)
     realtime.broadcastTick()

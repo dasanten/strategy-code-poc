@@ -17,6 +17,17 @@ export interface OrderRequest {
   [key: string]: unknown
 }
 
+/**
+ * Something a Player sees (`CONTEXT.md`: Sight), tagged with what it is. Ids are unique across
+ * all of them.
+ */
+export type SeenEntity =
+  | ({ is: 'resident' } & Resident)
+  | ({ is: 'building' } & Building)
+  | ({ is: 'city' } & City)
+  | ({ is: 'horse' } & Horse)
+  | ({ is: 'carriage' } & Carriage)
+
 /** Messages the server pushes over the WebSocket (ADR 0006). */
 export type ServerMessage =
   /** On connect: who you are, the map and everything in your sight. */
@@ -29,20 +40,14 @@ export type ServerMessage =
       exploredChunks: number[]
       /** The Player's realm and the city the view starts on. */
       home: { realmId: string; leaderId: string; cityId: string; x: number; y: number }
-      /**
-       * Cities, buildings, horses and carriages, as they stand on connect. Until sight
-       * (T2.3), these come once with the welcome and the tick updates carry residents only.
-       */
-      structures: {
-        cities: City[]
-        buildings: Building[]
-        horses: Horse[]
-        carriages: Carriage[]
-      }
-      entities: Resident[]
+      /** Everything the Player's residents see. */
+      entities: SeenEntity[]
     }
-  /** Every tick: entities in sight that changed, and ids that left sight. */
-  | { type: 'tick'; tick: number; changed: Resident[]; gone: string[] }
+  /**
+   * Every tick: entities in sight that changed, ids that left sight, and chunks whose explored
+   * terrain grew (load them again).
+   */
+  | { type: 'tick'; tick: number; changed: SeenEntity[]; gone: string[]; explored: number[] }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }
 

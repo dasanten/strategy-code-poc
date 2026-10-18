@@ -15,6 +15,7 @@ import { openDb } from './db/index.js'
 import { OrderQueue } from './orders.js'
 import { ExploredTerrain } from './explored.js'
 import { attachRealtime } from './realtime.js'
+import { SightTracker } from './sight.js'
 import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { generateTerrain } from './terrain-gen.js'
 import { runTick } from './tick.js'
@@ -48,7 +49,8 @@ const app = await buildApp({
 if (sentryOn) setupFastifyErrorHandler(app)
 
 const orders = new OrderQueue()
-const realtime = attachRealtime(app.server, { db, world, terrain, explored, orders })
+const sight = new SightTracker()
+const realtime = attachRealtime(app.server, { db, world, terrain, explored, sight, orders })
 
 const reporter = createTickReporter(logger)
 const loop = setInterval(() => {
@@ -59,7 +61,7 @@ const loop = setInterval(() => {
     slowTickMs: config.slowTickMs,
   })
   tagWorld(world)
-  realtime.broadcastTick()
+  realtime.broadcastTick(sight.update(world, explored))
   if (world.tick % config.saveEveryTicks === 0) {
     saveWorld(db, world)
     explored.save(db)

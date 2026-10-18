@@ -11,13 +11,12 @@ import {
 import type { SessionUser } from './auth.js'
 import { schema, type Db } from './db/index.js'
 
-/** Who is asking: a Player's id, and whether they are an admin. */
-type Viewer = Pick<SessionUser, 'id' | 'isAdmin'>
+/** Who is asking: a Player's id. */
+type Viewer = Pick<SessionUser, 'id'>
 
 /**
  * Every Player's explored terrain (`CONTEXT.md`: Explored terrain), one bit per tile, kept in
- * memory and saved with the world. Until residents with sight exist (Epic 2), admins have the
- * whole map explored and nothing explores terrain for anyone else.
+ * memory and saved with the world. It grows as the Player's residents see new tiles (sight.ts).
  */
 export class ExploredTerrain {
   private bits = new Map<number, Uint8Array>()
@@ -62,28 +61,37 @@ export class ExploredTerrain {
     this.dirty.clear()
   }
 
-  /** Marks every tile within `radius` of (x, y) as explored by the Player, across the joins. */
-  explore(userId: number, x: number, y: number, radius: number): void {
+  /**
+   * Marks every tile within `radius` of (x, y) as explored by the Player, across the joins.
+   * Returns the chunks in which tiles were newly explored.
+   */
+  explore(userId: number, x: number, y: number, radius: number): Set<number> {
     const { size } = this.terrain
     let bits = this.bits.get(userId)
     if (!bits) {
       bits = new Uint8Array(Math.ceil((size * size) / 8))
       this.bits.set(userId, bits)
     }
+    const n = chunksAcross(size)
+    const grown = new Set<number>()
     for (let ty = y - radius; ty <= y + radius; ty++) {
       for (let tx = x - radius; tx <= x + radius; tx++) {
         const dx = tx - x
         const dy = ty - y
         if (dx * dx + dy * dy > radius * radius) continue
         const t = tileIndex(size, tx, ty)
-        bits[t >> 3]! |= 1 << (t & 7)
+        const bit = 1 << (t & 7)
+        if (bits[t >> 3]! & bit) continue
+        bits[t >> 3]! |= bit
+        const [mx, my] = [t % size, Math.floor(t / size)]
+        grown.add(Math.floor(my / CHUNK_SIZE) * n + Math.floor(mx / CHUNK_SIZE))
       }
     }
-    this.dirty.add(userId)
+    if (grown.size > 0) this.dirty.add(userId)
+    return grown
   }
 
   isExplored(viewer: Viewer, x: number, y: number): boolean {
-    if (viewer.isAdmin) return true
     const bits = this.bits.get(viewer.id)
     const t = tileIndex(this.terrain.size, x, y)
     return bits !== undefined && (bits[t >> 3]! & (1 << (t & 7))) !== 0
@@ -129,7 +137,6 @@ export class ExploredTerrain {
   exploredChunks(viewer: Viewer): number[] {
     const { size } = this.terrain
     const n = chunksAcross(size)
-    if (viewer.isAdmin) return [...Array(n * n).keys()]
     const found = new Set<number>()
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
