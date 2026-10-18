@@ -1,4 +1,11 @@
 import {
+  BUILDABLE,
+  BUILD_MATERIALS,
+  BUILD_WORK,
+  NODE_WORKPLACE,
+  materialsNeeded,
+  workNeeded,
+  type Good,
   LIFESPAN_MAX,
   LIFESPAN_MIN,
   MAX_HEALTH,
@@ -105,8 +112,9 @@ export const realmsHaveLeaders: Invariant = {
 }
 
 /**
- * Buildings: one per tile and never on a wall; houses and storages inside their city's walls,
- * farms on Plains; every city's wall on passable terrain; no stock below zero.
+ * Buildings and construction sites: one per tile and never on a wall; houses and storages inside
+ * their city's walls, farms on Plains, mines, quarries and lumber camps on a resource node of
+ * their kind and of no city; every city's wall on passable terrain; no stock below zero.
  */
 export const buildingsInPlace: Invariant = {
   name: 'buildings-in-place',
@@ -120,11 +128,18 @@ export const buildingsInPlace: Invariant = {
       const key = `${b.x},${b.y}`
       if (tiles.has(key)) fail(b.id, `shares tile (${key}) with another building`)
       tiles.add(key)
-      const city = cities.get(b.cityId)
-      if (!city) fail(b.id, `belongs to no city (${b.cityId})`)
-      else if (world.cities.some((c) => isWallTile(c, b.x, b.y))) fail(b.id, 'stands on a wall')
-      else if (b.kind !== 'farm' && !isInsideWalls(city, b.x, b.y))
-        fail(b.id, 'is outside the walls')
+      const onWall = world.cities.some((c) => isWallTile(c, b.x, b.y))
+      if (onWall) fail(b.id, 'stands on a wall')
+      if (BUILDABLE.includes(b.kind)) {
+        const node = world.nodes.find((n) => n.x === b.x && n.y === b.y)
+        if (!node || NODE_WORKPLACE[node.kind] !== b.kind) fail(b.id, `is a ${b.kind} off its node`)
+        if (b.cityId !== null) fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
+      } else {
+        const city = b.cityId === null ? undefined : cities.get(b.cityId)
+        if (!city) fail(b.id, `belongs to no city (${b.cityId})`)
+        else if (!onWall && b.kind !== 'farm' && !isInsideWalls(city, b.x, b.y))
+          fail(b.id, 'is outside the walls')
+      }
       if (b.kind === 'farm' && terrainAt(terrain, b.x, b.y) !== Terrain.Plains) {
         fail(b.id, 'is a farm off Plains')
       }
@@ -253,7 +268,8 @@ export const goodsInPlace: Invariant = {
     for (const r of world.residents) if (negative(r.carried)) fail(r.id, 'carries negative goods')
     for (const b of world.buildings) {
       const holds = Object.values(b.stock ?? {}).some((n) => n > 0)
-      if (holds && b.kind !== 'storage') fail(b.id, `is a ${b.kind} holding goods`)
+      if (holds && (b.kind !== 'storage' || b.site)) fail(b.id, `is a ${b.kind} holding goods`)
+      if (b.site && negative(b.site.delivered)) fail(b.id, 'has negative materials delivered')
     }
     const tiles = new Set<string>()
     for (const p of world.piles) {
@@ -277,6 +293,9 @@ export const goodsInWholeUnits: Invariant = {
     const holders: [string, Stock | undefined][] = [
       ...world.residents.map((r): [string, Stock] => [r.id, r.carried]),
       ...world.buildings.map((b): [string, Stock | undefined] => [b.id, b.stock]),
+      ...world.buildings
+        .filter((b) => b.site)
+        .map((b): [string, Stock] => [b.id, b.site!.delivered]),
       ...world.carriages.map((k): [string, Stock] => [k.id, k.load]),
       ...world.piles.map((p): [string, Stock] => [p.id, p.goods]),
     ]
@@ -304,6 +323,58 @@ export const carryOrdersDone: Invariant = {
         message: `resident ${r.id} still holds a ${r.order!.kind} order after the tick`,
         entityIds: [r.id],
       }))
+  },
+}
+
+/**
+ * A construction site never holds more materials than its building needs, nor goods it doesn't
+ * need, and its work stays between 0 and what the building needs (`BUILD_WORK`). A site that has
+ * everything has become its building.
+ */
+export const sitesWithinNeeds: Invariant = {
+  name: 'sites-within-needs',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (id: string, message: string) =>
+      out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
+    for (const b of world.buildings) {
+      if (!b.site) continue
+      const needs = BUILD_MATERIALS[b.kind] ?? {}
+      for (const [good, units] of Object.entries(b.site.delivered) as [Good, number][]) {
+        if (units > (needs[good] ?? 0))
+          fail(b.id, `holds ${units} ${good}, needs ${needs[good] ?? 0}`)
+      }
+      const work = BUILD_WORK[b.kind] ?? 0
+      if (!(b.site.work >= 0 && b.site.work <= work))
+        fail(b.id, `has work ${b.site.work} of ${work}`)
+      if (workNeeded(b) === 0 && Object.keys(materialsNeeded(b)).length === 0) {
+        fail(b.id, 'has all its materials and work but is still a site')
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * After a tick, a resident with a build order on a site stands on that site, and it is still a
+ * site (`resolveBuilding` ends the orders of a finished or vanished one).
+ */
+export const buildOrdersOnSites: Invariant = {
+  name: 'build-orders-on-sites',
+  check(world) {
+    return world.residents.flatMap((r) => {
+      const o = r.order
+      if (o?.kind !== 'build' || o.siteId === null) return []
+      const site = world.buildings.find((b) => b.id === o.siteId)
+      if (site?.site && site.x === r.x && site.y === r.y) return []
+      return [
+        {
+          invariant: this.name,
+          message: `resident ${r.id} builds ${o.siteId}, which is not a site on their tile`,
+          entityIds: [r.id, o.siteId],
+        },
+      ]
+    })
   },
 }
 
@@ -344,6 +415,8 @@ export const worldInvariants: Invariant[] = [
   goodsInPlace,
   goodsInWholeUnits,
   carryOrdersDone,
+  sitesWithinNeeds,
+  buildOrdersOnSites,
   nodesOnFittingTerrain,
   realmLogsInOrder,
 ]

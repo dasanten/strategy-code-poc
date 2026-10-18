@@ -1,24 +1,32 @@
 import {
+  BUILD_MATERIALS,
+  BUILD_WORK,
   GOODS,
+  NODE_WORKPLACE,
   MAX_HEALTH,
   MAX_HUNGER,
   STAT_NAMES,
   STAT_BASE_MAX,
+  TICKS_PER_GAME_DAY,
   TRAINED_CAP_SHARE,
   ageInYears,
   canWork,
   carryCapacity,
+  materialsNeeded,
   stockWeight,
   trainedCap,
   type Building,
+  type BuildingKind,
   type Good,
   type GoodsSpot,
+  type KnownNode,
   type Pile,
   type Resident,
   type SkillName,
   type StatName,
   type Stock,
 } from '@csp/shared'
+import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 
 const GOOD_LABELS: Record<Good, string> = {
   food: 'Food',
@@ -70,6 +78,10 @@ function doing(r: Resident): string {
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
+  if (o?.kind === 'build') {
+    const what = BUILDING_NAMES[o.building].toLowerCase()
+    return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
+  }
   return 'Idle'
 }
 
@@ -144,6 +156,9 @@ export function ResidentInspector({
   storage,
   onPickUp,
   onDrop,
+  building,
+  node,
+  onBuild,
 }: {
   resident: Resident | undefined
   leaderId: string
@@ -163,6 +178,12 @@ export function ResidentInspector({
   onPickUp: (from: GoodsSpot, goods: Stock) => void
   /** Orders the resident to put carried goods at a spot on their tile. */
   onDrop: (to: GoodsSpot, goods: Stock) => void
+  /** The building or construction site on the resident's tile, if one is in sight. */
+  building: Building | undefined
+  /** The resource node on the resident's tile, if the Player knows of one. */
+  node: KnownNode | undefined
+  /** Orders the resident to build on their tile, or to join the site there. */
+  onBuild: (kind: BuildingKind) => void
 }) {
   if (!resident) {
     return (
@@ -177,6 +198,9 @@ export function ResidentInspector({
   const carried = goodsIn(r.carried)
   const ground: GoodsSpot = { kind: 'ground' }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
+  const site = building?.site ? building : undefined
+  const atSite: GoodsSpot = { kind: 'site', siteId: site?.id ?? '' }
+  const needed = site ? materialsNeeded(site) : {}
   return (
     <aside className="inspector" aria-label="Resident inspector">
       <div className="inspector-title">
@@ -256,7 +280,8 @@ export function ResidentInspector({
           {skills.length === 0 && <span className="chip">None yet</span>}
           {skills.map((s) => (
             <span className="chip" key={s}>
-              {SKILL_LABELS[s]} <span className="mono accent">{r.skills[s]}</span>
+              {SKILL_LABELS[s]}{' '}
+              <span className="mono accent">{Math.floor(r.skills[s]! * 10) / 10}</span>
             </span>
           ))}
         </div>
@@ -287,12 +312,19 @@ export function ResidentInspector({
                   Store
                 </button>
               )}
+              {(needed[good] ?? 0) > 0 && (
+                <button type="button" onClick={() => onDrop(atSite, { [good]: units })}>
+                  Deliver
+                </button>
+              )}
             </span>
           </div>
         ))}
       </section>
 
-      {(pile || storage) && (
+      <BuildBlock resident={r} tick={tick} building={building} node={node} onBuild={onBuild} />
+
+      {(pile || storage || site) && (
         <section className="inspector-block" aria-label="On this tile">
           <div className="panel-head">
             <h3>Here</h3>
@@ -307,10 +339,103 @@ export function ResidentInspector({
               onPickUp={onPickUp}
             />
           )}
+          {site && (
+            <TileGoods
+              title="Delivered to the site"
+              stock={site.site!.delivered}
+              spot={atSite}
+              onPickUp={onPickUp}
+            />
+          )}
         </section>
       )}
     </aside>
   )
+}
+
+/**
+ * Building on the resident's tile (`CONTEXT.md`: Building): on a resource node with nothing on it,
+ * build its workplace; on a construction site, see what it still needs and help build it.
+ */
+function BuildBlock({
+  resident,
+  tick,
+  building,
+  node,
+  onBuild,
+}: {
+  resident: Resident
+  tick: number
+  building: Building | undefined
+  node: KnownNode | undefined
+  onBuild: (kind: BuildingKind) => void
+}) {
+  const adult = canWork(resident, tick)
+  const o = resident.order
+  if (building?.site) {
+    const name = BUILDING_NAMES[building.kind]
+    const work = BUILD_WORK[building.kind] ?? 0
+    const materials = goodsIn(BUILD_MATERIALS[building.kind])
+    const joined = o?.kind === 'build' && o.siteId === building.id
+    return (
+      <section className="inspector-block" aria-label="Build">
+        <div className="panel-head">
+          <h3>Construction site</h3>
+          <span className="small muted">{name}</span>
+        </div>
+        <Meter
+          label="Work"
+          value={pct(work > 0 ? building.site.work / work : 1)}
+          share={work > 0 ? building.site.work / work : 1}
+        />
+        {materials.length === 0 && <p className="muted small">Needs no materials.</p>}
+        {materials.map(([good, units]) => (
+          <div className="goods-row" key={good}>
+            <span>{GOOD_LABELS[good]}</span>
+            <span className="mono">
+              {building.site!.delivered[good] ?? 0} / {units}
+            </span>
+            <span />
+          </div>
+        ))}
+        <div className="order-buttons">
+          <button type="button" disabled={!adult || joined} onClick={() => onBuild(building.kind)}>
+            {joined ? 'Building…' : 'Help build'}
+          </button>
+        </div>
+        <p className="muted small">
+          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done.
+        </p>
+      </section>
+    )
+  }
+  if (node && !building) {
+    const kind = NODE_WORKPLACE[node.kind]
+    const name = BUILDING_NAMES[kind]
+    const materials = goodsIn(BUILD_MATERIALS[kind])
+    const days = (BUILD_WORK[kind] ?? 0) / TICKS_PER_GAME_DAY
+    return (
+      <section className="inspector-block" aria-label="Build">
+        <div className="panel-head">
+          <h3>Build</h3>
+          <span className="small muted">{NODE_NAMES[node.kind]} node</span>
+        </div>
+        <p className="muted small">
+          Needs{' '}
+          {materials.length === 0
+            ? 'no materials'
+            : materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')}{' '}
+          and about {days} game days of one resident’s work.
+        </p>
+        <div className="order-buttons">
+          <button type="button" className="primary" disabled={!adult} onClick={() => onBuild(kind)}>
+            Build {name.toLowerCase()}
+          </button>
+        </div>
+      </section>
+    )
+  }
+  return null
 }
 
 /** Goods at one spot on the resident's tile, each with a button to pick it up. */

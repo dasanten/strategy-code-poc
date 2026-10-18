@@ -49,6 +49,18 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   house: 0xc7b391,
   storage: 0x8c6a44,
   farm: 0x9db05f,
+  mine: 0x5e5a57,
+  quarry: 0xb3ada3,
+  lumberCamp: 0x6b7f3c,
+}
+
+export const BUILDING_NAMES: Record<BuildingKind, string> = {
+  house: 'House',
+  storage: 'Storage',
+  farm: 'Farm',
+  mine: 'Mine',
+  quarry: 'Quarry',
+  lumberCamp: 'Lumber camp',
 }
 export const HORSE_COLOR = 0x6b4f2e
 export const CARRIAGE_COLOR = 0xb79a6e

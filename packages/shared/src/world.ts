@@ -62,9 +62,10 @@ export interface WalkOrder {
 
 /**
  * A place on the resident's own tile that goods are taken from or put: the pile on the ground,
- * or a storage standing there.
+ * a storage standing there, or the materials delivered to a construction site there.
  */
-export type GoodsSpot = { kind: 'ground' } | { kind: 'storage'; storageId: string }
+export type GoodsSpot =
+  { kind: 'ground' } | { kind: 'storage'; storageId: string } | { kind: 'site'; siteId: string }
 
 /**
  * Picking up goods on the resident's tile (`CONTEXT.md`: Core rule, whatever isn't protected can
@@ -76,15 +77,30 @@ export interface PickUpOrder {
   goods: Stock
 }
 
-/** Putting down carried goods on the resident's tile: on the ground (a pile) or in a storage. */
+/**
+ * Putting down carried goods on the resident's tile: on the ground (a pile), in a storage, or as
+ * materials for a construction site (only what the site still needs).
+ */
 export interface DropOrder {
   kind: 'drop'
   to: GoodsSpot
   goods: Stock
 }
 
+/**
+ * Building (`CONTEXT.md`: Building): the resident lays out a construction site of `building` on
+ * the tile they stand on (`at`), or joins the unfinished one of that kind already there, then
+ * works on it until it is finished. `siteId` is null until they are on the site.
+ */
+export interface BuildOrder {
+  kind: 'build'
+  building: BuildingKind
+  at: { x: number; y: number }
+  siteId: string | null
+}
+
 /** Any order a resident can hold. */
-export type ResidentOrder = WalkOrder | PickUpOrder | DropOrder
+export type ResidentOrder = WalkOrder | PickUpOrder | DropOrder | BuildOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -194,17 +210,34 @@ export interface City {
   gate: { x: number; y: number }
 }
 
-export type BuildingKind = 'house' | 'storage' | 'farm'
+export type BuildingKind = 'house' | 'storage' | 'farm' | 'mine' | 'quarry' | 'lumberCamp'
 
-/** A building takes one tile (`CONTEXT.md`: Tile). */
+/**
+ * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction
+ * site, not yet the building.
+ */
 export interface Building {
   id: string
   kind: BuildingKind
-  cityId: string
+  /** The city it belongs to; null for a building of no city, such as a workplace on a node. */
+  cityId: string | null
   x: number
   y: number
   /** Goods kept here; storages only. */
   stock?: Stock
+  /** There while the building is still a construction site. */
+  site?: ConstructionSite
+}
+
+/**
+ * How far a construction site has come (`CONTEXT.md`: Construction site): the materials carried
+ * to it so far and the work residents have put in. Like a workplace, it has no owner.
+ */
+export interface ConstructionSite {
+  /** Materials delivered so far; never more of a good than the building needs. */
+  delivered: Stock
+  /** Work put in so far, at most what the building needs (`BUILD_WORK`). */
+  work: number
 }
 
 /** An animal that pulls a carriage (`CONTEXT.md`: Horse). */
@@ -251,6 +284,14 @@ export interface ResourceNode {
   kind: ResourceKind
   x: number
   y: number
+}
+
+/** The workplace built on each kind of node (`CONTEXT.md`: Workplace, Where buildings go). */
+export const NODE_WORKPLACE: Record<ResourceKind, BuildingKind> = {
+  forest: 'lumberCamp',
+  stone: 'quarry',
+  ironOre: 'mine',
+  goldOre: 'mine',
 }
 
 /** The terrain each kind of node lies on (`CONTEXT.md`: Resource node). */

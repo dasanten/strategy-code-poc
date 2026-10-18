@@ -1,7 +1,9 @@
 import {
   GOODS,
   goodsAtSpot,
+  materialsNeeded,
   pileAt,
+  siteAt,
   storageAt,
   unitsThatFit,
   type Good,
@@ -46,11 +48,12 @@ function readGoods(goods: unknown): Stock | undefined {
 }
 
 function readSpot(spot: unknown): GoodsSpot | undefined {
-  const s = spot as Partial<{ kind: string; storageId: unknown }> | null
+  const s = spot as Partial<{ kind: string; storageId: unknown; siteId: unknown }> | null
   if (s?.kind === 'ground') return { kind: 'ground' }
   if (s?.kind === 'storage' && typeof s.storageId === 'string') {
     return { kind: 'storage', storageId: s.storageId }
   }
+  if (s?.kind === 'site' && typeof s.siteId === 'string') return { kind: 'site', siteId: s.siteId }
   return undefined
 }
 
@@ -61,11 +64,14 @@ function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   const r = world.residents.find((x) => x.id === o.residentId)
   if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
   const spot = readSpot(o.spot)
-  if (!spot) return 'the spot must be the ground or a storage'
+  if (!spot) return 'the spot must be the ground, a storage or a construction site'
   const goods = readGoods(o.goods)
   if (!goods) return 'goods must be whole units of known goods'
   if (spot.kind === 'storage' && storageAt(world, r.x, r.y)?.id !== spot.storageId) {
     return 'that storage is not on the resident’s tile'
+  }
+  if (spot.kind === 'site' && siteAt(world, r.x, r.y)?.id !== spot.siteId) {
+    return 'that construction site is not on the resident’s tile'
   }
   return { r, spot, goods }
 }
@@ -75,7 +81,8 @@ const has = (stock: Stock | undefined, goods: Stock) =>
 
 /**
  * The pick-up order (`CONTEXT.md`: Core rule): one of the Player's residents takes goods from the
- * pile or a storage on their tile. Nothing is protected yet, so anyone's goods can be taken.
+ * pile, a storage or a construction site on their tile. Nothing is protected yet, so anyone's
+ * goods can be taken.
  */
 export const pickUp: OrderKind = {
   validate(world, sender, order) {
@@ -91,12 +98,18 @@ export const pickUp: OrderKind = {
   },
 }
 
-/** The drop order: one of the Player's residents puts down carried goods on their tile. */
+/**
+ * The drop order: one of the Player's residents puts down carried goods on their tile. Delivered
+ * to a construction site, only what it still needs goes in; the rest stays carried.
+ */
 export const drop: OrderKind = {
   validate(world, sender, order) {
     const c = check(world, sender, order)
     if (typeof c === 'string') return c
     if (!has(c.r.carried, c.goods)) return 'not carrying any of those goods'
+    if (c.spot.kind === 'site' && !has(materialsNeeded(siteAt(world, c.r.x, c.r.y)!), c.goods)) {
+      return 'the construction site needs none of those goods'
+    }
     return undefined
   },
   apply(world, _sender, order) {
@@ -146,7 +159,7 @@ export function resolveCarrying(world: WorldState, actions: CarryAction[]): void
 
 function take(world: WorldState, r: Resident, a: CarryAction): void {
   const source =
-    a.spot.kind === 'ground' ? pileAt(world, r.x, r.y)?.goods : storageStock(world, r, a.spot)
+    a.spot.kind === 'ground' ? pileAt(world, r.x, r.y)?.goods : spotStock(world, r, a.spot)
   if (!source) return
   for (const [good, wanted] of Object.entries(a.goods) as [Good, number][]) {
     const units = Math.min(wanted, source[good] ?? 0, unitsThatFit(r, good, world.tick))
@@ -156,17 +169,24 @@ function take(world: WorldState, r: Resident, a: CarryAction): void {
 }
 
 function put(world: WorldState, r: Resident, a: CarryAction): void {
-  // On the ground the goods go in the tile's pile; a storage that is gone takes nothing.
-  const target = a.spot.kind === 'ground' ? {} : storageStock(world, r, a.spot)
+  // On the ground the goods go in the tile's pile; a storage or site that is gone takes nothing.
+  const target = a.spot.kind === 'ground' ? {} : spotStock(world, r, a.spot)
   if (!target) return
+  // A construction site takes only the materials it still needs.
+  const room = a.spot.kind === 'site' ? materialsNeeded(siteAt(world, r.x, r.y)!) : undefined
   for (const [good, wanted] of Object.entries(a.goods) as [Good, number][]) {
-    move(r.carried, target, good, Math.min(wanted, r.carried[good] ?? 0))
+    const units = Math.min(wanted, r.carried[good] ?? 0, room ? (room[good] ?? 0) : Infinity)
+    move(r.carried, target, good, units)
   }
   if (a.spot.kind === 'ground') dropGoods(world, r.x, r.y, target)
 }
 
-/** The stock of the named storage, if it stands on the resident's tile. */
-function storageStock(world: WorldState, r: Resident, spot: GoodsSpot): Stock | undefined {
+/** The goods of the named storage or construction site, if it stands on the resident's tile. */
+function spotStock(world: WorldState, r: Resident, spot: GoodsSpot): Stock | undefined {
+  if (spot.kind === 'site') {
+    const site = siteAt(world, r.x, r.y)
+    return site?.id === spot.siteId ? site.site!.delivered : undefined
+  }
   const storage = storageAt(world, r.x, r.y)
   if (spot.kind !== 'storage' || storage?.id !== spot.storageId) return undefined
   return (storage.stock ??= {})

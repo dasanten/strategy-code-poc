@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { checkScript, type Diagnostic } from '@csp/lang'
-import { formatGameTime, type Account, type GoodsSpot, type Stock } from '@csp/shared'
+import {
+  formatGameTime,
+  type Account,
+  type BuildingKind,
+  type GoodsSpot,
+  type KnownNode,
+  type Stock,
+} from '@csp/shared'
 import { AdminPanel } from './AdminPanel.js'
 import { api } from './api.js'
 import { Login } from './Login.js'
@@ -46,6 +53,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind, residentId: selected.id, spot, goods }))
   }
+  /** Orders the picked resident to build on their tile, or to join the site there. */
+  async function build(building: BuildingKind) {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'build', residentId: selected.id, building }))
+  }
+  const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
+  const onNodesLoaded = useCallback(
+    (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
+    [],
+  )
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
     selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
 
@@ -86,6 +103,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 }}
                 picking={picking}
                 onPickTile={walkTo}
+                onNodesLoaded={onNodesLoaded}
               />
             ) : (
               <p>Waiting for the server…</p>
@@ -112,9 +130,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onWalkTo={() => setPicking((p) => !p)}
               orderError={orderError}
               pile={onTile(world.piles)}
-              storage={onTile(world.buildings.filter((b) => b.kind === 'storage'))}
+              storage={onTile(world.buildings.filter((b) => b.kind === 'storage' && !b.site))}
+              building={onTile(world.buildings)}
+              node={selected && nodeAt?.(selected.x, selected.y)}
               onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
               onDrop={(spot, goods) => carry('drop', spot, goods)}
+              onBuild={build}
             />
           )}
           {world && <RealmLog events={world.events} />}

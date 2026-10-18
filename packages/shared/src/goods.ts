@@ -8,14 +8,20 @@ export function pileAt(world: WorldState, x: number, y: number): Pile | undefine
   return world.piles.find((p) => p.x === x && p.y === y)
 }
 
-/** The storage standing on a tile, if there is one. */
+/** The finished storage standing on a tile, if there is one. */
 export function storageAt(world: WorldState, x: number, y: number): Building | undefined {
-  return world.buildings.find((b) => b.kind === 'storage' && b.x === x && b.y === y)
+  return world.buildings.find((b) => b.kind === 'storage' && !b.site && b.x === x && b.y === y)
+}
+
+/** The construction site on a tile, if there is one. */
+export function siteAt(world: WorldState, x: number, y: number): Building | undefined {
+  return world.buildings.find((b) => b.site && b.x === x && b.y === y)
 }
 
 /**
- * The goods at a spot on the tile (x, y): the pile's, or the storage's. Undefined when the spot
- * is not there: no pile on the ground, or no such storage on that tile.
+ * The goods at a spot on the tile (x, y): the pile's, the storage's or the materials delivered
+ * to the construction site. Undefined when the spot is not there: no pile on the ground, or no
+ * such storage or site on that tile.
  */
 export function goodsAtSpot(
   world: WorldState,
@@ -24,6 +30,10 @@ export function goodsAtSpot(
   spot: GoodsSpot,
 ): Stock | undefined {
   if (spot.kind === 'ground') return pileAt(world, x, y)?.goods
+  if (spot.kind === 'site') {
+    const site = siteAt(world, x, y)
+    return site?.id === spot.siteId ? site.site!.delivered : undefined
+  }
   const storage = storageAt(world, x, y)
   if (!storage || storage.id !== spot.storageId) return undefined
   return storage.stock ?? {}

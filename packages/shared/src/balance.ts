@@ -1,7 +1,9 @@
 import { Terrain } from './terrain.js'
 import {
+  TICKS_PER_GAME_DAY,
   ageInYears,
   effective,
+  type BuildingKind,
   type Good,
   type ResourceKind,
   type Resident,
@@ -269,3 +271,55 @@ export const FOOD_SPOIL_PER_DAY = 0.02
  * in sees these, so a few game days of a busy realm should fit.
  */
 export const REALM_LOG_LENGTH = 100
+
+/**
+ * Materials each kind of building needs before its construction site can become the building
+ * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
+ * the lumber camp's wood builds the quarry, wood and stone build the mine.
+ */
+export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
+  lumberCamp: {},
+  quarry: { wood: 30 },
+  mine: { wood: 40, stone: 20 },
+}
+
+/**
+ * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
+ * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4. More or stronger
+ * workers finish it sooner (`buildWork`).
+ */
+export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
+  lumberCamp: 2 * TICKS_PER_GAME_DAY,
+  quarry: 3 * TICKS_PER_GAME_DAY,
+  mine: 4 * TICKS_PER_GAME_DAY,
+}
+
+/** The Strength at which a resident puts in one unit of building work per tick. */
+export const BUILD_STRENGTH_AVERAGE = 10
+
+/** How much more work each point of Construction skill puts in per tick. */
+export const CONSTRUCTION_SKILL_EFFECT = 0.05
+
+/** Construction skill a resident of average Intellect gains per game day of building work. */
+export const CONSTRUCTION_SKILL_PER_DAY = 1
+
+/** The Intellect at which a resident learns at the usual pace (`CONTEXT.md`: Stats). */
+export const INTELLECT_AVERAGE = 10
+
+/**
+ * Building work a resident puts in per tick at the given tick (`CONTEXT.md`: Construction site):
+ * in proportion to Strength, plus `CONSTRUCTION_SKILL_EFFECT` for each point of Construction.
+ */
+export function buildWork(resident: Resident, tick: number): number {
+  const strength = statValue(resident, 'strength', tick) / BUILD_STRENGTH_AVERAGE
+  return strength * (1 + (resident.skills.construction ?? 0) * CONSTRUCTION_SKILL_EFFECT)
+}
+
+/**
+ * Construction skill a resident learns from one tick of building work (`CONTEXT.md`: Skill,
+ * learned by doing), faster with more Intellect.
+ */
+export function constructionLearned(resident: Resident, tick: number): number {
+  const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
+  return (CONSTRUCTION_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
+}

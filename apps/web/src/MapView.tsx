@@ -66,6 +66,7 @@ export function MapView({
   onSelect,
   picking = false,
   onPickTile,
+  onNodesLoaded,
 }: {
   world: ClientWorld
   /** The resident shown with a ring, if any. */
@@ -76,6 +77,8 @@ export function MapView({
   picking?: boolean
   /** Called with a tile picked by click (while `picking`) or by right-click. */
   onPickTile?: (x: number, y: number) => void
+  /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
+  onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef(world)
@@ -86,6 +89,8 @@ export function MapView({
   pickingRef.current = picking
   const onPickTileRef = useRef(onPickTile)
   onPickTileRef.current = onPickTile
+  const onNodesLoadedRef = useRef(onNodesLoaded)
+  onNodesLoadedRef.current = onNodesLoaded
   const redrawRef = useRef<() => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
   const controlsRef = useRef<{ zoom(factor: number): void; centre(): void } | null>(null)
@@ -136,6 +141,11 @@ export function MapView({
           sprites.set(index, sprite)
         }
         nodes[chunk.cy * across + chunk.cx] = chunk.nodes
+        onNodesLoadedRef.current?.((x, y) =>
+          nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
+            (n) => n.x === x && n.y === y,
+          ),
+        )
         redraw()
       },
     )
@@ -492,9 +502,10 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
     g.rect(gx, gy, gw, gh).fill({ color: WALL_COLOR, alpha: 0.35 })
   }
   for (const b of buildings) {
+    // A construction site shows faintly, as an outline of what it will be.
     g.rect(...box(b.x, b.y, 0.08))
-      .fill(BUILDING_COLORS[b.kind])
-      .stroke({ width: 1, color: 0x4f3a22 })
+      .fill({ color: BUILDING_COLORS[b.kind], alpha: b.site ? 0.35 : 1 })
+      .stroke({ width: b.site ? 2 : 1, color: b.site ? BUILDING_COLORS[b.kind] : 0x4f3a22 })
   }
   for (const p of piles) {
     // A small heap in the tile's lower corner, so a building on the tile still shows.
