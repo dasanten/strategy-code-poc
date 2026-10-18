@@ -1,5 +1,5 @@
 import type { Account } from './api.js'
-import type { Resident } from './world.js'
+import type { Building, Carriage, City, Horse, Resident } from './world.js'
 
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
 export interface MapInfo {
@@ -27,6 +27,18 @@ export type ServerMessage =
       map: MapInfo
       /** Chunks with explored terrain, to load from `terrainChunkPath` (see `chunksAcross`). */
       exploredChunks: number[]
+      /** The Player's realm and the city the view starts on. */
+      home: { realmId: string; leaderId: string; cityId: string; x: number; y: number }
+      /**
+       * Cities, buildings, horses and carriages, as they stand on connect. Until sight
+       * (T2.3), these come once with the welcome and the tick updates carry residents only.
+       */
+      structures: {
+        cities: City[]
+        buildings: Building[]
+        horses: Horse[]
+        carriages: Carriage[]
+      }
       entities: Resident[]
     }
   /** Every tick: entities in sight that changed, and ids that left sight. */

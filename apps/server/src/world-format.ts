@@ -8,7 +8,7 @@ import { nearestFreeTile } from './world.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world.
  */
-export const WORLD_FORMAT_VERSION = 4
+export const WORLD_FORMAT_VERSION = 5
 
 /** What a migration step may look at besides the save itself. */
 export interface MigrationContext {
@@ -59,6 +59,18 @@ export const migrations: Record<number, MigrationStep> = {
     }))
     return { ...rest, residents }
   },
+  // Players got realms and starting cities. The placeholder residents belonged to nobody, so
+  // they go; each Player gets their city on their next login.
+  4: (state) => ({
+    ...(state as object),
+    nextId: 1,
+    residents: [],
+    realms: [],
+    cities: [],
+    buildings: [],
+    horses: [],
+    carriages: [],
+  }),
 }
 
 /** A placeholder unit, as saved in formats 1 to 3. */

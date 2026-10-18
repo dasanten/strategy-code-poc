@@ -1,4 +1,4 @@
-import { OFF_MAP, Terrain, UNEXPLORED, type ResourceKind } from '@csp/shared'
+import { OFF_MAP, Terrain, UNEXPLORED, type BuildingKind, type ResourceKind } from '@csp/shared'
 
 /** Terrain colours from the Main Game Screen design, as 0xRRGGBB. */
 export const TERRAIN_COLORS: Record<number, number> = {
@@ -40,6 +40,19 @@ export const NODE_NAMES: Record<ResourceKind, string> = {
   goldOre: 'Gold ore',
 }
 
-export const OWNER_COLORS: Record<string, number> = { red: 0xe0524a, blue: 0x4aa3e0 }
+/** Residents: your Leader, your other residents, everyone else. */
+export const LEADER_COLOR = 0xe8a33d
+export const OWN_COLOR = 0xf2eee3
+export const OTHER_COLOR = 0xe0524a
+
+/** City walls and buildings, from the design. */
+export const WALL_COLOR = 0x8a5a2b
+export const BUILDING_COLORS: Record<BuildingKind, number> = {
+  house: 0xc7b391,
+  storage: 0x8c6a44,
+  farm: 0x9db05f,
+}
+export const HORSE_COLOR = 0x6b4f2e
+export const CARRIAGE_COLOR = 0xb79a6e
 
 export const css = (color: number) => `#${color.toString(16).padStart(6, '0')}`

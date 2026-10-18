@@ -99,7 +99,13 @@ The shared language of the game. Domain terms only — no implementation details
 - **Realm:** everything one Player controls through their Leader: cities, residents, workplaces,
   carriages. Breaks up into self-managed cities when the Leader dies.
 - **City:** a settlement with residents, buildings and usually a wall. Sizes range from
-  **village** to large town.
+  **village** to large town. On the map it is a square of tiles; its **wall** is the ring of
+  tiles along the square's edge, with one **gate**. Buildings inside the wall take one tile each;
+  farms and workplaces may lie outside.
+- **House:** a building inside a city where a few residents live. A city's **free housing** is
+  its houses' room minus its residents.
+- **Storage:** a building inside a city where its goods are kept.
+- **At home:** a resident standing inside the walls of a city of their own realm.
 - **NPC city:** a city run by the game. Self-managed cities are NPC cities.
 - **Integrating:** bringing a village or city into your realm, with its residents. Three ways:
   **conquer** it (capture by force), **buy** it (physically deliver the agreed coins and goods),
@@ -210,7 +216,9 @@ The shared language of the game. Domain terms only — no implementation details
 ## Starting city
 
 - **Starting city:** what a Leader spawns with, far from other Players: about 8 residents with
-  random stats, a wooden wall, one farm, a small food stock, one horse and one carriage.
+  random stats (one of them the Leader), a wooden wall, houses for everyone with a little room
+  to spare, a storage with a small food stock, one farm outside the wall, one horse and one
+  carriage.
 
 ## Control
 

@@ -74,3 +74,30 @@ export const START_AGE_MAX = 45
 export function trainedCap(base: number): number {
   return Math.floor(base * TRAINED_CAP_SHARE)
 }
+
+/** Tiles along each side of a starting city, wall included: 5×5 tiles inside the wall. */
+export const START_CITY_SIZE = 7
+
+/** Residents in a starting city, the Leader included. */
+export const START_RESIDENTS = 8
+
+/** Residents one house holds. */
+export const HOUSE_CAPACITY = 4
+
+/** Houses a starting city gets beyond what its residents need. */
+export const START_SPARE_HOUSES = 1
+
+/** Food in a starting city's storage, in kg. */
+export const START_FOOD = 200
+
+/** A starting city keeps at least this many tiles from the edge of the world. */
+export const CITY_EDGE_MARGIN = 80
+
+/**
+ * Starting cities lie at least this many tiles apart (about 2.5 hours' walk on plains), when the
+ * map has room; otherwise as far apart as it allows.
+ */
+export const CITY_MIN_DISTANCE = 300
+
+/** Tiles around a new starting city that its Player has explored from the start. */
+export const START_EXPLORED_RADIUS = 24

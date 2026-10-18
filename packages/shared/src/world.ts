@@ -62,6 +62,91 @@ export interface WorldState {
   residents: Resident[]
   /** Placed once when the world is created, from the terrain and the seed. */
   nodes: ResourceNode[]
+  /** The number the next new entity's id gets, so ids are never reused. */
+  nextId: number
+  realms: Realm[]
+  cities: City[]
+  buildings: Building[]
+  horses: Horse[]
+  carriages: Carriage[]
+}
+
+/** PoC goods (`CONTEXT.md`: Good). Amounts are in kg. */
+export type Good = 'food' | 'wood' | 'stone' | 'ironOre' | 'iron' | 'goldOre' | 'coins'
+
+/** Goods by kind, in kg; a missing good is 0. */
+export type Stock = Partial<Record<Good, number>>
+
+/** Everything one Player controls through their Leader (`CONTEXT.md`: Realm). */
+export interface Realm {
+  id: string
+  /** The Player's account. */
+  userId: number
+  /** The resident who is the Player's Leader. */
+  leaderId: string
+}
+
+/**
+ * A walled square of tiles (`CONTEXT.md`: City). Its wall is the ring of tiles along the
+ * square's edge, with one gate tile in it.
+ */
+export interface City {
+  id: string
+  name: string
+  realmId: string
+  /** Top-left tile of the square, wall included. */
+  x: number
+  y: number
+  /** Tiles along each side, wall included. */
+  size: number
+  wall: 'wooden'
+  gate: { x: number; y: number }
+}
+
+export type BuildingKind = 'house' | 'storage' | 'farm'
+
+/** A building takes one tile (`CONTEXT.md`: Tile). */
+export interface Building {
+  id: string
+  kind: BuildingKind
+  cityId: string
+  x: number
+  y: number
+  /** Goods kept here; storages only. */
+  stock?: Stock
+}
+
+/** An animal that pulls a carriage (`CONTEXT.md`: Horse). */
+export interface Horse {
+  id: string
+  realmId: string
+  x: number
+  y: number
+  /** The hunger meter, as for residents. */
+  hunger: number
+}
+
+/** A horse-drawn cart (`CONTEXT.md`: Carriage). */
+export interface Carriage {
+  id: string
+  realmId: string
+  x: number
+  y: number
+  /** Goods on board, in kg. */
+  load: Stock
+}
+
+/** Whether a tile is part of the city's wall ring. */
+export function isWallTile(city: City, x: number, y: number): boolean {
+  const inside = x >= city.x && y >= city.y && x < city.x + city.size && y < city.y + city.size
+  const edge =
+    x === city.x || y === city.y || x === city.x + city.size - 1 || y === city.y + city.size - 1
+  return inside && edge
+}
+
+/** Whether a tile lies inside the city's walls (`CONTEXT.md`: At home). */
+export function isInsideWalls(city: City, x: number, y: number): boolean {
+  return x > city.x && y > city.y && x < city.x + city.size - 1 && y < city.y + city.size - 1
 }
 
 /** What a resource node yields once worked (`CONTEXT.md`: Resource node). */
