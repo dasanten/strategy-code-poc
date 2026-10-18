@@ -233,6 +233,29 @@ export const goodsInPlace: Invariant = {
   },
 }
 
+/**
+ * Goods are counted in whole units wherever they are (`Good`); spoilage and eating never leave
+ * part of a unit behind.
+ */
+export const goodsInWholeUnits: Invariant = {
+  name: 'goods-in-whole-units',
+  check(world) {
+    const holders: [string, Stock | undefined][] = [
+      ...world.residents.map((r): [string, Stock] => [r.id, r.carried]),
+      ...world.buildings.map((b): [string, Stock | undefined] => [b.id, b.stock]),
+      ...world.carriages.map((k): [string, Stock] => [k.id, k.load]),
+      ...world.piles.map((p): [string, Stock] => [p.id, p.goods]),
+    ]
+    return holders
+      .filter(([, stock]) => Object.values(stock ?? {}).some((n) => !Number.isInteger(n)))
+      .map(([id, stock]) => ({
+        invariant: this.name,
+        message: `${id} holds part of a unit: ${JSON.stringify(stock)}`,
+        entityIds: [id],
+      }))
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -242,6 +265,7 @@ export const worldInvariants: Invariant[] = [
   buildingsInPlace,
   carriedWithinCapacity,
   goodsInPlace,
+  goodsInWholeUnits,
   nodesOnFittingTerrain,
 ]
 

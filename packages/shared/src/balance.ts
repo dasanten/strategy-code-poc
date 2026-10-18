@@ -192,3 +192,9 @@ export function walkSpeed(resident: Resident, terrain: number): number {
   const slowdown = (1 - base) * (1 - clamp(away * AGILITY_TERRAIN_EFFECT))
   return (pace * (1 - slowdown)) / WALK_TICKS_PER_TILE
 }
+
+/**
+ * Share of the Food in one place (a storage, a resident's or carriage's load, a pile) that goes
+ * bad each game day (`CONTEXT.md`: Spoilage). About a third of a stock is lost over a game year.
+ */
+export const FOOD_SPOIL_PER_DAY = 0.02
