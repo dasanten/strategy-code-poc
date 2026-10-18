@@ -1,12 +1,24 @@
-import { wrapDistance, type City, type TerrainMap, type WorldState } from '@csp/shared'
+import {
+  MAX_HEALTH,
+  MAX_HUNGER,
+  START_HORSES,
+  START_STABLE_FOOD,
+  isInsideWalls,
+  wrapDistance,
+  type Building,
+  type City,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
 import { drawLifespan, hash, mulberry32 } from './residents.js'
+import { plainsOutside } from './starting-city.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 11
+export const WORLD_FORMAT_VERSION = 12
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -70,6 +82,51 @@ export const migrations: Record<number, MigrationStep> = {
         return { ...r, cityId: city?.id ?? null }
       }),
     }
+  },
+  // Horses got health, and starting cities a stable (`CONTEXT.md`: Horse, Stable, Starting city).
+  // Each city with a farm gets a stable on the next free Plains tile outside its wall, with a
+  // little food; the horses inside its walls move in, topped up to `START_HORSES` of its realm.
+  11: (state, ctx) => {
+    type OldHorse = { id: string; realmId: string | null; x: number; y: number; hunger: number }
+    const s = state as {
+      horses: OldHorse[]
+      cities: City[]
+      buildings: Building[]
+      nodes: { x: number; y: number }[]
+      nextId: number
+    }
+    let nextId = s.nextId
+    const buildings = [...s.buildings]
+    const horses = s.horses.map((h) => ({ ...h, health: MAX_HEALTH }))
+    for (const c of s.cities) {
+      if (!buildings.some((b) => b.cityId === c.id && b.kind === 'farm')) continue
+      const taken = new Set([...s.nodes, ...buildings].map((e) => `${e.x},${e.y}`))
+      const tile = plainsOutside(ctx.terrain, c).find(([x, y]) => !taken.has(`${x},${y}`))
+      if (!tile) continue
+      const [x, y] = tile
+      const stable: Building = {
+        id: `b${nextId++}`,
+        kind: 'stable',
+        cityId: c.id,
+        x,
+        y,
+        stock: { food: START_STABLE_FOOD },
+      }
+      buildings.push(stable)
+      const inside = horses.filter((h) => isInsideWalls(c, h.x, h.y))
+      for (const h of inside) Object.assign(h, { x, y })
+      for (let i = inside.length; i < START_HORSES; i++) {
+        horses.push({
+          id: `horse${nextId++}`,
+          realmId: c.realmId,
+          x,
+          y,
+          hunger: MAX_HUNGER,
+          health: MAX_HEALTH,
+        })
+      }
+    }
+    return { ...s, buildings, horses, nextId }
   },
 }
 

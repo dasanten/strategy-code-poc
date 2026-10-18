@@ -194,6 +194,10 @@ export type RealmEventWhat =
   | { kind: 'foodSpoiled'; units: number }
   /** A pair had a child (`CONTEXT.md`: Pairing, Child); `parents` are their names. */
   | { kind: 'born'; residentId: string; name: string; parents: [string, string] }
+  /** One of the realm's horses starved to death (`CONTEXT.md`: Horse). */
+  | { kind: 'horseDied'; horseId: string }
+  /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
+  | { kind: 'foaled'; horseId: string; stableId: string }
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the
@@ -249,7 +253,8 @@ export interface City {
   gate: { x: number; y: number }
 }
 
-export type BuildingKind = 'house' | 'storage' | 'farm' | 'mine' | 'quarry' | 'lumberCamp'
+export type BuildingKind =
+  'house' | 'storage' | 'farm' | 'stable' | 'mine' | 'quarry' | 'lumberCamp'
 
 /**
  * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction
@@ -262,8 +267,13 @@ export interface Building {
   cityId: string | null
   x: number
   y: number
-  /** Goods kept here; storages only. */
+  /** Goods kept here; storages and stables only. */
   stock?: Stock
+  /**
+   * A stable's progress toward its next foal, in ticks of breeding (`STABLE_BREED_DAYS`); there
+   * once it has started.
+   */
+  breeding?: number
   /** There while the building is still a construction site. */
   site?: ConstructionSite
   /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
@@ -281,15 +291,20 @@ export interface ConstructionSite {
   work: number
 }
 
-/** An animal that pulls a carriage (`CONTEXT.md`: Horse). */
+/**
+ * An animal that pulls a carriage (`CONTEXT.md`: Horse). It has no inventory: it eats only what
+ * is in reach (`horseFood`).
+ */
 export interface Horse {
   id: string
   /** The realm it belongs to; null when it belongs to nobody (after Leader death). */
   realmId: string | null
   x: number
   y: number
-  /** The hunger meter, as for residents. */
+  /** The hunger meter, as for residents: `MAX_HUNGER` is fully fed, 0 is empty. */
   hunger: number
+  /** 0 is dead; the most is `MAX_HEALTH`, as for residents. */
+  health: number
 }
 
 /** A horse-drawn cart (`CONTEXT.md`: Carriage). */

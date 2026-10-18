@@ -12,7 +12,7 @@ import {
   tagWorld,
 } from './monitoring.js'
 import { openDb } from './db/index.js'
-import { OrderQueue } from './orders.js'
+import { OrderQueue, orderKinds } from './orders.js'
 import { ExploredTerrain } from './explored.js'
 import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
@@ -49,7 +49,7 @@ const app = await buildApp({
 })
 if (sentryOn) setupFastifyErrorHandler(app)
 
-const orders = new OrderQueue()
+const orders = new OrderQueue(orderKinds, terrain)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
 const realtime = attachRealtime(app.server, { db, world, terrain, explored, sight, orders })

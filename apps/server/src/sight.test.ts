@@ -1,4 +1,4 @@
-import { CHUNK_SIZE, SIGHT_RANGE, chunksAcross, wrapDistance } from '@csp/shared'
+import { CHUNK_SIZE, SIGHT_RANGE, START_HORSES, chunksAcross, wrapDistance } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { ExploredTerrain } from './explored.js'
 import { SightTracker, entitiesInSight } from './sight.js'
@@ -16,7 +16,7 @@ describe('entitiesInSight', () => {
     expect(seen.filter((e) => e.is === 'resident')).toHaveLength(world.residents.length)
     expect(seen.filter((e) => e.is === 'building')).toHaveLength(world.buildings.length)
     expect(seen.filter((e) => e.is === 'city')).toHaveLength(1)
-    expect(seen.filter((e) => e.is === 'horse')).toHaveLength(1)
+    expect(seen.filter((e) => e.is === 'horse')).toHaveLength(START_HORSES)
     expect(seen.filter((e) => e.is === 'carriage')).toHaveLength(1)
     expect(entitiesInSight(world, terrain, undefined)).toEqual([])
   })

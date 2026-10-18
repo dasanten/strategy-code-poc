@@ -1,11 +1,14 @@
 import {
   CITY_MIN_DISTANCE,
   HOUSING_ROOM,
+  MAX_HEALTH,
   MAX_HUNGER,
   START_CARRIED_FOOD,
   START_CITY_SIZE,
   START_FOOD,
+  START_HORSES,
   START_RESIDENTS,
+  START_STABLE_FOOD,
   START_SPARE_HOUSES,
   Terrain,
   terrainAt,
@@ -61,25 +64,43 @@ function siteFits(terrain: TerrainMap, blocked: Set<string>, x: number, y: numbe
       if (blocked.has(`${tx},${ty}`)) return false
     }
   }
-  return farmTile(terrain, x, y) !== undefined
+  // Room outside the wall for the farm and the stable.
+  return plainsOutside(terrain, startCity(x, y)).length >= 2
 }
 
-/** A Plains tile just outside the wall for the farm, nearest the gate. */
-function farmTile(terrain: TerrainMap, x: number, y: number): [number, number] | undefined {
-  const gate: [number, number] = [x + Math.floor(START_CITY_SIZE / 2), y + START_CITY_SIZE - 1]
-  const ring: [number, number][] = []
-  for (let i = -1; i <= START_CITY_SIZE; i++) {
-    ring.push(
+/** The square and gate a starting city at (x, y) gets. */
+const startCity = (x: number, y: number) => ({
+  x,
+  y,
+  size: START_CITY_SIZE,
+  gate: { x: x + Math.floor(START_CITY_SIZE / 2), y: y + START_CITY_SIZE - 1 },
+})
+
+/**
+ * The Plains tiles in the ring just outside a city's wall, nearest its gate first, leaving the
+ * tile in front of the gate free: where a starting city's farm and stable go.
+ */
+export function plainsOutside(
+  terrain: TerrainMap,
+  city: Pick<City, 'x' | 'y' | 'size' | 'gate'>,
+): [number, number][] {
+  const { x, y, size } = city
+  const gate: [number, number] = [city.gate.x, city.gate.y]
+  const ring = new Map<string, [number, number]>()
+  for (let i = -1; i <= size; i++) {
+    for (const t of [
       [x + i, y - 1],
-      [x + i, y + START_CITY_SIZE],
+      [x + i, y + size],
       [x - 1, y + i],
-      [x + START_CITY_SIZE, y + i],
-    )
+      [x + size, y + i],
+    ] as [number, number][]) {
+      ring.set(`${t[0]},${t[1]}`, t)
+    }
   }
-  return ring
+  return [...ring.values()]
     .filter(([tx, ty]) => terrainAt(terrain, tx, ty) === Terrain.Plains)
     .filter(([tx, ty]) => !(tx === gate[0] && ty === gate[1] + 1))
-    .sort((a, b) => dist(a, gate) - dist(b, gate))[0]
+    .sort((a, b) => dist(a, gate) - dist(b, gate))
 }
 
 const dist = (a: readonly [number, number], b: readonly [number, number]) =>
@@ -116,8 +137,8 @@ export function findCitySite(
 /**
  * Gives a Player their realm and starting city (`CONTEXT.md`: Starting city), unless they
  * already have one: residents with random stats, one of them the Leader, a wooden wall with a
- * gate, houses for everyone and a spare, a storage with food, a farm outside the wall, a horse
- * and a carriage. The residents start on the farm, working it, each carrying a little food.
+ * gate, houses for everyone and a spare, a storage with food, a farm outside the wall, a stable
+ * next to it with horses and a little food, and a carriage. The residents start on the farm, working it, each carrying a little food.
  * The same world and Player always get the same city.
  */
 export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId: number): Realm {
@@ -153,9 +174,12 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
     { ...building('storage', x + mid, y + mid), stock: { food: START_FOOD } },
     ...Array.from({ length: houses }, (_, i) => building('house', x + 1 + i * 2, y + 1)),
   ]
-  const [fx, fy] = farmTile(terrain, x, y)!
+  // Outside the wall by the gate: the farm, and the stable next to it with a little food.
+  const [farmTile, stableTile] = plainsOutside(terrain, city)
+  const [fx, fy] = farmTile!
+  const [sx, sy] = stableTile!
   const farm = building('farm', fx, fy)
-  buildings.push(farm)
+  buildings.push(farm, { ...building('stable', sx, sy), stock: { food: START_STABLE_FOOD } })
 
   // Everyone starts on the farm, working it, with a little food on them; the first is the Leader.
   const residents = Array.from({ length: START_RESIDENTS }, () => {
@@ -177,13 +201,16 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
   world.cities.push(city)
   world.buildings.push(...buildings)
   world.residents.push(...residents)
-  world.horses.push({
-    id: newId(world, 'horse'),
-    realmId,
-    x: x + mid - 1,
-    y: y + size - 2,
-    hunger: MAX_HUNGER,
-  })
+  for (let i = 0; i < START_HORSES; i++) {
+    world.horses.push({
+      id: newId(world, 'horse'),
+      realmId,
+      x: sx,
+      y: sy,
+      hunger: MAX_HUNGER,
+      health: MAX_HEALTH,
+    })
+  }
   world.carriages.push({
     id: newId(world, 'carriage'),
     realmId,

@@ -1,4 +1,4 @@
-import type { Account, OrderRequest, ServerMessage, WorldState } from '@csp/shared'
+import type { Account, OrderRequest, ServerMessage, TerrainMap, WorldState } from '@csp/shared'
 import { build } from './building.js'
 import { tearDown } from './teardown.js'
 import { drop, pickUp } from './carrying.js'
@@ -18,7 +18,12 @@ export interface OrderSender {
  * that later ticks turn into actions, never change the world directly.
  */
 export interface OrderKind {
-  validate(world: WorldState, sender: OrderSender, order: OrderRequest): string | undefined
+  validate(
+    world: WorldState,
+    sender: OrderSender,
+    order: OrderRequest,
+    terrain?: TerrainMap,
+  ): string | undefined
   apply(world: WorldState, sender: OrderSender, order: OrderRequest): void
 }
 
@@ -42,7 +47,11 @@ interface Pending {
 export class OrderQueue {
   private pending: Pending[] = []
 
-  constructor(private kinds: Record<string, OrderKind> = orderKinds) {}
+  /** `terrain`, when given, lets orders check the land, such as a stable going on Plains. */
+  constructor(
+    private kinds: Record<string, OrderKind> = orderKinds,
+    private terrain?: TerrainMap,
+  ) {}
 
   /** Checks an incoming order and answers it; a valid one waits for the next tick. */
   receive(
@@ -58,7 +67,7 @@ export class OrderQueue {
     const req = order as OrderRequest
     const kind = typeof req.kind === 'string' ? this.kinds[req.kind] : undefined
     if (!kind) return { type: 'rejected', requestId: id, reason: `unknown order: ${req.kind}` }
-    const reason = kind.validate(world, sender, req)
+    const reason = kind.validate(world, sender, req, this.terrain)
     if (reason) return { type: 'rejected', requestId: id, reason }
     this.pending.push({ sender, order: req })
     return { type: 'ack', requestId: id }

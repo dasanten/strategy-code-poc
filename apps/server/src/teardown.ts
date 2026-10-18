@@ -77,6 +77,8 @@ export function resolveTearingDown(world: WorldState, actions: TearDownAction[])
     if (teardownLeft(b) === 0) {
       world.buildings = world.buildings.filter((x) => x !== b)
       dropGoods(world, b.x, b.y, teardownReturns(b))
+      // What a stable kept for its horses stays on the tile too.
+      dropGoods(world, b.x, b.y, b.stock ?? {})
     }
   }
   const standing = new Set(world.buildings.map((b) => b.id))

@@ -18,6 +18,8 @@ import {
   ageInYears,
   canWork,
   MAX_HUNGER,
+  STABLE_BREED_TICKS,
+  KEEPS_GOODS,
   NODE_TERRAINS,
   REALM_LOG_LENGTH,
   Terrain,
@@ -121,8 +123,9 @@ export const realmsHaveLeaders: Invariant = {
 
 /**
  * Buildings and construction sites: one per tile and never on a wall; houses and storages inside
- * their city's walls, farms on Plains, mines, quarries and lumber camps on a resource node of
- * their kind and of no city; every city's wall on passable terrain; no stock below zero.
+ * their city's walls, farms and stables on Plains, mines, quarries and lumber camps on a resource
+ * node of their kind and of no city; a stable of no city or of one that exists; every city's wall
+ * on passable terrain; no stock below zero.
  */
 export const buildingsInPlace: Invariant = {
   name: 'buildings-in-place',
@@ -138,7 +141,10 @@ export const buildingsInPlace: Invariant = {
       tiles.add(key)
       const onWall = world.cities.some((c) => isWallTile(c, b.x, b.y))
       if (onWall) fail(b.id, 'stands on a wall')
-      if (BUILDABLE.includes(b.kind)) {
+      if (b.kind === 'stable') {
+        if (b.cityId !== null && !cities.has(b.cityId))
+          fail(b.id, `belongs to no city (${b.cityId})`)
+      } else if (BUILDABLE.includes(b.kind)) {
         const node = world.nodes.find((n) => n.x === b.x && n.y === b.y)
         if (!node || NODE_WORKPLACE[node.kind] !== b.kind) fail(b.id, `is a ${b.kind} off its node`)
         if (b.cityId !== null) fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
@@ -148,8 +154,11 @@ export const buildingsInPlace: Invariant = {
         else if (!onWall && b.kind !== 'farm' && !isInsideWalls(city, b.x, b.y))
           fail(b.id, 'is outside the walls')
       }
-      if (b.kind === 'farm' && terrainAt(terrain, b.x, b.y) !== Terrain.Plains) {
-        fail(b.id, 'is a farm off Plains')
+      if (
+        (b.kind === 'farm' || b.kind === 'stable') &&
+        terrainAt(terrain, b.x, b.y) !== Terrain.Plains
+      ) {
+        fail(b.id, `is a ${b.kind} off Plains`)
       }
       if (Object.values(b.stock ?? {}).some((kg) => kg < 0)) fail(b.id, 'has negative stock')
     }
@@ -169,9 +178,6 @@ export const buildingsInPlace: Invariant = {
     }
     for (const k of world.carriages) {
       if (Object.values(k.load).some((kg) => kg < 0)) fail(k.id, 'has a negative load')
-    }
-    for (const h of world.horses) {
-      if (!(h.hunger >= 0 && h.hunger <= MAX_HUNGER)) fail(h.id, `has hunger ${h.hunger}`)
     }
     return out
   },
@@ -194,19 +200,47 @@ export const trainedWithinCap: Invariant = {
   },
 }
 
-/** Health and the hunger meter stay within their ranges. */
+/**
+ * Health and the hunger meter stay within their ranges, for residents and horses alike.
+ */
 export const healthAndHungerInRange: Invariant = {
   name: 'health-and-hunger-in-range',
   check(world) {
-    return world.residents
+    const living = [
+      ...world.residents.map((r) => ({ what: 'resident', ...r })),
+      ...world.horses.map((h) => ({ what: 'horse', ...h })),
+    ]
+    return living
       .filter(
-        (r) =>
-          !(r.health >= 0 && r.health <= MAX_HEALTH && r.hunger >= 0 && r.hunger <= MAX_HUNGER),
+        (t) =>
+          !(t.health >= 0 && t.health <= MAX_HEALTH && t.hunger >= 0 && t.hunger <= MAX_HUNGER),
       )
-      .map((r) => ({
+      .map((t) => ({
         invariant: this.name,
-        message: `resident ${r.id} has health ${r.health} and hunger ${r.hunger}`,
-        entityIds: [r.id],
+        message: `${t.what} ${t.id} has health ${t.health} and hunger ${t.hunger}`,
+        entityIds: [t.id],
+      }))
+  },
+}
+
+/**
+ * Stables breed only while they make sense (`CONTEXT.md`: Stable): breeding progress is kept
+ * only on stables, and stays between 0 and one foal's worth (`STABLE_BREED_TICKS`); a stable
+ * reaching it has had its foal.
+ */
+export const stablesBreedInRange: Invariant = {
+  name: 'stables-breed-in-range',
+  check(world) {
+    return world.buildings
+      .filter(
+        (b) =>
+          b.breeding !== undefined &&
+          !(b.kind === 'stable' && b.breeding >= 0 && b.breeding < STABLE_BREED_TICKS),
+      )
+      .map((b) => ({
+        invariant: this.name,
+        message: `${b.kind} ${b.id} has breeding ${b.breeding} of ${STABLE_BREED_TICKS}`,
+        entityIds: [b.id],
       }))
   },
 }
@@ -263,8 +297,8 @@ export const carriedWithinCapacity: Invariant = {
 }
 
 /**
- * Goods are never negative wherever they are, only storages among buildings hold any, and a pile
- * is never empty; one pile per tile.
+ * Goods are never negative wherever they are, only storages and stables among buildings hold any,
+ * and a pile is never empty; one pile per tile.
  */
 export const goodsInPlace: Invariant = {
   name: 'goods-in-place',
@@ -276,7 +310,8 @@ export const goodsInPlace: Invariant = {
     for (const r of world.residents) if (negative(r.carried)) fail(r.id, 'carries negative goods')
     for (const b of world.buildings) {
       const holds = Object.values(b.stock ?? {}).some((n) => n > 0)
-      if (holds && (b.kind !== 'storage' || b.site)) fail(b.id, `is a ${b.kind} holding goods`)
+      if (holds && (!KEEPS_GOODS.includes(b.kind) || b.site))
+        fail(b.id, `is a ${b.kind} holding goods`)
       if (b.site && negative(b.site.delivered)) fail(b.id, 'has negative materials delivered')
     }
     const tiles = new Set<string>()
@@ -586,6 +621,7 @@ export const worldInvariants: Invariant[] = [
   buildingsInPlace,
   carriedWithinCapacity,
   goodsInPlace,
+  stablesBreedInRange,
   goodsInWholeUnits,
   carryOrdersDone,
   sitesWithinNeeds,

@@ -1,6 +1,14 @@
-import { isPassableTerrain, terrainAt, wrap, type TerrainMap, type WorldState } from '@csp/shared'
+import {
+  isPassableTerrain,
+  terrainAt,
+  wrap,
+  type Horse,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
 import { placeResourceNodes } from './node-gen.js'
 import { requestBuilding, resolveBuilding } from './building.js'
+import { stepHorses } from './horses.js'
 import { requestTearingDown, resolveTearingDown } from './teardown.js'
 import { requestCarrying, resolveCarrying } from './carrying.js'
 import type { Walking } from './walking.js'
@@ -65,13 +73,15 @@ export interface StepResult {
   actions: number
   /** Who starved and which realms ended through it this tick. */
   survival: SurvivalResult
+  /** Horses that starved this tick. */
+  horsesDied: Horse[]
   /** Who died of old age and which realms ended through it, as the next tick begins. */
   aging: AgingResult
 }
 
 /**
- * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; food
- * spoils at the end of each game day; then their orders request actions (steps, then taking and
+ * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
+ * horses, and stables breed foals; food spoils at the end of each game day; then their orders request actions (steps, then taking and
  * putting down goods, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; then residents at
@@ -79,13 +89,14 @@ export interface StepResult {
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
+  const horsesDied = stepHorses(world, terrain)
   stepSpoilage(world)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
   const carries = requestCarrying(world)
   resolveCarrying(world, carries)
   const builds = requestBuilding(world)
-  resolveBuilding(world, builds)
+  resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
   resolveTearingDown(world, teardowns)
   const work = requestWork(world)
@@ -97,5 +108,5 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepHomeRefill(world)
   const actions =
     steps.length + carries.length + builds.length + teardowns.length + work.length + births.length
-  return { actions, survival, aging }
+  return { actions, survival, horsesDied, aging }
 }
