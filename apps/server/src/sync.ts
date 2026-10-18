@@ -1,40 +1,4 @@
-import {
-  terrainAt,
-  type Account,
-  type MapInfo,
-  type TerrainMap,
-  type Unit,
-  type WorldState,
-} from '@csp/shared'
-
-/** The size of the terrain window the client gets on connect, in tiles. */
-const WINDOW_WIDTH = 40
-const WINDOW_HEIGHT = 30
-
-/**
- * A window of terrain centred on the given units, for the client to draw. A stopgap until
- * explored terrain is served in chunks (T1.4); it does not check sight yet.
- */
-export function mapWindow(terrain: TerrainMap, seed: number, units: Unit[]): MapInfo {
-  const centre = Math.floor(terrain.diameter / 2)
-  const cx = units.length ? Math.round(units.reduce((s, u) => s + u.x, 0) / units.length) : centre
-  const cy = units.length ? Math.round(units.reduce((s, u) => s + u.y, 0) / units.length) : centre
-  const x = cx - Math.floor(WINDOW_WIDTH / 2)
-  const y = cy - Math.floor(WINDOW_HEIGHT / 2)
-  const window: number[] = []
-  for (let ty = y; ty < y + WINDOW_HEIGHT; ty++) {
-    for (let tx = x; tx < x + WINDOW_WIDTH; tx++) window.push(terrainAt(terrain, tx, ty))
-  }
-  return {
-    seed,
-    diameter: terrain.diameter,
-    x,
-    y,
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
-    terrain: window,
-  }
-}
+import type { Account, Unit, WorldState } from '@csp/shared'
 
 /**
  * What a Player currently sees (CONTEXT.md, Sight). Placeholder: everything, until residents

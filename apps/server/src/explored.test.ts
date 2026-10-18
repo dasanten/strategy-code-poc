@@ -5,6 +5,7 @@ import {
   SESSION_COOKIE,
   UNEXPLORED,
   chunksAcross,
+  decodeChunk,
   terrainAt,
   terrainChunkPath,
 } from '@csp/shared'
@@ -67,6 +68,21 @@ describe('ExploredTerrain', () => {
     expect(loaded.isExplored(viewer, 20, 60)).toBe(true)
     expect(loaded.isExplored(viewer, 40, 60)).toBe(false)
     close()
+  })
+})
+
+describe('resource nodes in chunks', () => {
+  it('include only nodes on tiles the Player explored', () => {
+    const nodes = [
+      { id: 'n1', kind: 'stone' as const, x: 40, y: 40 },
+      { id: 'n2', kind: 'goldOre' as const, x: 50, y: 50 },
+    ]
+    const explored = new ExploredTerrain(terrain, nodes)
+    explored.explore(player.id, 40, 40, 2)
+    expect(decodeChunk(1, 1, explored.chunk(player, 1, 1)!).nodes).toEqual([
+      { kind: 'stone', x: 40, y: 40 },
+    ])
+    expect(decodeChunk(1, 1, explored.chunk(admin, 1, 1)!).nodes).toHaveLength(2)
   })
 })
 

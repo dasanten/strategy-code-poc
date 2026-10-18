@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { OFF_MAP, terrainAt, type Account, type OrderRequest } from '@csp/shared'
+import type { Account, OrderRequest } from '@csp/shared'
 import { OrderQueue, type OrderKind } from './orders.js'
-import { ClientView, mapWindow } from './sync.js'
+import { ClientView } from './sync.js'
 import { smallTerrain } from './test-terrain.js'
 import { createWorld } from './world.js'
 
@@ -19,23 +19,6 @@ describe('ClientView', () => {
       gone: ['b'],
     })
     expect(view.diff([unit('a', 1), unit('c', 0)])).toEqual({ changed: [], gone: [] })
-  })
-})
-
-describe('mapWindow', () => {
-  it('cuts the stored terrain around the units', () => {
-    const units = [unit('a', 60), unit('b', 62)].map((u) => ({ ...u, y: 50 }))
-    const map = mapWindow(terrain, 1, units)
-    expect(map).toMatchObject({ seed: 1, diameter: terrain.diameter, width: 40, height: 30 })
-    expect(map.x).toBe(61 - 20)
-    expect(map.y).toBe(50 - 15)
-    expect(map.terrain).toHaveLength(40 * 30)
-    expect(map.terrain[5 * 40 + 7]).toBe(terrainAt(terrain, map.x + 7, map.y + 5))
-  })
-
-  it('shows tiles outside the disc as off the map', () => {
-    const map = mapWindow(terrain, 1, [unit('a', 0)])
-    expect(map.terrain[0]).toBe(OFF_MAP)
   })
 })
 

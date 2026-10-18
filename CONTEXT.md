@@ -120,8 +120,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Sight:** what a Player currently sees: everything within sight range of any of their
   residents, or of any resident of an alliance they belong to. People, goods, carriages and
   armies are only visible in sight.
-- **Explored terrain:** tiles a Player has ever had in sight. Their terrain stays known; what is on
-  them does not.
+- **Explored terrain:** tiles a Player has ever had in sight. Their terrain and resource nodes stay
+  known; what is on them (people, goods, buildings) does not.
 
 ## Military
 

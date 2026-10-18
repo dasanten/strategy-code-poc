@@ -13,7 +13,7 @@ import { getSessionUser, type SessionUser } from './auth.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
-import { ClientView, entitiesInSight, mapWindow } from './sync.js'
+import { ClientView, entitiesInSight } from './sync.js'
 
 function readCookie(header: string | undefined, name: string): string | undefined {
   for (const part of header?.split(';') ?? []) {
@@ -73,7 +73,7 @@ export function attachRealtime(
       type: 'welcome',
       account: client.account,
       tick: world.tick,
-      map: mapWindow(opts.terrain, world.seed, entities),
+      map: { seed: world.seed, diameter: opts.terrain.diameter },
       exploredChunks: opts.explored.exploredChunks(user),
       entities,
     })
