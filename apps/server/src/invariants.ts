@@ -7,7 +7,10 @@ import {
   isWallTile,
   STAT_NAMES,
   terrainAt,
+  carryCapacity,
+  stockWeight,
   trainedCap,
+  type Stock,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -33,7 +36,13 @@ export interface InvariantViolation {
 export const nothingOnImpassableTerrain: Invariant = {
   name: 'nothing-on-impassable-terrain',
   check(world, terrain) {
-    const things = [...world.residents, ...world.horses, ...world.carriages, ...world.buildings]
+    const things = [
+      ...world.residents,
+      ...world.horses,
+      ...world.carriages,
+      ...world.buildings,
+      ...world.piles,
+    ]
     return things
       .filter((t) => !isWalkable(terrain, t.x, t.y))
       .map((t) => ({
@@ -59,6 +68,7 @@ export const positionsOnMap: Invariant = {
       ...world.buildings,
       ...world.nodes,
       ...world.cities,
+      ...world.piles,
     ]
     return things
       .filter((t) => !on(t.x) || !on(t.y))
@@ -188,6 +198,41 @@ export const nodesOnFittingTerrain: Invariant = {
   },
 }
 
+/** Nobody carries more than their carry capacity (`CONTEXT.md`: Carry capacity). */
+export const carriedWithinCapacity: Invariant = {
+  name: 'carried-within-capacity',
+  check(world) {
+    return world.residents
+      .filter((r) => stockWeight(r.carried) > carryCapacity(r) + 1e-9)
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} carries ${stockWeight(r.carried)} kg of ${carryCapacity(r)} kg`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
+/** Goods are never negative wherever they are, and a pile is never empty; one pile per tile. */
+export const goodsInPlace: Invariant = {
+  name: 'goods-in-place',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (id: string, message: string) =>
+      out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
+    const negative = (stock: Stock) => Object.values(stock).some((n) => !(n >= 0))
+    for (const r of world.residents) if (negative(r.carried)) fail(r.id, 'carries negative goods')
+    const tiles = new Set<string>()
+    for (const p of world.piles) {
+      if (negative(p.goods)) fail(p.id, 'holds negative goods')
+      if (!Object.values(p.goods).some((n) => n > 0)) fail(p.id, 'is an empty pile')
+      const key = `${p.x},${p.y}`
+      if (tiles.has(key)) fail(p.id, `is a second pile on tile (${key})`)
+      tiles.add(key)
+    }
+    return out
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -195,6 +240,8 @@ export const worldInvariants: Invariant[] = [
   healthAndHungerInRange,
   realmsHaveLeaders,
   buildingsInPlace,
+  carriedWithinCapacity,
+  goodsInPlace,
   nodesOnFittingTerrain,
 ]
 

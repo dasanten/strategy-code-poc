@@ -81,5 +81,6 @@ export function newResident(
     health: MAX_HEALTH,
     hunger: MAX_HUNGER,
     bornAt: tick - Math.round(age * TICKS_PER_GAME_YEAR),
+    carried: {},
   }
 }

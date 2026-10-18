@@ -5,7 +5,7 @@ import type { TerrainMap, WorldState } from '@csp/shared'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 6
+export const WORLD_FORMAT_VERSION = 7
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -26,7 +26,13 @@ export type MigrationStep = (state: unknown, ctx: MigrationContext) => unknown
  * `migrations[n]` turns a version-n save into version n + 1. Steps start at `RESET_BEFORE`;
  * the steps for disc-shaped worlds went with the reset.
  */
-export const migrations: Record<number, MigrationStep> = {}
+export const migrations: Record<number, MigrationStep> = {
+  // Goods got weight and a place: residents carry some (nothing yet), and piles lie on the ground.
+  6: (state) => {
+    const s = state as { residents: object[] }
+    return { ...s, residents: s.residents.map((r) => ({ ...r, carried: {} })), piles: [] }
+  },
+}
 
 export class WorldFormatError extends Error {}
 

@@ -38,7 +38,9 @@ The shared language of the game. Domain terms only — no implementation details
 ## Resources and goods
 
 - **Good:** any physical thing that can be carried, stored, traded or stolen. Every good has
-  weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coins.
+  weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coins. Goods are always
+  somewhere: in a storage, carried by a resident or carriage, or in a pile.
+- **Pile:** goods lying on the ground on one tile, for anyone to take.
 - **Resource node:** a spot on the map that never runs out (forest, stone, iron ore, gold ore).
   Produces nothing on its own; it needs a workplace built on it and residents working there.
   Nodes lie on terrain that fits them: forest nodes in Forest, stone in Hills, ore in Hills and

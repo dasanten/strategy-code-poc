@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_HEALTH, MAX_HUNGER, Terrain, trainedCap, type Resident } from '@csp/shared'
+import {
+  MAX_HEALTH,
+  MAX_HUNGER,
+  Terrain,
+  carryCapacity,
+  trainedCap,
+  type Resident,
+} from '@csp/shared'
 import { checkInvariants, shouldCheckInvariants } from './invariants.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { stepWorld } from './world.js'
@@ -65,6 +72,33 @@ describe('invariants', () => {
       expect.objectContaining({ invariant: 'trained-within-cap', entityIds: [b.id] }),
       expect.objectContaining({ invariant: 'trained-within-cap', entityIds: [c.id] }),
     ])
+  })
+
+  it('catch a resident carrying more than their capacity', () => {
+    const world = worldWithCity().world
+    const r = world.residents[0]!
+    r.carried = { stone: carryCapacity(r) }
+    expect(checkInvariants(world, terrain)).toEqual([])
+    r.carried = { stone: carryCapacity(r) + 1 }
+    expect(checkInvariants(world, terrain)).toEqual([
+      expect.objectContaining({ invariant: 'carried-within-capacity', entityIds: [r.id] }),
+    ])
+  })
+
+  it('catch negative goods, empty piles and two piles on one tile', () => {
+    const world = worldWithCity().world
+    const r = world.residents[0]!
+    r.carried = { food: -1 }
+    const at = { x: r.x, y: r.y }
+    world.piles.push(
+      { id: 'p1', ...at, goods: { wood: 3 } },
+      { id: 'p2', ...at, goods: { wood: 2 } },
+      { id: 'p3', x: r.x + 1, y: r.y, goods: {} },
+    )
+    const ids = checkInvariants(world, terrain)
+      .filter((v) => v.invariant === 'goods-in-place')
+      .map((v) => v.entityIds[0])
+    expect(ids.sort()).toEqual([r.id, 'p2', 'p3'].sort())
   })
 
   it('catch health or hunger out of range', () => {
