@@ -4,7 +4,9 @@ import {
   OFF_MAP,
   UNEXPLORED,
   chunksAcross,
+  encodeChunk,
   isInsideDisc,
+  type ResourceNode,
   type TerrainMap,
 } from '@csp/shared'
 import type { SessionUser } from './auth.js'
@@ -22,11 +24,23 @@ export class ExploredTerrain {
   private bits = new Map<number, Uint8Array>()
   private dirty = new Set<number>()
 
-  constructor(private terrain: TerrainMap) {}
+  /** Resource nodes by chunk index; nodes never move, so this is built once. */
+  private nodesByChunk = new Map<number, ResourceNode[]>()
+
+  constructor(
+    private terrain: TerrainMap,
+    nodes: ResourceNode[] = [],
+  ) {
+    const n = chunksAcross(terrain.diameter)
+    for (const node of nodes) {
+      const c = Math.floor(node.y / CHUNK_SIZE) * n + Math.floor(node.x / CHUNK_SIZE)
+      this.nodesByChunk.set(c, [...(this.nodesByChunk.get(c) ?? []), node])
+    }
+  }
 
   /** Loads every Player's explored terrain from the database. */
-  static load(db: Db, terrain: TerrainMap): ExploredTerrain {
-    const explored = new ExploredTerrain(terrain)
+  static load(db: Db, terrain: TerrainMap, nodes: ResourceNode[] = []): ExploredTerrain {
+    const explored = new ExploredTerrain(terrain, nodes)
     for (const row of db.select().from(schema.explored).all()) {
       explored.bits.set(row.userId, new Uint8Array(row.data))
     }
@@ -79,8 +93,9 @@ export class ExploredTerrain {
   }
 
   /**
-   * One chunk of terrain as the Player knows it: `CHUNK_SIZE`² bytes, with tiles they haven't
-   * explored as `UNEXPLORED`. Undefined when they have explored nothing in it.
+   * One chunk of terrain as the Player knows it, encoded as `encodeChunk` describes: tiles they
+   * haven't explored are `UNEXPLORED`, and only resource nodes on explored tiles are included
+   * (they stay known like the terrain). Undefined when they have explored nothing in it.
    */
   chunk(viewer: Viewer, cx: number, cy: number): Uint8Array | undefined {
     const n = chunksAcross(this.terrain.diameter)
@@ -105,7 +120,11 @@ export class ExploredTerrain {
         }
       }
     }
-    return any ? out : undefined
+    if (!any) return undefined
+    const nodes = (this.nodesByChunk.get(cy * n + cx) ?? []).filter((node) =>
+      this.isExplored(viewer, node.x, node.y),
+    )
+    return encodeChunk(out, nodes, cx, cy)
   }
 
   /** The chunks in which the Player has explored at least one tile (see `chunksAcross`). */
