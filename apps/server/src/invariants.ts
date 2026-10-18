@@ -5,6 +5,7 @@ import {
   ageInYears,
   MAX_HUNGER,
   NODE_TERRAINS,
+  REALM_LOG_LENGTH,
   Terrain,
   isInsideWalls,
   isWallTile,
@@ -282,6 +283,31 @@ export const goodsInWholeUnits: Invariant = {
   },
 }
 
+/**
+ * Realm logs stay in order and in bounds: events are numbered in the order they happened, below
+ * the next id and not after the current tick, and no Player keeps more than `REALM_LOG_LENGTH`.
+ */
+export const realmLogsInOrder: Invariant = {
+  name: 'realm-logs-in-order',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (message: string) => out.push({ invariant: this.name, message, entityIds: [] })
+    const kept = new Map<number, number>()
+    let last = -Infinity
+    for (const e of world.events) {
+      if (!(e.seq > last)) fail(`event ${e.seq} is logged after event ${last}`)
+      if (e.seq >= world.nextId) fail(`event ${e.seq} is numbered past next id ${world.nextId}`)
+      if (e.tick > world.tick) fail(`event ${e.seq} happened at tick ${e.tick}, after now`)
+      last = e.seq
+      kept.set(e.userId, (kept.get(e.userId) ?? 0) + 1)
+    }
+    for (const [userId, n] of kept) {
+      if (n > REALM_LOG_LENGTH) fail(`Player ${userId} keeps ${n} events, over ${REALM_LOG_LENGTH}`)
+    }
+    return out
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -294,6 +320,7 @@ export const worldInvariants: Invariant[] = [
   goodsInPlace,
   goodsInWholeUnits,
   nodesOnFittingTerrain,
+  realmLogsInOrder,
 ]
 
 export function checkInvariants(

@@ -233,3 +233,5 @@ The shared language of the game. Domain terms only — no implementation details
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.
+- **Realm log:** what happened in a Player's realm (residents going hungry, deaths, Food
+  spoiling), shown only to that Player, also what happened while they were offline.

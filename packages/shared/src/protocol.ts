@@ -1,5 +1,5 @@
 import type { Account } from './api.js'
-import type { Building, Carriage, City, Horse, Resident } from './world.js'
+import type { Building, Carriage, City, Horse, RealmEvent, Resident } from './world.js'
 
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
 export interface MapInfo {
@@ -42,12 +42,21 @@ export type ServerMessage =
       home: { realmId: string; leaderId: string; cityId: string; x: number; y: number }
       /** Everything the Player's residents see. */
       entities: SeenEntity[]
+      /** The Player's realm log as kept, oldest first. */
+      events: RealmEvent[]
     }
   /**
-   * Every tick: entities in sight that changed, ids that left sight, and chunks whose explored
-   * terrain grew (load them again).
+   * Every tick: entities in sight that changed, ids that left sight, chunks whose explored
+   * terrain grew (load them again) and the Player's new realm events.
    */
-  | { type: 'tick'; tick: number; changed: SeenEntity[]; gone: string[]; explored: number[] }
+  | {
+      type: 'tick'
+      tick: number
+      changed: SeenEntity[]
+      gone: string[]
+      explored: number[]
+      events: RealmEvent[]
+    }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }
 

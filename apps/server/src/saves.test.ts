@@ -119,6 +119,11 @@ describe('world saves', () => {
     expect(migrateWorld(structuredClone(v8), 8, { terrain })).toEqual(v9)
   })
 
+  it('gives every Player an empty realm log (migration 9 → 10)', () => {
+    const v9 = { tick: 10, seed: 1, residents: [], piles: [] }
+    expect(migrateWorld(v9, 9, { terrain }, migrations, 10)).toEqual({ ...v9, events: [] })
+  })
+
   it('keeps the newest saves and one per hour for a week', async () => {
     const { db, close } = await openDb(':memory:')
     const now = 1_000_000_000

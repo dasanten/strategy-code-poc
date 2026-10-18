@@ -14,6 +14,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { recordEvent } from './events.js'
 
 /** How far one unit of food fills the hunger meter. */
 const FILL_PER_FOOD = (MAX_HUNGER * HUNGER_DAYS) / FOOD_PER_DAY
@@ -31,7 +32,8 @@ export interface SurvivalResult {
  * (slower with high Endurance); a resident eats a unit of food when there is room for it, from
  * what they carry, or from their city's storage while at home. An empty meter costs health; a
  * meter with anything in it slowly gives health back. A resident with no health left dies and
- * drops what they carried in a pile. When a Leader dies, their realm ends.
+ * drops what they carried in a pile. When a Leader dies, their realm ends. A meter running
+ * empty and a death go in the Player's realm log.
  */
 export function stepSurvival(world: WorldState): SurvivalResult {
   const drain = MAX_HUNGER / (HUNGER_DAYS * TICKS_PER_GAME_DAY)
@@ -40,6 +42,7 @@ export function stepSurvival(world: WorldState): SurvivalResult {
   const died: Resident[] = []
 
   for (const r of world.residents) {
+    const wasFed = r.hunger > 0
     r.hunger = Math.max(0, r.hunger - drain * hungerFactor(r, world.tick))
     if (r.hunger <= MAX_HUNGER - FILL_PER_FOOD) {
       const pantry = foodSource(world, r)
@@ -48,15 +51,26 @@ export function stepSurvival(world: WorldState): SurvivalResult {
         r.hunger = Math.min(MAX_HUNGER, r.hunger + FILL_PER_FOOD)
       }
     }
+    if (r.hunger <= 0 && wasFed) {
+      recordEvent(world, r.owner, { kind: 'hungry', residentId: r.id, name: r.name })
+    }
     if (r.hunger <= 0) r.health = Math.max(0, r.health - starve)
     else r.health = Math.min(MAX_HEALTH, r.health + heal)
     if (r.health <= 0) died.push(r)
   }
-  return { died, ended: dieAll(world, died) }
+  return { died, ended: dieAll(world, died, 'starved') }
 }
 
-/** Residents die, whatever of; a Leader's death ends their realm. Returns the realms that ended. */
-export function dieAll(world: WorldState, died: Resident[]): Realm[] {
+/**
+ * Residents die of `cause`, each death going in their Player's realm log; a Leader's death ends
+ * their realm. Returns the realms that ended.
+ */
+export function dieAll(world: WorldState, died: Resident[], cause: 'starved' | 'oldAge'): Realm[] {
+  // Every death is written down before any realm ends, so all of them reach the Player.
+  for (const r of died) {
+    const leader = world.realms.some((x) => x.leaderId === r.id)
+    recordEvent(world, r.owner, { kind: 'died', residentId: r.id, name: r.name, cause, leader })
+  }
   const ended: Realm[] = []
   for (const r of died) {
     die(world, r)
