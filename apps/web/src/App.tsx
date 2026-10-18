@@ -1,12 +1,35 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { checkScript, type Diagnostic } from '@csp/lang'
+import type { Account } from '@csp/shared'
+import { AdminPanel } from './AdminPanel.js'
+import { api } from './api.js'
+import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { ScriptEditor } from './ScriptEditor.js'
 import { useWorld } from './useWorld.js'
 
 export function App() {
-  const { world, status } = useWorld()
+  const [account, setAccount] = useState<Account | null | 'loading'>('loading')
+
+  useEffect(() => {
+    api.me().then(setAccount, () => setAccount(null))
+  }, [])
+
+  const loggedOut = useCallback(() => setAccount(null), [])
+
+  if (account === 'loading') return null
+  if (!account) return <Login onLoggedIn={setAccount} />
+  return <Game account={account} onLoggedOut={loggedOut} />
+}
+
+function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
+  const { world, status } = useWorld(onLoggedOut)
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([])
+
+  async function logout() {
+    await api.logout().catch(() => {})
+    onLoggedOut()
+  }
 
   return (
     <div className="layout">
@@ -15,6 +38,11 @@ export function App() {
         <span className={`status ${status}`}>
           {status === 'open' ? `tick ${world?.tick ?? '…'}` : status}
         </span>
+        <span className="spacer" />
+        <span>{account.name}</span>
+        <button type="button" onClick={logout}>
+          Log out
+        </button>
       </header>
       <main>
         <section className="map-panel">
@@ -28,6 +56,7 @@ export function App() {
               ? 'No syntax errors.'
               : diagnostics.map((d) => `${d.line}:${d.column} ${d.message}`).join('\n')}
           </p>
+          {account.isAdmin && <AdminPanel />}
         </section>
       </main>
     </div>

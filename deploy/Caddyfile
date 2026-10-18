@@ -1,0 +1,5 @@
+# HTTPS with automatic Let's Encrypt certificates for $DOMAIN; WebSockets pass through.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy server:3000
+}

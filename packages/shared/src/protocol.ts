@@ -1,7 +1,34 @@
-import type { Unit, WorldState } from './world.js'
+import type { Account } from './api.js'
+import type { Tile, Unit } from './world.js'
 
-/** Messages the server pushes over the WebSocket. */
+/** The map as the client draws it. Replaced by explored 32×32 terrain chunks in slice 1. */
+export interface MapInfo {
+  seed: number
+  width: number
+  height: number
+  tiles: Tile[]
+}
+
+/**
+ * An order from the UI (ADR 0002). `kind` picks the order; the rest is its plain-data input.
+ * The server answers every order with `ack` or `rejected` and applies it from the next tick.
+ */
+export interface OrderRequest {
+  kind: string
+  [key: string]: unknown
+}
+
+/** Messages the server pushes over the WebSocket (ADR 0006). */
 export type ServerMessage =
-  { type: 'welcome'; world: WorldState } | { type: 'tick'; tick: number; units: Unit[] }
+  /** On connect: who you are, the map and everything in your sight. */
+  | { type: 'welcome'; account: Account; tick: number; map: MapInfo; entities: Unit[] }
+  /** Every tick: entities in sight that changed, and ids that left sight. */
+  | { type: 'tick'; tick: number; changed: Unit[]; gone: string[] }
+  | { type: 'ack'; requestId: string }
+  | { type: 'rejected'; requestId: string; reason: string }
+
+/** Messages the client sends over the WebSocket. */
+export type ClientMessage = { type: 'order'; requestId: string; order: OrderRequest }
 
 export const WS_PATH = '/ws'
+export const SESSION_COOKIE = 'csp_session'

@@ -8,6 +8,20 @@
       "when": 1792259763828,
       "tag": "0000_tidy_sunset_bain",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792318949052,
+      "tag": "0001_accounts_and_world_saves",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792318953439,
+      "tag": "0002_drop_world_snapshots",
+      "breakpoints": true
     }
   ]
 }

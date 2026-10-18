@@ -14,7 +14,9 @@ The shared language of the game. Domain terms only — no implementation details
   walking across the full diameter on flat land takes about **12 real hours**.
 - **Game time:** 1 game day = 1 real hour; 1 game year = 1 real day. Crossing the map takes about
   12 game days.
-- **Tile:** one cell of the map, with one terrain type. Only tiles inside the disc exist.
+- **Tile:** one cell of the map, about 40 m across, with one terrain type. An unloaded resident
+  walks one plains tile in about 30 seconds, so the disc is about 1,440 tiles across. A building
+  fills one tile. Only tiles inside the disc exist.
 - **Terrain:** what a tile is made of. It sets how fast residents move across it and how much
   food they burn there (relative to plains). Agility softens the speed penalty, Endurance the
   food penalty.
@@ -91,7 +93,16 @@ The shared language of the game. Domain terms only — no implementation details
   workplaces project control around them according to their size and garrison; where they
   overlap, the stronger wins.
 - **Region map:** the map view colouring territory by owner. Alliance members show in the
-  alliance's colour; details show which member holds each part.
+  alliance's colour; details show which member holds each part. Territory is common knowledge:
+  it shows live over all explored terrain.
+
+## Sight
+
+- **Sight:** what a Player currently sees: everything within sight range of any of their
+  residents, or of any resident of an alliance they belong to. People, goods, carriages and
+  armies are only visible in sight.
+- **Explored terrain:** tiles a Player has ever had in sight. Their terrain stays known; what is on
+  them does not.
 
 ## Military
 
@@ -127,7 +138,10 @@ The shared language of the game. Domain terms only — no implementation details
 ## People
 
 - **Player:** the human behind an account. Owns nothing physically; joins alliances. Not a thing
-  in the world. _Avoid:_ user (in game rules), "the player" meaning the figure.
+  in the world. Signs up with an invite code. _Avoid:_ user (in game rules), "the player" meaning
+  the figure.
+- **Admin:** a Player with admin rights: creates invite codes, resets passwords and (future) gives
+  admin directives. Can play like anyone else.
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
 - **Leader death:** the Player instantly loses control of everything they held, wherever the

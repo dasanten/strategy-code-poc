@@ -1,8 +1,7 @@
 # Code Strategy PoC
 
-A persistent, real-time strategy world where players control their units with scripts written
-in our own small language. The server runs every unit's script once per tick (1 tick per second)
-with a step budget, then resolves all requested actions together.
+A persistent, real-time strategy world. Players run their realm through UI orders and, later,
+scripts in our own small language (ADR 0002). The server runs the world at 1 tick per second.
 
 Design decisions live in `docs/adr/`; the domain glossary is `CONTEXT.md`.
 
@@ -33,6 +32,15 @@ pnpm install
 pnpm dev        # server on :3000, client on http://localhost:5173 (proxies /api and /ws)
 ```
 
+Signing up needs an invite code (ADR 0005). Create yourself an admin and a code:
+
+```sh
+pnpm --filter @csp/server admin:create Daniel   # asks for a password (or set ADMIN_PASSWORD)
+pnpm --filter @csp/server admin:invite          # prints an invite code
+```
+
+Admins can also create invite codes and reset passwords in the client.
+
 Other scripts:
 
 ```sh
@@ -43,10 +51,15 @@ pnpm lint       # ESLint
 pnpm format     # Prettier
 ```
 
-The server stores the world in `data/world.db` (override with `DB_PATH`). It writes a snapshot
-every 10 ticks and on shutdown, and resumes from the latest one on start. After changing
-`apps/server/src/db/schema.ts`, run `pnpm --filter @csp/server db:generate` to add a migration;
-migrations run on startup.
+The server stores everything in `data/world.db` (override with `DB_PATH`). The world lives in
+memory and is saved as a gzipped snapshot every 30 ticks and on shutdown; old saves are pruned
+(ADR 0006).
+
+- **Table changes:** edit `apps/server/src/db/schema.ts`, then run
+  `pnpm --filter @csp/server db:generate` to add a migration; migrations run on startup.
+- **World state changes:** the world is never reset. Changing the shape of `WorldState` bumps
+  `WORLD_FORMAT_VERSION` in `apps/server/src/world-format.ts` and adds a migration step with a
+  test.
 
 ## Monitoring
 
@@ -62,8 +75,29 @@ CI on GitHub Actions runs lint, typecheck and test on every push.
 Workspace packages export a `source` condition pointing at `src/index.ts`. Vite, Vitest and
 `tsx` use it, so dev needs no build step. `tsc -b` builds `dist/` for `pnpm start`.
 
+## Deploy
+
+Every push to `main` that passes CI builds an image, pushes it to GHCR and deploys it over SSH
+to Daniel's server, where Caddy serves it over HTTPS (ADR 0007). One-time setup:
+
+1. On the server: Docker with the compose plugin, ports 80 and 443 open, a DNS record for the
+   domain, and a deploy user in the `docker` group with an SSH key for GitHub.
+2. In the deploy directory (`~/strategy-code-poc` by default): a `.env` copied from
+   `deploy/.env.example`.
+3. In GitHub: repository secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (the private key)
+   and `DEPLOY_KNOWN_HOSTS` (output of `ssh-keyscan <host>`); repository variable
+   `DEPLOY_ENABLED=true`, optionally `DEPLOY_DIR` and `VITE_SENTRY_DSN`. Until
+   `DEPLOY_ENABLED` is set, CI only builds the image.
+4. After the first deploy, in the deploy directory:
+   `docker compose exec server node dist/cli/admin.js create <name>` for the admin and
+   `docker compose exec server node dist/cli/admin.js invite` for invite codes.
+
+Backups go to the `world-backups` volume before every start and daily, 14 days kept. To roll
+back, deploy the previous image tag (`IMAGE_TAG=<tag> docker compose up -d`) and, if a migration
+already ran, stop the server and copy the `-start` backup over `/data/world.db`.
+
 ## Status
 
-- The tick loop, persistence and live map work end to end.
+- Accounts, the tick loop, persistence, per-Player sync and deploy work end to end.
 - Units move randomly as a stand-in until the interpreter exists.
 - `checkScript` in `packages/lang` is a stub; the parser and interpreter are next.
