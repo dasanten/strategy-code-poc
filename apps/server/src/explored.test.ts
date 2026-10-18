@@ -15,19 +15,22 @@ import { ExploredTerrain } from './explored.js'
 import { smallTerrain } from './test-terrain.js'
 
 const terrain = smallTerrain()
-const player = { id: 7, isAdmin: false }
-const admin = { id: 1, isAdmin: true }
+const player = { id: 7 }
+const other = { id: 8 }
 
 describe('ExploredTerrain', () => {
-  it('knows only what a Player explored; admins know the whole map', () => {
+  it('knows only what a Player explored, admins too, and reports newly explored chunks', () => {
     const explored = new ExploredTerrain(terrain)
     expect(explored.isExplored(player, 60, 60)).toBe(false)
-    explored.explore(player.id, 60, 60, 3)
+    const n = chunksAcross(terrain.size)
+    expect(explored.explore(player.id, 60, 60, 3)).toEqual(new Set([1 * n + 1]))
+    // Nothing new the second time.
+    expect(explored.explore(player.id, 60, 60, 3)).toEqual(new Set())
     expect(explored.isExplored(player, 60, 60)).toBe(true)
     expect(explored.isExplored(player, 63, 60)).toBe(true)
     expect(explored.isExplored(player, 63, 63)).toBe(false)
-    expect(explored.isExplored({ id: 8, isAdmin: false }, 60, 60)).toBe(false)
-    expect(explored.isExplored(admin, 100, 30)).toBe(true)
+    expect(explored.isExplored(other, 60, 60)).toBe(false)
+    expect(explored.exploredChunks(other)).toEqual([])
     // Exploring near a side reaches across the join.
     explored.explore(player.id, 0, 60, 2)
     expect(explored.isExplored(player, terrain.size - 2, 60)).toBe(true)
@@ -39,7 +42,6 @@ describe('ExploredTerrain', () => {
     explored.explore(player.id, 40, 40, 2)
     const n = chunksAcross(terrain.size)
     expect(explored.exploredChunks(player)).toEqual([1 * n + 1])
-    expect(explored.exploredChunks(admin)).toHaveLength(n * n)
     expect(explored.chunk(player, 0, 0)).toBeUndefined()
     expect(explored.chunk(player, 99, 0)).toBeUndefined()
     expect(explored.chunk(player, 1.5, 1)).toBeUndefined()
@@ -49,11 +51,6 @@ describe('ExploredTerrain', () => {
     const at = (x: number, y: number) => chunk[(y - CHUNK_SIZE) * CHUNK_SIZE + (x - CHUNK_SIZE)]
     expect(at(40, 40)).toBe(terrainAt(terrain, 40, 40))
     expect(at(50, 50)).toBe(UNEXPLORED)
-
-    // Admins get the terrain itself.
-    const whole = explored.chunk(admin, 0, 0)!
-    expect(whole[0]).toBe(terrainAt(terrain, 0, 0))
-    expect(whole[CHUNK_SIZE * CHUNK_SIZE - 1]).toBe(terrainAt(terrain, 31, 31))
   })
 
   it('saves what changed and loads it back', async () => {
@@ -85,7 +82,8 @@ describe('resource nodes in chunks', () => {
     expect(decodeChunk(1, 1, explored.chunk(player, 1, 1)!).nodes).toEqual([
       { kind: 'stone', x: 40, y: 40 },
     ])
-    expect(decodeChunk(1, 1, explored.chunk(admin, 1, 1)!).nodes).toHaveLength(2)
+    explored.explore(player.id, 50, 50, 1)
+    expect(decodeChunk(1, 1, explored.chunk(player, 1, 1)!).nodes).toHaveLength(2)
   })
 })
 

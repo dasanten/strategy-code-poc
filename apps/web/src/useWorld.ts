@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react'
-import { WS_PATH, type MapInfo, type Resident, type ServerMessage } from '@csp/shared'
+import {
+  WS_PATH,
+  type Building,
+  type Carriage,
+  type City,
+  type Horse,
+  type MapInfo,
+  type Resident,
+  type SeenEntity,
+  type ServerMessage,
+} from '@csp/shared'
 import { api } from './api.js'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed'
@@ -10,11 +20,35 @@ export interface ClientWorld {
   map: MapInfo
   /** Chunks with explored terrain, loaded on demand from `terrainChunkPath`. */
   exploredChunks: ReadonlySet<number>
+  /** Chunks whose explored terrain grew in the latest tick; any copy loaded before is stale. */
+  grownChunks: readonly number[]
   /** The Player's realm and home city, where the view starts. */
   home: Extract<ServerMessage, { type: 'welcome' }>['home']
-  /** Cities, buildings, horses and carriages as they stood on connect. */
-  structures: Extract<ServerMessage, { type: 'welcome' }>['structures']
+  /** What the Player's residents see, by kind (`CONTEXT.md`: Sight). */
   residents: Resident[]
+  cities: City[]
+  buildings: Building[]
+  horses: Horse[]
+  carriages: Carriage[]
+}
+
+/** Sorts what is in sight by kind, dropping the tag. */
+function byKind(entities: Iterable<SeenEntity>) {
+  const out = {
+    residents: [] as Resident[],
+    cities: [] as City[],
+    buildings: [] as Building[],
+    horses: [] as Horse[],
+    carriages: [] as Carriage[],
+  }
+  for (const { is, ...e } of entities) {
+    if (is === 'resident') out.residents.push(e as Resident)
+    else if (is === 'city') out.cities.push(e as City)
+    else if (is === 'building') out.buildings.push(e as Building)
+    else if (is === 'horse') out.horses.push(e as Horse)
+    else out.carriages.push(e as Carriage)
+  }
+  return out
 }
 
 /**
@@ -30,7 +64,7 @@ export function useWorld(onLoggedOut: () => void) {
     let socket: WebSocket | null = null
     let retry: ReturnType<typeof setTimeout> | undefined
     let stopped = false
-    let entities = new Map<string, Resident>()
+    let entities = new Map<string, SeenEntity>()
 
     const connect = () => {
       setStatus('connecting')
@@ -44,15 +78,23 @@ export function useWorld(onLoggedOut: () => void) {
           setWorld({
             map: msg.map,
             exploredChunks: new Set(msg.exploredChunks),
+            grownChunks: [],
             home: msg.home,
-            structures: msg.structures,
             tick: msg.tick,
-            residents: [...entities.values()],
+            ...byKind(entities.values()),
           })
         } else if (msg.type === 'tick') {
           for (const e of msg.changed) entities.set(e.id, e)
           for (const id of msg.gone) entities.delete(id)
-          setWorld((w) => (w ? { ...w, tick: msg.tick, residents: [...entities.values()] } : w))
+          const changed = msg.changed.length > 0 || msg.gone.length > 0
+          setWorld((w) => {
+            if (!w) return w
+            const grown = msg.explored
+            const exploredChunks =
+              grown.length > 0 ? new Set([...w.exploredChunks, ...grown]) : w.exploredChunks
+            const seen = changed ? byKind(entities.values()) : {}
+            return { ...w, ...seen, tick: msg.tick, exploredChunks, grownChunks: grown }
+          })
         }
       }
       socket.onclose = () => {

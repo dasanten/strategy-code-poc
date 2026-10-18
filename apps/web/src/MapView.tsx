@@ -62,15 +62,16 @@ export function MapView({ world }: { world: ClientWorld }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef(world)
   const redrawRef = useRef<() => void>(() => {})
+  const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
   const controlsRef = useRef<{ zoom(factor: number): void; centre(): void } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
   const mapSize = world.map.size
-  const explored = world.exploredChunks
 
-  // The residents change every tick; the scene reads the latest through the ref.
+  // What is in sight changes every tick; the scene reads the latest through the ref.
   useEffect(() => {
     worldRef.current = world
+    if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
     redrawRef.current()
   }, [world])
 
@@ -88,13 +89,26 @@ export function MapView({ world }: { world: ClientWorld }) {
     let ready = false
     let frame = 0
 
-    const store = new ChunkStore(explored, across, (chunk) => {
-      const sprite = new Sprite(chunkTexture(chunk))
-      terrainLayer.addChild(sprite)
-      sprites.set(chunk.cy * across + chunk.cx, sprite)
-      nodes[chunk.cy * across + chunk.cx] = chunk.nodes
-      redraw()
-    })
+    const store = new ChunkStore(
+      () => worldRef.current.exploredChunks,
+      across,
+      (chunk) => {
+        const index = chunk.cy * across + chunk.cx
+        const old = sprites.get(index)
+        if (old) {
+          // Explored terrain grew: the same sprite gets the newer picture.
+          const stale = old.texture
+          old.texture = chunkTexture(chunk)
+          stale.destroy(true)
+        } else {
+          const sprite = new Sprite(chunkTexture(chunk))
+          terrainLayer.addChild(sprite)
+          sprites.set(index, sprite)
+        }
+        nodes[chunk.cy * across + chunk.cx] = chunk.nodes
+        redraw()
+      },
+    )
 
     function redraw() {
       if (!ready || frame) return
@@ -104,6 +118,7 @@ export function MapView({ world }: { world: ClientWorld }) {
       })
     }
     redrawRef.current = redraw
+    forgetRef.current = (chunks) => store.forget(chunks)
 
     function draw() {
       const view = size()
@@ -264,13 +279,14 @@ export function MapView({ world }: { world: ClientWorld }) {
       store.stop()
       cancelAnimationFrame(frame)
       redrawRef.current = () => {}
+      forgetRef.current = () => {}
       controlsRef.current = null
       if (ready) {
         for (const sprite of sprites.values()) sprite.texture.destroy(true)
         app.destroy(true, { children: true })
       }
     }
-  }, [mapSize, explored])
+  }, [mapSize])
 
   return (
     <div className="map-view">
@@ -352,7 +368,7 @@ function homeCentre(world: ClientWorld): { x: number; y: number } {
 
 /** Cities' walls and gates, buildings, horses and carriages, at mid zoom and closer. */
 function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld) {
-  const { cities, buildings, horses, carriages } = world.structures
+  const { cities, buildings, horses, carriages } = world
   const tile = cam.scale
   const size = world.map.size
   const box = (x: number, y: number, inset = 0) => {

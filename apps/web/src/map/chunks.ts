@@ -5,7 +5,8 @@ const MAX_IN_FLIGHT = 6
 
 /**
  * The client's copy of explored terrain, loaded chunk by chunk as the view needs it (ADR 0006).
- * Only chunks the server listed as explored are asked for; each is loaded once.
+ * Only chunks the server listed as explored are asked for; each is loaded once, and again after
+ * `forget` when its explored terrain grew.
  */
 export class ChunkStore {
   private chunks = new Map<number, TerrainChunk>()
@@ -14,7 +15,7 @@ export class ChunkStore {
   private stopped = false
 
   constructor(
-    private readonly explored: ReadonlySet<number>,
+    private readonly explored: () => ReadonlySet<number>,
     private readonly across: number,
     private readonly onLoaded: (chunk: TerrainChunk) => void,
     private readonly fetchChunk: (path: string) => Promise<ArrayBuffer> = defaultFetch,
@@ -26,8 +27,17 @@ export class ChunkStore {
 
   /** Asks for the given chunks, most wanted first; drops earlier wishes that weren't started. */
   want(indices: number[]): void {
-    this.queue = indices.filter((i) => this.explored.has(i) && !this.chunks.has(i))
+    const explored = this.explored()
+    this.queue = indices.filter((i) => explored.has(i) && !this.chunks.has(i))
     this.pump()
+  }
+
+  /** Drops loaded copies of these chunks, so the next `want` loads them again. */
+  forget(indices: readonly number[]): void {
+    for (const i of indices) {
+      this.chunks.delete(i)
+      this.requested.delete(i)
+    }
   }
 
   stop(): void {
