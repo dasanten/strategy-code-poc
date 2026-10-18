@@ -137,6 +137,36 @@ export const START_FOOD = 200
  */
 export const START_CARRIED_FOOD = 4
 
+/** Horses in a starting city's stable: two, so they can breed (`CONTEXT.md`: Starting city). */
+export const START_HORSES = 2
+
+/**
+ * Food in a starting city's stable, in units: ten game days for its horses, time to start
+ * bringing it food from the farm.
+ */
+export const START_STABLE_FOOD = 60
+
+/**
+ * Food a horse eats per game day, in units (`CONTEXT.md`: Horse). More than a resident; its
+ * hunger meter otherwise runs like a resident's (`HUNGER_DAYS`, `STARVE_DAYS`, `HEAL_DAYS`).
+ */
+export const HORSE_FOOD_PER_DAY = 3
+
+/**
+ * How far from its tile a horse reaches Food lying on the ground, in tiles either way
+ * (`CONTEXT.md`: Horses have no inventory): its own tile and the eight around it.
+ */
+export const HORSE_REACH = 1
+
+/** Most horses a stable has room for; it breeds no foal once that many stand in it. */
+export const STABLE_CAPACITY = 6
+
+/**
+ * Game days two fed horses at a stable take to breed a foal (`CONTEXT.md`: Stable). Time without
+ * two fed horses or without room does not count.
+ */
+export const STABLE_BREED_DAYS = 10
+
 /**
  * Starting cities lie at least this many tiles apart (about 2.5 hours' walk on plains), when the
  * map has room; otherwise as far apart as it allows.
@@ -314,17 +344,19 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   lumberCamp: {},
   quarry: { wood: 30 },
   mine: { wood: 40, stone: 20 },
+  stable: { wood: 40 },
 }
 
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
- * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4. More or stronger
- * workers finish it sooner (`buildWork`).
+ * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3. More or
+ * stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
   quarry: 3 * TICKS_PER_GAME_DAY,
   mine: 4 * TICKS_PER_GAME_DAY,
+  stable: 3 * TICKS_PER_GAME_DAY,
 }
 
 /** The Strength at which a resident puts in one unit of building work per tick. */

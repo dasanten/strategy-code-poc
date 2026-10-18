@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { checkScript, type Diagnostic } from '@csp/lang'
 import {
   formatGameTime,
+  KEEPS_GOODS,
   type Account,
   type Building,
   type BuildingKind,
@@ -147,7 +148,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onWalkTo={() => setPicking((p) => !p)}
               orderError={orderError}
               pile={onTile(world.piles)}
-              storage={onTile(world.buildings.filter((b) => b.kind === 'storage' && !b.site))}
+              storage={onTile(
+                world.buildings.filter((b) => KEEPS_GOODS.includes(b.kind) && !b.site),
+              )}
               building={onTile(world.buildings)}
               node={selected && nodeAt?.(selected.x, selected.y)}
               onPickUp={(spot, goods) => carry('pickUp', spot, goods)}

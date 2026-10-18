@@ -191,7 +191,7 @@ export function ResidentInspector({
   orderError: string | undefined
   /** Goods lying on the resident's tile, if any are in sight. */
   pile: Pile | undefined
-  /** The storage on the resident's tile, if there is one. */
+  /** The storage on the resident's tile, if there is one: a storage, or a stable's. */
   storage: Building | undefined
   /** Orders the resident to take goods from a spot on their tile. */
   onPickUp: (from: GoodsSpot, goods: Stock) => void
@@ -372,7 +372,7 @@ export function ResidentInspector({
           <TileGoods title="On the ground" stock={pile?.goods} spot={ground} onPickUp={onPickUp} />
           {storage && (
             <TileGoods
-              title="In the storage"
+              title={storage.kind === 'stable' ? 'In the stable' : 'In the storage'}
               stock={storage.stock}
               spot={inStorage}
               onPickUp={onPickUp}
@@ -394,7 +394,8 @@ export function ResidentInspector({
 
 /**
  * Building on the resident's tile (`CONTEXT.md`: Building): on a resource node with nothing on it,
- * build its workplace; on a construction site, see what it still needs and help build it.
+ * build its workplace; on any other empty tile, a stable (on Plains only);
+ * on a construction site, see what it still needs and help build it.
  */
 function BuildBlock({
   resident,
@@ -448,8 +449,9 @@ function BuildBlock({
       </section>
     )
   }
-  if (node && !building) {
-    const kind = NODE_WORKPLACE[node.kind]
+  if (!building) {
+    // On a node its workplace; anywhere else a stable, which the server allows on Plains only.
+    const kind = node ? NODE_WORKPLACE[node.kind] : 'stable'
     const name = BUILDING_NAMES[kind]
     const materials = goodsIn(BUILD_MATERIALS[kind])
     const days = (BUILD_WORK[kind] ?? 0) / TICKS_PER_GAME_DAY
@@ -457,9 +459,12 @@ function BuildBlock({
       <section className="inspector-block" aria-label="Build">
         <div className="panel-head">
           <h3>Build</h3>
-          <span className="small muted">{NODE_NAMES[node.kind]} node</span>
+          <span className="small muted">
+            {node ? `${NODE_NAMES[node.kind]} node` : 'on Plains'}
+          </span>
         </div>
         <p className="muted small">
+          {!node && 'A stable keeps horses and their Food, and breeds them. '}
           Needs{' '}
           {materials.length === 0
             ? 'no materials'

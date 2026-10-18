@@ -6,12 +6,22 @@ import { sql } from 'drizzle-orm'
 import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
 import { gzipSync } from 'node:zlib'
-import { LIFESPAN_MAX, LIFESPAN_MIN, type TerrainMap } from '@csp/shared'
+import {
+  LIFESPAN_MAX,
+  LIFESPAN_MIN,
+  MAX_HEALTH,
+  START_HORSES,
+  START_STABLE_FOOD,
+  isInsideWalls,
+  type Horse,
+  type TerrainMap,
+} from '@csp/shared'
 import { createAdmin } from './auth.js'
 import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
-import { smallTerrain } from './test-terrain.js'
+import { smallTerrain, worldWithCity } from './test-terrain.js'
+import { checkInvariants } from './invariants.js'
 import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
 import { createWorld } from './world.js'
 
@@ -151,6 +161,38 @@ describe('world saves', () => {
     expect(v11.residents.map(({ cityId: _cityId, ...rest }) => rest)).toEqual(v10.residents)
     const none = { tick: 10, seed: 1, cities: [], residents: [resident('r1', null, 1)] }
     expect(migrateWorld(none, 10, { terrain }, migrations, 11).residents[0]!.cityId).toBeNull()
+  })
+
+  it('gives horses health and starting cities a stable with their horses in it (migration 11 → 12)', () => {
+    // A format-11 world: a starting city with no stable and one horse inside its walls, and a
+    // horse of nobody out on the map.
+    const { world, terrain: land } = worldWithCity()
+    const city = world.cities[0]!
+    const v11 = structuredClone(world) as unknown as Record<string, unknown> & typeof world
+    v11.buildings = v11.buildings.filter((b) => b.kind !== 'stable')
+    const strip = ({ health: _health, ...h }: Horse) => h
+    v11.horses = [
+      { ...world.horses[0]!, x: city.x + 2, y: city.y + city.size - 2 },
+      { ...world.horses[1]!, id: 'stray', realmId: null, x: 3, y: 3 },
+    ].map(strip) as Horse[]
+    const before = structuredClone(v11)
+
+    const v12 = migrateWorld(structuredClone(v11), 11, { terrain: land }, migrations, 12)
+    const stables = v12.buildings.filter((b) => b.kind === 'stable')
+    expect(stables).toHaveLength(1)
+    const stable = stables[0]!
+    expect(stable).toMatchObject({ cityId: city.id, stock: { food: START_STABLE_FOOD } })
+    expect(isInsideWalls(city, stable.x, stable.y)).toBe(false)
+    // The city's horse moved in and got company of its realm; the stray stayed where it was.
+    const inStable = v12.horses.filter((h) => h.x === stable.x && h.y === stable.y)
+    expect(inStable).toHaveLength(START_HORSES)
+    for (const h of inStable) expect(h.realmId).toBe(city.realmId)
+    expect(v12.horses.find((h) => h.id === 'stray')).toMatchObject({ x: 3, y: 3 })
+    for (const h of v12.horses) expect(h.health).toBe(MAX_HEALTH)
+    // New ids come from the world's counter, and the rest of the world is as it was.
+    expect(v12.nextId).toBe(before.nextId + 2)
+    expect(v12.residents).toEqual(before.residents)
+    expect(checkInvariants(v12, land)).toEqual([])
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

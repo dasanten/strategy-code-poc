@@ -16,11 +16,15 @@ import {
   type Stock,
   type WorldState,
 } from './world.js'
+import { Terrain, terrainAt, type TerrainMap } from './terrain.js'
 
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
 
-/** Kinds of building that can be built so far: the workplaces on resource nodes. */
-export const BUILDABLE: readonly BuildingKind[] = ['lumberCamp', 'quarry', 'mine']
+/** Kinds of building that can be built so far: the workplaces on resource nodes, and stables. */
+export const BUILDABLE: readonly BuildingKind[] = ['lumberCamp', 'quarry', 'mine', 'stable']
+
+/** Kinds of building that keep goods in a storage of their own: storages, and stables' Food. */
+export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'stable']
 
 /** The building or construction site on a tile, if there is one (one per tile). */
 export function buildingAt(world: WorldState, x: number, y: number): Building | undefined {
@@ -47,18 +51,23 @@ export function workNeeded(site: Building): number {
 
 /**
  * Why a building of this kind can't be laid out on the tile (`CONTEXT.md`: Where buildings go),
- * or undefined if it can: workplaces go on a resource node of their kind, one building per tile,
- * never on a city wall.
+ * or undefined if it can: workplaces go on a resource node of their kind, stables on Plains off
+ * any node, one building per tile, never on a city wall. Without `terrain` the Plains rule is not
+ * checked.
  */
 export function buildProblem(
   world: WorldState,
   x: number,
   y: number,
   kind: BuildingKind,
+  terrain?: TerrainMap,
 ): string | undefined {
   if (!BUILDABLE.includes(kind)) return `a ${kind} can't be built yet`
   const node = world.nodes.find((n) => n.x === x && n.y === y)
-  if (!node || NODE_WORKPLACE[node.kind] !== kind)
+  if (kind === 'stable') {
+    if (node || (terrain && terrainAt(terrain, x, y) !== Terrain.Plains))
+      return 'a stable goes on Plains, off any resource node'
+  } else if (!node || NODE_WORKPLACE[node.kind] !== kind)
     return `a ${kind} goes on a fitting resource node`
   if (buildingAt(world, x, y)) return 'there is already a building on this tile'
   if (world.cities.some((c) => isWallTile(c, x, y))) return 'nothing can be built on a wall'

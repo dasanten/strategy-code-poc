@@ -69,6 +69,7 @@ describe('realm events', () => {
     const { world } = worldWithCity()
     const realm = world.realms[0]!
     storageOf(world).stock = { food: 1000 }
+    world.buildings.find((b) => b.kind === 'stable')!.stock = {}
     world.carriages[0]!.load = { food: 100 }
     world.piles.push({ id: 'p1', x: world.residents[0]!.x, y: 0, goods: { food: 500 } })
     for (let t = 0; t < TICKS_PER_GAME_DAY; t++) {

@@ -10,6 +10,7 @@ import {
   workNeeded,
   type BuildingKind,
   type OrderRequest,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
@@ -37,7 +38,7 @@ interface BuildRequest extends OrderRequest {
  * there, and works on it until it is finished. Laying out and working happen in later ticks.
  */
 export const build: OrderKind = {
-  validate(world, sender, order) {
+  validate(world, sender, order, terrain) {
     const o = order as Partial<BuildRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
@@ -46,7 +47,7 @@ export const build: OrderKind = {
     if (!BUILDABLE.includes(o.building as BuildingKind)) return 'that can’t be built'
     const here = buildingAt(world, r.x, r.y)
     if (here?.site && here.kind === o.building) return undefined
-    return buildProblem(world, r.x, r.y, o.building!)
+    return buildProblem(world, r.x, r.y, o.building!, terrain)
   },
   apply(world, _sender, order) {
     const { residentId, building } = order as BuildRequest
@@ -74,7 +75,11 @@ export function requestBuilding(world: WorldState): BuildAction[] {
  * up to what it needs, and teaches Construction. A site with all its materials and work becomes
  * the building, and everyone's build order for it is done.
  */
-export function resolveBuilding(world: WorldState, actions: BuildAction[]): void {
+export function resolveBuilding(
+  world: WorldState,
+  actions: BuildAction[],
+  terrain?: TerrainMap,
+): void {
   for (const a of actions) {
     const r = world.residents.find((x) => x.id === a.residentId)
     const o = r?.order
@@ -86,7 +91,7 @@ export function resolveBuilding(world: WorldState, actions: BuildAction[]): void
     if (a.kind === 'layOut') {
       const here = buildingAt(world, r.x, r.y)
       if (here?.site && here.kind === o.building) o.siteId = here.id
-      else if (buildProblem(world, r.x, r.y, o.building)) r.order = null
+      else if (buildProblem(world, r.x, r.y, o.building, terrain)) r.order = null
       else {
         const id = newId(world, 'b')
         world.buildings.push({

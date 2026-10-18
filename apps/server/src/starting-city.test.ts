@@ -7,7 +7,9 @@ import {
   START_CARRIED_FOOD,
   START_CITY_SIZE,
   START_FOOD,
+  START_HORSES,
   START_RESIDENTS,
+  START_STABLE_FOOD,
   STAT_BASE_MAX,
   STAT_BASE_MIN,
   STAT_NAMES,
@@ -67,11 +69,20 @@ describe('foundStartingCity', () => {
     expect(world.buildings.find((b) => b.kind === 'storage')!.stock).toEqual({ food: START_FOOD })
     expect(isInsideWalls(city!, farm.x, farm.y)).toBe(false)
     expect(terrainAt(terrain, farm.x, farm.y)).toBe(Terrain.Plains)
-    expect(world.horses).toEqual([expect.objectContaining({ realmId: realm.id })])
-    expect(world.carriages).toEqual([expect.objectContaining({ realmId: realm.id, load: {} })])
-    for (const e of [...world.horses, ...world.carriages]) {
-      expect(isInsideWalls(city!, e.x, e.y)).toBe(true)
+    // A stable on Plains next to the farm, with a little food and the realm's horses in it.
+    const stable = world.buildings.find((b) => b.kind === 'stable')!
+    expect(kinds.filter((k) => k === 'stable')).toHaveLength(1)
+    expect(stable).toMatchObject({ cityId: city!.id, stock: { food: START_STABLE_FOOD } })
+    expect(terrainAt(terrain, stable.x, stable.y)).toBe(Terrain.Plains)
+    expect(isInsideWalls(city!, stable.x, stable.y)).toBe(false)
+    expect(Math.max(Math.abs(stable.x - farm.x), Math.abs(stable.y - farm.y))).toBeLessThan(4)
+    expect(world.horses).toHaveLength(START_HORSES)
+    for (const h of world.horses) {
+      expect(h).toMatchObject({ realmId: realm.id, x: stable.x, y: stable.y })
+      expect(h).toMatchObject({ hunger: MAX_HUNGER, health: MAX_HEALTH })
     }
+    expect(world.carriages).toEqual([expect.objectContaining({ realmId: realm.id, load: {} })])
+    expect(isInsideWalls(city!, world.carriages[0]!.x, world.carriages[0]!.y)).toBe(true)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 

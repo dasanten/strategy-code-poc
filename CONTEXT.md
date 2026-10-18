@@ -226,8 +226,16 @@ The shared language of the game. Domain terms only — no implementation details
 
 ## Transport
 
-- **Horse:** an animal that pulls a carriage. Eats Food. Bred at a **stable** on plains, or bought
-  from the Trade Organization.
+- **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
+  hunger meter costs health, and a horse without food dies after about 2 game days. Bred at a
+  stable, or bought from the Trade Organization.
+- **Horses have no inventory:** a horse eats only what is in reach. At a stable it eats from the
+  stable's storage; pulling a carriage, from the carriage's load; anywhere, from Food lying on the
+  ground on its tile or right next to it, so Players can feed a horse by putting food down by it.
+- **Stable:** a building on Plains where horses are kept. It has a storage for their Food, which
+  residents fill and empty like any storage. Two fed horses of one realm at a stable breed a foal
+  every so often, while the stable has room for another horse. No residents need to work there.
+  Like a workplace, a stable has no owner: any horse standing in it eats from it.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
   mountains.
@@ -236,8 +244,9 @@ The shared language of the game. Domain terms only — no implementation details
 
 - **Starting city:** what a Leader spawns with, far from other Players: about 8 residents with
   random stats (one of them the Leader), a wooden wall, houses for everyone with a little room
-  to spare, a storage with a small food stock, one farm outside the wall, one horse and one
-  carriage. The residents start on the farm, working it, each with a little food on them.
+  to spare, a storage with a small food stock, one farm outside the wall, a stable next to it
+  with two horses and a little Food, and one carriage. The residents start on the farm, working
+  it, each with a little food on them.
 
 ## Control
 

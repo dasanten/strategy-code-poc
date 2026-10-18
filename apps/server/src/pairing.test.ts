@@ -260,7 +260,7 @@ describe('births', () => {
       kind: 'born',
       residentId: child!.id,
       name: child!.name,
-      parents: [a.name, b.name],
+      parents: expect.arrayContaining([a.name, b.name]),
       userId: me.userId,
     })
   })

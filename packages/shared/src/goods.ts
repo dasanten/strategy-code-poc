@@ -1,4 +1,5 @@
 import { GOOD_WEIGHT, carryCapacity, stockWeight } from './balance.js'
+import { KEEPS_GOODS } from './building.js'
 import type { Building, Good, GoodsSpot, Pile, Resident, Stock, WorldState } from './world.js'
 
 /** World queries about where goods are (ADR 0002: the game API orders and scripts share). */
@@ -8,9 +9,14 @@ export function pileAt(world: WorldState, x: number, y: number): Pile | undefine
   return world.piles.find((p) => p.x === x && p.y === y)
 }
 
-/** The finished storage standing on a tile, if there is one. */
+/**
+ * The finished building with a storage standing on a tile, if there is one: a storage, or a
+ * stable's storage for its horses' Food (`KEEPS_GOODS`).
+ */
 export function storageAt(world: WorldState, x: number, y: number): Building | undefined {
-  return world.buildings.find((b) => b.kind === 'storage' && !b.site && b.x === x && b.y === y)
+  return world.buildings.find(
+    (b) => KEEPS_GOODS.includes(b.kind) && !b.site && b.x === x && b.y === y,
+  )
 }
 
 /** The construction site on a tile, if there is one. */
