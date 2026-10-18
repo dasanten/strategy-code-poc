@@ -58,6 +58,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'build', residentId: selected.id, building }))
   }
+  /** Orders the picked resident to pair with another resident of their city. */
+  async function pair(partnerId: string) {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'pair', residentId: selected.id, partnerId }))
+  }
   const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
   const onNodesLoaded = useCallback(
     (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
@@ -136,6 +141,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
               onDrop={(spot, goods) => carry('drop', spot, goods)}
               onBuild={build}
+              residents={own}
+              onPair={pair}
             />
           )}
           {world && <RealmLog events={world.events} />}

@@ -28,6 +28,8 @@ export interface Resident {
   name: string
   /** The realm the resident belongs to; null when it belongs to nobody (after Leader death). */
   owner: string | null
+  /** The city the resident lives in (`CONTEXT.md`: City, House); null for one of no city. */
+  cityId: string | null
   x: number
   y: number
   stats: Record<StatName, Stat>
@@ -99,8 +101,20 @@ export interface BuildOrder {
   siteId: string | null
 }
 
+/**
+ * Pairing (`CONTEXT.md`: Pairing): the resident and their partner, two adults of the same city,
+ * are set to have children. Both hold a pair order naming the other, with the same `since`: the
+ * tick they paired or last had a child. A child can come once a game year has passed since then,
+ * while their city has free housing and a food surplus. Any other order for either ends it.
+ */
+export interface PairOrder {
+  kind: 'pair'
+  partnerId: string
+  since: number
+}
+
 /** Any order a resident can hold. */
-export type ResidentOrder = WalkOrder | PickUpOrder | DropOrder | BuildOrder
+export type ResidentOrder = WalkOrder | PickUpOrder | DropOrder | BuildOrder | PairOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -155,6 +169,8 @@ export type RealmEventWhat =
     }
   /** Food went bad over the game day in the realm's storages, residents' loads and carriages. */
   | { kind: 'foodSpoiled'; units: number }
+  /** A pair had a child (`CONTEXT.md`: Pairing, Child); `parents` are their names. */
+  | { kind: 'born'; residentId: string; name: string; parents: [string, string] }
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the

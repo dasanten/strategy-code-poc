@@ -19,6 +19,10 @@ describe('realm log', () => {
     expect(describeEvent({ kind: 'foodSpoiled', units: 4, seq: 3, ...at }).text).toBe(
       '4 Food spoiled.',
     )
+    const born = { kind: 'born', residentId: 'r3', name: 'Wren', seq: 4, ...at } as const
+    expect(describeEvent({ ...born, parents: ['Mara', 'Tobin'] }).text).toBe(
+      'Mara and Tobin had a child, Wren.',
+    )
   })
 
   it('keeps the latest events, as many as the server does', () => {

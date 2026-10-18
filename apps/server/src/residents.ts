@@ -1,4 +1,5 @@
 import {
+  CHILD_STAT_SPREAD,
   MAX_HEALTH,
   LIFESPAN_MAX,
   LIFESPAN_MIN,
@@ -74,16 +75,17 @@ const between = (rand: () => number, min: number, max: number) =>
  */
 export function newResident(
   rand: () => number,
-  fields: { id: string; owner: string; x: number; y: number; tick: number },
+  fields: { id: string; owner: string; cityId?: string | null; x: number; y: number; tick: number },
 ): Resident {
   const stats = Object.fromEntries(
     STAT_NAMES.map((s) => [s, { base: between(rand, STAT_BASE_MIN, STAT_BASE_MAX), trained: 0 }]),
   ) as Record<StatName, Stat>
   const age = START_AGE_MIN + rand() * (START_AGE_MAX - START_AGE_MIN)
-  const { tick, ...place } = fields
+  const { tick, cityId = null, ...place } = fields
   const name = NAMES[Math.floor(rand() * NAMES.length)]!
   return {
     ...place,
+    cityId,
     name,
     stats,
     skills: {},
@@ -94,4 +96,45 @@ export function newResident(
     carried: {},
     order: null,
   }
+}
+
+/**
+ * A child of two parents, born at `tick` (`CONTEXT.md`: Child): each base stat is the parents'
+ * average, rounded, plus a whole random amount of at most `CHILD_STAT_SPREAD` either way, and at
+ * least 1. Nothing trained or learned, since neither is inherited; full health and hunger meter;
+ * a lifespan between `LIFESPAN_MIN` and `LIFESPAN_MAX`.
+ */
+export function newChild(
+  rand: () => number,
+  parents: [Resident, Resident],
+  fields: { id: string; owner: string | null; cityId: string; x: number; y: number; tick: number },
+): Resident {
+  const [a, b] = parents
+  const stats = Object.fromEntries(
+    STAT_NAMES.map((s) => {
+      const average = Math.round((a.stats[s].base + b.stats[s].base) / 2)
+      const base = average + between(rand, -CHILD_STAT_SPREAD, CHILD_STAT_SPREAD)
+      return [s, { base: Math.max(1, base), trained: 0 }]
+    }),
+  ) as Record<StatName, Stat>
+  const { tick, ...place } = fields
+  return {
+    ...place,
+    name: NAMES[Math.floor(rand() * NAMES.length)]!,
+    stats,
+    skills: {},
+    health: MAX_HEALTH,
+    hunger: MAX_HUNGER,
+    bornAt: tick,
+    lifespan: drawLifespan(rand),
+    carried: {},
+    order: null,
+  }
+}
+
+/** A string's FNV-1a hash, as a seed. */
+export function hash(text: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193)
+  return h >>> 0
 }

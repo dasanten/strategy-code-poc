@@ -109,19 +109,48 @@ describe('world saves', () => {
   it('gives every resident a lifespan, the same each time (migration 8 → 9)', () => {
     const resident = { id: 'r1', name: 'Mara', owner: 'realm1', x: 1, y: 2, order: null }
     const v8 = { tick: 10, seed: 1, residents: [resident, { ...resident, id: 'r2' }] }
-    const v9 = migrateWorld(structuredClone(v8), 8, { terrain })
+    const v9 = migrateWorld(structuredClone(v8), 8, { terrain }, migrations, 9)
     expect(v9.residents.map(({ lifespan: _lifespan, ...rest }) => rest)).toEqual(v8.residents)
     for (const r of v9.residents) {
       expect(r.lifespan).toBeGreaterThanOrEqual(LIFESPAN_MIN)
       expect(r.lifespan).toBeLessThanOrEqual(LIFESPAN_MAX)
     }
     expect(v9.residents[0]!.lifespan).not.toBe(v9.residents[1]!.lifespan)
-    expect(migrateWorld(structuredClone(v8), 8, { terrain })).toEqual(v9)
+    expect(migrateWorld(structuredClone(v8), 8, { terrain }, migrations, 9)).toEqual(v9)
   })
 
   it('gives every Player an empty realm log (migration 9 → 10)', () => {
     const v9 = { tick: 10, seed: 1, residents: [], piles: [] }
     expect(migrateWorld(v9, 9, { terrain }, migrations, 10)).toEqual({ ...v9, events: [] })
+  })
+
+  it('gives every resident the nearest city of their realm, else the nearest city (migration 10 → 11)', () => {
+    const city = (id: string, realmId: string | null, x: number) => ({
+      id,
+      realmId,
+      x,
+      y: 0,
+      size: 7,
+    })
+    const resident = (id: string, owner: string | null, x: number) => ({ id, owner, x, y: 3 })
+    const size = terrain.size
+    const v10 = {
+      tick: 10,
+      seed: 1,
+      cities: [city('c1', 'realm1', 0), city('c2', 'realm2', 20), city('c3', null, size - 10)],
+      residents: [
+        // Nearer c2 and, across the map's join, c3, but c1 is their realm's.
+        resident('r1', 'realm1', 18),
+        resident('r2', 'realm2', 1),
+        // Their realm ended: c3 is nearest the short way round.
+        resident('r3', null, size - 2),
+      ],
+    }
+    const v11 = migrateWorld(structuredClone(v10), 10, { terrain }, migrations, 11)
+    expect(v11.residents.map((r) => r.cityId)).toEqual(['c1', 'c2', 'c3'])
+    expect(v11.residents.map(({ cityId: _cityId, ...rest }) => rest)).toEqual(v10.residents)
+    const none = { tick: 10, seed: 1, cities: [], residents: [resident('r1', null, 1)] }
+    expect(migrateWorld(none, 10, { terrain }, migrations, 11).residents[0]!.cityId).toBeNull()
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

@@ -1,6 +1,7 @@
 import type { Account, OrderRequest, ServerMessage, WorldState } from '@csp/shared'
 import { build } from './building.js'
 import { drop, pickUp } from './carrying.js'
+import { pair } from './pairing.js'
 import { walkTo } from './walking.js'
 
 /** Who sent an order: the Player's account and id. */
@@ -20,7 +21,7 @@ export interface OrderKind {
 }
 
 /** The order kinds that exist. */
-export const orderKinds: Record<string, OrderKind> = { walkTo, pickUp, drop, build }
+export const orderKinds: Record<string, OrderKind> = { walkTo, pickUp, drop, build, pair }
 
 interface Pending {
   sender: OrderSender

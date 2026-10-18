@@ -107,7 +107,10 @@ The shared language of the game. Domain terms only — no implementation details
   tiles along the square's edge, with one **gate**. Buildings inside the wall take one tile each;
   farms and workplaces may lie outside.
 - **House:** a building inside a city where a few residents live. A city's **free housing** is
-  its houses' room minus its residents.
+  its houses' room minus its residents. Houses are the only housing for now; later buildings
+  (a palace, a castle) may add room the same way.
+- **Food surplus:** a city has one when its storage holds more Food than all its residents eat
+  in a set number of game days. Food that residents carry doesn't count.
 - **Storage:** a building inside a city where its goods are kept.
 - **At home:** a resident standing inside the walls of a city of their own realm.
 - **NPC city:** a city run by the game. Self-managed cities are NPC cities.
@@ -182,7 +185,8 @@ The shared language of the game. Domain terms only — no implementation details
 ## Residents
 
 - **Resident:** a person living in the world. Has stats, skills, health, hunger and an age.
-  Needs food or dies; dies of old age eventually. _Avoid:_ unit (old code term).
+  Needs food or dies; dies of old age eventually. Lives in one city, wherever they are standing.
+  _Avoid:_ unit (old code term).
 - **Stats:** Strength, Endurance, Agility, Intellect. Each has a **base value** and a
   **trained bonus**; the effective value is both together.
   - Strength: carry capacity, mining output, melee damage.
@@ -199,8 +203,11 @@ The shared language of the game. Domain terms only — no implementation details
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
   its own in NPC cities). A birth needs free housing and a food surplus; each pair has at most one
   child per game year. The only way, besides integrating, that residents come into being.
+  A Player's pairing order takes up both residents' order; any other order for either ends the
+  pair. A child can come once a game year has passed since they paired or last had one.
 - **Child:** a resident born to a pair. Each base stat is the parents' average plus a small
-  random amount. Grows up for a while before it can work.
+  random amount. Born where a parent stands, into their city and realm. Grows up for a while
+  before it can work.
 - **Aging:** residents grow old; their stats decline late in life, and they die of old age at
   around 60 game years. Children are grown after about 14 game years.
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and

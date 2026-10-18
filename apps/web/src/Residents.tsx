@@ -8,6 +8,7 @@ import {
   STAT_NAMES,
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
+  TICKS_PER_GAME_YEAR,
   TRAINED_CAP_SHARE,
   ageInYears,
   canWork,
@@ -26,6 +27,7 @@ import {
   type StatName,
   type Stock,
 } from '@csp/shared'
+import { useState } from 'react'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 
 const GOOD_LABELS: Record<Good, string> = {
@@ -82,6 +84,7 @@ function doing(r: Resident): string {
     const what = BUILDING_NAMES[o.building].toLowerCase()
     return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
   }
+  if (o?.kind === 'pair') return 'Paired'
   return 'Idle'
 }
 
@@ -159,6 +162,8 @@ export function ResidentInspector({
   building,
   node,
   onBuild,
+  residents,
+  onPair,
 }: {
   resident: Resident | undefined
   leaderId: string
@@ -184,6 +189,10 @@ export function ResidentInspector({
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
   onBuild: (kind: BuildingKind) => void
+  /** The Player's residents in sight, to pick a partner from. */
+  residents: Resident[]
+  /** Orders the resident to pair with another of the Player's residents. */
+  onPair: (partnerId: string) => void
 }) {
   if (!resident) {
     return (
@@ -324,6 +333,8 @@ export function ResidentInspector({
 
       <BuildBlock resident={r} tick={tick} building={building} node={node} onBuild={onBuild} />
 
+      <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
+
       {(pile || storage || site) && (
         <section className="inspector-block" aria-label="On this tile">
           <div className="panel-head">
@@ -436,6 +447,66 @@ function BuildBlock({
     )
   }
   return null
+}
+
+/**
+ * Pairing (`CONTEXT.md`: Pairing): pick another adult of the resident's city to pair with, or see
+ * whom they are paired with and when their next child can come.
+ */
+function PairBlock({
+  resident,
+  tick,
+  residents,
+  onPair,
+}: {
+  resident: Resident
+  tick: number
+  residents: Resident[]
+  onPair: (partnerId: string) => void
+}) {
+  const [partnerId, setPartnerId] = useState('')
+  if (!canWork(resident, tick) || resident.cityId === null) return null
+  const o = resident.order
+  const partner = o?.kind === 'pair' ? residents.find((x) => x.id === o.partnerId) : undefined
+  const choices = residents.filter(
+    (x) => x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick),
+  )
+  const days =
+    o?.kind === 'pair'
+      ? Math.max(0, Math.ceil((o.since + TICKS_PER_GAME_YEAR - tick) / TICKS_PER_GAME_DAY))
+      : 0
+  return (
+    <section className="inspector-block" aria-label="Pairing">
+      <div className="panel-head">
+        <h3>Pairing</h3>
+        <span className="small muted">one child a year at most</span>
+      </div>
+      {o?.kind === 'pair' && (
+        <p className="muted small">
+          Paired with {partner?.name ?? 'someone out of sight'}.{' '}
+          {days > 0 ? `A child can come in about ${days} game days` : 'A child can come now'}, once
+          the city has free housing and a food surplus.
+        </p>
+      )}
+      <div className="order-buttons">
+        <select
+          aria-label="Partner"
+          value={partnerId}
+          onChange={(e) => setPartnerId(e.target.value)}
+        >
+          <option value="">Pick a partner…</option>
+          {choices.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.name}
+            </option>
+          ))}
+        </select>
+        <button type="button" disabled={!partnerId} onClick={() => onPair(partnerId)}>
+          Pair
+        </button>
+      </div>
+    </section>
+  )
 }
 
 /** Goods at one spot on the resident's tile, each with a button to pick it up. */

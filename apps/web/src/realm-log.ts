@@ -17,6 +17,8 @@ export function describeEvent(e: RealmEvent): { text: string; tone: EventTone } 
     }
     case 'foodSpoiled':
       return { text: `${e.units} Food spoiled.`, tone: 'info' }
+    case 'born':
+      return { text: `${e.parents[0]} and ${e.parents[1]} had a child, ${e.name}.`, tone: 'info' }
   }
 }
 

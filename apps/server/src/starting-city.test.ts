@@ -1,7 +1,7 @@
 import {
   ADULT_AGE,
   CITY_MIN_DISTANCE,
-  HOUSE_CAPACITY,
+  HOUSING_ROOM,
   MAX_HEALTH,
   MAX_HUNGER,
   START_CITY_SIZE,
@@ -40,6 +40,7 @@ describe('foundStartingCity', () => {
     expect(residents.map((r) => r.id)).toContain(realm.leaderId)
     for (const r of residents) {
       expect(isInsideWalls(city!, r.x, r.y)).toBe(true)
+      expect(r.cityId).toBe(city!.id)
       expect(r.health).toBe(MAX_HEALTH)
       expect(r.hunger).toBe(MAX_HUNGER)
       expect(ageInYears(r, world.tick)).toBeGreaterThanOrEqual(ADULT_AGE)
@@ -51,7 +52,7 @@ describe('foundStartingCity', () => {
 
     const kinds = world.buildings.map((b) => b.kind)
     const houses = kinds.filter((k) => k === 'house').length
-    expect(houses * HOUSE_CAPACITY).toBeGreaterThan(START_RESIDENTS)
+    expect(houses * HOUSING_ROOM.house!).toBeGreaterThan(START_RESIDENTS)
     expect(kinds.filter((k) => k === 'storage')).toHaveLength(1)
     expect(kinds.filter((k) => k === 'farm')).toHaveLength(1)
     expect(world.buildings.find((b) => b.kind === 'storage')!.stock).toEqual({ food: START_FOOD })
