@@ -1,15 +1,51 @@
-import type { WorldState } from '@csp/shared'
+import type { TerrainMap, Unit, WorldState } from '@csp/shared'
+import { nearestFreeTile } from './world.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
- * would not match bumps this and adds a migration below, with a test in world-format.test.ts.
+ * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world.
  */
-export const WORLD_FORMAT_VERSION = 1
+export const WORLD_FORMAT_VERSION = 2
+
+/** What a migration step may look at besides the save itself. */
+export interface MigrationContext {
+  /** The world's stored terrain. */
+  terrain: TerrainMap
+}
+
+export type MigrationStep = (state: unknown, ctx: MigrationContext) => unknown
 
 /** `migrations[n]` turns a version-n save into version n + 1. */
-export const migrations: Record<number, (state: unknown) => unknown> = {
-  // 1: (state) => ({ ...(state as object), newField: 'default' }),
+export const migrations: Record<number, MigrationStep> = {
+  // Terrain moved out of the save into its own table, and the 32×24 grid became the disc.
+  // Units keep their places relative to each other, around the disc's centre.
+  1: (state, { terrain }) => {
+    const { tick, seed, width, height, units } = state as WorldStateV1
+    const centre = Math.floor(terrain.diameter / 2)
+    const occupied = new Set<string>()
+    const moved = units.map((u) => {
+      const [x, y] = nearestFreeTile(
+        terrain,
+        occupied,
+        centre - Math.floor(width / 2) + u.x,
+        centre - Math.floor(height / 2) + u.y,
+      )
+      occupied.add(`${x},${y}`)
+      return { ...u, x, y }
+    })
+    return { tick, seed, units: moved }
+  },
+}
+
+/** World state as saved in format 1. */
+interface WorldStateV1 {
+  tick: number
+  seed: number
+  width: number
+  height: number
+  tiles: string[]
+  units: Unit[]
 }
 
 export class WorldFormatError extends Error {}
@@ -18,7 +54,8 @@ export class WorldFormatError extends Error {}
 export function migrateWorld(
   state: unknown,
   version: number,
-  steps: Record<number, (state: unknown) => unknown> = migrations,
+  ctx: MigrationContext,
+  steps: Record<number, MigrationStep> = migrations,
   current = WORLD_FORMAT_VERSION,
 ): WorldState {
   if (version > current) {
@@ -30,7 +67,7 @@ export function migrateWorld(
   for (let v = version; v < current; v++) {
     const step = steps[v]
     if (!step) throw new WorldFormatError(`no migration from world format ${v} to ${v + 1}`)
-    s = step(s)
+    s = step(s, ctx)
   }
   return s as WorldState
 }

@@ -7,7 +7,10 @@ import { createAdmin, createSession } from './auth.js'
 import { openDb, schema } from './db/index.js'
 import { OrderQueue } from './orders.js'
 import { attachRealtime } from './realtime.js'
+import { smallTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
+
+const terrain = smallTerrain()
 
 const cleanup: (() => Promise<void> | void)[] = []
 afterEach(async () => {
@@ -22,8 +25,13 @@ async function start() {
     secureCookies: false,
     trustProxy: false,
   })
-  const world = createWorld()
-  const realtime = attachRealtime(app.server, { db: opened.db, world, orders: new OrderQueue() })
+  const world = createWorld(terrain)
+  const realtime = attachRealtime(app.server, {
+    db: opened.db,
+    world,
+    terrain,
+    orders: new OrderQueue(),
+  })
   await app.listen({ port: 0, host: '127.0.0.1' })
   cleanup.push(
     () => opened.close(),
@@ -84,7 +92,7 @@ describe('realtime', () => {
     realtime.broadcastTick()
     expect(await next('tick')).toEqual({ type: 'tick', tick: 0, changed: [], gone: [] })
 
-    stepWorld(world, () => 0)
+    stepWorld(world, terrain, () => 0)
     realtime.broadcastTick()
     const tick = await next('tick')
     if (tick.type === 'tick') expect(tick.tick).toBe(1)

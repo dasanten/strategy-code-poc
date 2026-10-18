@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { WorldState } from '@csp/shared'
 import { runTick, type TickReporter } from './tick.js'
+import { smallTerrain } from './test-terrain.js'
 import { createWorld } from './world.js'
+
+const terrain = smallTerrain()
 
 function fakeReporter() {
   return {
@@ -19,9 +22,9 @@ function clock(stepMs: number) {
 
 describe('runTick', () => {
   it('reports tick health with unit and action counts', () => {
-    const world = createWorld()
+    const world = createWorld(terrain)
     const reporter = fakeReporter()
-    const health = runTick(world, {
+    const health = runTick(world, terrain, {
       reporter,
       invariantSampleRate: 1,
       slowTickMs: 800,
@@ -33,7 +36,7 @@ describe('runTick', () => {
   })
 
   it('flags a tick above the slow-tick threshold', () => {
-    const health = runTick(createWorld(), {
+    const health = runTick(createWorld(terrain), terrain, {
       reporter: fakeReporter(),
       invariantSampleRate: 1,
       slowTickMs: 800,
@@ -43,25 +46,29 @@ describe('runTick', () => {
   })
 
   it('reports invariant violations on checked ticks only', () => {
-    const world = createWorld()
-    // Every unit on one tile: no move can make that legal again in one tick.
-    for (const u of world.units) Object.assign(u, { x: world.units[0]!.x, y: world.units[0]!.y })
+    const world = createWorld(terrain)
+    // Every unit outside the disc, in its corner: no move can make that legal again.
+    for (const u of world.units) Object.assign(u, { x: 0, y: 0 })
     const reporter = fakeReporter()
 
-    runTick(world, { reporter, invariantSampleRate: 0, slowTickMs: 800 })
+    runTick(world, terrain, { reporter, invariantSampleRate: 0, slowTickMs: 800 })
     expect(reporter.invariantViolations).not.toHaveBeenCalled()
 
-    runTick(world, { reporter, invariantSampleRate: 1, slowTickMs: 800 })
+    runTick(world, terrain, { reporter, invariantSampleRate: 1, slowTickMs: 800 })
     expect(reporter.invariantViolations).toHaveBeenCalledWith(
       world,
-      expect.arrayContaining([expect.objectContaining({ invariant: 'one-unit-per-tile' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ invariant: 'nothing-on-impassable-terrain' }),
+      ]),
     )
   })
 
   it('reports an error instead of throwing', () => {
-    const broken = { ...createWorld(), units: null } as unknown as WorldState
+    const broken = { ...createWorld(terrain), units: null } as unknown as WorldState
     const reporter = fakeReporter()
-    expect(runTick(broken, { reporter, invariantSampleRate: 1, slowTickMs: 800 })).toBeUndefined()
+    expect(
+      runTick(broken, terrain, { reporter, invariantSampleRate: 1, slowTickMs: 800 }),
+    ).toBeUndefined()
     expect(reporter.tickError).toHaveBeenCalledWith(broken, expect.any(TypeError))
   })
 })

@@ -1,4 +1,4 @@
-import type { WorldState } from '@csp/shared'
+import type { TerrainMap, WorldState } from '@csp/shared'
 import { isWalkable } from './world.js'
 
 /**
@@ -7,7 +7,7 @@ import { isWalkable } from './world.js'
  */
 export interface Invariant {
   name: string
-  check(world: WorldState): InvariantViolation[]
+  check(world: WorldState, terrain: TerrainMap): InvariantViolation[]
 }
 
 export interface InvariantViolation {
@@ -17,14 +17,15 @@ export interface InvariantViolation {
   entityIds: string[]
 }
 
-export const unitsOnWalkableTiles: Invariant = {
-  name: 'units-on-walkable-tiles',
-  check(world) {
+/** Nothing stands on impassable terrain or outside the disc. */
+export const nothingOnImpassableTerrain: Invariant = {
+  name: 'nothing-on-impassable-terrain',
+  check(world, terrain) {
     return world.units
-      .filter((u) => !isWalkable(world, u.x, u.y))
+      .filter((u) => !isWalkable(terrain, u.x, u.y))
       .map((u) => ({
         invariant: this.name,
-        message: `unit ${u.id} stands on unwalkable tile (${u.x}, ${u.y})`,
+        message: `unit ${u.id} stands on impassable terrain at (${u.x}, ${u.y})`,
         entityIds: [u.id],
       }))
   },
@@ -48,13 +49,14 @@ export const oneUnitPerTile: Invariant = {
   },
 }
 
-export const worldInvariants: Invariant[] = [unitsOnWalkableTiles, oneUnitPerTile]
+export const worldInvariants: Invariant[] = [nothingOnImpassableTerrain, oneUnitPerTile]
 
 export function checkInvariants(
   world: WorldState,
+  terrain: TerrainMap,
   invariants: Invariant[] = worldInvariants,
 ): InvariantViolation[] {
-  return invariants.flatMap((inv) => inv.check(world))
+  return invariants.flatMap((inv) => inv.check(world, terrain))
 }
 
 /** Whether this tick's invariants get checked, given the share of ticks to sample. */

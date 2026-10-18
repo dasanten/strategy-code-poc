@@ -1,12 +1,21 @@
 import type { Account } from './api.js'
-import type { Tile, Unit } from './world.js'
+import type { Unit } from './world.js'
 
-/** The map as the client draws it. Replaced by explored 32×32 terrain chunks in slice 1. */
+/**
+ * A window of terrain around the residents, as the client draws it. A stopgap until the client
+ * loads explored terrain in 32×32 chunks (T1.4).
+ */
 export interface MapInfo {
   seed: number
+  /** The whole disc's diameter in tiles. */
+  diameter: number
+  /** The window's top-left tile. */
+  x: number
+  y: number
   width: number
   height: number
-  tiles: Tile[]
+  /** The window's terrain bytes, row-major; `OFF_MAP` outside the disc. */
+  terrain: number[]
 }
 
 /**

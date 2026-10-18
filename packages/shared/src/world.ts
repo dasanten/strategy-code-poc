@@ -1,8 +1,4 @@
 export const TICK_MS = 1000
-export const MAP_WIDTH = 32
-export const MAP_HEIGHT = 24
-
-export type Tile = 'grass' | 'rock' | 'water' | 'resource'
 
 export type Direction = 'up' | 'down' | 'left' | 'right'
 
@@ -14,13 +10,13 @@ export interface Unit {
   hp: number
 }
 
+/**
+ * Everything in the world that changes, saved as snapshots (ADR 0006). Terrain is not part of
+ * it: it is generated once from `seed` and stored on its own.
+ */
 export interface WorldState {
   tick: number
   /** The seed the map was generated from. */
   seed: number
-  width: number
-  height: number
-  /** Row-major tile grid: tiles[y * width + x]. */
-  tiles: Tile[]
   units: Unit[]
 }
