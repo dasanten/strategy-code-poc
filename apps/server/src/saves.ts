@@ -1,8 +1,10 @@
 import { gunzipSync, gzipSync } from 'node:zlib'
 import { desc, sql } from 'drizzle-orm'
-import type { WorldState } from '@csp/shared'
+import type { TerrainMap, WorldState } from '@csp/shared'
 import { schema, type Db } from './db/index.js'
+import { loadTerrain, terrainForWorld } from './terrain.js'
 import { WORLD_FORMAT_VERSION, migrateWorld } from './world-format.js'
+import { createWorld } from './world.js'
 
 /** How many of the newest saves are always kept. */
 export const KEEP_LATEST = 20
@@ -16,12 +18,31 @@ export function saveWorld(db: Db, world: WorldState): void {
     .run()
 }
 
-/** The newest save, migrated to the current world format; undefined for a new world. */
-export function loadLatestWorld(db: Db): WorldState | undefined {
+/** The newest save as written, in whatever format it was written in. */
+function latestSave(db: Db): { state: unknown; version: number } | undefined {
   const row = db.select().from(schema.worldSaves).orderBy(desc(schema.worldSaves.id)).limit(1).get()
   if (!row) return undefined
-  const state: unknown = JSON.parse(gunzipSync(row.data).toString('utf8'))
-  return migrateWorld(state, row.version)
+  return { state: JSON.parse(gunzipSync(row.data).toString('utf8')), version: row.version }
+}
+
+/**
+ * The world and its terrain, as the server starts with them: the newest save migrated to the
+ * current format, or a fresh world. Terrain is loaded, or generated from the world's seed and
+ * stored the first time (ADR 0006).
+ */
+export function loadOrCreateWorld(
+  db: Db,
+  generate: (seed: number) => TerrainMap,
+  newSeed = 1,
+): { world: WorldState; terrain: TerrainMap } {
+  const save = latestSave(db)
+  // Every save format so far carries the seed at the top level.
+  const seed = save ? (save.state as { seed: number }).seed : (loadTerrain(db)?.seed ?? newSeed)
+  const terrain = terrainForWorld(db, seed, generate)
+  const world = save
+    ? migrateWorld(save.state, save.version, { terrain })
+    : createWorld(terrain, seed)
+  return { world, terrain }
 }
 
 /**

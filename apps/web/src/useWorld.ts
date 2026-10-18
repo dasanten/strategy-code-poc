@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
-import { WS_PATH, type ServerMessage, type Unit, type WorldState } from '@csp/shared'
+import { WS_PATH, type MapInfo, type ServerMessage, type Unit } from '@csp/shared'
 import { api } from './api.js'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed'
+
+/** What the client knows of the world: the terrain it was sent and the entities in sight. */
+export interface ClientWorld {
+  tick: number
+  map: MapInfo
+  units: Unit[]
+}
 
 /**
  * Keeps the client's copy of what the Player sees in sync with the server (ADR 0006): the
@@ -10,7 +17,7 @@ export type ConnectionStatus = 'connecting' | 'open' | 'closed'
  * Calls `onLoggedOut` when the session is no longer valid.
  */
 export function useWorld(onLoggedOut: () => void) {
-  const [world, setWorld] = useState<WorldState | null>(null)
+  const [world, setWorld] = useState<ClientWorld | null>(null)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
 
   useEffect(() => {
@@ -28,7 +35,7 @@ export function useWorld(onLoggedOut: () => void) {
         const msg = JSON.parse(ev.data as string) as ServerMessage
         if (msg.type === 'welcome') {
           entities = new Map(msg.entities.map((e) => [e.id, e]))
-          setWorld({ ...msg.map, tick: msg.tick, units: [...entities.values()] })
+          setWorld({ map: msg.map, tick: msg.tick, units: [...entities.values()] })
         } else if (msg.type === 'tick') {
           for (const e of msg.changed) entities.set(e.id, e)
           for (const id of msg.gone) entities.delete(id)

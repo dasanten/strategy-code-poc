@@ -5,18 +5,91 @@ import { describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
-import { KEEP_LATEST, loadLatestWorld, pruneSaves, saveWorld } from './saves.js'
+import { gzipSync } from 'node:zlib'
+import type { TerrainMap } from '@csp/shared'
+import { checkInvariants } from './invariants.js'
+import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
+import { loadTerrain } from './terrain.js'
+import { generateTerrain } from './terrain-gen.js'
+import { smallTerrain } from './test-terrain.js'
 import { WorldFormatError, migrateWorld } from './world-format.js'
 import { createWorld } from './world.js'
 
+const terrain = smallTerrain()
+
+/** Generates the small test map for any seed, counting how often it is asked to. */
+function counting() {
+  const seeds: number[] = []
+  const generate = (seed: number): TerrainMap => {
+    seeds.push(seed)
+    return seed === 1 ? terrain : generateTerrain(seed, 120)
+  }
+  return { generate, seeds }
+}
+
 describe('world saves', () => {
-  it('loads what was saved', async () => {
+  it('creates a world once, stores its terrain and loads what was saved', async () => {
     const { db, close } = await openDb(':memory:')
-    expect(loadLatestWorld(db)).toBeUndefined()
-    const world = createWorld(3)
-    world.tick = 42
-    saveWorld(db, world)
-    expect(loadLatestWorld(db)).toEqual(world)
+    const { generate, seeds } = counting()
+    const fresh = loadOrCreateWorld(db, generate, 3)
+    expect(fresh.world).toEqual(createWorld(fresh.terrain, 3))
+    expect(seeds).toEqual([3])
+    expect(loadTerrain(db)).toEqual({ seed: 3, map: fresh.terrain })
+
+    fresh.world.tick = 42
+    saveWorld(db, fresh.world)
+    const loaded = loadOrCreateWorld(db, generate)
+    expect(loaded.world).toEqual(fresh.world)
+    expect(loaded.terrain).toEqual(fresh.terrain)
+    // The stored terrain is used; nothing is generated again.
+    expect(seeds).toEqual([3])
+    close()
+  })
+
+  it('refuses stored terrain from another seed than the save', async () => {
+    const { db, close } = await openDb(':memory:')
+    const { generate } = counting()
+    loadOrCreateWorld(db, generate, 1)
+    saveWorld(db, { ...createWorld(terrain, 1), seed: 2 })
+    expect(() => loadOrCreateWorld(db, generate)).toThrow(/seed 1, the world is seed 2/)
+    close()
+  })
+
+  it('moves a format-1 world onto the stored disc (migration 1 → 2)', async () => {
+    const { db, close } = await openDb(':memory:')
+    // The 32×24 world as format 1 saved it, with units in the grid's corner.
+    const v1 = {
+      tick: 900,
+      seed: 1,
+      width: 32,
+      height: 24,
+      tiles: Array<string>(32 * 24).fill('grass'),
+      units: [
+        { id: 'u1', owner: 'red', x: 0, y: 0, hp: 10 },
+        { id: 'u2', owner: 'red', x: 1, y: 0, hp: 10 },
+        { id: 'u3', owner: 'blue', x: 31, y: 23, hp: 7 },
+      ],
+    }
+    db.insert(schema.worldSaves)
+      .values({ tick: 900, version: 1, data: gzipSync(JSON.stringify(v1)) })
+      .run()
+
+    const { generate, seeds } = counting()
+    const { world, terrain: stored } = loadOrCreateWorld(db, generate)
+    expect(seeds).toEqual([1])
+    expect(loadTerrain(db)?.seed).toBe(1)
+    expect(Object.keys(world).sort()).toEqual(['seed', 'tick', 'units'])
+    expect(world.tick).toBe(900)
+    expect(world.units.map((u) => u.hp)).toEqual([10, 10, 7])
+    expect(checkInvariants(world, stored)).toEqual([])
+    // Still near the centre and roughly where they were relative to each other.
+    const centre = stored.diameter / 2
+    for (const u of world.units) {
+      expect(Math.abs(u.x - centre)).toBeLessThan(25)
+      expect(Math.abs(u.y - centre)).toBeLessThan(25)
+    }
+    const [u1, , u3] = world.units
+    expect(u3!.x - u1!.x).toBeGreaterThan(20)
     close()
   })
 
@@ -54,13 +127,13 @@ describe('world format migrations', () => {
       1: (s: unknown) => ({ ...(s as object), a: 1 }),
       2: (s: unknown) => ({ ...(s as object), b: 2 }),
     }
-    expect(migrateWorld({ tick: 5 }, 1, steps, 3)).toEqual({ tick: 5, a: 1, b: 2 })
-    expect(migrateWorld({ tick: 5 }, 3, steps, 3)).toEqual({ tick: 5 })
+    expect(migrateWorld({ tick: 5 }, 1, { terrain }, steps, 3)).toEqual({ tick: 5, a: 1, b: 2 })
+    expect(migrateWorld({ tick: 5 }, 3, { terrain }, steps, 3)).toEqual({ tick: 5 })
   })
 
   it('refuses a missing step or a newer save', () => {
-    expect(() => migrateWorld({}, 1, {}, 2)).toThrow(WorldFormatError)
-    expect(() => migrateWorld({}, 3, {}, 2)).toThrow(/newer than this server/)
+    expect(() => migrateWorld({}, 1, { terrain }, {}, 2)).toThrow(WorldFormatError)
+    expect(() => migrateWorld({}, 3, { terrain }, {}, 2)).toThrow(/newer than this server/)
   })
 })
 
@@ -71,7 +144,7 @@ describe('backups', () => {
     const backups = path.join(dir, 'backups')
 
     const first = await openDb(dbPath)
-    saveWorld(first.db, createWorld())
+    saveWorld(first.db, createWorld(terrain))
     first.close()
 
     let backupFile = ''
@@ -83,7 +156,7 @@ describe('backups', () => {
     second.close()
     expect(fs.existsSync(backupFile)).toBe(true)
     const restored = await openDb(backupFile)
-    expect(loadLatestWorld(restored.db)?.seed).toBe(1)
+    expect(loadOrCreateWorld(restored.db, () => terrain).world.seed).toBe(1)
     restored.close()
 
     const old = path.join(backups, 'world-old-daily.db')

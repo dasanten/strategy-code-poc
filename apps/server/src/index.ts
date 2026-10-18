@@ -14,9 +14,9 @@ import {
 import { openDb } from './db/index.js'
 import { OrderQueue } from './orders.js'
 import { attachRealtime } from './realtime.js'
-import { loadLatestWorld, pruneSaves, saveWorld } from './saves.js'
+import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
+import { generateTerrain } from './terrain-gen.js'
 import { runTick } from './tick.js'
-import { createWorld } from './world.js'
 
 const sentryOn = initSentry({ dsn: config.sentryDsn, environment: config.environment })
 
@@ -31,7 +31,7 @@ const {
     ? async (s) => logger.info({ file: await backupDb(s, backupDir, 'start') }, 'backup written')
     : undefined,
 })
-const world = loadLatestWorld(db) ?? createWorld()
+const { world, terrain } = loadOrCreateWorld(db, (seed) => generateTerrain(seed))
 tagWorld(world)
 
 const app = await buildApp({
@@ -45,11 +45,11 @@ const app = await buildApp({
 if (sentryOn) setupFastifyErrorHandler(app)
 
 const orders = new OrderQueue()
-const realtime = attachRealtime(app.server, { db, world, orders })
+const realtime = attachRealtime(app.server, { db, world, terrain, orders })
 
 const reporter = createTickReporter(logger)
 const loop = setInterval(() => {
-  runTick(world, {
+  runTick(world, terrain, {
     reporter,
     orders,
     invariantSampleRate: config.invariantSampleRate,

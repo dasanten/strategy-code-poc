@@ -6,12 +6,13 @@ import {
   type Account,
   type ClientMessage,
   type ServerMessage,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import { getSessionUser, type SessionUser } from './auth.js'
 import type { Db } from './db/index.js'
 import type { OrderQueue } from './orders.js'
-import { ClientView, entitiesInSight } from './sync.js'
+import { ClientView, entitiesInSight, mapWindow } from './sync.js'
 
 function readCookie(header: string | undefined, name: string): string | undefined {
   for (const part of header?.split(';') ?? []) {
@@ -36,7 +37,7 @@ interface Client {
  */
 export function attachRealtime(
   server: Server,
-  opts: { db: Db; world: WorldState; orders: OrderQueue },
+  opts: { db: Db; world: WorldState; terrain: TerrainMap; orders: OrderQueue },
 ) {
   const { world } = opts
   const users = new WeakMap<object, SessionUser>()
@@ -60,13 +61,13 @@ export function attachRealtime(
       view: new ClientView(),
     }
     clients.set(socket, client)
-    const { seed, width, height, tiles, tick } = world
+    const entities = client.view.initial(entitiesInSight(world, client.account))
     send(socket, {
       type: 'welcome',
       account: client.account,
-      tick,
-      map: { seed, width, height, tiles },
-      entities: client.view.initial(entitiesInSight(world, client.account)),
+      tick: world.tick,
+      map: mapWindow(opts.terrain, world.seed, entities),
+      entities,
     })
 
     socket.on('message', (raw) => {

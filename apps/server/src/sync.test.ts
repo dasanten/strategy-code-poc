@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { Account, OrderRequest } from '@csp/shared'
+import { OFF_MAP, terrainAt, type Account, type OrderRequest } from '@csp/shared'
 import { OrderQueue, type OrderKind } from './orders.js'
-import { ClientView } from './sync.js'
+import { ClientView, mapWindow } from './sync.js'
+import { smallTerrain } from './test-terrain.js'
 import { createWorld } from './world.js'
+
+const terrain = smallTerrain()
 
 const unit = (id: string, x: number) => ({ id, owner: 'red', x, y: 0, hp: 10 })
 
@@ -19,6 +22,23 @@ describe('ClientView', () => {
   })
 })
 
+describe('mapWindow', () => {
+  it('cuts the stored terrain around the units', () => {
+    const units = [unit('a', 60), unit('b', 62)].map((u) => ({ ...u, y: 50 }))
+    const map = mapWindow(terrain, 1, units)
+    expect(map).toMatchObject({ seed: 1, diameter: terrain.diameter, width: 40, height: 30 })
+    expect(map.x).toBe(61 - 20)
+    expect(map.y).toBe(50 - 15)
+    expect(map.terrain).toHaveLength(40 * 30)
+    expect(map.terrain[5 * 40 + 7]).toBe(terrainAt(terrain, map.x + 7, map.y + 5))
+  })
+
+  it('shows tiles outside the disc as off the map', () => {
+    const map = mapWindow(terrain, 1, [unit('a', 0)])
+    expect(map.terrain[0]).toBe(OFF_MAP)
+  })
+})
+
 describe('OrderQueue', () => {
   const account: Account = { name: 'Mara', isAdmin: false }
   const applied: OrderRequest[] = []
@@ -29,7 +49,7 @@ describe('OrderQueue', () => {
 
   it('acks valid orders and applies them on the next tick', () => {
     const queue = new OrderQueue({ wait })
-    const world = createWorld()
+    const world = createWorld(terrain)
     expect(queue.receive(world, account, 'r1', { kind: 'wait', ticks: 3 })).toEqual({
       type: 'ack',
       requestId: 'r1',
@@ -42,7 +62,7 @@ describe('OrderQueue', () => {
 
   it('rejects unknown, invalid and malformed orders', () => {
     const queue = new OrderQueue({ wait })
-    const world = createWorld()
+    const world = createWorld(terrain)
     expect(queue.receive(world, account, 'r2', { kind: 'fly' })).toMatchObject({
       type: 'rejected',
       reason: 'unknown order: fly',

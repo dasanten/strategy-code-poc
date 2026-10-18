@@ -1,8 +1,8 @@
 import {
-  MAP_HEIGHT,
-  MAP_WIDTH,
+  isPassableTerrain,
+  terrainAt,
   type Direction,
-  type Tile,
+  type TerrainMap,
   type Unit,
   type WorldState,
 } from '@csp/shared'
@@ -18,29 +18,49 @@ function mulberry32(seed: number) {
   }
 }
 
-export function createWorld(seed = 1): WorldState {
+/** How far from the disc's centre the placeholder units start, in tiles. */
+const START_SPREAD = 8
+
+export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
   const rand = mulberry32(seed)
-  const tiles: Tile[] = []
-  for (let i = 0; i < MAP_WIDTH * MAP_HEIGHT; i++) {
-    const r = rand()
-    tiles.push(r < 0.08 ? 'rock' : r < 0.13 ? 'water' : r < 0.17 ? 'resource' : 'grass')
-  }
+  const centre = Math.floor(terrain.diameter / 2)
+  const occupied = new Set<string>()
   const units: Unit[] = []
   for (let i = 0; i < 6; i++) {
-    let x: number, y: number
-    do {
-      x = Math.floor(rand() * MAP_WIDTH)
-      y = Math.floor(rand() * MAP_HEIGHT)
-    } while (tiles[y * MAP_WIDTH + x] !== 'grass')
-    units.push({ id: `u${i + 1}`, owner: i < 3 ? 'red' : 'blue', x, y, hp: 10 })
+    const x = centre + Math.floor((rand() * 2 - 1) * START_SPREAD)
+    const y = centre + Math.floor((rand() * 2 - 1) * START_SPREAD)
+    const [ux, uy] = nearestFreeTile(terrain, occupied, x, y)
+    occupied.add(`${ux},${uy}`)
+    units.push({ id: `u${i + 1}`, owner: i < 3 ? 'red' : 'blue', x: ux, y: uy, hp: 10 })
   }
-  return { tick: 0, seed, width: MAP_WIDTH, height: MAP_HEIGHT, tiles, units }
+  return { tick: 0, seed, units }
 }
 
-export function isWalkable(world: WorldState, x: number, y: number): boolean {
-  if (x < 0 || y < 0 || x >= world.width || y >= world.height) return false
-  const tile = world.tiles[y * world.width + x]
-  return tile === 'grass' || tile === 'resource'
+export function isWalkable(terrain: TerrainMap, x: number, y: number): boolean {
+  return isPassableTerrain(terrainAt(terrain, x, y))
+}
+
+/**
+ * The walkable tile not in `occupied` closest to (x, y), searching outwards ring by ring.
+ * Throws if the whole map is full, which a real map never is.
+ */
+export function nearestFreeTile(
+  terrain: TerrainMap,
+  occupied: Set<string>,
+  x: number,
+  y: number,
+): [number, number] {
+  const free = (tx: number, ty: number) =>
+    isWalkable(terrain, tx, ty) && !occupied.has(`${tx},${ty}`)
+  for (let r = 0; r < terrain.diameter; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
+        if (free(x + dx, y + dy)) return [x + dx, y + dy]
+      }
+    }
+  }
+  throw new Error('no free walkable tile left on the map')
 }
 
 export interface StepResult {
@@ -60,7 +80,11 @@ const DIRS: Record<Direction, [number, number]> = {
  * random move; the moves are collected first and then resolved together, as scripts will be.
  * Returns what happened this tick, for tick-health reporting.
  */
-export function stepWorld(world: WorldState, rand: () => number = Math.random): StepResult {
+export function stepWorld(
+  world: WorldState,
+  terrain: TerrainMap,
+  rand: () => number = Math.random,
+): StepResult {
   const dirs = Object.keys(DIRS) as Direction[]
   const requested = world.units.map((u) => ({
     unit: u,
@@ -72,7 +96,7 @@ export function stepWorld(world: WorldState, rand: () => number = Math.random): 
     const [dx, dy] = DIRS[dir]
     const nx = unit.x + dx
     const ny = unit.y + dy
-    if (!isWalkable(world, nx, ny) || occupied.has(`${nx},${ny}`)) continue
+    if (!isWalkable(terrain, nx, ny) || occupied.has(`${nx},${ny}`)) continue
     occupied.delete(`${unit.x},${unit.y}`)
     occupied.add(`${nx},${ny}`)
     unit.x = nx

@@ -1,4 +1,4 @@
-import type { WorldState } from '@csp/shared'
+import type { TerrainMap, WorldState } from '@csp/shared'
 import { checkInvariants, shouldCheckInvariants, type InvariantViolation } from './invariants.js'
 import type { OrderQueue } from './orders.js'
 import { stepWorld } from './world.js'
@@ -35,14 +35,18 @@ export interface TickOptions {
  * invariants on sampled ticks and reports tick health. A thrown error is reported, not rethrown,
  * so one bad tick does not stop the loop.
  */
-export function runTick(world: WorldState, opts: TickOptions): TickHealth | undefined {
+export function runTick(
+  world: WorldState,
+  terrain: TerrainMap,
+  opts: TickOptions,
+): TickHealth | undefined {
   const now = opts.now ?? performance.now.bind(performance)
   try {
     const start = now()
     opts.orders?.applyAll(world)
-    const { actions } = stepWorld(world)
+    const { actions } = stepWorld(world, terrain)
     if (shouldCheckInvariants(opts.invariantSampleRate, opts.rand)) {
-      const violations = checkInvariants(world)
+      const violations = checkInvariants(world, terrain)
       if (violations.length > 0) opts.reporter.invariantViolations(world, violations)
     }
     const durationMs = now() - start

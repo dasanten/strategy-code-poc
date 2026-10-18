@@ -57,6 +57,18 @@ export const scripts = sqliteTable(
 )
 
 /**
+ * The world's terrain (ADR 0006): generated once from `seed` when the world is created, one byte
+ * per tile in a `diameter` × `diameter` grid. One row per world.
+ */
+export const terrain = sqliteTable('terrain', {
+  id: integer('id').primaryKey(),
+  seed: integer('seed').notNull(),
+  diameter: integer('diameter').notNull(),
+  data: blob('data', { mode: 'buffer' }).notNull(),
+  createdAt: createdAt(),
+})
+
+/**
  * Rolling saves of the world's entities as gzipped JSON (ADR 0006). `version` is the world
  * format the state was written in; loading migrates it to the current one.
  */
