@@ -199,6 +199,35 @@ export function hungerFactor(resident: Resident, tick: number): number {
   return 1 - change
 }
 
+/**
+ * How much food a resident burns on each terrain, relative to Plains (`CONTEXT.md`: Terrain).
+ * Endurance softens the extra (`foodUse`).
+ */
+export const TERRAIN_FOOD = {
+  [Terrain.Plains]: 1,
+  [Terrain.Forest]: 1,
+  [Terrain.Hills]: 1.3,
+  [Terrain.Mountain]: 2,
+} as const satisfies Partial<Record<Terrain, number>>
+
+/** How much of a terrain's extra food use each point of Endurance above average takes away. */
+export const ENDURANCE_TERRAIN_EFFECT = 0.03
+
+/**
+ * How much of the usual food a resident needs on a tile of the given terrain at the given tick
+ * (`CONTEXT.md`: Terrain, Hunger): their `hungerFactor`, times the terrain's extra food use
+ * softened by Endurance (by up to `HUNGER_ENDURANCE_LIMIT` of it, either way).
+ */
+export function foodUse(resident: Resident, terrain: number, tick: number): number {
+  const extra = ((TERRAIN_FOOD as Partial<Record<number, number>>)[terrain] ?? 1) - 1
+  const away = statValue(resident, 'endurance', tick) - HUNGER_ENDURANCE_AVERAGE
+  const soften = Math.max(
+    -HUNGER_ENDURANCE_LIMIT,
+    Math.min(HUNGER_ENDURANCE_LIMIT, away * ENDURANCE_TERRAIN_EFFECT),
+  )
+  return hungerFactor(resident, tick) * (1 + extra * (1 - soften))
+}
+
 /** Ticks (real seconds) an unloaded resident of average Agility takes to walk a plains tile. */
 export const WALK_TICKS_PER_TILE = 30
 
