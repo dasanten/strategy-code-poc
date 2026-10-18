@@ -49,7 +49,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           {world ? <MapView world={world} /> : <p>Waiting for the server…</p>}
         </section>
         <section className="editor-panel">
-          <h2>Unit script</h2>
+          <h2>Resident script</h2>
           <ScriptEditor onChange={(src) => setDiagnostics(checkScript(src))} />
           <p className="diagnostics">
             {diagnostics.length === 0

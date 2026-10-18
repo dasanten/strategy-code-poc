@@ -61,7 +61,7 @@ export function MapView({ world }: { world: ClientWorld }) {
   const { diameter } = world.map
   const explored = world.exploredChunks
 
-  // The units change every tick; the scene reads the latest through the ref.
+  // The residents change every tick; the scene reads the latest through the ref.
   useEffect(() => {
     worldRef.current = world
     redrawRef.current()
@@ -152,7 +152,7 @@ export function MapView({ world }: { world: ClientWorld }) {
       }
 
       const dot = Math.max(3, Math.min(8, cam.scale * 0.3))
-      for (const u of worldRef.current.units) {
+      for (const u of worldRef.current.residents) {
         const [sx, sy] = tileToScreen(cam, view, u.x + 0.5, u.y + 0.5)
         if (sx < -dot || sy < -dot || sx > view.width + dot || sy > view.height + dot) continue
         g.circle(sx, sy, dot)
@@ -340,13 +340,13 @@ function Legend() {
   )
 }
 
-/** Where the view starts and re-centres: the middle of the Player's units, or the disc's. */
+/** Where the view starts and re-centres: the middle of the Player's residents, or the disc's. */
 function unitCentre(world: ClientWorld, diameter: number): { x: number; y: number } {
-  const { units } = world
-  if (units.length === 0) return { x: diameter / 2, y: diameter / 2 }
+  const { residents } = world
+  if (residents.length === 0) return { x: diameter / 2, y: diameter / 2 }
   return {
-    x: units.reduce((s, u) => s + u.x, 0) / units.length + 0.5,
-    y: units.reduce((s, u) => s + u.y, 0) / units.length + 0.5,
+    x: residents.reduce((s, r) => s + r.x, 0) / residents.length + 0.5,
+    y: residents.reduce((s, r) => s + r.y, 0) / residents.length + 0.5,
   }
 }
 

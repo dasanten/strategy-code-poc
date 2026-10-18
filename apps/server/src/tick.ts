@@ -7,7 +7,7 @@ import { stepWorld } from './world.js'
 export interface TickHealth {
   tick: number
   durationMs: number
-  units: number
+  residents: number
   actions: number
   /** The tick took longer than the slow-tick threshold. */
   slow: boolean
@@ -53,7 +53,7 @@ export function runTick(
     const health: TickHealth = {
       tick: world.tick,
       durationMs,
-      units: world.units.length,
+      residents: world.residents.length,
       actions,
       slow: durationMs > opts.slowTickMs,
     }

@@ -1,5 +1,6 @@
-import type { TerrainMap, Unit, WorldState } from '@csp/shared'
+import { MAX_HEALTH, type TerrainMap, type WorldState } from '@csp/shared'
 import { placeResourceNodes } from './node-gen.js'
+import { mulberry32, newResident } from './residents.js'
 import { nearestFreeTile } from './world.js'
 
 /**
@@ -7,7 +8,7 @@ import { nearestFreeTile } from './world.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world.
  */
-export const WORLD_FORMAT_VERSION = 3
+export const WORLD_FORMAT_VERSION = 4
 
 /** What a migration step may look at besides the save itself. */
 export interface MigrationContext {
@@ -42,6 +43,31 @@ export const migrations: Record<number, MigrationStep> = {
     const s = state as { seed: number }
     return { ...s, nodes: placeResourceNodes(terrain, s.seed) }
   },
+  // The placeholder units became residents: same id, side and place, health from their hit
+  // points (10 was full), and new random stats and age.
+  3: (state) => {
+    const { units, ...rest } = state as { tick: number; seed: number; units: UnitV1[] }
+    const residents = units.map((u, i) => ({
+      ...newResident(mulberry32(rest.seed * 31 + i), {
+        id: u.id,
+        owner: u.owner,
+        x: u.x,
+        y: u.y,
+        tick: rest.tick,
+      }),
+      health: Math.max(0, Math.min(MAX_HEALTH, Math.round((u.hp / 10) * MAX_HEALTH))),
+    }))
+    return { ...rest, residents }
+  },
+}
+
+/** A placeholder unit, as saved in formats 1 to 3. */
+interface UnitV1 {
+  id: string
+  owner: string
+  x: number
+  y: number
+  hp: number
 }
 
 /** World state as saved in format 1. */
@@ -51,7 +77,7 @@ interface WorldStateV1 {
   width: number
   height: number
   tiles: string[]
-  units: Unit[]
+  units: UnitV1[]
 }
 
 export class WorldFormatError extends Error {}
