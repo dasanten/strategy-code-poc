@@ -4,7 +4,7 @@ A persistent, real-time strategy world where players control their units with sc
 in our own small language. The server runs every unit's script once per tick (1 tick per second)
 with a step budget, then resolves all requested actions together.
 
-Design decisions: `decisions/tech-stack-and-script-language.md` in the project folder.
+Design decisions live in `docs/adr/`; the domain glossary is `CONTEXT.md`.
 
 ## Layout
 
