@@ -1,7 +1,7 @@
-import Fastify from 'fastify'
-import { WebSocketServer, WebSocket } from 'ws'
-import { TICK_MS, WS_PATH, type ServerMessage } from '@csp/shared'
-import { LANGUAGE_VERSION } from '@csp/lang'
+import { TICK_MS } from '@csp/shared'
+import { deleteExpiredSessions } from './auth.js'
+import { buildApp } from './app.js'
+import { backupDb } from './backup.js'
 import { config } from './config.js'
 import { logger } from './log.js'
 import {
@@ -12,47 +12,72 @@ import {
   tagWorld,
 } from './monitoring.js'
 import { openDb } from './db/index.js'
+import { OrderQueue } from './orders.js'
+import { attachRealtime } from './realtime.js'
+import { loadLatestWorld, pruneSaves, saveWorld } from './saves.js'
 import { runTick } from './tick.js'
-import { createWorld, loadLatestWorld, saveWorld } from './world.js'
+import { createWorld } from './world.js'
 
 const sentryOn = initSentry({ dsn: config.sentryDsn, environment: config.environment })
 
-const { db, close: closeDb } = openDb(config.dbPath)
+const backupDir = config.backupDir
+// Back up before migrations run, so a bad migration can be undone (ADR 0007).
+const {
+  db,
+  sqlite,
+  close: closeDb,
+} = await openDb(config.dbPath, {
+  beforeMigrate: backupDir
+    ? async (s) => logger.info({ file: await backupDb(s, backupDir, 'start') }, 'backup written')
+    : undefined,
+})
 const world = loadLatestWorld(db) ?? createWorld()
 tagWorld(world)
 
-const app = Fastify({ loggerInstance: logger })
+const app = await buildApp({
+  db,
+  logger,
+  secureCookies: config.secureCookies,
+  trustProxy: config.trustProxy,
+  webDist: config.webDist,
+  tick: () => world.tick,
+})
 if (sentryOn) setupFastifyErrorHandler(app)
 
-app.get('/api/health', async () => ({ ok: true, tick: world.tick, language: LANGUAGE_VERSION }))
-app.get('/api/world', async () => world)
-
-const wss = new WebSocketServer({ server: app.server, path: WS_PATH })
-
-function send(socket: WebSocket, msg: ServerMessage) {
-  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
-}
-
-wss.on('connection', (socket) => send(socket, { type: 'welcome', world }))
+const orders = new OrderQueue()
+const realtime = attachRealtime(app.server, { db, world, orders })
 
 const reporter = createTickReporter(logger)
 const loop = setInterval(() => {
   runTick(world, {
     reporter,
+    orders,
     invariantSampleRate: config.invariantSampleRate,
     slowTickMs: config.slowTickMs,
   })
   tagWorld(world)
-  const msg: ServerMessage = { type: 'tick', tick: world.tick, units: world.units }
-  for (const client of wss.clients) send(client, msg)
-  if (world.tick % config.snapshotEveryTicks === 0) saveWorld(db, world)
+  realtime.broadcastTick()
+  if (world.tick % config.saveEveryTicks === 0) {
+    saveWorld(db, world)
+    pruneSaves(db)
+  }
 }, TICK_MS)
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const daily = setInterval(() => {
+  deleteExpiredSessions(db)
+  if (backupDir) {
+    backupDb(sqlite, backupDir, 'daily')
+      .then((file) => logger.info({ file }, 'backup written'))
+      .catch((err: unknown) => logger.error({ err }, 'backup failed'))
+  }
+}, DAY_MS)
 
 async function shutdown() {
   clearInterval(loop)
+  clearInterval(daily)
   saveWorld(db, world)
-  for (const client of wss.clients) client.close()
-  wss.close()
+  realtime.close()
   await app.close()
   closeDb()
   await flushSentry()

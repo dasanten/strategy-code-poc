@@ -1,0 +1,36 @@
+# Production on Daniel's server (ADR 0007). CI copies this file and the Caddyfile to the deploy
+# directory and runs `docker compose pull && docker compose up -d` with IMAGE_TAG set.
+# Settings live in `.env` next to this file (see .env.example here).
+
+services:
+  server:
+    image: ghcr.io/dasanten/strategy-code-poc:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - world-data:/data
+      - world-backups:/backups
+    # Room to write the final world save on shutdown.
+    stop_grace_period: 30s
+
+  caddy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - server
+
+volumes:
+  world-data:
+  world-backups:
+  caddy-data:
+  caddy-config:

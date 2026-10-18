@@ -8,6 +8,8 @@
   the same commit as the work.
 - **Keep scripting cheap to add** (ADR 0002): everything goes through the game API in
   `packages/shared`; orders only request actions; order state is plain serialisable data.
+- **World state is never reset** (ADR 0006): a change to its shape bumps `WORLD_FORMAT_VERSION`
+  and ships a migration step with a test.
 - **Monitoring** (ADR 0004): new simulation rules come with invariants and tests.
 - Toolchain: the machine's default Node is too old. In bash run
   `eval "$(fnm env --shell bash)" && fnm use` first, and call pnpm as `corepack pnpm`.

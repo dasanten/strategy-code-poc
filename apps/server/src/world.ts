@@ -1,4 +1,3 @@
-import { desc } from 'drizzle-orm'
 import {
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -7,7 +6,6 @@ import {
   type Unit,
   type WorldState,
 } from '@csp/shared'
-import { schema, type Db } from './db/index.js'
 
 /** Small seeded PRNG so a fresh world always looks the same. */
 function mulberry32(seed: number) {
@@ -82,21 +80,4 @@ export function stepWorld(world: WorldState, rand: () => number = Math.random): 
   }
   world.tick++
   return { actions: requested.length }
-}
-
-export function loadLatestWorld(db: Db): WorldState | undefined {
-  const row = db
-    .select()
-    .from(schema.worldSnapshots)
-    .orderBy(desc(schema.worldSnapshots.tick))
-    .limit(1)
-    .get()
-  const world = row?.state as WorldState | undefined
-  // Snapshots from before the seed was stored all came from the default seed.
-  if (world && world.seed === undefined) world.seed = 1
-  return world
-}
-
-export function saveWorld(db: Db, world: WorldState): void {
-  db.insert(schema.worldSnapshots).values({ tick: world.tick, state: world }).run()
 }

@@ -26,16 +26,17 @@ I sleep.
 - [x] pino structured logging on the server
 - [x] Invariant framework: checks run every tick in dev, sampled in prod, violations → Sentry
 - [x] Tick-health reporting (duration, resident and action counts), alert above 800 ms
-- [ ] Accounts (ADR 0005): sign-up with invite code, login, logout, 30-day sessions, rate limit
-- [ ] Admin: `admin:create` command, create invite codes, reset passwords
-- [ ] WebSocket accepts only logged-in sessions; login screen in the client
-- [ ] Rolling compressed snapshots with pruning; world format version and migration chain
+- [x] Accounts (ADR 0005): sign-up with invite code, login, logout, 30-day sessions, rate limit
+- [x] Admin: `admin:create` command, create invite codes, reset passwords
+- [x] WebSocket accepts only logged-in sessions; login screen in the client
+- [x] Rolling compressed snapshots with pruning; world format version and migration chain
       (ADR 0006)
-- [ ] SQLite backups before migrating on start and daily, 14 days kept
-- [ ] Protocol: per-Player sync (in sight on connect, changes and left-sight ids per tick),
+- [x] SQLite backups before migrating on start and daily, 14 days kept
+- [x] Protocol: per-Player sync (in sight on connect, changes and left-sight ids per tick),
       orders with request id and ack/error
-- [ ] Deploy (ADR 0007): Dockerfile, compose with Caddy, GHCR + SSH workflow after CI on main
-- [ ] **Daniel:** server with Docker, DNS record, GitHub secrets, `.env` on the server
+- [x] Deploy (ADR 0007): Dockerfile, compose with Caddy, GHCR + SSH workflow after CI on main
+- [ ] **Daniel:** server with Docker, DNS record, GitHub secrets and `DEPLOY_ENABLED`, `.env` on
+      the server (README, Deploy)
 
 ### 1. World map
 
@@ -102,4 +103,4 @@ I sleep.
 ## Done
 
 - [x] Monorepo with server, client and language packages (c6c1c79)
-- [x] Game rules and glossary (`CONTEXT.md`), ADRs 0001–0004
+- [x] Game rules and glossary (`CONTEXT.md`), ADRs 0001–0007

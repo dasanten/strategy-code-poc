@@ -17,12 +17,13 @@ Status: decided (2026-10-18, with Daniel)
 
 Daniel wanted his own server rather than a platform. A pre-built image means production never
 builds anything, so no toolchain is needed there and a build can't fail in production. A
-self-hosted GitHub runner would avoid inbound SSH, but on a public repository it lets pull
-requests from forks run code on the server. Caddy is the shortest way to HTTPS, and the
-`Secure` session cookies (ADR 0005) need HTTPS.
+self-hosted GitHub runner would avoid inbound SSH, but it runs every branch's workflow on the
+production machine, and if the repository ever goes public, pull requests from forks too. Caddy
+is the shortest way to HTTPS, and the `Secure` session cookies (ADR 0005) need HTTPS.
 
 ## Consequences
 
 - The server needs Docker with the compose plugin, and a DNS record pointing to it.
 - GitHub needs these secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, plus
-  `DEPLOY_KNOWN_HOSTS`. The domain and other settings live in `.env` on the server.
+  `DEPLOY_KNOWN_HOSTS`, and the variable `DEPLOY_ENABLED=true` (until then CI only builds the
+  image). The domain and other settings live in `.env` on the server.
