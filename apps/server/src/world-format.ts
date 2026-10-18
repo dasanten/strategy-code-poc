@@ -1,10 +1,4 @@
-import {
-  START_CARRIED_FOOD,
-  isInsideWalls,
-  unitsThatFit,
-  type TerrainMap,
-  type WorldState,
-} from '@csp/shared'
+import type { TerrainMap, WorldState } from '@csp/shared'
 import { drawLifespan, mulberry32 } from './residents.js'
 
 /**
@@ -12,7 +6,7 @@ import { drawLifespan, mulberry32 } from './residents.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 11
+export const WORLD_FORMAT_VERSION = 10
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -54,23 +48,6 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Players got realm logs; what happened before is not known, so every log starts empty.
   9: (state) => ({ ...(state as object), events: [] }),
-  // Residents stopped eating from storage at home; they eat only what they carry. So the deploy
-  // does not leave anyone with nothing to eat, everyone at home takes their starting share of
-  // food from their city's storage, as far as it lasts and fits (`START_CARRIED_FOOD`).
-  10: (state) => {
-    const s = structuredClone(state) as WorldState
-    for (const r of s.residents) {
-      const home = s.cities.find((c) => c.realmId === r.owner && isInsideWalls(c, r.x, r.y))
-      const stock = home && s.buildings.find((b) => b.cityId === home.id && b.stock?.food)?.stock
-      if (!stock) continue
-      const units = Math.min(START_CARRIED_FOOD, stock.food!, unitsThatFit(r, 'food', s.tick))
-      if (units <= 0) continue
-      r.carried.food = (r.carried.food ?? 0) + units
-      if (stock.food! > units) stock.food! -= units
-      else delete stock.food
-    }
-    return s
-  },
 }
 
 /** A string's FNV-1a hash, as a seed. */

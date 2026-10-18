@@ -3,6 +3,9 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   MAX_WORKERS,
+  HOME_FOOD_LOW,
+  MEAL_UNITS,
+  unitsThatFit,
   NODE_WORKPLACE,
   materialsNeeded,
   teardownWork,
@@ -27,6 +30,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { homeStorage } from './survival.js'
 import { isWalkable } from './world.js'
 
 /**
@@ -493,6 +497,28 @@ export const workOrdersOnWorkplaces: Invariant = {
   },
 }
 
+/**
+ * After a tick, nobody at home runs low on food while their city's storage still has some and a
+ * meal would fit (`stepHomeRefill`, `CONTEXT.md`: Eating).
+ */
+export const refilledAtHome: Invariant = {
+  name: 'refilled-at-home',
+  check(world) {
+    return world.residents
+      .filter(
+        (r) =>
+          (r.carried.food ?? 0) < HOME_FOOD_LOW &&
+          homeStorage(world, r) !== undefined &&
+          unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
+      )
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} is at home with ${r.carried.food ?? 0} food, storage has more`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -508,6 +534,7 @@ export const worldInvariants: Invariant[] = [
   sitesWithinNeeds,
   buildOrdersOnSites,
   workOrdersOnWorkplaces,
+  refilledAtHome,
   teardownsWithinNeeds,
   tearDownOrdersOnBuildings,
   nodesOnFittingTerrain,

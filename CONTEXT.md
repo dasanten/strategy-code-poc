@@ -209,7 +209,10 @@ The shared language of the game. Domain terms only — no implementation details
   less with high Endurance. An empty hunger meter costs health; without food a resident dies
   after about 2 game days. While the meter isn't empty, lost health slowly comes back.
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
-  straight from a storage: food has to be picked up first, or brought to them.
+  straight from a storage.
+- **Refilling at home:** a resident inside their own city's walls who is running low on food
+  takes a meal from the city's storage into their hands, without an order. Away from home (on
+  the farm, travelling) there is no refill: they need food on them or a delivery.
 
 ## Transport
 

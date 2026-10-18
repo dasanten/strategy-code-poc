@@ -179,6 +179,15 @@ export function carryCapacity(resident: Resident, tick: number): number {
 /** Food a resident of average Endurance eats per game day, in units (`CONTEXT.md`: Hunger). */
 export const FOOD_PER_DAY = 2
 
+/**
+ * A resident at home is running low on food when they carry fewer units than this: less than a
+ * game day's meals (`CONTEXT.md`: Eating). They then take meals from their city's storage.
+ */
+export const HOME_FOOD_LOW = 2
+
+/** Units of food in one meal, what a resident at home takes from storage at a time. */
+export const MEAL_UNITS = 1
+
 /** Game days a full hunger meter lasts without eating, at average Endurance. */
 export const HUNGER_DAYS = 1
 

@@ -1,5 +1,8 @@
 import {
   FOOD_PER_DAY,
+  HOME_FOOD_LOW,
+  START_FOOD,
+  carryCapacity,
   HUNGER_ENDURANCE_LIMIT,
   MAX_HEALTH,
   TERRAIN_FOOD,
@@ -12,9 +15,10 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { checkInvariants } from './invariants.js'
+import { checkInvariants, refilledAtHome } from './invariants.js'
 import { foundStartingCity, realmOf } from './starting-city.js'
-import { stepSurvival } from './survival.js'
+import { stepHomeRefill, stepSurvival } from './survival.js'
+import { stepWorld } from './world.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 
 const terrain = cityTerrain()
@@ -57,7 +61,7 @@ describe('stepSurvival', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('never feeds residents from storage, also not at home (`CONTEXT.md`: Eating)', () => {
+  it('never eats straight from storage, also at home (`CONTEXT.md`: Eating)', () => {
     const { world } = worldWithCity()
     const city = world.cities[0]!
     const before = structuredClone(storageOf(world).stock)
@@ -213,3 +217,76 @@ function tileOf(t: Terrain, fits: (x: number, y: number) => boolean): [number, n
   }
   throw new Error(`no tile of terrain ${t}`)
 }
+
+describe('stepHomeRefill', () => {
+  /** A starting city with everyone idle on the storage's tile, inside the walls, carrying nothing. */
+  function atHome() {
+    const { world } = worldWithCity()
+    const storage = storageOf(world)
+    for (const r of world.residents) {
+      Object.assign(r, { x: storage.x, y: storage.y, order: null, carried: {} })
+      r.stats.strength = { base: 10, trained: 0 }
+    }
+    return { world, storage, city: world.cities[0]! }
+  }
+
+  it('tops up a resident at home who runs low with meals from their city’s storage', () => {
+    const { world, storage } = atHome()
+    const r = world.residents[0]!
+    r.carried = { food: HOME_FOOD_LOW - 1 }
+    stepHomeRefill(world)
+    expect(r.carried.food).toBe(HOME_FOOD_LOW)
+    for (const other of world.residents.slice(1)) expect(other.carried.food).toBe(HOME_FOOD_LOW)
+    expect(storage.stock!.food).toBe(START_FOOD - (world.residents.length * HOME_FOOD_LOW - 1))
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('leaves a resident who isn’t running low alone', () => {
+    const { world, storage } = atHome()
+    for (const r of world.residents) r.carried = { food: HOME_FOOD_LOW }
+    stepHomeRefill(world)
+    expect(storage.stock!.food).toBe(START_FOOD)
+  })
+
+  it('gives nothing away from home, nor in someone else’s city', () => {
+    const { world, storage, city } = atHome()
+    const [away, stranger] = world.residents as [Resident, Resident]
+    Object.assign(away, { x: city.x + city.size + 3, y: city.y })
+    stranger.owner = 'someone else'
+    stepHomeRefill(world)
+    expect(away.carried).toEqual({})
+    expect(stranger.carried).toEqual({})
+    expect(storage.stock!.food).toBe(START_FOOD - (world.residents.length - 2) * HOME_FOOD_LOW)
+  })
+
+  it('takes only what the storage has and what fits', () => {
+    const { world, storage } = atHome()
+    const [full, ...rest] = world.residents as [Resident, ...Resident[]]
+    full.carried = { stone: carryCapacity(full, world.tick) }
+    storage.stock = { food: 1 }
+    stepHomeRefill(world)
+    expect(full.carried.food).toBeUndefined()
+    expect(rest.map((r) => r.carried.food ?? 0)).toEqual([1, ...rest.slice(1).map(() => 0)])
+    expect(storage.stock).toEqual({})
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('keeps a city at home fed from its storage: nobody starves and the storage goes down', () => {
+    const { world, storage } = atHome()
+    averageEndurance(world)
+    for (let t = 0; t < 5 * TICKS_PER_GAME_DAY; t++) stepWorld(world, terrain)
+    expect(world.residents).toHaveLength(8)
+    for (const r of world.residents) expect(r.health).toBe(MAX_HEALTH)
+    const eaten = START_FOOD - storage.stock!.food! - 8 * HOME_FOOD_LOW
+    // Spoilage takes a little more than the meals.
+    expect(eaten).toBeGreaterThanOrEqual(8 * FOOD_PER_DAY * 5 - 8)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('is caught by the invariant when skipped', () => {
+    const { world } = atHome()
+    expect(refilledAtHome.check(world, terrain)).toHaveLength(8)
+    stepHomeRefill(world)
+    expect(refilledAtHome.check(world, terrain)).toEqual([])
+  })
+})

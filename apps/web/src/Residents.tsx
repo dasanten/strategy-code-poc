@@ -312,7 +312,9 @@ export function ResidentInspector({
           </span>
         </div>
         {carried.length === 0 && (
-          <p className="muted">Nothing. Residents eat only food they carry, also at home.</p>
+          <p className="muted">
+            Nothing. Residents eat only what they carry; at home they take meals from storage.
+          </p>
         )}
         {carried.map(([good, units]) => (
           <div className="goods-row" key={good}>

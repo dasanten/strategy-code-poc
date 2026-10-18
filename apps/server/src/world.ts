@@ -5,7 +5,7 @@ import { requestTearingDown, resolveTearingDown } from './teardown.js'
 import { requestCarrying, resolveCarrying } from './carrying.js'
 import type { Walking } from './walking.js'
 import { stepSpoilage } from './spoilage.js'
-import { stepSurvival, type SurvivalResult } from './survival.js'
+import { stepHomeRefill, stepSurvival, type SurvivalResult } from './survival.js'
 import { stepAging, type AgingResult } from './aging.js'
 import { requestWork, resolveWork } from './work.js'
 
@@ -73,7 +73,8 @@ export interface StepResult {
  * spoils at the end of each game day; then their orders request actions (steps, then taking and
  * putting down goods, then laying out and working on construction sites, then tearing down, then
  * working workplaces), and the world resolves them together. As the next tick begins, residents
- * age: the old die, and loads too heavy for declining Strength are put down. Without `walking` nobody moves.
+ * age: the old die, and loads too heavy for declining Strength are put down; then residents at
+ * home who run low on food take meals from their city's storage. Without `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
@@ -90,6 +91,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveWork(world, work)
   world.tick++
   const aging = stepAging(world)
+  stepHomeRefill(world)
   const actions = steps.length + carries.length + builds.length + teardowns.length + work.length
   return { actions, survival, aging }
 }

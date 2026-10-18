@@ -1,5 +1,7 @@
 import {
   FOOD_PER_DAY,
+  HOME_FOOD_LOW,
+  MEAL_UNITS,
   HEAL_DAYS,
   HUNGER_DAYS,
   MAX_HEALTH,
@@ -7,6 +9,9 @@ import {
   STARVE_DAYS,
   TICKS_PER_GAME_DAY,
   foodUse,
+  isInsideWalls,
+  unitsThatFit,
+  type Building,
   terrainAt,
   type Good,
   type Realm,
@@ -116,4 +121,32 @@ export function endRealm(world: WorldState, realm: Realm): void {
   for (const c of world.cities) if (c.realmId === realm.id) c.realmId = null
   for (const h of world.horses) if (h.realmId === realm.id) h.realmId = null
   for (const k of world.carriages) if (k.realmId === realm.id) k.realmId = null
+}
+
+/** The finished storage of the resident's own city that holds food, if they stand at home. */
+export function homeStorage(world: WorldState, r: Resident): Building | undefined {
+  const home = world.cities.find((c) => c.realmId === r.owner && isInsideWalls(c, r.x, r.y))
+  if (!home) return undefined
+  return world.buildings.find(
+    (b) => b.cityId === home.id && b.kind === 'storage' && !b.site && (b.stock?.food ?? 0) > 0,
+  )
+}
+
+/**
+ * Refilling at home (`CONTEXT.md`: Eating): a resident inside their own city's walls who carries
+ * fewer than `HOME_FOOD_LOW` units of food takes meals (`MEAL_UNITS` each) from their city's
+ * storage into their hands, without an order, until they no longer run low, the storage has
+ * none left, or no more fits. Residents away from home get nothing. They still eat only what
+ * they carry.
+ */
+export function stepHomeRefill(world: WorldState): void {
+  for (const r of world.residents) {
+    while ((r.carried.food ?? 0) < HOME_FOOD_LOW) {
+      const stock = homeStorage(world, r)?.stock
+      const units = Math.min(MEAL_UNITS, stock?.food ?? 0, unitsThatFit(r, 'food', world.tick))
+      if (!stock || units <= 0) break
+      take(stock, 'food', units)
+      r.carried.food = (r.carried.food ?? 0) + units
+    }
+  }
 }
