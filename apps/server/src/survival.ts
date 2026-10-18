@@ -6,12 +6,14 @@ import {
   MAX_HUNGER,
   STARVE_DAYS,
   TICKS_PER_GAME_DAY,
-  hungerFactor,
+  foodUse,
   isInsideWalls,
+  terrainAt,
   type Good,
   type Realm,
   type Resident,
   type Stock,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
@@ -29,13 +31,13 @@ export interface SurvivalResult {
 
 /**
  * One tick of survival (`CONTEXT.md`: Hunger, Eating, Leader death): the hunger meter runs down
- * (slower with high Endurance); a resident eats a unit of food when there is room for it, from
+ * (faster on hard terrain, slower with high Endurance); a resident eats a unit of food when there is room for it, from
  * what they carry, or from their city's storage while at home. An empty meter costs health; a
  * meter with anything in it slowly gives health back. A resident with no health left dies and
  * drops what they carried in a pile. When a Leader dies, their realm ends. A meter running
  * empty and a death go in the Player's realm log.
  */
-export function stepSurvival(world: WorldState): SurvivalResult {
+export function stepSurvival(world: WorldState, terrain: TerrainMap): SurvivalResult {
   const drain = MAX_HUNGER / (HUNGER_DAYS * TICKS_PER_GAME_DAY)
   const starve = MAX_HEALTH / (STARVE_DAYS * TICKS_PER_GAME_DAY)
   const heal = MAX_HEALTH / (HEAL_DAYS * TICKS_PER_GAME_DAY)
@@ -43,7 +45,7 @@ export function stepSurvival(world: WorldState): SurvivalResult {
 
   for (const r of world.residents) {
     const wasFed = r.hunger > 0
-    r.hunger = Math.max(0, r.hunger - drain * hungerFactor(r, world.tick))
+    r.hunger = Math.max(0, r.hunger - drain * foodUse(r, terrainAt(terrain, r.x, r.y), world.tick))
     if (r.hunger <= MAX_HUNGER - FILL_PER_FOOD) {
       const pantry = foodSource(world, r)
       if (pantry) {

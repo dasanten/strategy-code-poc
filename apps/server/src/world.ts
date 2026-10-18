@@ -72,8 +72,8 @@ export interface StepResult {
  * age: the old die, and
  * loads too heavy for declining Strength are put down. Without `walking` nobody moves.
  */
-export function stepWorld(world: WorldState, _terrain: TerrainMap, walking?: Walking): StepResult {
-  const survival = stepSurvival(world)
+export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
+  const survival = stepSurvival(world, terrain)
   stepSpoilage(world)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)

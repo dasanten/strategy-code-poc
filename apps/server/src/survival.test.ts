@@ -1,8 +1,13 @@
 import {
   FOOD_PER_DAY,
+  HUNGER_ENDURANCE_LIMIT,
   MAX_HEALTH,
+  TERRAIN_FOOD,
+  Terrain,
   TICKS_PER_GAME_DAY,
+  foodUse,
   isInsideWalls,
+  terrainAt,
   type Resident,
   type WorldState,
 } from '@csp/shared'
@@ -18,7 +23,7 @@ const terrain = cityTerrain()
 function live(world: WorldState, days: number): Resident[] {
   const died: Resident[] = []
   for (let t = 0; t < days * TICKS_PER_GAME_DAY; t++) {
-    died.push(...stepSurvival(world).died)
+    died.push(...stepSurvival(world, terrain).died)
     world.tick++
   }
   return died
@@ -95,7 +100,7 @@ describe('stepSurvival', () => {
     Object.assign(leader, { x: city.x + city.size + 3, y: city.y })
     const ended: string[] = []
     for (let t = 0; t < 2.6 * TICKS_PER_GAME_DAY; t++) {
-      ended.push(...stepSurvival(world).ended.map((x) => x.id))
+      ended.push(...stepSurvival(world, terrain).ended.map((x) => x.id))
       world.tick++
     }
     expect(ended).toEqual([realm.id])
@@ -134,4 +139,63 @@ describe('stepSurvival', () => {
     live(frail, 6)
     expect(storageOf(tough).stock!.food!).toBeGreaterThan(storageOf(frail).stock!.food! + 20)
   })
+
+  it('burns more food on hard terrain, as `TERRAIN_FOOD` says (`CONTEXT.md`: Terrain)', () => {
+    const eaten = (t: Terrain) => {
+      const { world } = worldWithCity()
+      averageEndurance(world)
+      const city = world.cities[0]!
+      const [x, y] = tileOf(t, (x, y) => !isInsideWalls(city, x, y))
+      const r = world.residents[1]!
+      r.stats.strength = { base: 15, trained: 0 } // room to carry the food
+      Object.assign(r, { x, y, carried: { food: 25 } })
+      live(world, 5)
+      expect(world.residents).toContain(r)
+      expect(checkInvariants(world, terrain)).toEqual([])
+      return 25 - (r.carried.food ?? 0)
+    }
+    // Meals come in whole units, so each count may be one meal off what the days need.
+    const plains = eaten(Terrain.Plains)
+    expect(Math.abs(plains - FOOD_PER_DAY * 5)).toBeLessThanOrEqual(1)
+    expect(Math.abs(eaten(Terrain.Forest) - plains)).toBeLessThanOrEqual(1)
+    expect(
+      Math.abs(eaten(Terrain.Hills) - FOOD_PER_DAY * 5 * TERRAIN_FOOD[Terrain.Hills]),
+    ).toBeLessThanOrEqual(1)
+    expect(
+      Math.abs(eaten(Terrain.Mountain) - FOOD_PER_DAY * 5 * TERRAIN_FOOD[Terrain.Mountain]),
+    ).toBeLessThanOrEqual(1)
+  })
+
+  it('lets Endurance soften the extra food hard terrain costs, within its limit', () => {
+    const { world } = worldWithCity()
+    const r = world.residents[1]!
+    const extra = (endurance: number, t: Terrain) => {
+      r.stats.endurance = { base: endurance, trained: 0 }
+      return foodUse(r, t, world.tick) / foodUse(r, Terrain.Plains, world.tick)
+    }
+    expect(extra(10, Terrain.Mountain)).toBeCloseTo(2)
+    expect(extra(20, Terrain.Mountain)).toBeLessThan(2)
+    expect(extra(0, Terrain.Mountain)).toBeGreaterThan(2)
+    // However tough or frail, hard terrain costs more than plains and Endurance moves the extra
+    // by no more than `HUNGER_ENDURANCE_LIMIT` of it.
+    for (const e of [0, 5, 10, 15, 22, 40, 100]) {
+      for (const t of [Terrain.Hills, Terrain.Mountain]) {
+        const more = TERRAIN_FOOD[t] - 1
+        expect(extra(e, t)).toBeGreaterThan(1)
+        expect(extra(e, t)).toBeGreaterThanOrEqual(1 + more * (1 - HUNGER_ENDURANCE_LIMIT) - 1e-9)
+        expect(extra(e, t)).toBeLessThanOrEqual(1 + more * (1 + HUNGER_ENDURANCE_LIMIT) + 1e-9)
+      }
+      expect(extra(e, Terrain.Forest)).toBeCloseTo(1)
+    }
+  })
 })
+
+/** The first tile of terrain `t` on the test map that also passes `fits`. */
+function tileOf(t: Terrain, fits: (x: number, y: number) => boolean): [number, number] {
+  for (let y = 0; y < terrain.size; y++) {
+    for (let x = 0; x < terrain.size; x++) {
+      if (terrainAt(terrain, x, y) === t && fits(x, y)) return [x, y]
+    }
+  }
+  throw new Error(`no tile of terrain ${t}`)
+}

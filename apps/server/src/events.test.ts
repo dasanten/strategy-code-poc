@@ -25,7 +25,7 @@ describe('realm events', () => {
     storageOf(world).stock = {}
     const deaths: { id: string; tick: number }[] = []
     for (let t = 0; t < 3 * TICKS_PER_GAME_DAY; t++) {
-      for (const r of stepSurvival(world).died) deaths.push({ id: r.id, tick: world.tick })
+      for (const r of stepSurvival(world, terrain).died) deaths.push({ id: r.id, tick: world.tick })
       world.tick++
     }
     const log = eventsFor(world, realm.userId)
