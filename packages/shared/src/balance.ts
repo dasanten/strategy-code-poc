@@ -1,3 +1,6 @@
+import { Terrain } from './terrain.js'
+import type { ResourceKind } from './world.js'
+
 /**
  * Balance numbers: how much, how fast, how often. The rules (what happens) are in `CONTEXT.md`;
  * these are the values Daniel tunes. One commented constant each.
@@ -24,3 +27,17 @@ export const TERRAIN_SHARES = {
 
 /** Share of the disc's edge that is coast (Sea); the rest of the edge is land. */
 export const SEA_EDGE_SHARE = 0.4
+
+/**
+ * Resource nodes per tile of each terrain they lie on, when the world is created. Ore is denser
+ * in Mountain than in Hills; gold is rare.
+ */
+export const NODE_DENSITY = {
+  forest: { [Terrain.Forest]: 1 / 300 },
+  stone: { [Terrain.Hills]: 1 / 250 },
+  ironOre: { [Terrain.Hills]: 1 / 1500, [Terrain.Mountain]: 1 / 300 },
+  goldOre: { [Terrain.Hills]: 1 / 15000, [Terrain.Mountain]: 1 / 3000 },
+} as const satisfies Record<ResourceKind, Partial<Record<Terrain, number>>>
+
+/** No two resource nodes lie closer than this many tiles (in either direction). */
+export const NODE_MIN_SPACING = 4

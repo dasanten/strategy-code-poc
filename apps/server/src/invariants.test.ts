@@ -29,6 +29,17 @@ describe('invariants', () => {
     ])
   })
 
+  it('catch a resource node on terrain that does not fit it', () => {
+    const world = createWorld(terrain)
+    const node = world.nodes.find((n) => n.kind === 'forest')!
+    const plains = terrain.tiles.indexOf(Terrain.Plains)
+    node.x = plains % terrain.diameter
+    node.y = Math.floor(plains / terrain.diameter)
+    expect(checkInvariants(world, terrain)).toEqual([
+      expect.objectContaining({ invariant: 'nodes-on-fitting-terrain', entityIds: [node.id] }),
+    ])
+  })
+
   it('catch a unit outside the disc', () => {
     const world = createWorld(terrain)
     const unit = world.units[0]!
