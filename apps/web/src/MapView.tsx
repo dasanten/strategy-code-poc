@@ -26,7 +26,13 @@ import { ChunkStore } from './map/chunks.js'
 import {
   NODE_COLORS,
   NODE_NAMES,
-  OWNER_COLORS,
+  BUILDING_COLORS,
+  CARRIAGE_COLOR,
+  HORSE_COLOR,
+  LEADER_COLOR,
+  OTHER_COLOR,
+  OWN_COLOR,
+  WALL_COLOR,
   TERRAIN_COLORS,
   TERRAIN_NAMES,
   VOID_COLOR,
@@ -76,7 +82,7 @@ export function MapView({ world }: { world: ClientWorld }) {
     const terrainLayer = new Container()
     const overlay = new Graphics()
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
-    let cam: Camera = { ...unitCentre(worldRef.current, diameter), scale: START_SCALE }
+    let cam: Camera = { ...homeCentre(worldRef.current), scale: START_SCALE }
     let disposed = false
     let ready = false
     let frame = 0
@@ -151,13 +157,16 @@ export function MapView({ world }: { world: ClientWorld }) {
         }
       }
 
+      drawStructures(g, cam, view, worldRef.current)
+
+      const { home } = worldRef.current
       const dot = Math.max(3, Math.min(8, cam.scale * 0.3))
       for (const u of worldRef.current.residents) {
         const [sx, sy] = tileToScreen(cam, view, u.x + 0.5, u.y + 0.5)
         if (sx < -dot || sy < -dot || sx > view.width + dot || sy > view.height + dot) continue
-        g.circle(sx, sy, dot)
-          .fill(OWNER_COLORS[u.owner] ?? 0xf2eee3)
-          .stroke({ width: 2, color: 0x121518 })
+        const color =
+          u.id === home.leaderId ? LEADER_COLOR : u.owner === home.realmId ? OWN_COLOR : OTHER_COLOR
+        g.circle(sx, sy, dot).fill(color).stroke({ width: 2, color: 0x121518 })
       }
     }
 
@@ -231,7 +240,7 @@ export function MapView({ world }: { world: ClientWorld }) {
         const view = size()
         setCam(zoomAt(cam, view, diameter, factor, view.width / 2, view.height / 2))
       },
-      centre: () => setCam({ ...cam, ...unitCentre(worldRef.current, diameter) }),
+      centre: () => setCam({ ...cam, ...homeCentre(worldRef.current) }),
     }
 
     void app.init({ resizeTo: host, background: VOID_COLOR, antialias: true }).then(() => {
@@ -340,15 +349,59 @@ function Legend() {
   )
 }
 
-/** Where the view starts and re-centres: the middle of the Player's residents, or the disc's. */
-function unitCentre(world: ClientWorld, diameter: number): { x: number; y: number } {
-  const { residents } = world
-  if (residents.length === 0) return { x: diameter / 2, y: diameter / 2 }
-  return {
-    x: residents.reduce((s, r) => s + r.x, 0) / residents.length + 0.5,
-    y: residents.reduce((s, r) => s + r.y, 0) / residents.length + 0.5,
+/** Where the view starts and re-centres: the middle of the Player's home city. */
+function homeCentre(world: ClientWorld): { x: number; y: number } {
+  return { x: world.home.x + 0.5, y: world.home.y + 0.5 }
+}
+
+/** Cities' walls and gates, buildings, horses and carriages, at mid zoom and closer. */
+function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld) {
+  const { cities, buildings, horses, carriages } = world.structures
+  const tile = cam.scale
+  const box = (x: number, y: number, inset = 0) => {
+    const [sx, sy] = tileToScreen(cam, view, x, y)
+    return [
+      sx + inset * tile,
+      sy + inset * tile,
+      tile * (1 - 2 * inset),
+      tile * (1 - 2 * inset),
+    ] as const
+  }
+  for (const c of cities) {
+    const [sx, sy] = tileToScreen(cam, view, c.x, c.y)
+    if (sx > view.width || sy > view.height || sx + c.size * tile < 0 || sy + c.size * tile < 0) {
+      continue
+    }
+    // The wall is the ring of edge tiles; drawn as a thick band with the gate left open.
+    for (let i = 0; i < c.size; i++) {
+      for (const [x, y] of [
+        [c.x + i, c.y],
+        [c.x + i, c.y + c.size - 1],
+        [c.x, c.y + i],
+        [c.x + c.size - 1, c.y + i],
+      ] as const) {
+        if (x === c.gate.x && y === c.gate.y) continue
+        g.rect(...box(x, y)).fill(WALL_COLOR)
+      }
+    }
+    const [gx, gy, gw, gh] = box(c.gate.x, c.gate.y)
+    g.rect(gx, gy, gw, gh).fill({ color: WALL_COLOR, alpha: 0.35 })
+  }
+  for (const b of buildings) {
+    g.rect(...box(b.x, b.y, 0.08))
+      .fill(BUILDING_COLORS[b.kind])
+      .stroke({ width: 1, color: 0x4f3a22 })
+  }
+  for (const h of horses) g.circle(...centre(cam, view, h), tile * 0.22).fill(HORSE_COLOR)
+  for (const k of carriages) {
+    g.rect(...box(k.x, k.y, 0.22))
+      .fill(CARRIAGE_COLOR)
+      .stroke({ width: 1, color: 0x121518 })
   }
 }
+
+const centre = (cam: Camera, view: Size, e: { x: number; y: number }) =>
+  tileToScreen(cam, view, e.x + 0.5, e.y + 0.5)
 
 /** One pixel per tile; scaled up with nearest-neighbour sampling, so tiles stay crisp. */
 function chunkTexture(chunk: TerrainChunk): Texture {

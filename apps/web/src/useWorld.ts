@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { WS_PATH, type MapInfo, type ServerMessage, type Resident } from '@csp/shared'
+import { WS_PATH, type MapInfo, type Resident, type ServerMessage } from '@csp/shared'
 import { api } from './api.js'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed'
@@ -10,6 +10,10 @@ export interface ClientWorld {
   map: MapInfo
   /** Chunks with explored terrain, loaded on demand from `terrainChunkPath`. */
   exploredChunks: ReadonlySet<number>
+  /** The Player's realm and home city, where the view starts. */
+  home: Extract<ServerMessage, { type: 'welcome' }>['home']
+  /** Cities, buildings, horses and carriages as they stood on connect. */
+  structures: Extract<ServerMessage, { type: 'welcome' }>['structures']
   residents: Resident[]
 }
 
@@ -40,6 +44,8 @@ export function useWorld(onLoggedOut: () => void) {
           setWorld({
             map: msg.map,
             exploredChunks: new Set(msg.exploredChunks),
+            home: msg.home,
+            structures: msg.structures,
             tick: msg.tick,
             residents: [...entities.values()],
           })

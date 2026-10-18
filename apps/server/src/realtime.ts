@@ -2,6 +2,7 @@ import type { Server } from 'node:http'
 import { WebSocket, WebSocketServer } from 'ws'
 import {
   SESSION_COOKIE,
+  START_EXPLORED_RADIUS,
   WS_PATH,
   type Account,
   type ClientMessage,
@@ -13,6 +14,7 @@ import { getSessionUser, type SessionUser } from './auth.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
+import { foundStartingCity, realmOf } from './starting-city.js'
 import { ClientView, entitiesInSight } from './sync.js'
 
 function readCookie(header: string | undefined, name: string): string | undefined {
@@ -68,13 +70,22 @@ export function attachRealtime(
       view: new ClientView(),
     }
     clients.set(socket, client)
+    // A Player without a realm (new, or from before realms) gets their starting city now.
+    const hadRealm = realmOf(world, user.id) !== undefined
+    const realm = foundStartingCity(world, opts.terrain, user.id)
+    const city = world.cities.find((c) => c.realmId === realm.id)!
+    const [cx, cy] = [city.x + Math.floor(city.size / 2), city.y + Math.floor(city.size / 2)]
+    if (!hadRealm) opts.explored.explore(user.id, cx, cy, START_EXPLORED_RADIUS)
     const entities = client.view.initial(entitiesInSight(world, client.account))
+    const { cities, buildings, horses, carriages } = world
     send(socket, {
       type: 'welcome',
       account: client.account,
       tick: world.tick,
       map: { seed: world.seed, diameter: opts.terrain.diameter },
       exploredChunks: opts.explored.exploredChunks(user),
+      home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city.id, x: cx, y: cy },
+      structures: { cities, buildings, horses, carriages },
       entities,
     })
 

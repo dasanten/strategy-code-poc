@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { WorldState } from '@csp/shared'
 import { runTick, type TickReporter } from './tick.js'
-import { smallTerrain } from './test-terrain.js'
-import { createWorld } from './world.js'
+import { cityTerrain, worldWithCity } from './test-terrain.js'
 
-const terrain = smallTerrain()
+const terrain = cityTerrain()
 
 function fakeReporter() {
   return {
@@ -21,8 +20,8 @@ function clock(stepMs: number) {
 }
 
 describe('runTick', () => {
-  it('reports tick health with unit and action counts', () => {
-    const world = createWorld(terrain)
+  it('reports tick health with resident and action counts', () => {
+    const world = worldWithCity().world
     const reporter = fakeReporter()
     const health = runTick(world, terrain, {
       reporter,
@@ -30,13 +29,13 @@ describe('runTick', () => {
       slowTickMs: 800,
       now: clock(5),
     })
-    expect(health).toEqual({ tick: 1, durationMs: 5, residents: 6, actions: 0, slow: false })
+    expect(health).toEqual({ tick: 1, durationMs: 5, residents: 8, actions: 0, slow: false })
     expect(reporter.tickHealth).toHaveBeenCalledWith(world, health)
     expect(reporter.invariantViolations).not.toHaveBeenCalled()
   })
 
   it('flags a tick above the slow-tick threshold', () => {
-    const health = runTick(createWorld(terrain), terrain, {
+    const health = runTick(worldWithCity().world, terrain, {
       reporter: fakeReporter(),
       invariantSampleRate: 1,
       slowTickMs: 800,
@@ -46,7 +45,7 @@ describe('runTick', () => {
   })
 
   it('reports invariant violations on checked ticks only', () => {
-    const world = createWorld(terrain)
+    const world = worldWithCity().world
     // Every unit outside the disc, in its corner: no move can make that legal again.
     for (const u of world.residents) Object.assign(u, { x: 0, y: 0 })
     const reporter = fakeReporter()
@@ -64,7 +63,7 @@ describe('runTick', () => {
   })
 
   it('reports an error instead of throwing', () => {
-    const broken = { ...createWorld(terrain), residents: null } as unknown as WorldState
+    const broken = { ...worldWithCity().world, residents: null } as unknown as WorldState
     const reporter = fakeReporter()
     expect(
       runTick(broken, terrain, { reporter, invariantSampleRate: 1, slowTickMs: 800 }),

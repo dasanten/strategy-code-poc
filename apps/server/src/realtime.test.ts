@@ -1,17 +1,24 @@
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WebSocket } from 'ws'
-import { SESSION_COOKIE, WS_PATH, chunksAcross, type ServerMessage } from '@csp/shared'
+import {
+  CHUNK_SIZE,
+  SESSION_COOKIE,
+  WS_PATH,
+  chunksAcross,
+  isInsideDisc,
+  type ServerMessage,
+} from '@csp/shared'
 import { buildApp } from './app.js'
 import { createAdmin, createSession } from './auth.js'
 import { ExploredTerrain } from './explored.js'
 import { openDb, schema } from './db/index.js'
 import { OrderQueue } from './orders.js'
 import { attachRealtime } from './realtime.js'
-import { smallTerrain } from './test-terrain.js'
+import { cityTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain = smallTerrain()
+const terrain = cityTerrain()
 
 const cleanup: (() => Promise<void> | void)[] = []
 afterEach(async () => {
@@ -90,10 +97,26 @@ describe('realtime', () => {
     const welcome = await next('welcome')
     expect(welcome).toMatchObject({ type: 'welcome', account: { name: 'Daniel' }, tick: 0 })
     if (welcome.type === 'welcome') {
+      // First connect: Daniel gets a realm and starting city, and the view starts there.
+      expect(world.realms).toHaveLength(1)
+      const city = world.cities[0]!
+      expect(welcome.home).toMatchObject({ realmId: world.realms[0]!.id, cityId: city.id })
+      expect(welcome.home.x).toBeGreaterThan(city.x)
+      expect(welcome.home.x).toBeLessThan(city.x + city.size)
+      expect(welcome.structures.cities).toEqual([city])
       expect(welcome.entities).toHaveLength(world.residents.length)
       // Daniel is an admin, so the whole map counts as explored.
       const n = chunksAcross(terrain.diameter)
-      expect(welcome.exploredChunks).toEqual([...Array(n * n).keys()])
+      const onDisc = [...Array(n * n).keys()].filter((c) => {
+        const [x0, y0] = [(c % n) * CHUNK_SIZE, Math.floor(c / n) * CHUNK_SIZE]
+        for (let y = y0; y < y0 + CHUNK_SIZE; y++) {
+          for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
+            if (isInsideDisc(terrain.diameter, x, y)) return true
+          }
+        }
+        return false
+      })
+      expect(welcome.exploredChunks).toEqual(onDisc)
     }
 
     realtime.broadcastTick()
@@ -103,6 +126,17 @@ describe('realtime', () => {
     realtime.broadcastTick()
     const tick = await next('tick')
     if (tick.type === 'tick') expect(tick.tick).toBe(1)
+  })
+
+  it('keeps one realm per Player across logins', async () => {
+    const { url, token, world } = await start()
+    const first = await connect(url, token).next('welcome')
+    const second = await connect(url, token).next('welcome')
+    expect(world.realms).toHaveLength(1)
+    expect(world.cities).toHaveLength(1)
+    if (first.type === 'welcome' && second.type === 'welcome') {
+      expect(second.home).toEqual(first.home)
+    }
   })
 
   it('answers orders with an ack or a rejection', async () => {
