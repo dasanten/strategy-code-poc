@@ -8,11 +8,13 @@ import {
   type MapInfo,
   type OrderRequest,
   type Pile,
+  type RealmEvent,
   type Resident,
   type SeenEntity,
   type ServerMessage,
 } from '@csp/shared'
 import { api } from './api.js'
+import { appendEvents } from './realm-log.js'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed'
 
@@ -33,6 +35,8 @@ export interface ClientWorld {
   horses: Horse[]
   carriages: Carriage[]
   piles: Pile[]
+  /** The Player's realm log, oldest first. */
+  events: RealmEvent[]
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -58,7 +62,8 @@ function byKind(entities: Iterable<SeenEntity>) {
 
 /**
  * Keeps the client's copy of what the Player sees in sync with the server (ADR 0006): the
- * welcome message brings everything in sight, every tick brings changes and ids that left sight.
+ * welcome message brings everything in sight and the realm log, every tick brings changes, ids
+ * that left sight and new realm events.
  * Calls `onLoggedOut` when the session is no longer valid.
  */
 export function useWorld(onLoggedOut: () => void) {
@@ -89,6 +94,7 @@ export function useWorld(onLoggedOut: () => void) {
             grownChunks: [],
             home: msg.home,
             tick: msg.tick,
+            events: msg.events,
             ...byKind(entities.values()),
           })
         } else if (msg.type === 'ack' || msg.type === 'rejected') {
@@ -105,7 +111,8 @@ export function useWorld(onLoggedOut: () => void) {
             const exploredChunks =
               grown.length > 0 ? new Set([...w.exploredChunks, ...grown]) : w.exploredChunks
             const seen = changed ? byKind(entities.values()) : {}
-            return { ...w, ...seen, tick: msg.tick, exploredChunks, grownChunks: grown }
+            const events = appendEvents(w.events, msg.events)
+            return { ...w, ...seen, tick: msg.tick, exploredChunks, grownChunks: grown, events }
           })
         }
       }

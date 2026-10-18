@@ -5,6 +5,7 @@ import { AdminPanel } from './AdminPanel.js'
 import { api } from './api.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
+import { RealmLog } from './RealmLog.js'
 import { ResidentInspector, ResidentsList } from './Residents.js'
 import { ScriptEditor } from './ScriptEditor.js'
 import { useWorld } from './useWorld.js'
@@ -116,6 +117,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onDrop={(spot, goods) => carry('drop', spot, goods)}
             />
           )}
+          {world && <RealmLog events={world.events} />}
           <section className="editor-panel">
             <h2>Resident script</h2>
             <ScriptEditor onChange={(src) => setDiagnostics(checkScript(src))} />

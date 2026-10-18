@@ -1,0 +1,33 @@
+import { REALM_LOG_LENGTH, type RealmEvent } from '@csp/shared'
+import { describe, expect, it } from 'vitest'
+import { appendEvents, describeEvent } from './realm-log.js'
+
+const at = { tick: 7, userId: 1 }
+
+describe('realm log', () => {
+  it('describes each kind of event', () => {
+    const died = { kind: 'died', residentId: 'r1', name: 'Mara', seq: 2, ...at } as const
+    expect(
+      describeEvent({ kind: 'hungry', residentId: 'r1', name: 'Mara', seq: 1, ...at }),
+    ).toEqual({ text: 'Mara has nothing to eat and is starving.', tone: 'warn' })
+    expect(describeEvent({ ...died, cause: 'oldAge', leader: false }).text).toBe(
+      'Mara died of old age.',
+    )
+    expect(describeEvent({ ...died, cause: 'starved', leader: true }).text).toBe(
+      'Your Leader Mara starved to death. Your realm has ended.',
+    )
+    expect(describeEvent({ kind: 'foodSpoiled', units: 4, seq: 3, ...at }).text).toBe(
+      '4 Food spoiled.',
+    )
+  })
+
+  it('keeps the latest events, as many as the server does', () => {
+    const event = (seq: number): RealmEvent => ({ kind: 'foodSpoiled', units: 1, seq, ...at })
+    const log = Array.from({ length: REALM_LOG_LENGTH }, (_, i) => event(i))
+    expect(appendEvents(log, [])).toBe(log)
+    const next = appendEvents(log, [event(100), event(101)])
+    expect(next).toHaveLength(REALM_LOG_LENGTH)
+    expect(next.at(-1)!.seq).toBe(101)
+    expect(next[0]!.seq).toBe(2)
+  })
+})

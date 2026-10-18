@@ -121,6 +121,35 @@ export interface WorldState {
   carriages: Carriage[]
   /** Goods lying on the ground, at most one pile per tile. */
   piles: Pile[]
+  /** Each Player's latest realm events, oldest first, at most `REALM_LOG_LENGTH` each. */
+  events: RealmEvent[]
+}
+
+/** What happened, by kind; the rest of a `RealmEvent` says when and for whom. */
+export type RealmEventWhat =
+  /** A resident's hunger meter ran empty: they have nothing to eat and lose health. */
+  | { kind: 'hungry'; residentId: string; name: string }
+  /** A resident died; `leader` when it was the Leader, whose death ended the realm. */
+  | {
+      kind: 'died'
+      residentId: string
+      name: string
+      cause: 'starved' | 'oldAge'
+      leader: boolean
+    }
+  /** Food went bad over the game day in the realm's storages, residents' loads and carriages. */
+  | { kind: 'foodSpoiled'; units: number }
+
+/**
+ * Something that happened in a Player's realm, for their log. Plain data. It belongs to the
+ * Player, not the realm: a realm ends with its Leader, and the Player should still read why.
+ */
+export type RealmEvent = RealmEventWhat & {
+  /** Numbered from the world's `nextId`, so a later event has a higher number. */
+  seq: number
+  tick: number
+  /** The Player's account. */
+  userId: number
 }
 
 /** Goods lying on the ground on one tile, for anyone to take (`CONTEXT.md`: Pile). */
