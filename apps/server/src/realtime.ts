@@ -11,6 +11,7 @@ import {
 } from '@csp/shared'
 import { getSessionUser, type SessionUser } from './auth.js'
 import type { Db } from './db/index.js'
+import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
 import { ClientView, entitiesInSight, mapWindow } from './sync.js'
 
@@ -37,7 +38,13 @@ interface Client {
  */
 export function attachRealtime(
   server: Server,
-  opts: { db: Db; world: WorldState; terrain: TerrainMap; orders: OrderQueue },
+  opts: {
+    db: Db
+    world: WorldState
+    terrain: TerrainMap
+    explored: ExploredTerrain
+    orders: OrderQueue
+  },
 ) {
   const { world } = opts
   const users = new WeakMap<object, SessionUser>()
@@ -67,6 +74,7 @@ export function attachRealtime(
       account: client.account,
       tick: world.tick,
       map: mapWindow(opts.terrain, world.seed, entities),
+      exploredChunks: opts.explored.exploredChunks(user),
       entities,
     })
 

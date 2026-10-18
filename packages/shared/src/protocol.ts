@@ -30,7 +30,15 @@ export interface OrderRequest {
 /** Messages the server pushes over the WebSocket (ADR 0006). */
 export type ServerMessage =
   /** On connect: who you are, the map and everything in your sight. */
-  | { type: 'welcome'; account: Account; tick: number; map: MapInfo; entities: Unit[] }
+  | {
+      type: 'welcome'
+      account: Account
+      tick: number
+      map: MapInfo
+      /** Chunks with explored terrain, to load from `terrainChunkPath` (see `chunksAcross`). */
+      exploredChunks: number[]
+      entities: Unit[]
+    }
   /** Every tick: entities in sight that changed, and ids that left sight. */
   | { type: 'tick'; tick: number; changed: Unit[]; gone: string[] }
   | { type: 'ack'; requestId: string }
