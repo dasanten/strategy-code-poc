@@ -74,7 +74,7 @@ export class Walking {
         r.order = null
         continue
       }
-      o.progress += walkSpeed(r, terrainAt(this.terrain, next[0], next[1]))
+      o.progress += walkSpeed(r, terrainAt(this.terrain, next[0], next[1]), world.tick)
       if (o.progress >= 1)
         steps.push({ kind: 'step', residentId: r.id, to: { x: next[0], y: next[1] } })
     }

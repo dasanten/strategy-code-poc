@@ -1,5 +1,13 @@
 import { Terrain } from './terrain.js'
-import { effective, type Good, type ResourceKind, type Resident, type Stock } from './world.js'
+import {
+  ageInYears,
+  effective,
+  type Good,
+  type ResourceKind,
+  type Resident,
+  type StatName,
+  type Stock,
+} from './world.js'
 
 /**
  * Balance numbers: how much, how fast, how often. The rules (what happens) are in `CONTEXT.md`;
@@ -67,6 +75,34 @@ export const MAX_HUNGER = 100
 export const START_AGE_MIN = 16
 export const START_AGE_MAX = 45
 
+/** A new resident's lifespan, the age in game years they die of old age, lies in this range. */
+export const LIFESPAN_MIN = 55
+export const LIFESPAN_MAX = 65
+
+/** Stats start to decline at this age in game years (`CONTEXT.md`: Aging). */
+export const DECLINE_AGE = 45
+
+/** Share of a stat's effective value lost for each full game year past `DECLINE_AGE`. */
+export const DECLINE_PER_YEAR = 0.02
+
+/** However old a resident gets, their stats keep at least this share of their effective value. */
+export const DECLINE_FLOOR = 0.6
+
+/**
+ * How much of their stats a resident keeps at the given tick: all of it until `DECLINE_AGE`,
+ * then a little less with each full game year (`CONTEXT.md`: Aging).
+ */
+export function ageFactor(resident: Resident, tick: number): number {
+  const past = Math.floor(ageInYears(resident, tick)) - DECLINE_AGE
+  if (past <= 0) return 1
+  return Math.max(DECLINE_FLOOR, 1 - past * DECLINE_PER_YEAR)
+}
+
+/** A stat as it counts at the given tick: base and trained bonus, less the decline of old age. */
+export function statValue(resident: Resident, stat: StatName, tick: number): number {
+  return effective(resident.stats[stat]) * ageFactor(resident, tick)
+}
+
 /** The most a stat's trained bonus can be, for a given base value. */
 export function trainedCap(base: number): number {
   return Math.floor(base * TRAINED_CAP_SHARE)
@@ -127,9 +163,9 @@ export function stockWeight(stock: Stock): number {
   )
 }
 
-/** The most weight a resident can carry, in kg (`CONTEXT.md`: Carry capacity). */
-export function carryCapacity(resident: Resident): number {
-  return CARRY_BASE + CARRY_PER_STRENGTH * effective(resident.stats.strength)
+/** The most weight a resident can carry at the given tick, in kg (`CONTEXT.md`: Carry capacity). */
+export function carryCapacity(resident: Resident, tick: number): number {
+  return CARRY_BASE + CARRY_PER_STRENGTH * statValue(resident, 'strength', tick)
 }
 
 /** Food a resident of average Endurance eats per game day, in units (`CONTEXT.md`: Hunger). */
@@ -153,9 +189,9 @@ export const HUNGER_ENDURANCE_EFFECT = 0.02
 /** The furthest Endurance moves the food a resident needs, either way. */
 export const HUNGER_ENDURANCE_LIMIT = 0.3
 
-/** How much of the usual food a resident needs, from their effective Endurance. */
-export function hungerFactor(resident: Resident): number {
-  const away = effective(resident.stats.endurance) - HUNGER_ENDURANCE_AVERAGE
+/** How much of the usual food a resident needs, from their Endurance at the given tick. */
+export function hungerFactor(resident: Resident, tick: number): number {
+  const away = statValue(resident, 'endurance', tick) - HUNGER_ENDURANCE_AVERAGE
   const change = Math.max(
     -HUNGER_ENDURANCE_LIMIT,
     Math.min(HUNGER_ENDURANCE_LIMIT, away * HUNGER_ENDURANCE_EFFECT),
@@ -180,13 +216,13 @@ export const AGILITY_LIMIT = 0.3
 
 /**
  * How many tiles per tick a resident walks onto a tile of the given terrain (`CONTEXT.md`:
- * Terrain, Stats): plains speed from Agility, and the terrain's slowdown softened by Agility.
+ * Terrain, Stats): plains speed from Agility at the given tick, and the terrain's slowdown softened by Agility.
  * Zero for terrain nobody can enter.
  */
-export function walkSpeed(resident: Resident, terrain: number): number {
+export function walkSpeed(resident: Resident, terrain: number, tick: number): number {
   const base = (TERRAIN_SPEED as Partial<Record<number, number>>)[terrain]
   if (!base) return 0
-  const away = effective(resident.stats.agility) - AGILITY_AVERAGE
+  const away = statValue(resident, 'agility', tick) - AGILITY_AVERAGE
   const clamp = (v: number) => Math.max(-AGILITY_LIMIT, Math.min(AGILITY_LIMIT, v))
   const pace = 1 + clamp(away * AGILITY_SPEED_EFFECT)
   const slowdown = (1 - base) * (1 - clamp(away * AGILITY_TERRAIN_EFFECT))

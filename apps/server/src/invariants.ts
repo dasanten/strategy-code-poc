@@ -1,5 +1,8 @@
 import {
+  LIFESPAN_MAX,
+  LIFESPAN_MIN,
   MAX_HEALTH,
+  ageInYears,
   MAX_HUNGER,
   NODE_TERRAINS,
   Terrain,
@@ -184,6 +187,29 @@ export const healthAndHungerInRange: Invariant = {
   },
 }
 
+/**
+ * Every resident has a lifespan in range and has not outlived it (`CONTEXT.md`: Aging), and
+ * nobody is born after the current tick.
+ */
+export const agesInRange: Invariant = {
+  name: 'ages-in-range',
+  check(world) {
+    return world.residents.flatMap((r) => {
+      const age = ageInYears(r, world.tick)
+      const problems: string[] = []
+      if (!(r.lifespan >= LIFESPAN_MIN && r.lifespan <= LIFESPAN_MAX))
+        problems.push(`has lifespan ${r.lifespan}`)
+      if (age >= r.lifespan) problems.push(`is ${age} years old, past their lifespan ${r.lifespan}`)
+      if (!(age >= 0)) problems.push(`is born after the current tick (${r.bornAt})`)
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `resident ${r.id} ${p}`,
+        entityIds: [r.id],
+      }))
+    })
+  },
+}
+
 /** Every resource node lies on terrain that fits its kind. */
 export const nodesOnFittingTerrain: Invariant = {
   name: 'nodes-on-fitting-terrain',
@@ -203,10 +229,10 @@ export const carriedWithinCapacity: Invariant = {
   name: 'carried-within-capacity',
   check(world) {
     return world.residents
-      .filter((r) => stockWeight(r.carried) > carryCapacity(r) + 1e-9)
+      .filter((r) => stockWeight(r.carried) > carryCapacity(r, world.tick) + 1e-9)
       .map((r) => ({
         invariant: this.name,
-        message: `resident ${r.id} carries ${stockWeight(r.carried)} kg of ${carryCapacity(r)} kg`,
+        message: `resident ${r.id} carries ${stockWeight(r.carried)} kg of ${carryCapacity(r, world.tick)} kg`,
         entityIds: [r.id],
       }))
   },
@@ -261,6 +287,7 @@ export const worldInvariants: Invariant[] = [
   positionsOnMap,
   trainedWithinCap,
   healthAndHungerInRange,
+  agesInRange,
   realmsHaveLeaders,
   buildingsInPlace,
   carriedWithinCapacity,

@@ -5,6 +5,7 @@ import {
   STAT_BASE_MAX,
   TRAINED_CAP_SHARE,
   ageInYears,
+  canWork,
   trainedCap,
   type Resident,
   type SkillName,
@@ -142,7 +143,7 @@ export function ResidentInspector({
           {r.id === leaderId && <span className="badge">Leader</span>}
         </div>
         <div className="muted">
-          Adult · {age} years{cityName ? ` · ${cityName}` : ''}
+          {canWork(r, tick) ? 'Adult' : 'Child'} · {age} years{cityName ? ` · ${cityName}` : ''}
         </div>
       </div>
 

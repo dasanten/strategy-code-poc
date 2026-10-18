@@ -40,7 +40,7 @@ export function stepSurvival(world: WorldState): SurvivalResult {
   const died: Resident[] = []
 
   for (const r of world.residents) {
-    r.hunger = Math.max(0, r.hunger - drain * hungerFactor(r))
+    r.hunger = Math.max(0, r.hunger - drain * hungerFactor(r, world.tick))
     if (r.hunger <= MAX_HUNGER - FILL_PER_FOOD) {
       const pantry = foodSource(world, r)
       if (pantry) {
@@ -52,7 +52,11 @@ export function stepSurvival(world: WorldState): SurvivalResult {
     else r.health = Math.min(MAX_HEALTH, r.health + heal)
     if (r.health <= 0) died.push(r)
   }
+  return { died, ended: dieAll(world, died) }
+}
 
+/** Residents die, whatever of; a Leader's death ends their realm. Returns the realms that ended. */
+export function dieAll(world: WorldState, died: Resident[]): Realm[] {
   const ended: Realm[] = []
   for (const r of died) {
     die(world, r)
@@ -62,7 +66,7 @@ export function stepSurvival(world: WorldState): SurvivalResult {
       ended.push(realm)
     }
   }
-  return { died, ended }
+  return ended
 }
 
 /** Where a resident's next meal comes from: what they carry, else their city's storage at home. */
@@ -85,11 +89,16 @@ function take(stock: Stock, good: Good, units: number): void {
 /** Removes a dead resident; what they carried drops in a pile on their tile (`CONTEXT.md`: Loot). */
 export function die(world: WorldState, r: Resident): void {
   world.residents = world.residents.filter((x) => x !== r)
-  const goods = Object.entries(r.carried).filter(([, n]) => n > 0) as [Good, number][]
+  dropGoods(world, r.x, r.y, r.carried)
+}
+
+/** Puts goods in the pile on a tile, starting one if there is none and there is anything to drop. */
+export function dropGoods(world: WorldState, x: number, y: number, stock: Stock): void {
+  const goods = Object.entries(stock).filter(([, n]) => n > 0) as [Good, number][]
   if (goods.length === 0) return
-  let pile = world.piles.find((p) => p.x === r.x && p.y === r.y)
+  let pile = world.piles.find((p) => p.x === x && p.y === y)
   if (!pile) {
-    pile = { id: `pile${world.nextId++}`, x: r.x, y: r.y, goods: {} }
+    pile = { id: `pile${world.nextId++}`, x, y, goods: {} }
     world.piles.push(pile)
   }
   for (const [good, n] of goods) pile.goods[good] = (pile.goods[good] ?? 0) + n

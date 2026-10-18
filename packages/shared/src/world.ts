@@ -39,6 +39,8 @@ export interface Resident {
   hunger: number
   /** The tick the resident was born; may be before the world began. Age follows from it. */
   bornAt: number
+  /** The age in game years at which the resident dies of old age (`CONTEXT.md`: Aging). */
+  lifespan: number
   /** Goods the resident carries, up to their carry capacity. */
   carried: Stock
   /** What the resident was ordered to do, as plain data; null when idle (ADR 0002). */
@@ -69,6 +71,11 @@ export function effective(stat: Stat): number {
 /** A resident's age in game years at the given tick. */
 export function ageInYears(resident: Resident, tick: number): number {
   return (tick - resident.bornAt) / TICKS_PER_GAME_YEAR
+}
+
+/** Whether a resident is grown up, so they can work, build or take any job (`CONTEXT.md`: Child). */
+export function canWork(resident: Resident, tick: number): boolean {
+  return ageInYears(resident, tick) >= ADULT_AGE
 }
 
 /**

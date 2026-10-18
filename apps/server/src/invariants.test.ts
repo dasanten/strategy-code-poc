@@ -77,9 +77,9 @@ describe('invariants', () => {
   it('catch a resident carrying more than their capacity', () => {
     const world = worldWithCity().world
     const r = world.residents[0]!
-    r.carried = { stone: carryCapacity(r) }
+    r.carried = { stone: carryCapacity(r, world.tick) }
     expect(checkInvariants(world, terrain)).toEqual([])
-    r.carried = { stone: carryCapacity(r) + 1 }
+    r.carried = { stone: carryCapacity(r, world.tick) + 1 }
     expect(checkInvariants(world, terrain)).toEqual([
       expect.objectContaining({ invariant: 'carried-within-capacity', entityIds: [r.id] }),
     ])

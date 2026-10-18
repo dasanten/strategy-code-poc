@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm'
 import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
 import { gzipSync } from 'node:zlib'
-import type { TerrainMap } from '@csp/shared'
+import { LIFESPAN_MAX, LIFESPAN_MIN, type TerrainMap } from '@csp/shared'
 import { createAdmin } from './auth.js'
 import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
@@ -100,10 +100,23 @@ describe('world saves', () => {
   it('leaves every resident idle (migration 7 → 8)', () => {
     const resident = { id: 'r1', name: 'Mara', owner: 'realm1', x: 1, y: 2, carried: {} }
     const v7 = { tick: 10, seed: 1, residents: [resident], piles: [] }
-    expect(migrateWorld(v7, 7, { terrain })).toEqual({
+    expect(migrateWorld(v7, 7, { terrain }, migrations, 8)).toEqual({
       ...v7,
       residents: [{ ...resident, order: null }],
     })
+  })
+
+  it('gives every resident a lifespan, the same each time (migration 8 → 9)', () => {
+    const resident = { id: 'r1', name: 'Mara', owner: 'realm1', x: 1, y: 2, order: null }
+    const v8 = { tick: 10, seed: 1, residents: [resident, { ...resident, id: 'r2' }] }
+    const v9 = migrateWorld(structuredClone(v8), 8, { terrain })
+    expect(v9.residents.map(({ lifespan: _lifespan, ...rest }) => rest)).toEqual(v8.residents)
+    for (const r of v9.residents) {
+      expect(r.lifespan).toBeGreaterThanOrEqual(LIFESPAN_MIN)
+      expect(r.lifespan).toBeLessThanOrEqual(LIFESPAN_MAX)
+    }
+    expect(v9.residents[0]!.lifespan).not.toBe(v9.residents[1]!.lifespan)
+    expect(migrateWorld(structuredClone(v8), 8, { terrain })).toEqual(v9)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

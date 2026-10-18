@@ -1,5 +1,7 @@
 import {
   MAX_HEALTH,
+  LIFESPAN_MAX,
+  LIFESPAN_MIN,
   MAX_HUNGER,
   STAT_BASE_MAX,
   STAT_BASE_MIN,
@@ -57,12 +59,18 @@ const NAMES = [
   'Jutta',
 ]
 
+/** A lifespan in game years between `LIFESPAN_MIN` and `LIFESPAN_MAX` (`CONTEXT.md`: Aging). */
+export function drawLifespan(rand: () => number): number {
+  return LIFESPAN_MIN + rand() * (LIFESPAN_MAX - LIFESPAN_MIN)
+}
+
 const between = (rand: () => number, min: number, max: number) =>
   min + Math.floor(rand() * (max - min + 1))
 
 /**
  * A new adult resident with random base stats, nothing trained or learned yet, full health and
- * a full hunger meter, aged between `START_AGE_MIN` and `START_AGE_MAX` at `tick`.
+ * a full hunger meter, aged between `START_AGE_MIN` and `START_AGE_MAX` at `tick`, with a
+ * lifespan between `LIFESPAN_MIN` and `LIFESPAN_MAX`.
  */
 export function newResident(
   rand: () => number,
@@ -73,14 +81,16 @@ export function newResident(
   ) as Record<StatName, Stat>
   const age = START_AGE_MIN + rand() * (START_AGE_MAX - START_AGE_MIN)
   const { tick, ...place } = fields
+  const name = NAMES[Math.floor(rand() * NAMES.length)]!
   return {
     ...place,
-    name: NAMES[Math.floor(rand() * NAMES.length)]!,
+    name,
     stats,
     skills: {},
     health: MAX_HEALTH,
     hunger: MAX_HUNGER,
     bornAt: tick - Math.round(age * TICKS_PER_GAME_YEAR),
+    lifespan: drawLifespan(rand),
     carried: {},
     order: null,
   }
