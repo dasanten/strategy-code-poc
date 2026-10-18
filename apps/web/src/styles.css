@@ -225,3 +225,8 @@ label {
     display: none;
   }
 }
+.clock {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
