@@ -4,6 +4,7 @@ import {
   BUILD_WORK,
   NODE_WORKPLACE,
   materialsNeeded,
+  teardownWork,
   workNeeded,
   type Good,
   LIFESPAN_MAX,
@@ -379,6 +380,52 @@ export const buildOrdersOnSites: Invariant = {
 }
 
 /**
+ * Tearing down (`CONTEXT.md`: Tearing down): only what can be built is ever being torn down, and
+ * its tear-down work stays between 0 and what it needs (`teardownWork`); one that has all its
+ * work in is gone.
+ */
+export const teardownsWithinNeeds: Invariant = {
+  name: 'teardowns-within-needs',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (id: string, message: string) =>
+      out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
+    for (const b of world.buildings) {
+      if (b.teardown === undefined) continue
+      if (!BUILDABLE.includes(b.kind)) fail(b.id, `is a ${b.kind} being torn down`)
+      const work = teardownWork(b)
+      if (!(b.teardown >= 0 && b.teardown < work)) {
+        fail(b.id, `has tear-down work ${b.teardown} of ${work}`)
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * After a tick, a resident with a tear-down order stands on that building or site, and it is
+ * still there (`resolveTearingDown` ends the orders on one that is gone).
+ */
+export const tearDownOrdersOnBuildings: Invariant = {
+  name: 'tear-down-orders-on-buildings',
+  check(world) {
+    return world.residents.flatMap((r) => {
+      const o = r.order
+      if (o?.kind !== 'tearDown') return []
+      const b = world.buildings.find((x) => x.id === o.buildingId)
+      if (b && b.x === r.x && b.y === r.y) return []
+      return [
+        {
+          invariant: this.name,
+          message: `resident ${r.id} tears down ${o.buildingId}, which is not on their tile`,
+          entityIds: [r.id, o.buildingId],
+        },
+      ]
+    })
+  },
+}
+
+/**
  * Realm logs stay in order and in bounds: events are numbered in the order they happened, below
  * the next id and not after the current tick, and no Player keeps more than `REALM_LOG_LENGTH`.
  */
@@ -417,6 +464,8 @@ export const worldInvariants: Invariant[] = [
   carryOrdersDone,
   sitesWithinNeeds,
   buildOrdersOnSites,
+  teardownsWithinNeeds,
+  tearDownOrdersOnBuildings,
   nodesOnFittingTerrain,
   realmLogsInOrder,
 ]

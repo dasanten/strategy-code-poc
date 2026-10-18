@@ -99,8 +99,18 @@ export interface BuildOrder {
   siteId: string | null
 }
 
+/**
+ * Tearing down (`CONTEXT.md`: Tearing down): the resident works at taking down the building or
+ * construction site `buildingId` on the tile they stand on (`at`) until it is gone.
+ */
+export interface TearDownOrder {
+  kind: 'tearDown'
+  buildingId: string
+  at: { x: number; y: number }
+}
+
 /** Any order a resident can hold. */
-export type ResidentOrder = WalkOrder | PickUpOrder | DropOrder | BuildOrder
+export type ResidentOrder = WalkOrder | PickUpOrder | DropOrder | BuildOrder | TearDownOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -227,6 +237,8 @@ export interface Building {
   stock?: Stock
   /** There while the building is still a construction site. */
   site?: ConstructionSite
+  /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
+  teardown?: number
 }
 
 /**
