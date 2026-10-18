@@ -1,106 +1,54 @@
 # Backlog
 
-Work top to bottom. **Priority rule:** always take the next slice that makes the game playable
-sooner. The order is: survive → produce → transport → grow → trade → fight → alliances → scripts.
+Work lives in [GitHub Issues](https://github.com/dasanten/strategy-code-poc/issues): each slice
+is an **epic** (label `epic`) with its **tickets** as sub-issues, in order. `/next-ticket` picks
+the next one and works it into a PR (`.claude/commands/next-ticket.md`).
 
-**PoC done** = slices 0–6: my residents mine iron far away, and a carriage brings it home while
+**Priority rule:** bugs first, then epics in order, so the game becomes playable sooner:
+survive → produce → transport → grow → trade → fight → alliances → scripts.
+
+**PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
-## Rules for every task
+## Epics
 
-- Use the terms in `CONTEXT.md`. If a rule is missing or unclear, decide it with Daniel and add it
-  there first.
-- Keep scripting cheap to add (ADR 0002): actions and queries go through the game API, orders
-  only request actions, order state is plain serialisable data.
-- Every new simulation rule comes with its invariants (ADR 0004) and tests.
-- Each slice ends visible in the browser. Tick the checkboxes, move the slice to Done.
+| #   | Epic                                                                                            | State                   |
+| --- | ----------------------------------------------------------------------------------------------- | ----------------------- |
+| 0   | [Project setup](https://github.com/dasanten/strategy-code-poc/issues/4)                         | code done; needs Daniel |
+| 1   | [World map](https://github.com/dasanten/strategy-code-poc/issues/8)                             | ticketed                |
+| 2   | [Residents and the starting city](https://github.com/dasanten/strategy-code-poc/issues/14)      | ticketed                |
+| 3   | [Survive](https://github.com/dasanten/strategy-code-poc/issues/19)                              | ticketed                |
+| 4   | [Move and carry](https://github.com/dasanten/strategy-code-poc/issues/26)                       | ticketed                |
+| 5   | [Workplaces on resource nodes](https://github.com/dasanten/strategy-code-poc/issues/32)         | ticketed                |
+| 6   | [Carriages and supply routes](https://github.com/dasanten/strategy-code-poc/issues/38)          | ticketed, PoC done      |
+| 7   | [Pairing and children](https://github.com/dasanten/strategy-code-poc/issues/43)                 | ticketed                |
+| 8   | [NPC cities and integrating](https://github.com/dasanten/strategy-code-poc/issues/46)           | scope only              |
+| 9   | [Trade Organization](https://github.com/dasanten/strategy-code-poc/issues/47)                   | scope only              |
+| 10  | [Combat and armies](https://github.com/dasanten/strategy-code-poc/issues/48)                    | scope only              |
+| 11  | [Crime and reputation](https://github.com/dasanten/strategy-code-poc/issues/49)                 | scope only              |
+| 12  | [Alliances and territory](https://github.com/dasanten/strategy-code-poc/issues/50)              | scope only              |
+| 13  | [Leader death and self-managed cities](https://github.com/dasanten/strategy-code-poc/issues/51) | scope only              |
+| 14  | [Scripting](https://github.com/dasanten/strategy-code-poc/issues/52)                            | scope only              |
+| 15  | [Roads and admin directive](https://github.com/dasanten/strategy-code-poc/issues/53)            | scope only              |
 
-## Now
+Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
+its tickets or closes.
 
-### 0. Project setup
+## How tickets work
 
-- [x] Push to GitHub (`origin` = dasanten/strategy-code-poc)
-- [x] CI on GitHub Actions: lint, typecheck, test on every push
-- [ ] **Daniel:** create a Sentry project (server + browser), put the DSN in `.env`
-- [x] Sentry SDK on server and client, events tagged with tick, world seed and entity IDs
-- [x] pino structured logging on the server
-- [x] Invariant framework: checks run every tick in dev, sampled in prod, violations → Sentry
-- [x] Tick-health reporting (duration, resident and action counts), alert above 800 ms
-- [x] Accounts (ADR 0005): sign-up with invite code, login, logout, 30-day sessions, rate limit
-- [x] Admin: `admin:create` command, create invite codes, reset passwords
-- [x] WebSocket accepts only logged-in sessions; login screen in the client
-- [x] Rolling compressed snapshots with pruning; world format version and migration chain
-      (ADR 0006)
-- [x] SQLite backups before migrating on start and daily, 14 days kept
-- [x] Protocol: per-Player sync (in sight on connect, changes and left-sight ids per tick),
-      orders with request id and ack/error
-- [x] Deploy (ADR 0007): Dockerfile, compose with Caddy, GHCR + SSH workflow after CI on main
-- [ ] **Daniel:** server with Docker, DNS record, GitHub secrets and `DEPLOY_ENABLED`, `.env` on
-      the server (README, Deploy)
-
-### 1. World map
-
-- [ ] Seeded generator for a disc map with Plains, Forest, Hills, Mountain, Lake, Sea
-- [ ] Disc ~1,440 tiles across (a tile ≈ 40 m, ~30 s to walk on plains)
-- [ ] Terrain stored once as a binary blob, kept in memory (ADR 0006)
-- [ ] Resource nodes (forest, stone, iron ore, gold ore) placed by terrain
-- [ ] Explored terrain per Player; terrain served in 32×32 chunks, only explored ones
-- [ ] PixiJS view with pan and zoom; only visible tiles rendered
-- Done when: a fresh world shows a believable disc of terrain you can explore in the browser.
-
-### 2. Residents and the starting city
-
-- [ ] Resident with base stats, trained bonus, skills, health, hunger, age
-- [ ] Player login creates a Leader and a starting city (≈8 residents, wooden wall, farm, food,
-      horse, carriage) far from other Players
-- [ ] Sight: residents see within a sight range; the sync sends only what is in sight
-- [ ] Inspect a resident in the UI (design: the "Main Game Screen" canvas)
-- Done when: two Players log in and each sees their own city, far apart.
-
-### 3. Survive
-
-- [ ] Game time (1 day = 1 hour, 1 year = 1 real day)
-- [ ] Hunger and eating from storage; starvation after ~2 game days
-- [ ] Farm produces food from its workers; spoilage
-- [ ] Aging and death of old age
-- Done when: a city with workers on the farm lives on; one without food starves.
-
-## Next
-
-### 4. Move and carry
-
-- [ ] Orders: walk to, pick up, drop
-- [ ] Terrain speed and food cost, Agility/Endurance modifiers
-- [ ] Weight of goods, carry capacity from Strength
-
-### 5. Workplaces on resource nodes
-
-- [ ] Build mine / quarry / lumber camp on a node; smelter; mint
-- [ ] Assign workers; output from Strength and skill, capped by max workers
-- [ ] Holding a workplace = whoever works it
-
-### 6. Carriages and supply routes
-
-- [ ] Horses (stable, eating) and carriages (Driving skill, terrain limits)
-- [ ] Repeating "haul from A to B" order
-
-### 7. Pairing and children
-
-- [ ] Pairing order, housing, food surplus, cooldown
-- [ ] Inheritance of base stats, growing up
-
-## Later
-
-8. NPC cities and villages; integrating (conquer, buy, persuade); NPC growth
-9. Trade Organization: HQ, trading posts, stock floor, prices, transfers, its workplaces
-10. Combat, armies and supply, loot, capturing cities, mercenary contracts, Trade Org army
-11. Crime, witnesses, standing, respect, Trade Org reactions
-12. Alliances, derived territory, region map
-13. Leader death, self-managed cities, respawn
-14. Scripting: interpreter in `packages/lang` on top of the game API; script editor
-15. Roads; admin directive
-
-## Done
-
-- [x] Monorepo with server, client and language packages (c6c1c79)
-- [x] Game rules and glossary (`CONTEXT.md`), ADRs 0001–0007
+- **Status:** open = to do, closed = done (closed by the PR that merges). Labels: `in progress`
+  (someone is on it), `blocked` (waiting on something outside its Depends-on list), `needs Daniel`
+  (a rule decision or manual step only Daniel can do; never picked up automatically).
+- **Dependencies:** a ticket's "Depends on #n" line. A ticket is ready when all of them are
+  closed.
+- **PRs:** one per ticket; tickets that can't ship apart share one. The body says
+  `Closes #<ticket>` for each and `Part of #<epic>`; the PR closing an epic's last ticket closes
+  the epic. Daniel merges; each merge to `main` deploys.
+- **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in
+  `CONTEXT.md`. Balance numbers are picked in `packages/shared/src/balance.ts` and listed in the
+  PR for review.
+- **Scope-only epics:** an epic without tickets lists its open rule questions. When the epic
+  before it is nearly done, settle those questions with Daniel, then write its tickets.
+- **Every ticket:** use the terms in `CONTEXT.md`; keep scripting cheap (ADR 0002); new
+  simulation rules come with invariants and tests (ADR 0004); each epic ends visible in the
+  browser.
