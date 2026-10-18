@@ -2,6 +2,7 @@ import {
   CITY_MIN_DISTANCE,
   HOUSE_CAPACITY,
   MAX_HUNGER,
+  START_CARRIED_FOOD,
   START_CITY_SIZE,
   START_FOOD,
   START_RESIDENTS,
@@ -116,7 +117,8 @@ export function findCitySite(
  * Gives a Player their realm and starting city (`CONTEXT.md`: Starting city), unless they
  * already have one: residents with random stats, one of them the Leader, a wooden wall with a
  * gate, houses for everyone and a spare, a storage with food, a farm outside the wall, a horse
- * and a carriage. The same world and Player always get the same city.
+ * and a carriage. The residents start on the farm, working it, each carrying a little food.
+ * The same world and Player always get the same city.
  */
 export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId: number): Realm {
   const existing = realmOf(world, userId)
@@ -152,23 +154,21 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
     ...Array.from({ length: houses }, (_, i) => building('house', x + 1 + i * 2, y + 1)),
   ]
   const [fx, fy] = farmTile(terrain, x, y)!
-  buildings.push(building('farm', fx, fy))
+  const farm = building('farm', fx, fy)
+  buildings.push(farm)
 
-  // Residents on the free tiles inside the wall; the first is the Leader.
-  const used = new Set(buildings.map((b) => `${b.x},${b.y}`))
-  const free: [number, number][] = []
-  for (let ty = y + 1; ty < y + size - 1; ty++) {
-    for (let tx = x + 1; tx < x + size - 1; tx++) if (!used.has(`${tx},${ty}`)) free.push([tx, ty])
-  }
-  const residents = Array.from({ length: START_RESIDENTS }, (_, i) => {
-    const [rx, ry] = free[(i * 2) % free.length]!
-    return newResident(rand, {
+  // Everyone starts on the farm, working it, with a little food on them; the first is the Leader.
+  const residents = Array.from({ length: START_RESIDENTS }, () => {
+    const r = newResident(rand, {
       id: newId(world, 'r'),
       owner: realmId,
-      x: rx,
-      y: ry,
+      x: fx,
+      y: fy,
       tick: world.tick,
     })
+    r.carried = { food: START_CARRIED_FOOD }
+    r.order = { kind: 'workAt', buildingId: farm.id, at: { x: fx, y: fy }, progress: 0 }
+    return r
   })
   const realm: Realm = { id: realmId, userId, leaderId: residents[0]!.id }
 

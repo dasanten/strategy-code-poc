@@ -20,7 +20,7 @@ export interface Stat {
 }
 
 /** Something learned by doing or training; starts at 0, never inherited (`CONTEXT.md`: Skill). */
-export type SkillName = 'mining' | 'construction' | 'combat' | 'driving'
+export type SkillName = 'mining' | 'construction' | 'farming' | 'combat' | 'driving'
 
 /** A person living in the world (`CONTEXT.md`: Resident). Plain data. */
 export interface Resident {
@@ -99,8 +99,20 @@ export interface BuildOrder {
   siteId: string | null
 }
 
+/**
+ * Working at a workplace (`CONTEXT.md`: Workplace): the resident works the workplace on the tile
+ * they stand on (`at`), for now a farm, until ordered otherwise. `progress` is how much of the
+ * next unit of output their work has made so far, from 0 up to (not including) 1.
+ */
+export interface WorkOrder {
+  kind: 'workAt'
+  buildingId: string
+  at: { x: number; y: number }
+  progress: number
+}
+
 /** Any order a resident can hold. */
-export type ResidentOrder = WalkOrder | PickUpOrder | DropOrder | BuildOrder
+export type ResidentOrder = WalkOrder | PickUpOrder | DropOrder | BuildOrder | WorkOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {

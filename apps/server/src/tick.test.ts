@@ -29,7 +29,8 @@ describe('runTick', () => {
       slowTickMs: 800,
       now: clock(5),
     })
-    expect(health).toEqual({ tick: 1, durationMs: 5, residents: 8, actions: 0, slow: false })
+    // Everyone starts working the farm: one work action each.
+    expect(health).toEqual({ tick: 1, durationMs: 5, residents: 8, actions: 8, slow: false })
     expect(reporter.tickHealth).toHaveBeenCalledWith(world, health)
     expect(reporter.invariantViolations).not.toHaveBeenCalled()
   })

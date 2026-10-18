@@ -6,6 +6,7 @@ import type { Walking } from './walking.js'
 import { stepSpoilage } from './spoilage.js'
 import { stepSurvival, type SurvivalResult } from './survival.js'
 import { stepAging, type AgingResult } from './aging.js'
+import { requestWork, resolveWork } from './work.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -69,7 +70,7 @@ export interface StepResult {
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; food
  * spoils at the end of each game day; then their orders request actions (steps, then taking and
- * putting down goods, then laying out and working on construction sites), and the world resolves
+ * putting down goods, then laying out and working on construction sites, then working workplaces), and the world resolves
  * them together. As the next tick begins, residents age: the old die, and loads too heavy for
  * declining Strength are put down. Without `walking` nobody moves.
  */
@@ -82,7 +83,9 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveCarrying(world, carries)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds)
+  const work = requestWork(world)
+  resolveWork(world, work)
   world.tick++
   const aging = stepAging(world)
-  return { actions: steps.length + carries.length + builds.length, survival, aging }
+  return { actions: steps.length + carries.length + builds.length + work.length, survival, aging }
 }

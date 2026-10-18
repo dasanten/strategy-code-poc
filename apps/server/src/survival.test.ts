@@ -37,12 +37,17 @@ function averageEndurance(world: WorldState) {
 }
 
 describe('stepSurvival', () => {
-  it('feeds a city from its storage: everyone lives and the food goes down by what they eat', () => {
+  it('feeds residents from what they carry: everyone lives and the food goes down by what they eat', () => {
     const { world } = worldWithCity()
     averageEndurance(world)
-    const before = storageOf(world).stock!.food!
+    for (const r of world.residents) {
+      r.stats.strength = { base: 15, trained: 0 } // room to carry the food
+      r.carried = { food: 15 }
+    }
+    const carried = () => world.residents.reduce((n, r) => n + (r.carried.food ?? 0), 0)
+    const before = carried()
     expect(live(world, 5)).toEqual([])
-    const eaten = before - (storageOf(world).stock!.food ?? 0)
+    const eaten = before - carried()
     const expected = world.residents.length * FOOD_PER_DAY * 5
     expect(Math.abs(eaten - expected)).toBeLessThanOrEqual(world.residents.length)
     for (const r of world.residents) {
@@ -52,33 +57,34 @@ describe('stepSurvival', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
+  it('never feeds residents from storage, also not at home (`CONTEXT.md`: Eating)', () => {
+    const { world } = worldWithCity()
+    const city = world.cities[0]!
+    const before = structuredClone(storageOf(world).stock)
+    for (const r of world.residents) {
+      Object.assign(r, { x: storageOf(world).x, y: storageOf(world).y, order: null, carried: {} })
+      expect(isInsideWalls(city, r.x, r.y)).toBe(true)
+    }
+    expect(live(world, 2.6)).toHaveLength(8)
+    expect(storageOf(world).stock).toEqual(before)
+  })
+
   it('starves a city without food in about 2 game days', () => {
     const { world } = worldWithCity()
-    storageOf(world).stock = {}
+    for (const r of world.residents) r.carried = {}
     expect(live(world, 1.6)).toEqual([])
     const died = live(world, 1)
     expect(died).toHaveLength(8)
     expect(world.residents).toEqual([])
   })
 
-  it('eats what a resident carries first', () => {
+  it('eats what a resident carries, a unit at a time', () => {
     const { world } = worldWithCity()
     averageEndurance(world)
     const r = world.residents[1]!
     r.carried = { food: 3 }
     live(world, 1.1) // two meals: half a day in, and at the end of the day
     expect(r.carried.food).toBe(1)
-  })
-
-  it('does not feed residents from storage while they are away from home', () => {
-    const { world } = worldWithCity()
-    const city = world.cities[0]!
-    const r = world.residents[1]!
-    Object.assign(r, { x: city.x + city.size + 3, y: city.y })
-    expect(isInsideWalls(city, r.x, r.y)).toBe(false)
-    const died = live(world, 2.6)
-    expect(died).toContain(r)
-    expect(world.residents).toHaveLength(7)
   })
 
   it('drops what a dead resident carried in a pile on their tile', () => {
@@ -97,7 +103,7 @@ describe('stepSurvival', () => {
     const realm = world.realms[0]!
     const leader = world.residents.find((r) => r.id === realm.leaderId)!
     const city = world.cities[0]!
-    Object.assign(leader, { x: city.x + city.size + 3, y: city.y })
+    Object.assign(leader, { x: city.x + city.size + 3, y: city.y, order: null, carried: {} })
     const ended: string[] = []
     for (let t = 0; t < 2.6 * TICKS_PER_GAME_DAY; t++) {
       ended.push(...stepSurvival(world, terrain).ended.map((x) => x.id))
@@ -108,7 +114,7 @@ describe('stepSurvival', () => {
     expect(world.residents.every((r) => r.owner === null)).toBe(true)
     expect(world.cities[0]!.realmId).toBeNull()
     expect(world.horses[0]!.realmId).toBeNull()
-    // The old city's people still eat from their storage: it's theirs, and they're at home.
+    // The others still have food on them.
     expect(world.residents).toHaveLength(7)
     expect(checkInvariants(world, terrain)).toEqual([])
 
@@ -133,11 +139,19 @@ describe('stepSurvival', () => {
   it('lets high Endurance get by on less food', () => {
     const tough = worldWithCity().world
     const frail = worldWithCity().world
-    for (const r of tough.residents) r.stats.endurance = { base: 15, trained: 7 }
-    for (const r of frail.residents) r.stats.endurance = { base: 5, trained: 0 }
+    const stock = (world: WorldState, endurance: number) => {
+      for (const r of world.residents) {
+        r.stats.endurance = { base: endurance, trained: endurance > 10 ? 7 : 0 }
+        r.stats.strength = { base: 15, trained: 0 } // room to carry the food
+        r.carried = { food: 30 }
+      }
+    }
+    stock(tough, 15)
+    stock(frail, 5)
     live(tough, 6)
     live(frail, 6)
-    expect(storageOf(tough).stock!.food!).toBeGreaterThan(storageOf(frail).stock!.food! + 20)
+    const left = (world: WorldState) => world.residents.reduce((n, r) => n + r.carried.food!, 0)
+    expect(left(tough)).toBeGreaterThan(left(frail) + 20)
   })
 
   it('burns more food on hard terrain, as `TERRAIN_FOOD` says (`CONTEXT.md`: Terrain)', () => {
@@ -148,7 +162,7 @@ describe('stepSurvival', () => {
       const [x, y] = tileOf(t, (x, y) => !isInsideWalls(city, x, y))
       const r = world.residents[1]!
       r.stats.strength = { base: 15, trained: 0 } // room to carry the food
-      Object.assign(r, { x, y, carried: { food: 25 } })
+      Object.assign(r, { x, y, order: null, carried: { food: 25 } })
       live(world, 5)
       expect(world.residents).toContain(r)
       expect(checkInvariants(world, terrain)).toEqual([])

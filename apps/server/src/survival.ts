@@ -7,7 +7,6 @@ import {
   STARVE_DAYS,
   TICKS_PER_GAME_DAY,
   foodUse,
-  isInsideWalls,
   terrainAt,
   type Good,
   type Realm,
@@ -31,8 +30,8 @@ export interface SurvivalResult {
 
 /**
  * One tick of survival (`CONTEXT.md`: Hunger, Eating, Leader death): the hunger meter runs down
- * (faster on hard terrain, slower with high Endurance); a resident eats a unit of food when there is room for it, from
- * what they carry, or from their city's storage while at home. An empty meter costs health; a
+ * (faster on hard terrain, slower with high Endurance); a resident eats a unit of food when there
+ * is room for it, only from what they carry, also at home. An empty meter costs health; a
  * meter with anything in it slowly gives health back. A resident with no health left dies and
  * drops what they carried in a pile. When a Leader dies, their realm ends. A meter running
  * empty and a death go in the Player's realm log.
@@ -46,12 +45,9 @@ export function stepSurvival(world: WorldState, terrain: TerrainMap): SurvivalRe
   for (const r of world.residents) {
     const wasFed = r.hunger > 0
     r.hunger = Math.max(0, r.hunger - drain * foodUse(r, terrainAt(terrain, r.x, r.y), world.tick))
-    if (r.hunger <= MAX_HUNGER - FILL_PER_FOOD) {
-      const pantry = foodSource(world, r)
-      if (pantry) {
-        take(pantry, 'food', 1)
-        r.hunger = Math.min(MAX_HUNGER, r.hunger + FILL_PER_FOOD)
-      }
+    if (r.hunger <= MAX_HUNGER - FILL_PER_FOOD && (r.carried.food ?? 0) >= 1) {
+      take(r.carried, 'food', 1)
+      r.hunger = Math.min(MAX_HUNGER, r.hunger + FILL_PER_FOOD)
     }
     if (r.hunger <= 0 && wasFed) {
       recordEvent(world, r.owner, { kind: 'hungry', residentId: r.id, name: r.name })
@@ -83,17 +79,6 @@ export function dieAll(world: WorldState, died: Resident[], cause: 'starved' | '
     }
   }
   return ended
-}
-
-/** Where a resident's next meal comes from: what they carry, else their city's storage at home. */
-function foodSource(world: WorldState, r: Resident): Stock | undefined {
-  if ((r.carried.food ?? 0) >= 1) return r.carried
-  const home = world.cities.find((c) => c.realmId === r.owner && isInsideWalls(c, r.x, r.y))
-  if (!home) return undefined
-  const storage = world.buildings.find(
-    (b) => b.cityId === home.id && b.kind === 'storage' && (b.stock?.food ?? 0) >= 1,
-  )
-  return storage?.stock
 }
 
 function take(stock: Stock, good: Good, units: number): void {

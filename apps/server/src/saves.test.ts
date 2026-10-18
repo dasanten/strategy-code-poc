@@ -6,7 +6,8 @@ import { sql } from 'drizzle-orm'
 import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
 import { gzipSync } from 'node:zlib'
-import { LIFESPAN_MAX, LIFESPAN_MIN, type TerrainMap } from '@csp/shared'
+import { LIFESPAN_MAX, LIFESPAN_MIN, START_CARRIED_FOOD, type TerrainMap } from '@csp/shared'
+import { mulberry32, newResident } from './residents.js'
 import { createAdmin } from './auth.js'
 import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
@@ -109,19 +110,53 @@ describe('world saves', () => {
   it('gives every resident a lifespan, the same each time (migration 8 → 9)', () => {
     const resident = { id: 'r1', name: 'Mara', owner: 'realm1', x: 1, y: 2, order: null }
     const v8 = { tick: 10, seed: 1, residents: [resident, { ...resident, id: 'r2' }] }
-    const v9 = migrateWorld(structuredClone(v8), 8, { terrain })
+    const v9 = migrateWorld(structuredClone(v8), 8, { terrain }, migrations, 9)
     expect(v9.residents.map(({ lifespan: _lifespan, ...rest }) => rest)).toEqual(v8.residents)
     for (const r of v9.residents) {
       expect(r.lifespan).toBeGreaterThanOrEqual(LIFESPAN_MIN)
       expect(r.lifespan).toBeLessThanOrEqual(LIFESPAN_MAX)
     }
     expect(v9.residents[0]!.lifespan).not.toBe(v9.residents[1]!.lifespan)
-    expect(migrateWorld(structuredClone(v8), 8, { terrain })).toEqual(v9)
+    expect(migrateWorld(structuredClone(v8), 8, { terrain }, migrations, 9)).toEqual(v9)
   })
 
   it('gives every Player an empty realm log (migration 9 → 10)', () => {
     const v9 = { tick: 10, seed: 1, residents: [], piles: [] }
     expect(migrateWorld(v9, 9, { terrain }, migrations, 10)).toEqual({ ...v9, events: [] })
+  })
+
+  it('hands residents at home their starting food from storage, as far as it lasts (migration 10 → 11)', () => {
+    const v10 = createWorld(terrain)
+    v10.realms.push({ id: 'realm1', userId: 1, leaderId: 'r1' })
+    v10.cities.push({
+      id: 'c1',
+      name: 'Ashford',
+      realmId: 'realm1',
+      x: 0,
+      y: 0,
+      size: 5,
+      wall: 'wooden',
+      gate: { x: 2, y: 4 },
+    })
+    v10.buildings.push({ id: 'b1', kind: 'storage', cityId: 'c1', x: 2, y: 2, stock: { food: 6 } })
+    const at = (id: string, x: number, y: number, owner = 'realm1') =>
+      newResident(mulberry32(x + y), { id, owner, x, y, tick: 0 })
+    v10.residents.push(
+      { ...at('r1', 1, 1), carried: { food: 1 } },
+      at('r2', 2, 1),
+      at('r3', 3, 3), // the storage runs out
+      at('r4', 9, 9), // away from home
+      at('r5', 1, 3, 'realm2'), // not their city
+    )
+    const v11 = migrateWorld(structuredClone(v10), 10, { terrain }, migrations, 11)
+    expect(v11.residents.map((r) => r.carried)).toEqual([
+      { food: 1 + START_CARRIED_FOOD },
+      { food: 2 },
+      {},
+      {},
+      {},
+    ])
+    expect(v11.buildings[0]!.stock).toEqual({})
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {
