@@ -1,5 +1,4 @@
 import {
-  CITY_EDGE_MARGIN,
   CITY_MIN_DISTANCE,
   HOUSE_CAPACITY,
   MAX_HUNGER,
@@ -9,6 +8,7 @@ import {
   START_SPARE_HOUSES,
   Terrain,
   terrainAt,
+  wrapDistance,
   type Building,
   type City,
   type Realm,
@@ -84,30 +84,28 @@ function farmTile(terrain: TerrainMap, x: number, y: number): [number, number] |
 const dist = (a: readonly [number, number], b: readonly [number, number]) =>
   Math.hypot(a[0] - b[0], a[1] - b[1])
 
-const centreOf = (c: City): [number, number] => [c.x + c.size / 2, c.y + c.size / 2]
+const centreOf = (c: City) => ({ x: c.x + c.size / 2, y: c.y + c.size / 2 })
 
 /**
- * Picks a site for a new starting city: on open land, away from the edge of the world and at
- * least `CITY_MIN_DISTANCE` from every other city. When the map has no such room left, the
- * required distance is halved until a site fits.
+ * Picks a site for a new starting city: on open land and at least `CITY_MIN_DISTANCE` from every
+ * other city, the short way round the map. When the map has no such room left, the required
+ * distance is halved until a site fits. A city never straddles the map's joins.
  */
 export function findCitySite(
   world: WorldState,
   terrain: TerrainMap,
   rand: () => number,
 ): [number, number] {
-  const r = terrain.diameter / 2
-  const reach = Math.max(0, r - CITY_EDGE_MARGIN - START_CITY_SIZE)
+  // Room for the city and the ring of open land around it, without crossing a join.
+  const span = terrain.size - START_CITY_SIZE - 2
   const others = world.cities.map(centreOf)
   const blocked = new Set([...world.nodes, ...world.buildings].map((e) => `${e.x},${e.y}`))
   for (let minDistance = CITY_MIN_DISTANCE; ; minDistance = Math.floor(minDistance / 2)) {
     for (let attempt = 0; attempt < 3000; attempt++) {
-      const angle = rand() * Math.PI * 2
-      const radius = Math.sqrt(rand()) * reach
-      const x = Math.floor(r + Math.cos(angle) * radius - START_CITY_SIZE / 2)
-      const y = Math.floor(r + Math.sin(angle) * radius - START_CITY_SIZE / 2)
-      const centre: [number, number] = [x + START_CITY_SIZE / 2, y + START_CITY_SIZE / 2]
-      if (others.some((o) => dist(o, centre) < minDistance)) continue
+      const x = 1 + Math.floor(rand() * span)
+      const y = 1 + Math.floor(rand() * span)
+      const centre = { x: x + START_CITY_SIZE / 2, y: y + START_CITY_SIZE / 2 }
+      if (others.some((o) => wrapDistance(terrain.size, o, centre) < minDistance)) continue
       if (siteFits(terrain, blocked, x, y)) return [x, y]
     }
     if (minDistance === 0) throw new Error('no room left on the map for a starting city')

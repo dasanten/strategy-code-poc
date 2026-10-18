@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { wrapDelta } from '@csp/shared'
 import { smallTerrain } from './test-terrain.js'
 import { createWorld, isWalkable, nearestFreeTile, stepWorld } from './world.js'
 
@@ -36,6 +37,7 @@ describe('world', () => {
     const taken = new Set([`${x},${y}`])
     const next = nearestFreeTile(terrain, taken, x, y)
     expect(next).not.toEqual([x, y])
-    expect(Math.max(Math.abs(next[0] - x), Math.abs(next[1] - y))).toBeLessThanOrEqual(2)
+    const steps = (a: number, b: number) => Math.abs(wrapDelta(a, b, terrain.size))
+    expect(Math.max(steps(next[0], x), steps(next[1], y))).toBeLessThanOrEqual(2)
   })
 })

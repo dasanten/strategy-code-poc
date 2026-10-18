@@ -1,4 +1,4 @@
-import { TERRAIN_SPEED, Terrain, isInsideDisc, type TerrainMap } from '@csp/shared'
+import { TERRAIN_SPEED, Terrain, tileIndex, wrap, wrapDelta, type TerrainMap } from '@csp/shared'
 
 /** What crossing one tile of each terrain costs, in plains-tiles; Infinity can't be entered. */
 export type TerrainCosts = Readonly<Record<number, number>>
@@ -36,7 +36,8 @@ interface Request {
 /**
  * Finds paths across the map with A*, a little at a time (T4.1): `advance` works through the
  * waiting requests until its time budget for this tick runs out and carries on next tick, so a
- * path across the whole disc never stalls the tick. Moves go to the four neighbouring tiles.
+ * path across the whole map never stalls the tick. Moves go to the four neighbouring tiles,
+ * across the map's joins too.
  * The search state is scratch memory, not world state; requests lost on a restart are simply
  * asked for again.
  */
@@ -55,7 +56,7 @@ export class PathFinder {
   private results = new Map<string, PathResult>()
 
   constructor(private readonly terrain: TerrainMap) {
-    this.n = terrain.diameter * terrain.diameter
+    this.n = terrain.size * terrain.size
     this.g = new Float64Array(this.n)
     this.cameFrom = new Int32Array(this.n)
     this.stamp = new Uint32Array(this.n)
@@ -114,14 +115,20 @@ export class PathFinder {
   }
 
   private passable(costs: TerrainCosts, x: number, y: number): boolean {
-    return (
-      isInsideDisc(this.terrain.diameter, x, y) &&
-      costs[this.terrain.tiles[y * this.terrain.diameter + x]!]! < Infinity
-    )
+    return costs[this.terrain.tiles[tileIndex(this.terrain.size, x, y)]!]! < Infinity
+  }
+
+  /** Steps along both directions to the goal, the short way round the map. */
+  private stepsTo(req: Request, x: number, y: number): number {
+    const { size } = this.terrain
+    return Math.abs(wrapDelta(x, req.to[0], size)) + Math.abs(wrapDelta(y, req.to[1], size))
   }
 
   /** Begins a search; settles requests that need no search at all. */
   private start(req: Request): boolean {
+    const { size } = this.terrain
+    req.from = [wrap(req.from[0], size), wrap(req.from[1], size)]
+    req.to = [wrap(req.to[0], size), wrap(req.to[1], size)]
     const [fx, fy] = req.from
     const [tx, ty] = req.to
     if (!this.passable(req.costs, fx, fy) || !this.passable(req.costs, tx, ty)) {
@@ -134,8 +141,7 @@ export class PathFinder {
     }
     this.search++
     this.heap.clear()
-    const d = this.terrain.diameter
-    const s = fy * d + fx
+    const s = fy * size + fx
     this.stamp[s] = this.search
     this.g[s] = 0
     this.cameFrom[s] = -1
@@ -146,15 +152,14 @@ export class PathFinder {
 
   /** The cheapest possible cost to the goal: every step on the cheapest terrain. */
   private heuristic(req: Request, x: number, y: number): number {
-    const cheapest = Math.min(...Object.values(req.costs))
-    return (Math.abs(x - req.to[0]) + Math.abs(y - req.to[1])) * cheapest
+    return this.stepsTo(req, x, y) * Math.min(...Object.values(req.costs))
   }
 
   /** Expands up to `count` tiles of the current search; returns its result once it ends. */
   private expand(count: number): PathResult | undefined {
     const req = this.current!
     const { costs } = req
-    const d = this.terrain.diameter
+    const d = this.terrain.size
     const tiles = this.terrain.tiles
     const goal = req.to[1] * d + req.to[0]
     const cheapest = Math.min(...Object.values(costs))
@@ -167,9 +172,9 @@ export class PathFinder {
       const x = t % d
       const y = (t - x) / d
       for (let k = 0; k < 4; k++) {
-        const nx = k === 0 ? x + 1 : k === 1 ? x - 1 : x
-        const ny = k === 2 ? y + 1 : k === 3 ? y - 1 : y
-        if (!isInsideDisc(d, nx, ny)) continue
+        // Past a side of the map, the step continues on the opposite side.
+        const nx = wrap(k === 0 ? x + 1 : k === 1 ? x - 1 : x, d)
+        const ny = wrap(k === 2 ? y + 1 : k === 3 ? y - 1 : y, d)
         const nt = ny * d + nx
         const step = costs[tiles[nt]!]!
         if (step === Infinity || this.closed[nt] === this.search) continue
@@ -178,7 +183,7 @@ export class PathFinder {
         this.stamp[nt] = this.search
         this.g[nt] = g
         this.cameFrom[nt] = t
-        const h = (Math.abs(nx - req.to[0]) + Math.abs(ny - req.to[1])) * cheapest
+        const h = this.stepsTo(req, nx, ny) * cheapest
         this.heap.push(nt, g + h)
       }
     }
@@ -186,7 +191,7 @@ export class PathFinder {
   }
 
   private pathTo(goal: number): Point[] {
-    const d = this.terrain.diameter
+    const d = this.terrain.size
     const path: Point[] = []
     for (let t = goal; this.cameFrom[t] !== -1; t = this.cameFrom[t]!)
       path.push([t % d, Math.floor(t / d)])

@@ -1,4 +1,4 @@
-import { OFF_MAP, Terrain, UNEXPLORED, type BuildingKind, type ResourceKind } from '@csp/shared'
+import { Terrain, UNEXPLORED, type BuildingKind, type ResourceKind } from '@csp/shared'
 
 /** Terrain colours from the Main Game Screen design, as 0xRRGGBB. */
 export const TERRAIN_COLORS: Record<number, number> = {
@@ -9,10 +9,9 @@ export const TERRAIN_COLORS: Record<number, number> = {
   [Terrain.Lake]: 0x3a6a8a,
   [Terrain.Sea]: 0x2a4b66,
   [UNEXPLORED]: 0x1a1e22,
-  [OFF_MAP]: 0x0b0d0f,
 }
 
-/** Map background: off the edge of the world. */
+/** Map background, behind terrain not loaded yet. */
 export const VOID_COLOR = 0x0b0d0f
 
 export const TERRAIN_NAMES: Record<number, string> = {
@@ -23,7 +22,6 @@ export const TERRAIN_NAMES: Record<number, string> = {
   [Terrain.Lake]: 'Lake',
   [Terrain.Sea]: 'Sea',
   [UNEXPLORED]: 'Unexplored',
-  [OFF_MAP]: 'Edge of the world',
 }
 
 export const NODE_COLORS: Record<ResourceKind, number> = {

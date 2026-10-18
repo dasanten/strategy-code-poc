@@ -1,6 +1,5 @@
 import {
   ADULT_AGE,
-  CITY_EDGE_MARGIN,
   CITY_MIN_DISTANCE,
   HOUSE_CAPACITY,
   MAX_HEALTH,
@@ -15,6 +14,7 @@ import {
   ageInYears,
   isInsideWalls,
   terrainAt,
+  wrapDistance,
   type City,
   type TerrainMap,
 } from '@csp/shared'
@@ -25,7 +25,7 @@ import { generateTerrain } from './terrain-gen.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { createWorld } from './world.js'
 
-const centreOf = (c: City) => [c.x + c.size / 2, c.y + c.size / 2] as const
+const centreOf = (c: City) => ({ x: c.x + c.size / 2, y: c.y + c.size / 2 })
 
 describe('foundStartingCity', () => {
   it('gives a Player a realm with everything a starting city has', () => {
@@ -103,13 +103,15 @@ describe('foundStartingCity', () => {
       terrain = generateTerrain(1)
     }, 120_000)
 
-    it('places cities on open land, away from the edge and far from each other', () => {
+    it('places cities on open land, far from each other the short way round', () => {
       const world = createWorld(terrain)
       for (let user = 1; user <= 5; user++) foundStartingCity(world, terrain, user)
-      const r = terrain.diameter / 2
       for (const c of world.cities) {
-        const [cx, cy] = centreOf(c)
-        expect(Math.hypot(cx - r, cy - r)).toBeLessThan(r - CITY_EDGE_MARGIN)
+        // Inside the map's square: a city never straddles a join.
+        expect(c.x).toBeGreaterThanOrEqual(1)
+        expect(c.x + c.size).toBeLessThan(terrain.size)
+        expect(c.y).toBeGreaterThanOrEqual(1)
+        expect(c.y + c.size).toBeLessThan(terrain.size)
         for (let y = c.y; y < c.y + c.size; y++) {
           for (let x = c.x; x < c.x + c.size; x++) {
             expect([Terrain.Plains, Terrain.Forest, Terrain.Hills]).toContain(
@@ -119,8 +121,9 @@ describe('foundStartingCity', () => {
         }
         for (const other of world.cities) {
           if (other === c) continue
-          const [ox, oy] = centreOf(other)
-          expect(Math.hypot(cx - ox, cy - oy)).toBeGreaterThanOrEqual(CITY_MIN_DISTANCE)
+          expect(wrapDistance(terrain.size, centreOf(c), centreOf(other))).toBeGreaterThanOrEqual(
+            CITY_MIN_DISTANCE,
+          )
         }
       }
       expect(checkInvariants(world, terrain)).toEqual([])

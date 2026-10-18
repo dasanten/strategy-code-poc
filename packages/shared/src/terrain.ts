@@ -13,35 +13,47 @@ export const Terrain = {
 
 export type Terrain = (typeof Terrain)[keyof typeof Terrain]
 
-/** The byte for a grid cell outside the disc. Only tiles inside the disc exist. */
-export const OFF_MAP = 255
-
 /**
- * The map's terrain: a square grid of `diameter` × `diameter` bytes around the disc, row-major
- * (`tiles[y * diameter + x]`). Cells outside the disc hold `OFF_MAP`.
+ * The map's terrain (`CONTEXT.md`: Map): a `size` × `size` grid, row-major
+ * (`tiles[y * size + x]`), whose opposite sides join. Every tile exists.
  */
 export interface TerrainMap {
-  diameter: number
+  size: number
   tiles: Uint8Array
 }
 
-/** Whether the tile at (x, y) lies inside a disc of the given diameter. */
-export function isInsideDisc(diameter: number, x: number, y: number): boolean {
-  if (x < 0 || y < 0 || x >= diameter || y >= diameter) return false
-  const r = diameter / 2
-  const dx = x + 0.5 - r
-  const dy = y + 0.5 - r
-  return dx * dx + dy * dy <= r * r
+/** A coordinate brought back onto the map: the sides join, so -1 is `size - 1`. */
+export function wrap(v: number, size: number): number {
+  return ((v % size) + size) % size
 }
 
-/** The terrain at (x, y), or `OFF_MAP` for anything outside the disc. */
-export function terrainAt(map: TerrainMap, x: number, y: number): Terrain | typeof OFF_MAP {
-  if (!isInsideDisc(map.diameter, x, y)) return OFF_MAP
-  return map.tiles[y * map.diameter + x] as Terrain
+/** The shortest signed step from `a` to `b` along one direction of the map, the short way round. */
+export function wrapDelta(a: number, b: number, size: number): number {
+  const d = wrap(b - a, size)
+  return d > size / 2 ? d - size : d
 }
 
-/** Lake and Sea can't be entered; neither can anything outside the disc. */
-export function isPassableTerrain(t: Terrain | typeof OFF_MAP): boolean {
+/** Straight-line distance between two tiles, the short way round. */
+export function wrapDistance(
+  size: number,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  return Math.hypot(wrapDelta(a.x, b.x, size), wrapDelta(a.y, b.y, size))
+}
+
+/** The index of a tile in `TerrainMap.tiles`, for any coordinates. */
+export function tileIndex(size: number, x: number, y: number): number {
+  return wrap(y, size) * size + wrap(x, size)
+}
+
+/** The terrain at (x, y); coordinates past a side continue on the other. */
+export function terrainAt(map: TerrainMap, x: number, y: number): Terrain {
+  return map.tiles[tileIndex(map.size, x, y)] as Terrain
+}
+
+/** Lake and Sea can't be entered. */
+export function isPassableTerrain(t: number): boolean {
   return (
     t === Terrain.Plains || t === Terrain.Forest || t === Terrain.Hills || t === Terrain.Mountain
   )
@@ -53,9 +65,9 @@ export const CHUNK_SIZE = 32
 /** The byte for a tile in a served chunk that the Player hasn't explored. */
 export const UNEXPLORED = 254
 
-/** How many chunks fit across a map of the given diameter. Chunk `i` is at `(i % n, ⌊i / n⌋)`. */
-export function chunksAcross(diameter: number): number {
-  return Math.ceil(diameter / CHUNK_SIZE)
+/** How many chunks fit across the map. Chunk `i` is at `(i % n, ⌊i / n⌋)`. */
+export function chunksAcross(size: number): number {
+  return Math.ceil(size / CHUNK_SIZE)
 }
 
 /** Where the client loads one chunk of explored terrain: `CHUNK_SIZE`² bytes, row-major. */

@@ -22,8 +22,8 @@ describe('invariants', () => {
     const tile = terrain.tiles.indexOf(kind)
     expect(tile).toBeGreaterThanOrEqual(0)
     const resident = world.residents[0]!
-    resident.x = tile % terrain.diameter
-    resident.y = Math.floor(tile / terrain.diameter)
+    resident.x = tile % terrain.size
+    resident.y = Math.floor(tile / terrain.size)
     expect(checkInvariants(world, terrain)).toEqual([
       expect.objectContaining({
         invariant: 'nothing-on-impassable-terrain',
@@ -36,23 +36,19 @@ describe('invariants', () => {
     const world = worldWithCity().world
     const node = world.nodes.find((n) => n.kind === 'forest')!
     const plains = terrain.tiles.indexOf(Terrain.Plains)
-    node.x = plains % terrain.diameter
-    node.y = Math.floor(plains / terrain.diameter)
+    node.x = plains % terrain.size
+    node.y = Math.floor(plains / terrain.size)
     expect(checkInvariants(world, terrain)).toEqual([
       expect.objectContaining({ invariant: 'nodes-on-fitting-terrain', entityIds: [node.id] }),
     ])
   })
 
-  it('catch a resident outside the disc', () => {
+  it('catch a position stored past a side of the map', () => {
     const world = worldWithCity().world
     const resident = world.residents[0]!
-    resident.x = 0
-    resident.y = 0
+    resident.x -= terrain.size // the same tile, under another name
     expect(checkInvariants(world, terrain)).toEqual([
-      expect.objectContaining({
-        invariant: 'nothing-on-impassable-terrain',
-        entityIds: [resident.id],
-      }),
+      expect.objectContaining({ invariant: 'positions-on-map', entityIds: [resident.id] }),
     ])
   })
 
@@ -102,8 +98,8 @@ describe('invariants', () => {
     house.x = city.x // onto the wall
     storage.stock = { food: -1 }
     const forest = terrain.tiles.indexOf(Terrain.Forest)
-    farm.x = forest % terrain.diameter
-    farm.y = Math.floor(forest / terrain.diameter)
+    farm.x = forest % terrain.size
+    farm.y = Math.floor(forest / terrain.size)
     const ids = checkInvariants(world, terrain)
       .filter((v) => v.invariant === 'buildings-in-place')
       .map((v) => v.entityIds[0])

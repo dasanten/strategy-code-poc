@@ -29,7 +29,7 @@ export interface InvariantViolation {
   entityIds: string[]
 }
 
-/** Nothing stands on impassable terrain or outside the disc. */
+/** Nothing stands on impassable terrain. */
 export const nothingOnImpassableTerrain: Invariant = {
   name: 'nothing-on-impassable-terrain',
   check(world, terrain) {
@@ -39,6 +39,32 @@ export const nothingOnImpassableTerrain: Invariant = {
       .map((t) => ({
         invariant: this.name,
         message: `${t.id} stands on impassable terrain at (${t.x}, ${t.y})`,
+        entityIds: [t.id],
+      }))
+  },
+}
+
+/**
+ * Every position is stored as a tile on the map (0 ≤ x, y < size). Coordinates past a side
+ * would still find terrain, as the sides join, but two names for one tile hide clashes.
+ */
+export const positionsOnMap: Invariant = {
+  name: 'positions-on-map',
+  check(world, terrain) {
+    const on = (v: number) => Number.isInteger(v) && v >= 0 && v < terrain.size
+    const things = [
+      ...world.residents,
+      ...world.horses,
+      ...world.carriages,
+      ...world.buildings,
+      ...world.nodes,
+      ...world.cities,
+    ]
+    return things
+      .filter((t) => !on(t.x) || !on(t.y))
+      .map((t) => ({
+        invariant: this.name,
+        message: `${t.id} is at (${t.x}, ${t.y}), off the map's tiles`,
         entityIds: [t.id],
       }))
   },
@@ -164,6 +190,7 @@ export const nodesOnFittingTerrain: Invariant = {
 
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
+  positionsOnMap,
   trainedWithinCap,
   healthAndHungerInRange,
   realmsHaveLeaders,

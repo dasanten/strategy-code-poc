@@ -5,13 +5,13 @@ import { schema, type Db } from './db/index.js'
 export function loadTerrain(db: Db): { seed: number; map: TerrainMap } | undefined {
   const row = db.select().from(schema.terrain).get()
   if (!row) return undefined
-  return { seed: row.seed, map: { diameter: row.diameter, tiles: new Uint8Array(row.data) } }
+  return { seed: row.seed, map: { size: row.size, tiles: new Uint8Array(row.data) } }
 }
 
 /** Stores the world's terrain. Happens once, when the world is created (ADR 0006). */
 export function saveTerrain(db: Db, seed: number, map: TerrainMap): void {
   db.insert(schema.terrain)
-    .values({ id: 1, seed, diameter: map.diameter, data: Buffer.from(map.tiles) })
+    .values({ id: 1, seed, size: map.size, data: Buffer.from(map.tiles) })
     .run()
 }
 

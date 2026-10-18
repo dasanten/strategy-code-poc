@@ -4,8 +4,8 @@ import type { Building, Carriage, City, Horse, Resident } from './world.js'
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
 export interface MapInfo {
   seed: number
-  /** The whole disc's diameter in tiles. */
-  diameter: number
+  /** Tiles along each side of the map; its opposite sides join. */
+  size: number
 }
 
 /**

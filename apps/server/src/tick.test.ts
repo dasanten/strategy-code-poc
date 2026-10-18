@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { WorldState } from '@csp/shared'
+import { Terrain, type WorldState } from '@csp/shared'
 import { runTick, type TickReporter } from './tick.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 
@@ -46,8 +46,11 @@ describe('runTick', () => {
 
   it('reports invariant violations on checked ticks only', () => {
     const world = worldWithCity().world
-    // Every unit outside the disc, in its corner: no move can make that legal again.
-    for (const u of world.residents) Object.assign(u, { x: 0, y: 0 })
+    // Every resident in a lake; nothing moves them out again.
+    const lake = terrain.tiles.indexOf(Terrain.Lake)
+    for (const r of world.residents) {
+      Object.assign(r, { x: lake % terrain.size, y: Math.floor(lake / terrain.size) })
+    }
     const reporter = fakeReporter()
 
     runTick(world, terrain, { reporter, invariantSampleRate: 0, slowTickMs: 800 })

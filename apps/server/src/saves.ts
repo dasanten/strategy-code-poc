@@ -3,7 +3,7 @@ import { desc, sql } from 'drizzle-orm'
 import type { TerrainMap, WorldState } from '@csp/shared'
 import { schema, type Db } from './db/index.js'
 import { loadTerrain, terrainForWorld } from './terrain.js'
-import { WORLD_FORMAT_VERSION, migrateWorld } from './world-format.js'
+import { RESET_BEFORE, WORLD_FORMAT_VERSION, migrateWorld } from './world-format.js'
 import { createWorld } from './world.js'
 
 /** How many of the newest saves are always kept. */
@@ -35,7 +35,13 @@ export function loadOrCreateWorld(
   generate: (seed: number) => TerrainMap,
   newSeed = 1,
 ): { world: WorldState; terrain: TerrainMap } {
-  const save = latestSave(db)
+  let save = latestSave(db)
+  if (save && save.version < RESET_BEFORE) {
+    // The one reset (ADR 0006): a world from the disc-shaped map is thrown away with its
+    // terrain and explored terrain. Accounts, sessions, invite codes and scripts stay.
+    resetWorld(db)
+    save = undefined
+  }
   // Every save format so far carries the seed at the top level.
   const seed = save ? (save.state as { seed: number }).seed : (loadTerrain(db)?.seed ?? newSeed)
   const terrain = terrainForWorld(db, seed, generate)
@@ -59,4 +65,13 @@ export function pruneSaves(db: Db, nowS = Math.floor(Date.now() / 1000)): void {
         GROUP BY created_at / 3600
       )
   `)
+}
+
+/** Deletes the world, its terrain and every Player's explored terrain; nothing else. */
+export function resetWorld(db: Db): void {
+  db.transaction((tx) => {
+    tx.delete(schema.worldSaves).run()
+    tx.delete(schema.terrain).run()
+    tx.delete(schema.explored).run()
+  })
 }

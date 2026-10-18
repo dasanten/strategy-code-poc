@@ -4,6 +4,7 @@ import {
   NODE_TERRAINS,
   Terrain,
   terrainAt,
+  wrap,
   type ResourceKind,
   type ResourceNode,
   type TerrainMap,
@@ -37,14 +38,15 @@ describe('placeResourceNodes', () => {
       expect(wrong).toEqual([])
     })
 
-    it('keeps nodes apart, one per tile, with unique ids', () => {
+    it('keeps nodes apart, across the joins too, one per tile, with unique ids', () => {
       expect(new Set(nodes.map((n) => n.id)).size).toBe(nodes.length)
       const byTile = new Map(nodes.map((n) => [`${n.x},${n.y}`, n]))
       expect(byTile.size).toBe(nodes.length)
       const tooClose = nodes.filter((n) => {
         for (let dy = -(NODE_MIN_SPACING - 1); dy < NODE_MIN_SPACING; dy++) {
           for (let dx = -(NODE_MIN_SPACING - 1); dx < NODE_MIN_SPACING; dx++) {
-            const other = byTile.get(`${n.x + dx},${n.y + dy}`)
+            const [ox, oy] = [wrap(n.x + dx, terrain.size), wrap(n.y + dy, terrain.size)]
+            const other = byTile.get(`${ox},${oy}`)
             if (other && other !== n) return true
           }
         }

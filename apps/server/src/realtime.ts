@@ -82,7 +82,7 @@ export function attachRealtime(
       type: 'welcome',
       account: client.account,
       tick: world.tick,
-      map: { seed: world.seed, diameter: opts.terrain.diameter },
+      map: { seed: world.seed, size: opts.terrain.size },
       exploredChunks: opts.explored.exploredChunks(user),
       home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city.id, x: cx, y: cy },
       structures: { cities, buildings, horses, carriages },

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   CHUNK_SIZE,
-  OFF_MAP,
   SESSION_COOKIE,
   UNEXPLORED,
   chunksAcross,
@@ -20,7 +19,7 @@ const player = { id: 7, isAdmin: false }
 const admin = { id: 1, isAdmin: true }
 
 describe('ExploredTerrain', () => {
-  it('knows only what a Player explored; admins know the whole disc', () => {
+  it('knows only what a Player explored; admins know the whole map', () => {
     const explored = new ExploredTerrain(terrain)
     expect(explored.isExplored(player, 60, 60)).toBe(false)
     explored.explore(player.id, 60, 60, 3)
@@ -29,14 +28,18 @@ describe('ExploredTerrain', () => {
     expect(explored.isExplored(player, 63, 63)).toBe(false)
     expect(explored.isExplored({ id: 8, isAdmin: false }, 60, 60)).toBe(false)
     expect(explored.isExplored(admin, 100, 30)).toBe(true)
-    expect(explored.isExplored(admin, 0, 0)).toBe(false)
+    // Exploring near a side reaches across the join.
+    explored.explore(player.id, 0, 60, 2)
+    expect(explored.isExplored(player, terrain.size - 2, 60)).toBe(true)
+    expect(explored.isExplored(player, -2, 60)).toBe(true)
   })
 
   it('serves explored chunks with unexplored tiles hidden, and refuses others', () => {
     const explored = new ExploredTerrain(terrain)
     explored.explore(player.id, 40, 40, 2)
-    const n = chunksAcross(terrain.diameter)
+    const n = chunksAcross(terrain.size)
     expect(explored.exploredChunks(player)).toEqual([1 * n + 1])
+    expect(explored.exploredChunks(admin)).toHaveLength(n * n)
     expect(explored.chunk(player, 0, 0)).toBeUndefined()
     expect(explored.chunk(player, 99, 0)).toBeUndefined()
     expect(explored.chunk(player, 1.5, 1)).toBeUndefined()
@@ -47,9 +50,9 @@ describe('ExploredTerrain', () => {
     expect(at(40, 40)).toBe(terrainAt(terrain, 40, 40))
     expect(at(50, 50)).toBe(UNEXPLORED)
 
-    // Admins get the terrain itself; outside the disc stays off the map.
+    // Admins get the terrain itself.
     const whole = explored.chunk(admin, 0, 0)!
-    expect(whole[0]).toBe(OFF_MAP)
+    expect(whole[0]).toBe(terrainAt(terrain, 0, 0))
     expect(whole[CHUNK_SIZE * CHUNK_SIZE - 1]).toBe(terrainAt(terrain, 31, 31))
   })
 

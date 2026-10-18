@@ -1,14 +1,7 @@
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WebSocket } from 'ws'
-import {
-  CHUNK_SIZE,
-  SESSION_COOKIE,
-  WS_PATH,
-  chunksAcross,
-  isInsideDisc,
-  type ServerMessage,
-} from '@csp/shared'
+import { SESSION_COOKIE, WS_PATH, chunksAcross, type ServerMessage } from '@csp/shared'
 import { buildApp } from './app.js'
 import { createAdmin, createSession } from './auth.js'
 import { ExploredTerrain } from './explored.js'
@@ -106,17 +99,8 @@ describe('realtime', () => {
       expect(welcome.structures.cities).toEqual([city])
       expect(welcome.entities).toHaveLength(world.residents.length)
       // Daniel is an admin, so the whole map counts as explored.
-      const n = chunksAcross(terrain.diameter)
-      const onDisc = [...Array(n * n).keys()].filter((c) => {
-        const [x0, y0] = [(c % n) * CHUNK_SIZE, Math.floor(c / n) * CHUNK_SIZE]
-        for (let y = y0; y < y0 + CHUNK_SIZE; y++) {
-          for (let x = x0; x < x0 + CHUNK_SIZE; x++) {
-            if (isInsideDisc(terrain.diameter, x, y)) return true
-          }
-        }
-        return false
-      })
-      expect(welcome.exploredChunks).toEqual(onDisc)
+      const n = chunksAcross(terrain.size)
+      expect(welcome.exploredChunks).toEqual([...Array(n * n).keys()])
     }
 
     realtime.broadcastTick()
