@@ -2,6 +2,9 @@ packages:
   - apps/*
   - packages/*
 
+# Fail `pnpm install` on a Node older than `engines.node` instead of breaking later.
+engineStrict: true
+
+# better-sqlite3 ships prebuilt binaries for Windows, Linux and macOS, so it needs no build step.
 onlyBuiltDependencies:
-  - better-sqlite3
   - esbuild
