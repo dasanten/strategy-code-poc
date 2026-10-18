@@ -100,7 +100,8 @@ export function attachRealtime(
         return send(socket, { type: 'rejected', requestId: '', reason: 'not JSON' })
       }
       if (msg?.type === 'order') {
-        send(socket, opts.orders.receive(world, client.account, msg.requestId, msg.order))
+        const sender = { userId: client.userId, account: client.account }
+        send(socket, opts.orders.receive(world, sender, msg.requestId, msg.order))
       }
     })
     socket.on('close', () => clients.delete(socket))

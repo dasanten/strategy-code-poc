@@ -24,12 +24,21 @@ export function App() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, status } = useWorld(onLoggedOut)
+  const { world, status, sendOrder } = useWorld(onLoggedOut)
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([])
   const [selectedId, setSelectedId] = useState<string | undefined>()
+  const [picking, setPicking] = useState(false)
+  const [orderError, setOrderError] = useState<string | undefined>()
   const own = world ? world.residents.filter((r) => r.owner === world.home.realmId) : []
   const selected = own.find((r) => r.id === selectedId)
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
+
+  /** Orders the picked resident to walk to a tile (ADR 0002: the server checks it). */
+  async function walkTo(x: number, y: number) {
+    setPicking(false)
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
+  }
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -58,7 +67,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <div className="play-column">
           <section className="map-panel">
             {world ? (
-              <MapView world={world} selectedId={selectedId} onSelect={setSelectedId} />
+              <MapView
+                world={world}
+                selectedId={selectedId}
+                onSelect={(id) => {
+                  setSelectedId(id)
+                  setPicking(false)
+                  setOrderError(undefined)
+                }}
+                picking={picking}
+                onPickTile={walkTo}
+              />
             ) : (
               <p>Waiting for the server…</p>
             )}
@@ -80,6 +99,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               leaderId={world.home.leaderId}
               cityName={homeCity?.name}
               tick={world.tick}
+              picking={picking}
+              onWalkTo={() => setPicking((p) => !p)}
+              orderError={orderError}
             />
           )}
           <section className="editor-panel">

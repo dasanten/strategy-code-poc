@@ -1,5 +1,6 @@
 import { isPassableTerrain, terrainAt, wrap, type TerrainMap, type WorldState } from '@csp/shared'
 import { placeResourceNodes } from './node-gen.js'
+import type { Walking } from './walking.js'
 import { stepSurvival, type SurvivalResult } from './survival.js'
 
 /**
@@ -59,11 +60,14 @@ export interface StepResult {
 }
 
 /**
- * Advances the world by one tick: residents get hungry, eat, heal or starve. Nothing requests
- * actions yet: orders and scripts will, and the world resolves them here (ADR 0002).
+ * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; then
+ * their orders request actions (steps, for now), and the world resolves them together. Without
+ * `walking` nobody moves.
  */
-export function stepWorld(world: WorldState, _terrain: TerrainMap): StepResult {
+export function stepWorld(world: WorldState, _terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world)
+  const steps = walking?.requestSteps(world) ?? []
+  walking?.resolve(world, steps)
   world.tick++
-  return { actions: 0, survival }
+  return { actions: steps.length, survival }
 }

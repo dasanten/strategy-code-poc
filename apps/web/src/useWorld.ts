@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   WS_PATH,
   type Building,
@@ -6,6 +6,7 @@ import {
   type City,
   type Horse,
   type MapInfo,
+  type OrderRequest,
   type Resident,
   type SeenEntity,
   type ServerMessage,
@@ -59,6 +60,8 @@ function byKind(entities: Iterable<SeenEntity>) {
 export function useWorld(onLoggedOut: () => void) {
   const [world, setWorld] = useState<ClientWorld | null>(null)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
+  const socketRef = useRef<WebSocket | null>(null)
+  const answers = useRef(new Map<string, (rejected: string | undefined) => void>())
 
   useEffect(() => {
     let socket: WebSocket | null = null
@@ -70,6 +73,7 @@ export function useWorld(onLoggedOut: () => void) {
       setStatus('connecting')
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
       socket = new WebSocket(`${proto}://${location.host}${WS_PATH}`)
+      socketRef.current = socket
       socket.onopen = () => setStatus('open')
       socket.onmessage = (ev) => {
         const msg = JSON.parse(ev.data as string) as ServerMessage
@@ -83,6 +87,10 @@ export function useWorld(onLoggedOut: () => void) {
             tick: msg.tick,
             ...byKind(entities.values()),
           })
+        } else if (msg.type === 'ack' || msg.type === 'rejected') {
+          const answer = answers.current.get(msg.requestId)
+          answers.current.delete(msg.requestId)
+          answer?.(msg.type === 'rejected' ? msg.reason : undefined)
         } else if (msg.type === 'tick') {
           for (const e of msg.changed) entities.set(e.id, e)
           for (const id of msg.gone) entities.delete(id)
@@ -121,5 +129,21 @@ export function useWorld(onLoggedOut: () => void) {
     }
   }, [onLoggedOut])
 
-  return { world, status }
+  /**
+   * Sends an order (ADR 0002). Resolves with the server's reason when it is rejected, or
+   * undefined once it is accepted; it takes effect from the next tick.
+   */
+  const sendOrder = useCallback((order: OrderRequest): Promise<string | undefined> => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return Promise.resolve('not connected')
+    }
+    const requestId = crypto.randomUUID()
+    return new Promise((resolve) => {
+      answers.current.set(requestId, resolve)
+      socket.send(JSON.stringify({ type: 'order', requestId, order }))
+    })
+  }, [])
+
+  return { world, status, sendOrder }
 }

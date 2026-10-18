@@ -12,7 +12,7 @@ import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.j
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { smallTerrain } from './test-terrain.js'
-import { WorldFormatError, migrateWorld } from './world-format.js'
+import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
 import { createWorld } from './world.js'
 
 const terrain = smallTerrain()
@@ -90,10 +90,19 @@ describe('world saves', () => {
   it('gives residents empty hands and the world no piles (migration 6 → 7)', () => {
     const resident = { id: 'r1', name: 'Mara', owner: 'realm1', x: 1, y: 2 }
     const v6 = { tick: 10, seed: 1, residents: [resident], cities: [] }
-    expect(migrateWorld(v6, 6, { terrain })).toEqual({
+    expect(migrateWorld(v6, 6, { terrain }, migrations, 7)).toEqual({
       ...v6,
       residents: [{ ...resident, carried: {} }],
       piles: [],
+    })
+  })
+
+  it('leaves every resident idle (migration 7 → 8)', () => {
+    const resident = { id: 'r1', name: 'Mara', owner: 'realm1', x: 1, y: 2, carried: {} }
+    const v7 = { tick: 10, seed: 1, residents: [resident], piles: [] }
+    expect(migrateWorld(v7, 7, { terrain })).toEqual({
+      ...v7,
+      residents: [{ ...resident, order: null }],
     })
   })
 

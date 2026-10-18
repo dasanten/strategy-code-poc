@@ -1,4 +1,11 @@
 import type { Account, OrderRequest, ServerMessage, WorldState } from '@csp/shared'
+import { walkTo } from './walking.js'
+
+/** Who sent an order: the Player's account and id. */
+export interface OrderSender {
+  userId: number
+  account: Account
+}
 
 /**
  * One kind of UI order (ADR 0002). `validate` runs when the order arrives and returns a reason
@@ -6,15 +13,15 @@ import type { Account, OrderRequest, ServerMessage, WorldState } from '@csp/shar
  * that later ticks turn into actions, never change the world directly.
  */
 export interface OrderKind {
-  validate(world: WorldState, account: Account, order: OrderRequest): string | undefined
-  apply(world: WorldState, account: Account, order: OrderRequest): void
+  validate(world: WorldState, sender: OrderSender, order: OrderRequest): string | undefined
+  apply(world: WorldState, sender: OrderSender, order: OrderRequest): void
 }
 
-/** The order kinds that exist. Slice 4 adds the first ones (walk to, pick up, drop). */
-export const orderKinds: Record<string, OrderKind> = {}
+/** The order kinds that exist. */
+export const orderKinds: Record<string, OrderKind> = { walkTo }
 
 interface Pending {
-  account: Account
+  sender: OrderSender
   order: OrderRequest
 }
 
@@ -25,7 +32,12 @@ export class OrderQueue {
   constructor(private kinds: Record<string, OrderKind> = orderKinds) {}
 
   /** Checks an incoming order and answers it; a valid one waits for the next tick. */
-  receive(world: WorldState, account: Account, requestId: unknown, order: unknown): ServerMessage {
+  receive(
+    world: WorldState,
+    sender: OrderSender,
+    requestId: unknown,
+    order: unknown,
+  ): ServerMessage {
     const id = typeof requestId === 'string' ? requestId : ''
     if (!id || typeof order !== 'object' || order === null) {
       return { type: 'rejected', requestId: id, reason: 'malformed order' }
@@ -33,16 +45,16 @@ export class OrderQueue {
     const req = order as OrderRequest
     const kind = typeof req.kind === 'string' ? this.kinds[req.kind] : undefined
     if (!kind) return { type: 'rejected', requestId: id, reason: `unknown order: ${req.kind}` }
-    const reason = kind.validate(world, account, req)
+    const reason = kind.validate(world, sender, req)
     if (reason) return { type: 'rejected', requestId: id, reason }
-    this.pending.push({ account, order: req })
+    this.pending.push({ sender, order: req })
     return { type: 'ack', requestId: id }
   }
 
   applyAll(world: WorldState): void {
     const batch = this.pending
     this.pending = []
-    for (const { account, order } of batch) this.kinds[order.kind]!.apply(world, account, order)
+    for (const { sender, order } of batch) this.kinds[order.kind]!.apply(world, sender, order)
   }
 
   get size(): number {
