@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { checkScript, type Diagnostic } from '@csp/lang'
-import { formatGameTime, type Account } from '@csp/shared'
+import { formatGameTime, type Account, type GoodsSpot, type Stock } from '@csp/shared'
 import { AdminPanel } from './AdminPanel.js'
 import { api } from './api.js'
 import { Login } from './Login.js'
@@ -39,6 +39,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
   }
+
+  /** Orders the picked resident to pick up or drop goods on their tile. */
+  async function carry(kind: 'pickUp' | 'drop', spot: GoodsSpot, goods: Stock) {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind, residentId: selected.id, spot, goods }))
+  }
+  const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
+    selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -102,6 +110,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               picking={picking}
               onWalkTo={() => setPicking((p) => !p)}
               orderError={orderError}
+              pile={onTile(world.piles)}
+              storage={onTile(world.buildings.filter((b) => b.kind === 'storage'))}
+              onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
+              onDrop={(spot, goods) => carry('drop', spot, goods)}
             />
           )}
           <section className="editor-panel">

@@ -31,6 +31,7 @@ import {
   BUILDING_COLORS,
   CARRIAGE_COLOR,
   HORSE_COLOR,
+  PILE_COLOR,
   LEADER_COLOR,
   OTHER_COLOR,
   OWN_COLOR,
@@ -456,9 +457,9 @@ function homeCentre(world: ClientWorld): { x: number; y: number } {
   return { x: world.home.x + 0.5, y: world.home.y + 0.5 }
 }
 
-/** Cities' walls and gates, buildings, horses and carriages, at mid zoom and closer. */
+/** Cities' walls and gates, buildings, piles, horses and carriages, at mid zoom and closer. */
 function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld) {
-  const { cities, buildings, horses, carriages } = world
+  const { cities, buildings, horses, carriages, piles } = world
   const tile = cam.scale
   const size = world.map.size
   const box = (x: number, y: number, inset = 0) => {
@@ -493,6 +494,20 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
   for (const b of buildings) {
     g.rect(...box(b.x, b.y, 0.08))
       .fill(BUILDING_COLORS[b.kind])
+      .stroke({ width: 1, color: 0x4f3a22 })
+  }
+  for (const p of piles) {
+    // A small heap in the tile's lower corner, so a building on the tile still shows.
+    const [sx, sy] = tileToScreen(cam, view, size, p.x, p.y)
+    g.poly([
+      sx + tile * 0.55,
+      sy + tile * 0.92,
+      sx + tile * 0.92,
+      sy + tile * 0.92,
+      sx + tile * 0.735,
+      sy + tile * 0.6,
+    ])
+      .fill(PILE_COLOR)
       .stroke({ width: 1, color: 0x4f3a22 })
   }
   for (const h of horses) g.circle(...centre(cam, view, size, h), tile * 0.22).fill(HORSE_COLOR)

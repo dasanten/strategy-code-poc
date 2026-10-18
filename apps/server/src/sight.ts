@@ -43,6 +43,7 @@ export function entitiesInSight(
   for (const b of world.buildings) if (seen(size, observers, b)) out.push({ is: 'building', ...b })
   for (const h of world.horses) if (seen(size, observers, h)) out.push({ is: 'horse', ...h })
   for (const k of world.carriages) if (seen(size, observers, k)) out.push({ is: 'carriage', ...k })
+  for (const p of world.piles) if (seen(size, observers, p)) out.push({ is: 'pile', ...p })
   return out
 }
 

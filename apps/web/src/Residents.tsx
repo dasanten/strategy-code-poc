@@ -1,4 +1,5 @@
 import {
+  GOODS,
   MAX_HEALTH,
   MAX_HUNGER,
   STAT_NAMES,
@@ -6,11 +7,35 @@ import {
   TRAINED_CAP_SHARE,
   ageInYears,
   canWork,
+  carryCapacity,
+  stockWeight,
   trainedCap,
+  type Building,
+  type Good,
+  type GoodsSpot,
+  type Pile,
   type Resident,
   type SkillName,
   type StatName,
+  type Stock,
 } from '@csp/shared'
+
+const GOOD_LABELS: Record<Good, string> = {
+  food: 'Food',
+  wood: 'Wood',
+  stone: 'Stone',
+  ironOre: 'Iron ore',
+  iron: 'Iron',
+  goldOre: 'Gold ore',
+  coins: 'Coins',
+}
+
+/** A weight in kg, to one decimal (coins weigh little). */
+const kg = (weight: number) => `${Math.round(weight * 10) / 10} kg`
+
+/** The goods in a stock that are there, in the usual order. */
+const goodsIn = (stock: Stock | undefined) =>
+  GOODS.filter((g) => (stock?.[g] ?? 0) > 0).map((g) => [g, stock![g]!] as const)
 
 const STAT_LABELS: Record<StatName, string> = {
   strength: 'Strength',
@@ -43,6 +68,8 @@ function doing(r: Resident): string {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
     return `Walking to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
   }
+  if (o?.kind === 'pickUp') return 'Picking up goods'
+  if (o?.kind === 'drop') return 'Putting down goods'
   return 'Idle'
 }
 
@@ -95,7 +122,7 @@ export function ResidentsList({
                   style={{ width: pct(r.hunger / MAX_HUNGER) }}
                 />
               </span>
-              <span className="mono">0 kg</span>
+              <span className="mono">{kg(stockWeight(r.carried))}</span>
             </button>
           ))}
         </div>
@@ -113,6 +140,10 @@ export function ResidentInspector({
   picking,
   onWalkTo,
   orderError,
+  pile,
+  storage,
+  onPickUp,
+  onDrop,
 }: {
   resident: Resident | undefined
   leaderId: string
@@ -124,6 +155,14 @@ export function ResidentInspector({
   onWalkTo: () => void
   /** Why the last order was turned down, if it was. */
   orderError: string | undefined
+  /** Goods lying on the resident's tile, if any are in sight. */
+  pile: Pile | undefined
+  /** The storage on the resident's tile, if there is one. */
+  storage: Building | undefined
+  /** Orders the resident to take goods from a spot on their tile. */
+  onPickUp: (from: GoodsSpot, goods: Stock) => void
+  /** Orders the resident to put carried goods at a spot on their tile. */
+  onDrop: (to: GoodsSpot, goods: Stock) => void
 }) {
   if (!resident) {
     return (
@@ -135,6 +174,9 @@ export function ResidentInspector({
   const r = resident
   const age = Math.floor(ageInYears(r, tick))
   const skills = (Object.keys(SKILL_LABELS) as SkillName[]).filter((s) => (r.skills[s] ?? 0) > 0)
+  const carried = goodsIn(r.carried)
+  const ground: GoodsSpot = { kind: 'ground' }
+  const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
   return (
     <aside className="inspector" aria-label="Resident inspector">
       <div className="inspector-title">
@@ -223,13 +265,83 @@ export function ResidentInspector({
       <section className="inspector-block" aria-label="Carrying">
         <div className="panel-head">
           <h3>Carrying</h3>
-          <span className="mono small">0 kg</span>
+          <span className="mono small">
+            {kg(stockWeight(r.carried))} / {kg(carryCapacity(r, tick))}
+          </span>
         </div>
-        <p className="muted">
-          Nothing.{cityName ? ` Eats from ${cityName} storage while at home.` : ''}
-        </p>
+        {carried.length === 0 && (
+          <p className="muted">
+            Nothing.{cityName ? ` Eats from ${cityName} storage while at home.` : ''}
+          </p>
+        )}
+        {carried.map(([good, units]) => (
+          <div className="goods-row" key={good}>
+            <span>{GOOD_LABELS[good]}</span>
+            <span className="mono">{units}</span>
+            <span className="buttons">
+              <button type="button" onClick={() => onDrop(ground, { [good]: units })}>
+                Drop
+              </button>
+              {storage && (
+                <button type="button" onClick={() => onDrop(inStorage, { [good]: units })}>
+                  Store
+                </button>
+              )}
+            </span>
+          </div>
+        ))}
       </section>
+
+      {(pile || storage) && (
+        <section className="inspector-block" aria-label="On this tile">
+          <div className="panel-head">
+            <h3>Here</h3>
+            <span className="small muted">takes as much as fits</span>
+          </div>
+          <TileGoods title="On the ground" stock={pile?.goods} spot={ground} onPickUp={onPickUp} />
+          {storage && (
+            <TileGoods
+              title="In the storage"
+              stock={storage.stock}
+              spot={inStorage}
+              onPickUp={onPickUp}
+            />
+          )}
+        </section>
+      )}
     </aside>
+  )
+}
+
+/** Goods at one spot on the resident's tile, each with a button to pick it up. */
+function TileGoods({
+  title,
+  stock,
+  spot,
+  onPickUp,
+}: {
+  title: string
+  stock: Stock | undefined
+  spot: GoodsSpot
+  onPickUp: (from: GoodsSpot, goods: Stock) => void
+}) {
+  const goods = goodsIn(stock)
+  return (
+    <>
+      <div className="small muted">{title}</div>
+      {goods.length === 0 && <p className="muted small">Nothing.</p>}
+      {goods.map(([good, units]) => (
+        <div className="goods-row" key={good}>
+          <span>{GOOD_LABELS[good]}</span>
+          <span className="mono">{units}</span>
+          <span className="buttons">
+            <button type="button" onClick={() => onPickUp(spot, { [good]: units })}>
+              Pick up
+            </button>
+          </span>
+        </div>
+      ))}
+    </>
   )
 }
 

@@ -60,8 +60,31 @@ export interface WalkOrder {
   progress: number
 }
 
+/**
+ * A place on the resident's own tile that goods are taken from or put: the pile on the ground,
+ * or a storage standing there.
+ */
+export type GoodsSpot = { kind: 'ground' } | { kind: 'storage'; storageId: string }
+
+/**
+ * Picking up goods on the resident's tile (`CONTEXT.md`: Core rule, whatever isn't protected can
+ * be taken). The resident takes what is there of `goods`, as much as fits their carry capacity.
+ */
+export interface PickUpOrder {
+  kind: 'pickUp'
+  from: GoodsSpot
+  goods: Stock
+}
+
+/** Putting down carried goods on the resident's tile: on the ground (a pile) or in a storage. */
+export interface DropOrder {
+  kind: 'drop'
+  to: GoodsSpot
+  goods: Stock
+}
+
 /** Any order a resident can hold. */
-export type ResidentOrder = WalkOrder
+export type ResidentOrder = WalkOrder | PickUpOrder | DropOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -109,7 +132,8 @@ export interface Pile {
 }
 
 /** PoC goods (`CONTEXT.md`: Good). Amounts are counted in units; `GOOD_WEIGHT` weighs them. */
-export type Good = 'food' | 'wood' | 'stone' | 'ironOre' | 'iron' | 'goldOre' | 'coins'
+export const GOODS = ['food', 'wood', 'stone', 'ironOre', 'iron', 'goldOre', 'coins'] as const
+export type Good = (typeof GOODS)[number]
 
 /** Goods by kind, as unit counts; a missing good is 0. */
 export type Stock = Partial<Record<Good, number>>

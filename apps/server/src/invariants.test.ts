@@ -140,6 +140,28 @@ describe('invariants', () => {
     expect(ids.sort()).toEqual([farm.id, house.id, storage.id].sort())
   })
 
+  it('catch goods kept in a building that is not a storage', () => {
+    const { world } = worldWithCity()
+    const house = world.buildings.find((b) => b.kind === 'house')!
+    house.stock = { food: 3 }
+    expect(checkInvariants(world, terrain)).toEqual([
+      expect.objectContaining({ invariant: 'goods-in-place', entityIds: [house.id] }),
+    ])
+  })
+
+  it('catch a pick-up or drop order left over after its tick', () => {
+    const { world } = worldWithCity()
+    const [a, b] = world.residents
+    a!.order = { kind: 'pickUp', from: { kind: 'ground' }, goods: { food: 1 } }
+    b!.order = { kind: 'drop', to: { kind: 'ground' }, goods: { food: 1 } }
+    expect(checkInvariants(world, terrain)).toEqual([
+      expect.objectContaining({ invariant: 'carry-orders-done', entityIds: [a!.id] }),
+      expect.objectContaining({ invariant: 'carry-orders-done', entityIds: [b!.id] }),
+    ])
+    stepWorld(world, terrain)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
   it('are checked every tick at rate 1 and sampled below it', () => {
     expect(shouldCheckInvariants(1, () => 0.99)).toBe(true)
     expect(shouldCheckInvariants(0.1, () => 0.05)).toBe(true)
