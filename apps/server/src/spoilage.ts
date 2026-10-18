@@ -26,7 +26,9 @@ export function stepSpoilage(world: WorldState): void {
     if (realmId !== null && units > 0) lost.set(realmId, (lost.get(realmId) ?? 0) + units)
   }
   const cityRealm = new Map(world.cities.map((c) => [c.id, c.realmId]))
-  for (const b of world.buildings) spoil(b.id, b.stock, cityRealm.get(b.cityId))
+  for (const b of world.buildings) {
+    spoil(b.id, b.stock, b.cityId === null ? null : cityRealm.get(b.cityId))
+  }
   for (const r of world.residents) spoil(r.id, r.carried, r.owner)
   for (const k of world.carriages) spoil(k.id, k.load, k.realmId)
   for (const p of world.piles) spoil(p.id, p.goods)
