@@ -12,12 +12,22 @@ export function describeEvent(e: RealmEvent, realmId?: string): { text: string; 
     case 'hungry':
       return { text: `${e.name} has nothing to eat and is starving.`, tone: 'warn' }
     case 'died': {
-      const how = e.cause === 'starved' ? 'starved to death' : 'died of old age'
+      const how = {
+        starved: 'starved to death',
+        oldAge: 'died of old age',
+        killed: e.by ? `was killed by ${e.by}` : 'was killed',
+      }[e.cause]
       if (e.leader) {
         return { text: `Your Leader ${e.name} ${how}. Your realm has ended.`, tone: 'bad' }
       }
       return { text: `${e.name} ${how}.`, tone: 'bad' }
     }
+    case 'fight':
+      return e.attacker
+        ? { text: `${e.name} attacked ${e.other}.`, tone: 'info' }
+        : { text: `${e.name} was attacked by ${e.other}.`, tone: 'warn' }
+    case 'fled':
+      return { text: `${e.name} was hit and flees home.`, tone: 'warn' }
     case 'foodSpoiled':
       return { text: `${e.units} Food spoiled.`, tone: 'info' }
     case 'born':

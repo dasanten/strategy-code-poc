@@ -21,7 +21,9 @@ import {
   TICKS_PER_GAME_YEAR,
   TRAINED_CAP_SHARE,
   ageInYears,
+  bestWeapon,
   canWork,
+  wrapDistance,
   carryCapacity,
   materialsNeeded,
   recipeGood,
@@ -153,6 +155,7 @@ function doing(r: Resident): string {
   if (o?.kind === 'workAt')
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
   if (o?.kind === 'pair') return 'Paired'
+  if (o?.kind === 'attack') return o.path ? 'Going after their target' : 'Fighting'
   return 'Idle'
 }
 
@@ -238,6 +241,9 @@ export function ResidentInspector({
   onTearDown,
   residents,
   onPair,
+  others,
+  mapSize,
+  onAttack,
   carriage,
   onDriveTo,
   onHaulTo,
@@ -291,6 +297,12 @@ export function ResidentInspector({
   residents: Resident[]
   /** Orders the resident to pair with another of the Player's residents. */
   onPair: (partnerId: string) => void
+  /** Residents of other realms, or of none, in sight: whom the resident can attack. */
+  others: Resident[]
+  /** Tiles along each side of the map, to tell who is nearest. */
+  mapSize: number
+  /** Orders the resident to attack another realm's resident. */
+  onAttack: (targetId: string) => void
 }) {
   if (!resident) {
     return (
@@ -500,6 +512,7 @@ export function ResidentInspector({
       <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
       <TearDownBlock resident={r} tick={tick} building={road} onTearDown={onTearDown} />
       <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
+      <AttackBlock resident={r} others={others} mapSize={mapSize} onAttack={onAttack} />
 
       {(pile || storage || site || roadSite || carriage) && (
         <section className="inspector-block" aria-label="On this tile">
@@ -1002,6 +1015,68 @@ function PairBlock({
           Pair
         </button>
       </div>
+    </section>
+  )
+}
+
+/** Most residents of other realms the attack list offers, nearest first. */
+const ATTACK_CHOICES = 12
+
+/**
+ * Attacking (`CONTEXT.md`: Combat): pick a resident of another realm in sight, nearest first, to
+ * go after and strike; see whom the resident is fighting.
+ */
+function AttackBlock({
+  resident,
+  others,
+  mapSize,
+  onAttack,
+}: {
+  resident: Resident
+  others: Resident[]
+  mapSize: number
+  onAttack: (targetId: string) => void
+}) {
+  const [targetId, setTargetId] = useState('')
+  const o = resident.order
+  const target = o?.kind === 'attack' ? others.find((x) => x.id === o.targetId) : undefined
+  const weapon = bestWeapon(resident)
+  const choices = others
+    .map((x) => ({ x, d: wrapDistance(mapSize, resident, x) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, ATTACK_CHOICES)
+  return (
+    <section className="inspector-block" aria-label="Attack">
+      <div className="panel-head">
+        <h3>Attack</h3>
+        <span className="small muted">
+          {weapon ? `fights with a ${GOOD_LABELS[weapon].toLowerCase()}` : 'unarmed'}
+        </span>
+      </div>
+      {o?.kind === 'attack' && (
+        <p className="muted small">Attacking {target?.name ?? 'someone out of sight'}.</p>
+      )}
+      {choices.length === 0 ? (
+        <p className="muted small">Nobody of another realm in sight.</p>
+      ) : (
+        <div className="order-buttons">
+          <select
+            aria-label="Target"
+            value={targetId}
+            onChange={(e) => setTargetId(e.target.value)}
+          >
+            <option value="">Pick someone to attack…</option>
+            {choices.map(({ x, d }) => (
+              <option key={x.id} value={x.id}>
+                {x.name} · {Math.round(d)} tiles{bestWeapon(x) ? ' · armed' : ''}
+              </option>
+            ))}
+          </select>
+          <button type="button" disabled={!targetId} onClick={() => onAttack(targetId)}>
+            Attack
+          </button>
+        </div>
+      )}
     </section>
   )
 }
