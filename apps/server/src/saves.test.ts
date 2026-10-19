@@ -10,6 +10,8 @@ import {
   LIFESPAN_MAX,
   LIFESPAN_MIN,
   MAX_HEALTH,
+  NPC_TOWNS,
+  NPC_VILLAGES,
   START_HORSES,
   START_STABLE_FOOD,
   type Carriage,
@@ -22,8 +24,10 @@ import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { smallTerrain, worldWithCity } from './test-terrain.js'
 import { checkInvariants } from './invariants.js'
+import { npcCityCount } from './npc-cities.js'
+import { entitiesInSight } from './sight.js'
 import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
-import { createWorld } from './world.js'
+import { createWorld, generateWorld } from './world.js'
 
 const terrain = smallTerrain()
 
@@ -90,7 +94,7 @@ describe('world saves', () => {
     const { db, close } = await openDb(':memory:')
     const { generate, seeds } = counting()
     const fresh = loadOrCreateWorld(db, generate, 3)
-    expect(fresh.world).toEqual(createWorld(fresh.terrain, 3))
+    expect(fresh.world).toEqual(generateWorld(fresh.terrain, 3))
     expect(seeds).toEqual([3])
     expect(loadTerrain(db)).toEqual({ seed: 3, map: fresh.terrain })
 
@@ -375,6 +379,33 @@ describe('world saves', () => {
   it('gives the world no alliances (migration 15 → 16)', () => {
     const v15 = { tick: 10, seed: 1, residents: [], realms: [] }
     expect(migrateWorld(v15, 15, { terrain }, migrations, 16)).toEqual({ ...v15, alliances: [] })
+  })
+
+  it('places NPC cities in the live world, out of every Player’s sight (migration 16 → 17)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const before = structuredClone(world)
+    const v17 = migrateWorld(structuredClone(world), 16, { terrain: land }, migrations, 17)
+    // What was there stays as it was; the new cities come after it.
+    expect(v17.cities.slice(0, before.cities.length)).toEqual(before.cities)
+    expect(v17.residents.slice(0, before.residents.length)).toEqual(before.residents)
+    expect(v17.buildings.slice(0, before.buildings.length)).toEqual(before.buildings)
+    const npc = v17.cities.slice(before.cities.length)
+    expect(npc).toHaveLength(
+      npcCityCount(NPC_TOWNS, land.size) + npcCityCount(NPC_VILLAGES, land.size),
+    )
+    expect(npc.length).toBeGreaterThan(0)
+    for (const c of npc) expect(c.realmId).toBeNull()
+    // The Player sees none of them.
+    const realm = v17.realms[0]!
+    const seen = new Set(entitiesInSight(v17, land, realm.id).map((e) => e.id))
+    for (const c of npc) {
+      expect(seen.has(c.id)).toBe(false)
+      for (const r of v17.residents.filter((x) => x.cityId === c.id))
+        expect(seen.has(r.id)).toBe(false)
+    }
+    expect(checkInvariants(v17, land)).toEqual([])
+    // The same save always migrates the same way.
+    expect(migrateWorld(structuredClone(world), 16, { terrain: land }, migrations, 17)).toEqual(v17)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

@@ -173,6 +173,16 @@ describe('invariants', () => {
     ])
   })
 
+  it('catch a resident of an NPC city who belongs to a realm', () => {
+    const world = worldWithCity().world
+    world.cities[0]!.realmId = null
+    const [r, ...others] = world.residents
+    for (const o of others) o.owner = null
+    expect(checkInvariants(world, terrain)).toEqual([
+      expect.objectContaining({ invariant: 'npc-city-residents-unowned', entityIds: [r!.id] }),
+    ])
+  })
+
   it('catch a pair that does not hold together', () => {
     const world = worldWithCity().world
     const [a, b, c] = world.residents as [Resident, Resident, Resident]

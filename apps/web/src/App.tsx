@@ -16,6 +16,7 @@ import {
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
 import { api } from './api.js'
+import { CityInspector } from './CityInspector.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { pageFor } from './pages.js'
@@ -206,6 +207,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               diplomacy={world.diplomacy}
               realmId={world.home.realmId}
               sendOrder={sendOrder}
+            />
+          )}
+          {world && (
+            <CityInspector
+              cities={world.cities}
+              residents={world.residents}
+              buildings={world.buildings}
+              realmId={world.home.realmId}
+              realms={world.diplomacy.realmsInSight}
             />
           )}
           {world && <RealmLog events={world.events} realmId={world.home.realmId} />}
