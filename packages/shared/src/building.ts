@@ -97,7 +97,7 @@ export function workplaceGood(world: WorldState, workplace: Building): Good | un
 }
 
 /** The residents working a workplace: holding a work-at order for it and standing on it. */
-export function workersOf(world: WorldState, workplace: Building): Resident[] {
+export function workersOf(world: Pick<WorldState, 'residents'>, workplace: Building): Resident[] {
   return world.residents.filter(
     (r) =>
       r.order?.kind === 'workAt' &&
@@ -105,6 +105,16 @@ export function workersOf(world: WorldState, workplace: Building): Resident[] {
       r.x === workplace.x &&
       r.y === workplace.y,
   )
+}
+
+/**
+ * The realms holding a workplace (`CONTEXT.md`: Holding a workplace): those whose residents work
+ * it, and so get its output. There is no ownership flag, and the city a farm was laid out for
+ * doesn't count; nobody holds a workplace that nobody works.
+ */
+export function holdersOf(world: Pick<WorldState, 'residents'>, workplace: Building): string[] {
+  const realms = workersOf(world, workplace).map((r) => r.owner)
+  return [...new Set(realms.filter((id): id is string => id !== null))].sort()
 }
 
 /**
