@@ -679,7 +679,7 @@ export const pairsHoldTogether: Invariant = {
 }
 
 /** Orders only a grown resident can hold (`CONTEXT.md`: Child); pairing is checked with pairs. */
-const ADULT_ORDERS = new Set(['build', 'tearDown', 'workAt', 'drive'])
+const ADULT_ORDERS = new Set(['build', 'tearDown', 'workAt', 'drive', 'pickUp', 'drop'])
 
 /** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
 export const childrenDontWork: Invariant = {

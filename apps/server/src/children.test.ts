@@ -1,6 +1,7 @@
 import {
   ADULT_AGE,
   CHILD_STAT_SPREAD,
+  HOME_FOOD_LOW,
   STAT_NAMES,
   TICKS_PER_GAME_YEAR,
   canWork,
@@ -13,6 +14,7 @@ import { OrderQueue } from './orders.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { mulberry32, newChild } from './residents.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
+import { Walking } from './walking.js'
 import { stepWorld } from './world.js'
 
 const terrain = cityTerrain()
@@ -97,7 +99,36 @@ describe('children', () => {
     expect(world.events.filter((e) => e.kind === 'grownUp')).toHaveLength(1)
   })
 
-  it('are watched by an invariant: a child holds no work, build, tear-down or drive order', () => {
+  it('can’t pick up or put down goods, but can walk home and be fed there', () => {
+    const { world, queue, child } = bornOnTheFarm()
+    const city = world.cities.find((c) => c.id === child.cityId)!
+    const walking = new Walking(terrain)
+    const send = (o: object) => queue.receive(world, me, 'q', { residentId: child.id, ...o })
+    const carry = 'children can’t pick up or put down goods'
+    world.piles.push({ id: 'p1', x: child.x, y: child.y, goods: { food: 5 } })
+    expect(send({ kind: 'pickUp', spot: { kind: 'ground' }, goods: { food: 5 } })).toMatchObject({
+      type: 'rejected',
+      reason: carry,
+    })
+    child.carried = { food: 1 }
+    expect(send({ kind: 'drop', spot: { kind: 'ground' }, goods: { food: 1 } })).toMatchObject({
+      type: 'rejected',
+      reason: carry,
+    })
+
+    // Born on the farm outside the wall, they walk home, where they take meals from storage.
+    const home = { x: city.x + 1, y: city.y + city.size - 2 }
+    expect(send({ kind: 'walkTo', ...home })).toMatchObject({ type: 'ack' })
+    queue.applyAll(world)
+    for (let t = 0; t < 5000 && (child.x !== home.x || child.y !== home.y); t++) {
+      stepWorld(world, terrain, walking)
+    }
+    expect(child).toMatchObject(home)
+    expect(child.carried.food).toBeGreaterThanOrEqual(HOME_FOOD_LOW)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('are watched by an invariant: a child holds no order only adults may hold', () => {
     const { world, child } = bornOnTheFarm()
     const farm = world.buildings.find((b) => b.kind === 'farm')!
     child.order = {

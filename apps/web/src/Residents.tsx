@@ -243,6 +243,8 @@ export function ResidentInspector({
   const age = Math.floor(ageInYears(r, tick))
   const skills = (Object.keys(SKILL_LABELS) as SkillName[]).filter((s) => (r.skills[s] ?? 0) > 0)
   const carried = goodsIn(r.carried)
+  // Children can't pick up or put down goods (`CONTEXT.md`: Child).
+  const child = !canWork(r, tick)
   const ground: GoodsSpot = { kind: 'ground' }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
   const site = building?.site ? building : undefined
@@ -363,21 +365,37 @@ export function ResidentInspector({
             <span>{GOOD_LABELS[good]}</span>
             <span className="mono">{units}</span>
             <span className="buttons">
-              <button type="button" onClick={() => onDrop(ground, { [good]: units })}>
+              <button
+                type="button"
+                disabled={child}
+                onClick={() => onDrop(ground, { [good]: units })}
+              >
                 Drop
               </button>
               {storage && (
-                <button type="button" onClick={() => onDrop(inStorage, { [good]: units })}>
+                <button
+                  type="button"
+                  disabled={child}
+                  onClick={() => onDrop(inStorage, { [good]: units })}
+                >
                   Store
                 </button>
               )}
               {(needed[good] ?? 0) > 0 && (
-                <button type="button" onClick={() => onDrop(atSite, { [good]: units })}>
+                <button
+                  type="button"
+                  disabled={child}
+                  onClick={() => onDrop(atSite, { [good]: units })}
+                >
                   Deliver
                 </button>
               )}
               {carriage && (
-                <button type="button" onClick={() => onDrop(onCarriage, { [good]: units })}>
+                <button
+                  type="button"
+                  disabled={child}
+                  onClick={() => onDrop(onCarriage, { [good]: units })}
+                >
                   Load
                 </button>
               )}
@@ -406,13 +424,20 @@ export function ResidentInspector({
             <h3>Here</h3>
             <span className="small muted">takes as much as fits</span>
           </div>
-          <TileGoods title="On the ground" stock={pile?.goods} spot={ground} onPickUp={onPickUp} />
+          <TileGoods
+            title="On the ground"
+            stock={pile?.goods}
+            spot={ground}
+            onPickUp={onPickUp}
+            disabled={child}
+          />
           {storage && (
             <TileGoods
               title={storage.kind === 'stable' ? 'In the stable' : 'In the storage'}
               stock={storage.stock}
               spot={inStorage}
               onPickUp={onPickUp}
+              disabled={child}
             />
           )}
           {site && (
@@ -421,6 +446,7 @@ export function ResidentInspector({
               stock={site.site!.delivered}
               spot={atSite}
               onPickUp={onPickUp}
+              disabled={child}
             />
           )}
           {carriage && (
@@ -429,6 +455,7 @@ export function ResidentInspector({
               stock={carriage.load}
               spot={onCarriage}
               onPickUp={onPickUp}
+              disabled={child}
             />
           )}
         </section>
@@ -704,11 +731,13 @@ function TileGoods({
   stock,
   spot,
   onPickUp,
+  disabled,
 }: {
   title: string
   stock: Stock | undefined
   spot: GoodsSpot
   onPickUp: (from: GoodsSpot, goods: Stock) => void
+  disabled: boolean
 }) {
   const goods = goodsIn(stock)
   return (
@@ -720,7 +749,11 @@ function TileGoods({
           <span>{GOOD_LABELS[good]}</span>
           <span className="mono">{units}</span>
           <span className="buttons">
-            <button type="button" onClick={() => onPickUp(spot, { [good]: units })}>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onPickUp(spot, { [good]: units })}
+            >
               Pick up
             </button>
           </span>
