@@ -105,6 +105,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'pair', residentId: selected.id, partnerId }))
   }
+  /** Orders the picked resident to attack a resident of another realm. */
+  async function attack(targetId: string) {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'attack', residentId: selected.id, targetId }))
+  }
   const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
   const onNodesLoaded = useCallback(
     (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
@@ -199,6 +204,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onTearDown={tearDown}
               residents={own}
               onPair={pair}
+              others={world.residents.filter((r) => r.owner !== world.home.realmId)}
+              mapSize={world.map.size}
+              onAttack={attack}
             />
           )}
           {world && (

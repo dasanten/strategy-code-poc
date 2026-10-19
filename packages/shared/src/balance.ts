@@ -653,3 +653,94 @@ export const TEARDOWN_MATERIALS_RETURNED = 0.5
  * being a member (`CONTEXT.md`: Alliance): one game day, time enough for the others to react.
  */
 export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
+
+/**
+ * Ticks between two blows of a resident in a fight (`CONTEXT.md`: Combat): a blow every two
+ * seconds, so a fight between two unarmed residents lasts about a minute.
+ */
+export const STRIKE_TICKS = 2
+
+/** Damage a blow does before Strength, weapon and Combat skill: a little even from the weakest. */
+export const BLOW_BASE = 1
+
+/** Damage each point of Strength adds to a blow: an average resident's fist does 4. */
+export const BLOW_PER_STRENGTH = 0.3
+
+/** How much harder each point of Combat skill makes a blow, as a share of it. */
+export const COMBAT_SKILL_EFFECT = 0.05
+
+/** The furthest Combat skill raises a blow, as a share of it: at most twice as hard. */
+export const COMBAT_SKILL_LIMIT = 1
+
+/** The least damage a blow that lands does, however well the one hit is protected. */
+export const MIN_BLOW_DAMAGE = 1
+
+/** Chance of dodging a blow for each point of Agility: an average resident dodges one in five. */
+export const DODGE_PER_AGILITY = 0.02
+
+/** However agile a resident is, they dodge at most this share of blows. */
+export const DODGE_LIMIT = 0.5
+
+/**
+ * Combat skill a resident of average Intellect learns from each blow they strike or that is
+ * struck at them (`CONTEXT.md`: Combat, fighting teaches Combat): a point every 50 blows.
+ */
+export const COMBAT_SKILL_PER_BLOW = 0.02
+
+/** The weapon a resident fights with: the best one they carry, if any (`CONTEXT.md`: Weapons and armour). */
+export function bestWeapon(resident: Resident): Weapon | undefined {
+  const carried = (Object.keys(WEAPON_ATTACK) as Weapon[]).filter(
+    (w) => (resident.carried[w] ?? 0) > 0,
+  )
+  return carried.sort((a, b) => WEAPON_ATTACK[b] - WEAPON_ATTACK[a])[0]
+}
+
+/** Whether a resident is armed: carries a weapon (`CONTEXT.md`: Soldier). */
+export function isArmed(resident: Resident): boolean {
+  return bestWeapon(resident) !== undefined
+}
+
+/**
+ * Damage a resident's protection takes off each blow (`CONTEXT.md`: Weapons and armour): a shield
+ * and armour, if they carry them, one of each counting.
+ */
+export function protection(resident: Resident): number {
+  return (Object.keys(PROTECTION_DEFENCE) as Protection[])
+    .filter((p) => (resident.carried[p] ?? 0) > 0)
+    .reduce((sum, p) => sum + PROTECTION_DEFENCE[p], 0)
+}
+
+/**
+ * How hard a resident strikes at the given tick (`CONTEXT.md`: Combat): from Strength and the
+ * best weapon they carry, harder with Combat skill.
+ */
+export function attackPower(resident: Resident, tick: number): number {
+  const weapon = bestWeapon(resident)
+  const raw =
+    BLOW_BASE +
+    BLOW_PER_STRENGTH * statValue(resident, 'strength', tick) +
+    (weapon ? WEAPON_ATTACK[weapon] : 0)
+  const skill = Math.min(COMBAT_SKILL_LIMIT, (resident.skills.combat ?? 0) * COMBAT_SKILL_EFFECT)
+  return raw * (1 + skill)
+}
+
+/**
+ * Damage a blow from `attacker` does to `defender` when it lands, at the given tick: the
+ * attacker's `attackPower` less the defender's `protection`, but at least `MIN_BLOW_DAMAGE`.
+ */
+export function blowDamage(attacker: Resident, defender: Resident, tick: number): number {
+  return Math.max(MIN_BLOW_DAMAGE, attackPower(attacker, tick) - protection(defender))
+}
+
+/** Chance a resident dodges a blow at the given tick, from their Agility (`CONTEXT.md`: Combat). */
+export function dodgeChance(resident: Resident, tick: number): number {
+  return Math.min(DODGE_LIMIT, statValue(resident, 'agility', tick) * DODGE_PER_AGILITY)
+}
+
+/**
+ * Combat skill a resident learns from one blow they strike or that is struck at them, faster with
+ * more Intellect (`CONTEXT.md`: Skill, learned by doing).
+ */
+export function combatLearned(resident: Resident, tick: number): number {
+  return COMBAT_SKILL_PER_BLOW * (statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE)
+}

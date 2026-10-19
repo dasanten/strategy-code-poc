@@ -28,6 +28,25 @@ describe('realm log', () => {
     ).toEqual({ text: 'Wren has grown up and can work now.', tone: 'info' })
   })
 
+  it('describes fights, flight and deaths in them', () => {
+    const fight = { kind: 'fight', residentId: 'r1', name: 'Mara', otherId: 'r9', seq: 6 } as const
+    expect(describeEvent({ ...fight, other: 'Tobin', attacker: true, ...at })).toEqual({
+      text: 'Mara attacked Tobin.',
+      tone: 'info',
+    })
+    expect(describeEvent({ ...fight, other: 'Tobin', attacker: false, ...at })).toEqual({
+      text: 'Mara was attacked by Tobin.',
+      tone: 'warn',
+    })
+    expect(
+      describeEvent({ kind: 'fled', residentId: 'r1', name: 'Mara', seq: 7, ...at }).text,
+    ).toBe('Mara was hit and flees home.')
+    const died = { kind: 'died', residentId: 'r1', name: 'Mara', seq: 8, ...at } as const
+    expect(describeEvent({ ...died, cause: 'killed', leader: false, by: 'Tobin' }).text).toBe(
+      'Mara was killed by Tobin.',
+    )
+  })
+
   it('describes alliance events, saying which are about the Player’s own realm', () => {
     const north = { allianceId: 'a1', name: 'North', seq: 6, ...at } as const
     const about = (realmId: string) => ({ ...north, realmId, realm: 'Tobin' })

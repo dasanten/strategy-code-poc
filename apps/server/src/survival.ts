@@ -14,6 +14,7 @@ import {
   pileAt,
   unitsThatFit,
   type Building,
+  type DeathCause,
   terrainAt,
   type Good,
   type Realm,
@@ -69,13 +70,27 @@ export function stepSurvival(world: WorldState, terrain: TerrainMap): SurvivalRe
 
 /**
  * Residents die of `cause`, each death going in their Player's realm log; a Leader's death ends
- * their realm. Returns the realms that ended.
+ * their realm. `killers` names who killed each of them, by resident id, when they were killed.
+ * Returns the realms that ended.
  */
-export function dieAll(world: WorldState, died: Resident[], cause: 'starved' | 'oldAge'): Realm[] {
+export function dieAll(
+  world: WorldState,
+  died: Resident[],
+  cause: DeathCause,
+  killers?: Map<string, string>,
+): Realm[] {
   // Every death is written down before any realm ends, so all of them reach the Player.
   for (const r of died) {
     const leader = world.realms.some((x) => x.leaderId === r.id)
-    recordEvent(world, r.owner, { kind: 'died', residentId: r.id, name: r.name, cause, leader })
+    const by = killers?.get(r.id)
+    recordEvent(world, r.owner, {
+      kind: 'died',
+      residentId: r.id,
+      name: r.name,
+      cause,
+      leader,
+      ...(by === undefined ? {} : { by }),
+    })
   }
   const ended: Realm[] = []
   for (const r of died) {

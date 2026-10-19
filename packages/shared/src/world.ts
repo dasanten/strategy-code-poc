@@ -198,6 +198,23 @@ export interface HaulOrder {
   moving: { good: Good; before: number; onto: 'carriage' | 'stop' } | null
 }
 
+/**
+ * Attacking a resident (`CONTEXT.md`: Combat): the resident goes after `targetId` and, once in
+ * contact (the same or a neighbouring tile), strikes them until one of them dies, the target gets
+ * out of their sight or they are given another order. Out of contact they walk towards the target
+ * along `path` (null while it is being found), as for a walk order; `progress` is how far into the
+ * next step they are. `strike` is how far, from 0 up to 1, they are into their next blow.
+ * `started` is set once the fight went in the realm logs.
+ */
+export interface AttackOrder {
+  kind: 'attack'
+  targetId: string
+  path: [number, number][] | null
+  progress: number
+  strike: number
+  started: boolean
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -209,6 +226,7 @@ export type ResidentOrder =
   | TearDownOrder
   | WorkOrder
   | PairOrder
+  | AttackOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -246,6 +264,9 @@ export interface WorldState {
   alliances: Alliance[]
 }
 
+/** What a resident died of: hunger, old age, or blows in a fight (`CONTEXT.md`: Combat). */
+export type DeathCause = 'starved' | 'oldAge' | 'killed'
+
 /** What happened, by kind; the rest of a `RealmEvent` says when and for whom. */
 export type RealmEventWhat =
   /** A resident's hunger meter ran empty: they have nothing to eat and lose health. */
@@ -255,9 +276,25 @@ export type RealmEventWhat =
       kind: 'died'
       residentId: string
       name: string
-      cause: 'starved' | 'oldAge'
+      cause: DeathCause
       leader: boolean
+      /** Who killed them, by name, when they were `killed`. */
+      by?: string
     }
+  /**
+   * A fight began (`CONTEXT.md`: Combat): the realm's resident `name` struck the first blow at
+   * `other`, or, when not `attacker`, `other` struck it at them.
+   */
+  | {
+      kind: 'fight'
+      residentId: string
+      name: string
+      otherId: string
+      other: string
+      attacker: boolean
+    }
+  /** A resident who carries no weapon was hit and flees home (`CONTEXT.md`: Combat). */
+  | { kind: 'fled'; residentId: string; name: string }
   /** Food went bad over the game day in the realm's storages, residents' loads and carriages. */
   | { kind: 'foodSpoiled'; units: number }
   /** A pair had a child (`CONTEXT.md`: Pairing, Child); `parents` are their names. */

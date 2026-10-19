@@ -113,6 +113,8 @@ describe('invariants', () => {
     expect(checkInvariants(world, terrain)).toEqual([
       expect.objectContaining({ invariant: 'health-and-hunger-in-range', entityIds: [a.id] }),
       expect.objectContaining({ invariant: 'health-and-hunger-in-range', entityIds: [b.id] }),
+      // No health is in range, but a resident with none should have died and left their goods.
+      expect.objectContaining({ invariant: 'dead-leave-loot', entityIds: [c.id] }),
     ])
   })
 
