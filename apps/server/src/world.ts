@@ -99,14 +99,14 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
-  resolveTearingDown(world, teardowns)
+  resolveTearingDown(world, teardowns, terrain)
   const work = requestWork(world)
   resolveWork(world, work)
   const births = requestBirths(world)
   resolveBirths(world, births)
   world.tick++
   const aging = stepAging(world)
-  stepRefill(world)
+  stepRefill(world, terrain.size)
   const actions =
     steps.length + carries.length + builds.length + teardowns.length + work.length + births.length
   return { actions, survival, horsesDied, aging }

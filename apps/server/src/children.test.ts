@@ -101,7 +101,7 @@ describe('children', () => {
 
   it('can’t pick up or put down goods, but can walk home and be fed there', () => {
     const { world, queue, child } = bornOnTheFarm()
-    const city = world.cities.find((c) => c.id === child.cityId)!
+    const storage = world.buildings.find((b) => b.cityId === child.cityId && b.kind === 'storage')!
     const walking = new Walking(terrain)
     const send = (o: object) => queue.receive(world, me, 'q', { residentId: child.id, ...o })
     const carry = 'children can’t pick up or put down goods'
@@ -117,7 +117,7 @@ describe('children', () => {
     })
 
     // Born on the farm outside the wall, they walk home, where they take meals from storage.
-    const home = { x: city.x + 1, y: city.y + city.size - 2 }
+    const home = { x: storage.x - 2, y: storage.y + 2 }
     expect(send({ kind: 'walkTo', ...home })).toMatchObject({ type: 'ack' })
     queue.applyAll(world)
     for (let t = 0; t < 5000 && (child.x !== home.x || child.y !== home.y); t++) {

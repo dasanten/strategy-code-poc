@@ -12,7 +12,6 @@ import {
   MAX_HEALTH,
   START_HORSES,
   START_STABLE_FOOD,
-  isInsideWalls,
   type Carriage,
   type Horse,
   type TerrainMap,
@@ -27,6 +26,54 @@ import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
 import { createWorld } from './world.js'
 
 const terrain = smallTerrain()
+
+/** A city as saved before format 15: a walled square with one gate. */
+interface OldCity {
+  id: string
+  name: string
+  realmId: string | null
+  x: number
+  y: number
+  size: number
+  wall: 'wooden'
+  gate: { x: number; y: number }
+}
+
+const isInsideWalls = (c: OldCity, x: number, y: number) =>
+  x > c.x && y > c.y && x < c.x + c.size - 1 && y < c.y + c.size - 1
+
+/**
+ * A fresh world with Player 1's starting city, as it was saved before format 15: each city a
+ * walled square, with no town hall, wall or gate buildings. Returns the first city's old shape.
+ */
+function worldBefore15() {
+  const { world, terrain: land } = worldWithCity()
+  const cities: OldCity[] = world.cities.map((c) => {
+    const walls = world.buildings.filter(
+      (b) => b.cityId === c.id && (b.kind === 'wall' || b.kind === 'gate'),
+    )
+    const gate = walls.find((b) => b.kind === 'gate')!
+    const x = Math.min(...walls.map((b) => b.x))
+    const y = Math.min(...walls.map((b) => b.y))
+    const size = Math.max(...walls.map((b) => b.x)) - x + 1
+    return {
+      id: c.id,
+      name: c.name,
+      realmId: c.realmId,
+      x,
+      y,
+      size,
+      wall: 'wooden',
+      gate: { x: gate.x, y: gate.y },
+    }
+  })
+  const old = structuredClone(world) as unknown as Omit<typeof world, 'cities'> & {
+    cities: OldCity[]
+  }
+  old.cities = cities
+  old.buildings = old.buildings.filter((b) => !['townHall', 'wall', 'gate'].includes(b.kind))
+  return { world: old, terrain: land, city: cities[0]! }
+}
 
 /** Generates the small test map for any seed, counting how often it is asked to. */
 function counting() {
@@ -167,9 +214,8 @@ describe('world saves', () => {
   it('gives horses health and starting cities a stable with their horses in it (migration 11 → 12)', () => {
     // A format-11 world: a starting city with no stable and one horse inside its walls, and a
     // horse of nobody out on the map.
-    const { world, terrain: land } = worldWithCity()
-    const city = world.cities[0]!
-    const v11 = structuredClone(world) as unknown as Record<string, unknown> & typeof world
+    const { world, terrain: land, city } = worldBefore15()
+    const v11 = structuredClone(world)
     v11.buildings = v11.buildings.filter((b) => b.kind !== 'stable')
     const strip = ({ health: _health, ...h }: Horse) => h
     v11.horses = [
@@ -205,11 +251,10 @@ describe('world saves', () => {
   it('moves carriages from inside the walls to the stable and hitches a horse (migration 12 → 13)', () => {
     // A format-12 world: the city's carriage inside its walls with no horse, a second one of
     // the realm there too, and a carriage of nobody out on the map.
-    const { world, terrain: land } = worldWithCity()
-    const city = world.cities[0]!
+    const { world, terrain: land, city } = worldBefore15()
     const stable = world.buildings.find((b) => b.kind === 'stable')!
     const inside = { x: city.x + 3, y: city.y + city.size - 2 }
-    const v12 = structuredClone(world) as unknown as Record<string, unknown> & typeof world
+    const v12 = structuredClone(world)
     const own = world.carriages[0]!
     v12.carriages = [
       { ...own, ...inside },
@@ -232,12 +277,12 @@ describe('world saves', () => {
     // The stray stays where it is, with no horse; the rest of the world is as it was.
     expect(stray).toEqual({ ...before.carriages[2], horseId: null })
     expect(v13.horses).toEqual(before.horses)
-    expect(checkInvariants(v13, land)).toEqual([])
+    expect(checkInvariants(migrateWorld(v13, 13, { terrain: land }), land)).toEqual([])
   })
 
   it('gives running haul routes no return goods (migration 13 → 14)', () => {
     // A format-13 world: the city's driver on a haul route from the stable to the storage.
-    const { world, terrain: land } = worldWithCity()
+    const { world, terrain: land } = worldBefore15()
     const storage = world.buildings.find((b) => b.kind === 'storage')!
     const k = world.carriages[0]!
     const [driver, other] = world.residents
@@ -265,7 +310,66 @@ describe('world saves', () => {
     // Everyone else is as they were.
     expect(v14.residents.slice(1)).toEqual(before.residents.slice(1))
     expect(v14.residents[1]!.order).toEqual(other!.order)
-    expect(checkInvariants(v14, land)).toEqual([])
+    expect(checkInvariants(migrateWorld(v14, 14, { terrain: land }), land)).toEqual([])
+  })
+
+  it('gives cities a town hall and turns their wall ring into wall and gate buildings (migration 14 → 15)', () => {
+    // A format-14 world: the starting city as a walled square, and a pair living in it.
+    const { world, terrain: land, city } = worldBefore15()
+    const [a, b] = world.residents
+    a!.order = { kind: 'pair', partnerId: b!.id, since: 0 }
+    b!.order = { kind: 'pair', partnerId: a!.id, since: 0 }
+    const before = structuredClone(world)
+
+    const v15 = migrateWorld(structuredClone(world), 14, { terrain: land }, migrations, 15)
+    expect(v15.cities).toHaveLength(1)
+    const c = v15.cities[0]!
+    expect(c).toEqual({
+      id: city.id,
+      name: city.name,
+      realmId: city.realmId,
+      townHallId: c.townHallId,
+    })
+    // The town hall stands inside the walls, by the storage in the middle.
+    const hall = v15.buildings.find((x) => x.id === c.townHallId)!
+    expect(hall).toMatchObject({ kind: 'townHall', cityId: c.id })
+    expect(isInsideWalls(city, hall.x, hall.y)).toBe(true)
+    // Every tile of the old wall ring is a wall now, and the gate a gate, all of the city.
+    const ring = v15.buildings.filter((x) => x.kind === 'wall' || x.kind === 'gate')
+    expect(ring).toHaveLength(4 * (city.size - 1))
+    expect(ring.filter((x) => x.kind === 'gate')).toEqual([
+      expect.objectContaining({ x: city.gate.x, y: city.gate.y }),
+    ])
+    for (const x of ring) expect(x.cityId).toBe(c.id)
+    // Houses and the storage still belong to it, so does the farm laid out for it.
+    for (const x of before.buildings) {
+      expect(v15.buildings.find((y) => y.id === x.id)).toEqual(x)
+    }
+    // Residents and their pairs are as they were; new ids come from the world's counter.
+    expect(v15.residents).toEqual(before.residents)
+    expect(v15.nextId).toBe(before.nextId + 1 + ring.length)
+    expect(checkInvariants(v15, land)).toEqual([])
+  })
+
+  it('dissolves an old city with no room left for a town hall (migration 14 → 15)', () => {
+    const { world, terrain: land, city } = worldBefore15()
+    // Fill every free tile inside the walls.
+    for (let y = city.y + 1; y < city.y + city.size - 1; y++) {
+      for (let x = city.x + 1; x < city.x + city.size - 1; x++) {
+        if (world.buildings.some((b) => b.x === x && b.y === y)) continue
+        world.buildings.push({ id: `h${x},${y}`, kind: 'house', cityId: city.id, x, y })
+      }
+    }
+    const [a, b] = world.residents
+    a!.order = { kind: 'pair', partnerId: b!.id, since: 0 }
+    b!.order = { kind: 'pair', partnerId: a!.id, since: 0 }
+
+    const v15 = migrateWorld(structuredClone(world), 14, { terrain: land }, migrations, 15)
+    expect(v15.cities).toEqual([])
+    for (const r of v15.residents) expect(r.cityId).toBeNull()
+    expect(v15.residents[0]!.order).toBeNull()
+    for (const x of v15.buildings) expect(x.cityId).toBeNull()
+    expect(checkInvariants(v15, land)).toEqual([])
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

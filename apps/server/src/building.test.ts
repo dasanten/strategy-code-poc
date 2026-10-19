@@ -222,18 +222,8 @@ describe('build order', () => {
     r.bornAt = world.tick - 30 * TICKS_PER_GAME_YEAR
     world.buildings.push({ id: 'b9', kind: 'lumberCamp', cityId: null, x: 3, y: 3 })
     expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building on this tile')
-    world.buildings = []
-    world.cities.push({
-      id: 'c1',
-      name: 'Ashford',
-      realmId: 'r1',
-      x: 3,
-      y: 1,
-      size: 5,
-      wall: 'wooden',
-      gate: { x: 5, y: 5 },
-    })
-    expect(reject(buildOrder('lumberCamp'))).toBe('nothing can be built on a wall')
+    world.buildings = [{ id: 'b9', kind: 'wall', cityId: null, x: 3, y: 3 }]
+    expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building on this tile')
     expect(queue.size).toBe(0)
   })
 
@@ -284,6 +274,7 @@ describe('building invariants', () => {
     expect(buildingsInPlace.check(world, terrain).map((v) => v.message)).toEqual([
       'b1 is a mine off its node',
       'b2 is a mine of city c1',
+      'b2 belongs to no city (c1)',
     ])
   })
 

@@ -15,11 +15,14 @@ import {
   STAT_NAMES,
   Terrain,
   ageInYears,
-  isInsideWalls,
+  inCityArea,
   terrainAt,
   wrapDistance,
+  isCityBuilding,
+  townHallOf,
   type City,
   type TerrainMap,
+  type WorldState,
 } from '@csp/shared'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { checkInvariants } from './invariants.js'
@@ -28,7 +31,8 @@ import { generateTerrain } from './terrain-gen.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { createWorld } from './world.js'
 
-const centreOf = (c: City) => ({ x: c.x + c.size / 2, y: c.y + c.size / 2 })
+/** Where a city's town hall stands. */
+const centreOf = (world: WorldState, c: City) => townHallOf(world, c)!
 
 describe('foundStartingCity', () => {
   it('gives a Player a realm with everything a starting city has', () => {
@@ -36,7 +40,14 @@ describe('foundStartingCity', () => {
     const realm = realmOf(world, 1)!
     const [city] = world.cities
     expect(world.realms).toEqual([realm])
-    expect(city).toMatchObject({ realmId: realm.id, size: START_CITY_SIZE, wall: 'wooden' })
+    expect(city).toMatchObject({ realmId: realm.id })
+    // A town hall, and a ring of wooden wall with one gate in the middle of a side.
+    const hall = townHallOf(world, city!)!
+    expect(hall).toMatchObject({ kind: 'townHall', cityId: city!.id })
+    const walls = world.buildings.filter((b) => b.kind === 'wall' || b.kind === 'gate')
+    expect(walls).toHaveLength(4 * (START_CITY_SIZE - 1))
+    expect(walls.filter((b) => b.kind === 'gate')).toHaveLength(1)
+    for (const b of world.buildings.filter(isCityBuilding)) expect(b.cityId).toBe(city!.id)
 
     const residents = world.residents.filter((r) => r.owner === realm.id)
     expect(residents).toHaveLength(START_RESIDENTS)
@@ -67,14 +78,15 @@ describe('foundStartingCity', () => {
     expect(kinds.filter((k) => k === 'storage')).toHaveLength(1)
     expect(kinds.filter((k) => k === 'farm')).toHaveLength(1)
     expect(world.buildings.find((b) => b.kind === 'storage')!.stock).toEqual({ food: START_FOOD })
-    expect(isInsideWalls(city!, farm.x, farm.y)).toBe(false)
+    // The farm lies just past the city's area, so working it is not being at home.
+    expect(inCityArea(world, city!, farm.x, farm.y, terrain.size)).toBe(false)
     expect(terrainAt(terrain, farm.x, farm.y)).toBe(Terrain.Plains)
     // A stable on Plains next to the farm, with a little food and the realm's horses in it.
     const stable = world.buildings.find((b) => b.kind === 'stable')!
     expect(kinds.filter((k) => k === 'stable')).toHaveLength(1)
     expect(stable).toMatchObject({ cityId: city!.id, stock: { food: START_STABLE_FOOD } })
     expect(terrainAt(terrain, stable.x, stable.y)).toBe(Terrain.Plains)
-    expect(isInsideWalls(city!, stable.x, stable.y)).toBe(false)
+    expect(inCityArea(world, city!, stable.x, stable.y, terrain.size)).toBe(false)
     expect(Math.max(Math.abs(stable.x - farm.x), Math.abs(stable.y - farm.y))).toBeLessThan(4)
     expect(world.horses).toHaveLength(START_HORSES)
     for (const h of world.horses) {
@@ -131,23 +143,25 @@ describe('foundStartingCity', () => {
       const world = createWorld(terrain)
       for (let user = 1; user <= 5; user++) foundStartingCity(world, terrain, user)
       for (const c of world.cities) {
+        const own = world.buildings.filter((b) => b.cityId === c.id)
+        const xs = own.map((b) => b.x)
+        const ys = own.map((b) => b.y)
         // Inside the map's square: a city never straddles a join.
-        expect(c.x).toBeGreaterThanOrEqual(1)
-        expect(c.x + c.size).toBeLessThan(terrain.size)
-        expect(c.y).toBeGreaterThanOrEqual(1)
-        expect(c.y + c.size).toBeLessThan(terrain.size)
-        for (let y = c.y; y < c.y + c.size; y++) {
-          for (let x = c.x; x < c.x + c.size; x++) {
-            expect([Terrain.Plains, Terrain.Forest, Terrain.Hills]).toContain(
-              terrainAt(terrain, x, y),
-            )
-          }
+        expect(Math.min(...xs)).toBeGreaterThanOrEqual(1)
+        expect(Math.max(...xs)).toBeLessThan(terrain.size - 1)
+        expect(Math.min(...ys)).toBeGreaterThanOrEqual(1)
+        expect(Math.max(...ys)).toBeLessThan(terrain.size - 1)
+        expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(START_CITY_SIZE + 4)
+        for (const b of own) {
+          expect([Terrain.Plains, Terrain.Forest, Terrain.Hills]).toContain(
+            terrainAt(terrain, b.x, b.y),
+          )
         }
         for (const other of world.cities) {
           if (other === c) continue
-          expect(wrapDistance(terrain.size, centreOf(c), centreOf(other))).toBeGreaterThanOrEqual(
-            CITY_MIN_DISTANCE,
-          )
+          expect(
+            wrapDistance(terrain.size, centreOf(world, c), centreOf(world, other)),
+          ).toBeGreaterThanOrEqual(CITY_MIN_DISTANCE)
         }
       }
       expect(checkInvariants(world, terrain)).toEqual([])

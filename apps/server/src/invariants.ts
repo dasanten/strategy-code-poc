@@ -28,8 +28,9 @@ import {
   NODE_TERRAINS,
   REALM_LOG_LENGTH,
   Terrain,
-  isInsideWalls,
-  isWallTile,
+  OFF_NODES,
+  cityMembership,
+  isCityBuilding,
   STAT_NAMES,
   terrainAt,
   carryCapacity,
@@ -93,7 +94,6 @@ export const positionsOnMap: Invariant = {
       ...world.carriages,
       ...world.buildings,
       ...world.nodes,
-      ...world.cities,
       ...world.piles,
     ]
     return things
@@ -127,11 +127,10 @@ export const realmsHaveLeaders: Invariant = {
 }
 
 /**
- * Buildings and construction sites: one per tile and never on a wall; houses and storages inside
- * their city's walls, farms and stables on Plains, mines, quarries and lumber camps on a resource
- * node of their kind and of no city; smelters and mints of no city, off nodes and off Mountain; a
- * stable of no city or of one that exists; every city's wall
- * on passable terrain; no stock below zero.
+ * Buildings and construction sites: one per tile; farms and stables on Plains, mines, quarries
+ * and lumber camps on a resource node of their kind and of no city; smelters, mints, town halls,
+ * walls and gates off nodes and off Mountain, smelters and mints of no city; a stable, farm,
+ * house or storage of no city or of one that exists; no stock below zero.
  */
 export const buildingsInPlace: Invariant = {
   name: 'buildings-in-place',
@@ -145,27 +144,19 @@ export const buildingsInPlace: Invariant = {
       const key = `${b.x},${b.y}`
       if (tiles.has(key)) fail(b.id, `shares tile (${key}) with another building`)
       tiles.add(key)
-      const onWall = world.cities.some((c) => isWallTile(c, b.x, b.y))
-      if (onWall) fail(b.id, 'stands on a wall')
-      if (b.kind === 'stable') {
-        if (b.cityId !== null && !cities.has(b.cityId))
-          fail(b.id, `belongs to no city (${b.cityId})`)
-      } else if (PROCESSING.includes(b.kind)) {
+      if (OFF_NODES.includes(b.kind)) {
         if (world.nodes.some((n) => n.x === b.x && n.y === b.y))
           fail(b.id, `is a ${b.kind} on a resource node`)
         if (terrainAt(terrain, b.x, b.y) === Terrain.Mountain)
           fail(b.id, `is a ${b.kind} on Mountain`)
-        if (b.cityId !== null) fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
-      } else if (BUILDABLE.includes(b.kind)) {
+        if (PROCESSING.includes(b.kind) && b.cityId !== null)
+          fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
+      } else if (BUILDABLE.includes(b.kind) && b.kind !== 'stable') {
         const node = world.nodes.find((n) => n.x === b.x && n.y === b.y)
         if (!node || NODE_WORKPLACE[node.kind] !== b.kind) fail(b.id, `is a ${b.kind} off its node`)
         if (b.cityId !== null) fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
-      } else {
-        const city = b.cityId === null ? undefined : cities.get(b.cityId)
-        if (!city) fail(b.id, `belongs to no city (${b.cityId})`)
-        else if (!onWall && b.kind !== 'farm' && !isInsideWalls(city, b.x, b.y))
-          fail(b.id, 'is outside the walls')
       }
+      if (b.cityId !== null && !cities.has(b.cityId)) fail(b.id, `belongs to no city (${b.cityId})`)
       if (
         (b.kind === 'farm' || b.kind === 'stable') &&
         terrainAt(terrain, b.x, b.y) !== Terrain.Plains
@@ -174,22 +165,38 @@ export const buildingsInPlace: Invariant = {
       }
       if (Object.values(b.stock ?? {}).some((kg) => kg < 0)) fail(b.id, 'has negative stock')
     }
-    for (const c of world.cities) {
-      for (let i = 0; i < c.size; i++) {
-        for (const [x, y] of [
-          [c.x + i, c.y],
-          [c.x + i, c.y + c.size - 1],
-          [c.x, c.y + i],
-          [c.x + c.size - 1, c.y + i],
-        ] as const) {
-          if (!isWalkable(terrain, x, y))
-            fail(c.id, `has wall on impassable terrain at (${x}, ${y})`)
-        }
-      }
-      if (!isWallTile(c, c.gate.x, c.gate.y)) fail(c.id, 'has its gate off the wall')
-    }
     for (const k of world.carriages) {
       if (Object.values(k.load).some((kg) => kg < 0)) fail(k.id, 'has a negative load')
+    }
+    return out
+  },
+}
+
+/**
+ * Cities keep to `CONTEXT.md` (City, Town hall, City building): every city has exactly one town
+ * hall, a finished one that belongs to it; every town hall makes a city; and every finished city
+ * building belongs to the city its chain gives it (`cityMembership`), so the city area always
+ * follows from the buildings.
+ */
+export const citiesFromBuildings: Invariant = {
+  name: 'cities-from-buildings',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const fail = (id: string, message: string) =>
+      out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
+    const halls = new Map<string, string>()
+    for (const c of world.cities) {
+      const hall = world.buildings.find((b) => b.id === c.townHallId)
+      if (!hall || hall.kind !== 'townHall' || hall.site) fail(c.id, 'has no town hall')
+      else if (halls.has(hall.id)) fail(c.id, `shares town hall ${hall.id} with another city`)
+      else halls.set(hall.id, c.id)
+    }
+    const members = cityMembership(world, terrain.size)
+    for (const b of world.buildings) {
+      if (b.kind === 'townHall' && !b.site && !halls.has(b.id)) fail(b.id, 'makes no city')
+      if (!isCityBuilding(b)) continue
+      const city = members.get(b.id) ?? null
+      if (b.cityId !== city) fail(b.id, `belongs to city ${b.cityId}, but stands in ${city}`)
     }
     return out
   },
@@ -558,12 +565,12 @@ export const workOrdersOnWorkplaces: Invariant = {
  */
 export const refilledWhenLow: Invariant = {
   name: 'refilled-when-low',
-  check(world) {
+  check(world, terrain) {
     return world.residents
       .filter(
         (r) =>
           (r.carried.food ?? 0) < HOME_FOOD_LOW &&
-          (refillStock(world, r)?.food ?? 0) > 0 &&
+          (refillStock(world, r, terrain.size)?.food ?? 0) > 0 &&
           unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
       )
       .map((r) => ({
@@ -756,6 +763,7 @@ export const worldInvariants: Invariant[] = [
   agesInRange,
   realmsHaveLeaders,
   buildingsInPlace,
+  citiesFromBuildings,
   carriedWithinCapacity,
   goodsInPlace,
   stablesBreedInRange,
