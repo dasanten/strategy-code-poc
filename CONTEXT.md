@@ -47,8 +47,8 @@ The shared language of the game. Domain terms only — no implementation details
   (more of it) Mountain.
 - **Workplace:** a building where residents produce goods. Output depends on the workers'
   Strength and skill and is limited by the workplace's maximum number of workers. Working there
-  teaches its skill. Its output goes into its workers' hands, as far as they can carry it; the
-  rest is left in a pile on the workplace's tile. Getting it to a storage takes carrying it there.
+  teaches its skill. Its output is left in the pile on the workplace's tile, not in the
+  workers' hands. Getting it to a storage takes carrying it there.
   Kinds:
   - **Mine / Quarry / Lumber camp:** built on a resource node; makes what the node yields (a mine
     iron ore or gold ore). Lumber camps teach Woodcutting, quarries and mines Mining.
@@ -225,8 +225,11 @@ The shared language of the game. Domain terms only — no implementation details
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
 - **Refilling at home:** a resident inside their own city's walls who is running low on food
-  takes a meal from the city's storage into their hands, without an order. Away from home (on
-  the farm, travelling) there is no refill: they need food on them or a delivery.
+  takes a meal from the city's storage into their hands, without an order.
+- **Refilling at a workplace:** a resident working at a workplace who is running low on food
+  takes a meal the same way from Food lying on the workplace's tile, or else from a carriage
+  standing there. Anywhere else (travelling, building) there is no refill: they need food on
+  them or a delivery.
 
 ## Transport
 
@@ -253,7 +256,9 @@ The shared language of the game. Domain terms only — no implementation details
   like at a storage, up to what the carriage holds.
 - **Haul route:** an order (as a script could do it) for a resident to drive a carriage between
   two stops again and again: they load the chosen goods at the first stop, drive them to the
-  second, unload them, and come back for more, until stopped. A stop with a storage loads and
+  second, unload them, and come back for more, until stopped. Goods can go both ways: others
+  chosen to come back are loaded at the second stop and unloaded at the first (e.g. ore home,
+  Food out to the mine); no good goes both ways. A stop with a storage loads and
   unloads there, else on the ground; the driver loads by hand like anyone. Some Food stays on
   board for the horse, topped up at any stop that has Food. The carriage leaves the first stop
   once it has goods on board and nothing more to load; with no goods there yet it waits.

@@ -23,7 +23,8 @@ import { realmOf } from './starting-city.js'
 
 /**
  * The input of a haul order: which resident drives which carriage from the tile they share to
- * the other stop (x, y), which goods, and how much Food stays on board for the horse.
+ * the other stop (x, y), which goods go there and which come back (none if left out), and how
+ * much Food stays on board for the horse.
  */
 interface HaulRequest extends OrderRequest {
   kind: 'haul'
@@ -32,12 +33,13 @@ interface HaulRequest extends OrderRequest {
   x: number
   y: number
   goods: Good[]
+  returnGoods?: Good[]
   keepFood: number
 }
 
-/** The order's goods as plain data: known goods, each once, at least one. */
-function readGoods(goods: unknown): Good[] | undefined {
-  if (!Array.isArray(goods) || goods.length === 0) return undefined
+/** The order's goods as plain data: known goods, each once, at least `min` of them. */
+function readGoods(goods: unknown, min = 1): Good[] | undefined {
+  if (!Array.isArray(goods) || goods.length < min) return undefined
   if (!goods.every((g) => (GOODS as readonly unknown[]).includes(g))) return undefined
   return new Set(goods).size === goods.length ? (goods as Good[]) : undefined
 }
@@ -45,9 +47,9 @@ function readGoods(goods: unknown): Good[] | undefined {
 /**
  * The haul order (`CONTEXT.md`: Haul route): one of the Player's adult residents drives one of
  * the Player's carriages between the tile they share, where the goods are loaded, and another
- * tile, where they are unloaded, again and again until given another order. Like driving, it
- * only sets the order; later ticks request the steps (`Walking`) and the takes and puts
- * (`requestHauling`).
+ * tile, where they are unloaded and the return goods loaded, again and again until given another
+ * order. Like driving, it only sets the order; later ticks request the steps (`Walking`) and the
+ * takes and puts (`requestHauling`).
  */
 export const haul: OrderKind = {
   validate(world, sender, order, terrain) {
@@ -62,7 +64,12 @@ export const haul: OrderKind = {
     if (terrain && !carriageCanEnter(terrainAt(terrain, o.x!, o.y!))) {
       return 'a carriage can’t go there'
     }
-    if (!readGoods(o.goods)) return 'pick the goods to haul'
+    const goods = readGoods(o.goods)
+    if (!goods) return 'pick the goods to haul'
+    const back = readGoods(o.returnGoods ?? [], 0)
+    if (!back || back.some((g) => goods.includes(g))) {
+      return 'pick the goods to haul back, none of them hauled there'
+    }
     const food = o.keepFood
     if (!Number.isInteger(food) || food! < 0 || food! * GOOD_WEIGHT.food > CARRIAGE_CAPACITY) {
       return 'the Food kept for the horse must be whole units that fit on the carriage'
@@ -70,7 +77,7 @@ export const haul: OrderKind = {
     return driveProblem(world, r, carriage)
   },
   apply(world, _sender, order) {
-    const { residentId, carriageId, x, y, goods, keepFood } = order as HaulRequest
+    const { residentId, carriageId, x, y, goods, returnGoods, keepFood } = order as HaulRequest
     const r = world.residents.find((x) => x.id === residentId)
     const carriage = world.carriages.find((k) => k.id === carriageId)
     // Two drivers ordered onto one carriage in the same tick: the first one drives it.
@@ -81,6 +88,7 @@ export const haul: OrderKind = {
       from: { x: r.x, y: r.y },
       to: { x, y },
       goods: [...goods],
+      returnGoods: [...(returnGoods ?? [])],
       keepFood,
       stop: 'from',
       phase: 'loading',
@@ -127,9 +135,10 @@ interface Transfer {
 const kept = (o: HaulOrder, good: Good) => (good === 'food' ? o.keepFood : 0)
 
 /**
- * The next take at the hauler's stop, if there is one: at `to`, unloading the route's goods; at
- * either stop, topping up the Food kept for the horse; at `from`, loading the route's goods. Each
- * take is no more than the hauler can carry and, onto the carriage, no more than fits on it.
+ * The next take at the hauler's stop, if there is one: unloading what goes to this stop (`goods`
+ * at `to`, `returnGoods` at `from`); topping up the Food kept for the horse; loading what goes
+ * on from here (`goods` at `from`, `returnGoods` at `to`). Each take is no more than the hauler
+ * can carry and, onto the carriage, no more than fits on it.
  */
 function nextTransfer(
   world: WorldState,
@@ -143,19 +152,16 @@ function nextTransfer(
   const there = goodsAtSpot(world, r.x, r.y, spot) ?? {}
   const hands = (g: Good) => unitsThatFit(r, g, world.tick)
   const loadable = (g: Good) => Math.min(there[g] ?? 0, hands(g), unitsThatFitCarriage(carriage, g))
-  if (o.stop === 'to') {
-    for (const good of o.goods) {
-      const units = Math.min((load[good] ?? 0) - kept(o, good), hands(good))
-      if (units > 0) return { good, units, from: onCarriage, onto: 'stop' }
-    }
+  const [unloading, loading] = o.stop === 'to' ? [o.goods, o.returnGoods] : [o.returnGoods, o.goods]
+  for (const good of unloading) {
+    const units = Math.min((load[good] ?? 0) - kept(o, good), hands(good))
+    if (units > 0) return { good, units, from: onCarriage, onto: 'stop' }
   }
   const food = Math.min(o.keepFood - (load.food ?? 0), loadable('food'))
   if (food > 0) return { good: 'food', units: food, from: spot, onto: 'carriage' }
-  if (o.stop === 'from') {
-    for (const good of o.goods) {
-      const units = loadable(good)
-      if (units > 0) return { good, units, from: spot, onto: 'carriage' }
-    }
+  for (const good of loading) {
+    const units = loadable(good)
+    if (units > 0) return { good, units, from: spot, onto: 'carriage' }
   }
   return undefined
 }

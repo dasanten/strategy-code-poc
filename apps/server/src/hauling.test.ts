@@ -3,6 +3,7 @@ import {
   MAX_HEALTH,
   MAX_HUNGER,
   Terrain,
+  pileAt,
   type Building,
   type Carriage,
   type Good,
@@ -124,6 +125,11 @@ describe('the haul order', () => {
     expect(order({ goods: [] })).toMatchObject({ reason: 'pick the goods to haul' })
     expect(order({ goods: ['gems'] })).toMatchObject({ reason: 'pick the goods to haul' })
     expect(order({ goods: ['wood', 'wood'] })).toMatchObject({ reason: 'pick the goods to haul' })
+    const back = 'pick the goods to haul back, none of them hauled there'
+    expect(order({ returnGoods: ['food'] })).toEqual({ type: 'ack', requestId: 'q' })
+    expect(order({ returnGoods: ['ironOre'] })).toMatchObject({ reason: back })
+    expect(order({ returnGoods: ['gems'] })).toMatchObject({ reason: back })
+    expect(order({ returnGoods: 'food' })).toMatchObject({ reason: back })
     expect(order({ keepFood: -1 })).toMatchObject({ reason: expect.stringContaining('Food') })
     expect(order({ keepFood: CARRIAGE_CAPACITY + 1 })).toMatchObject({
       reason: expect.stringContaining('Food'),
@@ -202,6 +208,32 @@ describe('a haul route', () => {
     expect(w1.carried.food).toBe(2)
   })
 
+  it('hauls the return goods back from the other stop, keeping the horse’s Food on board', () => {
+    const { world, w1, carriage, storage } = setup()
+    storage.stock = { food: 60 }
+    pile(world, 2, 2, { ironOre: 20 })
+    haul(world, ['ironOre'], 6, { returnGoods: ['food'] })
+    const walking = new Walking(open)
+    const order = () => w1.order as HaulOrder
+    // Ore goes to the storage; the Food comes back and is unloaded at the first stop.
+    run(
+      world,
+      walking,
+      4000,
+      () =>
+        order().stop === 'to' &&
+        order().phase === 'driving' &&
+        (storage.stock!.ironOre ?? 0) === 20 &&
+        world.tick > 1000,
+    )
+    expect(storage.stock!.ironOre).toBe(20)
+    expect(storage.stock!.food ?? 0).toBe(0)
+    expect(pileAt(world, 2, 2)?.goods.food).toBeGreaterThan(40)
+    expect(carriage.load.food).toBeGreaterThan(4)
+    expect(carriage.load.food).toBeLessThanOrEqual(6)
+    expect(order().returnGoods).toEqual(['food'])
+  })
+
   it('stops when told to', () => {
     const { world, w1 } = setup()
     haul(world, ['ironOre'])
@@ -232,6 +264,8 @@ describe('a haul route', () => {
     world.residents.push(w2)
     haul(world, ['ironOre'])
     w2.order = { ...(w1.order as HaulOrder), to: { x: 2, y: 8 }, goods: [], keepFood: 999 }
+    world.residents.push(newResident(mulberry32(3), { id: 'w3', owner: 'r1', x: 2, y: 2, tick: 0 }))
+    world.residents.at(-1)!.order = { ...(w1.order as HaulOrder), returnGoods: ['ironOre'] }
     const messages = checkInvariants(world, map).map((v) => `${v.invariant}: ${v.message}`)
     expect(messages).toEqual(
       expect.arrayContaining([
@@ -239,6 +273,7 @@ describe('a haul route', () => {
         expect.stringMatching(/drivers-on-carriages: resident w2 drives k1 together with w1/),
         expect.stringMatching(/haul-routes-sound: resident w2 hauls to \(2, 8\), where no/),
         expect.stringMatching(/haul-routes-sound: resident w2 hauls no goods/),
+        expect.stringMatching(/haul-routes-sound: resident w3 hauls ironOre both ways/),
         expect.stringMatching(/haul-routes-sound: resident w2 keeps 999 Food/),
         expect.stringMatching(/haul-routes-sound: resident w2 loads at the from stop but stands/),
       ]),

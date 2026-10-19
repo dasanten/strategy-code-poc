@@ -7,6 +7,7 @@ import {
   batchWork,
   buildProblem,
   inputAt,
+  pileAt,
   workplaceGood,
   type BuildingKind,
   type TerrainMap,
@@ -99,23 +100,24 @@ describe('smelter and mint', () => {
     expect(workplaceGood(mint.world, mint.place)).toBe('coins')
   })
 
-  it('a smelter turns the iron ore its worker carries into iron, and teaches Smelting', () => {
+  it('a smelter turns the iron ore its worker carries into iron on its pile, and teaches Smelting', () => {
     const { world, r } = setup('smelter')
     r.carried.ironOre = 10
     run(world, TICKS_PER_GAME_DAY + 2)
     const batches = BATCHES_PER_DAY.smelter!
-    expect(r.carried.iron).toBe(batches)
+    expect(pileAt(world, 2, 2)?.goods.iron).toBe(batches)
+    expect(r.carried.iron ?? 0).toBe(0)
     expect(r.carried.ironOre).toBe(10 - 2 * batches)
     expect(r.skills.smelting).toBeCloseTo(1, 1)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('a mint turns gold ore lying on its tile into coins, and the empty pile goes', () => {
+  it('a mint turns gold ore lying on its tile into coins left there', () => {
     const { world, r } = setup('mint')
     world.piles.push({ id: 'p1', x: 2, y: 2, goods: { goldOre: 1 } })
     run(world, TICKS_PER_GAME_DAY)
-    expect(r.carried.coins).toBe(20)
-    expect(world.piles).toEqual([])
+    expect(r.carried.coins ?? 0).toBe(0)
+    expect(world.piles).toEqual([expect.objectContaining({ goods: { coins: 20 } })])
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 

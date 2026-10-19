@@ -106,6 +106,7 @@ export type Picking = false | 'walk' | 'drive' | 'haul'
 /** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
 export interface HaulSetup {
   goods: Good[]
+  returnGoods: Good[]
   keepFood: number
 }
 
@@ -126,7 +127,9 @@ function doing(r: Resident): string {
     if (o.phase === 'loading') {
       return o.stop === 'from' ? `Loading ${what} at ${x}, ${y}` : `Unloading ${what} at ${x}, ${y}`
     }
-    const leg = o.stop === 'to' ? `Hauling ${what} to` : 'Driving back to'
+    const back = o.returnGoods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
+    const leg =
+      o.stop === 'to' ? `Hauling ${what} to` : back ? `Hauling ${back} back to` : 'Driving back to'
     return o.path ? `${leg} ${x}, ${y} · ${o.path.length} tiles to go` : `${leg} ${x}, ${y}`
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
@@ -524,8 +527,8 @@ const PICKING_BUTTONS: Record<Exclude<Picking, false>, string> = {
 
 /**
  * Setting up a haul route with the carriage on the resident's tile (`CONTEXT.md`: Haul route):
- * which goods go from here to the other stop and how much Food stays on board for the horse,
- * then the other stop on the map.
+ * which goods go from here to the other stop, which come back, and how much Food stays on board
+ * for the horse, then the other stop on the map.
  */
 function HaulBlock({
   resident,
@@ -540,9 +543,14 @@ function HaulBlock({
   onHaulTo: (setup: HaulSetup) => void
 }) {
   const [goods, setGoods] = useState<Good[]>([])
+  const [returnGoods, setReturnGoods] = useState<Good[]>([])
   const [keepFood, setKeepFood] = useState(HAUL_KEEP_FOOD)
-  const toggle = (g: Good) =>
-    setGoods((now) => (now.includes(g) ? now.filter((x) => x !== g) : [...now, g]))
+  // A good goes one way or the other, never both.
+  const toggle = (g: Good, back: boolean) => {
+    const [set, other] = back ? [setReturnGoods, setGoods] : [setGoods, setReturnGoods]
+    set((now) => (now.includes(g) ? now.filter((x) => x !== g) : [...now, g]))
+    other((now) => now.filter((x) => x !== g))
+  }
   const o = resident.order
   return (
     <section className="inspector-block" aria-label="Haul route">
@@ -550,14 +558,23 @@ function HaulBlock({
         <h3>Haul route</h3>
         {o?.kind === 'haul' && <span className="small muted">on a route</span>}
       </div>
-      <div className="chips">
-        {GOODS.map((g) => (
-          <label className="chip" key={g}>
-            <input type="checkbox" checked={goods.includes(g)} onChange={() => toggle(g)} />{' '}
-            {GOOD_LABELS[g]}
-          </label>
-        ))}
-      </div>
+      {([false, true] as const).map((back) => (
+        <div key={String(back)}>
+          <span className="small muted">{back ? 'Back from there' : 'To the other stop'}</span>
+          <div className="chips">
+            {GOODS.map((g) => (
+              <label className="chip" key={g}>
+                <input
+                  type="checkbox"
+                  checked={(back ? returnGoods : goods).includes(g)}
+                  onChange={() => toggle(g, back)}
+                />{' '}
+                {GOOD_LABELS[g]}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
       <label className="small">
         Food kept for the horse{' '}
         <input
@@ -575,16 +592,16 @@ function HaulBlock({
           className={picking ? 'primary' : ''}
           aria-pressed={picking}
           disabled={!canWork(resident, tick) || goods.length === 0}
-          onClick={() => onHaulTo({ goods, keepFood })}
+          onClick={() => onHaulTo({ goods, returnGoods, keepFood })}
         >
           {picking ? 'Pick a tile…' : PICKING_BUTTONS.haul}
         </button>
       </div>
       <p className="muted small">
         The driver loads the picked goods here, drives them to the other stop and unloads them,
-        again and again until stopped. A stop with a storage loads and unloads there, else on the
-        ground. The horse eats from the carriage’s load; its Food is topped up wherever there is
-        some.
+        brings the goods picked to come back, again and again until stopped. A stop with a storage
+        loads and unloads there, else on the ground. The horse eats from the carriage’s load; its
+        Food is topped up wherever there is some.
       </p>
     </section>
   )
