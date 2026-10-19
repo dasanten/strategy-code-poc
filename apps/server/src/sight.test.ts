@@ -1,4 +1,11 @@
-import { CHUNK_SIZE, SIGHT_RANGE, START_HORSES, chunksAcross, wrapDistance } from '@csp/shared'
+import {
+  CHUNK_SIZE,
+  SIGHT_RANGE,
+  START_HORSES,
+  chunksAcross,
+  townHallOf,
+  wrapDistance,
+} from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { ExploredTerrain } from './explored.js'
 import { SightTracker, entitiesInSight } from './sight.js'
@@ -52,7 +59,9 @@ describe('entitiesInSight', () => {
     foundStartingCity(world, terrain, 2)
     const [a, b] = world.realms as [(typeof world.realms)[0], (typeof world.realms)[0]]
     const [ca, cb] = world.cities
-    expect(wrapDistance(terrain.size, ca!, cb!)).toBeGreaterThan(SIGHT_RANGE * 3)
+    expect(
+      wrapDistance(terrain.size, townHallOf(world, ca!)!, townHallOf(world, cb!)!),
+    ).toBeGreaterThan(SIGHT_RANGE * 3)
     const ownedBy = (realmId: string) =>
       new Set(
         [

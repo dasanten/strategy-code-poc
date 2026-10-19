@@ -6,9 +6,12 @@ import {
   teardownLeft,
   teardownReturns,
   teardownWork,
+  MAP_SIZE,
   type OrderRequest,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { dissolveCity, updateCityMembership } from './cities.js'
 import type { OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { dropGoods } from './survival.js'
@@ -58,9 +61,15 @@ export function requestTearingDown(world: WorldState): TearDownAction[] {
  * Resolves tear-down work (ADR 0002), one action after another. A resident who has left the tile
  * stops. Work goes into the building on the tile and teaches Construction; once enough is in, the
  * building or site is gone, its returned materials lie on the tile as goods, and everyone's build
- * or tear-down order on it is done.
+ * or tear-down order on it is done. Tearing down a town hall dissolves its city, and tearing down
+ * any city building may shrink or split a city (`updateCityMembership`).
  */
-export function resolveTearingDown(world: WorldState, actions: TearDownAction[]): void {
+export function resolveTearingDown(
+  world: WorldState,
+  actions: TearDownAction[],
+  terrain?: TerrainMap,
+): void {
+  let removed = false
   for (const a of actions) {
     const r = world.residents.find((x) => x.id === a.residentId)
     const o = r?.order
@@ -79,8 +88,12 @@ export function resolveTearingDown(world: WorldState, actions: TearDownAction[])
       dropGoods(world, b.x, b.y, teardownReturns(b))
       // What a stable kept for its horses stays on the tile too.
       dropGoods(world, b.x, b.y, b.stock ?? {})
+      removed = true
+      const city = world.cities.find((c) => c.townHallId === b.id)
+      if (city) dissolveCity(world, city)
     }
   }
+  if (removed) updateCityMembership(world, terrain?.size ?? MAP_SIZE)
   const standing = new Set(world.buildings.map((b) => b.id))
   for (const r of world.residents) {
     const o = r.order

@@ -45,7 +45,12 @@ export const OTHER_COLOR = 0xe0524a
 
 /** City walls and buildings, from the design. */
 export const WALL_COLOR = 0x8a5a2b
+/** A city's area, laid faintly over the terrain. */
+export const CITY_AREA_COLOR = 0xf2e3b8
 export const BUILDING_COLORS: Record<BuildingKind, number> = {
+  townHall: 0xd8c08a,
+  wall: WALL_COLOR,
+  gate: 0xb88a55,
   house: 0xc7b391,
   storage: 0x8c6a44,
   farm: 0x9db05f,
@@ -58,6 +63,9 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
 }
 
 export const BUILDING_NAMES: Record<BuildingKind, string> = {
+  townHall: 'Town hall',
+  wall: 'Wall',
+  gate: 'Gate',
   house: 'House',
   storage: 'Storage',
   farm: 'Farm',

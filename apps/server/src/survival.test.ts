@@ -9,7 +9,9 @@ import {
   Terrain,
   TICKS_PER_GAME_DAY,
   foodUse,
-  isInsideWalls,
+  inCityArea,
+  townHallOf,
+  type City,
   terrainAt,
   type Resident,
   type WorldState,
@@ -34,6 +36,12 @@ function live(world: WorldState, days: number): Resident[] {
 }
 
 const storageOf = (world: WorldState) => world.buildings.find((b) => b.kind === 'storage')!
+
+/** A tile a few steps east of a starting city, outside its area. */
+function awayFrom(world: WorldState, city: City) {
+  const hall = townHallOf(world, city)!
+  return { x: hall.x + 7, y: hall.y - 4 }
+}
 
 /** Every resident gets the same Endurance, so food use is predictable. */
 function averageEndurance(world: WorldState) {
@@ -67,7 +75,7 @@ describe('stepSurvival', () => {
     const before = structuredClone(storageOf(world).stock)
     for (const r of world.residents) {
       Object.assign(r, { x: storageOf(world).x, y: storageOf(world).y, order: null, carried: {} })
-      expect(isInsideWalls(city, r.x, r.y)).toBe(true)
+      expect(inCityArea(world, city, r.x, r.y, terrain.size)).toBe(true)
     }
     expect(live(world, 2.6)).toHaveLength(8)
     expect(storageOf(world).stock).toEqual(before)
@@ -95,7 +103,7 @@ describe('stepSurvival', () => {
     const { world } = worldWithCity()
     const city = world.cities[0]!
     const r = world.residents[1]!
-    Object.assign(r, { x: city.x + city.size + 3, y: city.y, carried: { stone: 4 } })
+    Object.assign(r, { ...awayFrom(world, city), carried: { stone: 4 } })
     world.piles.push({ id: 'p0', x: r.x, y: r.y, goods: { stone: 1, wood: 2 } })
     live(world, 2.6)
     expect(world.piles).toEqual([{ id: 'p0', x: r.x, y: r.y, goods: { stone: 5, wood: 2 } }])
@@ -107,7 +115,7 @@ describe('stepSurvival', () => {
     const realm = world.realms[0]!
     const leader = world.residents.find((r) => r.id === realm.leaderId)!
     const city = world.cities[0]!
-    Object.assign(leader, { x: city.x + city.size + 3, y: city.y, order: null, carried: {} })
+    Object.assign(leader, { ...awayFrom(world, city), order: null, carried: {} })
     const ended: string[] = []
     for (let t = 0; t < 2.6 * TICKS_PER_GAME_DAY; t++) {
       ended.push(...stepSurvival(world, terrain).ended.map((x) => x.id))
@@ -163,7 +171,7 @@ describe('stepSurvival', () => {
       const { world } = worldWithCity()
       averageEndurance(world)
       const city = world.cities[0]!
-      const [x, y] = tileOf(t, (x, y) => !isInsideWalls(city, x, y))
+      const [x, y] = tileOf(t, (x, y) => !inCityArea(world, city, x, y, terrain.size))
       const r = world.residents[1]!
       r.stats.strength = { base: 15, trained: 0 } // room to carry the food
       Object.assign(r, { x, y, order: null, carried: { food: 25 } })
@@ -234,7 +242,7 @@ describe('stepRefill', () => {
     const { world, storage } = atHome()
     const r = world.residents[0]!
     r.carried = { food: HOME_FOOD_LOW - 1 }
-    stepRefill(world)
+    stepRefill(world, terrain.size)
     expect(r.carried.food).toBe(HOME_FOOD_LOW)
     for (const other of world.residents.slice(1)) expect(other.carried.food).toBe(HOME_FOOD_LOW)
     expect(storage.stock!.food).toBe(START_FOOD - (world.residents.length * HOME_FOOD_LOW - 1))
@@ -244,16 +252,16 @@ describe('stepRefill', () => {
   it('leaves a resident who isn’t running low alone', () => {
     const { world, storage } = atHome()
     for (const r of world.residents) r.carried = { food: HOME_FOOD_LOW }
-    stepRefill(world)
+    stepRefill(world, terrain.size)
     expect(storage.stock!.food).toBe(START_FOOD)
   })
 
   it('gives nothing away from home, nor in someone else’s city', () => {
     const { world, storage, city } = atHome()
     const [away, stranger] = world.residents as [Resident, Resident]
-    Object.assign(away, { x: city.x + city.size + 3, y: city.y })
+    Object.assign(away, { ...awayFrom(world, city) })
     stranger.owner = 'someone else'
-    stepRefill(world)
+    stepRefill(world, terrain.size)
     expect(away.carried).toEqual({})
     expect(stranger.carried).toEqual({})
     expect(storage.stock!.food).toBe(START_FOOD - (world.residents.length - 2) * HOME_FOOD_LOW)
@@ -264,7 +272,7 @@ describe('stepRefill', () => {
     const [full, ...rest] = world.residents as [Resident, ...Resident[]]
     full.carried = { stone: carryCapacity(full, world.tick) }
     storage.stock = { food: 1 }
-    stepRefill(world)
+    stepRefill(world, terrain.size)
     expect(full.carried.food).toBeUndefined()
     expect(rest.map((r) => r.carried.food ?? 0)).toEqual([1, ...rest.slice(1).map(() => 0)])
     expect(storage.stock).toEqual({})
@@ -286,7 +294,7 @@ describe('stepRefill', () => {
   it('is caught by the invariant when skipped', () => {
     const { world } = atHome()
     expect(refilledWhenLow.check(world, terrain)).toHaveLength(8)
-    stepRefill(world)
+    stepRefill(world, terrain.size)
     expect(refilledWhenLow.check(world, terrain)).toEqual([])
   })
 })

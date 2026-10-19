@@ -5,6 +5,7 @@ import {
   TERRAIN_SPEED,
   Terrain,
   chunksAcross,
+  cityAreaTiles,
   wrapDelta,
   type KnownNode,
   type Resident,
@@ -36,6 +37,7 @@ import {
   OTHER_COLOR,
   OWN_COLOR,
   WALL_COLOR,
+  CITY_AREA_COLOR,
   TERRAIN_COLORS,
   TERRAIN_NAMES,
   VOID_COLOR,
@@ -467,7 +469,7 @@ function homeCentre(world: ClientWorld): { x: number; y: number } {
   return { x: world.home.x + 0.5, y: world.home.y + 0.5 }
 }
 
-/** Cities' walls and gates, buildings, piles, horses and carriages, at mid zoom and closer. */
+/** City areas, buildings (walls and gates among them), piles, horses and carriages, at mid zoom and closer. */
 function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld) {
   const { cities, buildings, horses, carriages, piles } = world
   const tile = cam.scale
@@ -481,27 +483,26 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
       tile * (1 - 2 * inset),
     ] as const
   }
+  // Each city's area, faintly, from the buildings in sight (`CONTEXT.md`: City area).
+  const onScreen = ([sx, sy]: readonly number[]) =>
+    sx! > -tile && sy! > -tile && sx! < view.width && sy! < view.height
   for (const c of cities) {
-    const [sx, sy] = tileToScreen(cam, view, size, c.x, c.y)
-    if (sx > view.width || sy > view.height || sx + c.size * tile < 0 || sy + c.size * tile < 0) {
-      continue
+    for (const key of cityAreaTiles(world, c, size)) {
+      const [x, y] = key.split(',').map(Number) as [number, number]
+      const b = box(x, y)
+      if (onScreen(b)) g.rect(...b)
     }
-    // The wall is the ring of edge tiles; drawn as a thick band with the gate left open.
-    for (let i = 0; i < c.size; i++) {
-      for (const [x, y] of [
-        [c.x + i, c.y],
-        [c.x + i, c.y + c.size - 1],
-        [c.x, c.y + i],
-        [c.x + c.size - 1, c.y + i],
-      ] as const) {
-        if (x === c.gate.x && y === c.gate.y) continue
-        g.rect(...box(x, y)).fill(WALL_COLOR)
-      }
-    }
-    const [gx, gy, gw, gh] = box(c.gate.x, c.gate.y)
-    g.rect(gx, gy, gw, gh).fill({ color: WALL_COLOR, alpha: 0.35 })
+    g.fill({ color: CITY_AREA_COLOR, alpha: 0.18 })
   }
   for (const b of buildings) {
+    // Walls and gates fill their whole tile, so a wall reads as one band; a gate shows lighter.
+    if (b.kind === 'wall' || b.kind === 'gate') {
+      g.rect(...box(b.x, b.y)).fill({
+        color: WALL_COLOR,
+        alpha: b.site ? 0.3 : b.kind === 'gate' ? 0.45 : 1,
+      })
+      continue
+    }
     // A construction site shows faintly, as an outline of what it will be.
     g.rect(...box(b.x, b.y, 0.08))
       .fill({ color: BUILDING_COLORS[b.kind], alpha: b.site ? 0.35 : 1 })

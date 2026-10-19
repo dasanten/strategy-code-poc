@@ -3,6 +3,7 @@ import { WebSocket, WebSocketServer } from 'ws'
 import {
   SESSION_COOKIE,
   WS_PATH,
+  townHallOf,
   type Account,
   type ClientMessage,
   type ServerMessage,
@@ -84,8 +85,12 @@ export function attachRealtime(
       lastEventSeq: 0,
     }
     clients.set(socket, client)
-    const city = world.cities.find((c) => c.realmId === realm.id)!
-    const [cx, cy] = [city.x + Math.floor(city.size / 2), city.y + Math.floor(city.size / 2)]
+    // The view starts at the town hall of the realm's first city, or with the Leader if it has
+    // none left.
+    const city = world.cities.find((c) => c.realmId === realm.id)
+    const leader = world.residents.find((r) => r.id === realm.leaderId)
+    const start = (city && townHallOf(world, city)) ?? leader ?? { x: 0, y: 0 }
+    const [cx, cy] = [start.x, start.y]
     const entities = client.view.initial(entitiesInSight(world, opts.terrain, realm.id))
     const events = eventsFor(world, user.id)
     client.lastEventSeq = events.at(-1)?.seq ?? 0
@@ -95,7 +100,7 @@ export function attachRealtime(
       tick: world.tick,
       map: { seed: world.seed, size: opts.terrain.size },
       exploredChunks: opts.explored.exploredChunks(user),
-      home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city.id, x: cx, y: cy },
+      home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city?.id ?? null, x: cx, y: cy },
       entities,
       events,
     })

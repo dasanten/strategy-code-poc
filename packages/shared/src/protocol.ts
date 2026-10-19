@@ -40,7 +40,7 @@ export type ServerMessage =
       /** Chunks with explored terrain, to load from `terrainChunkPath` (see `chunksAcross`). */
       exploredChunks: number[]
       /** The Player's realm and the city the view starts on. */
-      home: { realmId: string; leaderId: string; cityId: string; x: number; y: number }
+      home: { realmId: string; leaderId: string; cityId: string | null; x: number; y: number }
       /** Everything the Player's residents see. */
       entities: SeenEntity[]
       /** The Player's realm log as kept, oldest first. */

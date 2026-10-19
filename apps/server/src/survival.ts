@@ -10,7 +10,7 @@ import {
   TICKS_PER_GAME_DAY,
   foodUse,
   carriagesAt,
-  isInsideWalls,
+  inCityArea,
   pileAt,
   unitsThatFit,
   type Building,
@@ -125,22 +125,29 @@ export function endRealm(world: WorldState, realm: Realm): void {
   for (const k of world.carriages) if (k.realmId === realm.id) k.realmId = null
 }
 
-/** The finished storage of the resident's own city that holds food, if they stand at home. */
-export function homeStorage(world: WorldState, r: Resident): Building | undefined {
-  const home = world.cities.find((c) => c.realmId === r.owner && isInsideWalls(c, r.x, r.y))
-  if (!home) return undefined
-  return world.buildings.find(
-    (b) => b.cityId === home.id && b.kind === 'storage' && !b.site && (b.stock?.food ?? 0) > 0,
-  )
+/**
+ * The finished storage that holds food of the city they stand in, if the resident is at home
+ * (`CONTEXT.md`: At home): in the area of a city of their own realm. `size` is the map's.
+ */
+export function homeStorage(world: WorldState, r: Resident, size: number): Building | undefined {
+  if (r.owner === null) return undefined
+  for (const home of world.cities) {
+    if (home.realmId !== r.owner || !inCityArea(world, home, r.x, r.y, size)) continue
+    const storage = world.buildings.find(
+      (b) => b.cityId === home.id && b.kind === 'storage' && !b.site && (b.stock?.food ?? 0) > 0,
+    )
+    if (storage) return storage
+  }
+  return undefined
 }
 
 /**
  * Where a resident running low on food takes a meal from, if anywhere (`CONTEXT.md`: Refilling):
  * at home, their city's storage; working at a workplace, the Food in the pile on its tile, else on
- * a carriage standing there. Elsewhere nowhere.
+ * a carriage standing there. Elsewhere nowhere. `size` is the map's.
  */
-export function refillStock(world: WorldState, r: Resident): Stock | undefined {
-  const home = homeStorage(world, r)
+export function refillStock(world: WorldState, r: Resident, size: number): Stock | undefined {
+  const home = homeStorage(world, r, size)
   if (home) return home.stock
   const o = r.order
   if (o?.kind !== 'workAt' || r.x !== o.at.x || r.y !== o.at.y) return undefined
@@ -155,13 +162,14 @@ export function refillStock(world: WorldState, r: Resident): Stock | undefined {
  * Refilling (`CONTEXT.md`: Refilling at home, Refilling at a workplace): a resident who carries
  * fewer than `HOME_FOOD_LOW` units of food takes meals (`MEAL_UNITS` each) into their hands from
  * their `refillStock`, without an order, until they no longer run low, there is none left, or no
- * more fits. Residents anywhere else get nothing. They still eat only what they carry.
+ * more fits. Residents anywhere else get nothing. They still eat only what they carry. `size` is
+ * the map's.
  */
-export function stepRefill(world: WorldState): void {
+export function stepRefill(world: WorldState, size: number): void {
   let fromPile = false
   for (const r of world.residents) {
     while ((r.carried.food ?? 0) < HOME_FOOD_LOW) {
-      const stock = refillStock(world, r)
+      const stock = refillStock(world, r, size)
       const units = Math.min(MEAL_UNITS, stock?.food ?? 0, unitsThatFit(r, 'food', world.tick))
       if (!stock || units <= 0) break
       take(stock, 'food', units)

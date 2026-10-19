@@ -292,25 +292,32 @@ export interface Realm {
 }
 
 /**
- * A walled square of tiles (`CONTEXT.md`: City). Its wall is the ring of tiles along the
- * square's edge, with one gate tile in it.
+ * A settlement (`CONTEXT.md`: City). It has exactly one town hall, and its shape follows from its
+ * buildings (`cityMembership`, `inCityArea`); it is never stored. The number in its id says how
+ * old it is: a lower one was founded earlier.
  */
 export interface City {
   id: string
   name: string
   /** The realm it belongs to; null when it belongs to nobody (after Leader death). */
   realmId: string | null
-  /** Top-left tile of the square, wall included. */
-  x: number
-  y: number
-  /** Tiles along each side, wall included. */
-  size: number
-  wall: 'wooden'
-  gate: { x: number; y: number }
+  /** The town hall that makes it a city (`CONTEXT.md`: Town hall). */
+  townHallId: string
 }
 
 export type BuildingKind =
-  'house' | 'storage' | 'farm' | 'stable' | 'mine' | 'quarry' | 'lumberCamp' | 'smelter' | 'mint'
+  | 'townHall'
+  | 'house'
+  | 'storage'
+  | 'wall'
+  | 'gate'
+  | 'farm'
+  | 'stable'
+  | 'mine'
+  | 'quarry'
+  | 'lumberCamp'
+  | 'smelter'
+  | 'mint'
 
 /**
  * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction
@@ -319,7 +326,11 @@ export type BuildingKind =
 export interface Building {
   id: string
   kind: BuildingKind
-  /** The city it belongs to; null for a building of no city, such as a workplace on a node. */
+  /**
+   * The city it belongs to; null for a building of no city, such as a workplace on a node. A
+   * finished city building's follows from where it stands (`cityMembership`); a farm or stable
+   * keeps the city it was laid out for, until that city is gone.
+   */
   cityId: string | null
   x: number
   y: number
@@ -377,19 +388,6 @@ export interface Carriage {
   horseId: string | null
   /** Goods on board, up to `CARRIAGE_CAPACITY` by weight. */
   load: Stock
-}
-
-/** Whether a tile is part of the city's wall ring. */
-export function isWallTile(city: City, x: number, y: number): boolean {
-  const inside = x >= city.x && y >= city.y && x < city.x + city.size && y < city.y + city.size
-  const edge =
-    x === city.x || y === city.y || x === city.x + city.size - 1 || y === city.y + city.size - 1
-  return inside && edge
-}
-
-/** Whether a tile lies inside the city's walls (`CONTEXT.md`: At home). */
-export function isInsideWalls(city: City, x: number, y: number): boolean {
-  return x > city.x && y > city.y && x < city.x + city.size - 1 && y < city.y + city.size - 1
 }
 
 /** What a resource node yields once worked (`CONTEXT.md`: Resource node). */
