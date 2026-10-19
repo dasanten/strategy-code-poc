@@ -21,6 +21,7 @@ import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
+import { stepCaptures, type Capture } from './capture.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -94,6 +95,8 @@ export interface StepResult {
   horsesDied: Horse[]
   /** Who died of old age and which realms ended through it, as the next tick begins. */
   aging: AgingResult
+  /** Cities captured as the tick ended (`CONTEXT.md`: Capturing a city). */
+  captures: Capture[]
 }
 
 /**
@@ -103,7 +106,8 @@ export interface StepResult {
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
- * home or at their workplace who run low on food take meals there. Without `walking` nobody moves.
+ * home or at their workplace who run low on food take meals there; last, cities with a captor
+ * change realm (`stepCaptures`). Without `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
@@ -127,6 +131,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const aging = stepAging(world)
   stepAlliances(world)
   stepRefill(world, terrain.size)
+  const captures = stepCaptures(world, terrain.size)
   const actions =
     steps.length +
     strikes.length +
@@ -135,5 +140,5 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
     teardowns.length +
     work.length +
     births.length
-  return { actions, survival, combat, horsesDied, aging }
+  return { actions, survival, combat, horsesDied, aging, captures }
 }

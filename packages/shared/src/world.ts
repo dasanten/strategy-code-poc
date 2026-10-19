@@ -295,6 +295,19 @@ export type RealmEventWhat =
     }
   /** A resident who carries no weapon was hit and flees home (`CONTEXT.md`: Combat). */
   | { kind: 'fled'; residentId: string; name: string }
+  /**
+   * A city changed realm by capture (`CONTEXT.md`: Capturing a city): this realm took `city`,
+   * with its `residents`, from the realm of `other` (by its Leader's name; null for an NPC
+   * city), or, when not `captor`, the realm of `other` took it from this one.
+   */
+  | {
+      kind: 'cityCaptured'
+      cityId: string
+      city: string
+      other: string | null
+      captor: boolean
+      residents: number
+    }
   /** Food went bad over the game day in the realm's storages, residents' loads and carriages. */
   | { kind: 'foodSpoiled'; units: number }
   /** A pair had a child (`CONTEXT.md`: Pairing, Child); `parents` are their names. */
