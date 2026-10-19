@@ -4,6 +4,8 @@ import {
   BUILD_WORK,
   CARRIAGE_CAPACITY,
   carriageCanEnter,
+  drivenCarriageId,
+  GOOD_WEIGHT,
   MAX_WORKERS,
   HOME_FOOD_LOW,
   MEAL_UNITS,
@@ -616,21 +618,60 @@ export const driversOnCarriages: Invariant = {
     const out: InvariantViolation[] = []
     const driven = new Map<string, string>()
     for (const r of world.residents) {
+      const id = drivenCarriageId(r)
+      if (!id) continue
+      const fail = (message: string) =>
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${message}`,
+          entityIds: [r.id, id],
+        })
+      const k = world.carriages.find((c) => c.id === id)
+      if (!k) fail(`drives ${id}, which doesn't exist`)
+      else if (k.x !== r.x || k.y !== r.y) fail(`drives ${k.id} but isn't on its tile`)
+      if (!canWork(r, world.tick)) fail('drives as a child')
+      const other = driven.get(id)
+      if (other) fail(`drives ${id} together with ${other}`)
+      driven.set(id, r.id)
+    }
+    return out
+  },
+}
+
+/**
+ * Haul routes stay sound (`CONTEXT.md`: Haul route): two different stops a carriage can reach,
+ * at least one good, the Food kept for the horse fits on the carriage, and a hauler loading or
+ * unloading stands at the stop they are at, holding goods for the route only while loading.
+ */
+export const haulRoutesSound: Invariant = {
+  name: 'haul-routes-sound',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    for (const r of world.residents) {
       const o = r.order
-      if (o?.kind !== 'drive') continue
+      if (o?.kind !== 'haul') continue
       const fail = (message: string) =>
         out.push({
           invariant: this.name,
           message: `resident ${r.id} ${message}`,
           entityIds: [r.id, o.carriageId],
         })
-      const k = world.carriages.find((c) => c.id === o.carriageId)
-      if (!k) fail(`drives ${o.carriageId}, which doesn't exist`)
-      else if (k.x !== r.x || k.y !== r.y) fail(`drives ${k.id} but isn't on its tile`)
-      if (!canWork(r, world.tick)) fail('drives as a child')
-      const other = driven.get(o.carriageId)
-      if (other) fail(`drives ${o.carriageId} together with ${other}`)
-      driven.set(o.carriageId, r.id)
+      const { from, to } = o
+      if (from.x === to.x && from.y === to.y) fail('hauls between one tile and itself')
+      for (const s of [from, to]) {
+        if (!carriageCanEnter(terrainAt(terrain, s.x, s.y))) {
+          fail(`hauls to (${s.x}, ${s.y}), where no carriage can go`)
+        }
+      }
+      if (o.goods.length === 0) fail('hauls no goods')
+      if (o.keepFood < 0 || o.keepFood * GOOD_WEIGHT.food > CARRIAGE_CAPACITY) {
+        fail(`keeps ${o.keepFood} Food for the horse`)
+      }
+      const stop = o[o.stop]
+      if (o.phase === 'loading' && (r.x !== stop.x || r.y !== stop.y)) {
+        fail(`loads at the ${o.stop} stop but stands at (${r.x}, ${r.y})`)
+      }
+      if (o.phase === 'driving' && o.moving) fail('holds goods for the route while driving')
     }
     return out
   },
@@ -729,6 +770,7 @@ export const worldInvariants: Invariant[] = [
   childrenDontWork,
   carriagesInPlace,
   driversOnCarriages,
+  haulRoutesSound,
 ]
 
 export function checkInvariants(

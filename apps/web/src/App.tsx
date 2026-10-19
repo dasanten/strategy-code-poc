@@ -17,7 +17,7 @@ import { api } from './api.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { RealmLog } from './RealmLog.js'
-import { ResidentInspector, ResidentsList } from './Residents.js'
+import { ResidentInspector, ResidentsList, type HaulSetup, type Picking } from './Residents.js'
 import { ScriptEditor } from './ScriptEditor.js'
 import { useWorld } from './useWorld.js'
 
@@ -39,7 +39,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const { world, status, sendOrder } = useWorld(onLoggedOut)
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([])
   const [selectedId, setSelectedId] = useState<string | undefined>()
-  const [picking, setPicking] = useState<false | 'walk' | 'drive'>(false)
+  const [picking, setPicking] = useState<Picking>(false)
+  const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
   const own = world ? world.residents.filter((r) => r.owner === world.home.realmId) : []
   const selected = own.find((r) => r.id === selectedId)
@@ -47,16 +48,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
 
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
-   * carriage on their tile there (ADR 0002: the server checks it).
+   * carriage on their tile there, or, while picking a haul route's other stop, to haul between
+   * their tile and that one (ADR 0002: the server checks it).
    */
   async function goTo(x: number, y: number) {
-    const driving = picking === 'drive'
+    const mode = picking
     setPicking(false)
     if (!selected) return
     const carriage = onTile(world?.carriages)
-    if (driving && carriage) {
+    if (mode === 'drive' && carriage) {
       const order = { kind: 'drive', residentId: selected.id, carriageId: carriage.id, x, y }
       setOrderError(await sendOrder(order))
+      return
+    }
+    if (mode === 'haul' && carriage && haulSetup) {
+      const order = { kind: 'haul', residentId: selected.id, carriageId: carriage.id, x, y }
+      setOrderError(await sendOrder({ ...order, ...haulSetup }))
       return
     }
     setOrderError(await sendOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
@@ -81,6 +88,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function tearDown(buildingId: string) {
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'tearDown', residentId: selected.id, buildingId }))
+  }
+  /** Orders the picked resident to stop what they are doing, such as a haul route. */
+  async function stop() {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'stop', residentId: selected.id }))
   }
   /** Orders the picked resident to pair with another resident of their city. */
   async function pair(partnerId: string) {
@@ -159,6 +171,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
               carriage={onTile(world.carriages)}
               onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
+              onHaulTo={(setup) => {
+                setHaulSetup(setup)
+                setPicking((p) => (p === 'haul' ? false : 'haul'))
+              }}
+              onStop={stop}
               orderError={orderError}
               pile={onTile(world.piles)}
               storage={onTile(

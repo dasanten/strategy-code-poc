@@ -251,6 +251,12 @@ The shared language of the game. Domain terms only — no implementation details
   whose horse dies stands where it is until another horse is hitched.
 - **Loading a carriage:** residents on a carriage's tile put goods on it and take goods off it
   like at a storage, up to what the carriage holds.
+- **Haul route:** an order (as a script could do it) for a resident to drive a carriage between
+  two stops again and again: they load the chosen goods at the first stop, drive them to the
+  second, unload them, and come back for more, until stopped. A stop with a storage loads and
+  unloads there, else on the ground; the driver loads by hand like anyone. Some Food stays on
+  board for the horse, topped up at any stop that has Food. The carriage leaves the first stop
+  once it has goods on board and nothing more to load; with no goods there yet it waits.
 
 ## Starting city
 
