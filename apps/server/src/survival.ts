@@ -23,6 +23,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
+import { leaveOnLeaderDeath } from './alliances.js'
 
 /** How far one unit of food fills the hunger meter. */
 const FILL_PER_FOOD = (MAX_HUNGER * HUNGER_DAYS) / FOOD_PER_DAY
@@ -115,9 +116,10 @@ export function dropGoods(world: WorldState, x: number, y: number, stock: Stock)
 /**
  * Leader death, in its basic form (`CONTEXT.md`: Leader death): the realm ends, and its
  * residents, cities, horses and carriages stay where they are, belonging to nobody. The Player
- * gets a fresh starting city on their next login.
+ * gets a fresh starting city on their next login. The realm leaves its alliance at once.
  */
 export function endRealm(world: WorldState, realm: Realm): void {
+  leaveOnLeaderDeath(world, realm.id)
   world.realms = world.realms.filter((x) => x !== realm)
   for (const r of world.residents) if (r.owner === realm.id) r.owner = null
   for (const c of world.cities) if (c.realmId === realm.id) c.realmId = null

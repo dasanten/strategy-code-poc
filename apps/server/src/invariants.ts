@@ -1,4 +1,6 @@
 import {
+  ALLIANCE_LEAVE_DELAY,
+  ALLIANCE_NAME_MAX_LENGTH,
   BUILDABLE,
   BUILD_MATERIALS,
   BUILD_WORK,
@@ -755,6 +757,54 @@ export const childrenDontWork: Invariant = {
   },
 }
 
+/**
+ * Alliances hold together (`CONTEXT.md`: Alliance, Alliance leader): each has a name and at
+ * least one member, in the order they joined; its members and invited realms exist; a realm is in
+ * at most one alliance, and only a realm in none is invited; the alliance leader is a member; a
+ * member leaving goes within the leave delay.
+ */
+export const alliancesSound: Invariant = {
+  name: 'alliances-sound',
+  check(world) {
+    const realms = new Set(world.realms.map((r) => r.id))
+    const memberOf = new Map<string, string>()
+    for (const a of world.alliances) {
+      for (const m of a.members) memberOf.set(m.realmId, memberOf.has(m.realmId) ? '' : a.id)
+    }
+    return world.alliances.flatMap((a) => {
+      const problems: string[] = []
+      if (a.name.trim().length === 0 || a.name.length > ALLIANCE_NAME_MAX_LENGTH) {
+        problems.push(`has a bad name "${a.name}"`)
+      }
+      if (a.members.length === 0) problems.push('has no members')
+      if (!a.members.some((m) => m.realmId === a.leaderId)) {
+        problems.push(`has leader ${a.leaderId}, who is not a member`)
+      }
+      a.members.forEach((m, i) => {
+        if (!realms.has(m.realmId)) problems.push(`has member ${m.realmId}, which has ended`)
+        if (memberOf.get(m.realmId) === '') problems.push(`shares member ${m.realmId}`)
+        if (i > 0 && m.joinedAt < a.members[i - 1]!.joinedAt) {
+          problems.push(`lists member ${m.realmId} before one that joined earlier`)
+        }
+        const at = m.leaving?.at
+        if (at !== undefined && (at <= world.tick || at > world.tick + ALLIANCE_LEAVE_DELAY)) {
+          problems.push(`has member ${m.realmId} leaving at tick ${at}`)
+        }
+      })
+      if (new Set(a.invites).size !== a.invites.length) problems.push('invites a realm twice')
+      for (const id of a.invites) {
+        if (!realms.has(id)) problems.push(`invites ${id}, which has ended`)
+        else if (memberOf.has(id)) problems.push(`invites ${id}, which is in an alliance`)
+      }
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `alliance ${a.id} ${p}`,
+        entityIds: [a.id],
+      }))
+    })
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -783,6 +833,7 @@ export const worldInvariants: Invariant[] = [
   carriagesInPlace,
   driversOnCarriages,
   haulRoutesSound,
+  alliancesSound,
 ]
 
 export function checkInvariants(

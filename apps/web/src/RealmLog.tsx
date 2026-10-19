@@ -2,7 +2,7 @@ import { formatGameTime, type RealmEvent } from '@csp/shared'
 import { describeEvent } from './realm-log.js'
 
 /** What happened in the Player's realm, newest first: hunger, deaths, spoilage. */
-export function RealmLog({ events }: { events: RealmEvent[] }) {
+export function RealmLog({ events, realmId }: { events: RealmEvent[]; realmId: string }) {
   return (
     <section className="realm-log" aria-label="Realm log">
       <div className="panel-head">
@@ -11,7 +11,7 @@ export function RealmLog({ events }: { events: RealmEvent[] }) {
       </div>
       <ol className="realm-log-list" aria-live="polite">
         {[...events].reverse().map((e) => {
-          const { text, tone } = describeEvent(e)
+          const { text, tone } = describeEvent(e, realmId)
           return (
             <li key={e.seq} className={tone}>
               <time className="mono">{formatGameTime(e.tick)}</time>

@@ -3,9 +3,11 @@ import { WebSocket, WebSocketServer } from 'ws'
 import {
   SESSION_COOKIE,
   WS_PATH,
+  diplomacyFor,
   townHallOf,
   type Account,
   type ClientMessage,
+  type SeenEntity,
   type ServerMessage,
   type TerrainMap,
   type WorldState,
@@ -31,6 +33,11 @@ function send(socket: WebSocket, msg: ServerMessage) {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
 }
 
+/** The realms whose residents are among the entities. */
+function realmsSeen(entities: SeenEntity[]): string[] {
+  return entities.flatMap((e) => (e.is === 'resident' && e.owner !== null ? [e.owner] : []))
+}
+
 interface Client {
   account: Account
   userId: number
@@ -38,6 +45,8 @@ interface Client {
   view: ClientView
   /** The number of the last realm event sent, so each tick sends only newer ones. */
   lastEventSeq: number
+  /** The alliance matters last sent, as JSON, so a tick sends them only when they changed. */
+  lastDiplomacy: string
 }
 
 /**
@@ -83,6 +92,7 @@ export function attachRealtime(
       realmId: realm.id,
       view: new ClientView(),
       lastEventSeq: 0,
+      lastDiplomacy: '',
     }
     clients.set(socket, client)
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
@@ -94,6 +104,8 @@ export function attachRealtime(
     const entities = client.view.initial(entitiesInSight(world, opts.terrain, realm.id))
     const events = eventsFor(world, user.id)
     client.lastEventSeq = events.at(-1)?.seq ?? 0
+    const diplomacy = diplomacyFor(world, realm.id, realmsSeen(entities))
+    client.lastDiplomacy = JSON.stringify(diplomacy)
     send(socket, {
       type: 'welcome',
       account: client.account,
@@ -103,6 +115,7 @@ export function attachRealtime(
       home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city?.id ?? null, x: cx, y: cy },
       entities,
       events,
+      diplomacy,
     })
 
     socket.on('message', (raw) => {
@@ -124,7 +137,8 @@ export function attachRealtime(
     /**
      * Sends every client the changes in its sight since the last tick, and the chunks whose
      * explored terrain grew for its Player (`explored`, from `SightTracker.update`), and its
-     * Player's new realm events: each Player gets only their own.
+     * Player's new realm events, and their alliance matters when those changed: each Player gets
+     * only their own.
      */
     broadcastTick(explored: Map<number, Set<number>> = new Map()) {
       for (const [socket, client] of clients) {
@@ -133,7 +147,12 @@ export function attachRealtime(
         const grown = [...(explored.get(client.userId) ?? [])]
         const events = eventsFor(world, client.userId, client.lastEventSeq)
         client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq
-        send(socket, { type: 'tick', tick: world.tick, changed, gone, explored: grown, events })
+        const diplomacy = diplomacyFor(world, client.realmId, realmsSeen(inSight))
+        const json = JSON.stringify(diplomacy)
+        const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
+        client.lastDiplomacy = json
+        const tick = { tick: world.tick, changed, gone, explored: grown, events, ...fresh }
+        send(socket, { type: 'tick', ...tick })
       }
     },
     close() {

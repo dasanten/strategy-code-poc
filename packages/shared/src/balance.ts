@@ -607,3 +607,9 @@ export const TEARDOWN_WORK_SHARE = 0.5
  * to whole units. An unfinished site leaves all its delivered materials.
  */
 export const TEARDOWN_MATERIALS_RETURNED = 0.5
+
+/**
+ * How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
+ * being a member (`CONTEXT.md`: Alliance): one game day, time enough for the others to react.
+ */
+export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
