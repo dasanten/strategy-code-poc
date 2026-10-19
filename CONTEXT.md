@@ -32,6 +32,10 @@ The shared language of the game. Domain terms only — no implementation details
   | Sea      | impassable | —    | A few large bodies of water              |
   | Road     | ~130%      | 100% | Built by Players on top of passable land |
 
+- **Road:** built on a tile like a building (laid out by a resident there, then materials and
+  work) on any passable land except Mountain, and it may share a tile with a building, so roads
+  can lead through gates. On a road residents and carriages move at road speed whatever the
+  terrain beneath, and eat as on Plains. Nobody owns a road; anyone can walk it or tear it down.
 - No rivers and no water vehicles (for now), so all land is joined: any tile can be reached on
   foot from any other, if only the long way round.
 
@@ -86,23 +90,51 @@ The shared language of the game. Domain terms only — no implementation details
 - **Trade Organization:** one huge, non-player organization present from the start of the world.
   Buys and sells every good and carries transfers between Players for a fee. Its residents have
   normal stats; it is overpowered only through sheer size and stock.
-- **Trade Org HQ:** the Trade Organization's home, the largest walled city on the map.
-- **Trading post:** a Trade Org warehouse in a region, so Players can trade nearby. Goods move
-  between posts and HQ by caravan.
+- **Trade Org HQ:** the Trade Organization's home, the largest walled city on the map. Round,
+  with its town hall in the middle and rings of walls around it. The **inner ring** holds its
+  most valuable warehouses, above all its coins, and its soldiers keep everyone else out by
+  force: possible to break into in theory, hopeless in practice. The **outer rings** are open to
+  everyone, but the HQ closes its gates when too many armed outsiders want in. When it grows too
+  weak compared to the Players, it grows another ring.
+- **Trading post:** a small Trade Org city in a region, with a warehouse, so Players can trade
+  nearby. Goods move between posts and HQ by caravan.
+- **Trading with the Trade Organization:** only in person, by a resident (or a carriage) on a
+  warehouse's tile, at its HQ or a trading post. Selling hands the goods into the warehouse and
+  takes its coins into the resident's hands, as far as they can carry; buying is the other way
+  round. It happens at once.
+- **Warehouse prices:** each warehouse prices every good from its own stock, buying lower than it
+  sells. Posts don't share prices, so carrying goods between regions can pay off. Anyone with a
+  resident in sight of a warehouse sees its prices.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse runs low, it tops up to a minimum. This is the
   one controlled exception to "everything is physical" (see ADR 0003).
 - **Price anchor:** the Trade Organization buys low and sells high, so it is always there as a
   market of last resort. Its prices rise when its stock is low; Players usually get better deals
   trading with each other.
-- **Transfer:** the Trade Organization physically carries goods or coins from one place to another
-  for a fee. The caravan takes time and can be robbed.
+- **Caravan:** Trade Org carriages, driven by its own residents and always escorted by its
+  soldiers. A route that is attacked more often gets more escorts. Caravans also carry the Trade
+  Organization's own stock between its warehouses.
+- **Delivery:** a caravan brings goods bought from the Trade Organization to the storage of a
+  city the buyer names, or picks up goods sold to it from the seller's city, for a fee. Anyone
+  can instead carry the goods to or from the warehouse themselves, for free and at their own
+  risk.
+- **Transfer:** the Trade Organization carries goods or coins from one realm to another as a
+  courier: a caravan picks them up at a city of the sender (or they are handed in at a
+  warehouse) and unloads them into the storage of a city the recipient names. Its fee is clearly
+  higher than a delivery's.
+- **Guaranteed carriage:** when a caravan is robbed, the Trade Organization sends the delivery or
+  transfer again out of its own stock. That is part of why its prices and fees are high.
 - **Self-interest:** the Trade Organization defends only itself and whoever hires it. It is not a
   world police. It punishes anyone who steals from it, whoever they are.
-- **Admin directive** _(future)_: an admin orders the Trade Organization to weaken a Player or
+- **Admin directive:** an admin orders the Trade Organization to weaken a Player or
   organization that is deliberately ruining the game for others (e.g. farming new Players). The
   game still forbids nothing; the Trade Organization acts because a healthy world is good for
-  trade.
+  trade. It names a target (optionally with its alliance), a reason and **goals** (a city
+  destroyed, a number or share of its soldiers killed, …); it has no time limit and ends when
+  all goals are met or an admin lifts it. Until then the Trade Organization treats the target
+  as one to punish. Every Player sees the target and the reason; only admins see who gave it.
+  If the admin allows it, the target can **buy it off** by paying a set price in Coins at any
+  Trade Org warehouse.
 
 ## Organizations and territory
 
@@ -111,27 +143,60 @@ The shared language of the game. Domain terms only — no implementation details
 - **Realm:** everything one Player controls through their Leader: cities, residents, workplaces,
   carriages. Breaks up into self-managed cities when the Leader dies.
 - **City:** a settlement with residents, buildings and usually a wall. Sizes range from
-  **village** to large town. On the map it is a square of tiles; its **wall** is the ring of
-  tiles along the square's edge, with one **gate**. Buildings inside the wall take one tile each;
-  farms and workplaces may lie outside.
-- **House:** a building inside a city where a few residents live. A city's **free housing** is
+  **village** to large town. Every city has exactly one town hall; without it there is no city.
+  Its shape is derived from its buildings, never drawn.
+- **Town hall:** the building that makes a city. Building one founds a new city, belonging to the
+  realm whose residents finished it. Tearing it down dissolves the city: its buildings and
+  residents stay where they are, and its residents are homeless.
+- **City building:** a town hall, house, storage, wall or gate (and later ones of their kind);
+  not farms, workplaces or stables. It is part of a city when it lies within a short distance of
+  the city's town hall or of another building already part of that city, so a city grows outward
+  in a chain. A building belongs to at most one city: the one whose town hall is nearer (the
+  older city on a tie). A building cut off from the chain no longer belongs to the city.
+- **City area:** the tiles right around a city's buildings. Building on its edge grows the city;
+  tearing down shrinks it.
+- **Wall / Gate:** buildings of one tile each, built on any passable tile except Mountain, in
+  any shape: a closed ring, an inner ring or a single stretch. Nothing forces a closed ring.
+  Walls count as city buildings, so they grow the area like houses do.
+- **House:** a building in a city's area where a few residents live. A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
   (a palace, a castle) may add room the same way.
 - **Food surplus:** a city has one when its storage holds more Food than all its residents eat
   in a set number of game days. Food that residents carry doesn't count.
-- **Storage:** a building inside a city where its goods are kept.
-- **At home:** a resident standing inside the walls of a city of their own realm.
-- **NPC city:** a city run by the game. Self-managed cities are NPC cities.
+- **Storage:** a building in a city's area where its goods are kept.
+- **At home:** a resident standing in the area of a city of their own realm.
+- **NPC city:** a city run by the game. Self-managed cities are NPC cities. On its own it works
+  its farms and workplaces and carries the output to its storage, pairs its adults, builds a
+  house when it has a food surplus and no free housing, and puts more residents on farms (or
+  builds a farm) when Food runs short. It never founds new cities: when it has no room left it
+  grows its area by building on the edge, puts up a new wall there and then tears down the old
+  one. A Player does the same by hand, if they want to.
 - **Integrating:** bringing a village or city into your realm, with its residents. Three ways:
-  **conquer** it (capture by force), **buy** it (physically deliver the agreed coins and goods),
-  or **persuade** it (with high standing and respect it asks to join).
-- NPC cities grow slowly on their own through pairing.
-- **Alliance:** a group of Organizations that agreed to join. Members' armies by default don't
-  attack each other, but a direct order can (that counts as a crime). Leaving takes effect after
-  a delay.
+  **conquer** it (capture by force), **buy** it, or **persuade** it (with high standing and
+  respect it asks to join).
+- **Buying a city:** an NPC city names a price in Coins from what it is worth (its residents and
+  buildings). The buyer's residents carry the coins to its town hall; once they are all there,
+  the city joins the buyer's realm with everything in it, and the coins are gone: they are used
+  up by the deal, not kept by anyone. The better its standing toward the buyer, the lower the
+  price; at very bad standing it won't sell to them at all.
+- **Alliance:** a group of Organizations that agreed to join: Players' realms and NPC cities,
+  never the Trade Organization. A realm is in at most one. Members share sight, pass each other's
+  gates and stand on each other's walls. Members' armies by default don't attack each other, but
+  a direct order can (that counts as a crime). Leaving, or being removed, takes effect after a
+  delay. A realm whose Leader dies leaves at once.
+- **Alliance leader:** the member who founded the alliance or was handed the role. Invites and
+  removes members and commands the alliance army; nothing else. When they leave or die, the
+  longest-standing member takes over.
+- **NPC city in an alliance:** accepts an invitation when it holds every member in high standing
+  and knows of no recent crime by them against it; leaves on its own when its standing toward
+  any member falls too low. It keeps its own behaviour.
+- **Alliance army:** soldiers and carriages members hand over to the alliance leader's command.
+  They stay in their own realm but take orders only from the alliance leader. Their owner can
+  recall them, which takes effect after a game day; leaving the alliance recalls them.
 - **Territory:** the area an Organization controls. Derived, not claimed: cities and guarded
   workplaces project control around them according to their size and garrison; where they
-  overlap, the stronger wins.
+  overlap, the stronger wins. A workplace is **guarded** while an armed resident of whoever
+  holds it stands on or next to it. Territory is shown only: no rule depends on it (for now).
 - **Region map:** the map view colouring territory by owner. Alliance members show in the
   alliance's colour; details show which member holds each part. Territory is common knowledge:
   it shows live over all explored terrain.
@@ -146,18 +211,38 @@ The shared language of the game. Domain terms only — no implementation details
 
 ## Military
 
-- **Soldier:** a resident with a weapon and Combat skill. Not a separate kind of being; soldiers
-  eat, carry, age and die like everyone.
-- **Army:** residents moving and fighting together under one order or script. Needs a supply line
-  or it starves far from home.
-- **Combat:** resolved between residents in contact. Attack from Strength, weapon and Combat
-  skill; defence from Agility and armour. Walls must be broken or climbed and favour defenders.
+- **Soldier:** a resident carrying a weapon; Combat skill makes them better. Not a separate kind
+  of being; soldiers eat, carry, age and die like everyone. **Armed** means carrying a weapon.
+- **Weapons and armour:** goods like any other, with weight: **Spear** and **Sword** (attack),
+  **Shield** and **Armour** (defence). A resident fights with the best weapon and the best
+  protection they carry; there is nothing to equip, so heavy gear leaves less room for food.
+  No ranged weapons for now.
+- **Smithy:** a workplace that turns Iron and Wood into weapons and armour, at fixed recipes,
+  from what its workers carry and the pile on its tile. Teaches Smithing.
+- **Army:** a named group of a realm's residents moving and fighting together under one order or
+  script, at the pace of the slowest. A resident leaves it when given an order of their own.
+  Needs a supply line or it starves far from home.
+- **Supply line:** a carriage that follows an army is its supply wagon: army members refill from
+  it like at home (Refilling from a carriage). A haul route can have an army as its second
+  stop, so food keeps coming to wherever the army is. Cut the route and the army starves.
+- **Combat:** resolved between residents in contact (the same or a neighbouring tile). Attack
+  from Strength, weapon and Combat skill; Agility dodges, armour and shields take off damage.
+  Fighting teaches Combat. An armed resident who is hit fights back; an unarmed one flees home.
+  A city's soldiers fight attackers in its area on their own.
+- **Walls in combat:** nobody walks through a wall. The city's own realm can stand on its walls
+  and defends far better there. A **gate** lets the city's realm through always, everyone else
+  only while it is open; the city's realm opens and closes it. A wall or gate can be **broken**
+  (attacked until it falls, leaving part of its materials) or **climbed** (slow, and a climber
+  can't defend themselves, so a defended wall is costly to climb).
 - **Loot:** when a resident dies, everything they carried drops on the ground for anyone to take.
 - **Capturing a city:** armed residents inside and no defender left fighting. The city and its
   residents join the captor's realm, loyal at once (for now).
 - **Mercenary contract:** one Organization rents residents to another for coins over a period.
-  They walk to the hirer and take its orders; they always obey (for now). Not paying breaks the
-  contract and costs standing.
+  One side offers (residents, game days, price per game week, a storage of the lender to pay
+  into), the other accepts. The residents stay in the lender's realm but take only the hirer's
+  orders; they always obey (for now). Each week is paid in advance: the hirer's residents put the
+  coins into that storage with a pay order, or a Trade Org transfer brings them. A week left
+  unpaid breaks the contract and costs standing; at the end, or when it breaks, they walk home.
 - **Trade Org army:** a large army of normal residents, for hire like any mercenaries. When it has
   lost too many, it hires mercenaries itself. Its warehouses refill goods, never people.
 
@@ -169,19 +254,30 @@ The shared language of the game. Domain terms only — no implementation details
   consequences.
 - **Standing:** how one organization regards another. Known crimes lower it; trade and kept
   contracts raise it; it slowly drifts back to neutral. Standing is per organization, so allies
-  don't suffer for each other's crimes.
+  don't suffer for each other's crimes. A Player sees their standing toward others but it does
+  nothing on its own; the game acts on it only for NPC cities and the Trade Organization.
+- **NPC city reaction:** at low standing an NPC city won't trade with you or hire out to you and
+  keeps its gates shut to your residents; the lower it is, the more it asks to be bought, and at
+  very low standing it won't sell at all.
+- **Persuading a city:** an NPC city that holds you in high standing and sees enough respect from
+  you (more of your armed residents and walls in its sight than it has soldiers) asks to join
+  your realm. You accept or decline.
 - **Respect:** how dangerous a place looks to others, judged from the armed residents and walls
   they can see. Not stored; NPC cities and bandits avoid targets with high respect.
 - **Trade Org reaction:** below one standing threshold it refuses to trade; below a lower one it
-  sends its army to take back the value and punish.
+  sends its army to take back the value and punish: to the culprit's city nearest the crime, to
+  carry home twice what it lost (coins first), fighting whoever resists. It never captures the
+  city, and leaves once it has what it came for.
 
 ## People
 
 - **Player:** the human behind an account. Owns nothing physically; joins alliances. Not a thing
   in the world. Signs up with an invite code. _Avoid:_ user (in game rules), "the player" meaning
   the figure.
-- **Admin:** a Player with admin rights: creates invite codes, resets passwords and (future) gives
-  admin directives. Can play like anyone else.
+- **Admin:** an account with admin rights: creates invite codes, resets passwords and gives
+  admin directives, in an admin panel apart from the game. Being an admin has nothing to do with
+  the admin's own Player: it gives them no power or knowledge in the world, and they play like
+  anyone else.
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
@@ -189,6 +285,11 @@ The shared language of the game. Domain terms only — no implementation details
   starting city on their next login.
 - **Self-managed city:** a city with no living Leader in charge. It runs on its own behaviour and
   can be traded with, contracted, conquered or integrated by anyone, including its former Player.
+  When a Leader dies, each of their cities becomes its own self-managed city, with the residents
+  who live there (those away walk home; homeless ones join the nearest) and the horses and
+  carriages nearest it. Lent and hired soldiers walk home, and the realm leaves its alliance.
+  Each such city starts out holding its former Player in good standing, which fades like any
+  standing.
 
 ## Residents
 
@@ -204,7 +305,7 @@ The shared language of the game. Domain terms only — no implementation details
 - **Base value:** what a resident is born with. The only part children inherit.
 - **Trained bonus:** what training adds on top of the base value. Capped relative to the base,
   so birth still matters. Never inherited.
-- **Skill:** something learned by doing or training (Mining, Woodcutting, Smelting, Construction, Farming, Combat, Driving, …). Starts at 0,
+- **Skill:** something learned by doing or training (Mining, Woodcutting, Smelting, Smithing, Construction, Farming, Combat, Driving, …). Starts at 0,
   never inherited. Not a stat.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
@@ -224,9 +325,11 @@ The shared language of the game. Domain terms only — no implementation details
   after about 2 game days. While the meter isn't empty, lost health slowly comes back.
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
-- **Refilling at home:** a resident inside their own city's walls who is running low on food
+- **Refilling at home:** a resident in their own city's area who is running low on food
   takes a meal from the city's storage into their hands, without an order. Away from home (on
   the farm, travelling) there is no refill: they need food on them or a delivery.
+- **Refilling from a carriage:** a resident of an army running low on food takes a meal from a
+  carriage of their own realm on or next to their tile, like refilling at home.
 
 ## Transport
 
@@ -261,7 +364,7 @@ The shared language of the game. Domain terms only — no implementation details
 ## Starting city
 
 - **Starting city:** what a Leader spawns with, far from other Players: about 8 residents with
-  random stats (one of them the Leader), a wooden wall, houses for everyone with a little room
+  random stats (one of them the Leader), a town hall, a ring of wooden wall with a gate, houses for everyone with a little room
   to spare, a storage with a small food stock, one farm outside the wall, a stable next to it
   with two horses and a little Food, and one carriage standing at the stable with one of the
   horses hitched to it. The residents start on the farm, working
@@ -272,7 +375,16 @@ The shared language of the game. Domain terms only — no implementation details
 - **Order:** an instruction a player gives through the UI (e.g. "work this mine"). It requests
   the same actions a script could.
 - **Script:** a program in the game's own language that requests actions automatically, every
-  tick.
+  tick. A Player keeps a library of named scripts, with their history, also across Leader deaths.
+  **Running a script** is an order for a resident or an army: the script runs once a tick for
+  each of them, with its own memory, and can request only what that resident or army could. Any
+  other order ends it. A script can hand over to a built-in order for a while and take control
+  back. A saved change is picked up on the next tick.
+- **Memory:** the small store a running script or order keeps between ticks. Roles are just
+  something a script keeps there.
+- **Step budget:** how much work a script may do each tick, for each resident or army and for a
+  whole realm. Out of budget, the script stops for that tick; what it already requested still
+  counts. A script sees only what its Player sees: their sight and explored terrain.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

@@ -5,7 +5,7 @@ is an **epic** (label `epic`) with its **tickets** as sub-issues, in order. `/ne
 the next one and works it into a PR (`.claude/commands/next-ticket.md`).
 
 **Priority rule:** bugs first, then epics in order, so the game becomes playable sooner:
-survive → produce → transport → grow → trade → fight → alliances → scripts.
+survive → produce → transport → grow → trade → fight → alliances → scripts → roads.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -22,14 +22,15 @@ I sleep.
 | 5   | [Workplaces on resource nodes](https://github.com/dasanten/strategy-code-poc/issues/32)         | ticketed                |
 | 6   | [Carriages and supply routes](https://github.com/dasanten/strategy-code-poc/issues/38)          | ticketed, PoC done      |
 | 7   | [Pairing and children](https://github.com/dasanten/strategy-code-poc/issues/43)                 | ticketed                |
-| 8   | [NPC cities and integrating](https://github.com/dasanten/strategy-code-poc/issues/46)           | scope only              |
-| 9   | [Trade Organization](https://github.com/dasanten/strategy-code-poc/issues/47)                   | scope only              |
-| 10  | [Combat and armies](https://github.com/dasanten/strategy-code-poc/issues/48)                    | scope only              |
-| 11  | [Crime and reputation](https://github.com/dasanten/strategy-code-poc/issues/49)                 | scope only              |
-| 12  | [Alliances and territory](https://github.com/dasanten/strategy-code-poc/issues/50)              | scope only              |
-| 13  | [Leader death and self-managed cities](https://github.com/dasanten/strategy-code-poc/issues/51) | scope only              |
-| 14  | [Scripting](https://github.com/dasanten/strategy-code-poc/issues/52)                            | scope only              |
-| 15  | [Roads and admin directive](https://github.com/dasanten/strategy-code-poc/issues/53)            | scope only              |
+| 8   | [NPC cities and integrating](https://github.com/dasanten/strategy-code-poc/issues/46)           | ticketed                |
+| 9   | [Trade Organization](https://github.com/dasanten/strategy-code-poc/issues/47)                   | ticketed                |
+| 10  | [Combat and armies](https://github.com/dasanten/strategy-code-poc/issues/48)                    | ticketed                |
+| 11  | [Crime and reputation](https://github.com/dasanten/strategy-code-poc/issues/49)                 | ticketed                |
+| 12  | [Alliances and territory](https://github.com/dasanten/strategy-code-poc/issues/50)              | ticketed                |
+| 13  | [Leader death and self-managed cities](https://github.com/dasanten/strategy-code-poc/issues/51) | ticketed                |
+| 14  | [Scripting](https://github.com/dasanten/strategy-code-poc/issues/52)                            | ticketed                |
+| 15  | [Roads and admin directive](https://github.com/dasanten/strategy-code-poc/issues/53)            | ticketed                |
+| 16  | [Bandits](https://github.com/dasanten/strategy-code-poc/issues/144)                             | scope only              |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
