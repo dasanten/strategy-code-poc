@@ -54,6 +54,8 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
   if (ate) world.piles = world.piles.filter((p) => Object.values(p.goods).some((n) => n > 0))
   if (died.length > 0) {
     world.horses = world.horses.filter((h) => !died.includes(h))
+    // A carriage whose horse died stands where it is, with nothing to pull it.
+    for (const k of world.carriages) if (died.some((h) => h.id === k.horseId)) k.horseId = null
     for (const h of died) recordEvent(world, h.realmId, { kind: 'horseDied', horseId: h.id })
   }
 

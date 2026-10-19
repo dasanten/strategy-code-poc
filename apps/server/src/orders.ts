@@ -2,6 +2,7 @@ import type { Account, OrderRequest, ServerMessage, TerrainMap, WorldState } fro
 import { build } from './building.js'
 import { tearDown } from './teardown.js'
 import { drop, pickUp } from './carrying.js'
+import { drive } from './driving.js'
 import { pair } from './pairing.js'
 import { walkTo } from './walking.js'
 import { workAt } from './work.js'
@@ -30,6 +31,7 @@ export interface OrderKind {
 /** The order kinds that exist. */
 export const orderKinds: Record<string, OrderKind> = {
   walkTo,
+  drive,
   pickUp,
   drop,
   build,

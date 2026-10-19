@@ -138,7 +138,8 @@ export function findCitySite(
  * Gives a Player their realm and starting city (`CONTEXT.md`: Starting city), unless they
  * already have one: residents with random stats, one of them the Leader, a wooden wall with a
  * gate, houses for everyone and a spare, a storage with food, a farm outside the wall, a stable
- * next to it with horses and a little food, and a carriage. The residents start on the farm, working it, each carrying a little food.
+ * next to it with horses and a little food, and a carriage at the stable with a horse hitched to
+ * it. The residents start on the farm, working it, each carrying a little food.
  * The same world and Player always get the same city.
  */
 export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId: number): Realm {
@@ -211,11 +212,13 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
       health: MAX_HEALTH,
     })
   }
+  // The carriage stands at the stable, with one of the horses hitched to it.
   world.carriages.push({
     id: newId(world, 'carriage'),
     realmId,
-    x: x + mid + 1,
-    y: y + size - 2,
+    x: sx,
+    y: sy,
+    horseId: world.horses.at(-1)!.id,
     load: {},
   })
   return realm
