@@ -1,4 +1,6 @@
 import {
+  ALLIANCE_LEAVE_DELAY,
+  ALLIANCE_NAME_MAX_LENGTH,
   BUILDABLE,
   BUILD_MATERIALS,
   BUILD_WORK,
@@ -16,6 +18,7 @@ import {
   teardownWork,
   workNeeded,
   workplaceGood,
+  hasChoice,
   type Good,
   LIFESPAN_MAX,
   LIFESPAN_MIN,
@@ -512,7 +515,8 @@ export const realmLogsInOrder: Invariant = {
 }
 
 /**
- * After a tick, a resident with a work-at order stands on the finished workplace it names, their
+ * After a tick, a resident with a work-at order stands on the finished workplace it names, says
+ * what they make exactly where there is a choice (a smithy) and makes something there, their
  * share of the next unit is between 0 and 1, and no workplace has more workers than it takes
  * (`resolveWork` ends the orders that no longer fit).
  */
@@ -531,13 +535,12 @@ export const workOrdersOnWorkplaces: Invariant = {
           entityIds: [r.id, o.buildingId],
         })
       const place = world.buildings.find((b) => b.id === o.buildingId)
-      if (
-        !place ||
-        place.site ||
-        MAX_WORKERS[place.kind] === undefined ||
-        !workplaceGood(world, place)
-      )
+      if (!place || place.site || MAX_WORKERS[place.kind] === undefined)
         fail('which is no finished workplace')
+      else if (hasChoice(place.kind) !== (o.makes !== undefined))
+        fail(o.makes === undefined ? 'making nothing' : `making ${o.makes} with nothing to choose`)
+      else if (!workplaceGood(world, place, o.makes))
+        fail(o.makes === undefined ? 'which makes nothing' : `which can't make ${o.makes}`)
       else if (place.x !== r.x || place.y !== r.y || o.at.x !== r.x || o.at.y !== r.y)
         fail('which is not on their tile')
       if (!(o.progress >= 0 && o.progress < 1)) fail(`with progress ${o.progress}`)
@@ -755,6 +758,54 @@ export const childrenDontWork: Invariant = {
   },
 }
 
+/**
+ * Alliances hold together (`CONTEXT.md`: Alliance, Alliance leader): each has a name and at
+ * least one member, in the order they joined; its members and invited realms exist; a realm is in
+ * at most one alliance, and only a realm in none is invited; the alliance leader is a member; a
+ * member leaving goes within the leave delay.
+ */
+export const alliancesSound: Invariant = {
+  name: 'alliances-sound',
+  check(world) {
+    const realms = new Set(world.realms.map((r) => r.id))
+    const memberOf = new Map<string, string>()
+    for (const a of world.alliances) {
+      for (const m of a.members) memberOf.set(m.realmId, memberOf.has(m.realmId) ? '' : a.id)
+    }
+    return world.alliances.flatMap((a) => {
+      const problems: string[] = []
+      if (a.name.trim().length === 0 || a.name.length > ALLIANCE_NAME_MAX_LENGTH) {
+        problems.push(`has a bad name "${a.name}"`)
+      }
+      if (a.members.length === 0) problems.push('has no members')
+      if (!a.members.some((m) => m.realmId === a.leaderId)) {
+        problems.push(`has leader ${a.leaderId}, who is not a member`)
+      }
+      a.members.forEach((m, i) => {
+        if (!realms.has(m.realmId)) problems.push(`has member ${m.realmId}, which has ended`)
+        if (memberOf.get(m.realmId) === '') problems.push(`shares member ${m.realmId}`)
+        if (i > 0 && m.joinedAt < a.members[i - 1]!.joinedAt) {
+          problems.push(`lists member ${m.realmId} before one that joined earlier`)
+        }
+        const at = m.leaving?.at
+        if (at !== undefined && (at <= world.tick || at > world.tick + ALLIANCE_LEAVE_DELAY)) {
+          problems.push(`has member ${m.realmId} leaving at tick ${at}`)
+        }
+      })
+      if (new Set(a.invites).size !== a.invites.length) problems.push('invites a realm twice')
+      for (const id of a.invites) {
+        if (!realms.has(id)) problems.push(`invites ${id}, which has ended`)
+        else if (memberOf.has(id)) problems.push(`invites ${id}, which is in an alliance`)
+      }
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `alliance ${a.id} ${p}`,
+        entityIds: [a.id],
+      }))
+    })
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -783,6 +834,7 @@ export const worldInvariants: Invariant[] = [
   carriagesInPlace,
   driversOnCarriages,
   haulRoutesSound,
+  alliancesSound,
 ]
 
 export function checkInvariants(

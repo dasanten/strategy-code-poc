@@ -5,11 +5,13 @@ import {
   effective,
   type BuildingKind,
   type Good,
+  type Protection,
   type ResourceKind,
   type Resident,
   type SkillName,
   type StatName,
   type Stock,
+  type Weapon,
 } from './world.js'
 
 /**
@@ -205,7 +207,9 @@ export const SEA_COUNT = 3
 
 /**
  * What one unit of each good weighs, in kg (`CONTEXT.md`: Good). Coins are light but not
- * weightless, so a fortune still has to be carried.
+ * weightless, so a fortune still has to be carried. Weapons and armour weigh what went into them
+ * (`RECIPES`): an average resident (30 kg) in armour with a sword and a shield has half
+ * their room left for food.
  */
 export const GOOD_WEIGHT: Record<Good, number> = {
   food: 1,
@@ -215,6 +219,28 @@ export const GOOD_WEIGHT: Record<Good, number> = {
   iron: 1,
   goldOre: 1,
   coins: 0.02,
+  spear: 3,
+  sword: 3,
+  shield: 4,
+  armour: 8,
+}
+
+/**
+ * Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
+ * sword hits harder than a spear; combat (T10.2) adds it to Strength and Combat skill.
+ */
+export const WEAPON_ATTACK: Record<Weapon, number> = {
+  spear: 4,
+  sword: 6,
+}
+
+/**
+ * Damage each piece of protection takes off a blow (`CONTEXT.md`: Weapons and armour, Combat).
+ * Armour takes off more than a shield but weighs twice as much.
+ */
+export const PROTECTION_DEFENCE: Record<Protection, number> = {
+  shield: 3,
+  armour: 5,
 }
 
 /** Carry capacity of a resident with no Strength at all, in kg. */
@@ -424,7 +450,7 @@ export const REALM_LOG_LENGTH = 100
  * Materials each kind of building needs before its construction site can become the building
  * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
  * the lumber camp's wood builds the quarry, wood and stone build the mine and the smelter, and
- * the smelter's iron goes into the mint.
+ * the smelter's iron goes into the mint and the smithy.
  */
 export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   lumberCamp: {},
@@ -433,6 +459,7 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   stable: { wood: 40 },
   smelter: { stone: 40, wood: 20 },
   mint: { stone: 40, iron: 10 },
+  smithy: { stone: 30, wood: 20, iron: 10 },
   townHall: { wood: 60, stone: 40 },
   wall: { wood: 10 },
   gate: { wood: 15 },
@@ -441,8 +468,8 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
- * a mint 5, a town hall 6. A stretch of wooden wall takes a quarter of a game day, a gate half
- * of one. More or stronger workers finish it sooner (`buildWork`).
+ * a mint 5, a smithy 5, a town hall 6. A stretch of wooden wall takes a quarter of a game
+ * day, a gate half of one. More or stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -451,6 +478,7 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   stable: 3 * TICKS_PER_GAME_DAY,
   smelter: 4 * TICKS_PER_GAME_DAY,
   mint: 5 * TICKS_PER_GAME_DAY,
+  smithy: 5 * TICKS_PER_GAME_DAY,
   townHall: 6 * TICKS_PER_GAME_DAY,
   wall: TICKS_PER_GAME_DAY / 4,
   gate: TICKS_PER_GAME_DAY / 2,
@@ -488,8 +516,8 @@ export function constructionLearned(resident: Resident, tick: number): number {
 
 /**
  * Most residents who can work each kind of workplace at a time (`CONTEXT.md`: Workplace). A farm
- * has room for a whole starting city; the workplaces on nodes for a smaller crew; smelters and
- * mints for a few.
+ * has room for a whole starting city; the workplaces on nodes for a smaller crew; smelters,
+ * mints and smithies for a few.
  */
 export const WORKPLACE_MAX_WORKERS: Partial<Record<BuildingKind, number>> = {
   farm: 10,
@@ -498,11 +526,13 @@ export const WORKPLACE_MAX_WORKERS: Partial<Record<BuildingKind, number>> = {
   mine: 8,
   smelter: 4,
   mint: 4,
+  smithy: 4,
 }
 
 /**
  * The skill each kind of workplace uses and teaches (`CONTEXT.md`: Skill): Farming on a farm,
- * Woodcutting in a lumber camp, Mining in quarries and mines, Smelting in smelters and mints.
+ * Woodcutting in a lumber camp, Mining in quarries and mines, Smelting in smelters and mints,
+ * Smithing in a smithy.
  */
 export const WORKPLACE_SKILL: Partial<Record<BuildingKind, SkillName>> = {
   farm: 'farming',
@@ -511,6 +541,7 @@ export const WORKPLACE_SKILL: Partial<Record<BuildingKind, SkillName>> = {
   mine: 'mining',
   smelter: 'smelting',
   mint: 'smelting',
+  smithy: 'smithing',
 }
 
 /** What a workplace that processes goods turns into what, one batch at a time. */
@@ -522,23 +553,32 @@ export interface Recipe {
 }
 
 /**
- * The conversion rates of the workplaces that process goods (`CONTEXT.md`: Smelter, Coins): a
- * smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 20 coins (less weight than the
- * ore, but a fortune still weighs something).
+ * The fixed recipes of the workplaces that process goods (`CONTEXT.md`: Smelter, Coins, Smithy).
+ * A smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 20 coins (less weight than the
+ * ore, but a fortune still weighs something). A smithy has one recipe for each weapon and piece
+ * of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
+ * mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron.
  */
-export const RECIPES: Partial<Record<BuildingKind, Recipe>> = {
-  smelter: { input: { ironOre: 2 }, output: { iron: 1 } },
-  mint: { input: { goldOre: 1 }, output: { coins: 20 } },
+export const RECIPES: Partial<Record<BuildingKind, readonly Recipe[]>> = {
+  smelter: [{ input: { ironOre: 2 }, output: { iron: 1 } }],
+  mint: [{ input: { goldOre: 1 }, output: { coins: 20 } }],
+  smithy: [
+    { input: { iron: 1, wood: 2 }, output: { spear: 1 } },
+    { input: { iron: 2, wood: 1 }, output: { sword: 1 } },
+    { input: { iron: 1, wood: 3 }, output: { shield: 1 } },
+    { input: { iron: 7, wood: 1 }, output: { armour: 1 } },
+  ],
 }
 
 /**
  * Batches one worker of average Strength and no skill gets through per game day: a smelter worker
  * smelts what two miners dig (4 iron ore into 2 iron), a mint worker strikes what two gold miners
- * dig (2 gold ore into 40 coins).
+ * dig (2 gold ore into 40 coins), a smithy worker makes two weapons or pieces of armour.
  */
 export const BATCHES_PER_DAY: Partial<Record<BuildingKind, number>> = {
   smelter: 2,
   mint: 2,
+  smithy: 2,
 }
 
 /**
@@ -607,3 +647,9 @@ export const TEARDOWN_WORK_SHARE = 0.5
  * to whole units. An unfinished site leaves all its delivered materials.
  */
 export const TEARDOWN_MATERIALS_RETURNED = 0.5
+
+/**
+ * How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
+ * being a member (`CONTEXT.md`: Alliance): one game day, time enough for the others to react.
+ */
+export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY

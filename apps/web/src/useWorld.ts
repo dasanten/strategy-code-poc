@@ -4,6 +4,7 @@ import {
   type Building,
   type Carriage,
   type City,
+  type Diplomacy,
   type Horse,
   type MapInfo,
   type OrderRequest,
@@ -37,6 +38,8 @@ export interface ClientWorld {
   piles: Pile[]
   /** The Player's realm log, oldest first. */
   events: RealmEvent[]
+  /** The Player's alliance, invitations and the realms they could invite. */
+  diplomacy: Diplomacy
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -95,6 +98,7 @@ export function useWorld(onLoggedOut: () => void) {
             home: msg.home,
             tick: msg.tick,
             events: msg.events,
+            diplomacy: msg.diplomacy,
             ...byKind(entities.values()),
           })
         } else if (msg.type === 'ack' || msg.type === 'rejected') {
@@ -112,7 +116,16 @@ export function useWorld(onLoggedOut: () => void) {
               grown.length > 0 ? new Set([...w.exploredChunks, ...grown]) : w.exploredChunks
             const seen = changed ? byKind(entities.values()) : {}
             const events = appendEvents(w.events, msg.events)
-            return { ...w, ...seen, tick: msg.tick, exploredChunks, grownChunks: grown, events }
+            const diplomacy = msg.diplomacy ?? w.diplomacy
+            return {
+              ...w,
+              ...seen,
+              tick: msg.tick,
+              exploredChunks,
+              grownChunks: grown,
+              events,
+              diplomacy,
+            }
           })
         }
       }

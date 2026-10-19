@@ -1,4 +1,5 @@
 import {
+  GOODS,
   MAX_WORKERS,
   RECIPES,
   WORKPLACE_SKILL,
@@ -7,6 +8,7 @@ import {
   canWork,
   hasInput,
   pileAt,
+  recipeFor,
   workLearned,
   workOutput,
   workProblem,
@@ -31,16 +33,20 @@ export interface WorkAction {
   residentId: string
 }
 
-/** The input of a work-at order: which resident works the workplace on the tile they stand on. */
+/**
+ * The input of a work-at order: which resident works the workplace on the tile they stand on, and
+ * at a smithy which weapon or armour they make.
+ */
 interface WorkRequest extends OrderRequest {
   kind: 'workAt'
   residentId: string
+  makes?: Good
 }
 
 /**
  * The work-at order (`CONTEXT.md`: Workplace): one of the Player's adult residents works the
- * finished workplace on the tile they stand on (a farm, lumber camp, quarry, mine, smelter or
- * mint) until given another order.
+ * finished workplace on the tile they stand on (a farm, lumber camp, quarry, mine, smelter, mint
+ * or smithy) until given another order. At a smithy the order names what they make.
  */
 export const workAt: OrderKind = {
   validate(world, sender, order) {
@@ -49,19 +55,22 @@ export const workAt: OrderKind = {
     const r = world.residents.find((x) => x.id === o.residentId)
     if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t work'
-    return workProblem(world, r)
+    if (o.makes !== undefined && !(GOODS as readonly unknown[]).includes(o.makes))
+      return 'no such good'
+    return workProblem(world, r, o.makes)
   },
   apply(world, _sender, order) {
-    const { residentId } = order as WorkRequest
+    const { residentId, makes } = order as WorkRequest
     const r = world.residents.find((x) => x.id === residentId)
     const here = r && buildingAt(world, r.x, r.y)
-    if (r && here) startWork(r, here)
+    if (r && here) startWork(r, here, makes)
   },
 }
 
-/** Sets a resident to work the workplace on their tile. */
-export function startWork(r: Resident, workplace: Building): void {
+/** Sets a resident to work the workplace on their tile, making `makes` at a smithy. */
+export function startWork(r: Resident, workplace: Building, makes?: Good): void {
   r.order = { kind: 'workAt', buildingId: workplace.id, at: { x: r.x, y: r.y }, progress: 0 }
+  if (makes !== undefined) r.order.makes = makes
 }
 
 /** Requests this tick's work actions from residents' work-at orders. */
@@ -76,9 +85,10 @@ export function requestWork(world: WorldState): WorkAction[] {
  * has left the tile, whose workplace is gone or not finished, or who would be one worker too many
  * stops. Otherwise their work adds to their share of the next unit of the workplace's good (from
  * Strength and the workplace's skill) and teaches that skill. Each whole unit goes on the pile on
- * the workplace's tile. At a smelter or mint (`CONTEXT.md`: Smelter) the work goes into the next
- * batch of its recipe, and only while the input for it is there (`inputAt`); a finished batch uses
- * that input up and leaves its output on the pile the same way.
+ * the workplace's tile. At a smelter, mint or smithy (`CONTEXT.md`: Smelter, Smithy) the work
+ * goes into the next batch of the worker's recipe (`recipeFor`), and only while the input for it
+ * is there (`inputAt`); a finished batch uses that input up and leaves its output on the pile the
+ * same way.
  */
 export function resolveWork(world: WorldState, actions: WorkAction[]): void {
   const workers = new Map<string, number>()
@@ -89,7 +99,7 @@ export function resolveWork(world: WorldState, actions: WorkAction[]): void {
     const place = world.buildings.find((b) => b.id === o.buildingId)
     const count = workers.get(o.buildingId) ?? 0
     const max = place ? (MAX_WORKERS[place.kind] ?? 0) : 0
-    const good = place && workplaceGood(world, place)
+    const good = place && workplaceGood(world, place, o.makes)
     const skill = place && WORKPLACE_SKILL[place.kind]
     const onIt = place && !place.site && place.x === r.x && place.y === r.y
     if (!place || !onIt || !good || !skill || r.x !== o.at.x || r.y !== o.at.y || count >= max) {
@@ -97,17 +107,17 @@ export function resolveWork(world: WorldState, actions: WorkAction[]): void {
       continue
     }
     workers.set(o.buildingId, count + 1)
-    const recipe = RECIPES[place.kind]
+    const recipe = RECIPES[place.kind] && recipeFor(place.kind, o.makes)
     if (recipe) {
-      // A smelter or mint without the input for a batch stands idle: no work, nothing learned.
-      if (!hasInput(world, place)) continue
+      // A workplace without the input for a batch stands idle: no work, nothing learned.
+      if (!hasInput(world, place, recipe)) continue
       o.progress += batchWork(r, place.kind, world.tick)
     } else {
       o.progress += workOutput(r, good, skill, world.tick)
     }
     r.skills[skill] = (r.skills[skill] ?? 0) + workLearned(r, world.tick)
     while (o.progress >= 1) {
-      if (recipe && !hasInput(world, place)) {
+      if (recipe && !hasInput(world, place, recipe)) {
         o.progress = Math.min(o.progress, 1 - 1e-9)
         break
       }
@@ -123,7 +133,7 @@ export function resolveWork(world: WorldState, actions: WorkAction[]): void {
 }
 
 /**
- * Takes a batch's input from what a smelter's or mint's workers carry, the most laden first, and
+ * Takes a batch's input from what a processing workplace's workers carry, the most laden first, and
  * then from the pile on its tile (`inputAt`). The caller has checked it is all there.
  */
 function useUp(world: WorldState, place: Building, input: Stock): void {

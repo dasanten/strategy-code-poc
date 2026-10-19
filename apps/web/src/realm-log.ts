@@ -3,8 +3,11 @@ import { REALM_LOG_LENGTH, type RealmEvent } from '@csp/shared'
 /** How bad an event is, for its colour in the log. */
 export type EventTone = 'bad' | 'warn' | 'info'
 
-/** One line of the realm log, in the game's words (`CONTEXT.md`). */
-export function describeEvent(e: RealmEvent): { text: string; tone: EventTone } {
+/**
+ * One line of the realm log, in the game's words (`CONTEXT.md`). `realmId` is the Player's realm,
+ * so alliance events about it say so.
+ */
+export function describeEvent(e: RealmEvent, realmId?: string): { text: string; tone: EventTone } {
   switch (e.kind) {
     case 'hungry':
       return { text: `${e.name} has nothing to eat and is starving.`, tone: 'warn' }
@@ -25,6 +28,26 @@ export function describeEvent(e: RealmEvent): { text: string; tone: EventTone } 
       return { text: 'A horse starved to death.', tone: 'bad' }
     case 'foaled':
       return { text: 'A foal was born in a stable.', tone: 'info' }
+    case 'allianceInvited':
+      return { text: `You were invited to join the alliance ${e.name}.`, tone: 'info' }
+    case 'allianceJoined': {
+      const who = e.realmId === realmId ? 'You' : `The realm of ${e.realm}`
+      return { text: `${who} joined the alliance ${e.name}.`, tone: 'info' }
+    }
+    case 'allianceLeft': {
+      const you = e.realmId === realmId
+      const who = you ? 'Your realm' : `The realm of ${e.realm}`
+      const how = {
+        left: 'left',
+        removed: 'was removed from',
+        leaderDied: 'lost its Leader and left',
+      }
+      return { text: `${who} ${how[e.why]} the alliance ${e.name}.`, tone: you ? 'warn' : 'info' }
+    }
+    case 'allianceLeader': {
+      const who = e.realmId === realmId ? 'You are' : `The realm of ${e.realm} is`
+      return { text: `${who} now the leader of the alliance ${e.name}.`, tone: 'info' }
+    }
   }
 }
 

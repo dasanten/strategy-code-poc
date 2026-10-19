@@ -19,7 +19,14 @@ export interface Stat {
 
 /** Something learned by doing or training; starts at 0, never inherited (`CONTEXT.md`: Skill). */
 export type SkillName =
-  'mining' | 'woodcutting' | 'smelting' | 'construction' | 'farming' | 'combat' | 'driving'
+  | 'mining'
+  | 'woodcutting'
+  | 'smelting'
+  | 'smithing'
+  | 'construction'
+  | 'farming'
+  | 'combat'
+  | 'driving'
 
 /** A person living in the world (`CONTEXT.md`: Resident). Plain data. */
 export interface Resident {
@@ -114,6 +121,11 @@ export interface WorkOrder {
   buildingId: string
   at: { x: number; y: number }
   progress: number
+  /**
+   * At a workplace with more than one recipe (a smithy), the good this resident makes there
+   * (`recipeFor`). Missing elsewhere.
+   */
+  makes?: Good
 }
 
 /**
@@ -230,6 +242,8 @@ export interface WorldState {
   piles: Pile[]
   /** Each Player's latest realm events, oldest first, at most `REALM_LOG_LENGTH` each. */
   events: RealmEvent[]
+  /** Alliances with at least one member (`CONTEXT.md`: Alliance). */
+  alliances: Alliance[]
 }
 
 /** What happened, by kind; the rest of a `RealmEvent` says when and for whom. */
@@ -254,6 +268,24 @@ export type RealmEventWhat =
   | { kind: 'horseDied'; horseId: string }
   /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
   | { kind: 'foaled'; horseId: string; stableId: string }
+  /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */
+  | { kind: 'allianceInvited'; allianceId: string; name: string }
+  /** A realm (`realm`, by its Leader's name) joined the alliance: this one, or another. */
+  | { kind: 'allianceJoined'; allianceId: string; name: string; realmId: string; realm: string }
+  /**
+   * A realm stopped being a member of the alliance: this one, or another. `removed` when the
+   * alliance leader removed it; `leaderDied` when its Leader died and it left at once.
+   */
+  | {
+      kind: 'allianceLeft'
+      allianceId: string
+      name: string
+      realmId: string
+      realm: string
+      why: 'left' | 'removed' | 'leaderDied'
+    }
+  /** The role of alliance leader passed to a member (`CONTEXT.md`: Alliance leader). */
+  | { kind: 'allianceLeader'; allianceId: string; name: string; realmId: string; realm: string }
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the
@@ -275,9 +307,32 @@ export interface Pile {
   goods: Stock
 }
 
-/** PoC goods (`CONTEXT.md`: Good). Amounts are counted in units; `GOOD_WEIGHT` weighs them. */
-export const GOODS = ['food', 'wood', 'stone', 'ironOre', 'iron', 'goldOre', 'coins'] as const
+/**
+ * PoC goods (`CONTEXT.md`: Good, Weapons and armour). Amounts are counted in units;
+ * `GOOD_WEIGHT` weighs them.
+ */
+export const GOODS = [
+  'food',
+  'wood',
+  'stone',
+  'ironOre',
+  'iron',
+  'goldOre',
+  'coins',
+  'spear',
+  'sword',
+  'shield',
+  'armour',
+] as const
 export type Good = (typeof GOODS)[number]
+
+/** Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour). */
+export const WEAPONS = ['spear', 'sword'] as const satisfies readonly Good[]
+export type Weapon = (typeof WEAPONS)[number]
+
+/** Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour. */
+export const PROTECTION = ['shield', 'armour'] as const satisfies readonly Good[]
+export type Protection = (typeof PROTECTION)[number]
 
 /** Goods by kind, as unit counts; a missing good is 0. */
 export type Stock = Partial<Record<Good, number>>
@@ -289,6 +344,34 @@ export interface Realm {
   userId: number
   /** The resident who is the Player's Leader. */
   leaderId: string
+}
+
+/**
+ * A group of Organizations that agreed to join (`CONTEXT.md`: Alliance). For now its members are
+ * Players' realms; a realm is in at most one. It ends when its last member is gone.
+ */
+export interface Alliance {
+  id: string
+  /** Chosen by the realm that founded it. */
+  name: string
+  /** The member realm that is the alliance leader (`CONTEXT.md`: Alliance leader). */
+  leaderId: string
+  /** Members in the order they joined, so the first is the longest-standing. Never empty. */
+  members: AllianceMember[]
+  /** Realms the alliance leader invited that have not accepted or declined yet. */
+  invites: string[]
+}
+
+/** A realm's membership in an alliance. */
+export interface AllianceMember {
+  realmId: string
+  /** The tick it joined, or founded the alliance. */
+  joinedAt: number
+  /**
+   * Set once it leaves, or the alliance leader removes it (`removed`): the tick that takes
+   * effect. Until then it is a member like any other. Null while it stays.
+   */
+  leaving: { at: number; removed: boolean } | null
 }
 
 /**
@@ -318,6 +401,7 @@ export type BuildingKind =
   | 'lumberCamp'
   | 'smelter'
   | 'mint'
+  | 'smithy'
 
 /**
  * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction

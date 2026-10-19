@@ -1,4 +1,5 @@
 import type { Account } from './api.js'
+import type { Diplomacy } from './alliance.js'
 import type { Building, Carriage, City, Horse, Pile, RealmEvent, Resident } from './world.js'
 
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
@@ -45,10 +46,13 @@ export type ServerMessage =
       entities: SeenEntity[]
       /** The Player's realm log as kept, oldest first. */
       events: RealmEvent[]
+      /** The Player's alliance, invitations and the realms they could invite. */
+      diplomacy: Diplomacy
     }
   /**
    * Every tick: entities in sight that changed, ids that left sight, chunks whose explored
-   * terrain grew (load them again) and the Player's new realm events.
+   * terrain grew (load them again), the Player's new realm events and
+   * their alliance matters when those changed.
    */
   | {
       type: 'tick'
@@ -57,6 +61,7 @@ export type ServerMessage =
       gone: string[]
       explored: number[]
       events: RealmEvent[]
+      diplomacy?: Diplomacy
     }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }
