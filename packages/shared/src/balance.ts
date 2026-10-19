@@ -528,6 +528,12 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   road: TICKS_PER_GAME_DAY / 4,
 }
 
+/**
+ * The most tiles one road order along a line may cover (`roadLine`): about a game week of one
+ * resident's work, so a long road is a few orders rather than one that runs for months.
+ */
+export const ROAD_LINE_MAX_TILES = 32
+
 /** The Strength at which a resident puts in one unit of building work per tick. */
 export const BUILD_STRENGTH_AVERAGE = 10
 

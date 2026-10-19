@@ -13,6 +13,7 @@ import { stepHorses } from './horses.js'
 import { requestTearingDown, resolveTearingDown } from './teardown.js'
 import { requestCarrying, resolveCarrying } from './carrying.js'
 import { requestHauling } from './hauling.js'
+import { requestRoadMaterials } from './road-line.js'
 import type { Walking } from './walking.js'
 import { stepSpoilage } from './spoilage.js'
 import { stepRefill, stepSurvival, type SurvivalResult } from './survival.js'
@@ -99,7 +100,7 @@ export interface StepResult {
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
  * horses, and stables breed foals; food spoils at the end of each game day; then their orders request actions (steps, then blows in fights, then taking and
- * putting down goods, haul routes' included, then laying out and working on construction sites, then tearing down, then
+ * putting down goods, haul routes' and road orders' included, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
@@ -113,7 +114,11 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   walking?.resolve(world, steps)
   const strikes = requestStrikes(world, terrain.size)
   const combat = resolveStrikes(world, strikes, terrain.size)
-  const carries = [...requestCarrying(world), ...requestHauling(world)]
+  const carries = [
+    ...requestCarrying(world),
+    ...requestHauling(world),
+    ...requestRoadMaterials(world),
+  ]
   resolveCarrying(world, carries)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
