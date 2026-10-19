@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { SESSION_COOKIE } from '@csp/shared'
 import { buildApp } from './app.js'
@@ -6,10 +9,12 @@ import { openDb, type OpenDb } from './db/index.js'
 
 let opened: OpenDb
 let app: Awaited<ReturnType<typeof buildApp>>
+let appOpts: Parameters<typeof buildApp>[0]
 
 beforeEach(async () => {
   opened = await openDb(':memory:')
-  app = await buildApp({ db: opened.db, logger: false, secureCookies: false, trustProxy: false })
+  appOpts = { db: opened.db, logger: false, secureCookies: false, trustProxy: false }
+  app = await buildApp(appOpts)
 })
 afterEach(async () => {
   await app.close()
@@ -124,6 +129,21 @@ describe('admin', () => {
     })
     expect(reset.statusCode).toBe(204)
     expect((await loginAs('Mara', 'a new password'))[SESSION_COOKIE]).toBeTruthy()
+  })
+
+  it('serves the admin panel page from the built client', async () => {
+    const webDist = fs.mkdtempSync(path.join(os.tmpdir(), 'csp-web-'))
+    fs.writeFileSync(path.join(webDist, 'index.html'), '<div id="root"></div>')
+    const served = await buildApp({ ...appOpts, webDist })
+    try {
+      const page = await served.inject({ method: 'GET', url: '/admin' })
+      expect(page.statusCode).toBe(200)
+      expect(page.body).toContain('id="root"')
+      expect((await served.inject({ method: 'GET', url: '/api/admin' })).statusCode).toBe(404)
+    } finally {
+      await served.close()
+      fs.rmSync(webDist, { recursive: true, force: true })
+    }
   })
 
   it('keeps Players out of admin routes', async () => {

@@ -1,8 +1,37 @@
 import { useState, type FormEvent } from 'react'
+import type { Account } from '@csp/shared'
 import { api, ApiFailure } from './api.js'
 
+/**
+ * The admin panel, a page apart from the game (`CONTEXT.md`: Admin). It never opens the admin's
+ * realm: being an admin gives no power or knowledge in the world.
+ */
+export function AdminPage({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
+  async function logout() {
+    await api.logout().catch(() => {})
+    onLoggedOut()
+  }
+
+  return (
+    <div className="layout">
+      <header>
+        <h1>Code Strategy admin</h1>
+        <a href="/">Back to the game</a>
+        <span className="spacer" />
+        <span>{account.name}</span>
+        <button type="button" onClick={logout}>
+          Log out
+        </button>
+      </header>
+      <main className="admin-main">
+        {account.isAdmin ? <AdminPanel /> : <p>Only admins can open the admin panel.</p>}
+      </main>
+    </div>
+  )
+}
+
 /** Invite codes and password resets, for admins only (ADR 0005). */
-export function AdminPanel() {
+function AdminPanel() {
   const [codes, setCodes] = useState<string[]>([])
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
@@ -33,7 +62,7 @@ export function AdminPanel() {
 
   return (
     <section className="admin-panel">
-      <h2>Admin</h2>
+      <h2>Accounts</h2>
       <button type="button" onClick={invite}>
         New invite code
       </button>

@@ -13,11 +13,12 @@ import {
   type Resident,
   type Stock,
 } from '@csp/shared'
-import { AdminPanel } from './AdminPanel.js'
+import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
 import { api } from './api.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
+import { pageFor } from './pages.js'
 import { RealmLog } from './RealmLog.js'
 import { ResidentInspector, ResidentsList, type HaulSetup, type Picking } from './Residents.js'
 import { ScriptEditor } from './ScriptEditor.js'
@@ -34,6 +35,9 @@ export function App() {
 
   if (account === 'loading') return null
   if (!account) return <Login onLoggedIn={setAccount} />
+  // The admin page never mounts the game, so it never opens the admin's realm.
+  if (pageFor(window.location.pathname, account) !== 'game')
+    return <AdminPage account={account} onLoggedOut={loggedOut} />
   return <Game account={account} onLoggedOut={loggedOut} />
 }
 
@@ -213,7 +217,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 ? 'No syntax errors.'
                 : diagnostics.map((d) => `${d.line}:${d.column} ${d.message}`).join('\n')}
             </p>
-            {account.isAdmin && <AdminPanel />}
           </section>
         </div>
       </main>
