@@ -653,3 +653,12 @@ export const TEARDOWN_MATERIALS_RETURNED = 0.5
  * being a member (`CONTEXT.md`: Alliance): one game day, time enough for the others to react.
  */
 export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
+
+/**
+ * How many interpreter steps one resident's or army's script may use each tick (`CONTEXT.md`:
+ * Step budget). Every evaluated node costs 1; enough for a few loops over what it sees.
+ */
+export const SCRIPT_STEP_BUDGET = 2000
+
+/** How deeply a script's own function calls may nest before the run stops with an error. */
+export const SCRIPT_MAX_CALL_DEPTH = 50

@@ -1,5 +1,4 @@
 // The script language: lexer, parser and step-counting interpreter (ADR 0001).
-// The lexer and parser exist; the interpreter is the next piece of work.
 
 import { ScriptSyntaxError } from './lexer.js'
 import { parse } from './parser.js'
@@ -7,6 +6,18 @@ import { parse } from './parser.js'
 export type * from './ast.js'
 export { ScriptSyntaxError, tokenize, type Token } from './lexer.js'
 export { MAX_NESTING, parse } from './parser.js'
+export {
+  MAX_EVALUATION_DEPTH,
+  NativeFunction,
+  run,
+  type RunOptions,
+  type RunResult,
+  ScriptFunction,
+  type ScriptObject,
+  ScriptRuntimeError,
+  truthy,
+  type Value,
+} from './interpreter.js'
 
 export const LANGUAGE_VERSION = 1
 
