@@ -4,6 +4,7 @@ import {
   BUILDABLE,
   CARRIAGE_CAPACITY,
   GOODS,
+  HAUL_KEEP_FOOD,
   NODE_WORKPLACE,
   MAX_HEALTH,
   MAX_HUNGER,
@@ -82,6 +83,15 @@ function meterClass(share: number): string {
 
 const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
 
+/** What the map is waiting for a tile for: to walk or drive there, or a haul route's other stop. */
+export type Picking = false | 'walk' | 'drive' | 'haul'
+
+/** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
+export interface HaulSetup {
+  goods: Good[]
+  keepFood: number
+}
+
 /** What a resident is doing, from their order. */
 function doing(r: Resident): string {
   const o = r.order
@@ -92,6 +102,15 @@ function doing(r: Resident): string {
   if (o?.kind === 'drive') {
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
     return `Driving to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
+  }
+  if (o?.kind === 'haul') {
+    const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
+    const { x, y } = o[o.stop]
+    if (o.phase === 'loading') {
+      return o.stop === 'from' ? `Loading ${what} at ${x}, ${y}` : `Unloading ${what} at ${x}, ${y}`
+    }
+    const leg = o.stop === 'to' ? `Hauling ${what} to` : 'Driving back to'
+    return o.path ? `${leg} ${x}, ${y} · ${o.path.length} tiles to go` : `${leg} ${x}, ${y}`
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
@@ -188,19 +207,25 @@ export function ResidentInspector({
   onPair,
   carriage,
   onDriveTo,
+  onHaulTo,
+  onStop,
 }: {
   resident: Resident | undefined
   leaderId: string
   cityName: string | undefined
   tick: number
-  /** The map is waiting for a tile to walk or drive to. */
-  picking: false | 'walk' | 'drive'
+  /** The map is waiting for a tile to walk or drive to, or for a haul route's other stop. */
+  picking: Picking
   /** Starts (or cancels) picking a tile to walk to. */
   onWalkTo: () => void
   /** A carriage on the resident's tile, if one is in sight. */
   carriage: Carriage | undefined
   /** Starts (or cancels) picking a tile to drive the carriage to. */
   onDriveTo: () => void
+  /** Starts (or cancels) picking the other stop of a haul route carrying these goods. */
+  onHaulTo: (setup: HaulSetup) => void
+  /** Orders the resident to stop what they are doing. */
+  onStop: () => void
   /** Why the last order was turned down, if it was. */
   orderError: string | undefined
   /** Goods lying on the resident's tile, if any are in sight. */
@@ -301,15 +326,24 @@ export function ResidentInspector({
               {picking === 'drive' ? 'Pick a tile…' : 'Drive carriage to'}
             </button>
           )}
+          {r.order && (
+            <button type="button" onClick={onStop}>
+              Stop
+            </button>
+          )}
         </div>
         <p className="muted small" role="status">
           {orderError
             ? `Order turned down: ${orderError}`
             : picking
-              ? `Tap a tile on the map, or press ${picking === 'drive' ? 'Drive carriage' : 'Walk'} to again to cancel.`
+              ? `Tap a tile on the map, or press ${PICKING_BUTTONS[picking]} again to cancel.`
               : 'Right-click the map to walk there.'}
         </p>
       </section>
+
+      {carriage && (
+        <HaulBlock resident={r} tick={tick} picking={picking === 'haul'} onHaulTo={onHaulTo} />
+      )}
 
       <section className="inspector-block" aria-label="Stats">
         <div className="panel-head">
@@ -461,6 +495,81 @@ export function ResidentInspector({
         </section>
       )}
     </aside>
+  )
+}
+
+/** The button that started picking a tile, to name in the hint for cancelling. */
+const PICKING_BUTTONS: Record<Exclude<Picking, false>, string> = {
+  walk: 'Walk to',
+  drive: 'Drive carriage to',
+  haul: 'Pick the other stop',
+}
+
+/**
+ * Setting up a haul route with the carriage on the resident's tile (`CONTEXT.md`: Haul route):
+ * which goods go from here to the other stop and how much Food stays on board for the horse,
+ * then the other stop on the map.
+ */
+function HaulBlock({
+  resident,
+  tick,
+  picking,
+  onHaulTo,
+}: {
+  resident: Resident
+  tick: number
+  /** The map is waiting for the route's other stop. */
+  picking: boolean
+  onHaulTo: (setup: HaulSetup) => void
+}) {
+  const [goods, setGoods] = useState<Good[]>([])
+  const [keepFood, setKeepFood] = useState(HAUL_KEEP_FOOD)
+  const toggle = (g: Good) =>
+    setGoods((now) => (now.includes(g) ? now.filter((x) => x !== g) : [...now, g]))
+  const o = resident.order
+  return (
+    <section className="inspector-block" aria-label="Haul route">
+      <div className="panel-head">
+        <h3>Haul route</h3>
+        {o?.kind === 'haul' && <span className="small muted">on a route</span>}
+      </div>
+      <div className="chips">
+        {GOODS.map((g) => (
+          <label className="chip" key={g}>
+            <input type="checkbox" checked={goods.includes(g)} onChange={() => toggle(g)} />{' '}
+            {GOOD_LABELS[g]}
+          </label>
+        ))}
+      </div>
+      <label className="small">
+        Food kept for the horse{' '}
+        <input
+          type="number"
+          min={0}
+          step={1}
+          value={keepFood}
+          onChange={(e) => setKeepFood(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+          style={{ width: '4em' }}
+        />
+      </label>
+      <div className="order-buttons">
+        <button
+          type="button"
+          className={picking ? 'primary' : ''}
+          aria-pressed={picking}
+          disabled={!canWork(resident, tick) || goods.length === 0}
+          onClick={() => onHaulTo({ goods, keepFood })}
+        >
+          {picking ? 'Pick a tile…' : PICKING_BUTTONS.haul}
+        </button>
+      </div>
+      <p className="muted small">
+        The driver loads the picked goods here, drives them to the other stop and unloads them,
+        again and again until stopped. A stop with a storage loads and unloads there, else on the
+        ground. The horse eats from the carriage’s load; its Food is topped up wherever there is
+        some.
+      </p>
+    </section>
   )
 }
 

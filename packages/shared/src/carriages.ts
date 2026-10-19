@@ -1,5 +1,13 @@
 import { CARRIAGE_CAPACITY, GOOD_WEIGHT, canWork, stockWeight } from './balance.js'
-import { type Carriage, type Good, type Horse, type Resident, type WorldState } from './world.js'
+import { storageAt } from './goods.js'
+import {
+  type Carriage,
+  type Good,
+  type GoodsSpot,
+  type Horse,
+  type Resident,
+  type WorldState,
+} from './world.js'
 
 /** World queries about carriages (ADR 0002: the game API orders and scripts share). */
 
@@ -29,11 +37,24 @@ export function horseFor(world: WorldState, carriage: Carriage): Horse | undefin
   )
 }
 
-/** The resident driving a carriage, if anyone is (`DriveOrder`). */
+/** The carriage a resident drives, by a drive order or on a haul route, if they drive one. */
+export function drivenCarriageId(resident: Resident): string | undefined {
+  const o = resident.order
+  return o?.kind === 'drive' || o?.kind === 'haul' ? o.carriageId : undefined
+}
+
+/** The resident driving a carriage, if anyone is (`DriveOrder`, `HaulOrder`). */
 export function driverOf(world: WorldState, carriage: Carriage): Resident | undefined {
-  return world.residents.find(
-    (r) => r.order?.kind === 'drive' && r.order.carriageId === carriage.id,
-  )
+  return world.residents.find((r) => drivenCarriageId(r) === carriage.id)
+}
+
+/**
+ * Where a haul route's stop on tile (x, y) loads and unloads (`CONTEXT.md`: Haul route): the
+ * storage there, a stable's included, or else the ground.
+ */
+export function haulStopSpot(world: WorldState, x: number, y: number): GoodsSpot {
+  const storage = storageAt(world, x, y)
+  return storage ? { kind: 'storage', storageId: storage.id } : { kind: 'ground' }
 }
 
 /**

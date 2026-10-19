@@ -151,10 +151,43 @@ export interface DriveOrder {
   progress: number
 }
 
+/**
+ * A haul route (`CONTEXT.md`: Haul route): the resident drives the carriage `carriageId` between
+ * two stops again and again. At `from` they load `goods` onto it, as much as there is and fits;
+ * at `to` they unload them. At both stops they top up the Food on board to `keepFood` units, for
+ * the horse, and that much Food stays on. Loading and unloading go through their hands, one take
+ * or put a tick, like a pick-up or drop order. Driving works as for a drive order.
+ */
+export interface HaulOrder {
+  kind: 'haul'
+  carriageId: string
+  /** Where the goods are loaded. */
+  from: { x: number; y: number }
+  /** Where they are unloaded. */
+  to: { x: number; y: number }
+  /** The goods hauled from `from` to `to`; at least one. */
+  goods: Good[]
+  /** Units of Food kept on board for the horse. */
+  keepFood: number
+  /** The stop the carriage stands at or is driving to. */
+  stop: 'from' | 'to'
+  /** Loading and unloading at the stop, or driving to it. */
+  phase: 'loading' | 'driving'
+  /** While driving, the tiles still to drive; null while the path is being found. */
+  path: [number, number][] | null
+  progress: number
+  /**
+   * Goods the resident took last tick to put on the carriage or at the stop: which good, how many
+   * of it they held before, and where it goes. Null when they hold nothing for the route.
+   */
+  moving: { good: Good; before: number; onto: 'carriage' | 'stop' } | null
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
   | DriveOrder
+  | HaulOrder
   | PickUpOrder
   | DropOrder
   | BuildOrder

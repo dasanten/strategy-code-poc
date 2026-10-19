@@ -341,6 +341,13 @@ export function walkSpeed(resident: Resident, terrain: number, tick: number): nu
 export const CARRIAGE_CAPACITY = 400
 
 /**
+ * Food a haul route keeps on board for its horse unless the Player picks another amount, in
+ * units (`CONTEXT.md`: Haul route): two game days of the horse's eating, topped up at each stop
+ * that has Food.
+ */
+export const HAUL_KEEP_FOOD = 2 * HORSE_FOOD_PER_DAY
+
+/**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
  * Plains (`CONTEXT.md`: Carriage): twice as fast on Plains, a little slower than walking in Forest
  * and Hills. Mountains are missing: a carriage cannot enter them. Roads, once there are any, go

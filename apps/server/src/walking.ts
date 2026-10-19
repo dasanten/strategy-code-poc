@@ -8,6 +8,7 @@ import {
   walkSpeed,
   wrapDelta,
   type DriveOrder,
+  type HaulOrder,
   type OrderRequest,
   type Resident,
   type TerrainMap,
@@ -60,12 +61,35 @@ export const walkTo: OrderKind = {
   },
 }
 
-/** A walk-to or drive order: both go along a path to a target. */
-type MoveOrder = WalkOrder | DriveOrder
+/** A walk-to or drive order, or a haul route driving to its next stop: all go along a path. */
+type MoveOrder = WalkOrder | DriveOrder | HaulOrder
 
 function moveOrder(r: Resident): MoveOrder | undefined {
   const o = r.order
+  if (o?.kind === 'haul') return o.phase === 'driving' ? o : undefined
   return o?.kind === 'walkTo' || o?.kind === 'drive' ? o : undefined
+}
+
+/** Where a moving order goes: its target, or a haul route's next stop. */
+function targetOf(o: MoveOrder): { x: number; y: number } {
+  return o.kind === 'haul' ? o[o.stop] : o.target
+}
+
+/** The search for a moving order's path, by kind and target. */
+function searchKey(o: MoveOrder): string {
+  const { x, y } = targetOf(o)
+  return `${o.kind}:${x},${y}`
+}
+
+/** A moving order got there: a walk or drive is done, a haul route starts on its stop. */
+function arrive(r: Resident, o: MoveOrder): void {
+  if (o.kind !== 'haul') {
+    r.order = null
+    return
+  }
+  o.phase = 'loading'
+  o.path = null
+  o.progress = 0
 }
 
 /**
@@ -94,11 +118,11 @@ export class Walking {
       if (!o?.path) continue
       const next = o.path[0]
       if (!next) {
-        r.order = null
+        arrive(r, o)
         continue
       }
       const ground = terrainAt(this.terrain, next[0], next[1])
-      if (o.kind === 'drive') {
+      if (o.kind !== 'walkTo') {
         o.progress += driveSpeed(r, ground)
         r.skills.driving = (r.skills.driving ?? 0) + drivingLearned(r, world.tick)
       } else {
@@ -106,22 +130,26 @@ export class Walking {
       }
       if (o.progress < 1) continue
       const to = { x: next[0], y: next[1] }
-      const carriageId = o.kind === 'drive' ? o.carriageId : undefined
+      const carriageId = o.kind === 'walkTo' ? undefined : o.carriageId
       steps.push({ kind: 'step', residentId: r.id, to, ...(carriageId ? { carriageId } : {}) })
     }
     return steps
   }
 
-  /** Finds paths for new walk and drive orders; drops orders whose target can't be reached. */
+  /**
+   * Finds paths for new walk and drive orders and haul routes' next legs; drops orders whose
+   * target can't be reached.
+   */
   private plan(world: WorldState, budgetMs: number): void {
     for (const r of world.residents) {
       const o = moveOrder(r)
       if (!o || o.path) continue
       // A new order for a resident replaces any search for their old one.
-      const key = `${o.kind}:${o.target.x},${o.target.y}`
+      const key = searchKey(o)
       if (this.searching.get(r.id) !== key) {
-        const costs = o.kind === 'drive' ? CARRIAGE_COSTS : WALKING_COSTS
-        this.finder.request(r.id, [r.x, r.y], [o.target.x, o.target.y], costs)
+        const costs = o.kind === 'walkTo' ? WALKING_COSTS : CARRIAGE_COSTS
+        const target = targetOf(o)
+        this.finder.request(r.id, [r.x, r.y], [target.x, target.y], costs)
         this.searching.set(r.id, key)
       }
     }
@@ -132,7 +160,7 @@ export class Walking {
       this.searching.delete(id)
       const r = world.residents.find((x) => x.id === id)
       const o = r && moveOrder(r)
-      if (!o || o.path || `${o.kind}:${o.target.x},${o.target.y}` !== key) continue
+      if (!o || o.path || searchKey(o) !== key) continue
       if (result.status === 'found') o.path = result.path.map(([x, y]) => [x, y])
       else r.order = null
     }
@@ -177,7 +205,7 @@ export class Walking {
       if (!o?.path) continue
       o.path.shift()
       o.progress -= 1
-      if (o.path.length === 0) r.order = null
+      if (o.path.length === 0) arrive(r, o)
     }
     return taken
   }
