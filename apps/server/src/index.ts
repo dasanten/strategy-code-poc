@@ -19,6 +19,7 @@ import { SightTracker } from './sight.js'
 import { Walking } from './walking.js'
 import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { generateTerrain } from './terrain-gen.js'
+import { TerritoryTracker } from './territory.js'
 import { runTick } from './tick.js'
 
 const sentryOn = initSentry({ dsn: config.sentryDsn, environment: config.environment })
@@ -52,6 +53,7 @@ if (sentryOn) setupFastifyErrorHandler(app)
 const orders = new OrderQueue(orderKinds, terrain)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
+const territory = new TerritoryTracker()
 const realtime = attachRealtime(app.server, { db, world, terrain, explored, sight, orders })
 
 const reporter = createTickReporter(logger)
@@ -64,6 +66,7 @@ const loop = setInterval(() => {
     slowTickMs: config.slowTickMs,
   })
   tagWorld(world)
+  territory.update(world, terrain)
   realtime.broadcastTick(sight.update(world, explored))
   if (world.tick % config.saveEveryTicks === 0) {
     saveWorld(db, world)

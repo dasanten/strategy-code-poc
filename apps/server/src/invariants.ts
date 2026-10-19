@@ -33,6 +33,11 @@ import {
   Terrain,
   OFF_NODES,
   cityMembership,
+  computeTerritory,
+  controlAt,
+  controlSources,
+  wrap,
+  wrapDistance,
   isCityBuilding,
   STAT_NAMES,
   terrainAt,
@@ -691,6 +696,53 @@ export const haulRoutesSound: Invariant = {
   },
 }
 
+/**
+ * Territory is derived soundly (`CONTEXT.md`: Territory): every tile in it belongs to an
+ * Organization that exists (a realm, or a city of no realm) and lies within reach of one of that
+ * Organization's cities or guarded workplaces, and no other Organization projects as much
+ * control onto it.
+ */
+export const territorySound: Invariant = {
+  name: 'territory-sound',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const size = terrain.size
+    const organizations = new Set([
+      ...world.realms.map((r) => r.id),
+      ...world.cities.filter((c) => c.realmId === null).map((c) => c.id),
+    ])
+    // Each Organization's control on every tile it reaches, worked out apart from the territory.
+    const controlByTile = new Map<string, Map<string, number>>()
+    for (const s of controlSources(world, size)) {
+      for (const t of s.tiles) {
+        for (let dy = -s.reach; dy <= s.reach; dy++) {
+          for (let dx = -s.reach; dx <= s.reach; dx++) {
+            const at = { x: wrap(t.x + dx, size), y: wrap(t.y + dy, size) }
+            const c = controlAt(s, wrapDistance(size, t, at))
+            if (c <= 0) continue
+            const key = `${at.x},${at.y}`
+            const here = controlByTile.get(key) ?? new Map<string, number>()
+            controlByTile.set(key, here)
+            if (c > (here.get(s.owner) ?? 0)) here.set(s.owner, c)
+          }
+        }
+      }
+    }
+    for (const [key, owner] of computeTerritory(world, size).owners) {
+      const fail = (message: string) =>
+        out.push({ invariant: this.name, message: `tile (${key}) ${message}`, entityIds: [owner] })
+      if (!organizations.has(owner)) fail(`belongs to ${owner}, which is no Organization`)
+      const control = controlByTile.get(key) ?? new Map<string, number>()
+      const own = control.get(owner) ?? 0
+      if (own <= 0) fail(`belongs to ${owner}, which projects no control there`)
+      for (const [other, c] of control) {
+        if (other !== owner && c >= own)
+          fail(`belongs to ${owner}, but ${other} is as strong there`)
+      }
+    }
+    return out
+  },
+}
 /** Every resident lives in a city that exists, or in none. */
 export const residentsInCities: Invariant = {
   name: 'residents-in-cities',
@@ -835,6 +887,7 @@ export const worldInvariants: Invariant[] = [
   driversOnCarriages,
   haulRoutesSound,
   alliancesSound,
+  territorySound,
 ]
 
 export function checkInvariants(

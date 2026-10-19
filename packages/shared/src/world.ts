@@ -330,6 +330,11 @@ export type Good = (typeof GOODS)[number]
 export const WEAPONS = ['spear', 'sword'] as const satisfies readonly Good[]
 export type Weapon = (typeof WEAPONS)[number]
 
+/** Whether a resident is armed (`CONTEXT.md`: Soldier): carrying a weapon. */
+export function isArmed(resident: Pick<Resident, 'carried'>): boolean {
+  return WEAPONS.some((w) => (resident.carried[w] ?? 0) > 0)
+}
+
 /** Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour. */
 export const PROTECTION = ['shield', 'armour'] as const satisfies readonly Good[]
 export type Protection = (typeof PROTECTION)[number]
