@@ -127,11 +127,11 @@ describe('invariants', () => {
 
   it('catch buildings out of place, a farm off Plains and negative stock', () => {
     const { world } = worldWithCity()
-    const city = world.cities[0]!
+    const wall = world.buildings.find((b) => b.kind === 'wall')!
     const house = world.buildings.find((b) => b.kind === 'house')!
     const storage = world.buildings.find((b) => b.kind === 'storage')!
     const farm = world.buildings.find((b) => b.kind === 'farm')!
-    house.x = city.x // onto the wall
+    Object.assign(house, { x: wall.x, y: wall.y }) // onto the wall
     storage.stock = { food: -1 }
     const forest = terrain.tiles.indexOf(Terrain.Forest)
     farm.x = forest % terrain.size
@@ -139,7 +139,7 @@ describe('invariants', () => {
     const ids = checkInvariants(world, terrain)
       .filter((v) => v.invariant === 'buildings-in-place')
       .map((v) => v.entityIds[0])
-    expect(ids.sort()).toEqual([farm.id, house.id, storage.id].sort())
+    expect(ids.sort()).toEqual([farm.id, wall.id, storage.id].sort())
   })
 
   it('catch goods kept in a building that is not a storage', () => {

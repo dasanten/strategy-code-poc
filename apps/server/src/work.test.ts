@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest'
 import { checkInvariants, refilledWhenLow, workOrdersOnWorkplaces } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
-import { cityTerrain, worldWithCity } from './test-terrain.js'
+import { addCity, cityTerrain, worldWithCity } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
 
 /** Plains, with Forest at (3, 1) and Hills at (5, 1) and (7, 1) for the workplaces on nodes. */
@@ -42,17 +42,8 @@ const stranger = { userId: 8, account: { name: 'Tobin', isAdmin: false } }
 function setup() {
   const world = createWorld(terrain)
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'w1' })
-  world.cities.push({
-    id: 'c1',
-    name: 'Ashford',
-    realmId: 'r1',
-    x: 6,
-    y: 6,
-    size: 5,
-    wall: 'wooden',
-    gate: { x: 8, y: 10 },
-  })
   world.buildings.push({ id: 'farm', kind: 'farm', cityId: 'c1', x: 3, y: 3 })
+  addCity(world, { id: 'c1', realmId: 'r1', x: 8, y: 8 })
   const r = resident(world, 'w1', 3, 3)
   return { world, r, queue: new OrderQueue() }
 }

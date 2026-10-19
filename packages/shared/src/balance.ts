@@ -186,6 +186,19 @@ export const STABLE_BREED_DAYS = 10
  */
 export const CITY_MIN_DISTANCE = 300
 
+/**
+ * How near a city building must stand to the city's town hall, or to another building already
+ * part of that city, to be part of it too (`CONTEXT.md`: City building), in tiles along each
+ * direction. A wall with gaps of up to two tiles still holds together.
+ */
+export const CITY_BUILDING_REACH = 3
+
+/**
+ * How far around each of its buildings a city's area reaches (`CONTEXT.md`: City area), in tiles
+ * along each direction: the tiles right next to them.
+ */
+export const CITY_AREA_MARGIN = 1
+
 /** How far a resident sees, in tiles (`CONTEXT.md`: Sight). */
 export const SIGHT_RANGE = 12
 
@@ -447,12 +460,16 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   smelter: { stone: 40, wood: 20 },
   mint: { stone: 40, iron: 10 },
   smithy: { stone: 30, wood: 20, iron: 10 },
+  townHall: { wood: 60, stone: 40 },
+  wall: { wood: 10 },
+  gate: { wood: 15 },
 }
 
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
- * a mint 5, a smithy 5. More or stronger workers finish it sooner (`buildWork`).
+ * a mint 5, a smithy 5, a town hall 6. A stretch of wooden wall takes a quarter of a game
+ * day, a gate half of one. More or stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -462,6 +479,9 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   smelter: 4 * TICKS_PER_GAME_DAY,
   mint: 5 * TICKS_PER_GAME_DAY,
   smithy: 5 * TICKS_PER_GAME_DAY,
+  townHall: 6 * TICKS_PER_GAME_DAY,
+  wall: TICKS_PER_GAME_DAY / 4,
+  gate: TICKS_PER_GAME_DAY / 2,
 }
 
 /** The Strength at which a resident puts in one unit of building work per tick. */

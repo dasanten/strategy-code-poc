@@ -64,6 +64,9 @@ const BUILD_BLURBS: Partial<Record<BuildingKind, string>> = {
   smelter: 'A smelter turns iron ore into iron; not on Mountain. ',
   mint: 'A mint turns gold ore into coins; not on Mountain. ',
   smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain. ',
+  townHall: 'A town hall founds a new city of your realm; tearing it down dissolves the city. ',
+  wall: 'A stretch of wall; walls grow the city they stand by, like houses. ',
+  gate: 'A gate in a wall; it grows the city like a wall does. ',
 }
 
 /** A weight in kg, to one decimal (coins weigh little). */

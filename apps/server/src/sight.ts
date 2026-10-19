@@ -35,12 +35,13 @@ export function entitiesInSight(
   const size = terrain.size
   const out: SeenEntity[] = []
   for (const r of world.residents) if (seen(size, observers, r)) out.push({ is: 'resident', ...r })
-  for (const c of world.cities) {
-    // From its middle, a city reaches out as far as its corners.
-    const middle = { x: c.x + c.size / 2, y: c.y + c.size / 2 }
-    if (seen(size, observers, middle, (c.size / 2) * Math.SQRT2)) out.push({ is: 'city', ...c })
+  const seenCities = new Set<string>()
+  for (const b of world.buildings) {
+    if (!seen(size, observers, b)) continue
+    out.push({ is: 'building', ...b })
+    if (b.cityId !== null) seenCities.add(b.cityId)
   }
-  for (const b of world.buildings) if (seen(size, observers, b)) out.push({ is: 'building', ...b })
+  for (const c of world.cities) if (seenCities.has(c.id)) out.push({ is: 'city', ...c })
   for (const h of world.horses) if (seen(size, observers, h)) out.push({ is: 'horse', ...h })
   for (const k of world.carriages) if (seen(size, observers, k)) out.push({ is: 'carriage', ...k })
   for (const p of world.piles) if (seen(size, observers, p)) out.push({ is: 'pile', ...p })

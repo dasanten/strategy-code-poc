@@ -3,7 +3,6 @@ import {
   MAX_HUNGER,
   START_HORSES,
   START_STABLE_FOOD,
-  isInsideWalls,
   wrapDistance,
   type Building,
   type Carriage,
@@ -11,15 +10,32 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { updateCityMembership } from './cities.js'
 import { drawLifespan, hash, mulberry32 } from './residents.js'
-import { plainsOutside } from './starting-city.js'
+import { plainsOutside, ringTiles } from './starting-city.js'
+
+/** A city as saved before format 15: a walled square with one gate in its wall ring. */
+interface OldCity {
+  id: string
+  name: string
+  realmId: string | null
+  x: number
+  y: number
+  size: number
+  wall: 'wooden'
+  gate: { x: number; y: number }
+}
+
+/** Whether a tile lay inside an old city's walls. */
+const isInsideWalls = (c: OldCity, x: number, y: number) =>
+  x > c.x && y > c.y && x < c.x + c.size - 1 && y < c.y + c.size - 1
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 14
+export const WORLD_FORMAT_VERSION = 15
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -66,9 +82,9 @@ export const migrations: Record<number, MigrationStep> = {
   // ended, in the nearest city of all.
   10: (state, ctx) => {
     const s = state as { residents: { owner: string | null; x: number; y: number }[] } & {
-      cities: City[]
+      cities: OldCity[]
     }
-    const nearest = (r: { x: number; y: number }, cities: City[]) =>
+    const nearest = (r: { x: number; y: number }, cities: OldCity[]) =>
       cities
         .map((c) => ({
           c,
@@ -91,7 +107,7 @@ export const migrations: Record<number, MigrationStep> = {
     type OldHorse = { id: string; realmId: string | null; x: number; y: number; hunger: number }
     const s = state as {
       horses: OldHorse[]
-      cities: City[]
+      cities: OldCity[]
       buildings: Building[]
       nodes: { x: number; y: number }[]
       nextId: number
@@ -134,7 +150,7 @@ export const migrations: Record<number, MigrationStep> = {
   // gets a horse of its realm there that pulls no other carriage; every other carriage has none.
   12: (state) => {
     type OldCarriage = Omit<Carriage, 'horseId'>
-    const s = state as { carriages: OldCarriage[]; cities: City[]; buildings: Building[] } & {
+    const s = state as { carriages: OldCarriage[]; cities: OldCity[]; buildings: Building[] } & {
       horses: { id: string; realmId: string | null; x: number; y: number }[]
     }
     const hitched = new Set<string>()
@@ -162,6 +178,63 @@ export const migrations: Record<number, MigrationStep> = {
         r.order?.kind === 'haul' ? { ...r, order: { ...r.order, returnGoods: [] } } : r,
       ),
     }
+  },
+  // Cities are derived from their buildings (`CONTEXT.md`: City, Town hall, Wall / Gate). Each
+  // city gets a town hall on the free tile inside its walls nearest the middle, and its wall
+  // ring becomes wall buildings with a gate building where the gate was. Then every city
+  // building belongs to the city its chain gives it. A city with no free tile for a town hall
+  // dissolves, its residents homeless.
+  14: (state, ctx) => {
+    type OldResident = { cityId: string | null; order: { kind: string } | null }
+    const s = state as {
+      cities: OldCity[]
+      buildings: Building[]
+      residents: OldResident[]
+      nodes: { x: number; y: number }[]
+      nextId: number
+    }
+    let nextId = s.nextId
+    const buildings = s.buildings.map((b) => ({ ...b }))
+    const taken = new Set([...s.nodes, ...buildings].map((e) => `${e.x},${e.y}`))
+    const cities: City[] = []
+    for (const c of s.cities) {
+      const mid = { x: c.x + Math.floor(c.size / 2), y: c.y + Math.floor(c.size / 2) }
+      const inside: [number, number][] = []
+      for (let y = c.y + 1; y < c.y + c.size - 1; y++) {
+        for (let x = c.x + 1; x < c.x + c.size - 1; x++) inside.push([x, y])
+      }
+      const tile = inside
+        .filter(([x, y]) => !taken.has(`${x},${y}`))
+        .sort(
+          (a, b) => Math.hypot(a[0] - mid.x, a[1] - mid.y) - Math.hypot(b[0] - mid.x, b[1] - mid.y),
+        )[0]
+      if (!tile) continue
+      const hall: Building = {
+        id: `b${nextId++}`,
+        kind: 'townHall',
+        cityId: c.id,
+        x: tile[0],
+        y: tile[1],
+      }
+      buildings.push(hall)
+      taken.add(`${tile[0]},${tile[1]}`)
+      for (const [x, y] of ringTiles(c)) {
+        if (taken.has(`${x},${y}`)) continue
+        const kind = x === c.gate.x && y === c.gate.y ? 'gate' : 'wall'
+        buildings.push({ id: `b${nextId++}`, kind, cityId: c.id, x, y })
+        taken.add(`${x},${y}`)
+      }
+      cities.push({ id: c.id, name: c.name, realmId: c.realmId, townHallId: hall.id })
+    }
+    const kept = new Set(cities.map((c) => c.id))
+    const residents = s.residents.map((r) =>
+      r.cityId === null || kept.has(r.cityId)
+        ? r
+        : { ...r, cityId: null, order: r.order?.kind === 'pair' ? null : r.order },
+    )
+    const next = { ...s, cities, buildings, residents, nextId }
+    updateCityMembership(next as unknown as WorldState, ctx.terrain.size)
+    return next
   },
 }
 

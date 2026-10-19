@@ -100,8 +100,8 @@ describe('realtime', () => {
       expect(world.realms).toHaveLength(1)
       const city = world.cities[0]!
       expect(welcome.home).toMatchObject({ realmId: world.realms[0]!.id, cityId: city.id })
-      expect(welcome.home.x).toBeGreaterThan(city.x)
-      expect(welcome.home.x).toBeLessThan(city.x + city.size)
+      const hall = world.buildings.find((b) => b.id === city.townHallId)!
+      expect(welcome.home).toMatchObject({ x: hall.x, y: hall.y })
       // Daniel sees his city and everything in it, through his residents' eyes.
       const kinds = welcome.entities.map((e) => e.is)
       expect(kinds.filter((k) => k === 'resident')).toHaveLength(world.residents.length)

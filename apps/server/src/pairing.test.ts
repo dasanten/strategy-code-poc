@@ -5,6 +5,7 @@ import {
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   canWork,
+  cityAreaTiles,
   cityResidents,
   freeHousing,
   hasFoodSurplus,
@@ -19,7 +20,7 @@ import { OrderQueue } from './orders.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { newResident, mulberry32 } from './residents.js'
 import { foundStartingCity } from './starting-city.js'
-import { worldWithCity } from './test-terrain.js'
+import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { stepWorld } from './world.js'
 
 const me = { userId: 1, account: { name: 'Mara', isAdmin: false } }
@@ -58,15 +59,14 @@ function years(world: WorldState, n: number): Resident[] {
   return born
 }
 
-/** Adds a finished house to the city, on a free tile inside the walls. */
+/** Adds a finished house to the city, on a free tile in its area (`CONTEXT.md`: City area). */
 function addHouse(world: WorldState) {
   const city = world.cities[0]!
-  for (let y = city.y + 1; y < city.y + city.size - 1; y++) {
-    for (let x = city.x + 1; x < city.x + city.size - 1; x++) {
-      if (world.buildings.some((b) => b.x === x && b.y === y)) continue
-      world.buildings.push({ id: `h${x},${y}`, kind: 'house', cityId: city.id, x, y })
-      return
-    }
+  for (const key of cityAreaTiles(world, city, cityTerrain().size)) {
+    const [x, y] = key.split(',').map(Number) as [number, number]
+    if (world.buildings.some((b) => b.x === x && b.y === y)) continue
+    world.buildings.push({ id: `h${x},${y}`, kind: 'house', cityId: city.id, x, y })
+    return
   }
   throw new Error('no free tile in the city')
 }
@@ -280,13 +280,11 @@ describe('births', () => {
   })
 
   it('happens in the running world: a fed pair at home has a child after a game year', () => {
-    const { world, terrain, city, queue, residents } = setup(3000)
+    const { world, terrain, queue, residents } = setup(3000)
     const [a, b] = residents as [Resident, Resident]
     // Starting residents work the farm outside the wall; the pair stays at home to eat.
-    for (const r of [a, b]) {
-      r.x = city.x + 1
-      r.y = city.y + city.size - 2
-    }
+    const storage = storageOf(world)
+    for (const r of [a, b]) Object.assign(r, { x: storage.x - 2, y: storage.y + 2 })
     pairUp(world, queue, a, b)
     const before = world.residents.length
     for (let t = 0; t < TICKS_PER_GAME_YEAR + 1; t++) stepWorld(world, terrain)

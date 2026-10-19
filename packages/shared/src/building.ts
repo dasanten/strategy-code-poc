@@ -9,7 +9,6 @@ import {
 } from './balance.js'
 import {
   NODE_WORKPLACE,
-  isWallTile,
   type Building,
   type BuildingKind,
   type Good,
@@ -24,7 +23,7 @@ import { Terrain, terrainAt, type TerrainMap } from './terrain.js'
 
 /**
  * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters,
- * mints and smithies.
+ * mints and smithies, and town halls, walls and gates (`CONTEXT.md`: Town hall, Wall / Gate).
  */
 export const BUILDABLE: readonly BuildingKind[] = [
   'lumberCamp',
@@ -34,6 +33,9 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'smelter',
   'mint',
   'smithy',
+  'townHall',
+  'wall',
+  'gate',
 ]
 
 /** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
@@ -59,6 +61,11 @@ export function recipeFor(kind: BuildingKind, makes?: Good): Recipe | undefined 
 export function hasChoice(kind: BuildingKind): boolean {
   return (RECIPES[kind]?.length ?? 0) > 1
 }
+/**
+ * Buildable kinds that go on any passable terrain but Mountain, off any resource node
+ * (`CONTEXT.md`: Where buildings go).
+ */
+export const OFF_NODES: readonly BuildingKind[] = [...PROCESSING, 'townHall', 'wall', 'gate']
 
 /** Kinds of building that keep goods in a storage of their own: storages, and stables' Food. */
 export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'stable']
@@ -89,8 +96,8 @@ export function workNeeded(site: Building): number {
 /**
  * Why a building of this kind can't be laid out on the tile (`CONTEXT.md`: Where buildings go),
  * or undefined if it can: workplaces go on a resource node of their kind, stables on Plains off
- * any node, smelters, mints and smithies off any node and off Mountain, one building per tile, never on a
- * city wall. Without `terrain` the Plains and Mountain rules are not checked.
+ * any node, smelters, mints, smithies, town halls, walls and gates off any node and off Mountain,
+ * one building per tile. Without `terrain` the Plains and Mountain rules are not checked.
  */
 export function buildProblem(
   world: WorldState,
@@ -104,13 +111,12 @@ export function buildProblem(
   if (kind === 'stable') {
     if (node || (terrain && terrainAt(terrain, x, y) !== Terrain.Plains))
       return 'a stable goes on Plains, off any resource node'
-  } else if (PROCESSING.includes(kind)) {
+  } else if (OFF_NODES.includes(kind)) {
     if (node || (terrain && terrainAt(terrain, x, y) === Terrain.Mountain))
       return `a ${kind} goes off any resource node, and not on Mountain`
   } else if (!node || NODE_WORKPLACE[node.kind] !== kind)
     return `a ${kind} goes on a fitting resource node`
   if (buildingAt(world, x, y)) return 'there is already a building on this tile'
-  if (world.cities.some((c) => isWallTile(c, x, y))) return 'nothing can be built on a wall'
   return undefined
 }
 
@@ -249,7 +255,7 @@ export function teardownReturns(b: Building): Stock {
 
 /**
  * Why the building or site can't be torn down by a resident on (x, y), or undefined if it can.
- * So far only what can be built can be torn down: workplaces and their sites.
+ * So far only what can be built can be torn down, and its sites.
  */
 export function tearDownProblem(
   world: WorldState,

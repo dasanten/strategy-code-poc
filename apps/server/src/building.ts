@@ -1,6 +1,7 @@
 import {
   BUILDABLE,
   BUILD_WORK,
+  MAP_SIZE,
   buildProblem,
   buildWork,
   buildingAt,
@@ -14,6 +15,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
+import { foundCity, updateCityMembership } from './cities.js'
 import { newId, realmOf } from './starting-city.js'
 
 /**
@@ -73,13 +75,16 @@ export function requestBuilding(world: WorldState): BuildAction[] {
  * Laying out joins an unfinished site of the same kind already on the tile, or else lays out a new
  * one where the building may go; otherwise the order ends. Work goes into the site on the tile,
  * up to what it needs, and teaches Construction. A site with all its materials and work becomes
- * the building, and everyone's build order for it is done.
+ * the building, and everyone's build order for it is done. A finished town hall founds a city of
+ * the realm whose resident finished it, and any finished city building may grow a city
+ * (`updateCityMembership`).
  */
 export function resolveBuilding(
   world: WorldState,
   actions: BuildAction[],
   terrain?: TerrainMap,
 ): void {
+  let finished = false
   for (const a of actions) {
     const r = world.residents.find((x) => x.id === a.residentId)
     const o = r?.order
@@ -120,8 +125,11 @@ export function resolveBuilding(
     }
     if (workNeeded(site) === 0 && Object.keys(materialsNeeded(site)).length === 0) {
       delete site.site
+      finished = true
+      if (site.kind === 'townHall') foundCity(world, site, r.owner)
     }
   }
+  if (finished) updateCityMembership(world, terrain?.size ?? MAP_SIZE)
   const sites = new Set(world.buildings.filter((b) => b.site).map((b) => b.id))
   for (const r of world.residents) {
     if (r.order?.kind === 'build' && r.order.siteId !== null && !sites.has(r.order.siteId)) {
