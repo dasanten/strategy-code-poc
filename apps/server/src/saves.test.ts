@@ -381,6 +381,11 @@ describe('world saves', () => {
     expect(migrateWorld(v15, 15, { terrain }, migrations, 16)).toEqual({ ...v15, alliances: [] })
   })
 
+  it('gives the world no armies (migration 17 → 18)', () => {
+    const v17 = { tick: 10, seed: 1, residents: [], realms: [], alliances: [] }
+    expect(migrateWorld(v17, 17, { terrain }, migrations, 18)).toEqual({ ...v17, armies: [] })
+  })
+
   it('places NPC cities in the live world, out of every Player’s sight (migration 16 → 17)', () => {
     const { world, terrain: land } = worldWithCity()
     const before = structuredClone(world)

@@ -66,6 +66,8 @@ export interface WalkOrder {
   /** The tiles still to walk, in order; null while the path is being found. */
   path: [number, number][] | null
   progress: number
+  /** The army whose order this is (`CONTEXT.md`: Army); missing for the resident's own order. */
+  army?: string
 }
 
 /**
@@ -213,6 +215,8 @@ export interface AttackOrder {
   progress: number
   strike: number
   started: boolean
+  /** The army whose order this is (`CONTEXT.md`: Army); missing for the resident's own order. */
+  army?: string
 }
 
 /** Any order a resident can hold. */
@@ -262,7 +266,42 @@ export interface WorldState {
   events: RealmEvent[]
   /** Alliances with at least one member (`CONTEXT.md`: Alliance). */
   alliances: Alliance[]
+  /** Armies with at least one member (`CONTEXT.md`: Army). */
+  armies: Army[]
 }
+
+/**
+ * A named group of a realm's residents moving and fighting together under one order
+ * (`CONTEXT.md`: Army). A resident is in at most one army; one given an order of their own
+ * leaves it. Plain data (ADR 0002).
+ */
+export interface Army {
+  id: string
+  /** Chosen by the Player who formed it. */
+  name: string
+  realmId: string
+  /** Its residents; never empty. */
+  memberIds: string[]
+  /** What it was ordered to do; null when idle. */
+  order: ArmyOrder | null
+}
+
+/**
+ * An army's order (`CONTEXT.md`: Army). It gives its members walk or attack orders tagged with
+ * the army, and members walking for it keep together at the pace of the slowest. `started` is
+ * set once the members got their orders.
+ * - `walkTo`: all walk to a tile; done once none is still walking there.
+ * - `attack`: all go after one resident and strike them; done once none is still at it.
+ * - `guard`: all walk to a tile and stay; one who is idle away from it walks back. Until another
+ *   order.
+ * - `follow`: all keep in contact with a resident wherever they go, until that resident is gone
+ *   or out of the army's sight.
+ */
+export type ArmyOrder =
+  | { kind: 'walkTo'; target: { x: number; y: number }; started: boolean }
+  | { kind: 'attack'; targetId: string; started: boolean }
+  | { kind: 'guard'; at: { x: number; y: number }; started: boolean }
+  | { kind: 'follow'; targetId: string; started: boolean }
 
 /** What a resident died of: hunger, old age, or blows in a fight (`CONTEXT.md`: Combat). */
 export type DeathCause = 'starved' | 'oldAge' | 'killed'

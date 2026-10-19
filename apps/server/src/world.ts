@@ -21,6 +21,7 @@ import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
+import { stepArmies } from './armies.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -41,6 +42,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     piles: [],
     events: [],
     alliances: [],
+    armies: [],
   }
 }
 
@@ -103,7 +105,8 @@ export interface StepResult {
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
- * home or at their workplace who run low on food take meals there. Without `walking` nobody moves.
+ * home or at their workplace who run low on food take meals there; last, armies lose members who
+ * are gone and give the rest their orders for the next tick. Without `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
@@ -127,6 +130,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const aging = stepAging(world)
   stepAlliances(world)
   stepRefill(world, terrain.size)
+  stepArmies(world, terrain.size)
   const actions =
     steps.length +
     strikes.length +

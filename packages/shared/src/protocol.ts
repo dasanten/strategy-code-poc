@@ -1,6 +1,6 @@
 import type { Account } from './api.js'
 import type { Diplomacy } from './alliance.js'
-import type { Building, Carriage, City, Horse, Pile, RealmEvent, Resident } from './world.js'
+import type { Army, Building, Carriage, City, Horse, Pile, RealmEvent, Resident } from './world.js'
 
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
 export interface MapInfo {
@@ -29,6 +29,8 @@ export type SeenEntity =
   | ({ is: 'horse' } & Horse)
   | ({ is: 'carriage' } & Carriage)
   | ({ is: 'pile' } & Pile)
+  /** One of the Player's own armies; its members are what is seen of it. */
+  | ({ is: 'army' } & Army)
 
 /** Messages the server pushes over the WebSocket (ADR 0006). */
 export type ServerMessage =

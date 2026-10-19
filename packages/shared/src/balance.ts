@@ -790,6 +790,12 @@ export function combatLearned(resident: Resident, tick: number): number {
 }
 
 /**
+ * How many tiles further along an army's way a member may get than the one furthest behind
+ * (`CONTEXT.md`: Army): one ahead waits, so the army keeps together at the pace of the slowest.
+ */
+export const ARMY_SPREAD = 1
+
+/**
  * How many interpreter steps one resident's or army's script may use each tick (`CONTEXT.md`:
  * Step budget). Every evaluated node costs 1; enough for a few loops over what it sees.
  */

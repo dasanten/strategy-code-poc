@@ -21,6 +21,7 @@ import {
 import type { OrderKind, OrderSender } from './orders.js'
 import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { realmOf } from './starting-city.js'
+import { waitingForArmy } from './armies.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
 export const PATH_BUDGET_MS = 50
@@ -152,16 +153,23 @@ export class Walking {
     const roads = roadTiles(world, this.terrain.size)
     this.finder.setRoads(roads)
     this.plan(world, budgetMs)
+    const holding = new Set<string>()
+    for (const r of world.residents) {
+      const o = moveOrder(r)
+      if (o?.kind === 'attack' && attackHolds(world, r, o, this.terrain.size)) holding.add(r.id)
+    }
+    const waiting = waitingForArmy(world, holding)
     const steps: StepAction[] = []
     for (const r of world.residents) {
       const o = moveOrder(r)
-      if (o?.kind === 'attack' && attackHolds(world, r, o, this.terrain.size)) continue
-      if (!o?.path) continue
+      if (holding.has(r.id) || !o?.path) continue
       const next = o.path[0]
       if (!next) {
         arrive(r, o)
         continue
       }
+      // Keeping together with their army (`CONTEXT.md`: Army).
+      if (waiting.has(r.id)) continue
       const ground = groundAt(this.terrain, roads, next[0], next[1])
       if (!onFoot(o)) {
         o.progress += driveSpeed(r, ground)
