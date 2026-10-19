@@ -13,6 +13,7 @@ import {
   type Resident,
   type WorldState,
 } from '@csp/shared'
+import { commitCrime, organizationOf } from './crimes.js'
 import { recordEvent } from './events.js'
 import type { OrderKind } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
@@ -36,9 +37,26 @@ interface AttackRequest extends OrderRequest {
   targetId: string
 }
 
-/** A fresh attack order on `targetId`; `started` when the fight is already in the realm logs. */
-export function attackOrder(targetId: string, started = false): AttackOrder {
-  return { kind: 'attack', targetId, path: null, progress: 0, strike: 0, started }
+/**
+ * A fresh attack order on `targetId`; `started` when the fight is already in the realm logs,
+ * `defending` when it is fighting back at someone who hit the resident.
+ */
+export function attackOrder(targetId: string, started = false, defending = false): AttackOrder {
+  const o: AttackOrder = { kind: 'attack', targetId, path: null, progress: 0, strike: 0, started }
+  if (defending) o.defending = true
+  return o
+}
+
+/**
+ * Whether `a` striking `t` is a crime (`CONTEXT.md`: Crime): not when `a` fights back at someone
+ * who hit them, nor when `t` is attacking someone of `a`'s Organization on their own account.
+ */
+function isAggression(world: WorldState, a: Resident, t: Resident): boolean {
+  if (a.order?.kind === 'attack' && a.order.defending) return false
+  const o = t.order
+  if (o?.kind !== 'attack' || o.defending) return true
+  const theirTarget = world.residents.find((x) => x.id === o.targetId)
+  return !theirTarget || organizationOf(theirTarget) !== organizationOf(a)
 }
 
 /**
@@ -148,6 +166,9 @@ export function resolveStrikes(
         other: a.name,
         attacker: false,
       })
+      if (isAggression(world, a, t)) {
+        commitCrime(world, size, 'attack', a, { victimOrg: organizationOf(t), victim: t })
+      }
     }
     a.skills.combat = (a.skills.combat ?? 0) + combatLearned(a, world.tick)
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
@@ -157,6 +178,9 @@ export function resolveStrikes(
     if (t.health <= 0) {
       died.push(t)
       killers.set(t.id, a.name)
+      if (isAggression(world, a, t)) {
+        commitCrime(world, size, 'killing', a, { victimOrg: organizationOf(t), victim: t })
+      }
       continue
     }
     react(world, t, a)
@@ -175,7 +199,7 @@ export function resolveStrikes(
  */
 function react(world: WorldState, t: Resident, a: Resident): void {
   if (isArmed(t)) {
-    if (t.order?.kind !== 'attack') t.order = attackOrder(a.id, true)
+    if (t.order?.kind !== 'attack') t.order = attackOrder(a.id, true, true)
     return
   }
   const city = world.cities.find((c) => c.id === t.cityId)

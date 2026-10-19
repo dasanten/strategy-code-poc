@@ -5,6 +5,8 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   CARRIAGE_CAPACITY,
+  CRIME_MEMORY_DAYS,
+  TICKS_PER_GAME_DAY,
   carriageCanEnter,
   drivenCarriageId,
   GOOD_WEIGHT,
@@ -878,6 +880,41 @@ export const alliancesSound: Invariant = {
   },
 }
 
+/**
+ * Crimes hold together (`CONTEXT.md`: Crime, Witness): each is against another Organization than
+ * the culprit's and happened no later than now; its witnesses are living residents, each listed
+ * once, none of the culprit's Organization; it is known to each Organization at most once; and
+ * it is kept only while someone carries news of it or an Organization remembers it.
+ */
+export const crimesSound: Invariant = {
+  name: 'crimes-sound',
+  check(world) {
+    const alive = new Map(world.residents.map((r) => [r.id, r]))
+    const memory = CRIME_MEMORY_DAYS * TICKS_PER_GAME_DAY
+    return (world.crimes ?? []).flatMap((c) => {
+      const problems: string[] = []
+      if (c.culprit.org === c.victimOrg) problems.push('is against its culprit’s own Organization')
+      if (c.tick > world.tick) problems.push(`happens later, at tick ${c.tick}`)
+      if (new Set(c.witnesses).size !== c.witnesses.length) problems.push('lists a witness twice')
+      for (const id of c.witnesses) {
+        const w = alive.get(id)
+        if (!w) problems.push(`has witness ${id}, who is gone`)
+        else if ((w.owner ?? w.cityId) === c.culprit.org) {
+          problems.push(`has witness ${id} of the culprit’s Organization`)
+        }
+      }
+      if (new Set(c.knownBy).size !== c.knownBy.length) problems.push('is known twice to one')
+      const remembered = c.knownBy.length > 0 && world.tick - c.tick <= memory
+      if (c.witnesses.length === 0 && !remembered) problems.push('is kept though forgotten')
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `crime ${c.id} ${p}`,
+        entityIds: [c.id],
+      }))
+    })
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -910,6 +947,7 @@ export const worldInvariants: Invariant[] = [
   alliancesSound,
   deadLeaveLoot,
   attackOrdersSound,
+  crimesSound,
 ]
 
 export function checkInvariants(
