@@ -218,7 +218,8 @@ The shared language of the game. Domain terms only — no implementation details
   protection they carry; there is nothing to equip, so heavy gear leaves less room for food.
   No ranged weapons for now.
 - **Smithy:** a workplace that turns Iron and Wood into weapons and armour, at fixed recipes,
-  from what its workers carry and the pile on its tile. Teaches Smithing.
+  from what its workers carry and the pile on its tile. Each worker's work order says which of
+  them they make; they can switch. Teaches Smithing.
 - **Army:** a named group of a realm's residents moving and fighting together under one order or
   script, at the pace of the slowest. A resident leaves it when given an order of their own.
   Needs a supply line or it starves far from home.

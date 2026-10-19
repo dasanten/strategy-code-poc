@@ -24,6 +24,7 @@ import {
   canWork,
   carryCapacity,
   materialsNeeded,
+  recipeGood,
   teardownReturns,
   teardownWork,
   stockWeight,
@@ -51,6 +52,10 @@ const GOOD_LABELS: Record<Good, string> = {
   iron: 'Iron',
   goldOre: 'Gold ore',
   coins: 'Coins',
+  spear: 'Spear',
+  sword: 'Sword',
+  shield: 'Shield',
+  armour: 'Armour',
 }
 
 /** What a building off any node is for, shown before what it needs. */
@@ -58,6 +63,7 @@ const BUILD_BLURBS: Partial<Record<BuildingKind, string>> = {
   stable: 'A stable keeps horses and their Food, and breeds them; on Plains only. ',
   smelter: 'A smelter turns iron ore into iron; not on Mountain. ',
   mint: 'A mint turns gold ore into coins; not on Mountain. ',
+  smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain. ',
 }
 
 /** A weight in kg, to one decimal (coins weigh little). */
@@ -84,6 +90,7 @@ const SKILL_LABELS: Record<SkillName, string> = {
   mining: 'Mining',
   woodcutting: 'Woodcutting',
   smelting: 'Smelting',
+  smithing: 'Smithing',
   construction: 'Construction',
   farming: 'Farming',
   combat: 'Combat',
@@ -139,7 +146,8 @@ function doing(r: Resident): string {
     const what = BUILDING_NAMES[o.building].toLowerCase()
     return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
   }
-  if (o?.kind === 'workAt') return 'Working'
+  if (o?.kind === 'workAt')
+    return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
   if (o?.kind === 'pair') return 'Paired'
   return 'Idle'
 }
@@ -268,8 +276,8 @@ export function ResidentInspector({
   holders: string[]
   /** The Player's realm. */
   realmId: string
-  /** Orders the resident to work the workplace on their tile. */
-  onWork: () => void
+  /** Orders the resident to work the workplace on their tile, making `makes` at a smithy. */
+  onWork: (makes?: Good) => void
   /** Orders the resident to tear down the building or site on their tile. */
   onTearDown: (buildingId: string) => void
   /** The Player's residents in sight, to pick a partner from. */
@@ -666,7 +674,7 @@ function BuildBlock({
   }
   if (!building) {
     // On a node its workplace; anywhere else a stable (the server allows it on Plains only), a
-    // smelter or a mint (not on Mountain).
+    // smelter, a mint or a smithy (not on Mountain).
     const kinds: BuildingKind[] = node ? [NODE_WORKPLACE[node.kind]] : ['stable', ...PROCESSING]
     return (
       <section className="inspector-block" aria-label="Build">
@@ -732,16 +740,18 @@ function WorkBlock({
   workers: number
   holders: string[]
   realmId: string
-  onWork: () => void
+  onWork: (makes?: Good) => void
 }) {
   const max = building && !building.site ? MAX_WORKERS[building.kind] : undefined
   const skill = building && WORKPLACE_SKILL[building.kind]
-  const recipe = building && RECIPES[building.kind]
+  const recipes = (building && RECIPES[building.kind]) ?? []
+  const recipe = recipes.length === 1 ? recipes[0] : undefined
   const good = building?.kind === 'farm' ? 'food' : node && NODE_GOOD[node.kind]
-  if (!building || max === undefined || !skill || (!good && !recipe)) return null
+  if (!building || max === undefined || !skill || (!good && recipes.length === 0)) return null
   const batches = BATCHES_PER_DAY[building.kind] ?? 0
   const o = resident.order
   const working = o?.kind === 'workAt' && o.buildingId === building.id
+  const blocked = !canWork(resident, tick) || (!working && workers >= max)
   return (
     <section className="inspector-block" aria-label="Work">
       <div className="panel-head">
@@ -751,18 +761,41 @@ function WorkBlock({
         </span>
       </div>
       <p className="small">{holding(holders, realmId)}</p>
-      <div className="order-buttons">
-        <button
-          type="button"
-          className="primary"
-          disabled={!canWork(resident, tick) || working || workers >= max}
-          onClick={onWork}
-        >
-          {working ? 'Working…' : 'Work here'}
-        </button>
-      </div>
+      {recipes.length > 1 ? (
+        // A smithy: each worker says what they make (`CONTEXT.md`: Smithy).
+        recipes.map((r) => {
+          const made = recipeGood(r)
+          const making = working && o.makes === made
+          return (
+            <div key={made} className="goods-row">
+              <span>{GOOD_LABELS[made]}</span>
+              <span className="muted small">{stockText(r.input)}</span>
+              <button type="button" disabled={blocked || making} onClick={() => onWork(made)}>
+                {making ? 'Making…' : working ? 'Make instead' : 'Make'}
+              </button>
+            </div>
+          )
+        })
+      ) : (
+        <div className="order-buttons">
+          <button
+            type="button"
+            className="primary"
+            disabled={blocked || working}
+            onClick={() => onWork()}
+          >
+            {working ? 'Working…' : 'Work here'}
+          </button>
+        </div>
+      )}
       <p className="muted small">
-        {recipe ? (
+        {recipes.length > 1 ? (
+          <>
+            A worker of average Strength makes about {batches} of them a game day, more with{' '}
+            {SKILL_LABELS[skill]} skill. They use what the workers carry, then what lies on the
+            ground here; without it they stand idle. The output goes
+          </>
+        ) : recipe ? (
           <>
             A worker of average Strength turns about {stockText(recipe.input, batches)} into{' '}
             {stockText(recipe.output, batches)} a game day, more with {SKILL_LABELS[skill]} skill.

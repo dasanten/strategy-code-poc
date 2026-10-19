@@ -7,6 +7,7 @@ import {
   type Account,
   type Building,
   type BuildingKind,
+  type Good,
   type GoodsSpot,
   type KnownNode,
   type Resident,
@@ -79,10 +80,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'build', residentId: selected.id, building }))
   }
-  /** Orders the picked resident to work the workplace on their tile. */
-  async function work() {
+  /** Orders the picked resident to work the workplace on their tile, making `makes` at a smithy. */
+  async function work(makes?: Good) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'workAt', residentId: selected.id }))
+    setOrderError(await sendOrder({ kind: 'workAt', residentId: selected.id, makes }))
   }
   /** Orders the picked resident to tear down the building or site on their tile. */
   async function tearDown(buildingId: string) {

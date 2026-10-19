@@ -76,8 +76,8 @@ function total(world: WorldState, good: 'ironOre' | 'iron' | 'goldOre' | 'coins'
 
 describe('conversion rates (balance file)', () => {
   it('a smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 20 coins', () => {
-    expect(RECIPES.smelter).toEqual({ input: { ironOre: 2 }, output: { iron: 1 } })
-    expect(RECIPES.mint).toEqual({ input: { goldOre: 1 }, output: { coins: 20 } })
+    expect(RECIPES.smelter).toEqual([{ input: { ironOre: 2 }, output: { iron: 1 } }])
+    expect(RECIPES.mint).toEqual([{ input: { goldOre: 1 }, output: { coins: 20 } }])
     expect(BATCHES_PER_DAY.smelter).toBeGreaterThan(0)
     expect(BATCHES_PER_DAY.mint).toBeGreaterThan(0)
   })
@@ -154,14 +154,17 @@ describe('smelter and mint', () => {
   })
 })
 
-describe('where smelters and mints go', () => {
-  it.each(['smelter', 'mint'] as const)('a %s goes off nodes and off Mountain', (kind) => {
-    const world = createWorld(terrain)
-    world.nodes.push({ id: 'n1', kind: 'ironOre', x: 7, y: 5 })
-    expect(buildProblem(world, 2, 2, kind, terrain)).toBeUndefined()
-    expect(buildProblem(world, 5, 5, kind, terrain)).toMatch(/Mountain/)
-    expect(buildProblem(world, 7, 5, kind, terrain)).toMatch(/resource node/)
-  })
+describe('where smelters, mints and smithies go', () => {
+  it.each(['smelter', 'mint', 'smithy'] as const)(
+    'a %s goes off nodes and off Mountain',
+    (kind) => {
+      const world = createWorld(terrain)
+      world.nodes.push({ id: 'n1', kind: 'ironOre', x: 7, y: 5 })
+      expect(buildProblem(world, 2, 2, kind, terrain)).toBeUndefined()
+      expect(buildProblem(world, 5, 5, kind, terrain)).toMatch(/Mountain/)
+      expect(buildProblem(world, 7, 5, kind, terrain)).toMatch(/resource node/)
+    },
+  )
 
   it('the invariant catches one on a node or on Mountain', () => {
     const world = createWorld(terrain)

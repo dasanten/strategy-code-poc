@@ -16,6 +16,7 @@ import {
   teardownWork,
   workNeeded,
   workplaceGood,
+  hasChoice,
   type Good,
   LIFESPAN_MAX,
   LIFESPAN_MIN,
@@ -505,7 +506,8 @@ export const realmLogsInOrder: Invariant = {
 }
 
 /**
- * After a tick, a resident with a work-at order stands on the finished workplace it names, their
+ * After a tick, a resident with a work-at order stands on the finished workplace it names, says
+ * what they make exactly where there is a choice (a smithy) and makes something there, their
  * share of the next unit is between 0 and 1, and no workplace has more workers than it takes
  * (`resolveWork` ends the orders that no longer fit).
  */
@@ -524,13 +526,12 @@ export const workOrdersOnWorkplaces: Invariant = {
           entityIds: [r.id, o.buildingId],
         })
       const place = world.buildings.find((b) => b.id === o.buildingId)
-      if (
-        !place ||
-        place.site ||
-        MAX_WORKERS[place.kind] === undefined ||
-        !workplaceGood(world, place)
-      )
+      if (!place || place.site || MAX_WORKERS[place.kind] === undefined)
         fail('which is no finished workplace')
+      else if (hasChoice(place.kind) !== (o.makes !== undefined))
+        fail(o.makes === undefined ? 'making nothing' : `making ${o.makes} with nothing to choose`)
+      else if (!workplaceGood(world, place, o.makes))
+        fail(o.makes === undefined ? 'which makes nothing' : `which can't make ${o.makes}`)
       else if (place.x !== r.x || place.y !== r.y || o.at.x !== r.x || o.at.y !== r.y)
         fail('which is not on their tile')
       if (!(o.progress >= 0 && o.progress < 1)) fail(`with progress ${o.progress}`)
