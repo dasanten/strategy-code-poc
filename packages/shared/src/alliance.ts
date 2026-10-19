@@ -13,6 +13,15 @@ export function allianceOf(
   return world.alliances.find((a) => a.members.some((m) => m.realmId === realmId))
 }
 
+/**
+ * The realms whose residents a realm's Player sees through (`CONTEXT.md`: Sight): their own, and
+ * every member of their alliance. A member that is leaving shares until the leave delay is over.
+ */
+export function sharingSight(world: Pick<WorldState, 'alliances'>, realmId: string): string[] {
+  const alliance = allianceOf(world, realmId)
+  return alliance ? alliance.members.map((m) => m.realmId) : [realmId]
+}
+
 /** How a realm is called to other Players: by its Leader's name. */
 export function realmName(
   world: Pick<WorldState, 'realms' | 'residents'>,
@@ -55,7 +64,7 @@ export interface Diplomacy {
   } | null
   /** Alliances whose leader invited the Player's realm. */
   invitations: { allianceId: string; name: string; leader: string }[]
-  /** Other realms the Player sees residents of, who could be invited. */
+  /** Realms outside their alliance the Player sees residents of, who could be invited. */
   realmsInSight: RealmLabel[]
 }
 
@@ -85,8 +94,9 @@ export function diplomacyFor(
     .filter((a) => a.invites.includes(realmId))
     .map((a) => ({ allianceId: a.id, name: a.name, leader: realmName(world, a.leaderId) }))
   const realms = new Set(world.realms.map((r) => r.id))
+  const allies = new Set(sharingSight(world, realmId))
   const realmsInSight = [...new Set(seenRealms)]
-    .filter((id) => id !== realmId && realms.has(id))
+    .filter((id) => id !== realmId && !allies.has(id) && realms.has(id))
     .sort()
     .map(label)
   return { alliance: alliance ?? null, invitations, realmsInSight }
