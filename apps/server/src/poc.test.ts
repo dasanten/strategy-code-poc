@@ -2,12 +2,11 @@ import {
   HAUL_KEEP_FOOD,
   Terrain,
   TICKS_PER_GAME_DAY,
-  carryCapacity,
+  MAX_HEALTH,
   pileAt,
   statValue,
   terrainAt,
   unitsThatFit,
-  type Building,
   type GoodsSpot,
   type Resident,
   type Stock,
@@ -25,6 +24,18 @@ const NIGHT = 8 * TICKS_PER_GAME_DAY
 
 /** The iron mine is at least this far from home, in tiles along the carriage's road. */
 const FAR = 80
+
+/** Food each miner takes along for the walk out and the building, in units: two game days. */
+const MINER_FOOD = 6
+
+/**
+ * Food the driver takes along for the trip out and the night, in units: about ten game days, to be safe. A route bringing Food back
+ * out takes all the home storage has, so there is none left there to refill from.
+ */
+const DRIVER_FOOD = 24
+
+/** Iron ore that is home by morning at the least. */
+const MORNING_ORE = 30
 
 /**
  * The PoC check (`CONTEXT.md`: Haul route; epic 6): a Player's starting city builds an iron mine
@@ -75,11 +86,12 @@ function scenario() {
   const at = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     a.x === b.x && a.y === b.y
 
-  // The Leader stays home on the farm; the next resident drives, the four strongest of the rest mine.
-  const [, driver, ...rest] = world.residents.filter((r) => r.owner === realm.id)
-  const miners = rest
+  // The Leader stays home on the farm. The five strongest of the rest go: the strongest drives,
+  // as they carry their own Food for the night and still load by hand; the others mine.
+  const [, ...rest] = world.residents.filter((r) => r.owner === realm.id)
+  const [driver, ...miners] = rest
     .sort((a, b) => statValue(b, 'strength', 0) - statValue(a, 'strength', 0))
-    .slice(0, 4)
+    .slice(0, 5)
   const crew = [driver!, ...miners]
   const onCarriage: GoodsSpot = { kind: 'carriage', carriageId: carriage.id }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage.id }
@@ -139,36 +151,40 @@ describe('the PoC: iron from a far mine reaches home overnight', () => {
     })
     runUntil(() => s.idle([driver])() && s.at(driver, storage), TICKS_PER_GAME_DAY)
 
-    // The mine's materials go on the carriage; the miners take Food for the night.
+    // The mine's materials go on the carriage, and Food for the horse, which eats from the
+    // carriage's load on the way. The miners take Food for the walk and the building, the driver
+    // for the night.
     s.move(miners[0]!, { wood: 20 }, s.inStorage, s.onCarriage)
     s.move(miners[1]!, { wood: 20 }, s.inStorage, s.onCarriage)
     s.move(miners[2]!, { stone: 20 }, s.inStorage, s.onCarriage)
-    // And Food for the horse, which eats from the carriage's load until it is back home.
     s.move(miners[3]!, { food: HAUL_KEEP_FOOD }, s.inStorage, s.onCarriage)
-    console.log('loaded', world.tick)
     for (const m of miners) {
-      const food = unitsThatFit(m, 'food', world.tick)
-      order({ kind: 'pickUp', residentId: m.id, spot: s.inStorage, goods: { food } })
+      order({ kind: 'pickUp', residentId: m.id, spot: s.inStorage, goods: { food: MINER_FOOD } })
     }
-    runUntil(s.idle(miners), 10)
+    order({
+      kind: 'pickUp',
+      residentId: driver.id,
+      spot: s.inStorage,
+      goods: { food: DRIVER_FOOD },
+    })
+    runUntil(s.idle(crew), 10)
 
     // Off to the node: the miners walk, the driver drives the materials there.
     order({ kind: 'drive', residentId: driver.id, carriageId: carriage.id, x: node.x, y: node.y })
     for (const m of miners) order({ kind: 'walkTo', residentId: m.id, x: node.x, y: node.y })
     runUntil(() => crew.every((r) => r.order === null && s.at(r, node)), 3 * TICKS_PER_GAME_DAY)
 
-    console.log('arrived', world.tick)
     // The miners lay out the mine and build it; the driver unloads the materials onto the site.
     order({ kind: 'build', residentId: miners[0]!.id, building: 'mine' })
     runUntil(() => world.buildings.some((b) => s.at(b, node)), 10)
-    const site = world.buildings.find((b) => b.x === node.x && b.y === node.y)! as Building
+    const mine = world.buildings.find((b) => s.at(b, node))!
     for (const m of miners.slice(1)) order({ kind: 'build', residentId: m.id, building: 'mine' })
-    s.move(driver, { wood: 40, stone: 20 }, s.onCarriage, { kind: 'site', siteId: site.id })
-    runUntil(() => !site.site, 3 * TICKS_PER_GAME_DAY)
+    s.move(driver, { wood: 40, stone: 20 }, s.onCarriage, { kind: 'site', siteId: mine.id })
+    runUntil(() => !mine.site, 3 * TICKS_PER_GAME_DAY)
     runUntil(s.idle(miners), 10)
 
-    console.log('built', world.tick)
-    // Night falls: the miners work the mine, the driver hauls its ore home, the Player sleeps.
+    // Night falls: the miners work the mine, the driver hauls its ore home and Food back out to
+    // it, where the miners take their meals (`CONTEXT.md`: Refilling at a workplace).
     for (const m of miners) order({ kind: 'workAt', residentId: m.id })
     order({
       kind: 'haul',
@@ -177,28 +193,30 @@ describe('the PoC: iron from a far mine reaches home overnight', () => {
       x: storage.x,
       y: storage.y,
       goods: ['ironOre'],
+      returnGoods: ['food'],
       keepFood: HAUL_KEEP_FOOD,
     })
     const evening = world.tick
-    const oreAtHome = () => storage.stock?.ironOre ?? 0
-    const report = () => ({
-      hours: Math.round((world.tick - evening) / 150),
-      home: oreAtHome(),
-      pile: pileAt(world, node.x, node.y)?.goods,
-      onCarriage: carriage.load,
-      miners: miners.map((m) => ({
-        cap: Math.round(carryCapacity(m, world.tick)),
-        carried: m.carried,
-        hunger: Math.round(m.hunger),
-        health: Math.round(m.health),
-        alive: world.residents.includes(m),
-      })),
-      driver: { carried: driver.carried, order: driver.order?.kind },
-    })
-    for (let day = 0; day < 8; day++) {
-      runUntil(() => world.tick >= evening + (day + 1) * TICKS_PER_GAME_DAY, TICKS_PER_GAME_DAY + 1)
-      console.log(JSON.stringify(report()))
+    const dug = () =>
+      (storage.stock?.ironOre ?? 0) +
+      (pileAt(world, node.x, node.y)?.goods.ironOre ?? 0) +
+      (carriage.load.ironOre ?? 0) +
+      crew.reduce((n, r) => n + (r.carried.ironOre ?? 0), 0)
+
+    // The Player sleeps; nobody gives an order all night.
+    runUntil(() => world.tick >= evening + NIGHT, NIGHT)
+
+    // Morning: everyone is alive and still at it, and most of the night's iron ore is home.
+    expect(world.realms).toHaveLength(1)
+    for (const r of crew) {
+      expect(world.residents).toContain(r)
+      expect(r.health).toBe(MAX_HEALTH)
     }
-    expect(world.tick - evening).toBe(NIGHT)
-  }, 600_000)
+    for (const m of miners) expect(m.order).toMatchObject({ kind: 'workAt', buildingId: mine.id })
+    expect(driver.order).toMatchObject({ kind: 'haul', goods: ['ironOre'] })
+    expect(world.horses.find((h) => h.id === carriage.horseId)).toBeDefined()
+    expect(storage.stock?.ironOre ?? 0).toBeGreaterThanOrEqual(MORNING_ORE)
+    expect(storage.stock!.ironOre! / dug()).toBeGreaterThan(0.6)
+    expect(checkInvariants(world, s.terrain)).toEqual([])
+  }, 120_000)
 })

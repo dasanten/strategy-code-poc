@@ -235,6 +235,39 @@ describe('world saves', () => {
     expect(checkInvariants(v13, land)).toEqual([])
   })
 
+  it('gives running haul routes no return goods (migration 13 → 14)', () => {
+    // A format-13 world: the city's driver on a haul route from the stable to the storage.
+    const { world, terrain: land } = worldWithCity()
+    const storage = world.buildings.find((b) => b.kind === 'storage')!
+    const k = world.carriages[0]!
+    const [driver, other] = world.residents
+    driver!.x = k.x
+    driver!.y = k.y
+    const route = {
+      kind: 'haul',
+      carriageId: k.id,
+      from: { x: k.x, y: k.y },
+      to: { x: storage.x, y: storage.y },
+      goods: ['ironOre'],
+      keepFood: 6,
+      stop: 'from',
+      phase: 'loading',
+      path: null,
+      progress: 0,
+      moving: null,
+    }
+    const v13 = structuredClone(world) as unknown as { residents: { order: unknown }[] }
+    v13.residents[0]!.order = route
+    const before = structuredClone(v13)
+
+    const v14 = migrateWorld(structuredClone(v13), 13, { terrain: land }, migrations, 14)
+    expect(v14.residents[0]!.order).toEqual({ ...route, returnGoods: [] })
+    // Everyone else is as they were.
+    expect(v14.residents.slice(1)).toEqual(before.residents.slice(1))
+    expect(v14.residents[1]!.order).toEqual(other!.order)
+    expect(checkInvariants(v14, land)).toEqual([])
+  })
+
   it('keeps the newest saves and one per hour for a week', async () => {
     const { db, close } = await openDb(':memory:')
     const now = 1_000_000_000

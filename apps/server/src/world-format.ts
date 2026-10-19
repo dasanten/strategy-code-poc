@@ -19,7 +19,7 @@ import { plainsOutside } from './starting-city.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 13
+export const WORLD_FORMAT_VERSION = 14
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -152,6 +152,16 @@ export const migrations: Record<number, MigrationStep> = {
       return { ...k, x: stable.x, y: stable.y, horseId: horse?.id ?? null }
     })
     return { ...s, carriages }
+  },
+  // Haul routes got return goods; the routes already running haul nothing back.
+  13: (state) => {
+    const s = state as { residents: { order: { kind: string } | null }[] }
+    return {
+      ...s,
+      residents: s.residents.map((r) =>
+        r.order?.kind === 'haul' ? { ...r, order: { ...r.order, returnGoods: [] } } : r,
+      ),
+    }
   },
 }
 

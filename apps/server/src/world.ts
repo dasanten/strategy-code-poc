@@ -14,7 +14,7 @@ import { requestCarrying, resolveCarrying } from './carrying.js'
 import { requestHauling } from './hauling.js'
 import type { Walking } from './walking.js'
 import { stepSpoilage } from './spoilage.js'
-import { stepHomeRefill, stepSurvival, type SurvivalResult } from './survival.js'
+import { stepRefill, stepSurvival, type SurvivalResult } from './survival.js'
 import { stepAging, type AgingResult } from './aging.js'
 import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
@@ -86,7 +86,7 @@ export interface StepResult {
  * putting down goods, haul routes' included, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; then residents at
- * home who run low on food take meals from their city's storage. Without `walking` nobody moves.
+ * home or at their workplace who run low on food take meals there. Without `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
@@ -106,7 +106,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveBirths(world, births)
   world.tick++
   const aging = stepAging(world)
-  stepHomeRefill(world)
+  stepRefill(world)
   const actions =
     steps.length + carries.length + builds.length + teardowns.length + work.length + births.length
   return { actions, survival, horsesDied, aging }
