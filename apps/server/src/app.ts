@@ -21,6 +21,15 @@ import {
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
 import type { Logger } from './log.js'
+import {
+  activateVersion,
+  createScript,
+  deleteScript,
+  getScript,
+  listScripts,
+  renameScript,
+  saveScript,
+} from './scripts.js'
 
 export interface AppOptions {
   db: Db
@@ -53,6 +62,7 @@ const STATUS: Record<ApiError['error'], number> = {
   'not-found': 404,
   'not-explored': 403,
   'rate-limited': 429,
+  'script-has-errors': 422,
 }
 
 function fail(reply: FastifyReply, code: ApiError['error'], message: string) {
@@ -62,7 +72,10 @@ function fail(reply: FastifyReply, code: ApiError['error'], message: string) {
 
 const publicAccount = (u: SessionUser): Account => ({ name: u.name, isAdmin: u.isAdmin })
 
-/** The HTTP side of the server: accounts (ADR 0005), health and, in production, the client. */
+/**
+ * The HTTP side of the server: accounts (ADR 0005), the script library, health and, in
+ * production, the client.
+ */
 export async function buildApp(opts: AppOptions) {
   const { db } = opts
   const app = Fastify({ loggerInstance: opts.logger || undefined, trustProxy: opts.trustProxy })
@@ -143,6 +156,37 @@ export async function buildApp(opts: AppOptions) {
       return reply.type('application/octet-stream').send(Buffer.from(chunk))
     })
   }
+
+  // The Player's script library (`CONTEXT.md`: Script).
+  app.register(async (lib) => {
+    lib.addHook('preHandler', async (req, reply) => {
+      if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
+    })
+    type ById = { Params: { id: string } }
+    const id = (req: FastifyRequest<ById>) => Number(req.params.id)
+    lib.get('/api/scripts', async (req) => listScripts(db, req.user!.id))
+    lib.post('/api/scripts', async (req, reply) => {
+      const b = body(req)
+      return reply
+        .code(201)
+        .send(createScript(db, req.user!.id, { name: b.name, source: b.source }))
+    })
+    lib.get<ById>('/api/scripts/:id', async (req) => getScript(db, req.user!.id, id(req)))
+    lib.post<ById>('/api/scripts/:id/versions', async (req, reply) => {
+      const b = body(req)
+      return reply.code(201).send(saveScript(db, req.user!.id, id(req), { source: b.source }))
+    })
+    lib.post<ById>('/api/scripts/:id/name', async (req) =>
+      renameScript(db, req.user!.id, id(req), { name: body(req).name }),
+    )
+    lib.post<ById>('/api/scripts/:id/active', async (req) =>
+      activateVersion(db, req.user!.id, id(req), { version: body(req).version }),
+    )
+    lib.delete<ById>('/api/scripts/:id', async (req, reply) => {
+      deleteScript(db, req.user!.id, id(req))
+      return reply.code(204).send()
+    })
+  })
 
   // Admin routes: invite codes and password resets.
   app.register(async (admin) => {

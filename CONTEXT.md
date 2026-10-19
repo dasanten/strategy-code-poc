@@ -387,7 +387,10 @@ The shared language of the game. Domain terms only — no implementation details
   **Running a script** is an order for a resident or an army: the script runs once a tick for
   each of them, with its own memory, and can request only what that resident or army could. Any
   other order ends it. A script can hand over to a built-in order for a while and take control
-  back. A saved change is picked up on the next tick.
+  back. A saved change is picked up on the next tick: each save is a new version, and the
+  newest one without syntax errors is the **active version** that runs. A version with syntax
+  errors stays in the history but never becomes active; the Player can make an earlier version
+  active again.
 - **Memory:** the small store a running script or order keeps between ticks. Roles are just
   something a script keeps there.
 - **Step budget:** how much work a script may do each tick, for each resident or army and for a
