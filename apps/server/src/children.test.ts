@@ -97,7 +97,7 @@ describe('children', () => {
     expect(world.events.filter((e) => e.kind === 'grownUp')).toHaveLength(1)
   })
 
-  it('are watched by an invariant: a child holds no work, build or tear-down order', () => {
+  it('are watched by an invariant: a child holds no work, build, tear-down or drive order', () => {
     const { world, child } = bornOnTheFarm()
     const farm = world.buildings.find((b) => b.kind === 'farm')!
     child.order = {

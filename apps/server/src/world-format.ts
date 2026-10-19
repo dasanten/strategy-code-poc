@@ -6,6 +6,7 @@ import {
   isInsideWalls,
   wrapDistance,
   type Building,
+  type Carriage,
   type City,
   type TerrainMap,
   type WorldState,
@@ -18,7 +19,7 @@ import { plainsOutside } from './starting-city.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 12
+export const WORLD_FORMAT_VERSION = 13
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -127,6 +128,30 @@ export const migrations: Record<number, MigrationStep> = {
       }
     }
     return { ...s, buildings, horses, nextId }
+  },
+  // Carriages can be driven, pulled by a hitched horse (`CONTEXT.md`: Carriage, Starting city).
+  // A carriage inside a city's walls moves out to that city's stable, where its horses are, and
+  // gets a horse of its realm there that pulls no other carriage; every other carriage has none.
+  12: (state) => {
+    type OldCarriage = Omit<Carriage, 'horseId'>
+    const s = state as { carriages: OldCarriage[]; cities: City[]; buildings: Building[] } & {
+      horses: { id: string; realmId: string | null; x: number; y: number }[]
+    }
+    const hitched = new Set<string>()
+    const carriages = s.carriages.map((k): Carriage => {
+      const city = s.cities.find((c) => isInsideWalls(c, k.x, k.y))
+      const stable = s.buildings.find(
+        (b) => b.kind === 'stable' && !b.site && city && b.cityId === city.id,
+      )
+      if (!stable) return { ...k, horseId: null }
+      const horse = s.horses.find(
+        (h) =>
+          h.x === stable.x && h.y === stable.y && h.realmId === k.realmId && !hitched.has(h.id),
+      )
+      if (horse) hitched.add(horse.id)
+      return { ...k, x: stable.x, y: stable.y, horseId: horse?.id ?? null }
+    })
+    return { ...s, carriages }
   },
 }
 

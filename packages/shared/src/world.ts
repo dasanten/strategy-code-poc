@@ -62,10 +62,14 @@ export interface WalkOrder {
 
 /**
  * A place on the resident's own tile that goods are taken from or put: the pile on the ground,
- * a storage standing there, or the materials delivered to a construction site there.
+ * a storage standing there, the materials delivered to a construction site there, or the load
+ * of a carriage standing there.
  */
 export type GoodsSpot =
-  { kind: 'ground' } | { kind: 'storage'; storageId: string } | { kind: 'site'; siteId: string }
+  | { kind: 'ground' }
+  | { kind: 'storage'; storageId: string }
+  | { kind: 'site'; siteId: string }
+  | { kind: 'carriage'; carriageId: string }
 
 /**
  * Picking up goods on the resident's tile (`CONTEXT.md`: Core rule, whatever isn't protected can
@@ -133,9 +137,30 @@ export interface PairOrder {
   since: number
 }
 
+/**
+ * Driving a carriage to a tile (`CONTEXT.md`: Carriage): the resident drives the carriage
+ * `carriageId` from their tile, and the carriage, its horse and the driver move together. The
+ * path and `progress` work as for walking, at the carriage's speeds and never into mountains.
+ */
+export interface DriveOrder {
+  kind: 'drive'
+  carriageId: string
+  target: { x: number; y: number }
+  /** The tiles still to drive, in order; null while the path is being found. */
+  path: [number, number][] | null
+  progress: number
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
-  WalkOrder | PickUpOrder | DropOrder | BuildOrder | TearDownOrder | WorkOrder | PairOrder
+  | WalkOrder
+  | DriveOrder
+  | PickUpOrder
+  | DropOrder
+  | BuildOrder
+  | TearDownOrder
+  | WorkOrder
+  | PairOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -309,7 +334,12 @@ export interface Carriage {
   realmId: string | null
   x: number
   y: number
-  /** Goods on board. */
+  /**
+   * The horse hitched to it, which pulls it, moves with it and eats from its load; null when
+   * none is. A horse of the carriage's realm on its tile is hitched when it is first driven.
+   */
+  horseId: string | null
+  /** Goods on board, up to `CARRIAGE_CAPACITY` by weight. */
   load: Stock
 }
 

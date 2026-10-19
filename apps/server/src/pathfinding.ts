@@ -1,4 +1,11 @@
-import { TERRAIN_SPEED, Terrain, tileIndex, wrap, wrapDelta, type TerrainMap } from '@csp/shared'
+import {
+  CARRIAGE_SPEED,
+  TERRAIN_SPEED,
+  tileIndex,
+  wrap,
+  wrapDelta,
+  type TerrainMap,
+} from '@csp/shared'
 
 /** What crossing one tile of each terrain costs, in plains-tiles; Infinity can't be entered. */
 export type TerrainCosts = Readonly<Record<number, number>>
@@ -6,8 +13,11 @@ export type TerrainCosts = Readonly<Record<number, number>>
 /** Costs for someone on foot: the inverse of each terrain's speed. Lake and Sea are impassable. */
 export const WALKING_COSTS: TerrainCosts = costsFrom(TERRAIN_SPEED)
 
-/** Costs for a carriage: as on foot, but it cannot enter mountains (`CONTEXT.md`: Carriage). */
-export const CARRIAGE_COSTS: TerrainCosts = { ...WALKING_COSTS, [Terrain.Mountain]: Infinity }
+/**
+ * Costs for a carriage, from its speed on each terrain (`CONTEXT.md`: Carriage): cheap on plains,
+ * dear in forest and hills, and mountains, lakes and sea can't be entered.
+ */
+export const CARRIAGE_COSTS: TerrainCosts = costsFrom(CARRIAGE_SPEED)
 
 function costsFrom(speeds: Partial<Record<number, number>>): TerrainCosts {
   const costs: Record<number, number> = {}

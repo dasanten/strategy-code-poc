@@ -1,4 +1,5 @@
 import { HORSE_REACH, STABLE_BREED_DAYS, STABLE_CAPACITY } from './balance.js'
+import { carriagePulledBy } from './carriages.js'
 import { wrap } from './terrain.js'
 import {
   TICKS_PER_GAME_DAY,
@@ -25,12 +26,14 @@ export function horsesAt(world: WorldState, x: number, y: number): Horse[] {
 
 /**
  * Where a horse finds Food it can eat, in the order it eats from them (`CONTEXT.md`: Horses have
- * no inventory): the storage of the stable it stands in, then the Food on the ground on its tile
- * and within `HORSE_REACH` of it. Only places that hold Food are listed. A horse pulling a
- * carriage will eat from the carriage's load first, once carriages are driven.
+ * no inventory): the load of the carriage it pulls, then the storage of the stable it stands in,
+ * then the Food on the ground on its tile and within `HORSE_REACH` of it. Only places that hold
+ * Food are listed.
  */
 export function horseFood(world: WorldState, horse: Horse, mapSize: number): Stock[] {
   const out: Stock[] = []
+  const load = carriagePulledBy(world, horse)?.load
+  if ((load?.food ?? 0) > 0) out.push(load!)
   const stock = stableAt(world, horse.x, horse.y)?.stock
   if ((stock?.food ?? 0) > 0) out.push(stock!)
   for (let dy = -HORSE_REACH; dy <= HORSE_REACH; dy++) {

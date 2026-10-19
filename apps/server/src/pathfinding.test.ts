@@ -151,9 +151,7 @@ describe('PathFinder across the full map', () => {
     const r = finder.findPath(west, east, CARRIAGE_COSTS)
     expect(r.status).toBe('found')
     if (r.status !== 'found') return
-    checkPath(map, west, east, r.path, CARRIAGE_COSTS)
+    expect(checkPath(map, west, east, r.path, CARRIAGE_COSTS)).toBeCloseTo(r.cost)
     expect(r.path.some(([x, y]) => terrainAt(map, x, y) === Terrain.Mountain)).toBe(false)
-    const walking = finder.findPath(west, east)
-    expect(walking.status === 'found' && walking.cost).toBeLessThanOrEqual(r.cost)
   })
 })

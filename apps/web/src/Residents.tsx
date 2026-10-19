@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   BUILDABLE,
+  CARRIAGE_CAPACITY,
   GOODS,
   NODE_WORKPLACE,
   MAX_HEALTH,
@@ -24,6 +25,7 @@ import {
   stockWeight,
   trainedCap,
   type Building,
+  type Carriage,
   type BuildingKind,
   type Good,
   type GoodsSpot,
@@ -86,6 +88,10 @@ function doing(r: Resident): string {
   if (o?.kind === 'walkTo') {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
     return `Walking to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
+  }
+  if (o?.kind === 'drive') {
+    if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
+    return `Driving to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
@@ -180,15 +186,21 @@ export function ResidentInspector({
   onTearDown,
   residents,
   onPair,
+  carriage,
+  onDriveTo,
 }: {
   resident: Resident | undefined
   leaderId: string
   cityName: string | undefined
   tick: number
-  /** The map is waiting for a tile to walk to. */
-  picking: boolean
+  /** The map is waiting for a tile to walk or drive to. */
+  picking: false | 'walk' | 'drive'
   /** Starts (or cancels) picking a tile to walk to. */
   onWalkTo: () => void
+  /** A carriage on the resident's tile, if one is in sight. */
+  carriage: Carriage | undefined
+  /** Starts (or cancels) picking a tile to drive the carriage to. */
+  onDriveTo: () => void
   /** Why the last order was turned down, if it was. */
   orderError: string | undefined
   /** Goods lying on the resident's tile, if any are in sight. */
@@ -235,6 +247,7 @@ export function ResidentInspector({
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
   const site = building?.site ? building : undefined
   const atSite: GoodsSpot = { kind: 'site', siteId: site?.id ?? '' }
+  const onCarriage: GoodsSpot = { kind: 'carriage', carriageId: carriage?.id ?? '' }
   const needed = site ? materialsNeeded(site) : {}
   return (
     <aside className="inspector" aria-label="Resident inspector">
@@ -269,18 +282,29 @@ export function ResidentInspector({
         <div className="order-buttons">
           <button
             type="button"
-            className={picking ? 'primary' : ''}
+            className={picking === 'walk' ? 'primary' : ''}
             onClick={onWalkTo}
-            aria-pressed={picking}
+            aria-pressed={picking === 'walk'}
           >
-            {picking ? 'Pick a tile…' : 'Walk to'}
+            {picking === 'walk' ? 'Pick a tile…' : 'Walk to'}
           </button>
+          {carriage && (
+            <button
+              type="button"
+              className={picking === 'drive' ? 'primary' : ''}
+              onClick={onDriveTo}
+              aria-pressed={picking === 'drive'}
+              disabled={!canWork(r, tick)}
+            >
+              {picking === 'drive' ? 'Pick a tile…' : 'Drive carriage to'}
+            </button>
+          )}
         </div>
         <p className="muted small" role="status">
           {orderError
             ? `Order turned down: ${orderError}`
             : picking
-              ? 'Tap a tile on the map, or press Walk to again to cancel.'
+              ? `Tap a tile on the map, or press ${picking === 'drive' ? 'Drive carriage' : 'Walk'} to again to cancel.`
               : 'Right-click the map to walk there.'}
         </p>
       </section>
@@ -352,6 +376,11 @@ export function ResidentInspector({
                   Deliver
                 </button>
               )}
+              {carriage && (
+                <button type="button" onClick={() => onDrop(onCarriage, { [good]: units })}>
+                  Load
+                </button>
+              )}
             </span>
           </div>
         ))}
@@ -371,7 +400,7 @@ export function ResidentInspector({
       <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
       <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
 
-      {(pile || storage || site) && (
+      {(pile || storage || site || carriage) && (
         <section className="inspector-block" aria-label="On this tile">
           <div className="panel-head">
             <h3>Here</h3>
@@ -391,6 +420,14 @@ export function ResidentInspector({
               title="Delivered to the site"
               stock={site.site!.delivered}
               spot={atSite}
+              onPickUp={onPickUp}
+            />
+          )}
+          {carriage && (
+            <TileGoods
+              title={`On the carriage · ${kg(stockWeight(carriage.load))} / ${kg(CARRIAGE_CAPACITY)}${carriage.horseId ? '' : ' · no horse hitched'}`}
+              stock={carriage.load}
+              spot={onCarriage}
               onPickUp={onPickUp}
             />
           )}

@@ -25,9 +25,9 @@ export function siteAt(world: WorldState, x: number, y: number): Building | unde
 }
 
 /**
- * The goods at a spot on the tile (x, y): the pile's, the storage's or the materials delivered
- * to the construction site. Undefined when the spot is not there: no pile on the ground, or no
- * such storage or site on that tile.
+ * The goods at a spot on the tile (x, y): the pile's, the storage's, the materials delivered
+ * to the construction site or the carriage's load. Undefined when the spot is not there: no pile
+ * on the ground, or no such storage, site or carriage on that tile.
  */
 export function goodsAtSpot(
   world: WorldState,
@@ -36,6 +36,10 @@ export function goodsAtSpot(
   spot: GoodsSpot,
 ): Stock | undefined {
   if (spot.kind === 'ground') return pileAt(world, x, y)?.goods
+  if (spot.kind === 'carriage') {
+    const carriage = world.carriages.find((k) => k.id === spot.carriageId)
+    return carriage?.x === x && carriage.y === y ? carriage.load : undefined
+  }
   if (spot.kind === 'site') {
     const site = siteAt(world, x, y)
     return site?.id === spot.siteId ? site.site!.delivered : undefined

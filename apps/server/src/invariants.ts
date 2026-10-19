@@ -2,6 +2,8 @@ import {
   BUILDABLE,
   BUILD_MATERIALS,
   BUILD_WORK,
+  CARRIAGE_CAPACITY,
+  carriageCanEnter,
   MAX_WORKERS,
   HOME_FOOD_LOW,
   MEAL_UNITS,
@@ -561,6 +563,71 @@ export const refilledAtHome: Invariant = {
   },
 }
 
+/**
+ * Carriages keep to the rules of `CONTEXT.md` (Carriage): never in the mountains, never loaded
+ * past `CARRIAGE_CAPACITY`, and a hitched horse exists, stands with its carriage and pulls no
+ * other one.
+ */
+export const carriagesInPlace: Invariant = {
+  name: 'carriages-in-place',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const fail = (id: string, message: string, ids = [id]) =>
+      out.push({ invariant: this.name, message: `carriage ${id} ${message}`, entityIds: ids })
+    const pulling = new Map<string, string>()
+    for (const k of world.carriages) {
+      if (!carriageCanEnter(terrainAt(terrain, k.x, k.y))) {
+        fail(k.id, `stands where no carriage can go at (${k.x}, ${k.y})`)
+      }
+      const kg = stockWeight(k.load)
+      if (kg > CARRIAGE_CAPACITY + 1e-9) fail(k.id, `holds ${kg} kg of ${CARRIAGE_CAPACITY} kg`)
+      if (k.horseId === null) continue
+      const horse = world.horses.find((h) => h.id === k.horseId)
+      if (!horse) fail(k.id, `is hitched to ${k.horseId}, which doesn't exist`)
+      else if (horse.x !== k.x || horse.y !== k.y) {
+        fail(k.id, `is at (${k.x}, ${k.y}) but its horse at (${horse.x}, ${horse.y})`, [
+          k.id,
+          horse.id,
+        ])
+      }
+      const other = pulling.get(k.horseId)
+      if (other) fail(k.id, `shares horse ${k.horseId} with ${other}`, [k.id, other, k.horseId])
+      pulling.set(k.horseId, k.id)
+    }
+    return out
+  },
+}
+
+/**
+ * After a tick, a driver stands on the carriage they drive, which exists, and is grown up; no
+ * carriage has two drivers (`CONTEXT.md`: Carriage, `Walking.resolve` moves them together).
+ */
+export const driversOnCarriages: Invariant = {
+  name: 'drivers-on-carriages',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const driven = new Map<string, string>()
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'drive') continue
+      const fail = (message: string) =>
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${message}`,
+          entityIds: [r.id, o.carriageId],
+        })
+      const k = world.carriages.find((c) => c.id === o.carriageId)
+      if (!k) fail(`drives ${o.carriageId}, which doesn't exist`)
+      else if (k.x !== r.x || k.y !== r.y) fail(`drives ${k.id} but isn't on its tile`)
+      if (!canWork(r, world.tick)) fail('drives as a child')
+      const other = driven.get(o.carriageId)
+      if (other) fail(`drives ${o.carriageId} together with ${other}`)
+      driven.set(o.carriageId, r.id)
+    }
+    return out
+  },
+}
+
 /** Every resident lives in a city that exists, or in none. */
 export const residentsInCities: Invariant = {
   name: 'residents-in-cities',
@@ -612,7 +679,7 @@ export const pairsHoldTogether: Invariant = {
 }
 
 /** Orders only a grown resident can hold (`CONTEXT.md`: Child); pairing is checked with pairs. */
-const ADULT_ORDERS = new Set(['build', 'tearDown', 'workAt'])
+const ADULT_ORDERS = new Set(['build', 'tearDown', 'workAt', 'drive'])
 
 /** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
 export const childrenDontWork: Invariant = {
@@ -652,6 +719,8 @@ export const worldInvariants: Invariant[] = [
   residentsInCities,
   pairsHoldTogether,
   childrenDontWork,
+  carriagesInPlace,
+  driversOnCarriages,
 ]
 
 export function checkInvariants(

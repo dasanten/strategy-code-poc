@@ -81,8 +81,12 @@ describe('foundStartingCity', () => {
       expect(h).toMatchObject({ realmId: realm.id, x: stable.x, y: stable.y })
       expect(h).toMatchObject({ hunger: MAX_HUNGER, health: MAX_HEALTH })
     }
-    expect(world.carriages).toEqual([expect.objectContaining({ realmId: realm.id, load: {} })])
-    expect(isInsideWalls(city!, world.carriages[0]!.x, world.carriages[0]!.y)).toBe(true)
+    // The carriage stands at the stable with one of its horses hitched, ready to drive.
+    const horseIds = world.horses.map((h) => h.id)
+    expect(world.carriages).toEqual([
+      expect.objectContaining({ realmId: realm.id, load: {}, x: stable.x, y: stable.y }),
+    ])
+    expect(horseIds).toContain(world.carriages[0]!.horseId)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
