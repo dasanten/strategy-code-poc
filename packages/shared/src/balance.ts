@@ -61,6 +61,8 @@ export const TERRAIN_SPEED = {
   [Terrain.Forest]: 0.7,
   [Terrain.Hills]: 0.7,
   [Terrain.Mountain]: 0.35,
+  /** A road, whatever the terrain beneath (`CONTEXT.md`: Road). */
+  [Terrain.Road]: 1.3,
 } as const satisfies Partial<Record<Terrain, number>>
 
 /** A resident's base stats are drawn from this range when no parents pass theirs on. */
@@ -346,6 +348,8 @@ export const TERRAIN_FOOD = {
   [Terrain.Forest]: 1,
   [Terrain.Hills]: 1.3,
   [Terrain.Mountain]: 2,
+  /** On a road residents eat as on Plains, whatever the terrain beneath. */
+  [Terrain.Road]: 1,
 } as const satisfies Partial<Record<Terrain, number>>
 
 /** How much of a terrain's extra food use each point of Endurance above average takes away. */
@@ -396,7 +400,7 @@ export const AGILITY_LIMIT = 0.3
 /**
  * How many tiles per tick a resident walks onto a tile of the given terrain (`CONTEXT.md`:
  * Terrain, Stats): plains speed from Agility at the given tick, and the terrain's slowdown softened by Agility.
- * Zero for terrain nobody can enter.
+ * A road's speed-up comes on top, as it is. Zero for terrain nobody can enter.
  */
 export function walkSpeed(resident: Resident, terrain: number, tick: number): number {
   const base = (TERRAIN_SPEED as Partial<Record<number, number>>)[terrain]
@@ -404,8 +408,9 @@ export function walkSpeed(resident: Resident, terrain: number, tick: number): nu
   const away = statValue(resident, 'agility', tick) - AGILITY_AVERAGE
   const clamp = (v: number) => Math.max(-AGILITY_LIMIT, Math.min(AGILITY_LIMIT, v))
   const pace = 1 + clamp(away * AGILITY_SPEED_EFFECT)
-  const slowdown = (1 - base) * (1 - clamp(away * AGILITY_TERRAIN_EFFECT))
-  return (pace * (1 - slowdown)) / WALK_TICKS_PER_TILE
+  const slowdown = Math.max(0, 1 - base) * (1 - clamp(away * AGILITY_TERRAIN_EFFECT))
+  const speedUp = Math.max(0, base - 1)
+  return (pace * (1 - slowdown + speedUp)) / WALK_TICKS_PER_TILE
 }
 
 /**
@@ -424,13 +429,14 @@ export const HAUL_KEEP_FOOD = 2 * HORSE_FOOD_PER_DAY
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
  * Plains (`CONTEXT.md`: Carriage): twice as fast on Plains, a little slower than walking in Forest
- * and Hills. Mountains are missing: a carriage cannot enter them. Roads, once there are any, go
- * here at about 2.6.
+ * and Hills, and faster still on a road. Mountains are missing: a carriage cannot enter them.
  */
 export const CARRIAGE_SPEED = {
   [Terrain.Plains]: 2,
   [Terrain.Forest]: 0.6,
   [Terrain.Hills]: 0.6,
+  /** A road, whatever the terrain beneath (`CONTEXT.md`: Road): 1.3 times Plains, as on foot. */
+  [Terrain.Road]: 2.6,
 } as const satisfies Partial<Record<Terrain, number>>
 
 /** How much faster a carriage goes for each point of its driver's Driving skill. */
@@ -498,13 +504,15 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   townHall: { wood: 60, stone: 40 },
   wall: { wood: 10 },
   gate: { wood: 15 },
+  /** A tile of road (`CONTEXT.md`: Road): a little Stone, so a quarry pays for a long road. */
+  road: { stone: 5 },
 }
 
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
  * a mint 5, a smithy 5, a town hall 6. A stretch of wooden wall takes a quarter of a game
- * day, a gate half of one. More or stronger workers finish it sooner (`buildWork`).
+ * day, a gate half of one, a tile of road a quarter. More or stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -517,6 +525,7 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   townHall: 6 * TICKS_PER_GAME_DAY,
   wall: TICKS_PER_GAME_DAY / 4,
   gate: TICKS_PER_GAME_DAY / 2,
+  road: TICKS_PER_GAME_DAY / 4,
 }
 
 /** The Strength at which a resident puts in one unit of building work per tick. */

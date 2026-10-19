@@ -419,6 +419,7 @@ function Legend() {
     Terrain.Mountain,
     Terrain.Lake,
     Terrain.Sea,
+    Terrain.Road,
   ]
   const speed = (t: number) => {
     const s = (TERRAIN_SPEED as Partial<Record<number, number>>)[t]
@@ -469,7 +470,10 @@ function homeCentre(world: ClientWorld): { x: number; y: number } {
   return { x: world.home.x + 0.5, y: world.home.y + 0.5 }
 }
 
-/** City areas, buildings (walls and gates among them), piles, horses and carriages, at mid zoom and closer. */
+/**
+ * City areas, roads, buildings (walls and gates among them), piles, horses and carriages, at mid
+ * zoom and closer.
+ */
 function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld) {
   const { cities, buildings, horses, carriages, piles } = world
   const tile = cam.scale
@@ -494,7 +498,25 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
     }
     g.fill({ color: CITY_AREA_COLOR, alpha: 0.18 })
   }
+  // Roads under the buildings, as a band through the middle of the tile joined to the roads next
+  // to it (`CONTEXT.md`: Road); a road site shows faintly.
+  const roads = new Map(
+    buildings.filter((b) => b.kind === 'road').map((b) => [`${b.x},${b.y}`, b] as const),
+  )
+  const joined = (x: number, y: number) => roads.has(`${(x + size) % size},${(y + size) % size}`)
+  for (const r of roads.values()) {
+    const [sx, sy] = tileToScreen(cam, view, size, r.x, r.y)
+    const w = tile * 0.36
+    const mid = (tile - w) / 2
+    g.rect(sx + mid, sy + mid, w, w)
+    if (joined(r.x - 1, r.y)) g.rect(sx, sy + mid, mid, w)
+    if (joined(r.x + 1, r.y)) g.rect(sx + mid + w, sy + mid, mid, w)
+    if (joined(r.x, r.y - 1)) g.rect(sx + mid, sy, w, mid)
+    if (joined(r.x, r.y + 1)) g.rect(sx + mid, sy + mid + w, w, mid)
+    g.fill({ color: BUILDING_COLORS.road, alpha: r.site ? 0.4 : 1 })
+  }
   for (const b of buildings) {
+    if (b.kind === 'road') continue
     // Walls and gates fill their whole tile, so a wall reads as one band; a gate shows lighter.
     if (b.kind === 'wall' || b.kind === 'gate') {
       g.rect(...box(b.x, b.y)).fill({

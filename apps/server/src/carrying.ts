@@ -81,7 +81,7 @@ function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   if (spot.kind === 'storage' && storageAt(world, r.x, r.y)?.id !== spot.storageId) {
     return 'that storage is not on the resident’s tile'
   }
-  if (spot.kind === 'site' && siteAt(world, r.x, r.y)?.id !== spot.siteId) {
+  if (spot.kind === 'site' && !siteAt(world, r.x, r.y, spot.siteId)) {
     return 'that construction site is not on the resident’s tile'
   }
   if (spot.kind === 'carriage' && !goodsAtSpot(world, r.x, r.y, spot)) {
@@ -121,7 +121,10 @@ export const drop: OrderKind = {
     const c = check(world, sender, order)
     if (typeof c === 'string') return c
     if (!has(c.r.carried, c.goods)) return 'not carrying any of those goods'
-    if (c.spot.kind === 'site' && !has(materialsNeeded(siteAt(world, c.r.x, c.r.y)!), c.goods)) {
+    if (
+      c.spot.kind === 'site' &&
+      !has(materialsNeeded(siteAt(world, c.r.x, c.r.y, c.spot.siteId)!), c.goods)
+    ) {
       return 'the construction site needs none of those goods'
     }
     return undefined
@@ -187,7 +190,8 @@ function put(world: WorldState, r: Resident, a: CarryAction): void {
   const target = a.spot.kind === 'ground' ? {} : spotStock(world, r, a.spot)
   if (!target) return
   // A construction site takes only the materials it still needs, a carriage what fits on it.
-  const room = a.spot.kind === 'site' ? materialsNeeded(siteAt(world, r.x, r.y)!) : undefined
+  const room =
+    a.spot.kind === 'site' ? materialsNeeded(siteAt(world, r.x, r.y, a.spot.siteId)!) : undefined
   const carriage = a.spot.kind === 'carriage' ? carriageOf(world, a.spot) : undefined
   for (const [good, wanted] of Object.entries(a.goods) as [Good, number][]) {
     const fits = carriage ? unitsThatFitCarriage(carriage, good) : Infinity
@@ -208,8 +212,7 @@ function carriageOf(world: WorldState, spot: { carriageId: string }) {
 function spotStock(world: WorldState, r: Resident, spot: GoodsSpot): Stock | undefined {
   if (spot.kind === 'carriage') return goodsAtSpot(world, r.x, r.y, spot)
   if (spot.kind === 'site') {
-    const site = siteAt(world, r.x, r.y)
-    return site?.id === spot.siteId ? site.site!.delivered : undefined
+    return siteAt(world, r.x, r.y, spot.siteId)?.site!.delivered
   }
   const storage = storageAt(world, r.x, r.y)
   if (spot.kind !== 'storage' || storage?.id !== spot.storageId) return undefined

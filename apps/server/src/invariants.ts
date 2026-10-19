@@ -130,7 +130,8 @@ export const realmsHaveLeaders: Invariant = {
 }
 
 /**
- * Buildings and construction sites: one per tile; farms and stables on Plains, mines, quarries
+ * Buildings and construction sites: one per tile, and next to it at most one road or road site,
+ * on passable land off Mountain and of no city (`CONTEXT.md`: Road); farms and stables on Plains, mines, quarries
  * and lumber camps on a resource node of their kind and of no city; smelters, mints, town halls,
  * walls and gates off nodes and off Mountain, smelters and mints of no city; a stable, farm,
  * house or storage of no city or of one that exists; no stock below zero.
@@ -145,9 +146,15 @@ export const buildingsInPlace: Invariant = {
     const tiles = new Set<string>()
     for (const b of world.buildings) {
       const key = `${b.x},${b.y}`
-      if (tiles.has(key)) fail(b.id, `shares tile (${key}) with another building`)
-      tiles.add(key)
-      if (OFF_NODES.includes(b.kind)) {
+      const layer = b.kind === 'road' ? `road ${key}` : key
+      if (tiles.has(layer))
+        fail(b.id, `shares tile (${key}) with another ${b.kind === 'road' ? 'road' : 'building'}`)
+      tiles.add(layer)
+      if (b.kind === 'road') {
+        if (terrainAt(terrain, b.x, b.y) === Terrain.Mountain) fail(b.id, 'is a road on Mountain')
+        if (b.cityId !== null) fail(b.id, `is a road of city ${b.cityId}`)
+        if (b.stock) fail(b.id, 'is a road with a stock')
+      } else if (OFF_NODES.includes(b.kind)) {
         if (world.nodes.some((n) => n.x === b.x && n.y === b.y))
           fail(b.id, `is a ${b.kind} on a resource node`)
         if (terrainAt(terrain, b.x, b.y) === Terrain.Mountain)

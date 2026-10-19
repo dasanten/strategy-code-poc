@@ -9,6 +9,11 @@ export const Terrain = {
   Mountain: 3,
   Lake: 4,
   Sea: 5,
+  /**
+   * A finished road (`CONTEXT.md`: Road). Never stored in the map: roads are built on top of the
+   * terrain, and `groundAt` gives this for a tile with a road on it.
+   */
+  Road: 6,
 } as const
 
 export type Terrain = (typeof Terrain)[keyof typeof Terrain]
@@ -55,8 +60,26 @@ export function terrainAt(map: TerrainMap, x: number, y: number): Terrain {
 /** Lake and Sea can't be entered. */
 export function isPassableTerrain(t: number): boolean {
   return (
-    t === Terrain.Plains || t === Terrain.Forest || t === Terrain.Hills || t === Terrain.Mountain
+    t === Terrain.Plains ||
+    t === Terrain.Forest ||
+    t === Terrain.Hills ||
+    t === Terrain.Mountain ||
+    t === Terrain.Road
   )
+}
+
+/**
+ * What is underfoot on (x, y) (`CONTEXT.md`: Road): `Terrain.Road` where `roads` (tile indices,
+ * from `roadTiles`) holds a finished road, whatever the terrain beneath; elsewhere the terrain.
+ * Speed and food use go by this.
+ */
+export function groundAt(
+  map: TerrainMap,
+  roads: ReadonlySet<number>,
+  x: number,
+  y: number,
+): Terrain {
+  return roads.has(tileIndex(map.size, x, y)) ? Terrain.Road : terrainAt(map, x, y)
 }
 
 /** Terrain is served to clients in square chunks of this many tiles a side (ADR 0006). */
