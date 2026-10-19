@@ -4,7 +4,7 @@ import type { TerrainMap, WorldState } from '@csp/shared'
 import { schema, type Db } from './db/index.js'
 import { loadTerrain, terrainForWorld } from './terrain.js'
 import { RESET_BEFORE, WORLD_FORMAT_VERSION, migrateWorld } from './world-format.js'
-import { createWorld } from './world.js'
+import { generateWorld } from './world.js'
 
 /** How many of the newest saves are always kept. */
 export const KEEP_LATEST = 20
@@ -27,7 +27,7 @@ function latestSave(db: Db): { state: unknown; version: number } | undefined {
 
 /**
  * The world and its terrain, as the server starts with them: the newest save migrated to the
- * current format, or a fresh world. Terrain is loaded, or generated from the world's seed and
+ * current format, or a freshly generated world (`generateWorld`). Terrain is loaded, or generated from the world's seed and
  * stored the first time (ADR 0006).
  */
 export function loadOrCreateWorld(
@@ -47,7 +47,7 @@ export function loadOrCreateWorld(
   const terrain = terrainForWorld(db, seed, generate)
   const world = save
     ? migrateWorld(save.state, save.version, { terrain })
-    : createWorld(terrain, seed)
+    : generateWorld(terrain, seed)
   return { world, terrain }
 }
 

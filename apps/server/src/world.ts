@@ -6,6 +6,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { placeNpcCities } from './npc-cities.js'
 import { placeResourceNodes } from './node-gen.js'
 import { requestBuilding, resolveBuilding } from './building.js'
 import { stepHorses } from './horses.js'
@@ -41,6 +42,16 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     events: [],
     alliances: [],
   }
+}
+
+/**
+ * A world as the world generator makes it for a new game: `createWorld`, with its NPC cities
+ * placed (`placeNpcCities`).
+ */
+export function generateWorld(terrain: TerrainMap, seed = 1): WorldState {
+  const world = createWorld(terrain, seed)
+  placeNpcCities(world, terrain)
+  return world
 }
 
 export function isWalkable(terrain: TerrainMap, x: number, y: number): boolean {

@@ -707,6 +707,24 @@ export const residentsInCities: Invariant = {
 }
 
 /**
+ * An NPC city's residents belong to no realm (`CONTEXT.md`: NPC city): the game runs the city
+ * and everyone in it, so none of them answers to a Player.
+ */
+export const npcCityResidentsUnowned: Invariant = {
+  name: 'npc-city-residents-unowned',
+  check(world) {
+    const npc = new Set(world.cities.filter((c) => c.realmId === null).map((c) => c.id))
+    return world.residents
+      .filter((r) => r.cityId !== null && npc.has(r.cityId) && r.owner !== null)
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} of NPC city ${r.cityId} belongs to realm ${r.owner}`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
+/**
  * After a tick, pairs hold together (`CONTEXT.md`: Pairing): a resident's partner pairs back
  * with the same `since`, which is not after now; both are adults of the same city. Broken pairs
  * end in `requestBirths`.
@@ -876,6 +894,7 @@ export const worldInvariants: Invariant[] = [
   nodesOnFittingTerrain,
   realmLogsInOrder,
   residentsInCities,
+  npcCityResidentsUnowned,
   pairsHoldTogether,
   childrenDontWork,
   carriagesInPlace,
