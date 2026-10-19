@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   BUILDABLE,
+  BATCHES_PER_DAY,
   CARRIAGE_CAPACITY,
   GOODS,
   NODE_WORKPLACE,
@@ -9,6 +10,8 @@ import {
   MAX_HUNGER,
   MAX_WORKERS,
   NODE_GOOD,
+  PROCESSING,
+  RECIPES,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
   STAT_NAMES,
@@ -49,12 +52,25 @@ const GOOD_LABELS: Record<Good, string> = {
   coins: 'Coins',
 }
 
+/** What a building off any node is for, shown before what it needs. */
+const BUILD_BLURBS: Partial<Record<BuildingKind, string>> = {
+  stable: 'A stable keeps horses and their Food, and breeds them; on Plains only. ',
+  smelter: 'A smelter turns iron ore into iron; not on Mountain. ',
+  mint: 'A mint turns gold ore into coins; not on Mountain. ',
+}
+
 /** A weight in kg, to one decimal (coins weigh little). */
 const kg = (weight: number) => `${Math.round(weight * 10) / 10} kg`
 
 /** The goods in a stock that are there, in the usual order. */
 const goodsIn = (stock: Stock | undefined) =>
   GOODS.filter((g) => (stock?.[g] ?? 0) > 0).map((g) => [g, stock![g]!] as const)
+
+/** Some goods in words, each times `times`: "4 iron ore". */
+const stockText = (stock: Stock, times = 1) =>
+  goodsIn(stock)
+    .map(([g, n]) => `${n * times} ${GOOD_LABELS[g].toLowerCase()}`)
+    .join(', ')
 
 const STAT_LABELS: Record<StatName, string> = {
   strength: 'Strength',
@@ -66,6 +82,7 @@ const STAT_LABELS: Record<StatName, string> = {
 const SKILL_LABELS: Record<SkillName, string> = {
   mining: 'Mining',
   woodcutting: 'Woodcutting',
+  smelting: 'Smelting',
   construction: 'Construction',
   farming: 'Farming',
   combat: 'Combat',
@@ -522,32 +539,45 @@ function BuildBlock({
     )
   }
   if (!building) {
-    // On a node its workplace; anywhere else a stable, which the server allows on Plains only.
-    const kind = node ? NODE_WORKPLACE[node.kind] : 'stable'
-    const name = BUILDING_NAMES[kind]
-    const materials = goodsIn(BUILD_MATERIALS[kind])
-    const days = (BUILD_WORK[kind] ?? 0) / TICKS_PER_GAME_DAY
+    // On a node its workplace; anywhere else a stable (the server allows it on Plains only), a
+    // smelter or a mint (not on Mountain).
+    const kinds: BuildingKind[] = node ? [NODE_WORKPLACE[node.kind]] : ['stable', ...PROCESSING]
     return (
       <section className="inspector-block" aria-label="Build">
         <div className="panel-head">
           <h3>Build</h3>
           <span className="small muted">
-            {node ? `${NODE_NAMES[node.kind]} node` : 'on Plains'}
+            {node ? `${NODE_NAMES[node.kind]} node` : 'off any node'}
           </span>
         </div>
-        <p className="muted small">
-          {!node && 'A stable keeps horses and their Food, and breeds them. '}
-          Needs{' '}
-          {materials.length === 0
-            ? 'no materials'
-            : materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')}{' '}
-          and about {days} game days of one resident’s work.
-        </p>
-        <div className="order-buttons">
-          <button type="button" className="primary" disabled={!adult} onClick={() => onBuild(kind)}>
-            Build {name.toLowerCase()}
-          </button>
-        </div>
+        {kinds.map((kind) => {
+          const materials = goodsIn(BUILD_MATERIALS[kind])
+          const days = (BUILD_WORK[kind] ?? 0) / TICKS_PER_GAME_DAY
+          return (
+            <div key={kind}>
+              <p className="muted small">
+                {BUILD_BLURBS[kind]}
+                Needs{' '}
+                {materials.length === 0
+                  ? 'no materials'
+                  : materials
+                      .map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`)
+                      .join(', ')}{' '}
+                and about {days} game days of one resident’s work.
+              </p>
+              <div className="order-buttons">
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={!adult}
+                  onClick={() => onBuild(kind)}
+                >
+                  Build {BUILDING_NAMES[kind].toLowerCase()}
+                </button>
+              </div>
+            </div>
+          )
+        })}
       </section>
     )
   }
@@ -580,8 +610,10 @@ function WorkBlock({
 }) {
   const max = building && !building.site ? MAX_WORKERS[building.kind] : undefined
   const skill = building && WORKPLACE_SKILL[building.kind]
+  const recipe = building && RECIPES[building.kind]
   const good = building?.kind === 'farm' ? 'food' : node && NODE_GOOD[node.kind]
-  if (!building || max === undefined || !skill || !good) return null
+  if (!building || max === undefined || !skill || (!good && !recipe)) return null
+  const batches = BATCHES_PER_DAY[building.kind] ?? 0
   const o = resident.order
   const working = o?.kind === 'workAt' && o.buildingId === building.id
   return (
@@ -604,8 +636,20 @@ function WorkBlock({
         </button>
       </div>
       <p className="muted small">
-        A worker of average Strength makes about {WORK_OUTPUT_PER_DAY[good] ?? 0}{' '}
-        {GOOD_LABELS[good].toLowerCase()} a game day, more with {SKILL_LABELS[skill]} skill. It goes
+        {recipe ? (
+          <>
+            A worker of average Strength turns about {stockText(recipe.input, batches)} into{' '}
+            {stockText(recipe.output, batches)} a game day, more with {SKILL_LABELS[skill]} skill.
+            It uses what the workers carry, then what lies on the ground here; without it they stand
+            idle. The output goes
+          </>
+        ) : (
+          <>
+            A worker of average Strength makes about {WORK_OUTPUT_PER_DAY[good!] ?? 0}{' '}
+            {GOOD_LABELS[good!].toLowerCase()} a game day, more with {SKILL_LABELS[skill]} skill. It
+            goes
+          </>
+        )}{' '}
         into the workers’ hands as far as they can carry; the rest is left on the ground here.
       </p>
     </section>

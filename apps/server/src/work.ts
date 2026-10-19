@@ -1,8 +1,12 @@
 import {
   MAX_WORKERS,
+  RECIPES,
   WORKPLACE_SKILL,
+  batchWork,
   buildingAt,
   canWork,
+  hasInput,
+  pileAt,
   unitsThatFit,
   workLearned,
   workOutput,
@@ -13,6 +17,7 @@ import {
   type Good,
   type OrderRequest,
   type Resident,
+  type Stock,
   type WorldState,
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
@@ -35,8 +40,8 @@ interface WorkRequest extends OrderRequest {
 
 /**
  * The work-at order (`CONTEXT.md`: Workplace): one of the Player's adult residents works the
- * finished workplace on the tile they stand on (a farm, lumber camp, quarry or mine) until given
- * another order.
+ * finished workplace on the tile they stand on (a farm, lumber camp, quarry, mine, smelter or
+ * mint) until given another order.
  */
 export const workAt: OrderKind = {
   validate(world, sender, order) {
@@ -73,7 +78,9 @@ export function requestWork(world: WorldState): WorkAction[] {
  * stops. Otherwise their work adds to their share of the next unit of the workplace's good (from
  * Strength and the workplace's skill) and teaches that skill. Each whole unit goes to the
  * workplace's worker carrying the least of that good who still has room for it; when nobody has,
- * it is left in the pile on the workplace's tile.
+ * it is left in the pile on the workplace's tile. At a smelter or mint (`CONTEXT.md`: Smelter) the
+ * work goes into the next batch of its recipe, and only while the input for it is there (`inputAt`);
+ * a finished batch uses that input up and hands out its output the same way.
  */
 export function resolveWork(world: WorldState, actions: WorkAction[]): void {
   const workers = new Map<string, number>()
@@ -92,13 +99,51 @@ export function resolveWork(world: WorldState, actions: WorkAction[]): void {
       continue
     }
     workers.set(o.buildingId, count + 1)
-    o.progress += workOutput(r, good, skill, world.tick)
+    const recipe = RECIPES[place.kind]
+    if (recipe) {
+      // A smelter or mint without the input for a batch stands idle: no work, nothing learned.
+      if (!hasInput(world, place)) continue
+      o.progress += batchWork(r, place.kind, world.tick)
+    } else {
+      o.progress += workOutput(r, good, skill, world.tick)
+    }
     r.skills[skill] = (r.skills[skill] ?? 0) + workLearned(r, world.tick)
     while (o.progress >= 1) {
+      if (recipe && !hasInput(world, place)) {
+        o.progress = Math.min(o.progress, 1 - 1e-9)
+        break
+      }
       o.progress -= 1
-      produce(world, place, good)
+      if (recipe) {
+        useUp(world, place, recipe.input)
+        for (const [made, units] of Object.entries(recipe.output) as [Good, number][]) {
+          for (let i = 0; i < units; i++) produce(world, place, made)
+        }
+      } else produce(world, place, good)
     }
   }
+}
+
+/**
+ * Takes a batch's input from what a smelter's or mint's workers carry, the most laden first, and
+ * then from the pile on its tile (`inputAt`). The caller has checked it is all there.
+ */
+function useUp(world: WorldState, place: Building, input: Stock): void {
+  for (const [good, units] of Object.entries(input) as [Good, number][]) {
+    let left = units
+    const carriers = workersOf(world, place).sort(
+      (a, b) => (b.carried[good] ?? 0) - (a.carried[good] ?? 0),
+    )
+    const pile = pileAt(world, place.x, place.y)
+    for (const stock of [...carriers.map((w) => w.carried), ...(pile ? [pile.goods] : [])]) {
+      const take = Math.min(left, stock[good] ?? 0)
+      if (take <= 0) continue
+      if ((stock[good] ?? 0) > take) stock[good] = (stock[good] ?? 0) - take
+      else delete stock[good]
+      left -= take
+    }
+  }
+  world.piles = world.piles.filter((p) => Object.values(p.goods).some((n) => n > 0))
 }
 
 /** One unit of a workplace's good: into the hands of a worker with room, else on the ground. */

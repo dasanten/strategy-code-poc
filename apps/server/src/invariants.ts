@@ -9,6 +9,7 @@ import {
   MEAL_UNITS,
   unitsThatFit,
   NODE_WORKPLACE,
+  PROCESSING,
   materialsNeeded,
   teardownWork,
   workNeeded,
@@ -126,7 +127,8 @@ export const realmsHaveLeaders: Invariant = {
 /**
  * Buildings and construction sites: one per tile and never on a wall; houses and storages inside
  * their city's walls, farms and stables on Plains, mines, quarries and lumber camps on a resource
- * node of their kind and of no city; a stable of no city or of one that exists; every city's wall
+ * node of their kind and of no city; smelters and mints of no city, off nodes and off Mountain; a
+ * stable of no city or of one that exists; every city's wall
  * on passable terrain; no stock below zero.
  */
 export const buildingsInPlace: Invariant = {
@@ -146,6 +148,12 @@ export const buildingsInPlace: Invariant = {
       if (b.kind === 'stable') {
         if (b.cityId !== null && !cities.has(b.cityId))
           fail(b.id, `belongs to no city (${b.cityId})`)
+      } else if (PROCESSING.includes(b.kind)) {
+        if (world.nodes.some((n) => n.x === b.x && n.y === b.y))
+          fail(b.id, `is a ${b.kind} on a resource node`)
+        if (terrainAt(terrain, b.x, b.y) === Terrain.Mountain)
+          fail(b.id, `is a ${b.kind} on Mountain`)
+        if (b.cityId !== null) fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
       } else if (BUILDABLE.includes(b.kind)) {
         const node = world.nodes.find((n) => n.x === b.x && n.y === b.y)
         if (!node || NODE_WORKPLACE[node.kind] !== b.kind) fail(b.id, `is a ${b.kind} off its node`)
