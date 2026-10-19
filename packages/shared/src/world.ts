@@ -18,7 +18,8 @@ export interface Stat {
 }
 
 /** Something learned by doing or training; starts at 0, never inherited (`CONTEXT.md`: Skill). */
-export type SkillName = 'mining' | 'woodcutting' | 'construction' | 'farming' | 'combat' | 'driving'
+export type SkillName =
+  'mining' | 'woodcutting' | 'smelting' | 'construction' | 'farming' | 'combat' | 'driving'
 
 /** A person living in the world (`CONTEXT.md`: Resident). Plain data. */
 export interface Resident {
@@ -274,7 +275,7 @@ export interface City {
 }
 
 export type BuildingKind =
-  'house' | 'storage' | 'farm' | 'stable' | 'mine' | 'quarry' | 'lumberCamp'
+  'house' | 'storage' | 'farm' | 'stable' | 'mine' | 'quarry' | 'lumberCamp' | 'smelter' | 'mint'
 
 /**
  * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction

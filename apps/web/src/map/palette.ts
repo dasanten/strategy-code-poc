@@ -53,6 +53,8 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   mine: 0x5e5a57,
   quarry: 0xb3ada3,
   lumberCamp: 0x6b7f3c,
+  smelter: 0x9a4a2f,
+  mint: 0xc9a227,
 }
 
 export const BUILDING_NAMES: Record<BuildingKind, string> = {
@@ -63,6 +65,8 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   mine: 'Mine',
   quarry: 'Quarry',
   lumberCamp: 'Lumber camp',
+  smelter: 'Smelter',
+  mint: 'Mint',
 }
 export const HORSE_COLOR = 0x6b4f2e
 export const CARRIAGE_COLOR = 0xb79a6e

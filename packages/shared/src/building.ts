@@ -1,6 +1,7 @@
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
+  RECIPES,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
   WORKPLACE_MAX_WORKERS,
@@ -20,8 +21,21 @@ import { Terrain, terrainAt, type TerrainMap } from './terrain.js'
 
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
 
-/** Kinds of building that can be built so far: the workplaces on resource nodes, and stables. */
-export const BUILDABLE: readonly BuildingKind[] = ['lumberCamp', 'quarry', 'mine', 'stable']
+/**
+ * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters
+ * and mints.
+ */
+export const BUILDABLE: readonly BuildingKind[] = [
+  'lumberCamp',
+  'quarry',
+  'mine',
+  'stable',
+  'smelter',
+  'mint',
+]
+
+/** Workplaces that turn one good into another (`RECIPES`): smelters and mints. */
+export const PROCESSING = Object.keys(RECIPES) as readonly BuildingKind[]
 
 /** Kinds of building that keep goods in a storage of their own: storages, and stables' Food. */
 export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'stable']
@@ -52,8 +66,8 @@ export function workNeeded(site: Building): number {
 /**
  * Why a building of this kind can't be laid out on the tile (`CONTEXT.md`: Where buildings go),
  * or undefined if it can: workplaces go on a resource node of their kind, stables on Plains off
- * any node, one building per tile, never on a city wall. Without `terrain` the Plains rule is not
- * checked.
+ * any node, smelters and mints off any node and off Mountain, one building per tile, never on a
+ * city wall. Without `terrain` the Plains and Mountain rules are not checked.
  */
 export function buildProblem(
   world: WorldState,
@@ -67,6 +81,9 @@ export function buildProblem(
   if (kind === 'stable') {
     if (node || (terrain && terrainAt(terrain, x, y) !== Terrain.Plains))
       return 'a stable goes on Plains, off any resource node'
+  } else if (PROCESSING.includes(kind)) {
+    if (node || (terrain && terrainAt(terrain, x, y) === Terrain.Mountain))
+      return `a ${kind} goes off any resource node, and not on Mountain`
   } else if (!node || NODE_WORKPLACE[node.kind] !== kind)
     return `a ${kind} goes on a fitting resource node`
   if (buildingAt(world, x, y)) return 'there is already a building on this tile'
@@ -87,13 +104,38 @@ export const NODE_GOOD: Record<ResourceKind, Good> = {
 
 /**
  * The good a workplace makes (`CONTEXT.md`: Workplace): Food on a farm; on a resource node, what
- * the node yields, so a mine makes iron ore or gold ore by the node it stands on.
+ * the node yields, so a mine makes iron ore or gold ore by the node it stands on; at a smelter or
+ * mint, what its recipe makes (Iron, Coins).
  */
 export function workplaceGood(world: WorldState, workplace: Building): Good | undefined {
   if (workplace.kind === 'farm') return 'food'
   if (MAX_WORKERS[workplace.kind] === undefined) return undefined
+  const recipe = RECIPES[workplace.kind]
+  if (recipe) return (Object.keys(recipe.output) as Good[])[0]
   const node = world.nodes.find((n) => n.x === workplace.x && n.y === workplace.y)
   return node ? NODE_GOOD[node.kind] : undefined
+}
+
+/**
+ * The goods a smelter or mint can use up for its next batch (`CONTEXT.md`: Smelter): the
+ * recipe's input that its workers carry and that lies in the pile on its tile.
+ */
+export function inputAt(world: WorldState, workplace: Building): Stock {
+  const out: Stock = {}
+  const pile = world.piles.find((p) => p.x === workplace.x && p.y === workplace.y)
+  for (const good of Object.keys(RECIPES[workplace.kind]?.input ?? {}) as Good[]) {
+    const carried = workersOf(world, workplace).reduce((n, w) => n + (w.carried[good] ?? 0), 0)
+    const units = carried + (pile?.goods[good] ?? 0)
+    if (units > 0) out[good] = units
+  }
+  return out
+}
+
+/** Whether a smelter or mint has the input for one more batch (`inputAt`). */
+export function hasInput(world: WorldState, workplace: Building): boolean {
+  const at = inputAt(world, workplace)
+  const input = RECIPES[workplace.kind]?.input ?? {}
+  return (Object.entries(input) as [Good, number][]).every(([g, n]) => (at[g] ?? 0) >= n)
 }
 
 /** The residents working a workplace: holding a work-at order for it and standing on it. */

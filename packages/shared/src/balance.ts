@@ -403,25 +403,30 @@ export const REALM_LOG_LENGTH = 100
 /**
  * Materials each kind of building needs before its construction site can become the building
  * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
- * the lumber camp's wood builds the quarry, wood and stone build the mine.
+ * the lumber camp's wood builds the quarry, wood and stone build the mine and the smelter, and
+ * the smelter's iron goes into the mint.
  */
 export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   lumberCamp: {},
   quarry: { wood: 30 },
   mine: { wood: 40, stone: 20 },
   stable: { wood: 40 },
+  smelter: { stone: 40, wood: 20 },
+  mint: { stone: 40, iron: 10 },
 }
 
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
- * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3. More or
- * stronger workers finish it sooner (`buildWork`).
+ * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
+ * a mint 5. More or stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
   quarry: 3 * TICKS_PER_GAME_DAY,
   mine: 4 * TICKS_PER_GAME_DAY,
   stable: 3 * TICKS_PER_GAME_DAY,
+  smelter: 4 * TICKS_PER_GAME_DAY,
+  mint: 5 * TICKS_PER_GAME_DAY,
 }
 
 /** The Strength at which a resident puts in one unit of building work per tick. */
@@ -456,24 +461,57 @@ export function constructionLearned(resident: Resident, tick: number): number {
 
 /**
  * Most residents who can work each kind of workplace at a time (`CONTEXT.md`: Workplace). A farm
- * has room for a whole starting city; the workplaces on nodes for a smaller crew.
+ * has room for a whole starting city; the workplaces on nodes for a smaller crew; smelters and
+ * mints for a few.
  */
 export const WORKPLACE_MAX_WORKERS: Partial<Record<BuildingKind, number>> = {
   farm: 10,
   lumberCamp: 6,
   quarry: 6,
   mine: 8,
+  smelter: 4,
+  mint: 4,
 }
 
 /**
  * The skill each kind of workplace uses and teaches (`CONTEXT.md`: Skill): Farming on a farm,
- * Woodcutting in a lumber camp, Mining in quarries and mines.
+ * Woodcutting in a lumber camp, Mining in quarries and mines, Smelting in smelters and mints.
  */
 export const WORKPLACE_SKILL: Partial<Record<BuildingKind, SkillName>> = {
   farm: 'farming',
   lumberCamp: 'woodcutting',
   quarry: 'mining',
   mine: 'mining',
+  smelter: 'smelting',
+  mint: 'smelting',
+}
+
+/** What a workplace that processes goods turns into what, one batch at a time. */
+export interface Recipe {
+  /** Goods one batch uses up. */
+  input: Stock
+  /** Goods one batch makes. */
+  output: Stock
+}
+
+/**
+ * The conversion rates of the workplaces that process goods (`CONTEXT.md`: Smelter, Coins): a
+ * smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 20 coins (less weight than the
+ * ore, but a fortune still weighs something).
+ */
+export const RECIPES: Partial<Record<BuildingKind, Recipe>> = {
+  smelter: { input: { ironOre: 2 }, output: { iron: 1 } },
+  mint: { input: { goldOre: 1 }, output: { coins: 20 } },
+}
+
+/**
+ * Batches one worker of average Strength and no skill gets through per game day: a smelter worker
+ * smelts what two miners dig (4 iron ore into 2 iron), a mint worker strikes what two gold miners
+ * dig (2 gold ore into 40 coins).
+ */
+export const BATCHES_PER_DAY: Partial<Record<BuildingKind, number>> = {
+  smelter: 2,
+  mint: 2,
 }
 
 /**
@@ -504,9 +542,23 @@ export const WORK_SKILL_PER_DAY = 1
  * of the skill.
  */
 export function workOutput(resident: Resident, good: Good, skill: SkillName, tick: number): number {
+  return workPace(resident, WORK_OUTPUT_PER_DAY[good] ?? 0, skill, tick)
+}
+
+/**
+ * How much of a batch a worker gets through per tick at a workplace that processes goods
+ * (`RECIPES`), at the given tick: like `workOutput`, at the kind's `BATCHES_PER_DAY`.
+ */
+export function batchWork(resident: Resident, kind: BuildingKind, tick: number): number {
+  const skill = WORKPLACE_SKILL[kind]
+  return skill ? workPace(resident, BATCHES_PER_DAY[kind] ?? 0, skill, tick) : 0
+}
+
+/** `perDay` a game day, as a share per tick: in proportion to Strength, more with the skill. */
+function workPace(resident: Resident, perDay: number, skill: SkillName, tick: number): number {
   const strength = statValue(resident, 'strength', tick) / WORK_STRENGTH_AVERAGE
   const skilled = 1 + (resident.skills[skill] ?? 0) * WORK_SKILL_EFFECT
-  return ((WORK_OUTPUT_PER_DAY[good] ?? 0) / TICKS_PER_GAME_DAY) * strength * skilled
+  return (perDay / TICKS_PER_GAME_DAY) * strength * skilled
 }
 
 /**
