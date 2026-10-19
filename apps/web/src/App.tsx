@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { checkScript, type Diagnostic } from '@csp/lang'
 import {
   formatGameTime,
+  holdersOf,
   KEEPS_GOODS,
   type Account,
   type Building,
@@ -157,6 +158,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onDrop={(spot, goods) => carry('drop', spot, goods)}
               onBuild={build}
               workers={workersHere(world.residents, onTile(world.buildings))}
+              holders={heldBy(world.residents, onTile(world.buildings))}
+              realmId={world.home.realmId}
               onWork={work}
               onTearDown={tearDown}
               residents={own}
@@ -185,4 +188,9 @@ function workersHere(residents: Resident[], building: Building | undefined): num
   if (!building) return 0
   return residents.filter((r) => r.order?.kind === 'workAt' && r.order.buildingId === building.id)
     .length
+}
+
+/** The realms holding the building, as far as the Player sees its workers. */
+function heldBy(residents: Resident[], building: Building | undefined): string[] {
+  return building ? holdersOf({ residents }, building) : []
 }

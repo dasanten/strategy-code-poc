@@ -9,6 +9,7 @@ import {
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   carryCapacity,
+  holdersOf,
   workOutput,
   type BuildingKind,
   type Resident,
@@ -55,9 +56,9 @@ function setup() {
   return { world, r, queue: new OrderQueue() }
 }
 
-/** A resident of realm r1 with Strength, Intellect and Endurance 10. */
-function resident(world: WorldState, id: string, x: number, y: number) {
-  const r = newResident(mulberry32(world.residents.length + 1), { id, owner: 'r1', x, y, tick: 0 })
+/** A resident of a realm (r1 unless given) with Strength, Intellect and Endurance 10. */
+function resident(world: WorldState, id: string, x: number, y: number, owner = 'r1') {
+  const r = newResident(mulberry32(world.residents.length + 1), { id, owner, x, y, tick: 0 })
   r.stats.strength = { base: 10, trained: 0 }
   r.stats.intellect = { base: 10, trained: 0 }
   r.stats.endurance = { base: 10, trained: 0 }
@@ -303,6 +304,48 @@ describe('workplaces on nodes', () => {
     expect(workOrdersOnWorkplaces.check(world, terrain)).toEqual([
       expect.objectContaining({ entityIds: ['w1', 'mine'] }),
     ])
+  })
+})
+
+describe('holding a workplace', () => {
+  /** Realm r2 of the stranger (Player 8), with resident s1 standing on (x, y). */
+  function rival(world: WorldState, x: number, y: number) {
+    world.realms.push({ id: 'r2', userId: 8, leaderId: 's1' })
+    return resident(world, 's1', x, y, 'r2')
+  }
+
+  it('lets another realm’s workers take over an empty workplace, and its output', () => {
+    const { world, r, queue } = setup()
+    const farm = world.buildings[0]!
+    expect(holdersOf(world, farm)).toEqual([])
+    order(world, queue)
+    expect(holdersOf(world, farm)).toEqual(['r1'])
+    // r1's worker walks off: the farm (built for r1's city) is nobody's now.
+    r.x = 4
+    run(world)
+    expect(holdersOf(world, farm)).toEqual([])
+    const s = rival(world, 3, 3)
+    expect(order(world, queue, 's1', stranger)).toEqual({ type: 'ack', requestId: 'q' })
+    expect(holdersOf(world, farm)).toEqual(['r2'])
+    const before = r.carried.food ?? 0
+    run(world, TICKS_PER_GAME_DAY / 2)
+    expect(s.carried.food ?? 0).toBeGreaterThan(0)
+    expect(r.carried.food ?? 0).toBe(before)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('works the same on a workplace of no city', () => {
+    const { world, r } = onNode('mine', 'ironOre', 7)
+    const mine = world.buildings.find((b) => b.kind === 'mine')!
+    r.x = 6
+    run(world)
+    const s = rival(world, 7, 1)
+    expect(order(world, new OrderQueue(), 's1', stranger)).toEqual({ type: 'ack', requestId: 'q' })
+    run(world, TICKS_PER_GAME_DAY / 2)
+    expect(holdersOf(world, mine)).toEqual(['r2'])
+    expect(s.carried.ironOre ?? 0).toBeGreaterThan(0)
+    expect(r.carried.ironOre ?? 0).toBe(0)
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 })
 

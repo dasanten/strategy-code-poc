@@ -174,6 +174,8 @@ export function ResidentInspector({
   node,
   onBuild,
   workers,
+  holders,
+  realmId,
   onWork,
   onTearDown,
   residents,
@@ -205,6 +207,10 @@ export function ResidentInspector({
   onBuild: (kind: BuildingKind) => void
   /** Residents in sight working the building on the resident's tile. */
   workers: number
+  /** Realms whose residents in sight work it: who holds it (`CONTEXT.md`: Holding a workplace). */
+  holders: string[]
+  /** The Player's realm. */
+  realmId: string
   /** Orders the resident to work the workplace on their tile. */
   onWork: () => void
   /** Orders the resident to tear down the building or site on their tile. */
@@ -358,6 +364,8 @@ export function ResidentInspector({
         building={building}
         node={node}
         workers={workers}
+        holders={holders}
+        realmId={realmId}
         onWork={onWork}
       />
       <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
@@ -484,7 +492,8 @@ function BuildBlock({
 
 /**
  * Working the workplace on the resident’s tile (`CONTEXT.md`: Workplace): how
- * many work it, and a button to join them. The output goes into the workers’ hands.
+ * many work it, who holds it (`CONTEXT.md`: Holding a workplace), and a button to join them.
+ * The output goes into the workers’ hands.
  */
 function WorkBlock({
   resident,
@@ -492,6 +501,8 @@ function WorkBlock({
   building,
   node,
   workers,
+  holders,
+  realmId,
   onWork,
 }: {
   resident: Resident
@@ -499,6 +510,8 @@ function WorkBlock({
   building: Building | undefined
   node: KnownNode | undefined
   workers: number
+  holders: string[]
+  realmId: string
   onWork: () => void
 }) {
   const max = building && !building.site ? MAX_WORKERS[building.kind] : undefined
@@ -515,6 +528,7 @@ function WorkBlock({
           {workers} / {max} workers
         </span>
       </div>
+      <p className="small">{holding(holders, realmId)}</p>
       <div className="order-buttons">
         <button
           type="button"
@@ -691,4 +705,13 @@ function Meter({ label, value, share }: { label: string; value: string; share: n
       </span>
     </div>
   )
+}
+
+/** Who holds a workplace, in the Player's words (`CONTEXT.md`: Holding a workplace). */
+function holding(holders: string[], realmId: string): string {
+  const others = holders.filter((h) => h !== realmId).length
+  if (holders.length === 0) return 'Nobody holds it: whoever works it gets its output.'
+  if (others === 0) return 'Held by your realm.'
+  if (others === holders.length) return 'Held by another realm: its workers get the output.'
+  return 'Held by your realm and another: their workers share the output.'
 }
