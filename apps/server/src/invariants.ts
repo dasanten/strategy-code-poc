@@ -678,6 +678,23 @@ export const pairsHoldTogether: Invariant = {
   },
 }
 
+/** Orders only a grown resident can hold (`CONTEXT.md`: Child); pairing is checked with pairs. */
+const ADULT_ORDERS = new Set(['build', 'tearDown', 'workAt', 'drive', 'pickUp', 'drop'])
+
+/** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
+export const childrenDontWork: Invariant = {
+  name: 'children-dont-work',
+  check(world) {
+    return world.residents
+      .filter((r) => r.order && ADULT_ORDERS.has(r.order.kind) && !canWork(r, world.tick))
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} holds a ${r.order!.kind} order as a child`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -701,6 +718,7 @@ export const worldInvariants: Invariant[] = [
   realmLogsInOrder,
   residentsInCities,
   pairsHoldTogether,
+  childrenDontWork,
   carriagesInPlace,
   driversOnCarriages,
 ]

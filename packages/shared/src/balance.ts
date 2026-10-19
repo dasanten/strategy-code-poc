@@ -82,6 +82,17 @@ export const START_AGE_MAX = 45
 export const LIFESPAN_MIN = 55
 export const LIFESPAN_MAX = 65
 
+/**
+ * Children are grown at this age in game years (`CONTEXT.md`: Aging, Child): from then on they
+ * can work, build, tear down and pair.
+ */
+export const ADULT_AGE = 14
+
+/** Whether a resident is grown up, so they can work, build or take any job (`CONTEXT.md`: Child). */
+export function canWork(resident: Resident, tick: number): boolean {
+  return ageInYears(resident, tick) >= ADULT_AGE
+}
+
 /** Stats start to decline at this age in game years (`CONTEXT.md`: Aging). */
 export const DECLINE_AGE = 45
 

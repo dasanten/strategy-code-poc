@@ -212,7 +212,8 @@ The shared language of the game. Domain terms only — no implementation details
   pair. A child can come once a game year has passed since they paired or last had one.
 - **Child:** a resident born to a pair. Each base stat is the parents' average plus a small
   random amount. Born where a parent stands, into their city and realm. Grows up for a while
-  before it can work.
+  before it can work: until grown, a child can walk and eats what they take at home (Refilling at
+  home), but can't work, build, tear down, drive, pair, or pick up and put down goods.
 - **Aging:** residents grow old; their stats decline late in life, and they die of old age at
   around 60 game years. Children are grown after about 14 game years.
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and

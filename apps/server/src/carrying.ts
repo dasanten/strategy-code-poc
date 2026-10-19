@@ -1,5 +1,6 @@
 import {
   GOODS,
+  canWork,
   goodsAtSpot,
   materialsNeeded,
   pileAt,
@@ -72,6 +73,7 @@ function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   const realm = realmOf(world, sender.userId)
   const r = world.residents.find((x) => x.id === o.residentId)
   if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+  if (!canWork(r, world.tick)) return 'children can’t pick up or put down goods'
   const spot = readSpot(o.spot)
   if (!spot) return 'the spot must be the ground, a storage, a construction site or a carriage'
   const goods = readGoods(o.goods)

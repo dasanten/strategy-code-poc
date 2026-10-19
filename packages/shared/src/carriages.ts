@@ -1,12 +1,5 @@
-import { CARRIAGE_CAPACITY, GOOD_WEIGHT, stockWeight } from './balance.js'
-import {
-  canWork,
-  type Carriage,
-  type Good,
-  type Horse,
-  type Resident,
-  type WorldState,
-} from './world.js'
+import { CARRIAGE_CAPACITY, GOOD_WEIGHT, canWork, stockWeight } from './balance.js'
+import { type Carriage, type Good, type Horse, type Resident, type WorldState } from './world.js'
 
 /** World queries about carriages (ADR 0002: the game API orders and scripts share). */
 

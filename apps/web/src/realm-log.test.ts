@@ -23,6 +23,9 @@ describe('realm log', () => {
     expect(describeEvent({ ...born, parents: ['Mara', 'Tobin'] }).text).toBe(
       'Mara and Tobin had a child, Wren.',
     )
+    expect(
+      describeEvent({ kind: 'grownUp', residentId: 'r3', name: 'Wren', seq: 5, ...at }),
+    ).toEqual({ text: 'Wren has grown up and can work now.', tone: 'info' })
   })
 
   it('keeps the latest events, as many as the server does', () => {
