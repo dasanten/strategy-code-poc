@@ -1,9 +1,12 @@
 import type {
   Account,
   ApiError,
+  CreateScriptRequest,
   InviteCreated,
   LoginRequest,
   ResetPasswordRequest,
+  ScriptDetail,
+  ScriptSummary,
   SignUpRequest,
 } from '@csp/shared'
 
@@ -17,7 +20,7 @@ export class ApiFailure extends Error {
   }
 }
 
-async function call<T>(method: 'GET' | 'POST', url: string, body?: unknown): Promise<T> {
+async function call<T>(method: 'GET' | 'POST' | 'DELETE', url: string, body?: unknown): Promise<T> {
   let res: Response
   try {
     res = await fetch(url, {
@@ -45,4 +48,15 @@ export const api = {
   logout: () => call<void>('POST', '/api/logout'),
   createInvite: () => call<InviteCreated>('POST', '/api/admin/invites'),
   resetPassword: (req: ResetPasswordRequest) => call<void>('POST', '/api/admin/password', req),
+  // The script library: saving keeps every version; one without syntax errors becomes active.
+  scripts: () => call<ScriptSummary[]>('GET', '/api/scripts'),
+  script: (id: number) => call<ScriptDetail>('GET', `/api/scripts/${id}`),
+  createScript: (req: CreateScriptRequest) => call<ScriptDetail>('POST', '/api/scripts', req),
+  saveScript: (id: number, source: string) =>
+    call<ScriptDetail>('POST', `/api/scripts/${id}/versions`, { source }),
+  renameScript: (id: number, name: string) =>
+    call<ScriptDetail>('POST', `/api/scripts/${id}/name`, { name }),
+  activateScriptVersion: (id: number, version: number) =>
+    call<ScriptDetail>('POST', `/api/scripts/${id}/active`, { version }),
+  deleteScript: (id: number) => call<void>('DELETE', `/api/scripts/${id}`),
 }

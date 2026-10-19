@@ -18,6 +18,7 @@ import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
 import { Walking } from './walking.js'
 import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
+import { checkScriptLibrary } from './scripts.js'
 import { generateTerrain } from './terrain-gen.js'
 import { runTick } from './tick.js'
 
@@ -55,6 +56,8 @@ const walking = new Walking(terrain)
 const realtime = attachRealtime(app.server, { db, world, terrain, explored, sight, orders })
 
 const reporter = createTickReporter(logger)
+// The script library lives in the database, so its invariant is checked at start and daily.
+reporter.invariantViolations(world, checkScriptLibrary(db))
 const loop = setInterval(() => {
   runTick(world, terrain, {
     reporter,
@@ -75,6 +78,7 @@ const loop = setInterval(() => {
 const DAY_MS = 24 * 60 * 60 * 1000
 const daily = setInterval(() => {
   deleteExpiredSessions(db)
+  reporter.invariantViolations(world, checkScriptLibrary(db))
   if (backupDir) {
     backupDb(sqlite, backupDir, 'daily')
       .then((file) => logger.info({ file }, 'backup written'))

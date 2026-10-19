@@ -40,20 +40,39 @@ export const inviteCodes = sqliteTable('invite_codes', {
   createdAt: createdAt(),
 })
 
-/** Every save of a script is a new row, so the history is kept. */
+/**
+ * A Player's named scripts (`CONTEXT.md`: Script). They belong to the account, not the realm, so
+ * they outlast a Leader's death. `activeVersion` is the version that runs: always one without
+ * syntax errors, or null while there is none.
+ */
 export const scripts = sqliteTable(
   'scripts',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     userId: integer('user_id')
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
+    activeVersion: integer('active_version'),
+    createdAt: createdAt(),
+  },
+  // Names are unique per Player regardless of case.
+  (t) => [uniqueIndex('scripts_user_name_lower').on(t.userId, sql`lower(${t.name})`)],
+)
+
+/** Every save of a script is a new row, so the history is kept. */
+export const scriptVersions = sqliteTable(
+  'script_versions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    scriptId: integer('script_id')
+      .notNull()
+      .references(() => scripts.id, { onDelete: 'cascade' }),
     version: integer('version').notNull(),
     source: text('source').notNull(),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex('scripts_user_name_version').on(t.userId, t.name, t.version)],
+  (t) => [uniqueIndex('script_versions_script_version').on(t.scriptId, t.version)],
 )
 
 /**
