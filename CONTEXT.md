@@ -170,7 +170,9 @@ The shared language of the game. Domain terms only — no implementation details
   house when it has a food surplus and no free housing, and puts more residents on farms (or
   builds a farm) when Food runs short. It never founds new cities: when it has no room left it
   grows its area by building on the edge, puts up a new wall there and then tears down the old
-  one. A Player does the same by hand, if they want to.
+  one. A Player does the same by hand, if they want to. The world starts out with NPC villages
+  and towns, on Plains, far from every starting city and from each other, and out of every
+  Player's sight.
 - **Integrating:** bringing a village or city into your realm, with its residents. Three ways:
   **conquer** it (capture by force), **buy** it, or **persuade** it (with high standing and
   respect it asks to join).

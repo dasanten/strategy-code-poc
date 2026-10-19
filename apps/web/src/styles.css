@@ -551,3 +551,40 @@ button.residents-row:hover {
 .alliance-list li.invited {
   color: #9aa3a8;
 }
+.city-inspector h2 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa3a8;
+}
+.city-inspector .panel-head span {
+  font-size: 0.75rem;
+  color: #9aa3a8;
+}
+.city-list {
+  list-style: none;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+.city-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  text-align: left;
+}
+.city-list button span {
+  color: #9aa3a8;
+}
+.city-details {
+  margin: 4px 0 0;
+  padding: 0 8px;
+  color: #c9ced1;
+}

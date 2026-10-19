@@ -4,11 +4,15 @@ import {
   START_HORSES,
   chunksAcross,
   townHallOf,
+  ALLIANCE_LEAVE_DELAY,
+  diplomacyFor,
+  type Realm,
   wrapDistance,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { ExploredTerrain } from './explored.js'
-import { SightTracker, entitiesInSight } from './sight.js'
+import { stepAlliances } from './alliances.js'
+import { SightTracker, entitiesInSight, sentOutOfSight } from './sight.js'
 import { foundStartingCity } from './starting-city.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { createWorld } from './world.js'
@@ -119,5 +123,107 @@ describe('SightTracker', () => {
     const n = chunksAcross(terrain.size)
     expect(grown).toContain(Math.floor(r.y / CHUNK_SIZE) * n + Math.floor(r.x / CHUNK_SIZE))
     expect(explored.isExplored({ id: userId }, r.x, r.y)).toBe(true)
+  })
+})
+
+describe('shared sight', () => {
+  /** Three Players far apart; Mara and Tobin are in an alliance, Wren is not. */
+  function allied() {
+    const world = createWorld(terrain)
+    const [mara, tobin, wren] = [1, 2, 3].map((u) => foundStartingCity(world, terrain, u)) as [
+      Realm,
+      Realm,
+      Realm,
+    ]
+    world.alliances.push({
+      id: 'alliance-1',
+      name: 'North',
+      leaderId: mara.id,
+      members: [mara, tobin].map((r) => ({ realmId: r.id, joinedAt: 0, leaving: null })),
+      invites: [],
+    })
+    const ids = (realmId: string) =>
+      new Set(entitiesInSight(world, terrain, realmId).map((e) => e.id))
+    const residentsOf = (realm: Realm) => world.residents.filter((r) => r.owner === realm.id)
+    return { world, mara, tobin, wren, ids, residentsOf }
+  }
+
+  it('lets members see what any member’s residents see, and nobody else', () => {
+    const { world, mara, tobin, wren, ids, residentsOf } = allied()
+    const tobinCity = world.cities.find((c) => c.realmId === tobin.id)!
+    for (const viewer of [mara, tobin]) {
+      const seen = ids(viewer.id)
+      for (const r of [...residentsOf(mara), ...residentsOf(tobin)]) expect(seen).toContain(r.id)
+      expect(seen).toContain(tobinCity.id)
+      for (const r of residentsOf(wren)) expect(seen).not.toContain(r.id)
+    }
+    const wrenSees = ids(wren.id)
+    for (const r of [...residentsOf(mara), ...residentsOf(tobin)])
+      expect(wrenSees).not.toContain(r.id)
+    // A stranger near Tobin's city is seen by Mara through Tobin's residents.
+    const stranger = residentsOf(wren)[0]!
+    const tobinHall = townHallOf(world, tobinCity)!
+    Object.assign(stranger, { x: tobinHall.x, y: tobinHall.y })
+    expect(ids(mara.id)).toContain(stranger.id)
+    // ... but, as a member, not passed on as one who could be invited.
+    const seenRealms = residentsOf(tobin)
+      .concat(stranger)
+      .map((r) => r.owner!)
+    const diplomacy = diplomacyFor(world, mara.id, seenRealms)
+    expect(diplomacy.realmsInSight.map((r) => r.realmId)).toEqual([wren.id])
+  })
+
+  it('ends shared sight with the leave delay, not before', () => {
+    const { world, mara, tobin, ids, residentsOf } = allied()
+    const member = world.alliances[0]!.members[1]!
+    member.leaving = { at: world.tick + ALLIANCE_LEAVE_DELAY, removed: false }
+    for (let i = 0; i < ALLIANCE_LEAVE_DELAY - 1; i++) {
+      world.tick++
+      stepAlliances(world)
+    }
+    expect(ids(mara.id)).toContain(residentsOf(tobin)[0]!.id)
+    world.tick++
+    stepAlliances(world)
+    expect(world.alliances[0]?.members.map((m) => m.realmId)).toEqual([mara.id])
+    expect(ids(mara.id)).not.toContain(residentsOf(tobin)[0]!.id)
+    expect(ids(tobin.id)).not.toContain(residentsOf(mara)[0]!.id)
+  })
+
+  it('explores for every member around any member’s residents, a new member at once', () => {
+    const { world, mara, tobin, wren, residentsOf } = allied()
+    const explored = new ExploredTerrain(terrain)
+    const sight = new SightTracker()
+    sight.update(world, explored)
+    const at = (realm: Realm) => residentsOf(realm)[0]!
+    const user = (realm: Realm) => ({ id: realm.userId })
+    expect(explored.isExplored(user(mara), at(tobin).x, at(tobin).y)).toBe(true)
+    expect(explored.isExplored(user(tobin), at(mara).x, at(mara).y)).toBe(true)
+    expect(explored.isExplored(user(mara), at(wren).x, at(wren).y)).toBe(false)
+    // Wren joins: without anyone moving, they explore around Mara's and Tobin's residents, and
+    // they around Wren's.
+    world.alliances[0]!.members.push({ realmId: wren.id, joinedAt: world.tick, leaving: null })
+    const grown = sight.update(world, explored)
+    expect(grown.get(wren.userId)?.size).toBeGreaterThan(0)
+    expect(explored.isExplored(user(wren), at(mara).x, at(mara).y)).toBe(true)
+    expect(explored.isExplored(user(mara), at(wren).x, at(wren).y)).toBe(true)
+    // Nobody moved since: nothing new.
+    expect(sight.update(world, explored)).toEqual(new Map())
+  })
+
+  it('reports anything sent to a Player outside their own or their alliance’s sight', () => {
+    const { world, mara, tobin, wren } = allied()
+    for (const realm of [mara, tobin, wren]) {
+      expect(
+        sentOutOfSight(world, terrain, realm.id, entitiesInSight(world, terrain, realm.id)),
+      ).toEqual([])
+    }
+    // What Tobin sees, sent to Wren, is all outside Wren's sight; the cities included.
+    const tobins = entitiesInSight(world, terrain, tobin.id)
+    const out = sentOutOfSight(world, terrain, wren.id, tobins)
+    expect(out.map((v) => v.entityIds[0])).toEqual(tobins.map((e) => e.id))
+    expect(out[0]?.invariant).toBe('sent-only-in-sight')
+    // Once Tobin's residents leave the alliance, what they see is outside Mara's sight.
+    world.alliances[0]!.members.pop()
+    expect(sentOutOfSight(world, terrain, mara.id, tobins).length).toBeGreaterThan(0)
   })
 })

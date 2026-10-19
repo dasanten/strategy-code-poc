@@ -11,6 +11,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { updateCityMembership } from './cities.js'
+import { placeNpcCities } from './npc-cities.js'
 import { drawLifespan, hash, mulberry32 } from './residents.js'
 import { plainsOutside, ringTiles } from './starting-city.js'
 
@@ -35,7 +36,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 16
+export const WORLD_FORMAT_VERSION = 17
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -238,6 +239,13 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Alliances came (`CONTEXT.md`: Alliance); there are none yet.
   15: (state) => ({ ...(state as object), alliances: [] }),
+  // NPC cities came (`CONTEXT.md`: NPC city): the live world gets them as a new one would, on
+  // Plains, far from every city and out of every Player's sight. The shape stays the same.
+  16: (state, ctx) => {
+    const world = structuredClone(state) as WorldState
+    placeNpcCities(world, ctx.terrain)
+    return world
+  },
 }
 
 export class WorldFormatError extends Error {}

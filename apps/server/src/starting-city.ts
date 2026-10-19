@@ -4,6 +4,7 @@ import {
   HOUSING_ROOM,
   MAX_HEALTH,
   MAX_HUNGER,
+  NPC_CITY_MIN_DISTANCE,
   START_CARRIED_FOOD,
   START_CITY_SIZE,
   START_FOOD,
@@ -38,7 +39,7 @@ export function realmOf(world: WorldState, userId: number): Realm | undefined {
  * How many tiles out from a starting city's wall its farm and stable stand: just past its area
  * (`CITY_AREA_MARGIN`), so working the farm is not being at home.
  */
-const FARM_RING = 1 + CITY_AREA_MARGIN
+export const FARM_RING = 1 + CITY_AREA_MARGIN
 
 /** Where a city may stand: its square and the rings around it on open land, with no nodes. */
 function siteFits(terrain: TerrainMap, blocked: Set<string>, x: number, y: number): boolean {
@@ -63,13 +64,16 @@ export interface WallSquare {
   gate: { x: number; y: number }
 }
 
-/** The square and gate a starting city at (x, y) gets: the gate in the middle of the south side. */
-const startCity = (x: number, y: number): WallSquare => ({
+/** A walled square at (x, y), `size` tiles along each side: the gate in the middle of the south side. */
+export const wallSquare = (x: number, y: number, size: number): WallSquare => ({
   x,
   y,
-  size: START_CITY_SIZE,
-  gate: { x: x + Math.floor(START_CITY_SIZE / 2), y: y + START_CITY_SIZE - 1 },
+  size,
+  gate: { x: x + Math.floor(size / 2), y: y + size - 1 },
 })
+
+/** The square and gate a starting city at (x, y) gets. */
+const startCity = (x: number, y: number): WallSquare => wallSquare(x, y, START_CITY_SIZE)
 
 /** The tiles of a square's wall ring, the gate's included, each once. */
 export function ringTiles(square: WallSquare): [number, number][] {
@@ -116,9 +120,9 @@ const dist = (a: readonly [number, number], b: readonly [number, number]) =>
   Math.hypot(a[0] - b[0], a[1] - b[1])
 
 /**
- * Picks a site for a new starting city: on open land and at least `CITY_MIN_DISTANCE` from every
- * other city, the short way round the map. When the map has no such room left, the required
- * distance is halved until a site fits. A city never straddles the map's joins.
+ * Picks a site for a new starting city: on open land, at least `CITY_MIN_DISTANCE` from every
+ * city of a realm and `NPC_CITY_MIN_DISTANCE` from every NPC city, the short way round the map.
+ * When the map has no such room left, the required distances are halved until a site fits. A city never straddles the map's joins.
  */
 export function findCitySite(
   world: WorldState,
@@ -127,15 +131,21 @@ export function findCitySite(
 ): [number, number] {
   // Room for the city and the ring of open land around it, without crossing a join.
   const span = terrain.size - START_CITY_SIZE - 2 * FARM_RING
-  // Every other city, by where its town hall stands.
-  const others = world.cities.flatMap((c) => townHallOf(world, c) ?? [])
+  // Every other city, by where its town hall stands, and whether it is an NPC city.
+  const others = world.cities.flatMap((c) => {
+    const hall = townHallOf(world, c)
+    return hall ? [{ x: hall.x, y: hall.y, npc: c.realmId === null }] : []
+  })
   const blocked = new Set([...world.nodes, ...world.buildings].map((e) => `${e.x},${e.y}`))
   for (let minDistance = CITY_MIN_DISTANCE; ; minDistance = Math.floor(minDistance / 2)) {
     for (let attempt = 0; attempt < 3000; attempt++) {
       const x = FARM_RING + Math.floor(rand() * span)
       const y = FARM_RING + Math.floor(rand() * span)
       const centre = { x: x + START_CITY_SIZE / 2, y: y + START_CITY_SIZE / 2 }
-      if (others.some((o) => wrapDistance(terrain.size, o, centre) < minDistance)) continue
+      const tooNear = (o: (typeof others)[number]) =>
+        wrapDistance(terrain.size, o, centre) <
+        (o.npc ? Math.min(NPC_CITY_MIN_DISTANCE, minDistance) : minDistance)
+      if (others.some(tooNear)) continue
       if (siteFits(terrain, blocked, x, y)) return [x, y]
     }
     if (minDistance === 0) throw new Error('no room left on the map for a starting city')

@@ -6,6 +6,7 @@ import { buildApp } from './app.js'
 import { createAdmin, createInviteCode, createSession, signUp } from './auth.js'
 import { recordEvent } from './events.js'
 import { ExploredTerrain } from './explored.js'
+import type { InvariantViolation } from './invariants.js'
 import { openDb, schema } from './db/index.js'
 import { OrderQueue } from './orders.js'
 import { realmOf } from './starting-city.js'
@@ -31,6 +32,13 @@ async function start() {
   })
   const world = createWorld(terrain)
   const orders = new OrderQueue()
+  // Every send is checked against the Player's sight; what breaks it lands here.
+  const violations: InvariantViolation[] = []
+  const reporter = {
+    invariantViolations: (_w: unknown, v: InvariantViolation[]) => violations.push(...v),
+    tickHealth() {},
+    tickError() {},
+  }
   const realtime = attachRealtime(app.server, {
     db: opened.db,
     world,
@@ -38,6 +46,7 @@ async function start() {
     explored: new ExploredTerrain(terrain),
     sight: new SightTracker(),
     orders,
+    sightCheck: { reporter, sampleRate: 1 },
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
   cleanup.push(
@@ -54,6 +63,8 @@ async function start() {
     world,
     realtime,
     orders,
+    sightCheck: { reporter, sampleRate: 1 },
+    violations,
     url: `ws://127.0.0.1:${port}${WS_PATH}`,
     token: createSession(opened.db, user.id),
   }
@@ -93,7 +104,7 @@ describe('realtime', () => {
   })
 
   it('welcomes a logged-in Player, then sends only changes', async () => {
-    const { url, token, world, realtime } = await start()
+    const { url, token, world, realtime, violations } = await start()
     const { next } = connect(url, token)
     const welcome = await next('welcome')
     expect(welcome).toMatchObject({ type: 'welcome', account: { name: 'Daniel' }, tick: 0 })
@@ -131,6 +142,7 @@ describe('realtime', () => {
     realtime.broadcastTick()
     const tick = await next('tick')
     if (tick.type === 'tick') expect(tick.tick).toBe(1)
+    expect(violations).toEqual([])
   })
 
   it('keeps one realm per Player across logins', async () => {

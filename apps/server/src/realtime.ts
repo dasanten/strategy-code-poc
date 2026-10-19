@@ -18,7 +18,9 @@ import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
 import { foundStartingCity } from './starting-city.js'
 import { eventsFor } from './events.js'
-import { entitiesInSight, type SightTracker } from './sight.js'
+import { shouldCheckInvariants } from './invariants.js'
+import { entitiesInSight, sentOutOfSight, type SightTracker } from './sight.js'
+import type { TickReporter } from './tick.js'
 import { ClientView } from './sync.js'
 
 function readCookie(header: string | undefined, name: string): string | undefined {
@@ -63,11 +65,24 @@ export function attachRealtime(
     explored: ExploredTerrain
     sight: SightTracker
     orders: OrderQueue
+    /**
+     * Checks, on the sampled share of ticks, that nothing is sent outside a Player's sight
+     * (`sentOutOfSight`), and reports what is.
+     */
+    sightCheck?: { reporter: TickReporter; sampleRate: number; rand?: () => number }
   },
 ) {
   const { world } = opts
   const users = new WeakMap<object, SessionUser>()
   const clients = new Map<WebSocket, Client>()
+
+  /** Reports entities about to go to a realm's Player outside their sight, on sampled ticks. */
+  function checkSent(realmId: string, sent: SeenEntity[]) {
+    const check = opts.sightCheck
+    if (!check || !shouldCheckInvariants(check.sampleRate, check.rand)) return
+    const violations = sentOutOfSight(world, opts.terrain, realmId, sent)
+    if (violations.length > 0) check.reporter.invariantViolations(world, violations)
+  }
 
   const wss = new WebSocketServer({
     server,
@@ -102,6 +117,7 @@ export function attachRealtime(
     const start = (city && townHallOf(world, city)) ?? leader ?? { x: 0, y: 0 }
     const [cx, cy] = [start.x, start.y]
     const entities = client.view.initial(entitiesInSight(world, opts.terrain, realm.id))
+    checkSent(realm.id, entities)
     const events = eventsFor(world, user.id)
     client.lastEventSeq = events.at(-1)?.seq ?? 0
     const diplomacy = diplomacyFor(world, realm.id, realmsSeen(entities))
@@ -144,6 +160,7 @@ export function attachRealtime(
       for (const [socket, client] of clients) {
         const inSight = entitiesInSight(world, opts.terrain, client.realmId)
         const { changed, gone } = client.view.diff(inSight)
+        checkSent(client.realmId, changed)
         const grown = [...(explored.get(client.userId) ?? [])]
         const events = eventsFor(world, client.userId, client.lastEventSeq)
         client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq

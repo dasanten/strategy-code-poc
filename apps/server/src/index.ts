@@ -53,11 +53,19 @@ if (sentryOn) setupFastifyErrorHandler(app)
 const orders = new OrderQueue(orderKinds, terrain)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
-const realtime = attachRealtime(app.server, { db, world, terrain, explored, sight, orders })
-
 const reporter = createTickReporter(logger)
 // The script library lives in the database, so its invariant is checked at start and daily.
 reporter.invariantViolations(world, checkScriptLibrary(db))
+const realtime = attachRealtime(app.server, {
+  db,
+  world,
+  terrain,
+  explored,
+  sight,
+  orders,
+  sightCheck: { reporter, sampleRate: config.invariantSampleRate },
+})
+
 const loop = setInterval(() => {
   runTick(world, terrain, {
     reporter,
