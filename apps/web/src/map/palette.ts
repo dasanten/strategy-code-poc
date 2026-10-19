@@ -8,6 +8,8 @@ export const TERRAIN_COLORS: Record<number, number> = {
   [Terrain.Mountain]: 0x6f6a66,
   [Terrain.Lake]: 0x3a6a8a,
   [Terrain.Sea]: 0x2a4b66,
+  /** Never in a chunk: roads are drawn over the terrain, in this colour. */
+  [Terrain.Road]: 0xcdb98c,
   [UNEXPLORED]: 0x1a1e22,
 }
 
@@ -21,6 +23,7 @@ export const TERRAIN_NAMES: Record<number, string> = {
   [Terrain.Mountain]: 'Mountain',
   [Terrain.Lake]: 'Lake',
   [Terrain.Sea]: 'Sea',
+  [Terrain.Road]: 'Road',
   [UNEXPLORED]: 'Unexplored',
 }
 
@@ -61,6 +64,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   smelter: 0x9a4a2f,
   mint: 0xc9a227,
   smithy: 0x4a4e57,
+  road: 0xcdb98c,
 }
 
 export const BUILDING_NAMES: Record<BuildingKind, string> = {
@@ -77,6 +81,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   smelter: 'Smelter',
   mint: 'Mint',
   smithy: 'Smithy',
+  road: 'Road',
 }
 export const HORSE_COLOR = 0x6b4f2e
 export const CARRIAGE_COLOR = 0xb79a6e

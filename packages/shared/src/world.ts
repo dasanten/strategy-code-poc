@@ -100,9 +100,9 @@ export interface DropOrder {
 }
 
 /**
- * Building (`CONTEXT.md`: Building): the resident lays out a construction site of `building` on
- * the tile they stand on (`at`), or joins the unfinished one of that kind already there, then
- * works on it until it is finished. `siteId` is null until they are on the site.
+ * Building (`CONTEXT.md`: Building, Road): the resident lays out a construction site of
+ * `building` on the tile they stand on (`at`), or joins the unfinished one of that kind already
+ * there, then works on it until it is finished. `siteId` is null until they are on the site.
  */
 export interface BuildOrder {
   kind: 'build'
@@ -402,10 +402,12 @@ export type BuildingKind =
   | 'smelter'
   | 'mint'
   | 'smithy'
+  | 'road'
 
 /**
  * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction
- * site, not yet the building.
+ * site, not yet the building. A road is built like a building but may share its tile with one
+ * (`CONTEXT.md`: Road): a tile holds at most one road and one other building.
  */
 export interface Building {
   id: string

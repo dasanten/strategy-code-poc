@@ -60,6 +60,7 @@ const GOOD_LABELS: Record<Good, string> = {
 
 /** What a building off any node is for, shown before what it needs. */
 const BUILD_BLURBS: Partial<Record<BuildingKind, string>> = {
+  road: 'A road: residents walk and carriages drive faster on it, on any land but Mountain, and it can run through a gate. Nobody owns it. ',
   stable: 'A stable keeps horses and their Food, and breeds them; on Plains only. ',
   smelter: 'A smelter turns iron ore into iron; not on Mountain. ',
   mint: 'A mint turns gold ore into coins; not on Mountain. ',
@@ -227,6 +228,7 @@ export function ResidentInspector({
   onPickUp,
   onDrop,
   building,
+  road,
   node,
   onBuild,
   workers,
@@ -269,6 +271,8 @@ export function ResidentInspector({
   onDrop: (to: GoodsSpot, goods: Stock) => void
   /** The building or construction site on the resident's tile, if one is in sight. */
   building: Building | undefined
+  /** The road or road site on the resident's tile, if one is in sight; it may share the tile. */
+  road: Building | undefined
   /** The resource node on the resident's tile, if the Player knows of one. */
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
@@ -307,6 +311,9 @@ export function ResidentInspector({
   const atSite: GoodsSpot = { kind: 'site', siteId: site?.id ?? '' }
   const onCarriage: GoodsSpot = { kind: 'carriage', carriageId: carriage?.id ?? '' }
   const needed = site ? materialsNeeded(site) : {}
+  const roadSite = road?.site ? road : undefined
+  const atRoadSite: GoodsSpot = { kind: 'site', siteId: roadSite?.id ?? '' }
+  const roadNeeded = roadSite ? materialsNeeded(roadSite) : {}
   return (
     <aside className="inspector" aria-label="Resident inspector">
       <div className="inspector-title">
@@ -455,6 +462,15 @@ export function ResidentInspector({
                   Deliver
                 </button>
               )}
+              {(roadNeeded[good] ?? 0) > 0 && (
+                <button
+                  type="button"
+                  disabled={child}
+                  onClick={() => onDrop(atRoadSite, { [good]: units })}
+                >
+                  Deliver to road
+                </button>
+              )}
               {carriage && (
                 <button
                   type="button"
@@ -481,9 +497,11 @@ export function ResidentInspector({
         onWork={onWork}
       />
       <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
+      <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
+      <TearDownBlock resident={r} tick={tick} building={road} onTearDown={onTearDown} />
       <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
 
-      {(pile || storage || site || carriage) && (
+      {(pile || storage || site || roadSite || carriage) && (
         <section className="inspector-block" aria-label="On this tile">
           <div className="panel-head">
             <h3>Here</h3>
@@ -510,6 +528,15 @@ export function ResidentInspector({
               title="Delivered to the site"
               stock={site.site!.delivered}
               spot={atSite}
+              onPickUp={onPickUp}
+              disabled={child}
+            />
+          )}
+          {roadSite && (
+            <TileGoods
+              title="Delivered to the road site"
+              stock={roadSite.site!.delivered}
+              spot={atRoadSite}
               onPickUp={onPickUp}
               disabled={child}
             />
@@ -719,6 +746,54 @@ function BuildBlock({
     )
   }
   return null
+}
+
+/**
+ * A road on the resident's tile (`CONTEXT.md`: Road): with none, lay one out, next to any
+ * building there; on a road site, see what it still needs and help build it.
+ */
+function RoadBlock({
+  resident,
+  tick,
+  road,
+  onBuild,
+}: {
+  resident: Resident
+  tick: number
+  road: Building | undefined
+  onBuild: (kind: BuildingKind) => void
+}) {
+  if (road?.site) {
+    return (
+      <BuildBlock
+        resident={resident}
+        tick={tick}
+        building={road}
+        node={undefined}
+        onBuild={onBuild}
+      />
+    )
+  }
+  if (road) return null
+  const materials = goodsIn(BUILD_MATERIALS.road)
+  const days = (BUILD_WORK.road ?? 0) / TICKS_PER_GAME_DAY
+  return (
+    <section className="inspector-block" aria-label="Road">
+      <div className="panel-head">
+        <h3>Road</h3>
+      </div>
+      <p className="muted small">
+        {BUILD_BLURBS.road}
+        Needs {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and
+        about {days} game days of one resident’s work.
+      </p>
+      <div className="order-buttons">
+        <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
+          Build road
+        </button>
+      </div>
+    </section>
+  )
 }
 
 /**
