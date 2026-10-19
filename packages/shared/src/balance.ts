@@ -202,6 +202,41 @@ export const CITY_AREA_MARGIN = 1
 /** How far a resident sees, in tiles (`CONTEXT.md`: Sight). */
 export const SIGHT_RANGE = 12
 
+/**
+ * NPC villages placed on a full-size map (`CONTEXT.md`: NPC city); a smaller map gets fewer, by
+ * its area. Fewer are placed when the map has no room left for them.
+ */
+export const NPC_VILLAGES = 12
+
+/** NPC towns placed on a full-size map, like `NPC_VILLAGES`. Towns are placed first. */
+export const NPC_TOWNS = 4
+
+/**
+ * NPC cities lie at least this many tiles from every other city, starting cities and NPC cities
+ * alike (about an hour's walk on plains), the short way round the map.
+ */
+export const NPC_CITY_MIN_DISTANCE = 120
+
+/** What an NPC city is placed with, by its size: a walled square like a starting city's. */
+export interface NpcCitySize {
+  /** Tiles along each side, wall included. */
+  size: number
+  /** Adult residents, with random stats like a starting city's. */
+  residents: number
+  /** Houses inside the wall, in a row north of the storage; room for everyone and a little more. */
+  houses: number
+  /** Farms outside the wall, by the gate; the residents start on them, working them. */
+  farms: number
+  /** Food in its storage, in units. */
+  food: number
+}
+
+/** A village: a starting city's square, a few fewer residents, one farm. */
+export const NPC_VILLAGE: NpcCitySize = { size: 7, residents: 6, houses: 2, farms: 1, food: 150 }
+
+/** A town: a wider square, twice the residents of a starting city, two farms. */
+export const NPC_TOWN: NpcCitySize = { size: 11, residents: 16, houses: 5, farms: 2, food: 400 }
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 

@@ -75,7 +75,14 @@ const between = (rand: () => number, min: number, max: number) =>
  */
 export function newResident(
   rand: () => number,
-  fields: { id: string; owner: string; cityId?: string | null; x: number; y: number; tick: number },
+  fields: {
+    id: string
+    owner: string | null
+    cityId?: string | null
+    x: number
+    y: number
+    tick: number
+  },
 ): Resident {
   const stats = Object.fromEntries(
     STAT_NAMES.map((s) => [s, { base: between(rand, STAT_BASE_MIN, STAT_BASE_MAX), trained: 0 }]),
