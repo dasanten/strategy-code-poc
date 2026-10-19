@@ -5,6 +5,7 @@ import {
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
   WORKPLACE_MAX_WORKERS,
+  type Recipe,
 } from './balance.js'
 import {
   NODE_WORKPLACE,
@@ -21,8 +22,8 @@ import { Terrain, terrainAt, type TerrainMap } from './terrain.js'
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
 
 /**
- * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters
- * and mints, and town halls, walls and gates (`CONTEXT.md`: Town hall, Wall / Gate).
+ * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters,
+ * mints and smithies, and town halls, walls and gates (`CONTEXT.md`: Town hall, Wall / Gate).
  */
 export const BUILDABLE: readonly BuildingKind[] = [
   'lumberCamp',
@@ -31,14 +32,35 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'stable',
   'smelter',
   'mint',
+  'smithy',
   'townHall',
   'wall',
   'gate',
 ]
 
-/** Workplaces that turn one good into another (`RECIPES`): smelters and mints. */
+/** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
 export const PROCESSING = Object.keys(RECIPES) as readonly BuildingKind[]
 
+/** The good a recipe makes. */
+export function recipeGood(recipe: Recipe): Good {
+  return (Object.keys(recipe.output) as Good[])[0]!
+}
+
+/**
+ * The recipe a worker follows at a workplace that processes goods (`RECIPES`): the one that makes
+ * `makes`, or with no `makes` the workplace's only recipe. Undefined for a workplace that
+ * processes nothing, a good it can't make, or a smithy with no `makes` (it has more than one).
+ */
+export function recipeFor(kind: BuildingKind, makes?: Good): Recipe | undefined {
+  const recipes = RECIPES[kind] ?? []
+  if (makes === undefined) return recipes.length === 1 ? recipes[0] : undefined
+  return recipes.find((r) => recipeGood(r) === makes)
+}
+
+/** Whether a workplace has more than one recipe, so its workers say what they make (a smithy). */
+export function hasChoice(kind: BuildingKind): boolean {
+  return (RECIPES[kind]?.length ?? 0) > 1
+}
 /**
  * Buildable kinds that go on any passable terrain but Mountain, off any resource node
  * (`CONTEXT.md`: Where buildings go).
@@ -74,8 +96,8 @@ export function workNeeded(site: Building): number {
 /**
  * Why a building of this kind can't be laid out on the tile (`CONTEXT.md`: Where buildings go),
  * or undefined if it can: workplaces go on a resource node of their kind, stables on Plains off
- * any node, smelters, mints, town halls, walls and gates off any node and off Mountain, one
- * building per tile. Without `terrain` the Plains and Mountain rules are not checked.
+ * any node, smelters, mints, smithies, town halls, walls and gates off any node and off Mountain,
+ * one building per tile. Without `terrain` the Plains and Mountain rules are not checked.
  */
 export function buildProblem(
   world: WorldState,
@@ -112,25 +134,34 @@ export const NODE_GOOD: Record<ResourceKind, Good> = {
 /**
  * The good a workplace makes (`CONTEXT.md`: Workplace): Food on a farm; on a resource node, what
  * the node yields, so a mine makes iron ore or gold ore by the node it stands on; at a smelter or
- * mint, what its recipe makes (Iron, Coins).
+ * mint, what its recipe makes (Iron, Coins); at a smithy, the weapon or armour `makes` names
+ * (`recipeFor`), and nothing without it.
  */
-export function workplaceGood(world: WorldState, workplace: Building): Good | undefined {
+export function workplaceGood(
+  world: WorldState,
+  workplace: Building,
+  makes?: Good,
+): Good | undefined {
   if (workplace.kind === 'farm') return 'food'
   if (MAX_WORKERS[workplace.kind] === undefined) return undefined
-  const recipe = RECIPES[workplace.kind]
-  if (recipe) return (Object.keys(recipe.output) as Good[])[0]
+  if (RECIPES[workplace.kind]) {
+    const recipe = recipeFor(workplace.kind, makes)
+    return recipe && recipeGood(recipe)
+  }
   const node = world.nodes.find((n) => n.x === workplace.x && n.y === workplace.y)
   return node ? NODE_GOOD[node.kind] : undefined
 }
 
 /**
- * The goods a smelter or mint can use up for its next batch (`CONTEXT.md`: Smelter): the
- * recipe's input that its workers carry and that lies in the pile on its tile.
+ * The goods a workplace that processes goods can use up for its next batches (`CONTEXT.md`:
+ * Smelter, Smithy): the input of any of its recipes that its workers carry and that lies in the
+ * pile on its tile.
  */
 export function inputAt(world: WorldState, workplace: Building): Stock {
   const out: Stock = {}
   const pile = world.piles.find((p) => p.x === workplace.x && p.y === workplace.y)
-  for (const good of Object.keys(RECIPES[workplace.kind]?.input ?? {}) as Good[]) {
+  const goods = new Set((RECIPES[workplace.kind] ?? []).flatMap((r) => Object.keys(r.input)))
+  for (const good of goods as Set<Good>) {
     const carried = workersOf(world, workplace).reduce((n, w) => n + (w.carried[good] ?? 0), 0)
     const units = carried + (pile?.goods[good] ?? 0)
     if (units > 0) out[good] = units
@@ -138,11 +169,10 @@ export function inputAt(world: WorldState, workplace: Building): Stock {
   return out
 }
 
-/** Whether a smelter or mint has the input for one more batch (`inputAt`). */
-export function hasInput(world: WorldState, workplace: Building): boolean {
+/** Whether a workplace has the input for one more batch of `recipe` (`inputAt`). */
+export function hasInput(world: WorldState, workplace: Building, recipe: Recipe): boolean {
   const at = inputAt(world, workplace)
-  const input = RECIPES[workplace.kind]?.input ?? {}
-  return (Object.entries(input) as [Good, number][]).every(([g, n]) => (at[g] ?? 0) >= n)
+  return (Object.entries(recipe.input) as [Good, number][]).every(([g, n]) => (at[g] ?? 0) >= n)
 }
 
 /** The residents working a workplace: holding a work-at order for it and standing on it. */
@@ -168,17 +198,28 @@ export function holdersOf(world: Pick<WorldState, 'residents'>, workplace: Build
 
 /**
  * Why a resident can't start working the building on their tile, or undefined if they can: it
- * has to be a finished workplace residents can work, with room for one more worker.
+ * has to be a finished workplace residents can work, with room for one more worker. At a smithy
+ * `makes` names one of its recipes' goods (`recipeFor`); elsewhere it is left out. A worker there
+ * can switch to making something else.
  */
-export function workProblem(world: WorldState, resident: Resident): string | undefined {
+export function workProblem(
+  world: WorldState,
+  resident: Resident,
+  makes?: Good,
+): string | undefined {
   const here = buildingAt(world, resident.x, resident.y)
   const max = here && MAX_WORKERS[here.kind]
-  if (!here || max === undefined || !workplaceGood(world, here)) {
-    return 'there is no workplace to work here'
-  }
+  if (!here || max === undefined) return 'there is no workplace to work here'
+  if (hasChoice(here.kind)) {
+    if (makes === undefined) return `say what to make at the ${here.kind}`
+    if (!recipeFor(here.kind, makes)) return `a ${here.kind} can't make ${makes}`
+  } else if (makes !== undefined) return `nothing to choose at a ${here.kind}`
+  if (!workplaceGood(world, here, makes)) return 'there is no workplace to work here'
   if (here.site) return 'it is still a construction site'
-  if (resident.order?.kind === 'workAt' && resident.order.buildingId === here.id) {
-    return 'already working here'
+  const o = resident.order
+  if (o?.kind === 'workAt' && o.buildingId === here.id) {
+    if (o.makes === makes) return 'already working here'
+    return undefined
   }
   if (workersOf(world, here).length >= max) return `it already has ${max} workers`
   return undefined

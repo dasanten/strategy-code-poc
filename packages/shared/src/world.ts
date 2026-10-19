@@ -19,7 +19,14 @@ export interface Stat {
 
 /** Something learned by doing or training; starts at 0, never inherited (`CONTEXT.md`: Skill). */
 export type SkillName =
-  'mining' | 'woodcutting' | 'smelting' | 'construction' | 'farming' | 'combat' | 'driving'
+  | 'mining'
+  | 'woodcutting'
+  | 'smelting'
+  | 'smithing'
+  | 'construction'
+  | 'farming'
+  | 'combat'
+  | 'driving'
 
 /** A person living in the world (`CONTEXT.md`: Resident). Plain data. */
 export interface Resident {
@@ -114,6 +121,11 @@ export interface WorkOrder {
   buildingId: string
   at: { x: number; y: number }
   progress: number
+  /**
+   * At a workplace with more than one recipe (a smithy), the good this resident makes there
+   * (`recipeFor`). Missing elsewhere.
+   */
+  makes?: Good
 }
 
 /**
@@ -295,9 +307,32 @@ export interface Pile {
   goods: Stock
 }
 
-/** PoC goods (`CONTEXT.md`: Good). Amounts are counted in units; `GOOD_WEIGHT` weighs them. */
-export const GOODS = ['food', 'wood', 'stone', 'ironOre', 'iron', 'goldOre', 'coins'] as const
+/**
+ * PoC goods (`CONTEXT.md`: Good, Weapons and armour). Amounts are counted in units;
+ * `GOOD_WEIGHT` weighs them.
+ */
+export const GOODS = [
+  'food',
+  'wood',
+  'stone',
+  'ironOre',
+  'iron',
+  'goldOre',
+  'coins',
+  'spear',
+  'sword',
+  'shield',
+  'armour',
+] as const
 export type Good = (typeof GOODS)[number]
+
+/** Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour). */
+export const WEAPONS = ['spear', 'sword'] as const satisfies readonly Good[]
+export type Weapon = (typeof WEAPONS)[number]
+
+/** Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour. */
+export const PROTECTION = ['shield', 'armour'] as const satisfies readonly Good[]
+export type Protection = (typeof PROTECTION)[number]
 
 /** Goods by kind, as unit counts; a missing good is 0. */
 export type Stock = Partial<Record<Good, number>>
@@ -366,6 +401,7 @@ export type BuildingKind =
   | 'lumberCamp'
   | 'smelter'
   | 'mint'
+  | 'smithy'
 
 /**
  * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction
