@@ -54,9 +54,17 @@ const orders = new OrderQueue(orderKinds, terrain)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
 const territory = new TerritoryTracker()
-const realtime = attachRealtime(app.server, { db, world, terrain, explored, sight, orders })
-
 const reporter = createTickReporter(logger)
+const realtime = attachRealtime(app.server, {
+  db,
+  world,
+  terrain,
+  explored,
+  sight,
+  orders,
+  sightCheck: { reporter, sampleRate: config.invariantSampleRate },
+})
+
 const loop = setInterval(() => {
   runTick(world, terrain, {
     reporter,
