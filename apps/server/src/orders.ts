@@ -7,6 +7,7 @@ import { haul, stop } from './hauling.js'
 import { pair } from './pairing.js'
 import { walkTo } from './walking.js'
 import { workAt } from './work.js'
+import { allianceOrders } from './alliances.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -41,6 +42,7 @@ export const orderKinds: Record<string, OrderKind> = {
   tearDown,
   workAt,
   pair,
+  ...allianceOrders,
 }
 
 interface Pending {

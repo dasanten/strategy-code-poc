@@ -18,6 +18,7 @@ import { stepRefill, stepSurvival, type SurvivalResult } from './survival.js'
 import { stepAging, type AgingResult } from './aging.js'
 import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
+import { stepAlliances } from './alliances.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -37,6 +38,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     carriages: [],
     piles: [],
     events: [],
+    alliances: [],
   }
 }
 
@@ -85,7 +87,8 @@ export interface StepResult {
  * horses, and stables breed foals; food spoils at the end of each game day; then their orders request actions (steps, then taking and
  * putting down goods, haul routes' included, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
- * age: the old die, and loads too heavy for declining Strength are put down; then residents at
+ * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
+ * whose delay ran out take effect; then residents at
  * home or at their workplace who run low on food take meals there. Without `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
@@ -106,6 +109,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveBirths(world, births)
   world.tick++
   const aging = stepAging(world)
+  stepAlliances(world)
   stepRefill(world, terrain.size)
   const actions =
     steps.length + carries.length + builds.length + teardowns.length + work.length + births.length

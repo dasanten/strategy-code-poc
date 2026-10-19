@@ -501,3 +501,54 @@ button.residents-row:hover {
 .realm-log-list li.bad {
   border-left-color: #c94a4a;
 }
+.alliance-panel h2 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa3a8;
+}
+.alliance-panel .panel-head span {
+  font-size: 0.75rem;
+  color: #9aa3a8;
+}
+.alliance-panel form {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0.5rem 0;
+}
+.alliance-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+.alliance-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+.alliance-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  border-left: 3px solid #3a3d45;
+}
+.alliance-list li > span {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.alliance-list li.invited {
+  color: #9aa3a8;
+}

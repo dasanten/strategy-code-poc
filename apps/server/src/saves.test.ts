@@ -372,6 +372,11 @@ describe('world saves', () => {
     expect(checkInvariants(v15, land)).toEqual([])
   })
 
+  it('gives the world no alliances (migration 15 → 16)', () => {
+    const v15 = { tick: 10, seed: 1, residents: [], realms: [] }
+    expect(migrateWorld(v15, 15, { terrain }, migrations, 16)).toEqual({ ...v15, alliances: [] })
+  })
+
   it('keeps the newest saves and one per hour for a week', async () => {
     const { db, close } = await openDb(':memory:')
     const now = 1_000_000_000

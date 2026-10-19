@@ -30,13 +30,14 @@ async function start() {
     trustProxy: false,
   })
   const world = createWorld(terrain)
+  const orders = new OrderQueue()
   const realtime = attachRealtime(app.server, {
     db: opened.db,
     world,
     terrain,
     explored: new ExploredTerrain(terrain),
     sight: new SightTracker(),
-    orders: new OrderQueue(),
+    orders,
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
   cleanup.push(
@@ -52,6 +53,7 @@ async function start() {
     userId: user.id,
     world,
     realtime,
+    orders,
     url: `ws://127.0.0.1:${port}${WS_PATH}`,
     token: createSession(opened.db, user.id),
   }
@@ -192,5 +194,35 @@ describe('realtime', () => {
     // Logging in again brings the Player's log as kept, and only theirs.
     const welcome = await connect(url, token).next('welcome')
     expect(welcome.type === 'welcome' && welcome.events.map((e) => e.kind)).toEqual(['hungry'])
+  })
+  it('sends the Player their alliance matters on connect, and again only when they change', async () => {
+    const { url, token, world, realtime, orders } = await start()
+    const { socket, next } = connect(url, token)
+    const welcome = await next('welcome')
+    expect(welcome.type === 'welcome' && welcome.diplomacy).toEqual({
+      alliance: null,
+      invitations: [],
+      realmsInSight: [],
+    })
+    socket.send(
+      JSON.stringify({
+        type: 'order',
+        requestId: 'a1',
+        order: { kind: 'foundAlliance', name: 'North' },
+      }),
+    )
+    expect(await next('ack')).toEqual({ type: 'ack', requestId: 'a1' })
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('diplomacy')
+
+    orders.applyAll(world)
+    realtime.broadcastTick()
+    const tick = await next('tick')
+    expect(tick.type === 'tick' && tick.diplomacy?.alliance).toMatchObject({
+      name: 'North',
+      leaderId: world.realms[0]!.id,
+    })
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('diplomacy')
   })
 })

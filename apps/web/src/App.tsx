@@ -13,6 +13,7 @@ import {
   type Stock,
 } from '@csp/shared'
 import { AdminPanel } from './AdminPanel.js'
+import { AlliancePanel } from './Alliance.js'
 import { api } from './api.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
@@ -195,7 +196,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onPair={pair}
             />
           )}
-          {world && <RealmLog events={world.events} />}
+          {world && (
+            <AlliancePanel
+              diplomacy={world.diplomacy}
+              realmId={world.home.realmId}
+              sendOrder={sendOrder}
+            />
+          )}
+          {world && <RealmLog events={world.events} realmId={world.home.realmId} />}
           <section className="editor-panel">
             <h2>Resident script</h2>
             <ScriptEditor onChange={(src) => setDiagnostics(checkScript(src))} />
