@@ -13,6 +13,7 @@ import {
   START_HORSES,
   START_STABLE_FOOD,
   isInsideWalls,
+  type Carriage,
   type Horse,
   type TerrainMap,
 } from '@csp/shared'
@@ -175,6 +176,12 @@ describe('world saves', () => {
       { ...world.horses[0]!, x: city.x + 2, y: city.y + city.size - 2 },
       { ...world.horses[1]!, id: 'stray', realmId: null, x: 3, y: 3 },
     ].map(strip) as Horse[]
+    // Its carriage stood inside the walls with no horse, as carriages had none yet.
+    v11.carriages = v11.carriages.map(({ horseId: _horseId, ...k }) => ({
+      ...k,
+      x: city.x + 3,
+      y: city.y + city.size - 2,
+    })) as Carriage[]
     const before = structuredClone(v11)
 
     const v12 = migrateWorld(structuredClone(v11), 11, { terrain: land }, migrations, 12)
@@ -192,7 +199,40 @@ describe('world saves', () => {
     // New ids come from the world's counter, and the rest of the world is as it was.
     expect(v12.nextId).toBe(before.nextId + 2)
     expect(v12.residents).toEqual(before.residents)
-    expect(checkInvariants(v12, land)).toEqual([])
+    expect(checkInvariants(migrateWorld(v12, 12, { terrain: land }), land)).toEqual([])
+  })
+
+  it('moves carriages from inside the walls to the stable and hitches a horse (migration 12 → 13)', () => {
+    // A format-12 world: the city's carriage inside its walls with no horse, a second one of
+    // the realm there too, and a carriage of nobody out on the map.
+    const { world, terrain: land } = worldWithCity()
+    const city = world.cities[0]!
+    const stable = world.buildings.find((b) => b.kind === 'stable')!
+    const inside = { x: city.x + 3, y: city.y + city.size - 2 }
+    const v12 = structuredClone(world) as unknown as Record<string, unknown> & typeof world
+    const own = world.carriages[0]!
+    v12.carriages = [
+      { ...own, ...inside },
+      { ...own, id: 'second', ...inside },
+      { ...own, id: 'stray', realmId: null, x: 3, y: 3 },
+    ].map(({ horseId: _horseId, ...k }) => k) as Carriage[]
+    const before = structuredClone(v12)
+
+    const v13 = migrateWorld(structuredClone(v12), 12, { terrain: land }, migrations, 13)
+    const [first, second, stray] = v13.carriages
+    // Both of the city's carriages move to the stable, each with its own horse of the realm.
+    expect(first).toMatchObject({ x: stable.x, y: stable.y })
+    expect(second).toMatchObject({ x: stable.x, y: stable.y })
+    expect(first!.horseId).not.toBeNull()
+    expect(second!.horseId).not.toBeNull()
+    expect(first!.horseId).not.toBe(second!.horseId)
+    for (const k of [first!, second!]) {
+      expect(v13.horses.find((h) => h.id === k.horseId)?.realmId).toBe(city.realmId)
+    }
+    // The stray stays where it is, with no horse; the rest of the world is as it was.
+    expect(stray).toEqual({ ...before.carriages[2], horseId: null })
+    expect(v13.horses).toEqual(before.horses)
+    expect(checkInvariants(v13, land)).toEqual([])
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

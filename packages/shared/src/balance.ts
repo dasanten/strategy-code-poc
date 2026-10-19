@@ -324,6 +324,60 @@ export function walkSpeed(resident: Resident, terrain: number, tick: number): nu
 }
 
 /**
+ * Most weight a carriage carries, in kg (`CONTEXT.md`: Carriage): about thirteen residents of
+ * average Strength, so one carriage moves what a whole starting city could carry.
+ */
+export const CARRIAGE_CAPACITY = 400
+
+/**
+ * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
+ * Plains (`CONTEXT.md`: Carriage): twice as fast on Plains, a little slower than walking in Forest
+ * and Hills. Mountains are missing: a carriage cannot enter them. Roads, once there are any, go
+ * here at about 2.6.
+ */
+export const CARRIAGE_SPEED = {
+  [Terrain.Plains]: 2,
+  [Terrain.Forest]: 0.6,
+  [Terrain.Hills]: 0.6,
+} as const satisfies Partial<Record<Terrain, number>>
+
+/** How much faster a carriage goes for each point of its driver's Driving skill. */
+export const DRIVING_SKILL_EFFECT = 0.02
+
+/** The furthest Driving skill speeds a carriage up, as a share of its speed. */
+export const DRIVING_SKILL_LIMIT = 0.5
+
+/** Driving skill a driver of average Intellect gains per game day of driving. */
+export const DRIVING_SKILL_PER_DAY = 1
+
+/** Whether a carriage can enter a tile of the given terrain: passable land, but no mountains. */
+export function carriageCanEnter(terrain: number): boolean {
+  return ((CARRIAGE_SPEED as Partial<Record<number, number>>)[terrain] ?? 0) > 0
+}
+
+/**
+ * How many tiles per tick a carriage driven by `driver` goes onto a tile of the given terrain
+ * (`CONTEXT.md`: Carriage): the terrain's `CARRIAGE_SPEED`, up to `DRIVING_SKILL_LIMIT` faster
+ * with Driving skill. The horse sets the pace, so the driver's Agility does not count. Zero for
+ * terrain a carriage cannot enter.
+ */
+export function driveSpeed(driver: Resident, terrain: number): number {
+  const base = (CARRIAGE_SPEED as Partial<Record<number, number>>)[terrain] ?? 0
+  const skilled =
+    1 + Math.min(DRIVING_SKILL_LIMIT, (driver.skills.driving ?? 0) * DRIVING_SKILL_EFFECT)
+  return (base * skilled) / WALK_TICKS_PER_TILE
+}
+
+/**
+ * Driving skill a driver learns from one tick of driving (`CONTEXT.md`: Skill, learned by doing),
+ * faster with more Intellect.
+ */
+export function drivingLearned(resident: Resident, tick: number): number {
+  const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
+  return (DRIVING_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
+}
+
+/**
  * Share of the Food in one place (a storage, a resident's or carriage's load, a pile) that goes
  * bad each game day (`CONTEXT.md`: Spoilage). About a third of a stock is lost over a game year.
  */

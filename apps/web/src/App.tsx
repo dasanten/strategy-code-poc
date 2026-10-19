@@ -38,16 +38,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const { world, status, sendOrder } = useWorld(onLoggedOut)
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([])
   const [selectedId, setSelectedId] = useState<string | undefined>()
-  const [picking, setPicking] = useState(false)
+  const [picking, setPicking] = useState<false | 'walk' | 'drive'>(false)
   const [orderError, setOrderError] = useState<string | undefined>()
   const own = world ? world.residents.filter((r) => r.owner === world.home.realmId) : []
   const selected = own.find((r) => r.id === selectedId)
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
 
-  /** Orders the picked resident to walk to a tile (ADR 0002: the server checks it). */
-  async function walkTo(x: number, y: number) {
+  /**
+   * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
+   * carriage on their tile there (ADR 0002: the server checks it).
+   */
+  async function goTo(x: number, y: number) {
+    const driving = picking === 'drive'
     setPicking(false)
     if (!selected) return
+    const carriage = onTile(world?.carriages)
+    if (driving && carriage) {
+      const order = { kind: 'drive', residentId: selected.id, carriageId: carriage.id, x, y }
+      setOrderError(await sendOrder(order))
+      return
+    }
     setOrderError(await sendOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
   }
 
@@ -119,8 +129,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   setPicking(false)
                   setOrderError(undefined)
                 }}
-                picking={picking}
-                onPickTile={walkTo}
+                picking={picking !== false}
+                onPickTile={goTo}
                 onNodesLoaded={onNodesLoaded}
               />
             ) : (
@@ -145,7 +155,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               cityName={homeCity?.name}
               tick={world.tick}
               picking={picking}
-              onWalkTo={() => setPicking((p) => !p)}
+              onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
+              carriage={onTile(world.carriages)}
+              onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
               orderError={orderError}
               pile={onTile(world.piles)}
               storage={onTile(

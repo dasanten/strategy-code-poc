@@ -239,13 +239,22 @@ The shared language of the game. Domain terms only — no implementation details
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
   mountains.
+- **Driving:** a grown-up resident on a carriage's tile drives it to another tile; the driver,
+  the carriage and its horse move together. Driving teaches the Driving skill, and a more
+  skilled driver goes faster. Players drive only their own carriages, with their own horses.
+- **Hitched horse:** the one horse that pulls a carriage. A horse of the carriage's realm standing
+  with it is hitched when the carriage is first driven, and stays hitched (for now). A carriage
+  whose horse dies stands where it is until another horse is hitched.
+- **Loading a carriage:** residents on a carriage's tile put goods on it and take goods off it
+  like at a storage, up to what the carriage holds.
 
 ## Starting city
 
 - **Starting city:** what a Leader spawns with, far from other Players: about 8 residents with
   random stats (one of them the Leader), a wooden wall, houses for everyone with a little room
   to spare, a storage with a small food stock, one farm outside the wall, a stable next to it
-  with two horses and a little Food, and one carriage. The residents start on the farm, working
+  with two horses and a little Food, and one carriage standing at the stable with one of the
+  horses hitched to it. The residents start on the farm, working
   it, each with a little food on them.
 
 ## Control
