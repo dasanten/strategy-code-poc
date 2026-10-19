@@ -44,6 +44,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { refillStock } from './survival.js'
+import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
 
 /**
@@ -732,6 +733,27 @@ export const npcCityResidentsUnowned: Invariant = {
 }
 
 /**
+ * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
+ * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
+ * checks and resolves like anyone's.
+ */
+export const npcOrdersAllowed: Invariant = {
+  name: 'npc-orders-allowed',
+  check(world) {
+    return world.residents
+      .filter(
+        (r) =>
+          r.order !== null && runByNpcCity(world, r) && !NPC_ORDER_KINDS.includes(r.order.kind),
+      )
+      .map((r) => ({
+        invariant: this.name,
+        message: `NPC resident ${r.id} holds a ${r.order!.kind} order`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
+/**
  * After a tick, pairs hold together (`CONTEXT.md`: Pairing): a resident's partner pairs back
  * with the same `since`, which is not after now; both are adults of the same city. Broken pairs
  * end in `requestBirths`.
@@ -902,6 +924,7 @@ export const worldInvariants: Invariant[] = [
   realmLogsInOrder,
   residentsInCities,
   npcCityResidentsUnowned,
+  npcOrdersAllowed,
   pairsHoldTogether,
   childrenDontWork,
   carriagesInPlace,

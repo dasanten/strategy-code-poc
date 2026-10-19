@@ -172,12 +172,17 @@ export function storedFood(world: WorldState, city: City): number {
     .reduce((food, b) => food + (b.stock?.food ?? 0), 0)
 }
 
-/** Food all of a city's residents eat in `FOOD_SURPLUS_DAYS` game days, by their Endurance. */
-export function surplusFoodLine(world: WorldState, city: City): number {
+/** Food all of a city's residents eat in `days` game days, by their Endurance. */
+export function cityFoodUse(world: WorldState, city: City, days: number): number {
   return cityResidents(world, city).reduce(
-    (food, r) => food + FOOD_PER_DAY * hungerFactor(r, world.tick) * FOOD_SURPLUS_DAYS,
+    (food, r) => food + FOOD_PER_DAY * hungerFactor(r, world.tick) * days,
     0,
   )
+}
+
+/** Food all of a city's residents eat in `FOOD_SURPLUS_DAYS` game days, by their Endurance. */
+export function surplusFoodLine(world: WorldState, city: City): number {
+  return cityFoodUse(world, city, FOOD_SURPLUS_DAYS)
 }
 
 /**
