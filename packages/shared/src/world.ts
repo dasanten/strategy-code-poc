@@ -6,8 +6,6 @@ export const TICK_MS = 1000
 export const TICKS_PER_GAME_DAY = 3600
 /** One game year is one real day. */
 export const TICKS_PER_GAME_YEAR = 24 * TICKS_PER_GAME_DAY
-/** Children are grown after about this many game years (`CONTEXT.md`: Aging). */
-export const ADULT_AGE = 14
 
 /** A resident's stats (`CONTEXT.md`: Stats). */
 export const STAT_NAMES = ['strength', 'endurance', 'agility', 'intellect'] as const
@@ -149,11 +147,6 @@ export function ageInYears(resident: Resident, tick: number): number {
   return (tick - resident.bornAt) / TICKS_PER_GAME_YEAR
 }
 
-/** Whether a resident is grown up, so they can work, build or take any job (`CONTEXT.md`: Child). */
-export function canWork(resident: Resident, tick: number): boolean {
-  return ageInYears(resident, tick) >= ADULT_AGE
-}
-
 /**
  * Everything in the world that changes, saved as snapshots (ADR 0006). Terrain is not part of
  * it: it is generated once from `seed` and stored on its own.
@@ -194,6 +187,8 @@ export type RealmEventWhat =
   | { kind: 'foodSpoiled'; units: number }
   /** A pair had a child (`CONTEXT.md`: Pairing, Child); `parents` are their names. */
   | { kind: 'born'; residentId: string; name: string; parents: [string, string] }
+  /** A child reached `ADULT_AGE` and can now work (`CONTEXT.md`: Child, Aging). */
+  | { kind: 'grownUp'; residentId: string; name: string }
   /** One of the realm's horses starved to death (`CONTEXT.md`: Horse). */
   | { kind: 'horseDied'; horseId: string }
   /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
