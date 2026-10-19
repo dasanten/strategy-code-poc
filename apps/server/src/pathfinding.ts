@@ -5,7 +5,10 @@ import {
   tileIndex,
   wrap,
   wrapDelta,
+  mayStep,
+  strandedOnWall,
   type TerrainMap,
+  type WallMap,
 } from '@csp/shared'
 
 /**
@@ -40,13 +43,25 @@ export type PathResult =
   | { status: 'found'; path: Point[]; cost: number }
   | { status: 'unreachable' }
 
-interface Request {
+/** Who is going, for the walls and gates on the way (`mayStep`), and where to stop. */
+export interface PathOptions {
+  /** The realm of the one going: they may pass their own gates and stand on their own walls. */
+  realmId?: string | null
+  /** On foot, so they may go onto their own walls; a carriage never does. */
+  onWalls?: boolean
+  /** Stop on any tile in contact with the goal (`inContact`) rather than on it: to attack. */
+  near?: boolean
+}
+
+interface Request extends PathOptions {
   id: string
   from: Point
   to: Point
   costs: TerrainCosts
   /** The cheapest a step can cost, for the heuristic; set when the search starts. */
   cheapest?: number
+  /** Whether the search starts stuck on a wall (`strandedOnWall`); set when it starts. */
+  stranded?: boolean
 }
 
 /**
@@ -54,7 +69,8 @@ interface Request {
  * waiting requests until its time budget for this tick runs out and carries on next tick, so a
  * path across the whole map never stalls the tick. Moves go to the four neighbouring tiles,
  * across the map's joins too. Tiles with a finished road (`setRoads`) cost a road's step, so
- * paths prefer roads (`CONTEXT.md`: Road).
+ * paths prefer roads (`CONTEXT.md`: Road). Walls and gates (`setWalls`) block the way as
+ * `mayStep` says, for the realm a request names (`CONTEXT.md`: Walls in combat).
  * The search state is scratch memory, not world state; requests lost on a restart are simply
  * asked for again.
  */
@@ -68,6 +84,7 @@ export class PathFinder {
   /** 1 on tiles with a finished road. */
   private readonly road: Uint8Array
   private roadList: number[] = []
+  private walls: WallMap | undefined
   private search = 0
   private heap = new MinHeap()
 
@@ -94,15 +111,26 @@ export class PathFinder {
     for (const t of this.roadList) this.road[t] = 1
   }
 
+  /** The walls and gates on the map (`wallMap`); searches use them from the next step they take. */
+  setWalls(walls: WallMap | undefined): void {
+    this.walls = walls
+  }
+
   /** What is underfoot on tile index `t`: a road, or the terrain. */
   private ground(t: number): number {
     return this.road[t] ? Terrain.Road : this.terrain.tiles[t]!
   }
 
   /** Asks for a path from one tile to another; replaces an earlier request with the same id. */
-  request(id: string, from: Point, to: Point, costs: TerrainCosts = WALKING_COSTS): void {
+  request(
+    id: string,
+    from: Point,
+    to: Point,
+    costs: TerrainCosts = WALKING_COSTS,
+    options: PathOptions = {},
+  ): void {
     this.cancel(id)
-    this.queue.push({ id, from, to, costs })
+    this.queue.push({ ...options, id, from, to, costs })
     this.results.set(id, { status: 'searching' })
   }
 
@@ -143,9 +171,14 @@ export class PathFinder {
   }
 
   /** Searches to the end in one go, for tests and short paths. */
-  findPath(from: Point, to: Point, costs: TerrainCosts = WALKING_COSTS): PathResult {
+  findPath(
+    from: Point,
+    to: Point,
+    costs: TerrainCosts = WALKING_COSTS,
+    options: PathOptions = {},
+  ): PathResult {
     const id = '\0now'
-    this.request(id, from, to, costs)
+    this.request(id, from, to, costs, options)
     while (this.results.get(id)?.status === 'searching') this.advance(Infinity)
     return this.result(id)!
   }
@@ -154,10 +187,32 @@ export class PathFinder {
     return costs[this.ground(tileIndex(this.terrain.size, x, y))]! < Infinity
   }
 
-  /** Steps along both directions to the goal, the short way round the map. */
+  /**
+   * Steps along both directions to the goal, the short way round the map; for a `near` request,
+   * to the nearest tile in contact with it.
+   */
   private stepsTo(req: Request, x: number, y: number): number {
     const { size } = this.terrain
-    return Math.abs(wrapDelta(x, req.to[0], size)) + Math.abs(wrapDelta(y, req.to[1], size))
+    const dx = Math.abs(wrapDelta(x, req.to[0], size))
+    const dy = Math.abs(wrapDelta(y, req.to[1], size))
+    return req.near ? Math.max(0, dx - 1) + Math.max(0, dy - 1) : dx + dy
+  }
+
+  /** Whether the search may stop on (x, y): the goal, or for a `near` request beside it. */
+  private reached(req: Request, x: number, y: number): boolean {
+    if (!req.near) return x === req.to[0] && y === req.to[1]
+    const { size } = this.terrain
+    return (
+      Math.abs(wrapDelta(x, req.to[0], size)) <= 1 && Math.abs(wrapDelta(y, req.to[1], size)) <= 1
+    )
+  }
+
+  /** Whether the request may step from tile index `t` to the next tile `nt`, walls and gates aside. */
+  private mayStep(req: Request, t: number, nt: number): boolean {
+    if (!this.walls) return true
+    const start = tileIndex(this.terrain.size, req.from[0], req.from[1])
+    const stranded = !!req.stranded && t === start
+    return mayStep(this.walls, req.realmId ?? null, t, nt, !!req.onWalls, stranded)
   }
 
   /** Begins a search; settles requests that need no search at all. */
@@ -167,11 +222,11 @@ export class PathFinder {
     req.to = [wrap(req.to[0], size), wrap(req.to[1], size)]
     const [fx, fy] = req.from
     const [tx, ty] = req.to
-    if (!this.passable(req.costs, fx, fy) || !this.passable(req.costs, tx, ty)) {
+    if (!this.passable(req.costs, fx, fy) || (!req.near && !this.passable(req.costs, tx, ty))) {
       this.results.set(req.id, { status: 'unreachable' })
       return false
     }
-    if (fx === tx && fy === ty) {
+    if (this.reached(req, fx, fy)) {
       this.results.set(req.id, { status: 'found', path: [], cost: 0 })
       return false
     }
@@ -181,6 +236,7 @@ export class PathFinder {
     this.stamp[s] = this.search
     this.g[s] = 0
     this.cameFrom[s] = -1
+    req.stranded = !!this.walls && strandedOnWall(this.walls, req.realmId ?? null, s)
     // A road is the cheapest ground, but only counts while there are any: the heuristic stays as
     // sharp as it can, so searches stay short.
     const costs = Object.entries(req.costs)
@@ -197,7 +253,6 @@ export class PathFinder {
     const req = this.current!
     const { costs } = req
     const d = this.terrain.size
-    const goal = req.to[1] * d + req.to[0]
     // The cheapest possible cost to the goal: every step on the cheapest ground.
     const cheapest = req.cheapest!
     for (let i = 0; i < count; i++) {
@@ -205,9 +260,9 @@ export class PathFinder {
       if (t === undefined) return { status: 'unreachable' }
       if (this.closed[t] === this.search) continue
       this.closed[t] = this.search
-      if (t === goal) return { status: 'found', path: this.pathTo(t), cost: this.g[t]! }
       const x = t % d
       const y = (t - x) / d
+      if (this.reached(req, x, y)) return { status: 'found', path: this.pathTo(t), cost: this.g[t]! }
       for (let k = 0; k < 4; k++) {
         // Past a side of the map, the step continues on the opposite side.
         const nx = wrap(k === 0 ? x + 1 : k === 1 ? x - 1 : x, d)
@@ -215,6 +270,7 @@ export class PathFinder {
         const nt = ny * d + nx
         const step = costs[this.ground(nt)]!
         if (step === Infinity || this.closed[nt] === this.search) continue
+        if (!this.mayStep(req, t, nt)) continue
         const g = this.g[t]! + step
         if (this.stamp[nt] === this.search && g >= this.g[nt]!) continue
         this.stamp[nt] = this.search

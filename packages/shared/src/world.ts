@@ -468,6 +468,8 @@ export interface Building {
   site?: ConstructionSite
   /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
   teardown?: number
+  /** A gate its city's realm has closed (`CONTEXT.md`: Walls in combat); gates only, open without it. */
+  closed?: true
 }
 
 /**
