@@ -20,6 +20,7 @@ import { stepAging, type AgingResult } from './aging.js'
 import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
+import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -87,6 +88,8 @@ export interface StepResult {
   actions: number
   /** Who starved and which realms ended through it this tick. */
   survival: SurvivalResult
+  /** Blows struck this tick, who was killed and which realms ended through it. */
+  combat: CombatResult
   /** Horses that starved this tick. */
   horsesDied: Horse[]
   /** Who died of old age and which realms ended through it, as the next tick begins. */
@@ -95,7 +98,7 @@ export interface StepResult {
 
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
- * horses, and stables breed foals; food spoils at the end of each game day; then their orders request actions (steps, then taking and
+ * horses, and stables breed foals; food spoils at the end of each game day; then their orders request actions (steps, then blows in fights, then taking and
  * putting down goods, haul routes' included, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
@@ -108,6 +111,8 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepSpoilage(world)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
+  const strikes = requestStrikes(world, terrain.size)
+  const combat = resolveStrikes(world, strikes, terrain.size)
   const carries = [...requestCarrying(world), ...requestHauling(world)]
   resolveCarrying(world, carries)
   const builds = requestBuilding(world)
@@ -123,6 +128,12 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepAlliances(world)
   stepRefill(world, terrain.size)
   const actions =
-    steps.length + carries.length + builds.length + teardowns.length + work.length + births.length
-  return { actions, survival, horsesDied, aging }
+    steps.length +
+    strikes.length +
+    carries.length +
+    builds.length +
+    teardowns.length +
+    work.length +
+    births.length
+  return { actions, survival, combat, horsesDied, aging }
 }

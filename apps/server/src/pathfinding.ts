@@ -1,13 +1,17 @@
 import {
   CARRIAGE_SPEED,
   TERRAIN_SPEED,
+  Terrain,
   tileIndex,
   wrap,
   wrapDelta,
   type TerrainMap,
 } from '@csp/shared'
 
-/** What crossing one tile of each terrain costs, in plains-tiles; Infinity can't be entered. */
+/**
+ * What crossing one tile of each terrain costs, in plains-tiles; Infinity can't be entered. A tile
+ * with a road costs `Terrain.Road`'s, whatever the terrain beneath.
+ */
 export type TerrainCosts = Readonly<Record<number, number>>
 
 /** Costs for someone on foot: the inverse of each terrain's speed. Lake and Sea are impassable. */
@@ -41,13 +45,16 @@ interface Request {
   from: Point
   to: Point
   costs: TerrainCosts
+  /** The cheapest a step can cost, for the heuristic; set when the search starts. */
+  cheapest?: number
 }
 
 /**
  * Finds paths across the map with A*, a little at a time (T4.1): `advance` works through the
  * waiting requests until its time budget for this tick runs out and carries on next tick, so a
  * path across the whole map never stalls the tick. Moves go to the four neighbouring tiles,
- * across the map's joins too.
+ * across the map's joins too. Tiles with a finished road (`setRoads`) cost a road's step, so
+ * paths prefer roads (`CONTEXT.md`: Road).
  * The search state is scratch memory, not world state; requests lost on a restart are simply
  * asked for again.
  */
@@ -58,6 +65,9 @@ export class PathFinder {
   /** Which search last touched a tile, so the arrays never need clearing. */
   private readonly stamp: Uint32Array
   private readonly closed: Uint32Array
+  /** 1 on tiles with a finished road. */
+  private readonly road: Uint8Array
+  private roadList: number[] = []
   private search = 0
   private heap = new MinHeap()
 
@@ -71,6 +81,22 @@ export class PathFinder {
     this.cameFrom = new Int32Array(this.n)
     this.stamp = new Uint32Array(this.n)
     this.closed = new Uint32Array(this.n)
+    this.road = new Uint8Array(this.n)
+  }
+
+  /**
+   * The tiles with a finished road, as tile indices (`roadTiles`). Searches use them from the
+   * next step they take; one under way keeps its heuristic.
+   */
+  setRoads(roads: Iterable<number>): void {
+    for (const t of this.roadList) this.road[t] = 0
+    this.roadList = [...roads]
+    for (const t of this.roadList) this.road[t] = 1
+  }
+
+  /** What is underfoot on tile index `t`: a road, or the terrain. */
+  private ground(t: number): number {
+    return this.road[t] ? Terrain.Road : this.terrain.tiles[t]!
   }
 
   /** Asks for a path from one tile to another; replaces an earlier request with the same id. */
@@ -125,7 +151,7 @@ export class PathFinder {
   }
 
   private passable(costs: TerrainCosts, x: number, y: number): boolean {
-    return costs[this.terrain.tiles[tileIndex(this.terrain.size, x, y)]!]! < Infinity
+    return costs[this.ground(tileIndex(this.terrain.size, x, y))]! < Infinity
   }
 
   /** Steps along both directions to the goal, the short way round the map. */
@@ -155,14 +181,15 @@ export class PathFinder {
     this.stamp[s] = this.search
     this.g[s] = 0
     this.cameFrom[s] = -1
-    this.heap.push(s, this.heuristic(req, fx, fy))
+    // A road is the cheapest ground, but only counts while there are any: the heuristic stays as
+    // sharp as it can, so searches stay short.
+    const costs = Object.entries(req.costs)
+      .filter(([t]) => Number(t) !== Terrain.Road || this.roadList.length > 0)
+      .map(([, c]) => c)
+    req.cheapest = Math.min(...costs)
+    this.heap.push(s, this.stepsTo(req, fx, fy) * req.cheapest)
     this.current = req
     return true
-  }
-
-  /** The cheapest possible cost to the goal: every step on the cheapest terrain. */
-  private heuristic(req: Request, x: number, y: number): number {
-    return this.stepsTo(req, x, y) * Math.min(...Object.values(req.costs))
   }
 
   /** Expands up to `count` tiles of the current search; returns its result once it ends. */
@@ -170,9 +197,9 @@ export class PathFinder {
     const req = this.current!
     const { costs } = req
     const d = this.terrain.size
-    const tiles = this.terrain.tiles
     const goal = req.to[1] * d + req.to[0]
-    const cheapest = Math.min(...Object.values(costs))
+    // The cheapest possible cost to the goal: every step on the cheapest ground.
+    const cheapest = req.cheapest!
     for (let i = 0; i < count; i++) {
       const t = this.heap.pop()
       if (t === undefined) return { status: 'unreachable' }
@@ -186,7 +213,7 @@ export class PathFinder {
         const nx = wrap(k === 0 ? x + 1 : k === 1 ? x - 1 : x, d)
         const ny = wrap(k === 2 ? y + 1 : k === 3 ? y - 1 : y, d)
         const nt = ny * d + nx
-        const step = costs[tiles[nt]!]!
+        const step = costs[this.ground(nt)]!
         if (step === Infinity || this.closed[nt] === this.search) continue
         const g = this.g[t]! + step
         if (this.stamp[nt] === this.search && g >= this.g[nt]!) continue

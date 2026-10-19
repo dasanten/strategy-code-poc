@@ -106,6 +106,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'pair', residentId: selected.id, partnerId }))
   }
+  /** Orders the picked resident to attack a resident of another realm. */
+  async function attack(targetId: string) {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'attack', residentId: selected.id, targetId }))
+  }
   const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
   const onNodesLoaded = useCallback(
     (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
@@ -113,6 +118,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   )
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
     selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
+  // A road may share its tile with a building (`CONTEXT.md`: Road).
+  const buildingHere = onTile(world?.buildings.filter((b) => b.kind !== 'road'))
+  const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -188,18 +196,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               storage={onTile(
                 world.buildings.filter((b) => KEEPS_GOODS.includes(b.kind) && !b.site),
               )}
-              building={onTile(world.buildings)}
+              building={buildingHere}
+              road={roadHere}
               node={selected && nodeAt?.(selected.x, selected.y)}
               onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
               onDrop={(spot, goods) => carry('drop', spot, goods)}
               onBuild={build}
-              workers={workersHere(world.residents, onTile(world.buildings))}
-              holders={heldBy(world.residents, onTile(world.buildings))}
+              workers={workersHere(world.residents, buildingHere)}
+              holders={heldBy(world.residents, buildingHere)}
               realmId={world.home.realmId}
               onWork={work}
               onTearDown={tearDown}
               residents={own}
               onPair={pair}
+              others={world.residents.filter((r) => r.owner !== world.home.realmId)}
+              mapSize={world.map.size}
+              onAttack={attack}
             />
           )}
           {world && (

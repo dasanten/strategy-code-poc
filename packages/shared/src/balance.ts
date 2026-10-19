@@ -61,6 +61,8 @@ export const TERRAIN_SPEED = {
   [Terrain.Forest]: 0.7,
   [Terrain.Hills]: 0.7,
   [Terrain.Mountain]: 0.35,
+  /** A road, whatever the terrain beneath (`CONTEXT.md`: Road). */
+  [Terrain.Road]: 1.3,
 } as const satisfies Partial<Record<Terrain, number>>
 
 /** A resident's base stats are drawn from this range when no parents pass theirs on. */
@@ -346,6 +348,8 @@ export const TERRAIN_FOOD = {
   [Terrain.Forest]: 1,
   [Terrain.Hills]: 1.3,
   [Terrain.Mountain]: 2,
+  /** On a road residents eat as on Plains, whatever the terrain beneath. */
+  [Terrain.Road]: 1,
 } as const satisfies Partial<Record<Terrain, number>>
 
 /** How much of a terrain's extra food use each point of Endurance above average takes away. */
@@ -396,7 +400,7 @@ export const AGILITY_LIMIT = 0.3
 /**
  * How many tiles per tick a resident walks onto a tile of the given terrain (`CONTEXT.md`:
  * Terrain, Stats): plains speed from Agility at the given tick, and the terrain's slowdown softened by Agility.
- * Zero for terrain nobody can enter.
+ * A road's speed-up comes on top, as it is. Zero for terrain nobody can enter.
  */
 export function walkSpeed(resident: Resident, terrain: number, tick: number): number {
   const base = (TERRAIN_SPEED as Partial<Record<number, number>>)[terrain]
@@ -404,8 +408,9 @@ export function walkSpeed(resident: Resident, terrain: number, tick: number): nu
   const away = statValue(resident, 'agility', tick) - AGILITY_AVERAGE
   const clamp = (v: number) => Math.max(-AGILITY_LIMIT, Math.min(AGILITY_LIMIT, v))
   const pace = 1 + clamp(away * AGILITY_SPEED_EFFECT)
-  const slowdown = (1 - base) * (1 - clamp(away * AGILITY_TERRAIN_EFFECT))
-  return (pace * (1 - slowdown)) / WALK_TICKS_PER_TILE
+  const slowdown = Math.max(0, 1 - base) * (1 - clamp(away * AGILITY_TERRAIN_EFFECT))
+  const speedUp = Math.max(0, base - 1)
+  return (pace * (1 - slowdown + speedUp)) / WALK_TICKS_PER_TILE
 }
 
 /**
@@ -424,13 +429,14 @@ export const HAUL_KEEP_FOOD = 2 * HORSE_FOOD_PER_DAY
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
  * Plains (`CONTEXT.md`: Carriage): twice as fast on Plains, a little slower than walking in Forest
- * and Hills. Mountains are missing: a carriage cannot enter them. Roads, once there are any, go
- * here at about 2.6.
+ * and Hills, and faster still on a road. Mountains are missing: a carriage cannot enter them.
  */
 export const CARRIAGE_SPEED = {
   [Terrain.Plains]: 2,
   [Terrain.Forest]: 0.6,
   [Terrain.Hills]: 0.6,
+  /** A road, whatever the terrain beneath (`CONTEXT.md`: Road): 1.3 times Plains, as on foot. */
+  [Terrain.Road]: 2.6,
 } as const satisfies Partial<Record<Terrain, number>>
 
 /** How much faster a carriage goes for each point of its driver's Driving skill. */
@@ -498,13 +504,15 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   townHall: { wood: 60, stone: 40 },
   wall: { wood: 10 },
   gate: { wood: 15 },
+  /** A tile of road (`CONTEXT.md`: Road): a little Stone, so a quarry pays for a long road. */
+  road: { stone: 5 },
 }
 
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
  * a mint 5, a smithy 5, a town hall 6. A stretch of wooden wall takes a quarter of a game
- * day, a gate half of one. More or stronger workers finish it sooner (`buildWork`).
+ * day, a gate half of one, a tile of road a quarter. More or stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -517,6 +525,7 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   townHall: 6 * TICKS_PER_GAME_DAY,
   wall: TICKS_PER_GAME_DAY / 4,
   gate: TICKS_PER_GAME_DAY / 2,
+  road: TICKS_PER_GAME_DAY / 4,
 }
 
 /** The Strength at which a resident puts in one unit of building work per tick. */
@@ -715,6 +724,97 @@ export const TERRITORY_REACH_PER_ROOT = 2
 
 /** The farthest any one city or workplace projects control, in tiles. */
 export const TERRITORY_MAX_REACH = 24
+
+/**
+ * Ticks between two blows of a resident in a fight (`CONTEXT.md`: Combat): a blow every two
+ * seconds, so a fight between two unarmed residents lasts about a minute.
+ */
+export const STRIKE_TICKS = 2
+
+/** Damage a blow does before Strength, weapon and Combat skill: a little even from the weakest. */
+export const BLOW_BASE = 1
+
+/** Damage each point of Strength adds to a blow: an average resident's fist does 4. */
+export const BLOW_PER_STRENGTH = 0.3
+
+/** How much harder each point of Combat skill makes a blow, as a share of it. */
+export const COMBAT_SKILL_EFFECT = 0.05
+
+/** The furthest Combat skill raises a blow, as a share of it: at most twice as hard. */
+export const COMBAT_SKILL_LIMIT = 1
+
+/** The least damage a blow that lands does, however well the one hit is protected. */
+export const MIN_BLOW_DAMAGE = 1
+
+/** Chance of dodging a blow for each point of Agility: an average resident dodges one in five. */
+export const DODGE_PER_AGILITY = 0.02
+
+/** However agile a resident is, they dodge at most this share of blows. */
+export const DODGE_LIMIT = 0.5
+
+/**
+ * Combat skill a resident of average Intellect learns from each blow they strike or that is
+ * struck at them (`CONTEXT.md`: Combat, fighting teaches Combat): a point every 50 blows.
+ */
+export const COMBAT_SKILL_PER_BLOW = 0.02
+
+/** The weapon a resident fights with: the best one they carry, if any (`CONTEXT.md`: Weapons and armour). */
+export function bestWeapon(resident: Resident): Weapon | undefined {
+  const carried = (Object.keys(WEAPON_ATTACK) as Weapon[]).filter(
+    (w) => (resident.carried[w] ?? 0) > 0,
+  )
+  return carried.sort((a, b) => WEAPON_ATTACK[b] - WEAPON_ATTACK[a])[0]
+}
+
+/** Whether a resident is armed: carries a weapon (`CONTEXT.md`: Soldier). */
+export function isArmed(resident: Resident): boolean {
+  return bestWeapon(resident) !== undefined
+}
+
+/**
+ * Damage a resident's protection takes off each blow (`CONTEXT.md`: Weapons and armour): a shield
+ * and armour, if they carry them, one of each counting.
+ */
+export function protection(resident: Resident): number {
+  return (Object.keys(PROTECTION_DEFENCE) as Protection[])
+    .filter((p) => (resident.carried[p] ?? 0) > 0)
+    .reduce((sum, p) => sum + PROTECTION_DEFENCE[p], 0)
+}
+
+/**
+ * How hard a resident strikes at the given tick (`CONTEXT.md`: Combat): from Strength and the
+ * best weapon they carry, harder with Combat skill.
+ */
+export function attackPower(resident: Resident, tick: number): number {
+  const weapon = bestWeapon(resident)
+  const raw =
+    BLOW_BASE +
+    BLOW_PER_STRENGTH * statValue(resident, 'strength', tick) +
+    (weapon ? WEAPON_ATTACK[weapon] : 0)
+  const skill = Math.min(COMBAT_SKILL_LIMIT, (resident.skills.combat ?? 0) * COMBAT_SKILL_EFFECT)
+  return raw * (1 + skill)
+}
+
+/**
+ * Damage a blow from `attacker` does to `defender` when it lands, at the given tick: the
+ * attacker's `attackPower` less the defender's `protection`, but at least `MIN_BLOW_DAMAGE`.
+ */
+export function blowDamage(attacker: Resident, defender: Resident, tick: number): number {
+  return Math.max(MIN_BLOW_DAMAGE, attackPower(attacker, tick) - protection(defender))
+}
+
+/** Chance a resident dodges a blow at the given tick, from their Agility (`CONTEXT.md`: Combat). */
+export function dodgeChance(resident: Resident, tick: number): number {
+  return Math.min(DODGE_LIMIT, statValue(resident, 'agility', tick) * DODGE_PER_AGILITY)
+}
+
+/**
+ * Combat skill a resident learns from one blow they strike or that is struck at them, faster with
+ * more Intellect (`CONTEXT.md`: Skill, learned by doing).
+ */
+export function combatLearned(resident: Resident, tick: number): number {
+  return COMBAT_SKILL_PER_BLOW * (statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE)
+}
 
 /**
  * How many interpreter steps one resident's or army's script may use each tick (`CONTEXT.md`:

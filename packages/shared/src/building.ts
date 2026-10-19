@@ -17,13 +17,14 @@ import {
   type Stock,
   type WorldState,
 } from './world.js'
-import { Terrain, terrainAt, type TerrainMap } from './terrain.js'
+import { Terrain, isPassableTerrain, terrainAt, tileIndex, type TerrainMap } from './terrain.js'
 
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
 
 /**
  * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters,
- * mints and smithies, and town halls, walls and gates (`CONTEXT.md`: Town hall, Wall / Gate).
+ * mints and smithies, town halls, walls and gates (`CONTEXT.md`: Town hall, Wall / Gate), and
+ * roads (`CONTEXT.md`: Road).
  */
 export const BUILDABLE: readonly BuildingKind[] = [
   'lumberCamp',
@@ -36,6 +37,7 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'townHall',
   'wall',
   'gate',
+  'road',
 ]
 
 /** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
@@ -70,9 +72,39 @@ export const OFF_NODES: readonly BuildingKind[] = [...PROCESSING, 'townHall', 'w
 /** Kinds of building that keep goods in a storage of their own: storages, and stables' Food. */
 export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'stable']
 
-/** The building or construction site on a tile, if there is one (one per tile). */
+/**
+ * The building or construction site on a tile, if there is one (one per tile). A road is not one
+ * of them: it may share the tile with a building (`roadAt`).
+ */
 export function buildingAt(world: WorldState, x: number, y: number): Building | undefined {
-  return world.buildings.find((b) => b.x === x && b.y === y)
+  return world.buildings.find((b) => b.x === x && b.y === y && b.kind !== 'road')
+}
+
+/** The road or road construction site on a tile, if there is one (`CONTEXT.md`: Road). */
+export function roadAt(world: WorldState, x: number, y: number): Building | undefined {
+  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'road')
+}
+
+/** What of `kind` stands on a tile, finished or not: its road for a road, else its building. */
+export function constructionAt(
+  world: WorldState,
+  x: number,
+  y: number,
+  kind: BuildingKind,
+): Building | undefined {
+  return kind === 'road' ? roadAt(world, x, y) : buildingAt(world, x, y)
+}
+
+/**
+ * The tiles with a finished road, as tile indices on a map `size` across, for `groundAt`. Road
+ * construction sites don't count: nobody moves faster on them yet.
+ */
+export function roadTiles(world: Pick<WorldState, 'buildings'>, size: number): Set<number> {
+  const out = new Set<number>()
+  for (const b of world.buildings) {
+    if (b.kind === 'road' && !b.site) out.add(tileIndex(size, b.x, b.y))
+  }
+  return out
 }
 
 /** Materials a construction site still needs before it can become the building. */
@@ -97,7 +129,9 @@ export function workNeeded(site: Building): number {
  * Why a building of this kind can't be laid out on the tile (`CONTEXT.md`: Where buildings go),
  * or undefined if it can: workplaces go on a resource node of their kind, stables on Plains off
  * any node, smelters, mints, smithies, town halls, walls and gates off any node and off Mountain,
- * one building per tile. Without `terrain` the Plains and Mountain rules are not checked.
+ * one building per tile. A road goes on any passable land but Mountain, node or not, and next to
+ * a building on its tile, but one road per tile (`CONTEXT.md`: Road). Without `terrain` the
+ * terrain rules are not checked.
  */
 export function buildProblem(
   world: WorldState,
@@ -107,6 +141,13 @@ export function buildProblem(
   terrain?: TerrainMap,
 ): string | undefined {
   if (!BUILDABLE.includes(kind)) return `a ${kind} can't be built yet`
+  if (kind === 'road') {
+    const t = terrain && terrainAt(terrain, x, y)
+    if (t !== undefined && (!isPassableTerrain(t) || t === Terrain.Mountain))
+      return 'a road goes on passable land, not on Mountain'
+    if (roadAt(world, x, y)) return 'there is already a road on this tile'
+    return undefined
+  }
   const node = world.nodes.find((n) => n.x === x && n.y === y)
   if (kind === 'stable') {
     if (node || (terrain && terrainAt(terrain, x, y) !== Terrain.Plains))

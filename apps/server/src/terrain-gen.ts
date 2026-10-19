@@ -272,7 +272,8 @@ export interface TerrainProblem {
 export function checkTerrain(map: TerrainMap): TerrainProblem[] {
   const { size, tiles } = map
   const problems: TerrainProblem[] = []
-  const known = new Set<number>(Object.values(Terrain))
+  // A road is never stored in the map (`groundAt`).
+  const known = new Set<number>(Object.values(Terrain).filter((t) => t !== Terrain.Road))
   for (let t = 0; t < tiles.length; t++) {
     const at = `(${t % size}, ${Math.floor(t / size)})`
     if (!known.has(tiles[t]!)) {

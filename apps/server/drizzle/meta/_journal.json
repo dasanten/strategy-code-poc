@@ -36,6 +36,13 @@
       "when": 1792323837393,
       "tag": "0004_explored",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792433642918,
+      "tag": "0005_script_library",
+      "breakpoints": true
     }
   ]
 }

@@ -27,6 +27,7 @@ const BUILDING_NAMES: Record<BuildingKind, string> = {
   smelter: 'smelter',
   mint: 'mint',
   smithy: 'smithy',
+  road: 'road',
 }
 
 /** "3 houses", "1 storage". */

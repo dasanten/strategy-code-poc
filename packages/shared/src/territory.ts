@@ -5,11 +5,12 @@ import {
   TERRITORY_PER_RESIDENT,
   TERRITORY_REACH_PER_ROOT,
   TERRITORY_WORKPLACE_BASE,
+  isArmed,
 } from './balance.js'
 import { MAX_WORKERS, workersOf } from './building.js'
 import { inCityArea, isCityBuilding } from './city.js'
 import { wrap, wrapDelta } from './terrain.js'
-import { isArmed, type City, type WorldState } from './world.js'
+import type { City, WorldState } from './world.js'
 
 /** World queries about territory (ADR 0002: the game API orders and scripts share). */
 

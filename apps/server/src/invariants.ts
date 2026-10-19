@@ -135,7 +135,8 @@ export const realmsHaveLeaders: Invariant = {
 }
 
 /**
- * Buildings and construction sites: one per tile; farms and stables on Plains, mines, quarries
+ * Buildings and construction sites: one per tile, and next to it at most one road or road site,
+ * on passable land off Mountain and of no city (`CONTEXT.md`: Road); farms and stables on Plains, mines, quarries
  * and lumber camps on a resource node of their kind and of no city; smelters, mints, town halls,
  * walls and gates off nodes and off Mountain, smelters and mints of no city; a stable, farm,
  * house or storage of no city or of one that exists; no stock below zero.
@@ -150,9 +151,15 @@ export const buildingsInPlace: Invariant = {
     const tiles = new Set<string>()
     for (const b of world.buildings) {
       const key = `${b.x},${b.y}`
-      if (tiles.has(key)) fail(b.id, `shares tile (${key}) with another building`)
-      tiles.add(key)
-      if (OFF_NODES.includes(b.kind)) {
+      const layer = b.kind === 'road' ? `road ${key}` : key
+      if (tiles.has(layer))
+        fail(b.id, `shares tile (${key}) with another ${b.kind === 'road' ? 'road' : 'building'}`)
+      tiles.add(layer)
+      if (b.kind === 'road') {
+        if (terrainAt(terrain, b.x, b.y) === Terrain.Mountain) fail(b.id, 'is a road on Mountain')
+        if (b.cityId !== null) fail(b.id, `is a road of city ${b.cityId}`)
+        if (b.stock) fail(b.id, 'is a road with a stock')
+      } else if (OFF_NODES.includes(b.kind)) {
         if (world.nodes.some((n) => n.x === b.x && n.y === b.y))
           fail(b.id, `is a ${b.kind} on a resource node`)
         if (terrainAt(terrain, b.x, b.y) === Terrain.Mountain)
@@ -829,6 +836,53 @@ export const childrenDontWork: Invariant = {
 }
 
 /**
+ * Dead residents leave their goods as loot (`CONTEXT.md`: Loot): a resident with no health left
+ * is gone from the world by the end of the tick, killed, starved or not, so nobody keeps holding
+ * goods once dead. Dying (`die`) is the only way out, and it drops all they carried in the pile
+ * on their tile.
+ */
+export const deadLeaveLoot: Invariant = {
+  name: 'dead-leave-loot',
+  check(world) {
+    return world.residents
+      .filter((r) => !(r.health > 0))
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} has no health left but is still in the world, holding ${JSON.stringify(r.carried)}`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
+/**
+ * Attack orders are sound (`CONTEXT.md`: Combat): nobody attacks themselves, and a blow is
+ * always between 0 and 1 of the way to being struck.
+ */
+export const attackOrdersSound: Invariant = {
+  name: 'attack-orders-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'attack') continue
+      const problem =
+        o.targetId === r.id
+          ? 'attacks themselves'
+          : !(o.strike >= 0 && o.strike < 1)
+            ? `is ${o.strike} of the way to a blow`
+            : undefined
+      if (problem)
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${problem}`,
+          entityIds: [r.id],
+        })
+    }
+    return out
+  },
+}
+
+/**
  * Alliances hold together (`CONTEXT.md`: Alliance, Alliance leader): each has a name and at
  * least one member, in the order they joined; its members and invited realms exist; a realm is in
  * at most one alliance, and only a realm in none is invited; the alliance leader is a member; a
@@ -907,6 +961,8 @@ export const worldInvariants: Invariant[] = [
   haulRoutesSound,
   alliancesSound,
   territorySound,
+  deadLeaveLoot,
+  attackOrdersSound,
 ]
 
 export function checkInvariants(
