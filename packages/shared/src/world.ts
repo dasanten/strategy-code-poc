@@ -155,8 +155,8 @@ export interface DriveOrder {
 /**
  * A haul route (`CONTEXT.md`: Haul route): the resident drives the carriage `carriageId` between
  * two stops again and again. At `from` they load `goods` onto it, as much as there is and fits;
- * at `to` they unload them. At both stops they top up the Food on board to `keepFood` units, for
- * the horse, and that much Food stays on. Loading and unloading go through their hands, one take
+ * at `to` they unload them, and the other way round for `returnGoods`. At both stops they top up
+ * the Food on board to `keepFood` units, for the horse, and that much Food stays on. Loading and unloading go through their hands, one take
  * or put a tick, like a pick-up or drop order. Driving works as for a drive order.
  */
 export interface HaulOrder {
@@ -168,6 +168,8 @@ export interface HaulOrder {
   to: { x: number; y: number }
   /** The goods hauled from `from` to `to`; at least one. */
   goods: Good[]
+  /** The goods hauled back from `to` to `from`; none of `goods`, and maybe none at all. */
+  returnGoods: Good[]
   /** Units of Food kept on board for the horse. */
   keepFood: number
   /** The stop the carriage stands at or is driving to. */

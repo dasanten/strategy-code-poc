@@ -9,7 +9,9 @@ import {
   STARVE_DAYS,
   TICKS_PER_GAME_DAY,
   foodUse,
+  carriagesAt,
   isInsideWalls,
+  pileAt,
   unitsThatFit,
   type Building,
   terrainAt,
@@ -133,20 +135,39 @@ export function homeStorage(world: WorldState, r: Resident): Building | undefine
 }
 
 /**
- * Refilling at home (`CONTEXT.md`: Eating): a resident inside their own city's walls who carries
- * fewer than `HOME_FOOD_LOW` units of food takes meals (`MEAL_UNITS` each) from their city's
- * storage into their hands, without an order, until they no longer run low, the storage has
- * none left, or no more fits. Residents away from home get nothing. They still eat only what
- * they carry.
+ * Where a resident running low on food takes a meal from, if anywhere (`CONTEXT.md`: Refilling):
+ * at home, their city's storage; working at a workplace, the Food in the pile on its tile, else on
+ * a carriage standing there. Elsewhere nowhere.
  */
-export function stepHomeRefill(world: WorldState): void {
+export function refillStock(world: WorldState, r: Resident): Stock | undefined {
+  const home = homeStorage(world, r)
+  if (home) return home.stock
+  const o = r.order
+  if (o?.kind !== 'workAt' || r.x !== o.at.x || r.y !== o.at.y) return undefined
+  const place = world.buildings.find((b) => b.id === o.buildingId)
+  if (!place || place.site || place.x !== r.x || place.y !== r.y) return undefined
+  const pile = pileAt(world, r.x, r.y)
+  if ((pile?.goods.food ?? 0) > 0) return pile!.goods
+  return carriagesAt(world, r.x, r.y).find((k) => (k.load.food ?? 0) > 0)?.load
+}
+
+/**
+ * Refilling (`CONTEXT.md`: Refilling at home, Refilling at a workplace): a resident who carries
+ * fewer than `HOME_FOOD_LOW` units of food takes meals (`MEAL_UNITS` each) into their hands from
+ * their `refillStock`, without an order, until they no longer run low, there is none left, or no
+ * more fits. Residents anywhere else get nothing. They still eat only what they carry.
+ */
+export function stepRefill(world: WorldState): void {
+  let fromPile = false
   for (const r of world.residents) {
     while ((r.carried.food ?? 0) < HOME_FOOD_LOW) {
-      const stock = homeStorage(world, r)?.stock
+      const stock = refillStock(world, r)
       const units = Math.min(MEAL_UNITS, stock?.food ?? 0, unitsThatFit(r, 'food', world.tick))
       if (!stock || units <= 0) break
       take(stock, 'food', units)
       r.carried.food = (r.carried.food ?? 0) + units
+      fromPile ||= world.piles.some((p) => p.goods === stock)
     }
   }
+  if (fromPile) world.piles = world.piles.filter((p) => Object.values(p.goods).some((n) => n > 0))
 }

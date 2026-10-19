@@ -1,4 +1,5 @@
 import {
+  HOME_FOOD_LOW,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_MAX_WORKERS,
   WORK_SKILL_EFFECT,
@@ -8,8 +9,8 @@ import {
   Terrain,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
-  carryCapacity,
   holdersOf,
+  pileAt,
   workOutput,
   type BuildingKind,
   type Resident,
@@ -18,7 +19,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { checkInvariants, workOrdersOnWorkplaces } from './invariants.js'
+import { checkInvariants, refilledWhenLow, workOrdersOnWorkplaces } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
@@ -154,14 +155,16 @@ describe('work-at order', () => {
 })
 
 describe('farm work', () => {
-  it(`makes about ${FARM_FOOD_PER_DAY} food a game day into the worker’s hands, and teaches Farming`, () => {
+  it(`makes about ${FARM_FOOD_PER_DAY} food a game day onto the farm’s pile, and teaches Farming`, () => {
     const { world, r, queue } = setup()
+    r.carried = { food: HOME_FOOD_LOW }
     order(world, queue)
     // Just short of a game day, so none of it spoils yet; the skill learned adds a little.
     run(world, TICKS_PER_GAME_DAY - 2)
     const o = r.order!
-    expect(o.kind === 'workAt' && o.progress + r.carried.food!).toBeCloseTo(FARM_FOOD_PER_DAY, 0)
-    expect(world.piles).toEqual([])
+    const piled = pileAt(world, 3, 3)?.goods.food ?? 0
+    expect(o.kind === 'workAt' && o.progress + piled).toBeCloseTo(FARM_FOOD_PER_DAY, 0)
+    expect(r.carried).toEqual({ food: HOME_FOOD_LOW })
     expect(r.skills.farming).toBeCloseTo(1, 1)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
@@ -177,26 +180,34 @@ describe('farm work', () => {
     expect(farmOutput(r, 0)).toBeCloseTo(base * (1 + 10 * WORK_SKILL_EFFECT))
   })
 
-  it('hands each unit to the worker carrying the least food', () => {
+  it('lets a worker running low take meals from the farm’s pile, and nobody else', () => {
     const { world, r, queue } = setup()
     const other = resident(world, 'w2', 3, 3)
+    const idle = resident(world, 'idle', 3, 3)
     r.carried = { food: 5 }
     order(world, queue)
     order(world, queue, 'w2')
-    run(world, 1700)
-    // Two workers make 2 units in that time; the one who had none gets both.
+    run(world, 3000)
+    // Two workers make 4 units in that time: the one who had none takes meals from the pile
+    // until no longer low, the rest stays there; a resident who doesn't work there gets none.
     expect(r.carried.food).toBe(5)
-    expect(other.carried.food).toBe(2)
+    expect(other.carried.food).toBe(HOME_FOOD_LOW)
+    expect(idle.carried.food ?? 0).toBe(0)
+    expect(pileAt(world, 3, 3)?.goods.food).toBe(4 - HOME_FOOD_LOW)
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('leaves what the workers can’t carry in a pile on the farm’s tile', () => {
+  it('catches a worker who runs low while their farm’s pile has Food', () => {
     const { world, r, queue } = setup()
-    r.carried = { stone: carryCapacity(r, 0) - 1 }
     order(world, queue)
-    run(world, 3000) // 2 units, short of a game day so none spoils
-    expect(r.carried).toEqual({ stone: carryCapacity(r, 0) - 1, food: 1 })
-    expect(world.piles).toEqual([expect.objectContaining({ x: 3, y: 3, goods: { food: 1 } })])
-    expect(checkInvariants(world, terrain)).toEqual([])
+    r.carried = {}
+    world.piles.push({ id: 'p', x: 3, y: 3, goods: { food: 4 } })
+    expect(refilledWhenLow.check(world, terrain)).toEqual([
+      expect.objectContaining({ entityIds: ['w1'] }),
+    ])
+    run(world)
+    expect(r.carried.food).toBe(HOME_FOOD_LOW)
+    expect(refilledWhenLow.check(world, terrain)).toEqual([])
   })
 
   it('catches a worker who is not on their farm, or a farm with too many workers', () => {
@@ -237,13 +248,15 @@ describe('workplaces on nodes', () => {
     ['mine', 'ironOre', 7, 'ironOre', 'mining'],
     ['mine', 'goldOre', 7, 'goldOre', 'mining'],
   ] as const)(
-    'a %s on %s makes %s into the worker’s hands and teaches %s',
+    'a %s on %s makes %s onto the pile on its tile and teaches %s',
     (kind, node, x, good, skill) => {
       const { world, r } = onNode(kind, node, x)
       run(world, TICKS_PER_GAME_DAY - 2)
       const o = r.order!
       expect(o).toMatchObject({ kind: 'workAt', buildingId: kind })
-      const made = (o.kind === 'workAt' ? o.progress : 0) + (r.carried[good] ?? 0)
+      expect(r.carried[good] ?? 0).toBe(0)
+      const piled = pileAt(world, x, 1)?.goods[good] ?? 0
+      const made = (o.kind === 'workAt' ? o.progress : 0) + piled
       expect(made).toBeCloseTo(WORK_OUTPUT_PER_DAY[good]!, 0)
       expect(r.skills[skill]).toBeCloseTo(1, 1)
       expect(r.skills.farming ?? 0).toBe(0)
@@ -282,12 +295,16 @@ describe('workplaces on nodes', () => {
     },
   )
 
-  it('leaves what the workers can’t carry in a pile on the workplace’s tile', () => {
-    const { world, r } = onNode('lumberCamp', 'forest', 3)
-    r.carried = { food: carryCapacity(r, 0) }
-    run(world, TICKS_PER_GAME_DAY / 2)
-    expect(r.carried.wood ?? 0).toBe(0)
-    expect(world.piles).toEqual([expect.objectContaining({ x: 3, y: 1, goods: { wood: 2 } })])
+  it('lets a worker running low take meals from a carriage standing there, after the pile', () => {
+    const { world, r } = onNode('mine', 'ironOre', 7)
+    r.carried = {}
+    world.carriages.push({ id: 'k1', realmId: null, x: 7, y: 1, horseId: null, load: { food: 5 } })
+    world.piles.push({ id: 'p', x: 7, y: 1, goods: { food: 1 } })
+    run(world)
+    // The pile's one meal first, then the carriage's.
+    expect(r.carried.food).toBe(HOME_FOOD_LOW)
+    expect(pileAt(world, 7, 1)).toBeUndefined()
+    expect(world.carriages[0]!.load.food).toBe(5 - (HOME_FOOD_LOW - 1))
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
@@ -343,7 +360,9 @@ describe('holding a workplace', () => {
     expect(order(world, new OrderQueue(), 's1', stranger)).toEqual({ type: 'ack', requestId: 'q' })
     run(world, TICKS_PER_GAME_DAY / 2)
     expect(holdersOf(world, mine)).toEqual(['r2'])
-    expect(s.carried.ironOre ?? 0).toBeGreaterThan(0)
+    // The ore lies on the mine's tile, where r2's worker stands guard over it.
+    expect(pileAt(world, 7, 1)?.goods.ironOre ?? 0).toBeGreaterThan(0)
+    expect([s.x, s.y]).toEqual([7, 1])
     expect(r.carried.ironOre ?? 0).toBe(0)
     expect(checkInvariants(world, terrain)).toEqual([])
   })

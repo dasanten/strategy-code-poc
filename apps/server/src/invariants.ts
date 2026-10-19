@@ -39,7 +39,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
-import { homeStorage } from './survival.js'
+import { refillStock } from './survival.js'
 import { isWalkable } from './world.js'
 
 /**
@@ -552,22 +552,23 @@ export const workOrdersOnWorkplaces: Invariant = {
 }
 
 /**
- * After a tick, nobody at home runs low on food while their city's storage still has some and a
- * meal would fit (`stepHomeRefill`, `CONTEXT.md`: Eating).
+ * After a tick, nobody at home or at their workplace runs low on food while the storage, pile or
+ * carriage they refill from still has some and a meal would fit (`stepRefill`, `CONTEXT.md`:
+ * Refilling at home, Refilling at a workplace).
  */
-export const refilledAtHome: Invariant = {
-  name: 'refilled-at-home',
+export const refilledWhenLow: Invariant = {
+  name: 'refilled-when-low',
   check(world) {
     return world.residents
       .filter(
         (r) =>
           (r.carried.food ?? 0) < HOME_FOOD_LOW &&
-          homeStorage(world, r) !== undefined &&
+          (refillStock(world, r)?.food ?? 0) > 0 &&
           unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
       )
       .map((r) => ({
         invariant: this.name,
-        message: `resident ${r.id} is at home with ${r.carried.food ?? 0} food, storage has more`,
+        message: `resident ${r.id} runs low with ${r.carried.food ?? 0} food where there is more`,
         entityIds: [r.id],
       }))
   },
@@ -640,8 +641,9 @@ export const driversOnCarriages: Invariant = {
 
 /**
  * Haul routes stay sound (`CONTEXT.md`: Haul route): two different stops a carriage can reach,
- * at least one good, the Food kept for the horse fits on the carriage, and a hauler loading or
- * unloading stands at the stop they are at, holding goods for the route only while loading.
+ * at least one good and none hauled both ways, the Food kept for the horse fits on the carriage,
+ * and a hauler loading or unloading stands at the stop they are at, holding goods for the route
+ * only while loading.
  */
 export const haulRoutesSound: Invariant = {
   name: 'haul-routes-sound',
@@ -664,6 +666,8 @@ export const haulRoutesSound: Invariant = {
         }
       }
       if (o.goods.length === 0) fail('hauls no goods')
+      const both = o.returnGoods.filter((g) => o.goods.includes(g))
+      if (both.length > 0) fail(`hauls ${both.join(', ')} both ways`)
       if (o.keepFood < 0 || o.keepFood * GOOD_WEIGHT.food > CARRIAGE_CAPACITY) {
         fail(`keeps ${o.keepFood} Food for the horse`)
       }
@@ -760,7 +764,7 @@ export const worldInvariants: Invariant[] = [
   sitesWithinNeeds,
   buildOrdersOnSites,
   workOrdersOnWorkplaces,
-  refilledAtHome,
+  refilledWhenLow,
   teardownsWithinNeeds,
   tearDownOrdersOnBuildings,
   nodesOnFittingTerrain,

@@ -7,7 +7,6 @@ import {
   canWork,
   hasInput,
   pileAt,
-  unitsThatFit,
   workLearned,
   workOutput,
   workProblem,
@@ -76,11 +75,10 @@ export function requestWork(world: WorldState): WorkAction[] {
  * Resolves work actions (ADR 0002), one after another (`CONTEXT.md`: Workplace). A resident who
  * has left the tile, whose workplace is gone or not finished, or who would be one worker too many
  * stops. Otherwise their work adds to their share of the next unit of the workplace's good (from
- * Strength and the workplace's skill) and teaches that skill. Each whole unit goes to the
- * workplace's worker carrying the least of that good who still has room for it; when nobody has,
- * it is left in the pile on the workplace's tile. At a smelter or mint (`CONTEXT.md`: Smelter) the
- * work goes into the next batch of its recipe, and only while the input for it is there (`inputAt`);
- * a finished batch uses that input up and hands out its output the same way.
+ * Strength and the workplace's skill) and teaches that skill. Each whole unit goes on the pile on
+ * the workplace's tile. At a smelter or mint (`CONTEXT.md`: Smelter) the work goes into the next
+ * batch of its recipe, and only while the input for it is there (`inputAt`); a finished batch uses
+ * that input up and leaves its output on the pile the same way.
  */
 export function resolveWork(world: WorldState, actions: WorkAction[]): void {
   const workers = new Map<string, number>()
@@ -146,11 +144,7 @@ function useUp(world: WorldState, place: Building, input: Stock): void {
   world.piles = world.piles.filter((p) => Object.values(p.goods).some((n) => n > 0))
 }
 
-/** One unit of a workplace's good: into the hands of a worker with room, else on the ground. */
+/** One unit of a workplace's good, left on the pile on its tile (`CONTEXT.md`: Workplace). */
 function produce(world: WorldState, place: Building, good: Good): void {
-  const taker = workersOf(world, place)
-    .filter((w) => unitsThatFit(w, good, world.tick) >= 1)
-    .sort((a, b) => (a.carried[good] ?? 0) - (b.carried[good] ?? 0))[0]
-  if (taker) taker.carried[good] = (taker.carried[good] ?? 0) + 1
-  else dropGoods(world, place.x, place.y, { [good]: 1 })
+  dropGoods(world, place.x, place.y, { [good]: 1 })
 }
