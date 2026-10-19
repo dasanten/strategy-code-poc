@@ -15,7 +15,8 @@ import {
   unitsThatFit,
   type Building,
   type DeathCause,
-  terrainAt,
+  groundAt,
+  roadTiles,
   type Good,
   type Realm,
   type Resident,
@@ -39,7 +40,7 @@ export interface SurvivalResult {
 
 /**
  * One tick of survival (`CONTEXT.md`: Hunger, Eating, Leader death): the hunger meter runs down
- * (faster on hard terrain, slower with high Endurance); a resident eats a unit of food when there
+ * (faster on hard terrain, slower with high Endurance; on a road as on Plains); a resident eats a unit of food when there
  * is room for it, only from what they carry, also at home. An empty meter costs health; a
  * meter with anything in it slowly gives health back. A resident with no health left dies and
  * drops what they carried in a pile. When a Leader dies, their realm ends. A meter running
@@ -50,10 +51,12 @@ export function stepSurvival(world: WorldState, terrain: TerrainMap): SurvivalRe
   const starve = MAX_HEALTH / (STARVE_DAYS * TICKS_PER_GAME_DAY)
   const heal = MAX_HEALTH / (HEAL_DAYS * TICKS_PER_GAME_DAY)
   const died: Resident[] = []
+  const roads = roadTiles(world, terrain.size)
 
   for (const r of world.residents) {
     const wasFed = r.hunger > 0
-    r.hunger = Math.max(0, r.hunger - drain * foodUse(r, terrainAt(terrain, r.x, r.y), world.tick))
+    const ground = groundAt(terrain, roads, r.x, r.y)
+    r.hunger = Math.max(0, r.hunger - drain * foodUse(r, ground, world.tick))
     if (r.hunger <= MAX_HUNGER - FILL_PER_FOOD && (r.carried.food ?? 0) >= 1) {
       take(r.carried, 'food', 1)
       r.hunger = Math.min(MAX_HUNGER, r.hunger + FILL_PER_FOOD)

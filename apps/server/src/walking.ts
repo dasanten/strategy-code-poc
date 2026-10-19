@@ -3,9 +3,10 @@ import {
   carriageCanEnter,
   driveSpeed,
   drivingLearned,
+  groundAt,
   horseFor,
   isPassableTerrain,
-  terrainAt,
+  roadTiles,
   walkSpeed,
   wrapDelta,
   type AttackOrder,
@@ -144,9 +145,12 @@ export class Walking {
 
   /**
    * Requests this tick's steps for every walking resident and every driver. A driver goes at
-   * their carriage's speed and learns Driving while they drive.
+   * their carriage's speed and learns Driving while they drive. On a finished road both go at
+   * road speed, whatever the terrain beneath (`CONTEXT.md`: Road), and paths prefer roads.
    */
   requestSteps(world: WorldState, budgetMs = PATH_BUDGET_MS): StepAction[] {
+    const roads = roadTiles(world, this.terrain.size)
+    this.finder.setRoads(roads)
     this.plan(world, budgetMs)
     const steps: StepAction[] = []
     for (const r of world.residents) {
@@ -158,7 +162,7 @@ export class Walking {
         arrive(r, o)
         continue
       }
-      const ground = terrainAt(this.terrain, next[0], next[1])
+      const ground = groundAt(this.terrain, roads, next[0], next[1])
       if (!onFoot(o)) {
         o.progress += driveSpeed(r, ground)
         r.skills.driving = (r.skills.driving ?? 0) + drivingLearned(r, world.tick)
@@ -212,13 +216,14 @@ export class Walking {
    */
   resolve(world: WorldState, steps: StepAction[]): number {
     let taken = 0
+    const roads = roadTiles(world, this.terrain.size)
     for (const step of steps) {
       const r = world.residents.find((x) => x.id === step.residentId)
       if (!r) continue
       const size = this.terrain.size
       const near =
         Math.abs(wrapDelta(r.x, step.to.x, size)) + Math.abs(wrapDelta(r.y, step.to.y, size)) === 1
-      const ground = terrainAt(this.terrain, step.to.x, step.to.y)
+      const ground = groundAt(this.terrain, roads, step.to.x, step.to.y)
       if (!near || !isPassableTerrain(ground)) {
         r.order = null
         continue

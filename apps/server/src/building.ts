@@ -4,8 +4,8 @@ import {
   MAP_SIZE,
   buildProblem,
   buildWork,
-  buildingAt,
   canWork,
+  constructionAt,
   constructionLearned,
   materialsNeeded,
   workNeeded,
@@ -47,7 +47,7 @@ export const build: OrderKind = {
     if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t build'
     if (!BUILDABLE.includes(o.building as BuildingKind)) return 'that can’t be built'
-    const here = buildingAt(world, r.x, r.y)
+    const here = constructionAt(world, r.x, r.y, o.building!)
     if (here?.site && here.kind === o.building) return undefined
     return buildProblem(world, r.x, r.y, o.building!, terrain)
   },
@@ -94,7 +94,7 @@ export function resolveBuilding(
       continue
     }
     if (a.kind === 'layOut') {
-      const here = buildingAt(world, r.x, r.y)
+      const here = constructionAt(world, r.x, r.y, o.building)
       if (here?.site && here.kind === o.building) o.siteId = here.id
       else if (buildProblem(world, r.x, r.y, o.building, terrain)) r.order = null
       else {

@@ -19,9 +19,17 @@ export function storageAt(world: WorldState, x: number, y: number): Building | u
   )
 }
 
-/** The construction site on a tile, if there is one. */
-export function siteAt(world: WorldState, x: number, y: number): Building | undefined {
-  return world.buildings.find((b) => b.site && b.x === x && b.y === y)
+/**
+ * The construction site `siteId` if it is on the tile. A tile can hold two sites: a building's
+ * and a road's (`CONTEXT.md`: Road).
+ */
+export function siteAt(
+  world: WorldState,
+  x: number,
+  y: number,
+  siteId: string,
+): Building | undefined {
+  return world.buildings.find((b) => b.id === siteId && b.site && b.x === x && b.y === y)
 }
 
 /**
@@ -41,8 +49,7 @@ export function goodsAtSpot(
     return carriage?.x === x && carriage.y === y ? carriage.load : undefined
   }
   if (spot.kind === 'site') {
-    const site = siteAt(world, x, y)
-    return site?.id === spot.siteId ? site.site!.delivered : undefined
+    return siteAt(world, x, y, spot.siteId)?.site!.delivered
   }
   const storage = storageAt(world, x, y)
   if (!storage || storage.id !== spot.storageId) return undefined
