@@ -96,7 +96,7 @@ function runCity(world: WorldState, city: City, people: Resident[], size: number
       } else walkTo(r, place)
       continue
     }
-    const home = storage ?? world.buildings.find((b) => b.id === city.townHallId)
+    const home = npcHome(world, city)
     if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
   }
 }
@@ -172,6 +172,15 @@ function haul(r: Resident): Stock | undefined {
   return Object.keys(load).length > 0 ? load : undefined
 }
 
-function walkTo(r: Resident, to: { x: number; y: number }): void {
+/** Gives a resident an order to walk to a tile. */
+export function walkTo(r: Resident, to: { x: number; y: number }): void {
   r.order = { kind: 'walkTo', target: { x: to.x, y: to.y }, path: null, progress: 0 }
+}
+
+/** Where an NPC city's residents go home to: its finished storage, else its town hall. */
+export function npcHome(world: WorldState, city: City): Building | undefined {
+  return (
+    world.buildings.find((b) => b.cityId === city.id && b.kind === 'storage' && !b.site) ??
+    world.buildings.find((b) => b.id === city.townHallId)
+  )
 }

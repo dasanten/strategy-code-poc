@@ -222,7 +222,7 @@ describe('alliances', () => {
     order(tobin, { kind: 'leaveAlliance' })
     const maraRealm = realm(mara)
     const tobinRealm = realm(tobin)
-    dieAll(world, [leaderOf(mara), leaderOf(tobin)], 'starved')
+    dieAll(world, [leaderOf(mara), leaderOf(tobin)], 'starved', cityTerrain().size)
     expect(members(world, id)).toEqual([realm(wren)])
     expect(world.alliances[0]!.leaderId).toBe(realm(wren))
     expect(world.alliances[0]!.invites).toEqual([realm(ash)])
@@ -237,7 +237,12 @@ describe('alliances', () => {
     order(mara, { kind: 'foundAlliance', name: 'North' })
     order(mara, { kind: 'inviteToAlliance', realmId: realm(tobin) })
     const tobinRealm = world.realms.find((x) => x.id === realm(tobin))!
-    dieAll(world, [world.residents.find((r) => r.id === tobinRealm.leaderId)!], 'oldAge')
+    dieAll(
+      world,
+      [world.residents.find((r) => r.id === tobinRealm.leaderId)!],
+      'oldAge',
+      cityTerrain().size,
+    )
     expect(world.alliances[0]!.invites).toEqual([])
     expect(checkInvariants(world, cityTerrain())).toEqual([])
   })

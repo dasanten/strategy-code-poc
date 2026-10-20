@@ -785,6 +785,40 @@ export const npcCityResidentsUnowned: Invariant = {
 }
 
 /**
+ * Everything belongs to a realm that exists, an NPC city that exists, or nobody (`CONTEXT.md`:
+ * Leader death, Self-managed city): once a Leader has died, nothing belongs to their ended realm.
+ * A horse or carriage of an NPC city belongs to no realm.
+ */
+export const ownersExist: Invariant = {
+  name: 'owners-exist',
+  check(world) {
+    const realms = new Set(world.realms.map((r) => r.id))
+    const npc = new Set(world.cities.filter((c) => c.realmId === null).map((c) => c.id))
+    const out: InvariantViolation[] = []
+    const problem = (id: string, message: string) =>
+      out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
+    for (const r of world.residents) {
+      if (r.owner !== null && !realms.has(r.owner))
+        problem(r.id, `belongs to ended realm ${r.owner}`)
+    }
+    for (const c of world.cities) {
+      if (c.realmId !== null && !realms.has(c.realmId)) {
+        problem(c.id, `belongs to ended realm ${c.realmId}`)
+      }
+    }
+    for (const k of [...world.horses, ...world.carriages]) {
+      if (k.realmId !== null && !realms.has(k.realmId)) {
+        problem(k.id, `belongs to ended realm ${k.realmId}`)
+      }
+      if (k.cityId !== null && (k.realmId !== null || !npc.has(k.cityId))) {
+        problem(k.id, `belongs to ${k.cityId}, which is no NPC city it can belong to`)
+      }
+    }
+    return out
+  },
+}
+
+/**
  * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
  * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
  * checks and resolves like anyone's.
@@ -976,6 +1010,7 @@ export const worldInvariants: Invariant[] = [
   realmLogsInOrder,
   residentsInCities,
   npcCityResidentsUnowned,
+  ownersExist,
   npcOrdersAllowed,
   pairsHoldTogether,
   childrenDontWork,

@@ -32,7 +32,7 @@ export type SkillName =
 export interface Resident {
   id: string
   name: string
-  /** The realm the resident belongs to; null when it belongs to nobody (after Leader death). */
+  /** The realm the resident belongs to; null for one of an NPC city (`cityId`) or of nobody. */
   owner: string | null
   /** The city the resident lives in (`CONTEXT.md`: City, House); null for one of no city. */
   cityId: string | null
@@ -419,7 +419,7 @@ export interface AllianceMember {
 export interface City {
   id: string
   name: string
-  /** The realm it belongs to; null when it belongs to nobody (after Leader death). */
+  /** The realm it belongs to; null for an NPC city (`CONTEXT.md`: NPC city). */
   realmId: string | null
   /** The town hall that makes it a city (`CONTEXT.md`: Town hall). */
   townHallId: string
@@ -487,8 +487,13 @@ export interface ConstructionSite {
  */
 export interface Horse {
   id: string
-  /** The realm it belongs to; null when it belongs to nobody (after Leader death). */
+  /** The realm it belongs to; null for one of an NPC city (`cityId`) or of nobody. */
   realmId: string | null
+  /**
+   * The NPC city it belongs to when it belongs to no realm (`CONTEXT.md`: Self-managed city);
+   * null for one of a realm or of nobody.
+   */
+  cityId: string | null
   x: number
   y: number
   /** The hunger meter, as for residents: `MAX_HUNGER` is fully fed, 0 is empty. */
@@ -500,8 +505,13 @@ export interface Horse {
 /** A horse-drawn cart (`CONTEXT.md`: Carriage). */
 export interface Carriage {
   id: string
-  /** The realm it belongs to; null when it belongs to nobody (after Leader death). */
+  /** The realm it belongs to; null for one of an NPC city (`cityId`) or of nobody. */
   realmId: string | null
+  /**
+   * The NPC city it belongs to when it belongs to no realm (`CONTEXT.md`: Self-managed city);
+   * null for one of a realm or of nobody.
+   */
+  cityId: string | null
   x: number
   y: number
   /**

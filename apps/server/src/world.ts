@@ -126,7 +126,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const births = requestBirths(world)
   resolveBirths(world, births)
   world.tick++
-  const aging = stepAging(world)
+  const aging = stepAging(world, terrain.size)
   stepAlliances(world)
   stepRefill(world, terrain.size)
   const actions =

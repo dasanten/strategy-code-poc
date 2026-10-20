@@ -48,7 +48,7 @@ export function horseFood(world: WorldState, horse: Horse, mapSize: number): Sto
 }
 
 /**
- * Two fed horses of one realm at a stable, who can breed a foal there (`CONTEXT.md`: Stable), or
+ * Two fed horses of one realm (or NPC city) at a stable, who can breed a foal there (`CONTEXT.md`: Stable), or
  * undefined when there are none or the stable has no room for another horse.
  */
 export function breedingPair(world: WorldState, stable: Building): [Horse, Horse] | undefined {
@@ -56,7 +56,7 @@ export function breedingPair(world: WorldState, stable: Building): [Horse, Horse
   if (stable.site || stable.kind !== 'stable' || here.length >= STABLE_CAPACITY) return undefined
   const fed = here.filter((h) => h.hunger > 0)
   for (const a of fed) {
-    const b = fed.find((h) => h !== a && h.realmId === a.realmId)
+    const b = fed.find((h) => h !== a && h.realmId === a.realmId && h.cityId === a.cityId)
     if (b) return [a, b]
   }
   return undefined

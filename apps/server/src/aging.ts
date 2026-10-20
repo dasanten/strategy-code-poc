@@ -28,15 +28,15 @@ export interface AgingResult {
  * reaches `ADULT_AGE` has grown up and goes in the Player's realm log; a resident who has reached
  * their lifespan dies of old age, dropping what they carried; a Leader's death ends their realm.
  * Stats decline late in life (`statValue`), so a resident whose Strength no longer carries their
- * load puts down what is too much on their tile, Food last.
+ * load puts down what is too much on their tile, Food last. `size` is the map's.
  */
-export function stepAging(world: WorldState): AgingResult {
+export function stepAging(world: WorldState, size: number): AgingResult {
   const grown = world.residents.filter((r) => canWork(r, world.tick) && !canWork(r, world.tick - 1))
   for (const r of grown) {
     recordEvent(world, r.owner, { kind: 'grownUp', residentId: r.id, name: r.name })
   }
   const died = world.residents.filter((r) => ageInYears(r, world.tick) >= r.lifespan)
-  const ended = dieAll(world, died, 'oldAge')
+  const ended = dieAll(world, died, 'oldAge', size)
   for (const r of world.residents) dropExcess(world, r)
   return { died, ended, grown }
 }

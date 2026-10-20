@@ -56,7 +56,7 @@ function setup(food = 0) {
 }
 
 function horse(world: WorldState, id: string, x: number, y: number, realmId: string | null = 'r1') {
-  const h: Horse = { id, realmId, x, y, hunger: MAX_HUNGER, health: MAX_HEALTH }
+  const h: Horse = { id, realmId, cityId: null, x, y, hunger: MAX_HUNGER, health: MAX_HEALTH }
   world.horses.push(h)
   return h
 }

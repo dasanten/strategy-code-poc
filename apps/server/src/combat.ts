@@ -161,7 +161,7 @@ export function resolveStrikes(
     }
     react(world, t, a)
   }
-  const ended = dieAll(world, died, 'killed', killers)
+  const ended = dieAll(world, died, 'killed', size, killers)
   const gone = new Set(died.map((r) => r.id))
   for (const r of world.residents) {
     if (r.order?.kind === 'attack' && gone.has(r.order.targetId)) r.order = null
