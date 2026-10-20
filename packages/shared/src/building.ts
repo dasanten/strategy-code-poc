@@ -17,7 +17,15 @@ import {
   type Stock,
   type WorldState,
 } from './world.js'
-import { Terrain, isPassableTerrain, terrainAt, tileIndex, type TerrainMap } from './terrain.js'
+import {
+  Terrain,
+  isPassableTerrain,
+  terrainAt,
+  tileIndex,
+  wrap,
+  wrapDelta,
+  type TerrainMap,
+} from './terrain.js'
 
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
 
@@ -311,4 +319,30 @@ export function tearDownProblem(
   if (!b || b.x !== x || b.y !== y) return 'that building is not on the resident’s tile'
   if (!BUILDABLE.includes(b.kind)) return `a ${b.kind} can’t be torn down yet`
   return undefined
+}
+
+/**
+ * The tiles of a road along a straight line from `from` to `to`, both ends included, the short
+ * way round on a map `size` across. Each tile is next to the one before, never diagonally, as
+ * residents walk, so the road joins up; each step goes the way that keeps closest to the line.
+ */
+export function roadLine(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  size: number,
+): [number, number][] {
+  const dx = wrapDelta(from.x, to.x, size)
+  const dy = wrapDelta(from.y, to.y, size)
+  const nx = Math.abs(dx)
+  const ny = Math.abs(dy)
+  const out: [number, number][] = [[wrap(from.x, size), wrap(from.y, size)]]
+  let x = 0
+  let y = 0
+  while (x < nx || y < ny) {
+    // Along x when the line crosses the next x half-step before the next y half-step.
+    if (y >= ny || (x < nx && (2 * x + 1) * ny < (2 * y + 1) * nx)) x++
+    else y++
+    out.push([wrap(from.x + Math.sign(dx) * x, size), wrap(from.y + Math.sign(dy) * y, size)])
+  }
+  return out
 }
