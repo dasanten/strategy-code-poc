@@ -1,9 +1,23 @@
 import { allied, alliedRealms } from './alliance.js'
-import { WALL_ENCLOSES_MAX } from './balance.js'
-import { isPassableTerrain, tileIndex, wrap, type TerrainMap } from './terrain.js'
-import type { Building, Resident, WorldState } from './world.js'
+import {
+  BROKEN_MATERIALS_RETURNED,
+  BUILD_MATERIALS,
+  WALL_ENCLOSES_MAX,
+  WALL_STRENGTH,
+} from './balance.js'
+import { isPassableTerrain, tileIndex, wrap, wrapDelta, type TerrainMap } from './terrain.js'
+import type { Building, Good, Resident, Stock, WorldState } from './world.js'
 
 /** World queries about walls and gates (`CONTEXT.md`: Walls in combat; ADR 0002). */
+
+/**
+ * Whose side a resident is on at walls and gates: their realm, or for a resident of an NPC city,
+ * that city, so its residents stand on its walls as a realm's do (`CONTEXT.md`: NPC city).
+ * Null for a resident of nobody.
+ */
+export function wallSide(r: Pick<Resident, 'owner' | 'cityId'>): string | null {
+  return r.owner ?? r.cityId
+}
 
 /** A finished wall or gate on a tile, and whose it is. */
 export interface WallTile {
@@ -11,8 +25,9 @@ export interface WallTile {
   /** The realm of the wall's city; null for nobody's. */
   realmId: string | null
   /**
-   * The realms that may stand on it and pass its gate while closed: its city's realm and the
-   * other members of that realm's alliance (`CONTEXT.md`: Alliance). Empty for nobody's.
+   * The sides (`wallSide`) that may stand on it and pass its gate while closed: its city's realm
+   * and the other members of that realm's alliance (`CONTEXT.md`: Alliance), or for a city of no
+   * realm (an NPC city), the city itself. Empty for nobody's.
    */
   realms: string[]
   /** A gate that is closed. */
@@ -78,7 +93,7 @@ export function wallMap(
     tiles.set(tileIndex(size, b.x, b.y), {
       kind: b.kind as 'wall' | 'gate',
       realmId,
-      realms: side(realmId),
+      realms: realmId === null ? (b.cityId ? [b.cityId] : []) : side(realmId),
       closed: isClosed(b),
     })
   }
@@ -199,4 +214,65 @@ export function onOwnWall(
   )
   const city = wall && world.cities.find((c) => c.id === wall.cityId)
   return !!city && city.realmId !== null && r.owner !== null && allied(world, city.realmId, r.owner)
+}
+
+/** Damage a finished wall or gate takes before it falls (`WALL_STRENGTH`). */
+export function wallStrength(b: Building): number {
+  return WALL_STRENGTH[b.kind === 'gate' ? 'gate' : 'wall']
+}
+
+/** Damage a wall or gate can still take before it falls. */
+export function wallStrengthLeft(b: Building): number {
+  return Math.max(0, wallStrength(b) - (b.damage ?? 0))
+}
+
+/**
+ * Goods left on the tile of a wall or gate that was broken (`CONTEXT.md`: Walls in combat):
+ * `BROKEN_MATERIALS_RETURNED` of its materials, in whole units.
+ */
+export function brokenReturns(b: Building): Stock {
+  const out: Stock = {}
+  for (const [good, units] of Object.entries(BUILD_MATERIALS[b.kind] ?? {}) as [Good, number][]) {
+    const back = Math.floor(units * BROKEN_MATERIALS_RETURNED)
+    if (back > 0) out[good] = back
+  }
+  return out
+}
+
+/**
+ * The finished wall or gate `wallId` that a resident of `realmId` may break or climb: one of
+ * another realm's city, or of none (`CONTEXT.md`: Walls in combat); or why not.
+ */
+export function foreignWall(
+  world: Pick<WorldState, 'buildings' | 'cities' | 'alliances'>,
+  realmId: string | null,
+  wallId: unknown,
+): Building | string {
+  const b = world.buildings.find((x) => x.id === wallId)
+  if (!b || (b.kind !== 'wall' && b.kind !== 'gate')) return 'no such wall or gate'
+  if (b.site) return 'that wall is not finished yet'
+  const city = world.cities.find((c) => c.id === b.cityId)
+  if (city?.realmId != null && city.realmId === realmId) return 'that is one of your own walls'
+  return b
+}
+
+/**
+ * Where a climber at `from` comes down after climbing over the wall or gate at `wall`, on a map of
+ * `size` tiles: the tile beyond it, straight across, when they may stand there (passable land
+ * with no wall or gate); otherwise up on the wall itself, from where they may climb down anywhere
+ * next to it (`strandedOnWall`).
+ */
+export function climbLanding(
+  world: Pick<WorldState, 'buildings'>,
+  terrain: TerrainMap,
+  from: { x: number; y: number },
+  wall: { x: number; y: number },
+): { x: number; y: number } {
+  const { size } = terrain
+  const x = wrap(wall.x + wrapDelta(from.x, wall.x, size), size)
+  const y = wrap(wall.y + wrapDelta(from.y, wall.y, size), size)
+  const t = tileIndex(size, x, y)
+  const walled = world.buildings.some((b) => b.x === x && b.y === y && isWallOrGate(b))
+  if (walled || !isPassableTerrain(terrain.tiles[t]!)) return { x: wall.x, y: wall.y }
+  return { x, y }
 }

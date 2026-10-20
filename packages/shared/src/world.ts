@@ -248,7 +248,8 @@ export interface HaulOrder {
 /**
  * Attacking a resident (`CONTEXT.md`: Combat): the resident goes after `targetId` and, once in
  * contact (the same or a neighbouring tile), strikes them until one of them dies, the target gets
- * out of their sight or they are given another order. Out of contact they walk towards the target
+ * out of their sight or they are given another order. The target may also be a wall or gate, which
+ * they strike until it falls (`CONTEXT.md`: Walls in combat, broken). Out of contact they walk towards the target
  * along `path` (null while it is being found), as for a walk order; `progress` is how far into the
  * next step they are. `strike` is how far, from 0 up to 1, they are into their next blow.
  * `started` is set once the fight went in the realm logs. `defending` is set when the resident
@@ -285,6 +286,18 @@ export interface RoadLineOrder {
   siteId: string | null
 }
 
+/**
+ * Climbing a wall or gate (`CONTEXT.md`: Walls in combat, climbed): the resident, standing at
+ * `at` next to `wallId`, climbs over it. `progress` goes from 0 up to 1 (`CLIMB_TICKS`); then
+ * they come down on the far side. While climbing they can't defend themselves.
+ */
+export interface ClimbOrder {
+  kind: 'climb'
+  wallId: string
+  at: { x: number; y: number }
+  progress: number
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -297,6 +310,7 @@ export type ResidentOrder =
   | WorkOrder
   | PairOrder
   | AttackOrder
+  | ClimbOrder
   | RoadLineOrder
   | PayOrder
   | BuyCityOrder
@@ -809,6 +823,11 @@ export interface Building {
   teardown?: number
   /** A gate its city's realm has closed (`CONTEXT.md`: Walls in combat); gates only, open without it. */
   closed?: true
+  /**
+   * Damage taken from blows so far (`CONTEXT.md`: Walls in combat), once someone has struck it;
+   * finished walls and gates only. It falls at its `wallStrength`.
+   */
+  damage?: number
 }
 
 /**

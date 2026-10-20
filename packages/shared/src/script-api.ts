@@ -102,7 +102,12 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('tearDown', ['buildingId'], 'Tear down the building or site on my tile.'),
   action('workAt', ['makes?'], 'Work the workplace on my tile; at a smithy, say what to make.'),
   action('pair', ['partnerId'], 'Pair with an adult of my city to have children.'),
-  action('attack', ['targetId'], 'Go after a resident I see and strike them.'),
+  action(
+    'attack',
+    ['targetId'],
+    'Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls.',
+  ),
+  action('climb', ['wallId'], 'Climb over the wall or gate of another realm next to me.'),
   action(
     'pay',
     ['contractId', 'weeks'],

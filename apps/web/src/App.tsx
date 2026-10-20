@@ -3,6 +3,7 @@ import {
   formatGameTime,
   holdersOf,
   KEEPS_GOODS,
+  isWallOrGate,
   type Account,
   type Building,
   type BuildingKind,
@@ -143,6 +144,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'attack', residentId: selected.id, targetId }))
   }
+  /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
+  async function climb(wallId: string) {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'climb', residentId: selected.id, wallId }))
+  }
   const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
   const onNodesLoaded = useCallback(
     (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
@@ -260,6 +266,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               others={world.residents.filter((r) => !own.includes(r))}
               mapSize={world.map.size}
               onAttack={attack}
+              walls={world.buildings.filter(
+                (b) =>
+                  isWallOrGate(b) &&
+                  world.cities.find((c) => c.id === b.cityId)?.realmId !== world.home.realmId,
+              )}
+              onClimb={climb}
             />
           )}
           {world && (

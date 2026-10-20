@@ -1,4 +1,6 @@
 import {
+  isWallOrGate,
+  wallStrength,
   ALLIANCE_LEAVE_DELAY,
   ALLIANCE_RECALL_DELAY,
   ALLIANCE_NAME_MAX_LENGTH,
@@ -37,6 +39,7 @@ import {
   wrapDelta,
   Terrain,
   OFF_NODES,
+  ON_PLAINS,
   captorOf,
   cityMembership,
   cityOrganization,
@@ -177,7 +180,7 @@ export const buildingsInPlace: Invariant = {
           fail(b.id, `is a ${b.kind} on Mountain`)
         if (PROCESSING.includes(b.kind) && b.cityId !== null)
           fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
-      } else if (BUILDABLE.includes(b.kind) && b.kind !== 'stable') {
+      } else if (BUILDABLE.includes(b.kind) && !ON_PLAINS.includes(b.kind)) {
         const node = world.nodes.find((n) => n.x === b.x && n.y === b.y)
         if (!node || NODE_WORKPLACE[node.kind] !== b.kind) fail(b.id, `is a ${b.kind} off its node`)
         if (b.cityId !== null) fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
@@ -879,6 +882,34 @@ export const takenCitiesCaptured: Invariant = {
 }
 
 /**
+ * A city's own workplaces (`City.workplaceIds`), those an NPC city or the Trade Organization
+ * built for the goods it needs (`CONTEXT.md`: NPC city, Trade Org HQ), are workplaces other than
+ * farms (a farm is its city's by `cityId`), which belong to no city: whoever works one holds it.
+ * Ids of ones that are gone are skipped.
+ */
+export const cityWorkplacesSound: Invariant = {
+  name: 'city-workplaces-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const byId = new Map(world.buildings.map((b) => [b.id, b]))
+    for (const c of world.cities) {
+      for (const id of c.workplaceIds ?? []) {
+        const b = byId.get(id)
+        if (!b) continue
+        if (MAX_WORKERS[b.kind] === undefined || b.kind === 'farm' || b.cityId !== null) {
+          out.push({
+            invariant: this.name,
+            message: `${c.id} works ${b.id}, a ${b.kind} of city ${b.cityId}`,
+            entityIds: [c.id, b.id],
+          })
+        }
+      }
+    }
+    return out
+  },
+}
+
+/**
  * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
  * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
  * checks and resolves like anyone's.
@@ -1121,6 +1152,55 @@ export const gatesSound: Invariant = {
 }
 
 /**
+ * Broken walls are sound (`CONTEXT.md`: Walls in combat): only a finished wall or gate takes
+ * damage, and it stands only while its damage is short of its `wallStrength`.
+ */
+export const wallDamageSound: Invariant = {
+  name: 'wall-damage-sound',
+  check(world) {
+    return world.buildings
+      .filter(
+        (b) =>
+          b.damage !== undefined &&
+          (!isWallOrGate(b) || !(b.damage >= 0 && b.damage < wallStrength(b))),
+      )
+      .map((b) => ({
+        invariant: this.name,
+        message: `${b.site ? 'site of a ' : ''}${b.kind} ${b.id} stands with damage ${b.damage}`,
+        entityIds: [b.id],
+      }))
+  },
+}
+
+/**
+ * Climb orders are sound (`CONTEXT.md`: Walls in combat): the climber stands where they started
+ * climbing, and is between 0 and 1 of the way over.
+ */
+export const climbOrdersSound: Invariant = {
+  name: 'climb-orders-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'climb') continue
+      const problem =
+        r.x !== o.at.x || r.y !== o.at.y
+          ? `climbs from (${o.at.x}, ${o.at.y}) but stands on (${r.x}, ${r.y})`
+          : !(o.progress >= 0 && o.progress < 1)
+            ? `is ${o.progress} of the way over a wall`
+            : undefined
+      if (problem)
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${problem}`,
+          entityIds: [r.id],
+        })
+    }
+    return out
+  },
+}
+
+/**
  * Road orders along a line are sound (`CONTEXT.md`: Road): they have tiles left, at most
  * `ROAD_LINE_MAX_TILES`, each next to the one before; and after a tick one building on a site
  * stands on that road site, on the order's first tile (`resolveBuilding` moves the order on from
@@ -1219,6 +1299,7 @@ export const worldInvariants: Invariant[] = [
   cityResidentsInItsRealm,
   takenCitiesCaptured,
   npcOrdersAllowed,
+  cityWorkplacesSound,
   pairsHoldTogether,
   childrenDontWork,
   carriagesInPlace,
@@ -1234,6 +1315,8 @@ export const worldInvariants: Invariant[] = [
   supplyLinesSound,
   crimesSound,
   gatesSound,
+  wallDamageSound,
+  climbOrdersSound,
   tradeOrgSound,
   roadLineOrdersSound,
 ]
