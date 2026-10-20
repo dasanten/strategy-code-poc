@@ -13,6 +13,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { allianceOrders } from './alliances.js'
 import { armyOrders } from './armies.js'
+import { contractOrders } from './contracts.js'
 import { ExploredTerrain } from './explored.js'
 import { OrderQueue, orderKinds } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -87,9 +88,10 @@ describe('script bindings', () => {
     const { world, explored } = setup()
     const { globals } = runAs(world, explored, '')
     expect(Object.keys(globals).sort()).toEqual(SCRIPT_API.map((b) => b.name).sort())
-    // Alliance and army orders and the gate order are the realm's, not a resident's.
+    // Alliance, army and contract orders and the gate order are the realm's, not a resident's.
     const residentOrders = Object.keys(orderKinds).filter(
-      (k) => !(k in allianceOrders) && !(k in armyOrders) && k !== 'setGate',
+      (k) =>
+        !(k in allianceOrders) && !(k in armyOrders) && !(k in contractOrders) && k !== 'setGate',
     )
     expect([...SCRIPT_ORDER_KINDS].sort()).toEqual(residentOrders.sort())
   })
@@ -193,6 +195,7 @@ describe('script bindings', () => {
     ['attack("b1")', { kind: 'attack', targetId: 'b1' }],
     ['attack("b2")', { kind: 'attack', targetId: 'b2' }],
     ['attack("a1")', { kind: 'attack', targetId: 'a1' }],
+    ['pay("contract9", 1)', { kind: 'pay', contractId: 'contract9', weeks: 1 }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(60, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 60, y: 10 } }],
   ]

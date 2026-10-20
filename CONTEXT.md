@@ -13,7 +13,7 @@ The shared language of the game. Domain terms only — no implementation details
 - **Map:** a rectangle whose opposite sides join: walk off the east side and you come back in from
   the west, off the north and you come back from the south. The world has no edge and no centre.
   An unloaded resident walking once around it on flat land takes about **12 real hours**.
-- **Game time:** 1 game day = 1 real hour; 1 game year = 1 real day. Crossing the map takes about
+- **Game time:** 1 game day = 1 real hour; 1 game week = 7 game days; 1 game year = 1 real day. Crossing the map takes about
   12 game days.
 - **Tile:** one cell of the map, about 40 m across, with one terrain type. An unloaded resident
   walks one plains tile in about 30 seconds, so the map is 1,440 × 1,440 tiles. A building fills

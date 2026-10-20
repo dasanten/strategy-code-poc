@@ -77,7 +77,7 @@ export const attack: OrderKind = {
     if (target.owner === realm.id) return 'that is one of your own residents'
     const size = terrain?.size
     const seen = world.residents.some(
-      (x) => x.owner === realm.id && size && wrapDistance(size, x, target) <= SIGHT_RANGE,
+      (x) => commands(world, realm.id, x) && size && wrapDistance(size, x, target) <= SIGHT_RANGE,
     )
     if (size && !seen) return 'that resident is out of sight'
     return undefined

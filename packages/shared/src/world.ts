@@ -312,6 +312,7 @@ export type ResidentOrder =
   | AttackOrder
   | ClimbOrder
   | RoadLineOrder
+  | PayOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -351,6 +352,48 @@ export interface WorldState {
   armies: Army[]
   /** Crimes a witness still carries news of, or that an Organization still remembers. */
   crimes: Crime[]
+  /** Mercenary contracts offered or in force (`CONTEXT.md`: Mercenary contract). */
+  contracts: MercenaryContract[]
+}
+
+/**
+ * A mercenary contract (`CONTEXT.md`: Mercenary contract): the lender rents some of its residents
+ * to the hirer for `days` game days, at `pricePerWeek` coins a game week, paid into the lender's
+ * storage `storageId`. One side offers it, the other accepts; until then it is only an offer.
+ * The residents stay the lender's but take only the hirer's orders while it is in force. Each
+ * game week is paid in advance; one that ends unpaid breaks the contract. For now both sides are
+ * Players' realms. Plain data (ADR 0002).
+ */
+export interface MercenaryContract {
+  id: string
+  /** The realm whose residents are rented out. */
+  lenderId: string
+  /** The realm that rents them. */
+  hirerId: string
+  /** Which side offered it; the other side accepts or declines. */
+  offeredBy: 'lender' | 'hirer'
+  /** The rented residents, all the lender's; never empty. */
+  residentIds: string[]
+  /** How long it runs once accepted, in game days. */
+  days: number
+  /** Coins for each game week, paid in advance. */
+  pricePerWeek: number
+  /** The lender's storage the coins go into. */
+  storageId: string
+  /** The tick it was accepted; null while it is only offered. */
+  startedAt: number | null
+  /** Game weeks paid so far, counted from the first. */
+  paidWeeks: number
+}
+
+/**
+ * Paying for a mercenary contract (`CONTEXT.md`: Mercenary contract): the resident, standing on
+ * the contract's storage, puts in the coins for `weeks` game weeks from what they carry.
+ */
+export interface PayOrder {
+  kind: 'pay'
+  contractId: string
+  weeks: number
 }
 
 /** What a crime was (`CONTEXT.md`: Crime). */
@@ -561,6 +604,21 @@ export type RealmEventWhat =
   | ({ kind: 'scriptOutOfSteps'; name: string; scriptId: number; realm: boolean } & ScriptRunBy)
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
+  /**
+   * A mercenary contract (`CONTEXT.md`: Mercenary contract) with the realm `other` (by its
+   * Leader's name) changed: `offered` to this realm, `started` once accepted, `paid` for `weeks`
+   * more game weeks, `ended` when its time was up, or `broken` when a week went unpaid. `lender`
+   * when this realm rents out the residents.
+   */
+  | {
+      kind: 'contract'
+      contractId: string
+      what: 'offered' | 'started' | 'paid' | 'ended' | 'broken'
+      lender: boolean
+      other: string
+      residents: number
+      weeks?: number
+    }
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the
