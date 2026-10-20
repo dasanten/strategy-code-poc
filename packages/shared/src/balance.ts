@@ -724,6 +724,33 @@ export const TEARDOWN_MATERIALS_RETURNED = 0.5
 export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
 
 /**
+ * Control a city projects before counting anyone in it (`CONTEXT.md`: Territory), so even an
+ * empty city holds the ground it stands on.
+ */
+export const TERRITORY_CITY_BASE = 5
+
+/** Control a guarded workplace projects before counting its workers and guards. */
+export const TERRITORY_WORKPLACE_BASE = 2
+
+/** Control each resident adds: of a city, one living there; of a workplace, one working it. */
+export const TERRITORY_PER_RESIDENT = 1
+
+/**
+ * Control each armed resident adds on top: of a city, one living there and standing in its area
+ * (its garrison); of a workplace, one of its holder's guarding it. Soldiers count most.
+ */
+export const TERRITORY_PER_ARMED = 3
+
+/**
+ * How far control reaches, in tiles, per square root of its strength: a city of 5 control reaches
+ * 4 tiles, one of 30 ten, one of 100 twenty.
+ */
+export const TERRITORY_REACH_PER_ROOT = 2
+
+/** The farthest any one city or workplace projects control, in tiles. */
+export const TERRITORY_MAX_REACH = 24
+
+/**
  * Ticks between two blows of a resident in a fight (`CONTEXT.md`: Combat): a blow every two
  * seconds, so a fight between two unarmed residents lasts about a minute.
  */
