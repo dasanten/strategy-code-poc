@@ -10,6 +10,7 @@ import {
   type OrderRequest,
   type TerrainMap,
   type WorldState,
+  commands,
 } from '@csp/shared'
 import { dissolveCity, updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime } from './crimes.js'
@@ -39,7 +40,7 @@ export const tearDown: OrderKind = {
     const o = order as Partial<TearDownRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+    if (!r || !realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t tear down buildings'
     if (typeof o.buildingId !== 'string') return 'which building?'
     return tearDownProblem(world, r.x, r.y, o.buildingId)

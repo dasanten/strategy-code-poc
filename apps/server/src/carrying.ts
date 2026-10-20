@@ -15,6 +15,7 @@ import {
   type Resident,
   type Stock,
   type WorldState,
+  commands,
 } from '@csp/shared'
 import { buildingOrganization, carriageOrganization, commitCrime } from './crimes.js'
 import type { OrderKind, OrderSender } from './orders.js'
@@ -74,7 +75,7 @@ function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   const o = order as Partial<CarryRequest>
   const realm = realmOf(world, sender.userId)
   const r = world.residents.find((x) => x.id === o.residentId)
-  if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+  if (!r || !realm || !commands(world, realm.id, r)) return 'not one of your residents'
   if (!canWork(r, world.tick)) return 'children can’t pick up or put down goods'
   const spot = readSpot(o.spot)
   if (!spot) return 'the spot must be the ground, a storage, a construction site or a carriage'

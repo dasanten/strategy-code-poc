@@ -21,6 +21,8 @@ import {
   type SeenEntity,
   type TerrainMap,
   type WorldState,
+  commanderOf,
+  commands,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import type { InvariantViolation } from './invariants.js'
@@ -67,7 +69,7 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
       const o = order as Partial<RunScriptRequest>
       const realm = realmOf(world, sender.userId)
       const r = world.residents.find((x) => x.id === o.residentId)
-      if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+      if (!r || !realm || !commands(world, realm.id, r)) return 'not one of your residents'
       const script = Number.isInteger(o.scriptId) ? host.script(o.scriptId!) : undefined
       if (!script || script.userId !== sender.userId) {
         return 'not one of your scripts with a version that can run'
@@ -105,9 +107,10 @@ export class ScriptRunner {
     const byRealm = new Map<string, Resident[]>()
     for (const r of world.residents) {
       if (!r.script) continue
-      // A resident of no realm has no Player to run a script for.
-      if (r.owner === null) delete r.script
-      else byRealm.set(r.owner, [...(byRealm.get(r.owner) ?? []), r])
+      // A resident of no realm has no Player to run a script for; a hired one runs the hirer's.
+      const by = commanderOf(world, r)
+      if (by === null) delete r.script
+      else byRealm.set(by, [...(byRealm.get(by) ?? []), r])
     }
     const used = new Map<number, { source: string; program: Program }>()
     for (const realm of world.realms) {
@@ -240,7 +243,7 @@ function logLimited(
   const last = running[at]
   if (last !== undefined && world.tick - last < SCRIPT_LOG_INTERVAL) return
   running[at] = world.tick
-  recordEvent(world, r.owner, what)
+  recordEvent(world, commanderOf(world, r), what)
 }
 
 /**

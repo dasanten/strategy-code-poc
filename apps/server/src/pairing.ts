@@ -1,6 +1,7 @@
 import {
   TICKS_PER_GAME_YEAR,
   canWork,
+  commands,
   freeHousing,
   hasFoodSurplus,
   type OrderRequest,
@@ -37,7 +38,7 @@ export const pair: OrderKind = {
     const o = order as Partial<PairRequest>
     const realm = realmOf(world, sender.userId)
     const mine = (id: unknown) =>
-      world.residents.find((x) => x.id === id && realm && x.owner === realm.id)
+      world.residents.find((x) => x.id === id && realm && commands(world, realm.id, x))
     const r = mine(o.residentId)
     const partner = mine(o.partnerId)
     if (!r || !partner) return 'not one of your residents'

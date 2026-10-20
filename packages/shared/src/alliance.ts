@@ -1,3 +1,4 @@
+import { contractsFor, type ContractView } from './contract.js'
 import type { Alliance, WorldState } from './world.js'
 
 /** World queries about alliances (ADR 0002: the game API orders and scripts share). */
@@ -66,6 +67,8 @@ export interface Diplomacy {
   invitations: { allianceId: string; name: string; leader: string }[]
   /** Realms outside their alliance the Player sees residents of, who could be invited. */
   realmsInSight: RealmLabel[]
+  /** Mercenary contracts the realm is a side of, offered or in force (`CONTEXT.md`). */
+  contracts: ContractView[]
 }
 
 /**
@@ -73,7 +76,7 @@ export interface Diplomacy {
  * residents are in the Player's sight.
  */
 export function diplomacyFor(
-  world: Pick<WorldState, 'alliances' | 'realms' | 'residents'>,
+  world: Pick<WorldState, 'alliances' | 'realms' | 'residents' | 'contracts' | 'buildings'>,
   realmId: string,
   seenRealms: Iterable<string>,
 ): Diplomacy {
@@ -99,5 +102,10 @@ export function diplomacyFor(
     .filter((id) => id !== realmId && !allies.has(id) && realms.has(id))
     .sort()
     .map(label)
-  return { alliance: alliance ?? null, invitations, realmsInSight }
+  return {
+    alliance: alliance ?? null,
+    invitations,
+    realmsInSight,
+    contracts: contractsFor(world, realmId),
+  }
 }

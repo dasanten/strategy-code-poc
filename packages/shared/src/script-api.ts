@@ -96,6 +96,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('pair', ['partnerId'], 'Pair with an adult of my city to have children.'),
   action('attack', ['targetId'], 'Go after a resident I see and strike them.'),
   action(
+    'pay',
+    ['contractId', 'weeks'],
+    'On a mercenary contract’s storage, put in the coins for some weeks of it.',
+  ),
+  action(
     'roadLine',
     ['x', 'y'],
     'Build road on each tile of the line from my tile to (x, y), one after another, with the stone I carry.',

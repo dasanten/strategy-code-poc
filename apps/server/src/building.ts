@@ -17,6 +17,7 @@ import {
   type RoadLineOrder,
   type TerrainMap,
   type WorldState,
+  commands,
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
 import { foundCity, updateCityMembership } from './cities.js'
@@ -48,7 +49,7 @@ export const build: OrderKind = {
     const o = order as Partial<BuildRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+    if (!r || !realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t build'
     if (!BUILDABLE.includes(o.building as BuildingKind)) return 'that can’t be built'
     const here = constructionAt(world, r.x, r.y, o.building!)

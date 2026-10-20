@@ -14,6 +14,7 @@ import {
   type Realm,
   type Resident,
   type WorldState,
+  commands,
 } from '@csp/shared'
 import { commitCrime, organizationOf } from './crimes.js'
 import { recordEvent } from './events.js'
@@ -70,13 +71,13 @@ export const attack: OrderKind = {
     const o = order as Partial<AttackRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+    if (!r || !realm || !commands(world, realm.id, r)) return 'not one of your residents'
     const target = world.residents.find((x) => x.id === o.targetId)
     if (!target) return 'no such resident'
     if (target.owner === realm.id) return 'that is one of your own residents'
     const size = terrain?.size
     const seen = world.residents.some(
-      (x) => x.owner === realm.id && size && wrapDistance(size, x, target) <= SIGHT_RANGE,
+      (x) => commands(world, realm.id, x) && size && wrapDistance(size, x, target) <= SIGHT_RANGE,
     )
     if (size && !seen) return 'that resident is out of sight'
     return undefined

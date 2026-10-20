@@ -2,6 +2,7 @@ import {
   ARMY_NAME_MAX_LENGTH,
   ARMY_SPREAD,
   SIGHT_RANGE,
+  commands,
   armyOf,
   inContact,
   wrapDistance,
@@ -58,7 +59,7 @@ function ownArmy(world: WorldState, realmId: string, order: OrderRequest): Army 
 /** Whether any of the realm's residents sees the spot. */
 function inSightOf(world: WorldState, realmId: string, at: Resident, size: number): boolean {
   return world.residents.some(
-    (x) => x.owner === realmId && wrapDistance(size, x, at) <= SIGHT_RANGE,
+    (x) => commands(world, realmId, x) && wrapDistance(size, x, at) <= SIGHT_RANGE,
   )
 }
 
@@ -106,7 +107,8 @@ export const formArmy = armyOrderKind(
     const ids = order.residentIds
     if (!Array.isArray(ids) || ids.length === 0) return 'an army needs at least one resident'
     if (new Set(ids).size !== ids.length) return 'a resident is named twice'
-    const own = (id: unknown) => world.residents.some((r) => r.id === id && r.owner === realmId)
+    const own = (id: unknown) =>
+      world.residents.some((r) => r.id === id && commands(world, realmId, r))
     if (!ids.every(own)) return 'not all of them are your residents'
     return undefined
   },
@@ -187,7 +189,9 @@ export const armyAttack = commandArmy(
     const bad = badTarget(world, realmId, order, size)
     if (bad) return bad
     const target = world.residents.find((x) => x.id === order.targetId)
-    return target?.owner === realmId ? 'that is one of your own residents' : undefined
+    return target && (target.owner === realmId || commands(world, realmId, target))
+      ? 'that is one of your own residents'
+      : undefined
   },
   (_a, order) => ({ kind: 'attack', targetId: order.targetId as string, started: false }),
 )
@@ -267,7 +271,10 @@ export function stepArmies(world: WorldState, size: number): void {
   const byId = new Map(world.residents.map((r) => [r.id, r]))
   const realms = new Set(world.realms.map((r) => r.id))
   for (const a of world.armies) {
-    a.memberIds = a.memberIds.filter((id) => byId.get(id)?.owner === a.realmId)
+    a.memberIds = a.memberIds.filter((id) => {
+      const r = byId.get(id)
+      return r !== undefined && commands(world, a.realmId, r)
+    })
   }
   world.armies = world.armies.filter((a) => a.memberIds.length > 0 && realms.has(a.realmId))
   const armyIdOf = new Map(world.armies.flatMap((a) => a.memberIds.map((id) => [id, a.id])))
@@ -383,7 +390,7 @@ export const armiesSound: Invariant = {
       for (const id of a.memberIds) {
         const r = byId.get(id)
         if (!r) report(`army ${a.id} has member ${id}, who does not exist`, [a.id, id])
-        else if (r.owner !== a.realmId) {
+        else if (!commands(world, a.realmId, r)) {
           report(`army ${a.id} has member ${id} of another realm`, [a.id, id])
         }
         if (seen.has(id)) report(`resident ${id} is in two armies`, [id])

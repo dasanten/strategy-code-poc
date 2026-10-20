@@ -24,6 +24,7 @@ import {
   type WalkOrder,
   type WallMap,
   type WorldState,
+  commands,
 } from '@csp/shared'
 import type { OrderKind, OrderSender } from './orders.js'
 import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
@@ -61,7 +62,7 @@ export const walkTo: OrderKind = {
     const o = order as Partial<WalkToRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+    if (!r || !realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the target must be a tile'
     return undefined
   },

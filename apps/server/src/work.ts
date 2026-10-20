@@ -20,6 +20,7 @@ import {
   type Resident,
   type Stock,
   type WorldState,
+  commands,
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
@@ -53,7 +54,7 @@ export const workAt: OrderKind = {
     const o = order as Partial<WorkRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+    if (!r || !realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t work'
     if (o.makes !== undefined && !(GOODS as readonly unknown[]).includes(o.makes))
       return 'no such good'
