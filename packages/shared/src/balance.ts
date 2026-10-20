@@ -246,6 +246,28 @@ export const NPC_VILLAGE: NpcCitySize = { size: 7, residents: 6, houses: 2, farm
 export const NPC_TOWN: NpcCitySize = { size: 11, residents: 16, houses: 5, farms: 2, food: 400 }
 
 /**
+ * What an NPC city asks for each resident living there when it is bought (`CONTEXT.md`: Buying a
+ * city), in Coins: five game days of one mint worker's coins (`RECIPES`, `BATCHES_PER_DAY`).
+ */
+export const CITY_PRICE_PER_RESIDENT = 200
+
+/**
+ * What an NPC city asks for each of its finished buildings when it is bought, in Coins, by kind;
+ * a kind missing here adds nothing. A village (6 residents, a town hall, a storage, 2 houses, a
+ * farm and its wall ring) comes to about 1 600 coins, which three residents can carry; a town to
+ * about 4 000.
+ */
+export const CITY_PRICE_BY_BUILDING: Partial<Record<BuildingKind, number>> = {
+  townHall: 200,
+  house: 50,
+  storage: 50,
+  farm: 30,
+  stable: 40,
+  wall: 2,
+  gate: 5,
+}
+
+/**
  * An NPC city's Food runs short (`CONTEXT.md`: NPC city) when its storages hold less than its
  * residents eat in this many game days. It then puts residents on its farms first.
  */

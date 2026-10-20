@@ -1,6 +1,8 @@
 import {
   SIGHT_RANGE,
+  cityPrice,
   commanderOf,
+  forSale,
   sharingSight,
   wrapDistance,
   type Army,
@@ -74,7 +76,11 @@ export function entitiesInSight(
     out.push({ is: 'building', ...b })
     if (b.cityId !== null) seenCities.add(b.cityId)
   }
-  for (const c of world.cities) if (seenCities.has(c.id)) out.push({ is: 'city', ...c })
+  // An NPC city names its price (`CONTEXT.md`: Buying a city), from all of it.
+  for (const c of world.cities) {
+    if (!seenCities.has(c.id)) continue
+    out.push({ is: 'city', ...c, ...(forSale(c) ? { price: cityPrice(world, c) } : {}) })
+  }
   for (const h of world.horses) if (seen(size, observers, h)) out.push({ is: 'horse', ...h })
   for (const k of world.carriages) if (seen(size, observers, k)) out.push({ is: 'carriage', ...k })
   for (const p of world.piles) if (seen(size, observers, p)) out.push({ is: 'pile', ...p })

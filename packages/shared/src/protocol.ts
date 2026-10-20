@@ -29,13 +29,19 @@ export interface OrderRequest {
 }
 
 /**
+ * A city as Players see it: for an NPC city, the price in Coins it names (`CONTEXT.md`: Buying a
+ * city), worked out on the server from all of it, not only what is in sight.
+ */
+export type SeenCity = City & { price?: number }
+
+/**
  * Something a Player sees (`CONTEXT.md`: Sight), tagged with what it is. Ids are unique across
  * all of them.
  */
 export type SeenEntity =
   | ({ is: 'resident' } & SeenResident)
   | ({ is: 'building' } & Building)
-  | ({ is: 'city' } & City)
+  | ({ is: 'city' } & SeenCity)
   | ({ is: 'horse' } & Horse)
   | ({ is: 'carriage' } & Carriage)
   | ({ is: 'pile' } & Pile)

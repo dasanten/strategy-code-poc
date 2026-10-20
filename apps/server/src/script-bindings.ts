@@ -210,6 +210,7 @@ function residentActions(
     climb: ([wallId]) => request('climb', { wallId: plain(wallId) }),
     pay: ([contractId, weeks]) =>
       request('pay', { contractId: plain(contractId), weeks: plain(weeks) }),
+    buyCity: ([cityId]) => request('buyCity', { cityId: plain(cityId) }),
     roadLine: ([x, y]) =>
       request('roadLine', {
         from: { x: resident.x, y: resident.y },

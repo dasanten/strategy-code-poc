@@ -197,6 +197,7 @@ describe('script bindings', () => {
     ['attack("a1")', { kind: 'attack', targetId: 'a1' }],
     ['climb("w1")', { kind: 'climb', wallId: 'w1' }],
     ['pay("contract9", 1)', { kind: 'pay', contractId: 'contract9', weeks: 1 }],
+    ['buyCity("city4")', { kind: 'buyCity', cityId: 'city4' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(60, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 60, y: 10 } }],
   ]
