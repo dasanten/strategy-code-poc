@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { checkScript, type Diagnostic } from '@csp/lang'
 import {
   formatGameTime,
   holdersOf,
@@ -22,7 +21,7 @@ import { MapView } from './MapView.js'
 import { pageFor } from './pages.js'
 import { RealmLog } from './RealmLog.js'
 import { ResidentInspector, ResidentsList, type HaulSetup, type Picking } from './Residents.js'
-import { ScriptEditor } from './ScriptEditor.js'
+import { ScriptLibrary } from './ScriptLibrary.js'
 import { useWorld } from './useWorld.js'
 
 export function App() {
@@ -44,7 +43,6 @@ export function App() {
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
   const { world, status, sendOrder } = useWorld(onLoggedOut)
-  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([])
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [picking, setPicking] = useState<Picking>(false)
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
@@ -231,15 +229,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             />
           )}
           {world && <RealmLog events={world.events} realmId={world.home.realmId} />}
-          <section className="editor-panel">
-            <h2>Resident script</h2>
-            <ScriptEditor onChange={(src) => setDiagnostics(checkScript(src))} />
-            <p className="diagnostics">
-              {diagnostics.length === 0
-                ? 'No syntax errors.'
-                : diagnostics.map((d) => `${d.line}:${d.column} ${d.message}`).join('\n')}
-            </p>
-          </section>
+          <ScriptLibrary />
         </div>
       </main>
     </div>

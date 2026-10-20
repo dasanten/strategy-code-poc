@@ -185,6 +185,17 @@ describe('invariants', () => {
     ])
   })
 
+  it('catch an NPC city resident holding an order the city never gives', () => {
+    const world = worldWithCity().world
+    world.cities[0]!.realmId = null
+    for (const o of world.residents) o.owner = null
+    const r = world.residents[0]!
+    r.order = { kind: 'tearDown', buildingId: world.buildings[0]!.id, at: { x: r.x, y: r.y } }
+    expect(checkInvariants(world, terrain)).toContainEqual(
+      expect.objectContaining({ invariant: 'npc-orders-allowed', entityIds: [r.id] }),
+    )
+  })
+
   it('catch a pair that does not hold together', () => {
     const world = worldWithCity().world
     const [a, b, c] = world.residents as [Resident, Resident, Resident]
