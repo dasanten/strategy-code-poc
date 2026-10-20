@@ -1,18 +1,22 @@
 import { allied, alliedRealms } from './alliance.js'
 import { WALL_ENCLOSES_MAX } from './balance.js'
 import { isPassableTerrain, tileIndex, wrap, type TerrainMap } from './terrain.js'
-import type { Building, Resident, WorldState } from './world.js'
+import type { Building, City, Resident, WorldState } from './world.js'
 
 /** World queries about walls and gates (`CONTEXT.md`: Walls in combat; ADR 0002). */
 
 /** A finished wall or gate on a tile, and whose it is. */
 export interface WallTile {
   kind: 'wall' | 'gate'
-  /** The realm of the wall's city; null for nobody's. */
+  /**
+   * The side of the wall's city (`wallSideOfCity`): its realm, or the city itself for an NPC
+   * city; null for nobody's.
+   */
   realmId: string | null
   /**
-   * The realms that may stand on it and pass its gate while closed: its city's realm and the
-   * other members of that realm's alliance (`CONTEXT.md`: Alliance). Empty for nobody's.
+   * The sides that may stand on it and pass its gate while closed: its city's realm and the
+   * other members of that realm's alliance (`CONTEXT.md`: Alliance), or an NPC city's own
+   * residents (`wallSideOf`). Empty for nobody's.
    */
   realms: string[]
   /** A gate that is closed. */
@@ -33,6 +37,22 @@ export interface WallMap {
 /** Whether a building is a finished wall or gate. */
 export function isWallOrGate(b: Building): boolean {
   return (b.kind === 'wall' || b.kind === 'gate') && !b.site
+}
+
+/**
+ * Whose walls and gates a city's are (`CONTEXT.md`: Walls in combat): its realm's, or, for an NPC
+ * city, the city's own, an Organization of its own (`CONTEXT.md`: Organization).
+ */
+export function wallSideOfCity(city: Pick<City, 'id' | 'realmId'>): string {
+  return city.realmId ?? city.id
+}
+
+/**
+ * The side a resident walks and stands on walls for: their realm, or the NPC city they live in
+ * when they have none (`wallSideOfCity`); null for one of neither.
+ */
+export function wallSideOf(r: Pick<Resident, 'owner' | 'cityId'>): string | null {
+  return r.owner ?? r.cityId
 }
 
 /** Whether a gate is closed; a gate is open until its city's realm closes it. */
@@ -64,7 +84,7 @@ export function wallMap(
   terrain: TerrainMap,
 ): WallMap {
   const { size } = terrain
-  const realms = new Map(world.cities.map((c) => [c.id, c.realmId]))
+  const realms = new Map(world.cities.map((c) => [c.id, wallSideOfCity(c)]))
   const sides = new Map<string, string[]>()
   const side = (realmId: string | null): string[] => {
     if (realmId === null) return []
@@ -192,11 +212,12 @@ export function mayStep(
  */
 export function onOwnWall(
   world: Pick<WorldState, 'buildings' | 'cities' | 'alliances'>,
-  r: Pick<Resident, 'x' | 'y' | 'owner'>,
+  r: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId'>,
 ): boolean {
   const wall = world.buildings.find(
     (b) => b.x === r.x && b.y === r.y && b.kind === 'wall' && !b.site,
   )
   const city = wall && world.cities.find((c) => c.id === wall.cityId)
-  return !!city && city.realmId !== null && r.owner !== null && allied(world, city.realmId, r.owner)
+  const side = wallSideOf(r)
+  return !!city && side !== null && allied(world, wallSideOfCity(city), side)
 }
