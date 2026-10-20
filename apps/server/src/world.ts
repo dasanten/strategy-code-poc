@@ -21,6 +21,7 @@ import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
+import { stepNpcCities } from './npc-behaviour.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -109,6 +110,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const survival = stepSurvival(world, terrain)
   const horsesDied = stepHorses(world, terrain)
   stepSpoilage(world)
+  stepNpcCities(world, terrain.size)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
   const strikes = requestStrikes(world, terrain.size)
