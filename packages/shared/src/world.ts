@@ -53,7 +53,39 @@ export interface Resident {
   carried: Stock
   /** What the resident was ordered to do, as plain data; null when idle (ADR 0002). */
   order: ResidentOrder | null
+  /**
+   * The script the resident runs, when they were given the run-script order (`CONTEXT.md`:
+   * Running a script). Its actions set `order` like UI orders; any other order ends it. Absent
+   * when they run none.
+   */
+  script?: RunningScript
 }
+
+/** A script value as plain data, the only kind a script's memory keeps between ticks. */
+export type MemoryValue = number | string | boolean | null | MemoryValue[] | ScriptMemory
+
+/** A running script's memory (`CONTEXT.md`: Memory): plain, serialisable data (ADR 0002). */
+export interface ScriptMemory {
+  [key: string]: MemoryValue
+}
+
+/** A resident's run-script order: which script of the Player's library, and its memory. */
+export interface RunningScript {
+  /** The script in the Player's library; its active version is what runs each tick. */
+  scriptId: number
+  /** What the script kept between ticks, at most `SCRIPT_MEMORY_MAX` characters of JSON. */
+  memory: ScriptMemory
+  /** The tick its last error went into the realm log; errors are logged rate-limited. */
+  errorLoggedAt?: number
+  /** The tick its last out-of-steps warning went into the realm log. */
+  budgetLoggedAt?: number
+}
+
+/**
+ * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
+ * memory, which stays on the server.
+ */
+export type SeenResident = Omit<Resident, 'script'> & { script?: Pick<RunningScript, 'scriptId'> }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -356,6 +388,26 @@ export type RealmEventWhat =
     }
   /** The role of alliance leader passed to a member (`CONTEXT.md`: Alliance leader). */
   | { kind: 'allianceLeader'; allianceId: string; name: string; realmId: string; realm: string }
+  /**
+   * A resident's script stopped with an error this tick (`CONTEXT.md`: Running a script); it runs
+   * again next tick. `line` and `column` say where, when the error is in the script itself.
+   */
+  | {
+      kind: 'scriptError'
+      residentId: string
+      name: string
+      scriptId: number
+      message: string
+      line?: number
+      column?: number
+    }
+  /**
+   * A resident's script ran out of steps (`CONTEXT.md`: Step budget): its own budget, or, when
+   * `realm`, the realm's, so it was cut short or skipped the tick.
+   */
+  | { kind: 'scriptOutOfSteps'; residentId: string; name: string; scriptId: number; realm: boolean }
+  /** A resident's run-script order ended because its script was deleted from the library. */
+  | { kind: 'scriptEnded'; residentId: string; name: string; scriptId: number }
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the

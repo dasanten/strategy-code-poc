@@ -881,3 +881,22 @@ export const SCRIPT_TILE_QUERY_COST = 1
 
 /** Extra steps a script pays to request an action (`walkTo`, `pickUp`, …), accepted or not. */
 export const SCRIPT_ACTION_COST = 10
+
+/**
+ * How many interpreter steps all of a realm's running scripts may use together each tick
+ * (`CONTEXT.md`: Step budget): ten residents at their full `SCRIPT_STEP_BUDGET`. When it runs
+ * out, the rest skip the tick; who goes first rotates, so the same ones don't always skip.
+ */
+export const SCRIPT_REALM_STEP_BUDGET = 20000
+
+/**
+ * The most a running script's memory may hold, in characters of its JSON (`CONTEXT.md`:
+ * Memory). Enough for a role, a few tiles and ids; a run that leaves more keeps the old memory.
+ */
+export const SCRIPT_MEMORY_MAX = 4000
+
+/**
+ * Ticks between two realm-log entries about the same resident's script going wrong (an error,
+ * or running out of steps), so a script failing every tick doesn't flood the log. A minute.
+ */
+export const SCRIPT_LOG_INTERVAL = 60

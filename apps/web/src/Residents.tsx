@@ -40,6 +40,7 @@ import {
   type KnownNode,
   type Pile,
   type Resident,
+  type ScriptSummary,
   type SkillName,
   type StatName,
   type Stock,
@@ -127,8 +128,15 @@ export interface HaulSetup {
   keepFood: number
 }
 
-/** What a resident is doing, from their order. */
+/** What a resident is doing, from their order and the script they run. */
 function doing(r: Resident): string {
+  const now = orderDoing(r)
+  if (!r.script) return now
+  return now === 'Idle' ? 'Running a script' : `Running a script · ${now}`
+}
+
+/** What a resident's built-in order has them doing. */
+function orderDoing(r: Resident): string {
   const o = r.order
   if (o?.kind === 'walkTo') {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
@@ -260,6 +268,8 @@ export function ResidentInspector({
   onHaulTo,
   onRoadTo,
   onStop,
+  scripts,
+  onRunScript,
 }: {
   resident: Resident | undefined
   leaderId: string
@@ -279,6 +289,10 @@ export function ResidentInspector({
   onRoadTo: () => void
   /** Orders the resident to stop what they are doing. */
   onStop: () => void
+  /** The Player's script library, to pick a script to run. */
+  scripts: ScriptSummary[]
+  /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
+  onRunScript: (scriptId: number) => void
   /** Why the last order was turned down, if it was. */
   orderError: string | undefined
   /** Goods lying on the resident's tile, if any are in sight. */
@@ -390,7 +404,7 @@ export function ResidentInspector({
               {picking === 'drive' ? 'Pick a tile…' : 'Drive carriage to'}
             </button>
           )}
-          {r.order && (
+          {(r.order || r.script) && (
             <button type="button" onClick={onStop}>
               Stop
             </button>
@@ -403,6 +417,7 @@ export function ResidentInspector({
               ? `Tap a tile on the map, or press ${PICKING_BUTTONS[picking]} again to cancel.`
               : 'Right-click the map to walk there.'}
         </p>
+        <RunScript resident={r} scripts={scripts} onRunScript={onRunScript} />
       </section>
 
       {carriage && (
@@ -1201,4 +1216,57 @@ function holding(holders: string[], realmId: string): string {
   if (others === 0) return 'Held by your realm.'
   if (others === holders.length) return 'Held by another realm: its workers get the output.'
   return 'Held by your realm and another: their workers share the output.'
+}
+
+/**
+ * Gives the resident the run-script order with one of the Player's scripts (`CONTEXT.md`:
+ * Running a script). Only scripts with an active version can run; any other order ends it.
+ */
+function RunScript({
+  resident,
+  scripts,
+  onRunScript,
+}: {
+  resident: Resident
+  scripts: ScriptSummary[]
+  onRunScript: (scriptId: number) => void
+}) {
+  const runnable = scripts.filter((s) => s.activeVersion !== null)
+  const [picked, setPicked] = useState<number>()
+  const scriptId = runnable.some((s) => s.id === picked) ? picked : runnable[0]?.id
+  const running = resident.script && scripts.find((s) => s.id === resident.script!.scriptId)
+  return (
+    <div className="run-script">
+      {resident.script && (
+        <div className="small">
+          Runs {running ? <strong>{running.name}</strong> : 'a script'}
+          {running && ` · version ${running.activeVersion}`}
+        </div>
+      )}
+      {runnable.length === 0 ? (
+        <p className="muted small">Save a script without errors in the library to run it here.</p>
+      ) : (
+        <div className="order-buttons">
+          <select
+            aria-label="Script to run"
+            value={scriptId}
+            onChange={(e) => setPicked(Number(e.target.value))}
+          >
+            {runnable.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={scriptId === undefined}
+            onClick={() => scriptId !== undefined && onRunScript(scriptId)}
+          >
+            Run script
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }

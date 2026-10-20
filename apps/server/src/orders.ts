@@ -89,8 +89,14 @@ export class OrderQueue {
   applyAll(world: WorldState): void {
     const batch = this.pending
     this.pending = []
-    for (const { sender, order } of batch)
+    for (const { sender, order } of batch) {
+      // Any other order for a resident ends the script they run (`CONTEXT.md`: Running a script).
+      if (order.kind !== 'runScript') {
+        const r = world.residents.find((x) => x.id === order.residentId)
+        if (r) delete r.script
+      }
       this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
+    }
   }
 
   get size(): number {

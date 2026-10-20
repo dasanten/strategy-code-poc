@@ -141,8 +141,10 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       }),
   }
 
+  // The script's own state is `memory`, not part of `me`.
+  const self = { ...resident, script: undefined }
   const values: Record<string, Value> = {
-    me: toValue({ ...resident, age: ageInYears(resident, world.tick) }),
+    me: toValue({ ...self, age: ageInYears(resident, world.tick) }),
     memory: context.memory,
     tick: world.tick,
     mapSize: terrain.size,

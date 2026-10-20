@@ -1,6 +1,7 @@
 import type { TerrainMap, WorldState } from '@csp/shared'
 import { checkInvariants, shouldCheckInvariants, type InvariantViolation } from './invariants.js'
 import type { OrderQueue } from './orders.js'
+import type { ScriptRunner } from './script-runner.js'
 import type { Walking } from './walking.js'
 import { stepWorld } from './world.js'
 
@@ -29,12 +30,14 @@ export interface TickOptions {
   walking?: Walking
   /** Orders accepted since the last tick; applied before the world steps. */
   orders?: OrderQueue
+  /** Runs the residents' scripts after the orders are applied; without it no script runs. */
+  scripts?: ScriptRunner
   now?: () => number
   rand?: () => number
 }
 
 /**
- * Runs one tick of the simulation with monitoring around it: applies waiting orders, steps the world, checks the
+ * Runs one tick of the simulation with monitoring around it: applies waiting orders, runs scripts, steps the world, checks the
  * invariants on sampled ticks and reports tick health. A thrown error is reported, not rethrown,
  * so one bad tick does not stop the loop.
  */
@@ -47,9 +50,11 @@ export function runTick(
   try {
     const start = now()
     opts.orders?.applyAll(world)
+    const check = shouldCheckInvariants(opts.invariantSampleRate, opts.rand)
+    const scriptViolations = opts.scripts?.runAll(world, check) ?? []
     const { actions } = stepWorld(world, terrain, opts.walking)
-    if (shouldCheckInvariants(opts.invariantSampleRate, opts.rand)) {
-      const violations = checkInvariants(world, terrain)
+    if (check) {
+      const violations = [...scriptViolations, ...checkInvariants(world, terrain)]
       if (violations.length > 0) opts.reporter.invariantViolations(world, violations)
     }
     const durationMs = now() - start
