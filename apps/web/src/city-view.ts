@@ -17,6 +17,7 @@ const BUILDING_NAMES: Record<BuildingKind, string> = {
   townHall: 'town hall',
   house: 'house',
   storage: 'storage',
+  warehouse: 'warehouse',
   wall: 'wall',
   gate: 'gate',
   farm: 'farm',
@@ -38,7 +39,7 @@ export function buildingCount(kind: BuildingKind, n: number): string {
 
 /**
  * Describes a city in sight: your own, a city of another realm (by its name when the Player
- * knows it), or an NPC city run by the game.
+ * knows it), the Trade Org HQ, or an NPC city run by the game.
  */
 export function describeCity(
   city: City,
@@ -47,11 +48,13 @@ export function describeCity(
   realms: RealmLabel[],
 ): CityView {
   const whose =
-    city.realmId === null
-      ? 'NPC city'
-      : city.realmId === realmId
-        ? 'Your city'
-        : `City of the realm of ${realms.find((r) => r.realmId === city.realmId)?.realm ?? 'another Player'}`
+    city.tradeOrg === 'hq'
+      ? 'Trade Org HQ'
+      : city.realmId === null
+        ? 'NPC city'
+        : city.realmId === realmId
+          ? 'Your city'
+          : `City of the realm of ${realms.find((r) => r.realmId === city.realmId)?.realm ?? 'another Player'}`
   const counts = new Map<BuildingKind, number>()
   for (const b of seen.buildings) {
     if (b.cityId === city.id && !b.site) counts.set(b.kind, (counts.get(b.kind) ?? 0) + 1)

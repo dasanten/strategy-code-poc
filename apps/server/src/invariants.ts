@@ -33,6 +33,7 @@ import {
   Terrain,
   OFF_NODES,
   cityMembership,
+  cityOrganization,
   computeTerritory,
   controlAt,
   controlSources,
@@ -717,7 +718,7 @@ export const territorySound: Invariant = {
     const size = terrain.size
     const organizations = new Set([
       ...world.realms.map((r) => r.id),
-      ...world.cities.filter((c) => c.realmId === null).map((c) => c.id),
+      ...world.cities.filter((c) => c.realmId === null).map(cityOrganization),
     ])
     // Each Organization's control on every tile it reaches, worked out apart from the territory.
     const controlByTile = new Map<string, Map<string, number>>()
@@ -952,6 +953,33 @@ export const alliancesSound: Invariant = {
   },
 }
 
+/**
+ * The Trade Organization stays apart (`CONTEXT.md`: Trade Organization, Trade Org HQ,
+ * Warehouse): there is at most one Trade Org HQ, every Trade Org city belongs to no realm, and
+ * warehouses stand only in Trade Org cities, or in none once their city is gone.
+ */
+export const tradeOrgSound: Invariant = {
+  name: 'trade-org-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (id: string, message: string) =>
+      out.push({ invariant: this.name, message, entityIds: [id] })
+    const tradeOrg = new Set<string>()
+    for (const c of world.cities) {
+      if (!c.tradeOrg) continue
+      tradeOrg.add(c.id)
+      if (c.realmId !== null) fail(c.id, `Trade Org city ${c.id} belongs to realm ${c.realmId}`)
+    }
+    const hqs = world.cities.filter((c) => c.tradeOrg === 'hq')
+    if (hqs.length > 1) fail(hqs[1]!.id, `the world has ${hqs.length} Trade Org HQs`)
+    for (const b of world.buildings) {
+      if (b.kind === 'warehouse' && b.cityId !== null && !tradeOrg.has(b.cityId))
+        fail(b.id, `warehouse ${b.id} stands in ${b.cityId}, not a Trade Org city`)
+    }
+    return out
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -986,6 +1014,7 @@ export const worldInvariants: Invariant[] = [
   territorySound,
   deadLeaveLoot,
   attackOrdersSound,
+  tradeOrgSound,
 ]
 
 export function checkInvariants(

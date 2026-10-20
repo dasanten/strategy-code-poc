@@ -40,9 +40,12 @@ const tilesOf = (world: WorldState, c: City) => [
 describe('placeNpcCities (through generateWorld)', () => {
   let terrain: TerrainMap
   let world: WorldState
+  // The NPC cities, without the Trade Org HQ the world generator places first.
+  let npc: City[]
   beforeAll(() => {
     terrain = generateTerrain(1, 720)
     world = generateWorld(terrain)
+    npc = world.cities.filter((c) => !c.tradeOrg)
   })
 
   it('places towns and villages by the map area, run by the game', () => {
@@ -51,8 +54,8 @@ describe('placeNpcCities (through generateWorld)', () => {
     const towns = npcCityCount(NPC_TOWNS, 720)
     const villages = npcCityCount(NPC_VILLAGES, 720)
     expect(towns).toBeGreaterThan(0)
-    expect(world.cities).toHaveLength(towns + villages)
-    const sizes = world.cities.map((c) => world.residents.filter((r) => r.cityId === c.id).length)
+    expect(npc).toHaveLength(towns + villages)
+    const sizes = npc.map((c) => world.residents.filter((r) => r.cityId === c.id).length)
     expect(sizes).toEqual([
       ...Array<number>(towns).fill(NPC_TOWN.residents),
       ...Array<number>(villages).fill(NPC_VILLAGE.residents),
@@ -64,7 +67,7 @@ describe('placeNpcCities (through generateWorld)', () => {
   })
 
   it('lays each one out with a town hall, a storage, houses, a wall with a gate and farms', () => {
-    for (const c of world.cities) {
+    for (const c of npc) {
       const own = world.buildings.filter((b) => b.cityId === c.id)
       const kind = own.filter((b) => b.kind === 'farm').length === 1 ? NPC_VILLAGE : NPC_TOWN
       const count = (k: string) => own.filter((b) => b.kind === k).length
@@ -90,9 +93,9 @@ describe('placeNpcCities (through generateWorld)', () => {
   })
 
   it('puts them on Plains, far from each other', () => {
-    for (const c of world.cities) {
+    for (const c of npc) {
       for (const t of tilesOf(world, c)) expect(terrainAt(terrain, t.x, t.y)).toBe(Terrain.Plains)
-      for (const o of world.cities) {
+      for (const o of npc) {
         if (o === c) continue
         const d = wrapDistance(terrain.size, townHallOf(world, c)!, townHallOf(world, o)!)
         expect(d).toBeGreaterThanOrEqual(NPC_CITY_MIN_DISTANCE - NPC_TOWN.size)

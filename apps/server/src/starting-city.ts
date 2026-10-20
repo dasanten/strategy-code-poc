@@ -12,6 +12,8 @@ import {
   START_RESIDENTS,
   START_STABLE_FOOD,
   START_SPARE_HOUSES,
+  TRADE_ORG_HQ,
+  TRADE_ORG_HQ_MIN_DISTANCE,
   Terrain,
   terrainAt,
   townHallOf,
@@ -119,9 +121,14 @@ export function plainsOutside(terrain: TerrainMap, city: WallSquare, out = 1): [
 const dist = (a: readonly [number, number], b: readonly [number, number]) =>
   Math.hypot(a[0] - b[0], a[1] - b[1])
 
+/** How far a starting city keeps from the Trade Org HQ while it keeps `minDistance` from others. */
+const hqDistance = (minDistance: number) =>
+  (TRADE_ORG_HQ_MIN_DISTANCE * minDistance) / CITY_MIN_DISTANCE
+
 /**
  * Picks a site for a new starting city: on open land, at least `CITY_MIN_DISTANCE` from every
- * city of a realm and `NPC_CITY_MIN_DISTANCE` from every NPC city, the short way round the map.
+ * city of a realm, `TRADE_ORG_HQ_MIN_DISTANCE` from the Trade Org HQ and `NPC_CITY_MIN_DISTANCE`
+ * from every other NPC city, the short way round the map.
  * When the map has no such room left, the required distances are halved until a site fits. A city never straddles the map's joins.
  */
 export function findCitySite(
@@ -134,7 +141,7 @@ export function findCitySite(
   // Every other city, by where its town hall stands, and whether it is an NPC city.
   const others = world.cities.flatMap((c) => {
     const hall = townHallOf(world, c)
-    return hall ? [{ x: hall.x, y: hall.y, npc: c.realmId === null }] : []
+    return hall ? [{ x: hall.x, y: hall.y, npc: c.realmId === null, hq: c.tradeOrg === 'hq' }] : []
   })
   const blocked = new Set([...world.nodes, ...world.buildings].map((e) => `${e.x},${e.y}`))
   for (let minDistance = CITY_MIN_DISTANCE; ; minDistance = Math.floor(minDistance / 2)) {
@@ -144,7 +151,14 @@ export function findCitySite(
       const centre = { x: x + START_CITY_SIZE / 2, y: y + START_CITY_SIZE / 2 }
       const tooNear = (o: (typeof others)[number]) =>
         wrapDistance(terrain.size, o, centre) <
-        (o.npc ? Math.min(NPC_CITY_MIN_DISTANCE, minDistance) : minDistance)
+        (o.hq
+          ? Math.max(
+              hqDistance(minDistance),
+              TRADE_ORG_HQ.outerRadius + FARM_RING + START_CITY_SIZE,
+            )
+          : o.npc
+            ? Math.min(NPC_CITY_MIN_DISTANCE, minDistance)
+            : minDistance)
       if (others.some(tooNear)) continue
       if (siteFits(terrain, blocked, x, y)) return [x, y]
     }

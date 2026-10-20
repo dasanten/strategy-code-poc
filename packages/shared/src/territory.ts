@@ -39,9 +39,15 @@ export interface Territory {
   owners: Map<string, string>
 }
 
-/** The Organization a city projects control for: its realm, or itself when it has none. */
+/** The Trade Organization's id as an Organization (`CONTEXT.md`: Trade Organization). */
+export const TRADE_ORGANIZATION = 'tradeOrg'
+
+/**
+ * The Organization a city projects control for: the Trade Organization for its cities, else its
+ * realm, or itself when it has none.
+ */
 export function cityOrganization(city: City): string {
-  return city.realmId ?? city.id
+  return city.tradeOrg ? TRADE_ORGANIZATION : (city.realmId ?? city.id)
 }
 
 /** How far control of the given strength reaches, in tiles. */

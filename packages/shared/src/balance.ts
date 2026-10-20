@@ -264,6 +264,40 @@ export const NPC_FOOD_LEFT_AT_WORK = 4
  */
 export const NPC_OWN_FOOD = START_CARRIED_FOOD
 
+/**
+ * What the Trade Org HQ is placed with (`CONTEXT.md`: Trade Org HQ): a round city, the largest on
+ * the map, with two rings of wall around its town hall.
+ */
+export const TRADE_ORG_HQ = {
+  /** Tiles from the town hall to the inner ring of wall, which holds its warehouses. */
+  innerRadius: 4,
+  /** Tiles from the town hall to the outer ring of wall; twice an NPC town's width across. */
+  outerRadius: 10,
+  /** Gates in each ring, evenly round it, the first due north. */
+  gates: 4,
+  /** Adult residents, with random stats like a starting city's. */
+  residents: 32,
+  /** Houses between the rings: room for everyone and one house more. */
+  houses: 9,
+  /** Farms outside the outer ring, by its gates. */
+  farms: 4,
+  /** Food in its storage, in units: about a week of what everyone eats. */
+  food: 450,
+  /** Coins in its coin warehouse. */
+  coins: 20_000,
+  /** Goods in its goods warehouse, in units. */
+  goods: { wood: 300, stone: 300, ironOre: 150, iron: 100, goldOre: 50 } as Partial<
+    Record<Good, number>
+  >,
+}
+
+/**
+ * Starting cities lie at least this many tiles from the Trade Org HQ when the map has room
+ * (`CITY_MIN_DISTANCE` for other starting cities), and the HQ is placed as far from every city
+ * as the map allows.
+ */
+export const TRADE_ORG_HQ_MIN_DISTANCE = 400
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 

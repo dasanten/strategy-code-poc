@@ -10,10 +10,13 @@ import {
   LIFESPAN_MAX,
   LIFESPAN_MIN,
   MAX_HEALTH,
+  NPC_CITY_MIN_DISTANCE,
   NPC_TOWNS,
   NPC_VILLAGES,
   START_HORSES,
   START_STABLE_FOOD,
+  townHallOf,
+  wrapDistance,
   type Carriage,
   type Horse,
   type TerrainMap,
@@ -24,7 +27,7 @@ import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { smallTerrain, worldWithCity } from './test-terrain.js'
 import { checkInvariants } from './invariants.js'
-import { npcCityCount } from './npc-cities.js'
+import { npcCityCount, placeNpcCities } from './npc-cities.js'
 import { entitiesInSight } from './sight.js'
 import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
 import { createWorld, generateWorld } from './world.js'
@@ -135,7 +138,7 @@ describe('world saves', () => {
     const { generate, seeds } = counting()
     const { world, terrain: fresh } = loadOrCreateWorld(db, generate)
     expect(seeds).toEqual([1])
-    expect(world).toEqual(createWorld(fresh, 1))
+    expect(world).toEqual(generateWorld(fresh, 1))
     expect(loadTerrain(db)).toEqual({ seed: 1, map: fresh })
     expect(db.select().from(schema.worldSaves).all()).toEqual([])
     expect(db.select().from(schema.explored).all()).toEqual([])
@@ -406,6 +409,42 @@ describe('world saves', () => {
     expect(checkInvariants(v17, land)).toEqual([])
     // The same save always migrates the same way.
     expect(migrateWorld(structuredClone(world), 16, { terrain: land }, migrations, 17)).toEqual(v17)
+  })
+
+  it('places the Trade Org HQ in the live world, far away and out of sight (migration 17 → 18)', () => {
+    const { world, terrain: land } = worldWithCity()
+    placeNpcCities(world, land)
+    const before = structuredClone(world)
+    const v18 = migrateWorld(structuredClone(world), 17, { terrain: land }, migrations, 18)
+    // What was there stays as it was; the HQ comes after it.
+    expect(v18.cities.slice(0, before.cities.length)).toEqual(before.cities)
+    expect(v18.residents.slice(0, before.residents.length)).toEqual(before.residents)
+    expect(v18.buildings.slice(0, before.buildings.length)).toEqual(before.buildings)
+    const added = v18.cities.slice(before.cities.length)
+    expect(added).toHaveLength(1)
+    const hq = added[0]!
+    expect(hq).toMatchObject({ realmId: null, tradeOrg: 'hq' })
+    expect(v18.buildings.filter((b) => b.kind === 'warehouse' && b.cityId === hq.id)).toHaveLength(
+      2,
+    )
+    // Far from every city: as far as the map allows.
+    const hall = townHallOf(v18, hq)!
+    const nearest = Math.min(
+      ...before.cities.map((c) => wrapDistance(land.size, hall, townHallOf(v18, c)!)),
+    )
+    expect(nearest).toBeGreaterThanOrEqual(NPC_CITY_MIN_DISTANCE)
+    // The Player sees none of it.
+    const realm = v18.realms[0]!
+    const seen = new Set(entitiesInSight(v18, land, realm.id).map((e) => e.id))
+    for (const e of [
+      ...v18.buildings.filter((b) => b.cityId === hq.id),
+      ...v18.residents.filter((r) => r.cityId === hq.id),
+    ])
+      expect(seen.has(e.id)).toBe(false)
+    expect(checkInvariants(v18, land)).toEqual([])
+    // The same save always migrates the same way, and a world that has an HQ gets no other.
+    expect(migrateWorld(structuredClone(world), 17, { terrain: land }, migrations, 18)).toEqual(v18)
+    expect(migrateWorld(structuredClone(v18), 17, { terrain: land }, migrations, 18)).toEqual(v18)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

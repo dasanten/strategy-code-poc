@@ -423,12 +423,25 @@ export interface City {
   realmId: string | null
   /** The town hall that makes it a city (`CONTEXT.md`: Town hall). */
   townHallId: string
+  /**
+   * Set when the city is the Trade Organization's, saying which of its cities it is
+   * (`CONTEXT.md`: Trade Organization, Trade Org HQ). It belongs to no realm and the game runs it
+   * like an NPC city.
+   */
+  tradeOrg?: 'hq'
+  /**
+   * Workplaces the game has a city it runs work besides its farms, by id: the Trade Org HQ's own
+   * workplaces on the nearest nodes. A workplace still belongs to no city; one that is gone is
+   * skipped.
+   */
+  workplaceIds?: string[]
 }
 
 export type BuildingKind =
   | 'townHall'
   | 'house'
   | 'storage'
+  | 'warehouse'
   | 'wall'
   | 'gate'
   | 'farm'
@@ -457,7 +470,7 @@ export interface Building {
   cityId: string | null
   x: number
   y: number
-  /** Goods kept here; storages and stables only. */
+  /** Goods kept here; storages, warehouses and stables only. */
   stock?: Stock
   /**
    * A stable's progress toward its next foal, in ticks of breeding (`STABLE_BREED_DAYS`); there

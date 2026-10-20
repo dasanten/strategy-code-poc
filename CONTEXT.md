@@ -95,7 +95,13 @@ The shared language of the game. Domain terms only — no implementation details
   most valuable warehouses, above all its coins, and its soldiers keep everyone else out by
   force: possible to break into in theory, hopeless in practice. The **outer rings** are open to
   everyone, but the HQ closes its gates when too many armed outsiders want in. When it grows too
-  weak compared to the Players, it grows another ring.
+  weak compared to the Players, it grows another ring. The world starts out with it, as far from
+  every city as the map allows and out of every Player's sight; starting cities keep well away
+  from it. Its own workplaces stand on the nearest node of every kind, with a smelter and a mint
+  between its rings, and the game runs it like an NPC city.
+- **Warehouse:** a Trade Org building that keeps goods like a storage, a city building of the
+  storage kind. The HQ keeps its coins in one and its other goods in another, inside the inner
+  ring.
 - **Trading post:** a small Trade Org city in a region, with a warehouse, so Players can trade
   nearby. Goods move between posts and HQ by caravan.
 - **Trading with the Trade Organization:** only in person, by a resident (or a carriage) on a
@@ -167,8 +173,9 @@ The shared language of the game. Domain terms only — no implementation details
 - **At home:** a resident standing in the area of a city of their own realm; for a resident of an
   NPC city, in the area of that city.
 - **NPC city:** a city run by the game. Self-managed cities are NPC cities. On its own it works
-  its farms and workplaces and carries the output to its storage, pairs its adults, builds a
-  house when it has a food surplus and no free housing, and puts more residents on farms (or
+  its farms and workplaces and carries the output to its storage (its workers take food from
+  the storage before they set out and come home for more when they run low), pairs its adults,
+  builds a house when it has a food surplus and no free housing, and puts more residents on farms (or
   builds a farm) when Food runs short. It never founds new cities: when it has no room left it
   grows its area by building on the edge, puts up a new wall there and then tears down the old
   one. A Player does the same by hand, if they want to. The world starts out with NPC villages
