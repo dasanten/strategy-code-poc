@@ -3,10 +3,12 @@ import { SCRIPT_ACTION_COST, SCRIPT_LIST_QUERY_COST, SCRIPT_TILE_QUERY_COST } fr
 /**
  * The game API as a script sees it (`CONTEXT.md`: Script, Memory, Step budget; ADR 0002): the
  * built-in names a running script gets, as plain data, so the server binds them and the editor
- * can list them. Values are read like variables; queries and actions are called.
+ * can list them. Values are read like variables; queries and actions are called. A resident's
+ * script gets `SCRIPT_API`, an army's `ARMY_SCRIPT_API`: the same values and queries, but
+ * army actions.
  *
- * - A **value** is set before the run: `me` (the resident running the script), `memory`, `tick`,
- *   `mapSize`.
+ * - A **value** is set before the run: `me` (the resident or army running the script),
+ *   `memory`, `tick`, `mapSize`.
  * - A **query** answers from what the Player sees and has explored, nothing more.
  * - An **action** asks for the order of the same name for `me`, checked exactly as a UI order
  *   is. It answers `null` when requested, or why not as a string; a script can request nothing
@@ -47,9 +49,9 @@ const action = (name: string, params: string[], description: string): ScriptBind
   description,
 })
 
-export const SCRIPT_API: readonly ScriptBinding[] = [
-  value('me', 'The resident running the script, as the Player sees them, with their `age`.'),
-  value('memory', 'An object kept between ticks for this resident; whatever is set on it stays.'),
+/** The values every script gets but `me`, and the queries. */
+const SHARED: readonly ScriptBinding[] = [
+  value('memory', 'An object kept between ticks for whoever runs it; whatever is set on it stays.'),
   value('tick', 'The world tick this run is for.'),
   value('mapSize', 'Tiles along each side of the map; its opposite sides join.'),
 
@@ -75,6 +77,12 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     cost: SCRIPT_TILE_QUERY_COST,
     description: 'Tiles between two things with `x` and `y`, the short way round the map.',
   },
+]
+
+/** The game API of a resident's script. */
+export const SCRIPT_API: readonly ScriptBinding[] = [
+  value('me', 'The resident running the script, as the Player sees them, with their `age`.'),
+  ...SHARED,
 
   action('walkTo', ['x', 'y'], 'Walk to a tile.'),
   action('drive', ['carriageId', 'x', 'y'], 'Drive the carriage on my tile to a tile.'),
@@ -105,4 +113,22 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     ['x', 'y'],
     'Build road on each tile of the line from my tile to (x, y), one after another, with the stone I carry.',
   ),
+]
+
+/**
+ * The game API of an army's script (`CONTEXT.md`: Army). Its actions ask for the army order of
+ * the same meaning (`walkTo` is `armyWalkTo`, and so on), checked exactly as a UI army order is.
+ */
+export const ARMY_SCRIPT_API: readonly ScriptBinding[] = [
+  value(
+    'me',
+    'The army running the script: its `name`, `order`, `memberIds`, and its `members` as the Player sees them.',
+  ),
+  ...SHARED,
+
+  action('walkTo', ['x', 'y'], 'The army walks to a tile together.'),
+  action('guard', ['x', 'y'], 'The army walks to a tile together and stays there.'),
+  action('attack', ['targetId'], 'The army goes after a resident of another realm in sight.'),
+  action('follow', ['targetId'], 'The army keeps in contact with a resident in sight.'),
+  action('stop', [], 'The army stops: its order ends.'),
 ]

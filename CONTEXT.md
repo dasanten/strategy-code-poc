@@ -236,12 +236,15 @@ The shared language of the game. Domain terms only — no implementation details
 - **Supply line:** a carriage that follows an army is its supply wagon: army members refill from
   it like at home (Refilling from a carriage). A haul route can have an army as its second
   stop, so food keeps coming to wherever the army is. Cut the route and the army starves.
+  At its army stop the carriage unloads nothing: it stays with the army, which refills from it,
+  until the hauled goods are gone, then goes back for more. Nothing comes back from an army.
+  A supply wagon's driver, not being of the army, eats only what they carry.
 - **Combat:** resolved between residents in contact (the same or a neighbouring tile). Attack
   from Strength, weapon and Combat skill; Agility dodges, armour and shields take off damage.
   Fighting teaches Combat. An armed resident who is hit fights back; an unarmed one flees home.
   A city's soldiers fight attackers in its area on their own.
-- **Walls in combat:** nobody walks through a wall. The city's own realm can stand on its walls
-  and defends far better there. A **gate** lets the city's realm through always, everyone else
+- **Walls in combat:** nobody walks through a wall. The city's own realm and its allies can stand on its walls
+  and defend far better there. A **gate** lets the city's realm and its allies through always, everyone else
   only while it is open; the city's realm opens and closes it. A wall or gate can be **broken**
   (attacked until it falls, leaving part of its materials) or **climbed** (slow, and a climber
   can't defend themselves, so a defended wall is costly to climb).
@@ -294,6 +297,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
   Leader was. Their cities become self-managed. The Player respawns as a new Leader with a fresh
   starting city on their next login.
+  Their realm log tells them how their Leader died and what became of each city, and where it
+  stands, so they can find it again on the map.
 - **Self-managed city:** a city with no living Leader in charge. It runs on its own behaviour and
   can be traded with, contracted, conquered or integrated by anyone, including its former Player.
   When a Leader dies, each of their cities becomes its own self-managed city, with the residents

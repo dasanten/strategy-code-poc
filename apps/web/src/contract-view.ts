@@ -1,25 +1,4 @@
-import { formatGameTime, type ContractView, type Resident } from '@csp/shared'
-
-/**
- * The residents in sight whose orders the Player gives (`CONTEXT.md`: Mercenary contract): their
- * own, but for those rented out under a contract in force, and the mercenaries they hired.
- */
-export function commanded(
-  residents: Resident[],
-  contracts: ContractView[],
-  realmId: string,
-): Resident[] {
-  const inForce = contracts.filter((c) => c.startedAt !== null)
-  const ids = (side: 'lender' | 'hirer') =>
-    new Set(
-      inForce
-        .filter((c) => c[side].realmId === realmId)
-        .flatMap((c) => c.residents.map((r) => r.id)),
-    )
-  const rentedOut = ids('lender')
-  const hired = ids('hirer')
-  return residents.filter((r) => (r.owner === realmId ? !rentedOut.has(r.id) : hired.has(r.id)))
-}
+import { formatGameTime, type ContractView } from '@csp/shared'
 
 /** Where a contract stands, as the Player sees it. */
 export function contractStatus(c: ContractView, realmId: string): string {

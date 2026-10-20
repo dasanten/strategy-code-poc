@@ -1,4 +1,5 @@
 import {
+  commands,
   ROAD_LINE_MAX_TILES,
   MAP_SIZE,
   buildProblem,
@@ -10,7 +11,6 @@ import {
   type OrderRequest,
   type Stock,
   type WorldState,
-  commands,
 } from '@csp/shared'
 import type { CarryAction } from './carrying.js'
 import type { OrderKind } from './orders.js'
@@ -41,7 +41,7 @@ export const roadLine: OrderKind = {
     const o = order as Partial<RoadLineRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t build'
     if (!isTile(o.from) || !isTile(o.to)) return 'the line must run between two tiles'
     const tiles = lineTiles(o.from, o.to, terrain?.size ?? MAP_SIZE)

@@ -8,6 +8,7 @@ import {
 } from '@csp/shared'
 import { placeNpcCities } from './npc-cities.js'
 import { placeTradeOrgHq } from './trade-org.js'
+import { placeTradingPosts } from './trading-posts.js'
 import { placeResourceNodes } from './node-gen.js'
 import { requestBuilding, resolveBuilding } from './building.js'
 import { stepHorses } from './horses.js'
@@ -56,12 +57,14 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
 
 /**
  * A world as the world generator makes it for a new game: `createWorld`, with the Trade Org HQ
- * (`placeTradeOrgHq`) and then its NPC cities placed (`placeNpcCities`).
+ * (`placeTradeOrgHq`), its NPC cities (`placeNpcCities`) and then its trading posts placed
+ * (`placeTradingPosts`).
  */
 export function generateWorld(terrain: TerrainMap, seed = 1): WorldState {
   const world = createWorld(terrain, seed)
   placeTradeOrgHq(world, terrain)
   placeNpcCities(world, terrain)
+  placeTradingPosts(world, terrain)
   return world
 }
 
@@ -116,7 +119,7 @@ export interface StepResult {
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
- * home or at their workplace who run low on food take meals there; cities with a captor change
+ * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
  * realm (`stepCaptures`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
  * (`stepContracts`); last, armies
  * lose members who are gone and give the rest their orders for the next tick. Without `walking`
@@ -133,7 +136,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const combat = resolveStrikes(world, strikes, terrain.size)
   const carries = [
     ...requestCarrying(world),
-    ...requestHauling(world),
+    ...requestHauling(world, terrain.size),
     ...requestRoadMaterials(world),
   ]
   resolveCarrying(world, carries, terrain.size)

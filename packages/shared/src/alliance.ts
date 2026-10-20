@@ -1,10 +1,69 @@
-import { contractsFor, type ContractView } from './contract.js'
-import type { Alliance, WorldState } from './world.js'
+import { contractOf, contractsFor, type ContractView } from './contract.js'
+import type { Alliance, AllianceArmyPart, Carriage, Resident, WorldState } from './world.js'
 
 /** World queries about alliances (ADR 0002: the game API orders and scripts share). */
 
 /** The longest an alliance's name may be. */
 export const ALLIANCE_NAME_MAX_LENGTH = 30
+
+/** The alliance whose army holds the resident or carriage `id` (`CONTEXT.md`: Alliance army). */
+export function handedOverTo(
+  world: Pick<WorldState, 'alliances'>,
+  id: string,
+): Alliance | undefined {
+  return world.alliances.find((a) => a.army.some((p) => p.id === id))
+}
+
+/** The part of an alliance army that is the resident or carriage `id`, if any. */
+export function armyPartOf(
+  world: Pick<WorldState, 'alliances'>,
+  id: string,
+): AllianceArmyPart | undefined {
+  for (const a of world.alliances) {
+    const part = a.army.find((p) => p.id === id)
+    if (part) return part
+  }
+  return undefined
+}
+
+/**
+ * The realm whose orders the resident takes: the alliance leader's while they are handed over to
+ * its army (`CONTEXT.md`: Alliance army), the hirer's while a mercenary contract rents them out
+ * (`CONTEXT.md`: Mercenary contract), their own realm's otherwise; null for a resident of no
+ * realm.
+ */
+export function commanderOf(
+  world: Pick<WorldState, 'alliances' | 'contracts'>,
+  r: Pick<Resident, 'id' | 'owner'>,
+): string | null {
+  return handedOverTo(world, r.id)?.leaderId ?? contractOf(world, r.id)?.hirerId ?? r.owner
+}
+
+/** The realm whose orders the carriage takes, as `commanderOf` for a resident. */
+export function carriageCommanderOf(
+  world: Pick<WorldState, 'alliances'>,
+  k: Carriage,
+): string | null {
+  return handedOverTo(world, k.id)?.leaderId ?? k.realmId
+}
+
+/** Whether the realm's Player may give the resident orders. */
+export function commands(
+  world: Pick<WorldState, 'alliances' | 'contracts'>,
+  realmId: string,
+  r: Resident | undefined,
+): r is Resident {
+  return r !== undefined && commanderOf(world, r) === realmId
+}
+
+/** Whether the realm's Player may give orders with the carriage. */
+export function commandsCarriage(
+  world: Pick<WorldState, 'alliances'>,
+  realmId: string,
+  k: Carriage | undefined,
+): k is Carriage {
+  return k !== undefined && carriageCommanderOf(world, k) === realmId
+}
 
 /** The alliance the realm is a member of, if any (`CONTEXT.md`: Alliance: at most one). */
 export function allianceOf(
@@ -15,12 +74,29 @@ export function allianceOf(
 }
 
 /**
+ * The realm and its allies: every member of its alliance, or just itself when in none. A member
+ * that is leaving counts until the leave delay is over (`CONTEXT.md`: Alliance).
+ */
+export function alliedRealms(world: Pick<WorldState, 'alliances'>, realmId: string): string[] {
+  const alliance = allianceOf(world, realmId)
+  return alliance ? alliance.members.map((m) => m.realmId) : [realmId]
+}
+
+/**
+ * Whether two realms stand together: the same realm, or members of one alliance. Allies pass
+ * each other's gates, stand on each other's walls, and don't attack each other unless ordered
+ * to (`CONTEXT.md`: Alliance).
+ */
+export function allied(world: Pick<WorldState, 'alliances'>, a: string, b: string): boolean {
+  return a === b || alliedRealms(world, a).includes(b)
+}
+
+/**
  * The realms whose residents a realm's Player sees through (`CONTEXT.md`: Sight): their own, and
  * every member of their alliance. A member that is leaving shares until the leave delay is over.
  */
 export function sharingSight(world: Pick<WorldState, 'alliances'>, realmId: string): string[] {
-  const alliance = allianceOf(world, realmId)
-  return alliance ? alliance.members.map((m) => m.realmId) : [realmId]
+  return alliedRealms(world, realmId)
 }
 
 /** How a realm is called to other Players: by its Leader's name. */
@@ -62,6 +138,8 @@ export interface Diplomacy {
     leaderId: string
     members: (RealmLabel & { joinedAt: number; leavesAt: number | null })[]
     invites: RealmLabel[]
+    /** The alliance army: each part with its realm, and when a recall brings it back. */
+    army: (RealmLabel & AllianceArmyPart)[]
   } | null
   /** Alliances whose leader invited the Player's realm. */
   invitations: { allianceId: string; name: string; leader: string }[]
@@ -76,10 +154,17 @@ export interface Diplomacy {
  * residents are in the Player's sight.
  */
 export function diplomacyFor(
-  world: Pick<WorldState, 'alliances' | 'realms' | 'residents' | 'contracts' | 'buildings'>,
+  world: Pick<
+    WorldState,
+    'alliances' | 'realms' | 'residents' | 'carriages' | 'contracts' | 'buildings'
+  >,
   realmId: string,
   seenRealms: Iterable<string>,
 ): Diplomacy {
+  const ownerOf = (p: AllianceArmyPart) =>
+    p.is === 'resident'
+      ? world.residents.find((r) => r.id === p.id)?.owner
+      : world.carriages.find((k) => k.id === p.id)?.realmId
   const label = (id: string): RealmLabel => ({ realmId: id, realm: realmName(world, id) })
   const own = allianceOf(world, realmId)
   const alliance = own && {
@@ -92,6 +177,7 @@ export function diplomacyFor(
       leavesAt: m.leaving?.at ?? null,
     })),
     invites: own.invites.map(label),
+    army: own.army.map((p) => ({ ...label(ownerOf(p) ?? ''), ...p })),
   }
   const invitations = world.alliances
     .filter((a) => a.invites.includes(realmId))

@@ -6,6 +6,7 @@ import {
   type Value,
 } from '@csp/lang'
 import {
+  ARMY_SCRIPT_API,
   HAUL_KEEP_FOOD,
   SCRIPT_API,
   Terrain,
@@ -14,6 +15,7 @@ import {
   wrapDistance,
   type OrderRequest,
   type ResourceNode,
+  type ScriptBinding,
   type SeenEntity,
   type TerrainMap,
   type WorldState,
@@ -37,9 +39,11 @@ export interface ScriptContext {
   terrain: TerrainMap
   /** The Player whose script it is, as an order's sender. */
   sender: OrderSender
-  /** The resident running the script; one of the Player's. */
-  residentId: string
-  /** The script's memory for this resident, kept by the caller between ticks. */
+  /** The resident running the script; one of the Player's. Not used with `armyId`. */
+  residentId?: string
+  /** The army running the script instead; one of the Player's. */
+  armyId?: string
+  /** The script's memory for this resident or army, kept by the caller between ticks. */
   memory: ScriptObject
   /** Everything the Player sees (`entitiesInSight`); called at most once a run. */
   seen: () => readonly SeenEntity[]
@@ -61,17 +65,29 @@ export const SCRIPT_ORDER_KINDS: readonly string[] = SCRIPT_API.filter(
   (b) => b.is === 'action',
 ).map((b) => b.name)
 
+/** The army order each action of an army's script asks for (`ARMY_SCRIPT_API`). */
+export const ARMY_SCRIPT_ORDERS: Readonly<Record<string, string>> = {
+  walkTo: 'armyWalkTo',
+  guard: 'armyGuard',
+  attack: 'armyAttack',
+  follow: 'armyFollow',
+  stop: 'armyStop',
+}
+
+/** The order kinds an army's script can request: one per action in `ARMY_SCRIPT_API`. */
+export const ARMY_SCRIPT_ORDER_KINDS: readonly string[] = ARMY_SCRIPT_API.filter(
+  (b) => b.is === 'action',
+).map((b) => ARMY_SCRIPT_ORDERS[b.name]!)
+
 const TERRAIN_NAMES = new Map<number, string>(
   Object.entries(Terrain).map(([name, code]) => [code, name.toLowerCase()]),
 )
 
-/** Binds the game API for one run of a resident's script. */
+/** Binds the game API for one run of a resident's script, or an army's with `armyId`. */
 export function bindScript(context: ScriptContext): ScriptBindings {
-  const { world, terrain, sender, residentId } = context
+  const { world, terrain, sender } = context
   const kinds = context.kinds ?? orderKinds
   const requests: OrderRequest[] = []
-  const resident = world.residents.find((r) => r.id === residentId)
-  if (!resident) throw new Error(`no resident ${residentId} to run a script for`)
 
   let seen: readonly SeenEntity[] | undefined
   const seenOf = (is: SeenEntity['is']): Value => {
@@ -104,7 +120,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
 
   /** Asks for an order for `me`, checked exactly as one from the UI. */
   const request = (kind: string, input: Record<string, unknown>): Value => {
-    const order: OrderRequest = { kind, residentId, ...input }
+    const order: OrderRequest = { kind, ...forMe, ...input }
     const orderKind = kinds[kind]
     if (!orderKind) throw new Error(`no order kind ${kind} for the script action`)
     const reason = orderKind.validate(world, sender, order, terrain)
@@ -113,7 +129,64 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     return null
   }
 
-  const actions: Record<string, (args: Value[]) => Value> = {
+  let api: readonly ScriptBinding[]
+  let me: Value
+  let forMe: Record<string, string>
+  let actions: Record<string, (args: Value[]) => Value>
+  if (context.armyId !== undefined) {
+    const army = world.armies.find((a) => a.id === context.armyId)
+    if (!army) throw new Error(`no army ${context.armyId} to run a script for`)
+    api = ARMY_SCRIPT_API
+    forMe = { armyId: army.id }
+    const members = army.memberIds.flatMap((id) => {
+      const r = world.residents.find((x) => x.id === id)
+      return r ? [{ ...r, script: undefined, age: ageInYears(r, world.tick) }] : []
+    })
+    // The army's own script state is `memory`, not part of `me`.
+    me = toValue({ ...army, script: undefined, members })
+    actions = {
+      walkTo: ([x, y]) => request('armyWalkTo', { x: plain(x), y: plain(y) }),
+      guard: ([x, y]) => request('armyGuard', { x: plain(x), y: plain(y) }),
+      attack: ([targetId]) => request('armyAttack', { targetId: plain(targetId) }),
+      follow: ([targetId]) => request('armyFollow', { targetId: plain(targetId) }),
+      stop: () => request('armyStop', {}),
+    }
+  } else {
+    const resident = world.residents.find((r) => r.id === context.residentId)
+    if (!resident) throw new Error(`no resident ${context.residentId} to run a script for`)
+    api = SCRIPT_API
+    forMe = { residentId: resident.id }
+    // The script's own state is `memory`, not part of `me`.
+    me = toValue({ ...resident, script: undefined, age: ageInYears(resident, world.tick) })
+    actions = residentActions(request, resident)
+  }
+
+  const values: Record<string, Value> = {
+    me,
+    memory: context.memory,
+    tick: world.tick,
+    mapSize: terrain.size,
+  }
+
+  const globals: Record<string, Value> = {}
+  for (const binding of api) {
+    if (binding.is === 'value') {
+      globals[binding.name] = values[binding.name]!
+      continue
+    }
+    const call = (binding.is === 'query' ? queries : actions)[binding.name]
+    if (!call) throw new Error(`the script binding ${binding.name} is not implemented`)
+    globals[binding.name] = new NativeFunction(binding.name, call, binding.cost)
+  }
+  return { globals, requests }
+}
+
+/** The actions of a resident's script (`SCRIPT_API`), each asking for the order of its name. */
+function residentActions(
+  request: (kind: string, input: Record<string, unknown>) => Value,
+  resident: { x: number; y: number },
+): Record<string, (args: Value[]) => Value> {
+  return {
     walkTo: ([x, y]) => request('walkTo', { x: plain(x), y: plain(y) }),
     drive: ([carriageId, x, y]) =>
       request('drive', { carriageId: plain(carriageId), x: plain(x), y: plain(y) }),
@@ -142,27 +215,6 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         to: { x: plain(x), y: plain(y) },
       }),
   }
-
-  // The script's own state is `memory`, not part of `me`.
-  const self = { ...resident, script: undefined }
-  const values: Record<string, Value> = {
-    me: toValue({ ...self, age: ageInYears(resident, world.tick) }),
-    memory: context.memory,
-    tick: world.tick,
-    mapSize: terrain.size,
-  }
-
-  const globals: Record<string, Value> = {}
-  for (const binding of SCRIPT_API) {
-    if (binding.is === 'value') {
-      globals[binding.name] = values[binding.name]!
-      continue
-    }
-    const call = (binding.is === 'query' ? queries : actions)[binding.name]
-    if (!call) throw new Error(`the script binding ${binding.name} is not implemented`)
-    globals[binding.name] = new NativeFunction(binding.name, call, binding.cost)
-  }
-  return { globals, requests }
 }
 
 /**
@@ -178,18 +230,44 @@ export function scriptRequestsSound(
   requests: readonly OrderRequest[],
   kinds: Record<string, OrderKind> = orderKinds,
 ): InvariantViolation[] {
+  return requestsSound(world, terrain, sender, residentId, requests, kinds, 'resident')
+}
+
+/** The same invariant for an army's script: each request is an army action's order for it. */
+export function armyScriptRequestsSound(
+  world: WorldState,
+  terrain: TerrainMap,
+  sender: OrderSender,
+  armyId: string,
+  requests: readonly OrderRequest[],
+  kinds: Record<string, OrderKind> = orderKinds,
+): InvariantViolation[] {
+  return requestsSound(world, terrain, sender, armyId, requests, kinds, 'army')
+}
+
+function requestsSound(
+  world: WorldState,
+  terrain: TerrainMap,
+  sender: OrderSender,
+  id: string,
+  requests: readonly OrderRequest[],
+  kinds: Record<string, OrderKind>,
+  who: 'resident' | 'army',
+): InvariantViolation[] {
+  const allowed = who === 'army' ? ARMY_SCRIPT_ORDER_KINDS : SCRIPT_ORDER_KINDS
+  const field = who === 'army' ? 'armyId' : 'residentId'
   const out: InvariantViolation[] = []
   for (const order of requests) {
     const fail = (message: string) =>
       out.push({
         invariant: 'script-requests-as-orders',
-        message: `${residentId}'s script requested ${order.kind}: ${message}`,
-        entityIds: [residentId],
+        message: `${id}'s script requested ${order.kind}: ${message}`,
+        entityIds: [id],
       })
     const kind = kinds[order.kind]
-    if (!SCRIPT_ORDER_KINDS.includes(order.kind) || !kind) fail('not an order a resident can get')
-    else if (order.residentId !== residentId)
-      fail(`for another resident, ${String(order.residentId)}`)
+    if (!allowed.includes(order.kind) || !kind) {
+      fail(`not an order ${who === 'army' ? 'an army' : 'a resident'} can get`)
+    } else if (order[field] !== id) fail(`for another ${who}, ${String(order[field])}`)
     else {
       const reason = kind.validate(world, sender, order, terrain)
       if (reason !== undefined) fail(reason)

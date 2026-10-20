@@ -2,6 +2,7 @@ import {
   CONTRACT_MAX_DAYS,
   SIGHT_RANGE,
   commands,
+  handedOverTo,
   contractEndsAt,
   contractPayBy,
   contractWeeks,
@@ -64,6 +65,9 @@ function readOffer(
   }
   if (ids.some((id) => contracted(world, id as string))) {
     return 'a resident is already in a contract'
+  }
+  if (ids.some((id) => handedOverTo(world, id as string))) {
+    return 'a resident is in an alliance army'
   }
   let hirerId: string
   if (lenderId === realmId) {

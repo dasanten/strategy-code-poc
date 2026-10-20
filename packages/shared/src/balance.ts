@@ -304,6 +304,34 @@ export const TRADE_ORG_HQ = {
  */
 export const TRADE_ORG_HQ_MIN_DISTANCE = 400
 
+/**
+ * How wide a region is for trading posts (`CONTEXT.md`: Trading post), in tiles along each side:
+ * the map is cut into a grid of about this size, one post in each square. A full-size map gets
+ * 4 × 4 = 16 posts, as many as it gets NPC cities; a small map gets at least one.
+ */
+export const TRADING_POST_REGION = 360
+
+/**
+ * What a trading post is placed with (`CONTEXT.md`: Trading post): a walled village with a
+ * warehouse. It keeps this size; it never grows.
+ */
+export const TRADING_POST = {
+  /** Tiles along each side, wall included: a village's square. */
+  size: 7,
+  /** Adult residents: enough for its farm and its one workplace. */
+  residents: 4,
+  /** Houses inside the wall: room for everyone. */
+  houses: 2,
+  /** Farms outside the wall, by the gate. */
+  farms: 1,
+  /** Food in its storage, in units: about two weeks of what everyone eats. */
+  food: 100,
+  /** Coins in its warehouse. */
+  coins: 2_000,
+  /** Goods in its warehouse, in units. */
+  goods: { wood: 50, stone: 50, ironOre: 20, iron: 10 } as Partial<Record<Good, number>>,
+}
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 
@@ -776,6 +804,12 @@ export const TEARDOWN_MATERIALS_RETURNED = 0.5
 export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
 
 /**
+ * How long after its owner recalls a soldier or carriage from the alliance army it is theirs to
+ * command again (`CONTEXT.md`: Alliance army): a game day.
+ */
+export const ALLIANCE_RECALL_DELAY = TICKS_PER_GAME_DAY
+
+/**
  * Control a city projects before counting anyone in it (`CONTEXT.md`: Territory), so even an
  * empty city holds the ground it stands on.
  */
@@ -843,7 +877,7 @@ export const DODGE_LIMIT = 0.5
 export const COMBAT_SKILL_PER_BLOW = 0.02
 
 /** The weapon a resident fights with: the best one they carry, if any (`CONTEXT.md`: Weapons and armour). */
-export function bestWeapon(resident: Resident): Weapon | undefined {
+export function bestWeapon(resident: Pick<Resident, 'carried'>): Weapon | undefined {
   const carried = (Object.keys(WEAPON_ATTACK) as Weapon[]).filter(
     (w) => (resident.carried[w] ?? 0) > 0,
   )
@@ -851,7 +885,7 @@ export function bestWeapon(resident: Resident): Weapon | undefined {
 }
 
 /** Whether a resident is armed: carries a weapon (`CONTEXT.md`: Soldier). */
-export function isArmed(resident: Resident): boolean {
+export function isArmed(resident: Pick<Resident, 'carried'>): boolean {
   return bestWeapon(resident) !== undefined
 }
 

@@ -332,6 +332,30 @@ describe('mercenary contracts', () => {
   })
 })
 
+describe('mercenaries and the alliance army', () => {
+  it('keeps a resident out of both a contract and an alliance army', () => {
+    const { world, queue } = setup()
+    world.alliances.push({
+      id: 'alliance1',
+      name: 'North',
+      leaderId: 'r1',
+      members: [{ realmId: 'r1', joinedAt: 0, leaving: null }],
+      invites: [],
+      army: [{ is: 'resident', id: 'm2', recallAt: null }],
+    })
+    expect(order(world, queue, lenderPlayer, offer)).toBe('a resident is in an alliance army')
+    expect(order(world, queue, lenderPlayer, { ...offer, residentIds: ['m1'] })).toBe('ack')
+    at(world, 'm1').carried.spear = 1
+    expect(
+      order(world, queue, lenderPlayer, {
+        kind: 'handOverToAlliance',
+        residentIds: ['m1'],
+        carriageIds: [],
+      }),
+    ).toBe(`${at(world, 'm1').name} is in a mercenary contract`)
+  })
+})
+
 describe('contracts-sound', () => {
   it('catches a resident in two contracts and a week left unpaid', () => {
     const { world, queue } = setup()

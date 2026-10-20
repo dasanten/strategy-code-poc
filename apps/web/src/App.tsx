@@ -15,15 +15,16 @@ import {
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
+import { commandsSeen } from './alliance-army.js'
 import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { ContractsPanel } from './Contracts.js'
-import { commanded } from './contract-view.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { pageFor } from './pages.js'
 import { RealmLog } from './RealmLog.js'
+import { realmEnded } from './realm-log.js'
 import { ResidentInspector, ResidentsList, type HaulSetup, type Picking } from './Residents.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { useWorld } from './useWorld.js'
@@ -53,12 +54,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [orderError, setOrderError] = useState<string | undefined>()
   const [armyPick, setArmyPick] = useState<ArmyPick>()
   const [armyError, setArmyError] = useState<string | undefined>()
-  // The residents whose orders the Player gives: their own and mercenaries they hired.
-  const own = world ? commanded(world.residents, world.diplomacy.contracts, world.home.realmId) : []
+  // The residents the Player gives orders to: their own, less those handed over to their alliance's
+  // army or rented out, and, as its alliance leader, the ones handed over (`CONTEXT.md`: Alliance
+  // army) and the mercenaries they hired (`CONTEXT.md`: Mercenary contract).
+  const own = world
+    ? world.residents.filter((r) => commandsSeen(world.diplomacy, world.home.realmId, r))
+    : []
   const selected = own.find((r) => r.id === selectedId)
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
+  // A place from the realm log to show on the map.
+  const [focus, setFocus] = useState<{ x: number; y: number }>()
 
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
@@ -173,6 +180,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       <main>
         <div className="play-column">
           <section className="map-panel">
+            {world && realmEnded(world.events) && (
+              <div className="realm-ended" role="alert">
+                <p>
+                  Your Leader has died and your realm has ended. The realm log says what became of
+                  your cities. You start afresh with a new Leader and a new starting city.
+                </p>
+                <button type="button" onClick={() => window.location.reload()}>
+                  Start afresh
+                </button>
+              </div>
+            )}
             {world ? (
               <MapView
                 world={world}
@@ -186,6 +204,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 picking={picking !== false || armyPick !== undefined}
                 onPickTile={goTo}
                 onNodesLoaded={onNodesLoaded}
+                focus={focus}
               />
             ) : (
               <p>Waiting for the server…</p>
@@ -256,6 +275,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 setArmyError(undefined)
               }}
               pickError={armyError}
+              scripts={scripts}
               sendOrder={sendOrder}
             />
           )}
@@ -279,6 +299,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           {world && (
             <AlliancePanel
               diplomacy={world.diplomacy}
+              residents={world.residents}
+              carriages={world.carriages}
               realmId={world.home.realmId}
               sendOrder={sendOrder}
             />
@@ -295,7 +317,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               }
             />
           )}
-          {world && <RealmLog events={world.events} realmId={world.home.realmId} />}
+          {world && (
+            <RealmLog
+              events={world.events}
+              realmId={world.home.realmId}
+              onShowPlace={(p) => setFocus({ x: p.x, y: p.y })}
+            />
+          )}
           <ScriptLibrary onScripts={setScripts} />
         </div>
       </main>

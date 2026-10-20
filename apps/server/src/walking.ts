@@ -1,4 +1,7 @@
 import {
+  armyDrivenTo,
+  commands,
+  armySpot,
   inContact,
   carriageCanEnter,
   driveSpeed,
@@ -24,7 +27,6 @@ import {
   type WalkOrder,
   type WallMap,
   type WorldState,
-  commands,
 } from '@csp/shared'
 import type { OrderKind, OrderSender } from './orders.js'
 import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
@@ -62,7 +64,7 @@ export const walkTo: OrderKind = {
     const o = order as Partial<WalkToRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the target must be a tile'
     return undefined
   },
@@ -122,6 +124,41 @@ function attackHolds(world: WorldState, r: Resident, o: AttackOrder, size: numbe
 }
 
 /**
+ * A carriage going after an army (`CONTEXT.md`: Supply line) that need not drive this tick. With
+ * the army gone, the drive or haul route ends. Where the order heads (`target`, or a haul route's
+ * `to`) follows the army once it has moved on from there (`armySpot`), and a path that no longer
+ * ends in contact with it is found again. In contact with the army, a supply wagon stands with it
+ * and a haul route starts on its stop.
+ */
+function followHolds(
+  world: WorldState,
+  r: Resident,
+  o: DriveOrder | HaulOrder,
+  armyId: string,
+  size: number,
+): boolean {
+  const spot = armySpot(world, armyId, r, size)
+  if (!spot) {
+    r.order = null
+    return true
+  }
+  const to = o.kind === 'drive' ? o.target : o.to
+  if (!inContact(size, to, spot)) {
+    to.x = spot.x
+    to.y = spot.y
+  }
+  if (inContact(size, r, spot)) {
+    if (o.kind === 'haul') arrive(r, o)
+    o.path = null
+    o.progress = 0
+    return true
+  }
+  const end = o.path?.at(-1)
+  if (o.path && (!end || !inContact(size, { x: end[0], y: end[1] }, spot))) o.path = null
+  return false
+}
+
+/**
  * A moving order got there: a walk or drive is done, a haul route starts on its stop, an attack
  * order waits for contact or its target's next move, a road order builds on its tile.
  */
@@ -133,6 +170,12 @@ function arrive(r: Resident, o: MoveOrder): void {
   }
   if (o.kind === 'roadLine') {
     o.phase = 'building'
+    o.path = null
+    o.progress = 0
+    return
+  }
+  // A supply wagon's drive lasts as long as its army (`followHolds`).
+  if (o.kind === 'drive' && o.army !== undefined) {
     o.path = null
     o.progress = 0
     return
@@ -178,8 +221,15 @@ export class Walking {
     const roads = roadTiles(world, this.terrain.size)
     this.finder.setRoads(roads)
     this.finder.setWalls(this.wallsOf(world))
-    this.plan(world, budgetMs)
     const holding = new Set<string>()
+    for (const r of world.residents) {
+      const o = moveOrder(r)
+      const armyId = armyDrivenTo(r)
+      if ((o?.kind === 'drive' || o?.kind === 'haul') && armyId !== undefined) {
+        if (followHolds(world, r, o, armyId, this.terrain.size)) holding.add(r.id)
+      }
+    }
+    this.plan(world, budgetMs, holding)
     for (const r of world.residents) {
       const o = moveOrder(r)
       if (o?.kind === 'attack' && attackHolds(world, r, o, this.terrain.size)) holding.add(r.id)
@@ -215,10 +265,10 @@ export class Walking {
    * Finds paths for new walk and drive orders and haul routes' next legs; drops orders whose
    * target can't be reached.
    */
-  private plan(world: WorldState, budgetMs: number): void {
+  private plan(world: WorldState, budgetMs: number, holding: Set<string>): void {
     for (const r of world.residents) {
       const o = moveOrder(r)
-      if (!o || o.path) continue
+      if (!o || o.path || holding.has(r.id)) continue
       const target = targetOf(world, o)
       if (!target) continue
       // A new order for a resident replaces any search for their old one.
@@ -226,7 +276,9 @@ export class Walking {
       if (this.searching.get(r.id) !== key) {
         const costs = onFoot(o) ? WALKING_COSTS : CARRIAGE_COSTS
         // An attacker only needs to come into contact, even with a defender up on a wall.
-        const options = { realmId: r.owner, onWalls: onFoot(o), near: o.kind === 'attack' }
+        // So does a carriage going after an army (`CONTEXT.md`: Supply line).
+        const near = o.kind === 'attack' || armyDrivenTo(r) !== undefined
+        const options = { realmId: r.owner, onWalls: onFoot(o), near }
         this.finder.request(r.id, [r.x, r.y], [target.x, target.y], costs, options)
         this.searching.set(r.id, key)
       }

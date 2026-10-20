@@ -1,6 +1,7 @@
-import { type ContractView, type RealmEvent, type Resident } from '@csp/shared'
+import type { ContractView, Diplomacy, RealmEvent } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { commanded, contractStatus } from './contract-view.js'
+import { commandsSeen } from './alliance-army.js'
+import { contractStatus } from './contract-view.js'
 import { describeEvent } from './realm-log.js'
 
 const contract: ContractView = {
@@ -19,13 +20,20 @@ const contract: ContractView = {
   payBy: null,
 }
 
-const resident = (id: string, owner: string) => ({ id, owner }) as Resident
+const resident = (id: string, owner: string) => ({ id, owner })
+
+const diplomacy = (contracts: ContractView[]): Diplomacy => ({
+  alliance: null,
+  invitations: [],
+  realmsInSight: [],
+  contracts,
+})
 
 describe('mercenary contracts in the UI', () => {
   it('gives the hirer the orders of mercenaries in force, not before', () => {
     const residents = [resident('a1', 'r1'), resident('m1', 'r1'), resident('b1', 'r2')]
     const ids = (cs: ContractView[], realm: string) =>
-      commanded(residents, cs, realm).map((r) => r.id)
+      residents.filter((r) => commandsSeen(diplomacy(cs), realm, r)).map((r) => r.id)
     expect(ids([contract], 'r1')).toEqual(['a1', 'm1'])
     expect(ids([contract], 'r2')).toEqual(['b1'])
     const inForce = { ...contract, startedAt: 0 }

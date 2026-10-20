@@ -1,10 +1,5 @@
 import { realmName, type RealmLabel } from './alliance.js'
-import {
-  TICKS_PER_GAME_DAY,
-  type MercenaryContract,
-  type Resident,
-  type WorldState,
-} from './world.js'
+import { TICKS_PER_GAME_DAY, type MercenaryContract, type WorldState } from './world.js'
 
 /** World queries about mercenary contracts (ADR 0002: the game API orders and scripts share). */
 
@@ -42,26 +37,6 @@ export function contractOf(
   residentId: string,
 ): MercenaryContract | undefined {
   return world.contracts.find((c) => c.startedAt !== null && c.residentIds.includes(residentId))
-}
-
-/**
- * The realm whose orders the resident takes (`CONTEXT.md`: Mercenary contract): the hirer while
- * a contract rents them out, else their own realm; null for a resident of no realm.
- */
-export function commanderOf(
-  world: Pick<WorldState, 'contracts'>,
-  r: Pick<Resident, 'id' | 'owner'>,
-): string | null {
-  return contractOf(world, r.id)?.hirerId ?? r.owner
-}
-
-/** Whether the realm gives the resident's orders: its own, unless rented out, or hired. */
-export function commands(
-  world: Pick<WorldState, 'contracts'>,
-  realmId: string,
-  r: Pick<Resident, 'id' | 'owner'>,
-): boolean {
-  return commanderOf(world, r) === realmId
 }
 
 /** A mercenary contract as one of its sides sees it. */

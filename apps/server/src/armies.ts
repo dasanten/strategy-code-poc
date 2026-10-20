@@ -4,6 +4,7 @@ import {
   SIGHT_RANGE,
   commands,
   armyOf,
+  commanderOf,
   inContact,
   wrapDistance,
   type Army,
@@ -88,13 +89,13 @@ function stopMembers(world: WorldState, army: Army): void {
 }
 
 /** Takes residents out of every army; an army left with nobody is gone. */
-function takeOut(world: WorldState, ids: Set<string>): void {
+export function leaveArmies(world: WorldState, ids: Set<string>): void {
   for (const a of world.armies) a.memberIds = a.memberIds.filter((id) => !ids.has(id))
   world.armies = world.armies.filter((a) => a.memberIds.length > 0)
 }
 
 /**
- * Forming an army: a name and some of the realm's residents, who leave any army they were in.
+ * Forming an army: a name and some residents the realm commands, who leave any army they were in.
  * It starts idle; its members go on with what they were doing until it gets an order.
  */
 export const formArmy = armyOrderKind(
@@ -108,13 +109,17 @@ export const formArmy = armyOrderKind(
     if (!Array.isArray(ids) || ids.length === 0) return 'an army needs at least one resident'
     if (new Set(ids).size !== ids.length) return 'a resident is named twice'
     const own = (id: unknown) =>
-      world.residents.some((r) => r.id === id && commands(world, realmId, r))
+      commands(
+        world,
+        realmId,
+        world.residents.find((r) => r.id === id),
+      )
     if (!ids.every(own)) return 'not all of them are your residents'
     return undefined
   },
   (world, realmId, order) => {
     const ids = order.residentIds as string[]
-    takeOut(world, new Set(ids))
+    leaveArmies(world, new Set(ids))
     world.armies.push({
       id: newId(world, 'army'),
       name: (order.name as string).trim(),
@@ -250,7 +255,7 @@ export function leaveOnOwnOrders(
   for (const r of world.residents) {
     if (before.has(r.id) && before.get(r.id) !== r.order) left.add(r.id)
   }
-  if (left.size > 0) takeOut(world, left)
+  if (left.size > 0) leaveArmies(world, left)
 }
 
 const walkFor = (army: Army, x: number, y: number): WalkOrder => ({
@@ -263,9 +268,10 @@ const walkFor = (army: Army, x: number, y: number): WalkOrder => ({
 
 /**
  * Keeps armies sound and carries out their orders, on a map of `size` tiles, as a tick ends: a
- * member who died or no longer belongs to the army's realm leaves it, an army with nobody left
- * or whose realm ended is gone, and an order tagged with an army the resident is not in is their
- * own from then on. Then each army's order gives its members their orders for the next tick.
+ * member who died or no longer takes orders from the army's realm leaves it, an army with nobody
+ * left or whose realm ended is gone, and an order tagged with an army the resident is not in is
+ * their own from then on. Then each army's order gives its members their orders for the next
+ * tick.
  */
 export function stepArmies(world: WorldState, size: number): void {
   const byId = new Map(world.residents.map((r) => [r.id, r]))
@@ -273,7 +279,7 @@ export function stepArmies(world: WorldState, size: number): void {
   for (const a of world.armies) {
     a.memberIds = a.memberIds.filter((id) => {
       const r = byId.get(id)
-      return r !== undefined && commands(world, a.realmId, r)
+      return r !== undefined && commanderOf(world, r) === a.realmId
     })
   }
   world.armies = world.armies.filter((a) => a.memberIds.length > 0 && realms.has(a.realmId))
@@ -284,10 +290,45 @@ export function stepArmies(world: WorldState, size: number): void {
       if (armyIdOf.get(r.id) !== o.army) delete o.army
     }
   }
+  for (const r of world.residents) {
+    if (suppliedArmy(r) !== undefined && !suppliesOwnArmy(world, r)) r.order = null
+  }
   for (const army of world.armies) {
     const members = army.memberIds.map((id) => byId.get(id)!)
     carryOut(world, army, members, size)
   }
+}
+
+/** The army a resident's carriage supplies, following it or on a haul route to it, if any. */
+function suppliedArmy(r: Resident): string | undefined {
+  const o = r.order
+  if (o?.kind === 'drive') return o.army
+  if (o?.kind === 'haul') return o.toArmy
+  return undefined
+}
+
+/** Whether the army a resident supplies (`suppliedArmy`) exists and is their commander's. */
+function suppliesOwnArmy(world: WorldState, r: Resident): boolean {
+  const id = suppliedArmy(r)
+  return world.armies.some((a) => a.id === id && a.realmId === commanderOf(world, r))
+}
+
+/**
+ * Supply lines go to real armies (`CONTEXT.md`: Supply line): a carriage that follows an army, or
+ * a haul route with an army as its second stop, goes to an army of the driver's realm. When the
+ * army is gone, the drive or route ends (`stepArmies`).
+ */
+export const supplyLinesSound: Invariant = {
+  name: 'supply-lines-sound',
+  check(world) {
+    return world.residents
+      .filter((r) => suppliedArmy(r) !== undefined && !suppliesOwnArmy(world, r))
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} supplies army ${suppliedArmy(r)}, not one of their realm's`,
+        entityIds: [r.id],
+      }))
+  },
 }
 
 /** Gives the army's members their orders from the army's, and ends an order that is done. */
@@ -370,8 +411,8 @@ export function waitingForArmy(world: WorldState, holding: Set<string>): Set<str
 
 /**
  * Armies hold together (`CONTEXT.md`: Army): each has a name, belongs to a realm that exists and
- * has members, all living residents of that realm, none in two armies; an order tagged with an
- * army is held by one of its members.
+ * has members, all living residents that realm commands (`commanderOf`), none in two armies; an
+ * order tagged with an army is held by one of its members.
  */
 export const armiesSound: Invariant = {
   name: 'armies-sound',
@@ -390,8 +431,8 @@ export const armiesSound: Invariant = {
       for (const id of a.memberIds) {
         const r = byId.get(id)
         if (!r) report(`army ${a.id} has member ${id}, who does not exist`, [a.id, id])
-        else if (!commands(world, a.realmId, r)) {
-          report(`army ${a.id} has member ${id} of another realm`, [a.id, id])
+        else if (commanderOf(world, r) !== a.realmId) {
+          report(`army ${a.id} has member ${id} another realm commands`, [a.id, id])
         }
         if (seen.has(id)) report(`resident ${id} is in two armies`, [id])
         seen.add(id)

@@ -1,5 +1,6 @@
 import {
   ALLIANCE_LEAVE_DELAY,
+  ALLIANCE_RECALL_DELAY,
   ALLIANCE_NAME_MAX_LENGTH,
   BUILDABLE,
   BUILD_MATERIALS,
@@ -54,11 +55,11 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
-import { refillStock } from './survival.js'
+import { refillSource } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
-import { armiesSound } from './armies.js'
 import { contractsSound } from './contracts.js'
+import { armiesSound, supplyLinesSound } from './armies.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -583,9 +584,10 @@ export const workOrdersOnWorkplaces: Invariant = {
 }
 
 /**
- * After a tick, nobody at home or at their workplace runs low on food while the storage, pile or
- * carriage they refill from still has some and a meal would fit (`stepRefill`, `CONTEXT.md`:
- * Refilling at home, Refilling at a workplace).
+ * After a tick, nobody at home, at their workplace or in an army by a carriage runs low on food
+ * while the storage, pile or carriage they refill from still has some and a meal would fit
+ * (`stepRefill`, `CONTEXT.md`: Refilling at home, Refilling at a workplace, Refilling from a
+ * carriage).
  */
 export const refilledWhenLow: Invariant = {
   name: 'refilled-when-low',
@@ -594,7 +596,7 @@ export const refilledWhenLow: Invariant = {
       .filter(
         (r) =>
           (r.carried.food ?? 0) < HOME_FOOD_LOW &&
-          (refillStock(world, r, terrain.size)?.food ?? 0) > 0 &&
+          (refillSource(world, r, terrain.size)?.food ?? 0) > 0 &&
           unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
       )
       .map((r) => ({
@@ -674,7 +676,8 @@ export const driversOnCarriages: Invariant = {
  * Haul routes stay sound (`CONTEXT.md`: Haul route): two different stops a carriage can reach,
  * at least one good and none hauled both ways, the Food kept for the horse fits on the carriage,
  * and a hauler loading or unloading stands at the stop they are at, holding goods for the route
- * only while loading.
+ * only while loading. A route to an army (`CONTEXT.md`: Supply line) brings nothing back, and its
+ * hauler never holds goods for it there.
  */
 export const haulRoutesSound: Invariant = {
   name: 'haul-routes-sound',
@@ -690,8 +693,10 @@ export const haulRoutesSound: Invariant = {
           entityIds: [r.id, o.carriageId],
         })
       const { from, to } = o
-      if (from.x === to.x && from.y === to.y) fail('hauls between one tile and itself')
-      for (const s of [from, to]) {
+      // An army stop is wherever the army is (`CONTEXT.md`: Supply line).
+      const toArmy = o.toArmy !== undefined
+      if (!toArmy && from.x === to.x && from.y === to.y) fail('hauls between one tile and itself')
+      for (const s of toArmy ? [from] : [from, to]) {
         if (!carriageCanEnter(terrainAt(terrain, s.x, s.y))) {
           fail(`hauls to (${s.x}, ${s.y}), where no carriage can go`)
         }
@@ -699,11 +704,14 @@ export const haulRoutesSound: Invariant = {
       if (o.goods.length === 0) fail('hauls no goods')
       const both = o.returnGoods.filter((g) => o.goods.includes(g))
       if (both.length > 0) fail(`hauls ${both.join(', ')} both ways`)
+      if (toArmy && o.returnGoods.length > 0) fail('hauls goods back from an army')
       if (o.keepFood < 0 || o.keepFood * GOOD_WEIGHT.food > CARRIAGE_CAPACITY) {
         fail(`keeps ${o.keepFood} Food for the horse`)
       }
       const stop = o[o.stop]
-      if (o.phase === 'loading' && (r.x !== stop.x || r.y !== stop.y)) {
+      const withArmy = toArmy && o.stop === 'to'
+      if (withArmy && o.moving) fail('holds goods for the route at an army')
+      if (o.phase === 'loading' && !withArmy && (r.x !== stop.x || r.y !== stop.y)) {
         fail(`loads at the ${o.stop} stop but stands at (${r.x}, ${r.y})`)
       }
       if (o.phase === 'driving' && o.moving) fail('holds goods for the route while driving')
@@ -993,7 +1001,9 @@ export const attackOrdersSound: Invariant = {
  * Alliances hold together (`CONTEXT.md`: Alliance, Alliance leader): each has a name and at
  * least one member, in the order they joined; its members and invited realms exist; a realm is in
  * at most one alliance, and only a realm in none is invited; the alliance leader is a member; a
- * member leaving goes within the leave delay.
+ * member leaving goes within the leave delay; each soldier and carriage of its army (`CONTEXT.md`:
+ * Alliance army) exists, belongs to a member, is in no other alliance army and, when recalled,
+ * comes back within the recall delay.
  */
 export const alliancesSound: Invariant = {
   name: 'alliances-sound',
@@ -1002,6 +1012,10 @@ export const alliancesSound: Invariant = {
     const memberOf = new Map<string, string>()
     for (const a of world.alliances) {
       for (const m of a.members) memberOf.set(m.realmId, memberOf.has(m.realmId) ? '' : a.id)
+    }
+    const handedOver = new Map<string, string>()
+    for (const a of world.alliances) {
+      for (const p of a.army) handedOver.set(p.id, handedOver.has(p.id) ? '' : a.id)
     }
     return world.alliances.flatMap((a) => {
       const problems: string[] = []
@@ -1027,6 +1041,22 @@ export const alliancesSound: Invariant = {
       for (const id of a.invites) {
         if (!realms.has(id)) problems.push(`invites ${id}, which has ended`)
         else if (memberOf.has(id)) problems.push(`invites ${id}, which is in an alliance`)
+      }
+      const members = new Set(a.members.map((m) => m.realmId))
+      for (const p of a.army) {
+        const owner =
+          p.is === 'resident'
+            ? world.residents.find((r) => r.id === p.id)?.owner
+            : world.carriages.find((k) => k.id === p.id)?.realmId
+        if (owner === undefined) problems.push(`has ${p.is} ${p.id} in its army, which is gone`)
+        else if (!members.has(owner ?? '')) {
+          problems.push(`has ${p.is} ${p.id} in its army, which is no member's`)
+        }
+        if (handedOver.get(p.id) !== a.id) problems.push(`shares ${p.is} ${p.id} in its army`)
+        const at = p.recallAt
+        if (at !== null && (at <= world.tick || at > world.tick + ALLIANCE_RECALL_DELAY)) {
+          problems.push(`has ${p.is} ${p.id} in its army recalled at tick ${at}`)
+        }
       }
       return problems.map((p) => ({
         invariant: this.name,
@@ -1134,7 +1164,7 @@ export const roadLineOrdersSound: Invariant = {
 }
 
 /**
- * The Trade Organization stays apart (`CONTEXT.md`: Trade Organization, Trade Org HQ,
+ * The Trade Organization stays apart (`CONTEXT.md`: Trade Organization, Trade Org HQ, Trading post,
  * Warehouse): there is at most one Trade Org HQ, every Trade Org city belongs to no realm, and
  * warehouses stand only in Trade Org cities, or in none once their city is gone.
  */
@@ -1199,6 +1229,7 @@ export const worldInvariants: Invariant[] = [
   attackOrdersSound,
   armiesSound,
   contractsSound,
+  supplyLinesSound,
   crimesSound,
   gatesSound,
   tradeOrgSound,

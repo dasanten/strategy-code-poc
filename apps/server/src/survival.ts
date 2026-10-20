@@ -9,6 +9,9 @@ import {
   STARVE_DAYS,
   TICKS_PER_GAME_DAY,
   foodUse,
+  armyOf,
+  inContact,
+  spareFood,
   carriagesAt,
   inCityArea,
   pileAt,
@@ -143,12 +146,12 @@ export function dropGoods(world: WorldState, x: number, y: number, stock: Stock)
  * horse and carriage goes to the one nearest it. With control the Player's orders end: a
  * resident away walks home (`walkHomeIfAway`), and the others keep only the orders an NPC city
  * gives itself (`NPC_ORDER_KINDS`), so its behaviour takes over. With no city left to go to, the
- * realm's residents, horses and carriages belong to nobody. The Player gets a fresh starting
- * city on their next login. `size` is the map's.
+ * realm's residents, horses and carriages belong to nobody. The Player's log says what became
+ * of each city, and where it stands, and they get a fresh starting city on their next login.
+ * `size` is the map's.
  */
 export function endRealm(world: WorldState, realm: Realm, size: number): void {
   leaveOnLeaderDeath(world, realm.id)
-  world.realms = world.realms.filter((x) => x !== realm)
   const cities = world.cities.filter((c) => c.realmId === realm.id)
   for (const c of cities) c.realmId = null
   for (const r of world.residents) {
@@ -164,6 +167,17 @@ export function endRealm(world: WorldState, realm: Realm, size: number): void {
     k.realmId = null
     k.cityId = nearestCity(world, cities, k, size)?.id ?? null
   }
+  // What became of each city goes in the Player's log while the realm is still there to name them.
+  recordEvent(world, realm.id, {
+    kind: 'selfManaged',
+    cities: cities.flatMap((c) => {
+      const hall = townHallOf(world, c)
+      if (!hall) return []
+      const residents = world.residents.filter((r) => r.cityId === c.id).length
+      return [{ cityId: c.id, name: c.name, x: hall.x, y: hall.y, residents }]
+    }),
+  })
+  world.realms = world.realms.filter((x) => x !== realm)
 }
 
 /** Of `cities`, the one whose town hall is nearest a spot; undefined when there is none. */
@@ -223,37 +237,63 @@ export function homeStorage(world: WorldState, r: Resident, size: number): Build
   return undefined
 }
 
+/** Goods a resident may take a meal from, and how many units of Food of them they may take. */
+export interface RefillSource {
+  stock: Stock
+  food: number
+}
+
+/** A stock to refill from when it has Food: all of it may be taken. */
+const whole = (stock: Stock | undefined): RefillSource | undefined =>
+  stock && (stock.food ?? 0) > 0 ? { stock, food: stock.food! } : undefined
+
 /**
  * Where a resident running low on food takes a meal from, if anywhere (`CONTEXT.md`: Refilling):
  * at home, their city's storage; working at a workplace, the Food in the pile on its tile, else on
- * a carriage standing there. Elsewhere nowhere. `size` is the map's.
+ * a carriage standing there; in an army, a carriage of their realm on or next to their tile, but
+ * not the Food a haul route keeps on board for the horse (`spareFood`). Elsewhere nowhere. `size`
+ * is the map's.
  */
-export function refillStock(world: WorldState, r: Resident, size: number): Stock | undefined {
+export function refillSource(
+  world: WorldState,
+  r: Resident,
+  size: number,
+): RefillSource | undefined {
   const home = homeStorage(world, r, size)
-  if (home) return home.stock
+  if (home) return whole(home.stock)
   const o = r.order
-  if (o?.kind !== 'workAt' || r.x !== o.at.x || r.y !== o.at.y) return undefined
-  const place = world.buildings.find((b) => b.id === o.buildingId)
-  if (!place || place.site || place.x !== r.x || place.y !== r.y) return undefined
-  const pile = pileAt(world, r.x, r.y)
-  if ((pile?.goods.food ?? 0) > 0) return pile!.goods
-  return carriagesAt(world, r.x, r.y).find((k) => (k.load.food ?? 0) > 0)?.load
+  const atWork = o?.kind === 'workAt' && r.x === o.at.x && r.y === o.at.y
+  const place = atWork && world.buildings.find((b) => b.id === o.buildingId)
+  if (place && !place.site && place.x === r.x && place.y === r.y) {
+    const pile = pileAt(world, r.x, r.y)
+    if ((pile?.goods.food ?? 0) > 0) return whole(pile!.goods)
+    const here = carriagesAt(world, r.x, r.y).find((k) => (k.load.food ?? 0) > 0)
+    if (here) return whole(here.load)
+  }
+  if (r.owner === null || !armyOf(world, r.id)) return undefined
+  for (const k of world.carriages) {
+    if (k.realmId !== r.owner || !inContact(size, k, r)) continue
+    const food = spareFood(world, k)
+    if (food > 0) return { stock: k.load, food }
+  }
+  return undefined
 }
 
 /**
- * Refilling (`CONTEXT.md`: Refilling at home, Refilling at a workplace): a resident who carries
- * fewer than `HOME_FOOD_LOW` units of food takes meals (`MEAL_UNITS` each) into their hands from
- * their `refillStock`, without an order, until they no longer run low, there is none left, or no
- * more fits. Residents anywhere else get nothing. They still eat only what they carry. `size` is
- * the map's.
+ * Refilling (`CONTEXT.md`: Refilling at home, Refilling at a workplace, Refilling from a
+ * carriage): a resident who carries fewer than `HOME_FOOD_LOW` units of food takes meals
+ * (`MEAL_UNITS` each) into their hands from their `refillSource`, without an order, until they no
+ * longer run low, there is none left, or no more fits. Residents anywhere else get nothing. They
+ * still eat only what they carry. `size` is the map's.
  */
 export function stepRefill(world: WorldState, size: number): void {
   let fromPile = false
   for (const r of world.residents) {
     while ((r.carried.food ?? 0) < HOME_FOOD_LOW) {
-      const stock = refillStock(world, r, size)
-      const units = Math.min(MEAL_UNITS, stock?.food ?? 0, unitsThatFit(r, 'food', world.tick))
-      if (!stock || units <= 0) break
+      const source = refillSource(world, r, size)
+      const units = Math.min(MEAL_UNITS, source?.food ?? 0, unitsThatFit(r, 'food', world.tick))
+      if (!source || units <= 0) break
+      const stock = source.stock
       take(stock, 'food', units)
       r.carried.food = (r.carried.food ?? 0) + units
       fromPile ||= world.piles.some((p) => p.goods === stock)

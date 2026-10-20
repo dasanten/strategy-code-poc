@@ -11,6 +11,7 @@ import { openDb, schema } from './db/index.js'
 import { OrderQueue } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { SightTracker } from './sight.js'
+import { dieAll } from './survival.js'
 import { attachRealtime } from './realtime.js'
 import { TerritoryTracker } from './territory.js'
 import { cityTerrain } from './test-terrain.js'
@@ -181,8 +182,10 @@ describe('realtime', () => {
     })
     const daniel = connect(url, token)
     const mara = connect(url, createSession(db, other.id))
-    expect(await daniel.next('welcome')).toMatchObject({ events: [] })
-    expect(await mara.next('welcome')).toMatchObject({ events: [] })
+    // Each log starts with their Leader founding their starting city.
+    const founded = [expect.objectContaining({ kind: 'founded' })]
+    expect(await daniel.next('welcome')).toMatchObject({ events: founded })
+    expect(await mara.next('welcome')).toMatchObject({ events: founded })
 
     const danielsRealm = realmOf(world, userId)!
     const danielsLeader = world.residents.find((r) => r.id === danielsRealm.leaderId)!
@@ -209,8 +212,48 @@ describe('realtime', () => {
 
     // Logging in again brings the Player's log as kept, and only theirs.
     const welcome = await connect(url, token).next('welcome')
-    expect(welcome.type === 'welcome' && welcome.events.map((e) => e.kind)).toEqual(['hungry'])
+    expect(welcome.type === 'welcome' && welcome.events.map((e) => e.kind)).toEqual([
+      'founded',
+      'hungry',
+    ])
   })
+  it('tells a Player how their Leader died and what became of their cities, then starts them afresh', async () => {
+    const { url, token, userId, world, realtime, territory, violations } = await start()
+    const first = connect(url, token)
+    await first.next('welcome')
+    const realm = realmOf(world, userId)!
+    const leader = world.residents.find((r) => r.id === realm.leaderId)!
+    const city = world.cities.find((c) => c.realmId === realm.id)!
+    const hall = world.buildings.find((b) => b.id === city.townHallId)!
+
+    dieAll(world, [leader], 'killed', terrain.size, new Map([[leader.id, 'Brann']]))
+    realtime.broadcastTick()
+    // Online, the Player reads it at once.
+    const tick = await first.next('tick')
+    expect(tick.type === 'tick' && tick.events.map((e) => e.kind)).toEqual(['died', 'selfManaged'])
+    first.socket.close()
+
+    // On the next login: a new Leader and starting city, and the whole story in the log.
+    territory.update(world, terrain)
+    const welcome = await connect(url, token).next('welcome')
+    if (welcome.type !== 'welcome') throw new Error('no welcome')
+    const fresh = realmOf(world, userId)!
+    expect(fresh.id).not.toBe(realm.id)
+    expect(welcome.home).toMatchObject({ realmId: fresh.id, leaderId: fresh.leaderId })
+    expect(welcome.home.cityId).not.toBe(city.id)
+    expect(welcome.events.map((e) => e.kind)).toEqual(['founded', 'died', 'selfManaged', 'founded'])
+    expect(welcome.events[1]).toMatchObject({ name: leader.name, leader: true, by: 'Brann' })
+    const residents = world.residents.filter((r) => r.cityId === city.id).length
+    expect(welcome.events[2]).toMatchObject({
+      cities: [{ cityId: city.id, name: city.name, x: hall.x, y: hall.y, residents }],
+    })
+    // The former city stays findable: on the Region map over the terrain they explored.
+    expect(welcome.region?.holders).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: city.id, name: city.name })]),
+    )
+    expect(violations).toEqual([])
+  })
+
   it('sends the Player their alliance matters on connect, and again only when they change', async () => {
     const { url, token, world, realtime, orders } = await start()
     const { socket, next } = connect(url, token)

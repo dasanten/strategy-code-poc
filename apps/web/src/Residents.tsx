@@ -418,7 +418,7 @@ export function ResidentInspector({
               ? `Tap a tile on the map, or press ${PICKING_BUTTONS[picking]} again to cancel.`
               : 'Right-click the map to walk there.'}
         </p>
-        <RunScript resident={r} scripts={scripts} onRunScript={onRunScript} />
+        <RunScript script={r.script} scripts={scripts} onRunScript={onRunScript} />
       </section>
 
       {carriage && (
@@ -1220,25 +1220,29 @@ function holding(holders: string[], realmId: string): string {
 }
 
 /**
- * Gives the resident the run-script order with one of the Player's scripts (`CONTEXT.md`:
- * Running a script). Only scripts with an active version can run; any other order ends it.
+ * Gives a resident or an army the run-script order with one of the Player's scripts
+ * (`CONTEXT.md`: Running a script). Only scripts with an active version can run; any other
+ * order ends it.
  */
-function RunScript({
-  resident,
+export function RunScript({
+  script,
   scripts,
   onRunScript,
+  label = 'Script to run',
 }: {
-  resident: Resident
+  /** The script the resident or army runs now, if any. */
+  script: { scriptId: number } | undefined
   scripts: ScriptSummary[]
   onRunScript: (scriptId: number) => void
+  label?: string
 }) {
   const runnable = scripts.filter((s) => s.activeVersion !== null)
   const [picked, setPicked] = useState<number>()
   const scriptId = runnable.some((s) => s.id === picked) ? picked : runnable[0]?.id
-  const running = resident.script && scripts.find((s) => s.id === resident.script!.scriptId)
+  const running = script && scripts.find((s) => s.id === script.scriptId)
   return (
     <div className="run-script">
-      {resident.script && (
+      {script && (
         <div className="small">
           Runs {running ? <strong>{running.name}</strong> : 'a script'}
           {running && ` · version ${running.activeVersion}`}
@@ -1249,7 +1253,7 @@ function RunScript({
       ) : (
         <div className="order-buttons">
           <select
-            aria-label="Script to run"
+            aria-label={label}
             value={scriptId}
             onChange={(e) => setPicked(Number(e.target.value))}
           >

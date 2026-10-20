@@ -64,7 +64,7 @@ export function npcSiteFits(
 }
 
 /** Tiles something stands on: nodes, buildings, residents, horses, carriages and piles. */
-function takenTiles(world: WorldState): Set<string> {
+export function takenTiles(world: WorldState): Set<string> {
   const things = [
     ...world.nodes,
     ...world.buildings,
