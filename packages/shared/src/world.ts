@@ -247,6 +247,25 @@ export interface AttackOrder {
   started: boolean
 }
 
+/**
+ * Building a road along a line (`CONTEXT.md`: Road): the resident builds the road tiles of
+ * `tiles` one after another. For each they walk to it (`path` and `progress` as for a walk
+ * order), then lay out a road there or join the site already there, put in the materials they
+ * carry that it needs, and work on it as for a build order (`siteId`) until it is finished. A
+ * tile that already has a road, or can't take one, is skipped. The order ends after the last.
+ */
+export interface RoadLineOrder {
+  kind: 'roadLine'
+  /** The tiles still to build, in order; the first is being walked to or built. Never empty. */
+  tiles: [number, number][]
+  phase: 'walking' | 'building'
+  /** While walking, the tiles still to walk; null while the path is being found. */
+  path: [number, number][] | null
+  progress: number
+  /** While building, the road site on the first tile; null until it is laid out or joined. */
+  siteId: string | null
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -259,6 +278,7 @@ export type ResidentOrder =
   | WorkOrder
   | PairOrder
   | AttackOrder
+  | RoadLineOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -327,6 +347,19 @@ export type RealmEventWhat =
     }
   /** A resident who carries no weapon was hit and flees home (`CONTEXT.md`: Combat). */
   | { kind: 'fled'; residentId: string; name: string }
+  /**
+   * A city changed realm by capture (`CONTEXT.md`: Capturing a city): this realm took `city`,
+   * with its `residents`, from the realm of `other` (by its Leader's name; null for an NPC
+   * city), or, when not `captor`, the realm of `other` took it from this one.
+   */
+  | {
+      kind: 'cityCaptured'
+      cityId: string
+      city: string
+      other: string | null
+      captor: boolean
+      residents: number
+    }
   /** Food went bad over the game day in the realm's storages, residents' loads and carriages. */
   | { kind: 'foodSpoiled'; units: number }
   /** A pair had a child (`CONTEXT.md`: Pairing, Child); `parents` are their names. */

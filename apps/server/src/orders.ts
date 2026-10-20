@@ -9,6 +9,7 @@ import { walkTo } from './walking.js'
 import { workAt } from './work.js'
 import { allianceOrders } from './alliances.js'
 import { attack } from './combat.js'
+import { roadLine } from './road-line.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -28,7 +29,7 @@ export interface OrderKind {
     order: OrderRequest,
     terrain?: TerrainMap,
   ): string | undefined
-  apply(world: WorldState, sender: OrderSender, order: OrderRequest): void
+  apply(world: WorldState, sender: OrderSender, order: OrderRequest, terrain?: TerrainMap): void
 }
 
 /** The order kinds that exist. */
@@ -44,6 +45,7 @@ export const orderKinds: Record<string, OrderKind> = {
   workAt,
   pair,
   attack,
+  roadLine,
   ...allianceOrders,
 }
 
@@ -91,7 +93,7 @@ export class OrderQueue {
         const r = world.residents.find((x) => x.id === order.residentId)
         if (r) delete r.script
       }
-      this.kinds[order.kind]!.apply(world, sender, order)
+      this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
     }
   }
 

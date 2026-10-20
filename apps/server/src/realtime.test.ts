@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WebSocket } from 'ws'
-import { SESSION_COOKIE, WS_PATH, chunksAcross, type ServerMessage } from '@csp/shared'
+import { SESSION_COOKIE, WS_PATH, chunksAcross, realmName, type ServerMessage } from '@csp/shared'
 import { buildApp } from './app.js'
 import { createAdmin, createInviteCode, createSession, signUp } from './auth.js'
 import { recordEvent } from './events.js'
@@ -12,6 +12,7 @@ import { OrderQueue } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { SightTracker } from './sight.js'
 import { attachRealtime } from './realtime.js'
+import { TerritoryTracker } from './territory.js'
 import { cityTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
 
@@ -32,6 +33,7 @@ async function start() {
   })
   const world = createWorld(terrain)
   const orders = new OrderQueue()
+  const territory = new TerritoryTracker()
   // Every send is checked against the Player's sight; what breaks it lands here.
   const violations: InvariantViolation[] = []
   const reporter = {
@@ -46,6 +48,7 @@ async function start() {
     explored: new ExploredTerrain(terrain),
     sight: new SightTracker(),
     orders,
+    territory,
     sightCheck: { reporter, sampleRate: 1 },
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
@@ -62,6 +65,7 @@ async function start() {
     userId: user.id,
     world,
     realtime,
+    territory,
     orders,
     sightCheck: { reporter, sampleRate: 1 },
     violations,
@@ -236,5 +240,33 @@ describe('realtime', () => {
     })
     realtime.broadcastTick()
     expect(await next('tick')).not.toHaveProperty('diplomacy')
+  })
+
+  it('sends the Region map whole when territory is worked out, then the chunks explored', async () => {
+    const { url, token, userId, world, realtime, territory, violations } = await start()
+    const { next } = connect(url, token)
+    const welcome = await next('welcome')
+    // Territory is worked out on the first tick after a start: nothing to show yet.
+    expect(welcome.type === 'welcome' && welcome.region).toBeNull()
+    const explored = welcome.type === 'welcome' ? welcome.exploredChunks : []
+
+    territory.update(world, terrain)
+    realtime.broadcastTick()
+    const whole = await next('tick')
+    const realmId = world.realms[0]!.id
+    expect(whole.type === 'tick' && whole.region).toMatchObject({
+      tick: world.tick,
+      chunks: null,
+      holders: [{ id: realmId, name: realmName(world, realmId), alliance: null }],
+    })
+    // Only once: the next tick has nothing new for it.
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('region')
+
+    // Explored terrain grew in a chunk: that chunk goes out again.
+    realtime.broadcastTick(new Map([[userId, new Set([explored[0]!])]]))
+    const part = await next('tick')
+    expect(part.type === 'tick' && part.region?.chunks).toEqual([explored[0]])
+    expect(violations).toEqual([])
   })
 })

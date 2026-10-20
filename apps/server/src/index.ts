@@ -80,6 +80,7 @@ const realtime = attachRealtime(app.server, {
   explored,
   sight,
   orders,
+  territory,
   sightCheck: { reporter, sampleRate: config.invariantSampleRate },
 })
 

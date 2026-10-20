@@ -186,7 +186,7 @@ export class ScriptRunner {
       )
     }
     // What it requested counts, even when it stopped with an error or out of steps.
-    for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order)
+    for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
 
     const kept = keepMemory(memory)
     if (typeof kept === 'string') {
