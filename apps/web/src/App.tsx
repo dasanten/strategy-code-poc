@@ -22,6 +22,7 @@ import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { pageFor } from './pages.js'
 import { RealmLog } from './RealmLog.js'
+import { realmEnded } from './realm-log.js'
 import { ResidentInspector, ResidentsList, type HaulSetup, type Picking } from './Residents.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { useWorld } from './useWorld.js'
@@ -56,6 +57,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
+  // A place from the realm log to show on the map.
+  const [focus, setFocus] = useState<{ x: number; y: number }>()
 
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
@@ -170,6 +173,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       <main>
         <div className="play-column">
           <section className="map-panel">
+            {world && realmEnded(world.events) && (
+              <div className="realm-ended" role="alert">
+                <p>
+                  Your Leader has died and your realm has ended. The realm log says what became of
+                  your cities. You start afresh with a new Leader and a new starting city.
+                </p>
+                <button type="button" onClick={() => window.location.reload()}>
+                  Start afresh
+                </button>
+              </div>
+            )}
             {world ? (
               <MapView
                 world={world}
@@ -183,6 +197,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 picking={picking !== false || armyPick !== undefined}
                 onPickTile={goTo}
                 onNodesLoaded={onNodesLoaded}
+                focus={focus}
               />
             ) : (
               <p>Waiting for the server…</p>
@@ -275,7 +290,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               }
             />
           )}
-          {world && <RealmLog events={world.events} realmId={world.home.realmId} />}
+          {world && (
+            <RealmLog
+              events={world.events}
+              realmId={world.home.realmId}
+              onShowPlace={(p) => setFocus({ x: p.x, y: p.y })}
+            />
+          )}
           <ScriptLibrary onScripts={setScripts} />
         </div>
       </main>

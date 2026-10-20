@@ -294,6 +294,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
   Leader was. Their cities become self-managed. The Player respawns as a new Leader with a fresh
   starting city on their next login.
+  Their realm log tells them how their Leader died and what became of each city, and where it
+  stands, so they can find it again on the map.
 - **Self-managed city:** a city with no living Leader in charge. It runs on its own behaviour and
   can be traded with, contracted, conquered or integrated by anyone, including its former Player.
   When a Leader dies, each of their cities becomes its own self-managed city, with the residents

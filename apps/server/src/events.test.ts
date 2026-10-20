@@ -47,6 +47,8 @@ describe('realm events', () => {
 
   it('logs a death of old age', () => {
     const { world } = worldWithCity()
+    // Each log starts with the starting city's founding; these tests start from an empty one.
+    world.events = []
     const realm = world.realms[0]!
     const r = world.residents.find((x) => x.id !== realm.leaderId)!
     r.bornAt = world.tick - r.lifespan * TICKS_PER_GAME_YEAR
@@ -67,6 +69,8 @@ describe('realm events', () => {
 
   it('logs what food a realm lost to spoilage each game day, and not what lay in piles', () => {
     const { world } = worldWithCity()
+    // Each log starts with the starting city's founding; these tests start from an empty one.
+    world.events = []
     const realm = world.realms[0]!
     storageOf(world).stock = { food: 1000 }
     world.buildings.find((b) => b.kind === 'stable')!.stock = {}
@@ -87,6 +91,8 @@ describe('realm events', () => {
     const { world } = worldWithCity()
     const mine = world.realms[0]!
     const theirs = foundStartingCity(world, terrain, 2)
+    // Each log starts with the starting city's founding; these tests start from an empty one.
+    world.events = []
     recordEvent(world, theirs.id, { kind: 'foodSpoiled', units: 1 })
     for (let i = 0; i < REALM_LOG_LENGTH + 5; i++) {
       recordEvent(world, mine.id, { kind: 'foodSpoiled', units: i })

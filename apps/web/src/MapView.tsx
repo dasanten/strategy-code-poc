@@ -84,6 +84,7 @@ export function MapView({
   picking = false,
   onPickTile,
   onNodesLoaded,
+  focus,
 }: {
   world: ClientWorld
   /** The resident shown with a ring, if any. */
@@ -96,6 +97,8 @@ export function MapView({
   onPickTile?: (x: number, y: number) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
   onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
+  /** A tile to centre the view on, such as a place named in the realm log; a new object each time. */
+  focus?: { x: number; y: number }
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef(world)
@@ -111,7 +114,11 @@ export function MapView({
   const redrawRef = useRef<() => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
   const regionRef = useRef<(region: RegionState | null) => void>(() => {})
-  const controlsRef = useRef<{ zoom(factor: number): void; centre(): void } | null>(null)
+  const controlsRef = useRef<{
+    zoom(factor: number): void
+    centre(): void
+    goTo(x: number, y: number): void
+  } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
   const [mode, setMode] = useState<MapMode>('terrain')
@@ -122,6 +129,10 @@ export function MapView({
     modeRef.current = mode
     redrawRef.current()
   }, [mode])
+
+  useEffect(() => {
+    if (focus) controlsRef.current?.goTo(focus.x, focus.y)
+  }, [focus])
 
   // The Region map changes once a game hour, and where explored terrain grows.
   useEffect(() => regionRef.current(world.region), [world.region])
@@ -397,6 +408,7 @@ export function MapView({
         setCam(zoomAt(cam, view, mapSize, factor, view.width / 2, view.height / 2))
       },
       centre: () => setCam({ ...cam, ...homeCentre(worldRef.current) }),
+      goTo: (x, y) => setCam({ ...cam, x: x + 0.5, y: y + 0.5 }),
     }
 
     void app.init({ resizeTo: host, background: VOID_COLOR, antialias: true }).then(() => {

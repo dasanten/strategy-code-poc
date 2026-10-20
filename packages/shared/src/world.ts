@@ -455,6 +455,28 @@ export type RealmEventWhat =
       captor: boolean
       residents: number
     }
+  /**
+   * The realm's Leader died and the realm ended (`CONTEXT.md`: Leader death): each of its
+   * `cities` became a self-managed city, with the residents living there, its town hall at
+   * (`x`, `y`) so the Player can find it again.
+   */
+  | {
+      kind: 'selfManaged'
+      cities: { cityId: string; name: string; x: number; y: number; residents: number }[]
+    }
+  /**
+   * The Player's Leader `name` founded the realm's starting city `city`, its town hall at
+   * (`x`, `y`): on their first login, or as a fresh start after their Leader died.
+   */
+  | {
+      kind: 'founded'
+      residentId: string
+      name: string
+      cityId: string
+      city: string
+      x: number
+      y: number
+    }
   /** Food went bad over the game day in the realm's storages, residents' loads and carriages. */
   | { kind: 'foodSpoiled'; units: number }
   /** A pair had a child (`CONTEXT.md`: Pairing, Child); `parents` are their names. */
