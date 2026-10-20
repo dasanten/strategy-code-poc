@@ -58,6 +58,19 @@ export function describeEvent(e: RealmEvent, realmId?: string): { text: string; 
       const who = e.realmId === realmId ? 'You are' : `The realm of ${e.realm} is`
       return { text: `${who} now the leader of the alliance ${e.name}.`, tone: 'info' }
     }
+    case 'scriptError': {
+      const at = e.line === undefined ? '' : ` (line ${e.line}, column ${e.column})`
+      return { text: `${e.name}’s script stopped with an error${at}: ${e.message}`, tone: 'warn' }
+    }
+    case 'scriptOutOfSteps':
+      return e.realm
+        ? {
+            text: `${e.name}’s script was cut short: your realm’s scripts used up their steps.`,
+            tone: 'warn',
+          }
+        : { text: `${e.name}’s script ran out of steps this tick.`, tone: 'warn' }
+    case 'scriptEnded':
+      return { text: `${e.name} stopped running a script: it was deleted.`, tone: 'info' }
   }
 }
 

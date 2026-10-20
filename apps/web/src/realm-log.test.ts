@@ -28,6 +28,20 @@ describe('realm log', () => {
     ).toEqual({ text: 'Wren has grown up and can work now.', tone: 'info' })
   })
 
+  it('describes a script’s trouble', () => {
+    const who = { residentId: 'r1', name: 'Mara', scriptId: 3, seq: 9, ...at } as const
+    expect(
+      describeEvent({ kind: 'scriptError', ...who, message: 'Oops', line: 2, column: 5 }).text,
+    ).toBe('Mara’s script stopped with an error (line 2, column 5): Oops')
+    expect(describeEvent({ kind: 'scriptOutOfSteps', ...who, realm: false }).text).toBe(
+      'Mara’s script ran out of steps this tick.',
+    )
+    expect(describeEvent({ kind: 'scriptOutOfSteps', ...who, realm: true }).tone).toBe('warn')
+    expect(describeEvent({ kind: 'scriptEnded', ...who }).text).toBe(
+      'Mara stopped running a script: it was deleted.',
+    )
+  })
+
   it('describes fights, flight and deaths in them', () => {
     const fight = { kind: 'fight', residentId: 'r1', name: 'Mara', otherId: 'r9', seq: 6 } as const
     expect(describeEvent({ ...fight, other: 'Tobin', attacker: true, ...at })).toEqual({

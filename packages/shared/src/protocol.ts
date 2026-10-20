@@ -1,6 +1,6 @@
 import type { Account } from './api.js'
 import type { Diplomacy } from './alliance.js'
-import type { Building, Carriage, City, Horse, Pile, RealmEvent, Resident } from './world.js'
+import type { Building, Carriage, City, Horse, Pile, RealmEvent, SeenResident } from './world.js'
 
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
 export interface MapInfo {
@@ -23,7 +23,7 @@ export interface OrderRequest {
  * all of them.
  */
 export type SeenEntity =
-  | ({ is: 'resident' } & Resident)
+  | ({ is: 'resident' } & SeenResident)
   | ({ is: 'building' } & Building)
   | ({ is: 'city' } & City)
   | ({ is: 'horse' } & Horse)
