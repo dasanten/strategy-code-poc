@@ -14,6 +14,7 @@ import {
   pileAt,
   unitsThatFit,
   type Building,
+  type City,
   type DeathCause,
   groundAt,
   roadTiles,
@@ -26,6 +27,7 @@ import {
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import { leaveOnLeaderDeath } from './alliances.js'
+import { NPC_ORDER_KINDS } from './npc-behaviour.js'
 
 /** How far one unit of food fills the hunger meter. */
 const FILL_PER_FOOD = (MAX_HUNGER * HUNGER_DAYS) / FOOD_PER_DAY
@@ -134,25 +136,40 @@ export function dropGoods(world: WorldState, x: number, y: number, stock: Stock)
 /**
  * Leader death, in its basic form (`CONTEXT.md`: Leader death): the realm ends, and its
  * residents, cities, horses and carriages stay where they are, belonging to nobody. The Player
- * gets a fresh starting city on their next login. The realm leaves its alliance at once.
+ * gets a fresh starting city on their next login. The realm leaves its alliance at once. With
+ * control the Player's orders end too, but for those an NPC city gives itself
+ * (`NPC_ORDER_KINDS`): its behaviour takes the residents over.
  */
 export function endRealm(world: WorldState, realm: Realm): void {
   leaveOnLeaderDeath(world, realm.id)
   world.realms = world.realms.filter((x) => x !== realm)
-  for (const r of world.residents) if (r.owner === realm.id) r.owner = null
+  for (const r of world.residents) {
+    if (r.owner !== realm.id) continue
+    r.owner = null
+    if (r.order && !NPC_ORDER_KINDS.includes(r.order.kind)) r.order = null
+  }
   for (const c of world.cities) if (c.realmId === realm.id) c.realmId = null
   for (const h of world.horses) if (h.realmId === realm.id) h.realmId = null
   for (const k of world.carriages) if (k.realmId === realm.id) k.realmId = null
 }
 
 /**
+ * Whether a city is the resident's own home organization: a city of their realm, or for a
+ * resident of an NPC city, who belongs to no realm, that city itself (`CONTEXT.md`: Organization).
+ */
+function isHome(r: Resident, city: City): boolean {
+  if (r.owner !== null) return city.realmId === r.owner
+  return city.realmId === null && city.id === r.cityId
+}
+
+/**
  * The finished storage that holds food of the city they stand in, if the resident is at home
- * (`CONTEXT.md`: At home): in the area of a city of their own realm. `size` is the map's.
+ * (`CONTEXT.md`: At home): in the area of a city of their own realm, or a resident of an NPC city
+ * in their city's area. `size` is the map's.
  */
 export function homeStorage(world: WorldState, r: Resident, size: number): Building | undefined {
-  if (r.owner === null) return undefined
   for (const home of world.cities) {
-    if (home.realmId !== r.owner || !inCityArea(world, home, r.x, r.y, size)) continue
+    if (!isHome(r, home) || !inCityArea(world, home, r.x, r.y, size)) continue
     const storage = world.buildings.find(
       (b) => b.cityId === home.id && b.kind === 'storage' && !b.site && (b.stock?.food ?? 0) > 0,
     )
