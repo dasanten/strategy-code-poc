@@ -8,7 +8,7 @@ import {
   isArmed,
   pileAt,
   recipeFor,
-  wallSideOf,
+  wallSide,
   workProblem,
   wrapDistance,
   type Building,
@@ -215,7 +215,7 @@ function watchGates(world: WorldState, city: City, size: number): void {
     (r) =>
       r.health > 0 &&
       isArmed(r) &&
-      wallSideOf(r) !== city.id &&
+      wallSide(r) !== city.id &&
       gates.some((g) => wrapDistance(size, r, g) <= NPC_GATE_WATCH_RANGE),
   )
   for (const g of gates) {

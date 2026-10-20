@@ -107,7 +107,13 @@ describe('a dead Leader’s cities become self-managed', () => {
     }
     const work = structuredClone(worker!.order)
     Object.assign(builder!, { x: hall.x, y: hall.y + 1 })
-    builder!.order = { kind: 'tearDown', buildingId: farm.id, at: { x: farm.x, y: farm.y } }
+    builder!.order = {
+      kind: 'drive',
+      carriageId: 'k0',
+      target: { x: 0, y: 0 },
+      path: null,
+      progress: 0,
+    }
 
     endRealm(world, realm, terrain.size)
 

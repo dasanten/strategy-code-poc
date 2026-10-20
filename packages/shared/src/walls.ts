@@ -1,22 +1,28 @@
 import { allied, alliedRealms } from './alliance.js'
 import { WALL_ENCLOSES_MAX } from './balance.js'
 import { isPassableTerrain, tileIndex, wrap, type TerrainMap } from './terrain.js'
-import type { Building, City, Resident, WorldState } from './world.js'
+import type { Building, Resident, WorldState } from './world.js'
 
 /** World queries about walls and gates (`CONTEXT.md`: Walls in combat; ADR 0002). */
+
+/**
+ * Whose side a resident is on at walls and gates: their realm, or for a resident of an NPC city,
+ * that city, so its residents stand on its walls as a realm's do (`CONTEXT.md`: NPC city).
+ * Null for a resident of nobody.
+ */
+export function wallSide(r: Pick<Resident, 'owner' | 'cityId'>): string | null {
+  return r.owner ?? r.cityId
+}
 
 /** A finished wall or gate on a tile, and whose it is. */
 export interface WallTile {
   kind: 'wall' | 'gate'
-  /**
-   * The side of the wall's city (`wallSideOfCity`): its realm, or the city itself for an NPC
-   * city; null for nobody's.
-   */
+  /** The realm of the wall's city; null for nobody's. */
   realmId: string | null
   /**
-   * The sides that may stand on it and pass its gate while closed: its city's realm and the
-   * other members of that realm's alliance (`CONTEXT.md`: Alliance), or an NPC city's own
-   * residents (`wallSideOf`). Empty for nobody's.
+   * The sides (`wallSide`) that may stand on it and pass its gate while closed: its city's realm
+   * and the other members of that realm's alliance (`CONTEXT.md`: Alliance), or for a city of no
+   * realm (an NPC city), the city itself. Empty for nobody's.
    */
   realms: string[]
   /** A gate that is closed. */
@@ -37,22 +43,6 @@ export interface WallMap {
 /** Whether a building is a finished wall or gate. */
 export function isWallOrGate(b: Building): boolean {
   return (b.kind === 'wall' || b.kind === 'gate') && !b.site
-}
-
-/**
- * Whose walls and gates a city's are (`CONTEXT.md`: Walls in combat): its realm's, or, for an NPC
- * city, the city's own, an Organization of its own (`CONTEXT.md`: Organization).
- */
-export function wallSideOfCity(city: Pick<City, 'id' | 'realmId'>): string {
-  return city.realmId ?? city.id
-}
-
-/**
- * The side a resident walks and stands on walls for: their realm, or the NPC city they live in
- * when they have none (`wallSideOfCity`); null for one of neither.
- */
-export function wallSideOf(r: Pick<Resident, 'owner' | 'cityId'>): string | null {
-  return r.owner ?? r.cityId
 }
 
 /** Whether a gate is closed; a gate is open until its city's realm closes it. */
@@ -84,7 +74,7 @@ export function wallMap(
   terrain: TerrainMap,
 ): WallMap {
   const { size } = terrain
-  const realms = new Map(world.cities.map((c) => [c.id, wallSideOfCity(c)]))
+  const realms = new Map(world.cities.map((c) => [c.id, c.realmId]))
   const sides = new Map<string, string[]>()
   const side = (realmId: string | null): string[] => {
     if (realmId === null) return []
@@ -98,7 +88,7 @@ export function wallMap(
     tiles.set(tileIndex(size, b.x, b.y), {
       kind: b.kind as 'wall' | 'gate',
       realmId,
-      realms: side(realmId),
+      realms: realmId === null ? (b.cityId ? [b.cityId] : []) : side(realmId),
       closed: isClosed(b),
     })
   }
@@ -207,7 +197,7 @@ export function mayStep(
 }
 
 /**
- * Whether a resident stands on a wall of their own realm or an ally's, where they defend far better
+ * Whether a resident stands on a wall of their own side (`wallSide`) or an ally's, where they defend far better
  * (`CONTEXT.md`: Walls in combat; `WALL_DEFENCE`).
  */
 export function onOwnWall(
@@ -218,6 +208,8 @@ export function onOwnWall(
     (b) => b.x === r.x && b.y === r.y && b.kind === 'wall' && !b.site,
   )
   const city = wall && world.cities.find((c) => c.id === wall.cityId)
-  const side = wallSideOf(r)
-  return !!city && side !== null && allied(world, wallSideOfCity(city), side)
+  const side = wallSide(r)
+  if (!city || side === null) return false
+  // An NPC city's walls are its own residents' (`wallSide`).
+  return city.realmId === null ? side === city.id : allied(world, city.realmId, side)
 }

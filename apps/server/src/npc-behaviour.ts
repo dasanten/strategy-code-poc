@@ -9,6 +9,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   canWork,
   cityFoodUse,
+  hasFoodSurplus,
   inCityArea,
   isArmed,
   pileAt,
@@ -22,8 +23,10 @@ import {
   type Resident,
   type ResidentOrder,
   type Stock,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { cityGrowth } from './npc-growth.js'
 import { refillSource } from './survival.js'
 import { startWork } from './work.js'
 
@@ -37,6 +40,8 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'drop',
   'workAt',
   'pair',
+  'build',
+  'tearDown',
   'attack',
 ]
 
@@ -50,9 +55,9 @@ export function runByNpcCity(world: WorldState, r: Resident): boolean {
  * One tick of NPC city behaviour (`CONTEXT.md`: NPC city): each city run by the game keeps
  * itself alive. It only gives its residents orders, which request actions like a Player's
  * orders do (ADR 0002); the world resolves them later in the tick. Run before the actions are
- * requested. `size` is the map's.
+ * requested. `size` is the map's. With `terrain` the cities also grow (`cityGrowth`).
  */
-export function stepNpcCities(world: WorldState, size: number): void {
+export function stepNpcCities(world: WorldState, size: number, terrain?: TerrainMap): void {
   const residents = new Map<string, Resident[]>()
   for (const r of world.residents) {
     if (r.owner !== null || r.cityId === null) continue
@@ -63,36 +68,48 @@ export function stepNpcCities(world: WorldState, size: number): void {
   for (const city of world.cities) {
     if (city.realmId !== null) continue
     const people = residents.get(city.id)
-    if (people) runCity(world, city, people, size)
+    if (people) runCity(world, city, people, size, terrain)
   }
 }
 
 /**
  * What an NPC city does each tick: puts its idle adults to work on its farms and workplaces,
- * farms first while Food runs short (`NPC_FOOD_SHORT_DAYS`); sends a worker to carry a
+ * farms first until it has a food surplus; moves workers to its farms while Food runs short
+ * (`NPC_FOOD_SHORT_DAYS`); sends a worker to carry a
  * workplace's output to the storage once `NPC_FETCH_UNITS` of it lie there; sends workers who
  * run low on food where there is none to refill from home, and has residents take `NPC_OWN_FOOD`
- * from the storage before they set out; and brings idle residents with nothing to do home.
- * Its soldiers (armed adults) are put to no work (`stepNpcDefence`). Children are left alone:
+ * from the storage before they set out; gives idle adults their part in the city's growth
+ * (`cityGrowth`); and brings idle residents with nothing to do home. Its soldiers (armed adults)
+ * are put to no work and no building (`stepNpcDefence`). Children are left alone:
  * they refill at home.
  */
-function runCity(world: WorldState, city: City, people: Resident[], size: number): void {
+function runCity(
+  world: WorldState,
+  city: City,
+  people: Resident[],
+  size: number,
+  terrain?: TerrainMap,
+): void {
   const storage = world.buildings.find(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
   const short = storedFood(world, city) < cityFoodUse(world, city, NPC_FOOD_SHORT_DAYS)
-  const places = workplaces(world, city, short)
+  const places = workplaces(world, city, !hasFoodSurplus(world, city))
   const adults = people.filter((r) => canWork(r, world.tick))
 
   if (storage) for (const place of places) fetchOutput(world, place)
   if (short) moveToFarms(world, places)
   for (const r of adults) {
     const o = r.order
-    if (o?.kind === 'workAt' && lowOnFood(r) && !refillSource(world, r, size)) r.order = null
+    const busy = o?.kind === 'workAt' || o?.kind === 'build' || o?.kind === 'tearDown'
+    if (busy && lowOnFood(r) && !refillSource(world, r, size)) r.order = null
   }
+  const home = npcHome(world, city)
+  const growth = terrain && home && cityGrowth(world, city, home, adults, terrain, short)
 
   for (const r of adults) {
     if (r.order !== null) continue
+    if (growth && growth.assign(r, true)) continue
     const load = storage && haul(r)
     if (storage && load) {
       if (r.x === storage.x && r.y === storage.y) {
@@ -109,14 +126,15 @@ function runCity(world: WorldState, city: City, people: Resident[], size: number
       } else walkTo(r, storage)
       continue
     }
-    const place = !isArmed(r) && places.find((p) => room(world, p) > 0)
+    const soldier = isArmed(r)
+    if (!soldier && growth && growth.assign(r)) continue
+    const place = !soldier && places.find((p) => room(world, p) > 0)
     if (place) {
       if (r.x === place.x && r.y === place.y) {
         if (workProblem(world, r) === undefined) startWork(r, place)
       } else walkTo(r, place)
       continue
     }
-    const home = npcHome(world, city)
     if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
   }
 }
@@ -124,9 +142,9 @@ function runCity(world: WorldState, city: City, people: Resident[], size: number
 /**
  * The city's finished workplaces that make something from nothing (farms, camps, quarries,
  * mines; not those that process goods), its farms and those in its `workplaceIds`, in the order
- * it fills them: farms first while Food runs short, else last.
+ * it fills them: farms first until the city has a food surplus, else last.
  */
-function workplaces(world: WorldState, city: City, short: boolean): Building[] {
+function workplaces(world: WorldState, city: City, farmsFirst: boolean): Building[] {
   const own = new Set(city.workplaceIds)
   const places = world.buildings.filter(
     (b) =>
@@ -136,8 +154,8 @@ function workplaces(world: WorldState, city: City, short: boolean): Building[] {
       !RECIPES[b.kind] &&
       workplaceGood(world, b) !== undefined,
   )
-  const farmsFirst = (b: Building) => (b.kind === 'farm' ? 0 : 1)
-  return places.sort((a, b) => (short ? 1 : -1) * (farmsFirst(a) - farmsFirst(b)))
+  const farm = (b: Building) => (b.kind === 'farm' ? 0 : 1)
+  return places.sort((a, b) => (farmsFirst ? 1 : -1) * (farm(a) - farm(b)))
 }
 
 /** Room left at a workplace: its most workers, minus those on it and those walking to it. */
