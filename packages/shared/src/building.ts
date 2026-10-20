@@ -1,5 +1,6 @@
 import {
   BUILD_MATERIALS,
+  MAP_SIZE,
   BUILD_WORK,
   RECIPES,
   TEARDOWN_MATERIALS_RETURNED,
@@ -7,6 +8,7 @@ import {
   WORKPLACE_MAX_WORKERS,
   type Recipe,
 } from './balance.js'
+import { citiesAt } from './city.js'
 import {
   NODE_WORKPLACE,
   type Building,
@@ -31,14 +33,16 @@ import {
 
 /**
  * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters,
- * mints and smithies, town halls, walls and gates (`CONTEXT.md`: Town hall, Wall / Gate), and
- * roads (`CONTEXT.md`: Road).
+ * mints and smithies, town halls, walls and gates (`CONTEXT.md`: Town hall, Wall / Gate), houses
+ * and farms (`CONTEXT.md`: House, Farm), and roads (`CONTEXT.md`: Road).
  */
 export const BUILDABLE: readonly BuildingKind[] = [
   'lumberCamp',
   'quarry',
   'mine',
   'stable',
+  'farm',
+  'house',
   'smelter',
   'mint',
   'smithy',
@@ -75,7 +79,16 @@ export function hasChoice(kind: BuildingKind): boolean {
  * Buildable kinds that go on any passable terrain but Mountain, off any resource node
  * (`CONTEXT.md`: Where buildings go).
  */
-export const OFF_NODES: readonly BuildingKind[] = [...PROCESSING, 'townHall', 'wall', 'gate']
+export const OFF_NODES: readonly BuildingKind[] = [
+  ...PROCESSING,
+  'townHall',
+  'house',
+  'wall',
+  'gate',
+]
+
+/** Buildable kinds that go on Plains, off any resource node: stables and farms. */
+export const ON_PLAINS: readonly BuildingKind[] = ['stable', 'farm']
 
 /**
  * Kinds of building that keep goods in a storage of their own: storages, the Trade
@@ -138,9 +151,9 @@ export function workNeeded(site: Building): number {
 
 /**
  * Why a building of this kind can't be laid out on the tile (`CONTEXT.md`: Where buildings go),
- * or undefined if it can: workplaces go on a resource node of their kind, stables on Plains off
- * any node, smelters, mints, smithies, town halls, walls and gates off any node and off Mountain,
- * one building per tile. A road goes on any passable land but Mountain, node or not, and next to
+ * or undefined if it can: workplaces go on a resource node of their kind, stables and farms on
+ * Plains off any node, smelters, mints, smithies, town halls, houses, walls and gates off any node
+ * and off Mountain, a house only in a city's area (`CONTEXT.md`: House), one building per tile. A road goes on any passable land but Mountain, node or not, and next to
  * a building on its tile, but one road per tile (`CONTEXT.md`: Road). Without `terrain` the
  * terrain rules are not checked.
  */
@@ -160,12 +173,14 @@ export function buildProblem(
     return undefined
   }
   const node = world.nodes.find((n) => n.x === x && n.y === y)
-  if (kind === 'stable') {
+  if (ON_PLAINS.includes(kind)) {
     if (node || (terrain && terrainAt(terrain, x, y) !== Terrain.Plains))
-      return 'a stable goes on Plains, off any resource node'
+      return `a ${kind} goes on Plains, off any resource node`
   } else if (OFF_NODES.includes(kind)) {
     if (node || (terrain && terrainAt(terrain, x, y) === Terrain.Mountain))
       return `a ${kind} goes off any resource node, and not on Mountain`
+    if (kind === 'house' && citiesAt(world, x, y, terrain?.size ?? MAP_SIZE).length === 0)
+      return 'a house goes in a city’s area'
   } else if (!node || NODE_WORKPLACE[node.kind] !== kind)
     return `a ${kind} goes on a fitting resource node`
   if (buildingAt(world, x, y)) return 'there is already a building on this tile'

@@ -190,7 +190,7 @@ describe('invariants', () => {
     world.cities[0]!.realmId = null
     for (const o of world.residents) o.owner = null
     const r = world.residents[0]!
-    r.order = { kind: 'tearDown', buildingId: world.buildings[0]!.id, at: { x: r.x, y: r.y } }
+    r.order = { kind: 'drive', carriageId: 'k0', target: { x: 0, y: 0 }, path: null, progress: 0 }
     expect(checkInvariants(world, terrain)).toContainEqual(
       expect.objectContaining({ invariant: 'npc-orders-allowed', entityIds: [r.id] }),
     )

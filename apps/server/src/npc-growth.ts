@@ -1,0 +1,553 @@
+import {
+  BUILD_MATERIALS,
+  MAX_WORKERS,
+  NODE_GOOD,
+  NODE_WORKPLACE,
+  NPC_ADULTS_PER_PAIR,
+  NPC_BUILDERS,
+  NPC_FARM_REACH,
+  NPC_NODE_REACH,
+  NPC_WALL_STEP,
+  Terrain,
+  buildProblem,
+  buildingAt,
+  cityAreaTiles,
+  cityMembership,
+  freeHousing,
+  hasFoodSurplus,
+  inCityArea,
+  isCityBuilding,
+  isPassableTerrain,
+  materialsNeeded,
+  terrainAt,
+  workNeeded,
+  workplaceGood,
+  wrap,
+  wrapDelta,
+  wrapDistance,
+  type Building,
+  type BuildingKind,
+  type City,
+  type Good,
+  type Resident,
+  type Stock,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
+import { walkTo } from './npc-behaviour.js'
+
+/**
+ * How an NPC city grows (`CONTEXT.md`: NPC city): it pairs its adults, builds a house when it has a
+ * food surplus and no free housing, a farm when every farm is full, and the workplace for a
+ * material it needs but has no workplace for. With no room left inside its wall it builds on its
+ * edge, puts up a new wall `NPC_WALL_STEP` tiles further out and then tears down the old one. All
+ * through the orders a Player's residents take (ADR 0002). Not for the Trade Organization's
+ * cities, which grow their own way.
+ */
+
+/** Something an NPC city builds or takes down next. */
+export type Project =
+  | { kind: 'build'; building: BuildingKind; x: number; y: number }
+  | { kind: 'tearDown'; building: Building }
+
+/** A tile, relative to a city's home (`npcHome`), the short way round the map. */
+interface Offset {
+  dx: number
+  dy: number
+}
+
+/** How far a tile is from the home along the farther direction: which ring of wall it is on. */
+const ringOf = (o: Offset) => Math.max(Math.abs(o.dx), Math.abs(o.dy))
+
+/**
+ * The city's walls as rings round its home (`npcHome`): the innermost ring, the one it builds or
+ * keeps (`outer`), and where the gate of each goes. Undefined for a city without walls, or one
+ * whose walls stand at more distances than an old and a new ring.
+ */
+export interface Rings {
+  inner: number
+  outer: number
+  /** It has outgrown its wall: a house outside it, or the new wall begun. */
+  expanding: boolean
+  /** The gate of the innermost ring, if it has one. */
+  gate: Building | undefined
+  /** Where the outer ring's gate goes: in line with the inner one's, or south of the home. */
+  newGate: Offset
+}
+
+/** Pairs, builders and the next project of an NPC city, for one tick. */
+export interface Growth {
+  /**
+   * Gives an idle adult a part in the next project; false when there is none for them. With
+   * `deliver`, only to one carrying materials its site needs: they take them there, rather than
+   * to the storage.
+   */
+  assign(r: Resident, deliver?: boolean): boolean
+}
+
+/**
+ * One tick of an NPC city's growth, before its idle adults get work: ends pairs while Food runs
+ * short, pairs idle adults at home while it has a food surplus (one pair for every
+ * `NPC_ADULTS_PER_PAIR` adults), and stops builders who can do no more until materials come.
+ * Returns how the city gives idle adults a part in its next project, if it has one and a free
+ * builder's place (`NPC_BUILDERS`).
+ */
+export function cityGrowth(
+  world: WorldState,
+  city: City,
+  home: Building,
+  adults: Resident[],
+  terrain: TerrainMap,
+  short: boolean,
+): Growth | undefined {
+  if (city.tradeOrg) return undefined
+  const size = terrain.size
+  if (short) {
+    for (const r of adults) if (r.order?.kind === 'pair') r.order = null
+    return undefined
+  }
+  pairAdults(world, city, adults, size)
+  for (const r of adults) {
+    const o = r.order
+    const site = o?.kind === 'build' && world.buildings.find((b) => b.id === o.siteId)
+    if (site && site.site && workNeeded(site) === 0) r.order = null
+  }
+  let free = NPC_BUILDERS - adults.filter(isBuilder).length
+  if (free <= 0) return undefined
+  let project: Project | null | undefined = null
+  const storage = world.buildings.find(
+    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
+  )
+  return {
+    assign(r, deliver = false) {
+      if (free <= 0) return false
+      if (project === null) project = nextProject(world, city, home, terrain)
+      if (!project || !takePart(world, r, project, storage, deliver)) return false
+      free--
+      return true
+    },
+  }
+}
+
+/** Whether a resident is building, tearing down or delivering materials to a site. */
+function isBuilder(r: Resident): boolean {
+  const o = r.order
+  return (
+    o?.kind === 'build' ||
+    o?.kind === 'tearDown' ||
+    (o?.kind === 'drop' && o.to.kind === 'site') ||
+    (o?.kind === 'pickUp' && o.from.kind === 'storage' && !('food' in o.goods))
+  )
+}
+
+/**
+ * Pairs idle adults standing at home two by two (`CONTEXT.md`: Pairing) while the city has a food
+ * surplus, until it holds one pair for every `NPC_ADULTS_PER_PAIR` adults.
+ */
+function pairAdults(world: WorldState, city: City, adults: Resident[], size: number): void {
+  if (!hasFoodSurplus(world, city)) return
+  const pairs = adults.filter((r) => r.order?.kind === 'pair').length / 2
+  let wanted = Math.floor(adults.length / NPC_ADULTS_PER_PAIR) - Math.floor(pairs)
+  const idle = adults.filter((r) => r.order === null && inCityArea(world, city, r.x, r.y, size))
+  while (wanted > 0 && idle.length >= 2) {
+    const [a, b] = idle.splice(0, 2) as [Resident, Resident]
+    a.order = { kind: 'pair', partnerId: b.id, since: world.tick }
+    b.order = { kind: 'pair', partnerId: a.id, since: world.tick }
+    wanted--
+  }
+}
+
+/**
+ * Gives a resident their part in a project, if there is one for them: walking to the tile and
+ * laying out, building or tearing down there; for a site that still needs materials, carrying
+ * them from the storage, or building ahead while none are there. False when they can't help.
+ * With `deliver`, only bringing materials they carry.
+ */
+function takePart(
+  world: WorldState,
+  r: Resident,
+  project: Project,
+  storage: Building | undefined,
+  deliver: boolean,
+): boolean {
+  if (deliver) {
+    const site = project.kind === 'build' && buildingAt(world, project.x, project.y)
+    const carried = site && site.site && pick(r.carried, materialsNeeded(site))
+    if (!site || !carried) return false
+    if (r.x === site.x && r.y === site.y) {
+      r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
+    } else walkTo(r, site)
+    return true
+  }
+  if (project.kind === 'tearDown') {
+    const b = project.building
+    if (r.x !== b.x || r.y !== b.y) walkTo(r, b)
+    else r.order = { kind: 'tearDown', buildingId: b.id, at: { x: r.x, y: r.y } }
+    return true
+  }
+  const { x, y, building } = project
+  const here = r.x === x && r.y === y
+  const site = buildingAt(world, x, y)
+  const build = () => {
+    if (here) r.order = { kind: 'build', building, at: { x, y }, siteId: null }
+    else walkTo(r, { x, y })
+    return true
+  }
+  if (!site?.site) return build()
+  const need = materialsNeeded(site)
+  const carried = pick(r.carried, need)
+  if (carried) {
+    if (here) r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
+    else walkTo(r, site)
+    return true
+  }
+  const stocked = pick(storage?.stock, need)
+  if (storage && stocked) {
+    if (r.x === storage.x && r.y === storage.y) {
+      r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods: stocked }
+    } else walkTo(r, storage)
+    return true
+  }
+  return workNeeded(site) > 0 && build()
+}
+
+/** The goods of `wanted` that `stock` holds some of, as many as wanted; none if it holds none. */
+function pick(stock: Stock | undefined, wanted: Stock): Stock | undefined {
+  const out: Stock = {}
+  for (const [good, units] of Object.entries(wanted) as [Good, number][]) {
+    const have = stock?.[good] ?? 0
+    if (have > 0) out[good] = Math.min(have, units)
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+/**
+ * What an NPC city builds or takes down next, if anything: once its new wall is finished, the
+ * old one, a stretch at a time and the gate last; else whatever it wants most (`wanted`). When
+ * that needs a material the storage lacks and none of the city's workplaces makes, it is first
+ * that material's workplace, on the nearest fitting resource node (`NPC_NODE_REACH`).
+ */
+export function nextProject(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+): Project | undefined {
+  const rings = wallRings(world, city, home, terrain.size)
+  const old = rings && oldWallToTearDown(world, city, home, terrain, rings)
+  if (old) return { kind: 'tearDown', building: old }
+  const want = wanted(world, city, home, terrain, rings)
+  if (!want) return undefined
+  const site = buildingAt(world, want.x, want.y)
+  const need = site?.site ? materialsNeeded(site) : (BUILD_MATERIALS[want.building] ?? {})
+  const storage = world.buildings.find(
+    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
+  )
+  for (const [good, units] of Object.entries(need) as [Good, number][]) {
+    if ((storage?.stock?.[good] ?? 0) >= units || makes(world, city, good)) continue
+    const node = nearestNode(world, home, terrain, good)
+    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.kind], x: node.x, y: node.y }
+  }
+  return want
+}
+
+/** Whether one of the city's workplaces, finished or not, makes a good. */
+function makes(world: WorldState, city: City, good: Good): boolean {
+  const own = new Set(city.workplaceIds)
+  return world.buildings.some(
+    (b) => (b.cityId === city.id || own.has(b.id)) && workplaceGood(world, b) === good,
+  )
+}
+
+/** The nearest free resource node yielding `good` within `NPC_NODE_REACH` of the home. */
+function nearestNode(world: WorldState, home: Building, terrain: TerrainMap, good: Good) {
+  let best: { node: (typeof world.nodes)[number]; d: number } | undefined
+  for (const node of world.nodes) {
+    if (NODE_GOOD[node.kind] !== good) continue
+    const d = wrapDistance(terrain.size, home, node)
+    if (d > NPC_NODE_REACH || (best && d >= best.d)) continue
+    if (buildProblem(world, node.x, node.y, NODE_WORKPLACE[node.kind], terrain)) continue
+    best = { node, d }
+  }
+  return best?.node
+}
+
+/**
+ * What the city wants built most, where: a site of its own already begun (a farm, a workplace of
+ * its own, a house in its area, its new wall); else a farm when every farm is full; else a house
+ * when it has a food surplus and no free housing; else the next stretch of its new wall.
+ */
+function wanted(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings | undefined,
+): Extract<Project, { kind: 'build' }> | undefined {
+  const size = terrain.size
+  const own = new Set(city.workplaceIds)
+  const ring = rings?.expanding ? newWall(world, home, terrain, rings) : []
+  const begun = world.buildings.find(
+    (b) =>
+      b.site &&
+      (((b.kind === 'farm' || b.kind === 'stable') && b.cityId === city.id) ||
+        own.has(b.id) ||
+        (b.kind === 'house' && inCityArea(world, city, b.x, b.y, size))),
+  )
+  const wallSite = ring.find((t) => t.site)
+  const site = begun ?? wallSite?.site
+  if (site) return { kind: 'build', building: site.kind, x: site.x, y: site.y }
+  const at = (building: BuildingKind, t: { x: number; y: number } | undefined) =>
+    t && { kind: 'build' as const, building, x: t.x, y: t.y }
+  if (farmsFull(world, city)) {
+    const farm = at('farm', farmTile(world, home, terrain, rings))
+    if (farm) return farm
+  }
+  if (hasFoodSurplus(world, city) && freeHousing(world, city) <= 0) {
+    const house = at('house', houseTile(world, city, home, terrain, rings))
+    if (house) return house
+  }
+  const next = ring.find((t) => !t.done)
+  return next && { kind: 'build', building: next.kind, x: next.x, y: next.y }
+}
+
+/** Whether the city has farms and none of them has room for another worker, coming or there. */
+function farmsFull(world: WorldState, city: City): boolean {
+  const farms = world.buildings.filter((b) => b.kind === 'farm' && b.cityId === city.id && !b.site)
+  if (farms.length === 0) return false
+  return farms.every((f) => {
+    const there = world.residents.filter(
+      (r) =>
+        (r.order?.kind === 'workAt' && r.order.buildingId === f.id) ||
+        (r.order?.kind === 'walkTo' && r.order.target.x === f.x && r.order.target.y === f.y),
+    ).length
+    return there >= (MAX_WORKERS.farm ?? 0)
+  })
+}
+
+/**
+ * The city's walls as rings round its home (`Rings`). A city expands once it has a house, finished
+ * or begun, outside its innermost ring, or has begun its new wall `NPC_WALL_STEP` further out.
+ */
+export function wallRings(
+  world: WorldState,
+  city: City,
+  home: Building,
+  size: number,
+): Rings | undefined {
+  const off = (b: { x: number; y: number }): Offset => ({
+    dx: wrapDelta(home.x, b.x, size),
+    dy: wrapDelta(home.y, b.y, size),
+  })
+  const walls = world.buildings.filter(
+    (b) => b.cityId === city.id && (b.kind === 'wall' || b.kind === 'gate') && !b.site,
+  )
+  if (walls.length === 0) return undefined
+  const dists = walls.map((b) => ringOf(off(b)))
+  const inner = Math.min(...dists)
+  const outer = Math.max(...dists)
+  const target = inner + NPC_WALL_STEP
+  if (outer !== inner && outer !== target) return undefined
+  const begun = world.buildings.some(
+    (b) => (b.kind === 'wall' || b.kind === 'gate') && b.site && ringOf(off(b)) === target,
+  )
+  const outside = world.buildings.some(
+    (b) =>
+      b.kind === 'house' &&
+      ringOf(off(b)) > inner &&
+      (b.cityId === city.id || (b.site && inCityArea(world, city, b.x, b.y, size))),
+  )
+  const gate = walls.find((b) => b.kind === 'gate' && ringOf(off(b)) === inner)
+  const g = gate && off(gate)
+  const newGate =
+    g && Math.abs(g.dy) === inner
+      ? { dx: g.dx, dy: Math.sign(g.dy) * target }
+      : g
+        ? { dx: Math.sign(g.dx) * target, dy: g.dy }
+        : { dx: 0, dy: target }
+  const expanding = outer > inner || begun || outside
+  return { inner, outer: expanding ? target : inner, expanding, gate, newGate }
+}
+
+/** A tile of a city's new wall: what goes there, and whether it is finished or begun. */
+interface WallTileState {
+  kind: 'wall' | 'gate'
+  x: number
+  y: number
+  done: boolean
+  site?: Building
+}
+
+/**
+ * The tiles of the city's new wall (`Rings.outer`), the gate first and then outward from it:
+ * each either finished, begun, or free for it. Tiles that can take no wall (a farm stands there,
+ * a node, Mountain) are left out, and the wall has a gap there.
+ */
+export function newWall(
+  world: WorldState,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings,
+): WallTileState[] {
+  const size = terrain.size
+  const d = rings.outer
+  const out: (WallTileState & { order: number })[] = []
+  for (let dy = -d; dy <= d; dy++) {
+    for (let dx = -d; dx <= d; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue
+      const x = wrap(home.x + dx, size)
+      const y = wrap(home.y + dy, size)
+      const kind = dx === rings.newGate.dx && dy === rings.newGate.dy ? 'gate' : 'wall'
+      const order = Math.hypot(dx - rings.newGate.dx, dy - rings.newGate.dy)
+      const here = buildingAt(world, x, y)
+      if (here && (here.kind === 'wall' || here.kind === 'gate')) {
+        out.push({
+          kind: here.kind,
+          x,
+          y,
+          done: !here.site,
+          order,
+          ...(here.site ? { site: here } : {}),
+        })
+      } else if (!buildProblem(world, x, y, kind, terrain)) {
+        out.push({ kind, x, y, done: false, order })
+      }
+    }
+  }
+  return out.sort((a, b) => a.order - b.order).map(({ order: _order, ...t }) => t)
+}
+
+/**
+ * The stretch of the old wall to tear down next, once every tile of the new wall is finished
+ * (`CONTEXT.md`: NPC city), and only while the city's other buildings stay part of it without the
+ * old wall: the stretch farthest along the wall from its gate, so the rest stays reachable from
+ * the gate, and the gate last.
+ */
+function oldWallToTearDown(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings,
+): Building | undefined {
+  if (rings.outer === rings.inner) return undefined
+  if (newWall(world, home, terrain, rings).some((t) => !t.done)) return undefined
+  const size = terrain.size
+  const old = world.buildings.filter(
+    (b) =>
+      b.cityId === city.id &&
+      (b.kind === 'wall' || b.kind === 'gate') &&
+      !b.site &&
+      Math.max(Math.abs(wrapDelta(home.x, b.x, size)), Math.abs(wrapDelta(home.y, b.y, size))) ===
+        rings.inner,
+  )
+  const gone = new Set(old)
+  const members = cityMembership(
+    { cities: world.cities, buildings: world.buildings.filter((b) => !gone.has(b)) },
+    size,
+  )
+  const cut = world.buildings.some(
+    (b) =>
+      b.cityId === city.id && isCityBuilding(b) && !gone.has(b) && members.get(b.id) !== city.id,
+  )
+  if (cut) return undefined
+  // Distances along the old wall from its gate, four ways as residents walk.
+  const byTile = new Map(old.map((b) => [`${b.x},${b.y}`, b]))
+  const start = rings.gate && gone.has(rings.gate) ? rings.gate : old[0]
+  if (!start) return undefined
+  const dist = new Map<Building, number>([[start, 0]])
+  const todo = [start]
+  while (todo.length > 0) {
+    const b = todo.shift()!
+    for (const [nx, ny] of [
+      [b.x + 1, b.y],
+      [b.x - 1, b.y],
+      [b.x, b.y + 1],
+      [b.x, b.y - 1],
+    ] as [number, number][]) {
+      const n = byTile.get(`${wrap(nx, size)},${wrap(ny, size)}`)
+      if (n && !dist.has(n)) {
+        dist.set(n, dist.get(b)! + 1)
+        todo.push(n)
+      }
+    }
+  }
+  // Stretches cut off from the gate go first; then the farthest; the gate last.
+  const far = (b: Building) => dist.get(b) ?? Infinity
+  return [...old].sort((a, b) => far(b) - far(a) || a.id.localeCompare(b.id))[0]
+}
+
+/** Whether a tile is free to build on: passable, not Mountain, no node and no building. */
+function freeTile(world: WorldState, terrain: TerrainMap, x: number, y: number): boolean {
+  const t = terrainAt(terrain, x, y)
+  if (!isPassableTerrain(t) || t === Terrain.Mountain) return false
+  return !buildingAt(world, x, y) && !world.nodes.some((n) => n.x === x && n.y === y)
+}
+
+/**
+ * Where the city puts its next house (`CONTEXT.md`: House): a free tile of its area inside its
+ * wall, nearest its home first; when it is expanding, inside the new wall. With no room left
+ * there, a tile on its edge just outside the wall, which starts its expansion. A city without
+ * walls builds anywhere in its area.
+ */
+export function houseTile(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings | undefined,
+): { x: number; y: number } | undefined {
+  const size = terrain.size
+  const tiles = [...cityAreaTiles(world, city, size)].map((k) => {
+    const [x, y] = k.split(',').map(Number) as [number, number]
+    return {
+      x,
+      y,
+      ring: ringOf({ dx: wrapDelta(home.x, x, size), dy: wrapDelta(home.y, y, size) }),
+    }
+  })
+  const free = tiles
+    .filter((t) => freeTile(world, terrain, t.x, t.y))
+    .sort((a, b) => a.ring - b.ring || a.y - b.y || a.x - b.x)
+  if (!rings) return free[0]
+  const inside = free.find((t) => t.ring < rings.outer)
+  if (inside || rings.expanding) return inside
+  return free.find((t) => t.ring === rings.inner + 1)
+}
+
+/**
+ * Where the city lays out its next farm: the free Plains tile nearest its gate beyond where its
+ * next wall would stand, up to `NPC_FARM_REACH` further out, off the way out of its gate.
+ */
+export function farmTile(
+  world: WorldState,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings | undefined,
+): { x: number; y: number } | undefined {
+  const size = terrain.size
+  const wall = rings ? rings.outer : 0
+  const gate = rings?.newGate ?? { dx: 0, dy: wall }
+  const from = wall + NPC_WALL_STEP + 1
+  for (let d = from; d < from + NPC_FARM_REACH; d++) {
+    let best: { x: number; y: number; dist: number } | undefined
+    for (let dy = -d; dy <= d; dy++) {
+      for (let dx = -d; dx <= d; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue
+        // Keep the way out of the gate open.
+        const lane =
+          Math.abs(gate.dy) >= Math.abs(gate.dx)
+            ? dx === gate.dx && Math.sign(dy) === Math.sign(gate.dy)
+            : dy === gate.dy && Math.sign(dx) === Math.sign(gate.dx)
+        if (lane) continue
+        const x = wrap(home.x + dx, size)
+        const y = wrap(home.y + dy, size)
+        if (terrainAt(terrain, x, y) !== Terrain.Plains || !freeTile(world, terrain, x, y)) continue
+        const dist = Math.hypot(dx - gate.dx, dy - gate.dy)
+        if (!best || dist < best.dist) best = { x, y, dist }
+      }
+    }
+    if (best) return { x: best.x, y: best.y }
+  }
+  return undefined
+}

@@ -5,14 +5,24 @@ import type { Building, Resident, WorldState } from './world.js'
 
 /** World queries about walls and gates (`CONTEXT.md`: Walls in combat; ADR 0002). */
 
+/**
+ * Whose side a resident is on at walls and gates: their realm, or for a resident of an NPC city,
+ * that city, so its residents stand on its walls as a realm's do (`CONTEXT.md`: NPC city).
+ * Null for a resident of nobody.
+ */
+export function wallSide(r: Pick<Resident, 'owner' | 'cityId'>): string | null {
+  return r.owner ?? r.cityId
+}
+
 /** A finished wall or gate on a tile, and whose it is. */
 export interface WallTile {
   kind: 'wall' | 'gate'
   /** The realm of the wall's city; null for nobody's. */
   realmId: string | null
   /**
-   * The realms that may stand on it and pass its gate while closed: its city's realm and the
-   * other members of that realm's alliance (`CONTEXT.md`: Alliance). Empty for nobody's.
+   * The sides (`wallSide`) that may stand on it and pass its gate while closed: its city's realm
+   * and the other members of that realm's alliance (`CONTEXT.md`: Alliance), or for a city of no
+   * realm (an NPC city), the city itself. Empty for nobody's.
    */
   realms: string[]
   /** A gate that is closed. */
@@ -78,7 +88,7 @@ export function wallMap(
     tiles.set(tileIndex(size, b.x, b.y), {
       kind: b.kind as 'wall' | 'gate',
       realmId,
-      realms: side(realmId),
+      realms: realmId === null ? (b.cityId ? [b.cityId] : []) : side(realmId),
       closed: isClosed(b),
     })
   }

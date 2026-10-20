@@ -205,7 +205,9 @@ export function walkHomeIfAway(world: WorldState, city: City, r: Resident, size:
   const o = r.order
   const atWork =
     o?.kind === 'workAt' &&
-    world.buildings.some((b) => b.id === o.buildingId && b.cityId === city.id)
+    world.buildings.some(
+      (b) => b.id === o.buildingId && (b.cityId === city.id || !!city.workplaceIds?.includes(b.id)),
+    )
   const home = npcHome(world, city)
   if (atWork || !home || inCityArea(world, city, r.x, r.y, size)) return false
   walkTo(r, home)
