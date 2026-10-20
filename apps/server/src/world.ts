@@ -22,6 +22,7 @@ import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
+import { stepArmies } from './armies.js'
 import { stepCrimes } from './crimes.js'
 import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
@@ -45,6 +46,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     piles: [],
     events: [],
     alliances: [],
+    armies: [],
     crimes: [],
   }
 }
@@ -111,8 +113,9 @@ export interface StepResult {
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
  * home or at their workplace who run low on food take meals there; cities with a captor change
- * realm (`stepCaptures`); last, witnesses who got home make crimes known (`stepCrimes`). Without
- * `walking` nobody moves.
+ * realm (`stepCaptures`); witnesses who got home make crimes known (`stepCrimes`); last, armies
+ * lose members who are gone and give the rest their orders for the next tick. Without `walking`
+ * nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
@@ -143,6 +146,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepRefill(world, terrain.size)
   const captures = stepCaptures(world, terrain.size)
   stepCrimes(world, terrain.size)
+  stepArmies(world, terrain.size)
   const actions =
     steps.length +
     strikes.length +

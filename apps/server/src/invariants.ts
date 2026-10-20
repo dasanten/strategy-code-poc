@@ -56,6 +56,7 @@ import {
 import { refillStock } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
+import { armiesSound } from './armies.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -1132,6 +1133,7 @@ export const worldInvariants: Invariant[] = [
   territorySound,
   deadLeaveLoot,
   attackOrdersSound,
+  armiesSound,
   crimesSound,
   gatesSound,
   roadLineOrdersSound,

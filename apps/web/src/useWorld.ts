@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   WS_PATH,
   type Building,
+  type Army,
   type Carriage,
   type City,
   type Diplomacy,
@@ -37,6 +38,8 @@ export interface ClientWorld {
   horses: Horse[]
   carriages: Carriage[]
   piles: Pile[]
+  /** The Player's own armies (`CONTEXT.md`: Army). */
+  armies: Army[]
   /** The Player's realm log, oldest first. */
   events: RealmEvent[]
   /** The Player's alliance, invitations and the realms they could invite. */
@@ -54,6 +57,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     horses: [] as Horse[],
     carriages: [] as Carriage[],
     piles: [] as Pile[],
+    armies: [] as Army[],
   }
   for (const { is, ...e } of entities) {
     if (is === 'resident') out.residents.push(e as Resident)
@@ -61,6 +65,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     else if (is === 'building') out.buildings.push(e as Building)
     else if (is === 'horse') out.horses.push(e as Horse)
     else if (is === 'carriage') out.carriages.push(e as Carriage)
+    else if (is === 'army') out.armies.push(e as Army)
     else out.piles.push(e as Pile)
   }
   return out

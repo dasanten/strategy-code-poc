@@ -9,6 +9,7 @@ import { walkTo } from './walking.js'
 import { workAt } from './work.js'
 import { allianceOrders } from './alliances.js'
 import { attack } from './combat.js'
+import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
 import { roadLine } from './road-line.js'
 
@@ -49,6 +50,7 @@ export const orderKinds: Record<string, OrderKind> = {
   setGate,
   roadLine,
   ...allianceOrders,
+  ...armyOrders,
 }
 
 interface Pending {
@@ -86,6 +88,10 @@ export class OrderQueue {
     return { type: 'ack', requestId: id }
   }
 
+  /**
+   * Applies the waiting orders in the order they came. A resident in an army who gets an order of
+   * their own leaves it (`CONTEXT.md`: Army); orders to armies don't count.
+   */
   applyAll(world: WorldState): void {
     const batch = this.pending
     this.pending = []
@@ -95,7 +101,9 @@ export class OrderQueue {
         const r = world.residents.find((x) => x.id === order.residentId)
         if (r) delete r.script
       }
+      const before = order.kind in armyOrders ? undefined : memberOrders(world)
       this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
+      if (before) leaveOnOwnOrders(world, before)
     }
   }
 
