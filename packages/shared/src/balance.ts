@@ -239,6 +239,31 @@ export const NPC_VILLAGE: NpcCitySize = { size: 7, residents: 6, houses: 2, farm
 /** A town: a wider square, twice the residents of a starting city, two farms. */
 export const NPC_TOWN: NpcCitySize = { size: 11, residents: 16, houses: 5, farms: 2, food: 400 }
 
+/**
+ * An NPC city's Food runs short (`CONTEXT.md`: NPC city) when its storages hold less than its
+ * residents eat in this many game days. It then puts residents on its farms first.
+ */
+export const NPC_FOOD_SHORT_DAYS = 5
+
+/**
+ * An NPC city sends one of a workplace's workers to carry its output to the storage once this
+ * many units of it lie in the pile on the workplace's tile: about what a resident carries, so a
+ * trip is worth the walk.
+ */
+export const NPC_FETCH_UNITS = 15
+
+/**
+ * Units of Food an NPC city's carrier leaves in a farm's pile, so the workers there can still
+ * refill at their workplace (`CONTEXT.md`: Refilling at a workplace).
+ */
+export const NPC_FOOD_LEFT_AT_WORK = 4
+
+/**
+ * Units of Food an NPC city's carrier keeps on them when putting the rest in the storage: what a
+ * resident starts out with, so nobody walks to the storage for the food they carry anyway.
+ */
+export const NPC_OWN_FOOD = START_CARRIED_FOOD
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 
@@ -699,6 +724,33 @@ export const TEARDOWN_MATERIALS_RETURNED = 0.5
 export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
 
 /**
+ * Control a city projects before counting anyone in it (`CONTEXT.md`: Territory), so even an
+ * empty city holds the ground it stands on.
+ */
+export const TERRITORY_CITY_BASE = 5
+
+/** Control a guarded workplace projects before counting its workers and guards. */
+export const TERRITORY_WORKPLACE_BASE = 2
+
+/** Control each resident adds: of a city, one living there; of a workplace, one working it. */
+export const TERRITORY_PER_RESIDENT = 1
+
+/**
+ * Control each armed resident adds on top: of a city, one living there and standing in its area
+ * (its garrison); of a workplace, one of its holder's guarding it. Soldiers count most.
+ */
+export const TERRITORY_PER_ARMED = 3
+
+/**
+ * How far control reaches, in tiles, per square root of its strength: a city of 5 control reaches
+ * 4 tiles, one of 30 ten, one of 100 twenty.
+ */
+export const TERRITORY_REACH_PER_ROOT = 2
+
+/** The farthest any one city or workplace projects control, in tiles. */
+export const TERRITORY_MAX_REACH = 24
+
+/**
  * Ticks between two blows of a resident in a fight (`CONTEXT.md`: Combat): a blow every two
  * seconds, so a fight between two unarmed residents lasts about a minute.
  */
@@ -797,3 +849,16 @@ export const SCRIPT_STEP_BUDGET = 2000
 
 /** How deeply a script's own function calls may nest before the run stops with an error. */
 export const SCRIPT_MAX_CALL_DEPTH = 50
+
+/**
+ * Extra steps a script pays to ask the world something it sees as a list (`residents()`,
+ * `buildings()`, `nodes()`, …), on top of the 1 every evaluated node costs (`CONTEXT.md`: Step
+ * budget). Dear enough that a script keeps what it found in a variable rather than asking again.
+ */
+export const SCRIPT_LIST_QUERY_COST = 20
+
+/** Extra steps for a small query about one tile or two things, such as `terrainAt` or `distance`. */
+export const SCRIPT_TILE_QUERY_COST = 1
+
+/** Extra steps a script pays to request an action (`walkTo`, `pickUp`, …), accepted or not. */
+export const SCRIPT_ACTION_COST = 10
