@@ -4,11 +4,25 @@ import { BUILDING_NAMES } from './city-view.js'
 /** How bad an event is, for its colour in the log. */
 export type EventTone = 'bad' | 'warn' | 'info'
 
+/** A place an event names, which the Player can find on the map from the log. */
+export interface EventPlace {
+  name: string
+  x: number
+  y: number
+}
+
+/** An event in the game's words, with the places it names. */
+export interface EventLine {
+  text: string
+  tone: EventTone
+  places?: EventPlace[]
+}
+
 /**
  * One line of the realm log, in the game's words (`CONTEXT.md`). `realmId` is the Player's realm,
  * so alliance events about it say so.
  */
-export function describeEvent(e: RealmEvent, realmId?: string): { text: string; tone: EventTone } {
+export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
   switch (e.kind) {
     case 'hungry':
       return { text: `${e.name} has nothing to eat and is starving.`, tone: 'warn' }
@@ -57,6 +71,24 @@ export function describeEvent(e: RealmEvent, realmId?: string): { text: string; 
       const from = e.other === null ? '' : ` from the realm of ${e.other}`
       return { text: `You captured ${e.city}${from}, with its ${people}.`, tone: 'info' }
     }
+    case 'selfManaged': {
+      if (e.cities.length === 0) return { text: 'Your realm had no city left.', tone: 'bad' }
+      const each = e.cities.map((c) => `${c.name} (${residentsText(c.residents)})`)
+      const which = e.cities.length === 1 ? 'Your city' : 'Your cities'
+      const now =
+        e.cities.length === 1 ? 'is now a self-managed city' : 'are now self-managed cities'
+      return {
+        text: `${which} ${listText(each)} ${now}.`,
+        tone: 'bad',
+        places: e.cities.map((c) => ({ name: c.name, x: c.x, y: c.y })),
+      }
+    }
+    case 'founded':
+      return {
+        text: `Your Leader ${e.name} founded ${e.city}, your realm’s starting city.`,
+        tone: 'info',
+        places: [{ name: e.city, x: e.x, y: e.y }],
+      }
     case 'foodSpoiled':
       return { text: `${e.units} Food spoiled.`, tone: 'info' }
     case 'born':
@@ -101,6 +133,26 @@ export function describeEvent(e: RealmEvent, realmId?: string): { text: string; 
     case 'scriptEnded':
       return { text: `${e.name} stopped running a script: it was deleted.`, tone: 'info' }
   }
+}
+
+/** "1 resident", "3 residents". */
+function residentsText(n: number): string {
+  return `${n} resident${n === 1 ? '' : 's'}`
+}
+
+/** "A", "A and B", "A, B and C". */
+function listText(items: string[]): string {
+  return items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`
+}
+
+/**
+ * Whether the Player's realm has ended since its starting city was founded (`CONTEXT.md`: Leader
+ * death): their cities' fate is the newest of the two in their log. They start afresh on their
+ * next login.
+ */
+export function realmEnded(log: RealmEvent[]): boolean {
+  const last = log.findLast((e) => e.kind === 'selfManaged' || e.kind === 'founded')
+  return last?.kind === 'selfManaged'
 }
 
 /** Adds a tick's new events to the log, keeping the latest `REALM_LOG_LENGTH` as the server does. */
