@@ -16,6 +16,7 @@ import {
 } from '@csp/shared'
 import { api } from './api.js'
 import { appendEvents } from './realm-log.js'
+import { applyRegionMap, type RegionState } from './map/region.js'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed'
 
@@ -40,6 +41,8 @@ export interface ClientWorld {
   events: RealmEvent[]
   /** The Player's alliance, invitations and the realms they could invite. */
   diplomacy: Diplomacy
+  /** The Region map over the Player's explored terrain; null until the server has one. */
+  region: RegionState | null
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -99,6 +102,7 @@ export function useWorld(onLoggedOut: () => void) {
             tick: msg.tick,
             events: msg.events,
             diplomacy: msg.diplomacy,
+            region: msg.region && applyRegionMap(null, msg.region, msg.map.size),
             ...byKind(entities.values()),
           })
         } else if (msg.type === 'ack' || msg.type === 'rejected') {
@@ -117,6 +121,7 @@ export function useWorld(onLoggedOut: () => void) {
             const seen = changed ? byKind(entities.values()) : {}
             const events = appendEvents(w.events, msg.events)
             const diplomacy = msg.diplomacy ?? w.diplomacy
+            const region = msg.region ? applyRegionMap(w.region, msg.region, w.map.size) : w.region
             return {
               ...w,
               ...seen,
@@ -125,6 +130,7 @@ export function useWorld(onLoggedOut: () => void) {
               grownChunks: grown,
               events,
               diplomacy,
+              region,
             }
           })
         }
