@@ -25,6 +25,7 @@ import {
 } from '@csp/shared'
 import { refillSource } from './survival.js'
 import { startWork } from './work.js'
+import { caravanCrew } from './caravans.js'
 
 /**
  * The orders an NPC city gives its residents: only kinds a Player's order can give too
@@ -36,6 +37,8 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'drop',
   'workAt',
   'pair',
+  // A caravan's driver (`CONTEXT.md`: Caravan).
+  'drive',
 ]
 
 /** Whether a resident is run by an NPC city: they live in one and belong to no realm. */
@@ -52,8 +55,10 @@ export function runByNpcCity(world: WorldState, r: Resident): boolean {
  */
 export function stepNpcCities(world: WorldState, size: number): void {
   const residents = new Map<string, Resident[]>()
+  // A caravan's crew is run by its caravan (`stepCaravans`).
+  const crew = caravanCrew(world)
   for (const r of world.residents) {
-    if (r.owner !== null || r.cityId === null) continue
+    if (r.owner !== null || r.cityId === null || crew.has(r.id)) continue
     const list = residents.get(r.cityId) ?? []
     list.push(r)
     residents.set(r.cityId, list)

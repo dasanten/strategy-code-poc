@@ -60,6 +60,7 @@ import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
+import { caravansSound } from './caravans.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -1233,6 +1234,7 @@ export const worldInvariants: Invariant[] = [
   crimesSound,
   gatesSound,
   tradeOrgSound,
+  caravansSound,
   roadLineOrdersSound,
 ]
 

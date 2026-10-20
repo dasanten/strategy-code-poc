@@ -12,6 +12,7 @@ import {
   type Pile,
   type RealmEvent,
   type Resident,
+  type SeenCaravan,
   type SeenEntity,
   type ServerMessage,
 } from '@csp/shared'
@@ -40,6 +41,8 @@ export interface ClientWorld {
   piles: Pile[]
   /** The Player's own armies (`CONTEXT.md`: Army). */
   armies: Army[]
+  /** The Trade Org caravans in sight (`CONTEXT.md`: Caravan). */
+  caravans: SeenCaravan[]
   /** The Player's realm log, oldest first. */
   events: RealmEvent[]
   /** The Player's alliance, invitations and the realms they could invite. */
@@ -58,6 +61,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     carriages: [] as Carriage[],
     piles: [] as Pile[],
     armies: [] as Army[],
+    caravans: [] as SeenCaravan[],
   }
   for (const { is, ...e } of entities) {
     if (is === 'resident') out.residents.push(e as Resident)
@@ -66,6 +70,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     else if (is === 'horse') out.horses.push(e as Horse)
     else if (is === 'carriage') out.carriages.push(e as Carriage)
     else if (is === 'army') out.armies.push(e as Army)
+    else if (is === 'caravan') out.caravans.push(e as SeenCaravan)
     else out.piles.push(e as Pile)
   }
   return out

@@ -21,6 +21,7 @@ import {
   type Carriage,
   type Horse,
   type TerrainMap,
+  type WorldState,
 } from '@csp/shared'
 import { createAdmin } from './auth.js'
 import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
@@ -29,7 +30,7 @@ import { generateTerrain } from './terrain-gen.js'
 import { smallTerrain, worldWithCity } from './test-terrain.js'
 import { checkInvariants } from './invariants.js'
 import { placeTradeOrgHq } from './trade-org.js'
-import { regions } from './trading-posts.js'
+import { placeTradingPosts, regions } from './trading-posts.js'
 import { npcCityCount, placeNpcCities } from './npc-cities.js'
 import { entitiesInSight } from './sight.js'
 import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
@@ -537,6 +538,28 @@ describe('world saves', () => {
     // The same save always migrates the same way, and a region with a post gets no other.
     expect(migrateWorld(structuredClone(world), 21, { terrain: land }, migrations, 22)).toEqual(v22)
     expect(migrateWorld(structuredClone(v22), 21, { terrain: land }, migrations, 22)).toEqual(v22)
+  })
+
+  it('gives the HQ a caravan for every trading post (migration 24 → 25)', () => {
+    const { world, terrain: land } = worldWithCity()
+    placeTradeOrgHq(world, land)
+    placeNpcCities(world, land)
+    placeTradingPosts(world, land)
+    const v24: Partial<WorldState> = structuredClone(world)
+    delete v24.caravans
+    const before = structuredClone(v24)
+    const v25 = migrateWorld(structuredClone(v24), 24, { terrain: land }, migrations, 25)
+    // What was there stays as it was; the caravans' carriages, horses and crew come after it.
+    expect(v25.residents.slice(0, before.residents.length)).toEqual(before.residents)
+    expect(v25.carriages.slice(0, before.carriages.length)).toEqual(before.carriages)
+    expect(v25.horses.slice(0, before.horses.length)).toEqual(before.horses)
+    expect(v25.cities).toEqual(before.cities)
+    const posts = v25.cities.filter((c) => c.tradeOrg === 'post')
+    expect(posts.length).toBeGreaterThan(0)
+    expect(v25.caravans.map((c) => c.postId).sort()).toEqual(posts.map((c) => c.id).sort())
+    expect(checkInvariants(v25, land)).toEqual([])
+    // The same save always migrates the same way.
+    expect(migrateWorld(structuredClone(v24), 24, { terrain: land }, migrations, 25)).toEqual(v25)
   })
 
   it('gives every alliance an empty army (migration 22 → 23)', () => {

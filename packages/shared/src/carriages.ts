@@ -1,6 +1,7 @@
 import { CARRIAGE_CAPACITY, GOOD_WEIGHT, canWork, stockWeight } from './balance.js'
 import { storageAt } from './goods.js'
 import {
+  type Caravan,
   type Carriage,
   type Good,
   type GoodsSpot,
@@ -10,6 +11,14 @@ import {
 } from './world.js'
 
 /** World queries about carriages (ADR 0002: the game API orders and scripts share). */
+
+/** The Trade Org caravan a resident drives or escorts, if any (`CONTEXT.md`: Caravan). */
+export function caravanOf(
+  world: Pick<WorldState, 'caravans'>,
+  residentId: string,
+): Caravan | undefined {
+  return world.caravans.find((c) => c.driverId === residentId || c.escortIds.includes(residentId))
+}
 
 /** The carriages standing on a tile. */
 export function carriagesAt(world: WorldState, x: number, y: number): Carriage[] {

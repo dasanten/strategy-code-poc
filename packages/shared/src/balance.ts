@@ -332,6 +332,26 @@ export const TRADING_POST = {
   goods: { wood: 50, stone: 50, ironOre: 20, iron: 10 } as Partial<Record<Good, number>>,
 }
 
+/**
+ * Residents of the Trade Org HQ who walk along with each caravan as its escort, besides its
+ * driver (`CONTEXT.md`: Caravan). Routes that are attacked get more from Epic 10.
+ */
+export const CARAVAN_ESCORTS = 2
+
+/**
+ * Food a caravan keeps on board for its crew and its horse, in units, topped up at the storage
+ * at each end of its route (`CONTEXT.md`: Caravan): a driver, two escorts and a horse eat about
+ * 9 a game day, so this lasts about a week, the longest leg on a full-size map.
+ */
+export const CARAVAN_FOOD = 60
+
+/**
+ * How many tiles further along their way a caravan's driver or an escort may get than the one
+ * furthest behind (`CONTEXT.md`: Caravan): one ahead waits, so the escort keeps up with the
+ * carriage.
+ */
+export const CARAVAN_SPREAD = 2
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 

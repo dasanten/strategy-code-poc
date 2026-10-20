@@ -33,6 +33,7 @@ import {
 import { recordEvent } from './events.js'
 import { leaveOnLeaderDeath } from './alliances.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
+import { caravanFood } from './caravans.js'
 
 /** How far one unit of food fills the hunger meter. */
 const FILL_PER_FOOD = (MAX_HUNGER * HUNGER_DAYS) / FOOD_PER_DAY
@@ -251,7 +252,8 @@ const whole = (stock: Stock | undefined): RefillSource | undefined =>
  * Where a resident running low on food takes a meal from, if anywhere (`CONTEXT.md`: Refilling):
  * at home, their city's storage; working at a workplace, the Food in the pile on its tile, else on
  * a carriage standing there; in an army, a carriage of their realm on or next to their tile, but
- * not the Food a haul route keeps on board for the horse (`spareFood`). Elsewhere nowhere. `size`
+ * not the Food a haul route keeps on board for the horse (`spareFood`); on a caravan's crew, its
+ * carriage close by (`caravanFood`). Elsewhere nowhere. `size`
  * is the map's.
  */
 export function refillSource(
@@ -270,6 +272,8 @@ export function refillSource(
     const here = carriagesAt(world, r.x, r.y).find((k) => (k.load.food ?? 0) > 0)
     if (here) return whole(here.load)
   }
+  const caravan = caravanFood(world, r, size)
+  if (caravan) return whole(caravan)
   if (r.owner === null || !armyOf(world, r.id)) return undefined
   for (const k of world.carriages) {
     if (k.realmId !== r.owner || !inContact(size, k, r)) continue

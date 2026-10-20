@@ -26,6 +26,10 @@ export function organizationOf(r: Resident): string | null {
   return r.owner ?? r.cityId
 }
 
+/** Whether an Organization is one of the Trade Organization's cities (`CONTEXT.md`: Trade Organization). */
+const isTradeOrgCity = (world: WorldState, org: string) =>
+  world.cities.some((c) => c.id === org && c.tradeOrg !== undefined)
+
 /** The Organization a city belongs to: its realm, or the city itself when it has none. */
 export function cityOrganization(c: City): string {
   return c.realmId ?? c.id
@@ -77,6 +81,8 @@ export function commitCrime(
   const org = organizationOf(culprit)
   const { victimOrg, victim, goods, building } = against
   if (org === null || victimOrg === null || victimOrg === org) return
+  // The Trade Organization's cities are one Organization: a caravan moving its stock steals nothing.
+  if (isTradeOrgCity(world, org) && isTradeOrgCity(world, victimOrg)) return
   const witnesses = world.residents
     .filter((r) => r.health > 0 && r !== culprit && wrapDistance(size, r, culprit) <= SIGHT_RANGE)
     .filter((r) => {

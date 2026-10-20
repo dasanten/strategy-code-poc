@@ -9,6 +9,7 @@ import type {
   Pile,
   RealmEvent,
   SeenArmy,
+  SeenCaravan,
   SeenResident,
 } from './world.js'
 
@@ -41,6 +42,8 @@ export type SeenEntity =
   | ({ is: 'pile' } & Pile)
   /** One of the Player's own armies; its members are what is seen of it. */
   | ({ is: 'army' } & SeenArmy)
+  /** A Trade Org caravan; its carriage and crew are what is seen of it (`CONTEXT.md`: Caravan). */
+  | ({ is: 'caravan' } & SeenCaravan)
 
 /** Messages the server pushes over the WebSocket (ADR 0006). */
 export type ServerMessage =

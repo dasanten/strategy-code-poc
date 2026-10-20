@@ -340,7 +340,48 @@ export interface WorldState {
   crimes: Crime[]
   /** Mercenary contracts offered or in force (`CONTEXT.md`: Mercenary contract). */
   contracts: MercenaryContract[]
+  /** The Trade Organization's caravans, one on each trading post's route (`CONTEXT.md`: Caravan). */
+  caravans: Caravan[]
 }
+
+/**
+ * A Trade Org caravan (`CONTEXT.md`: Caravan): one of the Trade Organization's carriages, driven
+ * by one of its residents and escorted by others, on the fixed route between a trading post and
+ * the Trade Org HQ. At each end it stops first at the storage, to top up the Food on board for
+ * its crew and horse, then at the warehouse, where it unloads what it brought and loads what
+ * evens out the two warehouses' stock. Plain data (ADR 0002): the game gives the crew the same
+ * drive, pick-up, drop and walk orders a Player could give.
+ */
+export interface Caravan {
+  id: string
+  /** The trading post at the far end of its route; the other end is the HQ. */
+  postId: string
+  carriageId: string
+  /** The resident who drives the carriage. */
+  driverId: string
+  /** The residents who walk along with it (the escort). */
+  escortIds: string[]
+  /** The end of the route it stands at or is driving to. */
+  heading: 'hq' | 'post'
+  /** Where at that end it stands or is going: the storage first, then the warehouse. */
+  stop: 'storage' | 'warehouse'
+  /**
+   * Goods still to load at this end's warehouse for the other end, worked out once all it
+   * brought is unloaded; null until then.
+   */
+  toLoad: Stock | null
+  /**
+   * Goods the driver took last tick to put down, and where they go; null when they hold nothing
+   * for the caravan.
+   */
+  holding: { goods: Stock; onto: 'carriage' | 'stop' } | null
+}
+
+/** A caravan as Players see it, while its carriage or any of its crew is in sight. */
+export type SeenCaravan = Pick<
+  Caravan,
+  'id' | 'postId' | 'carriageId' | 'driverId' | 'escortIds' | 'heading'
+>
 
 /**
  * A mercenary contract (`CONTEXT.md`: Mercenary contract): the lender rents some of its residents

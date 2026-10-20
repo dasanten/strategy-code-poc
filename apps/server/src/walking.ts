@@ -32,6 +32,7 @@ import type { OrderKind, OrderSender } from './orders.js'
 import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { realmOf } from './starting-city.js'
 import { waitingForArmy } from './armies.js'
+import { waitingForEscort } from './caravans.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
 export const PATH_BUDGET_MS = 50
@@ -235,6 +236,8 @@ export class Walking {
       if (o?.kind === 'attack' && attackHolds(world, r, o, this.terrain.size)) holding.add(r.id)
     }
     const waiting = waitingForArmy(world, holding)
+    // And caravans with their escort (`CONTEXT.md`: Caravan).
+    for (const id of waitingForEscort(world, this.terrain.size)) waiting.add(id)
     const steps: StepAction[] = []
     for (const r of world.residents) {
       const o = moveOrder(r)

@@ -29,6 +29,7 @@ import { resolvePayments, stepContracts } from './contracts.js'
 import { stepCrimes } from './crimes.js'
 import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
+import { placeCaravans, stepCaravans } from './caravans.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -51,6 +52,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     alliances: [],
     armies: [],
     contracts: [],
+    caravans: [],
     crimes: [],
   }
 }
@@ -58,13 +60,14 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
 /**
  * A world as the world generator makes it for a new game: `createWorld`, with the Trade Org HQ
  * (`placeTradeOrgHq`), its NPC cities (`placeNpcCities`) and then its trading posts placed
- * (`placeTradingPosts`).
+ * (`placeTradingPosts`), with a caravan for each (`placeCaravans`).
  */
 export function generateWorld(terrain: TerrainMap, seed = 1): WorldState {
   const world = createWorld(terrain, seed)
   placeTradeOrgHq(world, terrain)
   placeNpcCities(world, terrain)
   placeTradingPosts(world, terrain)
+  placeCaravans(world)
   return world
 }
 
@@ -114,7 +117,7 @@ export interface StepResult {
 
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
- * horses, and stables breed foals; food spoils at the end of each game day; then their orders request actions (steps, then blows in fights, then taking and
+ * horses, and stables breed foals; food spoils at the end of each game day; caravans and NPC cities give their residents orders; then their orders request actions (steps, then blows in fights, then taking and
  * putting down goods, haul routes' and road orders' included, then paying for mercenary contracts, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
@@ -129,6 +132,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const survival = stepSurvival(world, terrain)
   const horsesDied = stepHorses(world, terrain)
   stepSpoilage(world)
+  stepCaravans(world, terrain.size)
   stepNpcCities(world, terrain.size)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
