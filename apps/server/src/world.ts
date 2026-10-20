@@ -27,10 +27,12 @@ import { requestClimbing, resolveClimbing } from './climbing.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
+import { resolvePurchases } from './buying.js'
 import { stepCrimes } from './crimes.js'
 import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
+import { stepNpcDefence } from './npc-defence.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -119,7 +121,7 @@ export interface StepResult {
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
  * horses, and stables breed foals; food spoils at the end of each game day; caravans and NPC cities give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
- * putting down goods, haul routes' and road orders' included, then paying for mercenary contracts, then laying out and working on construction sites, then tearing down, then
+ * putting down goods, haul routes' and road orders' included, then paying for mercenary contracts, then buying NPC cities, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
@@ -134,6 +136,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const horsesDied = stepHorses(world, terrain)
   stepSpoilage(world)
   stepCaravans(world, terrain.size)
+  stepNpcDefence(world, terrain.size)
   stepNpcCities(world, terrain.size, terrain)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
@@ -148,6 +151,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   ]
   resolveCarrying(world, carries, terrain.size)
   const payments = resolvePayments(world)
+  const purchases = resolvePurchases(world, terrain.size)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
@@ -173,6 +177,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
     teardowns.length +
     work.length +
     births.length +
-    payments
+    payments +
+    purchases
   return { actions, survival, combat, horsesDied, aging, captures }
 }

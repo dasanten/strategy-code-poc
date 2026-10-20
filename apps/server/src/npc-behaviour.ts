@@ -11,6 +11,7 @@ import {
   cityFoodUse,
   hasFoodSurplus,
   inCityArea,
+  isArmed,
   pileAt,
   storedFood,
   workProblem,
@@ -42,6 +43,7 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'pair',
   'build',
   'tearDown',
+  'attack',
 ]
 
 /** Whether a resident is run by an NPC city: they live in one and belong to no realm. */
@@ -80,7 +82,8 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * workplace's output to the storage once `NPC_FETCH_UNITS` of it lie there; sends workers who
  * run low on food where there is none to refill from home, and has residents take `NPC_OWN_FOOD`
  * from the storage before they set out; gives idle adults their part in the city's growth
- * (`cityGrowth`); and brings idle residents with nothing to do home. Children are left alone:
+ * (`cityGrowth`); and brings idle residents with nothing to do home. Its soldiers (armed adults)
+ * are put to no work and no building (`stepNpcDefence`). Children are left alone:
  * they refill at home.
  */
 function runCity(
@@ -126,8 +129,9 @@ function runCity(
       } else walkTo(r, storage)
       continue
     }
-    if (growth && growth.assign(r)) continue
-    const place = places.find((p) => room(world, p) > 0)
+    const soldier = isArmed(r)
+    if (!soldier && growth && growth.assign(r)) continue
+    const place = !soldier && places.find((p) => room(world, p) > 0)
     if (place) {
       if (r.x === place.x && r.y === place.y) {
         if (workProblem(world, r) === undefined) startWork(r, place)

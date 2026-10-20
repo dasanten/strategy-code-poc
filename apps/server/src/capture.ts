@@ -44,6 +44,18 @@ export function stepCaptures(world: WorldState, size: number): Capture[] {
  */
 export function captureCity(world: WorldState, city: City, captor: string, size: number): void {
   const from = city.realmId
+  const residents = joinRealm(world, city, captor, size)
+  const what = { kind: 'cityCaptured', cityId: city.id, city: city.name, residents } as const
+  recordEvent(world, captor, { ...what, other: from && realmName(world, from), captor: true })
+  recordEvent(world, from, { ...what, other: realmName(world, captor), captor: false })
+}
+
+/**
+ * A city joins the realm `captor` with everything in it, as `captureCity` says, whether captured
+ * or bought (`CONTEXT.md`: Buying a city). Returns how many of its residents joined.
+ */
+export function joinRealm(world: WorldState, city: City, captor: string, size: number): number {
+  const from = city.realmId
   const leaders = new Set(world.realms.map((r) => r.leaderId))
   const joining = world.residents.filter((r) => r.cityId === city.id && !leaders.has(r.id))
   const joined = new Set(joining.map((r) => r.id))
@@ -84,12 +96,5 @@ export function captureCity(world: WorldState, city: City, captor: string, size:
       r.order = null
   }
   city.realmId = captor
-  const what = {
-    kind: 'cityCaptured',
-    cityId: city.id,
-    city: city.name,
-    residents: joining.length,
-  } as const
-  recordEvent(world, captor, { ...what, other: from && realmName(world, from), captor: true })
-  recordEvent(world, from, { ...what, other: realmName(world, captor), captor: false })
+  return joining.length
 }

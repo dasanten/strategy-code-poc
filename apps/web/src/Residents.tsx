@@ -173,6 +173,7 @@ function orderDoing(r: Resident): string {
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
   if (o?.kind === 'pair') return 'Paired'
   if (o?.kind === 'pay') return 'Paying for mercenaries'
+  if (o?.kind === 'buyCity') return 'Buying a city'
   if (o?.kind === 'attack') return o.path ? 'Going after their target' : 'Fighting'
   if (o?.kind === 'climb') return `Climbing a wall · ${pct(o.progress)}`
   if (o?.kind === 'roadLine') {

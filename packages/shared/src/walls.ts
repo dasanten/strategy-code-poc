@@ -202,18 +202,21 @@ export function mayStep(
 }
 
 /**
- * Whether a resident stands on a wall of their own realm or an ally's, where they defend far better
+ * Whether a resident stands on a wall of their own side (`wallSide`) or an ally's, where they defend far better
  * (`CONTEXT.md`: Walls in combat; `WALL_DEFENCE`).
  */
 export function onOwnWall(
   world: Pick<WorldState, 'buildings' | 'cities' | 'alliances'>,
-  r: Pick<Resident, 'x' | 'y' | 'owner'>,
+  r: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId'>,
 ): boolean {
   const wall = world.buildings.find(
     (b) => b.x === r.x && b.y === r.y && b.kind === 'wall' && !b.site,
   )
   const city = wall && world.cities.find((c) => c.id === wall.cityId)
-  return !!city && city.realmId !== null && r.owner !== null && allied(world, city.realmId, r.owner)
+  const side = wallSide(r)
+  if (!city || side === null) return false
+  // An NPC city's walls are its own residents' (`wallSide`).
+  return city.realmId === null ? side === city.id : allied(world, city.realmId, side)
 }
 
 /** Damage a finished wall or gate takes before it falls (`WALL_STRENGTH`). */

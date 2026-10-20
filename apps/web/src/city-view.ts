@@ -1,4 +1,4 @@
-import type { Building, BuildingKind, City, RealmLabel, Resident } from '@csp/shared'
+import type { Building, BuildingKind, City, RealmLabel, Resident, SeenCity } from '@csp/shared'
 
 /** What the city inspector says about a city in sight, from what the Player sees of it. */
 export interface CityView {
@@ -67,5 +67,35 @@ export function describeCity(
     whose,
     residents: seen.residents.filter((r) => r.cityId === city.id).length,
     buildings: [...counts].sort((a, b) => b[1] - a[1]),
+  }
+}
+
+/** What the city inspector offers for buying an NPC city (`CONTEXT.md`: Buying a city). */
+export interface BuyView {
+  /** The price in Coins it names. */
+  price: number
+  /** Its town hall, where the coins have to be carried; missing when it isn't in sight. */
+  townHall?: { x: number; y: number }
+  /** Coins the Player's residents on its town hall carry together. */
+  coins: number
+  /** One of the Player's residents on its town hall, to give the buy order; none when nobody is. */
+  buyerId?: string
+}
+
+/** How the Player could buy a city in sight, or undefined when it isn't for sale. */
+export function describeBuying(
+  city: SeenCity,
+  seen: { residents: Resident[]; buildings: Building[] },
+  realmId: string,
+): BuyView | undefined {
+  if (city.price === undefined) return undefined
+  const hall = seen.buildings.find((b) => b.id === city.townHallId)
+  if (!hall) return { price: city.price, coins: 0 }
+  const here = seen.residents.filter((r) => r.owner === realmId && r.x === hall.x && r.y === hall.y)
+  return {
+    price: city.price,
+    townHall: { x: hall.x, y: hall.y },
+    coins: here.reduce((n, r) => n + (r.carried.coins ?? 0), 0),
+    ...(here[0] ? { buyerId: here[0].id } : {}),
   }
 }

@@ -4,7 +4,7 @@ import {
   type Building,
   type Army,
   type Carriage,
-  type City,
+  type SeenCity,
   type Diplomacy,
   type Horse,
   type MapInfo,
@@ -34,7 +34,7 @@ export interface ClientWorld {
   home: Extract<ServerMessage, { type: 'welcome' }>['home']
   /** What the Player's residents see, by kind (`CONTEXT.md`: Sight). */
   residents: Resident[]
-  cities: City[]
+  cities: SeenCity[]
   buildings: Building[]
   horses: Horse[]
   carriages: Carriage[]
@@ -55,7 +55,7 @@ export interface ClientWorld {
 function byKind(entities: Iterable<SeenEntity>) {
   const out = {
     residents: [] as Resident[],
-    cities: [] as City[],
+    cities: [] as SeenCity[],
     buildings: [] as Building[],
     horses: [] as Horse[],
     carriages: [] as Carriage[],
@@ -65,7 +65,7 @@ function byKind(entities: Iterable<SeenEntity>) {
   }
   for (const { is, ...e } of entities) {
     if (is === 'resident') out.residents.push(e as Resident)
-    else if (is === 'city') out.cities.push(e as City)
+    else if (is === 'city') out.cities.push(e as SeenCity)
     else if (is === 'building') out.buildings.push(e as Building)
     else if (is === 'horse') out.horses.push(e as Horse)
     else if (is === 'carriage') out.carriages.push(e as Carriage)
