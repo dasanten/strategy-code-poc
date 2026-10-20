@@ -61,6 +61,31 @@ describe('realm log', () => {
     )
   })
 
+  it('describes trades at a warehouse, cut down or not', () => {
+    const trade = {
+      kind: 'traded',
+      residentId: 'p1',
+      name: 'Ada',
+      good: 'ironOre',
+      x: 4,
+      y: 5,
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent({ ...trade, side: 'sell', units: 3, wanted: 3, coins: 12 })).toEqual({
+      text: 'Ada sold 3 iron ore for 12 coins at the warehouse.',
+      tone: 'info',
+      places: [{ name: 'the warehouse', x: 4, y: 5 }],
+    })
+    expect(describeEvent({ ...trade, side: 'buy', units: 2, wanted: 5, coins: 14 }).text).toBe(
+      'Ada bought 2 iron ore (of 5 wanted) for 14 coins at the warehouse.',
+    )
+    expect(describeEvent({ ...trade, side: 'buy', units: 0, wanted: 5, coins: 0 })).toMatchObject({
+      text: 'Ada couldn’t buy any iron ore at the warehouse.',
+      tone: 'warn',
+    })
+  })
+
   it('describes cities captured and lost', () => {
     const captured = { kind: 'cityCaptured', cityId: 'c1', city: 'Ashford', seq: 9, ...at } as const
     expect(describeEvent({ ...captured, other: null, captor: true, residents: 6 })).toEqual({
