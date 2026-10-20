@@ -707,7 +707,8 @@ export type RealmEventWhat =
    * A mercenary contract (`CONTEXT.md`: Mercenary contract) with the realm `other` (by its
    * Leader's name) changed: `offered` to this realm, `started` once accepted, `paid` for `weeks`
    * more game weeks, `ended` when its time was up, or `broken` when a week went unpaid. `lender`
-   * when this realm rents out the residents.
+   * when this realm rents out the residents. `leaderDied` says which side's Leader died when
+   * that ended it early (`CONTEXT.md`: Self-managed city).
    */
   | {
       kind: 'contract'
@@ -717,6 +718,7 @@ export type RealmEventWhat =
       other: string
       residents: number
       weeks?: number
+      leaderDied?: 'lender' | 'hirer'
     }
 
 /**

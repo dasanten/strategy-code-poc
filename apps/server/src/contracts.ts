@@ -14,6 +14,7 @@ import {
   type Resident,
   type WorldState,
 } from '@csp/shared'
+import { leaveArmies } from './armies.js'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { walkTo } from './npc-behaviour.js'
@@ -114,9 +115,13 @@ function tellBoth(
   c: MercenaryContract,
   what: 'started' | 'paid' | 'ended' | 'broken',
   weeks?: number,
+  leaderDied?: 'lender' | 'hirer',
 ): void {
   const n = c.residentIds.length
-  const extra = weeks === undefined ? {} : { weeks }
+  const extra = {
+    ...(weeks === undefined ? {} : { weeks }),
+    ...(leaderDied === undefined ? {} : { leaderDied }),
+  }
   const base = { kind: 'contract' as const, contractId: c.id, what, residents: n, ...extra }
   recordEvent(world, c.lenderId, { ...base, lender: true, other: realmName(world, c.hirerId) })
   recordEvent(world, c.hirerId, { ...base, lender: false, other: realmName(world, c.lenderId) })
@@ -321,6 +326,26 @@ function sendHome(world: WorldState, r: Resident): void {
   const city = world.cities.find((c) => c.id === r.cityId)
   const hall = city && townHallOf(world, city)
   if (hall && (r.x !== hall.x || r.y !== hall.y)) walkTo(r, hall)
+}
+
+/**
+ * A side's Leader died (`CONTEXT.md`: Self-managed city): every contract of the realm ends at
+ * once, as a contract ends, not breaks, so it costs no standing. The rented residents stop what
+ * they did for the hirer, haul routes included, leave the hirer's armies and walk home. Offers
+ * lapse. Call it before the realm ends, while its residents are still the lender's and its name
+ * is known.
+ */
+export function endContractsOnLeaderDeath(world: WorldState, realmId: string): void {
+  const ending = world.contracts.filter((c) => c.lenderId === realmId || c.hirerId === realmId)
+  if (ending.length === 0) return
+  world.contracts = world.contracts.filter((c) => !ending.includes(c))
+  for (const c of ending) {
+    if (c.startedAt === null) continue
+    const ids = new Set(c.residentIds)
+    for (const r of world.residents) if (ids.has(r.id)) sendHome(world, r)
+    leaveArmies(world, ids)
+    tellBoth(world, c, 'ended', undefined, c.lenderId === realmId ? 'lender' : 'hirer')
+  }
 }
 
 /**

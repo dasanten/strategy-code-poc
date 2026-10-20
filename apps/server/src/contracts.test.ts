@@ -1,4 +1,6 @@
 import {
+  MAX_HEALTH,
+  MAX_HUNGER,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_WEEK,
   Terrain,
@@ -11,6 +13,7 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { contractsSound } from './contracts.js'
+import { dieAll } from './survival.js'
 import { checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -368,5 +371,90 @@ describe('contracts-sound', () => {
       'resident m1 is in two contracts',
       'resident m2 is in two contracts',
     ])
+  })
+})
+
+describe('contracts when a Leader dies', () => {
+  /** The contract events of each side, by Player. */
+  const contractEvents = (world: WorldState) =>
+    world.events.filter(
+      (e) => e.kind === 'contract' && e.what !== 'offered' && e.what !== 'started',
+    )
+
+  /** Gives r2 a carriage with a horse on m1's tile and has m1 haul with it to (30, 10). */
+  function haulForHirer(world: WorldState, queue: OrderQueue) {
+    world.horses.push({
+      id: 'h2',
+      realmId: 'r2',
+      cityId: null,
+      x: 12,
+      y: 10,
+      hunger: MAX_HUNGER,
+      health: MAX_HEALTH,
+    })
+    world.carriages.push({
+      id: 'k2',
+      realmId: 'r2',
+      cityId: null,
+      x: 12,
+      y: 10,
+      horseId: null,
+      load: {},
+    })
+    at(world, 'm1').carried.wood = 2
+    const haul = { kind: 'haul', residentId: 'm1', carriageId: 'k2', x: 30, y: 10, goods: ['wood'] }
+    expect(order(world, queue, hirerPlayer, { ...haul, keepFood: 0 })).toBe('ack')
+    expect(at(world, 'm1').order).toMatchObject({ kind: 'haul' })
+  }
+
+  it('ends at once when the hirer’s Leader dies: the mercenaries stop hauling and walk home', () => {
+    const { world, queue, walking } = setup()
+    const c = hire(world, queue)
+    haulForHirer(world, queue)
+    expect(
+      order(world, queue, hirerPlayer, { kind: 'formArmy', name: 'Hired', residentIds: ['m2'] }),
+    ).toBe('ack')
+    dieAll(world, [at(world, 'b1')], 'killed', terrain.size)
+    expect(world.contracts).toEqual([])
+    expect(world.armies).toEqual([])
+    // Ended, not broken, though no week was paid: no standing lost.
+    expect(contractEvents(world)).toEqual([
+      expect.objectContaining({ userId: 7, contractId: c.id, what: 'ended', leaderDied: 'hirer' }),
+      expect.objectContaining({ userId: 8, contractId: c.id, what: 'ended', leaderDied: 'hirer' }),
+    ])
+    for (const id of ['m1', 'm2']) {
+      expect(commanderOf(world, at(world, id))).toBe('r1')
+      expect(at(world, id).order).toMatchObject({ kind: 'walkTo', target: { x: 10, y: 10 } })
+    }
+    run(world, walking, 100)
+    expect(at(world, 'm1')).toMatchObject({ x: 10, y: 10 })
+    expect(contractEvents(world).filter((e) => e.what === 'broken')).toEqual([])
+  })
+
+  it('ends at once when the lender’s Leader dies: the mercenaries walk home to their own city', () => {
+    const { world, queue, walking } = setup()
+    const c = hire(world, queue)
+    haulForHirer(world, queue)
+    dieAll(world, [at(world, 'a1')], 'killed', terrain.size)
+    expect(world.contracts).toEqual([])
+    expect(contractEvents(world)).toEqual([
+      expect.objectContaining({ userId: 7, contractId: c.id, what: 'ended', leaderDied: 'lender' }),
+      expect.objectContaining({ userId: 8, contractId: c.id, what: 'ended', leaderDied: 'lender' }),
+    ])
+    // They live in what is now a self-managed city, and take no realm's orders.
+    const m1 = at(world, 'm1')
+    expect(m1).toMatchObject({ owner: null, cityId: 'c1' })
+    expect(commanderOf(world, m1)).toBeNull()
+    expect(m1.order?.kind).not.toBe('haul')
+    run(world, walking, 50)
+    expect(at(world, 'm1').order?.kind).not.toBe('haul')
+  })
+
+  it('lets an offer lapse without a word when a side’s Leader dies', () => {
+    const { world, queue } = setup()
+    expect(order(world, queue, lenderPlayer, offer)).toBe('ack')
+    dieAll(world, [at(world, 'b1')], 'killed', terrain.size)
+    expect(world.contracts).toEqual([])
+    expect(contractEvents(world)).toEqual([])
   })
 })

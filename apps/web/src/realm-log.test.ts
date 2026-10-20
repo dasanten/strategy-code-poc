@@ -174,6 +174,28 @@ describe('realm log', () => {
     expect(describeEvent({ ...ended, cities: [] }).text).toBe('Your realm had no city left.')
   })
 
+  it('says whose Leader’s death ended a mercenary contract', () => {
+    const ended = {
+      kind: 'contract',
+      contractId: 'c1',
+      what: 'ended',
+      other: 'Tobin',
+      residents: 2,
+      seq: 11,
+      ...at,
+    } as const
+    expect(describeEvent({ ...ended, lender: true, leaderDied: 'hirer' })).toEqual({
+      text: 'The Leader of the realm of Tobin died, ending the contract for 2 mercenaries: the 2 mercenaries walk home.',
+      tone: 'warn',
+    })
+    expect(describeEvent({ ...ended, lender: false, leaderDied: 'hirer' }).text).toBe(
+      'Your Leader died, ending the contract for 2 mercenaries: the 2 mercenaries walk home.',
+    )
+    expect(describeEvent({ ...ended, lender: false }).text).toBe(
+      'The contract with the realm of Tobin for 2 mercenaries ended: the 2 mercenaries walk home.',
+    )
+  })
+
   it('says where the fresh start is, and whether the realm has ended until then', () => {
     const founded = {
       kind: 'founded',

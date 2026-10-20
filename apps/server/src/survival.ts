@@ -32,6 +32,7 @@ import {
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import { leaveOnLeaderDeath } from './alliances.js'
+import { endContractsOnLeaderDeath } from './contracts.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
 import { caravanFood } from './caravans.js'
 
@@ -141,8 +142,10 @@ export function dropGoods(world: WorldState, x: number, y: number, stock: Stock)
 }
 
 /**
- * Leader death (`CONTEXT.md`: Leader death, Self-managed city): the realm ends and leaves its
- * alliance at once, and each of its cities becomes its own self-managed city, an NPC city with
+ * Leader death (`CONTEXT.md`: Leader death, Self-managed city): the realm ends, its mercenary
+ * contracts end and its lent and hired residents walk home (`endContractsOnLeaderDeath`), it
+ * leaves its alliance at once and its alliance-army soldiers come back (`leaveOnLeaderDeath`),
+ * and each of its cities becomes its own self-managed city, an NPC city with
  * the residents who live there. Homeless residents join the nearest of those cities, and each
  * horse and carriage goes to the one nearest it. With control the Player's orders end: a
  * resident away walks home (`walkHomeIfAway`), and the others keep only the orders an NPC city
@@ -152,6 +155,7 @@ export function dropGoods(world: WorldState, x: number, y: number, stock: Stock)
  * `size` is the map's.
  */
 export function endRealm(world: WorldState, realm: Realm, size: number): void {
+  endContractsOnLeaderDeath(world, realm.id)
   leaveOnLeaderDeath(world, realm.id)
   const cities = world.cities.filter((c) => c.realmId === realm.id)
   for (const c of cities) c.realmId = null
