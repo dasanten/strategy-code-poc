@@ -22,6 +22,8 @@ import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
+import { stepArmies } from './armies.js'
+import { stepCrimes } from './crimes.js'
 import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
 
@@ -44,6 +46,8 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     piles: [],
     events: [],
     alliances: [],
+    armies: [],
+    crimes: [],
   }
 }
 
@@ -108,8 +112,10 @@ export interface StepResult {
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
- * home or at their workplace who run low on food take meals there; last, cities with a captor
- * change realm (`stepCaptures`). Without `walking` nobody moves.
+ * home or at their workplace who run low on food take meals there; cities with a captor change
+ * realm (`stepCaptures`); witnesses who got home make crimes known (`stepCrimes`); last, armies
+ * lose members who are gone and give the rest their orders for the next tick. Without `walking`
+ * nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
@@ -125,7 +131,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
     ...requestHauling(world),
     ...requestRoadMaterials(world),
   ]
-  resolveCarrying(world, carries)
+  resolveCarrying(world, carries, terrain.size)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
@@ -139,6 +145,8 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepAlliances(world)
   stepRefill(world, terrain.size)
   const captures = stepCaptures(world, terrain.size)
+  stepCrimes(world, terrain.size)
+  stepArmies(world, terrain.size)
   const actions =
     steps.length +
     strikes.length +

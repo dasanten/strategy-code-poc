@@ -616,11 +616,12 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
   }
   for (const b of buildings) {
     if (b.kind === 'road') continue
-    // Walls and gates fill their whole tile, so a wall reads as one band; a gate shows lighter.
+    // Walls and gates fill their whole tile, so a wall reads as one band; an open gate shows lighter,
+    // a closed one nearly as solid as the wall.
     if (b.kind === 'wall' || b.kind === 'gate') {
       g.rect(...box(b.x, b.y)).fill({
         color: WALL_COLOR,
-        alpha: b.site ? 0.3 : b.kind === 'gate' ? 0.45 : 1,
+        alpha: b.site ? 0.3 : b.kind === 'gate' ? (b.closed ? 0.8 : 0.45) : 1,
       })
       continue
     }

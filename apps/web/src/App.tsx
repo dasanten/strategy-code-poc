@@ -10,10 +10,12 @@ import {
   type GoodsSpot,
   type KnownNode,
   type Resident,
+  type ScriptSummary,
   type Stock,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
+import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { Login } from './Login.js'
@@ -47,9 +49,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [picking, setPicking] = useState<Picking>(false)
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
+  const [armyPick, setArmyPick] = useState<ArmyPick>()
+  const [armyError, setArmyError] = useState<string | undefined>()
   const own = world ? world.residents.filter((r) => r.owner === world.home.realmId) : []
   const selected = own.find((r) => r.id === selectedId)
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
+  // The script library's list, shared with the resident inspector's run-script order.
+  const [scripts, setScripts] = useState<ScriptSummary[]>([])
 
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
@@ -60,6 +66,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function goTo(x: number, y: number) {
     const mode = picking
     setPicking(false)
+    if (armyPick) {
+      setArmyPick(undefined)
+      setArmyError(await sendOrder({ kind: armyPick.kind, armyId: armyPick.armyId, x, y }))
+      return
+    }
     if (!selected) return
     const carriage = onTile(world?.carriages)
     if (mode === 'drive' && carriage) {
@@ -103,6 +114,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await sendOrder({ kind: 'tearDown', residentId: selected.id, buildingId }))
   }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
+  /** Orders the picked resident to run one of the Player's scripts. */
+  async function runScript(scriptId: number) {
+    if (!selected) return
+    setOrderError(await sendOrder({ kind: 'runScript', residentId: selected.id, scriptId }))
+  }
   async function stop() {
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'stop', residentId: selected.id }))
@@ -161,9 +177,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 onSelect={(id) => {
                   setSelectedId(id)
                   setPicking(false)
+                  setArmyPick(undefined)
                   setOrderError(undefined)
                 }}
-                picking={picking !== false}
+                picking={picking !== false || armyPick !== undefined}
                 onPickTile={goTo}
                 onNodesLoaded={onNodesLoaded}
               />
@@ -198,6 +215,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 setPicking((p) => (p === 'haul' ? false : 'haul'))
               }}
               onStop={stop}
+              scripts={scripts}
+              onRunScript={runScript}
               orderError={orderError}
               pile={onTile(world.piles)}
               storage={onTile(
@@ -222,6 +241,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             />
           )}
           {world && (
+            <ArmiesPanel
+              armies={world.armies}
+              own={own}
+              inSight={world.residents}
+              realmId={world.home.realmId}
+              picking={armyPick}
+              onPick={(pick) => {
+                setArmyPick(pick)
+                setPicking(false)
+                setArmyError(undefined)
+              }}
+              pickError={armyError}
+              sendOrder={sendOrder}
+            />
+          )}
+          {world && (
             <AlliancePanel
               diplomacy={world.diplomacy}
               realmId={world.home.realmId}
@@ -235,10 +270,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               buildings={world.buildings}
               realmId={world.home.realmId}
               realms={world.diplomacy.realmsInSight}
+              onSetGate={async (gateId, open) =>
+                setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
+              }
             />
           )}
           {world && <RealmLog events={world.events} realmId={world.home.realmId} />}
-          <ScriptLibrary />
+          <ScriptLibrary onScripts={setScripts} />
         </div>
       </main>
     </div>

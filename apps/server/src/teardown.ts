@@ -12,6 +12,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { dissolveCity, updateCityMembership } from './cities.js'
+import { buildingOrganization, commitCrime } from './crimes.js'
 import type { OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { dropGoods } from './survival.js'
@@ -62,7 +63,8 @@ export function requestTearingDown(world: WorldState): TearDownAction[] {
  * stops. Work goes into the building on the tile and teaches Construction; once enough is in, the
  * building or site is gone, its returned materials lie on the tile as goods, and everyone's build
  * or tear-down order on it is done. Tearing down a town hall dissolves its city, and tearing down
- * any city building may shrink or split a city (`updateCityMembership`).
+ * any city building may shrink or split a city (`updateCityMembership`). Taking down another
+ * Organization's building is a crime by whoever puts in the last work (`CONTEXT.md`: Crime).
  */
 export function resolveTearingDown(
   world: WorldState,
@@ -84,6 +86,8 @@ export function resolveTearingDown(
       r.skills.construction = (r.skills.construction ?? 0) + constructionLearned(r, world.tick)
     }
     if (teardownLeft(b) === 0) {
+      const victimOrg = buildingOrganization(world, b)
+      commitCrime(world, terrain?.size ?? MAP_SIZE, 'tearDown', r, { victimOrg, building: b.kind })
       world.buildings = world.buildings.filter((x) => x !== b)
       dropGoods(world, b.x, b.y, teardownReturns(b))
       // What a stable kept for its horses stays on the tile too.

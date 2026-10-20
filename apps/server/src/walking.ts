@@ -6,6 +6,11 @@ import {
   groundAt,
   horseFor,
   isPassableTerrain,
+  mayStep,
+  strandedOnWall,
+  tileIndex,
+  wallMap,
+  wallsKey,
   roadTiles,
   walkSpeed,
   wrapDelta,
@@ -17,11 +22,13 @@ import {
   type RoadLineOrder,
   type TerrainMap,
   type WalkOrder,
+  type WallMap,
   type WorldState,
 } from '@csp/shared'
 import type { OrderKind, OrderSender } from './orders.js'
 import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { realmOf } from './starting-city.js'
+import { waitingForArmy } from './armies.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
 export const PATH_BUDGET_MS = 50
@@ -142,14 +149,23 @@ function arrive(r: Resident, o: MoveOrder): void {
  * Turns residents' walk and drive orders into step actions each tick, and resolves the steps. The
  * path for a new order is found a little at a time (`PathFinder`), with the carriage's costs for
  * a drive; the found path is kept in the order as plain data, so a restart loses nothing but
- * searches in progress, which start again.
+ * searches in progress, which start again. Walls and gates block the way (`mayStep`); a step
+ * they block, as a gate closed since the path was found, finds a new path instead.
  */
 export class Walking {
   private finder: PathFinder
   private searching = new Map<string, string>()
+  private walls: { key: string; map: WallMap } | undefined
 
   constructor(private terrain: TerrainMap) {
     this.finder = new PathFinder(terrain)
+  }
+
+  /** The walls and gates on the map, built again only when they change. */
+  private wallsOf(world: WorldState): WallMap {
+    const key = wallsKey(world)
+    if (this.walls?.key !== key) this.walls = { key, map: wallMap(world, this.terrain) }
+    return this.walls.map
   }
 
   /**
@@ -160,17 +176,25 @@ export class Walking {
   requestSteps(world: WorldState, budgetMs = PATH_BUDGET_MS): StepAction[] {
     const roads = roadTiles(world, this.terrain.size)
     this.finder.setRoads(roads)
+    this.finder.setWalls(this.wallsOf(world))
     this.plan(world, budgetMs)
+    const holding = new Set<string>()
+    for (const r of world.residents) {
+      const o = moveOrder(r)
+      if (o?.kind === 'attack' && attackHolds(world, r, o, this.terrain.size)) holding.add(r.id)
+    }
+    const waiting = waitingForArmy(world, holding)
     const steps: StepAction[] = []
     for (const r of world.residents) {
       const o = moveOrder(r)
-      if (o?.kind === 'attack' && attackHolds(world, r, o, this.terrain.size)) continue
-      if (!o?.path) continue
+      if (holding.has(r.id) || !o?.path) continue
       const next = o.path[0]
       if (!next) {
         arrive(r, o)
         continue
       }
+      // Keeping together with their army (`CONTEXT.md`: Army).
+      if (waiting.has(r.id)) continue
       const ground = groundAt(this.terrain, roads, next[0], next[1])
       if (!onFoot(o)) {
         o.progress += driveSpeed(r, ground)
@@ -200,7 +224,9 @@ export class Walking {
       const key = searchKey(world, o)
       if (this.searching.get(r.id) !== key) {
         const costs = onFoot(o) ? WALKING_COSTS : CARRIAGE_COSTS
-        this.finder.request(r.id, [r.x, r.y], [target.x, target.y], costs)
+        // An attacker only needs to come into contact, even with a defender up on a wall.
+        const options = { realmId: r.owner, onWalls: onFoot(o), near: o.kind === 'attack' }
+        this.finder.request(r.id, [r.x, r.y], [target.x, target.y], costs, options)
         this.searching.set(r.id, key)
       }
     }
@@ -219,13 +245,14 @@ export class Walking {
 
   /**
    * Resolves step actions (ADR 0002): a step happens only if the resident still exists, the
-   * tile is next to them and can be entered. A driver's step also needs their carriage on their
+   * tile is next to them and can be entered, walls and gates letting them (`mayStep`). A driver's step also needs their carriage on their
    * tile with a horse to pull it, and a tile a carriage can enter; the carriage and its horse,
    * hitched now if it wasn't, go along. Each step taken uses up one tile of progress.
    */
   resolve(world: WorldState, steps: StepAction[]): number {
     let taken = 0
     const roads = roadTiles(world, this.terrain.size)
+    const walls = this.wallsOf(world)
     for (const step of steps) {
       const r = world.residents.find((x) => x.id === step.residentId)
       if (!r) continue
@@ -235,6 +262,17 @@ export class Walking {
       const ground = groundAt(this.terrain, roads, step.to.x, step.to.y)
       if (!near || !isPassableTerrain(ground)) {
         r.order = null
+        continue
+      }
+      const from = tileIndex(size, r.x, r.y)
+      const to = tileIndex(size, step.to.x, step.to.y)
+      const stranded = strandedOnWall(walls, r.owner, from)
+      if (!mayStep(walls, r.owner, from, to, !step.carriageId, stranded)) {
+        const o = moveOrder(r)
+        if (o) {
+          o.path = null
+          o.progress = 0
+        }
         continue
       }
       if (step.carriageId) {

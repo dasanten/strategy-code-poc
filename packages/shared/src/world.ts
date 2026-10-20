@@ -53,7 +53,39 @@ export interface Resident {
   carried: Stock
   /** What the resident was ordered to do, as plain data; null when idle (ADR 0002). */
   order: ResidentOrder | null
+  /**
+   * The script the resident runs, when they were given the run-script order (`CONTEXT.md`:
+   * Running a script). Its actions set `order` like UI orders; any other order ends it. Absent
+   * when they run none.
+   */
+  script?: RunningScript
 }
+
+/** A script value as plain data, the only kind a script's memory keeps between ticks. */
+export type MemoryValue = number | string | boolean | null | MemoryValue[] | ScriptMemory
+
+/** A running script's memory (`CONTEXT.md`: Memory): plain, serialisable data (ADR 0002). */
+export interface ScriptMemory {
+  [key: string]: MemoryValue
+}
+
+/** A resident's run-script order: which script of the Player's library, and its memory. */
+export interface RunningScript {
+  /** The script in the Player's library; its active version is what runs each tick. */
+  scriptId: number
+  /** What the script kept between ticks, at most `SCRIPT_MEMORY_MAX` characters of JSON. */
+  memory: ScriptMemory
+  /** The tick its last error went into the realm log; errors are logged rate-limited. */
+  errorLoggedAt?: number
+  /** The tick its last out-of-steps warning went into the realm log. */
+  budgetLoggedAt?: number
+}
+
+/**
+ * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
+ * memory, which stays on the server.
+ */
+export type SeenResident = Omit<Resident, 'script'> & { script?: Pick<RunningScript, 'scriptId'> }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -66,6 +98,8 @@ export interface WalkOrder {
   /** The tiles still to walk, in order; null while the path is being found. */
   path: [number, number][] | null
   progress: number
+  /** The army whose order this is (`CONTEXT.md`: Army); missing for the resident's own order. */
+  army?: string
 }
 
 /**
@@ -204,7 +238,8 @@ export interface HaulOrder {
  * out of their sight or they are given another order. Out of contact they walk towards the target
  * along `path` (null while it is being found), as for a walk order; `progress` is how far into the
  * next step they are. `strike` is how far, from 0 up to 1, they are into their next blow.
- * `started` is set once the fight went in the realm logs.
+ * `started` is set once the fight went in the realm logs. `defending` is set when the resident
+ * fights back at someone who hit them, which is no crime (`CONTEXT.md`: Crime).
  */
 export interface AttackOrder {
   kind: 'attack'
@@ -213,6 +248,9 @@ export interface AttackOrder {
   progress: number
   strike: number
   started: boolean
+  defending?: true
+  /** The army whose order this is (`CONTEXT.md`: Army); missing for the resident's own order. */
+  army?: string
 }
 
 /**
@@ -282,7 +320,77 @@ export interface WorldState {
   events: RealmEvent[]
   /** Alliances with at least one member (`CONTEXT.md`: Alliance). */
   alliances: Alliance[]
+  /** Armies with at least one member (`CONTEXT.md`: Army). */
+  armies: Army[]
+  /** Crimes a witness still carries news of, or that an Organization still remembers. */
+  crimes: Crime[]
 }
+
+/** What a crime was (`CONTEXT.md`: Crime). */
+export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
+
+/**
+ * A crime against another Organization (`CONTEXT.md`: Crime, Witness). An Organization is named by
+ * its realm's id, or by its city's id for a city of no realm (`organizationOf`). Plain data.
+ */
+export interface Crime {
+  id: string
+  kind: CrimeKind
+  /** The tick it happened, and where the culprit stood. */
+  tick: number
+  x: number
+  y: number
+  /** Who did it, and their Organization with its name at the time. */
+  culprit: { residentId: string; name: string; org: string; orgName: string }
+  /** The Organization it was against. */
+  victimOrg: string
+  /** The resident attacked or killed. */
+  victim?: { residentId: string; name: string }
+  /** What was stolen. */
+  goods?: Stock
+  /** What was torn down. */
+  building?: BuildingKind
+  /**
+   * Residents who saw it, or the victim who survived it, and have not got home yet. Each makes it
+   * known to their own Organization once they stand in the area of one of its cities.
+   */
+  witnesses: string[]
+  /** The Organizations it is known to. */
+  knownBy: string[]
+}
+
+/**
+ * A named group of a realm's residents moving and fighting together under one order
+ * (`CONTEXT.md`: Army). A resident is in at most one army; one given an order of their own
+ * leaves it. Plain data (ADR 0002).
+ */
+export interface Army {
+  id: string
+  /** Chosen by the Player who formed it. */
+  name: string
+  realmId: string
+  /** Its residents; never empty. */
+  memberIds: string[]
+  /** What it was ordered to do; null when idle. */
+  order: ArmyOrder | null
+}
+
+/**
+ * An army's order (`CONTEXT.md`: Army). It gives its members walk or attack orders tagged with
+ * the army, and members walking for it keep together at the pace of the slowest. `started` is
+ * set once the members got their orders.
+ * - `walkTo`: all walk to a tile; done once none is still walking there.
+ * - `attack`: all go after one resident and strike them; done once none is still at it.
+ * - `guard`: all walk to a tile and stay; one who is idle away from it walks back. Until another
+ *   order.
+ * - `follow`: all keep in contact with a resident wherever they go, until that resident is gone
+ *   or out of the army's sight.
+ */
+export type ArmyOrder =
+  | { kind: 'walkTo'; target: { x: number; y: number }; started: boolean }
+  | { kind: 'attack'; targetId: string; started: boolean }
+  | { kind: 'guard'; at: { x: number; y: number }; started: boolean }
+  | { kind: 'follow'; targetId: string; started: boolean }
 
 /** What a resident died of: hunger, old age, or blows in a fight (`CONTEXT.md`: Combat). */
 export type DeathCause = 'starved' | 'oldAge' | 'killed'
@@ -312,6 +420,25 @@ export type RealmEventWhat =
       otherId: string
       other: string
       attacker: boolean
+    }
+  /**
+   * A witness brought home news of a crime against the realm (`CONTEXT.md`: Crime, Witness):
+   * `culprit` of `culpritOrg` did `crime` at tick `at`, to `victim`, taking `goods` or tearing
+   * down `building`.
+   */
+  | {
+      kind: 'crimeKnown'
+      crimeId: string
+      crime: CrimeKind
+      at: number
+      x: number
+      y: number
+      culpritId: string
+      culprit: string
+      culpritOrg: string
+      victim?: string
+      goods?: Stock
+      building?: BuildingKind
     }
   /** A resident who carries no weapon was hit and flees home (`CONTEXT.md`: Combat). */
   | { kind: 'fled'; residentId: string; name: string }
@@ -356,6 +483,26 @@ export type RealmEventWhat =
     }
   /** The role of alliance leader passed to a member (`CONTEXT.md`: Alliance leader). */
   | { kind: 'allianceLeader'; allianceId: string; name: string; realmId: string; realm: string }
+  /**
+   * A resident's script stopped with an error this tick (`CONTEXT.md`: Running a script); it runs
+   * again next tick. `line` and `column` say where, when the error is in the script itself.
+   */
+  | {
+      kind: 'scriptError'
+      residentId: string
+      name: string
+      scriptId: number
+      message: string
+      line?: number
+      column?: number
+    }
+  /**
+   * A resident's script ran out of steps (`CONTEXT.md`: Step budget): its own budget, or, when
+   * `realm`, the realm's, so it was cut short or skipped the tick.
+   */
+  | { kind: 'scriptOutOfSteps'; residentId: string; name: string; scriptId: number; realm: boolean }
+  /** A resident's run-script order ended because its script was deleted from the library. */
+  | { kind: 'scriptEnded'; residentId: string; name: string; scriptId: number }
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the
@@ -501,6 +648,8 @@ export interface Building {
   site?: ConstructionSite
   /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
   teardown?: number
+  /** A gate its city's realm has closed (`CONTEXT.md`: Walls in combat); gates only, open without it. */
+  closed?: true
 }
 
 /**

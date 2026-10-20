@@ -382,6 +382,11 @@ describe('world saves', () => {
     expect(migrateWorld(v15, 15, { terrain }, migrations, 16)).toEqual({ ...v15, alliances: [] })
   })
 
+  it('gives the world no armies (migration 18 → 19)', () => {
+    const v18 = { tick: 10, seed: 1, residents: [], realms: [], alliances: [], crimes: [] }
+    expect(migrateWorld(v18, 18, { terrain }, migrations, 19)).toEqual({ ...v18, armies: [] })
+  })
+
   it('places NPC cities in the live world, out of every Player’s sight (migration 16 → 17)', () => {
     const { world, terrain: land } = worldWithCity()
     const before = structuredClone(world)
@@ -409,8 +414,13 @@ describe('world saves', () => {
     expect(migrateWorld(structuredClone(world), 16, { terrain: land }, migrations, 17)).toEqual(v17)
   })
 
-  it('turns the cities, residents, horses and carriages of dead Leaders self-managed (migration 17 → 18)', () => {
-    // A format-17 world: Player 1's Leader died, leaving everything to nobody; one of their
+  it('gives the world no crimes (migration 17 → 18)', () => {
+    const v17 = { tick: 10, seed: 1, residents: [], realms: [] }
+    expect(migrateWorld(v17, 17, { terrain }, migrations, 18)).toEqual({ ...v17, crimes: [] })
+  })
+
+  it('turns the cities, residents, horses and carriages of dead Leaders self-managed (migration 19 → 20)', () => {
+    // A format-19 world: Player 1's Leader died, leaving everything to nobody; one of their
     // residents had no home and was out on an errand. Player 2 still has their realm.
     const { world, terrain: land } = worldWithCity()
     const city = world.cities[0]!
@@ -425,26 +435,26 @@ describe('world saves', () => {
     Object.assign(homeless, { x: hall.x + 12, y: hall.y })
     homeless.order = { kind: 'tearDown', buildingId: hall.id, at: { x: hall.x, y: hall.y } }
     const living = foundStartingCity(world, land, 2)
-    const v17 = structuredClone(world)
-    v17.horses = v17.horses.map(({ cityId: _cityId, ...h }) => h) as Horse[]
-    v17.carriages = v17.carriages.map(({ cityId: _cityId, ...k }) => k) as Carriage[]
-    const before = structuredClone(v17)
+    const v19 = structuredClone(world)
+    v19.horses = v19.horses.map(({ cityId: _cityId, ...h }) => h) as Horse[]
+    v19.carriages = v19.carriages.map(({ cityId: _cityId, ...k }) => k) as Carriage[]
+    const before = structuredClone(v19)
 
-    const v18 = migrateWorld(structuredClone(v17), 17, { terrain: land }, migrations, 18)
-    const joined = v18.residents.find((r) => r.id === homeless.id)!
+    const v20 = migrateWorld(structuredClone(v19), 19, { terrain: land }, migrations, 20)
+    const joined = v20.residents.find((r) => r.id === homeless.id)!
     expect(joined.cityId).toBe(city.id)
     expect(joined.order).toMatchObject({ kind: 'walkTo', target: { x: expect.any(Number) } })
     // The others already lived in the city and are left as they were.
-    expect(v18.residents.filter((r) => r.id !== homeless.id)).toEqual(
+    expect(v20.residents.filter((r) => r.id !== homeless.id)).toEqual(
       before.residents.filter((r) => r.id !== homeless.id),
     )
-    for (const k of [...v18.horses, ...v18.carriages]) {
+    for (const k of [...v20.horses, ...v20.carriages]) {
       expect(k.cityId).toBe(k.realmId === null ? city.id : null)
     }
-    expect(v18.horses.filter((h) => h.realmId === living.id)).toHaveLength(START_HORSES)
-    expect(checkInvariants(v18, land).map((v) => v.message)).toEqual([])
+    expect(v20.horses.filter((h) => h.realmId === living.id)).toHaveLength(START_HORSES)
+    expect(checkInvariants(v20, land).map((v) => v.message)).toEqual([])
     // The same save always migrates the same way.
-    expect(migrateWorld(structuredClone(v17), 17, { terrain: land }, migrations, 18)).toEqual(v18)
+    expect(migrateWorld(structuredClone(v19), 19, { terrain: land }, migrations, 20)).toEqual(v20)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

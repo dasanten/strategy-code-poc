@@ -655,3 +655,11 @@ button.residents-row:hover {
   overflow: auto;
   pointer-events: auto;
 }
+
+.army-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  max-height: 8rem;
+  overflow-y: auto;
+}

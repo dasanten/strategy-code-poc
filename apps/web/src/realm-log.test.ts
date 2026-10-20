@@ -28,6 +28,20 @@ describe('realm log', () => {
     ).toEqual({ text: 'Wren has grown up and can work now.', tone: 'info' })
   })
 
+  it('describes a script’s trouble', () => {
+    const who = { residentId: 'r1', name: 'Mara', scriptId: 3, seq: 9, ...at } as const
+    expect(
+      describeEvent({ kind: 'scriptError', ...who, message: 'Oops', line: 2, column: 5 }).text,
+    ).toBe('Mara’s script stopped with an error (line 2, column 5): Oops')
+    expect(describeEvent({ kind: 'scriptOutOfSteps', ...who, realm: false }).text).toBe(
+      'Mara’s script ran out of steps this tick.',
+    )
+    expect(describeEvent({ kind: 'scriptOutOfSteps', ...who, realm: true }).tone).toBe('warn')
+    expect(describeEvent({ kind: 'scriptEnded', ...who }).text).toBe(
+      'Mara stopped running a script: it was deleted.',
+    )
+  })
+
   it('describes fights, flight and deaths in them', () => {
     const fight = { kind: 'fight', residentId: 'r1', name: 'Mara', otherId: 'r9', seq: 6 } as const
     expect(describeEvent({ ...fight, other: 'Tobin', attacker: true, ...at })).toEqual({
@@ -84,6 +98,31 @@ describe('realm log', () => {
     )
     expect(describeEvent({ kind: 'allianceLeader', ...about('realm1') }, 'realm1').text).toBe(
       'You are now the leader of the alliance North.',
+    )
+  })
+
+  it('describes crimes a witness brought home, with who did them', () => {
+    const crime = {
+      kind: 'crimeKnown',
+      crimeId: 'x9',
+      at: 3,
+      x: 4,
+      y: 5,
+      culpritId: 'r9',
+      culprit: 'Vex',
+      culpritOrg: 'the realm of Ada',
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent({ ...crime, crime: 'theft', goods: { food: 5, ironOre: 2 } })).toEqual({
+      text: 'A witness got home: Vex of the realm of Ada stole 5 Food, 2 Iron Ore at (4, 5).',
+      tone: 'bad',
+    })
+    expect(describeEvent({ ...crime, crime: 'killing', victim: 'Mara' }).text).toBe(
+      'A witness got home: Vex of the realm of Ada killed Mara at (4, 5).',
+    )
+    expect(describeEvent({ ...crime, crime: 'tearDown', building: 'lumberCamp' }).text).toBe(
+      'A witness got home: Vex of the realm of Ada tore down your lumber camp at (4, 5).',
     )
   })
 

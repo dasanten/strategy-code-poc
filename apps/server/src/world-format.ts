@@ -38,7 +38,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 18
+export const WORLD_FORMAT_VERSION = 20
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -248,11 +248,15 @@ export const migrations: Record<number, MigrationStep> = {
     placeNpcCities(world, ctx.terrain)
     return world
   },
+  // Crimes came (`CONTEXT.md`: Crime, Witness); none was noted before, so nobody knows of any.
+  17: (state) => ({ ...(state as object), crimes: [] }),
+  // Armies came (`CONTEXT.md`: Army); there are none yet.
+  18: (state) => ({ ...(state as object), armies: [] }),
   // Cities of dead Leaders became self-managed (`CONTEXT.md`: Self-managed city). Cities of no
   // realm are already NPC cities, run with the residents who live there; homeless residents of
   // no realm join the nearest of them and walk home, and horses and carriages of no realm, which
   // now belong to an NPC city, go to the one nearest them.
-  17: (state, ctx) => {
+  19: (state, ctx) => {
     const world = structuredClone(state) as WorldState
     const size = ctx.terrain.size
     const npc = world.cities.filter((c) => c.realmId === null)
