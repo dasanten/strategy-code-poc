@@ -150,8 +150,7 @@ export function stepCrimes(world: WorldState, size: number): void {
   }
   const memory = CRIME_MEMORY_DAYS * TICKS_PER_GAME_DAY
   world.crimes = world.crimes.filter(
-    (c) =>
-      c.witnesses.length > 0 || (c.knownBy.length > 0 && world.tick - c.tick < memory),
+    (c) => c.witnesses.length > 0 || (c.knownBy.length > 0 && world.tick - c.tick < memory),
   )
 }
 

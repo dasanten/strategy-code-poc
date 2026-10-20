@@ -208,7 +208,7 @@ describe('combat', () => {
     b.order = { kind: 'workAt', buildingId: 'none', at: { x: 11, y: 10 }, progress: 0 }
     expect(order(world, queue, 'a1', 'b1')).toBe('ack')
     expect(untilHit(world, 'b1')).toBeDefined()
-    expect(b.order).toEqual({ ...attackOrder('a1', true), strike: expect.any(Number) })
+    expect(b.order).toEqual({ ...attackOrder('a1', true, true), strike: expect.any(Number) })
     expect(untilHit(world, 'a1')).toBeDefined()
   })
 

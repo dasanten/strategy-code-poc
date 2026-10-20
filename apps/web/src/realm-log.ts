@@ -29,7 +29,9 @@ export function describeEvent(e: RealmEvent, realmId?: string): { text: string; 
         : { text: `${e.name} was attacked by ${e.other}.`, tone: 'warn' }
     case 'crimeKnown': {
       const goods = Object.entries(e.goods ?? {})
-        .map(([g, n]) => `${n} ${g.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`)}`)
+        .map(
+          ([g, n]) => `${n} ${g[0]!.toUpperCase()}${g.slice(1).replace(/[A-Z]/g, (c) => ` ${c}`)}`,
+        )
         .join(', ')
       const did = {
         theft: `stole ${goods || 'goods'}`,

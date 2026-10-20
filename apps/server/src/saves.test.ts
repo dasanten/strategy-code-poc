@@ -408,6 +408,11 @@ describe('world saves', () => {
     expect(migrateWorld(structuredClone(world), 16, { terrain: land }, migrations, 17)).toEqual(v17)
   })
 
+  it('gives the world no crimes (migration 17 → 18)', () => {
+    const v17 = { tick: 10, seed: 1, residents: [], realms: [] }
+    expect(migrateWorld(v17, 17, { terrain }, migrations, 18)).toEqual({ ...v17, crimes: [] })
+  })
+
   it('keeps the newest saves and one per hour for a week', async () => {
     const { db, close } = await openDb(':memory:')
     const now = 1_000_000_000
