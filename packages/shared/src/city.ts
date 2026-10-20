@@ -5,7 +5,9 @@ import {
   FOOD_SURPLUS_DAYS,
   HOUSING_ROOM,
   hungerFactor,
+  isArmed,
 } from './balance.js'
+import { allianceOf } from './alliance.js'
 import { wrap, wrapDelta, wrapDistance } from './terrain.js'
 import type { Building, BuildingKind, City, Resident, WorldState } from './world.js'
 
@@ -191,4 +193,53 @@ export function surplusFoodLine(world: WorldState, city: City): number {
  */
 export function hasFoodSurplus(world: WorldState, city: City): boolean {
   return storedFood(world, city) > surplusFoodLine(world, city)
+}
+
+/**
+ * Whether a realm stands with a city in a fight over it (`CONTEXT.md`: Capturing a city): the
+ * city's own realm, or a member of its alliance. An NPC city has nobody on its side but its own
+ * residents (`defendsCity`).
+ */
+function onCitySide(world: Pick<WorldState, 'alliances'>, city: City, realmId: string): boolean {
+  if (city.realmId === null) return false
+  if (realmId === city.realmId) return true
+  return allianceOf(world, city.realmId)?.members.some((m) => m.realmId === realmId) ?? false
+}
+
+/**
+ * Whether a resident is one of a city's defenders (`CONTEXT.md`: Capturing a city): armed,
+ * standing in its area, and on its side: of its realm or an allied one, or, for an NPC city, one
+ * of its own residents. `size` is the map's.
+ */
+export function defendsCity(
+  world: Pick<WorldState, 'buildings' | 'alliances'>,
+  city: City,
+  r: Resident,
+  size: number,
+): boolean {
+  const side =
+    r.owner === null
+      ? city.realmId === null && r.cityId === city.id
+      : onCitySide(world, city, r.owner)
+  return side && isArmed(r) && inCityArea(world, city, r.x, r.y, size)
+}
+
+/**
+ * The realm about to capture a city (`CONTEXT.md`: Capturing a city), if any: no defender of it
+ * is left in its area (`defendsCity`), and armed residents of exactly one other realm, not
+ * allied with it, stand there. With two such realms inside, neither has it yet. `size` is the
+ * map's.
+ */
+export function captorOf(
+  world: Pick<WorldState, 'buildings' | 'alliances' | 'residents'>,
+  city: City,
+  size: number,
+): string | null {
+  const captors = new Set<string>()
+  for (const r of world.residents) {
+    if (!isArmed(r) || !inCityArea(world, city, r.x, r.y, size)) continue
+    if (defendsCity(world, city, r, size)) return null
+    if (r.owner !== null && !onCitySide(world, city, r.owner)) captors.add(r.owner)
+  }
+  return captors.size === 1 ? [...captors][0]! : null
 }
