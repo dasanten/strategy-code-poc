@@ -1,5 +1,6 @@
 import type { Account } from './api.js'
 import type { Diplomacy } from './alliance.js'
+import type { RegionMap } from './region-map.js'
 import type { Building, Carriage, City, Horse, Pile, RealmEvent, Resident } from './world.js'
 
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
@@ -48,11 +49,14 @@ export type ServerMessage =
       events: RealmEvent[]
       /** The Player's alliance, invitations and the realms they could invite. */
       diplomacy: Diplomacy
+      /** The Region map over their explored terrain; null until territory is first worked out. */
+      region: RegionMap | null
     }
   /**
    * Every tick: entities in sight that changed, ids that left sight, chunks whose explored
    * terrain grew (load them again), the Player's new realm events and
-   * their alliance matters when those changed.
+   * their alliance matters when those changed, and the Region map when territory was worked out
+   * again (all of it) or their explored terrain grew (the grown chunks).
    */
   | {
       type: 'tick'
@@ -62,6 +66,7 @@ export type ServerMessage =
       explored: number[]
       events: RealmEvent[]
       diplomacy?: Diplomacy
+      region?: RegionMap
     }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }

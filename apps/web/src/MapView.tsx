@@ -4,8 +4,10 @@ import {
   CHUNK_SIZE,
   TERRAIN_SPEED,
   Terrain,
+  UNEXPLORED,
   chunksAcross,
   cityAreaTiles,
+  wrap,
   wrapDelta,
   type KnownNode,
   type Resident,
@@ -26,6 +28,14 @@ import {
   type Size,
 } from './map/camera.js'
 import { ChunkStore } from './map/chunks.js'
+import {
+  holderAt,
+  holderLabel,
+  regionChunkPixels,
+  regionChunks,
+  regionGroups,
+  type RegionState,
+} from './map/region.js'
 import {
   NODE_COLORS,
   NODE_NAMES,
@@ -54,7 +64,12 @@ interface Hover {
   y: number
   terrain: string
   node?: string
+  /** Who holds the tile on the Region map, when it is explored. */
+  holder?: string
 }
+
+/** What the map shows: the terrain, or territory over it (`CONTEXT.md`: Region map). */
+type MapMode = 'terrain' | 'region'
 
 /**
  * The world map (T1.5): explored terrain loaded in chunks as the view needs them, one small
@@ -95,10 +110,21 @@ export function MapView({
   onNodesLoadedRef.current = onNodesLoaded
   const redrawRef = useRef<() => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
+  const regionRef = useRef<(region: RegionState | null) => void>(() => {})
   const controlsRef = useRef<{ zoom(factor: number): void; centre(): void } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
+  const [mode, setMode] = useState<MapMode>('terrain')
+  const modeRef = useRef(mode)
   const mapSize = world.map.size
+
+  useEffect(() => {
+    modeRef.current = mode
+    redrawRef.current()
+  }, [mode])
+
+  // The Region map changes once a game hour, and where explored terrain grows.
+  useEffect(() => regionRef.current(world.region), [world.region])
 
   // What is in sight changes every tick; the scene reads the latest through the ref.
   useEffect(() => {
@@ -119,6 +145,9 @@ export function MapView({
     const sprites = new Map<number, Sprite>()
     const nodes: KnownNode[][] = []
     const terrainLayer = new Container()
+    // The Region map: territory over the terrain, one small texture per chunk like the terrain.
+    const regionSprites = new Map<number, Sprite>()
+    const regionLayer = new Container()
     const overlay = new Graphics()
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
     let cam: Camera = { ...homeCentre(worldRef.current), scale: START_SCALE }
@@ -162,13 +191,42 @@ export function MapView({
     redrawRef.current = redraw
     forgetRef.current = (chunks) => store.forget(chunks)
 
+    /** Redraws the Region map's chunks that changed, or all of them. */
+    function updateRegion(region: RegionState | null) {
+      if (!ready) return
+      const redo = region?.changed ?? [
+        ...new Set([...regionSprites.keys(), ...(region ? regionChunks(region, mapSize) : [])]),
+      ]
+      for (const i of redo) {
+        const old = regionSprites.get(i)
+        const pixels =
+          region && regionChunkPixels(region, mapSize, i % across, Math.floor(i / across))
+        if (old) {
+          old.texture.destroy(true)
+          if (!pixels) {
+            old.destroy()
+            regionSprites.delete(i)
+            continue
+          }
+          old.texture = pixelTexture(pixels)
+        } else if (pixels) {
+          const sprite = new Sprite(pixelTexture(pixels))
+          regionLayer.addChild(sprite)
+          regionSprites.set(i, sprite)
+        }
+      }
+      redraw()
+    }
+    regionRef.current = updateRegion
+
     function draw() {
       const view = size()
       // Only chunks on screen are drawn, each at its copy nearest the view's centre (the map's
       // sides join); nearer chunks are loaded first.
       const onScreen = visibleChunks(cam, view, mapSize)
       const shown = new Set(onScreen)
-      for (const [i, sprite] of sprites) {
+      regionLayer.visible = modeRef.current === 'region'
+      for (const [i, sprite] of [...sprites, ...regionSprites]) {
         sprite.visible = shown.has(i)
         if (!sprite.visible) continue
         sprite.position.set(
@@ -243,11 +301,16 @@ export function MapView({
       const chunk = store.get(Math.floor(ty / CHUNK_SIZE) * across + Math.floor(tx / CHUNK_SIZE))
       const byte = chunk?.tiles[(ty % CHUNK_SIZE) * CHUNK_SIZE + (tx % CHUNK_SIZE)]
       const node = chunk?.nodes.find((n) => n.x === tx && n.y === ty)
+      const explored = byte !== undefined && byte !== UNEXPLORED
+      const [wx, wy] = [wrap(tx, mapSize), wrap(ty, mapSize)]
       setHover({
         x: tx,
         y: ty,
         terrain: byte === undefined ? 'Unexplored' : (TERRAIN_NAMES[byte] ?? '?'),
         node: node && NODE_NAMES[node.kind],
+        holder: explored
+          ? holderLabel(holderAt(worldRef.current.region, mapSize, wx, wy))
+          : undefined,
       })
     }
 
@@ -352,8 +415,9 @@ export function MapView({
       app.canvas.addEventListener('wheel', onWheel, { passive: false })
       app.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
       app.renderer.on('resize', redraw)
-      app.stage.addChild(terrainLayer, overlay)
+      app.stage.addChild(terrainLayer, regionLayer, overlay)
       ready = true
+      updateRegion(worldRef.current.region)
       setCam({ ...cam, scale: clampScale(cam.scale, mapSize, size()) })
     })
 
@@ -363,9 +427,12 @@ export function MapView({
       cancelAnimationFrame(frame)
       redrawRef.current = () => {}
       forgetRef.current = () => {}
+      regionRef.current = () => {}
       controlsRef.current = null
       if (ready) {
-        for (const sprite of sprites.values()) sprite.texture.destroy(true)
+        for (const sprite of [...sprites.values(), ...regionSprites.values()]) {
+          sprite.texture.destroy(true)
+        }
         app.destroy(true, { children: true })
       }
     }
@@ -399,11 +466,23 @@ export function MapView({
             <path d="M9 1v3M9 14v3M1 9h3M14 9h3" />
           </svg>
         </button>
+        <button
+          type="button"
+          aria-label="Region map"
+          aria-pressed={mode === 'region'}
+          title="Region map"
+          onClick={() => setMode(mode === 'region' ? 'terrain' : 'region')}
+        >
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
+            <path d="M2 4l4.5-2 5 2L16 2v12l-4.5 2-5-2L2 16zM6.5 2v12M11.5 4v12" />
+          </svg>
+        </button>
       </div>
-      <Legend />
+      {mode === 'region' ? <RegionLegend region={world.region} /> : <Legend />}
       <div className="map-readout">
         {hover
-          ? `Tile ${hover.x}, ${hover.y} · ${hover.terrain}${hover.node ? ` · ${hover.node}` : ''}`
+          ? `Tile ${hover.x}, ${hover.y} · ${hover.terrain}${hover.node ? ` · ${hover.node}` : ''}` +
+            (mode === 'region' && hover.holder ? ` · ${hover.holder}` : '')
           : 'Tile –'}
         {` · zoom ${Math.round((scale / START_SCALE) * 100)}%`}
       </div>
@@ -439,6 +518,26 @@ function Legend() {
           <span className="swatch diamond" style={{ background: css(NODE_COLORS[k]) }} />
           <span>{NODE_NAMES[k]}</span>
           <span className="rule">node</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * The Region map's legend: each colour on it, an alliance with the members holding its parts
+ * (`CONTEXT.md`: Region map).
+ */
+function RegionLegend({ region }: { region: RegionState | null }) {
+  const groups = region ? regionGroups(region) : []
+  return (
+    <div className="map-legend region-legend">
+      {groups.length === 0 && <div className="rule">No territory on explored terrain yet</div>}
+      {groups.map((g) => (
+        <div key={g.key}>
+          <span className="swatch" style={{ background: css(g.colour) }} />
+          <span>{g.name}</span>
+          <span className="rule">{g.members.length > 0 ? g.members.join(', ') : ''}</span>
         </div>
       ))}
     </div>
@@ -554,6 +653,19 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
 
 const centre = (cam: Camera, view: Size, size: number, e: { x: number; y: number }) =>
   tileToScreen(cam, view, size, e.x + 0.5, e.y + 0.5)
+
+/** A chunk's RGBA pixels as a texture, one pixel per tile, kept crisp like `chunkTexture`. */
+function pixelTexture(pixels: Uint8ClampedArray): Texture {
+  const canvas = document.createElement('canvas')
+  canvas.width = CHUNK_SIZE
+  canvas.height = CHUNK_SIZE
+  const image = new ImageData(CHUNK_SIZE, CHUNK_SIZE)
+  image.data.set(pixels)
+  canvas.getContext('2d')!.putImageData(image, 0, 0)
+  const texture = Texture.from(canvas)
+  texture.source.scaleMode = 'nearest'
+  return texture
+}
 
 /** One pixel per tile; scaled up with nearest-neighbour sampling, so tiles stay crisp. */
 function chunkTexture(chunk: TerrainChunk): Texture {
