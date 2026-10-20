@@ -7,6 +7,8 @@ import {
   type ScriptObject,
 } from '@csp/lang'
 import {
+  commanderOf,
+  commands,
   SCRIPT_LOG_INTERVAL,
   SCRIPT_MAX_CALL_DEPTH,
   SCRIPT_MEMORY_MAX,
@@ -67,7 +69,7 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
       const o = order as Partial<RunScriptRequest>
       const realm = realmOf(world, sender.userId)
       const r = world.residents.find((x) => x.id === o.residentId)
-      if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+      if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
       const script = Number.isInteger(o.scriptId) ? host.script(o.scriptId!) : undefined
       if (!script || script.userId !== sender.userId) {
         return 'not one of your scripts with a version that can run'
@@ -105,9 +107,11 @@ export class ScriptRunner {
     const byRealm = new Map<string, Resident[]>()
     for (const r of world.residents) {
       if (!r.script) continue
-      // A resident of no realm has no Player to run a script for.
-      if (r.owner === null) delete r.script
-      else byRealm.set(r.owner, [...(byRealm.get(r.owner) ?? []), r])
+      // A script runs for the realm the resident takes orders from (`CONTEXT.md`: Alliance army);
+      // a resident of no realm has no Player to run a script for.
+      const realmId = commanderOf(world, r)
+      if (realmId === null) delete r.script
+      else byRealm.set(realmId, [...(byRealm.get(realmId) ?? []), r])
     }
     const used = new Map<number, { source: string; program: Program }>()
     for (const realm of world.realms) {
@@ -240,7 +244,7 @@ function logLimited(
   const last = running[at]
   if (last !== undefined && world.tick - last < SCRIPT_LOG_INTERVAL) return
   running[at] = world.tick
-  recordEvent(world, r.owner, what)
+  recordEvent(world, commanderOf(world, r), what)
 }
 
 /**

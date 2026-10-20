@@ -281,6 +281,7 @@ describe('alliances', () => {
           { realmId: realm(wren), realm: name(wren), joinedAt: 2, leavesAt: null },
         ],
         invites: [{ realmId: realm(ash), realm: name(ash) }],
+        army: [],
       },
       invitations: [],
       realmsInSight: [{ realmId: realm(ash), realm: name(ash) }],
@@ -303,6 +304,7 @@ describe('alliances', () => {
       leaderId: realm(wren),
       members: [{ realmId: realm(wren), joinedAt: 0, leaving: { at: 0, removed: false } }],
       invites: [],
+      army: [],
     })
     order(mara, { kind: 'leaveAlliance' })
     const messages = alliancesSound.check(world, cityTerrain()).map((v) => v.message)

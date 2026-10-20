@@ -496,6 +496,15 @@ describe('world saves', () => {
     expect(migrateWorld(structuredClone(v21), 20, { terrain: land }, migrations, 21)).toEqual(v21)
   })
 
+  it('gives every alliance an empty army (migration 21 → 22)', () => {
+    const v21 = {
+      tick: 5,
+      alliances: [{ id: 'alliance1', name: 'North', leaderId: 'realm1', members: [], invites: [] }],
+    }
+    const v22 = migrateWorld(structuredClone(v21), 21, { terrain: smallTerrain() }, migrations, 22)
+    expect(v22).toEqual({ tick: 5, alliances: [{ ...v21.alliances[0], army: [] }] })
+  })
+
   it('keeps the newest saves and one per hour for a week', async () => {
     const { db, close } = await openDb(':memory:')
     const now = 1_000_000_000

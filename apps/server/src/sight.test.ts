@@ -141,6 +141,7 @@ describe('shared sight', () => {
       leaderId: mara.id,
       members: [mara, tobin].map((r) => ({ realmId: r.id, joinedAt: 0, leaving: null })),
       invites: [],
+      army: [],
     })
     const ids = (realmId: string) =>
       new Set(entitiesInSight(world, terrain, realmId).map((e) => e.id))

@@ -1,4 +1,5 @@
 import {
+  commands,
   inContact,
   carriageCanEnter,
   driveSpeed,
@@ -61,7 +62,7 @@ export const walkTo: OrderKind = {
     const o = order as Partial<WalkToRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the target must be a tile'
     return undefined
   },

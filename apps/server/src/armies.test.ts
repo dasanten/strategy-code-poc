@@ -191,7 +191,7 @@ describe('armies', () => {
     const { world } = setup()
     world.armies.push({ id: 'army1', name: 'X', realmId: 'r1', memberIds: ['b1'], order: null })
     expect(checkInvariants(world, terrain, [armiesSound]).map((v) => v.message)).toEqual([
-      'army army1 has member b1 of another realm',
+      'army army1 has member b1 another realm commands',
     ])
   })
 })

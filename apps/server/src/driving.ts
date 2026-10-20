@@ -1,4 +1,11 @@
-import { carriageCanEnter, driveProblem, terrainAt, type OrderRequest } from '@csp/shared'
+import {
+  carriageCanEnter,
+  commandsCarriage,
+  commands,
+  driveProblem,
+  terrainAt,
+  type OrderRequest,
+} from '@csp/shared'
 import type { OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
 
@@ -22,9 +29,9 @@ export const drive: OrderKind = {
     const o = order as Partial<DriveRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     const carriage = world.carriages.find((k) => k.id === o.carriageId)
-    if (!carriage || carriage.realmId !== realm.id) return 'not one of your carriages'
+    if (!commandsCarriage(world, realm.id, carriage)) return 'not one of your carriages'
     if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the target must be a tile'
     if (terrain && !carriageCanEnter(terrainAt(terrain, o.x!, o.y!))) {
       return 'a carriage can’t go there'

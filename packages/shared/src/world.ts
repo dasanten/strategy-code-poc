@@ -577,6 +577,22 @@ export interface Alliance {
   members: AllianceMember[]
   /** Realms the alliance leader invited that have not accepted or declined yet. */
   invites: string[]
+  /**
+   * The alliance army (`CONTEXT.md`: Alliance army): soldiers and carriages members handed over
+   * to the alliance leader's command, in the order they were handed over.
+   */
+  army: AllianceArmyPart[]
+}
+
+/**
+ * A soldier or carriage handed over to an alliance's army. It stays in its own realm (the
+ * resident's `owner`, the carriage's `realmId`) but takes orders only from the alliance leader.
+ */
+export interface AllianceArmyPart {
+  is: 'resident' | 'carriage'
+  id: string
+  /** The tick its owner's recall takes effect; null while it stays. */
+  recallAt: number | null
 }
 
 /** A realm's membership in an alliance. */
