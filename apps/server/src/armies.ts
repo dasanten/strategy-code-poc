@@ -2,9 +2,9 @@ import {
   ARMY_NAME_MAX_LENGTH,
   ARMY_SPREAD,
   SIGHT_RANGE,
+  commands,
   armyOf,
   commanderOf,
-  commands,
   inContact,
   wrapDistance,
   type Army,
@@ -60,7 +60,7 @@ function ownArmy(world: WorldState, realmId: string, order: OrderRequest): Army 
 /** Whether any of the realm's residents sees the spot. */
 function inSightOf(world: WorldState, realmId: string, at: Resident, size: number): boolean {
   return world.residents.some(
-    (x) => x.owner === realmId && wrapDistance(size, x, at) <= SIGHT_RANGE,
+    (x) => commands(world, realmId, x) && wrapDistance(size, x, at) <= SIGHT_RANGE,
   )
 }
 
@@ -194,7 +194,9 @@ export const armyAttack = commandArmy(
     const bad = badTarget(world, realmId, order, size)
     if (bad) return bad
     const target = world.residents.find((x) => x.id === order.targetId)
-    return target?.owner === realmId ? 'that is one of your own residents' : undefined
+    return target && (target.owner === realmId || commands(world, realmId, target))
+      ? 'that is one of your own residents'
+      : undefined
   },
   (_a, order) => ({ kind: 'attack', targetId: order.targetId as string, started: false }),
 )

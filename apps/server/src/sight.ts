@@ -1,5 +1,6 @@
 import {
   SIGHT_RANGE,
+  commanderOf,
   sharingSight,
   wrapDistance,
   type Army,
@@ -30,10 +31,16 @@ function armySeen(
   return world.residents.some((r) => army.memberIds.includes(r.id) && inSight(r))
 }
 
-/** The residents a realm's Player sees through: their own and their alliance's. */
+/**
+ * The residents a realm's Player sees through: their own and their alliance's, those rented out
+ * included, and mercenaries they hired (`CONTEXT.md`: Mercenary contract).
+ */
 function observersOf(world: WorldState, realmId: string): Spot[] {
   const realms = new Set(sharingSight(world, realmId))
-  return world.residents.filter((r) => r.owner !== null && realms.has(r.owner))
+  return world.residents.filter((r) => {
+    const by = commanderOf(world, r)
+    return (r.owner !== null && realms.has(r.owner)) || (by !== null && realms.has(by))
+  })
 }
 
 /**
@@ -136,9 +143,12 @@ export class SightTracker {
     const grown = new Map<number, Set<number>>()
     const looking = new Set<string>()
     for (const r of world.residents) {
-      const viewers = r.owner === null ? undefined : viewersOf.get(r.owner)
+      const by = commanderOf(world, r)
+      const viewers = [r.owner, by === r.owner ? null : by].flatMap((id) =>
+        id === null ? [] : (viewersOf.get(id) ?? []),
+      )
       const here = `${r.x},${r.y}`
-      for (const userId of viewers ?? []) {
+      for (const userId of new Set(viewers)) {
         const key = `${userId}:${r.id}`
         looking.add(key)
         if (this.lastSeenFrom.get(key) === here) continue

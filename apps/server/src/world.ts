@@ -25,6 +25,7 @@ import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
+import { resolvePayments, stepContracts } from './contracts.js'
 import { stepCrimes } from './crimes.js'
 import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
@@ -49,6 +50,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     events: [],
     alliances: [],
     armies: [],
+    contracts: [],
     crimes: [],
   }
 }
@@ -113,12 +115,13 @@ export interface StepResult {
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
  * horses, and stables breed foals; food spoils at the end of each game day; then their orders request actions (steps, then blows in fights, then taking and
- * putting down goods, haul routes' and road orders' included, then laying out and working on construction sites, then tearing down, then
+ * putting down goods, haul routes' and road orders' included, then paying for mercenary contracts, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
  * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
- * realm (`stepCaptures`); witnesses who got home make crimes known (`stepCrimes`); last, armies
+ * realm (`stepCaptures`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
+ * (`stepContracts`); last, armies
  * lose members who are gone and give the rest their orders for the next tick. Without `walking`
  * nobody moves.
  */
@@ -137,6 +140,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
     ...requestRoadMaterials(world),
   ]
   resolveCarrying(world, carries, terrain.size)
+  const payments = resolvePayments(world)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
@@ -151,6 +155,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepRefill(world, terrain.size)
   const captures = stepCaptures(world, terrain.size)
   stepCrimes(world, terrain.size)
+  stepContracts(world)
   stepArmies(world, terrain.size)
   const actions =
     steps.length +
@@ -159,6 +164,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
     builds.length +
     teardowns.length +
     work.length +
-    births.length
+    births.length +
+    payments
   return { actions, survival, combat, horsesDied, aging, captures }
 }

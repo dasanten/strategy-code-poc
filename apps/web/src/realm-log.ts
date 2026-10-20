@@ -132,6 +132,35 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         : { text: `${e.name}’s script ran out of steps this tick.`, tone: 'warn' }
     case 'scriptEnded':
       return { text: `${e.name} stopped running a script: it was deleted.`, tone: 'info' }
+    case 'contract': {
+      const them = `the realm of ${e.other}`
+      const n = e.residents === 1 ? '1 mercenary' : `${e.residents} mercenaries`
+      const weeks = e.weeks === 1 ? '1 week' : `${e.weeks} weeks`
+      const walk = e.residents === 1 ? 'walks' : 'walk'
+      switch (e.what) {
+        case 'offered':
+          return e.lender
+            ? { text: `${cap(them)} asks to hire ${n} from you.`, tone: 'info' }
+            : { text: `${cap(them)} offers you ${n} for hire.`, tone: 'info' }
+        case 'started':
+          return e.lender
+            ? { text: `You rented out ${n} to ${them}.`, tone: 'info' }
+            : { text: `You hired ${n} from ${them}.`, tone: 'info' }
+        case 'paid':
+          return e.lender
+            ? { text: `${cap(them)} paid ${weeks} for your ${n}.`, tone: 'info' }
+            : { text: `You paid ${them} ${weeks} for ${n}.`, tone: 'info' }
+        case 'ended':
+          return {
+            text: `The contract with ${them} for ${n} ended: the ${n} ${walk} home.`,
+            tone: 'info',
+          }
+        case 'broken':
+          return e.lender
+            ? { text: `${cap(them)} left a week unpaid: your ${n} ${walk} home.`, tone: 'warn' }
+            : { text: `You left a week unpaid: the ${n} from ${them} ${walk} home.`, tone: 'warn' }
+      }
+    }
   }
 }
 
@@ -159,4 +188,9 @@ export function realmEnded(log: RealmEvent[]): boolean {
 export function appendEvents(log: RealmEvent[], events: RealmEvent[]): RealmEvent[] {
   if (events.length === 0) return log
   return [...log, ...events].slice(-REALM_LOG_LENGTH)
+}
+
+/** The text with its first letter in capitals. */
+function cap(text: string): string {
+  return text[0]!.toUpperCase() + text.slice(1)
 }
