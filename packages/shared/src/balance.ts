@@ -201,6 +201,12 @@ export const CITY_BUILDING_REACH = 3
  */
 export const CITY_AREA_MARGIN = 1
 
+/**
+ * Most tiles a ring of walls and gates can shut in (`CONTEXT.md`: Walls in combat): ground cut
+ * off by walls from more than this, a square of 100 tiles along each side, counts as outside.
+ */
+export const WALL_ENCLOSES_MAX = 10_000
+
 /** How far a resident sees, in tiles (`CONTEXT.md`: Sight). */
 export const SIGHT_RANGE = 12
 
@@ -776,6 +782,13 @@ export const COMBAT_SKILL_LIMIT = 1
 
 /** The least damage a blow that lands does, however well the one hit is protected. */
 export const MIN_BLOW_DAMAGE = 1
+
+/**
+ * What a blow that lands does to a defender standing on their own city's wall, as a share of its
+ * damage (`CONTEXT.md`: Walls in combat): a quarter, so a wall's defenders hold out four times
+ * as long.
+ */
+export const WALL_DEFENCE = 0.25
 
 /** Chance of dodging a blow for each point of Agility: an average resident dodges one in five. */
 export const DODGE_PER_AGILITY = 0.02

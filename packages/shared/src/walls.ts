@@ -1,0 +1,187 @@
+import { WALL_ENCLOSES_MAX } from './balance.js'
+import { isPassableTerrain, tileIndex, wrap, type TerrainMap } from './terrain.js'
+import type { Building, Resident, WorldState } from './world.js'
+
+/** World queries about walls and gates (`CONTEXT.md`: Walls in combat; ADR 0002). */
+
+/** A finished wall or gate on a tile, and whose it is. */
+export interface WallTile {
+  kind: 'wall' | 'gate'
+  /** The realm of the wall's city, which may stand on it and pass its gate; null for nobody's. */
+  realmId: string | null
+  /** A gate that is closed. */
+  closed: boolean
+}
+
+/**
+ * The finished walls and gates on the map, by tile index, and the tiles they enclose. Built
+ * once per set of walls (`wallsKey`), so movement can ask about every step cheaply.
+ */
+export interface WallMap {
+  size: number
+  tiles: Map<number, WallTile>
+  /** Tiles shut in by walls and gates (and impassable land): a wall ring's inside. */
+  inside: Set<number>
+}
+
+/** Whether a building is a finished wall or gate. */
+export function isWallOrGate(b: Building): boolean {
+  return (b.kind === 'wall' || b.kind === 'gate') && !b.site
+}
+
+/** Whether a gate is closed; a gate is open until its city's realm closes it. */
+export function isClosed(b: Building): boolean {
+  return b.kind === 'gate' && b.closed === true
+}
+
+/**
+ * A key that changes whenever the finished walls and gates, their gates' state or their cities'
+ * realms change, so a `WallMap` is rebuilt only then.
+ */
+export function wallsKey(world: Pick<WorldState, 'buildings' | 'cities'>): string {
+  const parts: string[] = []
+  for (const b of world.buildings) {
+    if (!isWallOrGate(b)) continue
+    parts.push(`${b.id}@${b.x},${b.y}:${b.cityId ?? ''}${isClosed(b) ? '!' : ''}`)
+  }
+  for (const c of world.cities) parts.push(`${c.id}=${c.realmId ?? ''}`)
+  return parts.join(';')
+}
+
+/**
+ * Builds the `WallMap` for the world on `terrain`. A tile is inside when it can't reach far out
+ * (`WALL_ENCLOSES_MAX` tiles) on foot without crossing a wall or gate.
+ */
+export function wallMap(
+  world: Pick<WorldState, 'buildings' | 'cities'>,
+  terrain: TerrainMap,
+): WallMap {
+  const { size } = terrain
+  const realms = new Map(world.cities.map((c) => [c.id, c.realmId]))
+  const tiles = new Map<number, WallTile>()
+  for (const b of world.buildings) {
+    if (!isWallOrGate(b)) continue
+    tiles.set(tileIndex(size, b.x, b.y), {
+      kind: b.kind as 'wall' | 'gate',
+      realmId: (b.cityId && realms.get(b.cityId)) ?? null,
+      closed: isClosed(b),
+    })
+  }
+  const inside = new Set<number>()
+  const outside = new Set<number>()
+  const open = (t: number) =>
+    !tiles.has(t) && isPassableTerrain(terrain.tiles[t]!) && !inside.has(t) && !outside.has(t)
+  for (const w of tiles.keys()) {
+    for (const start of neighbours(size, w)) {
+      if (!open(start)) continue
+      // Fill from beside the wall; a fill that grows too large, or runs into the outside, is out.
+      const seen = new Set([start])
+      const todo = [start]
+      let out = false
+      while (todo.length > 0 && !out) {
+        const t = todo.pop()!
+        for (const n of neighbours(size, t)) {
+          if (seen.has(n) || tiles.has(n) || !isPassableTerrain(terrain.tiles[n]!)) continue
+          if (outside.has(n) || seen.size >= WALL_ENCLOSES_MAX) {
+            out = true
+            break
+          }
+          seen.add(n)
+          todo.push(n)
+        }
+      }
+      for (const t of seen) (out ? outside : inside).add(t)
+    }
+  }
+  return { size, tiles, inside }
+}
+
+/** The four tiles next to tile index `t`, across the map's joins too. */
+function neighbours(size: number, t: number): number[] {
+  const x = t % size
+  const y = (t - x) / size
+  return [
+    y * size + wrap(x + 1, size),
+    y * size + wrap(x - 1, size),
+    wrap(y + 1, size) * size + x,
+    wrap(y - 1, size) * size + x,
+  ]
+}
+
+/** Whether a realm may stand on the wall on tile index `t`: its own city's. */
+function ownWall(walls: WallMap, realmId: string | null, t: number): boolean {
+  const w = walls.tiles.get(t)
+  return w?.kind === 'wall' && realmId !== null && w.realmId === realmId
+}
+
+/** Whether tile index `t` is a wall or gate of the realm's own cities. */
+function ownWallOrGate(walls: WallMap, realmId: string | null, t: number): boolean {
+  const w = walls.tiles.get(t)
+  return !!w && realmId !== null && w.realmId === realmId
+}
+
+/**
+ * Whether someone of `realmId` on tile index `t` is stuck on a wall: a wall they may not stand
+ * on (a foreign wall finished under them), or a stretch of their own wall with no gate and no way
+ * down inside. Such a one may climb down anywhere next to it.
+ */
+export function strandedOnWall(walls: WallMap, realmId: string | null, t: number): boolean {
+  if (walls.tiles.get(t)?.kind !== 'wall') return false
+  if (!ownWall(walls, realmId, t)) return true
+  const seen = new Set([t])
+  const todo = [t]
+  while (todo.length > 0) {
+    const c = todo.pop()!
+    if (walls.tiles.get(c)!.kind === 'gate') return false
+    for (const n of neighbours(walls.size, c)) {
+      if (walls.inside.has(n)) return false
+      if (!seen.has(n) && ownWallOrGate(walls, realmId, n)) {
+        seen.add(n)
+        todo.push(n)
+      }
+    }
+  }
+  return true
+}
+
+/**
+ * Whether someone of `realmId` may step from tile index `from` to the next tile `to`
+ * (`CONTEXT.md`: Walls in combat), walls and gates aside from the land itself. Nobody walks
+ * through a wall: only the city's own realm goes onto its walls, from inside or from the wall
+ * itself, and down only inside, and only `onWalls` (on foot, not driving). A gate lets its city's
+ * realm through always, everyone else only while open. `stranded` (`strandedOnWall`) frees the
+ * way down from a wall.
+ */
+export function mayStep(
+  walls: WallMap,
+  realmId: string | null,
+  from: number,
+  to: number,
+  onWalls: boolean,
+  stranded = false,
+): boolean {
+  const w = walls.tiles.get(to)
+  if (w?.kind === 'gate' && w.closed && !ownWallOrGate(walls, realmId, to)) return false
+  if (w?.kind === 'wall') {
+    if (!onWalls || !ownWall(walls, realmId, to)) return false
+    return walls.inside.has(from) || ownWallOrGate(walls, realmId, from)
+  }
+  if (walls.tiles.get(from)?.kind === 'wall' && !stranded)
+    return walls.inside.has(to) || ownWallOrGate(walls, realmId, to)
+  return true
+}
+
+/**
+ * Whether a resident stands on one of their own realm's walls, where they defend far better
+ * (`CONTEXT.md`: Walls in combat; `WALL_DEFENCE`).
+ */
+export function onOwnWall(
+  world: Pick<WorldState, 'buildings' | 'cities'>,
+  r: Pick<Resident, 'x' | 'y' | 'owner'>,
+): boolean {
+  const wall = world.buildings.find(
+    (b) => b.x === r.x && b.y === r.y && b.kind === 'wall' && !b.site,
+  )
+  const city = wall && world.cities.find((c) => c.id === wall.cityId)
+  return !!city && city.realmId !== null && city.realmId === r.owner
+}
