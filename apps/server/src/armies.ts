@@ -288,10 +288,45 @@ export function stepArmies(world: WorldState, size: number): void {
       if (armyIdOf.get(r.id) !== o.army) delete o.army
     }
   }
+  for (const r of world.residents) {
+    if (suppliedArmy(r) !== undefined && !suppliesOwnArmy(world, r)) r.order = null
+  }
   for (const army of world.armies) {
     const members = army.memberIds.map((id) => byId.get(id)!)
     carryOut(world, army, members, size)
   }
+}
+
+/** The army a resident's carriage supplies, following it or on a haul route to it, if any. */
+function suppliedArmy(r: Resident): string | undefined {
+  const o = r.order
+  if (o?.kind === 'drive') return o.army
+  if (o?.kind === 'haul') return o.toArmy
+  return undefined
+}
+
+/** Whether the army a resident supplies (`suppliedArmy`) exists and is their commander's. */
+function suppliesOwnArmy(world: WorldState, r: Resident): boolean {
+  const id = suppliedArmy(r)
+  return world.armies.some((a) => a.id === id && a.realmId === commanderOf(world, r))
+}
+
+/**
+ * Supply lines go to real armies (`CONTEXT.md`: Supply line): a carriage that follows an army, or
+ * a haul route with an army as its second stop, goes to an army of the driver's realm. When the
+ * army is gone, the drive or route ends (`stepArmies`).
+ */
+export const supplyLinesSound: Invariant = {
+  name: 'supply-lines-sound',
+  check(world) {
+    return world.residents
+      .filter((r) => suppliedArmy(r) !== undefined && !suppliesOwnArmy(world, r))
+      .map((r) => ({
+        invariant: this.name,
+        message: `resident ${r.id} supplies army ${suppliedArmy(r)}, not one of their realm's`,
+        entityIds: [r.id],
+      }))
+  },
 }
 
 /** Gives the army's members their orders from the army's, and ends an order that is done. */

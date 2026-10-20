@@ -4,6 +4,8 @@ import {
   CARRIAGE_CAPACITY,
   GOODS,
   GOOD_WEIGHT,
+  armySpot,
+  inContact,
   carriageCanEnter,
   driveProblem,
   goodsAtSpot,
@@ -21,6 +23,7 @@ import {
 } from '@csp/shared'
 import type { CarryAction } from './carrying.js'
 import type { OrderKind } from './orders.js'
+import { armyStart, armyToSupply } from './driving.js'
 import { realmOf } from './starting-city.js'
 
 /**
@@ -32,8 +35,10 @@ interface HaulRequest extends OrderRequest {
   kind: 'haul'
   residentId: string
   carriageId: string
-  x: number
-  y: number
+  x?: number
+  y?: number
+  /** Instead of a tile, the army of the Player's that is the other stop (`CONTEXT.md`: Supply line). */
+  armyId?: string
   goods: Good[]
   returnGoods?: Good[]
   keepFood: number
@@ -61,10 +66,15 @@ export const haul: OrderKind = {
     if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     const carriage = world.carriages.find((k) => k.id === o.carriageId)
     if (!commandsCarriage(world, realm.id, carriage)) return 'not one of your carriages'
-    if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the other stop must be a tile'
-    if (o.x === r.x && o.y === r.y) return 'the other stop must be another tile'
-    if (terrain && !carriageCanEnter(terrainAt(terrain, o.x!, o.y!))) {
-      return 'a carriage can’t go there'
+    if (o.armyId !== undefined) {
+      const army = armyToSupply(world, realm.id, o.armyId)
+      if (typeof army === 'string') return army
+    } else {
+      if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the other stop must be a tile'
+      if (o.x === r.x && o.y === r.y) return 'the other stop must be another tile'
+      if (terrain && !carriageCanEnter(terrainAt(terrain, o.x!, o.y!))) {
+        return 'a carriage can’t go there'
+      }
     }
     const goods = readGoods(o.goods)
     if (!goods) return 'pick the goods to haul'
@@ -72,6 +82,7 @@ export const haul: OrderKind = {
     if (!back || back.some((g) => goods.includes(g))) {
       return 'pick the goods to haul back, none of them hauled there'
     }
+    if (o.armyId !== undefined && back.length > 0) return 'nothing comes back from an army'
     const food = o.keepFood
     if (!Number.isInteger(food) || food! < 0 || food! * GOOD_WEIGHT.food > CARRIAGE_CAPACITY) {
       return 'the Food kept for the horse must be whole units that fit on the carriage'
@@ -79,16 +90,20 @@ export const haul: OrderKind = {
     return driveProblem(world, r, carriage)
   },
   apply(world, _sender, order) {
-    const { residentId, carriageId, x, y, goods, returnGoods, keepFood } = order as HaulRequest
+    const { residentId, carriageId, goods, returnGoods, keepFood, armyId } = order as HaulRequest
     const r = world.residents.find((x) => x.id === residentId)
     const carriage = world.carriages.find((k) => k.id === carriageId)
     // Two drivers ordered onto one carriage in the same tick: the first one drives it.
     if (!r || !carriage || driveProblem(world, r, carriage)) return
+    const army = armyId === undefined ? undefined : world.armies.find((a) => a.id === armyId)
+    if (armyId !== undefined && !army) return
+    const { x, y } = army ? armyStart(world, army) : (order as Required<HaulRequest>)
     r.order = {
       kind: 'haul',
       carriageId,
       from: { x: r.x, y: r.y },
       to: { x, y },
+      ...(army ? { toArmy: army.id } : {}),
       goods: [...goods],
       returnGoods: [...(returnGoods ?? [])],
       keepFood,
@@ -133,6 +148,34 @@ interface Transfer {
   onto: 'carriage' | 'stop'
 }
 
+/** Sets a hauler driving to their route's other stop. */
+function driveOn(o: HaulOrder, stop: HaulOrder['stop']): void {
+  o.stop = stop
+  o.phase = 'driving'
+  o.path = null
+  o.progress = 0
+}
+
+/**
+ * A haul route standing at its army stop (`CONTEXT.md`: Supply line): nothing is unloaded; the
+ * army's members refill from the carriage (`refillSource`) while it stays in contact with them.
+ * Once none of the route's goods is left on board but the Food kept for the horse, it goes back
+ * for more; when the army moves on, it drives after it; with the army gone, the route ends.
+ */
+function standWithArmy(
+  world: WorldState,
+  r: Resident,
+  o: HaulOrder,
+  armyId: string,
+  carriage: Carriage,
+  size: number,
+): void {
+  const spot = armySpot(world, armyId, r, size)
+  if (!spot) r.order = null
+  else if (!o.goods.some((g) => (carriage.load[g] ?? 0) > kept(o, g))) driveOn(o, 'from')
+  else if (!inContact(size, r, spot)) driveOn(o, 'to')
+}
+
 /** How much of a good the route leaves on board when unloading: the Food kept for the horse. */
 const kept = (o: HaulOrder, good: Good) => (good === 'food' ? o.keepFood : 0)
 
@@ -174,9 +217,10 @@ function nextTransfer(
  * hauler either puts down what they took the tick before (only that, not their own goods), or
  * takes the next goods to move. With nothing left to move they drive to the other stop; at
  * `from` only once something of the route's goods is on board, so they wait for goods there.
- * A hauler whose carriage is gone or not with them stops.
+ * A hauler whose carriage is gone or not with them stops. At an army stop see `standWithArmy`.
+ * `size` is the map's.
  */
-export function requestHauling(world: WorldState): CarryAction[] {
+export function requestHauling(world: WorldState, size: number): CarryAction[] {
   const actions: CarryAction[] = []
   for (const r of world.residents) {
     const o = r.order
@@ -184,6 +228,10 @@ export function requestHauling(world: WorldState): CarryAction[] {
     const carriage = world.carriages.find((k) => k.id === o.carriageId)
     if (!carriage || carriage.x !== r.x || carriage.y !== r.y) {
       r.order = null
+      continue
+    }
+    if (o.stop === 'to' && o.toArmy !== undefined) {
+      standWithArmy(world, r, o, o.toArmy, carriage, size)
       continue
     }
     const spot = haulStopSpot(world, r.x, r.y)
@@ -207,10 +255,7 @@ export function requestHauling(world: WorldState): CarryAction[] {
     }
     const loaded = o.goods.some((g) => (carriage.load[g] ?? 0) > kept(o, g))
     if (o.stop === 'from' && !loaded) continue
-    o.stop = o.stop === 'from' ? 'to' : 'from'
-    o.phase = 'driving'
-    o.path = null
-    o.progress = 0
+    driveOn(o, o.stop === 'from' ? 'to' : 'from')
   }
   return actions
 }

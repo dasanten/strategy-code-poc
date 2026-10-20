@@ -23,7 +23,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
-import { refillStock } from './survival.js'
+import { refillSource } from './survival.js'
 import { startWork } from './work.js'
 
 /**
@@ -85,7 +85,7 @@ function runCity(world: WorldState, city: City, people: Resident[], size: number
   if (short) moveToFarms(world, places)
   for (const r of adults) {
     const o = r.order
-    if (o?.kind === 'workAt' && lowOnFood(r) && !refillStock(world, r, size)) r.order = null
+    if (o?.kind === 'workAt' && lowOnFood(r) && !refillSource(world, r, size)) r.order = null
   }
 
   for (const r of adults) {
