@@ -211,6 +211,18 @@ function residentActions(
     pay: ([contractId, weeks]) =>
       request('pay', { contractId: plain(contractId), weeks: plain(weeks) }),
     buyCity: ([cityId]) => request('buyCity', { cityId: plain(cityId) }),
+    buy: ([good, units, carriageId]) =>
+      request('buy', {
+        good: plain(good),
+        units: plain(units),
+        carriageId: plain(carriageId ?? null),
+      }),
+    sell: ([good, units, carriageId]) =>
+      request('sell', {
+        good: plain(good),
+        units: plain(units),
+        carriageId: plain(carriageId ?? null),
+      }),
     roadLine: ([x, y]) =>
       request('roadLine', {
         from: { x: resident.x, y: resident.y },

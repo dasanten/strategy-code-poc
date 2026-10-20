@@ -107,7 +107,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Trading with the Trade Organization:** only in person, by a resident (or a carriage) on a
   warehouse's tile, at its HQ or a trading post. Selling hands the goods into the warehouse and
   takes its coins into the resident's hands, as far as they can carry; buying is the other way
-  round. It happens at once.
+  round. It happens at once. A carriage of theirs on the tile can trade its load instead of
+  their hands. Each unit goes at the price its stock makes with that unit in it, so a big trade
+  moves the price as it goes, and a trade is cut down to what the trader holds, what the
+  warehouse holds and what fits. At the HQ the coins come from and go into its coin warehouse.
 - **Warehouse prices:** each warehouse prices every good from its own stock, buying lower than it
   sells. Posts don't share prices, so carrying goods between regions can pay off. Anyone with a
   resident in sight of a warehouse sees its prices.

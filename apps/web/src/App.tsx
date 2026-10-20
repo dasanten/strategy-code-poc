@@ -324,11 +324,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               buildings={world.buildings}
               realmId={world.home.realmId}
               realms={world.diplomacy.realmsInSight}
+              carriages={world.carriages}
+              tick={world.tick}
               onSetGate={async (gateId, open) =>
                 setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
               }
               onBuyCity={async (residentId, cityId) =>
                 setOrderError(await sendOrder({ kind: 'buyCity', residentId, cityId }))
+              }
+              onTrade={async ({ side, ...trade }) =>
+                setOrderError(await sendOrder({ kind: side, ...trade }))
               }
             />
           )}
