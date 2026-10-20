@@ -164,7 +164,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Food surplus:** a city has one when its storage holds more Food than all its residents eat
   in a set number of game days. Food that residents carry doesn't count.
 - **Storage:** a building in a city's area where its goods are kept.
-- **At home:** a resident standing in the area of a city of their own realm.
+- **At home:** a resident standing in the area of a city of their own realm; for a resident of an
+  NPC city, in the area of that city.
 - **NPC city:** a city run by the game. Self-managed cities are NPC cities. On its own it works
   its farms and workplaces and carries the output to its storage, pairs its adults, builds a
   house when it has a food surplus and no free housing, and puts more residents on farms (or
