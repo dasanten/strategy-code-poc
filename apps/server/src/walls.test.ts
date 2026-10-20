@@ -8,6 +8,7 @@ import {
   onOwnWall,
   tileIndex,
   wallMap,
+  wallsKey,
   type Building,
   type TerrainMap,
   type WorldState,
@@ -169,6 +170,72 @@ describe('defending a wall', () => {
       stepWorld(world, terrain)
     }
     expect(a.health).toBeCloseTo(MAX_HEALTH - damage * WALL_DEFENCE, 0)
+  })
+})
+
+describe('allies at walls and gates', () => {
+  /** The setup world with r1 and r2 in one alliance. */
+  function allied() {
+    const s = setup()
+    s.world.alliances.push({
+      id: 'alliance-1',
+      name: 'North',
+      leaderId: 'r1',
+      members: ['r1', 'r2'].map((realmId) => ({ realmId, joinedAt: 0, leaving: null })),
+      invites: [],
+    })
+    return s
+  }
+
+  it('a member passes an ally’s closed gate', () => {
+    const { world, gate } = allied()
+    gate.closed = true
+    expect(path(world, [8, 14], [8, 8], { realmId: 'r2' })).toContainEqual([GATE.x, GATE.y])
+    expect(path(world, [8, 14], [8, 8], { realmId: null })).toBeUndefined()
+  })
+
+  it('a member goes up on an ally’s walls from inside, never over them', () => {
+    const { world } = allied()
+    const up = path(world, [8, 7], [8, 5], { realmId: 'r2' })!
+    expect(up.at(-1)).toEqual([8, 5])
+    expect(path(world, [8, 2], [8, 8], { realmId: 'r2' })).toContainEqual([GATE.x, GATE.y])
+    expect(path(world, [8, 7], [8, 5], { realmId: 'r3' })).toBeUndefined()
+  })
+
+  it('a member on an ally’s wall defends as well as its own realm', () => {
+    const { world } = allied()
+    world.realms.push({ id: 'r3', userId: 9, leaderId: 'c1' })
+    const b = resident(world, 'b1', 'r2', 8, 5)
+    const c = resident(world, 'c1', 'r3', 8, 4)
+    expect(onOwnWall(world, b)).toBe(true)
+    c.order = attackOrder('b1')
+    const damage = blowDamage(c, b, world.tick)
+    for (let i = 0; i < STRIKE_TICKS; i++) {
+      for (const r of world.residents) r.hunger = 100
+      stepWorld(world, terrain)
+    }
+    expect(b.health).toBeCloseTo(MAX_HEALTH - damage * WALL_DEFENCE, 0)
+  })
+
+  it('the way changes when the alliance does', () => {
+    const { world, gate } = allied()
+    gate.closed = true
+    const before = wallsKey(world)
+    world.alliances[0]!.members.pop()
+    expect(wallsKey(world)).not.toBe(before)
+    expect(path(world, [8, 14], [8, 8], { realmId: 'r2' })).toBeUndefined()
+  })
+
+  it('only the city’s own realm opens and closes its gates', () => {
+    const { world, gate } = allied()
+    const queue = new OrderQueue(undefined, terrain)
+    const ally = { userId: 8, account: { name: 'Tom', isAdmin: false } }
+    const answer = queue.receive(world, ally, 'q', {
+      kind: 'setGate',
+      gateId: gate.id,
+      open: false,
+    })
+    expect(answer).toMatchObject({ reason: 'not a gate of your cities' })
   })
 })
 

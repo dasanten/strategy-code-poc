@@ -240,8 +240,8 @@ The shared language of the game. Domain terms only — no implementation details
   from Strength, weapon and Combat skill; Agility dodges, armour and shields take off damage.
   Fighting teaches Combat. An armed resident who is hit fights back; an unarmed one flees home.
   A city's soldiers fight attackers in its area on their own.
-- **Walls in combat:** nobody walks through a wall. The city's own realm can stand on its walls
-  and defends far better there. A **gate** lets the city's realm through always, everyone else
+- **Walls in combat:** nobody walks through a wall. The city's own realm and its allies can stand on its walls
+  and defend far better there. A **gate** lets the city's realm and its allies through always, everyone else
   only while it is open; the city's realm opens and closes it. A wall or gate can be **broken**
   (attacked until it falls, leaving part of its materials) or **climbed** (slow, and a climber
   can't defend themselves, so a defended wall is costly to climb).

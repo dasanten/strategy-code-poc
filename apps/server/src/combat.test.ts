@@ -281,3 +281,54 @@ describe('combat invariants', () => {
     expect(broken(attackOrdersSound, world).map((v) => v.entityIds)).toEqual([['a1'], ['b1']])
   })
 })
+
+describe('allies in combat', () => {
+  /** The setup world with r1 and r2 in one alliance, both residents armed and next to each other. */
+  function allied() {
+    const s = setup()
+    s.world.alliances.push({
+      id: 'alliance-1',
+      name: 'North',
+      leaderId: 'r1',
+      members: ['r1', 'r2'].map((realmId) => ({ realmId, joinedAt: 0, leaving: null })),
+      invites: [],
+    })
+    s.a.carried = { spear: 1 }
+    s.b.carried = { spear: 1 }
+    return s
+  }
+
+  it('armed allies side by side leave each other alone', () => {
+    const { world, a, b } = allied()
+    expect(untilHit(world, 'a1', STRIKE_TICKS * 3)).toBeUndefined()
+    expect([a.order, b.order]).toEqual([null, null])
+    expect(world.crimes).toEqual([])
+  })
+
+  it('a direct order attacks an ally, and that is a crime; their fighting back is not', () => {
+    const { world, queue, b } = allied()
+    expect(order(world, queue, 'a1', 'b1')).toBe('ack')
+    expect(untilHit(world, 'b1')).toBeDefined()
+    expect(world.crimes).toMatchObject([
+      { kind: 'attack', victimOrg: 'r2', culprit: { residentId: 'a1', org: 'r1' } },
+    ])
+    expect(b.order).toMatchObject({ kind: 'attack', targetId: 'a1', defending: true })
+    expect(untilHit(world, 'a1')).toBeDefined()
+    expect(world.crimes.map((c) => c.culprit.residentId)).toEqual(['a1'])
+  })
+
+  it('an army ordered to attack an ally does, and that is a crime', () => {
+    const { world, queue } = allied()
+    const send = (o: Record<string, unknown>) => {
+      const answer = queue.receive(world, me, 'q', o as { kind: string })
+      queue.applyAll(world)
+      return answer.type
+    }
+    expect(send({ kind: 'formArmy', name: 'Foot', residentIds: ['a1'] })).toBe('ack')
+    const armyId = world.armies[0]!.id
+    expect(send({ kind: 'armyAttack', armyId, targetId: 'b1' })).toBe('ack')
+    run(world)
+    expect(untilHit(world, 'b1')).toBeDefined()
+    expect(world.crimes).toMatchObject([{ kind: 'attack', culprit: { residentId: 'a1' } }])
+  })
+})
