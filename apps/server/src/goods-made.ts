@@ -2,13 +2,13 @@ import type { Good, Stock, WorldState } from '@csp/shared'
 
 /**
  * Goods that came into the world during the current tick, by the rules that may bring them in:
- * work at a workplace, a building torn down giving back its materials, and the Trade Org's stock
+ * work at a workplace, a building torn down or broken giving back some of its materials, and the Trade Org's stock
  * floor (ADR 0003). Kept beside the world, not in it: it is only for checking that goods appear
  * nowhere else (`goodsOnlyFromNothingAtTheFloor`).
  */
 const made = new WeakMap<WorldState, Stock>()
 
-/** Notes goods that came into the world by work, a teardown or the stock floor. */
+/** Notes goods that came into the world by work, a teardown, a broken building or the stock floor. */
 export function noteMade(world: WorldState, goods: Stock): void {
   const tally = made.get(world) ?? {}
   for (const [good, n] of Object.entries(goods) as [Good, number][]) {

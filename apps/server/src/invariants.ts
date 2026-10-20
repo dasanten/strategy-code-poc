@@ -1336,7 +1336,7 @@ export function shouldCheckInvariants(sampleRate: number, rand: () => number = M
 /**
  * Goods appear from nothing only at the stock floor (`CONTEXT.md`: Stock floor, ADR 0003):
  * across one tick, no good grows in the world by more than work at workplaces, buildings torn
- * down and the Trade Org's floor brought in (`noteMade`). Goods may go: eaten, spoiled, used up.
+ * down or broken and the Trade Org's floor brought in (`noteMade`). Goods may go: eaten, spoiled, used up.
  * Checked across a tick, from the goods the world held (`tallyGoods`) before it.
  */
 export function goodsOnlyFromNothingAtTheFloor(
