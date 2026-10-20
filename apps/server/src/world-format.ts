@@ -16,6 +16,7 @@ import { placeNpcCities } from './npc-cities.js'
 import { nearestCity, walkHomeIfAway } from './survival.js'
 import { placeTradeOrgHq } from './trade-org.js'
 import { placeTradingPosts } from './trading-posts.js'
+import { placeCaravans } from './caravans.js'
 import { drawLifespan, hash, mulberry32 } from './residents.js'
 import { plainsOutside, ringTiles } from './starting-city.js'
 
@@ -40,7 +41,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 24
+export const WORLD_FORMAT_VERSION = 25
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -303,6 +304,13 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Mercenary contracts came (`CONTEXT.md`: Mercenary contract); there are none yet.
   23: (state) => ({ ...(state as object), contracts: [] }),
+  // Caravans came (`CONTEXT.md`: Caravan): the HQ gets one for every trading post, as a new
+  // world would, with a carriage, a horse and a crew of new residents at its goods warehouse.
+  24: (state) => {
+    const world = { ...structuredClone(state as WorldState), caravans: [] }
+    placeCaravans(world)
+    return world
+  },
 }
 
 export class WorldFormatError extends Error {}

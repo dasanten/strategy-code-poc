@@ -6,6 +6,7 @@ import {
   sharingSight,
   wrapDistance,
   type Army,
+  type Caravan,
   type SeenEntity,
   type TerrainMap,
   type WorldState,
@@ -96,7 +97,27 @@ export function entitiesInSight(
       })
     }
   }
+  // A caravan is seen through its carriage and its crew (`CONTEXT.md`: Caravan).
+  for (const c of world.caravans) {
+    if (caravanSeen(world, c, (at) => seen(size, observers, at))) {
+      const { id, postId, carriageId, driverId, escortIds, heading } = c
+      out.push({ is: 'caravan', id, postId, carriageId, driverId, escortIds, heading })
+    }
+  }
   return out
+}
+
+/** Whether a caravan's carriage or any of its crew is in sight. */
+function caravanSeen(
+  world: WorldState,
+  caravan: Pick<Caravan, 'carriageId' | 'driverId' | 'escortIds'>,
+  inSight: (at: Spot) => boolean,
+): boolean {
+  const crew = [caravan.driverId, ...caravan.escortIds]
+  return (
+    world.carriages.some((k) => k.id === caravan.carriageId && inSight(k)) ||
+    world.residents.some((r) => crew.includes(r.id) && inSight(r))
+  )
 }
 
 /**
@@ -117,7 +138,9 @@ export function sentOutOfSight(
       ? !world.buildings.some((b) => b.cityId === e.id && inSight(b))
       : e.is === 'army'
         ? !armySeen(world, e, inSight)
-        : !inSight(e),
+        : e.is === 'caravan'
+          ? !caravanSeen(world, e, inSight)
+          : !inSight(e),
   )
   return out.map((e) => ({
     invariant: 'sent-only-in-sight',

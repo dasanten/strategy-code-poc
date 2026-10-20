@@ -119,7 +119,11 @@ The shared language of the game. Domain terms only — no implementation details
   trading with each other.
 - **Caravan:** Trade Org carriages, driven by its own residents and always escorted by its
   soldiers. A route that is attacked more often gets more escorts. Caravans also carry the Trade
-  Organization's own stock between its warehouses.
+  Organization's own stock between its warehouses: each trading post has one caravan on a fixed
+  route to the HQ, which at each end tops up the Food on board at the storage, unloads at the
+  warehouse and loads what evens out the two warehouses' stock (half the difference of each good,
+  not Food or coins). The escort walks along with the carriage, which waits for it; the crew
+  refill from the carriage like an army.
 - **Delivery:** a caravan brings goods bought from the Trade Organization to the storage of a
   city the buyer names, or picks up goods sold to it from the seller's city, for a fee. Anyone
   can instead carry the goods to or from the warehouse themselves, for free and at their own
