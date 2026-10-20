@@ -196,6 +196,11 @@ export interface DriveOrder {
   /** The tiles still to drive, in order; null while the path is being found. */
   path: [number, number][] | null
   progress: number
+  /**
+   * The army the carriage follows as its supply wagon (`CONTEXT.md`: Supply line): `target` is
+   * then where the army was last seen, and the order lasts as long as the army does.
+   */
+  army?: string
 }
 
 /**
@@ -212,6 +217,12 @@ export interface HaulOrder {
   from: { x: number; y: number }
   /** Where they are unloaded. */
   to: { x: number; y: number }
+  /**
+   * The army that is the second stop (`CONTEXT.md`: Supply line): `to` is then where the army was
+   * last seen. There the carriage stays with the army, its members refilling from it, until the
+   * hauled goods are gone, and then goes back for more. Nothing comes back.
+   */
+  toArmy?: string
   /** The goods hauled from `from` to `to`; at least one. */
   goods: Good[]
   /** The goods hauled back from `to` to `from`; none of `goods`, and maybe none at all. */

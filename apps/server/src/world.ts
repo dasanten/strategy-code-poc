@@ -114,7 +114,7 @@ export interface StepResult {
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
- * home or at their workplace who run low on food take meals there; cities with a captor change
+ * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
  * realm (`stepCaptures`); witnesses who got home make crimes known (`stepCrimes`); last, armies
  * lose members who are gone and give the rest their orders for the next tick. Without `walking`
  * nobody moves.
@@ -130,7 +130,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const combat = resolveStrikes(world, strikes, terrain.size)
   const carries = [
     ...requestCarrying(world),
-    ...requestHauling(world),
+    ...requestHauling(world, terrain.size),
     ...requestRoadMaterials(world),
   ]
   resolveCarrying(world, carries, terrain.size)
