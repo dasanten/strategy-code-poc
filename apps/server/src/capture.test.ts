@@ -273,6 +273,7 @@ describe('capturing a city', () => {
         { realmId: 'r2', joinedAt: 0, leaving: null },
       ],
       invites: [],
+      army: [],
     })
     world.realms.push({ id: 'r3', userId: 9, leaderId: 'c1' })
     resident(world, 'c1', 'r3', 5, 5)

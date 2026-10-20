@@ -388,6 +388,11 @@ describe('world saves', () => {
     expect(migrateWorld(v15, 15, { terrain }, migrations, 16)).toEqual({ ...v15, alliances: [] })
   })
 
+  it('gives the world no mercenary contracts (migration 23 → 24)', () => {
+    const v23 = { tick: 10, seed: 1, residents: [], realms: [], armies: [], crimes: [] }
+    expect(migrateWorld(v23, 23, { terrain }, migrations, 24)).toEqual({ ...v23, contracts: [] })
+  })
+
   it('gives the world no armies (migration 18 → 19)', () => {
     const v18 = { tick: 10, seed: 1, residents: [], realms: [], alliances: [], crimes: [] }
     expect(migrateWorld(v18, 18, { terrain }, migrations, 19)).toEqual({ ...v18, armies: [] })
@@ -532,6 +537,15 @@ describe('world saves', () => {
     // The same save always migrates the same way, and a region with a post gets no other.
     expect(migrateWorld(structuredClone(world), 21, { terrain: land }, migrations, 22)).toEqual(v22)
     expect(migrateWorld(structuredClone(v22), 21, { terrain: land }, migrations, 22)).toEqual(v22)
+  })
+
+  it('gives every alliance an empty army (migration 22 → 23)', () => {
+    const v22 = {
+      tick: 5,
+      alliances: [{ id: 'alliance1', name: 'North', leaderId: 'realm1', members: [], invites: [] }],
+    }
+    const v23 = migrateWorld(structuredClone(v22), 22, { terrain: smallTerrain() }, migrations, 23)
+    expect(v23).toEqual({ tick: 5, alliances: [{ ...v22.alliances[0], army: [] }] })
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

@@ -207,6 +207,8 @@ function residentActions(
     workAt: ([makes]) => request('workAt', makes == null ? {} : { makes: plain(makes) }),
     pair: ([partnerId]) => request('pair', { partnerId: plain(partnerId) }),
     attack: ([targetId]) => request('attack', { targetId: plain(targetId) }),
+    pay: ([contractId, weeks]) =>
+      request('pay', { contractId: plain(contractId), weeks: plain(weeks) }),
     roadLine: ([x, y]) =>
       request('roadLine', {
         from: { x: resident.x, y: resident.y },

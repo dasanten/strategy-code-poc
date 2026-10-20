@@ -183,6 +183,7 @@ describe('allies at walls and gates', () => {
       leaderId: 'r1',
       members: ['r1', 'r2'].map((realmId) => ({ realmId, joinedAt: 0, leaving: null })),
       invites: [],
+      army: [],
     })
     return s
   }

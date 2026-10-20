@@ -1,5 +1,7 @@
 import {
   carriageCanEnter,
+  commands,
+  commandsCarriage,
   driveProblem,
   terrainAt,
   type Army,
@@ -47,9 +49,9 @@ export const drive: OrderKind = {
     const o = order as Partial<DriveRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     const carriage = world.carriages.find((k) => k.id === o.carriageId)
-    if (!carriage || carriage.realmId !== realm.id) return 'not one of your carriages'
+    if (!commandsCarriage(world, realm.id, carriage)) return 'not one of your carriages'
     if (o.armyId !== undefined) {
       const army = armyToSupply(world, realm.id, o.armyId)
       if (typeof army === 'string') return army

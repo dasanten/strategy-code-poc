@@ -7,6 +7,8 @@ import {
   type ScriptObject,
 } from '@csp/lang'
 import {
+  commanderOf,
+  commands,
   SCRIPT_LOG_INTERVAL,
   SCRIPT_MAX_CALL_DEPTH,
   SCRIPT_MEMORY_MAX,
@@ -87,7 +89,7 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
       const o = order as Partial<RunScriptRequest>
       const realm = realmOf(world, sender.userId)
       const r = world.residents.find((x) => x.id === o.residentId)
-      if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+      if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
       return badScript(host, sender, o.scriptId)
     },
     apply(world, _sender, order) {
@@ -159,11 +161,13 @@ export class ScriptRunner {
       byRealm.set(realmId, [...(byRealm.get(realmId) ?? []), runner])
     for (const r of world.residents) {
       if (!r.script) continue
-      // A resident of no realm has no Player to run a script for.
-      if (r.owner === null) delete r.script
+      // A script runs for the realm the resident takes orders from (`CONTEXT.md`: Alliance army);
+      // a resident of no realm has no Player to run a script for.
+      const realmId = commanderOf(world, r)
+      if (realmId === null) delete r.script
       else {
         const by = { residentId: r.id }
-        add(r.owner, { holder: r, id: r.id, name: r.name, by, bind: by })
+        add(realmId, { holder: r, id: r.id, name: r.name, by, bind: by })
       }
     }
     for (const a of world.armies) {

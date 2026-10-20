@@ -40,6 +40,7 @@ function setup(): WorldState {
       { realmId: 'r2', joinedAt: 0, leavesAt: null },
     ],
     invites: [],
+    army: [],
   })
   addCity(world, { id: 'c3', realmId: null, x: 40, y: 40, name: 'Oakmoor' })
   return world

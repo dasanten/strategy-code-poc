@@ -169,6 +169,7 @@ function orderDoing(r: Resident): string {
   if (o?.kind === 'workAt')
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
   if (o?.kind === 'pair') return 'Paired'
+  if (o?.kind === 'pay') return 'Paying for mercenaries'
   if (o?.kind === 'attack') return o.path ? 'Going after their target' : 'Fighting'
   if (o?.kind === 'roadLine') {
     const [x, y] = o.tiles[0]!

@@ -1,5 +1,6 @@
 import {
   ALLIANCE_LEAVE_DELAY,
+  ALLIANCE_RECALL_DELAY,
   ALLIANCE_NAME_MAX_LENGTH,
   BUILDABLE,
   BUILD_MATERIALS,
@@ -58,6 +59,7 @@ import {
 import { refillSource } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
+import { contractsSound } from './contracts.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 
 /**
@@ -1029,7 +1031,9 @@ export const attackOrdersSound: Invariant = {
  * Alliances hold together (`CONTEXT.md`: Alliance, Alliance leader): each has a name and at
  * least one member, in the order they joined; its members and invited realms exist; a realm is in
  * at most one alliance, and only a realm in none is invited; the alliance leader is a member; a
- * member leaving goes within the leave delay.
+ * member leaving goes within the leave delay; each soldier and carriage of its army (`CONTEXT.md`:
+ * Alliance army) exists, belongs to a member, is in no other alliance army and, when recalled,
+ * comes back within the recall delay.
  */
 export const alliancesSound: Invariant = {
   name: 'alliances-sound',
@@ -1038,6 +1042,10 @@ export const alliancesSound: Invariant = {
     const memberOf = new Map<string, string>()
     for (const a of world.alliances) {
       for (const m of a.members) memberOf.set(m.realmId, memberOf.has(m.realmId) ? '' : a.id)
+    }
+    const handedOver = new Map<string, string>()
+    for (const a of world.alliances) {
+      for (const p of a.army) handedOver.set(p.id, handedOver.has(p.id) ? '' : a.id)
     }
     return world.alliances.flatMap((a) => {
       const problems: string[] = []
@@ -1063,6 +1071,22 @@ export const alliancesSound: Invariant = {
       for (const id of a.invites) {
         if (!realms.has(id)) problems.push(`invites ${id}, which has ended`)
         else if (memberOf.has(id)) problems.push(`invites ${id}, which is in an alliance`)
+      }
+      const members = new Set(a.members.map((m) => m.realmId))
+      for (const p of a.army) {
+        const owner =
+          p.is === 'resident'
+            ? world.residents.find((r) => r.id === p.id)?.owner
+            : world.carriages.find((k) => k.id === p.id)?.realmId
+        if (owner === undefined) problems.push(`has ${p.is} ${p.id} in its army, which is gone`)
+        else if (!members.has(owner ?? '')) {
+          problems.push(`has ${p.is} ${p.id} in its army, which is no member's`)
+        }
+        if (handedOver.get(p.id) !== a.id) problems.push(`shares ${p.is} ${p.id} in its army`)
+        const at = p.recallAt
+        if (at !== null && (at <= world.tick || at > world.tick + ALLIANCE_RECALL_DELAY)) {
+          problems.push(`has ${p.is} ${p.id} in its army recalled at tick ${at}`)
+        }
       }
       return problems.map((p) => ({
         invariant: this.name,
@@ -1235,6 +1259,7 @@ export const worldInvariants: Invariant[] = [
   deadLeaveLoot,
   attackOrdersSound,
   armiesSound,
+  contractsSound,
   supplyLinesSound,
   crimesSound,
   gatesSound,
