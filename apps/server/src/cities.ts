@@ -66,8 +66,8 @@ export function foundCity(world: WorldState, hall: Building, realmId: string | n
 
 /**
  * Dissolves a city whose town hall is gone (`CONTEXT.md`: Town hall): its buildings and residents
- * stay where they are, and its residents are homeless. Pairs among them end, since a pair needs a
- * city to live in.
+ * stay where they are, and its residents are homeless; horses and carriages of an NPC city belong
+ * to nobody. Pairs among them end, since a pair needs a city to live in.
  */
 export function dissolveCity(world: WorldState, city: City): void {
   world.cities = world.cities.filter((c) => c !== city)
@@ -75,5 +75,8 @@ export function dissolveCity(world: WorldState, city: City): void {
     if (r.cityId !== city.id) continue
     r.cityId = null
     if (r.order?.kind === 'pair') r.order = null
+  }
+  for (const k of [...world.horses, ...world.carriages]) {
+    if (k.cityId === city.id) k.cityId = null
   }
 }

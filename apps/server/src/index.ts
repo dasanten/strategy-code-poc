@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { TICK_MS } from '@csp/shared'
 import { deleteExpiredSessions } from './auth.js'
 import { buildApp } from './app.js'
@@ -11,14 +12,15 @@ import {
   setupFastifyErrorHandler,
   tagWorld,
 } from './monitoring.js'
-import { openDb } from './db/index.js'
+import { openDb, schema } from './db/index.js'
 import { OrderQueue, orderKinds } from './orders.js'
 import { ExploredTerrain } from './explored.js'
 import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
 import { Walking } from './walking.js'
 import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
-import { checkScriptLibrary } from './scripts.js'
+import { ScriptRunner, runScriptOrder, type ScriptHost } from './script-runner.js'
+import { checkScriptLibrary, runnableScript } from './scripts.js'
 import { generateTerrain } from './terrain-gen.js'
 import { TerritoryTracker } from './territory.js'
 import { runTick } from './tick.js'
@@ -51,7 +53,20 @@ const app = await buildApp({
 })
 if (sentryOn) setupFastifyErrorHandler(app)
 
-const orders = new OrderQueue(orderKinds, terrain)
+const scriptHost: ScriptHost = {
+  script: (id) => runnableScript(db, id),
+  sender: (userId) => {
+    const user = db
+      .select({ name: schema.users.name, isAdmin: schema.users.isAdmin })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .get()
+    return user && { userId, account: user }
+  },
+  explored: (userId, x, y) => explored.isExplored({ id: userId }, x, y),
+}
+const orders = new OrderQueue({ ...orderKinds, runScript: runScriptOrder(scriptHost) }, terrain)
+const scripts = new ScriptRunner(terrain, scriptHost)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
 const territory = new TerritoryTracker()
@@ -73,6 +88,7 @@ const loop = setInterval(() => {
   runTick(world, terrain, {
     reporter,
     orders,
+    scripts,
     walking,
     invariantSampleRate: config.invariantSampleRate,
     slowTickMs: config.slowTickMs,

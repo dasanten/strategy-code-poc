@@ -211,6 +211,28 @@ export function deleteScript(db: Db, userId: number, id: number): void {
   })
 }
 
+/** What the run-script order needs of a script: whose it is and its active version's source. */
+export interface RunnableScript {
+  userId: number
+  source: string
+}
+
+/** A script that can run: its Player and active version; undefined if it has none (or is gone). */
+export function runnableScript(db: Db, scriptId: number): RunnableScript | undefined {
+  return db
+    .select({ userId: scripts.userId, source: scriptVersions.source })
+    .from(scripts)
+    .innerJoin(
+      scriptVersions,
+      and(
+        eq(scriptVersions.scriptId, scripts.id),
+        eq(scriptVersions.version, scripts.activeVersion),
+      ),
+    )
+    .where(eq(scripts.id, scriptId))
+    .get()
+}
+
 /** The source of the script's active version, or undefined if it has none (or is gone). */
 export function activeSource(db: Db, scriptId: number): string | undefined {
   return db

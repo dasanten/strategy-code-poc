@@ -6,6 +6,8 @@ import {
   dodgeChance,
   inContact,
   isArmed,
+  onOwnWall,
+  WALL_DEFENCE,
   wrapDistance,
   type AttackOrder,
   type OrderRequest,
@@ -13,6 +15,7 @@ import {
   type Resident,
   type WorldState,
 } from '@csp/shared'
+import { commitCrime, organizationOf } from './crimes.js'
 import { recordEvent } from './events.js'
 import type { OrderKind } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
@@ -36,9 +39,26 @@ interface AttackRequest extends OrderRequest {
   targetId: string
 }
 
-/** A fresh attack order on `targetId`; `started` when the fight is already in the realm logs. */
-export function attackOrder(targetId: string, started = false): AttackOrder {
-  return { kind: 'attack', targetId, path: null, progress: 0, strike: 0, started }
+/**
+ * A fresh attack order on `targetId`; `started` when the fight is already in the realm logs,
+ * `defending` when it is fighting back at someone who hit the resident.
+ */
+export function attackOrder(targetId: string, started = false, defending = false): AttackOrder {
+  const o: AttackOrder = { kind: 'attack', targetId, path: null, progress: 0, strike: 0, started }
+  if (defending) o.defending = true
+  return o
+}
+
+/**
+ * Whether `a` striking `t` is a crime (`CONTEXT.md`: Crime): not when `a` fights back at someone
+ * who hit them, nor when `t` is attacking someone of `a`'s Organization on their own account.
+ */
+function isAggression(world: WorldState, a: Resident, t: Resident): boolean {
+  if (a.order?.kind === 'attack' && a.order.defending) return false
+  const o = t.order
+  if (o?.kind !== 'attack' || o.defending) return true
+  const theirTarget = world.residents.find((x) => x.id === o.targetId)
+  return !theirTarget || organizationOf(theirTarget) !== organizationOf(a)
 }
 
 /**
@@ -110,7 +130,8 @@ export interface CombatResult {
  * Resolves blows (ADR 0002), one after another (`CONTEXT.md`: Combat), on a map of `size` tiles.
  * A blow is struck only by a living attacker still attacking a living target in contact. The
  * first blow of a fight goes in both realms' logs. Both learn Combat from it; the target dodges
- * it by Agility, or it lands and takes its `blowDamage` off their health. A target left with no
+ * it by Agility, or it lands and takes its `blowDamage` off their health, only `WALL_DEFENCE` of it
+ * for a target on their own city's wall (`CONTEXT.md`: Walls in combat). A target left with no
  * health is killed and drops what they carried (`CONTEXT.md`: Loot); otherwise one who is armed
  * fights back, unless already attacking someone, and one who is not flees home.
  */
@@ -148,20 +169,27 @@ export function resolveStrikes(
         other: a.name,
         attacker: false,
       })
+      if (isAggression(world, a, t)) {
+        commitCrime(world, size, 'attack', a, { victimOrg: organizationOf(t), victim: t })
+      }
     }
     a.skills.combat = (a.skills.combat ?? 0) + combatLearned(a, world.tick)
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
     const roll = mulberry32(hash(`${world.seed}:${world.tick}:${a.id}:strike`))()
     if (roll < dodgeChance(t, world.tick)) continue
-    t.health = Math.max(0, t.health - blowDamage(a, t, world.tick))
+    const cover = onOwnWall(world, t) ? WALL_DEFENCE : 1
+    t.health = Math.max(0, t.health - blowDamage(a, t, world.tick) * cover)
     if (t.health <= 0) {
       died.push(t)
       killers.set(t.id, a.name)
+      if (isAggression(world, a, t)) {
+        commitCrime(world, size, 'killing', a, { victimOrg: organizationOf(t), victim: t })
+      }
       continue
     }
     react(world, t, a)
   }
-  const ended = dieAll(world, died, 'killed', killers)
+  const ended = dieAll(world, died, 'killed', size, killers)
   const gone = new Set(died.map((r) => r.id))
   for (const r of world.residents) {
     if (r.order?.kind === 'attack' && gone.has(r.order.targetId)) r.order = null
@@ -175,7 +203,7 @@ export function resolveStrikes(
  */
 function react(world: WorldState, t: Resident, a: Resident): void {
   if (isArmed(t)) {
-    if (t.order?.kind !== 'attack') t.order = attackOrder(a.id, true)
+    if (t.order?.kind !== 'attack') t.order = attackOrder(a.id, true, true)
     return
   }
   const city = world.cities.find((c) => c.id === t.cityId)

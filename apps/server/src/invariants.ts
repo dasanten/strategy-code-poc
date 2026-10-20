@@ -5,6 +5,8 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   CARRIAGE_CAPACITY,
+  CRIME_MEMORY_DAYS,
+  TICKS_PER_GAME_DAY,
   carriageCanEnter,
   drivenCarriageId,
   GOOD_WEIGHT,
@@ -55,6 +57,7 @@ import {
 import { refillStock } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
+import { armiesSound } from './armies.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -789,6 +792,40 @@ export const npcCityResidentsUnowned: Invariant = {
 }
 
 /**
+ * Everything belongs to a realm that exists, an NPC city that exists, or nobody (`CONTEXT.md`:
+ * Leader death, Self-managed city): once a Leader has died, nothing belongs to their ended realm.
+ * A horse or carriage of an NPC city belongs to no realm.
+ */
+export const ownersExist: Invariant = {
+  name: 'owners-exist',
+  check(world) {
+    const realms = new Set(world.realms.map((r) => r.id))
+    const npc = new Set(world.cities.filter((c) => c.realmId === null).map((c) => c.id))
+    const out: InvariantViolation[] = []
+    const problem = (id: string, message: string) =>
+      out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
+    for (const r of world.residents) {
+      if (r.owner !== null && !realms.has(r.owner))
+        problem(r.id, `belongs to ended realm ${r.owner}`)
+    }
+    for (const c of world.cities) {
+      if (c.realmId !== null && !realms.has(c.realmId)) {
+        problem(c.id, `belongs to ended realm ${c.realmId}`)
+      }
+    }
+    for (const k of [...world.horses, ...world.carriages]) {
+      if (k.realmId !== null && !realms.has(k.realmId)) {
+        problem(k.id, `belongs to ended realm ${k.realmId}`)
+      }
+      if (k.cityId !== null && (k.realmId !== null || !npc.has(k.cityId))) {
+        problem(k.id, `belongs to ${k.cityId}, which is no NPC city it can belong to`)
+      }
+    }
+    return out
+  },
+}
+
+/**
  * A realm's city's residents belong to that realm (`CONTEXT.md`: Capturing a city): a city
  * changes realm together with everyone who lives there.
  */
@@ -1000,6 +1037,58 @@ export const alliancesSound: Invariant = {
 }
 
 /**
+ * Crimes hold together (`CONTEXT.md`: Crime, Witness): each is against another Organization than
+ * the culprit's and happened no later than now; its witnesses are living residents, each listed
+ * once, none of the culprit's Organization; it is known to each Organization at most once; and
+ * it is kept only while someone carries news of it or an Organization remembers it.
+ */
+export const crimesSound: Invariant = {
+  name: 'crimes-sound',
+  check(world) {
+    const alive = new Map(world.residents.map((r) => [r.id, r]))
+    const memory = CRIME_MEMORY_DAYS * TICKS_PER_GAME_DAY
+    return (world.crimes ?? []).flatMap((c) => {
+      const problems: string[] = []
+      if (c.culprit.org === c.victimOrg) problems.push('is against its culprit’s own Organization')
+      if (c.tick > world.tick) problems.push(`happens later, at tick ${c.tick}`)
+      if (new Set(c.witnesses).size !== c.witnesses.length) problems.push('lists a witness twice')
+      for (const id of c.witnesses) {
+        const w = alive.get(id)
+        if (!w) problems.push(`has witness ${id}, who is gone`)
+        else if ((w.owner ?? w.cityId) === c.culprit.org) {
+          problems.push(`has witness ${id} of the culprit’s Organization`)
+        }
+      }
+      if (new Set(c.knownBy).size !== c.knownBy.length) problems.push('is known twice to one')
+      const remembered = c.knownBy.length > 0 && world.tick - c.tick <= memory
+      if (c.witnesses.length === 0 && !remembered) problems.push('is kept though forgotten')
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `crime ${c.id} ${p}`,
+        entityIds: [c.id],
+      }))
+    })
+  },
+}
+
+/**
+ * Only gates close (`CONTEXT.md`: Walls in combat): a building marked closed is a finished gate,
+ * and a gate is either closed or open, nothing else.
+ */
+export const gatesSound: Invariant = {
+  name: 'gates-sound',
+  check(world) {
+    return world.buildings
+      .filter((b) => b.closed !== undefined && (b.kind !== 'gate' || b.site || b.closed !== true))
+      .map((b) => ({
+        invariant: this.name,
+        message: `${b.site ? 'site of a ' : ''}${b.kind} ${b.id} is marked closed: ${String(b.closed)}`,
+        entityIds: [b.id],
+      }))
+  },
+}
+
+/**
  * Road orders along a line are sound (`CONTEXT.md`: Road): they have tiles left, at most
  * `ROAD_LINE_MAX_TILES`, each next to the one before; and after a tick one building on a site
  * stands on that road site, on the order's first tile (`resolveBuilding` moves the order on from
@@ -1094,6 +1183,7 @@ export const worldInvariants: Invariant[] = [
   realmLogsInOrder,
   residentsInCities,
   npcCityResidentsUnowned,
+  ownersExist,
   cityResidentsInItsRealm,
   takenCitiesCaptured,
   npcOrdersAllowed,
@@ -1106,6 +1196,9 @@ export const worldInvariants: Invariant[] = [
   territorySound,
   deadLeaveLoot,
   attackOrdersSound,
+  armiesSound,
+  crimesSound,
+  gatesSound,
   tradeOrgSound,
   roadLineOrdersSound,
 ]

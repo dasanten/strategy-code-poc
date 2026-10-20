@@ -25,8 +25,20 @@ interface Opened {
  * The Player's script library (`CONTEXT.md`: Script): write and check scripts, save them as new
  * versions, browse a script's history and make an earlier version active again.
  */
-export function ScriptLibrary() {
-  const [scripts, setScripts] = useState<ScriptSummary[]>([])
+export function ScriptLibrary({
+  onScripts,
+}: {
+  /** Hears the list each time it is loaded, so residents can be given a script to run. */
+  onScripts?: (scripts: ScriptSummary[]) => void
+} = {}) {
+  const [scripts, setListed] = useState<ScriptSummary[]>([])
+  const setScripts = useCallback(
+    (list: ScriptSummary[]) => {
+      setListed(list)
+      onScripts?.(list)
+    },
+    [onScripts],
+  )
   const [script, setScript] = useState<ScriptDetail>()
   const [opened, setOpened] = useState<Opened>({ key: 'new', source: STARTER })
   const [draft, setDraft] = useState(STARTER)
@@ -36,22 +48,25 @@ export function ScriptLibrary() {
   const [error, setError] = useState<string>()
 
   /** Runs a library call, showing its error, and refreshes the list afterwards. */
-  const act = useCallback(async <T,>(call: () => Promise<T>): Promise<T | undefined> => {
-    setError(undefined)
-    setMessage(undefined)
-    try {
-      return await call()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      return undefined
-    } finally {
-      api.scripts().then(setScripts, () => {})
-    }
-  }, [])
+  const act = useCallback(
+    async <T,>(call: () => Promise<T>): Promise<T | undefined> => {
+      setError(undefined)
+      setMessage(undefined)
+      try {
+        return await call()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        return undefined
+      } finally {
+        api.scripts().then(setScripts, () => {})
+      }
+    },
+    [setScripts],
+  )
 
   useEffect(() => {
     api.scripts().then(setScripts, (e: Error) => setError(e.message))
-  }, [])
+  }, [setScripts])
 
   function show(detail: ScriptDetail, version = detail.versions.at(-1)) {
     setScript(detail)

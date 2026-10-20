@@ -13,7 +13,7 @@ export interface CityView {
 }
 
 /** Building names as the city inspector shows them. */
-const BUILDING_NAMES: Record<BuildingKind, string> = {
+export const BUILDING_NAMES: Record<BuildingKind, string> = {
   townHall: 'town hall',
   house: 'house',
   storage: 'storage',

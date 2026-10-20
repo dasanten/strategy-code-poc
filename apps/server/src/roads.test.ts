@@ -222,12 +222,21 @@ describe('moving on a road', () => {
       world.horses.push({
         id: 'h1',
         realmId: 'r1',
+        cityId: null,
         x: 2,
         y: 2,
         hunger: MAX_HUNGER,
         health: MAX_HEALTH,
       })
-      world.carriages.push({ id: 'k1', realmId: 'r1', x: 2, y: 2, horseId: null, load: {} })
+      world.carriages.push({
+        id: 'k1',
+        realmId: 'r1',
+        cityId: null,
+        x: 2,
+        y: 2,
+        horseId: null,
+        load: {},
+      })
       if (withRoad) for (let x = 3; x <= 6; x++) road(world, x, 2)
       r.order = {
         kind: 'drive',

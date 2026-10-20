@@ -1,4 +1,5 @@
 import { REALM_LOG_LENGTH, type RealmEvent } from '@csp/shared'
+import { BUILDING_NAMES } from './city-view.js'
 
 /** How bad an event is, for its colour in the log. */
 export type EventTone = 'bad' | 'warn' | 'info'
@@ -26,6 +27,23 @@ export function describeEvent(e: RealmEvent, realmId?: string): { text: string; 
       return e.attacker
         ? { text: `${e.name} attacked ${e.other}.`, tone: 'info' }
         : { text: `${e.name} was attacked by ${e.other}.`, tone: 'warn' }
+    case 'crimeKnown': {
+      const goods = Object.entries(e.goods ?? {})
+        .map(
+          ([g, n]) => `${n} ${g[0]!.toUpperCase()}${g.slice(1).replace(/[A-Z]/g, (c) => ` ${c}`)}`,
+        )
+        .join(', ')
+      const did = {
+        theft: `stole ${goods || 'goods'}`,
+        attack: `attacked ${e.victim ?? 'one of your residents'}`,
+        killing: `killed ${e.victim ?? 'one of your residents'}`,
+        tearDown: `tore down your ${e.building ? BUILDING_NAMES[e.building] : 'building'}`,
+      }[e.crime]
+      return {
+        text: `A witness got home: ${e.culprit} of ${e.culpritOrg} ${did} at (${e.x}, ${e.y}).`,
+        tone: 'bad',
+      }
+    }
     case 'fled':
       return { text: `${e.name} was hit and flees home.`, tone: 'warn' }
     case 'cityCaptured': {
@@ -69,6 +87,19 @@ export function describeEvent(e: RealmEvent, realmId?: string): { text: string; 
       const who = e.realmId === realmId ? 'You are' : `The realm of ${e.realm} is`
       return { text: `${who} now the leader of the alliance ${e.name}.`, tone: 'info' }
     }
+    case 'scriptError': {
+      const at = e.line === undefined ? '' : ` (line ${e.line}, column ${e.column})`
+      return { text: `${e.name}’s script stopped with an error${at}: ${e.message}`, tone: 'warn' }
+    }
+    case 'scriptOutOfSteps':
+      return e.realm
+        ? {
+            text: `${e.name}’s script was cut short: your realm’s scripts used up their steps.`,
+            tone: 'warn',
+          }
+        : { text: `${e.name}’s script ran out of steps this tick.`, tone: 'warn' }
+    case 'scriptEnded':
+      return { text: `${e.name} stopped running a script: it was deleted.`, tone: 'info' }
   }
 }
 

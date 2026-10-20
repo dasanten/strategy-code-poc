@@ -23,7 +23,7 @@ export function carriagePulledBy(world: WorldState, horse: Horse): Carriage | un
 
 /**
  * The horse that pulls a carriage once it is driven (`CONTEXT.md`: Carriage): the one hitched to
- * it, or else a horse of the carriage's realm on its tile that pulls no other carriage, which is
+ * it, or else a horse of the carriage's realm (or NPC city) on its tile that pulls no other carriage, which is
  * hitched when the carriage first moves. Undefined when there is none.
  */
 export function horseFor(world: WorldState, carriage: Carriage): Horse | undefined {
@@ -33,6 +33,7 @@ export function horseFor(world: WorldState, carriage: Carriage): Horse | undefin
       h.x === carriage.x &&
       h.y === carriage.y &&
       h.realmId === carriage.realmId &&
+      h.cityId === carriage.cityId &&
       !carriagePulledBy(world, h),
   )
 }

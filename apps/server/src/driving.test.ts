@@ -47,9 +47,25 @@ function setup(map: TerrainMap, x = 2, y = 2) {
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'w1' })
   const w1 = newResident(mulberry32(1), { id: 'w1', owner: 'r1', x, y, tick: 0 })
   world.residents.push(w1)
-  const horse: Horse = { id: 'h1', realmId: 'r1', x, y, hunger: MAX_HUNGER, health: MAX_HEALTH }
+  const horse: Horse = {
+    id: 'h1',
+    realmId: 'r1',
+    cityId: null,
+    x,
+    y,
+    hunger: MAX_HUNGER,
+    health: MAX_HEALTH,
+  }
   world.horses.push(horse)
-  const carriage: Carriage = { id: 'k1', realmId: 'r1', x, y, horseId: null, load: {} }
+  const carriage: Carriage = {
+    id: 'k1',
+    realmId: 'r1',
+    cityId: null,
+    x,
+    y,
+    horseId: null,
+    load: {},
+  }
   world.carriages.push(carriage)
   return { world, w1, horse, carriage }
 }

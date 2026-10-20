@@ -2,6 +2,7 @@ import {
   SIGHT_RANGE,
   sharingSight,
   wrapDistance,
+  type Army,
   type SeenEntity,
   type TerrainMap,
   type WorldState,
@@ -18,6 +19,11 @@ interface Spot {
 /** Whether any of the observers is within sight range of the spot (plus `reach`). */
 function seen(size: number, observers: Spot[], at: Spot, reach = 0): boolean {
   return observers.some((o) => wrapDistance(size, o, at) <= SIGHT_RANGE + reach)
+}
+
+/** Whether any of the army's members is in sight (`CONTEXT.md`: Sight). */
+function armySeen(world: WorldState, army: Army, inSight: (at: Spot) => boolean): boolean {
+  return world.residents.some((r) => army.memberIds.includes(r.id) && inSight(r))
 }
 
 /** The residents a realm's Player sees through: their own and their alliance's. */
@@ -41,7 +47,16 @@ export function entitiesInSight(
   if (observers.length === 0) return []
   const size = terrain.size
   const out: SeenEntity[] = []
-  for (const r of world.residents) if (seen(size, observers, r)) out.push({ is: 'resident', ...r })
+  for (const r of world.residents) {
+    if (!seen(size, observers, r)) continue
+    // Which script a resident runs is seen; its memory stays on the server.
+    const { script, ...rest } = r
+    out.push({
+      is: 'resident',
+      ...rest,
+      ...(script ? { script: { scriptId: script.scriptId } } : {}),
+    })
+  }
   const seenCities = new Set<string>()
   for (const b of world.buildings) {
     if (!seen(size, observers, b)) continue
@@ -52,6 +67,12 @@ export function entitiesInSight(
   for (const h of world.horses) if (seen(size, observers, h)) out.push({ is: 'horse', ...h })
   for (const k of world.carriages) if (seen(size, observers, k)) out.push({ is: 'carriage', ...k })
   for (const p of world.piles) if (seen(size, observers, p)) out.push({ is: 'pile', ...p })
+  // An army is seen through its members; the Player gets only their own.
+  for (const a of world.armies) {
+    if (a.realmId === realmId && armySeen(world, a, (at) => seen(size, observers, at))) {
+      out.push({ is: 'army', ...a })
+    }
+  }
   return out
 }
 
@@ -69,7 +90,11 @@ export function sentOutOfSight(
   const observers = observersOf(world, realmId)
   const inSight = (at: Spot) => seen(terrain.size, observers, at)
   const out = sent.filter((e) =>
-    e.is === 'city' ? !world.buildings.some((b) => b.cityId === e.id && inSight(b)) : !inSight(e),
+    e.is === 'city'
+      ? !world.buildings.some((b) => b.cityId === e.id && inSight(b))
+      : e.is === 'army'
+        ? !armySeen(world, e, inSight)
+        : !inSight(e),
   )
   return out.map((e) => ({
     invariant: 'sent-only-in-sight',

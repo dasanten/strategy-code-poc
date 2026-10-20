@@ -1,5 +1,6 @@
 import {
   GOODS,
+  MAP_SIZE,
   canWork,
   goodsAtSpot,
   materialsNeeded,
@@ -15,6 +16,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { buildingOrganization, carriageOrganization, commitCrime } from './crimes.js'
 import type { OrderKind, OrderSender } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { dropGoods } from './survival.js'
@@ -162,27 +164,50 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * Resolves take and put actions (ADR 0002), one after another, so two residents never take the
  * same goods. A take gets what is still at the spot on the resident's own tile, whole units that
  * fit their carry capacity; a put puts down what they still carry. A spot that is gone means
- * nothing happens. Either way the order is done.
+ * nothing happens. Either way the order is done. Taking from another Organization's storage or
+ * carriage is theft (`CONTEXT.md`: Crime), on a map of `size` tiles.
  */
-export function resolveCarrying(world: WorldState, actions: CarryAction[]): void {
+export function resolveCarrying(world: WorldState, actions: CarryAction[], size = MAP_SIZE): void {
   for (const a of actions) {
     const r = world.residents.find((x) => x.id === a.residentId)
     if (!r) continue
-    if (a.kind === 'take') take(world, r, a)
+    if (a.kind === 'take') take(world, r, a, size)
     else put(world, r, a)
     if (r.order?.kind === 'pickUp' || r.order?.kind === 'drop') r.order = null
   }
 }
 
-function take(world: WorldState, r: Resident, a: CarryAction): void {
+function take(world: WorldState, r: Resident, a: CarryAction, size: number): void {
   const source =
     a.spot.kind === 'ground' ? pileAt(world, r.x, r.y)?.goods : spotStock(world, r, a.spot)
   if (!source) return
+  const taken: Stock = {}
   for (const [good, wanted] of Object.entries(a.goods) as [Good, number][]) {
     const units = Math.min(wanted, source[good] ?? 0, unitsThatFit(r, good, world.tick))
     move(source, r.carried, good, units)
+    if (units > 0) taken[good] = units
   }
   world.piles = world.piles.filter((p) => Object.values(p.goods).some((n) => n > 0))
+  const victimOrg = spotOrganization(world, a.spot)
+  if (victimOrg !== null && Object.keys(taken).length > 0) {
+    commitCrime(world, size, 'theft', r, { victimOrg, goods: taken })
+  }
+}
+
+/**
+ * Whose goods a spot holds: a storage's city's Organization, or a carriage's. Piles on the ground
+ * and construction sites belong to nobody.
+ */
+function spotOrganization(world: WorldState, spot: GoodsSpot): string | null {
+  if (spot.kind === 'storage') {
+    const b = world.buildings.find((x) => x.id === spot.storageId)
+    return b ? buildingOrganization(world, b) : null
+  }
+  if (spot.kind === 'carriage') {
+    const k = carriageOf(world, spot)
+    return k ? carriageOrganization(k) : null
+  }
+  return null
 }
 
 function put(world: WorldState, r: Resident, a: CarryAction): void {
