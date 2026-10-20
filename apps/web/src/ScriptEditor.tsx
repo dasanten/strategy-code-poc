@@ -1,36 +1,59 @@
 import { useEffect, useRef } from 'react'
-import { EditorView, basicSetup } from 'codemirror'
+import { basicSetup } from 'codemirror'
+import { StreamLanguage } from '@codemirror/language'
+import { linter, lintGutter, type Diagnostic as LintDiagnostic } from '@codemirror/lint'
+import { EditorView } from '@codemirror/view'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { checkScript } from '@csp/lang'
+import { diagnosticRange, scriptHighlighting } from './script-editor.js'
 
-const EXAMPLE = `if (memory.role == null) { memory.role = "gatherer" }
+const language = StreamLanguage.define(scriptHighlighting)
 
-let enemy = world.nearest("enemy")
-if (enemy != null && distance(me, enemy) < 3) {
-  attack(enemy)
-} else {
-  move(towards(world.nearest("resource")))
-}
-`
+/** Marks syntax errors inline, with the same check the server runs on every saved version. */
+const syntaxErrors = linter(
+  (view): LintDiagnostic[] => {
+    const source = view.state.doc.toString()
+    return checkScript(source).map((d) => ({
+      ...diagnosticRange(source, d),
+      severity: 'error',
+      message: d.message,
+    }))
+  },
+  { delay: 300 },
+)
 
-/** Script editor. Highlighting and inline errors for our language come with packages/lang. */
-export function ScriptEditor({ onChange }: { onChange?: (source: string) => void }) {
+/**
+ * Script editor with highlighting and inline syntax errors. It starts from `initialSource`; give
+ * it a new React `key` to open other source.
+ */
+export function ScriptEditor({
+  initialSource,
+  onChange,
+}: {
+  initialSource: string
+  onChange: (source: string) => void
+}) {
   const hostRef = useRef<HTMLDivElement>(null)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
   useEffect(() => {
     const view = new EditorView({
-      doc: EXAMPLE,
+      doc: initialSource,
       parent: hostRef.current!,
       extensions: [
         basicSetup,
         oneDark,
+        language,
+        syntaxErrors,
+        lintGutter(),
         EditorView.updateListener.of((u) => {
-          if (u.docChanged) onChange?.(u.state.doc.toString())
+          if (u.docChanged) onChangeRef.current(u.state.doc.toString())
         }),
       ],
     })
-    onChange?.(EXAMPLE)
     return () => view.destroy()
-  }, [])
+  }, [initialSource])
 
   return <div ref={hostRef} className="editor" />
 }
