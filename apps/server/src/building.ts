@@ -1,4 +1,5 @@
 import {
+  commands,
   BUILDABLE,
   BUILD_WORK,
   MAP_SIZE,
@@ -48,7 +49,7 @@ export const build: OrderKind = {
     const o = order as Partial<BuildRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
-    if (!r || !realm || r.owner !== realm.id) return 'not one of your residents'
+    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t build'
     if (!BUILDABLE.includes(o.building as BuildingKind)) return 'that can’t be built'
     const here = constructionAt(world, r.x, r.y, o.building!)

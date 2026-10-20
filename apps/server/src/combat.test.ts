@@ -292,6 +292,7 @@ describe('allies in combat', () => {
       leaderId: 'r1',
       members: ['r1', 'r2'].map((realmId) => ({ realmId, joinedAt: 0, leaving: null })),
       invites: [],
+      army: [],
     })
     s.a.carried = { spear: 1 }
     s.b.carried = { spear: 1 }

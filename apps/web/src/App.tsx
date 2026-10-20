@@ -15,6 +15,7 @@ import {
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
+import { commandsSeen } from './alliance-army.js'
 import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
@@ -52,7 +53,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [orderError, setOrderError] = useState<string | undefined>()
   const [armyPick, setArmyPick] = useState<ArmyPick>()
   const [armyError, setArmyError] = useState<string | undefined>()
-  const own = world ? world.residents.filter((r) => r.owner === world.home.realmId) : []
+  // The residents the Player gives orders to: their own, less those handed over to their alliance's
+  // army, and, as its alliance leader, the ones handed over (`CONTEXT.md`: Alliance army).
+  const own = world
+    ? world.residents.filter((r) => commandsSeen(world.diplomacy, world.home.realmId, r))
+    : []
   const selected = own.find((r) => r.id === selectedId)
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The script library's list, shared with the resident inspector's run-script order.
@@ -275,6 +280,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           {world && (
             <AlliancePanel
               diplomacy={world.diplomacy}
+              residents={world.residents}
+              carriages={world.carriages}
               realmId={world.home.realmId}
               sendOrder={sendOrder}
             />
