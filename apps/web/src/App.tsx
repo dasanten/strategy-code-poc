@@ -315,6 +315,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onSetGate={async (gateId, open) =>
                 setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
               }
+              onBuyCity={async (residentId, cityId) =>
+                setOrderError(await sendOrder({ kind: 'buyCity', residentId, cityId }))
+              }
             />
           )}
           {world && (

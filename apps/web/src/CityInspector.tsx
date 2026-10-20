@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { isClosed, type Building, type City, type RealmLabel, type Resident } from '@csp/shared'
-import { buildingCount, describeCity } from './city-view.js'
+import { isClosed, type Building, type RealmLabel, type Resident, type SeenCity } from '@csp/shared'
+import { buildingCount, describeBuying, describeCity, type BuyView } from './city-view.js'
 
 /**
  * The city inspector: every city in sight (`CONTEXT.md`: City, NPC city), whose it is, and,
  * for the one picked, how many of its residents and which of its buildings the Player sees. A
- * city of the Player's own lists its gates, to open or close (`CONTEXT.md`: Walls in combat).
+ * city of the Player's own lists its gates, to open or close (`CONTEXT.md`: Walls in combat); an
+ * NPC city names its price and can be bought (`CONTEXT.md`: Buying a city).
  */
 export function CityInspector({
   cities,
@@ -14,13 +15,16 @@ export function CityInspector({
   realmId,
   realms,
   onSetGate,
+  onBuyCity,
 }: {
-  cities: City[]
+  cities: SeenCity[]
   residents: Resident[]
   buildings: Building[]
   realmId: string
   realms: RealmLabel[]
   onSetGate: (gateId: string, open: boolean) => void
+  /** Gives the buy order for an NPC city to one of the Player's residents on its town hall. */
+  onBuyCity: (residentId: string, cityId: string) => void
 }) {
   const [openId, setOpenId] = useState<string | undefined>()
   const views = cities.map((c) => describeCity(c, { residents, buildings }, realmId, realms))
@@ -48,6 +52,16 @@ export function CityInspector({
                   ` · ${v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}`}
               </p>
             )}
+            {openId === v.id && (
+              <Buying
+                buy={describeBuying(
+                  cities.find((c) => c.id === v.id)!,
+                  { residents, buildings },
+                  realmId,
+                )}
+                onBuy={(buyerId) => onBuyCity(buyerId, v.id)}
+              />
+            )}
             {openId === v.id && cities.find((c) => c.id === v.id)?.realmId === realmId && (
               <Gates
                 gates={buildings.filter((b) => b.kind === 'gate' && !b.site && b.cityId === v.id)}
@@ -58,6 +72,36 @@ export function CityInspector({
         ))}
       </ul>
     </section>
+  )
+}
+
+/**
+ * An NPC city's price (`CONTEXT.md`: Buying a city), the coins the Player's residents on its town
+ * hall carry, and the buy order for one of them once there.
+ */
+function Buying({ buy, onBuy }: { buy: BuyView | undefined; onBuy: (buyerId: string) => void }) {
+  if (!buy) return null
+  const enough = buy.coins >= buy.price
+  return (
+    <div className="city-buying" aria-label="Buying">
+      <p>
+        Price: <strong>{buy.price} coins</strong>
+      </p>
+      {buy.townHall && !buy.buyerId && (
+        <p className="small muted">
+          To buy it, bring residents carrying the coins to its town hall at ({buy.townHall.x},{' '}
+          {buy.townHall.y}).
+        </p>
+      )}
+      {buy.buyerId && (
+        <p>
+          Your residents at its town hall carry {buy.coins} coins.{' '}
+          <button type="button" disabled={!enough} onClick={() => onBuy(buy.buyerId!)}>
+            Buy for {buy.price} coins
+          </button>
+        </p>
+      )}
+    </div>
   )
 }
 

@@ -59,6 +59,7 @@ import { refillSource } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
+import { buyOrdersDone } from './buying.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 
 /**
@@ -1229,6 +1230,7 @@ export const worldInvariants: Invariant[] = [
   attackOrdersSound,
   armiesSound,
   contractsSound,
+  buyOrdersDone,
   supplyLinesSound,
   crimesSound,
   gatesSound,

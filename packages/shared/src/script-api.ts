@@ -109,6 +109,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'On a mercenary contract’s storage, put in the coins for some weeks of it.',
   ),
   action(
+    'buyCity',
+    ['cityId'],
+    'On an NPC city’s town hall, buy it with the coins my realm’s residents there carry.',
+  ),
+  action(
     'roadLine',
     ['x', 'y'],
     'Build road on each tile of the line from my tile to (x, y), one after another, with the stone I carry.',

@@ -1,5 +1,7 @@
 import {
   CITY_AREA_MARGIN,
+  CITY_PRICE_BY_BUILDING,
+  CITY_PRICE_PER_RESIDENT,
   CITY_BUILDING_REACH,
   FOOD_PER_DAY,
   FOOD_SURPLUS_DAYS,
@@ -242,4 +244,73 @@ export function captorOf(
     if (r.owner !== null && !onCitySide(world, city, r.owner)) captors.add(r.owner)
   }
   return captors.size === 1 ? [...captors][0]! : null
+}
+
+/**
+ * Whether a city can be bought (`CONTEXT.md`: Buying a city): an NPC city. The Trade
+ * Organization doesn't sell its cities, and a Player's city is not for sale.
+ */
+export function forSale(city: City): boolean {
+  return city.realmId === null && !city.tradeOrg
+}
+
+/**
+ * The price in Coins an NPC city names (`CONTEXT.md`: Buying a city), from what it is worth: its
+ * residents (`CITY_PRICE_PER_RESIDENT`) and its finished buildings (`CITY_PRICE_BY_BUILDING`).
+ */
+export function cityPrice(world: Pick<WorldState, 'residents' | 'buildings'>, city: City): number {
+  const residents = world.residents.filter((r) => r.cityId === city.id).length
+  const buildings = world.buildings
+    .filter((b) => b.cityId === city.id && !b.site)
+    .reduce((sum, b) => sum + (CITY_PRICE_BY_BUILDING[b.kind] ?? 0), 0)
+  return residents * CITY_PRICE_PER_RESIDENT + buildings
+}
+
+/**
+ * The realm's residents standing on a city's town hall (`CONTEXT.md`: Buying a city): the ones
+ * whose coins count toward buying it. None when its town hall is gone.
+ */
+export function buyersAtTownHall(
+  world: Pick<WorldState, 'residents' | 'buildings'>,
+  city: City,
+  realmId: string,
+): Resident[] {
+  const hall = townHallOf(world, city)
+  if (!hall) return []
+  return world.residents.filter((r) => r.owner === realmId && r.x === hall.x && r.y === hall.y)
+}
+
+/** The coins the realm's residents carry on a city's town hall (`buyersAtTownHall`). */
+export function coinsAtTownHall(
+  world: Pick<WorldState, 'residents' | 'buildings'>,
+  city: City,
+  realmId: string,
+): number {
+  return buyersAtTownHall(world, city, realmId).reduce((n, r) => n + (r.carried.coins ?? 0), 0)
+}
+
+/**
+ * Why the realm's resident `r` can't buy the city `cityId` now, if anything stops it
+ * (`CONTEXT.md`: Buying a city): the city must be for sale, the resident of the realm and standing
+ * on its town hall, and the realm's residents there must carry its price in coins together.
+ */
+export function buyProblem(
+  world: Pick<WorldState, 'residents' | 'buildings' | 'cities'>,
+  realmId: string,
+  r: Resident,
+  cityId: unknown,
+): string | undefined {
+  const city = world.cities.find((c) => c.id === cityId)
+  if (!city) return 'no such city'
+  if (city.tradeOrg) return 'the Trade Organization doesn’t sell its cities'
+  if (!forSale(city)) return 'only NPC cities are for sale'
+  if (r.owner !== realmId) return 'only a resident of your own realm can buy a city'
+  const hall = townHallOf(world, city)
+  if (!hall || r.x !== hall.x || r.y !== hall.y) return 'the resident must stand on its town hall'
+  const price = cityPrice(world, city)
+  const coins = coinsAtTownHall(world, city, realmId)
+  if (coins < price) {
+    return `it costs ${price} coins; your residents at its town hall carry ${coins}`
+  }
+  return undefined
 }

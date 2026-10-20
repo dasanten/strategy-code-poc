@@ -13,6 +13,7 @@ import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
 import { roadLine } from './road-line.js'
 import { contractOrders, pay } from './contracts.js'
+import { buyCity } from './buying.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -51,6 +52,7 @@ export const orderKinds: Record<string, OrderKind> = {
   setGate,
   roadLine,
   pay,
+  buyCity,
   ...allianceOrders,
   ...armyOrders,
   ...contractOrders,

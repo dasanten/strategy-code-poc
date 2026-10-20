@@ -71,6 +71,19 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const from = e.other === null ? '' : ` from the realm of ${e.other}`
       return { text: `You captured ${e.city}${from}, with its ${people}.`, tone: 'info' }
     }
+    case 'cityBought': {
+      const people = `${e.residents} resident${e.residents === 1 ? '' : 's'}`
+      return {
+        text: `You bought ${e.city} for ${e.price} coins, with its ${people}.`,
+        tone: 'info',
+        places: [{ name: e.city, x: e.x, y: e.y }],
+      }
+    }
+    case 'cityNotBought':
+      return {
+        text: `${e.city} wasn’t bought: it costs ${e.price} coins, and your residents at its town hall carried ${e.coins}.`,
+        tone: 'warn',
+      }
     case 'selfManaged': {
       if (e.cities.length === 0) return { text: 'Your realm had no city left.', tone: 'bad' }
       const each = e.cities.map((c) => `${c.name} (${residentsText(c.residents)})`)
