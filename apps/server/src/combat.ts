@@ -16,6 +16,11 @@ import {
   wallStrength,
   wallStrengthLeft,
   wrapDistance,
+  TRADE_ORG,
+  contractOf,
+  inInnerRing,
+  ofTradeOrgHq,
+  tradeOrgHq,
   type AttackOrder,
   type Building,
   type OrderRequest,
@@ -78,20 +83,28 @@ export function attackOrder(targetId: string, started = false, defending = false
 /**
  * Whether `a` striking `t` is a crime (`CONTEXT.md`: Crime): not when `a` fights back at someone
  * who hit them, nor when `t` is attacking someone of `a`'s Organization on their own account, or
- * breaking or climbing one of its walls or gates (`CONTEXT.md`: Walls in combat).
+ * breaking or climbing one of its walls or gates (`CONTEXT.md`: Walls in combat). The Trade Org
+ * HQ's mercenaries stand with the HQ, and its soldiers keep its inner ring clear by force, never
+ * a crime (`CONTEXT.md`: Trade Org army). `size` is the map's.
  */
-function isAggression(world: WorldState, a: Resident, t: Resident): boolean {
+function isAggression(world: WorldState, a: Resident, t: Resident, size: number): boolean {
   if (a.order?.kind === 'attack' && a.order.defending) return false
+  const hq = tradeOrgHq(world)
+  if (hq && ofTradeOrgHq(world, a) && !ofTradeOrgHq(world, t) && inInnerRing(world, t, size)) {
+    return false
+  }
+  const sides = new Set([organizationOf(a)])
+  if (hq && contractOf(world, a.id)?.hirerId === TRADE_ORG) sides.add(hq.id)
   const o = t.order
   const ours = (buildingId: string) => {
     const b = world.buildings.find((x) => x.id === buildingId)
-    return !!b && buildingOrganization(world, b) === organizationOf(a)
+    return !!b && sides.has(buildingOrganization(world, b))
   }
   if (o?.kind === 'climb') return !ours(o.wallId)
   if (o?.kind !== 'attack' || o.defending) return true
   const theirTarget = world.residents.find((x) => x.id === o.targetId)
   if (!theirTarget) return !ours(o.targetId)
-  return organizationOf(theirTarget) !== organizationOf(a)
+  return !sides.has(organizationOf(theirTarget))
 }
 
 /**
@@ -223,7 +236,7 @@ export function resolveStrikes(
         other: a.name,
         attacker: false,
       })
-      if (isAggression(world, a, t)) {
+      if (isAggression(world, a, t, size)) {
         commitCrime(world, size, 'attack', a, { victimOrg: organizationOf(t), victim: t })
       }
     }
@@ -237,7 +250,7 @@ export function resolveStrikes(
     if (t.health <= 0) {
       died.push(t)
       killers.set(t.id, a.name)
-      if (isAggression(world, a, t)) {
+      if (isAggression(world, a, t, size)) {
         commitCrime(world, size, 'killing', a, { victimOrg: organizationOf(t), victim: t })
       }
       continue

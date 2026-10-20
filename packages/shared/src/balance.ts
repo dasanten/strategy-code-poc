@@ -1118,6 +1118,27 @@ export const ARMY_SPREAD = 1
  */
 export const CONTRACT_MAX_DAYS = 48
 
+/** The Trade Org army (`CONTEXT.md`: Trade Org army). */
+export const TRADE_ORG_ARMY = {
+  /** Soldiers the HQ arms from its own adults: half of the residents it starts with. */
+  size: 16,
+  /** Adults the HQ keeps at work and never arms: its farms, workplaces and some spare. */
+  workers: 12,
+  /** Soldiers that always stay at the HQ: it never hires out more than the rest. */
+  guard: 8,
+  /** What it asks for each soldier and game week, in coins: about a spear's price. */
+  pricePerSoldierWeek: 20,
+  /**
+   * It has lost too many once its soldiers, the adults it could still arm and its mercenaries
+   * are fewer than this share of `size`.
+   */
+  hireBelow: 0.6,
+  /** What it offers for each mercenary and game week, in coins: less than it asks itself. */
+  hirePricePerSoldierWeek: 12,
+  /** How long it hires mercenaries for, in game days: two game weeks. */
+  hireDays: 14,
+}
+
 /**
  * How many interpreter steps one resident's or army's script may use each tick (`CONTEXT.md`:
  * Step budget). Every evaluated node costs 1; enough for a few loops over what it sees.

@@ -8,6 +8,7 @@ import {
   Terrain,
   terrainAt,
   townHallOf,
+  tradeOrgHq,
   wrapDistance,
   type Building,
   type City,
@@ -277,10 +278,12 @@ export function foundTradeOrgHq(
   })
   const hall = building('townHall', layout.hall)
   city.townHallId = hall.id
-  const ring = (tiles: Tile[], gates: Tile[]) =>
-    tiles.map((t) =>
-      building(gates.some((g) => g[0] === t[0] && g[1] === t[1]) ? 'gate' : 'wall', t),
-    )
+  // The inner gates stay closed (`CONTEXT.md`: Trade Org army); its own residents pass them.
+  const ring = (tiles: Tile[], gates: Tile[], closed = false) =>
+    tiles.map((t): Building => {
+      if (!gates.some((g) => g[0] === t[0] && g[1] === t[1])) return building('wall', t)
+      return closed ? { ...building('gate', t), closed } : building('gate', t)
+    })
   const taken = takenTiles(world)
   const farms = farmTiles(terrain, cx, cy, taken)
     .slice(0, TRADE_ORG_HQ.farms)
@@ -290,7 +293,7 @@ export function foundTradeOrgHq(
     { ...building('storage', layout.storage), stock: { food: TRADE_ORG_HQ.food } },
     { ...building('warehouse', layout.coinWarehouse), stock: { coins: TRADE_ORG_HQ.coins } },
     { ...building('warehouse', layout.goodsWarehouse), stock: { ...TRADE_ORG_HQ.goods } },
-    ...ring(layout.innerRing, layout.innerGates),
+    ...ring(layout.innerRing, layout.innerGates, true),
     ...ring(layout.outerRing, layout.outerGates),
     ...layout.houses.map((t) => building('house', t)),
     ...farms,
@@ -326,9 +329,7 @@ export function foundTradeOrgHq(
 }
 
 /** The Trade Org HQ, if the world has one. */
-export function tradeOrgHq(world: WorldState): City | undefined {
-  return world.cities.find((c) => c.tradeOrg === 'hq')
-}
+export { tradeOrgHq }
 
 /**
  * Places the Trade Org HQ (`findHqSite`, `foundTradeOrgHq`) unless the world has one already, or

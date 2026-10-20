@@ -6,8 +6,11 @@ import {
   contractEndsAt,
   contractPayBy,
   contractWeeks,
+  TRADE_ORG,
+  contractSide,
   realmName,
   townHallOf,
+  tradeOrgHq,
   wrapDistance,
   type MercenaryContract,
   type OrderRequest,
@@ -20,6 +23,7 @@ import type { Invariant, InvariantViolation } from './invariants.js'
 import { walkTo } from './npc-behaviour.js'
 import type { OrderKind } from './orders.js'
 import { newId, realmOf } from './starting-city.js'
+import { spareSoldiers } from './trade-org-army.js'
 
 /*
  * Mercenary contracts (`CONTEXT.md`: Mercenary contract): one realm rents some of its residents
@@ -27,14 +31,25 @@ import { newId, realmOf } from './starting-city.js'
  * is in force the residents stay the lender's, and the lender still sees them, but they take only
  * the hirer's orders (`commanderOf`). Each game week is paid in advance into the lender's storage
  * with a pay order; a week that ends unpaid breaks the contract. At the end, or when it breaks,
- * the residents walk home. For now both sides are Players' realms.
+ * the residents walk home. A side is a Player's realm or the Trade Organization (`TRADE_ORG`,
+ * `CONTEXT.md`: Trade Org army), which the game runs (`stepTradeOrgArmy`).
  */
 
-/** The realm whose storage it is: the realm of the city it belongs to, if a finished storage. */
+/**
+ * The side whose storage it is: the realm of the city a finished storage belongs to, or
+ * `TRADE_ORG` for a finished warehouse of one of the Trade Organization's cities.
+ */
 function storageRealm(world: WorldState, storageId: unknown): string | null {
   const b = world.buildings.find((x) => x.id === storageId)
-  if (!b || b.kind !== 'storage' || b.site) return null
-  return world.cities.find((c) => c.id === b.cityId)?.realmId ?? null
+  if (!b || b.site) return null
+  const city = world.cities.find((c) => c.id === b.cityId)
+  if (b.kind === 'storage') return city?.realmId ?? null
+  return b.kind === 'warehouse' && city?.tradeOrg ? TRADE_ORG : null
+}
+
+/** Whether a contract side exists: a realm, or the Trade Organization while it has its HQ. */
+function sideExists(world: WorldState, id: string): boolean {
+  return id === TRADE_ORG ? tradeOrgHq(world) !== undefined : world.realms.some((r) => r.id === id)
 }
 
 /** Whether the resident is named in any contract, offered or in force. */
@@ -48,6 +63,24 @@ function inSightOf(world: WorldState, realmId: string, at: Resident, size: numbe
   )
 }
 
+/**
+ * The residents an offer names: `residentIds`, or, asking the Trade Organization (`realmId` is
+ * `TRADE_ORG`) for a number of `soldiers`, that many it can spare (`spareSoldiers`). A reason
+ * when they can't be.
+ */
+function offeredResidents(world: WorldState, order: OrderRequest): unknown[] | string {
+  if (order.realmId !== TRADE_ORG || order.soldiers === undefined) {
+    return Array.isArray(order.residentIds) ? order.residentIds : []
+  }
+  const n = order.soldiers
+  if (!Number.isInteger(n) || (n as number) < 1) return 'ask for a whole number of soldiers'
+  const spare = spareSoldiers(world)
+  if (spare.length < (n as number)) {
+    return `the Trade Organization can spare only ${spare.length} soldiers`
+  }
+  return spare.slice(0, n as number).map((r) => r.id)
+}
+
 /** An offer's terms as plain data, or a reason they are not good. */
 function readOffer(
   world: WorldState,
@@ -55,13 +88,14 @@ function readOffer(
   order: OrderRequest,
   size?: number,
 ): MercenaryContract | string {
-  const ids = order.residentIds
-  if (!Array.isArray(ids) || ids.length === 0) return 'a contract needs at least one resident'
+  const ids = offeredResidents(world, order)
+  if (typeof ids === 'string') return ids
+  if (ids.length === 0) return 'a contract needs at least one resident'
   if (new Set(ids).size !== ids.length) return 'a resident is named twice'
   const residents = ids.map((id) => world.residents.find((r) => r.id === id))
   if (residents.some((r) => !r)) return 'no such resident'
-  const lenderId = residents[0]!.owner
-  if (lenderId === null || !residents.every((r) => r!.owner === lenderId)) {
+  const lenderId = contractSide(world, residents[0]!)
+  if (lenderId === null || !residents.every((r) => contractSide(world, r!) === lenderId)) {
     return 'the residents must all be of one realm'
   }
   if (ids.some((id) => contracted(world, id as string))) {
@@ -72,11 +106,19 @@ function readOffer(
   }
   let hirerId: string
   if (lenderId === realmId) {
+    if (order.realmId === TRADE_ORG) return 'the Trade Organization hires only by its own offers'
     if (typeof order.realmId !== 'string' || !world.realms.some((r) => r.id === order.realmId)) {
       return 'offer them to a realm'
     }
     if (order.realmId === realmId) return 'offer them to another realm'
     hirerId = order.realmId
+  } else if (lenderId === TRADE_ORG) {
+    // It hires out its spare soldiers wherever they are, seen or not.
+    const spare = new Set(spareSoldiers(world).map((r) => r.id))
+    if (!ids.every((id) => spare.has(id as string))) {
+      return 'the Trade Organization can’t spare those residents'
+    }
+    hirerId = realmId
   } else {
     if (!world.realms.some((r) => r.id === lenderId)) return 'the residents must be of a realm'
     if (size !== undefined && !residents.every((r) => inSightOf(world, realmId, r!, size))) {
@@ -93,7 +135,9 @@ function readOffer(
     return 'the price is a whole number of coins a week, at least 1'
   }
   if (storageRealm(world, order.storageId) !== lenderId) {
-    return 'the coins go into a storage of the realm renting them out'
+    return lenderId === TRADE_ORG
+      ? 'the coins go into a warehouse of the Trade Organization'
+      : 'the coins go into a storage of the realm renting them out'
   }
   return {
     id: '',
@@ -189,21 +233,30 @@ function offerOf(
 }
 
 /** A reason the offer can't start now, if any: its residents or storage changed hands. */
-function cannotStart(world: WorldState, c: MercenaryContract): string | undefined {
-  if (
-    !c.residentIds.every((id) => world.residents.some((r) => r.id === id && r.owner === c.lenderId))
-  ) {
-    return 'the residents are no longer all the lender’s'
-  }
+export function cannotStart(world: WorldState, c: MercenaryContract): string | undefined {
+  const lenders = (id: string) =>
+    world.residents.some((r) => r.id === id && contractSide(world, r) === c.lenderId)
+  if (!c.residentIds.every(lenders)) return 'the residents are no longer all the lender’s'
   if (storageRealm(world, c.storageId) !== c.lenderId)
     return 'the storage is no longer the lender’s'
   return undefined
 }
 
 /**
- * Accepting an offer the other side made: the contract is in force from now. The residents stop
- * what they were doing, scripts included, and wait for the hirer's orders.
+ * Puts an offer in force from now: its residents stop what they were doing, scripts included,
+ * and wait for the hirer's orders.
  */
+export function startContract(world: WorldState, c: MercenaryContract): void {
+  c.startedAt = world.tick
+  for (const r of world.residents) {
+    if (!c.residentIds.includes(r.id)) continue
+    r.order = null
+    delete r.script
+  }
+  tellBoth(world, c, 'started')
+}
+
+/** Accepting an offer the other side made (`startContract`). */
 export const acceptContract = contractOrderKind(
   (world, realmId, order) => {
     const c = offerOf(world, realmId, order)
@@ -213,14 +266,10 @@ export const acceptContract = contractOrderKind(
     return cannotStart(world, c)
   },
   (world, _realmId, order) => {
-    const c = world.contracts.find((x) => x.id === order.contractId)!
-    c.startedAt = world.tick
-    for (const r of world.residents) {
-      if (!c.residentIds.includes(r.id)) continue
-      r.order = null
-      delete r.script
-    }
-    tellBoth(world, c, 'started')
+    startContract(
+      world,
+      world.contracts.find((x) => x.id === order.contractId)!,
+    )
   },
 )
 
@@ -358,11 +407,14 @@ export function endContractsOnLeaderDeath(world: WorldState, realmId: string): v
 export function stepContracts(world: WorldState): void {
   if (world.contracts.length === 0) return
   const byId = new Map(world.residents.map((r) => [r.id, r]))
-  const realms = new Set(world.realms.map((r) => r.id))
   const kept: MercenaryContract[] = []
   for (const c of world.contracts) {
-    c.residentIds = c.residentIds.filter((id) => byId.get(id)?.owner === c.lenderId)
-    const sound = c.residentIds.length > 0 && realms.has(c.lenderId) && realms.has(c.hirerId)
+    c.residentIds = c.residentIds.filter((id) => {
+      const r = byId.get(id)
+      return r !== undefined && contractSide(world, r) === c.lenderId
+    })
+    const sound =
+      c.residentIds.length > 0 && sideExists(world, c.lenderId) && sideExists(world, c.hirerId)
     if (c.startedAt === null) {
       if (sound && storageRealm(world, c.storageId) === c.lenderId) kept.push(c)
       continue
@@ -381,7 +433,7 @@ export function stepContracts(world: WorldState): void {
 }
 
 /**
- * Contracts hold together (`CONTEXT.md`: Mercenary contract): two different realms that exist,
+ * Contracts hold together (`CONTEXT.md`: Mercenary contract): two different sides that exist,
  * residents who all live and belong to the lender, none in two contracts, a positive length and
  * price, a storage that exists, and no more weeks paid than it has. A contract in force has every
  * week paid that has ended, and has not run past its time.
@@ -393,19 +445,18 @@ export const contractsSound: Invariant = {
     const report = (message: string, entityIds: string[]) =>
       out.push({ invariant: this.name, message, entityIds })
     const byId = new Map(world.residents.map((r) => [r.id, r]))
-    const realms = new Set(world.realms.map((r) => r.id))
     const seen = new Set<string>()
     for (const c of world.contracts) {
       if (c.lenderId === c.hirerId) report(`contract ${c.id} rents to its own lender`, [c.id])
       for (const realm of [c.lenderId, c.hirerId]) {
-        if (!realms.has(realm))
+        if (!sideExists(world, realm))
           report(`contract ${c.id} has realm ${realm}, which does not exist`, [c.id])
       }
       if (c.residentIds.length === 0) report(`contract ${c.id} has no residents`, [c.id])
       for (const id of c.residentIds) {
         const r = byId.get(id)
         if (!r) report(`contract ${c.id} has resident ${id}, who does not exist`, [c.id, id])
-        else if (r.owner !== c.lenderId) {
+        else if (contractSide(world, r) !== c.lenderId) {
           report(`contract ${c.id} rents out ${id}, who is not the lender’s`, [c.id, id])
         }
         if (seen.has(id)) report(`resident ${id} is in two contracts`, [id])

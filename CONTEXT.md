@@ -270,8 +270,27 @@ The shared language of the game. Domain terms only — no implementation details
   orders; they always obey (for now). Each week is paid in advance: the hirer's residents put the
   coins into that storage with a pay order, or a Trade Org transfer brings them. A week left
   unpaid breaks the contract and costs standing; at the end, or when it breaks, they walk home.
-- **Trade Org army:** a large army of normal residents, for hire like any mercenaries. When it has
-  lost too many, it hires mercenaries itself. Its warehouses refill goods, never people.
+- **Trade Org army:** a large army of normal residents of the Trade Org HQ, for hire like any
+  mercenaries. The HQ builds it itself: it arms its own adults with weapons from its goods
+  warehouse until it has its army's size, keeping enough of them at work. Its warehouses refill
+  goods, never people, so lost soldiers come back only as new adults grow up, or as mercenaries.
+  - **Hiring it:** in mercenary contracts the Trade Organization is a side like a realm. A Player
+    asks for a number of its soldiers, paid into a Trade Org warehouse they name; it accepts at
+    once when the price is at least its price per soldier and week and it can spare them, and
+    declines otherwise. It never hires out so many that fewer than its guard stay at the HQ.
+    Hired soldiers take the hirer's orders where they stand; getting them where they are needed
+    is the hirer's business.
+  - **Guarding the inner ring:** anyone not of the HQ on or inside its inner ring is an
+    outsider: Players' residents, unarmed ones and its own hirers' included. The HQ's soldiers
+    attack every outsider there until they are dead or gone; that is never a crime. The inner
+    gates stay closed; the HQ's own residents pass them.
+  - **Hiring mercenaries:** when its soldiers, the adults it could still arm and the mercenaries
+    it has hired fall below a share of its army's size, it has lost too many: once a game day it
+    asks Players' realms for their armed residents nearest the HQ (never a Leader), as many as
+    it lacks, at its own price and length, paid into a storage of theirs. The Player accepts or
+    declines like any offer. It pays each week in advance from its coin warehouse straight into
+    that storage, like a transfer. Its mercenaries walk to the HQ and stand guard outside the
+    inner gates, fighting whoever attacks the HQ; while in its area they eat from its storage.
 
 ## Crime and reputation
 

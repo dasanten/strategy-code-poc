@@ -1,8 +1,11 @@
 import {
   NPC_GATE_WATCH_RANGE,
   NPC_SOLDIER_SHARE,
+  TRADE_ORG_ARMY,
   WEAPONS,
   canWork,
+  contractOf,
+  warehouseKeeps,
   defendsCity,
   inCityArea,
   isArmed,
@@ -18,6 +21,7 @@ import {
   type Weapon,
   type WorldState,
 } from '@csp/shared'
+import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
 import { walkTo } from './npc-behaviour.js'
 import { startWork } from './work.js'
@@ -37,21 +41,49 @@ export function npcSoldierTarget(adults: number): number {
  * One tick of NPC cities defending themselves (`CONTEXT.md`: NPC city, Combat): every city run by
  * the game sends its armed residents in its area after attackers there; one that isn't the Trade
  * Organization's also keeps soldiers by its size and closes its gates while armed outsiders are
- * near. Like the rest of an NPC city's behaviour it only gives orders a Player could give
+ * near, and the Trade Org HQ builds its army (`tradeOrgArmyTarget`). Like the rest of an NPC city's behaviour it only gives orders a Player could give
  * (ADR 0002), or opens and closes its own gates as a realm does. Run before `stepNpcCities`, so
  * the work it hands out passes its soldiers by. `size` is the map's.
  */
 export function stepNpcDefence(world: WorldState, size: number): void {
+  // A caravan's crew is run by its caravan, a hired-out resident by the hirer.
+  const crew = caravanCrew(world)
   for (const city of world.cities) {
     if (city.realmId !== null) continue
     const people = world.residents.filter(
-      (r) => r.owner === null && r.cityId === city.id && r.health > 0,
+      (r) =>
+        r.owner === null &&
+        r.cityId === city.id &&
+        r.health > 0 &&
+        !crew.has(r.id) &&
+        !contractOf(world, r.id),
     )
     fightAttackers(world, city, people, size)
+    const adults = people.filter((r) => canWork(r, world.tick)).length
+    if (city.tradeOrg === 'hq') {
+      // Its army's weapons come from its goods warehouse, which keeps them in stock.
+      const goods = world.buildings.find(
+        (b) =>
+          b.cityId === city.id &&
+          warehouseKeeps(world, b).some((g) => WEAPONS.includes(g as Weapon)),
+      )
+      keepSoldiers(world, city, people, tradeOrgArmyTarget(adults), goods)
+    }
     if (city.tradeOrg) continue
-    keepSoldiers(world, city, people)
+    const storage = world.buildings.find(
+      (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
+    )
+    keepSoldiers(world, city, people, npcSoldierTarget(adults), storage)
     watchGates(world, city, size)
   }
+}
+
+/**
+ * How many soldiers the Trade Org HQ keeps (`CONTEXT.md`: Trade Org army): its army's size, but
+ * never so many that fewer than `TRADE_ORG_ARMY.workers` of its `adults` are left to work.
+ */
+export function tradeOrgArmyTarget(adults: number): number {
+  return Math.max(0, Math.min(TRADE_ORG_ARMY.size, adults - TRADE_ORG_ARMY.workers))
 }
 
 /**
@@ -59,7 +91,7 @@ export function stepNpcDefence(world: WorldState, size: number): void {
  * one of its residents on their own account (not fighting back at one who hit them), striking
  * one of its walls or gates to break it, or climbing one.
  */
-function attackersOf(world: WorldState, city: City, size: number): Resident[] {
+export function attackersOf(world: WorldState, city: City, size: number): Resident[] {
   const own = (id: string) => {
     const t = world.residents.find((x) => x.id === id)
     return !!t && t.owner === null && t.cityId === city.id
@@ -95,23 +127,26 @@ function fightAttackers(world: WorldState, city: City, people: Resident[], size:
 }
 
 /**
- * An NPC city keeps `npcSoldierTarget` soldiers (`CONTEXT.md`: NPC city, Soldier): its armed
- * adults are its soldiers and stop working (the city then brings them home). While it has too
- * few, it arms one more adult at a time: with a weapon from its storage, else with a spear from
- * its smithy, which they make themselves from Iron and Wood they take from the storage, and pick
- * up from the pile on its tile once it is made.
+ * An NPC city keeps `target` soldiers (`CONTEXT.md`: NPC city, Soldier, Trade Org army): its
+ * armed adults are its soldiers and stop working (the city then brings them home). While it has
+ * too few, it arms one more adult at a time: with a weapon from `storage` (its storage, the HQ's
+ * goods warehouse), else with a spear from its smithy, which they make themselves from Iron and
+ * Wood they take from the storage, and pick up from the pile on its tile once it is made.
  */
-function keepSoldiers(world: WorldState, city: City, people: Resident[]): void {
+function keepSoldiers(
+  world: WorldState,
+  city: City,
+  people: Resident[],
+  target: number,
+  storage: Building | undefined,
+): void {
   const adults = people.filter((r) => canWork(r, world.tick))
   const soldiers = adults.filter(isArmed)
   for (const r of soldiers) if (r.order?.kind === 'workAt') r.order = null
-  if (soldiers.length >= npcSoldierTarget(adults.length)) return
+  if (soldiers.length >= target) return
   const unarmed = adults.filter((r) => !isArmed(r) && r.order?.kind !== 'attack')
   if (unarmed.length === 0) return
 
-  const storage = world.buildings.find(
-    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-  )
   const smithy = world.buildings.find(
     (b) =>
       b.kind === 'smithy' &&

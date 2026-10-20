@@ -404,14 +404,15 @@ export type SeenCaravan = Pick<
  * to the hirer for `days` game days, at `pricePerWeek` coins a game week, paid into the lender's
  * storage `storageId`. One side offers it, the other accepts; until then it is only an offer.
  * The residents stay the lender's but take only the hirer's orders while it is in force. Each
- * game week is paid in advance; one that ends unpaid breaks the contract. For now both sides are
- * Players' realms. Plain data (ADR 0002).
+ * game week is paid in advance; one that ends unpaid breaks the contract. A side is a Player's
+ * realm or the Trade Organization (`TRADE_ORG`, `CONTEXT.md`: Trade Org army), whose storage is
+ * a warehouse of its. Plain data (ADR 0002).
  */
 export interface MercenaryContract {
   id: string
-  /** The realm whose residents are rented out. */
+  /** The realm whose residents are rented out, or `TRADE_ORG`. */
   lenderId: string
-  /** The realm that rents them. */
+  /** The realm that rents them, or `TRADE_ORG`. */
   hirerId: string
   /** Which side offered it; the other side accepts or declines. */
   offeredBy: 'lender' | 'hirer'
@@ -706,14 +707,15 @@ export type RealmEventWhat =
   /**
    * A mercenary contract (`CONTEXT.md`: Mercenary contract) with the realm `other` (by its
    * Leader's name) changed: `offered` to this realm, `started` once accepted, `paid` for `weeks`
-   * more game weeks, `ended` when its time was up, or `broken` when a week went unpaid. `lender`
-   * when this realm rents out the residents. `leaderDied` says which side's Leader died when
-   * that ended it early (`CONTEXT.md`: Self-managed city).
+   * more game weeks, `ended` when its time was up, or `broken` when a week went unpaid; or
+   * `declined` by the Trade Organization (`CONTEXT.md`: Trade Org army). `lender` when this realm
+   * rents out the residents. `leaderDied` says which side's Leader died when that ended it early
+   * (`CONTEXT.md`: Self-managed city).
    */
   | {
       kind: 'contract'
       contractId: string
-      what: 'offered' | 'started' | 'paid' | 'ended' | 'broken'
+      what: 'offered' | 'started' | 'paid' | 'ended' | 'broken' | 'declined'
       lender: boolean
       other: string
       residents: number

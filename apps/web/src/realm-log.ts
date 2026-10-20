@@ -1,4 +1,4 @@
-import { REALM_LOG_LENGTH, type RealmEvent } from '@csp/shared'
+import { REALM_LOG_LENGTH, TRADE_ORG_NAME, type RealmEvent } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
 
 /** How bad an event is, for its colour in the log. */
@@ -164,7 +164,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     case 'scriptEnded':
       return { text: `${e.name} stopped running a script: it was deleted.`, tone: 'info' }
     case 'contract': {
-      const them = `the realm of ${e.other}`
+      const them = e.other === TRADE_ORG_NAME ? e.other : `the realm of ${e.other}`
       const n = e.residents === 1 ? '1 mercenary' : `${e.residents} mercenaries`
       const weeks = e.weeks === 1 ? '1 week' : `${e.weeks} weeks`
       const walk = e.residents === 1 ? 'walks' : 'walk'
@@ -200,6 +200,8 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           return e.lender
             ? { text: `${cap(them)} left a week unpaid: your ${n} ${walk} home.`, tone: 'warn' }
             : { text: `You left a week unpaid: the ${n} from ${them} ${walk} home.`, tone: 'warn' }
+        case 'declined':
+          return { text: `${cap(them)} declined to rent you ${n}.`, tone: 'warn' }
       }
     }
   }
