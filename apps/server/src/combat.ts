@@ -9,19 +9,27 @@ import {
   isArmed,
   onOwnWall,
   WALL_DEFENCE,
+  attackPower,
+  brokenReturns,
+  foreignWall,
+  isWallOrGate,
+  wallStrength,
+  wallStrengthLeft,
   wrapDistance,
   type AttackOrder,
+  type Building,
   type OrderRequest,
   type Realm,
   type Resident,
   type WorldState,
 } from '@csp/shared'
-import { commitCrime, organizationOf } from './crimes.js'
+import { updateCityMembership } from './cities.js'
+import { buildingOrganization, commitCrime, organizationOf } from './crimes.js'
 import { recordEvent } from './events.js'
 import type { OrderKind } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
 import { realmOf } from './starting-city.js'
-import { dieAll } from './survival.js'
+import { dieAll, dropGoods } from './survival.js'
 
 /**
  * An action a resident with an attack order requests once they are in contact with their target
@@ -31,6 +39,22 @@ import { dieAll } from './survival.js'
 export interface StrikeAction {
   attackerId: string
   targetId: string
+}
+
+/**
+ * What an attack order goes after: the resident `targetId`, or else the finished wall or gate of
+ * that id (`CONTEXT.md`: Walls in combat, broken); undefined once it is gone.
+ */
+export function attackTarget(world: WorldState, targetId: string): Resident | Building | undefined {
+  const r = world.residents.find((x) => x.id === targetId)
+  if (r) return r
+  const b = world.buildings.find((x) => x.id === targetId)
+  return b && isWallOrGate(b) ? b : undefined
+}
+
+/** Whether an attack target is a wall or gate rather than a resident. */
+function isBuilding(t: Resident | Building): t is Building {
+  return 'kind' in t
 }
 
 /** The input of an attack order: which of the Player's residents attacks whom. */
@@ -64,7 +88,9 @@ function isAggression(world: WorldState, a: Resident, t: Resident): boolean {
 
 /**
  * The attack order (`CONTEXT.md`: Combat): one of the Player's residents goes after a resident of
- * another realm, or of none, that the Player sees, and strikes them once in contact.
+ * another realm, or of none, that the Player sees, and strikes them once in contact. The target
+ * may also be a wall or gate of another realm's city, or of none, to break it (`CONTEXT.md`:
+ * Walls in combat).
  */
 export const attack: OrderKind = {
   validate(world, sender, order, terrain) {
@@ -72,14 +98,21 @@ export const attack: OrderKind = {
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
     if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
-    const target = world.residents.find((x) => x.id === o.targetId)
-    if (!target) return 'no such resident'
-    if (target.owner === realm.id) return 'that is one of your own residents'
+    const resident = world.residents.find((x) => x.id === o.targetId)
+    if (resident?.owner === realm.id) return 'that is one of your own residents'
+    let target: { x: number; y: number } | undefined = resident
+    if (!target) {
+      const wall = foreignWall(world, realm.id, o.targetId)
+      if (typeof wall === 'string')
+        return world.buildings.some((b) => b.id === o.targetId) ? wall : 'no such resident'
+      target = wall
+    }
     const size = terrain?.size
     const seen = world.residents.some(
       (x) => commands(world, realm.id, x) && size && wrapDistance(size, x, target) <= SIGHT_RANGE,
     )
-    if (size && !seen) return 'that resident is out of sight'
+    if (size && !seen)
+      return resident ? 'that resident is out of sight' : 'that wall is out of sight'
     return undefined
   },
   apply(world, _sender, order) {
@@ -91,7 +124,7 @@ export const attack: OrderKind = {
 
 /**
  * Requests this tick's blows from residents' attack orders, on a map of `size` tiles. An order
- * whose target is gone or out of the attacker's sight ends. An attacker in contact with their
+ * whose target (a resident, or a wall or gate) is gone or out of the attacker's sight ends. An attacker in contact with their
  * target stops walking and gets `1 / STRIKE_TICKS` closer to their next blow; once there, they
  * strike.
  */
@@ -101,7 +134,7 @@ export function requestStrikes(world: WorldState, size: number): StrikeAction[] 
   for (const r of world.residents) {
     const o = r.order
     if (o?.kind !== 'attack') continue
-    const target = byId.get(o.targetId)
+    const target = byId.get(o.targetId) ?? attackTarget(world, o.targetId)
     if (!target || target === r || wrapDistance(size, r, target) > SIGHT_RANGE) {
       r.order = null
       continue
@@ -123,6 +156,8 @@ export interface CombatResult {
   blows: number
   /** Residents killed this tick. */
   died: Resident[]
+  /** Walls and gates broken this tick. */
+  broken: Building[]
   /** Realms that ended because their Leader was killed. */
   ended: Realm[]
 }
@@ -134,7 +169,9 @@ export interface CombatResult {
  * it by Agility, or it lands and takes its `blowDamage` off their health, only `WALL_DEFENCE` of it
  * for a target on their own city's wall (`CONTEXT.md`: Walls in combat). A target left with no
  * health is killed and drops what they carried (`CONTEXT.md`: Loot); otherwise one who is armed
- * fights back, unless already attacking someone, and one who is not flees home.
+ * fights back, unless already attacking someone, and one who is not flees home. A climber can't
+ * defend themselves: they don't dodge, fight back or flee (`CONTEXT.md`: Walls in combat).
+ * A blow at a wall or gate always lands (`breakWall`).
  */
 export function resolveStrikes(
   world: WorldState,
@@ -143,13 +180,21 @@ export function resolveStrikes(
 ): CombatResult {
   const killers = new Map<string, string>()
   const died: Resident[] = []
+  const broken: Building[] = []
   let blows = 0
   for (const { attackerId, targetId } of strikes) {
     const a = world.residents.find((x) => x.id === attackerId)
-    const t = world.residents.find((x) => x.id === targetId)
-    if (!a || !t || a.health <= 0 || t.health <= 0) continue
+    const target = attackTarget(world, targetId)
+    if (!a || !target || a.health <= 0) continue
     const o = a.order
-    if (o?.kind !== 'attack' || o.targetId !== t.id || !inContact(size, a, t)) continue
+    if (o?.kind !== 'attack' || o.targetId !== target.id || !inContact(size, a, target)) continue
+    if (isBuilding(target)) {
+      blows++
+      if (breakWall(world, a, target, size)) broken.push(target)
+      continue
+    }
+    const t = target
+    if (t.health <= 0) continue
     blows++
     if (!o.started) {
       o.started = true
@@ -177,7 +222,8 @@ export function resolveStrikes(
     a.skills.combat = (a.skills.combat ?? 0) + combatLearned(a, world.tick)
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
     const roll = mulberry32(hash(`${world.seed}:${world.tick}:${a.id}:strike`))()
-    if (roll < dodgeChance(t, world.tick)) continue
+    const climbing = t.order?.kind === 'climb'
+    if (!climbing && roll < dodgeChance(t, world.tick)) continue
     const cover = onOwnWall(world, t) ? WALL_DEFENCE : 1
     t.health = Math.max(0, t.health - blowDamage(a, t, world.tick) * cover)
     if (t.health <= 0) {
@@ -191,11 +237,30 @@ export function resolveStrikes(
     react(world, t, a)
   }
   const ended = dieAll(world, died, 'killed', size, killers)
-  const gone = new Set(died.map((r) => r.id))
+  if (broken.length > 0) updateCityMembership(world, size)
+  const gone = new Set([...died, ...broken].map((x) => x.id))
   for (const r of world.residents) {
     if (r.order?.kind === 'attack' && gone.has(r.order.targetId)) r.order = null
   }
-  return { blows, died, ended }
+  return { blows, died, broken, ended }
+}
+
+/**
+ * A blow from `a` at the wall or gate `b` (`CONTEXT.md`: Walls in combat, broken): it always
+ * lands, its attacker's `attackPower` going onto the wall's damage, and teaches Combat. Once the
+ * wall has taken its `wallStrength` it falls: it is gone and `brokenReturns` of its materials
+ * lie on its tile. Breaking another Organization's wall is a crime of tearing down by whoever
+ * strikes the last blow (`CONTEXT.md`: Crime). Returns whether it fell.
+ */
+function breakWall(world: WorldState, a: Resident, b: Building, size: number): boolean {
+  a.skills.combat = (a.skills.combat ?? 0) + combatLearned(a, world.tick)
+  b.damage = Math.min(wallStrength(b), (b.damage ?? 0) + attackPower(a, world.tick))
+  if (wallStrengthLeft(b) > 0) return false
+  const victimOrg = buildingOrganization(world, b)
+  commitCrime(world, size, 'tearDown', a, { victimOrg, building: b.kind })
+  world.buildings = world.buildings.filter((x) => x !== b)
+  dropGoods(world, b.x, b.y, brokenReturns(b))
+  return true
 }
 
 /**
@@ -203,6 +268,7 @@ export function resolveStrikes(
  * they are already attacking someone; unarmed, they flee home, walking to their city's town hall.
  */
 function react(world: WorldState, t: Resident, a: Resident): void {
+  if (t.order?.kind === 'climb') return
   if (isArmed(t)) {
     if (t.order?.kind !== 'attack') t.order = attackOrder(a.id, true, true)
     return

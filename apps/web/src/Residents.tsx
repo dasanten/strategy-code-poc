@@ -24,7 +24,10 @@ import {
   ageInYears,
   bestWeapon,
   canWork,
+  wrapDelta,
   wrapDistance,
+  wallStrength,
+  wallStrengthLeft,
   carryCapacity,
   materialsNeeded,
   recipeGood,
@@ -169,6 +172,7 @@ function orderDoing(r: Resident): string {
   if (o?.kind === 'pair') return 'Paired'
   if (o?.kind === 'pay') return 'Paying for mercenaries'
   if (o?.kind === 'attack') return o.path ? 'Going after their target' : 'Fighting'
+  if (o?.kind === 'climb') return `Climbing a wall · ${pct(o.progress)}`
   if (o?.kind === 'roadLine') {
     const [x, y] = o.tiles[0]!
     const left = `${o.tiles.length} road tile${o.tiles.length === 1 ? '' : 's'} to go`
@@ -264,6 +268,8 @@ export function ResidentInspector({
   others,
   mapSize,
   onAttack,
+  walls,
+  onClimb,
   carriage,
   onDriveTo,
   onHaulTo,
@@ -330,8 +336,12 @@ export function ResidentInspector({
   others: Resident[]
   /** Tiles along each side of the map, to tell who is nearest. */
   mapSize: number
-  /** Orders the resident to attack another realm's resident. */
+  /** Orders the resident to attack another realm's resident, or to break a wall or gate. */
   onAttack: (targetId: string) => void
+  /** Finished walls and gates in sight of other realms' cities, or of none. */
+  walls: Building[]
+  /** Orders the resident to climb over a wall or gate next to them. */
+  onClimb: (wallId: string) => void
 }) {
   if (!resident) {
     return (
@@ -543,7 +553,20 @@ export function ResidentInspector({
       <RoadLineBlock resident={r} tick={tick} picking={picking === 'road'} onRoadTo={onRoadTo} />
       <TearDownBlock resident={r} tick={tick} building={road} onTearDown={onTearDown} />
       <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
-      <AttackBlock resident={r} others={others} mapSize={mapSize} onAttack={onAttack} />
+      <AttackBlock
+        resident={r}
+        others={others}
+        walls={walls}
+        mapSize={mapSize}
+        onAttack={onAttack}
+      />
+      <WallsBlock
+        resident={r}
+        walls={walls}
+        mapSize={mapSize}
+        onBreak={onAttack}
+        onClimb={onClimb}
+      />
 
       {(pile || storage || site || roadSite || carriage) && (
         <section className="inspector-block" aria-label="On this tile">
@@ -1096,6 +1119,79 @@ function PairBlock({
   )
 }
 
+/** Most walls and gates the walls list offers, nearest first. */
+const WALL_CHOICES = 8
+
+/**
+ * Walls in combat (`CONTEXT.md`): pick a wall or gate of another realm in sight, nearest first,
+ * to break (strike it until it falls) or, standing next to it, to climb over.
+ */
+function WallsBlock({
+  resident,
+  walls,
+  mapSize,
+  onBreak,
+  onClimb,
+}: {
+  resident: Resident
+  walls: Building[]
+  mapSize: number
+  onBreak: (wallId: string) => void
+  onClimb: (wallId: string) => void
+}) {
+  const [wallId, setWallId] = useState('')
+  const choices = walls
+    .map((w) => ({ w, d: wrapDistance(mapSize, resident, w) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, WALL_CHOICES)
+  if (choices.length === 0) return null
+  const o = resident.order
+  const breaking = o?.kind === 'attack' ? walls.find((w) => w.id === o.targetId) : undefined
+  const picked = choices.find(({ w }) => w.id === wallId)?.w
+  const beside =
+    picked &&
+    Math.abs(wrapDelta(resident.x, picked.x, mapSize)) +
+      Math.abs(wrapDelta(resident.y, picked.y, mapSize)) ===
+      1
+  const label = (w: Building) => (w.kind === 'gate' ? 'Gate' : 'Wall')
+  return (
+    <section className="inspector-block" aria-label="Walls">
+      <div className="panel-head">
+        <h3>Walls</h3>
+        <span className="small muted">break or climb</span>
+      </div>
+      {breaking && (
+        <Meter
+          label={`Breaking the ${label(breaking).toLowerCase()} at ${breaking.x}, ${breaking.y}`}
+          value={`${Math.round(wallStrengthLeft(breaking))} / ${wallStrength(breaking)}`}
+          share={wallStrengthLeft(breaking) / wallStrength(breaking)}
+        />
+      )}
+      <div className="order-buttons">
+        <select aria-label="Wall" value={wallId} onChange={(e) => setWallId(e.target.value)}>
+          <option value="">Pick a wall or gate…</option>
+          {choices.map(({ w, d }) => (
+            <option key={w.id} value={w.id}>
+              {label(w)} at {w.x}, {w.y} · {Math.round(d)} tiles
+              {w.damage ? ` · ${pct(w.damage / wallStrength(w))} broken` : ''}
+            </option>
+          ))}
+        </select>
+        <button type="button" disabled={!picked} onClick={() => onBreak(wallId)}>
+          Break
+        </button>
+        <button type="button" disabled={!beside} onClick={() => onClimb(wallId)}>
+          Climb
+        </button>
+      </div>
+      <p className="muted small">
+        Climbing takes a while, and a climber can’t dodge or strike back. Stand next to the wall to
+        climb it.
+      </p>
+    </section>
+  )
+}
+
 /** Most residents of other realms the attack list offers, nearest first. */
 const ATTACK_CHOICES = 12
 
@@ -1106,11 +1202,13 @@ const ATTACK_CHOICES = 12
 function AttackBlock({
   resident,
   others,
+  walls,
   mapSize,
   onAttack,
 }: {
   resident: Resident
   others: Resident[]
+  walls: Building[]
   mapSize: number
   onAttack: (targetId: string) => void
 }) {
@@ -1130,7 +1228,7 @@ function AttackBlock({
           {weapon ? `fights with a ${GOOD_LABELS[weapon].toLowerCase()}` : 'unarmed'}
         </span>
       </div>
-      {o?.kind === 'attack' && (
+      {o?.kind === 'attack' && !walls.some((w) => w.id === o.targetId) && (
         <p className="muted small">Attacking {target?.name ?? 'someone out of sight'}.</p>
       )}
       {choices.length === 0 ? (

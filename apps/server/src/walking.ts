@@ -32,6 +32,7 @@ import type { OrderKind, OrderSender } from './orders.js'
 import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { realmOf } from './starting-city.js'
 import { waitingForArmy } from './armies.js'
+import { attackTarget } from './combat.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
 export const PATH_BUDGET_MS = 50
@@ -90,11 +91,11 @@ function moveOrder(r: Resident): MoveOrder | undefined {
 
 /**
  * Where a moving order goes: its target, a haul route's next stop, or the tile an attack order's
- * target stands on; nowhere when that target is gone.
+ * target (a resident, or a wall or gate) stands on; nowhere when that target is gone.
  */
 function targetOf(world: WorldState, o: MoveOrder): { x: number; y: number } | undefined {
   if (o.kind === 'haul') return o[o.stop]
-  if (o.kind === 'attack') return world.residents.find((x) => x.id === o.targetId)
+  if (o.kind === 'attack') return attackTarget(world, o.targetId)
   if (o.kind === 'roadLine') return { x: o.tiles[0]![0], y: o.tiles[0]![1] }
   return o.target
 }

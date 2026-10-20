@@ -253,7 +253,7 @@ export function foreignWall(
  * next to it (`strandedOnWall`).
  */
 export function climbLanding(
-  walls: WallMap,
+  world: Pick<WorldState, 'buildings'>,
   terrain: TerrainMap,
   from: { x: number; y: number },
   wall: { x: number; y: number },
@@ -262,6 +262,7 @@ export function climbLanding(
   const x = wrap(wall.x + wrapDelta(from.x, wall.x, size), size)
   const y = wrap(wall.y + wrapDelta(from.y, wall.y, size), size)
   const t = tileIndex(size, x, y)
-  if (walls.tiles.has(t) || !isPassableTerrain(terrain.tiles[t]!)) return { x: wall.x, y: wall.y }
+  const walled = world.buildings.some((b) => b.x === x && b.y === y && isWallOrGate(b))
+  if (walled || !isPassableTerrain(terrain.tiles[t]!)) return { x: wall.x, y: wall.y }
   return { x, y }
 }
