@@ -1,4 +1,6 @@
 import {
+  isWallOrGate,
+  wallStrength,
   ALLIANCE_LEAVE_DELAY,
   ALLIANCE_RECALL_DELAY,
   ALLIANCE_NAME_MAX_LENGTH,
@@ -1150,6 +1152,55 @@ export const gatesSound: Invariant = {
 }
 
 /**
+ * Broken walls are sound (`CONTEXT.md`: Walls in combat): only a finished wall or gate takes
+ * damage, and it stands only while its damage is short of its `wallStrength`.
+ */
+export const wallDamageSound: Invariant = {
+  name: 'wall-damage-sound',
+  check(world) {
+    return world.buildings
+      .filter(
+        (b) =>
+          b.damage !== undefined &&
+          (!isWallOrGate(b) || !(b.damage >= 0 && b.damage < wallStrength(b))),
+      )
+      .map((b) => ({
+        invariant: this.name,
+        message: `${b.site ? 'site of a ' : ''}${b.kind} ${b.id} stands with damage ${b.damage}`,
+        entityIds: [b.id],
+      }))
+  },
+}
+
+/**
+ * Climb orders are sound (`CONTEXT.md`: Walls in combat): the climber stands where they started
+ * climbing, and is between 0 and 1 of the way over.
+ */
+export const climbOrdersSound: Invariant = {
+  name: 'climb-orders-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'climb') continue
+      const problem =
+        r.x !== o.at.x || r.y !== o.at.y
+          ? `climbs from (${o.at.x}, ${o.at.y}) but stands on (${r.x}, ${r.y})`
+          : !(o.progress >= 0 && o.progress < 1)
+            ? `is ${o.progress} of the way over a wall`
+            : undefined
+      if (problem)
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${problem}`,
+          entityIds: [r.id],
+        })
+    }
+    return out
+  },
+}
+
+/**
  * Road orders along a line are sound (`CONTEXT.md`: Road): they have tiles left, at most
  * `ROAD_LINE_MAX_TILES`, each next to the one before; and after a tick one building on a site
  * stands on that road site, on the order's first tile (`resolveBuilding` moves the order on from
@@ -1263,6 +1314,8 @@ export const worldInvariants: Invariant[] = [
   supplyLinesSound,
   crimesSound,
   gatesSound,
+  wallDamageSound,
+  climbOrdersSound,
   tradeOrgSound,
   roadLineOrdersSound,
 ]

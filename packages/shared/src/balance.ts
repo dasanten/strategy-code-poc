@@ -962,6 +962,26 @@ export const MIN_BLOW_DAMAGE = 1
  */
 export const WALL_DEFENCE = 0.25
 
+/**
+ * Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
+ * broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
+ * of wall alone in about five minutes; ten soldiers with swords in well under one. A gate holds
+ * out half as long again.
+ */
+export const WALL_STRENGTH: Record<'wall' | 'gate', number> = { wall: 600, gate: 900 }
+
+/**
+ * Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
+ * less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered.
+ */
+export const BROKEN_MATERIALS_RETURNED = 0.3
+
+/**
+ * Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): a
+ * minute, as long as walking two tiles of plains, all the while unable to dodge or strike back.
+ */
+export const CLIMB_TICKS = 60
+
 /** Chance of dodging a blow for each point of Agility: an average resident dodges one in five. */
 export const DODGE_PER_AGILITY = 0.02
 

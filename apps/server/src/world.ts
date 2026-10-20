@@ -24,6 +24,7 @@ import { stepAging, type AgingResult } from './aging.js'
 import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
+import { requestClimbing, resolveClimbing } from './climbing.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
@@ -115,7 +116,7 @@ export interface StepResult {
 
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
- * horses, and stables breed foals; food spoils at the end of each game day and Trade Org warehouses top up to their stock floor; then their orders request actions (steps, then blows in fights, then taking and
+ * horses, and stables breed foals; food spoils at the end of each game day and Trade Org warehouses top up to their stock floor; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
  * putting down goods, haul routes' and road orders' included, then paying for mercenary contracts, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
@@ -136,6 +137,8 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   walking?.resolve(world, steps)
   const strikes = requestStrikes(world, terrain.size)
   const combat = resolveStrikes(world, strikes, terrain.size)
+  const climbs = requestClimbing(world)
+  resolveClimbing(world, climbs, terrain)
   const carries = [
     ...requestCarrying(world),
     ...requestHauling(world, terrain.size),
@@ -162,6 +165,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const actions =
     steps.length +
     strikes.length +
+    climbs.length +
     carries.length +
     builds.length +
     teardowns.length +
