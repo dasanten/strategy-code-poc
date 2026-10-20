@@ -87,9 +87,9 @@ describe('script bindings', () => {
     const { world, explored } = setup()
     const { globals } = runAs(world, explored, '')
     expect(Object.keys(globals).sort()).toEqual(SCRIPT_API.map((b) => b.name).sort())
-    // Alliance and army orders are not orders a resident can get.
+    // Alliance and army orders and the gate order are the realm's, not a resident's.
     const residentOrders = Object.keys(orderKinds).filter(
-      (k) => !(k in allianceOrders) && !(k in armyOrders),
+      (k) => !(k in allianceOrders) && !(k in armyOrders) && k !== 'setGate',
     )
     expect([...SCRIPT_ORDER_KINDS].sort()).toEqual(residentOrders.sort())
   })

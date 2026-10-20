@@ -381,9 +381,9 @@ describe('world saves', () => {
     expect(migrateWorld(v15, 15, { terrain }, migrations, 16)).toEqual({ ...v15, alliances: [] })
   })
 
-  it('gives the world no armies (migration 17 → 18)', () => {
-    const v17 = { tick: 10, seed: 1, residents: [], realms: [], alliances: [] }
-    expect(migrateWorld(v17, 17, { terrain }, migrations, 18)).toEqual({ ...v17, armies: [] })
+  it('gives the world no armies (migration 18 → 19)', () => {
+    const v18 = { tick: 10, seed: 1, residents: [], realms: [], alliances: [], crimes: [] }
+    expect(migrateWorld(v18, 18, { terrain }, migrations, 19)).toEqual({ ...v18, armies: [] })
   })
 
   it('places NPC cities in the live world, out of every Player’s sight (migration 16 → 17)', () => {
@@ -411,6 +411,11 @@ describe('world saves', () => {
     expect(checkInvariants(v17, land)).toEqual([])
     // The same save always migrates the same way.
     expect(migrateWorld(structuredClone(world), 16, { terrain: land }, migrations, 17)).toEqual(v17)
+  })
+
+  it('gives the world no crimes (migration 17 → 18)', () => {
+    const v17 = { tick: 10, seed: 1, residents: [], realms: [] }
+    expect(migrateWorld(v17, 17, { terrain }, migrations, 18)).toEqual({ ...v17, crimes: [] })
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

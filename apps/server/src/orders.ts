@@ -10,6 +10,7 @@ import { workAt } from './work.js'
 import { allianceOrders } from './alliances.js'
 import { attack } from './combat.js'
 import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
+import { setGate } from './gates.js'
 import { roadLine } from './road-line.js'
 
 /** Who sent an order: the Player's account and id. */
@@ -46,6 +47,7 @@ export const orderKinds: Record<string, OrderKind> = {
   workAt,
   pair,
   attack,
+  setGate,
   roadLine,
   ...allianceOrders,
   ...armyOrders,
@@ -94,6 +96,11 @@ export class OrderQueue {
     const batch = this.pending
     this.pending = []
     for (const { sender, order } of batch) {
+      // Any other order for a resident ends the script they run (`CONTEXT.md`: Running a script).
+      if (order.kind !== 'runScript') {
+        const r = world.residents.find((x) => x.id === order.residentId)
+        if (r) delete r.script
+      }
       const before = order.kind in armyOrders ? undefined : memberOrders(world)
       this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
       if (before) leaveOnOwnOrders(world, before)

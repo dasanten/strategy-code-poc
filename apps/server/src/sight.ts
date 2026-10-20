@@ -47,7 +47,16 @@ export function entitiesInSight(
   if (observers.length === 0) return []
   const size = terrain.size
   const out: SeenEntity[] = []
-  for (const r of world.residents) if (seen(size, observers, r)) out.push({ is: 'resident', ...r })
+  for (const r of world.residents) {
+    if (!seen(size, observers, r)) continue
+    // Which script a resident runs is seen; its memory stays on the server.
+    const { script, ...rest } = r
+    out.push({
+      is: 'resident',
+      ...rest,
+      ...(script ? { script: { scriptId: script.scriptId } } : {}),
+    })
+  }
   const seenCities = new Set<string>()
   for (const b of world.buildings) {
     if (!seen(size, observers, b)) continue
