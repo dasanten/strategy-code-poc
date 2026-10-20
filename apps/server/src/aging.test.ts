@@ -38,7 +38,7 @@ describe('aging', () => {
     for (let year = 1; world.residents.length > 0; year++) {
       expect(year).toBeLessThan(LIFESPAN_MAX)
       world.tick = year * TICKS_PER_GAME_YEAR
-      const { died, ended } = stepAging(world)
+      const { died, ended } = stepAging(world, terrain.size)
       deaths.push(...died.map((r) => ({ id: r.id, age: ageInYears(r, world.tick) })))
       if (ended.includes(realm)) realmEnded = year
       expect(checkInvariants(world, terrain)).toEqual([])
@@ -112,7 +112,7 @@ describe('aging', () => {
     r.carried = { food: 5, stone: Math.floor(carryCapacity(r, world.tick)) - 5 }
     expect(checkInvariants(world, terrain)).toEqual([])
     aged(r, DECLINE_AGE + 10, world.tick)
-    stepAging(world)
+    stepAging(world, terrain.size)
     const capacity = carryCapacity(r, world.tick)
     expect(stockWeight(r.carried)).toBeLessThanOrEqual(capacity)
     expect(stockWeight(r.carried)).toBeGreaterThan(capacity - 1)

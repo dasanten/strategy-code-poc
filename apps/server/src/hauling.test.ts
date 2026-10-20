@@ -48,13 +48,22 @@ function setup(map: TerrainMap = open) {
   const horse: Horse = {
     id: 'h1',
     realmId: 'r1',
+    cityId: null,
     x: 2,
     y: 2,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
   }
   world.horses.push(horse)
-  const carriage: Carriage = { id: 'k1', realmId: 'r1', x: 2, y: 2, horseId: null, load: {} }
+  const carriage: Carriage = {
+    id: 'k1',
+    realmId: 'r1',
+    cityId: null,
+    x: 2,
+    y: 2,
+    horseId: null,
+    load: {},
+  }
   world.carriages.push(carriage)
   addCity(world, { id: 'c1', name: 'Ash', realmId: 'r1', x: 10, y: 1 })
   const storage: Building = { id: 's1', kind: 'storage', cityId: 'c1', x: 10, y: 2, stock: {} }

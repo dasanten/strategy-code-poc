@@ -30,6 +30,7 @@ const open = draw(Array.from({ length: 16 }, () => '.'.repeat(16)))
 /** A world on `map` with one resident at (x, y) of the given Agility, owned by realm r1. */
 function oneWalker(map: TerrainMap, x: number, y: number, agility = 10) {
   const world = createWorld(map)
+  world.realms.push({ id: 'r1', userId: 7, leaderId: 'w1' })
   const r = newResident(mulberry32(1), { id: 'w1', owner: 'r1', x, y, tick: 0 })
   r.stats.agility = { base: agility, trained: 0 }
   world.residents.push(r)

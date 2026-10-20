@@ -289,7 +289,15 @@ describe('workplaces on nodes', () => {
   it('lets a worker running low take meals from a carriage standing there, after the pile', () => {
     const { world, r } = onNode('mine', 'ironOre', 7)
     r.carried = {}
-    world.carriages.push({ id: 'k1', realmId: null, x: 7, y: 1, horseId: null, load: { food: 5 } })
+    world.carriages.push({
+      id: 'k1',
+      realmId: null,
+      cityId: null,
+      x: 7,
+      y: 1,
+      horseId: null,
+      load: { food: 5 },
+    })
     world.piles.push({ id: 'p', x: 7, y: 1, goods: { food: 1 } })
     run(world)
     // The pile's one meal first, then the carriage's.

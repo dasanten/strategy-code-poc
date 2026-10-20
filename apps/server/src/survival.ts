@@ -17,6 +17,8 @@ import {
   type City,
   type DeathCause,
   groundAt,
+  townHallOf,
+  wrapDistance,
   roadTiles,
   type Good,
   type Realm,
@@ -27,7 +29,7 @@ import {
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import { leaveOnLeaderDeath } from './alliances.js'
-import { NPC_ORDER_KINDS } from './npc-behaviour.js'
+import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
 
 /** How far one unit of food fills the hunger meter. */
 const FILL_PER_FOOD = (MAX_HUNGER * HUNGER_DAYS) / FOOD_PER_DAY
@@ -70,18 +72,19 @@ export function stepSurvival(world: WorldState, terrain: TerrainMap): SurvivalRe
     else r.health = Math.min(MAX_HEALTH, r.health + heal)
     if (r.health <= 0) died.push(r)
   }
-  return { died, ended: dieAll(world, died, 'starved') }
+  return { died, ended: dieAll(world, died, 'starved', terrain.size) }
 }
 
 /**
  * Residents die of `cause`, each death going in their Player's realm log; a Leader's death ends
  * their realm. `killers` names who killed each of them, by resident id, when they were killed.
- * Returns the realms that ended.
+ * Returns the realms that ended. `size` is the map's.
  */
 export function dieAll(
   world: WorldState,
   died: Resident[],
   cause: DeathCause,
+  size: number,
   killers?: Map<string, string>,
 ): Realm[] {
   // Every death is written down before any realm ends, so all of them reach the Player.
@@ -102,7 +105,7 @@ export function dieAll(
     die(world, r)
     const realm = world.realms.find((x) => x.leaderId === r.id)
     if (realm) {
-      endRealm(world, realm)
+      endRealm(world, realm, size)
       ended.push(realm)
     }
   }
@@ -134,23 +137,65 @@ export function dropGoods(world: WorldState, x: number, y: number, stock: Stock)
 }
 
 /**
- * Leader death, in its basic form (`CONTEXT.md`: Leader death): the realm ends, and its
- * residents, cities, horses and carriages stay where they are, belonging to nobody. The Player
- * gets a fresh starting city on their next login. The realm leaves its alliance at once. With
- * control the Player's orders end too, but for those an NPC city gives itself
- * (`NPC_ORDER_KINDS`): its behaviour takes the residents over.
+ * Leader death (`CONTEXT.md`: Leader death, Self-managed city): the realm ends and leaves its
+ * alliance at once, and each of its cities becomes its own self-managed city, an NPC city with
+ * the residents who live there. Homeless residents join the nearest of those cities, and each
+ * horse and carriage goes to the one nearest it. With control the Player's orders end: a
+ * resident away walks home (`walkHomeIfAway`), and the others keep only the orders an NPC city
+ * gives itself (`NPC_ORDER_KINDS`), so its behaviour takes over. With no city left to go to, the
+ * realm's residents, horses and carriages belong to nobody. The Player gets a fresh starting
+ * city on their next login. `size` is the map's.
  */
-export function endRealm(world: WorldState, realm: Realm): void {
+export function endRealm(world: WorldState, realm: Realm, size: number): void {
   leaveOnLeaderDeath(world, realm.id)
   world.realms = world.realms.filter((x) => x !== realm)
+  const cities = world.cities.filter((c) => c.realmId === realm.id)
+  for (const c of cities) c.realmId = null
   for (const r of world.residents) {
     if (r.owner !== realm.id) continue
     r.owner = null
+    if (r.cityId === null) r.cityId = nearestCity(world, cities, r, size)?.id ?? null
+    const city = cities.find((c) => c.id === r.cityId)
+    if (city && walkHomeIfAway(world, city, r, size)) continue
     if (r.order && !NPC_ORDER_KINDS.includes(r.order.kind)) r.order = null
   }
-  for (const c of world.cities) if (c.realmId === realm.id) c.realmId = null
-  for (const h of world.horses) if (h.realmId === realm.id) h.realmId = null
-  for (const k of world.carriages) if (k.realmId === realm.id) k.realmId = null
+  for (const k of [...world.horses, ...world.carriages]) {
+    if (k.realmId !== realm.id) continue
+    k.realmId = null
+    k.cityId = nearestCity(world, cities, k, size)?.id ?? null
+  }
+}
+
+/** Of `cities`, the one whose town hall is nearest a spot; undefined when there is none. */
+export function nearestCity(
+  world: WorldState,
+  cities: City[],
+  at: { x: number; y: number },
+  size: number,
+): City | undefined {
+  let best: { city: City; d: number } | undefined
+  for (const city of cities) {
+    const hall = townHallOf(world, city)
+    const d = hall ? wrapDistance(size, at, hall) : Infinity
+    if (hall && (!best || d < best.d)) best = { city, d }
+  }
+  return best?.city
+}
+
+/**
+ * Sends a resident of an NPC city who is away from it home (`npcHome`): one outside its area
+ * (`CONTEXT.md`: City area) who is not working one of its workplaces. Returns whether they were
+ * sent.
+ */
+export function walkHomeIfAway(world: WorldState, city: City, r: Resident, size: number): boolean {
+  const o = r.order
+  const atWork =
+    o?.kind === 'workAt' &&
+    world.buildings.some((b) => b.id === o.buildingId && b.cityId === city.id)
+  const home = npcHome(world, city)
+  if (atWork || !home || inCityArea(world, city, r.x, r.y, size)) return false
+  walkTo(r, home)
+  return true
 }
 
 /**

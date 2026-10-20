@@ -3,7 +3,9 @@ import {
   drivenCarriageId,
   inCityArea,
   realmName,
+  type Carriage,
   type City,
+  type Horse,
   type WorldState,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
@@ -57,15 +59,22 @@ export function captureCity(world: WorldState, city: City, captor: string, size:
     }
   }
   const inArea = (t: { x: number; y: number }) => inCityArea(world, city, t.x, t.y, size)
+  // Its former owner's: of its realm, or for an NPC city, of the city itself.
+  const fromOwner = (t: Horse | Carriage) =>
+    t.realmId === from && (from !== null || t.cityId === city.id) && inArea(t)
+  const join = (t: Horse | Carriage) => {
+    t.realmId = captor
+    t.cityId = null
+  }
   const carriages = new Set<string>()
   for (const k of world.carriages) {
-    if (k.realmId !== from || !inArea(k)) continue
-    k.realmId = captor
+    if (!fromOwner(k)) continue
+    join(k)
     carriages.add(k.id)
     const horse = world.horses.find((h) => h.id === k.horseId)
-    if (horse) horse.realmId = captor
+    if (horse) join(horse)
   }
-  for (const h of world.horses) if (h.realmId === from && inArea(h)) h.realmId = captor
+  for (const h of world.horses) if (fromOwner(h)) join(h)
   const owners = new Map(world.residents.map((r) => [r.id, r.owner]))
   for (const r of world.residents) {
     const driven = drivenCarriageId(r)

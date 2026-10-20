@@ -76,7 +76,7 @@ describe('children', () => {
     expect(workAt()).toMatchObject({ type: 'rejected', reason: 'children can’t work' })
 
     world.tick = child.bornAt + ADULT_AGE * TICKS_PER_GAME_YEAR - 1
-    expect(stepAging(world).grown).toEqual([])
+    expect(stepAging(world, terrain.size).grown).toEqual([])
     expect(workAt()).toMatchObject({ type: 'rejected', reason: 'children can’t work' })
     expect(world.events.some((e) => e.kind === 'grownUp')).toBe(false)
 

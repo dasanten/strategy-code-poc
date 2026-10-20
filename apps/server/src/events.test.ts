@@ -50,7 +50,7 @@ describe('realm events', () => {
     const realm = world.realms[0]!
     const r = world.residents.find((x) => x.id !== realm.leaderId)!
     r.bornAt = world.tick - r.lifespan * TICKS_PER_GAME_YEAR
-    stepAging(world)
+    stepAging(world, terrain.size)
     expect(eventsFor(world, realm.userId)).toEqual([
       {
         kind: 'died',

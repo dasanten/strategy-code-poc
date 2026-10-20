@@ -209,7 +209,7 @@ describe('scripts last', () => {
     const s = createScript(db, realm.userId, { name: 'miners', source: VALID })
 
     const leader = world.residents.find((r) => r.id === realm.leaderId)!
-    expect(dieAll(world, [leader], 'oldAge').map((x) => x.id)).toEqual([realm.id])
+    expect(dieAll(world, [leader], 'oldAge', terrain.size).map((x) => x.id)).toEqual([realm.id])
     expect(world.realms).toEqual([])
     saveWorld(db, world)
     const { world: loaded } = loadOrCreateWorld(db, () => terrain)

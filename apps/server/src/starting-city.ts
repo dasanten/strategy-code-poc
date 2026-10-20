@@ -231,6 +231,7 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
     world.horses.push({
       id: newId(world, 'horse'),
       realmId,
+      cityId: null,
       x: sx,
       y: sy,
       hunger: MAX_HUNGER,
@@ -241,6 +242,7 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
   world.carriages.push({
     id: newId(world, 'carriage'),
     realmId,
+    cityId: null,
     x: sx,
     y: sy,
     horseId: world.horses.at(-1)!.id,

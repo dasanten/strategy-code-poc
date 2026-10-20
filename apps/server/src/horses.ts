@@ -68,6 +68,7 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
     const foal: Horse = {
       id: newId(world, 'horse'),
       realmId: pair[0].realmId,
+      cityId: pair[0].cityId,
       x: stable.x,
       y: stable.y,
       hunger: MAX_HUNGER,

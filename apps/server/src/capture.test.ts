@@ -133,6 +133,39 @@ describe('capturing a city', () => {
     expect(npc.realmId).toBe('r1')
   })
 
+  it('takes an NPC city with its own horses and carriages, not those of another NPC city', () => {
+    const { world, npc } = setup()
+    addCity(world, { id: 'npc2', realmId: null, x: 60, y: 60, name: 'Redbank' })
+    const horse = (id: string, cityId: string) => ({
+      id,
+      realmId: null,
+      cityId,
+      x: 21,
+      y: 21,
+      hunger: 100,
+      health: 100,
+    })
+    world.horses.push(horse('hN', 'npc'), horse('hO', 'npc2'))
+    world.carriages.push({
+      id: 'kN',
+      realmId: null,
+      cityId: 'npc',
+      x: 21,
+      y: 21,
+      horseId: null,
+      load: {},
+    })
+    armed(resident(world, 'a2', 'r1', 21, 20))
+    stepWorld(world, terrain)
+    expect(npc.realmId).toBe('r1')
+    expect(world.horses.map((h) => [h.realmId, h.cityId])).toEqual([
+      ['r1', null],
+      [null, 'npc2'],
+    ])
+    expect(world.carriages[0]).toMatchObject({ realmId: 'r1', cityId: null })
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
   it('takes a Player’s city with its horses and carriages, and both realm logs show it', () => {
     const { world } = setup()
     const city = addCity(world, { id: 'c2', realmId: 'r2', x: 40, y: 40, name: 'Hartwell' })
@@ -145,10 +178,42 @@ describe('capturing a city', () => {
     b2.order = { kind: 'pair', partnerId: 'b3', since: 0 }
     b3.order = { kind: 'pair', partnerId: 'b2', since: 0 }
     const away = resident(world, 'b4', 'r2', 41, 39)
-    world.horses.push({ id: 'hA', realmId: 'r2', x: 43, y: 40, hunger: 100, health: 100 })
-    world.horses.push({ id: 'hB', realmId: 'r2', x: 50, y: 40, hunger: 100, health: 100 })
-    world.carriages.push({ id: 'kA', realmId: 'r2', x: 43, y: 41, horseId: null, load: {} })
-    world.carriages.push({ id: 'kB', realmId: 'r2', x: 10, y: 40, horseId: null, load: {} })
+    world.horses.push({
+      id: 'hA',
+      realmId: 'r2',
+      cityId: null,
+      x: 43,
+      y: 40,
+      hunger: 100,
+      health: 100,
+    })
+    world.horses.push({
+      id: 'hB',
+      realmId: 'r2',
+      cityId: null,
+      x: 50,
+      y: 40,
+      hunger: 100,
+      health: 100,
+    })
+    world.carriages.push({
+      id: 'kA',
+      realmId: 'r2',
+      cityId: null,
+      x: 43,
+      y: 41,
+      horseId: null,
+      load: {},
+    })
+    world.carriages.push({
+      id: 'kB',
+      realmId: 'r2',
+      cityId: null,
+      x: 10,
+      y: 40,
+      horseId: null,
+      load: {},
+    })
     const a2 = armed(resident(world, 'a2', 'r1', 43, 39))
     a2.order = attackOrder('b2')
     stepWorld(world, terrain)

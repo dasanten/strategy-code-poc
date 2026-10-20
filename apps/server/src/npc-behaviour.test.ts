@@ -142,9 +142,11 @@ describe('NPC cities work and eat', () => {
     const { world, terrain } = worldWithCity()
     const realm = world.realms[0]!
     const [driver, worker] = world.residents
+    const hall = world.buildings.find((b) => b.kind === 'townHall')!
+    Object.assign(driver!, { x: hall.x, y: hall.y })
     driver!.order = { kind: 'tearDown', buildingId: world.buildings[0]!.id, at: { x: 0, y: 0 } }
     const work = worker!.order
-    endRealm(world, realm)
+    endRealm(world, realm, terrain.size)
     expect(driver!.order).toBeNull()
     expect(worker!.order).toEqual(work)
     stepNpcCities(world, terrain.size)
