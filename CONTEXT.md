@@ -57,7 +57,7 @@ The shared language of the game. Domain terms only — no implementation details
   - **Mine / Quarry / Lumber camp:** built on a resource node; makes what the node yields (a mine
     iron ore or gold ore). Lumber camps teach Woodcutting, quarries and mines Mining.
   - **Farm:** built on plains, produces Food and teaches Farming. Not tied to a node, but each
-    farm has a cap.
+    farm has a cap. A farm belongs to the city of the resident who laid it out.
   - **Smelter / Mint:** a smelter turns ore into metal (Iron ore → Iron), a mint Gold ore into
     Coins, at fixed conversion rates. Anyone can build either. They have no storage: the ore
     they use is what their workers carry, then what lies in the pile on their tile; without it
@@ -176,9 +176,13 @@ The shared language of the game. Domain terms only — no implementation details
   its farms and workplaces and carries the output to its storage (its workers take food from
   the storage before they set out and come home for more when they run low), pairs its adults,
   builds a house when it has a food surplus and no free housing, and puts more residents on farms (or
-  builds a farm) when Food runs short. It never founds new cities: when it has no room left it
-  grows its area by building on the edge, puts up a new wall there and then tears down the old
-  one. A Player does the same by hand, if they want to. The world starts out with NPC villages
+  builds a farm, when every farm is full) when Food runs short. When it needs a material it has no
+  workplace for (Wood for walls and houses), it builds the matching workplace on the nearest
+  fitting resource node and works it like its other workplaces, carrying the output to its
+  storage. It never founds new cities: when it has no room left inside its wall it grows its area
+  by building on the edge, puts up a new wall 2 tiles further out on every side, with the gate in
+  the same place, and only once every tile of the new wall is finished tears down the old one.
+  Its residents stand on its walls as a realm's do. A Player does the same by hand, if they want to. The world starts out with NPC villages
   and towns, on Plains, far from every starting city and from each other, and out of every
   Player's sight.
 - **Integrating:** bringing a village or city into your realm, with its residents. Three ways:

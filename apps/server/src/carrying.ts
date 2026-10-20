@@ -16,6 +16,8 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { finishSite } from './building.js'
+import { updateCityMembership } from './cities.js'
 import { buildingOrganization, carriageOrganization, commitCrime } from './crimes.js'
 import type { OrderKind, OrderSender } from './orders.js'
 import { realmOf } from './starting-city.js'
@@ -172,7 +174,7 @@ export function resolveCarrying(world: WorldState, actions: CarryAction[], size 
     const r = world.residents.find((x) => x.id === a.residentId)
     if (!r) continue
     if (a.kind === 'take') take(world, r, a, size)
-    else put(world, r, a)
+    else put(world, r, a, size)
     if (r.order?.kind === 'pickUp' || r.order?.kind === 'drop') r.order = null
   }
 }
@@ -210,7 +212,11 @@ function spotOrganization(world: WorldState, spot: GoodsSpot): string | null {
   return null
 }
 
-function put(world: WorldState, r: Resident, a: CarryAction): void {
+/**
+ * Puts down goods. The last materials delivered to a site that has all its work finish it
+ * (`finishSite`).
+ */
+function put(world: WorldState, r: Resident, a: CarryAction, size: number): void {
   // On the ground the goods go in the tile's pile; a storage or site that is gone takes nothing.
   const target = a.spot.kind === 'ground' ? {} : spotStock(world, r, a.spot)
   if (!target) return
@@ -224,6 +230,8 @@ function put(world: WorldState, r: Resident, a: CarryAction): void {
     move(r.carried, target, good, units)
   }
   if (a.spot.kind === 'ground') dropGoods(world, r.x, r.y, target)
+  const site = a.spot.kind === 'site' && siteAt(world, r.x, r.y, a.spot.siteId)
+  if (site && finishSite(world, site, r)) updateCityMembership(world, size)
 }
 
 function carriageOf(world: WorldState, spot: { carriageId: string }) {

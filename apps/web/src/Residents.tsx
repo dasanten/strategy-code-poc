@@ -66,6 +66,8 @@ const GOOD_LABELS: Record<Good, string> = {
 const BUILD_BLURBS: Partial<Record<BuildingKind, string>> = {
   road: 'A road: residents walk and carriages drive faster on it, on any land but Mountain, and it can run through a gate. Nobody owns it. ',
   stable: 'A stable keeps horses and their Food, and breeds them; on Plains only. ',
+  farm: 'A farm makes Food and teaches Farming; on Plains only. ',
+  house: 'A house is room for a few residents; only in a city’s area, and it grows the city. ',
   smelter: 'A smelter turns iron ore into iron; not on Mountain. ',
   mint: 'A mint turns gold ore into coins; not on Mountain. ',
   smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain. ',
@@ -747,9 +749,11 @@ function BuildBlock({
     )
   }
   if (!building) {
-    // On a node its workplace; anywhere else a stable (the server allows it on Plains only), a
-    // smelter, a mint or a smithy (not on Mountain).
-    const kinds: BuildingKind[] = node ? [NODE_WORKPLACE[node.kind]] : ['stable', ...PROCESSING]
+    // On a node its workplace; anywhere else a farm or a stable (the server allows them on Plains
+    // only), a house (in a city's area), a smelter, a mint or a smithy (not on Mountain).
+    const kinds: BuildingKind[] = node
+      ? [NODE_WORKPLACE[node.kind]]
+      : ['farm', 'house', 'stable', ...PROCESSING]
     return (
       <section className="inspector-block" aria-label="Build">
         <div className="panel-head">

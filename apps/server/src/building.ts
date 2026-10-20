@@ -1,4 +1,7 @@
 import {
+  MAX_WORKERS,
+  ON_PLAINS,
+  PROCESSING,
   BUILDABLE,
   BUILD_WORK,
   MAP_SIZE,
@@ -10,6 +13,7 @@ import {
   materialsNeeded,
   workNeeded,
   type BuildOrder,
+  type Building,
   type BuildingKind,
   type OrderRequest,
   type Resident,
@@ -95,6 +99,44 @@ export function nextTile(r: Resident): void {
   o.siteId = null
 }
 
+/**
+ * The city a site is laid out for (`CONTEXT.md`: Farm): a farm or stable belongs to the city of the
+ * resident who lays it out, and keeps it while that city exists. Anything else starts out of every
+ * city; a city building joins one once finished (`updateCityMembership`).
+ */
+function laidOutFor(world: WorldState, r: Resident, kind: BuildingKind): string | null {
+  if (!ON_PLAINS.includes(kind) || r.cityId === null) return null
+  return world.cities.some((c) => c.id === r.cityId) ? r.cityId : null
+}
+
+/**
+ * A workplace on a node that a resident of an NPC city lays out is one of that city's workplaces
+ * (`City.workplaceIds`), so the city works it (`CONTEXT.md`: NPC city). It still belongs to no
+ * city: whoever works it holds it.
+ */
+function ownWorkplace(world: WorldState, r: Resident, kind: BuildingKind, id: string): void {
+  if (MAX_WORKERS[kind] === undefined || ON_PLAINS.includes(kind) || PROCESSING.includes(kind))
+    return
+  const city = world.cities.find((c) => c.id === r.cityId)
+  if (!city || city.realmId !== null || r.owner !== null) return
+  city.workplaceIds = [...(city.workplaceIds ?? []), id]
+}
+
+/**
+ * Makes a construction site the building once it has all its materials and work
+ * (`CONTEXT.md`: Construction site), whether the last of them was work or a delivery; `r` is the
+ * resident who put it in. A finished town hall founds a city of their realm. Returns whether it
+ * was finished; the caller brings city membership up to date (`updateCityMembership`).
+ */
+export function finishSite(world: WorldState, site: Building, r: Resident): boolean {
+  if (!site.site || workNeeded(site) > 0 || Object.keys(materialsNeeded(site)).length > 0) {
+    return false
+  }
+  delete site.site
+  if (site.kind === 'townHall') foundCity(world, site, r.owner)
+  return true
+}
+
 /** Requests this tick's build actions: laying out the site first, then work. */
 export function requestBuilding(world: WorldState): BuildAction[] {
   const actions: BuildAction[] = []
@@ -141,12 +183,13 @@ export function resolveBuilding(
         world.buildings.push({
           id,
           kind: part.building,
-          cityId: null,
+          cityId: laidOutFor(world, r, part.building),
           x: r.x,
           y: r.y,
           site: { delivered: {}, work: 0 },
         })
         o.siteId = id
+        ownWorkplace(world, r, part.building, id)
       }
       continue
     }
@@ -162,11 +205,7 @@ export function resolveBuilding(
       )
       r.skills.construction = (r.skills.construction ?? 0) + constructionLearned(r, world.tick)
     }
-    if (workNeeded(site) === 0 && Object.keys(materialsNeeded(site)).length === 0) {
-      delete site.site
-      finished = true
-      if (site.kind === 'townHall') foundCity(world, site, r.owner)
-    }
+    finished = finishSite(world, site, r) || finished
   }
   if (finished) updateCityMembership(world, terrain?.size ?? MAP_SIZE)
   // Orders on a site that is finished go on (a road order to its next tile); on one that is gone, they end.
