@@ -26,6 +26,7 @@ import {
 import { updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime, organizationOf } from './crimes.js'
 import { recordEvent } from './events.js'
+import { noteMade } from './goods-made.js'
 import type { OrderKind } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
 import { realmOf } from './starting-city.js'
@@ -266,7 +267,9 @@ function breakWall(world: WorldState, a: Resident, b: Building, size: number): b
   const victimOrg = buildingOrganization(world, b)
   commitCrime(world, size, 'tearDown', a, { victimOrg, building: b.kind })
   world.buildings = world.buildings.filter((x) => x !== b)
-  dropGoods(world, b.x, b.y, brokenReturns(b))
+  const returned = brokenReturns(b)
+  dropGoods(world, b.x, b.y, returned)
+  noteMade(world, returned)
   return true
 }
 

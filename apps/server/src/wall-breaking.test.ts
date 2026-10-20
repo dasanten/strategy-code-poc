@@ -15,7 +15,13 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { attackOrder } from './combat.js'
-import { checkInvariants, climbOrdersSound, wallDamageSound } from './invariants.js'
+import { tallyGoods, takeMade } from './goods-made.js'
+import {
+  checkInvariants,
+  climbOrdersSound,
+  goodsOnlyFromNothingAtTheFloor,
+  wallDamageSound,
+} from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { addCity } from './test-terrain.js'
@@ -75,8 +81,12 @@ function send(world: WorldState, sender: typeof me, order: object) {
 function run(world: WorldState, n: number, walking?: Walking) {
   for (let i = 0; i < n; i++) {
     for (const r of world.residents) r.hunger = 100
+    const goods = tallyGoods(world)
+    takeMade(world)
     stepWorld(world, terrain, walking)
     expect(checkInvariants(world, terrain, [wallDamageSound, climbOrdersSound])).toEqual([])
+    // What a broken wall leaves counts as made, not as from nothing.
+    expect(goodsOnlyFromNothingAtTheFloor(goods, world, takeMade(world))).toEqual([])
   }
 }
 

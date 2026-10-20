@@ -121,7 +121,8 @@ describe('caravans on their route', () => {
     const walking = new Walking(terrain)
     const postWarehouse = routeEnd(world, caravan, 'post').warehouse!
     const hqWarehouse = routeEnd(world, caravan, 'hq').warehouse!
-    postWarehouse.stock = { coins: 2_000, wood: 20 }
+    // Wood and coins stay above the stock floor, so the floor adds none of them on the way.
+    postWarehouse.stock = { coins: 2_000, wood: 30 }
     hqWarehouse.stock = { wood: 300, iron: 100 }
     const wood = total(world, 'wood')
     const carriage = world.carriages.find((k) => k.id === caravan.carriageId)!
@@ -137,7 +138,7 @@ describe('caravans on their route', () => {
         }
       }
       if (t % 500 === 0) expect(checkInvariants(world, terrain)).toEqual([])
-      if (caravan.heading === 'hq' && (postWarehouse.stock.wood ?? 0) > 20) reachedPost = true
+      if (caravan.heading === 'hq' && (postWarehouse.stock.wood ?? 0) > 30) reachedPost = true
       back = reachedPost && caravan.heading === 'post' && caravan.stop === 'storage'
     }
     expect(reachedPost).toBe(true)

@@ -112,8 +112,8 @@ The shared language of the game. Domain terms only — no implementation details
   sells. Posts don't share prices, so carrying goods between regions can pay off. Anyone with a
   resident in sight of a warehouse sees its prices.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
-  kind of resource, plus buying). When a warehouse runs low, it tops up to a minimum. This is the
-  one controlled exception to "everything is physical" (see ADR 0003).
+  kind of resource, plus buying). When a warehouse runs low, it tops up to a minimum at the end of
+  each game day. This is the one controlled exception to "everything is physical" (see ADR 0003).
 - **Price anchor:** the Trade Organization buys low and sells high, so it is always there as a
   market of last resort. Its prices rise when its stock is low; Players usually get better deals
   trading with each other.

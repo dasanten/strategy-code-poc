@@ -400,6 +400,65 @@ export const TRADING_POST = {
 }
 
 /**
+ * A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0003), in units: once a game day
+ * its warehouse tops up every good below this to this. Half of what a post starts with, so a
+ * fresh post is well above it.
+ */
+export const WAREHOUSE_FLOOR: Record<Good, number> = {
+  food: 20,
+  wood: 25,
+  stone: 25,
+  ironOre: 10,
+  iron: 5,
+  goldOre: 5,
+  coins: 1_000,
+  spear: 2,
+  sword: 1,
+  shield: 2,
+  armour: 1,
+}
+
+/** How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep. */
+export const HQ_FLOOR_FACTOR = 5
+
+/**
+ * What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
+ * times its floor (`CONTEXT.md`: Warehouse prices, Price anchor). Roughly what goes into it: an
+ * iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 20
+ * coins the mint strikes from it.
+ */
+export const WAREHOUSE_BASE_PRICE: Record<Exclude<Good, 'coins'>, number> = {
+  food: 2,
+  wood: 2,
+  stone: 2,
+  ironOre: 4,
+  iron: 10,
+  goldOre: 15,
+  spear: 20,
+  sword: 30,
+  shield: 22,
+  armour: 90,
+}
+
+/** Stock, in floors, at which a warehouse sells at its base price; less stock costs more. */
+export const PRICE_REFERENCE_FLOORS = 4
+
+/**
+ * How strongly prices follow stock: the sell price is the base price times (reference stock /
+ * stock) to this power, so half the stock costs about 1.4 times as much.
+ */
+export const PRICE_ELASTICITY = 0.5
+
+/** The lowest and highest a sell price goes, as shares of the base price. */
+export const PRICE_RANGE = { min: 0.5, max: 4 }
+
+/**
+ * The share of its sell price a warehouse pays when it buys (`CONTEXT.md`: Price anchor): it
+ * buys low and sells high, so Players usually get better deals trading with each other.
+ */
+export const BUY_SHARE = 0.6
+
+/**
  * Residents of the Trade Org HQ who walk along with each caravan as its escort, besides its
  * driver (`CONTEXT.md`: Caravan). Routes that are attacked get more from Epic 10.
  */

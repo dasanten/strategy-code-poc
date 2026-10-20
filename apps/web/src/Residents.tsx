@@ -51,7 +51,8 @@ import {
 import { useState } from 'react'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 
-const GOOD_LABELS: Record<Good, string> = {
+/** Good names as the UI shows them. */
+export const GOOD_LABELS: Record<Good, string> = {
   food: 'Food',
   wood: 'Wood',
   stone: 'Stone',

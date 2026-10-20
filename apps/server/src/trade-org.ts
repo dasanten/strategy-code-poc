@@ -1,5 +1,6 @@
 import {
   CITY_AREA_MARGIN,
+  HQ_COIN_WAREHOUSE,
   NODE_WORKPLACE,
   SIGHT_RANGE,
   START_CARRIED_FOOD,
@@ -113,7 +114,7 @@ export function hqLayout(cx: number, cy: number): HqLayout {
   return {
     hall: [cx, cy],
     storage: [cx - 1, cy - 1],
-    coinWarehouse: [cx + 1, cy - 1],
+    coinWarehouse: [cx + HQ_COIN_WAREHOUSE.dx, cy + HQ_COIN_WAREHOUSE.dy],
     goodsWarehouse: [cx + 1, cy + 1],
     innerRing,
     innerGates: gatesOf(cx, cy, innerRing),

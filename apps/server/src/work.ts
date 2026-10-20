@@ -24,6 +24,7 @@ import {
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
+import { noteMade } from './goods-made.js'
 import { dropGoods } from './survival.js'
 
 /**
@@ -158,4 +159,5 @@ function useUp(world: WorldState, place: Building, input: Stock): void {
 /** One unit of a workplace's good, left on the pile on its tile (`CONTEXT.md`: Workplace). */
 function produce(world: WorldState, place: Building, good: Good): void {
   dropGoods(world, place.x, place.y, { [good]: 1 })
+  noteMade(world, { [good]: 1 })
 }

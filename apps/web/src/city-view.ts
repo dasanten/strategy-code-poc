@@ -1,4 +1,13 @@
-import type { Building, BuildingKind, City, RealmLabel, Resident, SeenCity } from '@csp/shared'
+import {
+  warehousePrices,
+  type Building,
+  type BuildingKind,
+  type City,
+  type RealmLabel,
+  type Resident,
+  type SeenCity,
+  type WarehousePrice,
+} from '@csp/shared'
 
 /** What the city inspector says about a city in sight, from what the Player sees of it. */
 export interface CityView {
@@ -98,4 +107,26 @@ export function describeBuying(
     coins: here.reduce((n, r) => n + (r.carried.coins ?? 0), 0),
     ...(here[0] ? { buyerId: here[0].id } : {}),
   }
+}
+
+/** A Trade Org warehouse in sight and its prices (`CONTEXT.md`: Warehouse prices). */
+export interface WarehouseView {
+  id: string
+  x: number
+  y: number
+  prices: WarehousePrice[]
+}
+
+/**
+ * The prices of a city's warehouses in sight: anyone with a resident in sight of a warehouse
+ * sees its prices. Warehouses that price nothing (the HQ's coin warehouse) are left out.
+ */
+export function warehousesInSight(
+  city: City,
+  seen: { cities: City[]; buildings: Building[] },
+): WarehouseView[] {
+  return seen.buildings
+    .filter((b) => b.kind === 'warehouse' && b.cityId === city.id)
+    .map((b) => ({ id: b.id, x: b.x, y: b.y, prices: warehousePrices(seen, b) }))
+    .filter((w) => w.prices.length > 0)
 }

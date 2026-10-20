@@ -1,6 +1,13 @@
-import type { Building, City, Resident } from '@csp/shared'
+import {
+  PRICED_GOODS,
+  priceFor,
+  WAREHOUSE_FLOOR,
+  type Building,
+  type City,
+  type Resident,
+} from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { buildingCount, describeBuying, describeCity } from './city-view.js'
+import { buildingCount, describeBuying, describeCity, warehousesInSight } from './city-view.js'
 
 const city = (realmId: string | null): City => ({
   id: 'city1',
@@ -62,6 +69,27 @@ describe('city inspector', () => {
     expect(buildingCount('house', 3)).toBe('3 houses')
     expect(buildingCount('townHall', 1)).toBe('1 town hall')
     expect(buildingCount('lumberCamp', 2)).toBe('2 lumber camps')
+  })
+})
+
+describe('warehouse prices in sight', () => {
+  it('lists each warehouse of a trading post in sight with its prices from its stock', () => {
+    const post = { ...city(null), tradeOrg: 'post' as const }
+    const warehouse = { ...b('w1', 'warehouse', 'city1'), stock: { iron: 3 } }
+    const seen = { cities: [post], buildings: [b('b1', 'townHall', 'city1'), warehouse] }
+    const [view] = warehousesInSight(post, seen)
+    expect(view!.id).toBe('w1')
+    expect(view!.prices.map((p) => p.good)).toEqual(PRICED_GOODS)
+    expect(view!.prices.find((p) => p.good === 'iron')).toEqual({
+      good: 'iron',
+      stock: 3,
+      ...priceFor('iron', 3, WAREHOUSE_FLOOR.iron),
+    })
+  })
+
+  it('shows nothing for a city without warehouses in sight', () => {
+    const seen = { cities: [city(null)], buildings: [b('w1', 'warehouse', 'city2')] }
+    expect(warehousesInSight(city(null), seen)).toEqual([])
   })
 })
 

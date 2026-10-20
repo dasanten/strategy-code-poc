@@ -1,12 +1,21 @@
 import { useState } from 'react'
 import { isClosed, type Building, type RealmLabel, type Resident, type SeenCity } from '@csp/shared'
-import { buildingCount, describeBuying, describeCity, type BuyView } from './city-view.js'
+import {
+  buildingCount,
+  describeBuying,
+  describeCity,
+  warehousesInSight,
+  type BuyView,
+  type WarehouseView,
+} from './city-view.js'
+import { GOOD_LABELS } from './Residents.js'
 
 /**
  * The city inspector: every city in sight (`CONTEXT.md`: City, NPC city), whose it is, and,
  * for the one picked, how many of its residents and which of its buildings the Player sees. A
  * city of the Player's own lists its gates, to open or close (`CONTEXT.md`: Walls in combat); an
- * NPC city names its price and can be bought (`CONTEXT.md`: Buying a city).
+ * NPC city names its price and can be bought (`CONTEXT.md`: Buying a city); a Trade Org city lists
+ * the prices of its warehouses in sight (`CONTEXT.md`: Warehouse prices).
  */
 export function CityInspector({
   cities,
@@ -52,6 +61,11 @@ export function CityInspector({
                   ` · ${v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}`}
               </p>
             )}
+            {openId === v.id &&
+              warehousesInSight(
+                cities.find((c) => c.id === v.id)!,
+                { cities, buildings },
+              ).map((w) => <Prices key={w.id} warehouse={w} />)}
             {openId === v.id && (
               <Buying
                 buy={describeBuying(
@@ -130,5 +144,37 @@ function Gates({
         )
       })}
     </ul>
+  )
+}
+
+/** A warehouse's prices: per good, what it holds, what it pays and what it asks, in coins. */
+function Prices({ warehouse }: { warehouse: WarehouseView }) {
+  return (
+    <table
+      className="warehouse-prices"
+      aria-label={`Warehouse at (${warehouse.x}, ${warehouse.y})`}
+    >
+      <caption>
+        Warehouse at ({warehouse.x}, {warehouse.y}): prices in coins
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Good</th>
+          <th scope="col">Stock</th>
+          <th scope="col">Buys at</th>
+          <th scope="col">Sells at</th>
+        </tr>
+      </thead>
+      <tbody>
+        {warehouse.prices.map((p) => (
+          <tr key={p.good}>
+            <th scope="row">{GOOD_LABELS[p.good]}</th>
+            <td>{p.stock}</td>
+            <td>{p.buy}</td>
+            <td>{p.sell}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
