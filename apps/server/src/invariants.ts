@@ -54,10 +54,10 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
-import { refillStock } from './survival.js'
+import { refillSource } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
-import { armiesSound } from './armies.js'
+import { armiesSound, supplyLinesSound } from './armies.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -582,9 +582,10 @@ export const workOrdersOnWorkplaces: Invariant = {
 }
 
 /**
- * After a tick, nobody at home or at their workplace runs low on food while the storage, pile or
- * carriage they refill from still has some and a meal would fit (`stepRefill`, `CONTEXT.md`:
- * Refilling at home, Refilling at a workplace).
+ * After a tick, nobody at home, at their workplace or in an army by a carriage runs low on food
+ * while the storage, pile or carriage they refill from still has some and a meal would fit
+ * (`stepRefill`, `CONTEXT.md`: Refilling at home, Refilling at a workplace, Refilling from a
+ * carriage).
  */
 export const refilledWhenLow: Invariant = {
   name: 'refilled-when-low',
@@ -593,7 +594,7 @@ export const refilledWhenLow: Invariant = {
       .filter(
         (r) =>
           (r.carried.food ?? 0) < HOME_FOOD_LOW &&
-          (refillStock(world, r, terrain.size)?.food ?? 0) > 0 &&
+          (refillSource(world, r, terrain.size)?.food ?? 0) > 0 &&
           unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
       )
       .map((r) => ({
@@ -673,7 +674,8 @@ export const driversOnCarriages: Invariant = {
  * Haul routes stay sound (`CONTEXT.md`: Haul route): two different stops a carriage can reach,
  * at least one good and none hauled both ways, the Food kept for the horse fits on the carriage,
  * and a hauler loading or unloading stands at the stop they are at, holding goods for the route
- * only while loading.
+ * only while loading. A route to an army (`CONTEXT.md`: Supply line) brings nothing back, and its
+ * hauler never holds goods for it there.
  */
 export const haulRoutesSound: Invariant = {
   name: 'haul-routes-sound',
@@ -689,8 +691,10 @@ export const haulRoutesSound: Invariant = {
           entityIds: [r.id, o.carriageId],
         })
       const { from, to } = o
-      if (from.x === to.x && from.y === to.y) fail('hauls between one tile and itself')
-      for (const s of [from, to]) {
+      // An army stop is wherever the army is (`CONTEXT.md`: Supply line).
+      const toArmy = o.toArmy !== undefined
+      if (!toArmy && from.x === to.x && from.y === to.y) fail('hauls between one tile and itself')
+      for (const s of toArmy ? [from] : [from, to]) {
         if (!carriageCanEnter(terrainAt(terrain, s.x, s.y))) {
           fail(`hauls to (${s.x}, ${s.y}), where no carriage can go`)
         }
@@ -698,11 +702,14 @@ export const haulRoutesSound: Invariant = {
       if (o.goods.length === 0) fail('hauls no goods')
       const both = o.returnGoods.filter((g) => o.goods.includes(g))
       if (both.length > 0) fail(`hauls ${both.join(', ')} both ways`)
+      if (toArmy && o.returnGoods.length > 0) fail('hauls goods back from an army')
       if (o.keepFood < 0 || o.keepFood * GOOD_WEIGHT.food > CARRIAGE_CAPACITY) {
         fail(`keeps ${o.keepFood} Food for the horse`)
       }
       const stop = o[o.stop]
-      if (o.phase === 'loading' && (r.x !== stop.x || r.y !== stop.y)) {
+      const withArmy = toArmy && o.stop === 'to'
+      if (withArmy && o.moving) fail('holds goods for the route at an army')
+      if (o.phase === 'loading' && !withArmy && (r.x !== stop.x || r.y !== stop.y)) {
         fail(`loads at the ${o.stop} stop but stands at (${r.x}, ${r.y})`)
       }
       if (o.phase === 'driving' && o.moving) fail('holds goods for the route while driving')
@@ -1197,6 +1204,7 @@ export const worldInvariants: Invariant[] = [
   deadLeaveLoot,
   attackOrdersSound,
   armiesSound,
+  supplyLinesSound,
   crimesSound,
   gatesSound,
   tradeOrgSound,

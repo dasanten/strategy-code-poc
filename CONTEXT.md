@@ -236,6 +236,9 @@ The shared language of the game. Domain terms only — no implementation details
 - **Supply line:** a carriage that follows an army is its supply wagon: army members refill from
   it like at home (Refilling from a carriage). A haul route can have an army as its second
   stop, so food keeps coming to wherever the army is. Cut the route and the army starves.
+  At its army stop the carriage unloads nothing: it stays with the army, which refills from it,
+  until the hauled goods are gone, then goes back for more. Nothing comes back from an army.
+  A supply wagon's driver, not being of the army, eats only what they carry.
 - **Combat:** resolved between residents in contact (the same or a neighbouring tile). Attack
   from Strength, weapon and Combat skill; Agility dodges, armour and shields take off damage.
   Fighting teaches Combat. An armed resident who is hit fights back; an unarmed one flees home.
