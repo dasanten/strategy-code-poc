@@ -8,6 +8,9 @@ import {
   MAX_HUNGER,
   STARVE_DAYS,
   TICKS_PER_GAME_DAY,
+  TRADE_ORG,
+  contractOf,
+  tradeOrgHq,
   foodUse,
   armyOf,
   inContact,
@@ -240,6 +243,19 @@ export function homeStorage(world: WorldState, r: Resident, size: number): Build
   return undefined
 }
 
+/**
+ * For a mercenary the Trade Organization hired, standing in the Trade Org HQ's area, the HQ's
+ * finished storage with Food (`CONTEXT.md`: Trade Org army). `size` is the map's.
+ */
+function hirersStorage(world: WorldState, r: Resident, size: number): Building | undefined {
+  if (contractOf(world, r.id)?.hirerId !== TRADE_ORG) return undefined
+  const hq = tradeOrgHq(world)
+  if (!hq || !inCityArea(world, hq, r.x, r.y, size)) return undefined
+  return world.buildings.find(
+    (b) => b.cityId === hq.id && b.kind === 'storage' && !b.site && (b.stock?.food ?? 0) > 0,
+  )
+}
+
 /** Goods a resident may take a meal from, and how many units of Food of them they may take. */
 export interface RefillSource {
   stock: Stock
@@ -252,7 +268,7 @@ const whole = (stock: Stock | undefined): RefillSource | undefined =>
 
 /**
  * Where a resident running low on food takes a meal from, if anywhere (`CONTEXT.md`: Refilling):
- * at home, their city's storage; working at a workplace, the Food in the pile on its tile, else on
+ * at home, their city's storage (a mercenary of the Trade Org's, the HQ's); working at a workplace, the Food in the pile on its tile, else on
  * a carriage standing there; in an army, a carriage of their realm on or next to their tile, but
  * not the Food a haul route keeps on board for the horse (`spareFood`); on a caravan's crew, its
  * carriage close by (`caravanFood`). Elsewhere nowhere. `size`
@@ -263,7 +279,7 @@ export function refillSource(
   r: Resident,
   size: number,
 ): RefillSource | undefined {
-  const home = homeStorage(world, r, size)
+  const home = homeStorage(world, r, size) ?? hirersStorage(world, r, size)
   if (home) return whole(home.stock)
   const o = r.order
   const atWork = o?.kind === 'workAt' && r.x === o.at.x && r.y === o.at.y

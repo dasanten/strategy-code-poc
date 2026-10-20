@@ -1,4 +1,5 @@
 import { contractOf, contractsFor, type ContractView } from './contract.js'
+import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
 import type { Alliance, AllianceArmyPart, Carriage, Resident, WorldState } from './world.js'
 
 /** World queries about alliances (ADR 0002: the game API orders and scripts share). */
@@ -99,11 +100,15 @@ export function sharingSight(world: Pick<WorldState, 'alliances'>, realmId: stri
   return alliedRealms(world, realmId)
 }
 
-/** How a realm is called to other Players: by its Leader's name. */
+/**
+ * How a realm is called to other Players: by its Leader's name. The Trade Organization, a side
+ * like a realm in contracts, by its own.
+ */
 export function realmName(
   world: Pick<WorldState, 'realms' | 'residents'>,
   realmId: string,
 ): string {
+  if (realmId === TRADE_ORG) return TRADE_ORG_NAME
   const realm = world.realms.find((r) => r.id === realmId)
   const leader = realm && world.residents.find((r) => r.id === realm.leaderId)
   return leader?.name ?? 'a fallen realm'

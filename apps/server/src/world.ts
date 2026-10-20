@@ -28,6 +28,7 @@ import { requestClimbing, resolveClimbing } from './climbing.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
+import { stepTradeOrgArmy } from './trade-org-army.js'
 import { resolvePurchases } from './buying.js'
 import { stepCrimes } from './crimes.js'
 import { stepCaptures, type Capture } from './capture.js'
@@ -121,7 +122,7 @@ export interface StepResult {
 
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
- * horses, and stables breed foals; food spoils at the end of each game day and Trade Org warehouses top up to their stock floor; caravans and NPC cities give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
+ * horses, and stables breed foals; food spoils at the end of each game day and Trade Org warehouses top up to their stock floor; caravans, NPC cities and the Trade Org army give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
  * putting down goods, haul routes' and road orders' included, then paying for mercenary contracts, then buying NPC cities, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
@@ -139,6 +140,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepStockFloor(world)
   stepCaravans(world, terrain.size)
   stepNpcDefence(world, terrain.size)
+  stepTradeOrgArmy(world, terrain.size)
   stepNpcCities(world, terrain.size, terrain)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)

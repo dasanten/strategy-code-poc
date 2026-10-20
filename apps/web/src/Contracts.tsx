@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import {
   CONTRACT_MAX_DAYS,
+  TRADE_ORG,
+  TRADE_ORG_ARMY,
   type Building,
   type City,
   type ContractView,
@@ -8,11 +10,13 @@ import {
   type RealmLabel,
   type Resident,
 } from '@csp/shared'
-import { contractStatus } from './contract-view.js'
+import { contractStatus, sideName } from './contract-view.js'
 
 /**
  * Mercenary contracts (`CONTEXT.md`: Mercenary contract): offer some of your residents for hire
- * to a realm, or ask to hire residents of a realm you see; accept or decline what others offer;
+ * to a realm, or ask to hire residents of a realm you see, or a number of the Trade Org army's
+ * soldiers, paid into a Trade Org warehouse you know (`CONTEXT.md`: Trade Org army); accept or
+ * decline what others offer;
  * pay each week in advance with one of your residents standing on the contract's storage,
  * carrying the coins. Every change is an order the server checks (ADR 0002).
  */
@@ -44,26 +48,32 @@ export function ContractsPanel({
   const [days, setDays] = useState(7)
   const [price, setPrice] = useState(10)
   const [storageId, setStorageId] = useState('')
+  const [soldiers, setSoldiers] = useState(1)
   const [error, setError] = useState<string | undefined>()
   const order = async (o: OrderRequest) => setError(await sendOrder(o))
 
+  const tradeOrg = hiring && other === TRADE_ORG
   const lenderId = hiring ? other : realmId
-  const candidates = hiring
-    ? inSight.filter((r) => r.owner === other)
-    : own.filter((r) => r.owner === realmId)
+  const candidates = tradeOrg
+    ? []
+    : hiring
+      ? inSight.filter((r) => r.owner === other)
+      : own.filter((r) => r.owner === realmId)
   const storages = buildings.filter(
     (b) =>
-      b.kind === 'storage' &&
+      b.kind === (tradeOrg ? 'warehouse' : 'storage') &&
       !b.site &&
-      cities.some((c) => c.id === b.cityId && c.realmId === lenderId),
+      cities.some(
+        (c) => c.id === b.cityId && (tradeOrg ? c.tradeOrg !== undefined : c.realmId === lenderId),
+      ),
   )
 
   async function offer(e: FormEvent) {
     e.preventDefault()
     await order({
       kind: 'offerContract',
-      residentIds: [...chosen],
-      ...(hiring ? {} : { realmId: other }),
+      ...(tradeOrg ? { soldiers } : { residentIds: [...chosen] }),
+      ...(hiring && !tradeOrg ? {} : { realmId: other }),
       days,
       pricePerWeek: price,
       storageId,
@@ -111,13 +121,14 @@ export function ContractsPanel({
               <li key={c.id} className="army">
                 <span>
                   <strong>
-                    {lender ? 'Rented to' : 'Hired from'} the realm of {otherSide.realm}
+                    {lender ? 'Rented to' : 'Hired from'} {sideName(otherSide)}
                   </strong>
                   <br />
                   {c.residents.map((r) => r.name).join(', ')}
                   <br />
                   <span className="muted small">
-                    {c.days} days at {c.pricePerWeek} Coins a week, paid into the storage
+                    {c.days} days at {c.pricePerWeek} Coins a week, paid into the{' '}
+                    {c.lender.realmId === TRADE_ORG ? 'warehouse' : 'storage'}
                     {c.storage ? ` at ${c.storage.x}, ${c.storage.y}` : ' (gone)'} ·{' '}
                     {contractStatus(c, realmId)}
                   </span>
@@ -179,12 +190,27 @@ export function ContractsPanel({
             }}
           >
             <option value="">Pick a realm…</option>
+            {hiring && <option value={TRADE_ORG}>The Trade Organization</option>}
             {realms.map((r) => (
               <option key={r.realmId} value={r.realmId}>
                 The realm of {r.realm}
               </option>
             ))}
           </select>
+          {tradeOrg && (
+            <label>
+              Soldiers{' '}
+              <input
+                type="number"
+                min={1}
+                value={soldiers}
+                onChange={(e) => setSoldiers(Number(e.target.value))}
+              />{' '}
+              <span className="muted small">
+                at least {TRADE_ORG_ARMY.pricePerSoldierWeek} Coins a week each
+              </span>
+            </label>
+          )}
           {candidates.map((r) => (
             <label key={r.id}>
               <input type="checkbox" checked={chosen.has(r.id)} onChange={() => toggle(r.id)} />
@@ -215,15 +241,15 @@ export function ContractsPanel({
             value={storageId}
             onChange={(e) => setStorageId(e.target.value)}
           >
-            <option value="">Pay into the storage…</option>
+            <option value="">Pay into the {tradeOrg ? 'warehouse' : 'storage'}…</option>
             {storages.map((b) => (
               <option key={b.id} value={b.id}>
-                Storage at {b.x}, {b.y}
+                {tradeOrg ? 'Warehouse' : 'Storage'} at {b.x}, {b.y}
               </option>
             ))}
           </select>
         </fieldset>
-        <button type="submit" disabled={chosen.size === 0 || !other || !storageId}>
+        <button type="submit" disabled={(!tradeOrg && chosen.size === 0) || !other || !storageId}>
           {hiring ? 'Ask' : 'Offer'}
         </button>
       </form>

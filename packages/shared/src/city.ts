@@ -10,6 +10,7 @@ import {
   isArmed,
 } from './balance.js'
 import { allied } from './alliance.js'
+import { TRADE_ORG } from './trade-org.js'
 import { wrap, wrapDelta, wrapDistance } from './terrain.js'
 import type { Building, BuildingKind, City, Resident, WorldState } from './world.js'
 
@@ -229,11 +230,12 @@ export function defendsCity(
 /**
  * The realm about to capture a city (`CONTEXT.md`: Capturing a city), if any: no defender of it
  * is left in its area (`defendsCity`), and armed residents of exactly one other realm, not
- * allied with it, stand there. With two such realms inside, neither has it yet. `size` is the
- * map's.
+ * allied with it, stand there. With two such realms inside, neither has it yet. Mercenaries the
+ * Trade Organization hired capture nothing, and defend its HQ (`CONTEXT.md`: Trade Org army).
+ * `size` is the map's.
  */
 export function captorOf(
-  world: Pick<WorldState, 'buildings' | 'alliances' | 'residents'>,
+  world: Pick<WorldState, 'buildings' | 'alliances' | 'residents' | 'contracts'>,
   city: City,
   size: number,
 ): string | null {
@@ -241,6 +243,11 @@ export function captorOf(
   for (const r of world.residents) {
     if (!isArmed(r) || !inCityArea(world, city, r.x, r.y, size)) continue
     if (defendsCity(world, city, r, size)) return null
+    const forTradeOrg = world.contracts.some(
+      (c) => c.startedAt !== null && c.hirerId === TRADE_ORG && c.residentIds.includes(r.id),
+    )
+    if (forTradeOrg && city.tradeOrg === 'hq') return null
+    if (forTradeOrg) continue
     if (r.owner !== null && !onCitySide(world, city, r.owner)) captors.add(r.owner)
   }
   return captors.size === 1 ? [...captors][0]! : null

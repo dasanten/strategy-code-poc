@@ -1,7 +1,13 @@
-import type { ContractView, Diplomacy, RealmEvent } from '@csp/shared'
+import {
+  TRADE_ORG,
+  TRADE_ORG_NAME,
+  type ContractView,
+  type Diplomacy,
+  type RealmEvent,
+} from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { commandsSeen } from './alliance-army.js'
-import { contractStatus } from './contract-view.js'
+import { contractStatus, sideName } from './contract-view.js'
 import { describeEvent } from './realm-log.js'
 
 const contract: ContractView = {
@@ -69,6 +75,28 @@ describe('mercenary contracts in the UI', () => {
     )
     expect(text({ what: 'broken', lender: true, residents: 1 })).toBe(
       'The realm of Mara left a week unpaid: your 1 mercenary walks home.',
+    )
+  })
+
+  it('calls the Trade Organization by its name, not as a realm', () => {
+    expect(sideName({ realmId: 'r1', realm: 'Mara' })).toBe('the realm of Mara')
+    expect(sideName({ realmId: TRADE_ORG, realm: TRADE_ORG_NAME })).toBe('the Trade Organization')
+    const e = {
+      kind: 'contract',
+      contractId: 'contract1',
+      lender: false,
+      other: TRADE_ORG_NAME,
+      residents: 2,
+      seq: 1,
+      tick: 0,
+      userId: 1,
+    } as const
+    const text = (what: Partial<RealmEvent>) => describeEvent({ ...e, ...what } as RealmEvent).text
+    expect(text({ what: 'declined' })).toBe(
+      'The Trade Organization declined to rent you 2 mercenaries.',
+    )
+    expect(text({ what: 'offered', lender: true })).toBe(
+      'The Trade Organization asks to hire 2 mercenaries from you.',
     )
   })
 })

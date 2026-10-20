@@ -67,6 +67,7 @@ import { contractsSound } from './contracts.js'
 import { buyOrdersDone } from './buying.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound } from './caravans.js'
+import { tradeOrgArmySound } from './trade-org-army.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -1346,6 +1347,7 @@ export const worldInvariants: Invariant[] = [
   climbOrdersSound,
   tradeOrgSound,
   caravansSound,
+  tradeOrgArmySound,
   roadLineOrdersSound,
 ]
 

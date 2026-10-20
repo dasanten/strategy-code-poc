@@ -9,6 +9,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   canWork,
   cityFoodUse,
+  contractOf,
   hasFoodSurplus,
   inCityArea,
   isArmed,
@@ -46,9 +47,12 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'attack',
 ]
 
-/** Whether a resident is run by an NPC city: they live in one and belong to no realm. */
+/**
+ * Whether a resident is run by an NPC city: they live in one and belong to no realm, and no
+ * mercenary contract rents them out (`CONTEXT.md`: Trade Org army).
+ */
 export function runByNpcCity(world: WorldState, r: Resident): boolean {
-  if (r.owner !== null || r.cityId === null) return false
+  if (r.owner !== null || r.cityId === null || contractOf(world, r.id)) return false
   return world.cities.some((c) => c.id === r.cityId && c.realmId === null)
 }
 
@@ -60,10 +64,11 @@ export function runByNpcCity(world: WorldState, r: Resident): boolean {
  */
 export function stepNpcCities(world: WorldState, size: number, terrain?: TerrainMap): void {
   const residents = new Map<string, Resident[]>()
-  // A caravan's crew is run by its caravan (`stepCaravans`).
+  // A caravan's crew is run by its caravan (`stepCaravans`), a hired-out resident by the hirer.
   const crew = caravanCrew(world)
   for (const r of world.residents) {
     if (r.owner !== null || r.cityId === null || crew.has(r.id)) continue
+    if (contractOf(world, r.id)) continue
     const list = residents.get(r.cityId) ?? []
     list.push(r)
     residents.set(r.cityId, list)
