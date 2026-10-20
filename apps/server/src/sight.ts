@@ -22,7 +22,11 @@ function seen(size: number, observers: Spot[], at: Spot, reach = 0): boolean {
 }
 
 /** Whether any of the army's members is in sight (`CONTEXT.md`: Sight). */
-function armySeen(world: WorldState, army: Army, inSight: (at: Spot) => boolean): boolean {
+function armySeen(
+  world: WorldState,
+  army: Pick<Army, 'memberIds'>,
+  inSight: (at: Spot) => boolean,
+): boolean {
   return world.residents.some((r) => army.memberIds.includes(r.id) && inSight(r))
 }
 
@@ -70,7 +74,13 @@ export function entitiesInSight(
   // An army is seen through its members; the Player gets only their own.
   for (const a of world.armies) {
     if (a.realmId === realmId && armySeen(world, a, (at) => seen(size, observers, at))) {
-      out.push({ is: 'army', ...a })
+      // As for residents: which script it runs is seen, its memory isn't.
+      const { script, ...rest } = a
+      out.push({
+        is: 'army',
+        ...rest,
+        ...(script ? { script: { scriptId: script.scriptId } } : {}),
+      })
     }
   }
   return out
