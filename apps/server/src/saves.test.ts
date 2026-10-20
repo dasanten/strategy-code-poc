@@ -388,6 +388,11 @@ describe('world saves', () => {
     expect(migrateWorld(v15, 15, { terrain }, migrations, 16)).toEqual({ ...v15, alliances: [] })
   })
 
+  it('gives the world no mercenary contracts (migration 23 → 24)', () => {
+    const v23 = { tick: 10, seed: 1, residents: [], realms: [], armies: [], crimes: [] }
+    expect(migrateWorld(v23, 23, { terrain }, migrations, 24)).toEqual({ ...v23, contracts: [] })
+  })
+
   it('gives the world no armies (migration 18 → 19)', () => {
     const v18 = { tick: 10, seed: 1, residents: [], realms: [], alliances: [], crimes: [] }
     expect(migrateWorld(v18, 18, { terrain }, migrations, 19)).toEqual({ ...v18, armies: [] })

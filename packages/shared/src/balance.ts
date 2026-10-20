@@ -941,6 +941,12 @@ export function combatLearned(resident: Resident, tick: number): number {
 export const ARMY_SPREAD = 1
 
 /**
+ * The longest a mercenary contract may run, in game days (`CONTEXT.md`: Mercenary contract): two
+ * game years, so a contract is a campaign, not a permanent transfer of residents.
+ */
+export const CONTRACT_MAX_DAYS = 48
+
+/**
  * How many interpreter steps one resident's or army's script may use each tick (`CONTEXT.md`:
  * Step budget). Every evaluated node costs 1; enough for a few loops over what it sees.
  */

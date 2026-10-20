@@ -17,6 +17,7 @@ import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
 import { ArmiesPanel, type ArmyPick } from './Armies.js'
+import { ContractsPanel } from './Contracts.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { Login } from './Login.js'
@@ -54,7 +55,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [armyPick, setArmyPick] = useState<ArmyPick>()
   const [armyError, setArmyError] = useState<string | undefined>()
   // The residents the Player gives orders to: their own, less those handed over to their alliance's
-  // army, and, as its alliance leader, the ones handed over (`CONTEXT.md`: Alliance army).
+  // army or rented out, and, as its alliance leader, the ones handed over (`CONTEXT.md`: Alliance
+  // army) and the mercenaries they hired (`CONTEXT.md`: Mercenary contract).
   const own = world
     ? world.residents.filter((r) => commandsSeen(world.diplomacy, world.home.realmId, r))
     : []
@@ -255,7 +257,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onTearDown={tearDown}
               residents={own}
               onPair={pair}
-              others={world.residents.filter((r) => r.owner !== world.home.realmId)}
+              others={world.residents.filter((r) => !own.includes(r))}
               mapSize={world.map.size}
               onAttack={attack}
             />
@@ -274,6 +276,23 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               }}
               pickError={armyError}
               scripts={scripts}
+              sendOrder={sendOrder}
+            />
+          )}
+          {world && (
+            <ContractsPanel
+              contracts={world.diplomacy.contracts}
+              realmId={world.home.realmId}
+              own={own}
+              inSight={world.residents}
+              buildings={world.buildings}
+              cities={world.cities}
+              realms={[
+                ...(world.diplomacy.alliance?.members ?? []).filter(
+                  (m) => m.realmId !== world.home.realmId,
+                ),
+                ...world.diplomacy.realmsInSight,
+              ]}
               sendOrder={sendOrder}
             />
           )}

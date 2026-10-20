@@ -1,3 +1,4 @@
+import { contractOf, contractsFor, type ContractView } from './contract.js'
 import type { Alliance, AllianceArmyPart, Carriage, Resident, WorldState } from './world.js'
 
 /** World queries about alliances (ADR 0002: the game API orders and scripts share). */
@@ -26,11 +27,16 @@ export function armyPartOf(
 }
 
 /**
- * The realm whose orders the resident takes (`CONTEXT.md`: Alliance army): the alliance leader's
- * while they are handed over, their own realm's otherwise; null for a resident of no realm.
+ * The realm whose orders the resident takes: the alliance leader's while they are handed over to
+ * its army (`CONTEXT.md`: Alliance army), the hirer's while a mercenary contract rents them out
+ * (`CONTEXT.md`: Mercenary contract), their own realm's otherwise; null for a resident of no
+ * realm.
  */
-export function commanderOf(world: Pick<WorldState, 'alliances'>, r: Resident): string | null {
-  return handedOverTo(world, r.id)?.leaderId ?? r.owner
+export function commanderOf(
+  world: Pick<WorldState, 'alliances' | 'contracts'>,
+  r: Pick<Resident, 'id' | 'owner'>,
+): string | null {
+  return handedOverTo(world, r.id)?.leaderId ?? contractOf(world, r.id)?.hirerId ?? r.owner
 }
 
 /** The realm whose orders the carriage takes, as `commanderOf` for a resident. */
@@ -43,7 +49,7 @@ export function carriageCommanderOf(
 
 /** Whether the realm's Player may give the resident orders. */
 export function commands(
-  world: Pick<WorldState, 'alliances'>,
+  world: Pick<WorldState, 'alliances' | 'contracts'>,
   realmId: string,
   r: Resident | undefined,
 ): r is Resident {
@@ -139,6 +145,8 @@ export interface Diplomacy {
   invitations: { allianceId: string; name: string; leader: string }[]
   /** Realms outside their alliance the Player sees residents of, who could be invited. */
   realmsInSight: RealmLabel[]
+  /** Mercenary contracts the realm is a side of, offered or in force (`CONTEXT.md`). */
+  contracts: ContractView[]
 }
 
 /**
@@ -146,7 +154,10 @@ export interface Diplomacy {
  * residents are in the Player's sight.
  */
 export function diplomacyFor(
-  world: Pick<WorldState, 'alliances' | 'realms' | 'residents' | 'carriages'>,
+  world: Pick<
+    WorldState,
+    'alliances' | 'realms' | 'residents' | 'carriages' | 'contracts' | 'buildings'
+  >,
   realmId: string,
   seenRealms: Iterable<string>,
 ): Diplomacy {
@@ -177,5 +188,10 @@ export function diplomacyFor(
     .filter((id) => id !== realmId && !allies.has(id) && realms.has(id))
     .sort()
     .map(label)
-  return { alliance: alliance ?? null, invitations, realmsInSight }
+  return {
+    alliance: alliance ?? null,
+    invitations,
+    realmsInSight,
+    contracts: contractsFor(world, realmId),
+  }
 }
