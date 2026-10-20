@@ -1,7 +1,13 @@
 import {
+  handsOf,
+  loadOf,
+  quoteTrade,
   warehousePrices,
   type Building,
   type BuildingKind,
+  type Carriage,
+  type PricedGood,
+  type TradeQuote,
   type City,
   type RealmLabel,
   type Resident,
@@ -129,4 +135,51 @@ export function warehousesInSight(
     .filter((b) => b.kind === 'warehouse' && b.cityId === city.id)
     .map((b) => ({ id: b.id, x: b.x, y: b.y, prices: warehousePrices(seen, b) }))
     .filter((w) => w.prices.length > 0)
+}
+
+/**
+ * Who of the Player's could trade at a warehouse in sight (`CONTEXT.md`: Trading with the Trade
+ * Organization): their residents on its tile, and their carriages there to trade from instead of
+ * hands.
+ */
+export interface TradersView {
+  residents: Resident[]
+  carriages: Carriage[]
+}
+
+/** The Player's residents and carriages on a warehouse's tile. */
+export function tradersAt(
+  warehouse: { x: number; y: number },
+  seen: { residents: Resident[]; carriages: Carriage[] },
+  realmId: string,
+): TradersView {
+  const here = (t: { x: number; y: number }) => t.x === warehouse.x && t.y === warehouse.y
+  return {
+    residents: seen.residents.filter((r) => r.owner === realmId && here(r)),
+    carriages: seen.carriages.filter((k) => k.realmId === realmId && here(k)),
+  }
+}
+
+/**
+ * What buying and selling up to `units` of a good would move for one of the Player's residents,
+ * from their hands or `carriage` (`quoteTrade`), from what the Player sees. The server decides;
+ * this is the preview.
+ */
+export function previewTrade(
+  seen: { cities: City[]; buildings: Building[] },
+  warehouseId: string,
+  resident: Resident,
+  carriage: Carriage | undefined,
+  good: PricedGood,
+  units: number,
+  tick: number,
+): { buy: TradeQuote; sell: TradeQuote } {
+  const warehouse = seen.buildings.find((b) => b.id === warehouseId)
+  const none = { units: 0, coins: 0 }
+  if (!warehouse || !(units > 0)) return { buy: none, sell: none }
+  const holder = carriage ? loadOf(carriage) : handsOf(resident, tick)
+  return {
+    buy: quoteTrade(seen, warehouse, holder, 'buy', good, units),
+    sell: quoteTrade(seen, warehouse, holder, 'sell', good, units),
+  }
 }

@@ -61,6 +61,31 @@ describe('realm log', () => {
     )
   })
 
+  it('describes trades at a warehouse, cut down or not', () => {
+    const trade = {
+      kind: 'traded',
+      residentId: 'p1',
+      name: 'Ada',
+      good: 'ironOre',
+      x: 4,
+      y: 5,
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent({ ...trade, side: 'sell', units: 3, wanted: 3, coins: 12 })).toEqual({
+      text: 'Ada sold 3 iron ore for 12 coins at the warehouse.',
+      tone: 'info',
+      places: [{ name: 'the warehouse', x: 4, y: 5 }],
+    })
+    expect(describeEvent({ ...trade, side: 'buy', units: 2, wanted: 5, coins: 14 }).text).toBe(
+      'Ada bought 2 iron ore (of 5 wanted) for 14 coins at the warehouse.',
+    )
+    expect(describeEvent({ ...trade, side: 'buy', units: 0, wanted: 5, coins: 0 })).toMatchObject({
+      text: 'Ada couldn’t buy any iron ore at the warehouse.',
+      tone: 'warn',
+    })
+  })
+
   it('describes cities captured and lost', () => {
     const captured = { kind: 'cityCaptured', cityId: 'c1', city: 'Ashford', seq: 9, ...at } as const
     expect(describeEvent({ ...captured, other: null, captor: true, residents: 6 })).toEqual({
@@ -147,6 +172,28 @@ describe('realm log', () => {
     )
     expect(line.places).toHaveLength(3)
     expect(describeEvent({ ...ended, cities: [] }).text).toBe('Your realm had no city left.')
+  })
+
+  it('says whose Leader’s death ended a mercenary contract', () => {
+    const ended = {
+      kind: 'contract',
+      contractId: 'c1',
+      what: 'ended',
+      other: 'Tobin',
+      residents: 2,
+      seq: 11,
+      ...at,
+    } as const
+    expect(describeEvent({ ...ended, lender: true, leaderDied: 'hirer' })).toEqual({
+      text: 'The Leader of the realm of Tobin died, ending the contract for 2 mercenaries: the 2 mercenaries walk home.',
+      tone: 'warn',
+    })
+    expect(describeEvent({ ...ended, lender: false, leaderDied: 'hirer' }).text).toBe(
+      'Your Leader died, ending the contract for 2 mercenaries: the 2 mercenaries walk home.',
+    )
+    expect(describeEvent({ ...ended, lender: false }).text).toBe(
+      'The contract with the realm of Tobin for 2 mercenaries ended: the 2 mercenaries walk home.',
+    )
   })
 
   it('says where the fresh start is, and whether the realm has ended until then', () => {

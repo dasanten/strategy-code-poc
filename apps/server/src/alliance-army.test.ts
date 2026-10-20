@@ -4,6 +4,7 @@ import {
   allianceOf,
   commanderOf,
   diplomacyFor,
+  inCityArea,
   type Resident,
   type WorldState,
 } from '@csp/shared'
@@ -12,6 +13,7 @@ import { stepAlliances } from './alliances.js'
 import { stepArmies } from './armies.js'
 import { alliancesSound, checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
+import { npcHome } from './npc-behaviour.js'
 import { foundStartingCity } from './starting-city.js'
 import { dieAll } from './survival.js'
 import { cityTerrain } from './test-terrain.js'
@@ -190,6 +192,30 @@ describe('alliance army', () => {
     dieAll(world, [leader], 'killed', terrain.size)
     expect(world.alliances).toEqual([])
     expect(commanderOf(world, s)).toBeNull()
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('sends a dead Leader’s alliance-army soldiers home, out of the alliance leader’s army', () => {
+    const { world, terrain, realm, order, soldier, carriage } = setup()
+    const s = soldier(tobin)
+    const k = carriage(tobin)
+    order(tobin, { kind: 'handOverToAlliance', residentIds: [s.id], carriageIds: [k.id] })
+    expect(order(mara, { kind: 'formArmy', name: 'Guard', residentIds: [s.id] })).toBe('ok')
+    // Far out on the alliance leader's errand.
+    const city = world.cities.find((c) => c.id === s.cityId)!
+    s.x = (s.x + 30) % terrain.size
+    expect(inCityArea(world, city, s.x, s.y, terrain.size)).toBe(false)
+    expect(order(mara, { kind: 'walkTo', residentId: s.id, x: s.x + 1, y: s.y })).toBe('ok')
+    const leader = world.residents.find((r) => r.id === world.realms[1]!.leaderId)!
+    dieAll(world, [leader], 'killed', terrain.size)
+    // The realm left at once; Mara's alliance carries on without Tobin's soldier and carriage.
+    expect(world.alliances[0]!.members.map((m) => m.realmId)).toEqual([realm(mara)])
+    expect(world.alliances[0]!.army).toEqual([])
+    expect(world.armies).toEqual([])
+    expect(commanderOf(world, s)).toBeNull()
+    expect(k.realmId).toBeNull()
+    const home = npcHome(world, city)!
+    expect(s.order).toMatchObject({ kind: 'walkTo', target: { x: home.x, y: home.y } })
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 

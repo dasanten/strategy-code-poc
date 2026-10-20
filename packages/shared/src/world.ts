@@ -314,6 +314,7 @@ export type ResidentOrder =
   | RoadLineOrder
   | PayOrder
   | BuyCityOrder
+  | TradeOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -448,6 +449,18 @@ export interface BuyCityOrder {
   cityId: string
 }
 
+/**
+ * Trading at a Trade Org warehouse (`CONTEXT.md`: Trading with the Trade Organization): the
+ * resident, standing on its tile, buys or sells up to `units` of `good` at its prices, from and
+ * into their hands, or the load of `carriageId` on their tile. It happens this tick.
+ */
+export interface TradeOrder {
+  kind: 'trade'
+  side: 'buy' | 'sell'
+  good: Exclude<Good, 'coins'>
+  units: number
+  carriageId: string | null
+}
 /** What a crime was (`CONTEXT.md`: Crime). */
 export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
 
@@ -605,6 +618,23 @@ export type RealmEventWhat =
    */
   | { kind: 'cityNotBought'; cityId: string; city: string; price: number; coins: number }
   /**
+   * The resident `name` traded at the Trade Org warehouse at (`x`, `y`) (`CONTEXT.md`: Trading
+   * with the Trade Organization): bought or sold `units` of `good` for `coins`, of the `wanted`
+   * units; fewer when it was cut down, none when nothing could be traded.
+   */
+  | {
+      kind: 'traded'
+      residentId: string
+      name: string
+      side: 'buy' | 'sell'
+      good: Exclude<Good, 'coins'>
+      units: number
+      wanted: number
+      coins: number
+      x: number
+      y: number
+    }
+  /**
    * The realm's Leader died and the realm ended (`CONTEXT.md`: Leader death): each of its
    * `cities` became a self-managed city, with the residents living there, its town hall at
    * (`x`, `y`) so the Player can find it again.
@@ -679,7 +709,8 @@ export type RealmEventWhat =
    * Leader's name) changed: `offered` to this realm, `started` once accepted, `paid` for `weeks`
    * more game weeks, `ended` when its time was up, or `broken` when a week went unpaid; or
    * `declined` by the Trade Organization (`CONTEXT.md`: Trade Org army). `lender` when this realm
-   * rents out the residents.
+   * rents out the residents. `leaderDied` says which side's Leader died when that ended it early
+   * (`CONTEXT.md`: Self-managed city).
    */
   | {
       kind: 'contract'
@@ -689,6 +720,7 @@ export type RealmEventWhat =
       other: string
       residents: number
       weeks?: number
+      leaderDied?: 'lender' | 'hirer'
     }
 
 /**

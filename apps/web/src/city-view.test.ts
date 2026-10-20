@@ -7,7 +7,14 @@ import {
   type Resident,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { buildingCount, describeBuying, describeCity, warehousesInSight } from './city-view.js'
+import {
+  buildingCount,
+  describeBuying,
+  describeCity,
+  previewTrade,
+  tradersAt,
+  warehousesInSight,
+} from './city-view.js'
 
 const city = (realmId: string | null): City => ({
   id: 'city1',
@@ -90,6 +97,75 @@ describe('warehouse prices in sight', () => {
   it('shows nothing for a city without warehouses in sight', () => {
     const seen = { cities: [city(null)], buildings: [b('w1', 'warehouse', 'city2')] }
     expect(warehousesInSight(city(null), seen)).toEqual([])
+  })
+})
+
+describe('trading at a warehouse in the inspector', () => {
+  const post = { ...city(null), tradeOrg: 'post' as const }
+  const warehouse = {
+    ...b('w1', 'warehouse', 'city1'),
+    x: 3,
+    y: 4,
+    stock: { iron: 20, coins: 500 },
+  }
+  const seen = { cities: [post], buildings: [b('b1', 'townHall', 'city1'), warehouse] }
+  const trader = {
+    id: 'p1',
+    owner: 'realm1',
+    x: 3,
+    y: 4,
+    carried: { iron: 2, coins: 100 },
+    bornAt: -1e9,
+    stats: { strength: { base: 10, trained: 0 } },
+  } as unknown as Resident
+
+  it('finds the Player’s residents and carriages on the warehouse', () => {
+    const other = { ...trader, id: 'p2', owner: 'realm2' } as Resident
+    const away = { ...trader, id: 'p3', x: 9 } as Resident
+    const carriage = {
+      id: 'k1',
+      realmId: 'realm1',
+      cityId: null,
+      x: 3,
+      y: 4,
+      horseId: null,
+      load: {},
+    }
+    const theirs = { ...carriage, id: 'k2', realmId: 'realm2' }
+    expect(
+      tradersAt(
+        warehouse,
+        { residents: [trader, other, away], carriages: [carriage, theirs] },
+        'realm1',
+      ),
+    ).toEqual({ residents: [trader], carriages: [carriage] })
+  })
+
+  it('previews what buying and selling would move at the warehouse’s prices', () => {
+    const preview = previewTrade(seen, 'w1', trader, undefined, 'iron', 2, 0)
+    const floor = WAREHOUSE_FLOOR.iron
+    expect(preview.sell).toEqual({
+      units: 2,
+      coins: priceFor('iron', 21, floor).buy + priceFor('iron', 22, floor).buy,
+    })
+    expect(preview.buy.units).toBe(2)
+    expect(preview.buy.coins).toBe(
+      priceFor('iron', 20, floor).sell + priceFor('iron', 19, floor).sell,
+    )
+    // From a carriage holding nothing, there is nothing to sell or pay with.
+    const carriage = {
+      id: 'k1',
+      realmId: 'realm1',
+      cityId: null,
+      x: 3,
+      y: 4,
+      horseId: null,
+      load: {},
+    }
+    expect(previewTrade(seen, 'w1', trader, carriage, 'iron', 2, 0)).toEqual({
+      buy: { units: 0, coins: 0 },
+      sell: { units: 0, coins: 0 },
+    })
   })
 })
 

@@ -198,6 +198,8 @@ describe('script bindings', () => {
     ['climb("w1")', { kind: 'climb', wallId: 'w1' }],
     ['pay("contract9", 1)', { kind: 'pay', contractId: 'contract9', weeks: 1 }],
     ['buyCity("city4")', { kind: 'buyCity', cityId: 'city4' }],
+    ['buy("iron", 2)', { kind: 'buy', good: 'iron', units: 2, carriageId: null }],
+    ['sell("wood", 3, "k1")', { kind: 'sell', good: 'wood', units: 3, carriageId: 'k1' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(60, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 60, y: 10 } }],
   ]

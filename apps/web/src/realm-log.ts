@@ -84,6 +84,24 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         text: `${e.city} wasn’t bought: it costs ${e.price} coins, and your residents at its town hall carried ${e.coins}.`,
         tone: 'warn',
       }
+    case 'traded': {
+      const what = e.good.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`)
+      const place = { name: 'the warehouse', x: e.x, y: e.y }
+      if (e.units === 0) {
+        return {
+          text: `${e.name} couldn’t ${e.side} any ${what} at the warehouse.`,
+          tone: 'warn',
+          places: [place],
+        }
+      }
+      const did = e.side === 'buy' ? 'bought' : 'sold'
+      const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
+      return {
+        text: `${e.name} ${did} ${e.units} ${what}${cut} for ${e.coins} coins at the warehouse.`,
+        tone: 'info',
+        places: [place],
+      }
+    }
     case 'selfManaged': {
       if (e.cities.length === 0) return { text: 'Your realm had no city left.', tone: 'bad' }
       const each = e.cities.map((c) => `${c.name} (${residentsText(c.residents)})`)
@@ -164,6 +182,16 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
             ? { text: `${cap(them)} paid ${weeks} for your ${n}.`, tone: 'info' }
             : { text: `You paid ${them} ${weeks} for ${n}.`, tone: 'info' }
         case 'ended':
+          if (e.leaderDied) {
+            const whose =
+              e.leaderDied === (e.lender ? 'lender' : 'hirer')
+                ? 'Your Leader died'
+                : `The Leader of ${them} died`
+            return {
+              text: `${whose}, ending the contract for ${n}: the ${n} ${walk} home.`,
+              tone: 'warn',
+            }
+          }
           return {
             text: `The contract with ${them} for ${n} ended: the ${n} ${walk} home.`,
             tone: 'info',
