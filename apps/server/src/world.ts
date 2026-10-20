@@ -13,6 +13,7 @@ import { stepHorses } from './horses.js'
 import { requestTearingDown, resolveTearingDown } from './teardown.js'
 import { requestCarrying, resolveCarrying } from './carrying.js'
 import { requestHauling } from './hauling.js'
+import { requestRoadMaterials } from './road-line.js'
 import type { Walking } from './walking.js'
 import { stepSpoilage } from './spoilage.js'
 import { stepRefill, stepSurvival, type SurvivalResult } from './survival.js'
@@ -22,6 +23,7 @@ import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
+import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
 
 /**
@@ -97,17 +99,20 @@ export interface StepResult {
   horsesDied: Horse[]
   /** Who died of old age and which realms ended through it, as the next tick begins. */
   aging: AgingResult
+  /** Cities captured as the tick ended (`CONTEXT.md`: Capturing a city). */
+  captures: Capture[]
 }
 
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
  * horses, and stables breed foals; food spoils at the end of each game day; then their orders request actions (steps, then blows in fights, then taking and
- * putting down goods, haul routes' included, then laying out and working on construction sites, then tearing down, then
+ * putting down goods, haul routes' and road orders' included, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
- * home or at their workplace who run low on food take meals there; last, armies lose members who
- * are gone and give the rest their orders for the next tick. Without `walking` nobody moves.
+ * home or at their workplace who run low on food take meals there; then cities with a captor
+ * change realm (`stepCaptures`); last, armies lose members who are gone and give the rest their
+ * orders for the next tick. Without `walking` nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
   const survival = stepSurvival(world, terrain)
@@ -118,7 +123,11 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   walking?.resolve(world, steps)
   const strikes = requestStrikes(world, terrain.size)
   const combat = resolveStrikes(world, strikes, terrain.size)
-  const carries = [...requestCarrying(world), ...requestHauling(world)]
+  const carries = [
+    ...requestCarrying(world),
+    ...requestHauling(world),
+    ...requestRoadMaterials(world),
+  ]
   resolveCarrying(world, carries)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
@@ -132,6 +141,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const aging = stepAging(world)
   stepAlliances(world)
   stepRefill(world, terrain.size)
+  const captures = stepCaptures(world, terrain.size)
   stepArmies(world, terrain.size)
   const actions =
     steps.length +
@@ -141,5 +151,5 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
     teardowns.length +
     work.length +
     births.length
-  return { actions, survival, combat, horsesDied, aging }
+  return { actions, survival, combat, horsesDied, aging, captures }
 }

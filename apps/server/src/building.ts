@@ -9,8 +9,12 @@ import {
   constructionLearned,
   materialsNeeded,
   workNeeded,
+  type BuildOrder,
   type BuildingKind,
   type OrderRequest,
+  type Resident,
+  type ResidentOrder,
+  type RoadLineOrder,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -58,13 +62,46 @@ export const build: OrderKind = {
   },
 }
 
+/**
+ * What a resident is building, and where: a build order, or a road order along a line that is
+ * building on its next tile. Nothing otherwise.
+ */
+export function buildingPart(
+  o: ResidentOrder | null,
+):
+  | { order: BuildOrder | RoadLineOrder; building: BuildingKind; at: { x: number; y: number } }
+  | undefined {
+  if (o?.kind === 'build') return { order: o, building: o.building, at: o.at }
+  if (o?.kind === 'roadLine' && o.phase === 'building') {
+    return { order: o, building: 'road', at: { x: o.tiles[0]![0], y: o.tiles[0]![1] } }
+  }
+  return undefined
+}
+
+/**
+ * A road order along a line goes on to its next tile, walking there; after the last it is done.
+ * Any other order is done.
+ */
+export function nextTile(r: Resident): void {
+  const o = r.order
+  if (o?.kind !== 'roadLine' || o.tiles.length <= 1) {
+    r.order = null
+    return
+  }
+  o.tiles.shift()
+  o.phase = 'walking'
+  o.path = null
+  o.progress = 0
+  o.siteId = null
+}
+
 /** Requests this tick's build actions: laying out the site first, then work. */
 export function requestBuilding(world: WorldState): BuildAction[] {
   const actions: BuildAction[] = []
   for (const r of world.residents) {
-    const o = r.order
-    if (o?.kind === 'build') {
-      actions.push({ kind: o.siteId === null ? 'layOut' : 'work', residentId: r.id })
+    const part = buildingPart(r.order)
+    if (part) {
+      actions.push({ kind: part.order.siteId === null ? 'layOut' : 'work', residentId: r.id })
     }
   }
   return actions
@@ -77,7 +114,8 @@ export function requestBuilding(world: WorldState): BuildAction[] {
  * up to what it needs, and teaches Construction. A site with all its materials and work becomes
  * the building, and everyone's build order for it is done. A finished town hall founds a city of
  * the realm whose resident finished it, and any finished city building may grow a city
- * (`updateCityMembership`).
+ * (`updateCityMembership`). A road order along a line builds its tiles this way: where its tile
+ * can't take a road (it has one already) and once that road is finished, it goes on to the next.
  */
 export function resolveBuilding(
   world: WorldState,
@@ -87,21 +125,22 @@ export function resolveBuilding(
   let finished = false
   for (const a of actions) {
     const r = world.residents.find((x) => x.id === a.residentId)
-    const o = r?.order
-    if (!r || o?.kind !== 'build') continue
-    if (r.x !== o.at.x || r.y !== o.at.y) {
+    const part = buildingPart(r?.order ?? null)
+    if (!r || !part) continue
+    const o = part.order
+    if (r.x !== part.at.x || r.y !== part.at.y) {
       r.order = null
       continue
     }
     if (a.kind === 'layOut') {
-      const here = constructionAt(world, r.x, r.y, o.building)
-      if (here?.site && here.kind === o.building) o.siteId = here.id
-      else if (buildProblem(world, r.x, r.y, o.building, terrain)) r.order = null
+      const here = constructionAt(world, r.x, r.y, part.building)
+      if (here?.site && here.kind === part.building) o.siteId = here.id
+      else if (buildProblem(world, r.x, r.y, part.building, terrain)) nextTile(r)
       else {
         const id = newId(world, 'b')
         world.buildings.push({
           id,
-          kind: o.building,
+          kind: part.building,
           cityId: null,
           x: r.x,
           y: r.y,
@@ -130,10 +169,12 @@ export function resolveBuilding(
     }
   }
   if (finished) updateCityMembership(world, terrain?.size ?? MAP_SIZE)
-  const sites = new Set(world.buildings.filter((b) => b.site).map((b) => b.id))
+  // Orders on a site that is finished go on (a road order to its next tile); on one that is gone, they end.
+  const built = new Map(world.buildings.map((b) => [b.id, !b.site]))
   for (const r of world.residents) {
-    if (r.order?.kind === 'build' && r.order.siteId !== null && !sites.has(r.order.siteId)) {
-      r.order = null
-    }
+    const siteId = buildingPart(r.order)?.order.siteId
+    if (siteId === undefined || siteId === null || built.get(siteId) === false) continue
+    if (built.get(siteId)) nextTile(r)
+    else r.order = null
   }
 }

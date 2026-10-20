@@ -10,6 +10,7 @@ import { workAt } from './work.js'
 import { allianceOrders } from './alliances.js'
 import { attack } from './combat.js'
 import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
+import { roadLine } from './road-line.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -29,7 +30,7 @@ export interface OrderKind {
     order: OrderRequest,
     terrain?: TerrainMap,
   ): string | undefined
-  apply(world: WorldState, sender: OrderSender, order: OrderRequest): void
+  apply(world: WorldState, sender: OrderSender, order: OrderRequest, terrain?: TerrainMap): void
 }
 
 /** The order kinds that exist. */
@@ -45,6 +46,7 @@ export const orderKinds: Record<string, OrderKind> = {
   workAt,
   pair,
   attack,
+  roadLine,
   ...allianceOrders,
   ...armyOrders,
 }
@@ -93,7 +95,7 @@ export class OrderQueue {
     this.pending = []
     for (const { sender, order } of batch) {
       const before = order.kind in armyOrders ? undefined : memberOrders(world)
-      this.kinds[order.kind]!.apply(world, sender, order)
+      this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
       if (before) leaveOnOwnOrders(world, before)
     }
   }

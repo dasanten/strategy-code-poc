@@ -648,6 +648,13 @@ button.residents-row:hover {
 .script-history em {
   color: #9aa3a8;
 }
+.map-legend.region-legend {
+  grid-template-columns: minmax(0, auto);
+  max-height: 40%;
+  max-width: 50%;
+  overflow: auto;
+  pointer-events: auto;
+}
 
 .army-members {
   display: flex;

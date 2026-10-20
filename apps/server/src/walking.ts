@@ -14,6 +14,7 @@ import {
   type HaulOrder,
   type OrderRequest,
   type Resident,
+  type RoadLineOrder,
   type TerrainMap,
   type WalkOrder,
   type WorldState,
@@ -66,14 +67,15 @@ export const walkTo: OrderKind = {
 }
 
 /**
- * A walk-to or drive order, a haul route driving to its next stop, or an attack order going after
- * its target: all go along a path.
+ * A walk-to or drive order, a haul route driving to its next stop, an attack order going after
+ * its target, or a road order walking to its next tile: all go along a path.
  */
-type MoveOrder = WalkOrder | DriveOrder | HaulOrder | AttackOrder
+type MoveOrder = WalkOrder | DriveOrder | HaulOrder | AttackOrder | RoadLineOrder
 
 function moveOrder(r: Resident): MoveOrder | undefined {
   const o = r.order
   if (o?.kind === 'haul') return o.phase === 'driving' ? o : undefined
+  if (o?.kind === 'roadLine') return o.phase === 'walking' ? o : undefined
   return o?.kind === 'walkTo' || o?.kind === 'drive' || o?.kind === 'attack' ? o : undefined
 }
 
@@ -84,6 +86,7 @@ function moveOrder(r: Resident): MoveOrder | undefined {
 function targetOf(world: WorldState, o: MoveOrder): { x: number; y: number } | undefined {
   if (o.kind === 'haul') return o[o.stop]
   if (o.kind === 'attack') return world.residents.find((x) => x.id === o.targetId)
+  if (o.kind === 'roadLine') return { x: o.tiles[0]![0], y: o.tiles[0]![1] }
   return o.target
 }
 
@@ -94,8 +97,8 @@ function searchKey(world: WorldState, o: MoveOrder): string {
 }
 
 /** On foot, rather than driving a carriage. */
-function onFoot(o: MoveOrder): o is WalkOrder | AttackOrder {
-  return o.kind === 'walkTo' || o.kind === 'attack'
+function onFoot(o: MoveOrder): o is WalkOrder | AttackOrder | RoadLineOrder {
+  return o.kind === 'walkTo' || o.kind === 'attack' || o.kind === 'roadLine'
 }
 
 /**
@@ -113,10 +116,16 @@ function attackHolds(world: WorldState, r: Resident, o: AttackOrder, size: numbe
 
 /**
  * A moving order got there: a walk or drive is done, a haul route starts on its stop, an attack
- * order waits for contact or its target's next move.
+ * order waits for contact or its target's next move, a road order builds on its tile.
  */
 function arrive(r: Resident, o: MoveOrder): void {
   if (o.kind === 'attack') {
+    o.path = null
+    o.progress = 0
+    return
+  }
+  if (o.kind === 'roadLine') {
+    o.phase = 'building'
     o.path = null
     o.progress = 0
     return

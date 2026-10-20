@@ -28,6 +28,17 @@ export function describeEvent(e: RealmEvent, realmId?: string): { text: string; 
         : { text: `${e.name} was attacked by ${e.other}.`, tone: 'warn' }
     case 'fled':
       return { text: `${e.name} was hit and flees home.`, tone: 'warn' }
+    case 'cityCaptured': {
+      const people = `${e.residents} resident${e.residents === 1 ? '' : 's'}`
+      if (!e.captor) {
+        return {
+          text: `The realm of ${e.other} captured ${e.city} and its ${people}.`,
+          tone: 'bad',
+        }
+      }
+      const from = e.other === null ? '' : ` from the realm of ${e.other}`
+      return { text: `You captured ${e.city}${from}, with its ${people}.`, tone: 'info' }
+    }
     case 'foodSpoiled':
       return { text: `${e.units} Food spoiled.`, tone: 'info' }
     case 'born':

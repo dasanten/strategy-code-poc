@@ -134,6 +134,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     workAt: ([makes]) => request('workAt', makes == null ? {} : { makes: plain(makes) }),
     pair: ([partnerId]) => request('pair', { partnerId: plain(partnerId) }),
     attack: ([targetId]) => request('attack', { targetId: plain(targetId) }),
+    roadLine: ([x, y]) =>
+      request('roadLine', {
+        from: { x: resident.x, y: resident.y },
+        to: { x: plain(x), y: plain(y) },
+      }),
   }
 
   const values: Record<string, Value> = {
