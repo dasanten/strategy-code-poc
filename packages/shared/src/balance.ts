@@ -239,6 +239,31 @@ export const NPC_VILLAGE: NpcCitySize = { size: 7, residents: 6, houses: 2, farm
 /** A town: a wider square, twice the residents of a starting city, two farms. */
 export const NPC_TOWN: NpcCitySize = { size: 11, residents: 16, houses: 5, farms: 2, food: 400 }
 
+/**
+ * An NPC city's Food runs short (`CONTEXT.md`: NPC city) when its storages hold less than its
+ * residents eat in this many game days. It then puts residents on its farms first.
+ */
+export const NPC_FOOD_SHORT_DAYS = 5
+
+/**
+ * An NPC city sends one of a workplace's workers to carry its output to the storage once this
+ * many units of it lie in the pile on the workplace's tile: about what a resident carries, so a
+ * trip is worth the walk.
+ */
+export const NPC_FETCH_UNITS = 15
+
+/**
+ * Units of Food an NPC city's carrier leaves in a farm's pile, so the workers there can still
+ * refill at their workplace (`CONTEXT.md`: Refilling at a workplace).
+ */
+export const NPC_FOOD_LEFT_AT_WORK = 4
+
+/**
+ * Units of Food an NPC city's carrier keeps on them when putting the rest in the storage: what a
+ * resident starts out with, so nobody walks to the storage for the food they carry anyway.
+ */
+export const NPC_OWN_FOOD = START_CARRIED_FOOD
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 
