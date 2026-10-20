@@ -8,6 +8,7 @@ import {
 } from '@csp/shared'
 import { placeNpcCities } from './npc-cities.js'
 import { placeTradeOrgHq } from './trade-org.js'
+import { placeTradingPosts } from './trading-posts.js'
 import { placeResourceNodes } from './node-gen.js'
 import { requestBuilding, resolveBuilding } from './building.js'
 import { stepHorses } from './horses.js'
@@ -54,12 +55,14 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
 
 /**
  * A world as the world generator makes it for a new game: `createWorld`, with the Trade Org HQ
- * (`placeTradeOrgHq`) and then its NPC cities placed (`placeNpcCities`).
+ * (`placeTradeOrgHq`), its NPC cities (`placeNpcCities`) and then its trading posts placed
+ * (`placeTradingPosts`).
  */
 export function generateWorld(terrain: TerrainMap, seed = 1): WorldState {
   const world = createWorld(terrain, seed)
   placeTradeOrgHq(world, terrain)
   placeNpcCities(world, terrain)
+  placeTradingPosts(world, terrain)
   return world
 }
 
