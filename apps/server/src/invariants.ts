@@ -880,21 +880,20 @@ export const takenCitiesCaptured: Invariant = {
 
 /**
  * A city's own workplaces (`City.workplaceIds`), those an NPC city or the Trade Organization
- * built for the materials it needs (`CONTEXT.md`: NPC city), are workplaces on a resource node of
- * their kind, which belong to no city: whoever works one holds it. Ids of ones that are gone are
- * skipped.
+ * built for the goods it needs (`CONTEXT.md`: NPC city, Trade Org HQ), are workplaces other than
+ * farms (a farm is its city's by `cityId`), which belong to no city: whoever works one holds it.
+ * Ids of ones that are gone are skipped.
  */
 export const cityWorkplacesSound: Invariant = {
   name: 'city-workplaces-sound',
   check(world) {
     const out: InvariantViolation[] = []
     const byId = new Map(world.buildings.map((b) => [b.id, b]))
-    const nodeKinds = new Set(Object.values(NODE_WORKPLACE))
     for (const c of world.cities) {
       for (const id of c.workplaceIds ?? []) {
         const b = byId.get(id)
         if (!b) continue
-        if (!nodeKinds.has(b.kind) || b.cityId !== null) {
+        if (MAX_WORKERS[b.kind] === undefined || b.kind === 'farm' || b.cityId !== null) {
           out.push({
             invariant: this.name,
             message: `${c.id} works ${b.id}, a ${b.kind} of city ${b.cityId}`,
