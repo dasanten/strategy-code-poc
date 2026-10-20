@@ -16,6 +16,7 @@ import { dissolveCity, updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime } from './crimes.js'
 import type { OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
+import { noteMade } from './goods-made.js'
 import { dropGoods } from './survival.js'
 
 /** An action a resident with a tear-down order requests: put a tick's work into tearing down. */
@@ -90,7 +91,9 @@ export function resolveTearingDown(
       const victimOrg = buildingOrganization(world, b)
       commitCrime(world, terrain?.size ?? MAP_SIZE, 'tearDown', r, { victimOrg, building: b.kind })
       world.buildings = world.buildings.filter((x) => x !== b)
-      dropGoods(world, b.x, b.y, teardownReturns(b))
+      const returned = teardownReturns(b)
+      dropGoods(world, b.x, b.y, returned)
+      noteMade(world, returned)
       // What a stable kept for its horses stays on the tile too.
       dropGoods(world, b.x, b.y, b.stock ?? {})
       removed = true

@@ -1,5 +1,11 @@
 import type { TerrainMap, WorldState } from '@csp/shared'
-import { checkInvariants, shouldCheckInvariants, type InvariantViolation } from './invariants.js'
+import { tallyGoods, takeMade } from './goods-made.js'
+import {
+  checkInvariants,
+  goodsOnlyFromNothingAtTheFloor,
+  shouldCheckInvariants,
+  type InvariantViolation,
+} from './invariants.js'
 import type { OrderQueue } from './orders.js'
 import type { ScriptRunner } from './script-runner.js'
 import type { Walking } from './walking.js'
@@ -52,9 +58,15 @@ export function runTick(
     opts.orders?.applyAll(world)
     const check = shouldCheckInvariants(opts.invariantSampleRate, opts.rand)
     const scriptViolations = opts.scripts?.runAll(world, check) ?? []
+    const before = check ? tallyGoods(world) : undefined
+    takeMade(world)
     const { actions } = stepWorld(world, terrain, opts.walking)
     if (check) {
-      const violations = [...scriptViolations, ...checkInvariants(world, terrain)]
+      const violations = [
+        ...scriptViolations,
+        ...checkInvariants(world, terrain),
+        ...goodsOnlyFromNothingAtTheFloor(before!, world, takeMade(world)),
+      ]
       if (violations.length > 0) opts.reporter.invariantViolations(world, violations)
     }
     const durationMs = now() - start
