@@ -1,4 +1,5 @@
 import {
+  MAX_HEALTH,
   NPC_GATE_WATCH_RANGE,
   NPC_TOWN,
   NPC_VILLAGE,
@@ -179,5 +180,51 @@ describe('NPC cities defend themselves', () => {
     p.order = attackOrder(victim!.id)
     stepNpcDefence(world, terrain.size)
     expect(soldier!.order).toBeNull()
+  })
+
+  it('fight those breaking or climbing their walls, and commit no crime by it', () => {
+    const { world, terrain, city } = village()
+    const gate = buildingOf(world, city, 'gate')
+    const wall = buildingOf(world, city, 'wall')
+    const [soldier] = citizens(world, city)
+    Object.assign(soldier!, { x: gate.x, y: gate.y - 1, order: null })
+    soldier!.carried.spear = 1
+    const breaker = outsider(world, 'p1', gate.x, gate.y + 1)
+    breaker.carried.sword = 1
+    breaker.order = attackOrder(gate.id)
+    stepNpcDefence(world, terrain.size)
+    expect(soldier!.order).toMatchObject({ kind: 'attack', targetId: breaker.id })
+
+    soldier!.order = null
+    const climber = outsider(world, 'p2', wall.x, wall.y - 1)
+    breaker.order = null
+    climber.order = {
+      kind: 'climb',
+      wallId: wall.id,
+      at: { x: climber.x, y: climber.y },
+      progress: 0,
+    }
+    stepNpcDefence(world, terrain.size)
+    expect(soldier!.order).toMatchObject({ kind: 'attack', targetId: climber.id })
+
+    // Fought from the inside, the breaker at the gate gets hit and nobody counts it a crime.
+    soldier!.order = attackOrder(breaker.id)
+    breaker.order = attackOrder(gate.id)
+    climber.order = null
+    run(world, terrain, new Walking(terrain), TICKS_PER_GAME_DAY / 4)
+    expect(breaker.health).toBeLessThan(MAX_HEALTH)
+    expect(world.crimes.filter((c) => c.culprit.residentId === soldier!.id)).toEqual([])
+  })
+
+  it('still close a damaged gate, and close nothing once it is broken', () => {
+    const { world, terrain, city } = village()
+    const gate = buildingOf(world, city, 'gate')
+    gate.damage = 1
+    outsider(world, 'p1', gate.x, gate.y + 2).carried.sword = 1
+    stepNpcDefence(world, terrain.size)
+    expect(gate.closed).toBe(true)
+    world.buildings = world.buildings.filter((b) => b !== gate)
+    stepNpcDefence(world, terrain.size)
+    expect(world.buildings.some((b) => b.cityId === city.id && b.closed)).toBe(false)
   })
 })

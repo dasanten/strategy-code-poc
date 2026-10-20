@@ -55,19 +55,26 @@ export function stepNpcDefence(world: WorldState, size: number): void {
 }
 
 /**
- * Attackers in a city's area (`CONTEXT.md`: Combat): residents there going after one of its
- * residents on their own account, not fighting back at one who hit them.
+ * Attackers in a city's area (`CONTEXT.md`: Combat, Walls in combat): residents there going after
+ * one of its residents on their own account (not fighting back at one who hit them), striking
+ * one of its walls or gates to break it, or climbing one.
  */
 function attackersOf(world: WorldState, city: City, size: number): Resident[] {
   const own = (id: string) => {
     const t = world.residents.find((x) => x.id === id)
     return !!t && t.owner === null && t.cityId === city.id
   }
+  const ownWall = (id: string) =>
+    world.buildings.some(
+      (b) => b.id === id && b.cityId === city.id && (b.kind === 'wall' || b.kind === 'gate'),
+    )
   return world.residents.filter((r) => {
+    if (r.health <= 0 || (r.owner === null && r.cityId === city.id)) return false
     const o = r.order
-    if (o?.kind !== 'attack' || o.defending || r.health <= 0) return false
-    if (r.owner === null && r.cityId === city.id) return false
-    return own(o.targetId) && inCityArea(world, city, r.x, r.y, size)
+    const attacking =
+      (o?.kind === 'attack' && !o.defending && (own(o.targetId) || ownWall(o.targetId))) ||
+      (o?.kind === 'climb' && ownWall(o.wallId))
+    return attacking && inCityArea(world, city, r.x, r.y, size)
   })
 }
 
