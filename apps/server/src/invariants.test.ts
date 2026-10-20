@@ -196,6 +196,24 @@ describe('invariants', () => {
     )
   })
 
+  it('catch an NPC city resident attacking someone of their own city', () => {
+    const world = worldWithCity().world
+    world.cities[0]!.realmId = null
+    for (const o of world.residents) o.owner = null
+    const [r, other] = world.residents
+    r!.order = {
+      kind: 'attack',
+      targetId: other!.id,
+      path: null,
+      progress: 0,
+      strike: 0,
+      started: false,
+    }
+    expect(checkInvariants(world, terrain)).toContainEqual(
+      expect.objectContaining({ invariant: 'npc-fights-outsiders', entityIds: [r!.id] }),
+    )
+  })
+
   it('catch a pair that does not hold together', () => {
     const world = worldWithCity().world
     const [a, b, c] = world.residents as [Resident, Resident, Resident]

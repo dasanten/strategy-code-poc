@@ -29,6 +29,7 @@ import { resolvePayments, stepContracts } from './contracts.js'
 import { stepCrimes } from './crimes.js'
 import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
+import { stepNpcDefence } from './npc-defence.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -129,6 +130,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const survival = stepSurvival(world, terrain)
   const horsesDied = stepHorses(world, terrain)
   stepSpoilage(world)
+  stepNpcDefence(world, terrain.size)
   stepNpcCities(world, terrain.size)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
