@@ -4,12 +4,15 @@ import {
   SESSION_COOKIE,
   WS_PATH,
   diplomacyFor,
+  regionMapFor,
   townHallOf,
   type Account,
   type ClientMessage,
+  type RegionMap,
   type SeenEntity,
   type ServerMessage,
   type TerrainMap,
+  type Territory,
   type WorldState,
 } from '@csp/shared'
 import { getSessionUser, type SessionUser } from './auth.js'
@@ -18,6 +21,7 @@ import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
 import { foundStartingCity } from './starting-city.js'
 import { eventsFor } from './events.js'
+import { regionMapUnsound } from './region-map.js'
 import { shouldCheckInvariants } from './invariants.js'
 import { entitiesInSight, sentOutOfSight, type SightTracker } from './sight.js'
 import type { TickReporter } from './tick.js'
@@ -49,6 +53,8 @@ interface Client {
   lastEventSeq: number
   /** The alliance matters last sent, as JSON, so a tick sends them only when they changed. */
   lastDiplomacy: string
+  /** The tick of the territory the Region map last went out from; null before any did. */
+  regionTick: number | null
 }
 
 /**
@@ -65,6 +71,8 @@ export function attachRealtime(
     explored: ExploredTerrain
     sight: SightTracker
     orders: OrderQueue
+    /** The world's territory as last worked out (`TerritoryTracker`), for the Region map. */
+    territory?: { current: Territory | null }
     /**
      * Checks, on the sampled share of ticks, that nothing is sent outside a Player's sight
      * (`sentOutOfSight`), and reports what is.
@@ -82,6 +90,28 @@ export function attachRealtime(
     if (!check || !shouldCheckInvariants(check.sampleRate, check.rand)) return
     const violations = sentOutOfSight(world, opts.terrain, realmId, sent)
     if (violations.length > 0) check.reporter.invariantViolations(world, violations)
+  }
+
+  /**
+   * The Region map to send a client, if any: all of it when territory was worked out again since
+   * the last one went out, else the chunks whose explored terrain grew. Checked like `checkSent`.
+   */
+  function regionFor(client: Client, grown: number[]): RegionMap | undefined {
+    const territory = opts.territory?.current
+    if (!territory) return undefined
+    const fresh = territory.tick !== client.regionTick
+    if (!fresh && grown.length === 0) return undefined
+    client.regionTick = territory.tick
+    const size = opts.terrain.size
+    const isExplored = (x: number, y: number) =>
+      opts.explored.isExplored({ id: client.userId }, x, y)
+    const region = regionMapFor(world, territory, size, isExplored, fresh ? null : grown)
+    const check = opts.sightCheck
+    if (check && shouldCheckInvariants(check.sampleRate, check.rand)) {
+      const violations = regionMapUnsound(region, territory, size, isExplored, client.realmId)
+      if (violations.length > 0) check.reporter.invariantViolations(world, violations)
+    }
+    return region
   }
 
   const wss = new WebSocketServer({
@@ -108,6 +138,7 @@ export function attachRealtime(
       view: new ClientView(),
       lastEventSeq: 0,
       lastDiplomacy: '',
+      regionTick: null,
     }
     clients.set(socket, client)
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
@@ -132,6 +163,7 @@ export function attachRealtime(
       entities,
       events,
       diplomacy,
+      region: regionFor(client, []) ?? null,
     })
 
     socket.on('message', (raw) => {
@@ -153,8 +185,9 @@ export function attachRealtime(
     /**
      * Sends every client the changes in its sight since the last tick, and the chunks whose
      * explored terrain grew for its Player (`explored`, from `SightTracker.update`), and its
-     * Player's new realm events, and their alliance matters when those changed: each Player gets
-     * only their own.
+     * Player's new realm events, and their alliance matters when those changed, and the Region map
+     * when territory was worked out again or their explored terrain grew: each Player gets only
+     * their own.
      */
     broadcastTick(explored: Map<number, Set<number>> = new Map()) {
       for (const [socket, client] of clients) {
@@ -168,7 +201,16 @@ export function attachRealtime(
         const json = JSON.stringify(diplomacy)
         const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
         client.lastDiplomacy = json
-        const tick = { tick: world.tick, changed, gone, explored: grown, events, ...fresh }
+        const region = regionFor(client, grown)
+        const tick = {
+          tick: world.tick,
+          changed,
+          gone,
+          explored: grown,
+          events,
+          ...fresh,
+          ...(region ? { region } : {}),
+        }
         send(socket, { type: 'tick', ...tick })
       }
     },
