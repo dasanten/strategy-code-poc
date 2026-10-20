@@ -40,6 +40,7 @@ import {
   NODE_COLORS,
   NODE_NAMES,
   BUILDING_COLORS,
+  CARAVAN_COLOR,
   CARRIAGE_COLOR,
   HORSE_COLOR,
   PILE_COLOR,
@@ -54,6 +55,7 @@ import {
   css,
 } from './map/palette.js'
 import type { ClientWorld } from './useWorld.js'
+import { caravanAt, caravanParts } from './caravans.js'
 
 /** Starting zoom, in screen pixels per tile. */
 const START_SCALE = 12
@@ -66,6 +68,8 @@ interface Hover {
   node?: string
   /** Who holds the tile on the Region map, when it is explored. */
   holder?: string
+  /** A Trade Org caravan stands there (`CONTEXT.md`: Caravan). */
+  caravan?: boolean
 }
 
 /** What the map shows: the terrain, or territory over it (`CONTEXT.md`: Region map). */
@@ -284,12 +288,19 @@ export function MapView({
       drawStructures(g, cam, view, worldRef.current)
 
       const { home } = worldRef.current
+      const { crew } = caravanParts(worldRef.current.caravans)
       const dot = Math.max(3, Math.min(8, cam.scale * 0.3))
       for (const u of worldRef.current.residents) {
         const [sx, sy] = tileToScreen(cam, view, mapSize, u.x + 0.5, u.y + 0.5)
         if (sx < -dot || sy < -dot || sx > view.width + dot || sy > view.height + dot) continue
         const color =
-          u.id === home.leaderId ? LEADER_COLOR : u.owner === home.realmId ? OWN_COLOR : OTHER_COLOR
+          u.id === home.leaderId
+            ? LEADER_COLOR
+            : u.owner === home.realmId
+              ? OWN_COLOR
+              : crew.has(u.id)
+                ? CARAVAN_COLOR
+                : OTHER_COLOR
         g.circle(sx, sy, dot).fill(color).stroke({ width: 2, color: 0x121518 })
         if (u.id === selectedRef.current) {
           g.circle(sx, sy, dot + 4).stroke({ width: 2.5, color: LEADER_COLOR })
@@ -322,6 +333,7 @@ export function MapView({
         holder: explored
           ? holderLabel(holderAt(worldRef.current.region, mapSize, wx, wy))
           : undefined,
+        caravan: caravanAt(caravanParts(worldRef.current.caravans), worldRef.current, wx, wy),
       })
     }
 
@@ -494,6 +506,7 @@ export function MapView({
       <div className="map-readout">
         {hover
           ? `Tile ${hover.x}, ${hover.y} · ${hover.terrain}${hover.node ? ` · ${hover.node}` : ''}` +
+            (hover.caravan ? ' · Trade Org caravan' : '') +
             (mode === 'region' && hover.holder ? ` · ${hover.holder}` : '')
           : 'Tile –'}
         {` · zoom ${Math.round((scale / START_SCALE) * 100)}%`}
@@ -532,6 +545,11 @@ function Legend() {
           <span className="rule">node</span>
         </div>
       ))}
+      <div>
+        <span className="swatch" style={{ background: css(CARAVAN_COLOR) }} />
+        <span>Caravan</span>
+        <span className="rule">Trade Org</span>
+      </div>
     </div>
   )
 }
@@ -657,9 +675,11 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
       .stroke({ width: 1, color: 0x4f3a22 })
   }
   for (const h of horses) g.circle(...centre(cam, view, size, h), tile * 0.22).fill(HORSE_COLOR)
+  // A Trade Org caravan's carriage stands out (`CONTEXT.md`: Caravan).
+  const caravans = caravanParts(world.caravans).carriages
   for (const k of carriages) {
     g.rect(...box(k.x, k.y, 0.22))
-      .fill(CARRIAGE_COLOR)
+      .fill(caravans.has(k.id) ? CARAVAN_COLOR : CARRIAGE_COLOR)
       .stroke({ width: 1, color: 0x121518 })
   }
 }

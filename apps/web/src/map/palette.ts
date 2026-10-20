@@ -87,6 +87,8 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
 }
 export const HORSE_COLOR = 0x6b4f2e
 export const CARRIAGE_COLOR = 0xb79a6e
+/** A Trade Org caravan's carriage and crew (`CONTEXT.md`: Caravan). */
+export const CARAVAN_COLOR = 0x3fb4c9
 /** Goods lying on the ground. */
 export const PILE_COLOR = 0xd9c27a
 

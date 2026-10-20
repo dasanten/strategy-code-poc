@@ -56,6 +56,7 @@ import {
   trainedCap,
   type Stock,
   type TerrainMap,
+  type Resident,
   type WorldState,
 } from '@csp/shared'
 import { refillSource } from './survival.js'
@@ -64,6 +65,7 @@ import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
 import { buyOrdersDone } from './buying.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
+import { caravansSound } from './caravans.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -912,16 +914,16 @@ export const cityWorkplacesSound: Invariant = {
 /**
  * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
  * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
- * checks and resolves like anyone's.
+ * checks and resolves like anyone's. A caravan's driver also drives (`CONTEXT.md`: Caravan).
  */
 export const npcOrdersAllowed: Invariant = {
   name: 'npc-orders-allowed',
   check(world) {
+    const drivers = new Set(world.caravans.map((c) => c.driverId))
+    const allowed = (r: Resident) =>
+      NPC_ORDER_KINDS.includes(r.order!.kind) || (r.order!.kind === 'drive' && drivers.has(r.id))
     return world.residents
-      .filter(
-        (r) =>
-          r.order !== null && runByNpcCity(world, r) && !NPC_ORDER_KINDS.includes(r.order.kind),
-      )
+      .filter((r) => r.order !== null && runByNpcCity(world, r) && !allowed(r))
       .map((r) => ({
         invariant: this.name,
         message: `NPC resident ${r.id} holds a ${r.order!.kind} order`,
@@ -1342,6 +1344,7 @@ export const worldInvariants: Invariant[] = [
   wallDamageSound,
   climbOrdersSound,
   tradeOrgSound,
+  caravansSound,
   roadLineOrdersSound,
 ]
 
