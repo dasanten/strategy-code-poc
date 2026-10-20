@@ -15,12 +15,13 @@ import type { Building, BuildingKind, City, Resident, WorldState } from './world
 
 /**
  * Kinds of city building (`CONTEXT.md`: City building): what a city is made of. Farms,
- * workplaces and stables are not.
+ * workplaces and stables are not. A Trade Org warehouse is a storage of its kind.
  */
 export const CITY_BUILDINGS: readonly BuildingKind[] = [
   'townHall',
   'house',
   'storage',
+  'warehouse',
   'wall',
   'gate',
 ]

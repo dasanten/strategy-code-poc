@@ -23,6 +23,9 @@ describe('city inspector', () => {
   it('says whose a city is', () => {
     const none = { residents: [], buildings: [] }
     expect(describeCity(city(null), none, 'realm1', realms).whose).toBe('NPC city')
+    expect(describeCity({ ...city(null), tradeOrg: 'hq' }, none, 'realm1', realms).whose).toBe(
+      'Trade Org HQ',
+    )
     expect(describeCity(city('realm1'), none, 'realm1', realms).whose).toBe('Your city')
     expect(describeCity(city('realm2'), none, 'realm1', realms).whose).toBe(
       'City of the realm of Mara',

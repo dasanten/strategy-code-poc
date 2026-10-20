@@ -1,4 +1,5 @@
 import {
+  HOME_FOOD_LOW,
   MAX_WORKERS,
   NPC_FETCH_UNITS,
   NPC_FOOD_LEFT_AT_WORK,
@@ -22,6 +23,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { refillStock } from './survival.js'
 import { startWork } from './work.js'
 
 /**
@@ -66,8 +68,10 @@ export function stepNpcCities(world: WorldState, size: number): void {
 /**
  * What an NPC city does each tick: puts its idle adults to work on its farms and workplaces,
  * farms first while Food runs short (`NPC_FOOD_SHORT_DAYS`); sends a worker to carry a
- * workplace's output to the storage once `NPC_FETCH_UNITS` of it lie there; and brings idle
- * residents with nothing to do home. Children are left alone: they refill at home.
+ * workplace's output to the storage once `NPC_FETCH_UNITS` of it lie there; sends workers who
+ * run low on food where there is none to refill from home, and has residents take `NPC_OWN_FOOD`
+ * from the storage before they set out; and brings idle residents with nothing to do home.
+ * Children are left alone: they refill at home.
  */
 function runCity(world: WorldState, city: City, people: Resident[], size: number): void {
   const storage = world.buildings.find(
@@ -79,6 +83,10 @@ function runCity(world: WorldState, city: City, people: Resident[], size: number
 
   if (storage) for (const place of places) fetchOutput(world, place)
   if (short) moveToFarms(world, places)
+  for (const r of adults) {
+    const o = r.order
+    if (o?.kind === 'workAt' && lowOnFood(r) && !refillStock(world, r, size)) r.order = null
+  }
 
   for (const r of adults) {
     if (r.order !== null) continue
@@ -86,6 +94,15 @@ function runCity(world: WorldState, city: City, people: Resident[], size: number
     if (storage && load) {
       if (r.x === storage.x && r.y === storage.y) {
         r.order = { kind: 'drop', to: { kind: 'storage', storageId: storage.id }, goods: load }
+      } else walkTo(r, storage)
+      continue
+    }
+    const food = storage?.stock?.food ?? 0
+    if (storage && food > 0 && (r.carried.food ?? 0) < NPC_OWN_FOOD) {
+      if (r.x === storage.x && r.y === storage.y) {
+        const units = Math.min(food, NPC_OWN_FOOD - (r.carried.food ?? 0))
+        const from = { kind: 'storage' as const, storageId: storage.id }
+        r.order = { kind: 'pickUp', from, goods: { food: units } }
       } else walkTo(r, storage)
       continue
     }
@@ -103,13 +120,14 @@ function runCity(world: WorldState, city: City, people: Resident[], size: number
 
 /**
  * The city's finished workplaces that make something from nothing (farms, camps, quarries,
- * mines; not those that process goods), in the order it fills them: farms first while Food runs
- * short, else last.
+ * mines; not those that process goods), its farms and those in its `workplaceIds`, in the order
+ * it fills them: farms first while Food runs short, else last.
  */
 function workplaces(world: WorldState, city: City, short: boolean): Building[] {
+  const own = new Set(city.workplaceIds)
   const places = world.buildings.filter(
     (b) =>
-      b.cityId === city.id &&
+      (b.cityId === city.id || own.has(b.id)) &&
       !b.site &&
       MAX_WORKERS[b.kind] !== undefined &&
       !RECIPES[b.kind] &&
@@ -171,6 +189,9 @@ function haul(r: Resident): Stock | undefined {
   }
   return Object.keys(load).length > 0 ? load : undefined
 }
+
+/** Whether a resident carries less food than a resident at home takes meals at (`HOME_FOOD_LOW`). */
+const lowOnFood = (r: Resident) => (r.carried.food ?? 0) < HOME_FOOD_LOW
 
 /** Gives a resident an order to walk to a tile. */
 export function walkTo(r: Resident, to: { x: number; y: number }): void {

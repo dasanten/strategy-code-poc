@@ -77,8 +77,11 @@ export function hasChoice(kind: BuildingKind): boolean {
  */
 export const OFF_NODES: readonly BuildingKind[] = [...PROCESSING, 'townHall', 'wall', 'gate']
 
-/** Kinds of building that keep goods in a storage of their own: storages, and stables' Food. */
-export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'stable']
+/**
+ * Kinds of building that keep goods in a storage of their own: storages, the Trade
+ * Organization's warehouses (`CONTEXT.md`: Warehouse), and stables' Food.
+ */
+export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'warehouse', 'stable']
 
 /**
  * The building or construction site on a tile, if there is one (one per tile). A road is not one
