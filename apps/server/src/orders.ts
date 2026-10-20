@@ -96,12 +96,18 @@ export class OrderQueue {
     const batch = this.pending
     this.pending = []
     for (const { sender, order } of batch) {
-      // Any other order for a resident ends the script they run (`CONTEXT.md`: Running a script).
+      // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
+      // script).
       if (order.kind !== 'runScript') {
         const r = world.residents.find((x) => x.id === order.residentId)
         if (r) delete r.script
       }
-      const before = order.kind in armyOrders ? undefined : memberOrders(world)
+      if (order.kind !== 'armyRunScript') {
+        const a = world.armies.find((x) => x.id === order.armyId)
+        if (a) delete a.script
+      }
+      const toArmy = order.kind in armyOrders || order.kind === 'armyRunScript'
+      const before = toArmy ? undefined : memberOrders(world)
       this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
       if (before) leaveOnOwnOrders(world, before)
     }

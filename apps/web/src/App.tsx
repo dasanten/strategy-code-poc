@@ -268,6 +268,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 setArmyError(undefined)
               }}
               pickError={armyError}
+              scripts={scripts}
               sendOrder={sendOrder}
             />
           )}
