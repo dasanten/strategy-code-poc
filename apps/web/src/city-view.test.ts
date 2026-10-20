@@ -7,7 +7,7 @@ import {
   type Resident,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { buildingCount, describeCity, warehousesInSight } from './city-view.js'
+import { buildingCount, describeBuying, describeCity, warehousesInSight } from './city-view.js'
 
 const city = (realmId: string | null): City => ({
   id: 'city1',
@@ -90,5 +90,36 @@ describe('warehouse prices in sight', () => {
   it('shows nothing for a city without warehouses in sight', () => {
     const seen = { cities: [city(null)], buildings: [b('w1', 'warehouse', 'city2')] }
     expect(warehousesInSight(city(null), seen)).toEqual([])
+  })
+})
+
+describe('buying a city in the inspector', () => {
+  const hall = { ...b('b1', 'townHall', 'city1'), x: 5, y: 6 }
+  const mine = (x: number, y: number, coins?: number) =>
+    ({ id: `r${x}${y}`, owner: 'realm1', x, y, carried: coins ? { coins } : {} }) as Resident
+
+  it('names no price for a city that is not for sale', () => {
+    expect(describeBuying(city('realm2'), { residents: [], buildings: [hall] }, 'realm1')).toBe(
+      undefined,
+    )
+  })
+
+  it('shows the price and where to bring the coins', () => {
+    const view = describeBuying(
+      { ...city(null), price: 900 },
+      { residents: [mine(1, 1, 500)], buildings: [hall] },
+      'realm1',
+    )
+    expect(view).toEqual({ price: 900, townHall: { x: 5, y: 6 }, coins: 0 })
+  })
+
+  it('adds up the coins of the Player’s residents on the town hall and picks one to buy', () => {
+    const other = { ...mine(5, 6, 700), owner: 'realm2' } as Resident
+    const view = describeBuying(
+      { ...city(null), price: 900 },
+      { residents: [mine(5, 6, 500), mine(5, 6, 300), other], buildings: [hall] },
+      'realm1',
+    )
+    expect(view).toEqual({ price: 900, townHall: { x: 5, y: 6 }, coins: 800, buyerId: 'r56' })
   })
 })

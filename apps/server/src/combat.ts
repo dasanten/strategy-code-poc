@@ -77,14 +77,21 @@ export function attackOrder(targetId: string, started = false, defending = false
 
 /**
  * Whether `a` striking `t` is a crime (`CONTEXT.md`: Crime): not when `a` fights back at someone
- * who hit them, nor when `t` is attacking someone of `a`'s Organization on their own account.
+ * who hit them, nor when `t` is attacking someone of `a`'s Organization on their own account, or
+ * breaking or climbing one of its walls or gates (`CONTEXT.md`: Walls in combat).
  */
 function isAggression(world: WorldState, a: Resident, t: Resident): boolean {
   if (a.order?.kind === 'attack' && a.order.defending) return false
   const o = t.order
+  const ours = (buildingId: string) => {
+    const b = world.buildings.find((x) => x.id === buildingId)
+    return !!b && buildingOrganization(world, b) === organizationOf(a)
+  }
+  if (o?.kind === 'climb') return !ours(o.wallId)
   if (o?.kind !== 'attack' || o.defending) return true
   const theirTarget = world.residents.find((x) => x.id === o.targetId)
-  return !theirTarget || organizationOf(theirTarget) !== organizationOf(a)
+  if (!theirTarget) return !ours(o.targetId)
+  return organizationOf(theirTarget) !== organizationOf(a)
 }
 
 /**

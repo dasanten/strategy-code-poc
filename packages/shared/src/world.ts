@@ -313,6 +313,7 @@ export type ResidentOrder =
   | ClimbOrder
   | RoadLineOrder
   | PayOrder
+  | BuyCityOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -394,6 +395,15 @@ export interface PayOrder {
   kind: 'pay'
   contractId: string
   weeks: number
+}
+
+/**
+ * Buying an NPC city (`CONTEXT.md`: Buying a city): the resident, standing on the city's town
+ * hall, completes the deal with the coins the realm's residents there carry. It happens this tick.
+ */
+export interface BuyCityOrder {
+  kind: 'buyCity'
+  cityId: string
 }
 
 /** What a crime was (`CONTEXT.md`: Crime). */
@@ -534,6 +544,24 @@ export type RealmEventWhat =
       captor: boolean
       residents: number
     }
+  /**
+   * The realm bought the NPC city `city` (`CONTEXT.md`: Buying a city) for `price` coins, now
+   * gone, with its `residents`; its town hall is at (`x`, `y`).
+   */
+  | {
+      kind: 'cityBought'
+      cityId: string
+      city: string
+      price: number
+      residents: number
+      x: number
+      y: number
+    }
+  /**
+   * A buy order for `city` fell through when it was carried out: the realm's residents at its
+   * town hall carried `coins`, short of its `price`.
+   */
+  | { kind: 'cityNotBought'; cityId: string; city: string; price: number; coins: number }
   /**
    * The realm's Leader died and the realm ended (`CONTEXT.md`: Leader death): each of its
    * `cities` became a self-managed city, with the residents living there, its town hall at
