@@ -605,14 +605,14 @@ export interface City {
   townHallId: string
   /**
    * Set when the city is the Trade Organization's, saying which of its cities it is
-   * (`CONTEXT.md`: Trade Organization, Trade Org HQ). It belongs to no realm and the game runs it
-   * like an NPC city.
+   * (`CONTEXT.md`: Trade Organization, Trade Org HQ, Trading post). It belongs to no realm and
+   * the game runs it like an NPC city.
    */
-  tradeOrg?: 'hq'
+  tradeOrg?: 'hq' | 'post'
   /**
    * Workplaces the game has a city it runs work besides its farms, by id: the Trade Org HQ's own
-   * workplaces on the nearest nodes. A workplace still belongs to no city; one that is gone is
-   * skipped.
+   * workplaces on the nearest nodes, a trading post's one. A workplace still belongs to no city;
+   * one that is gone is skipped.
    */
   workplaceIds?: string[]
 }

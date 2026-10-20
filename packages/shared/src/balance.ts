@@ -304,6 +304,34 @@ export const TRADE_ORG_HQ = {
  */
 export const TRADE_ORG_HQ_MIN_DISTANCE = 400
 
+/**
+ * How wide a region is for trading posts (`CONTEXT.md`: Trading post), in tiles along each side:
+ * the map is cut into a grid of about this size, one post in each square. A full-size map gets
+ * 4 × 4 = 16 posts, as many as it gets NPC cities; a small map gets at least one.
+ */
+export const TRADING_POST_REGION = 360
+
+/**
+ * What a trading post is placed with (`CONTEXT.md`: Trading post): a walled village with a
+ * warehouse. It keeps this size; it never grows.
+ */
+export const TRADING_POST = {
+  /** Tiles along each side, wall included: a village's square. */
+  size: 7,
+  /** Adult residents: enough for its farm and its one workplace. */
+  residents: 4,
+  /** Houses inside the wall: room for everyone. */
+  houses: 2,
+  /** Farms outside the wall, by the gate. */
+  farms: 1,
+  /** Food in its storage, in units: about two weeks of what everyone eats. */
+  food: 100,
+  /** Coins in its warehouse. */
+  coins: 2_000,
+  /** Goods in its warehouse, in units. */
+  goods: { wood: 50, stone: 50, ironOre: 20, iron: 10 } as Partial<Record<Good, number>>,
+}
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 

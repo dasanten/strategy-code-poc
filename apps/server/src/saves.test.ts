@@ -15,6 +15,7 @@ import {
   NPC_VILLAGES,
   START_HORSES,
   START_STABLE_FOOD,
+  TRADING_POST,
   townHallOf,
   wrapDistance,
   type Carriage,
@@ -27,6 +28,8 @@ import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { smallTerrain, worldWithCity } from './test-terrain.js'
 import { checkInvariants } from './invariants.js'
+import { placeTradeOrgHq } from './trade-org.js'
+import { regions } from './trading-posts.js'
 import { npcCityCount, placeNpcCities } from './npc-cities.js'
 import { entitiesInSight } from './sight.js'
 import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
@@ -494,6 +497,41 @@ describe('world saves', () => {
     // The same save always migrates the same way, and a world that has an HQ gets no other.
     expect(migrateWorld(structuredClone(world), 20, { terrain: land }, migrations, 21)).toEqual(v21)
     expect(migrateWorld(structuredClone(v21), 20, { terrain: land }, migrations, 21)).toEqual(v21)
+  })
+
+  it('places trading posts in the live world, out of sight (migration 21 → 22)', () => {
+    const { world, terrain: land } = worldWithCity()
+    placeTradeOrgHq(world, land)
+    placeNpcCities(world, land)
+    const before = structuredClone(world)
+    const v22 = migrateWorld(structuredClone(world), 21, { terrain: land }, migrations, 22)
+    // What was there stays as it was; the posts come after it.
+    expect(v22.cities.slice(0, before.cities.length)).toEqual(before.cities)
+    expect(v22.residents.slice(0, before.residents.length)).toEqual(before.residents)
+    expect(v22.buildings.slice(0, before.buildings.length)).toEqual(before.buildings)
+    const added = v22.cities.slice(before.cities.length)
+    expect(added.length).toBeGreaterThanOrEqual(1)
+    expect(added.length).toBeLessThanOrEqual(regions(land.size).length)
+    const realm = v22.realms[0]!
+    const start = v22.cities.find((c) => c.realmId === realm.id)!
+    const seen = new Set(entitiesInSight(v22, land, realm.id).map((e) => e.id))
+    for (const post of added) {
+      expect(post).toMatchObject({ realmId: null, tradeOrg: 'post' })
+      expect(
+        v22.buildings.filter((b) => b.kind === 'warehouse' && b.cityId === post.id),
+      ).toHaveLength(1)
+      const d = wrapDistance(land.size, townHallOf(v22, post)!, townHallOf(v22, start)!)
+      expect(d).toBeGreaterThanOrEqual(NPC_CITY_MIN_DISTANCE - TRADING_POST.size)
+      for (const e of [
+        ...v22.buildings.filter((b) => b.cityId === post.id),
+        ...v22.residents.filter((r) => r.cityId === post.id),
+      ])
+        expect(seen.has(e.id)).toBe(false)
+    }
+    expect(checkInvariants(v22, land)).toEqual([])
+    // The same save always migrates the same way, and a region with a post gets no other.
+    expect(migrateWorld(structuredClone(world), 21, { terrain: land }, migrations, 22)).toEqual(v22)
+    expect(migrateWorld(structuredClone(v22), 21, { terrain: land }, migrations, 22)).toEqual(v22)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

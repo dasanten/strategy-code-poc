@@ -15,6 +15,7 @@ import { NPC_ORDER_KINDS } from './npc-behaviour.js'
 import { placeNpcCities } from './npc-cities.js'
 import { nearestCity, walkHomeIfAway } from './survival.js'
 import { placeTradeOrgHq } from './trade-org.js'
+import { placeTradingPosts } from './trading-posts.js'
 import { drawLifespan, hash, mulberry32 } from './residents.js'
 import { plainsOutside, ringTiles } from './starting-city.js'
 
@@ -39,7 +40,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 21
+export const WORLD_FORMAT_VERSION = 22
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -285,6 +286,13 @@ export const migrations: Record<number, MigrationStep> = {
   20: (state, ctx) => {
     const world = structuredClone(state) as WorldState
     placeTradeOrgHq(world, ctx.terrain)
+    return world
+  },
+  // Trading posts came (`CONTEXT.md`: Trading post), with a second mark for Trade Org cities: the
+  // live world gets one in every region, as a new one would, out of every Player's sight.
+  21: (state, ctx) => {
+    const world = structuredClone(state) as WorldState
+    placeTradingPosts(world, ctx.terrain)
     return world
   },
 }
