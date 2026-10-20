@@ -10,6 +10,7 @@ import {
   horseFor,
   isPassableTerrain,
   mayStep,
+  wallSide,
   strandedOnWall,
   tileIndex,
   wallMap,
@@ -278,7 +279,7 @@ export class Walking {
         // An attacker only needs to come into contact, even with a defender up on a wall.
         // So does a carriage going after an army (`CONTEXT.md`: Supply line).
         const near = o.kind === 'attack' || armyDrivenTo(r) !== undefined
-        const options = { realmId: r.owner, onWalls: onFoot(o), near }
+        const options = { realmId: wallSide(r), onWalls: onFoot(o), near }
         this.finder.request(r.id, [r.x, r.y], [target.x, target.y], costs, options)
         this.searching.set(r.id, key)
       }
@@ -319,8 +320,8 @@ export class Walking {
       }
       const from = tileIndex(size, r.x, r.y)
       const to = tileIndex(size, step.to.x, step.to.y)
-      const stranded = strandedOnWall(walls, r.owner, from)
-      if (!mayStep(walls, r.owner, from, to, !step.carriageId, stranded)) {
+      const stranded = strandedOnWall(walls, wallSide(r), from)
+      if (!mayStep(walls, wallSide(r), from, to, !step.carriageId, stranded)) {
         const o = moveOrder(r)
         if (o) {
           o.path = null

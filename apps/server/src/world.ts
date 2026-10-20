@@ -131,7 +131,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const horsesDied = stepHorses(world, terrain)
   stepSpoilage(world)
   stepStockFloor(world)
-  stepNpcCities(world, terrain.size)
+  stepNpcCities(world, terrain.size, terrain)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
   const strikes = requestStrikes(world, terrain.size)
