@@ -1036,6 +1036,23 @@ export const crimesSound: Invariant = {
 }
 
 /**
+ * Only gates close (`CONTEXT.md`: Walls in combat): a building marked closed is a finished gate,
+ * and a gate is either closed or open, nothing else.
+ */
+export const gatesSound: Invariant = {
+  name: 'gates-sound',
+  check(world) {
+    return world.buildings
+      .filter((b) => b.closed !== undefined && (b.kind !== 'gate' || b.site || b.closed !== true))
+      .map((b) => ({
+        invariant: this.name,
+        message: `${b.site ? 'site of a ' : ''}${b.kind} ${b.id} is marked closed: ${String(b.closed)}`,
+        entityIds: [b.id],
+      }))
+  },
+}
+
+/**
  * Road orders along a line are sound (`CONTEXT.md`: Road): they have tiles left, at most
  * `ROAD_LINE_MAX_TILES`, each next to the one before; and after a tick one building on a site
  * stands on that road site, on the order's first tile (`resolveBuilding` moves the order on from
@@ -1116,6 +1133,7 @@ export const worldInvariants: Invariant[] = [
   deadLeaveLoot,
   attackOrdersSound,
   crimesSound,
+  gatesSound,
   roadLineOrdersSound,
 ]
 
