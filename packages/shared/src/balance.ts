@@ -797,3 +797,16 @@ export const SCRIPT_STEP_BUDGET = 2000
 
 /** How deeply a script's own function calls may nest before the run stops with an error. */
 export const SCRIPT_MAX_CALL_DEPTH = 50
+
+/**
+ * Extra steps a script pays to ask the world something it sees as a list (`residents()`,
+ * `buildings()`, `nodes()`, …), on top of the 1 every evaluated node costs (`CONTEXT.md`: Step
+ * budget). Dear enough that a script keeps what it found in a variable rather than asking again.
+ */
+export const SCRIPT_LIST_QUERY_COST = 20
+
+/** Extra steps for a small query about one tile or two things, such as `terrainAt` or `distance`. */
+export const SCRIPT_TILE_QUERY_COST = 1
+
+/** Extra steps a script pays to request an action (`walkTo`, `pickUp`, …), accepted or not. */
+export const SCRIPT_ACTION_COST = 10
