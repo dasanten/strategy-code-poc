@@ -6,6 +6,8 @@ import {
   dodgeChance,
   inContact,
   isArmed,
+  onOwnWall,
+  WALL_DEFENCE,
   wrapDistance,
   type AttackOrder,
   type OrderRequest,
@@ -110,7 +112,8 @@ export interface CombatResult {
  * Resolves blows (ADR 0002), one after another (`CONTEXT.md`: Combat), on a map of `size` tiles.
  * A blow is struck only by a living attacker still attacking a living target in contact. The
  * first blow of a fight goes in both realms' logs. Both learn Combat from it; the target dodges
- * it by Agility, or it lands and takes its `blowDamage` off their health. A target left with no
+ * it by Agility, or it lands and takes its `blowDamage` off their health, only `WALL_DEFENCE` of it
+ * for a target on their own city's wall (`CONTEXT.md`: Walls in combat). A target left with no
  * health is killed and drops what they carried (`CONTEXT.md`: Loot); otherwise one who is armed
  * fights back, unless already attacking someone, and one who is not flees home.
  */
@@ -153,7 +156,8 @@ export function resolveStrikes(
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
     const roll = mulberry32(hash(`${world.seed}:${world.tick}:${a.id}:strike`))()
     if (roll < dodgeChance(t, world.tick)) continue
-    t.health = Math.max(0, t.health - blowDamage(a, t, world.tick))
+    const cover = onOwnWall(world, t) ? WALL_DEFENCE : 1
+    t.health = Math.max(0, t.health - blowDamage(a, t, world.tick) * cover)
     if (t.health <= 0) {
       died.push(t)
       killers.set(t.id, a.name)

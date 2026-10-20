@@ -262,7 +262,8 @@ export class PathFinder {
       this.closed[t] = this.search
       const x = t % d
       const y = (t - x) / d
-      if (this.reached(req, x, y)) return { status: 'found', path: this.pathTo(t), cost: this.g[t]! }
+      if (this.reached(req, x, y))
+        return { status: 'found', path: this.pathTo(t), cost: this.g[t]! }
       for (let k = 0; k < 4; k++) {
         // Past a side of the map, the step continues on the opposite side.
         const nx = wrap(k === 0 ? x + 1 : k === 1 ? x - 1 : x, d)

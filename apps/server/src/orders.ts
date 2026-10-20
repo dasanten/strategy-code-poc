@@ -9,6 +9,7 @@ import { walkTo } from './walking.js'
 import { workAt } from './work.js'
 import { allianceOrders } from './alliances.js'
 import { attack } from './combat.js'
+import { setGate } from './gates.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -44,6 +45,7 @@ export const orderKinds: Record<string, OrderKind> = {
   workAt,
   pair,
   attack,
+  setGate,
   ...allianceOrders,
 }
 

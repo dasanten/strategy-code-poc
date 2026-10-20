@@ -226,6 +226,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               buildings={world.buildings}
               realmId={world.home.realmId}
               realms={world.diplomacy.realmsInSight}
+              onSetGate={async (gateId, open) =>
+                setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
+              }
             />
           )}
           {world && <RealmLog events={world.events} realmId={world.home.realmId} />}

@@ -952,6 +952,23 @@ export const alliancesSound: Invariant = {
   },
 }
 
+/**
+ * Only gates close (`CONTEXT.md`: Walls in combat): a building marked closed is a finished gate,
+ * and a gate is either closed or open, nothing else.
+ */
+export const gatesSound: Invariant = {
+  name: 'gates-sound',
+  check(world) {
+    return world.buildings
+      .filter((b) => b.closed !== undefined && (b.kind !== 'gate' || b.site || b.closed !== true))
+      .map((b) => ({
+        invariant: this.name,
+        message: `${b.site ? 'site of a ' : ''}${b.kind} ${b.id} is marked closed: ${String(b.closed)}`,
+        entityIds: [b.id],
+      }))
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -986,6 +1003,7 @@ export const worldInvariants: Invariant[] = [
   territorySound,
   deadLeaveLoot,
   attackOrdersSound,
+  gatesSound,
 ]
 
 export function checkInvariants(
