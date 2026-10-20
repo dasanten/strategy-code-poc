@@ -271,6 +271,39 @@ export const NPC_FOOD_LEFT_AT_WORK = 4
 export const NPC_OWN_FOOD = START_CARRIED_FOOD
 
 /**
+ * An NPC city keeps one pair for every this many of its adults (`CONTEXT.md`: NPC city,
+ * Pairing): a village of six one pair, a town of sixteen two. A pair stops working while it waits
+ * for its child, so most adults keep working.
+ */
+export const NPC_ADULTS_PER_PAIR = 6
+
+/**
+ * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
+ * materials to the site, building or tearing down. The others keep working.
+ */
+export const NPC_BUILDERS = 2
+
+/**
+ * How many tiles further out an NPC city puts up its new wall when it has no room left inside
+ * the old one (`CONTEXT.md`: NPC city), on every side, with the gate in the same place. At most
+ * `CITY_BUILDING_REACH`, so the new wall stays part of the city once the old one is gone.
+ */
+export const NPC_WALL_STEP = 2
+
+/**
+ * How far from its home an NPC city looks for a resource node to build a workplace on when it
+ * needs a material it has no workplace for (`CONTEXT.md`: NPC city), in tiles: about twenty
+ * minutes' walk on plains.
+ */
+export const NPC_NODE_REACH = 40
+
+/**
+ * How far beyond its wall an NPC city looks for Plains to lay out a new farm on, in tiles. Farms
+ * go beyond where its next wall would stand.
+ */
+export const NPC_FARM_REACH = 12
+
+/**
  * What the Trade Org HQ is placed with (`CONTEXT.md`: Trade Org HQ): a round city, the largest on
  * the map, with two rings of wall around its town hall.
  */
@@ -625,13 +658,17 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   gate: { wood: 15 },
   /** A tile of road (`CONTEXT.md`: Road): a little Stone, so a quarry pays for a long road. */
   road: { stone: 5 },
+  /** A house (`CONTEXT.md`: House): timber for four residents' room. */
+  house: { wood: 20 },
+  /** A farm is fields on Plains: work, but no materials, so a city can always feed itself. */
+  farm: {},
 }
 
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
  * a mint 5, a smithy 5, a town hall 6. A stretch of wooden wall takes a quarter of a game
- * day, a gate half of one, a tile of road a quarter. More or stronger workers finish it sooner (`buildWork`).
+ * day, a gate half of one, a tile of road a quarter, a house one game day and a farm half of one. More or stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -645,6 +682,8 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   wall: TICKS_PER_GAME_DAY / 4,
   gate: TICKS_PER_GAME_DAY / 2,
   road: TICKS_PER_GAME_DAY / 4,
+  house: TICKS_PER_GAME_DAY,
+  farm: TICKS_PER_GAME_DAY / 2,
 }
 
 /**
@@ -883,6 +922,26 @@ export const MIN_BLOW_DAMAGE = 1
  * as long.
  */
 export const WALL_DEFENCE = 0.25
+
+/**
+ * Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
+ * broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
+ * of wall alone in about five minutes; ten soldiers with swords in well under one. A gate holds
+ * out half as long again.
+ */
+export const WALL_STRENGTH: Record<'wall' | 'gate', number> = { wall: 600, gate: 900 }
+
+/**
+ * Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
+ * less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered.
+ */
+export const BROKEN_MATERIALS_RETURNED = 0.3
+
+/**
+ * Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): a
+ * minute, as long as walking two tiles of plains, all the while unable to dodge or strike back.
+ */
+export const CLIMB_TICKS = 60
 
 /** Chance of dodging a blow for each point of Agility: an average resident dodges one in five. */
 export const DODGE_PER_AGILITY = 0.02

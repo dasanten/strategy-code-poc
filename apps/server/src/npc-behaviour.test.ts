@@ -144,7 +144,13 @@ describe('NPC cities work and eat', () => {
     const [driver, worker] = world.residents
     const hall = world.buildings.find((b) => b.kind === 'townHall')!
     Object.assign(driver!, { x: hall.x, y: hall.y })
-    driver!.order = { kind: 'tearDown', buildingId: world.buildings[0]!.id, at: { x: 0, y: 0 } }
+    driver!.order = {
+      kind: 'drive',
+      carriageId: 'k0',
+      target: { x: 0, y: 0 },
+      path: null,
+      progress: 0,
+    }
     const work = worker!.order
     endRealm(world, realm, terrain.size)
     expect(driver!.order).toBeNull()

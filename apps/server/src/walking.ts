@@ -10,6 +10,7 @@ import {
   horseFor,
   isPassableTerrain,
   mayStep,
+  wallSide,
   strandedOnWall,
   tileIndex,
   wallMap,
@@ -33,6 +34,7 @@ import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { realmOf } from './starting-city.js'
 import { waitingForArmy } from './armies.js'
 import { waitingForEscort } from './caravans.js'
+import { attackTarget } from './combat.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
 export const PATH_BUDGET_MS = 50
@@ -91,11 +93,11 @@ function moveOrder(r: Resident): MoveOrder | undefined {
 
 /**
  * Where a moving order goes: its target, a haul route's next stop, or the tile an attack order's
- * target stands on; nowhere when that target is gone.
+ * target (a resident, or a wall or gate) stands on; nowhere when that target is gone.
  */
 function targetOf(world: WorldState, o: MoveOrder): { x: number; y: number } | undefined {
   if (o.kind === 'haul') return o[o.stop]
-  if (o.kind === 'attack') return world.residents.find((x) => x.id === o.targetId)
+  if (o.kind === 'attack') return attackTarget(world, o.targetId)
   if (o.kind === 'roadLine') return { x: o.tiles[0]![0], y: o.tiles[0]![1] }
   return o.target
 }
@@ -281,7 +283,7 @@ export class Walking {
         // An attacker only needs to come into contact, even with a defender up on a wall.
         // So does a carriage going after an army (`CONTEXT.md`: Supply line).
         const near = o.kind === 'attack' || armyDrivenTo(r) !== undefined
-        const options = { realmId: r.owner, onWalls: onFoot(o), near }
+        const options = { realmId: wallSide(r), onWalls: onFoot(o), near }
         this.finder.request(r.id, [r.x, r.y], [target.x, target.y], costs, options)
         this.searching.set(r.id, key)
       }
@@ -322,8 +324,8 @@ export class Walking {
       }
       const from = tileIndex(size, r.x, r.y)
       const to = tileIndex(size, step.to.x, step.to.y)
-      const stranded = strandedOnWall(walls, r.owner, from)
-      if (!mayStep(walls, r.owner, from, to, !step.carriageId, stranded)) {
+      const stranded = strandedOnWall(walls, wallSide(r), from)
+      if (!mayStep(walls, wallSide(r), from, to, !step.carriageId, stranded)) {
         const o = moveOrder(r)
         if (o) {
           o.path = null

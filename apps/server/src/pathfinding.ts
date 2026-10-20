@@ -45,7 +45,10 @@ export type PathResult =
 
 /** Who is going, for the walls and gates on the way (`mayStep`), and where to stop. */
 export interface PathOptions {
-  /** The realm of the one going: they may pass their own gates and stand on their own walls. */
+  /**
+   * The side of the one going (`wallSide`): their realm, or their NPC city. They may pass their
+   * own gates and stand on their own walls.
+   */
   realmId?: string | null
   /** On foot, so they may go onto their own walls; a carriage never does. */
   onWalls?: boolean

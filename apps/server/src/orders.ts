@@ -8,6 +8,7 @@ import { pair } from './pairing.js'
 import { walkTo } from './walking.js'
 import { workAt } from './work.js'
 import { allianceOrders } from './alliances.js'
+import { climb } from './climbing.js'
 import { attack } from './combat.js'
 import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
@@ -48,6 +49,7 @@ export const orderKinds: Record<string, OrderKind> = {
   workAt,
   pair,
   attack,
+  climb,
   setGate,
   roadLine,
   pay,
