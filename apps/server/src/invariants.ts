@@ -930,6 +930,29 @@ export const npcOrdersAllowed: Invariant = {
 }
 
 /**
+ * An NPC city fights only outsiders (`CONTEXT.md`: NPC city, Combat): none of its residents goes
+ * after another of its residents.
+ */
+export const npcFightsOutsiders: Invariant = {
+  name: 'npc-fights-outsiders',
+  check(world) {
+    const byId = new Map(world.residents.map((r) => [r.id, r]))
+    return world.residents
+      .filter((r) => {
+        const o = r.order
+        if (o?.kind !== 'attack' || !runByNpcCity(world, r)) return false
+        const t = byId.get(o.targetId)
+        return !!t && t.owner === null && t.cityId === r.cityId
+      })
+      .map((r) => ({
+        invariant: this.name,
+        message: `NPC resident ${r.id} attacks someone of their own city`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
+/**
  * After a tick, pairs hold together (`CONTEXT.md`: Pairing): a resident's partner pairs back
  * with the same `since`, which is not after now; both are adults of the same city. Broken pairs
  * end in `requestBirths`.
@@ -1298,6 +1321,7 @@ export const worldInvariants: Invariant[] = [
   cityResidentsInItsRealm,
   takenCitiesCaptured,
   npcOrdersAllowed,
+  npcFightsOutsiders,
   cityWorkplacesSound,
   pairsHoldTogether,
   childrenDontWork,

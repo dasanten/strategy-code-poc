@@ -271,6 +271,18 @@ export const NPC_FOOD_LEFT_AT_WORK = 4
 export const NPC_OWN_FOOD = START_CARRIED_FOOD
 
 /**
+ * Share of an NPC city's adults it keeps as soldiers (`CONTEXT.md`: NPC city, Soldier), rounded
+ * up so even a village keeps one: a starting village (6 residents) keeps 2, a town (16) keeps 4.
+ */
+export const NPC_SOLDIER_SHARE = 0.25
+
+/**
+ * How near to an NPC city's gate, in tiles, an armed outsider makes it close its gates
+ * (`CONTEXT.md`: NPC city): a little inside sight, so the gate shuts before they reach it.
+ */
+export const NPC_GATE_WATCH_RANGE = 8
+
+/**
  * An NPC city keeps one pair for every this many of its adults (`CONTEXT.md`: NPC city,
  * Pairing): a village of six one pair, a town of sixteen two. A pair stops working while it waits
  * for its child, so most adults keep working.

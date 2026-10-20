@@ -182,7 +182,9 @@ The shared language of the game. Domain terms only — no implementation details
   storage. It never founds new cities: when it has no room left inside its wall it grows its area
   by building on the edge, puts up a new wall 2 tiles further out on every side, with the gate in
   the same place, and only once every tile of the new wall is finished tears down the old one.
-  Its residents stand on its walls as a realm's do. A Player does the same by hand, if they want to. The world starts out with NPC villages
+  Its residents stand on its walls and pass its gates as a realm's do. It keeps some soldiers by
+  its size, arms them from its smithy or by buying, fights attackers in its area and closes its
+  gates when armed outsiders come near. A Player does the same by hand, if they want to. The world starts out with NPC villages
   and towns, on Plains, far from every starting city and from each other, and out of every
   Player's sight.
 - **Integrating:** bringing a village or city into your realm, with its residents. Three ways:
