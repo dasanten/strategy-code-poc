@@ -101,6 +101,31 @@ describe('realm log', () => {
     )
   })
 
+  it('describes crimes a witness brought home, with who did them', () => {
+    const crime = {
+      kind: 'crimeKnown',
+      crimeId: 'x9',
+      at: 3,
+      x: 4,
+      y: 5,
+      culpritId: 'r9',
+      culprit: 'Vex',
+      culpritOrg: 'the realm of Ada',
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent({ ...crime, crime: 'theft', goods: { food: 5, ironOre: 2 } })).toEqual({
+      text: 'A witness got home: Vex of the realm of Ada stole 5 Food, 2 Iron Ore at (4, 5).',
+      tone: 'bad',
+    })
+    expect(describeEvent({ ...crime, crime: 'killing', victim: 'Mara' }).text).toBe(
+      'A witness got home: Vex of the realm of Ada killed Mara at (4, 5).',
+    )
+    expect(describeEvent({ ...crime, crime: 'tearDown', building: 'lumberCamp' }).text).toBe(
+      'A witness got home: Vex of the realm of Ada tore down your lumber camp at (4, 5).',
+    )
+  })
+
   it('keeps the latest events, as many as the server does', () => {
     const event = (seq: number): RealmEvent => ({ kind: 'foodSpoiled', units: 1, seq, ...at })
     const log = Array.from({ length: REALM_LOG_LENGTH }, (_, i) => event(i))

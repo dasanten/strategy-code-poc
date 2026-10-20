@@ -519,6 +519,12 @@ export const FOOD_SPOIL_PER_DAY = 0.02
 export const REALM_LOG_LENGTH = 100
 
 /**
+ * How long, in game days, an Organization remembers a crime once it is known and nobody carries
+ * news of it any more (`CONTEXT.md`: Crime). A week: long enough to count as "recent".
+ */
+export const CRIME_MEMORY_DAYS = 7
+
+/**
  * Materials each kind of building needs before its construction site can become the building
  * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
  * the lumber camp's wood builds the quarry, wood and stone build the mine and the smelter, and

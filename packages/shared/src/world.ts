@@ -236,7 +236,8 @@ export interface HaulOrder {
  * out of their sight or they are given another order. Out of contact they walk towards the target
  * along `path` (null while it is being found), as for a walk order; `progress` is how far into the
  * next step they are. `strike` is how far, from 0 up to 1, they are into their next blow.
- * `started` is set once the fight went in the realm logs.
+ * `started` is set once the fight went in the realm logs. `defending` is set when the resident
+ * fights back at someone who hit them, which is no crime (`CONTEXT.md`: Crime).
  */
 export interface AttackOrder {
   kind: 'attack'
@@ -245,6 +246,7 @@ export interface AttackOrder {
   progress: number
   strike: number
   started: boolean
+  defending?: true
 }
 
 /**
@@ -314,6 +316,41 @@ export interface WorldState {
   events: RealmEvent[]
   /** Alliances with at least one member (`CONTEXT.md`: Alliance). */
   alliances: Alliance[]
+  /** Crimes a witness still carries news of, or that an Organization still remembers. */
+  crimes: Crime[]
+}
+
+/** What a crime was (`CONTEXT.md`: Crime). */
+export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
+
+/**
+ * A crime against another Organization (`CONTEXT.md`: Crime, Witness). An Organization is named by
+ * its realm's id, or by its city's id for a city of no realm (`organizationOf`). Plain data.
+ */
+export interface Crime {
+  id: string
+  kind: CrimeKind
+  /** The tick it happened, and where the culprit stood. */
+  tick: number
+  x: number
+  y: number
+  /** Who did it, and their Organization with its name at the time. */
+  culprit: { residentId: string; name: string; org: string; orgName: string }
+  /** The Organization it was against. */
+  victimOrg: string
+  /** The resident attacked or killed. */
+  victim?: { residentId: string; name: string }
+  /** What was stolen. */
+  goods?: Stock
+  /** What was torn down. */
+  building?: BuildingKind
+  /**
+   * Residents who saw it, or the victim who survived it, and have not got home yet. Each makes it
+   * known to their own Organization once they stand in the area of one of its cities.
+   */
+  witnesses: string[]
+  /** The Organizations it is known to. */
+  knownBy: string[]
 }
 
 /** What a resident died of: hunger, old age, or blows in a fight (`CONTEXT.md`: Combat). */
@@ -344,6 +381,25 @@ export type RealmEventWhat =
       otherId: string
       other: string
       attacker: boolean
+    }
+  /**
+   * A witness brought home news of a crime against the realm (`CONTEXT.md`: Crime, Witness):
+   * `culprit` of `culpritOrg` did `crime` at tick `at`, to `victim`, taking `goods` or tearing
+   * down `building`.
+   */
+  | {
+      kind: 'crimeKnown'
+      crimeId: string
+      crime: CrimeKind
+      at: number
+      x: number
+      y: number
+      culpritId: string
+      culprit: string
+      culpritOrg: string
+      victim?: string
+      goods?: Stock
+      building?: BuildingKind
     }
   /** A resident who carries no weapon was hit and flees home (`CONTEXT.md`: Combat). */
   | { kind: 'fled'; residentId: string; name: string }
