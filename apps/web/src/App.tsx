@@ -14,6 +14,7 @@ import {
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
+import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { Login } from './Login.js'
@@ -47,6 +48,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [picking, setPicking] = useState<Picking>(false)
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
+  const [armyPick, setArmyPick] = useState<ArmyPick>()
+  const [armyError, setArmyError] = useState<string | undefined>()
   const own = world ? world.residents.filter((r) => r.owner === world.home.realmId) : []
   const selected = own.find((r) => r.id === selectedId)
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
@@ -59,6 +62,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function goTo(x: number, y: number) {
     const mode = picking
     setPicking(false)
+    if (armyPick) {
+      setArmyPick(undefined)
+      setArmyError(await sendOrder({ kind: armyPick.kind, armyId: armyPick.armyId, x, y }))
+      return
+    }
     if (!selected) return
     const carriage = onTile(world?.carriages)
     if (mode === 'drive' && carriage) {
@@ -153,9 +161,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 onSelect={(id) => {
                   setSelectedId(id)
                   setPicking(false)
+                  setArmyPick(undefined)
                   setOrderError(undefined)
                 }}
-                picking={picking !== false}
+                picking={picking !== false || armyPick !== undefined}
                 onPickTile={goTo}
                 onNodesLoaded={onNodesLoaded}
               />
@@ -210,6 +219,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               others={world.residents.filter((r) => r.owner !== world.home.realmId)}
               mapSize={world.map.size}
               onAttack={attack}
+            />
+          )}
+          {world && (
+            <ArmiesPanel
+              armies={world.armies}
+              own={own}
+              inSight={world.residents}
+              realmId={world.home.realmId}
+              picking={armyPick}
+              onPick={(pick) => {
+                setArmyPick(pick)
+                setPicking(false)
+                setArmyError(undefined)
+              }}
+              pickError={armyError}
+              sendOrder={sendOrder}
             />
           )}
           {world && (

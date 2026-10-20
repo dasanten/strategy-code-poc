@@ -12,6 +12,7 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { allianceOrders } from './alliances.js'
+import { armyOrders } from './armies.js'
 import { ExploredTerrain } from './explored.js'
 import { OrderQueue, orderKinds } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -86,7 +87,10 @@ describe('script bindings', () => {
     const { world, explored } = setup()
     const { globals } = runAs(world, explored, '')
     expect(Object.keys(globals).sort()).toEqual(SCRIPT_API.map((b) => b.name).sort())
-    const residentOrders = Object.keys(orderKinds).filter((k) => !(k in allianceOrders))
+    // Alliance and army orders are not orders a resident can get.
+    const residentOrders = Object.keys(orderKinds).filter(
+      (k) => !(k in allianceOrders) && !(k in armyOrders),
+    )
     expect([...SCRIPT_ORDER_KINDS].sort()).toEqual(residentOrders.sort())
   })
 

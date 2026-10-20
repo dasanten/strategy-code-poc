@@ -648,3 +648,11 @@ button.residents-row:hover {
 .script-history em {
   color: #9aa3a8;
 }
+
+.army-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  max-height: 8rem;
+  overflow-y: auto;
+}
