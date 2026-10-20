@@ -32,6 +32,7 @@ import {
   REALM_LOG_LENGTH,
   Terrain,
   OFF_NODES,
+  captorOf,
   cityMembership,
   computeTerritory,
   controlAt,
@@ -785,6 +786,49 @@ export const npcCityResidentsUnowned: Invariant = {
 }
 
 /**
+ * A realm's city's residents belong to that realm (`CONTEXT.md`: Capturing a city): a city
+ * changes realm together with everyone who lives there.
+ */
+export const cityResidentsInItsRealm: Invariant = {
+  name: 'city-residents-in-its-realm',
+  check(world) {
+    const realmOf = new Map(world.cities.map((c) => [c.id, c.realmId]))
+    return world.residents.flatMap((r) => {
+      const realm = r.cityId === null ? null : realmOf.get(r.cityId)
+      if (realm === null || realm === undefined || r.owner === realm) return []
+      return [
+        {
+          invariant: this.name,
+          message: `resident ${r.id} of city ${r.cityId} (realm ${realm}) belongs to ${r.owner ?? 'no realm'}`,
+          entityIds: [r.id, r.cityId!],
+        },
+      ]
+    })
+  },
+}
+
+/**
+ * After a tick, no city is left standing taken (`CONTEXT.md`: Capturing a city): a city with
+ * armed residents of one other realm inside and no defender left has changed realm already.
+ */
+export const takenCitiesCaptured: Invariant = {
+  name: 'taken-cities-captured',
+  check(world, terrain) {
+    return world.cities.flatMap((c) => {
+      const captor = captorOf(world, c, terrain.size)
+      if (captor === null || captor === c.realmId) return []
+      return [
+        {
+          invariant: this.name,
+          message: `city ${c.id} of ${c.realmId ?? 'no realm'} is taken by ${captor} but hasn't changed realm`,
+          entityIds: [c.id],
+        },
+      ]
+    })
+  },
+}
+
+/**
  * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
  * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
  * checks and resolves like anyone's.
@@ -976,6 +1020,8 @@ export const worldInvariants: Invariant[] = [
   realmLogsInOrder,
   residentsInCities,
   npcCityResidentsUnowned,
+  cityResidentsInItsRealm,
+  takenCitiesCaptured,
   npcOrdersAllowed,
   pairsHoldTogether,
   childrenDontWork,
