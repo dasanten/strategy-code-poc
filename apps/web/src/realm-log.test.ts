@@ -47,6 +47,21 @@ describe('realm log', () => {
     )
   })
 
+  it('describes cities captured and lost', () => {
+    const captured = { kind: 'cityCaptured', cityId: 'c1', city: 'Ashford', seq: 9, ...at } as const
+    expect(describeEvent({ ...captured, other: null, captor: true, residents: 6 })).toEqual({
+      text: 'You captured Ashford, with its 6 residents.',
+      tone: 'info',
+    })
+    expect(describeEvent({ ...captured, other: 'Tobin', captor: true, residents: 1 }).text).toBe(
+      'You captured Ashford from the realm of Tobin, with its 1 resident.',
+    )
+    expect(describeEvent({ ...captured, other: 'Mara', captor: false, residents: 3 })).toEqual({
+      text: 'The realm of Mara captured Ashford and its 3 residents.',
+      tone: 'bad',
+    })
+  })
+
   it('describes alliance events, saying which are about the Player’s own realm', () => {
     const north = { allianceId: 'a1', name: 'North', seq: 6, ...at } as const
     const about = (realmId: string) => ({ ...north, realmId, realm: 'Tobin' })

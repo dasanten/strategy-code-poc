@@ -32,8 +32,11 @@ import {
   KEEPS_GOODS,
   NODE_TERRAINS,
   REALM_LOG_LENGTH,
+  ROAD_LINE_MAX_TILES,
+  wrapDelta,
   Terrain,
   OFF_NODES,
+  captorOf,
   cityMembership,
   computeTerritory,
   controlAt,
@@ -787,6 +790,49 @@ export const npcCityResidentsUnowned: Invariant = {
 }
 
 /**
+ * A realm's city's residents belong to that realm (`CONTEXT.md`: Capturing a city): a city
+ * changes realm together with everyone who lives there.
+ */
+export const cityResidentsInItsRealm: Invariant = {
+  name: 'city-residents-in-its-realm',
+  check(world) {
+    const realmOf = new Map(world.cities.map((c) => [c.id, c.realmId]))
+    return world.residents.flatMap((r) => {
+      const realm = r.cityId === null ? null : realmOf.get(r.cityId)
+      if (realm === null || realm === undefined || r.owner === realm) return []
+      return [
+        {
+          invariant: this.name,
+          message: `resident ${r.id} of city ${r.cityId} (realm ${realm}) belongs to ${r.owner ?? 'no realm'}`,
+          entityIds: [r.id, r.cityId!],
+        },
+      ]
+    })
+  },
+}
+
+/**
+ * After a tick, no city is left standing taken (`CONTEXT.md`: Capturing a city): a city with
+ * armed residents of one other realm inside and no defender left has changed realm already.
+ */
+export const takenCitiesCaptured: Invariant = {
+  name: 'taken-cities-captured',
+  check(world, terrain) {
+    return world.cities.flatMap((c) => {
+      const captor = captorOf(world, c, terrain.size)
+      if (captor === null || captor === c.realmId) return []
+      return [
+        {
+          invariant: this.name,
+          message: `city ${c.id} of ${c.realmId ?? 'no realm'} is taken by ${captor} but hasn't changed realm`,
+          entityIds: [c.id],
+        },
+      ]
+    })
+  },
+}
+
+/**
  * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
  * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
  * checks and resolves like anyone's.
@@ -843,7 +889,7 @@ export const pairsHoldTogether: Invariant = {
 }
 
 /** Orders only a grown resident can hold (`CONTEXT.md`: Child); pairing is checked with pairs. */
-const ADULT_ORDERS = new Set(['build', 'tearDown', 'workAt', 'drive', 'pickUp', 'drop'])
+const ADULT_ORDERS = new Set(['build', 'roadLine', 'tearDown', 'workAt', 'drive', 'pickUp', 'drop'])
 
 /** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
 export const childrenDontWork: Invariant = {
@@ -989,6 +1035,50 @@ export const crimesSound: Invariant = {
   },
 }
 
+/**
+ * Road orders along a line are sound (`CONTEXT.md`: Road): they have tiles left, at most
+ * `ROAD_LINE_MAX_TILES`, each next to the one before; and after a tick one building on a site
+ * stands on that road site, on the order's first tile (`resolveBuilding` moves the order on from
+ * a finished one and ends it on a vanished one).
+ */
+export const roadLineOrdersSound: Invariant = {
+  name: 'road-line-orders-sound',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'roadLine') continue
+      const fail = (problem: string) =>
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${problem}`,
+          entityIds: o.siteId ? [r.id, o.siteId] : [r.id],
+        })
+      const first = o.tiles[0]
+      if (!first || o.tiles.length > ROAD_LINE_MAX_TILES) {
+        fail(`has a road order with ${o.tiles.length} tiles`)
+        continue
+      }
+      const size = terrain.size
+      const apart = o.tiles.findIndex(
+        ([x, y], i) =>
+          i > 0 &&
+          Math.abs(wrapDelta(o.tiles[i - 1]![0], x, size)) +
+            Math.abs(wrapDelta(o.tiles[i - 1]![1], y, size)) !==
+            1,
+      )
+      if (apart > 0) fail(`has a road order whose tile ${apart} is not next to the one before`)
+      if (o.phase !== 'building' || o.siteId === null) continue
+      const site = world.buildings.find((b) => b.id === o.siteId)
+      const onIt = site?.site && site.kind === 'road' && site.x === r.x && site.y === r.y
+      if (!onIt || r.x !== first[0] || r.y !== first[1]) {
+        fail(`builds ${o.siteId}, which is not the road site on their tile and the order’s next`)
+      }
+    }
+    return out
+  },
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -1013,6 +1103,8 @@ export const worldInvariants: Invariant[] = [
   realmLogsInOrder,
   residentsInCities,
   npcCityResidentsUnowned,
+  cityResidentsInItsRealm,
+  takenCitiesCaptured,
   npcOrdersAllowed,
   pairsHoldTogether,
   childrenDontWork,
@@ -1024,6 +1116,7 @@ export const worldInvariants: Invariant[] = [
   deadLeaveLoot,
   attackOrdersSound,
   crimesSound,
+  roadLineOrdersSound,
 ]
 
 export function checkInvariants(

@@ -1,5 +1,6 @@
 import {
   BUILD_MATERIALS,
+  ROAD_LINE_MAX_TILES,
   BUILD_WORK,
   BUILDABLE,
   BATCHES_PER_DAY,
@@ -113,8 +114,11 @@ function meterClass(share: number): string {
 
 const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
 
-/** What the map is waiting for a tile for: to walk or drive there, or a haul route's other stop. */
-export type Picking = false | 'walk' | 'drive' | 'haul'
+/**
+ * What the map is waiting for a tile for: to walk or drive there, a haul route's other stop, or
+ * the far end of a road along a line.
+ */
+export type Picking = false | 'walk' | 'drive' | 'haul' | 'road'
 
 /** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
 export interface HaulSetup {
@@ -156,6 +160,13 @@ function doing(r: Resident): string {
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
   if (o?.kind === 'pair') return 'Paired'
   if (o?.kind === 'attack') return o.path ? 'Going after their target' : 'Fighting'
+  if (o?.kind === 'roadLine') {
+    const [x, y] = o.tiles[0]!
+    const left = `${o.tiles.length} road tile${o.tiles.length === 1 ? '' : 's'} to go`
+    return o.phase === 'walking'
+      ? `Walking to lay road at ${x}, ${y} · ${left}`
+      : `Building road at ${x}, ${y} · ${left}`
+  }
   return 'Idle'
 }
 
@@ -247,6 +258,7 @@ export function ResidentInspector({
   carriage,
   onDriveTo,
   onHaulTo,
+  onRoadTo,
   onStop,
 }: {
   resident: Resident | undefined
@@ -263,6 +275,8 @@ export function ResidentInspector({
   onDriveTo: () => void
   /** Starts (or cancels) picking the other stop of a haul route carrying these goods. */
   onHaulTo: (setup: HaulSetup) => void
+  /** Starts (or cancels) picking the far end of a road to build along a line from here. */
+  onRoadTo: () => void
   /** Orders the resident to stop what they are doing. */
   onStop: () => void
   /** Why the last order was turned down, if it was. */
@@ -510,6 +524,7 @@ export function ResidentInspector({
       />
       <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
       <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
+      <RoadLineBlock resident={r} tick={tick} picking={picking === 'road'} onRoadTo={onRoadTo} />
       <TearDownBlock resident={r} tick={tick} building={road} onTearDown={onTearDown} />
       <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
       <AttackBlock resident={r} others={others} mapSize={mapSize} onAttack={onAttack} />
@@ -574,6 +589,7 @@ const PICKING_BUTTONS: Record<Exclude<Picking, false>, string> = {
   walk: 'Walk to',
   drive: 'Drive carriage to',
   haul: 'Pick the other stop',
+  road: 'Build road to',
 }
 
 /**
@@ -803,6 +819,51 @@ function RoadBlock({
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
           Build road
+        </button>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * A road along a line (`CONTEXT.md`: Road): the resident builds a road on each tile of the
+ * straight line from their tile to one picked on the map, one tile after another, putting in the
+ * stone they carry. Tiles that have a road already are skipped.
+ */
+function RoadLineBlock({
+  resident,
+  tick,
+  picking,
+  onRoadTo,
+}: {
+  resident: Resident
+  tick: number
+  /** The map is waiting for the line's far end. */
+  picking: boolean
+  onRoadTo: () => void
+}) {
+  const stone = BUILD_MATERIALS.road?.stone ?? 0
+  const carried = resident.carried.stone ?? 0
+  const tiles = stone > 0 ? Math.floor(carried / stone) : ROAD_LINE_MAX_TILES
+  return (
+    <section className="inspector-block" aria-label="Road along a line">
+      <div className="panel-head">
+        <h3>Road along a line</h3>
+      </div>
+      <p className="muted small">
+        Builds road from here to a tile you pick, at most {ROAD_LINE_MAX_TILES} tiles, one after
+        another. The stone carried covers {tiles} tile{tiles === 1 ? '' : 's'}; without more, the
+        resident waits on the next site until someone delivers it.
+      </p>
+      <div className="order-buttons">
+        <button
+          type="button"
+          className={picking ? 'primary' : ''}
+          onClick={onRoadTo}
+          aria-pressed={picking}
+          disabled={!canWork(resident, tick)}
+        >
+          {picking ? 'Pick a tile…' : PICKING_BUTTONS.road}
         </button>
       </div>
     </section>
