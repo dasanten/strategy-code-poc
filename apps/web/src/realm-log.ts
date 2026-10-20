@@ -164,6 +164,16 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
             ? { text: `${cap(them)} paid ${weeks} for your ${n}.`, tone: 'info' }
             : { text: `You paid ${them} ${weeks} for ${n}.`, tone: 'info' }
         case 'ended':
+          if (e.leaderDied) {
+            const whose =
+              e.leaderDied === (e.lender ? 'lender' : 'hirer')
+                ? 'Your Leader died'
+                : `The Leader of ${them} died`
+            return {
+              text: `${whose}, ending the contract for ${n}: the ${n} ${walk} home.`,
+              tone: 'warn',
+            }
+          }
           return {
             text: `The contract with ${them} for ${n} ended: the ${n} ${walk} home.`,
             tone: 'info',
