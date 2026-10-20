@@ -127,6 +127,25 @@ describe('a dead Leader’s cities become self-managed', () => {
     expect(checkInvariants(world, terrain).map((v) => v.message)).toEqual([])
   })
 
+  it('tells the Player what became of each city, and where it stands', () => {
+    const { world, terrain, realm, first, second } = twoCities()
+    const settler = world.residents.find((r) => r.id !== realm.leaderId)!
+    settler.cityId = second.id
+    const living = (c: City) => world.residents.filter((r) => r.cityId === c.id).length
+
+    endRealm(world, realm, terrain.size)
+
+    const [h1, h2] = [hallOf(world, first), hallOf(world, second)]
+    expect(world.events.at(-1)).toMatchObject({
+      kind: 'selfManaged',
+      userId: realm.userId,
+      cities: [
+        { cityId: first.id, name: first.name, x: h1.x, y: h1.y, residents: living(first) },
+        { cityId: second.id, name: 'Redbank', x: h2.x, y: h2.y, residents: 1 },
+      ],
+    })
+  })
+
   it('leaves everything to nobody when the realm has no city left', () => {
     const { world, terrain } = worldWithCity()
     const realm = world.realms[0]!
@@ -142,6 +161,7 @@ describe('a dead Leader’s cities become self-managed', () => {
       expect(k).toMatchObject({ realmId: null, cityId: null })
     }
     expect(ownersExist.check(world, terrain)).toEqual([])
+    expect(world.events.at(-1)).toMatchObject({ kind: 'selfManaged', cities: [] })
   })
 
   it('a Leader dying in the world leaves nothing belonging to the ended realm', () => {

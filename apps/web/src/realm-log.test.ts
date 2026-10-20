@@ -1,6 +1,6 @@
 import { REALM_LOG_LENGTH, type RealmEvent } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { appendEvents, describeEvent } from './realm-log.js'
+import { appendEvents, describeEvent, realmEnded } from './realm-log.js'
 
 const at = { tick: 7, userId: 1 }
 
@@ -124,6 +124,65 @@ describe('realm log', () => {
     expect(describeEvent({ ...crime, crime: 'tearDown', building: 'lumberCamp' }).text).toBe(
       'A witness got home: Vex of the realm of Ada tore down your lumber camp at (4, 5).',
     )
+  })
+
+  it('says what became of a dead Leader’s cities, and where to find them', () => {
+    const city = (name: string, x: number, residents: number) => ({
+      cityId: name,
+      name,
+      x,
+      y: 9,
+      residents,
+    })
+    const ended = { kind: 'selfManaged', seq: 10, ...at } as const
+    expect(describeEvent({ ...ended, cities: [city('Ashford', 3, 1)] })).toEqual({
+      text: 'Your city Ashford (1 resident) is now a self-managed city.',
+      tone: 'bad',
+      places: [{ name: 'Ashford', x: 3, y: 9 }],
+    })
+    const three = [city('Ashford', 3, 4), city('Redbank', 40, 0), city('Elm', 70, 2)]
+    const line = describeEvent({ ...ended, cities: three })
+    expect(line.text).toBe(
+      'Your cities Ashford (4 residents), Redbank (0 residents) and Elm (2 residents) are now self-managed cities.',
+    )
+    expect(line.places).toHaveLength(3)
+    expect(describeEvent({ ...ended, cities: [] }).text).toBe('Your realm had no city left.')
+  })
+
+  it('says where the fresh start is, and whether the realm has ended until then', () => {
+    const founded = {
+      kind: 'founded',
+      residentId: 'r1',
+      name: 'Mara',
+      cityId: 'c1',
+      city: 'Ashford',
+      x: 3,
+      y: 9,
+      seq: 1,
+      ...at,
+    } as const
+    expect(describeEvent(founded)).toEqual({
+      text: 'Your Leader Mara founded Ashford, your realm’s starting city.',
+      tone: 'info',
+      places: [{ name: 'Ashford', x: 3, y: 9 }],
+    })
+    const died = {
+      kind: 'died',
+      residentId: 'r1',
+      name: 'Mara',
+      cause: 'oldAge',
+      leader: true,
+    } as const
+    const log: RealmEvent[] = [founded, { ...died, seq: 2, ...at }]
+    expect(realmEnded([])).toBe(false)
+    expect(realmEnded(log)).toBe(false)
+    log.push(
+      { kind: 'selfManaged', cities: [], seq: 3, ...at },
+      { kind: 'foodSpoiled', units: 1, seq: 4, ...at },
+    )
+    expect(realmEnded(log)).toBe(true)
+    log.push({ ...founded, seq: 5 })
+    expect(realmEnded(log)).toBe(false)
   })
 
   it('keeps the latest events, as many as the server does', () => {

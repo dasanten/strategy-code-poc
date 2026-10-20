@@ -1156,7 +1156,7 @@ export const roadLineOrdersSound: Invariant = {
 }
 
 /**
- * The Trade Organization stays apart (`CONTEXT.md`: Trade Organization, Trade Org HQ,
+ * The Trade Organization stays apart (`CONTEXT.md`: Trade Organization, Trade Org HQ, Trading post,
  * Warehouse): there is at most one Trade Org HQ, every Trade Org city belongs to no realm, and
  * warehouses stand only in Trade Org cities, or in none once their city is gone.
  */

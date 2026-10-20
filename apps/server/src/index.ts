@@ -19,7 +19,12 @@ import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
 import { Walking } from './walking.js'
 import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
-import { ScriptRunner, runScriptOrder, type ScriptHost } from './script-runner.js'
+import {
+  ScriptRunner,
+  armyRunScriptOrder,
+  runScriptOrder,
+  type ScriptHost,
+} from './script-runner.js'
 import { checkScriptLibrary, runnableScript } from './scripts.js'
 import { generateTerrain } from './terrain-gen.js'
 import { TerritoryTracker } from './territory.js'
@@ -65,7 +70,14 @@ const scriptHost: ScriptHost = {
   },
   explored: (userId, x, y) => explored.isExplored({ id: userId }, x, y),
 }
-const orders = new OrderQueue({ ...orderKinds, runScript: runScriptOrder(scriptHost) }, terrain)
+const orders = new OrderQueue(
+  {
+    ...orderKinds,
+    runScript: runScriptOrder(scriptHost),
+    armyRunScript: armyRunScriptOrder(scriptHost),
+  },
+  terrain,
+)
 const scripts = new ScriptRunner(terrain, scriptHost)
 const sight = new SightTracker()
 const walking = new Walking(terrain)

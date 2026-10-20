@@ -7,7 +7,7 @@ import {
   hungerFactor,
   isArmed,
 } from './balance.js'
-import { allianceOf } from './alliance.js'
+import { allied } from './alliance.js'
 import { wrap, wrapDelta, wrapDistance } from './terrain.js'
 import type { Building, BuildingKind, City, Resident, WorldState } from './world.js'
 
@@ -203,8 +203,7 @@ export function hasFoodSurplus(world: WorldState, city: City): boolean {
  */
 function onCitySide(world: Pick<WorldState, 'alliances'>, city: City, realmId: string): boolean {
   if (city.realmId === null) return false
-  if (realmId === city.realmId) return true
-  return allianceOf(world, city.realmId)?.members.some((m) => m.realmId === realmId) ?? false
+  return allied(world, city.realmId, realmId)
 }
 
 /**

@@ -69,7 +69,9 @@ export interface ScriptMemory {
   [key: string]: MemoryValue
 }
 
-/** A resident's run-script order: which script of the Player's library, and its memory. */
+/**
+ * A resident's or army's run-script order: which script of the Player's library, and its memory.
+ */
 export interface RunningScript {
   /** The script in the Player's library; its active version is what runs each tick. */
   scriptId: number
@@ -373,7 +375,16 @@ export interface Army {
   memberIds: string[]
   /** What it was ordered to do; null when idle. */
   order: ArmyOrder | null
+  /**
+   * The script the army runs, when it was given the run-script order (`CONTEXT.md`: Running a
+   * script). Its actions set `order` like UI army orders; any other army order ends it. Absent
+   * when it runs none.
+   */
+  script?: RunningScript
 }
+
+/** An army as its Player sees it: which script it runs, but not its memory. */
+export type SeenArmy = Omit<Army, 'script'> & { script?: Pick<RunningScript, 'scriptId'> }
 
 /**
  * An army's order (`CONTEXT.md`: Army). It gives its members walk or attack orders tagged with
@@ -455,6 +466,28 @@ export type RealmEventWhat =
       captor: boolean
       residents: number
     }
+  /**
+   * The realm's Leader died and the realm ended (`CONTEXT.md`: Leader death): each of its
+   * `cities` became a self-managed city, with the residents living there, its town hall at
+   * (`x`, `y`) so the Player can find it again.
+   */
+  | {
+      kind: 'selfManaged'
+      cities: { cityId: string; name: string; x: number; y: number; residents: number }[]
+    }
+  /**
+   * The Player's Leader `name` founded the realm's starting city `city`, its town hall at
+   * (`x`, `y`): on their first login, or as a fresh start after their Leader died.
+   */
+  | {
+      kind: 'founded'
+      residentId: string
+      name: string
+      cityId: string
+      city: string
+      x: number
+      y: number
+    }
   /** Food went bad over the game day in the realm's storages, residents' loads and carriages. */
   | { kind: 'foodSpoiled'; units: number }
   /** A pair had a child (`CONTEXT.md`: Pairing, Child); `parents` are their names. */
@@ -484,25 +517,25 @@ export type RealmEventWhat =
   /** The role of alliance leader passed to a member (`CONTEXT.md`: Alliance leader). */
   | { kind: 'allianceLeader'; allianceId: string; name: string; realmId: string; realm: string }
   /**
-   * A resident's script stopped with an error this tick (`CONTEXT.md`: Running a script); it runs
-   * again next tick. `line` and `column` say where, when the error is in the script itself.
+   * A resident's or army's script stopped with an error this tick (`CONTEXT.md`: Running a
+   * script); it runs again next tick. `line` and `column` say where, when the error is in the
+   * script itself. Script events name the resident by `residentId` or the army by `armyId`.
    */
-  | {
+  | ({
       kind: 'scriptError'
-      residentId: string
       name: string
       scriptId: number
       message: string
       line?: number
       column?: number
-    }
+    } & ScriptRunBy)
   /**
-   * A resident's script ran out of steps (`CONTEXT.md`: Step budget): its own budget, or, when
-   * `realm`, the realm's, so it was cut short or skipped the tick.
+   * A resident's or army's script ran out of steps (`CONTEXT.md`: Step budget): its own budget,
+   * or, when `realm`, the realm's, so it was cut short or skipped the tick.
    */
-  | { kind: 'scriptOutOfSteps'; residentId: string; name: string; scriptId: number; realm: boolean }
-  /** A resident's run-script order ended because its script was deleted from the library. */
-  | { kind: 'scriptEnded'; residentId: string; name: string; scriptId: number }
+  | ({ kind: 'scriptOutOfSteps'; name: string; scriptId: number; realm: boolean } & ScriptRunBy)
+  /** A run-script order ended because its script was deleted from the library. */
+  | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the
@@ -621,14 +654,14 @@ export interface City {
   townHallId: string
   /**
    * Set when the city is the Trade Organization's, saying which of its cities it is
-   * (`CONTEXT.md`: Trade Organization, Trade Org HQ). It belongs to no realm and the game runs it
-   * like an NPC city.
+   * (`CONTEXT.md`: Trade Organization, Trade Org HQ, Trading post). It belongs to no realm and
+   * the game runs it like an NPC city.
    */
-  tradeOrg?: 'hq'
+  tradeOrg?: 'hq' | 'post'
   /**
    * Workplaces the game has a city it runs work besides its farms, by id: the Trade Org HQ's own
-   * workplaces on the nearest nodes. A workplace still belongs to no city; one that is gone is
-   * skipped.
+   * workplaces on the nearest nodes, a trading post's one. A workplace still belongs to no city;
+   * one that is gone is skipped.
    */
   workplaceIds?: string[]
 }
@@ -760,3 +793,7 @@ export const NODE_TERRAINS: Record<ResourceKind, readonly Terrain[]> = {
   ironOre: [Terrain.Hills, Terrain.Mountain],
   goldOre: [Terrain.Hills, Terrain.Mountain],
 }
+
+/** Who ran a script, in a script event: a resident or an army. */
+export type ScriptRunBy =
+  { residentId: string; armyId?: never } | { armyId: string; residentId?: never }

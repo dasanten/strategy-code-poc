@@ -217,7 +217,7 @@ export function findHqSite(
 }
 
 /** The nearest resource node of `kind` with no building on it, from (cx, cy). */
-function nearestFreeNode(
+export function nearestFreeNode(
   world: WorldState,
   size: number,
   kind: ResourceKind,

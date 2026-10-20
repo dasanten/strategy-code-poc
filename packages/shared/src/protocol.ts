@@ -2,13 +2,13 @@ import type { Account } from './api.js'
 import type { Diplomacy } from './alliance.js'
 import type { RegionMap } from './region-map.js'
 import type {
-  Army,
   Building,
   Carriage,
   City,
   Horse,
   Pile,
   RealmEvent,
+  SeenArmy,
   SeenResident,
 } from './world.js'
 
@@ -40,7 +40,7 @@ export type SeenEntity =
   | ({ is: 'carriage' } & Carriage)
   | ({ is: 'pile' } & Pile)
   /** One of the Player's own armies; its members are what is seen of it. */
-  | ({ is: 'army' } & Army)
+  | ({ is: 'army' } & SeenArmy)
 
 /** Messages the server pushes over the WebSocket (ADR 0006). */
 export type ServerMessage =

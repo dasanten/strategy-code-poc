@@ -25,6 +25,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { CITY_NAMES, updateCityMembership } from './cities.js'
+import { recordEvent } from './events.js'
 import { mulberry32, newResident } from './residents.js'
 
 /** A fresh id for a new entity; ids are never reused. */
@@ -261,6 +262,16 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
     y: sy,
     horseId: world.horses.at(-1)!.id,
     load: {},
+  })
+  const leader = residents[0]!
+  recordEvent(world, realmId, {
+    kind: 'founded',
+    residentId: leader.id,
+    name: leader.name,
+    cityId: city.id,
+    city: city.name,
+    x: hall.x,
+    y: hall.y,
   })
   return realm
 }

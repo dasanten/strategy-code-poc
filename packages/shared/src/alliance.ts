@@ -68,12 +68,29 @@ export function allianceOf(
 }
 
 /**
+ * The realm and its allies: every member of its alliance, or just itself when in none. A member
+ * that is leaving counts until the leave delay is over (`CONTEXT.md`: Alliance).
+ */
+export function alliedRealms(world: Pick<WorldState, 'alliances'>, realmId: string): string[] {
+  const alliance = allianceOf(world, realmId)
+  return alliance ? alliance.members.map((m) => m.realmId) : [realmId]
+}
+
+/**
+ * Whether two realms stand together: the same realm, or members of one alliance. Allies pass
+ * each other's gates, stand on each other's walls, and don't attack each other unless ordered
+ * to (`CONTEXT.md`: Alliance).
+ */
+export function allied(world: Pick<WorldState, 'alliances'>, a: string, b: string): boolean {
+  return a === b || alliedRealms(world, a).includes(b)
+}
+
+/**
  * The realms whose residents a realm's Player sees through (`CONTEXT.md`: Sight): their own, and
  * every member of their alliance. A member that is leaving shares until the leave delay is over.
  */
 export function sharingSight(world: Pick<WorldState, 'alliances'>, realmId: string): string[] {
-  const alliance = allianceOf(world, realmId)
-  return alliance ? alliance.members.map((m) => m.realmId) : [realmId]
+  return alliedRealms(world, realmId)
 }
 
 /** How a realm is called to other Players: by its Leader's name. */

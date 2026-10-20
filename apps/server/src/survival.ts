@@ -143,12 +143,12 @@ export function dropGoods(world: WorldState, x: number, y: number, stock: Stock)
  * horse and carriage goes to the one nearest it. With control the Player's orders end: a
  * resident away walks home (`walkHomeIfAway`), and the others keep only the orders an NPC city
  * gives itself (`NPC_ORDER_KINDS`), so its behaviour takes over. With no city left to go to, the
- * realm's residents, horses and carriages belong to nobody. The Player gets a fresh starting
- * city on their next login. `size` is the map's.
+ * realm's residents, horses and carriages belong to nobody. The Player's log says what became
+ * of each city, and where it stands, and they get a fresh starting city on their next login.
+ * `size` is the map's.
  */
 export function endRealm(world: WorldState, realm: Realm, size: number): void {
   leaveOnLeaderDeath(world, realm.id)
-  world.realms = world.realms.filter((x) => x !== realm)
   const cities = world.cities.filter((c) => c.realmId === realm.id)
   for (const c of cities) c.realmId = null
   for (const r of world.residents) {
@@ -164,6 +164,17 @@ export function endRealm(world: WorldState, realm: Realm, size: number): void {
     k.realmId = null
     k.cityId = nearestCity(world, cities, k, size)?.id ?? null
   }
+  // What became of each city goes in the Player's log while the realm is still there to name them.
+  recordEvent(world, realm.id, {
+    kind: 'selfManaged',
+    cities: cities.flatMap((c) => {
+      const hall = townHallOf(world, c)
+      if (!hall) return []
+      const residents = world.residents.filter((r) => r.cityId === c.id).length
+      return [{ cityId: c.id, name: c.name, x: hall.x, y: hall.y, residents }]
+    }),
+  })
+  world.realms = world.realms.filter((x) => x !== realm)
 }
 
 /** Of `cities`, the one whose town hall is nearest a spot; undefined when there is none. */

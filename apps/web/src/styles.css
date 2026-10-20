@@ -500,6 +500,25 @@ button.residents-row:hover {
 .realm-log-list li.bad {
   border-left-color: #c94a4a;
 }
+.realm-log-list li button.place {
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+}
+.realm-ended {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-left: 3px solid #c94a4a;
+  background: #2a1d20;
+  font-size: 0.85rem;
+}
+.realm-ended p {
+  margin: 0;
+  flex: 1;
+}
 .alliance-panel h2 {
   margin: 0;
   font-size: 0.8rem;

@@ -1,5 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { ARMY_NAME_MAX_LENGTH, type Army, type OrderRequest, type Resident } from '@csp/shared'
+import {
+  ARMY_NAME_MAX_LENGTH,
+  type Army,
+  type OrderRequest,
+  type Resident,
+  type ScriptSummary,
+} from '@csp/shared'
+import { RunScript } from './Residents.js'
 
 /** An army order that needs a tile, picked on the map. */
 export type ArmyPick = { armyId: string; kind: 'armyWalkTo' | 'armyGuard' }
@@ -17,8 +24,8 @@ function armyDoing(army: Army, names: Map<string, string>): string {
 
 /**
  * The Player's armies (`CONTEXT.md`: Army): form one from their residents, and order it to walk
- * or guard a tile picked on the map, to attack or follow a resident in sight, to stop, or to
- * disband. Every change is an order the server checks (ADR 0002).
+ * or guard a tile picked on the map, to attack or follow a resident in sight, to run a script,
+ * to stop, or to disband. Every change is an order the server checks (ADR 0002).
  */
 export function ArmiesPanel({
   armies,
@@ -28,6 +35,7 @@ export function ArmiesPanel({
   picking,
   onPick,
   pickError,
+  scripts,
   sendOrder,
 }: {
   armies: Army[]
@@ -41,6 +49,8 @@ export function ArmiesPanel({
   onPick: (pick: ArmyPick | undefined) => void
   /** Why the last order with a tile picked on the map was rejected, if it was. */
   pickError: string | undefined
+  /** The Player's script library. */
+  scripts: ScriptSummary[]
   sendOrder: (order: OrderRequest) => Promise<string | undefined>
 }) {
   const [name, setName] = useState('')
@@ -131,7 +141,7 @@ export function ArmiesPanel({
                   </button>
                   <button
                     type="button"
-                    disabled={!a.order}
+                    disabled={!a.order && !a.script}
                     onClick={() => order({ kind: 'armyStop', armyId: a.id })}
                   >
                     Stop
@@ -143,6 +153,14 @@ export function ArmiesPanel({
                     Disband
                   </button>
                 </div>
+                <RunScript
+                  script={a.script}
+                  scripts={scripts}
+                  label={`Script for ${a.name} to run`}
+                  onRunScript={(scriptId) =>
+                    order({ kind: 'armyRunScript', armyId: a.id, scriptId })
+                  }
+                />
               </li>
             )
           })}
