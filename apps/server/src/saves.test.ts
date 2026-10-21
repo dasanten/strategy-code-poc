@@ -581,13 +581,22 @@ describe('world saves', () => {
     expect(checkInvariants(v26, land)).toEqual([])
   })
 
-  it('has no punishment under way (migration 27 → 28)', () => {
+  it('starts with no city asking to join (migration 27 → 28)', () => {
     const { world, terrain: land } = worldWithCity()
     const v27: Partial<WorldState> = structuredClone(world)
-    delete v27.punishments
+    delete v27.joinRequests
     const v28 = migrateWorld(structuredClone(v27), 27, { terrain: land }, migrations, 28)
-    expect(v28).toEqual({ ...v27, punishments: [] })
+    expect(v28).toEqual({ ...v27, joinRequests: [] })
     expect(checkInvariants(v28, land)).toEqual([])
+  })
+
+  it('has no punishment under way (migration 28 → 29)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v28: Partial<WorldState> = structuredClone(world)
+    delete v28.punishments
+    const v29 = migrateWorld(structuredClone(v28), 28, { terrain: land }, migrations, 29)
+    expect(v29).toEqual({ ...v28, punishments: [] })
+    expect(checkInvariants(v29, land)).toEqual([])
   })
 
   it('gives every alliance an empty army (migration 22 → 23)', () => {

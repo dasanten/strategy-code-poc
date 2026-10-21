@@ -15,6 +15,7 @@ import { setGate } from './gates.js'
 import { roadLine } from './road-line.js'
 import { contractOrders, pay } from './contracts.js'
 import { buyCity } from './buying.js'
+import { persuasionOrders } from './persuasion.js'
 import { buy, sell } from './trading.js'
 
 /** Who sent an order: the Player's account and id. */
@@ -61,6 +62,7 @@ export const orderKinds: Record<string, OrderKind> = {
   ...allianceOrders,
   ...armyOrders,
   ...contractOrders,
+  ...persuasionOrders,
 }
 
 interface Pending {

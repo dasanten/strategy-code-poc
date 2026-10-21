@@ -94,6 +94,22 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         text: `${e.city} wasn’t bought: it costs ${e.price} coins, and your residents at its town hall carried ${e.coins}.`,
         tone: 'warn',
       }
+    case 'joinAsked':
+      return {
+        text: `${e.city} holds you in high standing and respects your strength: it asks to join your realm. Accept or decline under Standing.`,
+        tone: 'info',
+        places: [{ name: e.city, x: e.x, y: e.y }],
+      }
+    case 'cityPersuaded': {
+      const people = `${e.residents} resident${e.residents === 1 ? '' : 's'}`
+      return {
+        text: `${e.city} joined your realm, persuaded, with its ${people}.`,
+        tone: 'info',
+        places: [{ name: e.city, x: e.x, y: e.y }],
+      }
+    }
+    case 'joinWithdrawn':
+      return { text: `${e.city} no longer asks to join your realm.`, tone: 'warn' }
     case 'traded': {
       const what = goodText(e.good)
       const place = { name: 'the warehouse', x: e.x, y: e.y }
