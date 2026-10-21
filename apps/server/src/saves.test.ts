@@ -7,6 +7,7 @@ import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
 import { gzipSync } from 'node:zlib'
 import {
+  FORMER_PLAYER_STANDING,
   LIFESPAN_MAX,
   LIFESPAN_MIN,
   MAX_HEALTH,
@@ -15,7 +16,10 @@ import {
   NPC_VILLAGES,
   START_HORSES,
   START_STABLE_FOOD,
+  STANDING_DRIFT_PER_DAY,
+  TICKS_PER_GAME_DAY,
   TRADING_POST,
+  standingOf,
   townHallOf,
   wrapDistance,
   type Carriage,
@@ -36,6 +40,7 @@ import { entitiesInSight } from './sight.js'
 import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
 import { createWorld, generateWorld } from './world.js'
 import { foundStartingCity } from './starting-city.js'
+import { endRealm } from './survival.js'
 
 const terrain = smallTerrain()
 
@@ -590,13 +595,34 @@ describe('world saves', () => {
     expect(checkInvariants(v28, land)).toEqual([])
   })
 
-  it('has no punishment under way (migration 28 → 29)', () => {
+  it('has self-managed cities remember their former Player (migration 28 → 29)', () => {
+    // Players 1 and 2 lost their Leaders a game day ago; Player 2 has a new realm already.
     const { world, terrain: land } = worldWithCity()
-    const v28: Partial<WorldState> = structuredClone(world)
-    delete v28.punishments
+    foundStartingCity(world, land, 2)
+    const [one, two] = world.realms.map((r) => world.cities.find((c) => c.realmId === r.id))
+    for (const realm of [...world.realms]) endRealm(world, realm, land.size)
+    world.tick += TICKS_PER_GAME_DAY
+    const again = foundStartingCity(world, land, 2)
+    const v28 = structuredClone(world)
+    for (const c of v28.cities) delete c.formerPlayer
+    v28.standings = []
+
     const v29 = migrateWorld(structuredClone(v28), 28, { terrain: land }, migrations, 29)
-    expect(v29).toEqual({ ...v28, punishments: [] })
+
+    const left = FORMER_PLAYER_STANDING - STANDING_DRIFT_PER_DAY
+    expect(v29.cities.find((c) => c.id === one!.id)!.formerPlayer).toEqual({ userId: 1, tick: 0 })
+    expect(v29.cities.find((c) => c.id === two!.id)!.formerPlayer).toBeUndefined()
+    expect(standingOf(v29, two!.id, again.id)).toBeCloseTo(left)
     expect(checkInvariants(v29, land)).toEqual([])
+  })
+
+  it('has no punishment under way (migration 29 → 30)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v29: Partial<WorldState> = structuredClone(world)
+    delete v29.punishments
+    const v30 = migrateWorld(structuredClone(v29), 29, { terrain: land }, migrations, 30)
+    expect(v30).toEqual({ ...v29, punishments: [] })
+    expect(checkInvariants(v30, land)).toEqual([])
   })
 
   it('gives every alliance an empty army (migration 22 → 23)', () => {

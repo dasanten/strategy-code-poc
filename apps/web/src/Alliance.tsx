@@ -6,6 +6,7 @@ import {
   type Carriage,
   type Diplomacy,
   type OrderRequest,
+  type RealmLabel,
   type SeenResident,
 } from '@csp/shared'
 
@@ -113,7 +114,7 @@ export function AlliancePanel({
         {alliance.members.map((m) => (
           <li key={m.realmId}>
             <span>
-              {m.realmId === realmId ? 'Your realm' : `Realm of ${m.realm}`}
+              {m.realmId === realmId ? 'Your realm' : labelOf(m)}
               {m.realmId === alliance.leaderId && <span className="badge">leader</span>}
               {m.leavesAt !== null && (
                 <span className="badge">leaves {formatGameTime(m.leavesAt)}</span>
@@ -132,7 +133,7 @@ export function AlliancePanel({
         {alliance.invites.map((r) => (
           <li key={r.realmId} className="invited">
             <span>
-              Realm of {r.realm}
+              {labelOf(r)}
               <span className="badge">invited</span>
             </span>
             {leading && (
@@ -149,14 +150,14 @@ export function AlliancePanel({
       {leading && (
         <form onSubmit={invite}>
           <label>
-            Invite a realm in sight
+            Invite a realm or NPC city in sight
             <select value={invitee} onChange={(e) => setInvitee(e.target.value)}>
               <option value="">
-                {invitable.length === 0 ? 'no other realm in sight' : 'Choose a realm'}
+                {invitable.length === 0 ? 'nobody else in sight' : 'Choose whom'}
               </option>
               {invitable.map((r) => (
                 <option key={r.realmId} value={r.realmId}>
-                  Realm of {r.realm}
+                  {labelOf(r)}
                 </option>
               ))}
             </select>
@@ -290,4 +291,9 @@ function AllianceArmy({
       )}
     </div>
   )
+}
+
+/** How a member is called: a realm by its Leader's name, an NPC city by its own. */
+function labelOf(m: RealmLabel): string {
+  return m.city ? `${m.realm} (NPC city)` : `Realm of ${m.realm}`
 }

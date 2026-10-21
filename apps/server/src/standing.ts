@@ -3,8 +3,11 @@ import {
   STANDING_RANGE,
   TICKS_PER_GAME_DAY,
   TRADE_ORG,
+  formerPlayerStanding,
   standingInRange,
   standingOrganization,
+  type City,
+  type Realm,
   type WorldState,
 } from '@csp/shared'
 import type { Invariant, InvariantViolation } from './invariants.js'
@@ -62,6 +65,7 @@ function organizationExists(world: WorldState, org: string): boolean {
  * whose Leader died, a city torn down) is dropped too.
  */
 export function stepStanding(world: WorldState): void {
+  forgetFormerPlayers(world)
   if (world.standings.length === 0) return
   const drift = STANDING_DRIFT_PER_DAY / TICKS_PER_GAME_DAY
   world.standings = world.standings.filter((s) => {
@@ -97,6 +101,64 @@ export const standingsSound: Invariant = {
       }
       if (seen.has(pair)) report(`standing ${pair} is kept twice`)
       seen.add(pair)
+    }
+    return out
+  },
+}
+
+/*
+ * A self-managed city remembers its former Player (`CONTEXT.md`: Self-managed city): it starts out
+ * holding them in good standing, which fades like any standing. Their realm is gone until they
+ * come back, so the city keeps the memory (`City.formerPlayer`) and gives the standing, as far as
+ * it has faded by then, to their next realm when it is founded.
+ */
+
+/** The cities of a realm whose Leader just died remember its Player from now on. */
+export function rememberFormerPlayer(world: WorldState, cities: City[], userId: number): void {
+  for (const c of cities) c.formerPlayer = { userId, tick: world.tick }
+}
+
+/**
+ * A Player's new realm is founded: every self-managed city that remembers them holds the realm
+ * in the good standing left of its memory, and the memory now lives on as that standing.
+ */
+export function welcomeFormerPlayer(world: WorldState, realm: Realm): void {
+  for (const c of world.cities) {
+    if (c.formerPlayer?.userId !== realm.userId) continue
+    if (c.realmId === null)
+      changeStanding(world, c.id, realm.id, formerPlayerStanding(c, world.tick))
+    delete c.formerPlayer
+  }
+}
+
+/** A city forgets its former Player once the memory has faded, or once it joined a realm. */
+export function forgetFormerPlayers(world: WorldState): void {
+  for (const c of world.cities) {
+    if (!c.formerPlayer) continue
+    if (c.realmId !== null || formerPlayerStanding(c, world.tick) === 0) delete c.formerPlayer
+  }
+}
+
+/**
+ * Former Players are remembered soundly (`CONTEXT.md`: Self-managed city): only by cities of no
+ * realm and not of the Trade Organization, from a tick already passed, and only
+ * while the Player has no realm (a new one takes the memory over as standing).
+ */
+export const formerPlayersSound: Invariant = {
+  name: 'former-players-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const c of world.cities) {
+      const f = c.formerPlayer
+      if (!f) continue
+      const report = (message: string) =>
+        out.push({ invariant: this.name, message, entityIds: [c.id] })
+      if (c.realmId !== null) report(`${c.id} belongs to a realm but remembers a former Player`)
+      if (c.tradeOrg !== undefined) report(`Trade Org city ${c.id} remembers a former Player`)
+      if (f.tick > world.tick) report(`${c.id} remembers a Leader death still to come`)
+      if (world.realms.some((r) => r.userId === f.userId)) {
+        report(`${c.id} remembers Player ${f.userId}, who has a realm again`)
+      }
     }
     return out
   },

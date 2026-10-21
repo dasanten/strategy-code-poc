@@ -835,6 +835,13 @@ export const PERSUADE_CHECK_TICKS = 60
 export const PERSUADE_ASK_AGAIN_DAYS = 7
 
 /**
+ * The standing a self-managed city starts out holding its former Player in (`CONTEXT.md`:
+ * Self-managed city): good, and like any standing gone in about 60 game days, two and a half real
+ * days.
+ */
+export const FORMER_PLAYER_STANDING = 60
+
+/**
  * Below this standing toward an Organization the Trade Organization refuses to trade with it
  * (`CONTEXT.md`: Trade Org reaction): no buying or selling at its warehouses, no hiring its
  * soldiers, no hiring theirs. Any known crime against it gets there; a theft is forgiven in about
@@ -1100,6 +1107,20 @@ export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
  * command again (`CONTEXT.md`: Alliance army): a game day.
  */
 export const ALLIANCE_RECALL_DELAY = TICKS_PER_GAME_DAY
+
+/**
+ * The standing an NPC city must hold toward every member of an alliance to accept its
+ * invitation (`CONTEXT.md`: NPC city in an alliance): half the way to the best. Some 25
+ * paid contract weeks, or a lot of trade, earn it from neutral.
+ */
+export const NPC_ALLIANCE_JOIN_STANDING = 50
+
+/**
+ * The standing toward a member below which an NPC city leaves its alliance on its own
+ * (`CONTEXT.md`: NPC city in an alliance): a theft and an attack from neutral, so standing merely
+ * drifting back to neutral never makes it go.
+ */
+export const NPC_ALLIANCE_LEAVE_STANDING = -20
 
 /**
  * Control a city projects before counting anyone in it (`CONTEXT.md`: Territory), so even an
