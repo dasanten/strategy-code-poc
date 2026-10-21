@@ -53,6 +53,7 @@ export function takeOnDelivery(world: WorldState, caravan: Caravan, warehouse: B
     paid: 0,
     fee: 0,
     misses: 0,
+    robbed: 0,
   }
   return true
 }
@@ -143,6 +144,10 @@ export function runDelivery(
     if (gone && job.step === 'pay') return paidUp(world, job, d)
     if (gone) return turnBack(world, caravan, job, d)
   }
+  // Robbed of all it carried for a delivery, it has nothing left to bring.
+  if (job.step === 'deliver' && d && job.units === 0 && job.robbed > 0 && !caravan.holding) {
+    return sendAgain(world, job, d, deliveryStorage(world, d.cityId))
+  }
   const b = stepBuilding(world, job)
   if (!b) return finish(caravan)
   if (driver.x !== b.x || driver.y !== b.y) {
@@ -198,11 +203,14 @@ export function runDelivery(
         job.step = 'deliver'
         return
       }
-      // A pick-up loads the coins its goods fetch at the warehouse's prices now.
+      // A pick-up loads the coins its goods fetch at the warehouse's prices now, or, robbed while
+      // it paid, what it has still to pay.
+      const paying = job.target !== null
       const storage = d && deliveryStorage(world, d.cityId)
       const warehouse = world.buildings.find((x) => x.id === job.warehouseId)
-      const need =
-        d && storage && warehouse
+      const need = paying
+        ? job.toPay - job.paid
+        : d && storage && warehouse
           ? quotePickUp(world, warehouse, g, d.units, d.units, tiles(storage), Infinity).coins
           : 0
       const units = Math.min(
@@ -212,13 +220,16 @@ export function runDelivery(
         unitsThatFitCarriage(carriage, 'coins'),
       )
       if (units > 0) return take(here, 'coins', units, 'carriage')
-      job.step = 'collect'
+      // With no coins to pay with, it waits at the coin warehouse for some.
+      if (paying && need > 0 && job.coins === 0) return
+      job.step = paying ? 'pay' : 'collect'
       return
     }
     case 'deliver': {
       job.target ??= job.units
       const units = Math.min(job.units, hands(g))
       if (units > 0) return take(onCarriage, g, units, 'stop')
+      if (job.robbed > 0) return sendAgain(world, job, d!, b)
       deliveredAll(world, job, d!, b)
       job.step = 'return'
       return
@@ -231,17 +242,19 @@ export function runDelivery(
           : { units: 0 }
         job.target = Math.min(q.units, unitsThatFitCarriage(carriage, g))
       }
+      // What robbers took off the carriage was collected all the same.
+      const collected = job.units + job.robbed
       const units = Math.min(
-        job.target - job.units,
+        job.target - collected,
         stock[g] ?? 0,
         hands(g),
         unitsThatFitCarriage(carriage, g),
       )
       if (units > 0) return take(here, g, units, 'carriage')
       const q = warehouse
-        ? quotePickUp(world, warehouse, g, job.units, job.units, tiles(b), Infinity)
+        ? quotePickUp(world, warehouse, g, collected, collected, tiles(b), Infinity)
         : { coins: 0, fee: 0 }
-      job.toPay = Math.min(q.coins, job.coins)
+      job.toPay = q.coins
       job.fee = q.fee
       job.step = 'pay'
       return
@@ -249,6 +262,11 @@ export function runDelivery(
     case 'pay': {
       const units = Math.min(job.toPay - job.paid, job.coins, hands('coins'))
       if (units > 0) return take(onCarriage, 'coins', units, 'stop')
+      // Short of coins (robbed, or the price rose), it fetches the rest at the coin warehouse.
+      if (job.paid < job.toPay && job.coins === 0) {
+        job.step = 'load'
+        return
+      }
       return paidUp(world, job, d!)
     }
     case 'return': {
@@ -283,6 +301,64 @@ function deliveredAll(world: WorldState, job: CaravanJob, d: Delivery, b: Buildi
   })
 }
 
+/**
+ * Robbers took some of a delivery off the caravan, which put the rest into the city's storage `b`
+ * (none when it had nothing left to bring): the Trade Organization sends what was taken again
+ * (`CONTEXT.md`: Guaranteed carriage). The delivery waits for the next caravan, the warehouse
+ * keeping its goods for it, and this caravan goes back to its route.
+ */
+function sendAgain(world: WorldState, job: CaravanJob, d: Delivery, b?: Building): void {
+  const city = world.cities.find((c) => c.id === d.cityId)?.name ?? ''
+  if (b && (job.target ?? 0) > 0) {
+    recordEvent(world, d.realmId, {
+      kind: 'delivered',
+      delivery: 'delivery',
+      good: d.good,
+      units: job.target!,
+      coins: 0,
+      fee: d.fee,
+      cityId: d.cityId,
+      city,
+      x: b.x,
+      y: b.y,
+    })
+  }
+  recordEvent(world, d.realmId, {
+    kind: 'deliveryRobbed',
+    good: d.good,
+    units: job.robbed,
+    cityId: d.cityId,
+    city,
+  })
+  d.units = job.robbed
+  d.caravanId = null
+  job.robbed = 0
+  job.step = 'return'
+}
+
+/**
+ * Robbers took goods off `caravan`'s carriage (`CONTEXT.md`: Guaranteed carriage): what its job
+ * counts on board is cut down to what is left. Units of a delivery on the way to the storage, or
+ * of a pick-up after it collected them, count as `robbed`; coins of a pick-up on the way to
+ * collect are fetched again at the coin warehouse first. Taken while it loads, it loads again.
+ */
+export function deliveryRobbed(caravan: Caravan, carriage: Carriage): void {
+  const job = caravan.job
+  if (!job) return
+  const units = Math.min(job.units, carriage.load[job.good] ?? 0)
+  const coins = Math.min(job.coins, carriage.load.coins ?? 0)
+  const lost = job.units - units
+  const coinsLost = job.coins - coins
+  job.units = units
+  job.coins = coins
+  const collected =
+    job.kind === 'pickUp' && job.target !== null && ['load', 'collect', 'pay'].includes(job.step)
+  if (job.step === 'deliver' || collected) job.robbed += lost
+  // What was put into the storage is the rest: the target less what was taken.
+  if (job.step === 'deliver' && job.target !== null) job.target -= lost
+  if (coinsLost > 0 && job.step === 'collect' && job.target === null) job.step = 'load'
+}
+
 /** A pick-up is paid for: it is done, and the caravan brings the goods to the warehouse. */
 function paidUp(world: WorldState, job: CaravanJob, d: Delivery): void {
   drop(world, d)
@@ -296,7 +372,7 @@ function paidUp(world: WorldState, job: CaravanJob, d: Delivery): void {
     kind: 'delivered',
     delivery: 'pickUp',
     good: d.good,
-    units: job.units,
+    units: job.units + job.robbed,
     coins: job.paid,
     fee: job.fee,
     cityId: d.cityId,
@@ -322,8 +398,9 @@ export function collectsFrom(world: WorldState, r: Resident, storageId: string):
  * Deliveries hold together (`CONTEXT.md`: Delivery; ADR 0004): each is for a whole, positive
  * number of units within one delivery load, with a fee of at least 0; one a caravan carries out
  * is that caravan's job, and no caravan's job is for a delivery another carries out or for one
- * gone before its goods reached the storage; and what a caravan counts on board for its job is on
- * its carriage, but for Food its crew may have eaten.
+ * gone before its goods reached the storage; what a caravan counts on board for its job is on
+ * its carriage, but for Food its crew may have eaten; and what it counts robbed is a whole
+ * number, no more than its delivery is for.
  */
 export const deliveriesSound: Invariant = {
   name: 'deliveries-sound',
@@ -361,6 +438,9 @@ export const deliveriesSound: Invariant = {
       }
       if (stockWeight({ [job.good]: job.units }) > DELIVERY_LOAD + 1e-9) {
         fail(c.id, `caravan ${c.id} carries more than one delivery load for its delivery`)
+      }
+      if (!Number.isInteger(job.robbed) || job.robbed < 0 || (d && job.robbed > d.units)) {
+        fail(c.id, `caravan ${c.id} counts ${job.robbed} units robbed, not within its delivery`)
       }
     }
     return out

@@ -193,6 +193,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'warn',
       }
     }
+    case 'deliveryRobbed':
+      return {
+        text: `Robbers took ${e.units} ${goodText(e.good)} of your delivery to ${e.city} off a caravan; the Trade Organization sends them again.`,
+        tone: 'warn',
+      }
     case 'selfManaged': {
       if (e.cities.length === 0) return { text: 'Your realm had no city left.', tone: 'bad' }
       const each = e.cities.map((c) => `${c.name} (${residentsText(c.residents)})`)

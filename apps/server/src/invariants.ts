@@ -70,7 +70,7 @@ import { formerPlayersSound, standingsSound } from './standing.js'
 import { buyOrdersDone, cityPricesSound } from './buying.js'
 import { refusedTradeNothing, tradeOrdersDone, tradesKeepGoods } from './trading.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
-import { caravansSound } from './caravans.js'
+import { caravansSound, routeRobberiesSound } from './caravans.js'
 import { deliveriesSound } from './deliveries.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
 import { directivesSound } from './directives.js'
@@ -1368,6 +1368,7 @@ export const worldInvariants: Invariant[] = [
   climbOrdersSound,
   tradeOrgSound,
   caravansSound,
+  routeRobberiesSound,
   tradeOrgArmySound,
   punishmentsSound,
   directivesSound,

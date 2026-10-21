@@ -26,7 +26,8 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
-import { releaseDelivery, runDelivery, takeOnDelivery } from './deliveries.js'
+import { organizationOf } from './crimes.js'
+import { deliveryRobbed, releaseDelivery, runDelivery, takeOnDelivery } from './deliveries.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
@@ -325,6 +326,50 @@ export function caravanFood(world: WorldState, r: Resident, size: number): Stock
   const carriage = caravan && world.carriages.find((k) => k.id === caravan.carriageId)
   if (!carriage || (carriage.load.food ?? 0) <= 0) return undefined
   return wrapDistance(size, r, carriage) <= CARAVAN_SPREAD ? carriage.load : undefined
+}
+
+/**
+ * Resident `r` took goods off carriage `carriageId` (`CONTEXT.md`: Guaranteed carriage): when it
+ * is a caravan's and they aren't of the Trade Organization, they robbed it. Its route counts the
+ * robbery, once a tick however many take from it (`robbed` holds the caravans robbed this tick),
+ * and the Trade Organization makes good what was taken of its delivery (`deliveryRobbed`).
+ */
+export function robCaravan(
+  world: WorldState,
+  r: Resident,
+  carriageId: string,
+  robbed: Set<string>,
+): void {
+  const caravan = world.caravans.find((c) => c.carriageId === carriageId)
+  const carriage = world.carriages.find((k) => k.id === carriageId)
+  if (!caravan || !carriage) return
+  const org = organizationOf(r)
+  if (world.cities.some((c) => c.id === org && c.tradeOrg !== undefined)) return
+  if (!robbed.has(caravan.id)) {
+    robbed.add(caravan.id)
+    world.routeRobberies[caravan.postId] = (world.routeRobberies[caravan.postId] ?? 0) + 1
+  }
+  deliveryRobbed(caravan, carriage)
+}
+
+/**
+ * Robberies counted per caravan route hold together (`CONTEXT.md`: Guaranteed carriage; ADR
+ * 0004): each route ends at a trading post and was robbed a whole number of times, at least once.
+ */
+export const routeRobberiesSound: Invariant = {
+  name: 'route-robberies-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const [postId, n] of Object.entries(world.routeRobberies)) {
+      const fail = (message: string) =>
+        out.push({ invariant: this.name, message, entityIds: [postId] })
+      if (!world.cities.some((c) => c.id === postId && c.tradeOrg === 'post')) {
+        fail(`robberies are counted for ${postId}, which is no trading post`)
+      }
+      if (!Number.isInteger(n) || n < 1) fail(`the route to ${postId} counts ${n} robberies`)
+    }
+    return out
+  },
 }
 
 /**

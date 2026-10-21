@@ -42,7 +42,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 31
+export const WORLD_FORMAT_VERSION = 32
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -343,8 +343,18 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // The Trade Organization's punishments came (`CONTEXT.md`: Trade Org reaction); none are under way.
   29: (state) => ({ ...(state as object), punishments: [] }),
+  // Robbed caravans are made good and robberies counted per route (`CONTEXT.md`: Guaranteed
+  // carriage): no route was robbed yet, and no caravan's job counts anything robbed.
+  30: (state) => {
+    const world = structuredClone(state) as { caravans: { job: object | null }[] }
+    return {
+      ...world,
+      caravans: world.caravans.map((c) => ({ ...c, job: c.job && { ...c.job, robbed: 0 } })),
+      routeRobberies: {},
+    }
+  },
   // Admins give directives (`CONTEXT.md`: Admin directive); none are in force yet.
-  30: (state) => ({ ...(state as object), directives: [] }),
+  31: (state) => ({ ...(state as object), directives: [] }),
 }
 
 export class WorldFormatError extends Error {}
