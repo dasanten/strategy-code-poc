@@ -211,12 +211,26 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     case 'allianceInvited':
       return { text: `You were invited to join the alliance ${e.name}.`, tone: 'info' }
     case 'allianceJoined': {
-      const who = e.realmId === realmId ? 'You' : `The realm of ${e.realm}`
+      const who =
+        e.realmId === realmId
+          ? 'You'
+          : e.city
+            ? `The NPC city ${e.realm}`
+            : `The realm of ${e.realm}`
       return { text: `${who} joined the alliance ${e.name}.`, tone: 'info' }
     }
+    case 'allianceDeclined':
+      return {
+        text: `The NPC city ${e.realm} declined to join the alliance ${e.name}.`,
+        tone: 'info',
+      }
     case 'allianceLeft': {
       const you = e.realmId === realmId
-      const who = you ? 'Your realm' : `The realm of ${e.realm}`
+      const who = you
+        ? 'Your realm'
+        : e.city
+          ? `The NPC city ${e.realm}`
+          : `The realm of ${e.realm}`
       const how = {
         left: 'left',
         removed: 'was removed from',

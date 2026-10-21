@@ -13,6 +13,7 @@ import {
   pileAt,
   recipeFor,
   wallSide,
+  allied,
   workProblem,
   wrapDistance,
   type Building,
@@ -254,9 +255,10 @@ function smithing(world: WorldState, smithy: Building, unarmed: Resident[], inpu
 }
 
 /**
- * An NPC city closes its gates while an armed outsider (anyone armed not of the city) stands
- * within `NPC_GATE_WATCH_RANGE` of one of them, and opens them again once none does
- * (`CONTEXT.md`: NPC city, Walls in combat). Its own residents pass them either way.
+ * An NPC city closes its gates while an armed outsider (anyone armed not of the city or its
+ * alliance) stands within `NPC_GATE_WATCH_RANGE` of one of them, and opens them again once none
+ * does (`CONTEXT.md`: NPC city, Walls in combat). Its own residents and allies pass them either
+ * way.
  */
 function watchGates(world: WorldState, city: City, size: number): void {
   const gates = world.buildings.filter((b) => b.cityId === city.id && b.kind === 'gate' && !b.site)
@@ -265,7 +267,7 @@ function watchGates(world: WorldState, city: City, size: number): void {
     (r) =>
       r.health > 0 &&
       isArmed(r) &&
-      wallSide(r) !== city.id &&
+      !allied(world, city.id, wallSide(r) ?? '') &&
       gates.some((g) => wrapDistance(size, r, g) <= NPC_GATE_WATCH_RANGE),
   )
   for (const g of gates) {

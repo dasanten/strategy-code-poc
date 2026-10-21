@@ -836,11 +836,22 @@ export type RealmEventWhat =
   | { kind: 'foaled'; horseId: string; stableId: string }
   /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */
   | { kind: 'allianceInvited'; allianceId: string; name: string }
-  /** A realm (`realm`, by its Leader's name) joined the alliance: this one, or another. */
-  | { kind: 'allianceJoined'; allianceId: string; name: string; realmId: string; realm: string }
   /**
-   * A realm stopped being a member of the alliance: this one, or another. `removed` when the
-   * alliance leader removed it; `leaderDied` when its Leader died and it left at once.
+   * A realm (`realm`, by its Leader's name) joined the alliance: this one, or another. `city`
+   * when it is an NPC city (`CONTEXT.md`: NPC city in an alliance), `realm` then its name.
+   */
+  | {
+      kind: 'allianceJoined'
+      allianceId: string
+      name: string
+      realmId: string
+      realm: string
+      city?: true
+    }
+  /**
+   * A member stopped being one of the alliance: this realm, or another (`city` for an NPC city,
+   * as for `allianceJoined`). `removed` when the alliance leader removed it; `leaderDied` when
+   * its Leader died and it left at once.
    */
   | {
       kind: 'allianceLeft'
@@ -849,7 +860,13 @@ export type RealmEventWhat =
       realmId: string
       realm: string
       why: 'left' | 'removed' | 'leaderDied'
+      city?: true
     }
+  /**
+   * An NPC city (`realmId`, `realm` its name) the alliance leader invited declined
+   * (`CONTEXT.md`: NPC city in an alliance).
+   */
+  | { kind: 'allianceDeclined'; allianceId: string; name: string; realmId: string; realm: string }
   /** The role of alliance leader passed to a member (`CONTEXT.md`: Alliance leader). */
   | { kind: 'allianceLeader'; allianceId: string; name: string; realmId: string; realm: string }
   /**
@@ -951,18 +968,25 @@ export interface Realm {
 }
 
 /**
- * A group of Organizations that agreed to join (`CONTEXT.md`: Alliance). For now its members are
- * Players' realms; a realm is in at most one. It ends when its last member is gone.
+ * A group of Organizations that agreed to join (`CONTEXT.md`: Alliance): Players' realms and NPC
+ * cities (`CONTEXT.md`: NPC city in an alliance), never the Trade Organization. Each is in at
+ * most one. It ends when its last realm is gone.
  */
 export interface Alliance {
   id: string
   /** Chosen by the realm that founded it. */
   name: string
-  /** The member realm that is the alliance leader (`CONTEXT.md`: Alliance leader). */
+  /**
+   * The member realm that is the alliance leader (`CONTEXT.md`: Alliance leader); always a realm,
+   * since an NPC city gives no orders.
+   */
   leaderId: string
   /** Members in the order they joined, so the first is the longest-standing. Never empty. */
   members: AllianceMember[]
-  /** Realms the alliance leader invited that have not accepted or declined yet. */
+  /**
+   * Realms the alliance leader invited that have not accepted or declined yet. An NPC city
+   * answers at once, so it is never kept here.
+   */
   invites: string[]
   /**
    * The alliance army (`CONTEXT.md`: Alliance army): soldiers and carriages members handed over
@@ -982,8 +1006,9 @@ export interface AllianceArmyPart {
   recallAt: number | null
 }
 
-/** A realm's membership in an alliance. */
+/** An Organization's membership in an alliance. */
 export interface AllianceMember {
+  /** The member: a realm's id, or an NPC city's (`CONTEXT.md`: NPC city in an alliance). */
   realmId: string
   /** The tick it joined, or founded the alliance. */
   joinedAt: number

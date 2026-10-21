@@ -39,9 +39,12 @@ function send(socket: WebSocket, msg: ServerMessage) {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
 }
 
-/** The realms whose residents are among the entities. */
+/** The realms whose residents are among the entities, and the cities among them. */
 function realmsSeen(entities: SeenEntity[]): string[] {
-  return entities.flatMap((e) => (e.is === 'resident' && e.owner !== null ? [e.owner] : []))
+  return entities.flatMap((e) => {
+    if (e.is === 'resident' && e.owner !== null) return [e.owner]
+    return e.is === 'city' ? [e.id] : []
+  })
 }
 
 interface Client {
