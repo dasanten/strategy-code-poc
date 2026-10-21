@@ -835,6 +835,13 @@ export const PERSUADE_CHECK_TICKS = 60
 export const PERSUADE_ASK_AGAIN_DAYS = 7
 
 /**
+ * The standing a self-managed city starts out holding its former Player in (`CONTEXT.md`:
+ * Self-managed city): good, and like any standing gone in about 60 game days, two and a half real
+ * days.
+ */
+export const FORMER_PLAYER_STANDING = 60
+
+/**
  * Materials each kind of building needs before its construction site can become the building
  * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
  * the lumber camp's wood builds the quarry, wood and stone build the mine and the smelter, and
