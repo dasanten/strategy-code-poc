@@ -1,7 +1,9 @@
 import {
   DIRECTIVE_PUNISH_WORTH,
   HQ_COIN_WAREHOUSE,
+  MAX_DIRECTIVE_GOALS,
   MAX_DIRECTIVE_REASON,
+  MAX_DIRECTIVE_SOLDIERS,
   TRADE_ORG_ARMY,
   TRADE_ORG_PUNISH,
   Terrain,
@@ -14,6 +16,7 @@ import {
   type Building,
   type City,
   type Directive,
+  type DirectiveGoalRequest,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -28,7 +31,9 @@ import {
   giveDirective,
   liftDirective,
   setDirectivePrice,
+  stepDirectives,
 } from './directives.js'
+import { dieAll } from './survival.js'
 import { checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -121,8 +126,17 @@ function resident(
 }
 
 /** Gives a directive that must be given. */
-function give(world: WorldState, target: string, withAlliance = false): Directive {
-  const d = giveDirective(world, { target, withAlliance, reason: 'farms new Players' }, 'Daniel')
+function give(
+  world: WorldState,
+  target: string,
+  withAlliance = false,
+  goals: DirectiveGoalRequest[] = [{ kind: 'soldiers', count: 1000 }],
+): Directive {
+  const d = giveDirective(
+    world,
+    { target, withAlliance, reason: 'farms new Players', goals },
+    'Daniel',
+  )
   if (typeof d === 'string') throw new Error(d)
   return d
 }
@@ -180,9 +194,26 @@ describe('giving and lifting an admin directive', () => {
     const { world, hq } = setup()
     const targets = directiveTargetChoices(world, (id) => (id === 7 ? 'mara' : undefined))
     expect(targets).toEqual([
-      { org: 'r1', name: 'Aldo', is: 'realm', account: 'mara' },
-      { org: 'r2', name: 'Bea', is: 'realm', account: undefined },
-      { org: 'n1', name: 'Nook', is: 'city' },
+      {
+        org: 'r1',
+        name: 'Aldo',
+        is: 'realm',
+        account: 'mara',
+        cities: [
+          { id: 'c1', name: 'Ashford' },
+          { id: 'c2', name: 'Farhold' },
+        ],
+        allies: ['r2'],
+      },
+      {
+        org: 'r2',
+        name: 'Bea',
+        is: 'realm',
+        account: undefined,
+        cities: [{ id: 'c3', name: 'Bywater' }],
+        allies: ['r1'],
+      },
+      { org: 'n1', name: 'Nook', is: 'city', cities: [{ id: 'n1', name: 'Nook' }], allies: [] },
     ])
     expect(targets.some((t) => t.org === hq.id)).toBe(false)
   })
@@ -266,9 +297,13 @@ describe('the Trade Organization under an admin directive', () => {
 })
 
 describe('who sees an admin directive', () => {
-  it('shows every Player the target and the reason, never who gave it', () => {
+  it('shows every Player the target, the reason and the goals, never who gave it', () => {
     const { world } = setup()
-    give(world, 'r1', true)
+    give(world, 'r1', true, [
+      { kind: 'city', cityId: 'c3' },
+      { kind: 'soldiers', count: 5 },
+    ])
+    world.directives[0]!.soldiersKilled = 3
     for (const realm of ['r1', 'r2']) {
       const seen = diplomacyFor(world, realm, [])
       expect(seen.directives).toEqual([
@@ -277,25 +312,223 @@ describe('who sees an admin directive', () => {
           targetName: 'Aldo',
           withAlliance: true,
           reason: 'farms new Players',
+          goals: [
+            { kind: 'city', city: 'Bywater' },
+            { kind: 'soldiers', count: 5 },
+          ],
         }),
       ])
       expect(JSON.stringify(seen)).not.toContain('Daniel')
+      // How far the goals have come stays with admins.
+      expect(JSON.stringify(seen)).not.toMatch(/soldiersKilled|"met"/)
     }
   })
 
-  it('shows admins who gave it', () => {
+  it('shows admins who gave it and how far its goals have come', () => {
     const { world } = setup()
-    give(world, 'n1')
+    give(world, 'n1', false, [{ kind: 'city', cityId: 'n1' }])
     expect(adminDirectives(world)).toEqual([
-      expect.objectContaining({ target: 'n1', targetName: 'Nook', givenBy: 'Daniel' }),
+      expect.objectContaining({
+        target: 'n1',
+        targetName: 'Nook',
+        givenBy: 'Daniel',
+        goals: [{ kind: 'city', cityId: 'n1', city: 'Nook', met: false }],
+        soldiersKilled: 0,
+      }),
     ])
+  })
+})
+
+/** Adds an armed resident of realm r1 in city c2, far from the HQ. */
+function soldier(world: WorldState, id: string, owner = 'r1', cityId = 'c2') {
+  const r = resident(world, id, owner, MID + 61, MID + 1, cityId)
+  r.carried.spear = 1
+  return r
+}
+
+describe('setting directive goals', () => {
+  const reason = 'farms new Players'
+  const tryGoals = (world: WorldState, goals: unknown, target = 'r1', withAlliance = false) =>
+    giveDirective(world, { target, withAlliance, reason, goals }, 'Daniel')
+
+  it('needs at least one goal, each a city of whom it names or soldiers killed', () => {
+    const { world } = setup()
+    expect(tryGoals(world, undefined)).toBe('Set at least one goal.')
+    expect(tryGoals(world, [])).toBe('Set at least one goal.')
+    expect(tryGoals(world, [{ kind: 'gold' }])).toBe(
+      'A goal is a city destroyed or soldiers killed.',
+    )
+    expect(tryGoals(world, [null])).toBe('A goal is a city destroyed or soldiers killed.')
+    expect(
+      tryGoals(world, Array(MAX_DIRECTIVE_GOALS + 1).fill({ kind: 'soldiers', count: 1 })),
+    ).toMatch(/at most/)
+    // Bywater is r2's: only a directive with r1's alliance can make it a goal.
+    expect(tryGoals(world, [{ kind: 'city', cityId: 'c3' }])).toMatch(/city of the target/)
+    expect(tryGoals(world, [{ kind: 'city', cityId: 'n1' }])).toMatch(/city of the target/)
+    expect(
+      tryGoals(world, [
+        { kind: 'city', cityId: 'c1' },
+        { kind: 'city', cityId: 'c1' },
+      ]),
+    ).toBe('Ashford is a goal twice.')
+    for (const count of [0, 1.5, -2, MAX_DIRECTIVE_SOLDIERS + 1, '3']) {
+      expect(tryGoals(world, [{ kind: 'soldiers', count }])).toMatch(/soldiers killed/)
+    }
+    for (const percent of [0, 101, 33.3]) {
+      expect(tryGoals(world, [{ kind: 'soldierShare', percent }])).toMatch(/percent/)
+    }
+    expect(world.directives).toEqual([])
+
+    const d = give(world, 'r1', true, [
+      { kind: 'city', cityId: 'c3' },
+      { kind: 'city', cityId: 'c2' },
+      { kind: 'soldiers', count: 12 },
+    ])
+    expect(d.goals).toEqual([
+      { kind: 'city', cityId: 'c3', city: 'Bywater', met: false },
+      { kind: 'city', cityId: 'c2', city: 'Farhold', met: false },
+      { kind: 'soldiers', count: 12 },
+    ])
+    expect(d.soldiersKilled).toBe(0)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('counts a share of soldiers from those it names when given, at least one', () => {
+    const { world } = setup()
+    for (let i = 0; i < 5; i++) soldier(world, `s${i}`)
+    soldier(world, 'x1', 'r2', 'c3')
+    resident(world, 'u1', 'r1', MID + 61, MID + 1, 'c2') // unarmed: no soldier
+    const d = give(world, 'r1', false, [{ kind: 'soldierShare', percent: 50 }])
+    // r1 has 5 soldiers (Aldo carries no weapon); half of them is 3, rounding up.
+    expect(d.goals).toEqual([{ kind: 'soldiers', count: 3, percent: 50 }])
+    liftDirective(world, d.id)
+    // With its alliance, Bea's realm's soldier counts too.
+    const all = give(world, 'r1', true, [{ kind: 'soldierShare', percent: 100 }])
+    expect(all.goals).toEqual([{ kind: 'soldiers', count: 6, percent: 100 }])
+    liftDirective(world, all.id)
+    const none = give(world, 'n1', false, [{ kind: 'soldierShare', percent: 10 }])
+    expect(none.goals).toEqual([{ kind: 'soldiers', count: 1, percent: 10 }])
+  })
+})
+
+describe('tracking directive goals', () => {
+  it('counts soldiers of those it names killed, not the unarmed or those dying otherwise', () => {
+    const { world } = setup()
+    const d = give(world, 'r1', true)
+    const other = give(world, 'n1')
+    const [s1, s2, s3] = [soldier(world, 's1'), soldier(world, 's2'), soldier(world, 's3')]
+    const ally = soldier(world, 'x1', 'r2', 'c3')
+    const unarmed = resident(world, 'u1', 'r1', MID + 61, MID + 1, 'c2')
+    dieAll(world, [s1, unarmed, ally], 'killed', terrain.size)
+    expect(d.soldiersKilled).toBe(2)
+    dieAll(world, [s2], 'starved', terrain.size)
+    dieAll(world, [s3], 'oldAge', terrain.size)
+    expect(d.soldiersKilled).toBe(2)
+    expect(other.soldiersKilled).toBe(0)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('meets a city goal once the city is captured or dissolved, and keeps it met', () => {
+    const { world } = setup()
+    const d = give(world, 'r1', true, [
+      { kind: 'city', cityId: 'c1' },
+      { kind: 'city', cityId: 'c2' },
+      { kind: 'city', cityId: 'c3' },
+      { kind: 'soldiers', count: 50 },
+    ])
+    const c2 = world.cities.find((c) => c.id === 'c2')!
+    // Handing a city to an ally the directive names doesn't destroy it.
+    c2.realmId = 'r2'
+    stepDirectives(world)
+    expect(d.goals.map((g) => g.kind === 'city' && g.met)).toEqual([false, false, false, false])
+    // Captured by someone it doesn't name.
+    world.realms.push({ id: 'r3', userId: 9, leaderId: 'z1' })
+    c2.realmId = 'r3'
+    // Its town hall torn down: the city is gone.
+    world.cities = world.cities.filter((c) => c.id !== 'c3')
+    stepDirectives(world)
+    expect(d.goals.map((g) => g.kind === 'city' && g.met)).toEqual([false, true, true, false])
+    // Taken back, it stays met.
+    c2.realmId = 'r1'
+    stepDirectives(world)
+    expect(d.goals.map((g) => g.kind === 'city' && g.met)).toEqual([false, true, true, false])
+    expect(world.directives).toEqual([d])
+    // The city was taken apart by hand here, so only the directive is checked.
+    expect(directivesSound.check(world, terrain)).toEqual([])
+  })
+
+  it('meets an NPC city target’s city goal once it joins a realm', () => {
+    const { world } = setup()
+    const d = give(world, 'n1', false, [{ kind: 'city', cityId: 'n1' }])
+    stepDirectives(world)
+    expect(world.directives).toEqual([d])
+    world.cities.find((c) => c.id === 'n1')!.realmId = 'r2'
+    stepDirectives(world)
+    expect(world.directives).toEqual([])
+  })
+})
+
+describe('a directive ending on its goals', () => {
+  it('ends once all its goals are met, telling every realm it named', () => {
+    const { world } = setup()
+    const d = give(world, 'r1', true, [
+      { kind: 'city', cityId: 'c2' },
+      { kind: 'soldiers', count: 2 },
+    ])
+    stepPunishments(world, terrain.size)
+    expect(world.punishments.length).toBeGreaterThan(0)
+    world.cities.find((c) => c.id === 'c2')!.realmId = null
+    dieAll(world, [soldier(world, 's1')], 'killed', terrain.size)
+    stepDirectives(world)
+    // One soldier of two: it stands.
+    expect(world.directives).toEqual([d])
+    expect(checkInvariants(world, terrain)).toEqual([])
+
+    dieAll(world, [soldier(world, 's2', 'r2', 'c3')], 'killed', terrain.size)
+    stepDirectives(world)
+    expect(world.directives).toEqual([])
+    expect(tradeOrgRefuses(world, 'r1')).toBe(false)
+    for (const userId of [7, 8]) {
+      expect(
+        world.events.filter((e) => e.kind === 'directiveEnded' && e.userId === userId),
+      ).toEqual([expect.objectContaining({ reason: 'farms new Players' })])
+    }
+    // Its punishments head home.
+    stepPunishments(world, terrain.size)
+    expect(world.punishments.every((p) => p.heading === 'home')).toBe(true)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('ends within a world step once a goal city is lost', () => {
+    const { world, walking } = setup()
+    give(world, 'r1', false, [{ kind: 'city', cityId: 'c2' }])
+    run(world, walking, 1)
+    expect(world.directives).toHaveLength(1)
+    world.cities.find((c) => c.id === 'c2')!.realmId = null
+    run(world, walking, 1)
+    expect(world.directives).toEqual([])
+  })
+
+  it('never ends on its own without goals (given before goals existed)', () => {
+    const { world } = setup()
+    const d = give(world, 'r1')
+    d.goals = []
+    stepDirectives(world)
+    expect(world.directives).toEqual([d])
   })
 })
 
 describe('the directives-sound invariant', () => {
   it('catches a directive naming the Trade Organization, a target named twice, or no reason', () => {
     const { world, hq } = setup()
-    const base = { withAlliance: false, givenBy: 'Daniel', givenAt: 0, price: null }
+    const base = {
+      withAlliance: false,
+      givenBy: 'Daniel',
+      givenAt: 0,
+      goals: [],
+      soldiersKilled: 0,
+      price: null,
+    }
     const broken = (city: City) => [
       { ...base, id: 'd1', target: city.id, reason: 'x' },
       { ...base, id: 'd2', target: 'r1', reason: 'x' },
@@ -306,6 +539,39 @@ describe('the directives-sound invariant', () => {
       `directive d1 names the Trade Organization`,
       `r1 is named by two directives`,
       `directive d3 has a reason of 1 characters`,
+    ])
+  })
+
+  it('catches badly formed goals, a partial count, and a directive whose goals are all met', () => {
+    const { world } = setup()
+    const base = { withAlliance: false, givenBy: 'Daniel', givenAt: 0, reason: 'x', price: null }
+    world.directives = [
+      {
+        ...base,
+        id: 'd1',
+        target: 'r1',
+        goals: [
+          { kind: 'soldiers', count: 0 },
+          { kind: 'soldiers', count: 3, percent: 120 },
+        ],
+        soldiersKilled: 1.5,
+      },
+      {
+        ...base,
+        id: 'd2',
+        target: 'r2',
+        goals: [
+          { kind: 'city', cityId: 'c3', city: 'Bywater', met: true },
+          { kind: 'soldiers', count: 2 },
+        ],
+        soldiersKilled: 2,
+      },
+    ]
+    expect(directivesSound.check(world, terrain).map((v) => v.message)).toEqual([
+      'directive d1 counts 1.5 soldiers killed',
+      'directive d1 asks for 0 soldiers killed',
+      'directive d1 asks for 120% of its soldiers killed',
+      'directive d2 met all its goals but is still in force',
     ])
   })
 })
@@ -319,7 +585,13 @@ describe('buying off an admin directive', () => {
     const s = setup()
     const d = giveDirective(
       s.world,
-      { target: 'r1', withAlliance, reason: 'farms new Players', price },
+      {
+        target: 'r1',
+        withAlliance,
+        reason: 'farms new Players',
+        price,
+        goals: [{ kind: 'soldiers', count: 1000 }],
+      },
       'Daniel',
     )
     if (typeof d === 'string') throw new Error(d)
@@ -461,7 +733,13 @@ describe('buying off an admin directive', () => {
     expect(setDirectivePrice(world, d.id, 500)).toMatchObject({ price: 500 })
     const other = giveDirective(
       world,
-      { target: 'n1', withAlliance: false, reason: 'x', price: 0 },
+      {
+        target: 'n1',
+        withAlliance: false,
+        reason: 'x',
+        price: 0,
+        goals: [{ kind: 'soldiers', count: 1000 }],
+      },
       'Daniel',
     )
     expect(other).toBe('A price to buy it off is a whole number of Coins, at least one, or none.')
@@ -485,7 +763,13 @@ describe('the buy-off invariants', () => {
     const { world, walking, hq } = setup()
     const d = giveDirective(
       world,
-      { target: 'r1', withAlliance: false, reason: 'x', price: 100 },
+      {
+        target: 'r1',
+        withAlliance: false,
+        reason: 'x',
+        price: 100,
+        goals: [{ kind: 'soldiers', count: 1000 }],
+      },
       'Daniel',
     ) as Directive
     const hall = townHallOf(world, hq)!

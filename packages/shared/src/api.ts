@@ -97,6 +97,8 @@ export interface GiveDirectiveRequest {
   target: string
   withAlliance: boolean
   reason: string
+  /** What ends it, at least one (`MAX_DIRECTIVE_GOALS` at most). */
+  goals: DirectiveGoalRequest[]
   /** The Coins to buy it off with, or null when the target can't. */
   price: number | null
 }
@@ -106,6 +108,15 @@ export interface DirectivePriceRequest {
   price: number | null
 }
 
+/**
+ * A goal an admin sets: a city of an Organization the directive names destroyed, a number of
+ * their soldiers killed, or a share (`percent`) of the soldiers they have now killed.
+ */
+export type DirectiveGoalRequest =
+  | { kind: 'city'; cityId: string }
+  | { kind: 'soldiers'; count: number }
+  | { kind: 'soldierShare'; percent: number }
+
 /** An Organization an admin can name in a directive. */
 export interface DirectiveTarget {
   org: string
@@ -114,6 +125,10 @@ export interface DirectiveTarget {
   is: 'realm' | 'city'
   /** A realm's Player's account name. */
   account?: string
+  /** Its cities, for `city` goals: a realm's, or an NPC city itself. */
+  cities: { id: string; name: string }[]
+  /** The other members of a realm's alliance, by org, for a directive with its alliance. */
+  allies: string[]
 }
 
 /** What the admin panel shows of directives: those in force and whom one can name. */

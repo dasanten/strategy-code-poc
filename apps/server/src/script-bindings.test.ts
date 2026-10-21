@@ -173,6 +173,8 @@ describe('script bindings', () => {
       reason: 'farms new Players',
       givenBy: 'Daniel',
       givenAt: 0,
+      goals: [],
+      soldiersKilled: 0,
       price: 500,
     })
     const memory: ScriptObject = {}

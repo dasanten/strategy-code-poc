@@ -241,7 +241,13 @@ export async function buildApp(opts: AppOptions) {
       const b = body(req)
       const given = giveDirective(
         world,
-        { target: b.target, withAlliance: b.withAlliance, reason: b.reason, price: b.price },
+        {
+          target: b.target,
+          withAlliance: b.withAlliance,
+          reason: b.reason,
+          goals: b.goals,
+          price: b.price,
+        },
         req.user!.name,
       )
       if (typeof given === 'string') return fail(reply, 'invalid-input', given)

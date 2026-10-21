@@ -77,6 +77,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'info',
         places: [{ name: 'the warehouse', x: e.x, y: e.y }],
       }
+    case 'directiveEnded':
+      return {
+        text: `The admin directive against you (${e.reason}) has ended: all its goals are met.`,
+        tone: 'info',
+      }
     case 'fled':
       return { text: `${e.name} was hit and flees home.`, tone: 'warn' }
     case 'cityCaptured': {

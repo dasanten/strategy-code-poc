@@ -164,9 +164,15 @@ The shared language of the game. Domain terms only — no implementation details
   trade. It names a target (optionally with its alliance), a reason and **goals** (a city
   destroyed, a number or share of its soldiers killed, …); it has no time limit and ends when
   all goals are met or an admin lifts it. Until then the Trade Organization treats the target
-  as one to punish. Every Player sees the target and the reason; only admins see who gave it.
-  If the admin allows it, the target can **buy it off** by paying a set price in Coins at any
-  Trade Org warehouse.
+  as one to punish. Every Player sees the target, the reason and the goals; only admins see who
+  gave it and how far its goals have come. If the admin allows it, the target can **buy it off**
+  by paying a set price in Coins at any Trade Org warehouse.
+  - **Goals:** at least one. A **city destroyed** names a city of the target (or of its
+    alliance, if named) and is met once that city is gone or belongs to none of them any more
+    (captured, dissolved, self-managed); once met it stays met. **Soldiers killed** counts the
+    soldiers of the target (and its alliance, as it stands) killed in combat since the directive
+    was given, by anyone; a **share** is taken of the soldiers they had when it was given. When
+    the last goal is met the directive ends and the target's realm log says so.
 
 ## Organizations and territory
 

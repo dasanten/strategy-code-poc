@@ -42,7 +42,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 33
+export const WORLD_FORMAT_VERSION = 34
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -355,9 +355,18 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Admins give directives (`CONTEXT.md`: Admin directive); none are in force yet.
   31: (state) => ({ ...(state as object), directives: [] }),
+  // Directives have goals (`CONTEXT.md`: Admin directive); those in force were given without
+  // any, so they end only when an admin lifts them, and count no soldiers killed yet.
+  32: (state) => {
+    const world = state as { directives: object[] }
+    return {
+      ...world,
+      directives: world.directives.map((d) => ({ ...d, goals: [], soldiersKilled: 0 })),
+    }
+  },
   // Directives can be bought off where an admin allows it (`CONTEXT.md`: Admin directive); none
   // given so far allows it.
-  32: (state) => {
+  33: (state) => {
     const world = structuredClone(state) as { directives: object[] }
     return { ...world, directives: world.directives.map((d) => ({ ...d, price: null })) }
   },
