@@ -120,13 +120,13 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   ),
   action(
     'buy',
-    ['good', 'units', 'carriageId?'],
-    'On a Trade Org warehouse, buy up to `units` of a good at its prices with the coins in my hands, or on my carriage there.',
+    ['good', 'units', 'carriageId?', 'cityId?'],
+    'On a Trade Org warehouse, buy up to `units` of a good at its prices with the coins in my hands, or on my carriage there. With `cityId`, one of my realm’s cities, a caravan delivers them to its storage for a fee.',
   ),
   action(
     'sell',
-    ['good', 'units', 'carriageId?'],
-    'On a Trade Org warehouse, sell up to `units` of a good at its prices from my hands, or from my carriage there.',
+    ['good', 'units', 'carriageId?', 'cityId?'],
+    'On a Trade Org warehouse, sell up to `units` of a good at its prices from my hands, or from my carriage there. With `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
   ),
   action(
     'roadLine',

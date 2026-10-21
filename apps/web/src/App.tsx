@@ -334,6 +334,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               realms={world.diplomacy.realmsInSight}
               carriages={world.carriages}
               tick={world.tick}
+              mapSize={world.map.size}
               onSetGate={async (gateId, open) =>
                 setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
               }
@@ -349,6 +350,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             <RealmLog
               events={world.events}
               realmId={world.home.realmId}
+              deliveries={world.diplomacy.deliveries}
               onShowPlace={(p) => setFocus({ x: p.x, y: p.y })}
             />
           )}

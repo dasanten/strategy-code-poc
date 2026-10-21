@@ -263,6 +263,7 @@ describe('realtime', () => {
       invitations: [],
       realmsInSight: [],
       contracts: [],
+      deliveries: [],
       standings: [],
       joinRequests: [],
     })

@@ -562,6 +562,16 @@ describe('world saves', () => {
     expect(migrateWorld(structuredClone(v24), 24, { terrain: land }, migrations, 25)).toEqual(v25)
   })
 
+  it('gives every caravan no delivery and the world none (migration 26 → 27)', () => {
+    const v26 = { tick: 5, caravans: [{ id: 'caravan1', postId: 'c2', toLoad: null }] }
+    const v27 = migrateWorld(structuredClone(v26), 26, { terrain: smallTerrain() }, migrations, 27)
+    expect(v27).toEqual({
+      tick: 5,
+      caravans: [{ ...v26.caravans[0], job: null }],
+      deliveries: [],
+    })
+  })
+
   it('starts everyone neutral toward everyone (migration 25 → 26)', () => {
     const { world, terrain: land } = worldWithCity()
     const v25: Partial<WorldState> = structuredClone(world)
@@ -571,13 +581,13 @@ describe('world saves', () => {
     expect(checkInvariants(v26, land)).toEqual([])
   })
 
-  it('starts with no city asking to join (migration 26 → 27)', () => {
+  it('starts with no city asking to join (migration 27 → 28)', () => {
     const { world, terrain: land } = worldWithCity()
-    const v26: Partial<WorldState> = structuredClone(world)
-    delete v26.joinRequests
-    const v27 = migrateWorld(structuredClone(v26), 26, { terrain: land }, migrations, 27)
-    expect(v27).toEqual({ ...v26, joinRequests: [] })
-    expect(checkInvariants(v27, land)).toEqual([])
+    const v27: Partial<WorldState> = structuredClone(world)
+    delete v27.joinRequests
+    const v28 = migrateWorld(structuredClone(v27), 27, { terrain: land }, migrations, 28)
+    expect(v28).toEqual({ ...v27, joinRequests: [] })
+    expect(checkInvariants(v28, land)).toEqual([])
   })
 
   it('gives every alliance an empty army (migration 22 → 23)', () => {

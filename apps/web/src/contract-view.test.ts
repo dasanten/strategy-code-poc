@@ -35,6 +35,7 @@ const diplomacy = (contracts: ContractView[]): Diplomacy => ({
   standings: [],
   joinRequests: [],
   contracts,
+  deliveries: [],
 })
 
 describe('mercenary contracts in the UI', () => {

@@ -2,6 +2,7 @@ import { contractOf, contractsFor, type ContractView } from './contract.js'
 import { joinRequestsFor, type JoinRequestView } from './persuasion.js'
 import { standingsFor, type StandingView } from './standing.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
+import { deliveriesFor, type DeliveryView } from './warehouse.js'
 import type { Alliance, AllianceArmyPart, Carriage, Resident, WorldState } from './world.js'
 
 /** World queries about alliances (ADR 0002: the game API orders and scripts share). */
@@ -154,6 +155,8 @@ export interface Diplomacy {
   realmsInSight: RealmLabel[]
   /** Mercenary contracts the realm is a side of, offered or in force (`CONTEXT.md`). */
   contracts: ContractView[]
+  /** The realm's deliveries and pick-ups not yet done (`CONTEXT.md`: Delivery). */
+  deliveries: DeliveryView[]
   /** Standing between the realm and other Organizations (`CONTEXT.md`: Standing), shown only. */
   standings: StandingView[]
   /** NPC cities asking the realm to join it (`CONTEXT.md`: Persuading a city). */
@@ -161,8 +164,8 @@ export interface Diplomacy {
 }
 
 /**
- * The Player's alliance matters, as their realm sees them. `seenRealms` are the realms whose
- * residents are in the Player's sight.
+ * The Player's alliance matters, as their realm sees them, and their open deliveries. `seenRealms`
+ * are the realms whose residents are in the Player's sight.
  */
 export function diplomacyFor(
   world: Pick<
@@ -173,6 +176,7 @@ export function diplomacyFor(
     | 'carriages'
     | 'contracts'
     | 'buildings'
+    | 'deliveries'
     | 'standings'
     | 'cities'
     | 'joinRequests'
@@ -212,6 +216,7 @@ export function diplomacyFor(
     invitations,
     realmsInSight,
     contracts: contractsFor(world, realmId),
+    deliveries: deliveriesFor(world, realmId),
     standings: standingsFor(world, realmId),
     joinRequests: joinRequestsFor(world, realmId),
   }

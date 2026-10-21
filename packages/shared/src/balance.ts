@@ -485,6 +485,25 @@ export const CARAVAN_FOOD = 60
  */
 export const CARAVAN_SPREAD = 2
 
+/**
+ * The part of a delivery's fee every delivery or pick-up pays, in coins (`CONTEXT.md`:
+ * Delivery), however light or near.
+ */
+export const DELIVERY_FEE_BASE = 5
+
+/**
+ * The part of a delivery's fee that grows with weight and distance, in coins per kg and tile from
+ * the warehouse to the city's storage (`CONTEXT.md`: Delivery). 100 kg over 100 tiles, about a
+ * trading post's region, costs 50: a tenth of what 100 iron fetch, a lot for cheap Food.
+ */
+export const DELIVERY_FEE_PER_KG_TILE = 0.005
+
+/**
+ * How often a caravan's drive towards a delivery's storage may end short of it before it turns
+ * back (`CONTEXT.md`: Delivery), say behind closed gates or out of reach of carriages.
+ */
+export const DELIVERY_DRIVE_TRIES = 3
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 
@@ -666,6 +685,12 @@ export function walkSpeed(resident: Resident, terrain: number, tick: number): nu
 export const CARRIAGE_CAPACITY = 400
 
 /**
+ * The most one delivery or pick-up carries, in kg (`CONTEXT.md`: Delivery): a caravan's carriage
+ * with room left for the Food it keeps on board (`CARAVAN_FOOD`, a kg a unit).
+ */
+export const DELIVERY_LOAD = CARRIAGE_CAPACITY - CARAVAN_FOOD
+
+/**
  * Food a haul route keeps on board for its horse unless the Player picks another amount, in
  * units (`CONTEXT.md`: Haul route): two game days of the horse's eating, topped up at each stop
  * that has Food.
@@ -770,6 +795,26 @@ export const STANDING_CONTRACT_BROKEN_LOSS = 20
  * forgotten in about 30 game days, a little over a real day.
  */
 export const STANDING_DRIFT_PER_DAY = 1
+
+/**
+ * Below this standing toward an Organization an NPC city won't trade with it or hire out to it
+ * and keeps its gates shut to its residents (`CONTEXT.md`: NPC city reaction). A killing known
+ * to it, not a single theft or attack.
+ */
+export const NPC_CITY_REFUSES_STANDING = -25
+
+/**
+ * Below this standing toward a realm an NPC city won't sell itself to it at all (`CONTEXT.md`:
+ * NPC city reaction). Two killings known to it.
+ */
+export const NPC_CITY_WONT_SELL_STANDING = -60
+
+/**
+ * How far standing moves an NPC city's price (`CONTEXT.md`: Buying a city): its price times
+ * 1 - this × standing / `STANDING_RANGE`, so half price at the best standing and half again as
+ * much at the worst.
+ */
+export const CITY_PRICE_STANDING_SWING = 0.5
 
 /**
  * The standing an NPC city needs toward a realm before it asks to join it (`CONTEXT.md`:

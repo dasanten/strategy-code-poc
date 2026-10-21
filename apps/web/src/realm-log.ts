@@ -1,4 +1,4 @@
-import { REALM_LOG_LENGTH, TRADE_ORG_NAME, type RealmEvent } from '@csp/shared'
+import { REALM_LOG_LENGTH, TRADE_ORG_NAME, type DeliveryView, type RealmEvent } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
 
 /** How bad an event is, for its colour in the log. */
@@ -101,7 +101,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     case 'joinWithdrawn':
       return { text: `${e.city} no longer asks to join your realm.`, tone: 'warn' }
     case 'traded': {
-      const what = e.good.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`)
+      const what = goodText(e.good)
       const place = { name: 'the warehouse', x: e.x, y: e.y }
       if (e.units === 0) {
         return {
@@ -116,6 +116,68 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         text: `${e.name} ${did} ${e.units} ${what}${cut} for ${e.coins} coins at the warehouse.`,
         tone: 'info',
         places: [place],
+      }
+    }
+    case 'deliveryOrdered': {
+      const what = goodText(e.good)
+      const place = { name: 'the warehouse', x: e.x, y: e.y }
+      if (e.units === 0) {
+        const how = e.side === 'buy' ? `buy any ${what} delivered to` : `sell any ${what} from`
+        return {
+          text: `${e.name} couldn’t ${how} ${e.city} at the warehouse.`,
+          tone: 'warn',
+          places: [place],
+        }
+      }
+      if (e.side === 'buy') {
+        const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
+        return {
+          text: `${e.name} bought ${e.units} ${what}${cut} for ${e.coins} coins and a ${e.fee}-coin fee; a caravan brings them to ${e.city}.`,
+          tone: 'info',
+          places: [place],
+        }
+      }
+      return {
+        text: `${e.name} sold up to ${e.units} ${what} from ${e.city}; a caravan picks them up and pays there (about ${e.coins} coins after a ${e.fee}-coin fee at today’s prices).`,
+        tone: 'info',
+        places: [place],
+      }
+    }
+    case 'delivered': {
+      const what = goodText(e.good)
+      const place = { name: e.city, x: e.x, y: e.y }
+      if (e.delivery === 'delivery') {
+        return {
+          text: `A caravan delivered ${e.units} ${what} to ${e.city}.`,
+          tone: 'info',
+          places: [place],
+        }
+      }
+      if (e.units === 0) {
+        return {
+          text: `A caravan found no ${what} to pick up in ${e.city}.`,
+          tone: 'warn',
+          places: [place],
+        }
+      }
+      return {
+        text: `A caravan picked up ${e.units} ${what} in ${e.city} and paid ${e.coins} coins there (after a ${e.fee}-coin fee).`,
+        tone: 'info',
+        places: [place],
+      }
+    }
+    case 'deliveryStuck': {
+      const what = `${e.units} ${goodText(e.good)}`
+      const job = e.delivery === 'delivery' ? `delivering ${what} to` : `picking up ${what} in`
+      if (e.cancelled) {
+        return {
+          text: `A caravan ${job} ${e.city} gave up: the city is no longer yours.`,
+          tone: 'bad',
+        }
+      }
+      return {
+        text: `A caravan ${job} ${e.city} couldn’t get to its storage and turned back; the next caravan tries again.`,
+        tone: 'warn',
       }
     }
     case 'selfManaged': {
@@ -252,4 +314,20 @@ export function appendEvents(log: RealmEvent[], events: RealmEvent[]): RealmEven
 /** The text with its first letter in capitals. */
 function cap(text: string): string {
   return text[0]!.toUpperCase() + text.slice(1)
+}
+
+/** A good's name in a sentence: `ironOre` is "iron ore". */
+function goodText(good: string): string {
+  return good.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`)
+}
+
+/**
+ * An open delivery or pick-up in the game's words (`CONTEXT.md`: Delivery), for the list above
+ * the realm log.
+ */
+export function describeDelivery(d: DeliveryView): string {
+  const what = `${d.units} ${goodText(d.good)}`
+  const job = d.kind === 'delivery' ? `${what} to ${d.city}` : `up to ${what} from ${d.city}`
+  const state = d.underway ? 'a caravan is on it' : 'waiting for a caravan at the warehouse'
+  return `${d.kind === 'delivery' ? 'Delivery' : 'Pick-up'} of ${job}: ${state}.`
 }
