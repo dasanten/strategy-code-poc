@@ -288,6 +288,7 @@ describe('alliances', () => {
       invitations: [],
       realmsInSight: [{ realmId: realm(ash), realm: name(ash) }],
       contracts: [],
+      deliveries: [],
       standings: [],
     })
     expect(diplomacyFor(world, realm(ash), [])).toEqual({
@@ -295,6 +296,7 @@ describe('alliances', () => {
       invitations: [{ allianceId: id, name: 'North', leader: name(mara) }],
       realmsInSight: [],
       contracts: [],
+      deliveries: [],
       standings: [],
     })
   })

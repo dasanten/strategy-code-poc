@@ -5,6 +5,8 @@ import {
   WALL_ENCLOSES_MAX,
   WALL_STRENGTH,
 } from './balance.js'
+import { npcCityRefuses } from './city.js'
+import { TRADE_ORG } from './trade-org.js'
 import { isPassableTerrain, tileIndex, wrap, wrapDelta, type TerrainMap } from './terrain.js'
 import type { Building, Good, Resident, Stock, WorldState } from './world.js'
 
@@ -32,6 +34,11 @@ export interface WallTile {
   realms: string[]
   /** A gate that is closed. */
   closed: boolean
+  /**
+   * The sides (`wallSide`) an NPC city keeps its gate shut to even while open, because it refuses
+   * them (`CONTEXT.md`: NPC city reaction; `npcCityRefuses`). Empty for a wall.
+   */
+  shutTo: string[]
 }
 
 /**
@@ -56,10 +63,31 @@ export function isClosed(b: Building): boolean {
 }
 
 /**
- * A key that changes whenever the finished walls and gates, their gates' state or their cities'
- * realms or those realms' alliances change, so a `WallMap` is rebuilt only then.
+ * The sides (`wallSide`) each NPC city refuses (`npcCityRefuses`), by city id: a realm or NPC
+ * city by its id, the Trade Organization by each of its cities. Its gates are shut to them.
  */
-export function wallsKey(world: Pick<WorldState, 'buildings' | 'cities' | 'alliances'>): string {
+export function shutOut(world: Pick<WorldState, 'cities' | 'standings'>): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  for (const s of world.standings) {
+    const city = world.cities.find((c) => c.id === s.of)
+    if (!city || !npcCityRefuses(world, city, s.toward)) continue
+    const sides =
+      s.toward === TRADE_ORG
+        ? world.cities.filter((c) => c.tradeOrg !== undefined).map((c) => c.id)
+        : [s.toward]
+    out.set(city.id, [...(out.get(city.id) ?? []), ...sides].sort())
+  }
+  return out
+}
+
+/**
+ * A key that changes whenever the finished walls and gates, their gates' state or their cities'
+ * realms or those realms' alliances change, or whom an NPC city shuts its gates to (`shutOut`),
+ * so a `WallMap` is rebuilt only then.
+ */
+export function wallsKey(
+  world: Pick<WorldState, 'buildings' | 'cities' | 'alliances' | 'standings'>,
+): string {
   const parts: string[] = []
   for (const b of world.buildings) {
     if (!isWallOrGate(b)) continue
@@ -67,6 +95,7 @@ export function wallsKey(world: Pick<WorldState, 'buildings' | 'cities' | 'allia
   }
   for (const c of world.cities) parts.push(`${c.id}=${c.realmId ?? ''}`)
   for (const a of world.alliances) parts.push(`${a.id}+${a.members.map((m) => m.realmId).join()}`)
+  for (const [cityId, sides] of shutOut(world)) parts.push(`${cityId}-${sides.join()}`)
   return parts.join(';')
 }
 
@@ -75,10 +104,11 @@ export function wallsKey(world: Pick<WorldState, 'buildings' | 'cities' | 'allia
  * (`WALL_ENCLOSES_MAX` tiles) on foot without crossing a wall or gate.
  */
 export function wallMap(
-  world: Pick<WorldState, 'buildings' | 'cities' | 'alliances'>,
+  world: Pick<WorldState, 'buildings' | 'cities' | 'alliances' | 'standings'>,
   terrain: TerrainMap,
 ): WallMap {
   const { size } = terrain
+  const shut = shutOut(world)
   const realms = new Map(world.cities.map((c) => [c.id, c.realmId]))
   const sides = new Map<string, string[]>()
   const side = (realmId: string | null): string[] => {
@@ -95,6 +125,7 @@ export function wallMap(
       realmId,
       realms: side(realmId ?? b.cityId),
       closed: isClosed(b),
+      shutTo: (b.kind === 'gate' && b.cityId && shut.get(b.cityId)) || [],
     })
   }
   const inside = new Set<number>()
@@ -179,7 +210,8 @@ export function strandedOnWall(walls: WallMap, realmId: string | null, t: number
  * (`CONTEXT.md`: Walls in combat), walls and gates aside from the land itself. Nobody walks
  * through a wall: only the city's own realm and its allies go onto its walls, from inside or from
  * the wall itself, and down only inside, and only `onWalls` (on foot, not driving). A gate lets
- * them through always, everyone else only while open. `stranded` (`strandedOnWall`) frees the
+ * them through always, everyone else only while open, and an NPC city's gate never those it
+ * refuses (`CONTEXT.md`: NPC city reaction; `WallTile.shutTo`). `stranded` (`strandedOnWall`) frees the
  * way down from a wall.
  */
 export function mayStep(
@@ -191,7 +223,9 @@ export function mayStep(
   stranded = false,
 ): boolean {
   const w = walls.tiles.get(to)
-  if (w?.kind === 'gate' && w.closed && !ownWallOrGate(walls, realmId, to)) return false
+  if (w?.kind === 'gate' && !ownWallOrGate(walls, realmId, to)) {
+    if (w.closed || (realmId !== null && w.shutTo.includes(realmId))) return false
+  }
   if (w?.kind === 'wall') {
     if (!onWalls || !ownWall(walls, realmId, to)) return false
     return walls.inside.has(from) || ownWallOrGate(walls, realmId, from)

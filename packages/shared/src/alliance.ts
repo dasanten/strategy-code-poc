@@ -6,6 +6,7 @@ import {
 import { contractOf, contractsFor, type ContractView } from './contract.js'
 import { organizationLabel, standingOf, standingsFor, type StandingView } from './standing.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
+import { deliveriesFor, type DeliveryView } from './warehouse.js'
 import {
   TICKS_PER_GAME_DAY,
   type Alliance,
@@ -231,13 +232,15 @@ export interface Diplomacy {
   realmsInSight: RealmLabel[]
   /** Mercenary contracts the realm is a side of, offered or in force (`CONTEXT.md`). */
   contracts: ContractView[]
+  /** The realm's deliveries and pick-ups not yet done (`CONTEXT.md`: Delivery). */
+  deliveries: DeliveryView[]
   /** Standing between the realm and other Organizations (`CONTEXT.md`: Standing), shown only. */
   standings: StandingView[]
 }
 
 /**
- * The Player's alliance matters, as their realm sees them. `seenRealms` are the realms whose
- * residents are in the Player's sight, and the cities in it.
+ * The Player's alliance matters, as their realm sees them, and their open deliveries. `seenRealms`
+ * are the realms whose residents are in the Player's sight, and the cities in it.
  */
 export function diplomacyFor(
   world: Pick<
@@ -248,6 +251,7 @@ export function diplomacyFor(
     | 'carriages'
     | 'contracts'
     | 'buildings'
+    | 'deliveries'
     | 'standings'
     | 'cities'
   >,
@@ -292,6 +296,7 @@ export function diplomacyFor(
     invitations,
     realmsInSight,
     contracts: contractsFor(world, realmId),
+    deliveries: deliveriesFor(world, realmId),
     standings: standingsFor(world, realmId),
   }
 }

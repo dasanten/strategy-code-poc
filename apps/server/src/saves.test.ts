@@ -562,6 +562,16 @@ describe('world saves', () => {
     expect(migrateWorld(structuredClone(v24), 24, { terrain: land }, migrations, 25)).toEqual(v25)
   })
 
+  it('gives every caravan no delivery and the world none (migration 26 → 27)', () => {
+    const v26 = { tick: 5, caravans: [{ id: 'caravan1', postId: 'c2', toLoad: null }] }
+    const v27 = migrateWorld(structuredClone(v26), 26, { terrain: smallTerrain() }, migrations, 27)
+    expect(v27).toEqual({
+      tick: 5,
+      caravans: [{ ...v26.caravans[0], job: null }],
+      deliveries: [],
+    })
+  })
+
   it('starts everyone neutral toward everyone (migration 25 → 26)', () => {
     const { world, terrain: land } = worldWithCity()
     const v25: Partial<WorldState> = structuredClone(world)

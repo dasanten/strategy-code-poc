@@ -1,19 +1,30 @@
 import {
+  DELIVERY_LOAD,
+  GOOD_WEIGHT,
+  MAP_SIZE,
   STANDING_TRADE_COINS_PER_POINT,
   TRADE_ORG,
   commanderOf,
   commands,
   commandsCarriage,
+  deliveryStorage,
   handsOf,
   loadOf,
+  owedBy,
+  quoteDelivery,
+  quotePickUp,
   quoteTrade,
   tradeCoinWarehouse,
   tradeProblem,
   tradingWarehouseAt,
+  wrapDistance,
+  type Building,
   type Good,
   type OrderRequest,
   type PricedGood,
+  type Resident,
   type Stock,
+  type TradeOrder,
   type TradeSide,
   type WorldState,
 } from '@csp/shared'
@@ -21,7 +32,7 @@ import { recordEvent } from './events.js'
 import type { Invariant } from './invariants.js'
 import type { OrderKind } from './orders.js'
 import { raiseStandingBothWays } from './standing.js'
-import { realmOf } from './starting-city.js'
+import { newId, realmOf } from './starting-city.js'
 
 /** The input of a buy or sell order: the resident, the good, how many units, maybe a carriage. */
 interface TradeRequest extends OrderRequest {
@@ -29,13 +40,16 @@ interface TradeRequest extends OrderRequest {
   good: PricedGood
   units: number
   carriageId?: string | null
+  /** A city of the realm to deliver the goods bought to, or to pick up the goods sold from. */
+  cityId?: string | null
 }
 
 /**
  * A buy or sell order (`CONTEXT.md`: Trading with the Trade Organization): one of the Player's
  * residents, on a Trade Org warehouse's tile, trades up to `units` of a good there at its prices,
  * from and into their hands or the load of their carriage `carriageId` on the tile. It happens
- * this tick.
+ * this tick. With `cityId` it orders a delivery to or a pick-up from that city instead
+ * (`CONTEXT.md`: Delivery).
  */
 function tradeOrder(side: TradeSide): OrderKind {
   return {
@@ -44,7 +58,7 @@ function tradeOrder(side: TradeSide): OrderKind {
       const realm = realmOf(world, sender.userId)
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
-      return tradeProblem(world, realm.id, r, side, o.good, o.units, o.carriageId)
+      return tradeProblem(world, realm.id, r, side, o.good, o.units, o.carriageId, o.cityId)
     },
     apply(world, _sender, order) {
       const o = order as TradeRequest
@@ -56,6 +70,7 @@ function tradeOrder(side: TradeSide): OrderKind {
           good: o.good,
           units: o.units,
           carriageId: o.carriageId ?? null,
+          ...(o.cityId ? { cityId: o.cityId } : {}),
         }
       }
     },
@@ -101,9 +116,11 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * their hands or carriage and the warehouse at its prices, cut down to what can be traded and
  * what fits (`quoteTrade`). At the HQ the coins come from and go into its coin warehouse. The
  * coins raise standing both ways between the realm and the Trade Organization (`CONTEXT.md`:
- * Standing). Either way the order is done, with a line in the realm log. Returns how many trades moved anything.
+ * Standing). Either way the order is done, with a line in the realm log. An order with a city
+ * orders a delivery or pick-up instead (`orderDelivery`). Returns how many trades moved anything.
+ * `size` is the map's.
  */
-export function resolveTrades(world: WorldState): number {
+export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
   const records: TradeRecord[] = []
   ledger.set(world, records)
   let traded = 0
@@ -124,7 +141,14 @@ export function resolveTrades(world: WorldState): number {
     const holder = carriage ? loadOf(carriage) : handsOf(r, world.tick)
     const parties = [holder.stock, (warehouse.stock ??= {}), (coinWarehouse.stock ??= {})]
     const before = total([...new Set(parties)])
-    const { units, coins } = quoteTrade(world, warehouse, holder, o.side, o.good, o.units)
+    if (o.cityId !== undefined) {
+      if (realm === null) continue
+      if (orderDelivery(world, size, r, realm, o, warehouse, holder.stock)) traded++
+      records.push({ residentId: r.id, before, after: total([...new Set(parties)]) })
+      continue
+    }
+    const owed = owedBy(world, warehouse.id, o.good)
+    const { units, coins } = quoteTrade(world, warehouse, holder, o.side, o.good, o.units, owed)
     const goodsFrom = o.side === 'buy' ? warehouse.stock : holder.stock
     const goodsTo = o.side === 'buy' ? holder.stock : warehouse.stock
     move(goodsFrom, goodsTo, o.good, units)
@@ -150,6 +174,88 @@ export function resolveTrades(world: WorldState): number {
     })
   }
   return traded
+}
+
+/**
+ * Orders a delivery or pick-up (`CONTEXT.md`: Delivery) for the trade order `o` of resident `r`
+ * of `realm`, at `warehouse`, paying from `payer` (their hands or carriage). Buying, the goods
+ * and the fee (`quoteDelivery`) are paid now into the coin warehouse, and the warehouse keeps
+ * the goods for a caravan to bring to the city's storage. Selling, nothing moves yet: a caravan
+ * picks the goods up and pays there, up to `o.units` and one delivery load (`DELIVERY_LOAD`).
+ * Either way with a line in the realm log. The coins for goods bought raise standing like any
+ * trade. Returns whether a delivery was ordered.
+ */
+function orderDelivery(
+  world: WorldState,
+  size: number,
+  r: Resident,
+  realm: string,
+  o: TradeOrder,
+  warehouse: Building,
+  payer: Stock,
+): boolean {
+  const city = world.cities.find((c) => c.id === o.cityId)
+  const storage = city?.realmId === realm ? deliveryStorage(world, city.id) : undefined
+  const coinWarehouse = tradeCoinWarehouse(world, warehouse)
+  if (!city || !storage || !coinWarehouse) return false
+  const tiles = wrapDistance(size, warehouse, storage)
+  const q =
+    o.side === 'buy'
+      ? quoteDelivery(
+          world,
+          warehouse,
+          payer,
+          o.good,
+          o.units,
+          tiles,
+          owedBy(world, warehouse.id, o.good),
+        )
+      : quotePickUp(
+          world,
+          warehouse,
+          o.good,
+          o.units,
+          storage.stock?.[o.good] ?? 0,
+          tiles,
+          coinWarehouse.stock?.coins ?? 0,
+        )
+  const units =
+    o.side === 'buy' || q.units === 0
+      ? q.units
+      : Math.min(o.units, Math.floor(DELIVERY_LOAD / GOOD_WEIGHT[o.good] + 1e-9))
+  if (o.side === 'buy') move(payer, (coinWarehouse.stock ??= {}), 'coins', q.coins + q.fee)
+  if (o.side === 'buy' && q.coins > 0) {
+    raiseStandingBothWays(world, realm, TRADE_ORG, q.coins / STANDING_TRADE_COINS_PER_POINT)
+  }
+  if (units > 0) {
+    world.deliveries.push({
+      id: newId(world, 'delivery'),
+      kind: o.side === 'buy' ? 'delivery' : 'pickUp',
+      realmId: realm,
+      warehouseId: warehouse.id,
+      cityId: city.id,
+      good: o.good,
+      units,
+      fee: o.side === 'buy' ? q.fee : 0,
+      caravanId: null,
+    })
+  }
+  recordEvent(world, realm, {
+    kind: 'deliveryOrdered',
+    residentId: r.id,
+    name: r.name,
+    side: o.side,
+    good: o.good,
+    units,
+    wanted: o.units,
+    coins: q.coins,
+    fee: q.fee,
+    cityId: city.id,
+    city: city.name,
+    x: warehouse.x,
+    y: warehouse.y,
+  })
+  return units > 0
 }
 
 /**

@@ -3,6 +3,8 @@ import {
   cityPrice,
   commanderOf,
   forSale,
+  npcCityRefuses,
+  sellsTo,
   sharingSight,
   wrapDistance,
   type Army,
@@ -79,10 +81,17 @@ export function entitiesInSight(
     out.push({ is: 'building', ...b })
     if (b.cityId !== null) seenCities.add(b.cityId)
   }
-  // An NPC city names its price (`CONTEXT.md`: Buying a city), from all of it.
+  // An NPC city names the Player its price (`CONTEXT.md`: Buying a city), from all of it, or says
+  // it won't sell to them or refuses them at all (`CONTEXT.md`: NPC city reaction).
   for (const c of world.cities) {
     if (!seenCities.has(c.id)) continue
-    out.push({ is: 'city', ...c, ...(forSale(c) ? { price: cityPrice(world, c) } : {}) })
+    const sale = !forSale(c)
+      ? {}
+      : sellsTo(world, c, realmId)
+        ? { price: cityPrice(world, c, realmId) }
+        : { wontSell: true as const }
+    const refuses = npcCityRefuses(world, c, realmId) ? { refuses: true as const } : {}
+    out.push({ is: 'city', ...c, ...sale, ...refuses })
   }
   for (const h of world.horses) if (seen(size, observers, h)) out.push({ is: 'horse', ...h })
   for (const k of world.carriages) if (seen(size, observers, k)) out.push({ is: 'carriage', ...k })
