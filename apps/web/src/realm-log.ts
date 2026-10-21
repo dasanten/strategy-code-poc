@@ -209,6 +209,58 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         text: `Robbers took ${e.units} ${goodText(e.good)} of your delivery to ${e.city} off a caravan; the Trade Organization sends them again.`,
         tone: 'warn',
       }
+    case 'transferOrdered': {
+      const what = `${e.units} ${goodText(e.good)}`
+      const to = `${e.city} of ${e.toRealm}`
+      const place = { name: e.fromCity ?? 'the warehouse', x: e.x, y: e.y }
+      if (e.fromCity === null && e.units === 0) {
+        return {
+          text: `${e.name} couldn’t hand in any ${goodText(e.good)} for ${to} at the warehouse.`,
+          tone: 'warn',
+          places: [place],
+        }
+      }
+      if (e.fromCity === null) {
+        const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
+        return {
+          text: `${e.name} handed in ${what}${cut} with a ${e.fee}-coin fee; a caravan brings them to ${to}.`,
+          tone: 'info',
+          places: [place],
+        }
+      }
+      return {
+        text: `You sent ${what} from ${e.fromCity} to ${to}; a caravan picks them up there with its fee.`,
+        tone: 'info',
+        places: [place],
+      }
+    }
+    case 'transferred': {
+      const what = `${e.units} ${goodText(e.good)}`
+      const place = { name: e.city, x: e.x, y: e.y }
+      if (e.back) {
+        return {
+          text: `A caravan brought ${what} you sent back to ${e.city}.`,
+          tone: 'warn',
+          places: [place],
+        }
+      }
+      const text =
+        e.toRealmId === realmId
+          ? `A caravan brought ${what} from ${e.fromRealm} to ${e.city}.`
+          : `A caravan brought the ${what} you sent to ${e.city} of ${e.toRealm} (a ${e.fee}-coin fee).`
+      return { text, tone: 'info', places: [place] }
+    }
+    case 'transferStuck': {
+      const what = `${e.units} ${goodText(e.good)}`
+      const text = {
+        turnedBack: `A caravan carrying ${what} for ${e.city} couldn’t get to a storage and turned back; the next caravan tries again.`,
+        cancelled: `Your transfer of ${what} to ${e.city} was cancelled: the city is no longer theirs. A caravan brings it back.`,
+        kept: `Your transfer of ${what} to ${e.city} couldn’t be finished or brought back; the Trade Organization keeps it.`,
+        nothing: `A caravan found no ${goodText(e.good)} (or no coins for the fee) to pick up for ${e.city}.`,
+        robbed: `Robbers took ${what} of your transfer to ${e.city} off a caravan; the Trade Organization sends them again.`,
+      }[e.why]
+      return { text, tone: e.why === 'turnedBack' || e.why === 'robbed' ? 'warn' : 'bad' }
+    }
     case 'selfManaged': {
       if (e.cities.length === 0) return { text: 'Your realm had no city left.', tone: 'bad' }
       const each = e.cities.map((c) => `${c.name} (${residentsText(c.residents)})`)

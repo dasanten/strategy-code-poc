@@ -22,6 +22,7 @@ import { updateCityMembership } from './cities.js'
 import { robCaravan } from './caravans.js'
 import { buildingOrganization, carriageOrganization, commitCrime } from './crimes.js'
 import { collectsFrom } from './deliveries.js'
+import { collectsTransferFrom } from './transfers.js'
 import type { OrderKind, OrderSender } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { dropGoods } from './survival.js'
@@ -202,8 +203,11 @@ function take(
   }
   world.piles = world.piles.filter((p) => Object.values(p.goods).some((n) => n > 0))
   const victimOrg = spotOrganization(world, a.spot)
-  // A caravan collecting a pick-up takes what was sold to it (`CONTEXT.md`: Delivery).
-  const sold = a.spot.kind === 'storage' && collectsFrom(world, r, a.spot.storageId)
+  // A caravan collecting a pick-up takes what was sold to it (`CONTEXT.md`: Delivery), one
+  // collecting a transfer what it was given to carry (`CONTEXT.md`: Transfer).
+  const sold =
+    a.spot.kind === 'storage' &&
+    (collectsFrom(world, r, a.spot.storageId) || collectsTransferFrom(world, r, a.spot.storageId))
   if (victimOrg !== null && !sold && Object.keys(taken).length > 0) {
     commitCrime(world, size, 'theft', r, { victimOrg, goods: taken })
   }

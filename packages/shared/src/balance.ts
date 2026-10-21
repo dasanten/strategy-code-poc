@@ -525,6 +525,14 @@ export const DELIVERY_FEE_PER_KG_TILE = 0.005
  */
 export const DELIVERY_DRIVE_TRIES = 3
 
+/**
+ * How many times a delivery's fee a transfer between realms costs, for its weight over the
+ * caravan's whole way (`CONTEXT.md`: Transfer): clearly higher, since the Trade Organization
+ * carries for others what they could carry themselves. 100 iron over a region and back cost
+ * about 300 coins.
+ */
+export const TRANSFER_FEE_FACTOR = 3
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 

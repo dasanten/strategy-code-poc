@@ -145,6 +145,78 @@ describe('realm log', () => {
     expect(describeEvent({ ...stuck, cancelled: true }).tone).toBe('bad')
   })
 
+  it('describes transfers ordered, arrived and stuck, for sender and recipient', () => {
+    const ordered = {
+      kind: 'transferOrdered',
+      good: 'iron',
+      units: 4,
+      wanted: 4,
+      fee: 0,
+      toRealmId: 'realm2',
+      toRealm: 'Ivo',
+      cityId: 'c2',
+      city: 'Yonder',
+      x: 4,
+      y: 5,
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent({ ...ordered, fromCity: 'Ashford', name: null })).toEqual({
+      text: 'You sent 4 iron from Ashford to Yonder of Ivo; a caravan picks them up there with its fee.',
+      tone: 'info',
+      places: [{ name: 'Ashford', x: 4, y: 5 }],
+    })
+    expect(describeEvent({ ...ordered, fromCity: null, name: 'Ada', fee: 30 }).text).toBe(
+      'Ada handed in 4 iron with a 30-coin fee; a caravan brings them to Yonder of Ivo.',
+    )
+    const none = { ...ordered, fromCity: null, name: 'Ada', units: 0 }
+    expect(describeEvent(none).tone).toBe('warn')
+    const done = {
+      kind: 'transferred',
+      good: 'iron',
+      units: 4,
+      fee: 30,
+      fromRealmId: 'realm1',
+      fromRealm: 'Mara',
+      toRealmId: 'realm2',
+      toRealm: 'Ivo',
+      back: false,
+      cityId: 'c2',
+      city: 'Yonder',
+      x: 8,
+      y: 9,
+      seq: 10,
+      ...at,
+    } as const
+    expect(describeEvent(done, 'realm2')).toEqual({
+      text: 'A caravan brought 4 iron from Mara to Yonder.',
+      tone: 'info',
+      places: [{ name: 'Yonder', x: 8, y: 9 }],
+    })
+    expect(describeEvent(done, 'realm1').text).toBe(
+      'A caravan brought the 4 iron you sent to Yonder of Ivo (a 30-coin fee).',
+    )
+    expect(describeEvent({ ...done, back: true, city: 'Ashford' }, 'realm1').text).toBe(
+      'A caravan brought 4 iron you sent back to Ashford.',
+    )
+    const stuck = {
+      kind: 'transferStuck',
+      good: 'iron',
+      units: 4,
+      cityId: 'c2',
+      city: 'Yonder',
+      seq: 11,
+      ...at,
+    } as const
+    expect(describeEvent({ ...stuck, why: 'turnedBack' }).tone).toBe('warn')
+    expect(describeEvent({ ...stuck, why: 'robbed' }).text).toBe(
+      'Robbers took 4 iron of your transfer to Yonder off a caravan; the Trade Organization sends them again.',
+    )
+    for (const why of ['cancelled', 'kept', 'nothing'] as const) {
+      expect(describeEvent({ ...stuck, why }).tone).toBe('bad')
+    }
+  })
+
   it('describes open deliveries', () => {
     const d = {
       id: 'd1',

@@ -1,5 +1,8 @@
 import {
   deliveryStorage,
+  nearestWarehouse,
+  quoteTransfer,
+  transferTiles,
   handsOf,
   loadOf,
   quoteDelivery,
@@ -13,6 +16,7 @@ import {
   type Carriage,
   GOOD_WEIGHT,
   type DeliveryQuote,
+  type Good,
   type NpcCityPrice,
   type PricedGood,
   type TradeQuote,
@@ -239,6 +243,39 @@ export function previewDelivery(
     buy: quoteDelivery(seen, warehouse, payer, good, units, tiles),
     sell: quotePickUp(seen, warehouse, good, units, held, tiles, budget),
   }
+}
+
+/**
+ * Whether the Player can send a transfer to the city (`CONTEXT.md`: Transfer): it is another
+ * realm's, with a storage the Player sees.
+ */
+export function takesTransfers(
+  city: City,
+  seen: { buildings: Building[] },
+  realmId: string,
+): boolean {
+  return city.realmId !== null && city.realmId !== realmId && !!deliveryStorage(seen, city.id)
+}
+
+/**
+ * What a transfer of up to `units` of a good picked up at the Player's city `from` for the city
+ * `toCityId` would take there (`quoteTransfer`, `CONTEXT.md`: Transfer), from what the Player
+ * sees: the units and fee, coming from the warehouse in sight nearest `from`. Undefined when no
+ * warehouse or the recipient's storage is in sight. The server decides; this is the preview.
+ */
+export function previewTransfer(
+  seen: { cities: City[]; buildings: Building[] },
+  from: DeliveryCity,
+  toCityId: string,
+  good: Good,
+  units: number,
+  mapSize: number,
+): { units: number; fee: number } | undefined {
+  const to = deliveryStorage(seen, toCityId)
+  const warehouse = nearestWarehouse(seen, from.storage, mapSize)
+  if (!to || !warehouse || !(units > 0)) return undefined
+  const tiles = transferTiles(mapSize, warehouse, from.storage, to)
+  return quoteTransfer(from.storage.stock ?? {}, good, units, tiles)
 }
 
 /**

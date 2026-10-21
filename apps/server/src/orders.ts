@@ -17,6 +17,7 @@ import { contractOrders, pay } from './contracts.js'
 import { buyCity } from './buying.js'
 import { persuasionOrders } from './persuasion.js'
 import { buy, sell } from './trading.js'
+import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
 
 /** Who sent an order: the Player's account and id. */
@@ -60,6 +61,8 @@ export const orderKinds: Record<string, OrderKind> = {
   buyCity,
   buy,
   sell,
+  handIn: handInOrder,
+  transfer,
   buyOff,
   ...allianceOrders,
   ...armyOrders,

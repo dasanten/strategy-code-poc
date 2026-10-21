@@ -37,7 +37,7 @@ import { placeTradeOrgHq } from './trade-org.js'
 import { placeTradingPosts, regions } from './trading-posts.js'
 import { npcCityCount, placeNpcCities } from './npc-cities.js'
 import { entitiesInSight } from './sight.js'
-import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
+import { WORLD_FORMAT_VERSION, WorldFormatError, migrateWorld, migrations } from './world-format.js'
 import { createWorld, generateWorld } from './world.js'
 import { foundStartingCity } from './starting-city.js'
 import { endRealm } from './survival.js'
@@ -686,6 +686,25 @@ describe('world saves', () => {
     const v33 = migrateWorld(structuredClone(v32), 32, { terrain: land }, migrations, 33)
     expect(v33).toEqual({ ...v32, directives: [{ ...old, goals: [], soldiersKilled: 0 }] })
     expect(checkInvariants(v33, land)).toEqual([])
+  })
+
+  it('gives every caravan no transfer and the world none (migration 34 → 35)', () => {
+    const job = { deliveryId: 'delivery1', step: 'deliver', units: 3, robbed: 0 }
+    const v34 = {
+      tick: 5,
+      caravans: [
+        { id: 'caravan1', postId: 'c2', job: null },
+        { id: 'caravan2', postId: 'c3', job },
+      ],
+    }
+    // The live format, so a step no version reaches would show here.
+    expect(WORLD_FORMAT_VERSION).toBe(35)
+    const v35 = migrateWorld(structuredClone(v34), 34, { terrain: smallTerrain() })
+    expect(v35).toEqual({
+      tick: 5,
+      caravans: v34.caravans.map((c) => ({ ...c, transfer: null })),
+      transfers: [],
+    })
   })
 
   it('gives every alliance an empty army (migration 22 → 23)', () => {

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import {
+  GOODS,
   isClosed,
   type Building,
   type Carriage,
   type DeliveryQuote,
+  type Good,
   type DirectiveView,
   type NpcCityPrice,
   type PricedGood,
@@ -22,6 +24,8 @@ import {
   previewDelivery,
   previewNpcTrade,
   previewTrade,
+  previewTransfer,
+  takesTransfers,
   tradersAt,
   warehousesInSight,
   type BuyView,
@@ -40,6 +44,7 @@ import { GOOD_LABELS } from './Residents.js'
  * residents on a warehouse buy and sell (`CONTEXT.md`: Trading with the Trade Organization). An
  * NPC city that doesn't refuse the Player lists its prices at its storages in sight, where their
  * residents trade with it the same way (`CONTEXT.md`: Trading with an NPC city).
+ * A city of another realm takes transfers from the Player's cities (`CONTEXT.md`: Transfer).
  */
 export function CityInspector({
   cities,
@@ -53,6 +58,7 @@ export function CityInspector({
   onSetGate,
   onBuyCity,
   onTrade,
+  onTransfer,
   directives,
   onBuyOff,
 }: {
@@ -70,6 +76,8 @@ export function CityInspector({
   onBuyCity: (residentId: string, cityId: string) => void
   /** Gives a buy or sell order to one of the Player's residents on a warehouse. */
   onTrade: (trade: TradeRequest) => void
+  /** Orders a transfer from one of the Player's cities to another realm's city. */
+  onTransfer: (transfer: TransferRequest) => void
   /** The admin directives in force; one naming the Player's realm may be bought off here. */
   directives: DirectiveView[]
   /** Gives the buy-off order for a directive to one of the Player's residents on a warehouse. */
@@ -144,6 +152,21 @@ export function CityInspector({
                   />
                 </div>
               ))}
+            {openId === v.id &&
+              takesTransfers(
+                cities.find((c) => c.id === v.id)!,
+                { buildings },
+                realmId,
+              ) && (
+                <Transferring
+                  to={v}
+                  fromCities={deliveryCities({ cities, buildings }, realmId)}
+                  preview={(from, good, units) =>
+                    previewTransfer({ cities, buildings }, from, v.id, good, units, mapSize)
+                  }
+                  onTransfer={onTransfer}
+                />
+              )}
             {openId === v.id &&
               npcStoragesInSight(
                 cities.find((c) => c.id === v.id)!,
@@ -473,6 +496,93 @@ function Trading({
         <button type="button" disabled={!canSell} onClick={() => trade('sell')}>
           {sellText}
         </button>
+      </p>
+    </div>
+  )
+}
+
+/** A transfer order (`CONTEXT.md`: Transfer): from one of the Player's cities to another realm's. */
+export interface TransferRequest {
+  fromCityId: string
+  toCityId: string
+  good: Good
+  units: number
+}
+
+/**
+ * Sending a transfer to another realm's city (`CONTEXT.md`: Transfer): a caravan picks up a good
+ * (coins too) at one of the Player's cities and brings it to this city's storage, taking its fee
+ * there with the goods; with a preview of what it would take, as far as the Player sees.
+ */
+function Transferring({
+  to,
+  fromCities,
+  preview,
+  onTransfer,
+}: {
+  to: { id: string; name: string }
+  fromCities: DeliveryCity[]
+  preview: (
+    from: DeliveryCity,
+    good: Good,
+    units: number,
+  ) => { units: number; fee: number } | undefined
+  onTransfer: (transfer: TransferRequest) => void
+}) {
+  const [fromId, setFromId] = useState<string>('')
+  const [good, setGood] = useState<Good>('food')
+  const [units, setUnits] = useState(1)
+  const from = fromCities.find((c) => c.id === fromId) ?? fromCities[0]
+  if (!from) return null
+  const label = GOOD_LABELS[good].toLowerCase()
+  const quote = preview(from, good, units)
+  const text =
+    quote === undefined
+      ? `Send ${units} ${label} from ${from.name}`
+      : quote.units > 0
+        ? `Send ${quote.units} ${label} from ${from.name} for a ${quote.fee}-coin fee`
+        : `${from.name} hasn’t the ${label} or the fee`
+  return (
+    <div className="city-transfer" aria-label="Transfer">
+      <label>
+        From{' '}
+        <select value={from.id} onChange={(e) => setFromId(e.target.value)}>
+          {fromCities.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Good{' '}
+        <select value={good} onChange={(e) => setGood(e.target.value as Good)}>
+          {GOODS.map((g) => (
+            <option key={g} value={g}>
+              {GOOD_LABELS[g]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Units{' '}
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={units}
+          onChange={(e) => setUnits(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+        />
+      </label>
+      <p>
+        <button
+          type="button"
+          disabled={quote?.units === 0}
+          onClick={() => onTransfer({ fromCityId: from.id, toCityId: to.id, good, units })}
+        >
+          {text}
+        </button>{' '}
+        <span className="small muted">to {to.name}, by Trade Org caravan</span>
       </p>
     </div>
   )

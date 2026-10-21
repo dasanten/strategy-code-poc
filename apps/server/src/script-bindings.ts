@@ -229,6 +229,13 @@ function residentActions(
         carriageId: plain(carriageId ?? null),
         ...(cityId === undefined || cityId === null ? {} : { cityId: plain(cityId) }),
       }),
+    handIn: ([good, units, toCityId, carriageId]) =>
+      request('handIn', {
+        good: plain(good),
+        units: plain(units),
+        toCityId: plain(toCityId),
+        carriageId: plain(carriageId ?? null),
+      }),
     buyOff: ([directiveId, carriageId]) =>
       request('buyOff', {
         directiveId: plain(directiveId),

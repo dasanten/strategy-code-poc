@@ -133,6 +133,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'On a Trade Org warehouse or an NPC city’s storage, sell up to `units` of a good at its prices from my hands, or from my carriage there. At a warehouse, with `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
   ),
   action(
+    'handIn',
+    ['good', 'units', 'toCityId', 'carriageId?'],
+    'On a Trade Org warehouse, hand in up to `units` of a good (coins too) from my hands, or from my carriage there, with the fee, for a caravan to bring to the storage of `toCityId`, a city of another realm.',
+  ),
+  action(
     'buyOff',
     ['directiveId', 'carriageId?'],
     'On a Trade Org warehouse, pay the price of an admin directive against my realm with the coins in my hands, or on my carriage there, to end it.',
