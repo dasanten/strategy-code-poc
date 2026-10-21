@@ -59,6 +59,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     armies: [],
     contracts: [],
     caravans: [],
+    deliveries: [],
     crimes: [],
   }
 }
@@ -157,7 +158,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveCarrying(world, carries, terrain.size)
   const payments = resolvePayments(world)
   const purchases = resolvePurchases(world, terrain.size)
-  const trades = resolveTrades(world)
+  const trades = resolveTrades(world, terrain.size)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)

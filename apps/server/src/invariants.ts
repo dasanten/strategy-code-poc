@@ -68,6 +68,7 @@ import { buyOrdersDone } from './buying.js'
 import { tradeOrdersDone, tradesKeepGoods } from './trading.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound } from './caravans.js'
+import { deliveriesSound } from './deliveries.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
 
 /**
@@ -1343,6 +1344,7 @@ export const worldInvariants: Invariant[] = [
   buyOrdersDone,
   tradeOrdersDone,
   tradesKeepGoods,
+  deliveriesSound,
   supplyLinesSound,
   crimesSound,
   gatesSound,

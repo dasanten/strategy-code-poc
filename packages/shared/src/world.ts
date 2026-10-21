@@ -358,6 +358,8 @@ export interface WorldState {
   contracts: MercenaryContract[]
   /** The Trade Organization's caravans, one on each trading post's route (`CONTEXT.md`: Caravan). */
   caravans: Caravan[]
+  /** Deliveries and pick-ups ordered and not yet done, oldest first (`CONTEXT.md`: Delivery). */
+  deliveries: Delivery[]
 }
 
 /**
@@ -391,6 +393,63 @@ export interface Caravan {
    * for the caravan.
    */
   holding: { goods: Stock; onto: 'carriage' | 'stop' } | null
+  /** The delivery it is carrying out instead of going on along its route (`CONTEXT.md`: Delivery). */
+  job: CaravanJob | null
+}
+
+/**
+ * A delivery or pick-up the Trade Organization owes a realm (`CONTEXT.md`: Delivery), ordered at
+ * its warehouse `warehouseId`. A `delivery` was bought and paid for, fee and all: `units` of
+ * `good` that the warehouse keeps for it until a caravan loads them and brings them to the
+ * storage of the realm's city `cityId`. A `pickUp` is a sale of up to `units` of `good` from that
+ * city's storage: a caravan comes with coins, takes the goods there and pays for them at the
+ * warehouse's prices of the moment, less the fee, and brings them to the warehouse. A caravan
+ * standing at the warehouse takes it on (`caravanId`). Plain data (ADR 0002).
+ */
+export interface Delivery {
+  id: string
+  kind: 'delivery' | 'pickUp'
+  realmId: string
+  warehouseId: string
+  cityId: string
+  good: Exclude<Good, 'coins'>
+  units: number
+  /** The fee a delivery was paid with; 0 for a pick-up, whose fee comes off what it pays. */
+  fee: number
+  /** The caravan carrying it out, or null while it waits for one. */
+  caravanId: string | null
+}
+
+/**
+ * What a caravan does for a delivery it took on (`Delivery`), one step after another, each at a
+ * building it drives to first. A delivery loads the goods at the warehouse (`load`) and puts
+ * them into the city's storage (`deliver`). A pick-up loads coins at the warehouse's coin
+ * warehouse (`load`), takes the goods at the city's storage (`collect`) and pays there (`pay`),
+ * then unloads the goods at the warehouse (`return`) and the coins left at the coin warehouse
+ * (`returnCoins`). A caravan that can't get to the storage turns back (`return`) with what it
+ * carries for the delivery, which waits for the next caravan. Plain data (ADR 0002).
+ */
+export interface CaravanJob {
+  deliveryId: string
+  kind: Delivery['kind']
+  warehouseId: string
+  good: Exclude<Good, 'coins'>
+  step: 'load' | 'deliver' | 'collect' | 'pay' | 'return' | 'returnCoins'
+  /** Units of the good on the carriage for the delivery. */
+  units: number
+  /** Coins on the carriage for the delivery (a pick-up's). */
+  coins: number
+  /**
+   * The units to put into or take from the city's storage, worked out when the caravan gets
+   * there; null until then.
+   */
+  target: number | null
+  /** A pick-up's price at the storage, less the `fee`, and how much of it is paid so far. */
+  toPay: number
+  paid: number
+  fee: number
+  /** Drives towards the step's building that ended short of it. */
+  misses: number
 }
 
 /** A caravan as Players see it, while its carriage or any of its crew is in sight. */
@@ -452,7 +511,10 @@ export interface BuyCityOrder {
 /**
  * Trading at a Trade Org warehouse (`CONTEXT.md`: Trading with the Trade Organization): the
  * resident, standing on its tile, buys or sells up to `units` of `good` at its prices, from and
- * into their hands, or the load of `carriageId` on their tile. It happens this tick.
+ * into their hands, or the load of `carriageId` on their tile. It happens this tick. With
+ * `cityId`, a city of their realm, it orders a delivery instead (`CONTEXT.md`: Delivery): a buy
+ * is paid now, fee and all, and a caravan brings the goods to that city's storage; a sell is
+ * picked up from that storage by a caravan, which pays there.
  */
 export interface TradeOrder {
   kind: 'trade'
@@ -460,6 +522,7 @@ export interface TradeOrder {
   good: Exclude<Good, 'coins'>
   units: number
   carriageId: string | null
+  cityId?: string
 }
 /** What a crime was (`CONTEXT.md`: Crime). */
 export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
@@ -633,6 +696,58 @@ export type RealmEventWhat =
       coins: number
       x: number
       y: number
+    }
+  /**
+   * The resident `name` ordered a delivery at the Trade Org warehouse at (`x`, `y`)
+   * (`CONTEXT.md`: Delivery): buying, `units` of `good` (of the `wanted`) paid with `coins` and
+   * a `fee`, to be brought to the storage of `city`; selling, up to `units` of it to be picked up
+   * from that storage and paid for there. None when nothing could be ordered.
+   */
+  | {
+      kind: 'deliveryOrdered'
+      residentId: string
+      name: string
+      side: 'buy' | 'sell'
+      good: Exclude<Good, 'coins'>
+      units: number
+      wanted: number
+      coins: number
+      fee: number
+      cityId: string
+      city: string
+      x: number
+      y: number
+    }
+  /**
+   * A caravan carried out a delivery at the storage of `city` at (`x`, `y`) (`CONTEXT.md`:
+   * Delivery): a `delivery` put `units` of `good` into it; a `pickUp` took `units` of `good` from
+   * it and paid `coins` there, the `fee` already taken off.
+   */
+  | {
+      kind: 'delivered'
+      delivery: Delivery['kind']
+      good: Exclude<Good, 'coins'>
+      units: number
+      coins: number
+      fee: number
+      cityId: string
+      city: string
+      x: number
+      y: number
+    }
+  /**
+   * A caravan couldn't get to the storage of `city` for a delivery of `good` (`CONTEXT.md`:
+   * Delivery): it turned back, and the next caravan tries again. `cancelled` when the city is no
+   * longer the realm's: then the delivery is dropped.
+   */
+  | {
+      kind: 'deliveryStuck'
+      delivery: Delivery['kind']
+      good: Exclude<Good, 'coins'>
+      units: number
+      cityId: string
+      city: string
+      cancelled: boolean
     }
   /**
    * The realm's Leader died and the realm ended (`CONTEXT.md`: Leader death): each of its

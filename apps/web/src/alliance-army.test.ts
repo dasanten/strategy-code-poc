@@ -15,6 +15,7 @@ const diplomacy: Diplomacy = {
   invitations: [],
   realmsInSight: [],
   contracts: [],
+  deliveries: [],
 }
 
 describe('alliance army in the UI', () => {

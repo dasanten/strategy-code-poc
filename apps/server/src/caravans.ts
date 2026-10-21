@@ -11,6 +11,7 @@ import {
   caravanOf,
   canWork,
   inContact,
+  owedBy,
   stockWeight,
   townHallOf,
   unitsThatFit,
@@ -25,6 +26,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { releaseDelivery, runDelivery, takeOnDelivery } from './deliveries.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
@@ -122,6 +124,7 @@ export function placeCaravans(world: WorldState): Caravan[] {
       stop: 'storage',
       toLoad: null,
       holding: null,
+      job: null,
     }
     world.caravans.push(caravan)
     placed.push(caravan)
@@ -188,16 +191,20 @@ function take(
 /**
  * One tick of a caravan whose driver is idle with the carriage: drive to the next stop; at a
  * storage, top up the Food on board to `CARAVAN_FOOD`; at a warehouse, unload what was brought,
- * then load what evens out the stock with the other end's warehouse (`evenOut`), then set off.
+ * then take on a delivery ordered there (`takeOnDelivery`), or else load what evens out the stock
+ * with the other end's warehouse (`evenOut`) beyond what it keeps for deliveries, then set off.
  * Each take or put is one pick-up or drop order of the driver's, one a tick, like anyone's. An
- * end without its storage is skipped to the warehouse; one without its warehouse, passed by.
+ * end without its storage is skipped to the warehouse; one without its warehouse, passed by. A
+ * caravan carrying out a delivery does that instead (`runDelivery`). `size` is the map's.
  */
 function runCaravan(
   world: WorldState,
   caravan: Caravan,
   driver: Resident,
   carriage: Carriage,
+  size: number,
 ): void {
+  if (caravan.job) return runDelivery(world, caravan, driver, carriage, size)
   const end = routeEnd(world, caravan, caravan.heading)
   const stop = caravan.stop === 'storage' ? end.storage : end.warehouse
   if (!stop) {
@@ -244,8 +251,11 @@ function runCaravan(
       const units = Math.min(carriage.load[g] ?? 0, hands(g))
       if (units > 0) return take(caravan, driver, onCarriage, { [g]: units }, 'stop')
     }
+    if (takeOnDelivery(world, caravan, stop)) return
     const other = routeEnd(world, caravan, caravan.heading === 'hq' ? 'post' : 'hq').warehouse
-    caravan.toLoad = other ? evenOut(stock, other.stock ?? {}, carriage) : {}
+    const spare: Stock = { ...stock }
+    for (const g of CARRIED) spare[g] = (stock[g] ?? 0) - owedBy(world, stop.id, g)
+    caravan.toLoad = other ? evenOut(spare, other.stock ?? {}, carriage) : {}
   }
   for (const [g, wanted] of Object.entries(caravan.toLoad) as [Good, number][]) {
     const units = Math.min(wanted, stock[g] ?? 0, hands(g), unitsThatFitCarriage(carriage, g))
@@ -274,11 +284,14 @@ export function stepCaravans(world: WorldState, size: number): void {
     const driver = world.residents.find((r) => r.id === caravan.driverId)
     const carriage = world.carriages.find((k) => k.id === caravan.carriageId)
     const post = world.cities.find((c) => c.id === caravan.postId && c.tradeOrg === 'post')
-    if (!hq || !driver || !carriage || !post) return false
+    if (!hq || !driver || !carriage || !post) {
+      releaseDelivery(world, caravan)
+      return false
+    }
     followCarriage(world, caravan, carriage, size)
     if (driver.order !== null || !canWork(driver, world.tick)) return true
     if (driver.x !== carriage.x || driver.y !== carriage.y) walkTo(driver, carriage)
-    else runCaravan(world, caravan, driver, carriage)
+    else runCaravan(world, caravan, driver, carriage, size)
     return true
   })
 }

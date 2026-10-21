@@ -1,11 +1,17 @@
 import {
+  deliveryStorage,
   handsOf,
   loadOf,
+  quoteDelivery,
+  quotePickUp,
   quoteTrade,
+  tradeCoinWarehouse,
+  wrapDistance,
   warehousePrices,
   type Building,
   type BuildingKind,
   type Carriage,
+  type DeliveryQuote,
   type PricedGood,
   type TradeQuote,
   type City,
@@ -181,5 +187,54 @@ export function previewTrade(
   return {
     buy: quoteTrade(seen, warehouse, holder, 'buy', good, units),
     sell: quoteTrade(seen, warehouse, holder, 'sell', good, units),
+  }
+}
+
+/** A city of the Player's that a delivery can go to or a pick-up come from, and its storage. */
+export interface DeliveryCity {
+  id: string
+  name: string
+  storage: Building
+}
+
+/** The Player's cities with a storage in sight (`deliveryStorage`; `CONTEXT.md`: Delivery). */
+export function deliveryCities(
+  seen: { cities: City[]; buildings: Building[] },
+  realmId: string,
+): DeliveryCity[] {
+  return seen.cities
+    .filter((c) => c.realmId === realmId)
+    .flatMap((c) => {
+      const storage = deliveryStorage(seen, c.id)
+      return storage ? [{ id: c.id, name: c.name, storage }] : []
+    })
+}
+
+/**
+ * What buying up to `units` of a good for delivery to `city`, paid from the resident's hands or
+ * `carriage`, and selling up to `units` from its storage for a pick-up would come to
+ * (`quoteDelivery`, `quotePickUp`), from what the Player sees. The server decides; this is the
+ * preview. `mapSize` is the map's.
+ */
+export function previewDelivery(
+  seen: { cities: City[]; buildings: Building[] },
+  warehouseId: string,
+  resident: Resident,
+  carriage: Carriage | undefined,
+  good: PricedGood,
+  units: number,
+  city: DeliveryCity,
+  mapSize: number,
+): { buy: DeliveryQuote; sell: DeliveryQuote } {
+  const warehouse = seen.buildings.find((b) => b.id === warehouseId)
+  const none = { units: 0, coins: 0, fee: 0 }
+  if (!warehouse || !(units > 0)) return { buy: none, sell: none }
+  const tiles = wrapDistance(mapSize, warehouse, city.storage)
+  const payer = carriage ? carriage.load : resident.carried
+  const held = city.storage.stock?.[good] ?? 0
+  const budget = tradeCoinWarehouse(seen, warehouse)?.stock?.coins ?? 0
+  return {
+    buy: quoteDelivery(seen, warehouse, payer, good, units, tiles),
+    sell: quotePickUp(seen, warehouse, good, units, held, tiles, budget),
   }
 }

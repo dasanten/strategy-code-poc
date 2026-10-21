@@ -1,5 +1,6 @@
 import { contractOf, contractsFor, type ContractView } from './contract.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
+import { deliveriesFor, type DeliveryView } from './warehouse.js'
 import type { Alliance, AllianceArmyPart, Carriage, Resident, WorldState } from './world.js'
 
 /** World queries about alliances (ADR 0002: the game API orders and scripts share). */
@@ -152,16 +153,25 @@ export interface Diplomacy {
   realmsInSight: RealmLabel[]
   /** Mercenary contracts the realm is a side of, offered or in force (`CONTEXT.md`). */
   contracts: ContractView[]
+  /** The realm's deliveries and pick-ups not yet done (`CONTEXT.md`: Delivery). */
+  deliveries: DeliveryView[]
 }
 
 /**
- * The Player's alliance matters, as their realm sees them. `seenRealms` are the realms whose
- * residents are in the Player's sight.
+ * The Player's alliance matters, as their realm sees them, and their open deliveries. `seenRealms`
+ * are the realms whose residents are in the Player's sight.
  */
 export function diplomacyFor(
   world: Pick<
     WorldState,
-    'alliances' | 'realms' | 'residents' | 'carriages' | 'contracts' | 'buildings'
+    | 'alliances'
+    | 'realms'
+    | 'residents'
+    | 'carriages'
+    | 'contracts'
+    | 'buildings'
+    | 'deliveries'
+    | 'cities'
   >,
   realmId: string,
   seenRealms: Iterable<string>,
@@ -198,5 +208,6 @@ export function diplomacyFor(
     invitations,
     realmsInSight,
     contracts: contractsFor(world, realmId),
+    deliveries: deliveriesFor(world, realmId),
   }
 }

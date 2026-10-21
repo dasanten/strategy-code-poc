@@ -478,6 +478,25 @@ export const CARAVAN_FOOD = 60
  */
 export const CARAVAN_SPREAD = 2
 
+/**
+ * The part of a delivery's fee every delivery or pick-up pays, in coins (`CONTEXT.md`:
+ * Delivery), however light or near.
+ */
+export const DELIVERY_FEE_BASE = 5
+
+/**
+ * The part of a delivery's fee that grows with weight and distance, in coins per kg and tile from
+ * the warehouse to the city's storage (`CONTEXT.md`: Delivery). 100 kg over 100 tiles, about a
+ * trading post's region, costs 50: a tenth of what 100 iron fetch, a lot for cheap Food.
+ */
+export const DELIVERY_FEE_PER_KG_TILE = 0.005
+
+/**
+ * How often a caravan's drive towards a delivery's storage may end short of it before it turns
+ * back (`CONTEXT.md`: Delivery), say behind closed gates or out of reach of carriages.
+ */
+export const DELIVERY_DRIVE_TRIES = 3
+
 /** Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`. */
 export const SEA_COUNT = 3
 
@@ -657,6 +676,12 @@ export function walkSpeed(resident: Resident, terrain: number, tick: number): nu
  * average Strength, so one carriage moves what a whole starting city could carry.
  */
 export const CARRIAGE_CAPACITY = 400
+
+/**
+ * The most one delivery or pick-up carries, in kg (`CONTEXT.md`: Delivery): a caravan's carriage
+ * with room left for the Food it keeps on board (`CARAVAN_FOOD`, a kg a unit).
+ */
+export const DELIVERY_LOAD = CARRIAGE_CAPACITY - CARAVAN_FOOD
 
 /**
  * Food a haul route keeps on board for its horse unless the Player picks another amount, in
