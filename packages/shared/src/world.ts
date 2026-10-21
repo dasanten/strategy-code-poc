@@ -369,6 +369,26 @@ export interface WorldState {
   deliveries: Delivery[]
   /** The Trade Org army's punishments under way (`CONTEXT.md`: Trade Org reaction). */
   punishments: Punishment[]
+  /** Admin directives in force, oldest first (`CONTEXT.md`: Admin directive). */
+  directives: Directive[]
+}
+
+/**
+ * An admin's order to the Trade Organization to weaken an Organization (`CONTEXT.md`: Admin
+ * directive). Until an admin lifts it, the Trade Organization treats the target, and with
+ * `withAlliance` every member of its alliance, as one to punish. Every Player sees the target and
+ * the reason; only admins see `givenBy`. Plain data (ADR 0002).
+ */
+export interface Directive {
+  id: string
+  /** The Organization it names: a realm or an NPC city. */
+  target: string
+  /** Whether it also names whoever is in the target's alliance, as the alliance stands. */
+  withAlliance: boolean
+  reason: string
+  /** The giving admin's account name. */
+  givenBy: string
+  givenAt: number
 }
 
 /**
@@ -585,6 +605,11 @@ export interface Punishment {
   /** The Coins' worth it took, as it stood when it headed home. */
   took: number
   startedAt: number
+  /**
+   * The admin directive it was sent for (`CONTEXT.md`: Admin directive) rather than crimes; it
+   * heads home once that directive is lifted.
+   */
+  directiveId?: string
 }
 /**
  * A crime against another Organization (`CONTEXT.md`: Crime, Witness). An Organization is named by
@@ -719,6 +744,8 @@ export type RealmEventWhat =
       city: string
       worth: number
       took?: number
+      /** Sent for an admin directive, with its reason, rather than for crimes. */
+      directive?: string
     }
   /** A resident who carries no weapon was hit and flees home (`CONTEXT.md`: Combat). */
   | { kind: 'fled'; residentId: string; name: string }

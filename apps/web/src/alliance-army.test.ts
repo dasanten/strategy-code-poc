@@ -18,6 +18,7 @@ const diplomacy: Diplomacy = {
   deliveries: [],
   standings: [],
   joinRequests: [],
+  directives: [],
 }
 
 describe('alliance army in the UI', () => {

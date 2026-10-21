@@ -1,4 +1,5 @@
 /** HTTP API shapes shared by server and client (ADR 0005). */
+import type { AdminDirectiveView } from './directive.js'
 
 export interface Account {
   name: string
@@ -89,3 +90,27 @@ export interface ActivateScriptRequest {
 export const SCRIPT_NAME_MAX_LENGTH = 40
 /** Longest script source the server stores, in characters. */
 export const SCRIPT_MAX_LENGTH = 20_000
+
+/** An admin gives a directive (`CONTEXT.md`: Admin directive). */
+export interface GiveDirectiveRequest {
+  /** The Organization it names: a realm's or an NPC city's id. */
+  target: string
+  withAlliance: boolean
+  reason: string
+}
+
+/** An Organization an admin can name in a directive. */
+export interface DirectiveTarget {
+  org: string
+  /** A realm's Leader's name, or an NPC city's name. */
+  name: string
+  is: 'realm' | 'city'
+  /** A realm's Player's account name. */
+  account?: string
+}
+
+/** What the admin panel shows of directives: those in force and whom one can name. */
+export interface AdminDirectives {
+  directives: AdminDirectiveView[]
+  targets: DirectiveTarget[]
+}

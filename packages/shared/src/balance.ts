@@ -880,6 +880,14 @@ export const TRADE_ORG_PUNISH = {
 }
 
 /**
+ * What the Trade Organization's army comes to take, in Coins' worth, each time it goes out against
+ * the target of an admin directive (`CONTEXT.md`: Admin directive), which names no crimes to weigh
+ * it by: as much as it takes back for a killing (`TRADE_ORG_PUNISH.times` its loss). It goes again
+ * as soon as one punishment is over, until the directive is lifted.
+ */
+export const DIRECTIVE_PUNISH_WORTH = 400
+
+/**
  * Materials each kind of building needs before its construction site can become the building
  * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
  * the lumber camp's wood builds the quarry, wood and stone build the mine and the smelter, and

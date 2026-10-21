@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { JoinRequestView, OrderRequest, StandingView } from '@csp/shared'
+import type { DirectiveView, JoinRequestView, OrderRequest, StandingView } from '@csp/shared'
 import { formatStanding, standingName, standingWord } from './standing-view.js'
 
 /**
@@ -11,10 +11,12 @@ import { formatStanding, standingName, standingWord } from './standing-view.js'
 export function StandingPanel({
   standings,
   joinRequests,
+  directives,
   sendOrder,
 }: {
   standings: StandingView[]
   joinRequests: JoinRequestView[]
+  directives: DirectiveView[]
   sendOrder: (order: OrderRequest) => Promise<string | undefined>
 }) {
   const [error, setError] = useState<string>()
@@ -70,6 +72,21 @@ export function StandingPanel({
             </li>
           ))}
         </ul>
+      )}
+      {directives.length > 0 && (
+        <>
+          <h3>Admin directives</h3>
+          <ul className="alliance-list" aria-label="Admin directives">
+            {directives.map((d) => (
+              <li key={d.id}>
+                <span>
+                  The Trade Organization punishes {d.targetName}
+                  {d.withAlliance && ' and its alliance'}: {d.reason}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       <p className="muted small">
         Known crimes lower it, trade and paid contract weeks raise it, and it drifts back to

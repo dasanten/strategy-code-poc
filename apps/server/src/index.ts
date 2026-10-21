@@ -55,6 +55,7 @@ const app = await buildApp({
   trustProxy: config.trustProxy,
   webDist: config.webDist,
   tick: () => world.tick,
+  world,
 })
 if (sentryOn) setupFastifyErrorHandler(app)
 

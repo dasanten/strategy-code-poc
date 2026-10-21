@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { SESSION_COOKIE } from '@csp/shared'
 import { buildApp } from './app.js'
+import { createWorld } from './world.js'
 import { createAdmin, createInviteCode, getSessionUser } from './auth.js'
 import { openDb, type OpenDb } from './db/index.js'
 
@@ -129,6 +130,59 @@ describe('admin', () => {
     })
     expect(reset.statusCode).toBe(204)
     expect((await loginAs('Mara', 'a new password'))[SESSION_COOKIE]).toBeTruthy()
+  })
+
+  it('lets admins give and lift directives, and no one else', async () => {
+    const world = createWorld({ size: 64, tiles: new Uint8Array(64 * 64) })
+    await app.close()
+    app = await buildApp({ ...appOpts, world })
+    await createAdmin(opened.db, 'Daniel', 'admin password')
+    const cookies = await loginAs('Daniel', 'admin password')
+    const invite = await app.inject({ method: 'POST', url: '/api/admin/invites', cookies })
+    await signUp('Mara', invite.json().code)
+    const mara = await loginAs('Mara', 'correct horse')
+    world.realms.push({
+      id: 'r1',
+      userId: getSessionUser(opened.db, mara[SESSION_COOKIE])!.id,
+      leaderId: 'a1',
+    })
+
+    const listed = await app.inject({ method: 'GET', url: '/api/admin/directives', cookies })
+    expect(listed.json()).toEqual({
+      directives: [],
+      targets: [{ org: 'r1', name: 'a fallen realm', is: 'realm', account: 'Mara' }],
+    })
+    const payload = { target: 'r1', withAlliance: false, reason: 'farms new Players' }
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/api/admin/directives',
+      cookies: mara,
+      payload,
+    })
+    expect(refused.statusCode).toBe(403)
+    const bad = await app.inject({
+      method: 'POST',
+      url: '/api/admin/directives',
+      cookies,
+      payload: { ...payload, target: 'nowhere' },
+    })
+    expect(bad.statusCode).toBe(400)
+
+    const given = await app.inject({
+      method: 'POST',
+      url: '/api/admin/directives',
+      cookies,
+      payload,
+    })
+    expect(given.statusCode).toBe(201)
+    expect(given.json()).toMatchObject({ ...payload, givenBy: 'Daniel' })
+    expect(world.directives).toHaveLength(1)
+
+    const url = `/api/admin/directives/${given.json().id}`
+    expect((await app.inject({ method: 'DELETE', url, cookies: mara })).statusCode).toBe(403)
+    expect((await app.inject({ method: 'DELETE', url, cookies })).statusCode).toBe(204)
+    expect(world.directives).toEqual([])
+    expect((await app.inject({ method: 'DELETE', url, cookies })).statusCode).toBe(404)
   })
 
   it('serves the admin panel page from the built client', async () => {

@@ -73,6 +73,7 @@ import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound } from './caravans.js'
 import { deliveriesSound } from './deliveries.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
+import { directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
 
@@ -1369,6 +1370,7 @@ export const worldInvariants: Invariant[] = [
   caravansSound,
   tradeOrgArmySound,
   punishmentsSound,
+  directivesSound,
   hqRingsSound,
   roadLineOrdersSound,
 ]

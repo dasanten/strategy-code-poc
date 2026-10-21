@@ -61,7 +61,10 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     case 'punished':
       return e.what === 'coming'
         ? {
-            text: `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`,
+            text:
+              e.directive === undefined
+                ? `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`
+                : `By admin directive (${e.directive}), the Trade Organization is sending its army to ${e.city} to take ${e.worth} Coins' worth.`,
             tone: 'bad',
           }
         : {

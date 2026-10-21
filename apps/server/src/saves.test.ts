@@ -625,6 +625,15 @@ describe('world saves', () => {
     expect(checkInvariants(v30, land)).toEqual([])
   })
 
+  it('has no admin directive in force (migration 30 → 31)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v30: Partial<WorldState> = structuredClone(world)
+    delete v30.directives
+    const v31 = migrateWorld(structuredClone(v30), 30, { terrain: land }, migrations, 31)
+    expect(v31).toEqual({ ...v30, directives: [] })
+    expect(checkInvariants(v31, land)).toEqual([])
+  })
+
   it('gives every alliance an empty army (migration 22 → 23)', () => {
     const v22 = {
       tick: 5,
