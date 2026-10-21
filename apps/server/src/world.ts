@@ -30,6 +30,7 @@ import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
 import { stepTradeOrgArmy } from './trade-org-army.js'
 import { stepPunishments } from './trade-org-punishment.js'
+import { stepDirectives } from './directives.js'
 import { resolvePurchases } from './buying.js'
 import { resolveTrades } from './trading.js'
 import { stepCrimes } from './crimes.js'
@@ -138,7 +139,7 @@ export interface StepResult {
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
  * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
- * realm (`stepCaptures`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
+ * realm (`stepCaptures`); admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
  * (`stepContracts`); standing drifts toward neutral (`stepStanding`); last, armies
  * lose members who are gone and give the rest their orders for the next tick. Without `walking`
  * nobody moves.
@@ -181,6 +182,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepAlliances(world)
   stepRefill(world, terrain.size)
   const captures = stepCaptures(world, terrain.size)
+  stepDirectives(world)
   stepCrimes(world, terrain.size)
   stepContracts(world)
   stepStanding(world)

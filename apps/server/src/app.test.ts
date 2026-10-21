@@ -150,9 +150,16 @@ describe('admin', () => {
     const listed = await app.inject({ method: 'GET', url: '/api/admin/directives', cookies })
     expect(listed.json()).toEqual({
       directives: [],
-      targets: [{ org: 'r1', name: 'a fallen realm', is: 'realm', account: 'Mara' }],
+      targets: [
+        { org: 'r1', name: 'a fallen realm', is: 'realm', account: 'Mara', cities: [], allies: [] },
+      ],
     })
-    const payload = { target: 'r1', withAlliance: false, reason: 'farms new Players' }
+    const payload = {
+      target: 'r1',
+      withAlliance: false,
+      reason: 'farms new Players',
+      goals: [{ kind: 'soldiers', count: 20 }],
+    }
     const refused = await app.inject({
       method: 'POST',
       url: '/api/admin/directives',
@@ -167,6 +174,13 @@ describe('admin', () => {
       payload: { ...payload, target: 'nowhere' },
     })
     expect(bad.statusCode).toBe(400)
+    const noGoals = await app.inject({
+      method: 'POST',
+      url: '/api/admin/directives',
+      cookies,
+      payload: { ...payload, goals: [] },
+    })
+    expect(noGoals.statusCode).toBe(400)
 
     const given = await app.inject({
       method: 'POST',
@@ -175,7 +189,12 @@ describe('admin', () => {
       payload,
     })
     expect(given.statusCode).toBe(201)
-    expect(given.json()).toMatchObject({ ...payload, givenBy: 'Daniel' })
+    expect(given.json()).toMatchObject({
+      ...payload,
+      givenBy: 'Daniel',
+      goals: [{ kind: 'soldiers', count: 20 }],
+      soldiersKilled: 0,
+    })
     expect(world.directives).toHaveLength(1)
 
     const url = `/api/admin/directives/${given.json().id}`

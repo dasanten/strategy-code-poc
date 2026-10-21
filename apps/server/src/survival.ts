@@ -39,6 +39,7 @@ import { leaveOnLeaderDeath } from './alliances.js'
 import { endContractsOnLeaderDeath } from './contracts.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
 import { caravanFood } from './caravans.js'
+import { countSoldiersKilled } from './directives.js'
 
 /** How far one unit of food fills the hunger meter. */
 const FILL_PER_FOOD = (MAX_HUNGER * HUNGER_DAYS) / FOOD_PER_DAY
@@ -96,6 +97,7 @@ export function dieAll(
   size: number,
   killers?: Map<string, string>,
 ): Realm[] {
+  if (cause === 'killed') countSoldiersKilled(world, died)
   // Every death is written down before any realm ends, so all of them reach the Player.
   for (const r of died) {
     const leader = world.realms.some((x) => x.leaderId === r.id)
