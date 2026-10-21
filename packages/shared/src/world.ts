@@ -358,6 +358,11 @@ export interface WorldState {
   standings: Standing[]
   /** Mercenary contracts offered or in force (`CONTEXT.md`: Mercenary contract). */
   contracts: MercenaryContract[]
+  /**
+   * NPC cities asking a realm to join it, and asks a realm declined that the city still
+   * remembers (`CONTEXT.md`: Persuading a city).
+   */
+  joinRequests: JoinRequest[]
   /** The Trade Organization's caravans, one on each trading post's route (`CONTEXT.md`: Caravan). */
   caravans: Caravan[]
   /** Deliveries and pick-ups ordered and not yet done, oldest first (`CONTEXT.md`: Delivery). */
@@ -473,6 +478,21 @@ export type SeenCaravan = Pick<
   Caravan,
   'id' | 'postId' | 'carriageId' | 'driverId' | 'escortIds' | 'heading'
 >
+
+/**
+ * An NPC city asking a realm to join it (`CONTEXT.md`: Persuading a city). It stands until the
+ * Player accepts or declines, or the city stops holding the realm in high standing. A declined
+ * ask is kept for `PERSUADE_ASK_AGAIN_DAYS`, so the city doesn't ask that realm again before
+ * then. Plain data (ADR 0002).
+ */
+export interface JoinRequest {
+  cityId: string
+  realmId: string
+  /** The tick the city asked, or, once declined, the tick the Player declined. */
+  at: number
+  /** Whether the Player declined; the city then only remembers it. */
+  declined: boolean
+}
 
 /**
  * A mercenary contract (`CONTEXT.md`: Mercenary contract): the lender rents some of its residents
@@ -707,6 +727,26 @@ export type RealmEventWhat =
    * town hall carried `coins`, short of its `price`.
    */
   | { kind: 'cityNotBought'; cityId: string; city: string; price: number; coins: number }
+  /**
+   * The NPC city `city`, its town hall at (`x`, `y`), holds the realm in high standing and sees
+   * enough respect from it: it asks to join the realm (`CONTEXT.md`: Persuading a city). The
+   * Player accepts or declines.
+   */
+  | { kind: 'joinAsked'; cityId: string; city: string; x: number; y: number }
+  /**
+   * The Player accepted `city`'s ask: it joined the realm with its `residents` (`CONTEXT.md`:
+   * Persuading a city, Integrating).
+   */
+  | {
+      kind: 'cityPersuaded'
+      cityId: string
+      city: string
+      residents: number
+      x: number
+      y: number
+    }
+  /** `city` no longer asks to join: it stopped holding the realm in high standing, or is gone. */
+  | { kind: 'joinWithdrawn'; cityId: string; city: string }
   /**
    * The resident `name` traded at the Trade Org warehouse at (`x`, `y`) (`CONTEXT.md`: Trading
    * with the Trade Organization): bought or sold `units` of `good` for `coins`, of the `wanted`
