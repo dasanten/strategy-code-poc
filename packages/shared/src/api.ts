@@ -99,6 +99,13 @@ export interface GiveDirectiveRequest {
   reason: string
   /** What ends it, at least one (`MAX_DIRECTIVE_GOALS` at most). */
   goals: DirectiveGoalRequest[]
+  /** The Coins to buy it off with, or null when the target can't. */
+  price: number | null
+}
+
+/** An admin allows buying off a directive at a price, or stops allowing it (null). */
+export interface DirectivePriceRequest {
+  price: number | null
 }
 
 /**

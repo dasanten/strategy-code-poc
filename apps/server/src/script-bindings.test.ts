@@ -165,6 +165,25 @@ describe('script bindings', () => {
     expect(memory.d).toBe(14)
   })
 
+  it('list the admin directives in force with their price, never who gave them', () => {
+    const { world, explored } = setup()
+    world.directives.push({
+      id: 'directive1',
+      target: 'nobody',
+      withAlliance: false,
+      reason: 'farms new Players',
+      givenBy: 'Daniel',
+      givenAt: 0,
+      goals: [],
+      soldiersKilled: 0,
+      price: 500,
+    })
+    const memory: ScriptObject = {}
+    runAs(world, explored, 'memory.d = directives()[0]', memory)
+    expect(memory.d).toMatchObject({ id: 'directive1', reason: 'farms new Players', price: 500 })
+    expect(JSON.stringify(memory.d)).not.toContain('Daniel')
+  })
+
   it('stop at a query used wrong', () => {
     const { world, explored } = setup()
     const { result } = runAs(world, explored, 'terrainAt("here")')
@@ -207,6 +226,7 @@ describe('script bindings', () => {
     ['buyCity("city4")', { kind: 'buyCity', cityId: 'city4' }],
     ['buy("iron", 2)', { kind: 'buy', good: 'iron', units: 2, carriageId: null }],
     ['sell("wood", 3, "k1")', { kind: 'sell', good: 'wood', units: 3, carriageId: 'k1' }],
+    ['buyOff("directive1")', { kind: 'buyOff', directiveId: 'directive1', carriageId: null }],
     [
       'buy("iron", 2, null, "c1")',
       { kind: 'buy', good: 'iron', units: 2, carriageId: null, cityId: 'c1' },

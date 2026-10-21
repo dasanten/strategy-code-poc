@@ -287,6 +287,56 @@ export function tradeProblem(
 }
 
 /**
+ * Where the coins go when a directive is bought off on tile (x, y) (`CONTEXT.md`: Admin
+ * directive): at any finished Trade Org warehouse there, the one that keeps its city's coins (at
+ * the HQ its coin warehouse). Undefined off a Trade Org warehouse, or when the HQ's coin warehouse
+ * is gone.
+ */
+export function buyOffCoinWarehouseAt(
+  world: Pick<WorldState, 'cities' | 'buildings'>,
+  x: number,
+  y: number,
+): Building | undefined {
+  const here = world.buildings.find(
+    (b) => b.x === x && b.y === y && warehouseKeeps(world, b).length > 0,
+  )
+  if (!here) return undefined
+  if (warehouseKeeps(world, here).includes('coins')) return here
+  return tradeCoinWarehouse(world, here)
+}
+
+/**
+ * Why a resident can't buy off a directive now, or undefined when they can (`CONTEXT.md`: Admin
+ * directive): the directive names `realmId` as its target and an admin allows buying it off, and
+ * the resident is grown up, on a Trade Org warehouse's tile (`buyOffCoinWarehouseAt`), with the
+ * whole price in their hands or on `carriageId`, a carriage on their tile that `realmId`
+ * commands. The Trade Organization takes the price even from those it otherwise refuses.
+ */
+export function buyOffProblem(
+  world: WorldState,
+  realmId: string,
+  resident: Resident,
+  directiveId: unknown,
+  carriageId: unknown,
+): string | undefined {
+  const d = world.directives.find((x) => x.id === directiveId)
+  if (!d || d.target !== realmId) return 'no directive names your realm by that id'
+  if (d.price === null) return 'this directive can’t be bought off'
+  if (!canWork(resident, world.tick)) return 'children can’t pay'
+  if (!buyOffCoinWarehouseAt(world, resident.x, resident.y)) return 'not on a Trade Org warehouse'
+  let stock = resident.carried
+  if (carriageId !== null && carriageId !== undefined) {
+    const k = world.carriages.find((x) => x.id === carriageId)
+    if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
+    if (k.x !== resident.x || k.y !== resident.y)
+      return 'that carriage is not on the resident’s tile'
+    stock = k.load
+  }
+  if ((stock.coins ?? 0) < d.price) return `it costs ${d.price} coins`
+  return undefined
+}
+
+/**
  * The storage of a city that deliveries go to and pick-ups come from (`CONTEXT.md`: Delivery):
  * its first finished one. Undefined when it has none.
  */

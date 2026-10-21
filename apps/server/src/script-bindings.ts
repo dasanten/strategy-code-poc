@@ -11,6 +11,8 @@ import {
   SCRIPT_API,
   Terrain,
   ageInYears,
+  directivesFor,
+  organizationLabel,
   terrainAt,
   wrapDistance,
   type OrderRequest,
@@ -110,6 +112,8 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     carriages: () => seenOf('carriage'),
     piles: () => seenOf('pile'),
     nodes: exploredNodes,
+    directives: () =>
+      directivesFor(world, (org) => organizationLabel(world, org)).map((d) => toValue(d)),
     terrainAt: ([x, y]) => {
       const at = tile(x, y, 'terrainAt')
       if (!context.explored(at.x, at.y)) return null
@@ -230,6 +234,11 @@ function residentActions(
         good: plain(good),
         units: plain(units),
         toCityId: plain(toCityId),
+        carriageId: plain(carriageId ?? null),
+      }),
+    buyOff: ([directiveId, carriageId]) =>
+      request('buyOff', {
+        directiveId: plain(directiveId),
         carriageId: plain(carriageId ?? null),
       }),
     roadLine: ([x, y]) =>

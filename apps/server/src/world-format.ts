@@ -364,9 +364,15 @@ export const migrations: Record<number, MigrationStep> = {
       directives: world.directives.map((d) => ({ ...d, goals: [], soldiersKilled: 0 })),
     }
   },
+  // Directives can be bought off where an admin allows it (`CONTEXT.md`: Admin directive); none
+  // given so far allows it.
+  33: (state) => {
+    const world = structuredClone(state) as { directives: object[] }
+    return { ...world, directives: world.directives.map((d) => ({ ...d, price: null })) }
+  },
   // Transfers between realms came (`CONTEXT.md`: Transfer): none are ordered yet, and no
   // caravan carries one out.
-  33: (state) => {
+  34: (state) => {
     const world = structuredClone(state) as { caravans: object[] }
     return {
       ...world,

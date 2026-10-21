@@ -18,6 +18,7 @@ import { buyCity } from './buying.js'
 import { persuasionOrders } from './persuasion.js'
 import { buy, sell } from './trading.js'
 import { handInOrder, transfer } from './transfers.js'
+import { buyOff } from './directives.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -62,6 +63,7 @@ export const orderKinds: Record<string, OrderKind> = {
   sell,
   handIn: handInOrder,
   transfer,
+  buyOff,
   ...allianceOrders,
   ...armyOrders,
   ...contractOrders,

@@ -651,6 +651,26 @@ describe('world saves', () => {
     expect(checkInvariants(v32, land)).toEqual([])
   })
 
+  it('lets no directive given so far be bought off (migration 33 → 34)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v33 = structuredClone(world) as unknown as { directives: object[] }
+    v33.directives = [
+      {
+        id: 'directive1',
+        target: world.realms[0]!.id,
+        withAlliance: false,
+        reason: 'farms new Players',
+        givenBy: 'Daniel',
+        givenAt: 0,
+        goals: [],
+        soldiersKilled: 0,
+      },
+    ]
+    const v34 = migrateWorld(structuredClone(v33), 33, { terrain: land }, migrations, 34)
+    expect(v34).toEqual({ ...v33, directives: [{ ...v33.directives[0], price: null }] })
+    expect(checkInvariants(v34, land)).toEqual([])
+  })
+
   it('gives directives in force no goals and no soldiers killed (migration 32 → 33)', () => {
     const { world, terrain: land } = worldWithCity()
     const realm = world.realms[0]!
@@ -668,19 +688,19 @@ describe('world saves', () => {
     expect(checkInvariants(v33, land)).toEqual([])
   })
 
-  it('gives every caravan no transfer and the world none (migration 33 → 34)', () => {
+  it('gives every caravan no transfer and the world none (migration 34 → 35)', () => {
     const job = { deliveryId: 'delivery1', step: 'deliver', units: 3, robbed: 0 }
-    const v33 = {
+    const v34 = {
       tick: 5,
       caravans: [
         { id: 'caravan1', postId: 'c2', job: null },
         { id: 'caravan2', postId: 'c3', job },
       ],
     }
-    const v34 = migrateWorld(structuredClone(v33), 33, { terrain: smallTerrain() }, migrations, 34)
-    expect(v34).toEqual({
+    const v35 = migrateWorld(structuredClone(v34), 34, { terrain: smallTerrain() }, migrations, 35)
+    expect(v35).toEqual({
       tick: 5,
-      caravans: v33.caravans.map((c) => ({ ...c, transfer: null })),
+      caravans: v34.caravans.map((c) => ({ ...c, transfer: null })),
       transfers: [],
     })
   })

@@ -94,6 +94,12 @@ export function StandingPanel({
                       Until: {d.goals.map(describeGoal).join('; ')}.
                     </span>
                   )}
+                  {d.price !== null && (
+                    <span className="muted small">
+                      {' '}
+                      (can be bought off for {d.price} Coins at any Trade Org warehouse)
+                    </span>
+                  )}
                 </span>
               </li>
             ))}

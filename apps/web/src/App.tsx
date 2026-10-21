@@ -348,6 +348,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onTransfer={async (transfer) =>
                 setOrderError(await sendOrder({ kind: 'transfer', ...transfer }))
               }
+              directives={world.diplomacy.directives}
+              onBuyOff={async (residentId, directiveId, carriageId) =>
+                setOrderError(
+                  await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
+                )
+              }
             />
           )}
           {world && (

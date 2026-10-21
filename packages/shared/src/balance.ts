@@ -917,6 +917,14 @@ export const TRADE_ORG_PUNISH = {
 export const DIRECTIVE_PUNISH_WORTH = 400
 
 /**
+ * The price, in Coins, the admin panel offers for buying off an admin directive (`CONTEXT.md`:
+ * Admin directive) when an admin allows it; they may set another. A couple of punishments'
+ * worth (`DIRECTIVE_PUNISH_WORTH`), and 20 kg of coins: a resident's hands or a carriage can
+ * bring it.
+ */
+export const DIRECTIVE_BUY_OFF_PRICE = 1000
+
+/**
  * Materials each kind of building needs before its construction site can become the building
  * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
  * the lumber camp's wood builds the quarry, wood and stone build the mine and the smelter, and
