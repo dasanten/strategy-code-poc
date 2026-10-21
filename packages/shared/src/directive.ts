@@ -69,7 +69,7 @@ export function goalsMet(d: Pick<Directive, 'goals' | 'soldiersKilled'>): boolea
 export type DirectiveGoalView =
   { kind: 'city'; city: string } | { kind: 'soldiers'; count: number; percent?: number }
 
-/** A directive as every Player sees it: its target, reason and goals, never who gave it. */
+/** A directive as every Player sees it: its target, reason, goals and price, never who gave it. */
 export interface DirectiveView {
   id: string
   target: string
@@ -79,6 +79,8 @@ export interface DirectiveView {
   reason: string
   givenAt: number
   goals: DirectiveGoalView[]
+  /** The Coins the target can pay at any Trade Org warehouse to buy it off; null when it can't. */
+  price: number | null
 }
 
 /** A directive as admins see it, with who gave it and how far its goals have come. */
@@ -109,6 +111,7 @@ export function directivesFor(
             ...(g.percent === undefined ? {} : { percent: g.percent }),
           },
     ),
+    price: d.price,
   }))
 }
 

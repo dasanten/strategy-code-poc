@@ -4,6 +4,7 @@ import type {
   AdminDirectives,
   ApiError,
   CreateScriptRequest,
+  DirectivePriceRequest,
   GiveDirectiveRequest,
   InviteCreated,
   LoginRequest,
@@ -23,7 +24,11 @@ export class ApiFailure extends Error {
   }
 }
 
-async function call<T>(method: 'GET' | 'POST' | 'DELETE', url: string, body?: unknown): Promise<T> {
+async function call<T>(
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  url: string,
+  body?: unknown,
+): Promise<T> {
   let res: Response
   try {
     res = await fetch(url, {
@@ -55,6 +60,8 @@ export const api = {
   directives: () => call<AdminDirectives>('GET', '/api/admin/directives'),
   giveDirective: (req: GiveDirectiveRequest) =>
     call<AdminDirectiveView>('POST', '/api/admin/directives', req),
+  setDirectivePrice: (id: string, req: DirectivePriceRequest) =>
+    call<AdminDirectiveView>('PATCH', `/api/admin/directives/${id}`, req),
   liftDirective: (id: string) => call<void>('DELETE', `/api/admin/directives/${id}`),
   // The script library: saving keeps every version; one without syntax errors becomes active.
   scripts: () => call<ScriptSummary[]>('GET', '/api/scripts'),
