@@ -863,6 +863,12 @@ export interface City {
    * one that is gone is skipped.
    */
   workplaceIds?: string[]
+  /**
+   * For a self-managed city, the Player whose Leader died while it was theirs and the tick it
+   * happened (`CONTEXT.md`: Self-managed city). It holds them in good standing, fading from then
+   * on (`formerPlayerStanding`), which goes to their next realm when it is founded.
+   */
+  formerPlayer?: { userId: number; tick: number }
 }
 
 export type BuildingKind =

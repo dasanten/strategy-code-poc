@@ -7,6 +7,7 @@ import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
 import { gzipSync } from 'node:zlib'
 import {
+  FORMER_PLAYER_STANDING,
   LIFESPAN_MAX,
   LIFESPAN_MIN,
   MAX_HEALTH,
@@ -15,7 +16,10 @@ import {
   NPC_VILLAGES,
   START_HORSES,
   START_STABLE_FOOD,
+  STANDING_DRIFT_PER_DAY,
+  TICKS_PER_GAME_DAY,
   TRADING_POST,
+  standingOf,
   townHallOf,
   wrapDistance,
   type Carriage,
@@ -36,6 +40,7 @@ import { entitiesInSight } from './sight.js'
 import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
 import { createWorld, generateWorld } from './world.js'
 import { foundStartingCity } from './starting-city.js'
+import { endRealm } from './survival.js'
 
 const terrain = smallTerrain()
 
@@ -569,6 +574,27 @@ describe('world saves', () => {
     const v26 = migrateWorld(structuredClone(v25), 25, { terrain: land }, migrations, 26)
     expect(v26).toEqual({ ...v25, standings: [] })
     expect(checkInvariants(v26, land)).toEqual([])
+  })
+
+  it('has self-managed cities remember their former Player (migration 26 → 27)', () => {
+    // Players 1 and 2 lost their Leaders a game day ago; Player 2 has a new realm already.
+    const { world, terrain: land } = worldWithCity()
+    foundStartingCity(world, land, 2)
+    const [one, two] = world.realms.map((r) => world.cities.find((c) => c.realmId === r.id))
+    for (const realm of [...world.realms]) endRealm(world, realm, land.size)
+    world.tick += TICKS_PER_GAME_DAY
+    const again = foundStartingCity(world, land, 2)
+    const v26 = structuredClone(world)
+    for (const c of v26.cities) delete c.formerPlayer
+    v26.standings = []
+
+    const v27 = migrateWorld(structuredClone(v26), 26, { terrain: land }, migrations, 27)
+
+    const left = FORMER_PLAYER_STANDING - STANDING_DRIFT_PER_DAY
+    expect(v27.cities.find((c) => c.id === one!.id)!.formerPlayer).toEqual({ userId: 1, tick: 0 })
+    expect(v27.cities.find((c) => c.id === two!.id)!.formerPlayer).toBeUndefined()
+    expect(standingOf(v27, two!.id, again.id)).toBeCloseTo(left)
+    expect(checkInvariants(v27, land)).toEqual([])
   })
 
   it('gives every alliance an empty army (migration 22 → 23)', () => {

@@ -1,7 +1,7 @@
 import { realmName } from './alliance.js'
-import { STANDING_RANGE } from './balance.js'
+import { FORMER_PLAYER_STANDING, STANDING_DRIFT_PER_DAY, STANDING_RANGE } from './balance.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
-import type { WorldState } from './world.js'
+import { TICKS_PER_GAME_DAY, type City, type WorldState } from './world.js'
 
 /*
  * Standing (`CONTEXT.md`: Standing): how one Organization regards another, from
@@ -31,6 +31,17 @@ export function standingOf(
 /** Whether a standing value is within its range. */
 export const standingInRange = (value: number) =>
   Number.isFinite(value) && value >= -STANDING_RANGE && value <= STANDING_RANGE
+
+/**
+ * The standing a self-managed city holds its former Player in at `tick` (`CONTEXT.md`:
+ * Self-managed city): `FORMER_PLAYER_STANDING` when their Leader died, fading like any standing
+ * since; 0 once it has faded, or for a city that remembers no former Player.
+ */
+export function formerPlayerStanding(city: Pick<City, 'formerPlayer'>, tick: number): number {
+  if (!city.formerPlayer) return 0
+  const days = (tick - city.formerPlayer.tick) / TICKS_PER_GAME_DAY
+  return Math.max(0, FORMER_PLAYER_STANDING - STANDING_DRIFT_PER_DAY * days)
+}
 
 /** How Players call an Organization: a realm by its Leader's name, a city by its own. */
 export function organizationLabel(
