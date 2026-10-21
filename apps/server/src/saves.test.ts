@@ -577,19 +577,19 @@ describe('world saves', () => {
     })
   })
 
-  it('counts no robbery on any route or caravan job (migration 29 → 30)', () => {
+  it('counts no robbery on any route or caravan job (migration 30 → 31)', () => {
     const job = { deliveryId: 'delivery1', step: 'deliver', units: 3 }
-    const v29 = {
+    const v30 = {
       tick: 5,
       caravans: [
         { id: 'caravan1', postId: 'c2', job: null },
         { id: 'caravan2', postId: 'c3', job },
       ],
     }
-    const v30 = migrateWorld(structuredClone(v29), 29, { terrain: smallTerrain() }, migrations, 30)
-    expect(v30).toEqual({
+    const v31 = migrateWorld(structuredClone(v30), 30, { terrain: smallTerrain() }, migrations, 31)
+    expect(v31).toEqual({
       tick: 5,
-      caravans: [v29.caravans[0], { ...v29.caravans[1], job: { ...job, robbed: 0 } }],
+      caravans: [v30.caravans[0], { ...v30.caravans[1], job: { ...job, robbed: 0 } }],
       routeRobberies: {},
     })
   })
@@ -631,6 +631,15 @@ describe('world saves', () => {
     expect(v29.cities.find((c) => c.id === two!.id)!.formerPlayer).toBeUndefined()
     expect(standingOf(v29, two!.id, again.id)).toBeCloseTo(left)
     expect(checkInvariants(v29, land)).toEqual([])
+  })
+
+  it('has no punishment under way (migration 29 → 30)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v29: Partial<WorldState> = structuredClone(world)
+    delete v29.punishments
+    const v30 = migrateWorld(structuredClone(v29), 29, { terrain: land }, migrations, 30)
+    expect(v30).toEqual({ ...v29, punishments: [] })
+    expect(checkInvariants(v30, land)).toEqual([])
   })
 
   it('gives every alliance an empty army (migration 22 → 23)', () => {

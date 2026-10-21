@@ -11,6 +11,7 @@ import {
   inCityArea,
   isArmed,
   pileAt,
+  punishers,
   recipeFor,
   wallSide,
   allied,
@@ -48,8 +49,10 @@ export function npcSoldierTarget(adults: number): number {
  * the work it hands out passes its soldiers by. `size` is the map's.
  */
 export function stepNpcDefence(world: WorldState, size: number): void {
-  // A caravan's crew is run by its caravan, a hired-out resident by the hirer.
+  // A caravan's crew is run by its caravan, a hired-out resident by the hirer, a
+  // punisher by its punishment.
   const crew = caravanCrew(world)
+  const away = punishers(world)
   for (const city of world.cities) {
     if (city.realmId !== null) continue
     const people = world.residents.filter(
@@ -58,6 +61,7 @@ export function stepNpcDefence(world: WorldState, size: number): void {
         r.cityId === city.id &&
         r.health > 0 &&
         !crew.has(r.id) &&
+        !away.has(r.id) &&
         !contractOf(world, r.id),
     )
     fightAttackers(world, city, people, size)

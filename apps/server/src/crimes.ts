@@ -45,7 +45,7 @@ export function buildingOrganization(world: WorldState, b: Building): string | n
 
 /**
  * The Organization a carriage belongs to: its realm, or for one of no realm its city (a caravan's
- * is the Trade Org HQ's); null for one of neither.
+ * is the HQ's); null for one of neither.
  */
 export function carriageOrganization(k: Carriage): string | null {
   return k.realmId ?? k.cityId

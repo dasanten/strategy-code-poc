@@ -14,6 +14,7 @@ import {
   inCityArea,
   isArmed,
   pileAt,
+  punishers,
   storedFood,
   workProblem,
   workersOf,
@@ -64,10 +65,12 @@ export function runByNpcCity(world: WorldState, r: Resident): boolean {
  */
 export function stepNpcCities(world: WorldState, size: number, terrain?: TerrainMap): void {
   const residents = new Map<string, Resident[]>()
-  // A caravan's crew is run by its caravan (`stepCaravans`), a hired-out resident by the hirer.
+  // A caravan's crew is run by its caravan (`stepCaravans`), a hired-out resident by the hirer, a
+  // punisher by its punishment (`stepPunishments`).
   const crew = caravanCrew(world)
+  const away = punishers(world)
   for (const r of world.residents) {
-    if (r.owner !== null || r.cityId === null || crew.has(r.id)) continue
+    if (r.owner !== null || r.cityId === null || crew.has(r.id) || away.has(r.id)) continue
     if (contractOf(world, r.id)) continue
     const list = residents.get(r.cityId) ?? []
     list.push(r)
