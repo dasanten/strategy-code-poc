@@ -37,7 +37,7 @@ import { placeTradeOrgHq } from './trade-org.js'
 import { placeTradingPosts, regions } from './trading-posts.js'
 import { npcCityCount, placeNpcCities } from './npc-cities.js'
 import { entitiesInSight } from './sight.js'
-import { WorldFormatError, migrateWorld, migrations } from './world-format.js'
+import { WORLD_FORMAT_VERSION, WorldFormatError, migrateWorld, migrations } from './world-format.js'
 import { createWorld, generateWorld } from './world.js'
 import { foundStartingCity } from './starting-city.js'
 import { endRealm } from './survival.js'
@@ -697,7 +697,9 @@ describe('world saves', () => {
         { id: 'caravan2', postId: 'c3', job },
       ],
     }
-    const v35 = migrateWorld(structuredClone(v34), 34, { terrain: smallTerrain() }, migrations, 35)
+    // The live format, so a step no version reaches would show here.
+    expect(WORLD_FORMAT_VERSION).toBe(35)
+    const v35 = migrateWorld(structuredClone(v34), 34, { terrain: smallTerrain() })
     expect(v35).toEqual({
       tick: 5,
       caravans: v34.caravans.map((c) => ({ ...c, transfer: null })),
