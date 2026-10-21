@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import type { DirectiveView, JoinRequestView, OrderRequest, StandingView } from '@csp/shared'
+import {
+  describeGoal,
+  type DirectiveView,
+  type JoinRequestView,
+  type OrderRequest,
+  type StandingView,
+} from '@csp/shared'
 import { formatStanding, standingName, standingWord } from './standing-view.js'
 
 /**
@@ -82,6 +88,12 @@ export function StandingPanel({
                 <span>
                   The Trade Organization punishes {d.targetName}
                   {d.withAlliance && ' and its alliance'}: {d.reason}
+                  {d.goals.length > 0 && (
+                    <span className="muted small">
+                      {' '}
+                      Until: {d.goals.map(describeGoal).join('; ')}.
+                    </span>
+                  )}
                 </span>
               </li>
             ))}

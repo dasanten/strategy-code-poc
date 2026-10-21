@@ -71,6 +71,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
             text: `The Trade Organization's army left ${e.city}, taking ${e.took ?? 0} of the ${e.worth} Coins' worth it came for.`,
             tone: 'warn',
           }
+    case 'directiveEnded':
+      return {
+        text: `The admin directive against you (${e.reason}) has ended: all its goals are met.`,
+        tone: 'info',
+      }
     case 'fled':
       return { text: `${e.name} was hit and flees home.`, tone: 'warn' }
     case 'cityCaptured': {

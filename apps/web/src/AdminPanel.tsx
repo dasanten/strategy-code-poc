@@ -1,9 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
+  MAX_DIRECTIVE_GOALS,
   MAX_DIRECTIVE_REASON,
+  MAX_DIRECTIVE_SOLDIERS,
+  describeGoal,
   formatGameTime,
+  goalMet,
   type Account,
   type AdminDirectives,
+  type DirectiveGoalRequest,
 } from '@csp/shared'
 import { api, ApiFailure } from './api.js'
 
@@ -111,13 +116,18 @@ function AdminPanel() {
 
 /**
  * Admin directives (`CONTEXT.md`: Admin directive): give one naming an Organization, optionally
- * with its alliance, and a reason every Player sees; lift one in force.
+ * with its alliance, a reason every Player sees and goals that end it; see how far each goal has
+ * come; lift one in force.
  */
 function DirectivesPanel() {
   const [shown, setShown] = useState<AdminDirectives>()
   const [target, setTarget] = useState('')
   const [withAlliance, setWithAlliance] = useState(false)
   const [reason, setReason] = useState('')
+  const [goals, setGoals] = useState<DirectiveGoalRequest[]>([])
+  const [goalKind, setGoalKind] = useState<DirectiveGoalRequest['kind']>('city')
+  const [goalCity, setGoalCity] = useState('')
+  const [goalNumber, setGoalNumber] = useState(10)
   const [message, setMessage] = useState('')
 
   const report = (err: unknown) =>
@@ -127,12 +137,46 @@ function DirectivesPanel() {
     void load()
   }, [])
 
+  // The cities a city goal can name: the target's, and with its alliance its allies' too.
+  const chosen = shown?.targets.find((t) => t.org === target)
+  const named = chosen ? [chosen.org, ...(withAlliance ? chosen.allies : [])] : []
+  const cityChoices = (shown?.targets ?? [])
+    .filter((t) => named.includes(t.org))
+    .flatMap((t) => t.cities)
+  const cityName = (id: string) => cityChoices.find((c) => c.id === id)?.name ?? id
+
+  function addGoal() {
+    if (goalKind === 'city') {
+      if (goalCity === '' || goals.some((g) => g.kind === 'city' && g.cityId === goalCity)) return
+      setGoals([...goals, { kind: 'city', cityId: goalCity }])
+    } else if (goalKind === 'soldiers') {
+      setGoals([...goals, { kind: 'soldiers', count: goalNumber }])
+    } else {
+      setGoals([...goals, { kind: 'soldierShare', percent: goalNumber }])
+    }
+  }
+
+  function goalText(g: DirectiveGoalRequest): string {
+    if (g.kind === 'city') return `${cityName(g.cityId)} destroyed`
+    if (g.kind === 'soldiers') return `${g.count} soldiers killed`
+    return `${g.percent}% of its soldiers killed`
+  }
+
+  // Resets the goals when the target or its alliance changes, since city goals depend on them.
+  function retarget(next: string, alliance: boolean) {
+    setTarget(next)
+    setWithAlliance(alliance)
+    setGoals([])
+    setGoalCity('')
+  }
+
   async function give(e: FormEvent) {
     e.preventDefault()
     try {
-      const d = await api.giveDirective({ target, withAlliance, reason })
+      const d = await api.giveDirective({ target, withAlliance, reason, goals })
       setMessage(`Directive given against ${d.targetName}.`)
       setReason('')
+      setGoals([])
       await load()
     } catch (err) {
       report(err)
@@ -153,9 +197,9 @@ function DirectivesPanel() {
     <section className="admin-panel" aria-label="Admin directives">
       <h2>Admin directives</h2>
       <p className="muted small">
-        The Trade Organization treats the target as one to punish until you lift it: it refuses it
-        trade and sends its army against it. Every Player sees the target and the reason; only
-        admins see who gave it.
+        The Trade Organization treats the target as one to punish until all its goals are met or you
+        lift it: it refuses it trade and sends its army against it. Every Player sees the target,
+        the reason and the goals; only admins see who gave it and how far it has come.
       </p>
       {shown && shown.directives.length > 0 ? (
         <ul className="codes">
@@ -169,6 +213,21 @@ function DirectivesPanel() {
               <button type="button" onClick={() => lift(d.id, d.targetName)}>
                 Lift
               </button>
+              <ul aria-label={`Goals against ${d.targetName}`}>
+                {d.goals.length === 0 && (
+                  <li className="muted small">No goals: it ends only when lifted.</li>
+                )}
+                {d.goals.map((g, i) => (
+                  <li key={i}>
+                    {describeGoal(g)}:{' '}
+                    {g.kind === 'city'
+                      ? g.met
+                        ? 'met'
+                        : 'not yet'
+                      : `${Math.min(d.soldiersKilled, g.count)} of ${g.count} killed${goalMet(d, g) ? ', met' : ''}`}
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
         </ul>
@@ -178,7 +237,7 @@ function DirectivesPanel() {
       <form onSubmit={give}>
         <label>
           Target
-          <select value={target} onChange={(e) => setTarget(e.target.value)} required>
+          <select value={target} onChange={(e) => retarget(e.target.value, withAlliance)} required>
             <option value="">Choose…</option>
             {shown?.targets.map((t) => (
               <option key={t.org} value={t.org}>
@@ -191,7 +250,7 @@ function DirectivesPanel() {
           <input
             type="checkbox"
             checked={withAlliance}
-            onChange={(e) => setWithAlliance(e.target.checked)}
+            onChange={(e) => retarget(target, e.target.checked)}
           />
           With its alliance
         </label>
@@ -204,7 +263,59 @@ function DirectivesPanel() {
             required
           />
         </label>
-        <button type="submit">Give directive</button>
+        <fieldset aria-label="Goals">
+          <legend>Goals (all must be met)</legend>
+          {goals.length > 0 && (
+            <ul className="codes">
+              {goals.map((g, i) => (
+                <li key={i}>
+                  {goalText(g)}{' '}
+                  <button type="button" onClick={() => setGoals(goals.filter((_, j) => j !== i))}>
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <select
+            aria-label="Goal kind"
+            value={goalKind}
+            onChange={(e) => setGoalKind(e.target.value as DirectiveGoalRequest['kind'])}
+          >
+            <option value="city">A city destroyed</option>
+            <option value="soldiers">Soldiers killed</option>
+            <option value="soldierShare">Share of its soldiers killed</option>
+          </select>{' '}
+          {goalKind === 'city' ? (
+            <select
+              aria-label="Goal city"
+              value={goalCity}
+              onChange={(e) => setGoalCity(e.target.value)}
+            >
+              <option value="">Choose…</option>
+              {cityChoices.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              aria-label={goalKind === 'soldiers' ? 'Soldiers' : 'Percent'}
+              type="number"
+              min={1}
+              max={goalKind === 'soldiers' ? MAX_DIRECTIVE_SOLDIERS : 100}
+              value={goalNumber}
+              onChange={(e) => setGoalNumber(Number(e.target.value))}
+            />
+          )}{' '}
+          <button type="button" onClick={addGoal} disabled={goals.length >= MAX_DIRECTIVE_GOALS}>
+            Add goal
+          </button>
+        </fieldset>
+        <button type="submit" disabled={goals.length === 0}>
+          Give directive
+        </button>
       </form>
       {message && <p role="status">{message}</p>}
     </section>

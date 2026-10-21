@@ -395,7 +395,27 @@ export interface Directive {
   /** The giving admin's account name. */
   givenBy: string
   givenAt: number
+  /**
+   * What ends it (`CONTEXT.md`: Admin directive): once every goal is met the game lifts it. A
+   * directive given before goals existed has none and ends only when an admin lifts it.
+   */
+  goals: DirectiveGoal[]
+  /** Soldiers of the Organizations it names killed since it was given, for `soldiers` goals. */
+  soldiersKilled: number
 }
+
+/**
+ * A goal of an admin directive (`CONTEXT.md`: Admin directive):
+ * - `city`: a city of an Organization the directive names is destroyed: it is gone, or belongs to
+ *   none of them any more (captured, dissolved, self-managed). `city` is its name when the goal
+ *   was set. Once met it stays met.
+ * - `soldiers`: `count` soldiers of the Organizations it names are killed. Set as a share, it
+ *   keeps the `percent` of the soldiers they had when the directive was given; `count` is that
+ *   share.
+ */
+export type DirectiveGoal =
+  | { kind: 'city'; cityId: string; city: string; met: boolean }
+  | { kind: 'soldiers'; count: number; percent?: number }
 
 /**
  * A Trade Org caravan (`CONTEXT.md`: Caravan): one of the Trade Organization's carriages, driven
@@ -762,6 +782,11 @@ export type RealmEventWhat =
       /** Sent for an admin directive, with its reason, rather than for crimes. */
       directive?: string
     }
+  /**
+   * An admin directive naming this realm, given for `reason`, ended because all its goals were
+   * met (`CONTEXT.md`: Admin directive).
+   */
+  | { kind: 'directiveEnded'; reason: string }
   /** A resident who carries no weapon was hit and flees home (`CONTEXT.md`: Combat). */
   | { kind: 'fled'; residentId: string; name: string }
   /**
