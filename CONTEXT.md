@@ -148,8 +148,24 @@ The shared language of the game. Domain terms only — no implementation details
   the realm's is cancelled.
 - **Transfer:** the Trade Organization carries goods or coins from one realm to another as a
   courier: a caravan picks them up at a city of the sender (or they are handed in at a
-  warehouse) and unloads them into the storage of a city the recipient names. Its fee is clearly
-  higher than a delivery's.
+  warehouse) and unloads them into the storage of a city of the recipient's realm. The sender
+  picks that city; the recipient doesn't have to agree, the transfer simply arrives. At most one
+  carriage load at a time, coins counting by their weight.
+  - **Ordering it:** handed in at a warehouse, it is ordered there in person like a trade, and
+    the goods and fee are paid at once. Picked up at one of the sender's cities, it can be
+    ordered from anywhere, from the realm, with nobody at a warehouse.
+  - **The fee:** a multiple of a delivery's fee for that weight over the caravan's whole way.
+    A pick-up comes from the warehouse nearest the sender's city, to that city, straight on to
+    the recipient's city and back to its warehouse. A hand-in goes from its warehouse to the
+    recipient's city and back. A pick-up's caravan takes the fee in coins from the sender's
+    storage along with the goods. When that storage doesn't hold the goods and the fee, it takes
+    what is there, up to what was ordered, and a fee for what it takes.
+  - **When it can't be finished:** a caravan that can't get to a storage (closed gates, no way
+    for a carriage) turns back and the next one tries again. When the recipient's city is no
+    longer that realm's, or the recipient's realm is gone, the transfer is cancelled: the caravan
+    brings the goods back to the sender's city it took them from (a hand-in's to the sender's
+    city nearest the warehouse). The fee is not refunded. Goods it can't bring back either stay
+    with the Trade Organization.
 - **Guaranteed carriage:** when a caravan is robbed, the Trade Organization sends the delivery or
   transfer again out of its own stock. That is part of why its prices and fees are high. A
   caravan is robbed when anyone not of the Trade Organization takes goods off its carriage; what

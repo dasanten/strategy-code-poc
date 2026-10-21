@@ -308,10 +308,11 @@ export function deliveryFee(kg: number, tiles: number): number {
 /**
  * The units of a good a warehouse keeps for deliveries bought there (`CONTEXT.md`: Delivery):
  * all of each that waits for a caravan, what is not on board yet of each being loaded. A
- * warehouse sells none of them to anyone else.
+ * warehouse sells none of them to anyone else. So for transfers it keeps (`CONTEXT.md`:
+ * Transfer): handed in there, turned back to it or sent again after a robbery.
  */
 export function owedBy(
-  world: Pick<WorldState, 'deliveries' | 'caravans'>,
+  world: Pick<WorldState, 'deliveries' | 'transfers' | 'caravans'>,
   warehouseId: string,
   good: Good,
 ): number {
@@ -321,6 +322,12 @@ export function owedBy(
     const job = world.caravans.find((c) => c.id === d.caravanId)?.job
     if (job?.deliveryId !== d.id) owed += d.units
     else if (job.step === 'load') owed += Math.max(0, d.units - job.units)
+  }
+  for (const t of world.transfers) {
+    if (t.fromCityId !== null || t.warehouseId !== warehouseId || t.good !== good) continue
+    const job = world.caravans.find((c) => c.id === t.caravanId)?.transfer
+    if (job?.transferId !== t.id) owed += t.units
+    else if (job.step === 'load') owed += Math.max(0, t.units - job.units)
   }
   return owed
 }

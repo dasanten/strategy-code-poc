@@ -2,6 +2,8 @@ import {
   PRICED_GOODS,
   deliveryFee,
   priceFor,
+  transferFee,
+  transferTiles,
   WAREHOUSE_FLOOR,
   type Building,
   type City,
@@ -15,6 +17,8 @@ import {
   deliveryCities,
   previewDelivery,
   previewTrade,
+  previewTransfer,
+  takesTransfers,
   tradersAt,
   warehousesInSight,
 } from './city-view.js'
@@ -191,6 +195,22 @@ describe('trading at a warehouse in the inspector', () => {
     const price = priceFor('iron', 21, floor).buy + priceFor('iron', 22, floor).buy
     const fee = deliveryFee(2, 20)
     expect(preview.sell).toEqual({ units: 2, coins: price - fee, fee })
+  })
+
+  it('previews a transfer from one of the Player’s cities to another realm’s, fee and all', () => {
+    const home: City = { id: 'city2', name: 'Home', realmId: 'realm1', townHallId: 'h2' }
+    const theirs: City = { ...home, id: 'city3', name: 'Yonder', realmId: 'realm2' }
+    const storage = { ...b('s2', 'storage', 'city2'), x: 23, y: 4, stock: { iron: 5, coins: 900 } }
+    const their = { ...b('s3', 'storage', 'city3'), x: 30, y: 4 }
+    const all = { cities: [post, home, theirs], buildings: [...seen.buildings, storage, their] }
+    expect(takesTransfers(theirs, all, 'realm1')).toBe(true)
+    expect(takesTransfers(home, all, 'realm1')).toBe(false)
+    expect(takesTransfers(post, all, 'realm1')).toBe(false)
+    const [from] = deliveryCities(all, 'realm1')
+    const fee = transferFee(5, transferTiles(128, warehouse, storage, their))
+    expect(previewTransfer(all, from!, 'city3', 'iron', 9, 128)).toEqual({ units: 5, fee })
+    // Without the recipient's storage in sight there is nothing to preview.
+    expect(previewTransfer(all, from!, 'city4', 'iron', 9, 128)).toBe(undefined)
   })
 })
 

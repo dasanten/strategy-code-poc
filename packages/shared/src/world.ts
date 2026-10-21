@@ -316,6 +316,7 @@ export type ResidentOrder =
   | PayOrder
   | BuyCityOrder
   | TradeOrder
+  | HandInOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -368,6 +369,8 @@ export interface WorldState {
   caravans: Caravan[]
   /** Deliveries and pick-ups ordered and not yet done, oldest first (`CONTEXT.md`: Delivery). */
   deliveries: Delivery[]
+  /** Transfers between realms ordered and not yet done, oldest first (`CONTEXT.md`: Transfer). */
+  transfers: Transfer[]
   /**
    * How often each caravan route was robbed (`CONTEXT.md`: Guaranteed carriage), by the trading
    * post at its far end; a route never robbed has no entry.
@@ -450,6 +453,8 @@ export interface Caravan {
   holding: { goods: Stock; onto: 'carriage' | 'stop' } | null
   /** The delivery it is carrying out instead of going on along its route (`CONTEXT.md`: Delivery). */
   job: CaravanJob | null
+  /** The transfer it is carrying out instead of going on along its route (`CONTEXT.md`: Transfer). */
+  transfer: TransferJob | null
 }
 
 /**
@@ -514,6 +519,63 @@ export interface CaravanJob {
    * carriage).
    */
   robbed: number
+}
+
+/**
+ * A transfer between realms (`CONTEXT.md`: Transfer): the Trade Organization carries `units` of
+ * `good` (coins too) from the realm `realmId` to the storage of `toCityId`, a city of the realm
+ * `toRealmId`, with a caravan of its warehouse `warehouseId`. Ordered from the realm, a caravan
+ * picks the goods up at the storage of the sender's city `fromCityId` and takes the fee there;
+ * handed in at the warehouse, the warehouse keeps them for it (`fromCityId` null), the fee paid.
+ * What robbers took is sent again out of the warehouse's stock the same way. Cancelled, it is
+ * brought `back` to the sender's city `toCityId` instead. A caravan standing at the warehouse
+ * takes it on (`caravanId`). Plain data (ADR 0002).
+ */
+export interface Transfer {
+  id: string
+  realmId: string
+  toRealmId: string
+  toCityId: string
+  warehouseId: string
+  fromCityId: string | null
+  good: Good
+  units: number
+  /** The fee paid for it so far; a pick-up's is taken when the caravan collects. */
+  fee: number
+  /** Whether it was cancelled and goes back to the sender's city `toCityId`. */
+  back: boolean
+  /** The caravan carrying it out, or null while it waits for one. */
+  caravanId: string | null
+}
+
+/**
+ * What a caravan does for a transfer it took on (`Transfer`), one step after another, each at a
+ * building it drives to first. A pick-up takes the goods and then the fee at the sender's storage
+ * (`collect`, `fee`); a transfer the warehouse keeps is loaded there, or at its coin warehouse
+ * for coins (`load`). Either way it puts the goods into the recipient's storage (`deliver`), then
+ * unloads what it still carries at the warehouse (`return`): goods it turned back with at the
+ * warehouse, and coins at the coin warehouse. What robbers took once it collected is made good out
+ * of the Trade Org's own stock (`CONTEXT.md`: Guaranteed carriage). Plain data (ADR 0002).
+ */
+export interface TransferJob {
+  transferId: string
+  warehouseId: string
+  good: Good
+  step: 'collect' | 'fee' | 'load' | 'deliver' | 'return'
+  /** Units of the good on the carriage for the transfer (coins, for a transfer of coins). */
+  units: number
+  /** Coins of the fee on the carriage, the Trade Org's, besides the units. */
+  coins: number
+  /** The units to take at the sender's storage, worked out when the caravan gets there. */
+  target: number | null
+  /** The fee it takes at the sender's storage for what it collected. */
+  fee: number
+  /** Drives towards the step's building that ended short of it. */
+  misses: number
+  /** Units robbers took off the carriage on the way to the recipient's storage. */
+  robbed: number
+  /** The sender's city it collected at, to bring the goods back to if the transfer is cancelled. */
+  fromCityId: string | null
 }
 
 /** A caravan as Players see it, while its carriage or any of its crew is in sight. */
@@ -602,6 +664,20 @@ export interface TradeOrder {
   units: number
   carriageId: string | null
   cityId?: string
+}
+
+/**
+ * Handing in a transfer at a Trade Org warehouse (`CONTEXT.md`: Transfer): the resident, standing
+ * on its tile, hands in up to `units` of `good` (coins too) from their hands, or the load of
+ * `carriageId` on their tile, and pays the fee, for a caravan to bring to the storage of
+ * `toCityId`, a city of another realm. It happens this tick.
+ */
+export interface HandInOrder {
+  kind: 'handIn'
+  good: Good
+  units: number
+  carriageId: string | null
+  toCityId: string
 }
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
@@ -916,6 +992,62 @@ export type RealmEventWhat =
   | {
       kind: 'deliveryRobbed'
       good: Exclude<Good, 'coins'>
+      units: number
+      cityId: string
+      city: string
+    }
+  /**
+   * The realm ordered a transfer of `units` of `good` to `city` of the realm `toRealmId`,
+   * called `toRealm` (`CONTEXT.md`: Transfer): picked up at its city `fromCity`, or handed in by resident `name` at
+   * the warehouse at (`x`, `y`), paying `fee` there. `wanted` is what was asked.
+   */
+  | {
+      kind: 'transferOrdered'
+      good: Good
+      units: number
+      wanted: number
+      fee: number
+      fromCity: string | null
+      name: string | null
+      toRealmId: string
+      toRealm: string
+      cityId: string
+      city: string
+      x: number
+      y: number
+    }
+  /**
+   * A caravan put `units` of `good` of a transfer from `fromRealmId` to `toRealmId` into the
+   * storage of `city` at (`x`, `y`) (`CONTEXT.md`: Transfer), in both realms' logs, the realms
+   * called `fromRealm` and `toRealm`; `fee` is what the sender paid. `back` when it was cancelled and brought back to the sender.
+   */
+  | {
+      kind: 'transferred'
+      good: Good
+      units: number
+      fee: number
+      fromRealmId: string
+      fromRealm: string
+      toRealmId: string
+      toRealm: string
+      back: boolean
+      cityId: string
+      city: string
+      x: number
+      y: number
+    }
+  /**
+   * A transfer of `units` of `good` to `city` didn't get on (`CONTEXT.md`: Transfer), in the
+   * sender's log: `turnedBack` when a caravan couldn't get to a storage and the next one tries
+   * again; `cancelled` when the recipient's city or realm is gone and it goes back to the sender,
+   * or, when it can't, stays with the Trade Organization (`kept`); `nothing` when the sender's
+   * storage had none of it, or not the fee; `robbed` when robbers took `units` of it, which the
+   * Trade Organization sends again.
+   */
+  | {
+      kind: 'transferStuck'
+      why: 'turnedBack' | 'cancelled' | 'kept' | 'nothing' | 'robbed'
+      good: Good
       units: number
       cityId: string
       city: string

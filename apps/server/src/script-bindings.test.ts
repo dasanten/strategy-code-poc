@@ -89,15 +89,16 @@ describe('script bindings', () => {
     const { world, explored } = setup()
     const { globals } = runAs(world, explored, '')
     expect(Object.keys(globals).sort()).toEqual(SCRIPT_API.map((b) => b.name).sort())
-    // Alliance, army, contract and persuasion orders and the gate order are the realm's, not a
-    // resident's.
+    // Alliance, army, contract and persuasion orders, the gate order and the transfer order are
+    // the realm's, not a resident's.
     const residentOrders = Object.keys(orderKinds).filter(
       (k) =>
         !(k in allianceOrders) &&
         !(k in armyOrders) &&
         !(k in contractOrders) &&
         !(k in persuasionOrders) &&
-        k !== 'setGate',
+        k !== 'setGate' &&
+        k !== 'transfer',
     )
     expect([...SCRIPT_ORDER_KINDS].sort()).toEqual(residentOrders.sort())
   })
@@ -213,6 +214,10 @@ describe('script bindings', () => {
     [
       'sell("wood", 3, null, "c1")',
       { kind: 'sell', good: 'wood', units: 3, carriageId: null, cityId: 'c1' },
+    ],
+    [
+      'handIn("coins", 50, "c2")',
+      { kind: 'handIn', good: 'coins', units: 50, toCityId: 'c2', carriageId: null },
     ],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(60, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 60, y: 10 } }],

@@ -668,6 +668,23 @@ describe('world saves', () => {
     expect(checkInvariants(v33, land)).toEqual([])
   })
 
+  it('gives every caravan no transfer and the world none (migration 33 → 34)', () => {
+    const job = { deliveryId: 'delivery1', step: 'deliver', units: 3, robbed: 0 }
+    const v33 = {
+      tick: 5,
+      caravans: [
+        { id: 'caravan1', postId: 'c2', job: null },
+        { id: 'caravan2', postId: 'c3', job },
+      ],
+    }
+    const v34 = migrateWorld(structuredClone(v33), 33, { terrain: smallTerrain() }, migrations, 34)
+    expect(v34).toEqual({
+      tick: 5,
+      caravans: v33.caravans.map((c) => ({ ...c, transfer: null })),
+      transfers: [],
+    })
+  })
+
   it('gives every alliance an empty army (migration 22 → 23)', () => {
     const v22 = {
       tick: 5,

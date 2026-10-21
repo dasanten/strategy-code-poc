@@ -129,6 +129,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'On a Trade Org warehouse, sell up to `units` of a good at its prices from my hands, or from my carriage there. With `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
   ),
   action(
+    'handIn',
+    ['good', 'units', 'toCityId', 'carriageId?'],
+    'On a Trade Org warehouse, hand in up to `units` of a good (coins too) from my hands, or from my carriage there, with the fee, for a caravan to bring to the storage of `toCityId`, a city of another realm.',
+  ),
+  action(
     'roadLine',
     ['x', 'y'],
     'Build road on each tile of the line from my tile to (x, y), one after another, with the stone I carry.',

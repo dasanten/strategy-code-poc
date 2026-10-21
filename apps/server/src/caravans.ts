@@ -35,6 +35,7 @@ import {
 import { attackOrder } from './combat.js'
 import { organizationOf } from './crimes.js'
 import { deliveryRobbed, releaseDelivery, runDelivery, takeOnDelivery } from './deliveries.js'
+import { releaseTransfer, runTransfer, takeOnTransfer, transferRobbed } from './transfers.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
@@ -133,6 +134,7 @@ export function placeCaravans(world: WorldState): Caravan[] {
       toLoad: null,
       holding: null,
       job: null,
+      transfer: null,
     }
     world.caravans.push(caravan)
     placed.push(caravan)
@@ -315,11 +317,11 @@ function take(
 /**
  * One tick of a caravan whose driver is idle with the carriage: drive to the next stop; at a
  * storage, top up the Food on board for its crew (`caravanFoodFor`); at a warehouse, unload what was brought,
- * then take on a delivery ordered there (`takeOnDelivery`), or else load what evens out the stock
+ * then take on a delivery ordered there (`takeOnDelivery`) or a transfer (`takeOnTransfer`), or else load what evens out the stock
  * with the other end's warehouse (`evenOut`) beyond what it keeps for deliveries, then set off.
  * Each take or put is one pick-up or drop order of the driver's, one a tick, like anyone's. An
  * end without its storage is skipped to the warehouse; one without its warehouse, passed by. A
- * caravan carrying out a delivery does that instead (`runDelivery`). `size` is the map's.
+ * caravan carrying out a delivery or transfer does that instead (`runDelivery`, `runTransfer`). `size` is the map's.
  */
 function runCaravan(
   world: WorldState,
@@ -329,6 +331,7 @@ function runCaravan(
   size: number,
 ): void {
   if (caravan.job) return runDelivery(world, caravan, driver, carriage, size)
+  if (caravan.transfer) return runTransfer(world, caravan, driver, carriage, size)
   const end = routeEnd(world, caravan, caravan.heading)
   const stop = caravan.stop === 'storage' ? end.storage : end.warehouse
   if (!stop) {
@@ -375,7 +378,7 @@ function runCaravan(
       const units = Math.min(carriage.load[g] ?? 0, hands(g))
       if (units > 0) return take(caravan, driver, onCarriage, { [g]: units }, 'stop')
     }
-    if (takeOnDelivery(world, caravan, stop)) return
+    if (takeOnDelivery(world, caravan, stop) || takeOnTransfer(world, caravan, stop)) return
     const other = routeEnd(world, caravan, caravan.heading === 'hq' ? 'post' : 'hq').warehouse
     const spare: Stock = { ...stock }
     for (const g of CARRIED) spare[g] = (stock[g] ?? 0) - owedBy(world, stop.id, g)
@@ -411,6 +414,7 @@ export function stepCaravans(world: WorldState, size: number): void {
     const post = world.cities.find((c) => c.id === caravan.postId && c.tradeOrg === 'post')
     if (!hq || !driver || !carriage || !post) {
       releaseDelivery(world, caravan)
+      releaseTransfer(world, caravan)
       return false
     }
     guardCaravan(world, caravan, carriage, size)
@@ -459,7 +463,8 @@ export function caravanFood(world: WorldState, r: Resident, size: number): Stock
  * Resident `r` took goods off carriage `carriageId` (`CONTEXT.md`: Guaranteed carriage): when it
  * is a caravan's and they aren't of the Trade Organization, they robbed it. Its route counts the
  * robbery, once a tick however many take from it (`robbed` holds the caravans robbed this tick),
- * and the Trade Organization makes good what was taken of its delivery (`deliveryRobbed`).
+ * and the Trade Organization makes good what was taken of its delivery or transfer
+ * (`deliveryRobbed`, `transferRobbed`).
  */
 export function robCaravan(
   world: WorldState,
@@ -476,6 +481,7 @@ export function robCaravan(
     world.routeRobberies[caravan.postId] = (world.routeRobberies[caravan.postId] ?? 0) + 1
   }
   deliveryRobbed(caravan, carriage)
+  transferRobbed(caravan, carriage)
 }
 
 /**

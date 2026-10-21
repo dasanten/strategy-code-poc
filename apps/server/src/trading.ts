@@ -33,6 +33,7 @@ import { recordEvent } from './events.js'
 import type { Invariant } from './invariants.js'
 import type { OrderKind } from './orders.js'
 import { raiseStandingBothWays } from './standing.js'
+import { handIn } from './transfers.js'
 import { newId, realmOf } from './starting-city.js'
 
 /** The input of a buy or sell order: the resident, the good, how many units, maybe a carriage. */
@@ -122,7 +123,8 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * coins raise standing both ways between the realm and the Trade Organization (`CONTEXT.md`:
  * Standing). A realm the Trade Organization refuses (`CONTEXT.md`: Trade Org reaction) trades
  * nothing. Either way the order is done, with a line in the realm log. An order with a city
- * orders a delivery or pick-up instead (`orderDelivery`). Returns how many trades moved anything.
+ * orders a delivery or pick-up instead (`orderDelivery`), and a hand-in order hands in a transfer
+ * (`handIn`, `CONTEXT.md`: Transfer). Returns how many trades moved anything.
  * `size` is the map's.
  */
 export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
@@ -131,7 +133,7 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
   let traded = 0
   for (const r of world.residents) {
     const o = r.order
-    if (o?.kind !== 'trade') continue
+    if (o?.kind !== 'trade' && o?.kind !== 'handIn') continue
     r.order = null
     const warehouse = tradingWarehouseAt(world, r.x, r.y)
     const coinWarehouse = warehouse && tradeCoinWarehouse(world, warehouse)
@@ -148,9 +150,13 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
     const holder = carriage ? loadOf(carriage) : handsOf(r, world.tick)
     const parties = [holder.stock, (warehouse.stock ??= {}), (coinWarehouse.stock ??= {})]
     const before = total([...new Set(parties)])
-    if (o.cityId !== undefined) {
+    if (o.kind === 'handIn' || o.cityId !== undefined) {
       if (realm === null) continue
-      if (orderDelivery(world, size, r, realm, o, warehouse, holder.stock)) traded++
+      const ordered =
+        o.kind === 'handIn'
+          ? handIn(world, size, r, realm, o, warehouse, holder.stock)
+          : orderDelivery(world, size, r, realm, o, warehouse, holder.stock)
+      if (ordered) traded++
       records.push({
         residentId: r.id,
         realm,
@@ -298,12 +304,15 @@ export const tradesKeepGoods: Invariant = {
   },
 }
 
-/** Every buy and sell order is done the tick it is given (`resolveTrades`): none outlasts a tick. */
+/**
+ * Every buy, sell and hand-in order is done the tick it is given (`resolveTrades`): none outlasts
+ * a tick.
+ */
 export const tradeOrdersDone: Invariant = {
   name: 'trade-orders-done',
   check(world) {
     return world.residents
-      .filter((r) => r.order?.kind === 'trade')
+      .filter((r) => r.order?.kind === 'trade' || r.order?.kind === 'handIn')
       .map((r) => ({
         invariant: this.name,
         message: `resident ${r.id} still holds a trade order after the tick`,
