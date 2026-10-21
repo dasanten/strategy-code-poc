@@ -42,7 +42,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 27
+export const WORLD_FORMAT_VERSION = 28
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -314,10 +314,19 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Standing came (`CONTEXT.md`: Standing): everyone starts neutral toward everyone.
   25: (state) => ({ ...(state as object), standings: [] }),
+  // Deliveries came (`CONTEXT.md`: Delivery): none are ordered yet, and no caravan carries one out.
+  26: (state) => {
+    const world = structuredClone(state) as { caravans: object[] }
+    return {
+      ...world,
+      caravans: world.caravans.map((c) => ({ ...c, job: null })),
+      deliveries: [],
+    }
+  },
   // Self-managed cities came to remember their former Player (`CONTEXT.md`: Self-managed city):
   // each one a Leader death left, as the Player's log tells, remembers them from then on, and a
   // Player who already has a new realm gets what is left of that good standing now.
-  26: (state) => {
+  27: (state) => {
     const world = structuredClone(state) as WorldState
     for (const e of world.events) {
       if (e.kind !== 'selfManaged') continue

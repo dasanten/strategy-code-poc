@@ -567,6 +567,16 @@ describe('world saves', () => {
     expect(migrateWorld(structuredClone(v24), 24, { terrain: land }, migrations, 25)).toEqual(v25)
   })
 
+  it('gives every caravan no delivery and the world none (migration 26 → 27)', () => {
+    const v26 = { tick: 5, caravans: [{ id: 'caravan1', postId: 'c2', toLoad: null }] }
+    const v27 = migrateWorld(structuredClone(v26), 26, { terrain: smallTerrain() }, migrations, 27)
+    expect(v27).toEqual({
+      tick: 5,
+      caravans: [{ ...v26.caravans[0], job: null }],
+      deliveries: [],
+    })
+  })
+
   it('starts everyone neutral toward everyone (migration 25 → 26)', () => {
     const { world, terrain: land } = worldWithCity()
     const v25: Partial<WorldState> = structuredClone(world)
@@ -576,7 +586,7 @@ describe('world saves', () => {
     expect(checkInvariants(v26, land)).toEqual([])
   })
 
-  it('has self-managed cities remember their former Player (migration 26 → 27)', () => {
+  it('has self-managed cities remember their former Player (migration 27 → 28)', () => {
     // Players 1 and 2 lost their Leaders a game day ago; Player 2 has a new realm already.
     const { world, terrain: land } = worldWithCity()
     foundStartingCity(world, land, 2)
@@ -584,17 +594,17 @@ describe('world saves', () => {
     for (const realm of [...world.realms]) endRealm(world, realm, land.size)
     world.tick += TICKS_PER_GAME_DAY
     const again = foundStartingCity(world, land, 2)
-    const v26 = structuredClone(world)
-    for (const c of v26.cities) delete c.formerPlayer
-    v26.standings = []
+    const v27 = structuredClone(world)
+    for (const c of v27.cities) delete c.formerPlayer
+    v27.standings = []
 
-    const v27 = migrateWorld(structuredClone(v26), 26, { terrain: land }, migrations, 27)
+    const v28 = migrateWorld(structuredClone(v27), 27, { terrain: land }, migrations, 28)
 
     const left = FORMER_PLAYER_STANDING - STANDING_DRIFT_PER_DAY
-    expect(v27.cities.find((c) => c.id === one!.id)!.formerPlayer).toEqual({ userId: 1, tick: 0 })
-    expect(v27.cities.find((c) => c.id === two!.id)!.formerPlayer).toBeUndefined()
-    expect(standingOf(v27, two!.id, again.id)).toBeCloseTo(left)
-    expect(checkInvariants(v27, land)).toEqual([])
+    expect(v28.cities.find((c) => c.id === one!.id)!.formerPlayer).toEqual({ userId: 1, tick: 0 })
+    expect(v28.cities.find((c) => c.id === two!.id)!.formerPlayer).toBeUndefined()
+    expect(standingOf(v28, two!.id, again.id)).toBeCloseTo(left)
+    expect(checkInvariants(v28, land)).toEqual([])
   })
 
   it('gives every alliance an empty army (migration 22 → 23)', () => {

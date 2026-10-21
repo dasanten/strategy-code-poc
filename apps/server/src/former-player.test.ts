@@ -1,7 +1,10 @@
 import {
+  CITY_PRICE_STANDING_SWING,
   FORMER_PLAYER_STANDING,
   STANDING_DRIFT_PER_DAY,
+  STANDING_RANGE,
   TICKS_PER_GAME_DAY,
+  cityPrice,
   formerPlayerStanding,
   standingOf,
   type WorldState,
@@ -47,6 +50,20 @@ describe('a self-managed city remembers its former Player', () => {
     // The memory lives on as that standing now.
     expect(city.formerPlayer).toBeUndefined()
     expect(sound(world, terrain)).toEqual([])
+  })
+
+  it('sells itself back to the Player’s new realm cheaper than to a stranger', () => {
+    const { world, terrain, city } = afterDeath()
+    const realm = foundStartingCity(world, terrain, 1)
+    const stranger = foundStartingCity(world, terrain, 2)
+    const worth = cityPrice(world, city)
+    expect(cityPrice(world, city, stranger.id)).toBe(worth)
+    expect(cityPrice(world, city, realm.id)).toBeLessThan(worth)
+    expect(cityPrice(world, city, realm.id)).toBe(
+      Math.round(
+        worth * (1 - (CITY_PRICE_STANDING_SWING * FORMER_PLAYER_STANDING) / STANDING_RANGE),
+      ),
+    )
   })
 
   it('fades from the Leader’s death on, also while the Player is away', () => {

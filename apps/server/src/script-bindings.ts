@@ -211,17 +211,19 @@ function residentActions(
     pay: ([contractId, weeks]) =>
       request('pay', { contractId: plain(contractId), weeks: plain(weeks) }),
     buyCity: ([cityId]) => request('buyCity', { cityId: plain(cityId) }),
-    buy: ([good, units, carriageId]) =>
+    buy: ([good, units, carriageId, cityId]) =>
       request('buy', {
         good: plain(good),
         units: plain(units),
         carriageId: plain(carriageId ?? null),
+        ...(cityId === undefined || cityId === null ? {} : { cityId: plain(cityId) }),
       }),
-    sell: ([good, units, carriageId]) =>
+    sell: ([good, units, carriageId, cityId]) =>
       request('sell', {
         good: plain(good),
         units: plain(units),
         carriageId: plain(carriageId ?? null),
+        ...(cityId === undefined || cityId === null ? {} : { cityId: plain(cityId) }),
       }),
     roadLine: ([x, y]) =>
       request('roadLine', {

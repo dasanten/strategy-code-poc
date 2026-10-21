@@ -30,10 +30,13 @@ export interface OrderRequest {
 }
 
 /**
- * A city as Players see it: for an NPC city, the price in Coins it names (`CONTEXT.md`: Buying a
- * city), worked out on the server from all of it, not only what is in sight.
+ * A city as Players see it: for an NPC city, the price in Coins it names them (`CONTEXT.md`:
+ * Buying a city), worked out on the server from all of it, not only what is in sight; or
+ * `wontSell` when it holds them in too low standing to sell, and `refuses` when it won't trade
+ * with them, hire out to them or let their residents through its gates (`CONTEXT.md`: NPC city
+ * reaction).
  */
-export type SeenCity = City & { price?: number }
+export type SeenCity = City & { price?: number; wontSell?: true; refuses?: true }
 
 /**
  * Something a Player sees (`CONTEXT.md`: Sight), tagged with what it is. Ids are unique across
