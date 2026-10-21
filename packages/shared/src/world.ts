@@ -367,6 +367,11 @@ export interface WorldState {
   caravans: Caravan[]
   /** Deliveries and pick-ups ordered and not yet done, oldest first (`CONTEXT.md`: Delivery). */
   deliveries: Delivery[]
+  /**
+   * How often each caravan route was robbed (`CONTEXT.md`: Guaranteed carriage), by the trading
+   * post at its far end; a route never robbed has no entry.
+   */
+  routeRobberies: Record<string, number>
   /** The Trade Org army's punishments under way (`CONTEXT.md`: Trade Org reaction). */
   punishments: Punishment[]
 }
@@ -436,7 +441,10 @@ export interface Delivery {
  * warehouse (`load`), takes the goods at the city's storage (`collect`) and pays there (`pay`),
  * then unloads the goods at the warehouse (`return`) and the coins left at the coin warehouse
  * (`returnCoins`). A caravan that can't get to the storage turns back (`return`) with what it
- * carries for the delivery, which waits for the next caravan. Plain data (ADR 0002).
+ * carries for the delivery, which waits for the next caravan. A caravan robbed on the way is made
+ * good out of the Trade Org's own stock (`CONTEXT.md`: Guaranteed carriage): what was taken of a
+ * delivery is sent again with the next caravan, and coins taken from a pick-up are fetched again
+ * at the coin warehouse (`load`). Plain data (ADR 0002).
  */
 export interface CaravanJob {
   deliveryId: string
@@ -459,6 +467,12 @@ export interface CaravanJob {
   fee: number
   /** Drives towards the step's building that ended short of it. */
   misses: number
+  /**
+   * Units of the good robbers took off the carriage once they were the realm's: a delivery's on
+   * the way to the storage, a pick-up's after it collected them (`CONTEXT.md`: Guaranteed
+   * carriage).
+   */
+  robbed: number
 }
 
 /** A caravan as Players see it, while its carriage or any of its crew is in sight. */
@@ -841,6 +855,17 @@ export type RealmEventWhat =
       cityId: string
       city: string
       cancelled: boolean
+    }
+  /**
+   * Robbers took `units` of `good` of a delivery to `city` off a caravan (`CONTEXT.md`:
+   * Guaranteed carriage): the Trade Organization sends them again with the next caravan.
+   */
+  | {
+      kind: 'deliveryRobbed'
+      good: Exclude<Good, 'coins'>
+      units: number
+      cityId: string
+      city: string
     }
   /**
    * The realm's Leader died and the realm ended (`CONTEXT.md`: Leader death): each of its

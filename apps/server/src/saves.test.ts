@@ -577,6 +577,23 @@ describe('world saves', () => {
     })
   })
 
+  it('counts no robbery on any route or caravan job (migration 30 → 31)', () => {
+    const job = { deliveryId: 'delivery1', step: 'deliver', units: 3 }
+    const v30 = {
+      tick: 5,
+      caravans: [
+        { id: 'caravan1', postId: 'c2', job: null },
+        { id: 'caravan2', postId: 'c3', job },
+      ],
+    }
+    const v31 = migrateWorld(structuredClone(v30), 30, { terrain: smallTerrain() }, migrations, 31)
+    expect(v31).toEqual({
+      tick: 5,
+      caravans: [v30.caravans[0], { ...v30.caravans[1], job: { ...job, robbed: 0 } }],
+      routeRobberies: {},
+    })
+  })
+
   it('starts everyone neutral toward everyone (migration 25 → 26)', () => {
     const { world, terrain: land } = worldWithCity()
     const v25: Partial<WorldState> = structuredClone(world)
