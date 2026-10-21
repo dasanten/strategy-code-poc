@@ -1,11 +1,13 @@
 import {
   CITY_PRICE_STANDING_SWING,
   FORMER_PLAYER_STANDING,
+  PERSUADE_STANDING,
   STANDING_DRIFT_PER_DAY,
   STANDING_RANGE,
   TICKS_PER_GAME_DAY,
   cityPrice,
   formerPlayerStanding,
+  holdsHigh,
   standingOf,
   type WorldState,
 } from '@csp/shared'
@@ -64,6 +66,21 @@ describe('a self-managed city remembers its former Player', () => {
         worth * (1 - (CITY_PRICE_STANDING_SWING * FORMER_PLAYER_STANDING) / STANDING_RANGE),
       ),
     )
+  })
+
+  it('holds the Player’s new realm high enough to ask it to join, for a while', () => {
+    const { world, terrain, city } = afterDeath()
+    const realm = foundStartingCity(world, terrain, 1)
+    const stranger = foundStartingCity(world, terrain, 2)
+    // Persuading needs high standing and respect; the former Player brings the standing.
+    expect(holdsHigh(world, city, realm.id)).toBe(true)
+    expect(holdsHigh(world, city, stranger.id)).toBe(false)
+    // Until it has faded below high standing.
+    const days = (FORMER_PLAYER_STANDING - PERSUADE_STANDING) / STANDING_DRIFT_PER_DAY
+    passDays(world, days - 1)
+    expect(holdsHigh(world, city, realm.id)).toBe(true)
+    passDays(world, 2)
+    expect(holdsHigh(world, city, realm.id)).toBe(false)
   })
 
   it('fades from the Leader’s death on, also while the Player is away', () => {

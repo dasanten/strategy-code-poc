@@ -586,7 +586,16 @@ describe('world saves', () => {
     expect(checkInvariants(v26, land)).toEqual([])
   })
 
-  it('has self-managed cities remember their former Player (migration 27 → 28)', () => {
+  it('starts with no city asking to join (migration 27 → 28)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v27: Partial<WorldState> = structuredClone(world)
+    delete v27.joinRequests
+    const v28 = migrateWorld(structuredClone(v27), 27, { terrain: land }, migrations, 28)
+    expect(v28).toEqual({ ...v27, joinRequests: [] })
+    expect(checkInvariants(v28, land)).toEqual([])
+  })
+
+  it('has self-managed cities remember their former Player (migration 28 → 29)', () => {
     // Players 1 and 2 lost their Leaders a game day ago; Player 2 has a new realm already.
     const { world, terrain: land } = worldWithCity()
     foundStartingCity(world, land, 2)
@@ -594,17 +603,17 @@ describe('world saves', () => {
     for (const realm of [...world.realms]) endRealm(world, realm, land.size)
     world.tick += TICKS_PER_GAME_DAY
     const again = foundStartingCity(world, land, 2)
-    const v27 = structuredClone(world)
-    for (const c of v27.cities) delete c.formerPlayer
-    v27.standings = []
+    const v28 = structuredClone(world)
+    for (const c of v28.cities) delete c.formerPlayer
+    v28.standings = []
 
-    const v28 = migrateWorld(structuredClone(v27), 27, { terrain: land }, migrations, 28)
+    const v29 = migrateWorld(structuredClone(v28), 28, { terrain: land }, migrations, 29)
 
     const left = FORMER_PLAYER_STANDING - STANDING_DRIFT_PER_DAY
-    expect(v28.cities.find((c) => c.id === one!.id)!.formerPlayer).toEqual({ userId: 1, tick: 0 })
-    expect(v28.cities.find((c) => c.id === two!.id)!.formerPlayer).toBeUndefined()
-    expect(standingOf(v28, two!.id, again.id)).toBeCloseTo(left)
-    expect(checkInvariants(v28, land)).toEqual([])
+    expect(v29.cities.find((c) => c.id === one!.id)!.formerPlayer).toEqual({ userId: 1, tick: 0 })
+    expect(v29.cities.find((c) => c.id === two!.id)!.formerPlayer).toBeUndefined()
+    expect(standingOf(v29, two!.id, again.id)).toBeCloseTo(left)
+    expect(checkInvariants(v29, land)).toEqual([])
   })
 
   it('gives every alliance an empty army (migration 22 → 23)', () => {

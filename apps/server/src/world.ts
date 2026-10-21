@@ -33,6 +33,7 @@ import { resolvePurchases } from './buying.js'
 import { resolveTrades } from './trading.js'
 import { stepCrimes } from './crimes.js'
 import { stepStanding } from './standing.js'
+import { stepPersuasion } from './persuasion.js'
 import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
@@ -63,6 +64,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     deliveries: [],
     crimes: [],
     standings: [],
+    joinRequests: [],
   }
 }
 
@@ -177,6 +179,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepCrimes(world, terrain.size)
   stepContracts(world)
   stepStanding(world)
+  stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
   const actions =
     steps.length +

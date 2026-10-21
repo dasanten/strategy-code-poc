@@ -1,16 +1,59 @@
-import type { StandingView } from '@csp/shared'
+import { useState } from 'react'
+import type { JoinRequestView, OrderRequest, StandingView } from '@csp/shared'
 import { formatStanding, standingName, standingWord } from './standing-view.js'
 
 /**
  * Standing (`CONTEXT.md`: Standing): how other Organizations regard the Player's realm, and how
- * it regards them. Shown only; it does nothing on its own for Players.
+ * it regards them. Shown only; it does nothing on its own for Players. NPC cities that hold the
+ * realm in high standing and respect it ask to join here (`CONTEXT.md`: Persuading a city); the
+ * Player accepts or declines, each an order the server checks (ADR 0002).
  */
-export function StandingPanel({ standings }: { standings: StandingView[] }) {
+export function StandingPanel({
+  standings,
+  joinRequests,
+  sendOrder,
+}: {
+  standings: StandingView[]
+  joinRequests: JoinRequestView[]
+  sendOrder: (order: OrderRequest) => Promise<string | undefined>
+}) {
+  const [error, setError] = useState<string>()
+  const order = async (o: OrderRequest) => setError(await sendOrder(o))
   return (
     <section className="alliance-panel" aria-label="Standing">
       <div className="panel-head">
         <h2>Standing</h2>
       </div>
+      {joinRequests.length > 0 && (
+        <ul className="alliance-list" aria-label="Cities asking to join">
+          {joinRequests.map((q) => (
+            <li key={q.cityId}>
+              <span>
+                {q.city} asks to join your realm
+                <span className="muted small">
+                  {' '}
+                  (town hall at {q.x}, {q.y})
+                </span>
+              </span>
+              <div className="order-buttons">
+                <button
+                  type="button"
+                  onClick={() => order({ kind: 'acceptJoin', cityId: q.cityId })}
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onClick={() => order({ kind: 'declineJoin', cityId: q.cityId })}
+                >
+                  Decline
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <p className="error">{error}</p>}
       {standings.length === 0 ? (
         <p className="muted small">Everyone regards you neutrally.</p>
       ) : (
@@ -30,7 +73,8 @@ export function StandingPanel({ standings }: { standings: StandingView[] }) {
       )}
       <p className="muted small">
         Known crimes lower it, trade and paid contract weeks raise it, and it drifts back to
-        neutral.
+        neutral. An NPC city that holds you in high standing and sees more of your armed residents
+        and walls than it has soldiers asks to join you.
       </p>
     </section>
   )

@@ -817,6 +817,24 @@ export const NPC_CITY_WONT_SELL_STANDING = -60
 export const CITY_PRICE_STANDING_SWING = 0.5
 
 /**
+ * The standing an NPC city needs toward a realm before it asks to join it (`CONTEXT.md`:
+ * Persuading a city): "high standing", where the standing list starts calling it trusted.
+ */
+export const PERSUADE_STANDING = 50
+
+/**
+ * How often, in ticks, an NPC city weighs whether to ask a realm to join (`CONTEXT.md`:
+ * Persuading a city): once a game minute, so standing and respect aren't counted every tick.
+ */
+export const PERSUADE_CHECK_TICKS = 60
+
+/**
+ * Game days an NPC city waits after a realm declined it before it asks that realm again
+ * (`CONTEXT.md`: Persuading a city). A week, like a remembered crime.
+ */
+export const PERSUADE_ASK_AGAIN_DAYS = 7
+
+/**
  * The standing a self-managed city starts out holding its former Player in (`CONTEXT.md`:
  * Self-managed city): good, and like any standing gone in about 60 game days, two and a half real
  * days.
