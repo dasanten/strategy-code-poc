@@ -26,8 +26,22 @@ game screen.
   art (a test fails when a kind has none), rasterised into a Pixi texture atlas at load. The
   relationship colour is a tinted base layer, so one icon serves every owner. Painted sprites can
   replace the SVGs later by changing only what the registry points to.
-- **Style** is picked by Daniel from a throwaway prototype with three directions, built on the
-  real map.
+- **Style** was picked by Daniel from a throwaway prototype with three directions (branch
+  `t203-style-prototype`, variant D): **the painted board-game terrain, with the clean modern
+  "command table" for everything else.**
+  - Terrain: bright, saturated colours (Plains `#93c45a`, Forest `#3f8c3c`, Hills `#c9a65c`,
+    Mountain `#938f8a`, Lake `#45aee0`, Sea `#2f80c6`), ragged organic edges between types, small
+    dark marks (trees, hill arcs, peaks, waves) when zoomed in, and wide light roads (`#e8cf97`).
+  - Tokens: buildings and city emblems are dark hex badges with a ring in the relationship
+    colour and a light glyph; residents, carts and armies are dark round badges with the glyph
+    and ring in the relationship colour; resource nodes are dark diamonds with the glyph in the
+    node's colour. Walls are joined lines in the owner's colour. Counts are light pill badges.
+  - Relationship colours: yours `#f2b630`, alliance `#4f9dff`, other realm `#ff6a48`, NPC city
+    `#a89c8a`, Trade Organization `#2ec8b8`.
+  - Screen: dark translucent panels, Inter type; a thin top bar (realm, clock, live status,
+    goods, Leader), a narrow icon rail on the left with tooltips, a drawer sliding over the map
+    (wide for scripts), an inspector docked top right with keyboard hints on its actions, and a
+    zoom tier switch with a minimap bottom right.
 
 ## Why
 
