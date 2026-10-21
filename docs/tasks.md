@@ -5,7 +5,8 @@ is an **epic** (label `epic`) with its **tickets** as sub-issues, in order. `/ne
 the next one and works it into a PR (`.claude/commands/next-ticket.md`).
 
 **Priority rule:** bugs first, then epics in order, so the game becomes playable sooner:
-survive → produce → transport → grow → trade → fight → alliances → scripts → roads.
+survive → produce → transport → grow → trade → fight → alliances → scripts → roads. Exception:
+the UI redesign (Epic 17, ADR 0008) goes ahead of the remaining gameplay epics.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -31,6 +32,7 @@ I sleep.
 | 14  | [Scripting](https://github.com/dasanten/strategy-code-poc/issues/52)                            | ticketed                |
 | 15  | [Roads and admin directive](https://github.com/dasanten/strategy-code-poc/issues/53)            | ticketed                |
 | 16  | [Bandits](https://github.com/dasanten/strategy-code-poc/issues/144)                             | scope only              |
+| 17  | [Game UI redesign](https://github.com/dasanten/strategy-code-poc/issues/202)                    | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
