@@ -1,4 +1,14 @@
-import { CARRIAGE_CAPACITY, GOOD_WEIGHT, canWork, stockWeight } from './balance.js'
+import {
+  CARAVAN_ESCORTS,
+  CARAVAN_ESCORTS_MAX,
+  CARAVAN_FOOD,
+  CARAVAN_FOOD_PER_ESCORT,
+  CARAVAN_ROBBERIES_PER_ESCORT,
+  CARRIAGE_CAPACITY,
+  GOOD_WEIGHT,
+  canWork,
+  stockWeight,
+} from './balance.js'
 import { storageAt } from './goods.js'
 import {
   type Caravan,
@@ -18,6 +28,27 @@ export function caravanOf(
   residentId: string,
 ): Caravan | undefined {
   return world.caravans.find((c) => c.driverId === residentId || c.escortIds.includes(residentId))
+}
+
+/**
+ * How many escorts the caravan on the route to trading post `postId` walks with (`CONTEXT.md`:
+ * Caravan): `CARAVAN_ESCORTS`, and one more for every `CARAVAN_ROBBERIES_PER_ESCORT` times the
+ * route was robbed, up to `CARAVAN_ESCORTS_MAX`.
+ */
+export function caravanEscortsWanted(
+  world: Pick<WorldState, 'routeRobberies'>,
+  postId: string,
+): number {
+  const extra = Math.floor((world.routeRobberies[postId] ?? 0) / CARAVAN_ROBBERIES_PER_ESCORT)
+  return Math.min(CARAVAN_ESCORTS_MAX, CARAVAN_ESCORTS + extra)
+}
+
+/**
+ * The Food a caravan keeps on board for a crew with `escorts` escorts (`CONTEXT.md`: Caravan):
+ * `CARAVAN_FOOD`, and `CARAVAN_FOOD_PER_ESCORT` more for each escort beyond `CARAVAN_ESCORTS`.
+ */
+export function caravanFoodFor(escorts: number): number {
+  return CARAVAN_FOOD + CARAVAN_FOOD_PER_ESCORT * Math.max(0, escorts - CARAVAN_ESCORTS)
 }
 
 /** The carriages standing on a tile. */
