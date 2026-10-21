@@ -89,7 +89,9 @@ describe('alliances', () => {
     expect(order(tobin, { kind: 'inviteToAlliance', realmId: realm(wren) })).toBe(
       'you are in no alliance',
     )
-    expect(order(mara, { kind: 'inviteToAlliance', realmId: 'realm999' })).toBe('no such realm')
+    expect(order(mara, { kind: 'inviteToAlliance', realmId: 'realm999' })).toBe(
+      'no such realm or NPC city',
+    )
     expect(order(mara, { kind: 'inviteToAlliance', realmId: realm(tobin) })).toBe('ok')
     expect(order(mara, { kind: 'inviteToAlliance', realmId: realm(tobin) })).toBe('already invited')
     expect(world.events.at(-1)).toMatchObject({ kind: 'allianceInvited', userId: tobin.userId })
@@ -114,7 +116,7 @@ describe('alliances', () => {
     order(tobin, { kind: 'foundAlliance', name: 'South' })
     const [north, south] = world.alliances.map((a) => a.id) as [string, string]
     expect(order(mara, { kind: 'inviteToAlliance', realmId: realm(tobin) })).toBe(
-      'that realm is already in an alliance',
+      'they are already in an alliance',
     )
     order(mara, { kind: 'inviteToAlliance', realmId: realm(wren) })
     order(tobin, { kind: 'inviteToAlliance', realmId: realm(wren) })

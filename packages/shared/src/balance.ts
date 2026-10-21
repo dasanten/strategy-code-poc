@@ -1001,6 +1001,20 @@ export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
 export const ALLIANCE_RECALL_DELAY = TICKS_PER_GAME_DAY
 
 /**
+ * The standing an NPC city must hold toward every member of an alliance to accept its
+ * invitation (`CONTEXT.md`: NPC city in an alliance): half the way to the best. Some 25
+ * paid contract weeks, or a lot of trade, earn it from neutral.
+ */
+export const NPC_ALLIANCE_JOIN_STANDING = 50
+
+/**
+ * The standing toward a member below which an NPC city leaves its alliance on its own
+ * (`CONTEXT.md`: NPC city in an alliance): a theft and an attack from neutral, so standing merely
+ * drifting back to neutral never makes it go.
+ */
+export const NPC_ALLIANCE_LEAVE_STANDING = -20
+
+/**
  * Control a city projects before counting anyone in it (`CONTEXT.md`: Territory), so even an
  * empty city holds the ground it stands on.
  */

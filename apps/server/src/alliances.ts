@@ -7,7 +7,11 @@ import {
   commanderOf,
   drivenCarriageId,
   handedOverTo,
+  isAllianceCity,
   isArmed,
+  npcCityAccepts,
+  npcCityWantsOut,
+  organizationLabel,
   realmName,
   type Alliance,
   type AllianceArmyPart,
@@ -80,26 +84,52 @@ export const foundAlliance = allianceOrder(
   },
 )
 
-/** The alliance leader invites a realm in no alliance (`realmId`) to join. */
+/**
+ * The alliance leader invites a realm or an NPC city in no alliance (`realmId`) to join. A realm's
+ * Player answers later; an NPC city answers at once (`CONTEXT.md`: NPC city in an alliance): it
+ * joins when it holds every member in high standing and knows of no recent crime by them against
+ * it (`npcCityAccepts`), and declines otherwise.
+ */
 export const inviteToAlliance = allianceOrder(
   (world, realmId, order) => {
     const alliance = ledBy(world, realmId)
     if (typeof alliance === 'string') return alliance
-    if (!world.realms.some((r) => r.id === order.realmId)) return 'no such realm'
-    if (allianceOf(world, order.realmId as string)) return 'that realm is already in an alliance'
-    if (alliance.invites.includes(order.realmId as string)) return 'already invited'
+    const id = order.realmId as string
+    if (!world.realms.some((r) => r.id === id) && !isAllianceCity(world, id)) {
+      return 'no such realm or NPC city'
+    }
+    if (allianceOf(world, id)) return 'they are already in an alliance'
+    if (alliance.invites.includes(id)) return 'already invited'
     return undefined
   },
   (world, realmId, order) => {
     const alliance = allianceOf(world, realmId)!
-    alliance.invites.push(order.realmId as string)
-    recordEvent(world, order.realmId as string, {
+    const id = order.realmId as string
+    if (isAllianceCity(world, id)) return answerAsCity(world, alliance, id)
+    alliance.invites.push(id)
+    recordEvent(world, id, {
       kind: 'allianceInvited',
       allianceId: alliance.id,
       name: alliance.name,
     })
   },
 )
+
+/** The NPC city `cityId` answers the alliance's invitation: it joins or declines. */
+function answerAsCity(world: WorldState, alliance: Alliance, cityId: string): void {
+  const about = {
+    allianceId: alliance.id,
+    name: alliance.name,
+    realmId: cityId,
+    realm: organizationLabel(world, cityId),
+  }
+  if (!npcCityAccepts(world, cityId, alliance)) {
+    recordEvent(world, alliance.leaderId, { kind: 'allianceDeclined', ...about })
+    return
+  }
+  alliance.members.push({ realmId: cityId, joinedAt: world.tick, leaving: null })
+  tellMembers(world, alliance, { kind: 'allianceJoined', ...about, city: true })
+}
 
 /** The alliance leader takes back an invitation (`realmId`) not yet answered. */
 export const withdrawInvite = allianceOrder(
@@ -339,9 +369,9 @@ function tellMembers(world: WorldState, alliance: Alliance, what: RealmEventWhat
 }
 
 /**
- * Ends the realm's membership now (`CONTEXT.md`: Alliance, Alliance leader): it is told, as are
+ * Ends a member's membership now (`CONTEXT.md`: Alliance, Alliance leader): it is told, as are
  * the members staying. When it was the alliance leader, the role passes to the longest-standing
- * member left; an alliance with nobody left ends.
+ * realm left, since an NPC city gives no orders; an alliance with no realm left ends.
  */
 function endMembership(
   world: WorldState,
@@ -349,14 +379,15 @@ function endMembership(
   realmId: string,
   why: 'left' | 'removed' | 'leaderDied',
 ): void {
-  const realm = realmName(world, realmId)
+  const city = world.cities.some((c) => c.id === realmId)
+  const realm = city ? organizationLabel(world, realmId) : realmName(world, realmId)
   const left = { kind: 'allianceLeft', allianceId: alliance.id, name: alliance.name } as const
-  tellMembers(world, alliance, { ...left, realmId, realm, why })
+  tellMembers(world, alliance, { ...left, realmId, realm, why, ...(city && { city: true }) })
   // Leaving recalls everything the realm handed over (`CONTEXT.md`: Alliance army).
   const own = alliance.army.filter((p) => ownerOfPart(world, p) === realmId)
   giveBack(world, alliance, own)
   alliance.members = alliance.members.filter((m) => m.realmId !== realmId)
-  const next = alliance.members[0]
+  const next = alliance.members.find((m) => world.realms.some((r) => r.id === m.realmId))
   if (!next) {
     world.alliances = world.alliances.filter((a) => a !== alliance)
     return
@@ -386,7 +417,9 @@ export function leaveOnLeaderDeath(world: WorldState, realmId: string): void {
  * One tick of alliances: recalls and leaves and removals whose delay has run out take effect.
  * Members and invitations of realms that no longer exist are dropped too, so a realm ended some
  * other way still leaves at once, and so are soldiers and carriages of the alliance army that are
- * gone or no longer belong to a member.
+ * gone or no longer belong to a member. An NPC city member that is torn down or joined a realm
+ * leaves at once; one whose standing toward another member fell too low (`npcCityWantsOut`)
+ * starts leaving (`CONTEXT.md`: NPC city in an alliance).
  */
 export function stepAlliances(world: WorldState): void {
   const realms = new Set(world.realms.map((r) => r.id))
@@ -398,10 +431,15 @@ export function stepAlliances(world: WorldState): void {
     const due = alliance.army.filter((p) => p.recallAt !== null && p.recallAt <= world.tick)
     giveBack(world, alliance, due)
     for (const m of [...alliance.members]) {
-      if (!realms.has(m.realmId)) {
-        endMembership(world, alliance, m.realmId, 'leaderDied')
+      if (!world.alliances.includes(alliance)) break
+      const city = !realms.has(m.realmId) && isAllianceCity(world, m.realmId)
+      if (!realms.has(m.realmId) && !city) {
+        const wasCity = world.cities.some((c) => c.id === m.realmId)
+        endMembership(world, alliance, m.realmId, wasCity ? 'left' : 'leaderDied')
       } else if (m.leaving && m.leaving.at <= world.tick) {
         endMembership(world, alliance, m.realmId, m.leaving.removed ? 'removed' : 'left')
+      } else if (city && !m.leaving && npcCityWantsOut(world, m.realmId, alliance)) {
+        m.leaving = { at: world.tick + ALLIANCE_LEAVE_DELAY, removed: false }
       }
     }
   }

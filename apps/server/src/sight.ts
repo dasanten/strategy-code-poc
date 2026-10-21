@@ -35,14 +35,16 @@ function armySeen(
 }
 
 /**
- * The residents a realm's Player sees through: their own and their alliance's, those rented out
- * included, and mercenaries they hired (`CONTEXT.md`: Mercenary contract).
+ * The residents a realm's Player sees through: their own and their alliance's, an NPC city
+ * member's included, those rented out too, and mercenaries they hired (`CONTEXT.md`: Mercenary
+ * contract).
  */
 function observersOf(world: WorldState, realmId: string): Spot[] {
-  const realms = new Set(sharingSight(world, realmId))
+  const members = new Set(sharingSight(world, realmId))
   return world.residents.filter((r) => {
     const by = commanderOf(world, r)
-    return (r.owner !== null && realms.has(r.owner)) || (by !== null && realms.has(by))
+    const org = r.owner ?? r.cityId
+    return (org !== null && members.has(org)) || (by !== null && members.has(by))
   })
 }
 
@@ -163,17 +165,24 @@ export class SightTracker {
   /** Explores around residents that moved; returns, per Player, the chunks that grew. */
   update(world: WorldState, explored: ExploredTerrain): Map<number, Set<number>> {
     const userOf = new Map(world.realms.map((r) => [r.id, r.userId]))
-    // Per realm, the Players who see through its residents.
+    // Per realm, and per NPC city in an alliance, the Players who see through its residents.
     const viewersOf = new Map<string, number[]>()
-    for (const realm of world.realms) {
-      const viewers = sharingSight(world, realm.id).flatMap((id) => userOf.get(id) ?? [])
-      viewersOf.set(realm.id, viewers)
+    const members = [
+      ...world.realms.map((r) => r.id),
+      ...world.alliances.flatMap((a) => a.members.map((m) => m.realmId)),
+    ]
+    for (const id of new Set(members)) {
+      viewersOf.set(
+        id,
+        sharingSight(world, id).flatMap((x) => userOf.get(x) ?? []),
+      )
     }
     const grown = new Map<number, Set<number>>()
     const looking = new Set<string>()
     for (const r of world.residents) {
       const by = commanderOf(world, r)
-      const viewers = [r.owner, by === r.owner ? null : by].flatMap((id) =>
+      const org = r.owner ?? r.cityId
+      const viewers = [org, by === r.owner ? null : by].flatMap((id) =>
         id === null ? [] : (viewersOf.get(id) ?? []),
       )
       const here = `${r.x},${r.y}`

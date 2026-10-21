@@ -27,7 +27,7 @@ export interface WallTile {
   /**
    * The sides (`wallSide`) that may stand on it and pass its gate while closed: its city's realm
    * and the other members of that realm's alliance (`CONTEXT.md`: Alliance), or for a city of no
-   * realm (an NPC city), the city itself. Empty for nobody's.
+   * realm (an NPC city), the city itself and the members of its alliance. Empty for nobody's.
    */
   realms: string[]
   /** A gate that is closed. */
@@ -93,7 +93,7 @@ export function wallMap(
     tiles.set(tileIndex(size, b.x, b.y), {
       kind: b.kind as 'wall' | 'gate',
       realmId,
-      realms: realmId === null ? (b.cityId ? [b.cityId] : []) : side(realmId),
+      realms: side(realmId ?? b.cityId),
       closed: isClosed(b),
     })
   }
@@ -215,8 +215,8 @@ export function onOwnWall(
   const city = wall && world.cities.find((c) => c.id === wall.cityId)
   const side = wallSide(r)
   if (!city || side === null) return false
-  // An NPC city's walls are its own residents' (`wallSide`).
-  return city.realmId === null ? side === city.id : allied(world, city.realmId, side)
+  // An NPC city's walls are its own residents' and its allies' (`wallSide`).
+  return allied(world, city.realmId ?? city.id, side)
 }
 
 /** Damage a finished wall or gate takes before it falls (`WALL_STRENGTH`). */

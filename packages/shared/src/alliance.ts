@@ -1,9 +1,80 @@
+import {
+  CRIME_MEMORY_DAYS,
+  NPC_ALLIANCE_JOIN_STANDING,
+  NPC_ALLIANCE_LEAVE_STANDING,
+} from './balance.js'
 import { contractOf, contractsFor, type ContractView } from './contract.js'
-import { standingsFor, type StandingView } from './standing.js'
+import { organizationLabel, standingOf, standingsFor, type StandingView } from './standing.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
-import type { Alliance, AllianceArmyPart, Carriage, Resident, WorldState } from './world.js'
+import {
+  TICKS_PER_GAME_DAY,
+  type Alliance,
+  type AllianceArmyPart,
+  type Carriage,
+  type Resident,
+  type WorldState,
+} from './world.js'
 
-/** World queries about alliances (ADR 0002: the game API orders and scripts share). */
+/**
+ * World queries about alliances (ADR 0002: the game API orders and scripts share). A member is
+ * a Player's realm or an NPC city (`CONTEXT.md`: NPC city in an alliance), named by its id.
+ */
+
+/**
+ * Whether `id` names an NPC city that can be in an alliance (`CONTEXT.md`: NPC city in an
+ * alliance): a city of no realm, never one of the Trade Organization's.
+ */
+export function isAllianceCity(world: Pick<WorldState, 'cities'>, id: string): boolean {
+  return world.cities.some((c) => c.id === id && c.realmId === null && c.tradeOrg === undefined)
+}
+
+/** Whether the NPC city `cityId` knows of a crime by `org` against it in the last `CRIME_MEMORY_DAYS`. */
+export function knowsRecentCrime(
+  world: Pick<WorldState, 'crimes' | 'tick'>,
+  cityId: string,
+  org: string,
+): boolean {
+  const since = world.tick - CRIME_MEMORY_DAYS * TICKS_PER_GAME_DAY
+  return world.crimes.some(
+    (c) =>
+      c.victimOrg === cityId &&
+      c.culprit.org === org &&
+      c.knownBy.includes(cityId) &&
+      c.tick > since,
+  )
+}
+
+/**
+ * Whether the NPC city `cityId` accepts an invitation to the alliance (`CONTEXT.md`: NPC city in
+ * an alliance): it holds every member in at least `NPC_ALLIANCE_JOIN_STANDING` and knows of no
+ * recent crime by any of them against it.
+ */
+export function npcCityAccepts(
+  world: Pick<WorldState, 'standings' | 'cities' | 'crimes' | 'tick'>,
+  cityId: string,
+  alliance: Pick<Alliance, 'members'>,
+): boolean {
+  return alliance.members.every(
+    (m) =>
+      standingOf(world, cityId, m.realmId) >= NPC_ALLIANCE_JOIN_STANDING &&
+      !knowsRecentCrime(world, cityId, m.realmId),
+  )
+}
+
+/**
+ * Whether the NPC city `cityId` leaves its alliance on its own (`CONTEXT.md`: NPC city in an
+ * alliance): its standing toward some other member fell below `NPC_ALLIANCE_LEAVE_STANDING`.
+ */
+export function npcCityWantsOut(
+  world: Pick<WorldState, 'standings' | 'cities'>,
+  cityId: string,
+  alliance: Pick<Alliance, 'members'>,
+): boolean {
+  return alliance.members.some(
+    (m) =>
+      m.realmId !== cityId && standingOf(world, cityId, m.realmId) < NPC_ALLIANCE_LEAVE_STANDING,
+  )
+}
 
 /** The longest an alliance's name may be. */
 export const ALLIANCE_NAME_MAX_LENGTH = 30
@@ -129,10 +200,14 @@ export function realmsStandingTogether(
   return groups
 }
 
-/** A realm as a Player sees it in alliance matters: its id and its Leader's name. */
+/**
+ * A member as a Player sees it in alliance matters: its id and its name, a realm's by its
+ * Leader's name, an NPC city's (`city`) its own.
+ */
 export interface RealmLabel {
   realmId: string
   realm: string
+  city?: true
 }
 
 /** What a Player knows of alliances: their own, the invitations they hold, whom they could invite. */
@@ -149,7 +224,10 @@ export interface Diplomacy {
   } | null
   /** Alliances whose leader invited the Player's realm. */
   invitations: { allianceId: string; name: string; leader: string }[]
-  /** Realms outside their alliance the Player sees residents of, who could be invited. */
+  /**
+   * Realms outside their alliance the Player sees residents of, and NPC cities outside it they
+   * see, who could be invited.
+   */
   realmsInSight: RealmLabel[]
   /** Mercenary contracts the realm is a side of, offered or in force (`CONTEXT.md`). */
   contracts: ContractView[]
@@ -159,7 +237,7 @@ export interface Diplomacy {
 
 /**
  * The Player's alliance matters, as their realm sees them. `seenRealms` are the realms whose
- * residents are in the Player's sight.
+ * residents are in the Player's sight, and the cities in it.
  */
 export function diplomacyFor(
   world: Pick<
@@ -180,7 +258,11 @@ export function diplomacyFor(
     p.is === 'resident'
       ? world.residents.find((r) => r.id === p.id)?.owner
       : world.carriages.find((k) => k.id === p.id)?.realmId
-  const label = (id: string): RealmLabel => ({ realmId: id, realm: realmName(world, id) })
+  const label = (id: string): RealmLabel => ({
+    realmId: id,
+    realm: organizationLabel(world, id),
+    ...(isAllianceCity(world, id) && { city: true as const }),
+  })
   const own = allianceOf(world, realmId)
   const alliance = own && {
     id: own.id,
@@ -200,7 +282,9 @@ export function diplomacyFor(
   const realms = new Set(world.realms.map((r) => r.id))
   const allies = new Set(sharingSight(world, realmId))
   const realmsInSight = [...new Set(seenRealms)]
-    .filter((id) => id !== realmId && !allies.has(id) && realms.has(id))
+    .filter(
+      (id) => id !== realmId && !allies.has(id) && (realms.has(id) || isAllianceCity(world, id)),
+    )
     .sort()
     .map(label)
   return {
