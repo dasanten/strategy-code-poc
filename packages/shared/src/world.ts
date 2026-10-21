@@ -253,7 +253,8 @@ export interface HaulOrder {
  * along `path` (null while it is being found), as for a walk order; `progress` is how far into the
  * next step they are. `strike` is how far, from 0 up to 1, they are into their next blow.
  * `started` is set once the fight went in the realm logs. `defending` is set when the resident
- * fights back at someone who hit them, which is no crime (`CONTEXT.md`: Crime).
+ * fights back at someone who hit them, or as a caravan's escort defends it (`CONTEXT.md`:
+ * Caravan), which is no crime (`CONTEXT.md`: Crime).
  */
 export interface AttackOrder {
   kind: 'attack'

@@ -467,9 +467,30 @@ export const BUY_SHARE = 0.6
 
 /**
  * Residents of the Trade Org HQ who walk along with each caravan as its escort, besides its
- * driver (`CONTEXT.md`: Caravan). Routes that are attacked get more from Epic 10.
+ * driver (`CONTEXT.md`: Caravan), on a route never robbed.
  */
 export const CARAVAN_ESCORTS = 2
+
+/**
+ * Robberies of a route that earn its caravan one more escort (`CONTEXT.md`: Caravan, a route that
+ * is attacked more often gets more escorts): the second robbery adds the first extra escort.
+ */
+export const CARAVAN_ROBBERIES_PER_ESCORT = 2
+
+/** The most escorts a caravan walks with, however often its route was robbed. */
+export const CARAVAN_ESCORTS_MAX = 8
+
+/**
+ * Extra Food a caravan keeps on board for each escort beyond `CARAVAN_ESCORTS`, in units: a
+ * week of `FOOD_PER_DAY`, like `CARAVAN_FOOD`.
+ */
+export const CARAVAN_FOOD_PER_ESCORT = 14
+
+/**
+ * How near its carriage, in tiles, a caravan's escort defends it (`CONTEXT.md`: Caravan): they go
+ * after robbers and attackers of the crew this close, and give up a chase that leads further.
+ */
+export const CARAVAN_GUARD_RANGE = 4
 
 /**
  * Food a caravan keeps on board for its crew and its horse, in units, topped up at the storage
