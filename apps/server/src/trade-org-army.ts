@@ -67,7 +67,8 @@ export function spareSoldiers(world: WorldState): Resident[] {
 
 /**
  * One tick of the Trade Org army, on a map of `size` tiles: it answers the offers made to it,
- * pays its mercenaries, keeps its inner ring clear, runs its mercenaries, and once a game day
+ * pays its mercenaries, keeps its inner ring clear, watches its outer gates, runs its
+ * mercenaries, and once a game day
  * hires more when it has lost too many. Run after `stepNpcDefence` and before `stepNpcCities`, so
  * the work the HQ hands out passes its soldiers by.
  */
@@ -77,6 +78,7 @@ export function stepTradeOrgArmy(world: WorldState, size: number): void {
   answerOffers(world)
   payMercenaries(world, hq)
   guardInnerRing(world, hq, size)
+  watchOuterGates(world, hq, size)
   runMercenaries(world, hq, size)
   if (world.tick % TICKS_PER_GAME_DAY === 0) hireMercenaries(world, hq, size)
 }
@@ -157,6 +159,54 @@ function innerGates(world: WorldState, hq: City, hall: Building, size: number): 
       Math.hypot(wrapDelta(hall.x, b.x, size), wrapDelta(hall.y, b.y, size)) <=
         TRADE_ORG_HQ.innerRadius + 1,
   )
+}
+
+/**
+ * The HQ's outer gates: its finished gates that are not on its inner ring, on every outer ring
+ * it has.
+ */
+function outerGates(world: WorldState, hq: City, hall: Building, size: number): Building[] {
+  const inner = new Set(innerGates(world, hq, hall, size))
+  return world.buildings.filter(
+    (b) => b.cityId === hq.id && b.kind === 'gate' && !b.site && !inner.has(b),
+  )
+}
+
+/**
+ * Armed outsiders near the HQ (`CONTEXT.md`: Trade Org HQ): armed residents not of it in its area
+ * or within `TRADE_ORG_ARMY.gateWatchRange` of one of its outer gates. Its own mercenaries stand
+ * guard for it and don't count.
+ */
+export function armedOutsidersNear(world: WorldState, hq: City, size: number): Resident[] {
+  const hall = townHallOf(world, hq)
+  if (!hall) return []
+  const gates = outerGates(world, hq, hall, size)
+  const hired = new Set(mercenaries(world).map((r) => r.id))
+  return world.residents.filter(
+    (r) =>
+      r.health > 0 &&
+      isArmed(r) &&
+      !ofHq(hq, r) &&
+      !hired.has(r.id) &&
+      (inCityArea(world, hq, r.x, r.y, size) ||
+        gates.some((g) => wrapDistance(size, r, g) <= TRADE_ORG_ARMY.gateWatchRange)),
+  )
+}
+
+/**
+ * The HQ closes its outer gates while more armed outsiders are near it (`armedOutsidersNear`)
+ * than `TRADE_ORG_ARMY.gateShare` of its soldiers at home (not hired out), and opens them again
+ * once there are no more (`CONTEXT.md`: Trade Org HQ). Its own residents pass them either way.
+ */
+function watchOuterGates(world: WorldState, hq: City, size: number): void {
+  const hall = townHallOf(world, hq)
+  if (!hall) return
+  const home = hqSoldiers(world).filter((r) => !contractOf(world, r.id)).length
+  const close = armedOutsidersNear(world, hq, size).length > TRADE_ORG_ARMY.gateShare * home
+  for (const g of outerGates(world, hq, hall, size)) {
+    if (close) g.closed = true
+    else delete g.closed
+  }
 }
 
 /**

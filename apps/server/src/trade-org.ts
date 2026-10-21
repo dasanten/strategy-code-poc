@@ -24,7 +24,7 @@ import { FARM_RING, newId } from './starting-city.js'
 type Tile = [number, number]
 
 /** Offsets from the middle that lie within `radius`, as a round shape on the tile grid. */
-const within = (dx: number, dy: number, radius: number) => Math.hypot(dx, dy) <= radius + 0.5
+export const within = (dx: number, dy: number, radius: number) => Math.hypot(dx, dy) <= radius + 0.5
 
 /**
  * A round ring of tiles `radius` out from (cx, cy): the tiles within it that touch a tile outside
@@ -48,20 +48,20 @@ export function roundRing(cx: number, cy: number, radius: number): Tile[] {
 }
 
 /** The angle of a tile seen from (cx, cy), clockwise from due north, in [0, 2π). */
-const angleOf = (cx: number, cy: number, [x, y]: Tile) =>
+export const angleOf = (cx: number, cy: number, [x, y]: Tile) =>
   (Math.atan2(x - cx, cy - y) + 2 * Math.PI) % (2 * Math.PI)
 
 /** The `n` gate angles of a ring, evenly round it, the first due north. */
-const gateAngles = (n: number) => Array.from({ length: n }, (_, i) => (i * 2 * Math.PI) / n)
+export const gateAngles = (n: number) => Array.from({ length: n }, (_, i) => (i * 2 * Math.PI) / n)
 
 /** How far apart two angles are, the short way round. */
-const angleApart = (a: number, b: number) => {
+export const angleApart = (a: number, b: number) => {
   const d = Math.abs(a - b) % (2 * Math.PI)
   return Math.min(d, 2 * Math.PI - d)
 }
 
 /** The tile of `ring` nearest each gate angle. */
-function gatesOf(cx: number, cy: number, ring: Tile[]): Tile[] {
+export function gatesOf(cx: number, cy: number, ring: Tile[]): Tile[] {
   return gateAngles(TRADE_ORG_HQ.gates).map(
     (a) =>
       [...ring].sort(
