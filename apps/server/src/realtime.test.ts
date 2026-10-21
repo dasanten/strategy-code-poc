@@ -264,6 +264,7 @@ describe('realtime', () => {
       realmsInSight: [],
       contracts: [],
       deliveries: [],
+      standings: [],
     })
     socket.send(
       JSON.stringify({

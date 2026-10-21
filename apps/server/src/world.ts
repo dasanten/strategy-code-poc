@@ -32,6 +32,7 @@ import { stepTradeOrgArmy } from './trade-org-army.js'
 import { resolvePurchases } from './buying.js'
 import { resolveTrades } from './trading.js'
 import { stepCrimes } from './crimes.js'
+import { stepStanding } from './standing.js'
 import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
@@ -61,6 +62,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     caravans: [],
     deliveries: [],
     crimes: [],
+    standings: [],
   }
 }
 
@@ -131,7 +133,7 @@ export interface StepResult {
  * whose delay ran out take effect; then residents at
  * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
  * realm (`stepCaptures`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
- * (`stepContracts`); last, armies
+ * (`stepContracts`); standing drifts toward neutral (`stepStanding`); last, armies
  * lose members who are gone and give the rest their orders for the next tick. Without `walking`
  * nobody moves.
  */
@@ -174,6 +176,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const captures = stepCaptures(world, terrain.size)
   stepCrimes(world, terrain.size)
   stepContracts(world)
+  stepStanding(world)
   stepArmies(world, terrain.size)
   const actions =
     steps.length +

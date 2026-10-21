@@ -1,5 +1,7 @@
 import {
   CONTRACT_MAX_DAYS,
+  STANDING_CONTRACT_BROKEN_LOSS,
+  STANDING_PER_PAID_WEEK,
   SIGHT_RANGE,
   commands,
   handedOverTo,
@@ -24,6 +26,7 @@ import { walkTo } from './npc-behaviour.js'
 import type { OrderKind } from './orders.js'
 import { newId, realmOf } from './starting-city.js'
 import { spareSoldiers } from './trade-org-army.js'
+import { changeStanding, raiseStandingBothWays } from './standing.js'
 
 /*
  * Mercenary contracts (`CONTEXT.md`: Mercenary contract): one realm rents some of its residents
@@ -335,7 +338,7 @@ export const contractOrders: Record<string, OrderKind> = {
 
 /**
  * Puts the coins for `weeks` game weeks of the contract into its storage, and counts them as
- * paid. Whoever brings them (a pay order, later a Trade Org transfer) has checked there are weeks
+ * paid; each week paid raises standing both ways between its sides (`CONTEXT.md`: Standing). Whoever brings them (a pay order, later a Trade Org transfer) has checked there are weeks
  * left and taken the coins from where they were.
  */
 export function payInto(world: WorldState, c: MercenaryContract, weeks: number): void {
@@ -343,6 +346,7 @@ export function payInto(world: WorldState, c: MercenaryContract, weeks: number):
   const stock = (storage.stock ??= {})
   stock.coins = (stock.coins ?? 0) + weeks * c.pricePerWeek
   c.paidWeeks += weeks
+  raiseStandingBothWays(world, c.lenderId, c.hirerId, weeks * STANDING_PER_PAID_WEEK)
   tellBoth(world, c, 'paid', weeks)
 }
 
@@ -401,8 +405,9 @@ export function endContractsOnLeaderDeath(world: WorldState, realmId: string): v
  * Keeps contracts sound and ends them, as a tick ends: a resident who died or no longer belongs
  * to the lender drops out, and a contract left with nobody, or with a side whose realm ended, is
  * gone. An offer whose storage is no longer the lender's is gone too. A contract in force ends
- * when its time is up with every week paid, and breaks once a week ends unpaid (`contractPayBy`);
- * either way its residents walk home.
+ * when its time is up with every week paid, and breaks once a week ends unpaid (`contractPayBy`),
+ * which costs standing with the lender (`CONTEXT.md`: Mercenary contract); either way its
+ * residents walk home.
  */
 export function stepContracts(world: WorldState): void {
   if (world.contracts.length === 0) return
@@ -427,6 +432,8 @@ export function stepContracts(world: WorldState): void {
       continue
     }
     for (const id of c.residentIds) sendHome(world, byId.get(id)!)
+    if (broken && sound)
+      changeStanding(world, c.lenderId, c.hirerId, -STANDING_CONTRACT_BROKEN_LOSS)
     if (c.residentIds.length > 0) tellBoth(world, c, broken ? 'broken' : 'ended')
   }
   world.contracts = kept

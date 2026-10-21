@@ -32,6 +32,7 @@ const diplomacy = (contracts: ContractView[]): Diplomacy => ({
   alliance: null,
   invitations: [],
   realmsInSight: [],
+  standings: [],
   contracts,
   deliveries: [],
 })

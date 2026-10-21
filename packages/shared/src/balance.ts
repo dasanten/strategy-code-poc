@@ -4,6 +4,7 @@ import {
   ageInYears,
   effective,
   type BuildingKind,
+  type CrimeKind,
   type Good,
   type Protection,
   type ResourceKind,
@@ -346,6 +347,12 @@ export const TRADE_ORG_HQ = {
   innerRadius: 4,
   /** Tiles from the town hall to the outer ring of wall; twice an NPC town's width across. */
   outerRadius: 10,
+  /**
+   * Tiles from one outer ring to the next one it grows (`CONTEXT.md`: Trade Org HQ): as far as a
+   * city building reaches (`CITY_BUILDING_REACH`), so the new ring joins the HQ, with a band of
+   * houses between.
+   */
+  ringStep: 3,
   /** Gates in each ring, evenly round it, the first due north. */
   gates: 4,
   /** Adult residents, with random stats like a starting city's. */
@@ -757,6 +764,38 @@ export const REALM_LOG_LENGTH = 100
  */
 export const CRIME_MEMORY_DAYS = 7
 
+/** How far standing goes each way from neutral (`CONTEXT.md`: Standing): -100 to +100. */
+export const STANDING_RANGE = 100
+
+/**
+ * What a crime costs in the victim's standing toward the culprit's Organization once the victim
+ * knows of it (`CONTEXT.md`: Standing). Killing is the worst; a theft is forgiven soonest.
+ */
+export const CRIME_STANDING_LOSS: Record<CrimeKind, number> = {
+  theft: 10,
+  attack: 15,
+  tearDown: 20,
+  killing: 30,
+}
+
+/**
+ * Coins of trade that raise standing by one point, both ways between the trader's realm and the
+ * Trade Organization (`CONTEXT.md`: Standing). About two spears' worth.
+ */
+export const STANDING_TRADE_COINS_PER_POINT = 50
+
+/** Standing each paid game week of a mercenary contract raises, both ways between its sides. */
+export const STANDING_PER_PAID_WEEK = 2
+
+/** What a contract broken by an unpaid week costs in the lender's standing toward the hirer. */
+export const STANDING_CONTRACT_BROKEN_LOSS = 20
+
+/**
+ * Points standing drifts back toward neutral each game day (`CONTEXT.md`: Standing): a killing is
+ * forgotten in about 30 game days, a little over a real day.
+ */
+export const STANDING_DRIFT_PER_DAY = 1
+
 /**
  * Materials each kind of building needs before its construction site can become the building
  * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
@@ -1162,6 +1201,22 @@ export const TRADE_ORG_ARMY = {
   hirePricePerSoldierWeek: 12,
   /** How long it hires mercenaries for, in game days: two game weeks. */
   hireDays: 14,
+  /**
+   * The HQ keeps at least this many times the strongest Organization's armed residents as
+   * soldiers (`CONTEXT.md`: Trade Org HQ), and `size` at the least: a little more than any
+   * Player can bring.
+   */
+  strongestMultiple: 1.5,
+  /**
+   * The HQ closes its outer gates while more armed outsiders than this share of its soldiers at
+   * home stand near it (`CONTEXT.md`: Trade Org HQ): half, so it can still drive them off.
+   */
+  gateShare: 0.5,
+  /**
+   * How near to one of the HQ's outer gates, in tiles, an armed outsider counts as near it, as
+   * well as anywhere in its area: as for an NPC city (`NPC_GATE_WATCH_RANGE`).
+   */
+  gateWatchRange: 8,
 }
 
 /**

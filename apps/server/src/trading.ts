@@ -2,6 +2,8 @@ import {
   DELIVERY_LOAD,
   GOOD_WEIGHT,
   MAP_SIZE,
+  STANDING_TRADE_COINS_PER_POINT,
+  TRADE_ORG,
   commanderOf,
   commands,
   commandsCarriage,
@@ -29,6 +31,7 @@ import {
 import { recordEvent } from './events.js'
 import type { Invariant } from './invariants.js'
 import type { OrderKind } from './orders.js'
+import { raiseStandingBothWays } from './standing.js'
 import { newId, realmOf } from './starting-city.js'
 
 /** The input of a buy or sell order: the resident, the good, how many units, maybe a carriage. */
@@ -111,9 +114,11 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * Carries out buy and sell orders (`CONTEXT.md`: Trading with the Trade Organization). Where the
  * trader still stands on the warehouse (and their carriage too), the goods and coins swap between
  * their hands or carriage and the warehouse at its prices, cut down to what can be traded and
- * what fits (`quoteTrade`). At the HQ the coins come from and go into its coin warehouse. Either
- * way the order is done, with a line in the realm log. An order with a city orders a delivery or
- * pick-up instead (`orderDelivery`). Returns how many trades moved anything. `size` is the map's.
+ * what fits (`quoteTrade`). At the HQ the coins come from and go into its coin warehouse. The
+ * coins raise standing both ways between the realm and the Trade Organization (`CONTEXT.md`:
+ * Standing). Either way the order is done, with a line in the realm log. An order with a city
+ * orders a delivery or pick-up instead (`orderDelivery`). Returns how many trades moved anything.
+ * `size` is the map's.
  */
 export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
   const records: TradeRecord[] = []
@@ -152,6 +157,9 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
     move(coinsFrom, coinsTo, 'coins', coins)
     records.push({ residentId: r.id, before, after: total([...new Set(parties)]) })
     if (units > 0) traded++
+    if (realm !== null && coins > 0) {
+      raiseStandingBothWays(world, realm, TRADE_ORG, coins / STANDING_TRADE_COINS_PER_POINT)
+    }
     recordEvent(world, realm, {
       kind: 'traded',
       residentId: r.id,
@@ -173,8 +181,9 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
  * of `realm`, at `warehouse`, paying from `payer` (their hands or carriage). Buying, the goods
  * and the fee (`quoteDelivery`) are paid now into the coin warehouse, and the warehouse keeps
  * the goods for a caravan to bring to the city's storage. Selling, nothing moves yet: a caravan
- * picks the goods up and pays there, up to `o.units` and one delivery load (`DELIVERY_LOAD`). Either way with a
- * line in the realm log. Returns whether a delivery was ordered.
+ * picks the goods up and pays there, up to `o.units` and one delivery load (`DELIVERY_LOAD`).
+ * Either way with a line in the realm log. The coins for goods bought raise standing like any
+ * trade. Returns whether a delivery was ordered.
  */
 function orderDelivery(
   world: WorldState,
@@ -215,6 +224,9 @@ function orderDelivery(
       ? q.units
       : Math.min(o.units, Math.floor(DELIVERY_LOAD / GOOD_WEIGHT[o.good] + 1e-9))
   if (o.side === 'buy') move(payer, (coinWarehouse.stock ??= {}), 'coins', q.coins + q.fee)
+  if (o.side === 'buy' && q.coins > 0) {
+    raiseStandingBothWays(world, realm, TRADE_ORG, q.coins / STANDING_TRADE_COINS_PER_POINT)
+  }
   if (units > 0) {
     world.deliveries.push({
       id: newId(world, 'delivery'),

@@ -1,5 +1,6 @@
 import {
   CRIME_MEMORY_DAYS,
+  CRIME_STANDING_LOSS,
   SIGHT_RANGE,
   TICKS_PER_GAME_DAY,
   inCityArea,
@@ -16,6 +17,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
+import { changeStanding } from './standing.js'
 import { newId } from './starting-city.js'
 
 /**
@@ -160,10 +162,14 @@ export function stepCrimes(world: WorldState, size: number): void {
   )
 }
 
-/** `org` learns of `crime`; the victim's realm logs it. */
+/**
+ * `org` learns of `crime`. When it is the victim, its standing toward the culprit's Organization
+ * falls (`CONTEXT.md`: Standing) and its realm logs it.
+ */
 function learn(world: WorldState, crime: Crime, org: string): void {
   crime.knownBy.push(org)
   if (org !== crime.victimOrg) return
+  changeStanding(world, org, crime.culprit.org, -CRIME_STANDING_LOSS[crime.kind])
   recordEvent(world, org, {
     kind: 'crimeKnown',
     crimeId: crime.id,

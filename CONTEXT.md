@@ -94,8 +94,15 @@ The shared language of the game. Domain terms only — no implementation details
   with its town hall in the middle and rings of walls around it. The **inner ring** holds its
   most valuable warehouses, above all its coins, and its soldiers keep everyone else out by
   force: possible to break into in theory, hopeless in practice. The **outer rings** are open to
-  everyone, but the HQ closes its gates when too many armed outsiders want in. When it grows too
-  weak compared to the Players, it grows another ring. The world starts out with it, as far from
+  everyone, but the HQ closes its gates when too many armed outsiders want in: while more armed
+  outsiders stand in its area or near an outer gate than a share of its soldiers at home, it
+  closes its outer gates, and opens them once there are no more (its own mercenaries don't
+  count). It keeps at least a multiple of the strongest Organization's armed residents as
+  soldiers (an alliance's members counted together). When it grows too weak compared to the
+  Players, so it can't arm that many from its adults and keep its workers, it grows like an NPC
+  city (pairing, houses between its rings), and with no room left for a house it grows another
+  ring: a round ring of wall a little further out, its gates in line with the others', keeping
+  the old rings. The world starts out with it, as far from
   every city as the map allows and out of every Player's sight; starting cities keep well away
   from it. Its own workplaces stand on the nearest node of every kind, with a smelter and a mint
   between its rings, and the game runs it like an NPC city.

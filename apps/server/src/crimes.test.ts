@@ -1,9 +1,11 @@
 import {
   CRIME_MEMORY_DAYS,
+  CRIME_STANDING_LOSS,
   SIGHT_RANGE,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   Terrain,
+  standingOf,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -114,9 +116,13 @@ describe('crimes and witnesses', () => {
     })
     // The culprit's Player hears nothing of it.
     expect(crimeLog(world, 7)).toEqual([])
-    // Known once: staying home logs nothing more.
+    // The victim's realm now regards the culprit's worse; not the other way round.
+    expect(standingOf(world, 'r2', 'r1')).toBeCloseTo(-CRIME_STANDING_LOSS.attack, 2)
+    expect(standingOf(world, 'r1', 'r2')).toBe(0)
+    // Known once: staying home logs nothing more, and costs no more standing.
     run(world, 3)
     expect(crimeLog(world, 8)).toHaveLength(1)
+    expect(standingOf(world, 'r2', 'r1')).toBeCloseTo(-CRIME_STANDING_LOSS.attack, 2)
   })
 
   it('a known crime is forgotten after the crime memory runs out', () => {
@@ -148,6 +154,8 @@ describe('crimes and witnesses', () => {
     // Only the victim's realm logs it, and it does not know yet.
     expect(crimeLog(world, 8)).toEqual([])
     expect(crimeLog(world, 9)).toEqual([])
+    // Standing is the victim's affair: the bystander's realm thinks no worse of the culprit.
+    expect(world.standings).toEqual([])
   })
 
   it('fighting back is no crime', () => {

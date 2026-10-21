@@ -1,4 +1,5 @@
 import { contractOf, contractsFor, type ContractView } from './contract.js'
+import { standingsFor, type StandingView } from './standing.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
 import { deliveriesFor, type DeliveryView } from './warehouse.js'
 import type { Alliance, AllianceArmyPart, Carriage, Resident, WorldState } from './world.js'
@@ -155,6 +156,8 @@ export interface Diplomacy {
   contracts: ContractView[]
   /** The realm's deliveries and pick-ups not yet done (`CONTEXT.md`: Delivery). */
   deliveries: DeliveryView[]
+  /** Standing between the realm and other Organizations (`CONTEXT.md`: Standing), shown only. */
+  standings: StandingView[]
 }
 
 /**
@@ -171,6 +174,7 @@ export function diplomacyFor(
     | 'contracts'
     | 'buildings'
     | 'deliveries'
+    | 'standings'
     | 'cities'
   >,
   realmId: string,
@@ -209,5 +213,6 @@ export function diplomacyFor(
     realmsInSight,
     contracts: contractsFor(world, realmId),
     deliveries: deliveriesFor(world, realmId),
+    standings: standingsFor(world, realmId),
   }
 }

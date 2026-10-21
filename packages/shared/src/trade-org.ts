@@ -1,4 +1,4 @@
-import { TRADE_ORG_HQ } from './balance.js'
+import { TRADE_ORG_ARMY, TRADE_ORG_HQ, isArmed } from './balance.js'
 import { townHallOf } from './city.js'
 import { wrapDelta } from './terrain.js'
 import type { City, Resident, WorldState } from './world.js'
@@ -59,4 +59,40 @@ export function inInnerRingAround(
 ): boolean {
   const d = Math.hypot(wrapDelta(hall.x, at.x, size), wrapDelta(hall.y, at.y, size))
   return d <= TRADE_ORG_HQ.innerRadius + 0.5
+}
+
+/**
+ * The armed residents of the strongest Organization (`CONTEXT.md`: Trade Org HQ): the most
+ * living armed residents any Player's side has, an alliance's members counted together and a
+ * realm in none on its own. Residents the Trade Organization has hired don't count.
+ */
+export function strongestArmed(
+  world: Pick<WorldState, 'residents' | 'alliances' | 'contracts'>,
+): number {
+  const hired = new Set(
+    world.contracts.filter((c) => c.hirerId === TRADE_ORG).flatMap((c) => c.residentIds),
+  )
+  const sideOf = new Map<string, string>()
+  for (const a of world.alliances) for (const m of a.members) sideOf.set(m.realmId, a.id)
+  const armed = new Map<string, number>()
+  for (const r of world.residents) {
+    if (r.owner === null || r.health <= 0 || !isArmed(r) || hired.has(r.id)) continue
+    const side = sideOf.get(r.owner) ?? r.owner
+    armed.set(side, (armed.get(side) ?? 0) + 1)
+  }
+  return Math.max(0, ...armed.values())
+}
+
+/**
+ * How many soldiers the Trade Org HQ wants (`CONTEXT.md`: Trade Org HQ, Trade Org army): its
+ * army's size, or more when the strongest Organization has many armed residents
+ * (`TRADE_ORG_ARMY.strongestMultiple` of them).
+ */
+export function tradeOrgArmyWanted(
+  world: Pick<WorldState, 'residents' | 'alliances' | 'contracts'>,
+): number {
+  return Math.max(
+    TRADE_ORG_ARMY.size,
+    Math.ceil(TRADE_ORG_ARMY.strongestMultiple * strongestArmed(world)),
+  )
 }

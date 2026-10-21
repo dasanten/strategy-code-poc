@@ -1,6 +1,8 @@
 import {
   DELIVERY_DRIVE_TRIES,
   DELIVERY_LOAD,
+  STANDING_TRADE_COINS_PER_POINT,
+  TRADE_ORG,
   GOOD_WEIGHT,
   deliveryStorage,
   quotePickUp,
@@ -21,6 +23,7 @@ import {
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
+import { raiseStandingBothWays } from './standing.js'
 
 /*
  * Deliveries (`CONTEXT.md`: Delivery): a caravan standing at a warehouse takes on the oldest
@@ -283,6 +286,11 @@ function deliveredAll(world: WorldState, job: CaravanJob, d: Delivery, b: Buildi
 /** A pick-up is paid for: it is done, and the caravan brings the goods to the warehouse. */
 function paidUp(world: WorldState, job: CaravanJob, d: Delivery): void {
   drop(world, d)
+  // Paying for goods sold is trade, which raises standing (`CONTEXT.md`: Standing).
+  if (job.paid > 0) {
+    const points = job.paid / STANDING_TRADE_COINS_PER_POINT
+    raiseStandingBothWays(world, d.realmId, TRADE_ORG, points)
+  }
   const storage = deliveryStorage(world, d.cityId)
   recordEvent(world, d.realmId, {
     kind: 'delivered',

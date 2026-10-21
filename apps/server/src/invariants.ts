@@ -64,12 +64,14 @@ import { refillSource } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
+import { standingsSound } from './standing.js'
 import { buyOrdersDone } from './buying.js'
 import { tradeOrdersDone, tradesKeepGoods } from './trading.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound } from './caravans.js'
 import { deliveriesSound } from './deliveries.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
+import { hqRingsSound } from './hq-growth.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -1347,12 +1349,14 @@ export const worldInvariants: Invariant[] = [
   deliveriesSound,
   supplyLinesSound,
   crimesSound,
+  standingsSound,
   gatesSound,
   wallDamageSound,
   climbOrdersSound,
   tradeOrgSound,
   caravansSound,
   tradeOrgArmySound,
+  hqRingsSound,
   roadLineOrdersSound,
 ]
 

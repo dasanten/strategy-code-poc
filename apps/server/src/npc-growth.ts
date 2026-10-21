@@ -34,6 +34,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { hqGrows, hqProject } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
 
 /**
@@ -41,8 +42,8 @@ import { walkTo } from './npc-behaviour.js'
  * food surplus and no free housing, a farm when every farm is full, and the workplace for a
  * material it needs but has no workplace for. With no room left inside its wall it builds on its
  * edge, puts up a new wall `NPC_WALL_STEP` tiles further out and then tears down the old one. All
- * through the orders a Player's residents take (ADR 0002). Not for the Trade Organization's
- * cities, which grow their own way.
+ * through the orders a Player's residents take (ADR 0002). The Trade Org HQ grows this way only
+ * while it is too weak, building round rings of its own (`hqProject`); trading posts never grow.
  */
 
 /** Something an NPC city builds or takes down next. */
@@ -100,7 +101,8 @@ export function cityGrowth(
   terrain: TerrainMap,
   short: boolean,
 ): Growth | undefined {
-  if (city.tradeOrg) return undefined
+  // The Trade Organization's cities grow only while the HQ is too weak (`hqGrows`).
+  if (city.tradeOrg && (city.tradeOrg !== 'hq' || !hqGrows(world, adults))) return undefined
   const size = terrain.size
   if (short) {
     for (const r of adults) if (r.order?.kind === 'pair') r.order = null
@@ -121,7 +123,11 @@ export function cityGrowth(
   return {
     assign(r, deliver = false) {
       if (free <= 0) return false
-      if (project === null) project = nextProject(world, city, home, terrain)
+      if (project === null) {
+        project = city.tradeOrg
+          ? hqProject(world, city, terrain)
+          : nextProject(world, city, home, terrain)
+      }
       if (!project || !takePart(world, r, project, storage, deliver)) return false
       free--
       return true
