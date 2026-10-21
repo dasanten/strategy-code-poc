@@ -19,6 +19,7 @@ import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
 import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { ContractsPanel } from './Contracts.js'
+import { StandingPanel } from './Standing.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { Login } from './Login.js'
@@ -317,6 +318,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               sendOrder={sendOrder}
             />
           )}
+          {world && <StandingPanel standings={world.diplomacy.standings} />}
           {world && (
             <CityInspector
               cities={world.cities}

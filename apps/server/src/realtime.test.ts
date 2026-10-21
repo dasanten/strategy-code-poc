@@ -263,6 +263,7 @@ describe('realtime', () => {
       invitations: [],
       realmsInSight: [],
       contracts: [],
+      standings: [],
     })
     socket.send(
       JSON.stringify({

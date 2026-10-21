@@ -1,5 +1,8 @@
 import {
   MAX_HEALTH,
+  STANDING_CONTRACT_BROKEN_LOSS,
+  STANDING_PER_PAID_WEEK,
+  standingOf,
   MAX_HUNGER,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_WEEK,
@@ -253,6 +256,9 @@ describe('mercenary contracts', () => {
     expect(at(world, 'b2').order).toBeNull()
     const paid = world.events.filter((e) => e.kind === 'contract' && e.what === 'paid')
     expect(paid.map((e) => e.userId).sort()).toEqual([7, 8])
+    // A paid week raises standing both ways.
+    expect(standingOf(world, 'r1', 'r2')).toBeCloseTo(STANDING_PER_PAID_WEEK, 2)
+    expect(standingOf(world, 'r2', 'r1')).toBeCloseTo(STANDING_PER_PAID_WEEK, 2)
     // Only the hirer pays, and only with coins in hand.
     at(world, 'a1').carried.coins = 50
     Object.assign(at(world, 'a1'), { x: 11, y: 10 })
@@ -284,6 +290,10 @@ describe('mercenary contracts', () => {
     expect(world.contracts).toEqual([])
     const broken = world.events.filter((e) => e.kind === 'contract' && e.what === 'broken')
     expect(broken.map((e) => e.userId).sort()).toEqual([7, 8])
+    // Breaking it costs the hirer standing with the lender; the paid week still counts.
+    const left = STANDING_PER_PAID_WEEK - STANDING_CONTRACT_BROKEN_LOSS
+    expect(standingOf(world, 'r1', 'r2')).toBeCloseTo(left, 0)
+    expect(standingOf(world, 'r2', 'r1')).toBeCloseTo(STANDING_PER_PAID_WEEK, 0)
     expect(commanderOf(world, at(world, 'm1'))).toBe('r1')
     expect(at(world, 'm1').order).toMatchObject({ kind: 'walkTo', target: { x: 10, y: 10 } })
     run(world, walking, 600)
@@ -429,6 +439,7 @@ describe('contracts when a Leader dies', () => {
     run(world, walking, 100)
     expect(at(world, 'm1')).toMatchObject({ x: 10, y: 10 })
     expect(contractEvents(world).filter((e) => e.what === 'broken')).toEqual([])
+    expect(world.standings).toEqual([])
   })
 
   it('ends at once when the lender’s Leader dies: the mercenaries walk home to their own city', () => {

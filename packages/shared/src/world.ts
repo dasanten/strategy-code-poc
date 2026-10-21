@@ -354,6 +354,8 @@ export interface WorldState {
   armies: Army[]
   /** Crimes a witness still carries news of, or that an Organization still remembers. */
   crimes: Crime[]
+  /** Every standing other than neutral, one per pair of Organizations (`CONTEXT.md`: Standing). */
+  standings: Standing[]
   /** Mercenary contracts offered or in force (`CONTEXT.md`: Mercenary contract). */
   contracts: MercenaryContract[]
   /** The Trade Organization's caravans, one on each trading post's route (`CONTEXT.md`: Caravan). */
@@ -461,6 +463,17 @@ export interface TradeOrder {
   units: number
   carriageId: string | null
 }
+/**
+ * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
+ * to +`STANDING_RANGE`. An Organization is a realm's id, an NPC city's id, or `TRADE_ORG`
+ * (`standingOrganization`). A pair with none is neutral (0). Plain data.
+ */
+export interface Standing {
+  of: string
+  toward: string
+  value: number
+}
+
 /** What a crime was (`CONTEXT.md`: Crime). */
 export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
 

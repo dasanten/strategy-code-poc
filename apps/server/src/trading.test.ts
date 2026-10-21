@@ -1,4 +1,7 @@
 import {
+  STANDING_TRADE_COINS_PER_POINT,
+  TRADE_ORG,
+  standingOf,
   CARRIAGE_CAPACITY,
   GOOD_WEIGHT,
   HQ_COIN_WAREHOUSE,
@@ -105,6 +108,12 @@ describe('trading at a warehouse', () => {
     expect(warehouse.stock!.iron).toBe(stock + 4)
     expect(warehouse.stock!.coins).toBe(coins - paid)
     expect(p1.order).toBe(null)
+    // The trade raises standing both ways with the Trade Organization, by the coins it moved.
+    const raised = paid / STANDING_TRADE_COINS_PER_POINT
+    expect(standingOf(world, TRADE_ORG, 'r1')).toBeCloseTo(raised, 2)
+    expect(standingOf(world, 'r1', TRADE_ORG)).toBeCloseTo(raised, 2)
+    // Named by any of its cities, the Trade Organization is one.
+    expect(standingOf(world, warehouse.cityId!, 'r1')).toBeCloseTo(raised, 2)
   })
 
   it('buys: the coins go into the warehouse and the goods into the hands at its sell price', () => {

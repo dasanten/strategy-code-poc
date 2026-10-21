@@ -41,7 +41,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 25
+export const WORLD_FORMAT_VERSION = 26
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -311,6 +311,8 @@ export const migrations: Record<number, MigrationStep> = {
     placeCaravans(world)
     return world
   },
+  // Standing came (`CONTEXT.md`: Standing): everyone starts neutral toward everyone.
+  25: (state) => ({ ...(state as object), standings: [] }),
 }
 
 export class WorldFormatError extends Error {}
