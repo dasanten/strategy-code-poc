@@ -65,10 +65,11 @@ import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
 import { standingsSound } from './standing.js'
-import { buyOrdersDone } from './buying.js'
+import { buyOrdersDone, cityPricesSound } from './buying.js'
 import { refusedTradeNothing, tradeOrdersDone, tradesKeepGoods } from './trading.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound } from './caravans.js'
+import { deliveriesSound } from './deliveries.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
@@ -1344,9 +1345,11 @@ export const worldInvariants: Invariant[] = [
   armiesSound,
   contractsSound,
   buyOrdersDone,
+  cityPricesSound,
   tradeOrdersDone,
   tradesKeepGoods,
   refusedTradeNothing,
+  deliveriesSound,
   supplyLinesSound,
   crimesSound,
   standingsSound,

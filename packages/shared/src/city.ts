@@ -2,14 +2,19 @@ import {
   CITY_AREA_MARGIN,
   CITY_PRICE_BY_BUILDING,
   CITY_PRICE_PER_RESIDENT,
+  CITY_PRICE_STANDING_SWING,
   CITY_BUILDING_REACH,
   FOOD_PER_DAY,
   FOOD_SURPLUS_DAYS,
   HOUSING_ROOM,
   hungerFactor,
   isArmed,
+  NPC_CITY_REFUSES_STANDING,
+  NPC_CITY_WONT_SELL_STANDING,
+  STANDING_RANGE,
 } from './balance.js'
 import { allied } from './alliance.js'
+import { standingOf } from './standing.js'
 import { TRADE_ORG } from './trade-org.js'
 import { wrap, wrapDelta, wrapDistance } from './terrain.js'
 import type { Building, BuildingKind, City, Resident, WorldState } from './world.js'
@@ -262,15 +267,50 @@ export function forSale(city: City): boolean {
 }
 
 /**
+ * Whether an NPC city refuses an Organization (`CONTEXT.md`: NPC city reaction): its standing
+ * toward it is below `NPC_CITY_REFUSES_STANDING`, so it won't trade with it or hire out to it and
+ * keeps its gates shut to its residents. Only NPC cities react so: a city of a realm or of the
+ * Trade Organization never refuses here.
+ */
+export function npcCityRefuses(
+  world: Pick<WorldState, 'standings' | 'cities'>,
+  city: City,
+  org: string,
+): boolean {
+  return forSale(city) && standingOf(world, city.id, org) < NPC_CITY_REFUSES_STANDING
+}
+
+/**
+ * Whether an NPC city sells itself to a realm (`CONTEXT.md`: NPC city reaction): it is for sale
+ * and its standing toward the realm is not below `NPC_CITY_WONT_SELL_STANDING`.
+ */
+export function sellsTo(
+  world: Pick<WorldState, 'standings' | 'cities'>,
+  city: City,
+  realmId: string,
+): boolean {
+  return forSale(city) && standingOf(world, city.id, realmId) >= NPC_CITY_WONT_SELL_STANDING
+}
+
+/**
  * The price in Coins an NPC city names (`CONTEXT.md`: Buying a city), from what it is worth: its
  * residents (`CITY_PRICE_PER_RESIDENT`) and its finished buildings (`CITY_PRICE_BY_BUILDING`).
+ * Named to a buyer, its standing toward them moves it (`CITY_PRICE_STANDING_SWING`): the better,
+ * the lower.
  */
-export function cityPrice(world: Pick<WorldState, 'residents' | 'buildings'>, city: City): number {
+export function cityPrice(
+  world: Pick<WorldState, 'residents' | 'buildings' | 'standings' | 'cities'>,
+  city: City,
+  buyerId?: string,
+): number {
   const residents = world.residents.filter((r) => r.cityId === city.id).length
   const buildings = world.buildings
     .filter((b) => b.cityId === city.id && !b.site)
     .reduce((sum, b) => sum + (CITY_PRICE_BY_BUILDING[b.kind] ?? 0), 0)
-  return residents * CITY_PRICE_PER_RESIDENT + buildings
+  const worth = residents * CITY_PRICE_PER_RESIDENT + buildings
+  if (buyerId === undefined) return worth
+  const standing = standingOf(world, city.id, buyerId)
+  return Math.round(worth * (1 - (CITY_PRICE_STANDING_SWING * standing) / STANDING_RANGE))
 }
 
 /**
@@ -298,11 +338,12 @@ export function coinsAtTownHall(
 
 /**
  * Why the realm's resident `r` can't buy the city `cityId` now, if anything stops it
- * (`CONTEXT.md`: Buying a city): the city must be for sale, the resident of the realm and standing
- * on its town hall, and the realm's residents there must carry its price in coins together.
+ * (`CONTEXT.md`: Buying a city): the city must be for sale to the realm (`sellsTo`), the resident
+ * of the realm and standing on its town hall, and the realm's residents there must carry its
+ * price to the realm in coins together.
  */
 export function buyProblem(
-  world: Pick<WorldState, 'residents' | 'buildings' | 'cities'>,
+  world: Pick<WorldState, 'residents' | 'buildings' | 'cities' | 'standings'>,
   realmId: string,
   r: Resident,
   cityId: unknown,
@@ -311,10 +352,12 @@ export function buyProblem(
   if (!city) return 'no such city'
   if (city.tradeOrg) return 'the Trade Organization doesn’t sell its cities'
   if (!forSale(city)) return 'only NPC cities are for sale'
+  if (!sellsTo(world, city, realmId))
+    return 'it won’t sell to you: it holds you in too low standing'
   if (r.owner !== realmId) return 'only a resident of your own realm can buy a city'
   const hall = townHallOf(world, city)
   if (!hall || r.x !== hall.x || r.y !== hall.y) return 'the resident must stand on its town hall'
-  const price = cityPrice(world, city)
+  const price = cityPrice(world, city, realmId)
   const coins = coinsAtTownHall(world, city, realmId)
   if (coins < price) {
     return `it costs ${price} coins; your residents at its town hall carry ${coins}`

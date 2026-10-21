@@ -200,6 +200,14 @@ describe('script bindings', () => {
     ['buyCity("city4")', { kind: 'buyCity', cityId: 'city4' }],
     ['buy("iron", 2)', { kind: 'buy', good: 'iron', units: 2, carriageId: null }],
     ['sell("wood", 3, "k1")', { kind: 'sell', good: 'wood', units: 3, carriageId: 'k1' }],
+    [
+      'buy("iron", 2, null, "c1")',
+      { kind: 'buy', good: 'iron', units: 2, carriageId: null, cityId: 'c1' },
+    ],
+    [
+      'sell("wood", 3, null, "c1")',
+      { kind: 'sell', good: 'wood', units: 3, carriageId: null, cityId: 'c1' },
+    ],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(60, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 60, y: 10 } }],
   ]

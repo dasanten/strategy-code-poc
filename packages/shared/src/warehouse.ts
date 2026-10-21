@@ -2,6 +2,9 @@ import { commandsCarriage } from './alliance.js'
 import {
   BUY_SHARE,
   CARRIAGE_CAPACITY,
+  DELIVERY_FEE_BASE,
+  DELIVERY_FEE_PER_KG_TILE,
+  DELIVERY_LOAD,
   GOOD_WEIGHT,
   HQ_FLOOR_FACTOR,
   PRICE_ELASTICITY,
@@ -20,6 +23,7 @@ import {
   GOODS,
   type Building,
   type Carriage,
+  type Delivery,
   type Good,
   type Resident,
   type Stock,
@@ -187,7 +191,8 @@ export interface TradeQuote {
  * with that unit in it: bought at the sell price before it leaves, sold at the buy price once it
  * is in, so buying and selling back always costs coins. The trade is cut down to the units the
  * trader holds (selling) or the warehouse holds (buying), the coins the payer has, and what fits
- * in the holder's room. Pure: nothing moves.
+ * in the holder's room. A warehouse doesn't sell the `owed` units it keeps for deliveries
+ * (`owedBy`). Pure: nothing moves.
  */
 export function quoteTrade(
   world: Pick<WorldState, 'cities' | 'buildings'>,
@@ -196,6 +201,7 @@ export function quoteTrade(
   side: TradeSide,
   good: PricedGood,
   wanted: number,
+  owed = 0,
 ): TradeQuote {
   const floor = stockFloor(world, warehouse)[good]
   const coinWarehouse = tradeCoinWarehouse(world, warehouse)
@@ -215,7 +221,7 @@ export function quoteTrade(
       if (coins + p > coinStock || room < -1e-9) break
       coins += p
     } else {
-      if (n > stock) break
+      if (n > stock - owed) break
       const p = priceFor(good, stock - units, floor).sell
       const room = holder.room + (coins + p) * GOOD_WEIGHT.coins - n * GOOD_WEIGHT[good]
       if (coins + p > heldCoins || room < -1e-9) break
@@ -231,7 +237,10 @@ export function quoteTrade(
  * Trading with the Trade Organization): `realmId` is not refused (`CONTEXT.md`: Trade Org
  * reaction), and the resident is grown up, on a Trade Org warehouse's tile that prices the
  * good, `units` whole and positive, with some of the good to sell or coins to buy, in their hands
- * or on `carriageId`, a carriage on their tile that `realmId` commands.
+ * or on `carriageId`, a carriage on their tile that `realmId` commands. With `cityId`, a
+ * delivery (`CONTEXT.md`: Delivery): the city is one of the realm's with a storage, which holds
+ * some of the good for a pick-up, and the coins for a delivery come from hands or carriage as
+ * usual.
  */
 export function tradeProblem(
   world: WorldState,
@@ -241,6 +250,7 @@ export function tradeProblem(
   good: unknown,
   units: unknown,
   carriageId: unknown,
+  cityId: unknown = undefined,
 ): string | undefined {
   if (tradeOrgRefuses(world, realmId)) return 'the Trade Organization won’t trade with you'
   if (!canWork(resident, world.tick)) return 'children can’t trade'
@@ -259,7 +269,167 @@ export function tradeProblem(
       return 'that carriage is not on the resident’s tile'
     stock = k.load
   }
+  if (cityId !== null && cityId !== undefined) {
+    const city = world.cities.find((c) => c.id === cityId)
+    if (!city || city.realmId !== realmId) return 'not one of your cities'
+    const storage = deliveryStorage(world, city.id)
+    if (!storage) return 'that city has no storage'
+    if (side === 'sell') {
+      if (carriageId !== null && carriageId !== undefined) {
+        return 'a pick-up comes from the city’s storage, not a carriage'
+      }
+      stock = storage.stock ?? {}
+    }
+  }
   if (side === 'sell' && !((stock[good as PricedGood] ?? 0) > 0)) return 'none of that good to sell'
   if (side === 'buy' && !((stock.coins ?? 0) > 0)) return 'no coins to buy with'
   return undefined
+}
+
+/**
+ * The storage of a city that deliveries go to and pick-ups come from (`CONTEXT.md`: Delivery):
+ * its first finished one. Undefined when it has none.
+ */
+export function deliveryStorage(
+  world: Pick<WorldState, 'buildings'>,
+  cityId: string,
+): Building | undefined {
+  return world.buildings.find((b) => b.cityId === cityId && b.kind === 'storage' && !b.site)
+}
+
+/**
+ * A delivery's fee, in coins (`CONTEXT.md`: Delivery): `DELIVERY_FEE_BASE`, and
+ * `DELIVERY_FEE_PER_KG_TILE` for each kg carried each tile from the warehouse to the storage.
+ */
+export function deliveryFee(kg: number, tiles: number): number {
+  return DELIVERY_FEE_BASE + Math.ceil(kg * tiles * DELIVERY_FEE_PER_KG_TILE - 1e-9)
+}
+
+/**
+ * The units of a good a warehouse keeps for deliveries bought there (`CONTEXT.md`: Delivery):
+ * all of each that waits for a caravan, what is not on board yet of each being loaded. A
+ * warehouse sells none of them to anyone else.
+ */
+export function owedBy(
+  world: Pick<WorldState, 'deliveries' | 'caravans'>,
+  warehouseId: string,
+  good: Good,
+): number {
+  let owed = 0
+  for (const d of world.deliveries) {
+    if (d.kind !== 'delivery' || d.warehouseId !== warehouseId || d.good !== good) continue
+    const job = world.caravans.find((c) => c.id === d.caravanId)?.job
+    if (job?.deliveryId !== d.id) owed += d.units
+    else if (job.step === 'load') owed += Math.max(0, d.units - job.units)
+  }
+  return owed
+}
+
+/** What a delivery or pick-up moves: `units` of the good, `coins` paid for them, and the `fee`. */
+export interface DeliveryQuote extends TradeQuote {
+  fee: number
+}
+
+const noDelivery: DeliveryQuote = { units: 0, coins: 0, fee: 0 }
+
+/**
+ * What buying up to `wanted` units of a good for delivery `tiles` away would take (`CONTEXT.md`:
+ * Delivery): the units at the warehouse's prices, as `quoteTrade` buys them, and the fee for
+ * their weight (`deliveryFee`), all paid from the `payer`'s coins. Cut down to what the payer
+ * pays for, what the warehouse holds beyond the `owed` units it keeps for other deliveries, and
+ * one delivery load (`DELIVERY_LOAD`). The goods stay in the warehouse until a caravan loads them. Pure.
+ */
+export function quoteDelivery(
+  world: Pick<WorldState, 'cities' | 'buildings'>,
+  warehouse: Building,
+  payer: Stock,
+  good: PricedGood,
+  wanted: number,
+  tiles: number,
+  owed = 0,
+): DeliveryQuote {
+  const floor = stockFloor(world, warehouse)[good]
+  if (floor === undefined || !tradeCoinWarehouse(world, warehouse)) return noDelivery
+  const stock = warehouse.stock?.[good] ?? 0
+  const held = payer.coins ?? 0
+  let best = noDelivery
+  let coins = 0
+  for (let n = 1; n <= wanted; n++) {
+    const kg = n * GOOD_WEIGHT[good]
+    if (n > stock - owed || kg > DELIVERY_LOAD + 1e-9) break
+    coins += priceFor(good, stock - (n - 1), floor).sell
+    const fee = deliveryFee(kg, tiles)
+    if (coins + fee > held) break
+    best = { units: n, coins, fee }
+  }
+  return best
+}
+
+/**
+ * What a pick-up of up to `wanted` units of a good `tiles` away would pay (`CONTEXT.md`:
+ * Delivery): the units at the warehouse's prices, as `quoteTrade` sells them, less the fee for
+ * their weight (`deliveryFee`). Cut down to the `held` units at the storage, one delivery load and
+ * the `budget` of coins to pay with; none when the fee eats the whole price. Pure.
+ */
+export function quotePickUp(
+  world: Pick<WorldState, 'cities' | 'buildings'>,
+  warehouse: Building,
+  good: PricedGood,
+  wanted: number,
+  held: number,
+  tiles: number,
+  budget: number,
+): DeliveryQuote {
+  const floor = stockFloor(world, warehouse)[good]
+  if (floor === undefined || !tradeCoinWarehouse(world, warehouse)) return noDelivery
+  const stock = warehouse.stock?.[good] ?? 0
+  let best = noDelivery
+  let price = 0
+  for (let n = 1; n <= wanted; n++) {
+    const kg = n * GOOD_WEIGHT[good]
+    if (n > held || kg > DELIVERY_LOAD + 1e-9) break
+    price += priceFor(good, stock + n, floor).buy
+    const fee = deliveryFee(kg, tiles)
+    if (price - fee > budget) break
+    if (price > fee) best = { units: n, coins: price - fee, fee }
+  }
+  return best
+}
+
+/** A delivery as its realm sees it (`CONTEXT.md`: Delivery), for the open ones in the realm log. */
+export interface DeliveryView {
+  id: string
+  kind: Delivery['kind']
+  good: PricedGood
+  units: number
+  cityId: string
+  city: string
+  /** The warehouse it was ordered at. */
+  x: number
+  y: number
+  /** Whether a caravan is on its way with it; else it waits for one at the warehouse. */
+  underway: boolean
+}
+
+/** A realm's deliveries and pick-ups not yet done, oldest first (`CONTEXT.md`: Delivery). */
+export function deliveriesFor(
+  world: Pick<WorldState, 'deliveries' | 'cities' | 'buildings'>,
+  realmId: string,
+): DeliveryView[] {
+  return world.deliveries
+    .filter((d) => d.realmId === realmId)
+    .map((d) => {
+      const w = world.buildings.find((b) => b.id === d.warehouseId)
+      return {
+        id: d.id,
+        kind: d.kind,
+        good: d.good,
+        units: d.units,
+        cityId: d.cityId,
+        city: world.cities.find((c) => c.id === d.cityId)?.name ?? '',
+        x: w?.x ?? 0,
+        y: w?.y ?? 0,
+        underway: d.caravanId !== null,
+      }
+    })
 }

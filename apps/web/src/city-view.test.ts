@@ -1,5 +1,6 @@
 import {
   PRICED_GOODS,
+  deliveryFee,
   priceFor,
   WAREHOUSE_FLOOR,
   type Building,
@@ -11,6 +12,8 @@ import {
   buildingCount,
   describeBuying,
   describeCity,
+  deliveryCities,
+  previewDelivery,
   previewTrade,
   tradersAt,
   warehousesInSight,
@@ -166,6 +169,28 @@ describe('trading at a warehouse in the inspector', () => {
       buy: { units: 0, coins: 0 },
       sell: { units: 0, coins: 0 },
     })
+  })
+
+  it('previews a delivery to and a pick-up from one of the Player’s cities, fee and all', () => {
+    const home: City = { id: 'city2', name: 'Home', realmId: 'realm1', townHallId: 'h2' }
+    const storage = { ...b('s2', 'storage', 'city2'), x: 23, y: 4, stock: { iron: 5 } }
+    const theirs = { ...b('s3', 'storage', 'city3'), x: 30, y: 4 }
+    const all = {
+      cities: [post, home, { ...home, id: 'city3', realmId: 'realm2' }],
+      buildings: [...seen.buildings, storage, theirs],
+    }
+    const [to] = deliveryCities(all, 'realm1')
+    expect(deliveryCities(all, 'realm1')).toEqual([{ id: 'city2', name: 'Home', storage }])
+    const preview = previewDelivery(all, 'w1', trader, undefined, 'iron', 2, to!, 128)
+    const floor = WAREHOUSE_FLOOR.iron
+    expect(preview.buy).toEqual({
+      units: 2,
+      coins: priceFor('iron', 20, floor).sell + priceFor('iron', 19, floor).sell,
+      fee: deliveryFee(2, 20),
+    })
+    const price = priceFor('iron', 21, floor).buy + priceFor('iron', 22, floor).buy
+    const fee = deliveryFee(2, 20)
+    expect(preview.sell).toEqual({ units: 2, coins: price - fee, fee })
   })
 })
 
