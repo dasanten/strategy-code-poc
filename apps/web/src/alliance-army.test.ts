@@ -16,6 +16,7 @@ const diplomacy: Diplomacy = {
   realmsInSight: [],
   contracts: [],
   standings: [],
+  joinRequests: [],
 }
 
 describe('alliance army in the UI', () => {

@@ -318,7 +318,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               sendOrder={sendOrder}
             />
           )}
-          {world && <StandingPanel standings={world.diplomacy.standings} />}
+          {world && (
+            <StandingPanel
+              standings={world.diplomacy.standings}
+              joinRequests={world.diplomacy.joinRequests}
+              sendOrder={sendOrder}
+            />
+          )}
           {world && (
             <CityInspector
               cities={world.cities}
