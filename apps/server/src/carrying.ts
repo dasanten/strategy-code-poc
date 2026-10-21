@@ -19,6 +19,7 @@ import {
 } from '@csp/shared'
 import { finishSite } from './building.js'
 import { updateCityMembership } from './cities.js'
+import { robCaravan } from './caravans.js'
 import { buildingOrganization, carriageOrganization, commitCrime } from './crimes.js'
 import { collectsFrom } from './deliveries.js'
 import type { OrderKind, OrderSender } from './orders.js'
@@ -169,19 +170,27 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * same goods. A take gets what is still at the spot on the resident's own tile, whole units that
  * fit their carry capacity; a put puts down what they still carry. A spot that is gone means
  * nothing happens. Either way the order is done. Taking from another Organization's storage or
- * carriage is theft (`CONTEXT.md`: Crime), on a map of `size` tiles.
+ * carriage is theft (`CONTEXT.md`: Crime), on a map of `size` tiles, and taking from a caravan's
+ * carriage robs it (`robCaravan`).
  */
 export function resolveCarrying(world: WorldState, actions: CarryAction[], size = MAP_SIZE): void {
+  const robbed = new Set<string>()
   for (const a of actions) {
     const r = world.residents.find((x) => x.id === a.residentId)
     if (!r) continue
-    if (a.kind === 'take') take(world, r, a, size)
+    if (a.kind === 'take') take(world, r, a, size, robbed)
     else put(world, r, a, size)
     if (r.order?.kind === 'pickUp' || r.order?.kind === 'drop') r.order = null
   }
 }
 
-function take(world: WorldState, r: Resident, a: CarryAction, size: number): void {
+function take(
+  world: WorldState,
+  r: Resident,
+  a: CarryAction,
+  size: number,
+  robbed: Set<string>,
+): void {
   const source =
     a.spot.kind === 'ground' ? pileAt(world, r.x, r.y)?.goods : spotStock(world, r, a.spot)
   if (!source) return
@@ -197,6 +206,9 @@ function take(world: WorldState, r: Resident, a: CarryAction, size: number): voi
   const sold = a.spot.kind === 'storage' && collectsFrom(world, r, a.spot.storageId)
   if (victimOrg !== null && !sold && Object.keys(taken).length > 0) {
     commitCrime(world, size, 'theft', r, { victimOrg, goods: taken })
+  }
+  if (a.spot.kind === 'carriage' && Object.keys(taken).length > 0) {
+    robCaravan(world, r, a.spot.carriageId, robbed)
   }
 }
 

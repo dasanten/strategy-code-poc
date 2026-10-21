@@ -151,7 +151,11 @@ The shared language of the game. Domain terms only — no implementation details
   warehouse) and unloads them into the storage of a city the recipient names. Its fee is clearly
   higher than a delivery's.
 - **Guaranteed carriage:** when a caravan is robbed, the Trade Organization sends the delivery or
-  transfer again out of its own stock. That is part of why its prices and fees are high.
+  transfer again out of its own stock. That is part of why its prices and fees are high. A
+  caravan is robbed when anyone not of the Trade Organization takes goods off its carriage; what
+  was taken of a delivery goes again with the next caravan, and coins taken from a caravan on a
+  pick-up are fetched again, so the seller is paid in full. Each route counts how often it was
+  robbed.
 - **Self-interest:** the Trade Organization defends only itself and whoever hires it. It is not a
   world police. It punishes anyone who steals from it, whoever they are.
 - **Admin directive:** an admin orders the Trade Organization to weaken a Player or

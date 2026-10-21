@@ -43,9 +43,12 @@ export function buildingOrganization(world: WorldState, b: Building): string | n
   return city ? cityOrganization(city) : null
 }
 
-/** The Organization a carriage belongs to: its realm; null for one of none. */
+/**
+ * The Organization a carriage belongs to: its realm, or for one of no realm its city (a caravan's
+ * is the Trade Org HQ's); null for one of neither.
+ */
 export function carriageOrganization(k: Carriage): string | null {
-  return k.realmId
+  return k.realmId ?? k.cityId
 }
 
 /** An Organization's name for the log: a realm by its Leader's name, a city by its own. */
