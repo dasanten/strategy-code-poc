@@ -772,6 +772,44 @@ export const STANDING_CONTRACT_BROKEN_LOSS = 20
 export const STANDING_DRIFT_PER_DAY = 1
 
 /**
+ * Below this standing toward an Organization the Trade Organization refuses to trade with it
+ * (`CONTEXT.md`: Trade Org reaction): no buying or selling at its warehouses, no hiring its
+ * soldiers, no hiring theirs. Any known crime against it gets there; a theft is forgiven in about
+ * five game days.
+ */
+export const TRADE_ORG_REFUSES_TRADE_BELOW = -5
+
+/**
+ * Below this standing toward an Organization the Trade Organization sends its army to punish it
+ * for the crimes against it it knows of (`CONTEXT.md`: Trade Org reaction). Lower than refusing
+ * trade, and still above what a single theft costs, since it punishes anyone who steals from it
+ * (`CONTEXT.md`: Self-interest).
+ */
+export const TRADE_ORG_PUNISHES_BELOW = -8
+
+/**
+ * What a crime costs the Trade Organization in Coins, besides stolen goods, which are worth their
+ * warehouse base price (`WAREHOUSE_BASE_PRICE`): a resident wounded, one killed (worth as much as
+ * a resident in a city's price, `CITY_PRICE_PER_RESIDENT`), or a building torn down.
+ */
+export const TRADE_ORG_LOSS: Record<Exclude<CrimeKind, 'theft'>, number> = {
+  attack: 50,
+  killing: 200,
+  tearDown: 150,
+}
+
+/**
+ * How the Trade Organization's army punishes (`CONTEXT.md`: Trade Org reaction): it takes back
+ * `times` what it lost, sends at most `soldiers` of its spare soldiers, and gives up and goes
+ * home after `giveUpDays` game days out if it can't get it all.
+ */
+export const TRADE_ORG_PUNISH = {
+  times: 2,
+  soldiers: 8,
+  giveUpDays: 5,
+}
+
+/**
  * Materials each kind of building needs before its construction site can become the building
  * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
  * the lumber camp's wood builds the quarry, wood and stone build the mine and the smelter, and

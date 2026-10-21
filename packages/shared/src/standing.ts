@@ -1,5 +1,5 @@
 import { realmName } from './alliance.js'
-import { STANDING_RANGE } from './balance.js'
+import { STANDING_RANGE, TRADE_ORG_REFUSES_TRADE_BELOW } from './balance.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
 import type { WorldState } from './world.js'
 
@@ -78,4 +78,12 @@ export function standingsFor(
     views.push({ org, name: organizationLabel(world, org), is, theirs, yours })
   }
   return views.sort((a, b) => a.theirs - b.theirs || a.name.localeCompare(b.name))
+}
+
+/**
+ * Whether the Trade Organization refuses to trade with an Organization (`CONTEXT.md`: Trade Org
+ * reaction): it holds it below `TRADE_ORG_REFUSES_TRADE_BELOW`.
+ */
+export function tradeOrgRefuses(world: Pick<WorldState, 'standings' | 'cities'>, org: string) {
+  return standingOf(world, TRADE_ORG, org) < TRADE_ORG_REFUSES_TRADE_BELOW
 }

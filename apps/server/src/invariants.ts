@@ -66,10 +66,11 @@ import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
 import { standingsSound } from './standing.js'
 import { buyOrdersDone } from './buying.js'
-import { tradeOrdersDone, tradesKeepGoods } from './trading.js'
+import { refusedTradeNothing, tradeOrdersDone, tradesKeepGoods } from './trading.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound } from './caravans.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
+import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
 
 /**
@@ -1345,6 +1346,7 @@ export const worldInvariants: Invariant[] = [
   buyOrdersDone,
   tradeOrdersDone,
   tradesKeepGoods,
+  refusedTradeNothing,
   supplyLinesSound,
   crimesSound,
   standingsSound,
@@ -1354,6 +1356,7 @@ export const worldInvariants: Invariant[] = [
   tradeOrgSound,
   caravansSound,
   tradeOrgArmySound,
+  punishmentsSound,
   hqRingsSound,
   roadLineOrdersSound,
 ]

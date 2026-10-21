@@ -15,6 +15,7 @@ import {
 } from './balance.js'
 import { townHallOf } from './city.js'
 import { KEEPS_GOODS } from './building.js'
+import { tradeOrgRefuses } from './standing.js'
 import {
   GOODS,
   type Building,
@@ -227,7 +228,8 @@ export function quoteTrade(
 
 /**
  * Why a resident can't trade at a warehouse now, or undefined when they can (`CONTEXT.md`:
- * Trading with the Trade Organization): grown up, on a Trade Org warehouse's tile that prices the
+ * Trading with the Trade Organization): `realmId` is not refused (`CONTEXT.md`: Trade Org
+ * reaction), and the resident is grown up, on a Trade Org warehouse's tile that prices the
  * good, `units` whole and positive, with some of the good to sell or coins to buy, in their hands
  * or on `carriageId`, a carriage on their tile that `realmId` commands.
  */
@@ -240,6 +242,7 @@ export function tradeProblem(
   units: unknown,
   carriageId: unknown,
 ): string | undefined {
+  if (tradeOrgRefuses(world, realmId)) return 'the Trade Organization won’t trade with you'
   if (!canWork(resident, world.tick)) return 'children can’t trade'
   const warehouse = tradingWarehouseAt(world, resident.x, resident.y)
   if (!warehouse) return 'not on a Trade Org warehouse'

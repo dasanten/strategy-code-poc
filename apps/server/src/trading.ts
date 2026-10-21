@@ -9,6 +9,7 @@ import {
   quoteTrade,
   tradeCoinWarehouse,
   tradeProblem,
+  tradeOrgRefuses,
   tradingWarehouseAt,
   type Good,
   type OrderRequest,
@@ -68,6 +69,9 @@ export const sell = tradeOrder('sell')
 /** One trade carried out this tick, with the goods and coins of everyone in it before and after. */
 interface TradeRecord {
   residentId: string
+  /** The realm that traded, if any, and whether the Trade Organization refused it as it traded. */
+  realm: string | null
+  refused: boolean
   before: Stock
   after: Stock
 }
@@ -101,7 +105,8 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * their hands or carriage and the warehouse at its prices, cut down to what can be traded and
  * what fits (`quoteTrade`). At the HQ the coins come from and go into its coin warehouse. The
  * coins raise standing both ways between the realm and the Trade Organization (`CONTEXT.md`:
- * Standing). Either way the order is done, with a line in the realm log. Returns how many trades moved anything.
+ * Standing). A realm the Trade Organization refuses (`CONTEXT.md`: Trade Org reaction) trades
+ * nothing. Either way the order is done, with a line in the realm log. Returns how many trades moved anything.
  */
 export function resolveTrades(world: WorldState): number {
   const records: TradeRecord[] = []
@@ -115,6 +120,8 @@ export function resolveTrades(world: WorldState): number {
     const coinWarehouse = warehouse && tradeCoinWarehouse(world, warehouse)
     if (!warehouse || !coinWarehouse) continue
     const realm = commanderOf(world, r)
+    // The Trade Organization may have come to refuse the realm since the order was given.
+    if (realm !== null && tradeOrgRefuses(world, realm)) continue
     const carriage =
       o.carriageId === null ? undefined : world.carriages.find((k) => k.id === o.carriageId)
     if (o.carriageId !== null) {
@@ -131,7 +138,13 @@ export function resolveTrades(world: WorldState): number {
     const coinsFrom = o.side === 'buy' ? holder.stock : coinWarehouse.stock
     const coinsTo = o.side === 'buy' ? coinWarehouse.stock : holder.stock
     move(coinsFrom, coinsTo, 'coins', coins)
-    records.push({ residentId: r.id, before, after: total([...new Set(parties)]) })
+    records.push({
+      residentId: r.id,
+      realm,
+      refused: realm !== null && tradeOrgRefuses(world, realm),
+      before,
+      after: total([...new Set(parties)]),
+    })
     if (units > 0) traded++
     if (realm !== null && coins > 0) {
       raiseStandingBothWays(world, realm, TRADE_ORG, coins / STANDING_TRADE_COINS_PER_POINT)
@@ -190,4 +203,22 @@ export const tradeOrdersDone: Invariant = {
 /** Test hook: the trades of the latest `resolveTrades`, so a test can tamper with one. */
 export function tradesOf(world: WorldState): TradeRecord[] {
   return ledger.get(world) ?? []
+}
+
+/**
+ * The Trade Organization trades with nobody it refuses (`CONTEXT.md`: Trade Org reaction): no
+ * trade of the latest tick was by a realm it held below `TRADE_ORG_REFUSES_TRADE_BELOW` as it
+ * traded.
+ */
+export const refusedTradeNothing: Invariant = {
+  name: 'refused-trade-nothing',
+  check(world) {
+    return (ledger.get(world) ?? [])
+      .filter((t) => t.refused)
+      .map((t) => ({
+        invariant: this.name,
+        message: `${t.residentId} of ${t.realm} traded with the Trade Organization, which refuses it`,
+        entityIds: [t.residentId],
+      }))
+  },
 }
