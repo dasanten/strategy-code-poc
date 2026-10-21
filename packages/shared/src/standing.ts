@@ -5,6 +5,7 @@ import {
   STANDING_RANGE,
   TRADE_ORG_REFUSES_TRADE_BELOW,
 } from './balance.js'
+import { directiveAgainst } from './directive.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
 import { TICKS_PER_GAME_DAY, type City, type WorldState } from './world.js'
 
@@ -98,8 +99,15 @@ export function standingsFor(
 
 /**
  * Whether the Trade Organization refuses to trade with an Organization (`CONTEXT.md`: Trade Org
- * reaction): it holds it below `TRADE_ORG_REFUSES_TRADE_BELOW`.
+ * reaction): it holds it below `TRADE_ORG_REFUSES_TRADE_BELOW`, or an admin directive has it treat
+ * the Organization as one to punish (`CONTEXT.md`: Admin directive).
  */
-export function tradeOrgRefuses(world: Pick<WorldState, 'standings' | 'cities'>, org: string) {
-  return standingOf(world, TRADE_ORG, org) < TRADE_ORG_REFUSES_TRADE_BELOW
+export function tradeOrgRefuses(
+  world: Pick<WorldState, 'standings' | 'cities' | 'directives' | 'alliances'>,
+  org: string,
+) {
+  return (
+    standingOf(world, TRADE_ORG, org) < TRADE_ORG_REFUSES_TRADE_BELOW ||
+    (standingOrganization(world, org) !== TRADE_ORG && directiveAgainst(world, org) !== undefined)
+  )
 }

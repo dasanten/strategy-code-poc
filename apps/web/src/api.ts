@@ -1,7 +1,10 @@
 import type {
   Account,
+  AdminDirectiveView,
+  AdminDirectives,
   ApiError,
   CreateScriptRequest,
+  GiveDirectiveRequest,
   InviteCreated,
   LoginRequest,
   ResetPasswordRequest,
@@ -48,6 +51,11 @@ export const api = {
   logout: () => call<void>('POST', '/api/logout'),
   createInvite: () => call<InviteCreated>('POST', '/api/admin/invites'),
   resetPassword: (req: ResetPasswordRequest) => call<void>('POST', '/api/admin/password', req),
+  // Admin directives (`CONTEXT.md`: Admin directive).
+  directives: () => call<AdminDirectives>('GET', '/api/admin/directives'),
+  giveDirective: (req: GiveDirectiveRequest) =>
+    call<AdminDirectiveView>('POST', '/api/admin/directives', req),
+  liftDirective: (id: string) => call<void>('DELETE', `/api/admin/directives/${id}`),
   // The script library: saving keeps every version; one without syntax errors becomes active.
   scripts: () => call<ScriptSummary[]>('GET', '/api/scripts'),
   script: (id: number) => call<ScriptDetail>('GET', `/api/scripts/${id}`),

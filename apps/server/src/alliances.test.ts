@@ -291,6 +291,7 @@ describe('alliances', () => {
       deliveries: [],
       standings: [],
       joinRequests: [],
+      directives: [],
     })
     expect(diplomacyFor(world, realm(ash), [])).toEqual({
       alliance: null,
@@ -300,6 +301,7 @@ describe('alliances', () => {
       deliveries: [],
       standings: [],
       joinRequests: [],
+      directives: [],
     })
   })
 

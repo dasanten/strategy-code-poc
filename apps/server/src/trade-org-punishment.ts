@@ -1,10 +1,12 @@
 import {
   TICKS_PER_GAME_DAY,
+  DIRECTIVE_PUNISH_WORTH,
   TRADE_ORG,
   TRADE_ORG_LOSS,
   TRADE_ORG_PUNISH,
   TRADE_ORG_PUNISHES_BELOW,
   WAREHOUSE_BASE_PRICE,
+  directiveTargets,
   inCityArea,
   standingOf,
   standingOrganization,
@@ -85,8 +87,8 @@ const toPunish = (world: WorldState, c: Crime) =>
 
 /**
  * One tick of the Trade Organization punishing, on a map of `size` tiles: it sends out new
- * punishments (`sendOut`) and runs those under way. Run after `stepTradeOrgArmy` and before
- * `stepNpcCities`; the HQ leaves the members of a punishment to it.
+ * punishments (`sendOut`, `sendOutForDirectives`) and runs those under way. Run after
+ * `stepTradeOrgArmy` and before `stepNpcCities`; the HQ leaves the members of a punishment to it.
  */
 export function stepPunishments(world: WorldState, size: number): void {
   const hq = tradeOrgHq(world)
@@ -95,6 +97,7 @@ export function stepPunishments(world: WorldState, size: number): void {
     return
   }
   sendOut(world, size)
+  sendOutForDirectives(world, size)
   for (const p of [...world.punishments]) runPunishment(world, hq, p, size)
 }
 
@@ -148,6 +151,57 @@ function sendOut(world: WorldState, size: number): void {
       city: city.name,
       worth,
     })
+  }
+}
+
+/**
+ * For each Organization an admin directive names (`CONTEXT.md`: Admin directive), with none of
+ * the Trade Organization's punishments under way: its army goes to the Organization's city
+ * nearest the HQ, `TRADE_ORG_PUNISH.soldiers` of its spare soldiers at most, to take
+ * `DIRECTIVE_PUNISH_WORTH`, and goes again each time it is back, until the directive is lifted.
+ * With no spare soldier, or no city to go to, it waits.
+ */
+function sendOutForDirectives(world: WorldState, size: number): void {
+  const hq = tradeOrgHq(world)
+  const hqHall = hq && townHallOf(world, hq)
+  if (!hqHall) return
+  for (const d of world.directives) {
+    for (const org of directiveTargets(world, d)) {
+      if (world.punishments.some((p) => p.culpritOrg === org)) continue
+      if (standingOrganization(world, org) === TRADE_ORG) continue
+      const halls = world.cities.flatMap((c) => {
+        const hall = !c.tradeOrg && cityOrganization(c) === org && townHallOf(world, c)
+        return hall ? [{ c, hall }] : []
+      })
+      if (halls.length === 0) continue
+      const city = halls.reduce((a, b) =>
+        wrapDistance(size, hqHall, b.hall) < wrapDistance(size, hqHall, a.hall) ? b : a,
+      ).c
+      const busy = new Set(world.punishments.flatMap((p) => p.members.map((m) => m.residentId)))
+      const soldiers = spareSoldiers(world)
+        .filter((r) => !busy.has(r.id))
+        .slice(0, TRADE_ORG_PUNISH.soldiers)
+      if (soldiers.length === 0) return
+      world.punishments.push({
+        id: newId(world, 'punishment'),
+        culpritOrg: org,
+        cityId: city.id,
+        worth: DIRECTIVE_PUNISH_WORTH,
+        members: soldiers.map((r) => ({ residentId: r.id, own: { ...r.carried } })),
+        heading: 'out',
+        took: 0,
+        startedAt: world.tick,
+        directiveId: d.id,
+      })
+      recordEvent(world, org, {
+        kind: 'punished',
+        what: 'coming',
+        cityId: city.id,
+        city: city.name,
+        worth: DIRECTIVE_PUNISH_WORTH,
+        directive: d.reason,
+      })
+    }
   }
 }
 
@@ -205,8 +259,9 @@ function headFor(r: Resident, to: { x: number; y: number }): void {
 /**
  * One tick of a punishment (`CONTEXT.md`: Trade Org reaction). Out, each member goes after anyone
  * attacking one of them, otherwise to the city's nearest storage holding anything and picks up
- * what is still to take there. It heads home once it has taken its worth, when the city has
- * nothing left, when the city is no longer the culprit's, or after `TRADE_ORG_PUNISH.giveUpDays`.
+ * what is still to take there. It heads home once it has taken its worth, when the admin directive
+ * it was sent for is lifted, when the city has nothing left, when the city is no longer the
+ * culprit's, or after `TRADE_ORG_PUNISH.giveUpDays`.
  * Home, each member brings Coins they took to the HQ's coin warehouse and other goods to its goods
  * warehouse, then goes home; once every living member is home with nothing taken, or none is left,
  * it is over and the culprit hears what it took: what it carried as it headed home.
@@ -217,10 +272,13 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
   const took = tookSoFar(world, p)
   const storages = city ? storagesToTake(world, city) : []
   const giveUp = world.tick - p.startedAt >= TRADE_ORG_PUNISH.giveUpDays * TICKS_PER_GAME_DAY
+  const lifted =
+    p.directiveId !== undefined && !world.directives.some((d) => d.id === p.directiveId)
   if (p.heading === 'out') p.took = Math.min(took, p.worth)
   if (
     p.heading === 'out' &&
     (took >= p.worth ||
+      lifted ||
       !city ||
       city.tradeOrg ||
       cityOrganization(city) !== p.culpritOrg ||

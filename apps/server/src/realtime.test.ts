@@ -266,6 +266,7 @@ describe('realtime', () => {
       deliveries: [],
       standings: [],
       joinRequests: [],
+      directives: [],
     })
     socket.send(
       JSON.stringify({

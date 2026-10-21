@@ -4,6 +4,7 @@ import {
   NPC_ALLIANCE_LEAVE_STANDING,
 } from './balance.js'
 import { contractOf, contractsFor, type ContractView } from './contract.js'
+import { directivesFor, type DirectiveView } from './directive.js'
 import { joinRequestsFor, type JoinRequestView } from './persuasion.js'
 import { organizationLabel, standingOf, standingsFor, type StandingView } from './standing.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
@@ -239,6 +240,11 @@ export interface Diplomacy {
   standings: StandingView[]
   /** NPC cities asking the realm to join it (`CONTEXT.md`: Persuading a city). */
   joinRequests: JoinRequestView[]
+  /**
+   * Admin directives in force (`CONTEXT.md`: Admin directive): their targets and reasons, never
+   * who gave them.
+   */
+  directives: DirectiveView[]
 }
 
 /**
@@ -258,6 +264,7 @@ export function diplomacyFor(
     | 'standings'
     | 'cities'
     | 'joinRequests'
+    | 'directives'
   >,
   realmId: string,
   seenRealms: Iterable<string>,
@@ -303,5 +310,6 @@ export function diplomacyFor(
     deliveries: deliveriesFor(world, realmId),
     standings: standingsFor(world, realmId),
     joinRequests: joinRequestsFor(world, realmId),
+    directives: directivesFor(world, (org) => organizationLabel(world, org)),
   }
 }

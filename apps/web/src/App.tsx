@@ -322,6 +322,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             <StandingPanel
               standings={world.diplomacy.standings}
               joinRequests={world.diplomacy.joinRequests}
+              directives={world.diplomacy.directives}
               sendOrder={sendOrder}
             />
           )}

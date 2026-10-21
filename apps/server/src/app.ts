@@ -4,7 +4,15 @@ import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify'
 import cookie from '@fastify/cookie'
 import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
-import { SESSION_COOKIE, type Account, type ApiError, type InviteCreated } from '@csp/shared'
+import { eq } from 'drizzle-orm'
+import {
+  SESSION_COOKIE,
+  type Account,
+  type AdminDirectives,
+  type ApiError,
+  type InviteCreated,
+  type WorldState,
+} from '@csp/shared'
 import { LANGUAGE_VERSION } from '@csp/lang'
 import {
   AuthError,
@@ -18,7 +26,13 @@ import {
   signUp,
   type SessionUser,
 } from './auth.js'
-import type { Db } from './db/index.js'
+import { schema, type Db } from './db/index.js'
+import {
+  adminDirectives,
+  directiveTargetChoices,
+  giveDirective,
+  liftDirective,
+} from './directives.js'
 import type { ExploredTerrain } from './explored.js'
 import type { Logger } from './log.js'
 import {
@@ -44,6 +58,8 @@ export interface AppOptions {
   explored?: ExploredTerrain
   /** Login and sign-up attempts allowed per IP and minute. */
   authRateLimit?: number
+  /** The running world, for admin directives. Without it there is no directive API. */
+  world?: WorldState
 }
 
 declare module 'fastify' {
@@ -188,7 +204,7 @@ export async function buildApp(opts: AppOptions) {
     })
   })
 
-  // Admin routes: invite codes and password resets.
+  // Admin routes: invite codes, password resets and admin directives.
   app.register(async (admin) => {
     admin.addHook('preHandler', async (req, reply) => {
       if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
@@ -201,6 +217,39 @@ export async function buildApp(opts: AppOptions) {
     admin.post('/api/admin/password', async (req, reply) => {
       const b = body(req)
       await resetPassword(db, b.name, b.password)
+      return reply.code(204).send()
+    })
+
+    // Admin directives (`CONTEXT.md`: Admin directive), given and lifted between ticks.
+    const { world } = opts
+    if (!world) return
+    const accountOf = (userId: number) =>
+      db
+        .select({ name: schema.users.name })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .get()?.name
+    admin.get('/api/admin/directives', async () => {
+      const shown: AdminDirectives = {
+        directives: adminDirectives(world),
+        targets: directiveTargetChoices(world, accountOf),
+      }
+      return shown
+    })
+    admin.post('/api/admin/directives', async (req, reply) => {
+      const b = body(req)
+      const given = giveDirective(
+        world,
+        { target: b.target, withAlliance: b.withAlliance, reason: b.reason },
+        req.user!.name,
+      )
+      if (typeof given === 'string') return fail(reply, 'invalid-input', given)
+      return reply.code(201).send(adminDirectives(world).find((d) => d.id === given.id))
+    })
+    admin.delete<{ Params: { id: string } }>('/api/admin/directives/:id', async (req, reply) => {
+      if (!liftDirective(world, req.params.id)) {
+        return fail(reply, 'not-found', 'No such directive.')
+      }
       return reply.code(204).send()
     })
   })
