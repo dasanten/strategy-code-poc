@@ -562,6 +562,15 @@ describe('world saves', () => {
     expect(migrateWorld(structuredClone(v24), 24, { terrain: land }, migrations, 25)).toEqual(v25)
   })
 
+  it('starts everyone neutral toward everyone (migration 25 → 26)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v25: Partial<WorldState> = structuredClone(world)
+    delete v25.standings
+    const v26 = migrateWorld(structuredClone(v25), 25, { terrain: land }, migrations, 26)
+    expect(v26).toEqual({ ...v25, standings: [] })
+    expect(checkInvariants(v26, land)).toEqual([])
+  })
+
   it('gives every alliance an empty army (migration 22 → 23)', () => {
     const v22 = {
       tick: 5,

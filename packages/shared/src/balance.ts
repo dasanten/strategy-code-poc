@@ -4,6 +4,7 @@ import {
   ageInYears,
   effective,
   type BuildingKind,
+  type CrimeKind,
   type Good,
   type Protection,
   type ResourceKind,
@@ -731,6 +732,38 @@ export const REALM_LOG_LENGTH = 100
  * news of it any more (`CONTEXT.md`: Crime). A week: long enough to count as "recent".
  */
 export const CRIME_MEMORY_DAYS = 7
+
+/** How far standing goes each way from neutral (`CONTEXT.md`: Standing): -100 to +100. */
+export const STANDING_RANGE = 100
+
+/**
+ * What a crime costs in the victim's standing toward the culprit's Organization once the victim
+ * knows of it (`CONTEXT.md`: Standing). Killing is the worst; a theft is forgiven soonest.
+ */
+export const CRIME_STANDING_LOSS: Record<CrimeKind, number> = {
+  theft: 10,
+  attack: 15,
+  tearDown: 20,
+  killing: 30,
+}
+
+/**
+ * Coins of trade that raise standing by one point, both ways between the trader's realm and the
+ * Trade Organization (`CONTEXT.md`: Standing). About two spears' worth.
+ */
+export const STANDING_TRADE_COINS_PER_POINT = 50
+
+/** Standing each paid game week of a mercenary contract raises, both ways between its sides. */
+export const STANDING_PER_PAID_WEEK = 2
+
+/** What a contract broken by an unpaid week costs in the lender's standing toward the hirer. */
+export const STANDING_CONTRACT_BROKEN_LOSS = 20
+
+/**
+ * Points standing drifts back toward neutral each game day (`CONTEXT.md`: Standing): a killing is
+ * forgotten in about 30 game days, a little over a real day.
+ */
+export const STANDING_DRIFT_PER_DAY = 1
 
 /**
  * Materials each kind of building needs before its construction site can become the building

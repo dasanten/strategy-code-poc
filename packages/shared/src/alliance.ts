@@ -1,4 +1,5 @@
 import { contractOf, contractsFor, type ContractView } from './contract.js'
+import { standingsFor, type StandingView } from './standing.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
 import type { Alliance, AllianceArmyPart, Carriage, Resident, WorldState } from './world.js'
 
@@ -152,6 +153,8 @@ export interface Diplomacy {
   realmsInSight: RealmLabel[]
   /** Mercenary contracts the realm is a side of, offered or in force (`CONTEXT.md`). */
   contracts: ContractView[]
+  /** Standing between the realm and other Organizations (`CONTEXT.md`: Standing), shown only. */
+  standings: StandingView[]
 }
 
 /**
@@ -161,7 +164,14 @@ export interface Diplomacy {
 export function diplomacyFor(
   world: Pick<
     WorldState,
-    'alliances' | 'realms' | 'residents' | 'carriages' | 'contracts' | 'buildings'
+    | 'alliances'
+    | 'realms'
+    | 'residents'
+    | 'carriages'
+    | 'contracts'
+    | 'buildings'
+    | 'standings'
+    | 'cities'
   >,
   realmId: string,
   seenRealms: Iterable<string>,
@@ -198,5 +208,6 @@ export function diplomacyFor(
     invitations,
     realmsInSight,
     contracts: contractsFor(world, realmId),
+    standings: standingsFor(world, realmId),
   }
 }

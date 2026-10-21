@@ -1,4 +1,6 @@
 import {
+  STANDING_TRADE_COINS_PER_POINT,
+  TRADE_ORG,
   commanderOf,
   commands,
   commandsCarriage,
@@ -18,6 +20,7 @@ import {
 import { recordEvent } from './events.js'
 import type { Invariant } from './invariants.js'
 import type { OrderKind } from './orders.js'
+import { raiseStandingBothWays } from './standing.js'
 import { realmOf } from './starting-city.js'
 
 /** The input of a buy or sell order: the resident, the good, how many units, maybe a carriage. */
@@ -96,8 +99,9 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * Carries out buy and sell orders (`CONTEXT.md`: Trading with the Trade Organization). Where the
  * trader still stands on the warehouse (and their carriage too), the goods and coins swap between
  * their hands or carriage and the warehouse at its prices, cut down to what can be traded and
- * what fits (`quoteTrade`). At the HQ the coins come from and go into its coin warehouse. Either
- * way the order is done, with a line in the realm log. Returns how many trades moved anything.
+ * what fits (`quoteTrade`). At the HQ the coins come from and go into its coin warehouse. The
+ * coins raise standing both ways between the realm and the Trade Organization (`CONTEXT.md`:
+ * Standing). Either way the order is done, with a line in the realm log. Returns how many trades moved anything.
  */
 export function resolveTrades(world: WorldState): number {
   const records: TradeRecord[] = []
@@ -129,6 +133,9 @@ export function resolveTrades(world: WorldState): number {
     move(coinsFrom, coinsTo, 'coins', coins)
     records.push({ residentId: r.id, before, after: total([...new Set(parties)]) })
     if (units > 0) traded++
+    if (realm !== null && coins > 0) {
+      raiseStandingBothWays(world, realm, TRADE_ORG, coins / STANDING_TRADE_COINS_PER_POINT)
+    }
     recordEvent(world, realm, {
       kind: 'traded',
       residentId: r.id,
