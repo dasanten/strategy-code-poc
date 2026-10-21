@@ -316,6 +316,7 @@ export type ResidentOrder =
   | PayOrder
   | BuyCityOrder
   | TradeOrder
+  | BuyOffOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -402,6 +403,11 @@ export interface Directive {
   goals: DirectiveGoal[]
   /** Soldiers of the Organizations it names killed since it was given, for `soldiers` goals. */
   soldiersKilled: number
+  /**
+   * The Coins the target can pay at any Trade Org warehouse to buy the directive off, or null when
+   * the admin doesn't allow it (`CONTEXT.md`: Admin directive).
+   */
+  price: number | null
 }
 
 /**
@@ -603,6 +609,17 @@ export interface TradeOrder {
   carriageId: string | null
   cityId?: string
 }
+
+/**
+ * Buying off an admin directive (`CONTEXT.md`: Admin directive): the resident, standing on a
+ * Trade Org warehouse's tile, pays the directive's price from their hands, or the load of
+ * `carriageId` on their tile, into the Trade Organization's coins there. It happens this tick.
+ */
+export interface BuyOffOrder {
+  kind: 'buyOff'
+  directiveId: string
+  carriageId: string | null
+}
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
  * to +`STANDING_RANGE`. An Organization is a realm's id, an NPC city's id, or `TRADE_ORG`
@@ -781,6 +798,19 @@ export type RealmEventWhat =
       took?: number
       /** Sent for an admin directive, with its reason, rather than for crimes. */
       directive?: string
+    }
+  /**
+   * The resident `name` bought off the admin directive with `reason` for `coins` at the Trade Org
+   * warehouse at (`x`, `y`) (`CONTEXT.md`: Admin directive): it no longer holds.
+   */
+  | {
+      kind: 'boughtOff'
+      residentId: string
+      name: string
+      reason: string
+      coins: number
+      x: number
+      y: number
     }
   /**
    * An admin directive naming this realm, given for `reason`, ended because all its goals were

@@ -62,6 +62,10 @@ const SHARED: readonly ScriptBinding[] = [
   list('carriages', 'The carriages the Player sees.'),
   list('piles', 'The piles of goods the Player sees.'),
   list('nodes', 'The resource nodes on terrain the Player has explored.'),
+  list(
+    'directives',
+    'The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).',
+  ),
   {
     name: 'terrainAt',
     is: 'query',
@@ -127,6 +131,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'sell',
     ['good', 'units', 'carriageId?', 'cityId?'],
     'On a Trade Org warehouse, sell up to `units` of a good at its prices from my hands, or from my carriage there. With `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
+  ),
+  action(
+    'buyOff',
+    ['directiveId', 'carriageId?'],
+    'On a Trade Org warehouse, pay the price of an admin directive against my realm with the coins in my hands, or on my carriage there, to end it.',
   ),
   action(
     'roadLine',

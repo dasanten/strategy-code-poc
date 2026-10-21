@@ -1,5 +1,6 @@
 import {
   DIRECTIVE_PUNISH_WORTH,
+  HQ_COIN_WAREHOUSE,
   MAX_DIRECTIVE_GOALS,
   MAX_DIRECTIVE_REASON,
   MAX_DIRECTIVE_SOLDIERS,
@@ -9,8 +10,10 @@ import {
   diplomacyFor,
   directiveAgainst,
   standingOf,
+  townHallOf,
   tradeOrgRefuses,
   TRADE_ORG,
+  type Building,
   type City,
   type Directive,
   type DirectiveGoalRequest,
@@ -20,14 +23,19 @@ import {
 import { describe, expect, it } from 'vitest'
 import {
   adminDirectives,
+  buyOffOrdersDone,
+  buyOffsOf,
+  buyOffsSound,
   directiveTargetChoices,
   directivesSound,
   giveDirective,
   liftDirective,
+  setDirectivePrice,
   stepDirectives,
 } from './directives.js'
 import { dieAll } from './survival.js'
 import { checkInvariants } from './invariants.js'
+import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { addCity } from './test-terrain.js'
 import { foundTradeOrgHq } from './trade-org.js'
@@ -519,6 +527,7 @@ describe('the directives-sound invariant', () => {
       givenAt: 0,
       goals: [],
       soldiersKilled: 0,
+      price: null,
     }
     const broken = (city: City) => [
       { ...base, id: 'd1', target: city.id, reason: 'x' },
@@ -535,7 +544,7 @@ describe('the directives-sound invariant', () => {
 
   it('catches badly formed goals, a partial count, and a directive whose goals are all met', () => {
     const { world } = setup()
-    const base = { withAlliance: false, givenBy: 'Daniel', givenAt: 0, reason: 'x' }
+    const base = { withAlliance: false, givenBy: 'Daniel', givenAt: 0, reason: 'x', price: null }
     world.directives = [
       {
         ...base,
@@ -564,5 +573,227 @@ describe('the directives-sound invariant', () => {
       'directive d1 asks for 120% of its soldiers killed',
       'directive d2 met all its goals but is still in force',
     ])
+  })
+})
+
+describe('buying off an admin directive', () => {
+  const aldo = { userId: 7, account: { name: 'Mara', isAdmin: false } }
+  const bea = { userId: 8, account: { name: 'Ben', isAdmin: false } }
+
+  /** The setup with a directive against r1 that costs `price` to buy off, and the HQ's warehouses. */
+  function priced(price: number | null, withAlliance = false) {
+    const s = setup()
+    const d = giveDirective(
+      s.world,
+      {
+        target: 'r1',
+        withAlliance,
+        reason: 'farms new Players',
+        price,
+        goals: [{ kind: 'soldiers', count: 1000 }],
+      },
+      'Daniel',
+    )
+    if (typeof d === 'string') throw new Error(d)
+    const hall = townHallOf(s.world, s.hq)!
+    const isCoins = (b: Building) =>
+      b.x === hall.x + HQ_COIN_WAREHOUSE.dx && b.y === hall.y + HQ_COIN_WAREHOUSE.dy
+    const warehouses = s.world.buildings.filter((b) => b.kind === 'warehouse')
+    return {
+      ...s,
+      d,
+      coins: warehouses.find(isCoins)!,
+      goods: warehouses.find((b) => b.cityId === s.hq.id && !isCoins(b))!,
+      queue: new OrderQueue(undefined, terrain),
+    }
+  }
+
+  /** Puts a resident on a tile with some coins in their hands. */
+  function standOn(world: WorldState, id: string, at: { x: number; y: number }, coins: number) {
+    const r = world.residents.find((x) => x.id === id)!
+    r.x = at.x
+    r.y = at.y
+    r.carried = coins > 0 ? { coins } : {}
+    return r
+  }
+
+  /** The buy-off order for the resident `residentId`. */
+  const buyOff = (residentId: string, directiveId: string, carriageId: string | null = null) => ({
+    kind: 'buyOff',
+    residentId,
+    directiveId,
+    carriageId,
+  })
+
+  it('ends the directive once the target pays its price at a warehouse; the coins go into its stock', () => {
+    const { world, walking, d, coins, goods, queue } = priced(300)
+    const a1 = standOn(world, 'a1', goods, 350)
+    expect(tradeOrgRefuses(world, 'r1')).toBe(true)
+    const before = coins.stock!.coins ?? 0
+    expect(queue.receive(world, aldo, 'q1', buyOff('a1', d.id))).toEqual({
+      type: 'ack',
+      requestId: 'q1',
+    })
+    queue.applyAll(world)
+    stepWorld(world, terrain, walking)
+    expect(world.directives).toEqual([])
+    expect(a1.carried.coins).toBe(50)
+    expect(coins.stock!.coins).toBe(before + 300)
+    expect(goods.stock?.coins).toBeUndefined()
+    expect(a1.order).toBeNull()
+    expect(tradeOrgRefuses(world, 'r1')).toBe(false)
+    expect(world.events.filter((e) => e.kind === 'boughtOff')).toEqual([
+      expect.objectContaining({ name: 'Aldo', reason: 'farms new Players', coins: 300 }),
+    ])
+    expect(buyOffsOf(world)).toHaveLength(1)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('takes the price from a carriage, and at the coin warehouse itself', () => {
+    const { world, walking, d, coins, queue } = priced(300)
+    standOn(world, 'a1', coins, 0)
+    world.carriages.push({
+      id: 'k1',
+      realmId: 'r1',
+      cityId: null,
+      x: coins.x,
+      y: coins.y,
+      horseId: null,
+      load: { coins: 300 },
+    } as WorldState['carriages'][number])
+    const before = coins.stock!.coins ?? 0
+    expect(queue.receive(world, aldo, 'q1', buyOff('a1', d.id, 'k1')).type).toBe('ack')
+    queue.applyAll(world)
+    stepWorld(world, terrain, walking)
+    expect(world.directives).toEqual([])
+    expect(world.carriages.find((k) => k.id === 'k1')!.load.coins).toBeUndefined()
+    expect(coins.stock!.coins).toBe(before + 300)
+  })
+
+  it('calls the army sent for it home', () => {
+    const { world, walking, d, goods, queue } = priced(300)
+    stepPunishments(world, terrain.size)
+    expect(world.punishments[0]).toMatchObject({ culpritOrg: 'r1', heading: 'out' })
+    standOn(world, 'a1', goods, 300)
+    queue.receive(world, aldo, 'q1', buyOff('a1', d.id))
+    queue.applyAll(world)
+    stepWorld(world, terrain, walking)
+    stepPunishments(world, terrain.size)
+    expect(world.directives).toEqual([])
+    expect(world.punishments[0]!.heading).toBe('home')
+  })
+
+  it('is refused unless the admin allows it, to the target, with the whole price, on a warehouse', () => {
+    const { world, d, goods } = priced(300, true)
+    standOn(world, 'a1', goods, 299)
+    standOn(world, 'b1', goods, 1000)
+    const ask = (sender: typeof aldo, residentId: string, directiveId = d.id) =>
+      new OrderQueue(undefined, terrain).receive(
+        world,
+        sender,
+        'q',
+        buyOff(residentId, directiveId),
+      )
+    expect(ask(aldo, 'a1')).toMatchObject({ reason: 'it costs 300 coins' })
+    // Bea's realm is named only through its alliance: the target pays, not its allies.
+    expect(ask(bea, 'b1')).toMatchObject({ reason: 'no directive names your realm by that id' })
+    expect(ask(aldo, 'a1', 'nope')).toMatchObject({
+      reason: 'no directive names your realm by that id',
+    })
+    standOn(world, 'a1', { x: goods.x + 30, y: goods.y + 30 }, 300)
+    expect(ask(aldo, 'a1')).toMatchObject({ reason: 'not on a Trade Org warehouse' })
+    standOn(world, 'a1', goods, 300)
+    expect(ask(aldo, 'a1').type).toBe('ack')
+    expect(setDirectivePrice(world, d.id, null)).toMatchObject({ price: null })
+    expect(ask(aldo, 'a1')).toMatchObject({ reason: 'this directive can’t be bought off' })
+  })
+
+  it('does nothing when the price rose since the order', () => {
+    const { world, walking, d, goods, queue } = priced(300)
+    const a1 = standOn(world, 'a1', goods, 300)
+    queue.receive(world, aldo, 'q1', buyOff('a1', d.id))
+    setDirectivePrice(world, d.id, 400)
+    queue.applyAll(world)
+    stepWorld(world, terrain, walking)
+    expect(world.directives).toHaveLength(1)
+    expect(a1.carried.coins).toBe(300)
+    expect(a1.order).toBeNull()
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('lets admins set whole Coins as the price, or none, and Players see it', () => {
+    const { world, d } = priced(null)
+    expect(d.price).toBeNull()
+    for (const bad of [0, -5, 2.5, '100']) {
+      expect(setDirectivePrice(world, d.id, bad)).toBe(
+        'A price to buy it off is a whole number of Coins, at least one, or none.',
+      )
+    }
+    expect(setDirectivePrice(world, 'nope', 100)).toBe('No such directive.')
+    expect(setDirectivePrice(world, d.id, 500)).toMatchObject({ price: 500 })
+    const other = giveDirective(
+      world,
+      {
+        target: 'n1',
+        withAlliance: false,
+        reason: 'x',
+        price: 0,
+        goals: [{ kind: 'soldiers', count: 1000 }],
+      },
+      'Daniel',
+    )
+    expect(other).toBe('A price to buy it off is a whole number of Coins, at least one, or none.')
+    expect(diplomacyFor(world, 'r2', []).directives).toEqual([
+      expect.objectContaining({ target: 'r1', price: 500 }),
+    ])
+  })
+})
+
+describe('the buy-off invariants', () => {
+  it('catch a price that is not whole Coins', () => {
+    const { world } = setup()
+    const d = give(world, 'r1')
+    d.price = 2.5
+    expect(directivesSound.check(world, terrain).map((v) => v.message)).toEqual([
+      `directive ${d.id} asks 2.5 coins to buy it off`,
+    ])
+  })
+
+  it('catch a buy-off that made or lost coins, or left its directive in force', () => {
+    const { world, walking, hq } = setup()
+    const d = giveDirective(
+      world,
+      {
+        target: 'r1',
+        withAlliance: false,
+        reason: 'x',
+        price: 100,
+        goals: [{ kind: 'soldiers', count: 1000 }],
+      },
+      'Daniel',
+    ) as Directive
+    const hall = townHallOf(world, hq)!
+    const a1 = world.residents.find((r) => r.id === 'a1')!
+    a1.x = hall.x + HQ_COIN_WAREHOUSE.dx
+    a1.y = hall.y + HQ_COIN_WAREHOUSE.dy
+    a1.carried = { coins: 100 }
+    a1.order = { kind: 'buyOff', directiveId: d.id, carriageId: null }
+    stepWorld(world, terrain, walking)
+    expect(world.directives).toEqual([])
+    expect(buyOffsSound.check(world, terrain)).toEqual([])
+    const record = buyOffsOf(world)[0]!
+    record.after += 1
+    world.directives.push(d)
+    expect(buyOffsSound.check(world, terrain).map((v) => v.message)).toEqual([
+      `a buy-off by a1 turned ${record.before} coins into ${record.before + 1}`,
+      `directive ${d.id} still holds after it was bought off`,
+    ])
+  })
+
+  it('catch a buy-off order that outlasts its tick', () => {
+    const { world } = setup()
+    const a1 = world.residents.find((r) => r.id === 'a1')!
+    a1.order = { kind: 'buyOff', directiveId: 'd', carriageId: null }
+    expect(buyOffOrdersDone.check(world, terrain)).toHaveLength(1)
   })
 })
