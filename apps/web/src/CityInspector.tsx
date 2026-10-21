@@ -107,6 +107,7 @@ export function CityInspector({
                   />
                 </div>
               ))}
+            {openId === v.id && <Reaction city={cities.find((c) => c.id === v.id)!} />}
             {openId === v.id && (
               <Buying
                 buy={describeBuying(
@@ -127,6 +128,20 @@ export function CityInspector({
         ))}
       </ul>
     </section>
+  )
+}
+
+/**
+ * What an NPC city that holds the Player in low standing won't do (`CONTEXT.md`: NPC city
+ * reaction): let their residents through its gates, trade, hire out, or sell itself.
+ */
+function Reaction({ city }: { city: SeenCity }) {
+  if (!city.refuses && !city.wontSell) return null
+  return (
+    <div className="city-reaction" aria-label="Reaction">
+      {city.refuses && <p>It holds you in low standing: its gates are shut to your residents.</p>}
+      {city.wontSell && <p>It won’t sell itself to you.</p>}
+    </div>
   )
 }
 
