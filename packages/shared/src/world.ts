@@ -367,6 +367,8 @@ export interface WorldState {
   caravans: Caravan[]
   /** Deliveries and pick-ups ordered and not yet done, oldest first (`CONTEXT.md`: Delivery). */
   deliveries: Delivery[]
+  /** The Trade Org army's punishments under way (`CONTEXT.md`: Trade Org reaction). */
+  punishments: Punishment[]
 }
 
 /**
@@ -561,6 +563,30 @@ export interface Standing {
 export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
 
 /**
+ * The Trade Org army out to punish an Organization for crimes against the Trade Organization
+ * (`CONTEXT.md`: Trade Org reaction): its soldiers go to the culprit's city nearest the crime,
+ * take back `worth` Coins' worth from its storages and carry it home. Plain data (ADR 0002).
+ */
+export interface Punishment {
+  id: string
+  /** The Organization punished: a realm or an NPC city. */
+  culpritOrg: string
+  /** The city it goes to. */
+  cityId: string
+  /** What it comes to take back, in Coins' worth: twice what it lost. */
+  worth: number
+  /**
+   * Its soldiers, each with what they carried as they set out: anything they carry above that is
+   * what they took.
+   */
+  members: { residentId: string; own: Stock }[]
+  /** Out to the city while it hasn't got what it came for; home once it has or gives up. */
+  heading: 'out' | 'home'
+  /** The Coins' worth it took, as it stood when it headed home. */
+  took: number
+  startedAt: number
+}
+/**
  * A crime against another Organization (`CONTEXT.md`: Crime, Witness). An Organization is named by
  * its realm's id, or by its city's id for a city of no realm (`organizationOf`). Plain data.
  */
@@ -588,6 +614,8 @@ export interface Crime {
   witnesses: string[]
   /** The Organizations it is known to. */
   knownBy: string[]
+  /** The Trade Organization has sent its army to punish it (`CONTEXT.md`: Trade Org reaction). */
+  punished?: true
 }
 
 /**
@@ -679,6 +707,18 @@ export type RealmEventWhat =
       victim?: string
       goods?: Stock
       building?: BuildingKind
+    }
+  /**
+   * The Trade Organization punishes the realm (`CONTEXT.md`: Trade Org reaction): its army is
+   * `coming` to `city` to take back `worth` Coins' worth, or `left` it having taken `took`.
+   */
+  | {
+      kind: 'punished'
+      what: 'coming' | 'left'
+      cityId: string
+      city: string
+      worth: number
+      took?: number
     }
   /** A resident who carries no weapon was hit and flees home (`CONTEXT.md`: Combat). */
   | { kind: 'fled'; residentId: string; name: string }

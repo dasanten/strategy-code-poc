@@ -96,3 +96,8 @@ export function tradeOrgArmyWanted(
     Math.ceil(TRADE_ORG_ARMY.strongestMultiple * strongestArmed(world)),
   )
 }
+
+/** Everyone in the Trade Org army out to punish someone (`CONTEXT.md`: Trade Org reaction), by id. */
+export function punishers(world: Pick<WorldState, 'punishments'>): Set<string> {
+  return new Set(world.punishments.flatMap((p) => p.members.map((m) => m.residentId)))
+}

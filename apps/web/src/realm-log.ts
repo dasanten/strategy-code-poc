@@ -58,6 +58,16 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'bad',
       }
     }
+    case 'punished':
+      return e.what === 'coming'
+        ? {
+            text: `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`,
+            tone: 'bad',
+          }
+        : {
+            text: `The Trade Organization's army left ${e.city}, taking ${e.took ?? 0} of the ${e.worth} Coins' worth it came for.`,
+            tone: 'warn',
+          }
     case 'fled':
       return { text: `${e.name} was hit and flees home.`, tone: 'warn' }
     case 'cityCaptured': {

@@ -13,7 +13,9 @@ import {
   isArmed,
   realmName,
   townHallOf,
+  punishers,
   tradeOrgHq,
+  tradeOrgRefuses,
   warehouseKeeps,
   wrapDelta,
   wrapDistance,
@@ -58,7 +60,7 @@ export function hqSoldiers(world: WorldState): Resident[] {
  * ones go first.
  */
 export function spareSoldiers(world: WorldState): Resident[] {
-  const named = new Set(world.contracts.flatMap((c) => c.residentIds))
+  const named = new Set([...world.contracts.flatMap((c) => c.residentIds), ...punishers(world)])
   const home = hqSoldiers(world)
     .filter((r) => !named.has(r.id))
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -84,11 +86,13 @@ export function stepTradeOrgArmy(world: WorldState, size: number): void {
 }
 
 /**
- * Why the Trade Organization turns down an offer for its soldiers, if it does: less than its
+ * Why the Trade Organization turns down an offer for its soldiers, if it does: it refuses to trade
+ * with the hirer (`CONTEXT.md`: Trade Org reaction), less than its
  * price per soldier and week, residents or a warehouse no longer its, or soldiers it can't spare
  * (one in another contract, or fewer than its guard left at the HQ).
  */
 function refusal(world: WorldState, c: MercenaryContract): string | undefined {
+  if (tradeOrgRefuses(world, c.hirerId)) return 'standing'
   if (c.pricePerWeek < c.residentIds.length * TRADE_ORG_ARMY.pricePerSoldierWeek) return 'price'
   if (cannotStart(world, c)) return 'changed'
   const busy = new Set(world.contracts.filter((x) => x !== c).flatMap((x) => x.residentIds))
@@ -222,8 +226,9 @@ function guardInnerRing(world: WorldState, hq: City, size: number): void {
     (r) => r.health > 0 && !ofHq(hq, r) && inInnerRingAround(hall, r, size),
   )
   if (outsiders.length === 0) return
+  const away = punishers(world)
   for (const r of hqSoldiers(world)) {
-    if (r.order?.kind === 'attack' || contractOf(world, r.id)) continue
+    if (r.order?.kind === 'attack' || contractOf(world, r.id) || away.has(r.id)) continue
     if (!inCityArea(world, hq, r.x, r.y, size)) continue
     const nearest = outsiders.reduce((a, b) =>
       wrapDistance(size, r, b) < wrapDistance(size, r, a) ? b : a,
@@ -301,7 +306,7 @@ export function soldiersLacking(world: WorldState, hq: City): number {
 /**
  * The Trade Organization hires mercenaries once it has lost too many (`soldiersLacking`): it asks
  * Players' realms for their armed residents nearest the HQ (never a Leader, nor anyone in a
- * contract or an alliance army), the nearest realm first, as many as it lacks, at its own price
+ * contract or an alliance army, nor of a realm it refuses to trade with), the nearest realm first, as many as it lacks, at its own price
  * and length, paid into the lender's storage nearest them. It asks each realm at most once at a
  * time; the Player accepts or declines.
  */
@@ -325,6 +330,7 @@ function hireMercenaries(world: WorldState, hq: City, size: number): void {
         !leaders.has(r.id) &&
         !busy.has(r.id) &&
         !asked.has(r.owner) &&
+        !tradeOrgRefuses(world, r.owner) &&
         !handedOverTo(world, r.id),
     )
     .sort(

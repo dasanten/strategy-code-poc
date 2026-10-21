@@ -616,6 +616,15 @@ describe('world saves', () => {
     expect(checkInvariants(v29, land)).toEqual([])
   })
 
+  it('has no punishment under way (migration 29 → 30)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v29: Partial<WorldState> = structuredClone(world)
+    delete v29.punishments
+    const v30 = migrateWorld(structuredClone(v29), 29, { terrain: land }, migrations, 30)
+    expect(v30).toEqual({ ...v29, punishments: [] })
+    expect(checkInvariants(v30, land)).toEqual([])
+  })
+
   it('gives every alliance an empty army (migration 22 → 23)', () => {
     const v22 = {
       tick: 5,
