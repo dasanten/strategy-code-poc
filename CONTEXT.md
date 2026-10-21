@@ -121,6 +121,18 @@ The shared language of the game. Domain terms only — no implementation details
 - **Warehouse prices:** each warehouse prices every good from its own stock, buying lower than it
   sells. Posts don't share prices, so carrying goods between regions can pay off. Anyone with a
   resident in sight of a warehouse sees its prices.
+- **Trading with an NPC city:** only in person, by a resident (or a carriage) on the tile of an
+  NPC city's storage, exactly like trading at a warehouse: it happens at once, goods and coins
+  move between the trader's hands (or carriage) and the storage, and a trade is cut down to what
+  the trader holds, what the storage holds and what fits. The city keeps a **reserve** of each
+  good: Food for some game days for all its residents, and the materials its next house and some
+  wall need. It sells only its surplus, what its storages hold above the reserve, and buys only
+  goods it is short of, up to the reserve and with the coins in its storage; other goods it
+  doesn't take. Its prices come from its own stock the way warehouse prices do (buying lower
+  than it sells, each unit priced with its stock as it moves), then its standing toward the
+  trader moves them like the city price: the better, the cheaper it sells and the more it pays.
+  Anyone with a resident in sight of the storage sees its prices. A trade raises its standing
+  toward the trader, like trade with the Trade Organization.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse runs low, it tops up to a minimum at the end of
   each game day. This is the one controlled exception to "everything is physical" (see ADR 0003).
@@ -295,6 +307,15 @@ The shared language of the game. Domain terms only — no implementation details
   orders; they always obey (for now). Each week is paid in advance: the hirer's residents put the
   coins into that storage with a pay order, or a Trade Org transfer brings them. A week left
   unpaid breaks the contract and costs standing; at the end, or when it breaks, they walk home.
+- **Hiring from an NPC city:** an NPC city never offers on its own. Like the Trade Org army, a
+  Player asks it for a number of its residents for some game days, paid into its storage. It
+  accepts at once when the price per resident and week is at least its asking price (moved by
+  its standing like its trade prices) and it can spare them, and declines otherwise. It lends
+  only adults it can spare: it keeps its farmers to feed the city and a share of its adults at
+  home to defend it, and lends idle adults first, then workers from its other workplaces. Its
+  lent residents take weapons and armour from its storage along, as far as it has them. Paying
+  and ending go as in any mercenary contract: each week in advance into that storage, an unpaid
+  week breaks it and costs standing, a paid one raises it, and at the end they walk home.
 - **Trade Org army:** a large army of normal residents of the Trade Org HQ, for hire like any
   mercenaries. The HQ builds it itself: it arms its own adults with weapons from its goods
   warehouse until it has its army's size, keeping enough of them at work. Its warehouses refill
@@ -327,8 +348,8 @@ The shared language of the game. Domain terms only — no implementation details
   contracts raise it; it slowly drifts back to neutral. Standing is per organization, so allies
   don't suffer for each other's crimes. A Player sees their standing toward others but it does
   nothing on its own; the game acts on it only for NPC cities and the Trade Organization.
-- **NPC city reaction:** at low standing an NPC city won't trade with you or hire out to you and
-  keeps its gates shut to your residents; the lower it is, the more it asks to be bought, and at
+- **NPC city reaction:** at low standing an NPC city won't trade with you or hire out to you
+  (Trading with an NPC city, Hiring from an NPC city) and keeps its gates shut to your residents; the lower it is, the more it asks to be bought, and at
   very low standing it won't sell at all.
 - **Persuading a city:** an NPC city that holds you in high standing and sees enough respect from
   you (more of your armed residents and walls in its sight than it has soldiers) asks to join

@@ -68,11 +68,17 @@ import { contractsSound } from './contracts.js'
 import { joinRequestsSound } from './persuasion.js'
 import { formerPlayersSound, standingsSound } from './standing.js'
 import { buyOrdersDone, cityPricesSound } from './buying.js'
-import { refusedTradeNothing, tradeOrdersDone, tradesKeepGoods } from './trading.js'
+import {
+  npcTradesKeepReserve,
+  refusedTradeNothing,
+  tradeOrdersDone,
+  tradesKeepGoods,
+} from './trading.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound, routeRobberiesSound } from './caravans.js'
 import { deliveriesSound } from './deliveries.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
+import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
@@ -1357,6 +1363,7 @@ export const worldInvariants: Invariant[] = [
   tradeOrdersDone,
   tradesKeepGoods,
   refusedTradeNothing,
+  npcTradesKeepReserve,
   deliveriesSound,
   supplyLinesSound,
   crimesSound,
@@ -1370,6 +1377,7 @@ export const worldInvariants: Invariant[] = [
   caravansSound,
   routeRobberiesSound,
   tradeOrgArmySound,
+  npcHireSound,
   punishmentsSound,
   directivesSound,
   buyOffsSound,
