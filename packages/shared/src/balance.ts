@@ -772,6 +772,26 @@ export const STANDING_CONTRACT_BROKEN_LOSS = 20
 export const STANDING_DRIFT_PER_DAY = 1
 
 /**
+ * Below this standing toward an Organization an NPC city won't trade with it or hire out to it
+ * and keeps its gates shut to its residents (`CONTEXT.md`: NPC city reaction). A killing known
+ * to it, not a single theft or attack.
+ */
+export const NPC_CITY_REFUSES_STANDING = -25
+
+/**
+ * Below this standing toward a realm an NPC city won't sell itself to it at all (`CONTEXT.md`:
+ * NPC city reaction). Two killings known to it.
+ */
+export const NPC_CITY_WONT_SELL_STANDING = -60
+
+/**
+ * How far standing moves an NPC city's price (`CONTEXT.md`: Buying a city): its price times
+ * 1 - this × standing / `STANDING_RANGE`, so half price at the best standing and half again as
+ * much at the worst.
+ */
+export const CITY_PRICE_STANDING_SWING = 0.5
+
+/**
  * Materials each kind of building needs before its construction site can become the building
  * (`CONTEXT.md`: Construction site). A lumber camp needs none, so a realm can start from nothing:
  * the lumber camp's wood builds the quarry, wood and stone build the mine and the smelter, and
