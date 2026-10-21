@@ -10,8 +10,14 @@ import {
   deliveryStorage,
   handsOf,
   loadOf,
+  npcCityRefuses,
+  npcCityReserve,
+  npcCityStock,
+  npcTradeProblem,
+  npcTradingStorageAt,
   owedBy,
   quoteDelivery,
+  quoteNpcTrade,
   quotePickUp,
   quoteTrade,
   tradeCoinWarehouse,
@@ -20,6 +26,7 @@ import {
   tradingWarehouseAt,
   wrapDistance,
   type Building,
+  type City,
   type Good,
   type OrderRequest,
   type PricedGood,
@@ -50,7 +57,8 @@ interface TradeRequest extends OrderRequest {
  * residents, on a Trade Org warehouse's tile, trades up to `units` of a good there at its prices,
  * from and into their hands or the load of their carriage `carriageId` on the tile. It happens
  * this tick. With `cityId` it orders a delivery to or a pick-up from that city instead
- * (`CONTEXT.md`: Delivery).
+ * (`CONTEXT.md`: Delivery). On an NPC city's storage the resident trades with that city instead
+ * (`CONTEXT.md`: Trading with an NPC city).
  */
 function tradeOrder(side: TradeSide): OrderKind {
   return {
@@ -59,7 +67,8 @@ function tradeOrder(side: TradeSide): OrderKind {
       const realm = realmOf(world, sender.userId)
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
-      return tradeProblem(world, realm.id, r, side, o.good, o.units, o.carriageId, o.cityId)
+      const problem = npcTradingStorageAt(world, r.x, r.y) ? npcTradeProblem : tradeProblem
+      return problem(world, realm.id, r, side, o.good, o.units, o.carriageId, o.cityId)
     },
     apply(world, _sender, order) {
       const o = order as TradeRequest
@@ -84,11 +93,20 @@ export const sell = tradeOrder('sell')
 /** One trade carried out this tick, with the goods and coins of everyone in it before and after. */
 interface TradeRecord {
   residentId: string
-  /** The realm that traded, if any, and whether the Trade Organization refused it as it traded. */
+  /**
+   * The realm that traded, if any, and whether the side it traded with (the Trade Organization
+   * or an NPC city) refused it as it traded.
+   */
   realm: string | null
   refused: boolean
   before: Stock
   after: Stock
+  /**
+   * For a trade with an NPC city (`CONTEXT.md`: Trading with an NPC city): the city, and whether
+   * the trade kept to its reserve: it sold none of the reserve and bought nothing beyond it.
+   */
+  npcCityId?: string
+  keptReserve?: boolean
 }
 
 /** The trades of the latest `resolveTrades`, kept beside the world for `tradesKeepGoods`. */
@@ -133,6 +151,11 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
     const o = r.order
     if (o?.kind !== 'trade') continue
     r.order = null
+    const npc = npcTradingStorageAt(world, r.x, r.y)
+    if (npc) {
+      if (tradeWithCity(world, r, o, npc.city, npc.storage, records)) traded++
+      continue
+    }
     const warehouse = tradingWarehouseAt(world, r.x, r.y)
     const coinWarehouse = warehouse && tradeCoinWarehouse(world, warehouse)
     if (!warehouse || !coinWarehouse) continue
@@ -193,6 +216,79 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
     })
   }
   return traded
+}
+
+/**
+ * Carries out the trade order `o` of resident `r` on the storage of an NPC city (`CONTEXT.md`:
+ * Trading with an NPC city): where the trader's carriage, if any, is still theirs and on the
+ * tile, the goods and coins swap between their hands or carriage and the storage at the city's
+ * prices, cut down to its surplus or what it lacks of its reserve and to what fits
+ * (`quoteNpcTrade`). The coins raise standing both ways between the realm and the city. A realm
+ * the city refuses (`npcCityRefuses`) trades nothing, and nothing is delivered. The trade goes
+ * into `records`, with a line in the realm log. Returns whether it moved anything.
+ */
+function tradeWithCity(
+  world: WorldState,
+  r: Resident,
+  o: TradeOrder,
+  city: City,
+  storage: Building,
+  records: TradeRecord[],
+): boolean {
+  const realm = commanderOf(world, r)
+  if (o.cityId !== undefined) return false
+  // The city may have come to refuse the realm since the order was given.
+  if (realm !== null && npcCityRefuses(world, city, realm)) return false
+  const carriage =
+    o.carriageId === null ? undefined : world.carriages.find((k) => k.id === o.carriageId)
+  if (o.carriageId !== null) {
+    if (realm === null || !commandsCarriage(world, realm, carriage)) return false
+    if (carriage.x !== r.x || carriage.y !== r.y) return false
+  }
+  const holder = carriage ? loadOf(carriage) : handsOf(r, world.tick)
+  const parties = [holder.stock, (storage.stock ??= {})]
+  const before = total(parties)
+  const { units, coins } = quoteNpcTrade(
+    world,
+    city,
+    storage,
+    holder,
+    o.side,
+    o.good,
+    o.units,
+    realm,
+  )
+  const goodsFrom = o.side === 'buy' ? storage.stock : holder.stock
+  const goodsTo = o.side === 'buy' ? holder.stock : storage.stock
+  move(goodsFrom, goodsTo, o.good, units)
+  move(goodsTo, goodsFrom, 'coins', coins)
+  const held = npcCityStock(world, city)[o.good] ?? 0
+  const keep = npcCityReserve(world, city)[o.good] ?? 0
+  records.push({
+    residentId: r.id,
+    realm,
+    refused: realm !== null && npcCityRefuses(world, city, realm),
+    before,
+    after: total(parties),
+    npcCityId: city.id,
+    keptReserve: units === 0 || (o.side === 'buy' ? held >= keep : held <= keep),
+  })
+  if (realm !== null && coins > 0) {
+    raiseStandingBothWays(world, realm, city.id, coins / STANDING_TRADE_COINS_PER_POINT)
+  }
+  recordEvent(world, realm, {
+    kind: 'traded',
+    residentId: r.id,
+    name: r.name,
+    side: o.side,
+    good: o.good,
+    units,
+    wanted: o.units,
+    coins,
+    x: storage.x,
+    y: storage.y,
+  })
+  return units > 0
 }
 
 /**
@@ -318,9 +414,9 @@ export function tradesOf(world: WorldState): TradeRecord[] {
 }
 
 /**
- * The Trade Organization trades with nobody it refuses (`CONTEXT.md`: Trade Org reaction): no
- * trade of the latest tick was by a realm it held below `TRADE_ORG_REFUSES_TRADE_BELOW` as it
- * traded.
+ * The Trade Organization and NPC cities trade with nobody they refuse (`CONTEXT.md`: Trade Org
+ * reaction, NPC city reaction): no trade of the latest tick was by a realm the side it traded with
+ * refused as it traded.
  */
 export const refusedTradeNothing: Invariant = {
   name: 'refused-trade-nothing',
@@ -329,8 +425,25 @@ export const refusedTradeNothing: Invariant = {
       .filter((t) => t.refused)
       .map((t) => ({
         invariant: this.name,
-        message: `${t.residentId} of ${t.realm} traded with the Trade Organization, which refuses it`,
+        message: `${t.residentId} of ${t.realm} traded with ${t.npcCityId ?? 'the Trade Organization'}, which refuses it`,
         entityIds: [t.residentId],
+      }))
+  },
+}
+
+/**
+ * An NPC city keeps its reserve (`CONTEXT.md`: Trading with an NPC city): no trade with one of
+ * the latest tick sold any of its reserve or bought beyond it.
+ */
+export const npcTradesKeepReserve: Invariant = {
+  name: 'npc-trades-keep-reserve',
+  check(world) {
+    return (ledger.get(world) ?? [])
+      .filter((t) => t.npcCityId !== undefined && !t.keptReserve)
+      .map((t) => ({
+        invariant: this.name,
+        message: `a trade by ${t.residentId} broke into the reserve of ${t.npcCityId}`,
+        entityIds: [t.residentId, t.npcCityId!],
       }))
   },
 }

@@ -4,7 +4,7 @@ import {
   TRADE_ORG,
   TRADE_ORG_ARMY,
   type Building,
-  type City,
+  type SeenCity,
   type ContractView,
   type OrderRequest,
   type RealmLabel,
@@ -15,7 +15,8 @@ import { contractStatus, sideName } from './contract-view.js'
 /**
  * Mercenary contracts (`CONTEXT.md`: Mercenary contract): offer some of your residents for hire
  * to a realm, or ask to hire residents of a realm you see, or a number of the Trade Org army's
- * soldiers, paid into a Trade Org warehouse you know (`CONTEXT.md`: Trade Org army); accept or
+ * soldiers, paid into a Trade Org warehouse you know (`CONTEXT.md`: Trade Org army), or a number
+ * of an NPC city's residents, paid into its storage (`CONTEXT.md`: Hiring from an NPC city); accept or
  * decline what others offer;
  * pay each week in advance with one of your residents standing on the contract's storage,
  * carrying the coins. Every change is an order the server checks (ADR 0002).
@@ -37,7 +38,8 @@ export function ContractsPanel({
   /** Everyone in sight, the Player's own included. */
   inSight: Resident[]
   buildings: Building[]
-  cities: City[]
+  /** Cities in sight; an NPC city that doesn't refuse the Player says what it would lend. */
+  cities: SeenCity[]
   /** Realms the Player could make a contract with. */
   realms: RealmLabel[]
   sendOrder: (order: OrderRequest) => Promise<string | undefined>
@@ -49,22 +51,28 @@ export function ContractsPanel({
   const [price, setPrice] = useState(10)
   const [storageId, setStorageId] = useState('')
   const [soldiers, setSoldiers] = useState(1)
+  const [count, setCount] = useState(1)
   const [error, setError] = useState<string | undefined>()
   const order = async (o: OrderRequest) => setError(await sendOrder(o))
 
   const tradeOrg = hiring && other === TRADE_ORG
+  const npcCities = cities.filter((c) => c.hire !== undefined)
+  const npc = hiring ? npcCities.find((c) => c.id === other) : undefined
   const lenderId = hiring ? other : realmId
-  const candidates = tradeOrg
-    ? []
-    : hiring
-      ? inSight.filter((r) => r.owner === other)
-      : own.filter((r) => r.owner === realmId)
+  const candidates =
+    tradeOrg || npc
+      ? []
+      : hiring
+        ? inSight.filter((r) => r.owner === other)
+        : own.filter((r) => r.owner === realmId)
   const storages = buildings.filter(
     (b) =>
       b.kind === (tradeOrg ? 'warehouse' : 'storage') &&
       !b.site &&
       cities.some(
-        (c) => c.id === b.cityId && (tradeOrg ? c.tradeOrg !== undefined : c.realmId === lenderId),
+        (c) =>
+          c.id === b.cityId &&
+          (tradeOrg ? c.tradeOrg !== undefined : npc ? c.id === npc.id : c.realmId === lenderId),
       ),
   )
 
@@ -72,8 +80,8 @@ export function ContractsPanel({
     e.preventDefault()
     await order({
       kind: 'offerContract',
-      ...(tradeOrg ? { soldiers } : { residentIds: [...chosen] }),
-      ...(hiring && !tradeOrg ? {} : { realmId: other }),
+      ...(tradeOrg ? { soldiers } : npc ? { residents: count } : { residentIds: [...chosen] }),
+      ...(hiring && !tradeOrg && !npc ? {} : { realmId: other }),
       days,
       pricePerWeek: price,
       storageId,
@@ -121,7 +129,7 @@ export function ContractsPanel({
               <li key={c.id} className="army">
                 <span>
                   <strong>
-                    {lender ? 'Rented to' : 'Hired from'} {sideName(otherSide)}
+                    {lender ? 'Rented to' : 'Hired from'} {sideName(otherSide, cities)}
                   </strong>
                   <br />
                   {c.residents.map((r) => r.name).join(', ')}
@@ -196,6 +204,12 @@ export function ContractsPanel({
                 The realm of {r.realm}
               </option>
             ))}
+            {hiring &&
+              npcCities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
           </select>
           {tradeOrg && (
             <label>
@@ -208,6 +222,22 @@ export function ContractsPanel({
               />{' '}
               <span className="muted small">
                 at least {TRADE_ORG_ARMY.pricePerSoldierWeek} Coins a week each
+              </span>
+            </label>
+          )}
+          {npc && (
+            <label>
+              Residents{' '}
+              <input
+                type="number"
+                min={1}
+                max={Math.max(1, npc.hire!.spare)}
+                value={count}
+                onChange={(e) => setCount(Number(e.target.value))}
+              />{' '}
+              <span className="muted small">
+                it can spare {npc.hire!.spare}, at least {npc.hire!.pricePerResidentWeek} Coins a
+                week each
               </span>
             </label>
           )}
@@ -249,7 +279,10 @@ export function ContractsPanel({
             ))}
           </select>
         </fieldset>
-        <button type="submit" disabled={(!tradeOrg && chosen.size === 0) || !other || !storageId}>
+        <button
+          type="submit"
+          disabled={(!tradeOrg && !npc && chosen.size === 0) || !other || !storageId}
+        >
           {hiring ? 'Ask' : 'Offer'}
         </button>
       </form>

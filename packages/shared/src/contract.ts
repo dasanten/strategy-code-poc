@@ -1,4 +1,5 @@
-import { realmName, type RealmLabel } from './alliance.js'
+import type { RealmLabel } from './alliance.js'
+import { organizationLabel } from './standing.js'
 import { TICKS_PER_GAME_DAY, type MercenaryContract, type WorldState } from './world.js'
 
 /** World queries about mercenary contracts (ADR 0002: the game API orders and scripts share). */
@@ -62,10 +63,10 @@ export interface ContractView {
 
 /** The contracts the realm is a side of, offered or in force. */
 export function contractsFor(
-  world: Pick<WorldState, 'contracts' | 'realms' | 'residents' | 'buildings'>,
+  world: Pick<WorldState, 'contracts' | 'realms' | 'residents' | 'buildings' | 'cities'>,
   realmId: string,
 ): ContractView[] {
-  const label = (id: string): RealmLabel => ({ realmId: id, realm: realmName(world, id) })
+  const label = (id: string): RealmLabel => ({ realmId: id, realm: organizationLabel(world, id) })
   return world.contracts
     .filter((c) => c.lenderId === realmId || c.hirerId === realmId)
     .map((c) => {

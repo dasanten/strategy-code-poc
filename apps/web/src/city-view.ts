@@ -11,7 +11,9 @@ import {
   type Building,
   type BuildingKind,
   type Carriage,
+  GOOD_WEIGHT,
   type DeliveryQuote,
+  type NpcCityPrice,
   type PricedGood,
   type TradeQuote,
   type City,
@@ -236,5 +238,68 @@ export function previewDelivery(
   return {
     buy: quoteDelivery(seen, warehouse, payer, good, units, tiles),
     sell: quotePickUp(seen, warehouse, good, units, held, tiles, budget),
+  }
+}
+
+/**
+ * The storages of an NPC city in sight, each with the city's prices to the Player
+ * (`CONTEXT.md`: Trading with an NPC city). None when the city names no prices: it refuses the
+ * Player, or no storage of it is in sight.
+ */
+export function npcStoragesInSight(
+  city: SeenCity,
+  seen: { buildings: Building[] },
+): WarehouseView[] {
+  const prices = city.trade
+  if (!prices) return []
+  return seen.buildings
+    .filter((b) => b.kind === 'storage' && !b.site && b.cityId === city.id)
+    .map((b) => ({ id: b.id, x: b.x, y: b.y, prices }))
+}
+
+/**
+ * About what a trade with an NPC city at its `storage` would move (`CONTEXT.md`: Trading with an
+ * NPC city), from the prices it names the Player: each unit at today's price, cut down to its
+ * surplus or what it lacks of its reserve, what that storage holds, the coins on either side and
+ * what fits. The server prices each unit as the stock moves, so the coins may differ a little.
+ */
+export function previewNpcTrade(
+  prices: NpcCityPrice[],
+  storage: Building,
+  resident: Resident,
+  carriage: Carriage | undefined,
+  good: PricedGood,
+  units: number,
+  tick: number,
+): { buy: TradeQuote; sell: TradeQuote } {
+  const line = prices.find((p) => p.good === good)
+  const none = { units: 0, coins: 0 }
+  if (!line || !(units > 0)) return { buy: none, sell: none }
+  const holder = carriage ? loadOf(carriage) : handsOf(resident, tick)
+  // How many units fit when each adds `per` kg to the holder.
+  const fits = (per: number) => (per > 0 ? (holder.room + 1e-9) / per : Infinity)
+  const perBuy = GOOD_WEIGHT[good] - line.sell * GOOD_WEIGHT.coins
+  const perSell = line.buy * GOOD_WEIGHT.coins - GOOD_WEIGHT[good]
+  const buyUnits = Math.floor(
+    Math.min(
+      units,
+      line.forSale,
+      storage.stock?.[good] ?? 0,
+      (holder.stock.coins ?? 0) / line.sell,
+      fits(perBuy),
+    ),
+  )
+  const sellUnits = Math.floor(
+    Math.min(
+      units,
+      line.wanted,
+      holder.stock[good] ?? 0,
+      (storage.stock?.coins ?? 0) / line.buy,
+      fits(perSell),
+    ),
+  )
+  return {
+    buy: { units: buyUnits, coins: buyUnits * line.sell },
+    sell: { units: sellUnits, coins: sellUnits * line.buy },
   }
 }

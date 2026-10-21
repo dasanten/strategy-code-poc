@@ -837,6 +837,27 @@ export const NPC_CITY_WONT_SELL_STANDING = -60
  */
 export const CITY_PRICE_STANDING_SWING = 0.5
 
+/** Trading with and hiring from an NPC city (`CONTEXT.md`: Trading with / Hiring from an NPC city). */
+export const NPC_TRADE = {
+  /**
+   * Game days of Food for all its residents an NPC city keeps in reserve and never sells: more
+   * than its food surplus line (`FOOD_SURPLUS_DAYS`), so selling never stops it growing.
+   */
+  reserveFoodDays: 15,
+  /**
+   * Stretches of wall whose materials it keeps in reserve, beside a house's (`BUILD_MATERIALS`):
+   * with a house that makes 60 Wood.
+   */
+  reserveWallStretches: 4,
+  /**
+   * What it asks for each resident it lends and game week, in coins, at neutral standing: less
+   * than a Trade Org soldier (`TRADE_ORG_ARMY.pricePerSoldierWeek`), as they come mostly unarmed.
+   */
+  pricePerResidentWeek: 12,
+  /** Share of its adults, rounded up, it keeps at home to defend it and never lends. */
+  defenceShare: 0.25,
+}
+
 /**
  * The standing an NPC city needs toward a realm before it asks to join it (`CONTEXT.md`:
  * Persuading a city): "high standing", where the standing list starts calling it trusted.

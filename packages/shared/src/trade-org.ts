@@ -29,12 +29,14 @@ export function ofTradeOrgHq(world: Pick<WorldState, 'cities'>, r: Resident): bo
 
 /**
  * The side a resident is on in a mercenary contract: their realm, `TRADE_ORG` for one of the
- * Trade Organization's cities, null for anyone else.
+ * Trade Organization's cities, their NPC city itself (`CONTEXT.md`: Hiring from an NPC city),
+ * null for anyone else.
  */
 export function contractSide(world: Pick<WorldState, 'cities'>, r: Resident): string | null {
   if (r.owner !== null) return r.owner
   const city = world.cities.find((c) => c.id === r.cityId)
-  return city?.tradeOrg ? TRADE_ORG : null
+  if (city?.tradeOrg) return TRADE_ORG
+  return city?.realmId === null ? city.id : null
 }
 
 /**

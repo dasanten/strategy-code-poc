@@ -10,7 +10,11 @@ import {
   contractWeeks,
   TRADE_ORG,
   contractSide,
+  forSale,
+  npcCityRefuses,
+  organizationLabel,
   realmName,
+  spareResidents,
   townHallOf,
   tradeOrgHq,
   wrapDistance,
@@ -34,25 +38,37 @@ import { changeStanding, raiseStandingBothWays } from './standing.js'
  * is in force the residents stay the lender's, and the lender still sees them, but they take only
  * the hirer's orders (`commanderOf`). Each game week is paid in advance into the lender's storage
  * with a pay order; a week that ends unpaid breaks the contract. At the end, or when it breaks,
- * the residents walk home. A side is a Player's realm or the Trade Organization (`TRADE_ORG`,
- * `CONTEXT.md`: Trade Org army), which the game runs (`stepTradeOrgArmy`).
+ * the residents walk home. A side is a Player's realm, the Trade Organization (`TRADE_ORG`,
+ * `CONTEXT.md`: Trade Org army), which the game runs (`stepTradeOrgArmy`), or an NPC city lending
+ * its residents (`CONTEXT.md`: Hiring from an NPC city, `stepNpcHire`).
  */
 
+/** The NPC city an id names, if it is one (`forSale`). */
+function npcCity(world: WorldState, id: unknown) {
+  const city = world.cities.find((c) => c.id === id)
+  return city && forSale(city) ? city : undefined
+}
+
 /**
- * The side whose storage it is: the realm of the city a finished storage belongs to, or
- * `TRADE_ORG` for a finished warehouse of one of the Trade Organization's cities.
+ * The side whose storage it is: the realm of the city a finished storage belongs to, the city
+ * itself for an NPC city's, or `TRADE_ORG` for a finished warehouse of one of the Trade
+ * Organization's cities.
  */
 function storageRealm(world: WorldState, storageId: unknown): string | null {
   const b = world.buildings.find((x) => x.id === storageId)
   if (!b || b.site) return null
   const city = world.cities.find((c) => c.id === b.cityId)
-  if (b.kind === 'storage') return city?.realmId ?? null
+  if (b.kind === 'storage') return city && forSale(city) ? city.id : (city?.realmId ?? null)
   return b.kind === 'warehouse' && city?.tradeOrg ? TRADE_ORG : null
 }
 
-/** Whether a contract side exists: a realm, or the Trade Organization while it has its HQ. */
+/**
+ * Whether a contract side exists: a realm, the Trade Organization while it has its HQ, or an
+ * NPC city while it is one.
+ */
 function sideExists(world: WorldState, id: string): boolean {
-  return id === TRADE_ORG ? tradeOrgHq(world) !== undefined : world.realms.some((r) => r.id === id)
+  if (id === TRADE_ORG) return tradeOrgHq(world) !== undefined
+  return world.realms.some((r) => r.id === id) || npcCity(world, id) !== undefined
 }
 
 /** Whether the resident is named in any contract, offered or in force. */
@@ -68,10 +84,21 @@ function inSightOf(world: WorldState, realmId: string, at: Resident, size: numbe
 
 /**
  * The residents an offer names: `residentIds`, or, asking the Trade Organization (`realmId` is
- * `TRADE_ORG`) for a number of `soldiers`, that many it can spare (`spareSoldiers`). A reason
- * when they can't be.
+ * `TRADE_ORG`) for a number of `soldiers`, that many it can spare (`spareSoldiers`), or asking an
+ * NPC city (`realmId` is its id) for a number of `residents`, that many it would lend
+ * (`spareResidents`). A reason when they can't be.
  */
 function offeredResidents(world: WorldState, order: OrderRequest): unknown[] | string {
+  const city = npcCity(world, order.realmId)
+  if (city) {
+    const n = order.residents
+    if (!Number.isInteger(n) || (n as number) < 1) return 'ask for a whole number of residents'
+    const spare = spareResidents(world, city)
+    if (spare.length < (n as number)) {
+      return `${city.name} can spare only ${spare.length} residents`
+    }
+    return spare.slice(0, n as number).map((r) => r.id)
+  }
   if (order.realmId !== TRADE_ORG || order.soldiers === undefined) {
     return Array.isArray(order.residentIds) ? order.residentIds : []
   }
@@ -122,6 +149,10 @@ function readOffer(
       return 'the Trade Organization can’t spare those residents'
     }
     hirerId = realmId
+  } else if (npcCity(world, lenderId)) {
+    // An NPC city lends only by being asked for a number of its residents, wherever they are.
+    if (order.realmId !== lenderId) return 'ask the city for a number of its residents'
+    hirerId = realmId
   } else {
     if (!world.realms.some((r) => r.id === lenderId)) return 'the residents must be of a realm'
     if (size !== undefined && !residents.every((r) => inSightOf(world, realmId, r!, size))) {
@@ -138,10 +169,14 @@ function readOffer(
     return 'the price is a whole number of coins a week, at least 1'
   }
   if (storageRealm(world, order.storageId) !== lenderId) {
-    return lenderId === TRADE_ORG
-      ? 'the coins go into a warehouse of the Trade Organization'
+    if (lenderId === TRADE_ORG) return 'the coins go into a warehouse of the Trade Organization'
+    return npcCity(world, lenderId)
+      ? 'the coins go into a storage of the city'
       : 'the coins go into a storage of the realm renting them out'
   }
+  // A city that refuses the hirer says so at once; a low price it declines like any offer.
+  const city = npcCity(world, lenderId)
+  if (city && npcCityRefuses(world, city, hirerId)) return `${city.name} won’t hire out to you`
   return {
     id: '',
     lenderId,
@@ -170,8 +205,16 @@ function tellBoth(
     ...(leaderDied === undefined ? {} : { leaderDied }),
   }
   const base = { kind: 'contract' as const, contractId: c.id, what, residents: n, ...extra }
-  recordEvent(world, c.lenderId, { ...base, lender: true, other: realmName(world, c.hirerId) })
-  recordEvent(world, c.hirerId, { ...base, lender: false, other: realmName(world, c.lenderId) })
+  recordEvent(world, c.lenderId, {
+    ...base,
+    lender: true,
+    other: organizationLabel(world, c.hirerId),
+  })
+  recordEvent(world, c.hirerId, {
+    ...base,
+    lender: false,
+    other: organizationLabel(world, c.lenderId),
+  })
 }
 
 /** A contract order: `check` gives a reason to reject it, on a map of `size` tiles when known. */
