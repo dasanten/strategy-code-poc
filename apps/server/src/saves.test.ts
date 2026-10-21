@@ -581,6 +581,15 @@ describe('world saves', () => {
     expect(checkInvariants(v26, land)).toEqual([])
   })
 
+  it('starts with no city asking to join (migration 27 → 28)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v27: Partial<WorldState> = structuredClone(world)
+    delete v27.joinRequests
+    const v28 = migrateWorld(structuredClone(v27), 27, { terrain: land }, migrations, 28)
+    expect(v28).toEqual({ ...v27, joinRequests: [] })
+    expect(checkInvariants(v28, land)).toEqual([])
+  })
+
   it('gives every alliance an empty army (migration 22 → 23)', () => {
     const v22 = {
       tick: 5,

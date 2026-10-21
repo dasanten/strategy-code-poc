@@ -1,4 +1,5 @@
 import { contractOf, contractsFor, type ContractView } from './contract.js'
+import { joinRequestsFor, type JoinRequestView } from './persuasion.js'
 import { standingsFor, type StandingView } from './standing.js'
 import { TRADE_ORG, TRADE_ORG_NAME } from './trade-org.js'
 import { deliveriesFor, type DeliveryView } from './warehouse.js'
@@ -158,6 +159,8 @@ export interface Diplomacy {
   deliveries: DeliveryView[]
   /** Standing between the realm and other Organizations (`CONTEXT.md`: Standing), shown only. */
   standings: StandingView[]
+  /** NPC cities asking the realm to join it (`CONTEXT.md`: Persuading a city). */
+  joinRequests: JoinRequestView[]
 }
 
 /**
@@ -176,6 +179,7 @@ export function diplomacyFor(
     | 'deliveries'
     | 'standings'
     | 'cities'
+    | 'joinRequests'
   >,
   realmId: string,
   seenRealms: Iterable<string>,
@@ -214,5 +218,6 @@ export function diplomacyFor(
     contracts: contractsFor(world, realmId),
     deliveries: deliveriesFor(world, realmId),
     standings: standingsFor(world, realmId),
+    joinRequests: joinRequestsFor(world, realmId),
   }
 }
