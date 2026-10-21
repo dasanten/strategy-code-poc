@@ -345,6 +345,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onTrade={async ({ side, ...trade }) =>
                 setOrderError(await sendOrder({ kind: side, ...trade }))
               }
+              directives={world.diplomacy.directives}
+              onBuyOff={async (residentId, directiveId, carriageId) =>
+                setOrderError(
+                  await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
+                )
+              }
             />
           )}
           {world && (

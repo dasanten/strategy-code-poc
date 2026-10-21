@@ -4,6 +4,7 @@ import {
   type Building,
   type Carriage,
   type DeliveryQuote,
+  type DirectiveView,
   type PricedGood,
   type RealmLabel,
   type Resident,
@@ -47,6 +48,8 @@ export function CityInspector({
   onSetGate,
   onBuyCity,
   onTrade,
+  directives,
+  onBuyOff,
 }: {
   cities: SeenCity[]
   residents: Resident[]
@@ -62,6 +65,10 @@ export function CityInspector({
   onBuyCity: (residentId: string, cityId: string) => void
   /** Gives a buy or sell order to one of the Player's residents on a warehouse. */
   onTrade: (trade: TradeRequest) => void
+  /** The admin directives in force; one naming the Player's realm may be bought off here. */
+  directives: DirectiveView[]
+  /** Gives the buy-off order for a directive to one of the Player's residents on a warehouse. */
+  onBuyOff: (residentId: string, directiveId: string, carriageId: string | null) => void
 }) {
   const [openId, setOpenId] = useState<string | undefined>()
   const views = cities.map((c) => describeCity(c, { residents, buildings }, realmId, realms))
@@ -124,6 +131,11 @@ export function CityInspector({
                       )
                     }
                     onTrade={onTrade}
+                  />
+                  <BuyingOff
+                    directives={directives.filter((d) => d.target === realmId && d.price !== null)}
+                    traders={tradersAt(w, { residents, carriages }, realmId)}
+                    onBuyOff={onBuyOff}
                   />
                 </div>
               ))}
@@ -417,6 +429,75 @@ function Trading({
           {sellText}
         </button>
       </p>
+    </div>
+  )
+}
+
+/**
+ * Buying off an admin directive against the Player's realm (`CONTEXT.md`: Admin directive): one
+ * of their residents on the warehouse pays its price from their hands or their carriage there.
+ * Nothing when no directive names the realm with a price.
+ */
+function BuyingOff({
+  directives,
+  traders,
+  onBuyOff,
+}: {
+  directives: DirectiveView[]
+  traders: TradersView
+  onBuyOff: (residentId: string, directiveId: string, carriageId: string | null) => void
+}) {
+  const [residentId, setResidentId] = useState<string | undefined>()
+  const [carriageId, setCarriageId] = useState<string>('')
+  if (directives.length === 0) return null
+  const resident = traders.residents.find((r) => r.id === residentId) ?? traders.residents[0]
+  const carriage = traders.carriages.find((k) => k.id === carriageId)
+  if (!resident) {
+    return (
+      <p className="small muted">
+        To buy off the admin directive against you, bring a resident here with its price in coins.
+      </p>
+    )
+  }
+  const coins = (carriage ? carriage.load : resident.carried).coins ?? 0
+  return (
+    <div className="warehouse-trading" aria-label="Buying off">
+      <label>
+        Payer{' '}
+        <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
+          {traders.residents.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {traders.carriages.length > 0 && (
+        <label>
+          With{' '}
+          <select value={carriageId} onChange={(e) => setCarriageId(e.target.value)}>
+            <option value="">their hands</option>
+            {traders.carriages.map((k) => (
+              <option key={k.id} value={k.id}>
+                carriage {k.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {directives.map((d) => (
+        <p key={d.id}>
+          <button
+            type="button"
+            disabled={coins < d.price!}
+            onClick={() => onBuyOff(resident.id, d.id, carriage?.id ?? null)}
+          >
+            {coins < d.price!
+              ? `Buying off the directive (${d.reason}) takes ${d.price} coins`
+              : `Pay ${d.price} coins to buy off the directive (${d.reason})`}
+          </button>
+        </p>
+      ))}
     </div>
   )
 }

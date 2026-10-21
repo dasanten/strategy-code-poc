@@ -32,6 +32,7 @@ import { stepTradeOrgArmy } from './trade-org-army.js'
 import { stepPunishments } from './trade-org-punishment.js'
 import { resolvePurchases } from './buying.js'
 import { resolveTrades } from './trading.js'
+import { resolveBuyOffs } from './directives.js'
 import { stepCrimes } from './crimes.js'
 import { stepStanding } from './standing.js'
 import { stepPersuasion } from './persuasion.js'
@@ -168,6 +169,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   const payments = resolvePayments(world)
   const purchases = resolvePurchases(world, terrain.size)
   const trades = resolveTrades(world, terrain.size)
+  const buyOffs = resolveBuyOffs(world)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
@@ -197,6 +199,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
     births.length +
     payments +
     purchases +
-    trades
+    trades +
+    buyOffs
   return { actions, survival, combat, horsesDied, aging, captures }
 }

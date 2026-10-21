@@ -97,6 +97,13 @@ export interface GiveDirectiveRequest {
   target: string
   withAlliance: boolean
   reason: string
+  /** The Coins to buy it off with, or null when the target can't. */
+  price: number | null
+}
+
+/** An admin allows buying off a directive at a price, or stops allowing it (null). */
+export interface DirectivePriceRequest {
+  price: number | null
 }
 
 /** An Organization an admin can name in a directive. */

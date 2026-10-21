@@ -32,6 +32,7 @@ import {
   directiveTargetChoices,
   giveDirective,
   liftDirective,
+  setDirectivePrice,
 } from './directives.js'
 import type { ExploredTerrain } from './explored.js'
 import type { Logger } from './log.js'
@@ -240,11 +241,18 @@ export async function buildApp(opts: AppOptions) {
       const b = body(req)
       const given = giveDirective(
         world,
-        { target: b.target, withAlliance: b.withAlliance, reason: b.reason },
+        { target: b.target, withAlliance: b.withAlliance, reason: b.reason, price: b.price },
         req.user!.name,
       )
       if (typeof given === 'string') return fail(reply, 'invalid-input', given)
       return reply.code(201).send(adminDirectives(world).find((d) => d.id === given.id))
+    })
+    admin.patch<{ Params: { id: string } }>('/api/admin/directives/:id', async (req, reply) => {
+      const set = setDirectivePrice(world, req.params.id, body(req).price)
+      if (typeof set === 'string') {
+        return fail(reply, set === 'No such directive.' ? 'not-found' : 'invalid-input', set)
+      }
+      return adminDirectives(world).find((d) => d.id === set.id)
     })
     admin.delete<{ Params: { id: string } }>('/api/admin/directives/:id', async (req, reply) => {
       if (!liftDirective(world, req.params.id)) {

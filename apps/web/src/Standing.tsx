@@ -82,6 +82,12 @@ export function StandingPanel({
                 <span>
                   The Trade Organization punishes {d.targetName}
                   {d.withAlliance && ' and its alliance'}: {d.reason}
+                  {d.price !== null && (
+                    <span className="muted small">
+                      {' '}
+                      (can be bought off for {d.price} Coins at any Trade Org warehouse)
+                    </span>
+                  )}
                 </span>
               </li>
             ))}

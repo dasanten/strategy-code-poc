@@ -651,6 +651,24 @@ describe('world saves', () => {
     expect(checkInvariants(v32, land)).toEqual([])
   })
 
+  it('lets no directive given so far be bought off (migration 32 → 33)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const v32 = structuredClone(world) as unknown as { directives: object[] }
+    v32.directives = [
+      {
+        id: 'directive1',
+        target: world.realms[0]!.id,
+        withAlliance: false,
+        reason: 'farms new Players',
+        givenBy: 'Daniel',
+        givenAt: 0,
+      },
+    ]
+    const v33 = migrateWorld(structuredClone(v32), 32, { terrain: land }, migrations, 33)
+    expect(v33).toEqual({ ...v32, directives: [{ ...v32.directives[0], price: null }] })
+    expect(checkInvariants(v33, land)).toEqual([])
+  })
+
   it('gives every alliance an empty army (migration 22 → 23)', () => {
     const v22 = {
       tick: 5,

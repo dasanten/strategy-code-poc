@@ -177,8 +177,20 @@ describe('admin', () => {
     expect(given.statusCode).toBe(201)
     expect(given.json()).toMatchObject({ ...payload, givenBy: 'Daniel' })
     expect(world.directives).toHaveLength(1)
+    expect(world.directives[0]!.price).toBeNull()
 
     const url = `/api/admin/directives/${given.json().id}`
+    const priced = { price: 800 }
+    expect(
+      (await app.inject({ method: 'PATCH', url, cookies: mara, payload: priced })).statusCode,
+    ).toBe(403)
+    const badPrice = await app.inject({ method: 'PATCH', url, cookies, payload: { price: 0 } })
+    expect(badPrice.statusCode).toBe(400)
+    const set = await app.inject({ method: 'PATCH', url, cookies, payload: priced })
+    expect(set.statusCode).toBe(200)
+    expect(set.json()).toMatchObject({ price: 800 })
+    expect(world.directives[0]!.price).toBe(800)
+
     expect((await app.inject({ method: 'DELETE', url, cookies: mara })).statusCode).toBe(403)
     expect((await app.inject({ method: 'DELETE', url, cookies })).statusCode).toBe(204)
     expect(world.directives).toEqual([])

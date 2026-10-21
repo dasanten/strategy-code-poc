@@ -32,7 +32,7 @@ export function directiveAgainst(
   return world.directives.find((d) => directiveTargets(world, d).includes(org))
 }
 
-/** A directive as every Player sees it: its target and reason, never who gave it. */
+/** A directive as every Player sees it: its target, reason and price, never who gave it. */
 export interface DirectiveView {
   id: string
   target: string
@@ -41,6 +41,8 @@ export interface DirectiveView {
   withAlliance: boolean
   reason: string
   givenAt: number
+  /** The Coins the target can pay at any Trade Org warehouse to buy it off; null when it can't. */
+  price: number | null
 }
 
 /** A directive as admins see it, with who gave it. */
@@ -60,5 +62,6 @@ export function directivesFor(
     withAlliance: d.withAlliance,
     reason: d.reason,
     givenAt: d.givenAt,
+    price: d.price,
   }))
 }
