@@ -34,6 +34,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
+import { rememberFormerPlayer } from './standing.js'
 import { leaveOnLeaderDeath } from './alliances.js'
 import { endContractsOnLeaderDeath } from './contracts.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
@@ -154,7 +155,8 @@ export function dropGoods(world: WorldState, x: number, y: number, stock: Stock)
  * resident away walks home (`walkHomeIfAway`), and the others keep only the orders an NPC city
  * gives itself (`NPC_ORDER_KINDS`), so its behaviour takes over. With no city left to go to, the
  * realm's residents, horses and carriages belong to nobody. The Player's log says what became
- * of each city, and where it stands, and they get a fresh starting city on their next login.
+ * of each city, and where it stands, and they get a fresh starting city on their next login;
+ * each city remembers them in good standing (`rememberFormerPlayer`).
  * `size` is the map's.
  */
 export function endRealm(world: WorldState, realm: Realm, size: number): void {
@@ -162,6 +164,7 @@ export function endRealm(world: WorldState, realm: Realm, size: number): void {
   leaveOnLeaderDeath(world, realm.id)
   const cities = world.cities.filter((c) => c.realmId === realm.id)
   for (const c of cities) c.realmId = null
+  rememberFormerPlayer(world, cities, realm.userId)
   for (const r of world.residents) {
     if (r.owner !== realm.id) continue
     r.owner = null

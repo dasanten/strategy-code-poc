@@ -4,6 +4,7 @@ import {
   ALLIANCE_LEAVE_DELAY,
   ALLIANCE_RECALL_DELAY,
   ALLIANCE_NAME_MAX_LENGTH,
+  isAllianceCity,
   BUILDABLE,
   BUILD_MATERIALS,
   BUILD_WORK,
@@ -64,8 +65,8 @@ import { refillSource } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
-import { standingsSound } from './standing.js'
 import { joinRequestsSound } from './persuasion.js'
+import { formerPlayersSound, standingsSound } from './standing.js'
 import { buyOrdersDone, cityPricesSound } from './buying.js'
 import { tradeOrdersDone, tradesKeepGoods } from './trading.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
@@ -1062,9 +1063,11 @@ export const attackOrdersSound: Invariant = {
 }
 
 /**
- * Alliances hold together (`CONTEXT.md`: Alliance, Alliance leader): each has a name and at
- * least one member, in the order they joined; its members and invited realms exist; a realm is in
- * at most one alliance, and only a realm in none is invited; the alliance leader is a member; a
+ * Alliances hold together (`CONTEXT.md`: Alliance, Alliance leader, NPC city in an alliance):
+ * each has a name and at least one member, in the order they joined; its members are realms or
+ * NPC cities (never the Trade Organization's) and its invited realms exist; a member is in at
+ * most one alliance, and only a realm in none is invited; the alliance leader is a realm and a
+ * member; a
  * member leaving goes within the leave delay; each soldier and carriage of its army (`CONTEXT.md`:
  * Alliance army) exists, belongs to a member, is in no other alliance army and, when recalled,
  * comes back within the recall delay.
@@ -1090,8 +1093,11 @@ export const alliancesSound: Invariant = {
       if (!a.members.some((m) => m.realmId === a.leaderId)) {
         problems.push(`has leader ${a.leaderId}, who is not a member`)
       }
+      if (!realms.has(a.leaderId)) problems.push(`has leader ${a.leaderId}, which is no realm`)
       a.members.forEach((m, i) => {
-        if (!realms.has(m.realmId)) problems.push(`has member ${m.realmId}, which has ended`)
+        if (!realms.has(m.realmId) && !isAllianceCity(world, m.realmId)) {
+          problems.push(`has member ${m.realmId}, which is no realm or NPC city`)
+        }
         if (memberOf.get(m.realmId) === '') problems.push(`shares member ${m.realmId}`)
         if (i > 0 && m.joinedAt < a.members[i - 1]!.joinedAt) {
           problems.push(`lists member ${m.realmId} before one that joined earlier`)
@@ -1353,6 +1359,7 @@ export const worldInvariants: Invariant[] = [
   crimesSound,
   standingsSound,
   joinRequestsSound,
+  formerPlayersSound,
   gatesSound,
   wallDamageSound,
   climbOrdersSound,

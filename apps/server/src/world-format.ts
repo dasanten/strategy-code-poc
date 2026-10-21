@@ -17,6 +17,7 @@ import { nearestCity, walkHomeIfAway } from './survival.js'
 import { placeTradeOrgHq } from './trade-org.js'
 import { placeTradingPosts } from './trading-posts.js'
 import { placeCaravans } from './caravans.js'
+import { forgetFormerPlayers, welcomeFormerPlayer } from './standing.js'
 import { drawLifespan, hash, mulberry32 } from './residents.js'
 import { plainsOutside, ringTiles } from './starting-city.js'
 
@@ -41,7 +42,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 29
+export const WORLD_FORMAT_VERSION = 30
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -324,9 +325,25 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Persuading a city came (`CONTEXT.md`: Persuading a city); no city has asked anyone yet.
   27: (state) => ({ ...(state as object), joinRequests: [] }),
+  // Self-managed cities came to remember their former Player (`CONTEXT.md`: Self-managed city):
+  // each one a Leader death left, as the Player's log tells, remembers them from then on, and a
+  // Player who already has a new realm gets what is left of that good standing now.
+  28: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const e of world.events) {
+      if (e.kind !== 'selfManaged') continue
+      for (const { cityId } of e.cities) {
+        const city = world.cities.find((c) => c.id === cityId && c.realmId === null)
+        if (city) city.formerPlayer = { userId: e.userId, tick: e.tick }
+      }
+    }
+    for (const realm of world.realms) welcomeFormerPlayer(world, realm)
+    forgetFormerPlayers(world)
+    return world
+  },
   // Robbed caravans are made good and robberies counted per route (`CONTEXT.md`: Guaranteed
   // carriage): no route was robbed yet, and no caravan's job counts anything robbed.
-  28: (state) => {
+  29: (state) => {
     const world = structuredClone(state) as { caravans: { job: object | null }[] }
     return {
       ...world,

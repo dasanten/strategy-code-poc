@@ -27,6 +27,7 @@ import {
 import { CITY_NAMES, updateCityMembership } from './cities.js'
 import { recordEvent } from './events.js'
 import { mulberry32, newResident } from './residents.js'
+import { welcomeFormerPlayer } from './standing.js'
 
 /** A fresh id for a new entity; ids are never reused. */
 export function newId(world: WorldState, prefix: string): string {
@@ -238,6 +239,7 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
   const realm: Realm = { id: realmId, userId, leaderId: residents[0]!.id }
 
   world.realms.push(realm)
+  welcomeFormerPlayer(world, realm)
   world.cities.push(city)
   world.buildings.push(...buildings)
   updateCityMembership(world, terrain.size)
