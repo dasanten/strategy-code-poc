@@ -1,6 +1,7 @@
 import type { Account } from './api.js'
 import type { Diplomacy } from './alliance.js'
 import type { RegionMap } from './region-map.js'
+import type { NpcCityPrice } from './npc-trade.js'
 import type {
   Building,
   Carriage,
@@ -34,9 +35,17 @@ export interface OrderRequest {
  * Buying a city), worked out on the server from all of it, not only what is in sight; or
  * `wontSell` when it holds them in too low standing to sell, and `refuses` when it won't trade
  * with them, hire out to them or let their residents through its gates (`CONTEXT.md`: NPC city
- * reaction).
+ * reaction). An NPC city that doesn't refuse them says how many residents it would lend and what
+ * it asks for each a week (`hire`, `CONTEXT.md`: Hiring from an NPC city) and, with a storage of
+ * it in sight, its prices to them (`trade`, `CONTEXT.md`: Trading with an NPC city).
  */
-export type SeenCity = City & { price?: number; wontSell?: true; refuses?: true }
+export type SeenCity = City & {
+  price?: number
+  wontSell?: true
+  refuses?: true
+  hire?: { spare: number; pricePerResidentWeek: number }
+  trade?: NpcCityPrice[]
+}
 
 /**
  * Something a Player sees (`CONTEXT.md`: Sight), tagged with what it is. Ids are unique across

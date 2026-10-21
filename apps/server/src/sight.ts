@@ -3,8 +3,11 @@ import {
   cityPrice,
   commanderOf,
   forSale,
+  npcCityPrices,
   npcCityRefuses,
+  npcHirePrice,
   sellsTo,
+  spareResidents,
   sharingSight,
   wrapDistance,
   type Army,
@@ -76,13 +79,17 @@ export function entitiesInSight(
     })
   }
   const seenCities = new Set<string>()
+  const seenStorages = new Set<string>()
   for (const b of world.buildings) {
     if (!seen(size, observers, b)) continue
     out.push({ is: 'building', ...b })
     if (b.cityId !== null) seenCities.add(b.cityId)
+    if (b.cityId !== null && b.kind === 'storage' && !b.site) seenStorages.add(b.cityId)
   }
   // An NPC city names the Player its price (`CONTEXT.md`: Buying a city), from all of it, or says
-  // it won't sell to them or refuses them at all (`CONTEXT.md`: NPC city reaction).
+  // it won't sell to them or refuses them at all (`CONTEXT.md`: NPC city reaction). One that doesn't
+  // refuse them names what it would lend and its asking price, and, with a storage of it in sight,
+  // its prices (`CONTEXT.md`: Hiring from / Trading with an NPC city).
   for (const c of world.cities) {
     if (!seenCities.has(c.id)) continue
     const sale = !forSale(c)
@@ -91,7 +98,17 @@ export function entitiesInSight(
         ? { price: cityPrice(world, c, realmId) }
         : { wontSell: true as const }
     const refuses = npcCityRefuses(world, c, realmId) ? { refuses: true as const } : {}
-    out.push({ is: 'city', ...c, ...sale, ...refuses })
+    const deal =
+      !forSale(c) || refuses.refuses
+        ? {}
+        : {
+            hire: {
+              spare: spareResidents(world, c).length,
+              pricePerResidentWeek: npcHirePrice(world, c, realmId),
+            },
+            ...(seenStorages.has(c.id) ? { trade: npcCityPrices(world, c, realmId) } : {}),
+          }
+    out.push({ is: 'city', ...c, ...sale, ...refuses, ...deal })
   }
   for (const h of world.horses) if (seen(size, observers, h)) out.push({ is: 'horse', ...h })
   for (const k of world.carriages) if (seen(size, observers, k)) out.push({ is: 'carriage', ...k })

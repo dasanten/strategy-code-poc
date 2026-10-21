@@ -7,6 +7,7 @@ import {
   WAREHOUSE_FLOOR,
   type Building,
   type City,
+  type NpcCityPrice,
   type Resident,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
@@ -15,7 +16,9 @@ import {
   describeBuying,
   describeCity,
   deliveryCities,
+  npcStoragesInSight,
   previewDelivery,
+  previewNpcTrade,
   previewTrade,
   previewTransfer,
   takesTransfers,
@@ -242,5 +245,36 @@ describe('buying a city in the inspector', () => {
       'realm1',
     )
     expect(view).toEqual({ price: 900, townHall: { x: 5, y: 6 }, coins: 800, buyerId: 'r56' })
+  })
+})
+
+describe('trading with an NPC city in the inspector', () => {
+  const food: NpcCityPrice = { good: 'food', stock: 30, forSale: 10, wanted: 0, buy: 1, sell: 3 }
+  const wood: NpcCityPrice = { good: 'wood', stock: 5, forSale: 0, wanted: 20, buy: 4, sell: 6 }
+  const storage = { ...b('s1', 'storage', 'city1'), stock: { food: 30, wood: 5, coins: 12 } }
+
+  it('lists the storages in sight of an NPC city that names its prices', () => {
+    const seen = {
+      buildings: [storage, b('s2', 'storage', 'city1', true), b('h', 'house', 'city1')],
+    }
+    expect(npcStoragesInSight({ ...city(null), trade: [food] }, seen)).toEqual([
+      { id: 's1', x: 0, y: 0, prices: [food] },
+    ])
+    expect(npcStoragesInSight(city(null), seen)).toEqual([])
+  })
+
+  it('previews a trade cut down to its surplus, what it lacks and the coins on either side', () => {
+    const trader = {
+      carried: { coins: 100, wood: 10 },
+      bornAt: -1e9,
+      stats: { strength: { base: 10, trained: 0 } },
+    } as unknown as Resident
+    const q = (good: 'food' | 'wood', units: number) =>
+      previewNpcTrade([food, wood], storage, trader, undefined, good, units, 0)
+    expect(q('food', 50).buy).toEqual({ units: 10, coins: 30 })
+    expect(q('food', 50).sell.units).toBe(0)
+    // It lacks 20 wood, but has only 12 coins: 3 wood at 4 coins.
+    expect(q('wood', 10).sell).toEqual({ units: 3, coins: 12 })
+    expect(q('wood', 10).buy.units).toBe(0)
   })
 })

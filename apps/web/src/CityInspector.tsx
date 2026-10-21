@@ -7,6 +7,7 @@ import {
   type DeliveryQuote,
   type Good,
   type DirectiveView,
+  type NpcCityPrice,
   type PricedGood,
   type RealmLabel,
   type Resident,
@@ -19,7 +20,9 @@ import {
   describeBuying,
   deliveryCities,
   describeCity,
+  npcStoragesInSight,
   previewDelivery,
+  previewNpcTrade,
   previewTrade,
   previewTransfer,
   takesTransfers,
@@ -38,8 +41,10 @@ import { GOOD_LABELS } from './Residents.js'
  * city of the Player's own lists its gates, to open or close (`CONTEXT.md`: Walls in combat); an
  * NPC city names its price and can be bought (`CONTEXT.md`: Buying a city); a Trade Org city lists
  * the prices of its warehouses in sight (`CONTEXT.md`: Warehouse prices), where the Player's
- * residents on a warehouse buy and sell (`CONTEXT.md`: Trading with the Trade Organization); a
- * city of another realm takes transfers from the Player's cities (`CONTEXT.md`: Transfer).
+ * residents on a warehouse buy and sell (`CONTEXT.md`: Trading with the Trade Organization). An
+ * NPC city that doesn't refuse the Player lists its prices at its storages in sight, where their
+ * residents trade with it the same way (`CONTEXT.md`: Trading with an NPC city).
+ * A city of another realm takes transfers from the Player's cities (`CONTEXT.md`: Transfer).
  */
 export function CityInspector({
   cities,
@@ -101,7 +106,7 @@ export function CityInspector({
               <p className="city-details">
                 {v.residents} {v.residents === 1 ? 'resident' : 'residents'} in sight
                 {v.buildings.length > 0 &&
-                  ` · ${v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}`}
+                  ` Â· ${v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}`}
               </p>
             )}
             {openId === v.id &&
@@ -162,6 +167,34 @@ export function CityInspector({
                   onTransfer={onTransfer}
                 />
               )}
+            {openId === v.id &&
+              npcStoragesInSight(
+                cities.find((c) => c.id === v.id)!,
+                { buildings },
+              ).map((s) => (
+                <div key={s.id}>
+                  <Prices warehouse={s} place="Storage" />
+                  <Trading
+                    warehouse={s}
+                    place="storage"
+                    traders={tradersAt(s, { residents, carriages }, realmId)}
+                    deliveryCities={[]}
+                    preview={(resident, carriage, good, units) =>
+                      previewNpcTrade(
+                        s.prices as NpcCityPrice[],
+                        buildings.find((b) => b.id === s.id)!,
+                        resident,
+                        carriage,
+                        good,
+                        units,
+                        tick,
+                      )
+                    }
+                    previewDelivery={() => ({ buy: noDelivery, sell: noDelivery })}
+                    onTrade={onTrade}
+                  />
+                </div>
+              ))}
             {openId === v.id && <Reaction city={cities.find((c) => c.id === v.id)!} />}
             {openId === v.id && (
               <Buying
@@ -194,8 +227,13 @@ function Reaction({ city }: { city: SeenCity }) {
   if (!city.refuses && !city.wontSell) return null
   return (
     <div className="city-reaction" aria-label="Reaction">
-      {city.refuses && <p>It holds you in low standing: its gates are shut to your residents.</p>}
-      {city.wontSell && <p>It won’t sell itself to you.</p>}
+      {city.refuses && (
+        <p>
+          It holds you in low standing: it won’t trade with you or hire out to you, and its gates
+          are shut to your residents.
+        </p>
+      )}
+      {city.wontSell && <p>It wonât sell itself to you.</p>}
     </div>
   )
 }
@@ -259,14 +297,18 @@ function Gates({
 }
 
 /** A warehouse's prices: per good, what it holds, what it pays and what it asks, in coins. */
-function Prices({ warehouse }: { warehouse: WarehouseView }) {
+function Prices({
+  warehouse,
+  place = 'Warehouse',
+}: {
+  warehouse: WarehouseView
+  /** What it is called: a Trade Org warehouse or an NPC city's storage. */
+  place?: 'Warehouse' | 'Storage'
+}) {
   return (
-    <table
-      className="warehouse-prices"
-      aria-label={`Warehouse at (${warehouse.x}, ${warehouse.y})`}
-    >
+    <table className="warehouse-prices" aria-label={`${place} at (${warehouse.x}, ${warehouse.y})`}>
       <caption>
-        Warehouse at ({warehouse.x}, {warehouse.y}): prices in coins
+        {place} at ({warehouse.x}, {warehouse.y}): prices in coins
       </caption>
       <thead>
         <tr>
@@ -310,6 +352,7 @@ export interface TradeRequest {
  */
 function Trading({
   warehouse,
+  place = 'warehouse',
   traders,
   deliveryCities,
   preview,
@@ -317,6 +360,8 @@ function Trading({
   onTrade,
 }: {
   warehouse: WarehouseView
+  /** Where the trade happens: a Trade Org warehouse or an NPC city's storage. */
+  place?: 'warehouse' | 'storage'
   traders: TradersView
   deliveryCities: DeliveryCity[]
   preview: (
@@ -346,7 +391,7 @@ function Trading({
   if (!resident || !picked) {
     return (
       <p className="small muted">
-        To trade here, bring a resident to the warehouse at ({warehouse.x}, {warehouse.y}).
+        To trade here, bring a resident to the {place} at ({warehouse.x}, {warehouse.y}).
       </p>
     )
   }
@@ -371,7 +416,7 @@ function Trading({
     canSell = quote.sell.units > 0
     buyText = canBuy
       ? `Buy ${quote.buy.units} ${label} for ${quote.buy.coins} coins + ${quote.buy.fee} fee, delivered to ${city.name}`
-      : `Can’t buy ${label} for delivery`
+      : `Canât buy ${label} for delivery`
     sellText = canSell
       ? `Sell ${quote.sell.units} ${label} from ${city.name}, picked up for about ${quote.sell.coins} coins after a ${quote.sell.fee} fee`
       : `Nothing to pick up in ${city.name}`
@@ -381,10 +426,10 @@ function Trading({
     canSell = quote.sell.units > 0
     buyText = canBuy
       ? `Buy ${quote.buy.units} ${label} for ${quote.buy.coins} coins`
-      : `Can’t buy ${label}`
+      : `Canât buy ${label}`
     sellText = canSell
       ? `Sell ${quote.sell.units} ${label} for ${quote.sell.coins} coins`
-      : `Can’t sell ${label}`
+      : `Canât sell ${label}`
   }
   return (
     <div className="warehouse-trading" aria-label="Trading">
@@ -611,3 +656,6 @@ function BuyingOff({
     </div>
   )
 }
+
+/** No delivery: an NPC city delivers nothing (`CONTEXT.md`: Delivery is a Trade Org service). */
+const noDelivery: DeliveryQuote = { units: 0, coins: 0, fee: 0 }

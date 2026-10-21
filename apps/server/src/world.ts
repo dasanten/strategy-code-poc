@@ -29,6 +29,7 @@ import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
 import { stepTradeOrgArmy } from './trade-org-army.js'
+import { stepNpcHire } from './npc-hire.js'
 import { stepPunishments } from './trade-org-punishment.js'
 import { stepDirectives } from './directives.js'
 import { resolvePurchases } from './buying.js'
@@ -154,6 +155,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepCaravans(world, terrain.size)
   stepNpcDefence(world, terrain.size)
   stepTradeOrgArmy(world, terrain.size)
+  stepNpcHire(world, terrain.size)
   stepPunishments(world, terrain.size)
   stepNpcCities(world, terrain.size, terrain)
   const steps = walking?.requestSteps(world) ?? []

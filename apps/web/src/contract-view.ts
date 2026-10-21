@@ -1,8 +1,12 @@
 import { TRADE_ORG, formatGameTime, type ContractView, type RealmLabel } from '@csp/shared'
 
-/** How a side of a contract is called: "the realm of Mara", or the Trade Organization. */
-export function sideName(side: RealmLabel): string {
-  return side.realmId === TRADE_ORG ? side.realm : `the realm of ${side.realm}`
+/**
+ * How a side of a contract is called: "the realm of Mara", the Trade Organization, or an NPC city
+ * by its name (`CONTEXT.md`: Hiring from an NPC city), one of `cities`.
+ */
+export function sideName(side: RealmLabel, cities: readonly { id: string }[] = []): string {
+  if (side.realmId === TRADE_ORG || cities.some((c) => c.id === side.realmId)) return side.realm
+  return `the realm of ${side.realm}`
 }
 
 /** Where a contract stands, as the Player sees it. */

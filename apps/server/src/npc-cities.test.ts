@@ -150,8 +150,16 @@ describe('findNpcCitySite', () => {
     // Just south of its gate, where its farms are.
     Object.assign(scout, { x: x + 3, y: y + NPC_VILLAGE.size + 3, order: null })
     const seen = entitiesInSight(world, terrain, realm.id)
-    // It names its price (`CONTEXT.md`: Buying a city).
-    expect(seen).toContainEqual({ is: 'city', ...c, price: cityPrice(world, c) })
+    // It names its price (`CONTEXT.md`: Buying a city) and what it would lend (`CONTEXT.md`:
+    // Hiring from an NPC city).
+    expect(seen).toContainEqual(
+      expect.objectContaining({
+        is: 'city',
+        ...c,
+        price: cityPrice(world, c),
+        hire: expect.anything(),
+      }),
+    )
     const hall = townHallOf(world, c)!
     expect(seen).toContainEqual({ is: 'building', ...hall })
     expect(seen.filter((e) => e.is === 'resident' && e.cityId === c.id).length).toBeGreaterThan(0)

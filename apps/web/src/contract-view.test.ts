@@ -85,6 +85,7 @@ describe('mercenary contracts in the UI', () => {
   it('calls the Trade Organization by its name, not as a realm', () => {
     expect(sideName({ realmId: 'r1', realm: 'Mara' })).toBe('the realm of Mara')
     expect(sideName({ realmId: TRADE_ORG, realm: TRADE_ORG_NAME })).toBe('the Trade Organization')
+    expect(sideName({ realmId: 'npc', realm: 'Dunmere' }, [{ id: 'npc' }])).toBe('Dunmere')
     const e = {
       kind: 'contract',
       contractId: 'contract1',
