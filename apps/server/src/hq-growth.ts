@@ -1,0 +1,211 @@
+import {
+  TRADE_ORG_ARMY,
+  TRADE_ORG_HQ,
+  buildProblem,
+  buildingAt,
+  freeHousing,
+  hasFoodSurplus,
+  inCityArea,
+  isPassableTerrain,
+  terrainAt,
+  townHallOf,
+  tradeOrgHq,
+  tradeOrgArmyWanted,
+  wrap,
+  wrapDelta,
+  type Building,
+  type City,
+  type Resident,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
+import type { Invariant, InvariantViolation } from './invariants.js'
+import type { Project } from './npc-growth.js'
+import { angleApart, angleOf, gateAngles, gatesOf, roundRing, within } from './trade-org.js'
+
+/*
+ * How the Trade Org HQ grows (`CONTEXT.md`: Trade Org HQ): while it is too weak against the
+ * strongest Organization and has too few adults to arm, it grows like an NPC city (`cityGrowth`:
+ * pairing and houses), its houses between its rings; with no room left for a house it puts up
+ * another round ring of wall `TRADE_ORG_HQ.ringStep` further out, its gates in line with the
+ * others, and keeps the old ones. All through the orders a Player's residents take (ADR 0002).
+ */
+
+/** The radius of the HQ's `k`th outer ring; the one it starts with is ring 0. */
+export const hqRingRadius = (k: number) => TRADE_ORG_HQ.outerRadius + k * TRADE_ORG_HQ.ringStep
+
+/** A tile of one of the HQ's outer rings, and what stands there. */
+interface RingTile {
+  kind: 'wall' | 'gate'
+  x: number
+  y: number
+}
+
+/**
+ * The tiles of the HQ's `k`th outer ring round its town hall, on a map of `size` tiles: its gates
+ * first, evenly round it like the others' (`gatesOf`), then outward from them.
+ */
+export function hqRingTiles(hall: { x: number; y: number }, k: number, size: number): RingTile[] {
+  const ring = roundRing(hall.x, hall.y, hqRingRadius(k))
+  const gates = gatesOf(hall.x, hall.y, ring)
+  const toGate = ([x, y]: [number, number]) =>
+    Math.min(...gates.map(([gx, gy]) => Math.hypot(x - gx, y - gy)))
+  return ring
+    .sort((p, q) => toGate(p) - toGate(q))
+    .map(([x, y]) => ({
+      kind: toGate([x, y]) === 0 ? 'gate' : 'wall',
+      x: wrap(x, size),
+      y: wrap(y, size),
+    }))
+}
+
+/** The wall or gate on a tile, finished or begun, if one stands there. */
+function wallAt(world: WorldState, t: { x: number; y: number }): Building | undefined {
+  const b = buildingAt(world, t.x, t.y)
+  return b && (b.kind === 'wall' || b.kind === 'gate') ? b : undefined
+}
+
+/** The HQ's outer rings: the farthest that stands, and the one it is putting up beyond it. */
+export interface HqRings {
+  outermost: number
+  building: number | undefined
+}
+
+/**
+ * The HQ's outer rings (`HqRings`) round its town hall: the farthest ring with a wall or gate on
+ * it, begun or finished, is the one it is putting up until every tile of it that can take one has
+ * a finished wall or gate.
+ */
+export function hqRings(world: WorldState, hall: Building, terrain: TerrainMap): HqRings {
+  let k = 0
+  while (hqRingTiles(hall, k + 1, terrain.size).some((t) => wallAt(world, t))) k++
+  if (k === 0) return { outermost: 0, building: undefined }
+  const done = hqRingTiles(hall, k, terrain.size).every((t) => {
+    const b = wallAt(world, t)
+    return b ? !b.site : buildProblem(world, t.x, t.y, t.kind, terrain) !== undefined
+  })
+  return done ? { outermost: k, building: undefined } : { outermost: k - 1, building: k }
+}
+
+/**
+ * Whether the HQ grows (`CONTEXT.md`: Trade Org HQ): it wants more soldiers
+ * (`tradeOrgArmyWanted`) than it can arm from its `adults` while keeping its workers.
+ */
+export function hqGrows(world: WorldState, adults: Resident[]): boolean {
+  return adults.length - TRADE_ORG_ARMY.workers < tradeOrgArmyWanted(world)
+}
+
+/**
+ * Where the HQ puts its next house: a free tile in its area between its inner ring and its
+ * outermost ring, off its rings and clear of the straight ways in from its gates (as in
+ * `hqLayout`), nearest the town hall first.
+ */
+export function hqHouseTile(
+  world: WorldState,
+  hall: Building,
+  terrain: TerrainMap,
+  outermost: number,
+): { x: number; y: number } | undefined {
+  const size = terrain.size
+  const radius = hqRingRadius(outermost)
+  const rings = new Set<string>()
+  for (let k = 0; k <= outermost; k++) {
+    for (const t of hqRingTiles(hall, k, size)) rings.add(`${t.x},${t.y}`)
+  }
+  const free: { x: number; y: number; d: number }[] = []
+  const r = Math.ceil(radius)
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (!within(dx, dy, radius) || within(dx, dy, TRADE_ORG_HQ.innerRadius)) continue
+      const d = Math.hypot(dx, dy)
+      const angle = angleOf(0, 0, [dx, dy])
+      const clear = Math.asin(Math.min(1, 1.5 / d))
+      if (gateAngles(TRADE_ORG_HQ.gates).some((a) => angleApart(angle, a) <= clear)) continue
+      const x = wrap(hall.x + dx, size)
+      const y = wrap(hall.y + dy, size)
+      if (rings.has(`${x},${y}`) || !isPassableTerrain(terrainAt(terrain, x, y))) continue
+      if (buildProblem(world, x, y, 'house', terrain)) continue
+      free.push({ x, y, d })
+    }
+  }
+  free.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x)
+  return free[0] && { x: free[0].x, y: free[0].y }
+}
+
+/**
+ * What the HQ builds next, if anything (`CONTEXT.md`: Trade Org HQ): a house or a tile of its new
+ * ring it has begun; else a house when it has a food surplus and no free housing (`hqHouseTile`),
+ * or with no room left for one, the next tile of a new ring; else the next tile of the ring it is
+ * putting up.
+ */
+export function hqProject(
+  world: WorldState,
+  hq: City,
+  terrain: TerrainMap,
+): Extract<Project, { kind: 'build' }> | undefined {
+  const hall = townHallOf(world, hq)
+  if (!hall) return undefined
+  const size = terrain.size
+  const rings = hqRings(world, hall, terrain)
+  const ring = hqRingTiles(hall, rings.building ?? rings.outermost + 1, size)
+  const build = (b: { kind: Building['kind']; x: number; y: number }) => ({
+    kind: 'build' as const,
+    building: b.kind,
+    x: b.x,
+    y: b.y,
+  })
+  const begun =
+    world.buildings.find(
+      (b) => b.site && b.kind === 'house' && inCityArea(world, hq, b.x, b.y, size),
+    ) ?? ring.flatMap((t) => wallAt(world, t) ?? []).find((b) => b.site)
+  if (begun) return build(begun)
+  const nextOfRing = ring.find(
+    (t) => !wallAt(world, t) && !buildProblem(world, t.x, t.y, t.kind, terrain),
+  )
+  if (hasFoodSurplus(world, hq) && freeHousing(world, hq) <= 0) {
+    const house = hqHouseTile(world, hall, terrain, rings.outermost)
+    if (house) return build({ kind: 'house', ...house })
+    if (nextOfRing) return build(nextOfRing)
+  }
+  return rings.building !== undefined && nextOfRing ? build(nextOfRing) : undefined
+}
+
+/**
+ * The HQ's rings hold together (`CONTEXT.md`: Trade Org HQ; ADR 0004): each of its walls and
+ * gates stands on its inner ring or one of its outer rings, and each of its houses between its
+ * inner ring and its farthest ring.
+ */
+export const hqRingsSound: Invariant = {
+  name: 'hq-rings-sound',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const hq = tradeOrgHq(world)
+    const hall = hq && townHallOf(world, hq)
+    if (!hq || !hall) return out
+    const fail = (message: string, b: Building) =>
+      out.push({ invariant: this.name, message, entityIds: [b.id] })
+    const size = terrain.size
+    const rings = hqRings(world, hall, terrain)
+    const top = rings.building ?? rings.outermost
+    const onRing = new Set(
+      roundRing(hall.x, hall.y, TRADE_ORG_HQ.innerRadius).map(
+        ([x, y]) => `${wrap(x, size)},${wrap(y, size)}`,
+      ),
+    )
+    for (let k = 0; k <= top; k++) {
+      for (const t of hqRingTiles(hall, k, size)) onRing.add(`${t.x},${t.y}`)
+    }
+    for (const b of world.buildings) {
+      if (b.cityId !== hq.id) continue
+      if ((b.kind === 'wall' || b.kind === 'gate') && !onRing.has(`${b.x},${b.y}`)) {
+        fail(`${b.kind} ${b.id} of the Trade Org HQ stands on none of its rings`, b)
+      }
+      if (b.kind !== 'house') continue
+      const d = Math.hypot(wrapDelta(hall.x, b.x, size), wrapDelta(hall.y, b.y, size))
+      if (d <= TRADE_ORG_HQ.innerRadius + 0.5 || d > hqRingRadius(top) + 0.5) {
+        fail(`house ${b.id} of the Trade Org HQ stands outside its rings`, b)
+      }
+    }
+    return out
+  },
+}

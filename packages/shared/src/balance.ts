@@ -346,6 +346,12 @@ export const TRADE_ORG_HQ = {
   innerRadius: 4,
   /** Tiles from the town hall to the outer ring of wall; twice an NPC town's width across. */
   outerRadius: 10,
+  /**
+   * Tiles from one outer ring to the next one it grows (`CONTEXT.md`: Trade Org HQ): as far as a
+   * city building reaches (`CITY_BUILDING_REACH`), so the new ring joins the HQ, with a band of
+   * houses between.
+   */
+  ringStep: 3,
   /** Gates in each ring, evenly round it, the first due north. */
   gates: 4,
   /** Adult residents, with random stats like a starting city's. */
@@ -1137,6 +1143,22 @@ export const TRADE_ORG_ARMY = {
   hirePricePerSoldierWeek: 12,
   /** How long it hires mercenaries for, in game days: two game weeks. */
   hireDays: 14,
+  /**
+   * The HQ keeps at least this many times the strongest Organization's armed residents as
+   * soldiers (`CONTEXT.md`: Trade Org HQ), and `size` at the least: a little more than any
+   * Player can bring.
+   */
+  strongestMultiple: 1.5,
+  /**
+   * The HQ closes its outer gates while more armed outsiders than this share of its soldiers at
+   * home stand near it (`CONTEXT.md`: Trade Org HQ): half, so it can still drive them off.
+   */
+  gateShare: 0.5,
+  /**
+   * How near to one of the HQ's outer gates, in tiles, an armed outsider counts as near it, as
+   * well as anywhere in its area: as for an NPC city (`NPC_GATE_WATCH_RANGE`).
+   */
+  gateWatchRange: 8,
 }
 
 /**

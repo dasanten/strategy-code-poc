@@ -2,6 +2,7 @@ import {
   NPC_GATE_WATCH_RANGE,
   NPC_SOLDIER_SHARE,
   TRADE_ORG_ARMY,
+  tradeOrgArmyWanted,
   WEAPONS,
   canWork,
   contractOf,
@@ -67,7 +68,13 @@ export function stepNpcDefence(world: WorldState, size: number): void {
           b.cityId === city.id &&
           warehouseKeeps(world, b).some((g) => WEAPONS.includes(g as Weapon)),
       )
-      keepSoldiers(world, city, people, tradeOrgArmyTarget(adults), goods)
+      keepSoldiers(
+        world,
+        city,
+        people,
+        tradeOrgArmyTarget(adults, tradeOrgArmyWanted(world)),
+        goods,
+      )
     }
     if (city.tradeOrg) continue
     const storage = world.buildings.find(
@@ -79,11 +86,12 @@ export function stepNpcDefence(world: WorldState, size: number): void {
 }
 
 /**
- * How many soldiers the Trade Org HQ keeps (`CONTEXT.md`: Trade Org army): its army's size, but
- * never so many that fewer than `TRADE_ORG_ARMY.workers` of its `adults` are left to work.
+ * How many soldiers the Trade Org HQ keeps (`CONTEXT.md`: Trade Org army): as many as it `wants`
+ * (`tradeOrgArmyWanted`), but never so many that fewer than `TRADE_ORG_ARMY.workers` of its
+ * `adults` are left to work.
  */
-export function tradeOrgArmyTarget(adults: number): number {
-  return Math.max(0, Math.min(TRADE_ORG_ARMY.size, adults - TRADE_ORG_ARMY.workers))
+export function tradeOrgArmyTarget(adults: number, wanted = TRADE_ORG_ARMY.size): number {
+  return Math.max(0, Math.min(wanted, adults - TRADE_ORG_ARMY.workers))
 }
 
 /**
