@@ -137,7 +137,15 @@ The shared language of the game. Domain terms only — no implementation details
 - **Delivery:** a caravan brings goods bought from the Trade Organization to the storage of a
   city the buyer names, or picks up goods sold to it from the seller's city, for a fee. Anyone
   can instead carry the goods to or from the warehouse themselves, for free and at their own
-  risk.
+  risk. It is ordered in person at the warehouse like any trade, to or from a city of the
+  trader's own realm, at most one carriage load at a time. The fee grows with weight and
+  distance. A delivery is paid at once, goods and fee; the warehouse keeps the goods for it, so
+  nobody else can buy them, until a caravan standing at that warehouse loads them and brings them
+  to the city's storage. A pick-up is paid when the caravan collects: it comes with coins, takes
+  the goods from the storage (what is there, up to what was sold) and pays there at the
+  warehouse's prices of that moment, less the fee. A caravan that can't get to the storage (closed
+  gates, no way for a carriage) turns back and the next one tries again; one for a city no longer
+  the realm's is cancelled.
 - **Transfer:** the Trade Organization carries goods or coins from one realm to another as a
   courier: a caravan picks them up at a city of the sender (or they are handed in at a
   warehouse) and unloads them into the storage of a city the recipient names. Its fee is clearly

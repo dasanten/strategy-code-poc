@@ -3,6 +3,7 @@ import {
   isClosed,
   type Building,
   type Carriage,
+  type DeliveryQuote,
   type PricedGood,
   type RealmLabel,
   type Resident,
@@ -13,11 +14,14 @@ import {
 import {
   buildingCount,
   describeBuying,
+  deliveryCities,
   describeCity,
+  previewDelivery,
   previewTrade,
   tradersAt,
   warehousesInSight,
   type BuyView,
+  type DeliveryCity,
   type TradersView,
   type WarehouseView,
 } from './city-view.js'
@@ -39,6 +43,7 @@ export function CityInspector({
   realms,
   carriages,
   tick,
+  mapSize,
   onSetGate,
   onBuyCity,
   onTrade,
@@ -50,6 +55,8 @@ export function CityInspector({
   realms: RealmLabel[]
   carriages: Carriage[]
   tick: number
+  /** Tiles along each side of the map, for delivery fees. */
+  mapSize: number
   onSetGate: (gateId: string, open: boolean) => void
   /** Gives the buy order for an NPC city to one of the Player's residents on its town hall. */
   onBuyCity: (residentId: string, cityId: string) => void
@@ -92,6 +99,7 @@ export function CityInspector({
                   <Trading
                     warehouse={w}
                     traders={tradersAt(w, { residents, carriages }, realmId)}
+                    deliveryCities={deliveryCities({ cities, buildings }, realmId)}
                     preview={(resident, carriage, good, units) =>
                       previewTrade(
                         { cities, buildings },
@@ -101,6 +109,18 @@ export function CityInspector({
                         good,
                         units,
                         tick,
+                      )
+                    }
+                    previewDelivery={(resident, carriage, good, units, city) =>
+                      previewDelivery(
+                        { cities, buildings },
+                        w.id,
+                        resident,
+                        carriage,
+                        good,
+                        units,
+                        city,
+                        mapSize,
                       )
                     }
                     onTrade={onTrade}
@@ -242,35 +262,51 @@ export interface TradeRequest {
   good: PricedGood
   units: number
   carriageId: string | null
+  /** A city of the Player's to deliver to or pick up from (`CONTEXT.md`: Delivery). */
+  cityId?: string
 }
 
 /**
  * Buying and selling at a warehouse (`CONTEXT.md`: Trading with the Trade Organization): one of
  * the Player's residents on its tile trades a good from their hands or their carriage there, with
- * a preview of what it would move at its prices. Nobody of theirs there, and it says how to trade.
+ * a preview of what it would move at its prices. Or, with one of the Player's cities picked, a
+ * caravan delivers what is bought to its storage, or picks up what is sold from there, for a fee
+ * (`CONTEXT.md`: Delivery). Nobody of theirs there, and it says how to trade.
  */
 function Trading({
   warehouse,
   traders,
+  deliveryCities,
   preview,
+  previewDelivery,
   onTrade,
 }: {
   warehouse: WarehouseView
   traders: TradersView
+  deliveryCities: DeliveryCity[]
   preview: (
     resident: Resident,
     carriage: Carriage | undefined,
     good: PricedGood,
     units: number,
   ) => { buy: TradeQuote; sell: TradeQuote }
+  previewDelivery: (
+    resident: Resident,
+    carriage: Carriage | undefined,
+    good: PricedGood,
+    units: number,
+    city: DeliveryCity,
+  ) => { buy: DeliveryQuote; sell: DeliveryQuote }
   onTrade: (trade: TradeRequest) => void
 }) {
   const [residentId, setResidentId] = useState<string | undefined>()
   const [carriageId, setCarriageId] = useState<string>('')
+  const [cityId, setCityId] = useState<string>('')
   const [good, setGood] = useState<PricedGood | undefined>()
   const [units, setUnits] = useState(1)
   const resident = traders.residents.find((r) => r.id === residentId) ?? traders.residents[0]
   const carriage = traders.carriages.find((k) => k.id === carriageId)
+  const city = deliveryCities.find((c) => c.id === cityId)
   const picked = good ?? warehouse.prices[0]?.good
   if (!resident || !picked) {
     return (
@@ -279,7 +315,6 @@ function Trading({
       </p>
     )
   }
-  const quote = preview(resident, carriage, picked, units)
   const label = GOOD_LABELS[picked].toLowerCase()
   const trade = (side: TradeSide) =>
     onTrade({
@@ -287,8 +322,35 @@ function Trading({
       residentId: resident.id,
       good: picked,
       units,
-      carriageId: carriage?.id ?? null,
+      // A pick-up comes from the city's storage, never a carriage.
+      carriageId: city && side === 'sell' ? null : (carriage?.id ?? null),
+      ...(city ? { cityId: city.id } : {}),
     })
+  let buyText: string
+  let sellText: string
+  let canBuy: boolean
+  let canSell: boolean
+  if (city) {
+    const quote = previewDelivery(resident, carriage, picked, units, city)
+    canBuy = quote.buy.units > 0
+    canSell = quote.sell.units > 0
+    buyText = canBuy
+      ? `Buy ${quote.buy.units} ${label} for ${quote.buy.coins} coins + ${quote.buy.fee} fee, delivered to ${city.name}`
+      : `Can’t buy ${label} for delivery`
+    sellText = canSell
+      ? `Sell ${quote.sell.units} ${label} from ${city.name}, picked up for about ${quote.sell.coins} coins after a ${quote.sell.fee} fee`
+      : `Nothing to pick up in ${city.name}`
+  } else {
+    const quote = preview(resident, carriage, picked, units)
+    canBuy = quote.buy.units > 0
+    canSell = quote.sell.units > 0
+    buyText = canBuy
+      ? `Buy ${quote.buy.units} ${label} for ${quote.buy.coins} coins`
+      : `Can’t buy ${label}`
+    sellText = canSell
+      ? `Sell ${quote.sell.units} ${label} for ${quote.sell.coins} coins`
+      : `Can’t sell ${label}`
+  }
   return (
     <div className="warehouse-trading" aria-label="Trading">
       <label>
@@ -309,6 +371,19 @@ function Trading({
             {traders.carriages.map((k) => (
               <option key={k.id} value={k.id}>
                 carriage {k.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {deliveryCities.length > 0 && (
+        <label>
+          Delivery{' '}
+          <select value={cityId} onChange={(e) => setCityId(e.target.value)}>
+            <option value="">none, carry it here</option>
+            {deliveryCities.map((c) => (
+              <option key={c.id} value={c.id}>
+                to or from {c.name}
               </option>
             ))}
           </select>
@@ -335,15 +410,11 @@ function Trading({
         />
       </label>
       <p>
-        <button type="button" disabled={quote.buy.units === 0} onClick={() => trade('buy')}>
-          {quote.buy.units === 0
-            ? `Can’t buy ${label}`
-            : `Buy ${quote.buy.units} ${label} for ${quote.buy.coins} coins`}
+        <button type="button" disabled={!canBuy} onClick={() => trade('buy')}>
+          {buyText}
         </button>{' '}
-        <button type="button" disabled={quote.sell.units === 0} onClick={() => trade('sell')}>
-          {quote.sell.units === 0
-            ? `Can’t sell ${label}`
-            : `Sell ${quote.sell.units} ${label} for ${quote.sell.coins} coins`}
+        <button type="button" disabled={!canSell} onClick={() => trade('sell')}>
+          {sellText}
         </button>
       </p>
     </div>

@@ -1,6 +1,6 @@
 import { REALM_LOG_LENGTH, type RealmEvent } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { appendEvents, describeEvent, realmEnded } from './realm-log.js'
+import { appendEvents, describeDelivery, describeEvent, realmEnded } from './realm-log.js'
 
 const at = { tick: 7, userId: 1 }
 
@@ -84,6 +84,85 @@ describe('realm log', () => {
       text: 'Ada couldn’t buy any iron ore at the warehouse.',
       tone: 'warn',
     })
+  })
+
+  it('describes deliveries ordered, carried out and stuck', () => {
+    const ordered = {
+      kind: 'deliveryOrdered',
+      residentId: 'p1',
+      name: 'Ada',
+      good: 'iron',
+      wanted: 4,
+      cityId: 'c1',
+      city: 'Ashford',
+      x: 4,
+      y: 5,
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent({ ...ordered, side: 'buy', units: 4, coins: 40, fee: 6 })).toEqual({
+      text: 'Ada bought 4 iron for 40 coins and a 6-coin fee; a caravan brings them to Ashford.',
+      tone: 'info',
+      places: [{ name: 'the warehouse', x: 4, y: 5 }],
+    })
+    expect(describeEvent({ ...ordered, side: 'sell', units: 4, coins: 20, fee: 6 }).text).toBe(
+      'Ada sold up to 4 iron from Ashford; a caravan picks them up and pays there (about 20 coins after a 6-coin fee at today’s prices).',
+    )
+    expect(describeEvent({ ...ordered, side: 'buy', units: 0, coins: 0, fee: 0 }).tone).toBe('warn')
+    const done = {
+      kind: 'delivered',
+      good: 'iron',
+      units: 4,
+      cityId: 'c1',
+      city: 'Ashford',
+      x: 8,
+      y: 9,
+      seq: 10,
+      ...at,
+    } as const
+    expect(describeEvent({ ...done, delivery: 'delivery', coins: 0, fee: 6 })).toEqual({
+      text: 'A caravan delivered 4 iron to Ashford.',
+      tone: 'info',
+      places: [{ name: 'Ashford', x: 8, y: 9 }],
+    })
+    expect(describeEvent({ ...done, delivery: 'pickUp', coins: 20, fee: 6 }).text).toBe(
+      'A caravan picked up 4 iron in Ashford and paid 20 coins there (after a 6-coin fee).',
+    )
+    const stuck = {
+      kind: 'deliveryStuck',
+      delivery: 'delivery',
+      good: 'iron',
+      units: 4,
+      cityId: 'c1',
+      city: 'Ashford',
+      seq: 11,
+      ...at,
+    } as const
+    expect(describeEvent({ ...stuck, cancelled: false })).toEqual({
+      text: 'A caravan delivering 4 iron to Ashford couldn’t get to its storage and turned back; the next caravan tries again.',
+      tone: 'warn',
+    })
+    expect(describeEvent({ ...stuck, cancelled: true }).tone).toBe('bad')
+  })
+
+  it('describes open deliveries', () => {
+    const d = {
+      id: 'd1',
+      kind: 'delivery',
+      good: 'ironOre',
+      units: 3,
+      cityId: 'c1',
+      city: 'Ashford',
+      x: 1,
+      y: 2,
+      underway: false,
+    } as const
+    expect(describeDelivery(d)).toBe(
+      'Delivery of 3 iron ore to Ashford: waiting for a caravan at the warehouse.',
+    )
+    expect(describeDelivery({ ...d, kind: 'pickUp', underway: true })).toBe(
+      'Pick-up of up to 3 iron ore from Ashford: a caravan is on it.',
+    )
   })
 
   it('describes cities captured and lost', () => {
