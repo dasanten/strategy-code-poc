@@ -8,7 +8,6 @@ import {
   NPC_FARM_REACH,
   NPC_NODE_REACH,
   NPC_WALL_STEP,
-  Terrain,
   buildProblem,
   buildingAt,
   cityAreaTiles,
@@ -17,9 +16,7 @@ import {
   hasFoodSurplus,
   inCityArea,
   isCityBuilding,
-  isPassableTerrain,
   materialsNeeded,
-  terrainAt,
   workNeeded,
   workplaceGood,
   wrap,
@@ -33,9 +30,13 @@ import {
   type Stock,
   type TerrainMap,
   type WorldState,
+  isAt,
+  footprintTiles,
+  FOOTPRINT,
 } from '@csp/shared'
 import { hqGrows, hqProject } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
+import { Ground, nodeCorner } from './placing.js'
 
 /**
  * How an NPC city grows (`CONTEXT.md`: NPC city): it pairs its adults, builds a house when it has a
@@ -180,14 +181,14 @@ function takePart(
     const site = project.kind === 'build' && buildingAt(world, project.x, project.y)
     const carried = site && site.site && pick(r.carried, materialsNeeded(site))
     if (!site || !carried) return false
-    if (r.x === site.x && r.y === site.y) {
+    if (isAt(r, site)) {
       r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
     } else walkTo(r, site)
     return true
   }
   if (project.kind === 'tearDown') {
     const b = project.building
-    if (r.x !== b.x || r.y !== b.y) walkTo(r, b)
+    if (!isAt(r, b)) walkTo(r, b)
     else r.order = { kind: 'tearDown', buildingId: b.id, at: { x: r.x, y: r.y } }
     return true
   }
@@ -203,13 +204,13 @@ function takePart(
   const need = materialsNeeded(site)
   const carried = pick(r.carried, need)
   if (carried) {
-    if (here) r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
+    if (isAt(r, site)) r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
     else walkTo(r, site)
     return true
   }
   const stocked = pick(storage?.stock, need)
   if (storage && stocked) {
-    if (r.x === storage.x && r.y === storage.y) {
+    if (isAt(r, storage)) {
       r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods: stocked }
     } else walkTo(r, storage)
     return true
@@ -252,7 +253,7 @@ export function nextProject(
   for (const [good, units] of Object.entries(need) as [Good, number][]) {
     if ((storage?.stock?.[good] ?? 0) >= units || makes(world, city, good)) continue
     const node = nearestNode(world, home, terrain, good)
-    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.kind], x: node.x, y: node.y }
+    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.node.kind], ...node.at }
   }
   return want
 }
@@ -265,17 +266,22 @@ function makes(world: WorldState, city: City, good: Good): boolean {
   )
 }
 
-/** The nearest free resource node yielding `good` within `NPC_NODE_REACH` of the home. */
+/**
+ * The nearest free resource node yielding `good` within `NPC_NODE_REACH` of the home, with where
+ * its workplace goes (`nodeCorner`).
+ */
 function nearestNode(world: WorldState, home: Building, terrain: TerrainMap, good: Good) {
-  let best: { node: (typeof world.nodes)[number]; d: number } | undefined
+  let best:
+    | { node: (typeof world.nodes)[number]; at: { x: number; y: number }; d: number }
+    | undefined
   for (const node of world.nodes) {
     if (NODE_GOOD[node.kind] !== good) continue
     const d = wrapDistance(terrain.size, home, node)
     if (d > NPC_NODE_REACH || (best && d >= best.d)) continue
-    if (buildProblem(world, node.x, node.y, NODE_WORKPLACE[node.kind], terrain)) continue
-    best = { node, d }
+    const at = nodeCorner(world, terrain, node)
+    if (at) best = { node, at, d }
   }
-  return best?.node
+  return best
 }
 
 /**
@@ -483,18 +489,23 @@ function oldWallToTearDown(
   return [...old].sort((a, b) => far(b) - far(a) || a.id.localeCompare(b.id))[0]
 }
 
-/** Whether a tile is free to build on: passable, not Mountain, no node and no building. */
-function freeTile(world: WorldState, terrain: TerrainMap, x: number, y: number): boolean {
-  const t = terrainAt(terrain, x, y)
-  if (!isPassableTerrain(t) || t === Terrain.Mountain) return false
-  return !buildingAt(world, x, y) && !world.nodes.some((n) => n.x === x && n.y === y)
+/** The rings round the home that a footprint's tiles lie on, nearest and farthest. */
+function ringsOf(
+  home: Building,
+  b: { kind: BuildingKind; x: number; y: number },
+  size: number,
+): { near: number; far: number } {
+  const rings = footprintTiles(b, size).map(([x, y]) =>
+    ringOf({ dx: wrapDelta(home.x, x, size), dy: wrapDelta(home.y, y, size) }),
+  )
+  return { near: Math.min(...rings), far: Math.max(...rings) }
 }
 
 /**
- * Where the city puts its next house (`CONTEXT.md`: House): a free tile of its area inside its
- * wall, nearest its home first; when it is expanding, inside the new wall. With no room left
- * there, a tile on its edge just outside the wall, which starts its expansion. A city without
- * walls builds anywhere in its area.
+ * Where the city puts its next house (`CONTEXT.md`: House), by the north-west tile of its
+ * footprint: wholly on free ground of its area inside its wall, nearest its home first; when it is
+ * expanding, inside the new wall. With no room left there, on its edge just outside the wall,
+ * which starts its expansion. A city without walls builds anywhere in its area.
  */
 export function houseTile(
   world: WorldState,
@@ -504,26 +515,27 @@ export function houseTile(
   rings: Rings | undefined,
 ): { x: number; y: number } | undefined {
   const size = terrain.size
-  const tiles = [...cityAreaTiles(world, city, size)].map((k) => {
-    const [x, y] = k.split(',').map(Number) as [number, number]
-    return {
-      x,
-      y,
-      ring: ringOf({ dx: wrapDelta(home.x, x, size), dy: wrapDelta(home.y, y, size) }),
-    }
-  })
-  const free = tiles
-    .filter((t) => freeTile(world, terrain, t.x, t.y))
-    .sort((a, b) => a.ring - b.ring || a.y - b.y || a.x - b.x)
-  if (!rings) return free[0]
-  const inside = free.find((t) => t.ring < rings.outer)
-  if (inside || rings.expanding) return inside
-  return free.find((t) => t.ring === rings.inner + 1)
+  const area = cityAreaTiles(world, city, size)
+  const ground = new Ground(world, terrain)
+  const inArea = (x: number, y: number) => area.has(`${x},${y}`)
+  const free = [...area]
+    .map((k) => {
+      const [x, y] = k.split(',').map(Number) as [number, number]
+      return { x, y, ...ringsOf(home, { kind: 'house', x, y }, size) }
+    })
+    .filter((t) => ground.fits('house', t.x, t.y, inArea))
+    .sort((a, b) => a.near - b.near || a.y - b.y || a.x - b.x)
+  const at = (t: { x: number; y: number } | undefined) => t && { x: t.x, y: t.y }
+  if (!rings) return at(free[0])
+  const inside = free.find((t) => t.far < rings.outer)
+  if (inside || rings.expanding) return at(inside)
+  return at(free.find((t) => t.near === rings.inner + 1))
 }
 
 /**
- * Where the city lays out its next farm: the free Plains tile nearest its gate beyond where its
- * next wall would stand, up to `NPC_FARM_REACH` further out, off the way out of its gate.
+ * Where the city lays out its next farm, by the north-west tile of its footprint: wholly on free
+ * Plains beyond where its next wall would stand, nearest that wall first and then nearest its gate,
+ * up to `NPC_FARM_REACH` further out, off the way out of its gate.
  */
 export function farmTile(
   world: WorldState,
@@ -535,23 +547,32 @@ export function farmTile(
   const wall = rings ? rings.outer : 0
   const gate = rings?.newGate ?? { dx: 0, dy: wall }
   const from = wall + NPC_WALL_STEP + 1
+  const side = FOOTPRINT.farm
+  const ground = new Ground(world, terrain)
+  // Keep the way out of the gate open, and stay beyond the next wall.
+  const fine = (x: number, y: number) => {
+    const dx = wrapDelta(home.x, x, size)
+    const dy = wrapDelta(home.y, y, size)
+    const lane =
+      Math.abs(gate.dy) >= Math.abs(gate.dx)
+        ? dx === gate.dx && Math.sign(dy) === Math.sign(gate.dy)
+        : dy === gate.dy && Math.sign(dx) === Math.sign(gate.dx)
+    return !lane && ringOf({ dx, dy }) >= from
+  }
   for (let d = from; d < from + NPC_FARM_REACH; d++) {
     let best: { x: number; y: number; dist: number } | undefined
-    for (let dy = -d; dy <= d; dy++) {
-      for (let dx = -d; dx <= d; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue
-        // Keep the way out of the gate open.
-        const lane =
-          Math.abs(gate.dy) >= Math.abs(gate.dx)
-            ? dx === gate.dx && Math.sign(dy) === Math.sign(gate.dy)
-            : dy === gate.dy && Math.sign(dx) === Math.sign(gate.dx)
-        if (lane) continue
-        const x = wrap(home.x + dx, size)
-        const y = wrap(home.y + dy, size)
-        if (terrainAt(terrain, x, y) !== Terrain.Plains || !freeTile(world, terrain, x, y)) continue
-        const dist = Math.hypot(dx - gate.dx, dy - gate.dy)
-        if (!best || dist < best.dist) best = { x, y, dist }
-      }
+    // North-west tiles of footprints whose nearest tile to the home is on ring `d`: touching it
+    // from outside on one of its four sides.
+    const candidates: [number, number][] = []
+    for (let t = -d - side + 1; t <= d; t++) {
+      candidates.push([t, -d - side + 1], [t, d], [-d - side + 1, t], [d, t])
+    }
+    for (const [dx, dy] of candidates) {
+      const x = wrap(home.x + dx, size)
+      const y = wrap(home.y + dy, size)
+      if (!ground.fits('farm', x, y, fine)) continue
+      const dist = Math.hypot(dx + (side - 1) / 2 - gate.dx, dy + (side - 1) / 2 - gate.dy)
+      if (!best || dist < best.dist) best = { x, y, dist }
     }
     if (best) return { x: best.x, y: best.y }
   }

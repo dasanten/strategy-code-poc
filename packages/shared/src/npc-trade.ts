@@ -10,6 +10,7 @@ import {
   isArmed,
 } from './balance.js'
 import { cityFoodUse, forSale, npcCityRefuses } from './city.js'
+import { covers, isAt } from './footprint.js'
 import { standingOf } from './standing.js'
 import {
   PRICED_GOODS,
@@ -34,8 +35,9 @@ export function npcStorages(world: Pick<WorldState, 'buildings'>, city: City): B
 }
 
 /**
- * The NPC city whose finished storage stands on tile (x, y), with that storage: where a resident
- * there trades with it. Undefined anywhere else, and on a storage of a Player's city.
+ * The NPC city whose finished storage covers tile (x, y), with that storage: where a resident
+ * there trades with it (`CONTEXT.md`: At a building). Undefined anywhere else, and at a storage
+ * of a Player's city.
  */
 export function npcTradingStorageAt(
   world: Pick<WorldState, 'cities' | 'buildings'>,
@@ -43,7 +45,7 @@ export function npcTradingStorageAt(
   y: number,
 ): { city: City; storage: Building } | undefined {
   const storage = world.buildings.find(
-    (b) => b.kind === 'storage' && !b.site && b.x === x && b.y === y,
+    (b) => b.kind === 'storage' && !b.site && covers(b, x, y),
   )
   const city = storage && world.cities.find((c) => c.id === storage.cityId)
   return city && forSale(city) ? { city, storage: storage! } : undefined
@@ -220,7 +222,7 @@ export function npcTradeProblem(
   cityId: unknown = undefined,
 ): string | undefined {
   const at = npcTradingStorageAt(world, resident.x, resident.y)
-  if (!at) return 'not on an NPC city’s storage'
+  if (!at) return 'not at an NPC city’s storage'
   if (npcCityRefuses(world, at.city, realmId)) return `${at.city.name} won’t trade with you`
   if (!canWork(resident, world.tick)) return 'children can’t trade'
   if (!(PRICED_GOODS as readonly unknown[]).includes(good)) return 'not a good cities trade'
@@ -230,8 +232,7 @@ export function npcTradeProblem(
   if (carriageId !== null && carriageId !== undefined) {
     const k = world.carriages.find((x) => x.id === carriageId)
     if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
-    if (k.x !== resident.x || k.y !== resident.y)
-      return 'that carriage is not on the resident’s tile'
+    if (!isAt(k, at.storage)) return 'that carriage is not at the storage'
     stock = k.load
   }
   if (side === 'sell' && !((stock[good as PricedGood] ?? 0) > 0)) return 'none of that good to sell'

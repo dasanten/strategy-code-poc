@@ -61,24 +61,24 @@ describe('generateTerrain', () => {
       const start = performance.now()
       map = generateTerrain(1)
       ms = performance.now() - start
-    }, 120_000)
+    }, 300_000)
 
-    it('generates well under a minute', () => {
-      expect(ms).toBeLessThan(30_000)
+    it('generates in under a minute', () => {
+      expect(ms).toBeLessThan(60_000)
     })
 
-    it('is a 1,440 × 1,440 square whose coordinates run on past every side', () => {
+    it('is a 5,760 × 5,760 square whose coordinates run on past every side', () => {
       expect(map.size).toBe(MAP_SIZE)
-      expect(MAP_SIZE).toBe(1440)
-      expect(map.tiles).toHaveLength(1440 * 1440)
-      expect(terrainAt(map, -1, 5)).toBe(terrainAt(map, 1439, 5))
-      expect(terrainAt(map, 1440, 5)).toBe(terrainAt(map, 0, 5))
-      expect(terrainAt(map, 7, -1)).toBe(terrainAt(map, 7, 1439))
+      expect(MAP_SIZE).toBe(5760)
+      expect(map.tiles).toHaveLength(5760 * 5760)
+      expect(terrainAt(map, -1, 5)).toBe(terrainAt(map, 5759, 5))
+      expect(terrainAt(map, 5760, 5)).toBe(terrainAt(map, 0, 5))
+      expect(terrainAt(map, 7, -1)).toBe(terrainAt(map, 7, 5759))
     })
 
     it('has no seams where the sides join', () => {
       // Across a join the terrain changes about as often as anywhere else.
-      const inside = (changeAcross(map, 'x', 720) + changeAcross(map, 'y', 720)) / 2
+      const inside = (changeAcross(map, 'x', 2880) + changeAcross(map, 'y', 2880)) / 2
       for (const across of [changeAcross(map, 'x', 0), changeAcross(map, 'y', 0)]) {
         expect(across).toBeLessThan(inside * 2 + 0.02)
       }
@@ -107,7 +107,7 @@ describe('generateTerrain', () => {
     it('forms mountains into ranges', () => {
       const sizes = groupSizes(map, Terrain.Mountain)
       const total = sizes.reduce((a, b) => a + b, 0)
-      const inRanges = sizes.filter((s) => s >= 200).reduce((a, b) => a + b, 0)
+      const inRanges = sizes.filter((s) => s >= 3200).reduce((a, b) => a + b, 0)
       expect(inRanges / total).toBeGreaterThan(0.7)
     })
 

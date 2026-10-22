@@ -22,6 +22,7 @@ import {
   type OrderRequest,
   type Resident,
   type WorldState,
+  isAt,
 } from '@csp/shared'
 import { leaveArmies } from './armies.js'
 import { recordEvent } from './events.js'
@@ -341,7 +342,7 @@ function cannotPay(
   if (!Number.isInteger(weeks) || (weeks as number) < 1) return 'pay for a whole number of weeks'
   if ((weeks as number) > contractWeeks(c) - c.paidWeeks) return 'that is more weeks than are left'
   const b = world.buildings.find((x) => x.id === c.storageId)
-  if (!b || b.x !== r.x || b.y !== r.y) return 'the resident must stand on the contract’s storage'
+  if (!b || !isAt(r, b)) return 'the resident must stand at the contract’s storage'
   if ((r.carried.coins ?? 0) < (weeks as number) * c.pricePerWeek) {
     return 'the resident doesn’t carry enough coins'
   }
@@ -421,7 +422,7 @@ function sendHome(world: WorldState, r: Resident): void {
   r.order = null
   const city = world.cities.find((c) => c.id === r.cityId)
   const hall = city && townHallOf(world, city)
-  if (hall && (r.x !== hall.x || r.y !== hall.y)) walkTo(r, hall)
+  if (hall && !isAt(r, hall)) walkTo(r, hall)
 }
 
 /**

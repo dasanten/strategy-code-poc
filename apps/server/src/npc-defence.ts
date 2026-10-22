@@ -10,7 +10,6 @@ import {
   defendsCity,
   inCityArea,
   isArmed,
-  pileAt,
   punishers,
   recipeFor,
   wallSide,
@@ -23,6 +22,8 @@ import {
   type Stock,
   type Weapon,
   type WorldState,
+  buildingPile,
+  isAt,
 } from '@csp/shared'
 import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
@@ -188,16 +189,15 @@ function weaponIn(stock: Stock): Weapon | undefined {
 }
 
 /**
- * A weapon lies on the smithy's pile: an unarmed adult working there, or idle on its tile, picks
- * it up. Whether one does.
+ * A weapon lies on the smithy's pile: an unarmed adult working there, or idle at it, picks it
+ * up. Whether one does.
  */
 function takeFromSmithy(world: WorldState, smithy: Building, unarmed: Resident[]): boolean {
-  const weapon = weaponIn(pileAt(world, smithy.x, smithy.y)?.goods ?? {})
+  const weapon = weaponIn(buildingPile(world, smithy)?.goods ?? {})
   if (!weapon) return false
   const here = unarmed.find(
     (r) =>
-      r.x === smithy.x &&
-      r.y === smithy.y &&
+      isAt(r, smithy) &&
       (r.order === null || (r.order.kind === 'workAt' && r.order.buildingId === smithy.id)),
   )
   if (!here) return false
@@ -210,7 +210,7 @@ function takeFromSmithy(world: WorldState, smithy: Building, unarmed: Resident[]
  * there takes them; else an idle adult, or failing that a worker, sets out.
  */
 function fetch(storage: Building, unarmed: Resident[], goods: Stock): void {
-  const at = (r: Resident) => r.x === storage.x && r.y === storage.y
+  const at = (r: Resident) => isAt(r, storage)
   const there = unarmed.find((r) => r.order === null && at(r))
   if (there) {
     there.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods }
@@ -249,7 +249,7 @@ function smithing(world: WorldState, smithy: Building, unarmed: Resident[], inpu
   )
   if (!smith) return false
   if (smith.order !== null) return true
-  if (smith.x !== smithy.x || smith.y !== smithy.y) {
+  if (!isAt(smith, smithy)) {
     walkTo(smith, smithy)
     return true
   }

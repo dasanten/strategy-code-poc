@@ -9,7 +9,8 @@ import {
 } from './balance.js'
 import { MAX_WORKERS, workersOf } from './building.js'
 import { inCityArea, isCityBuilding } from './city.js'
-import { wrap, wrapDelta } from './terrain.js'
+import { footprintTiles, nearFootprint } from './footprint.js'
+import { wrap } from './terrain.js'
 import type { City, WorldState } from './world.js'
 
 /** World queries about territory (ADR 0002: the game API orders and scripts share). */
@@ -78,7 +79,9 @@ function source(id: string, owner: string, strength: number, tiles: ControlSourc
 export function controlSources(world: WorldState, size: number): ControlSource[] {
   const out: ControlSource[] = []
   for (const city of world.cities) {
-    const tiles = world.buildings.filter((b) => b.cityId === city.id && isCityBuilding(b))
+    const tiles = world.buildings
+      .filter((b) => b.cityId === city.id && isCityBuilding(b))
+      .flatMap((b) => footprintTiles(b, size).map(([x, y]) => ({ x, y })))
     if (tiles.length === 0) continue
     let strength = TERRITORY_CITY_BASE
     for (const r of world.residents) {
@@ -93,8 +96,7 @@ export function controlSources(world: WorldState, size: number): ControlSource[]
     const guards = new Map<string, number>()
     for (const r of world.residents) {
       if (r.owner === null || !isArmed(r)) continue
-      if (Math.abs(wrapDelta(b.x, r.x, size)) > 1 || Math.abs(wrapDelta(b.y, r.y, size)) > 1)
-        continue
+      if (!nearFootprint(b, r, 1, size)) continue
       guards.set(r.owner, (guards.get(r.owner) ?? 0) + 1)
     }
     if (guards.size === 0) continue
@@ -108,7 +110,7 @@ export function controlSources(world: WorldState, size: number): ControlSource[]
       if (g === 0) continue
       const strength =
         TERRITORY_WORKPLACE_BASE + n * TERRITORY_PER_RESIDENT + g * TERRITORY_PER_ARMED
-      out.push(source(b.id, owner, strength, [{ x: b.x, y: b.y }]))
+      out.push(source(b.id, owner, strength, footprintTiles(b, size).map(([x, y]) => ({ x, y }))))
     }
   }
   return out

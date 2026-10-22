@@ -13,7 +13,7 @@ export function smallTerrain(): TerrainMap {
 
 /** A map big enough for a few starting cities, still quick to generate. */
 export function cityTerrain(): TerrainMap {
-  return (medium ??= generateTerrain(1, 384))
+  return (medium ??= generateTerrain(1, 1536))
 }
 
 /**

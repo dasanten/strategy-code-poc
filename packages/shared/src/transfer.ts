@@ -1,5 +1,6 @@
 import { commandsCarriage } from './alliance.js'
 import { DELIVERY_LOAD, GOOD_WEIGHT, TRANSFER_FEE_FACTOR, canWork } from './balance.js'
+import { isAt } from './footprint.js'
 import { tradeOrgRefuses } from './standing.js'
 import { wrapDistance } from './terrain.js'
 import {
@@ -160,14 +161,13 @@ export function handInProblem(
   const problem = transferProblem(world, realmId, good, units, toCityId)
   if (problem) return problem
   if (!canWork(resident, world.tick)) return 'children can’t hand in a transfer'
-  if (!tradingWarehouseAt(world, resident.x, resident.y)) return 'not on a Trade Org warehouse'
+  const warehouse = tradingWarehouseAt(world, resident.x, resident.y)
+  if (!warehouse) return 'not at a Trade Org warehouse'
   let stock = resident.carried
   if (carriageId !== null && carriageId !== undefined) {
     const k = world.carriages.find((x) => x.id === carriageId)
     if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
-    if (k.x !== resident.x || k.y !== resident.y) {
-      return 'that carriage is not on the resident’s tile'
-    }
+    if (!isAt(k, warehouse)) return 'that carriage is not at the warehouse'
     stock = k.load
   }
   if (!((stock[good as Good] ?? 0) > 0)) return 'none of that good to hand in'

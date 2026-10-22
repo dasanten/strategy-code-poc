@@ -11,9 +11,10 @@ import {
   cityFoodUse,
   contractOf,
   hasFoodSurplus,
+  buildingPile,
   inCityArea,
   isArmed,
-  pileAt,
+  isAt,
   punishers,
   storedFood,
   workProblem,
@@ -123,14 +124,14 @@ function runCity(
     if (growth && growth.assign(r, true)) continue
     const load = storage && haul(r)
     if (storage && load) {
-      if (r.x === storage.x && r.y === storage.y) {
+      if (isAt(r, storage, size)) {
         r.order = { kind: 'drop', to: { kind: 'storage', storageId: storage.id }, goods: load }
       } else walkTo(r, storage)
       continue
     }
     const food = storage?.stock?.food ?? 0
     if (storage && food > 0 && (r.carried.food ?? 0) < NPC_OWN_FOOD) {
-      if (r.x === storage.x && r.y === storage.y) {
+      if (isAt(r, storage, size)) {
         const units = Math.min(food, NPC_OWN_FOOD - (r.carried.food ?? 0))
         const from = { kind: 'storage' as const, storageId: storage.id }
         r.order = { kind: 'pickUp', from, goods: { food: units } }
@@ -141,7 +142,7 @@ function runCity(
     if (!soldier && growth && growth.assign(r)) continue
     const place = !soldier && places.find((p) => room(world, p) > 0)
     if (place) {
-      if (r.x === place.x && r.y === place.y) {
+      if (isAt(r, place, size)) {
         if (workProblem(world, r) === undefined) startWork(r, place)
       } else walkTo(r, place)
       continue
@@ -169,7 +170,7 @@ function workplaces(world: WorldState, city: City, farmsFirst: boolean): Buildin
   return places.sort((a, b) => (farmsFirst ? 1 : -1) * (farm(a) - farm(b)))
 }
 
-/** Room left at a workplace: its most workers, minus those on it and those walking to it. */
+/** Room left at a workplace: its most workers, minus those at it and those walking to it. */
 function room(world: WorldState, place: Building): number {
   const coming = world.residents.filter(
     (r) =>
@@ -179,13 +180,13 @@ function room(world: WorldState, place: Building): number {
 }
 
 /**
- * Once `NPC_FETCH_UNITS` of a workplace's good lie in the pile on its tile, one of its workers
+ * Once `NPC_FETCH_UNITS` of a workplace's good lie in its pile, one of its workers
  * stops to pick it up, leaving `NPC_FOOD_LEFT_AT_WORK` Food for the others to refill from.
  */
 function fetchOutput(world: WorldState, place: Building): void {
   const good = workplaceGood(world, place)
   if (!good) return
-  const lying = pileAt(world, place.x, place.y)?.goods[good] ?? 0
+  const lying = buildingPile(world, place)?.goods[good] ?? 0
   const units = lying - (good === 'food' ? NPC_FOOD_LEFT_AT_WORK : 0)
   if (lying < NPC_FETCH_UNITS || units <= 0) return
   const worker = workersOf(world, place)[0]

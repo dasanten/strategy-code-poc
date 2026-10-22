@@ -79,7 +79,8 @@ interface Request extends PathOptions {
  */
 export class PathFinder {
   private readonly n: number
-  private readonly g: Float64Array
+  /** Cost so far to each tile, in single precision: plenty across the map, at half the memory. */
+  private readonly g: Float32Array
   private readonly cameFrom: Int32Array
   /** Which search last touched a tile, so the arrays never need clearing. */
   private readonly stamp: Uint32Array
@@ -97,7 +98,7 @@ export class PathFinder {
 
   constructor(private readonly terrain: TerrainMap) {
     this.n = terrain.size * terrain.size
-    this.g = new Float64Array(this.n)
+    this.g = new Float32Array(this.n)
     this.cameFrom = new Int32Array(this.n)
     this.stamp = new Uint32Array(this.n)
     this.closed = new Uint32Array(this.n)
@@ -275,7 +276,7 @@ export class PathFinder {
         const step = costs[this.ground(nt)]!
         if (step === Infinity || this.closed[nt] === this.search) continue
         if (!this.mayStep(req, t, nt)) continue
-        const g = this.g[t]! + step
+        const g = Math.fround(this.g[t]! + step)
         if (this.stamp[nt] === this.search && g >= this.g[nt]!) continue
         this.stamp[nt] = this.search
         this.g[nt] = g

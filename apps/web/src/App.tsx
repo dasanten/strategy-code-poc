@@ -12,6 +12,8 @@ import {
   type Resident,
   type ScriptSummary,
   type Stock,
+  isAt,
+  covers,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
@@ -175,8 +177,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   )
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
     selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
-  // A road may share its tile with a building (`CONTEXT.md`: Road).
-  const buildingHere = onTile(world?.buildings.filter((b) => b.kind !== 'road'))
+  // A road may share its tile with a building (`CONTEXT.md`: Road); a building is wherever its
+  // footprint is (`CONTEXT.md`: At a building).
+  const buildingHere =
+    selected && world?.buildings.find((b) => b.kind !== 'road' && isAt(selected, b))
   const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
 
   async function logout() {
@@ -379,7 +383,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               GOOD_LABELS,
             )}
             building={world.buildings.find(
-              (b) => b.x === selectedTile.x && b.y === selectedTile.y && b.kind !== 'road',
+              (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
             )}
             nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
             actor={selected}
@@ -417,8 +421,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             scripts={scripts}
             onRunScript={runScript}
             orderError={orderError}
-            pile={onTile(world.piles)}
-            storage={onTile(world.buildings.filter((b) => KEEPS_GOODS.includes(b.kind) && !b.site))}
+            pile={world.piles.find(
+              (p) => p.x === (buildingHere ?? selected).x && p.y === (buildingHere ?? selected).y,
+            )}
+            storage={
+              buildingHere && KEEPS_GOODS.includes(buildingHere.kind) && !buildingHere.site
+                ? buildingHere
+                : undefined
+            }
             building={buildingHere}
             road={roadHere}
             node={nodeAt?.(selected.x, selected.y)}

@@ -68,6 +68,45 @@ function fbm(
   return sum / total
 }
 
+/**
+ * Tiles apart at which `fbmField` works noise out exactly; in between it blends. Its finest
+ * features lie dozens of tiles apart, so the blend never shows, and a full-size map takes a
+ * sixteenth of the work.
+ */
+const FIELD_STEP = 4
+
+/**
+ * `fbm` for every tile of a map `size` across, by tile index: worked out every `FIELD_STEP` tiles
+ * along each direction and blended in between, seamless across the joins like `fbm` itself. A map
+ * whose size `FIELD_STEP` doesn't divide gets it worked out on every tile.
+ */
+function fbmField(size: number, spacing: number, octaves: number, seed: number): Float32Array {
+  const step = size % FIELD_STEP === 0 ? FIELD_STEP : 1
+  const n = size / step
+  const coarse = new Float32Array(n * n)
+  for (let cy = 0; cy < n; cy++) {
+    for (let cx = 0; cx < n; cx++) {
+      coarse[cy * n + cx] = fbm(cx * step, cy * step, size, spacing, octaves, seed)
+    }
+  }
+  if (step === 1) return coarse
+  const out = new Float32Array(size * size)
+  for (let y = 0; y < size; y++) {
+    const y0 = Math.floor(y / step)
+    const y1 = (y0 + 1) % n
+    const fy = (y % step) / step
+    for (let x = 0; x < size; x++) {
+      const x0 = Math.floor(x / step)
+      const x1 = (x0 + 1) % n
+      const fx = (x % step) / step
+      const top = coarse[y0 * n + x0]! * (1 - fx) + coarse[y0 * n + x1]! * fx
+      const bottom = coarse[y1 * n + x0]! * (1 - fx) + coarse[y1 * n + x1]! * fx
+      out[y * size + x] = top * (1 - fy) + bottom * fy
+    }
+  }
+  return out
+}
+
 /** The value below which `share` of `values` lie. */
 function quantile(values: Float32Array, share: number): number {
   if (values.length === 0) return Infinity
@@ -140,7 +179,7 @@ export function landGroups(map: TerrainMap): { group: Int32Array; sizes: number[
 }
 
 /** Lakes stay at least this many tiles from the sea, so they are inland. */
-const LAKE_COAST_MARGIN = 12
+const LAKE_COAST_MARGIN = 48
 
 /**
  * Generates the map from a seed (`CONTEXT.md`: Map, Terrain): a square whose opposite sides
@@ -165,6 +204,7 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
     r: size * (0.12 + rand() * 0.08),
   }))
   const seaScore = new Float32Array(n)
+  const coast = fbmField(size, 240, 4, seed + 5)
   for (let t = 0; t < n; t++) {
     const x = xOf(t)
     const y = yOf(t)
@@ -173,7 +213,7 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
       const d = Math.hypot(wrapDelta(sea.x, x, size), wrapDelta(sea.y, y, size))
       deepest = Math.max(deepest, 1 - d / sea.r)
     }
-    seaScore[t] = deepest + (fbm(x, y, size, 60, 4, seed + 5) - 0.5) * 0.6
+    seaScore[t] = deepest + (coast[t]! - 0.5) * 0.6
   }
   const seaCut = quantile(seaScore, 1 - TERRAIN_SHARES.sea)
   for (let t = 0; t < n; t++) if (seaScore[t]! >= seaCut) tiles[t] = Terrain.Sea
@@ -182,10 +222,11 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
   const fromSea = stepsFrom(size, (t) => tiles[t] === Terrain.Sea)
   const lakeAt: number[] = []
   const lakeField: number[] = []
+  const lakeNoise = fbmField(size, 360, 3, seed + 1)
   for (let t = 0; t < n; t++) {
     if (tiles[t] === Terrain.Sea || fromSea[t]! <= LAKE_COAST_MARGIN) continue
     lakeAt.push(t)
-    lakeField.push(fbm(xOf(t), yOf(t), size, 90, 3, seed + 1))
+    lakeField.push(lakeNoise[t]!)
   }
   const lakeCut = quantile(
     Float32Array.from(lakeField),
@@ -200,10 +241,12 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
   const isLand = (t: number) => tiles[t] !== Terrain.Sea && tiles[t] !== Terrain.Lake
   const relief = new Float32Array(n)
   const landRelief: number[] = []
+  const ridges = fbmField(size, 640, 4, seed + 2)
+  const masks = fbmField(size, 1600, 2, seed + 3)
   for (let t = 0; t < n; t++) {
     if (!isLand(t)) continue
-    const ridge = 1 - Math.abs(2 * fbm(xOf(t), yOf(t), size, 160, 4, seed + 2) - 1)
-    const mask = fbm(xOf(t), yOf(t), size, 400, 2, seed + 3)
+    const ridge = 1 - Math.abs(2 * ridges[t]! - 1)
+    const mask = masks[t]!
     relief[t] = ridge * ridge * mask
     landRelief.push(relief[t]!)
   }
@@ -216,11 +259,10 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
   )
 
   // Forest: patches of a separate field among the remaining land; plains everywhere else.
-  const growth = new Float32Array(n)
+  const growth = fbmField(size, 280, 4, seed + 4)
   const flatGrowth: number[] = []
   for (let t = 0; t < n; t++) {
     if (!isLand(t) || relief[t]! >= hillsCut) continue
-    growth[t] = fbm(xOf(t), yOf(t), size, 70, 4, seed + 4)
     flatGrowth.push(growth[t]!)
   }
   const forestCut = quantile(

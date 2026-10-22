@@ -102,7 +102,7 @@ describe('work-at order', () => {
     r.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
     reject('children can’t work')
     r.bornAt = world.tick - 30 * TICKS_PER_GAME_YEAR
-    r.x = 5
+    r.x = 8
     reject('there is no workplace to work here')
     r.x = 3
     world.buildings[0]!.site = { delivered: {}, work: 0 }

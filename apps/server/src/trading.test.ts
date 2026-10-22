@@ -244,7 +244,7 @@ describe('trading at a warehouse', () => {
     p1.y = coins.y
     p1.carried = { iron: 5 }
     expect(order(world, queue, { kind: 'sell', good: 'iron', units: 5 })).toBe(
-      'not on a Trade Org warehouse',
+      'not at a Trade Org warehouse',
     )
   })
 
@@ -299,7 +299,7 @@ describe('trading at a warehouse', () => {
     p1.bornAt = -20 * 24 * 3600
     p1.x += 1
     expect(order(world, queue, { kind: 'buy', good: 'iron', units: 1 })).toBe(
-      'not on a Trade Org warehouse',
+      'not at a Trade Org warehouse',
     )
   })
 

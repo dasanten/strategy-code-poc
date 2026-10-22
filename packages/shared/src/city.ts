@@ -16,7 +16,8 @@ import {
 import { allied } from './alliance.js'
 import { standingOf } from './standing.js'
 import { TRADE_ORG } from './trade-org.js'
-import { wrap, wrapDelta, wrapDistance } from './terrain.js'
+import { FOOTPRINT, footprintsNear, isAt, nearFootprint } from './footprint.js'
+import { wrap, wrapDistance } from './terrain.js'
 import type { Building, BuildingKind, City, Resident, WorldState } from './world.js'
 
 /** World queries about cities (ADR 0002: the game API orders and scripts share). */
@@ -44,18 +45,13 @@ export function idNumber(id: string): number {
   return Number(id.replace(/^\D+/, ''))
 }
 
-/** Whether two tiles are at most `reach` tiles apart along each direction, the short way round. */
-function within(size: number, a: Building, b: { x: number; y: number }, reach: number): boolean {
-  return (
-    Math.abs(wrapDelta(a.x, b.x, size)) <= reach && Math.abs(wrapDelta(a.y, b.y, size)) <= reach
-  )
-}
 
 /**
  * Which city each finished city building belongs to (`CONTEXT.md`: City building), by id; a
  * building missing from it belongs to none. A town hall belongs to its own city. Cities grow
- * outward in a chain from their town halls: a building within `CITY_BUILDING_REACH` of a
- * building already part of a city can join it. Claims are settled nearest town hall first,
+ * outward in a chain from their town halls: a building whose footprint comes within
+ * `CITY_BUILDING_REACH` of the footprint of a building already part of a city can join it. Claims
+ * are settled nearest town hall first,
  * the older city first on a tie, so a building both chains reach goes to the city whose town hall
  * is nearer, and a chain only goes on through buildings that are its own. `size` is the map's.
  */
@@ -69,15 +65,19 @@ export function cityMembership(
     const hall = world.buildings.find((b) => b.id === c.townHallId)
     if (hall) halls.set(c.id, hall)
   }
-  // City buildings by tile, to find the ones within reach.
+  // City buildings by the north-west tile of their footprint, to find the ones within reach.
   const byTile = new Map<string, Building>()
   for (const b of world.buildings) if (isCityBuilding(b)) byTile.set(`${b.x},${b.y}`, b)
+  const widest = Math.max(1, ...[...byTile.values()].map((b) => FOOTPRINT[b.kind]))
   const near = (b: Building) => {
     const out: Building[] = []
-    for (let dy = -CITY_BUILDING_REACH; dy <= CITY_BUILDING_REACH; dy++) {
-      for (let dx = -CITY_BUILDING_REACH; dx <= CITY_BUILDING_REACH; dx++) {
+    const from = -CITY_BUILDING_REACH - widest + 1
+    const to = CITY_BUILDING_REACH + FOOTPRINT[b.kind] - 1
+    for (let dy = from; dy <= to; dy++) {
+      for (let dx = from; dx <= to; dx++) {
         const n = byTile.get(`${wrap(b.x + dx, size)},${wrap(b.y + dy, size)}`)
-        if (n && n !== b && n.kind !== 'townHall') out.push(n)
+        if (n && n !== b && n.kind !== 'townHall' && footprintsNear(b, n, CITY_BUILDING_REACH, size))
+          out.push(n)
       }
     }
     return out
@@ -112,7 +112,8 @@ export function cityMembership(
 
 /**
  * Whether a tile lies in a city's area (`CONTEXT.md`: City area): within `CITY_AREA_MARGIN` of
- * one of its finished city buildings, the buildings' own tiles included. `size` is the map's.
+ * the footprint of one of its finished city buildings, the footprints included. `size` is the
+ * map's.
  */
 export function inCityArea(
   world: Pick<WorldState, 'buildings'>,
@@ -122,7 +123,8 @@ export function inCityArea(
   size: number,
 ): boolean {
   return world.buildings.some(
-    (b) => b.cityId === city.id && isCityBuilding(b) && within(size, b, { x, y }, CITY_AREA_MARGIN),
+    (b) =>
+      b.cityId === city.id && isCityBuilding(b) && nearFootprint(b, { x, y }, CITY_AREA_MARGIN, size),
   )
 }
 
@@ -145,8 +147,9 @@ export function cityAreaTiles(
   const out = new Set<string>()
   for (const b of world.buildings) {
     if (b.cityId !== city.id || !isCityBuilding(b)) continue
-    for (let dy = -CITY_AREA_MARGIN; dy <= CITY_AREA_MARGIN; dy++) {
-      for (let dx = -CITY_AREA_MARGIN; dx <= CITY_AREA_MARGIN; dx++) {
+    const side = FOOTPRINT[b.kind]
+    for (let dy = -CITY_AREA_MARGIN; dy < side + CITY_AREA_MARGIN; dy++) {
+      for (let dx = -CITY_AREA_MARGIN; dx < side + CITY_AREA_MARGIN; dx++) {
         out.add(`${wrap(b.x + dx, size)},${wrap(b.y + dy, size)}`)
       }
     }
@@ -307,14 +310,15 @@ export function cityPrice(
   const buildings = world.buildings
     .filter((b) => b.cityId === city.id && !b.site)
     .reduce((sum, b) => sum + (CITY_PRICE_BY_BUILDING[b.kind] ?? 0), 0)
-  const worth = residents * CITY_PRICE_PER_RESIDENT + buildings
+  // Whole coins: a stretch of wall is worth less than one (`CITY_PRICE_BY_BUILDING`).
+  const worth = Math.round(residents * CITY_PRICE_PER_RESIDENT + buildings)
   if (buyerId === undefined) return worth
   const standing = standingOf(world, city.id, buyerId)
   return Math.round(worth * (1 - (CITY_PRICE_STANDING_SWING * standing) / STANDING_RANGE))
 }
 
 /**
- * The realm's residents standing on a city's town hall (`CONTEXT.md`: Buying a city): the ones
+ * The realm's residents standing at a city's town hall (`CONTEXT.md`: Buying a city): the ones
  * whose coins count toward buying it. None when its town hall is gone.
  */
 export function buyersAtTownHall(
@@ -324,7 +328,7 @@ export function buyersAtTownHall(
 ): Resident[] {
   const hall = townHallOf(world, city)
   if (!hall) return []
-  return world.residents.filter((r) => r.owner === realmId && r.x === hall.x && r.y === hall.y)
+  return world.residents.filter((r) => r.owner === realmId && isAt(r, hall))
 }
 
 /** The coins the realm's residents carry on a city's town hall (`buyersAtTownHall`). */
@@ -356,7 +360,7 @@ export function buyProblem(
     return 'it won’t sell to you: it holds you in too low standing'
   if (r.owner !== realmId) return 'only a resident of your own realm can buy a city'
   const hall = townHallOf(world, city)
-  if (!hall || r.x !== hall.x || r.y !== hall.y) return 'the resident must stand on its town hall'
+  if (!hall || !isAt(r, hall)) return 'the resident must stand at its town hall'
   const price = cityPrice(world, city, realmId)
   const coins = coinsAtTownHall(world, city, realmId)
   if (coins < price) {

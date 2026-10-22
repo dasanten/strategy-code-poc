@@ -41,22 +41,22 @@ const plains = (size: number): TerrainMap => ({
 
 /** Resource nodes east of the post's square: two of stone, one of each other kind nearer. */
 const NODES: [ResourceKind, number, number][] = [
-  ['forest', 34, 22],
-  ['stone', 40, 20],
-  ['stone', 38, 26],
-  ['ironOre', 33, 18],
+  ['forest', 64, 28],
+  ['stone', 76, 24],
+  ['stone', 70, 40],
+  ['ironOre', 62, 12],
 ]
 
-/** A trading post alone on a Plains map 64 across, its square's top-left at (20, 20). */
+/** A trading post alone on a Plains map 128 across, its square's top-left at (20, 20). */
 function post(): { world: WorldState; terrain: TerrainMap; city: City } {
-  const terrain = plains(64)
+  const terrain = plains(128)
   for (const [kind, x, y] of NODES) {
     terrain.tiles[tileIndex(terrain.size, x, y)] =
       kind === 'forest' ? Terrain.Forest : Terrain.Hills
   }
   const world = createWorld(terrain)
   world.nodes = NODES.map(([kind, x, y], i) => ({ id: `n${i}`, kind, x, y }))
-  const region: Region = { x: 0, y: 0, width: 64, height: 64 }
+  const region: Region = { x: 0, y: 0, width: 128, height: 128 }
   const city = foundTradingPost(
     world,
     terrain,
@@ -70,8 +70,8 @@ function post(): { world: WorldState; terrain: TerrainMap; city: City } {
 
 describe('regions', () => {
   it('cuts a full-size map into 4 × 4 regions, a small one into one', () => {
-    expect(regions(1440)).toHaveLength(16)
-    expect(regions(1440).every((r) => r.width === 360 && r.height === 360)).toBe(true)
+    expect(regions(5760)).toHaveLength(16)
+    expect(regions(5760).every((r) => r.width === 1440 && r.height === 1440)).toBe(true)
     expect(regions(128)).toEqual([{ x: 0, y: 0, width: 128, height: 128 }])
   })
 
@@ -112,8 +112,8 @@ describe('a trading post', () => {
     const { world, city } = post()
     expect(city.workplaceIds).toHaveLength(1)
     const workplace = world.buildings.find((b) => b.id === city.workplaceIds![0])!
-    // Stone is the most common; of the two stone nodes, (38, 26) is nearer the town hall.
-    expect(workplace).toMatchObject({ kind: NODE_WORKPLACE.stone, cityId: null, x: 38, y: 26 })
+    // Stone is the most common; of the two stone nodes, (70, 40) is nearer the town hall.
+    expect(workplace).toMatchObject({ kind: NODE_WORKPLACE.stone, cityId: null, x: 70, y: 40 })
   })
 
   it('left alone keeps its size and keeps itself fed', () => {
@@ -135,7 +135,7 @@ describe('placing trading posts', () => {
   let terrain: TerrainMap
   let world: WorldState
   beforeAll(() => {
-    terrain = generateTerrain(1, 720)
+    terrain = generateTerrain(1, 2880)
     world = generateWorld(terrain)
   })
 

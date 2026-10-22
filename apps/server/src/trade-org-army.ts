@@ -24,6 +24,7 @@ import {
   type MercenaryContract,
   type Resident,
   type WorldState,
+  middleOf,
 } from '@csp/shared'
 import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
@@ -250,9 +251,10 @@ function mercenaries(world: WorldState): Resident[] {
  * hall, round the ring.
  */
 function guardPosts(hall: Building): { x: number; y: number }[] {
-  return hqLayout(hall.x, hall.y).innerGates.map(([x, y]) => {
-    const d = Math.hypot(x - hall.x, y - hall.y) || 1
-    return { x: x + Math.round((x - hall.x) / d), y: y + Math.round((y - hall.y) / d) }
+  const c = middleOf(hall)
+  return hqLayout(c.x, c.y).innerGates.map(([x, y]) => {
+    const d = Math.hypot(x - c.x, y - c.y) || 1
+    return { x: x + Math.round((x - c.x) / d), y: y + Math.round((y - c.y) / d) }
   })
 }
 

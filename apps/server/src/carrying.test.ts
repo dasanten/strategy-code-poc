@@ -129,7 +129,7 @@ describe('pick-up order', () => {
     })
     queue.applyAll(world)
     expect(r.order?.kind).toBe('pickUp')
-    r.x = 2 // moved off the storage before the tick resolves
+    r.x = 4 // moved off the storage before the tick resolves
     stepWorld(world, open)
     expect(r.carried).toEqual({})
     expect(r.order).toBeNull()
@@ -152,7 +152,7 @@ describe('pick-up order', () => {
       'the spot must be the ground, a storage, a construction site or a carriage',
     )
     expect(reason(pick({ spot: { kind: 'storage', storageId: 's9' }, goods: { food: 1 } }))).toBe(
-      'that storage is not on the resident’s tile',
+      'the resident is not at that storage',
     )
     expect(reason(pick({ goods: { stone: 1 } }))).toBe('none of those goods here')
     expect(reason(pick({ spot: ground, goods: { food: 1 } }))).toBe('none of those goods here')

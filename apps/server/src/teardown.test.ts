@@ -227,9 +227,9 @@ describe('tear-down order', () => {
     }
     expect(reject(tearDownOrder(), stranger)).toBe('not one of your residents')
     expect(reject({ kind: 'tearDown', residentId: 'w1' })).toBe('which building?')
-    expect(reject(tearDownOrder('b9'))).toBe('that building is not on the resident’s tile')
+    expect(reject(tearDownOrder('b9'))).toBe('the resident is not at that building')
     r.x = 6
-    expect(reject(tearDownOrder())).toBe('that building is not on the resident’s tile')
+    expect(reject(tearDownOrder())).toBe('the resident is not at that building')
     r.x = 7
     r.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
     expect(reject(tearDownOrder())).toBe('children can’t tear down buildings')
@@ -297,8 +297,8 @@ describe('tear-down invariants', () => {
       y: 7,
       site: { delivered: {}, work: 0 },
     })
-    expect(buildingsInPlace.check(world, terrain).map((v) => v.message)).toContain(
-      'b2 shares tile (7,7) with another building',
+    expect(buildingsInPlace.check(world, terrain).map((v) => v.message)).toContainEqual(
+      expect.stringMatching(/^b2 overlaps .+ on tile .7,7.$/),
     )
   })
 

@@ -701,7 +701,7 @@ describe('buying off an admin directive', () => {
       reason: 'no directive names your realm by that id',
     })
     standOn(world, 'a1', { x: goods.x + 30, y: goods.y + 30 }, 300)
-    expect(ask(aldo, 'a1')).toMatchObject({ reason: 'not on a Trade Org warehouse' })
+    expect(ask(aldo, 'a1')).toMatchObject({ reason: 'not at a Trade Org warehouse' })
     standOn(world, 'a1', goods, 300)
     expect(ask(aldo, 'a1').type).toBe('ack')
     expect(setDirectivePrice(world, d.id, null)).toMatchObject({ price: null })

@@ -44,16 +44,16 @@ describe('placeNpcCities (through generateWorld)', () => {
   // The NPC cities, without the Trade Org HQ the world generator places first.
   let npc: City[]
   beforeAll(() => {
-    terrain = generateTerrain(1, 720)
+    terrain = generateTerrain(1, 2880)
     world = generateWorld(terrain)
     npc = world.cities.filter((c) => !c.tradeOrg)
   })
 
   it('places towns and villages by the map area, run by the game', () => {
-    expect(npcCityCount(NPC_TOWNS, 1440)).toBe(NPC_TOWNS)
-    expect(npcCityCount(NPC_VILLAGES, 1440)).toBe(NPC_VILLAGES)
-    const towns = npcCityCount(NPC_TOWNS, 720)
-    const villages = npcCityCount(NPC_VILLAGES, 720)
+    expect(npcCityCount(NPC_TOWNS, 5760)).toBe(NPC_TOWNS)
+    expect(npcCityCount(NPC_VILLAGES, 5760)).toBe(NPC_VILLAGES)
+    const towns = npcCityCount(NPC_TOWNS, 2880)
+    const villages = npcCityCount(NPC_VILLAGES, 2880)
     expect(towns).toBeGreaterThan(0)
     expect(npc).toHaveLength(towns + villages)
     const sizes = npc.map((c) => world.residents.filter((r) => r.cityId === c.id).length)

@@ -122,7 +122,7 @@ describe('PathFinder across the full map', () => {
     // As far apart as two places get: half the map along each direction.
     west = nearestFreeTile(map, new Set(), 100, 100)
     east = nearestFreeTile(map, new Set(), 820, 820)
-  }, 120_000)
+  }, 300_000)
 
   it('finds a path between the farthest places in steps that stay within the tick budget', () => {
     const finder = new PathFinder(map)

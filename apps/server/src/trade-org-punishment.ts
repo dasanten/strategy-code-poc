@@ -23,6 +23,7 @@ import {
   type Resident,
   type Stock,
   type WorldState,
+  isAt,
 } from '@csp/shared'
 import { attackOrder } from './combat.js'
 import { cityOrganization } from './crimes.js'
@@ -306,7 +307,7 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
       const storage = storages.reduce((a, b) =>
         wrapDistance(size, r, b) < wrapDistance(size, r, a) ? b : a,
       )
-      if (r.x !== storage.x || r.y !== storage.y) {
+      if (!isAt(r, storage, size)) {
         headFor(r, storage)
         continue
       }
@@ -348,7 +349,7 @@ function bringHome(world: WorldState, hq: City, r: Resident, taken: Stock, size:
     const keeps = warehouseKeeps(world, b)
     const here = goods.filter((g) => keeps.includes(g))
     if (here.length === 0) continue
-    if (r.x !== b.x || r.y !== b.y) {
+    if (!isAt(r, b, size)) {
       headFor(r, b)
       return
     }

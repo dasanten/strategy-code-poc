@@ -137,7 +137,7 @@ describe('foundStartingCity', () => {
 
     beforeAll(() => {
       terrain = generateTerrain(1)
-    }, 120_000)
+    }, 300_000)
 
     it('places cities on open land, far from each other the short way round', () => {
       const world = createWorld(terrain)

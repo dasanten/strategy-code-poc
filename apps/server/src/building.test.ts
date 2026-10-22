@@ -20,13 +20,13 @@ import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { createWorld, stepWorld } from './world.js'
 
-/** Plains, with forest at (3, 3) and (4, 4) and hills at (6, 6) and (7, 7). */
+/** Plains, with forest at (3, 3) and (4, 4) and hills at (6, 6) and (10, 10). */
 function map(): TerrainMap {
   const tiles = new Uint8Array(16 * 16).fill(Terrain.Plains)
   tiles[3 * 16 + 3] = Terrain.Forest
   tiles[4 * 16 + 4] = Terrain.Forest
   tiles[6 * 16 + 6] = Terrain.Hills
-  tiles[7 * 16 + 7] = Terrain.Hills
+  tiles[10 * 16 + 10] = Terrain.Hills
   return { size: 16, tiles }
 }
 const terrain = map()
@@ -35,14 +35,14 @@ const stranger = { userId: 8, account: { name: 'Tobin', isAdmin: false } }
 
 /**
  * A world on a small map: a forest node at (3, 3), a stone node at (6, 6) and an iron ore node at
- * (7, 7); realm r1 (Player 7) with resident w1 standing on the forest node, Strength 10.
+ * (10, 10); realm r1 (Player 7) with resident w1 standing on the forest node, Strength 10.
  */
 function setup() {
   const world = createWorld({ size: 16, tiles: new Uint8Array(16 * 16).fill(Terrain.Plains) })
   world.nodes = [
     { id: 'n1', kind: 'forest', x: 3, y: 3 },
     { id: 'n2', kind: 'stone', x: 6, y: 6 },
-    { id: 'n3', kind: 'ironOre', x: 7, y: 7 },
+    { id: 'n3', kind: 'ironOre', x: 10, y: 10 },
   ]
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'w1' })
   const r = resident(world, 'w1', 3, 3)
@@ -168,7 +168,7 @@ describe('build order', () => {
 
   it('lets delivered materials be taken again: they are goods like any others', () => {
     const { world, r, queue } = setup()
-    r.x = r.y = 7
+    r.x = r.y = 10
     order(world, queue, buildOrder('mine'))
     const site = siteOf(world)!
     site.site!.delivered = { wood: 10, stone: 4 }
@@ -213,17 +213,17 @@ describe('build order', () => {
     }
     expect(reject(buildOrder('lumberCamp'), stranger)).toBe('not one of your residents')
     expect(reject(buildOrder('storage'))).toBe('that can’t be built')
-    expect(reject(buildOrder('quarry'))).toBe('a quarry goes on a fitting resource node')
+    expect(reject(buildOrder('quarry'))).toBe('a quarry goes with one tile on a fitting resource node')
     r.x = 1
-    expect(reject(buildOrder('lumberCamp'))).toBe('a lumberCamp goes on a fitting resource node')
+    expect(reject(buildOrder('lumberCamp'))).toBe('a lumberCamp goes with one tile on a fitting resource node')
     r.x = 3
     r.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
     expect(reject(buildOrder('lumberCamp'))).toBe('children can’t build')
     r.bornAt = world.tick - 30 * TICKS_PER_GAME_YEAR
     world.buildings.push({ id: 'b9', kind: 'lumberCamp', cityId: null, x: 3, y: 3 })
-    expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building on this tile')
+    expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building there')
     world.buildings = [{ id: 'b9', kind: 'wall', cityId: null, x: 3, y: 3 }]
-    expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building on this tile')
+    expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building there')
     expect(queue.size).toBe(0)
   })
 
@@ -243,8 +243,8 @@ describe('building invariants', () => {
     id: 'b1',
     kind: 'mine',
     cityId: null,
-    x: 7,
-    y: 7,
+    x: 10,
+    y: 10,
     site: { delivered: {}, work: 0 },
     ...over,
   })
@@ -283,7 +283,7 @@ describe('building invariants', () => {
     world.buildings.push(site())
     r.order = { kind: 'build', building: 'mine', at: { x: 3, y: 3 }, siteId: 'b1' }
     expect(buildOrdersOnSites.check(world, terrain)).toHaveLength(1)
-    r.x = r.y = 7
+    r.x = r.y = 10
     expect(buildOrdersOnSites.check(world, terrain)).toEqual([])
   })
 })
