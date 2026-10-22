@@ -1,36 +1,291 @@
+/* Colours and fonts come from `theme.ts` as custom properties (`applyTheme`). */
 :root {
   color-scheme: dark;
-  font-family: system-ui, sans-serif;
-  background: #181a1f;
-  color: #e6e6e6;
+  font-family: var(--font-ui);
+  background: var(--ui-ink);
+  color: var(--ui-text);
 }
 body {
   margin: 0;
 }
+
+/* ---------- Game screen (ADR 0008): a full-screen map with a HUD over it ---------- */
+.game {
+  --top-h: 38px;
+  --rail-w: 48px;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  font-size: 13px;
+}
+.game-map {
+  position: absolute;
+  inset: 0;
+}
+.game-map .map-view {
+  position: absolute;
+  inset: 0;
+  height: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--terrain-void);
+}
+/* The map's own controls clear the top bar and the rail. */
+.game-map .map-buttons {
+  left: calc(var(--rail-w) + 12px);
+  top: calc(var(--top-h) + 12px);
+}
+.game-map .map-legend {
+  left: calc(var(--rail-w) + 12px);
+}
+.game-map .map-legend,
+.game-map .map-readout {
+  background: var(--ui-bar);
+  border-color: var(--ui-line);
+  backdrop-filter: blur(8px);
+}
+.game-waiting {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--ui-muted);
+}
+.hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: var(--top-h);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px 0 calc(var(--rail-w) + 14px);
+  background: var(--ui-bar);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--ui-line);
+  white-space: nowrap;
+}
+.hud-sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  background: var(--ui-line-strong);
+}
+.hud-grow {
+  flex: 1;
+}
+.hud-muted {
+  color: var(--ui-muted);
+}
+.hud-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.hud-status {
+  font-size: 11px;
+  color: var(--ui-muted);
+}
+.hud-status.open {
+  color: var(--ui-live);
+}
+.hud-status.closed {
+  color: var(--ui-bad);
+}
+.hud-goods {
+  display: inline-flex;
+  gap: 14px;
+}
+.hud-good,
+.hud-leader {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.hud-leader .icon {
+  color: var(--rel-own);
+}
+button.hud-logout {
+  padding: 3px 10px;
+  font-size: 12px;
+  background: transparent;
+  border-color: var(--ui-line-strong);
+}
+.hud-rail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 4;
+  width: var(--rail-w);
+  box-sizing: border-box;
+  padding-top: calc(var(--top-h) + 10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--ui-bar);
+  border-right: 1px solid var(--ui-line);
+}
+.hud-rail button {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+.hud-rail button:hover {
+  background: var(--ui-raised-hover);
+}
+.hud-rail button.on {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+}
+.hud-rail button:hover::after,
+.hud-rail button:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 44px;
+  z-index: 5;
+  white-space: nowrap;
+  background: var(--ui-text);
+  color: var(--ui-ink);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.hud-drawer {
+  position: absolute;
+  top: var(--top-h);
+  left: var(--rail-w);
+  bottom: 0;
+  z-index: 2;
+  width: min(380px, calc(100vw - var(--rail-w)));
+  box-sizing: border-box;
+  padding: 12px 16px 16px;
+  overflow: auto;
+  background: var(--ui-panel);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid var(--ui-line);
+}
+.hud-drawer.wide {
+  width: min(760px, calc(100vw - var(--rail-w)));
+}
+.hud-drawer[hidden] {
+  display: none;
+}
+.hud-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.hud-drawer-head h2 {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ui-muted);
+}
+.hud-drawer-head button,
+.game-inspector-close {
+  padding: 2px 8px;
+  border: 0;
+  background: var(--ui-raised);
+}
+/* The panel's own heading repeats the drawer's; the drawer heading names it. */
+.hud-drawer .panel-head h2 {
+  font-size: 0.75rem;
+}
+.game-inspector {
+  position: absolute;
+  top: calc(var(--top-h) + 12px);
+  right: 12px;
+  z-index: 1;
+  width: min(380px, calc(100vw - var(--rail-w) - 24px));
+  max-height: calc(100% - var(--top-h) - 24px);
+  overflow: auto;
+  border-radius: 10px;
+}
+.game-inspector .inspector {
+  background: var(--ui-panel);
+  backdrop-filter: blur(10px);
+  border-color: var(--ui-line);
+  border-radius: 10px;
+}
+.game-inspector-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+.hud-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.hud-dialog {
+  width: min(440px, 100%);
+  box-sizing: border-box;
+  padding: 20px 22px;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-line-strong);
+  border-top: 3px solid var(--ui-bad);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.hud-dialog h2 {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+}
+.hud-dialog p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--ui-muted);
+}
+.hud-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+@media (max-width: 640px) {
+  .hud-goods,
+  .hud-top .hud-muted,
+  .hud-top .hud-sep {
+    display: none;
+  }
+}
+
+/* ---------- Admin page ---------- */
 .layout header {
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid #2c2f36;
+  border-bottom: 1px solid var(--ui-line);
 }
 .layout h1 {
   font-size: 1.1rem;
   margin: 0;
 }
-.status {
-  font-size: 0.85rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  background: #3a3d45;
-}
-.status.open {
-  background: #24502f;
-}
-.status.closed {
-  background: #5a2626;
-}
-main {
+.layout main {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
@@ -133,20 +388,6 @@ label {
 .codes {
   margin: 0;
   padding-left: 1.2rem;
-}
-.play-column {
-  flex: 999 1 640px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.side-column {
-  flex: 1 1 340px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 .map-view {
   position: relative;
@@ -504,20 +745,6 @@ button.residents-row:hover {
   margin-left: 6px;
   padding: 0 6px;
   font-size: 0.75rem;
-}
-.realm-ended {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  border-left: 3px solid #c94a4a;
-  background: #2a1d20;
-  font-size: 0.85rem;
-}
-.realm-ended p {
-  margin: 0;
-  flex: 1;
 }
 .alliance-panel h2 {
   margin: 0;

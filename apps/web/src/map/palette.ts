@@ -1,19 +1,20 @@
 import { Terrain, UNEXPLORED, type BuildingKind, type ResourceKind } from '@csp/shared'
+import { THEME, hex, type Relationship } from '../theme.js'
 
 /** Roads, wide and light over the terrain (ADR 0008). */
-export const ROAD_COLOR = 0xe8cf97
+export const ROAD_COLOR = hex(THEME.terrain.road)
 
-/** The painted board-game terrain colours (ADR 0008), as 0xRRGGBB. */
+/** Terrain colours from the theme (ADR 0008), as 0xRRGGBB. */
 export const TERRAIN_COLORS: Record<number, number> = {
-  [Terrain.Plains]: 0x93c45a,
-  [Terrain.Forest]: 0x3f8c3c,
-  [Terrain.Hills]: 0xc9a65c,
-  [Terrain.Mountain]: 0x938f8a,
-  [Terrain.Lake]: 0x45aee0,
-  [Terrain.Sea]: 0x2f80c6,
+  [Terrain.Plains]: hex(THEME.terrain.plains),
+  [Terrain.Forest]: hex(THEME.terrain.forest),
+  [Terrain.Hills]: hex(THEME.terrain.hills),
+  [Terrain.Mountain]: hex(THEME.terrain.mountain),
+  [Terrain.Lake]: hex(THEME.terrain.lake),
+  [Terrain.Sea]: hex(THEME.terrain.sea),
   /** Never in a chunk: roads are drawn over the terrain, in this colour. */
   [Terrain.Road]: ROAD_COLOR,
-  [UNEXPLORED]: 0x1a1e22,
+  [UNEXPLORED]: hex(THEME.terrain.unexplored),
 }
 
 /** The small dark marks on the terrain (trees, hill arcs, peaks, waves, tufts), and how strong. */
@@ -21,7 +22,12 @@ export const TERRAIN_MARK_COLOR = 0x1f3d17
 export const TERRAIN_MARK_ALPHA = 0.5
 
 /** Map background, behind terrain not loaded yet. */
-export const VOID_COLOR = 0x0b0d0f
+export const VOID_COLOR = hex(THEME.terrain.void)
+
+/** Who a token belongs to, seen from the Player (ADR 0008), as 0xRRGGBB. */
+export const RELATIONSHIP_COLORS = Object.fromEntries(
+  Object.entries(THEME.relationship).map(([k, v]) => [k, hex(v)]),
+) as Record<Relationship, number>
 
 export const TERRAIN_NAMES: Record<number, string> = {
   [Terrain.Plains]: 'Plains',
@@ -49,9 +55,9 @@ export const NODE_NAMES: Record<ResourceKind, string> = {
 }
 
 /** Residents: your Leader, your other residents, everyone else. */
-export const LEADER_COLOR = 0xe8a33d
+export const LEADER_COLOR = RELATIONSHIP_COLORS.own
 export const OWN_COLOR = 0xf2eee3
-export const OTHER_COLOR = 0xe0524a
+export const OTHER_COLOR = RELATIONSHIP_COLORS.otherRealm
 
 /** City walls and buildings, from the design. */
 export const WALL_COLOR = 0x8a5a2b
@@ -95,7 +101,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
 export const HORSE_COLOR = 0x6b4f2e
 export const CARRIAGE_COLOR = 0xb79a6e
 /** A Trade Org caravan's carriage and crew (`CONTEXT.md`: Caravan). */
-export const CARAVAN_COLOR = 0x3fb4c9
+export const CARAVAN_COLOR = RELATIONSHIP_COLORS.tradeOrg
 /** Goods lying on the ground. */
 export const PILE_COLOR = 0xd9c27a
 

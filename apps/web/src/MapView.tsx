@@ -9,8 +9,10 @@ import {
   cityAreaTiles,
   wrap,
   wrapDelta,
+  type Building,
   type KnownNode,
   type Resident,
+  type ResourceKind,
 } from '@csp/shared'
 import {
   CLOSE_SCALE,
@@ -39,7 +41,6 @@ import {
 import {
   NODE_COLORS,
   NODE_NAMES,
-  BUILDING_COLORS,
   CARAVAN_COLOR,
   CARRIAGE_COLOR,
   HORSE_COLOR,
@@ -47,7 +48,6 @@ import {
   LEADER_COLOR,
   OTHER_COLOR,
   OWN_COLOR,
-  WALL_COLOR,
   CITY_AREA_COLOR,
   ROAD_COLOR,
   TERRAIN_COLORS,
@@ -55,6 +55,16 @@ import {
   VOID_COLOR,
   css,
 } from './map/palette.js'
+import { BASE_ART, BUILDING_ART, NODE_ART } from './map/art.js'
+import { destroyAtlas, loadAtlas, type Atlas } from './map/atlas.js'
+import {
+  GLYPH_COLOR,
+  NODE_GLYPH_COLORS,
+  TokenLayer,
+  cityRelationship,
+  relationshipColor,
+  type Relationship,
+} from './map/tokens.js'
 import type { ClientWorld } from './useWorld.js'
 import { caravanAt, caravanParts } from './caravans.js'
 
@@ -164,6 +174,10 @@ export function MapView({
     // The Region map: territory over the terrain, one small texture per chunk like the terrain.
     const regionSprites = new Map<number, Sprite>()
     const regionLayer = new Container()
+    // Under the tokens: grid, city areas, roads and walls; over them: piles, carts and residents.
+    const under = new Graphics()
+    const tokens = new TokenLayer()
+    let atlas: Atlas | undefined
     const overlay = new Graphics()
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
     let cam: Camera = { ...homeCentre(worldRef.current), scale: START_SCALE }
@@ -252,32 +266,40 @@ export function MapView({
 
     function drawOverlay(g: Graphics, cam: Camera, view: Size, onScreen: number[]) {
       g.clear()
-      if (cam.scale < FAR_SCALE) return
+      under.clear()
+      tokens.begin()
+      if (cam.scale >= FAR_SCALE) drawMiddle(g, cam, view, onScreen)
+      tokens.end()
+    }
 
+    function drawMiddle(g: Graphics, cam: Camera, view: Size, onScreen: number[]) {
       if (cam.scale >= CLOSE_SCALE) {
         const { x0, y0, x1, y1 } = visibleTiles(cam, view)
         for (let x = x0; x <= x1 + 1; x++) {
           const sx = (x - cam.x) * cam.scale + view.width / 2
-          g.moveTo(sx, 0).lineTo(sx, view.height)
+          under.moveTo(sx, 0).lineTo(sx, view.height)
         }
         for (let y = y0; y <= y1 + 1; y++) {
           const sy = (y - cam.y) * cam.scale + view.height / 2
-          g.moveTo(0, sy).lineTo(view.width, sy)
+          under.moveTo(0, sy).lineTo(view.width, sy)
         }
-        g.stroke({ width: 1, color: 0x000000, alpha: 0.12 })
+        under.stroke({ width: 1, color: 0x000000, alpha: 0.12 })
       }
 
-      const r = Math.max(4, Math.min(9, cam.scale * 0.35))
+      // A node under a building shows as the building.
+      const built = new Set(
+        worldRef.current.buildings.filter((b) => b.kind !== 'road').map((b) => `${b.x},${b.y}`),
+      )
+      const r = tokenRadius(cam.scale)
       for (const i of onScreen) {
         for (const n of nodes[i] ?? []) {
+          if (built.has(`${n.x},${n.y}`)) continue
           const [sx, sy] = tileToScreen(cam, view, mapSize, n.x + 0.5, n.y + 0.5)
-          g.poly([sx, sy - r, sx + r, sy, sx, sy + r, sx - r, sy])
-            .fill(NODE_COLORS[n.kind])
-            .stroke({ width: 2, color: 0x121518 })
+          drawNode(tokens, n.kind, sx, sy, r)
         }
       }
 
-      drawStructures(g, cam, view, worldRef.current)
+      drawStructures(under, g, tokens, cam, view, worldRef.current)
 
       const { home } = worldRef.current
       const { crew } = caravanParts(worldRef.current.caravans)
@@ -431,8 +453,14 @@ export function MapView({
       app.canvas.addEventListener('wheel', onWheel, { passive: false })
       app.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
       app.renderer.on('resize', redraw)
-      app.stage.addChild(terrainLayer.container, regionLayer, overlay)
+      app.stage.addChild(terrainLayer.container, regionLayer, under, tokens.container, overlay)
       ready = true
+      void loadAtlas().then((loaded) => {
+        if (disposed) return destroyAtlas(loaded)
+        atlas = loaded
+        tokens.atlas = loaded
+        redraw()
+      })
       updateRegion(worldRef.current.region)
       setCam({ ...cam, scale: clampScale(cam.scale, mapSize, size()) })
     })
@@ -450,6 +478,7 @@ export function MapView({
         for (const sprite of regionSprites.values()) sprite.texture.destroy(true)
         app.destroy(true, { children: true })
       }
+      if (atlas) destroyAtlas(atlas)
     }
   }, [mapSize])
 
@@ -590,11 +619,47 @@ function homeCentre(world: ClientWorld): { x: number; y: number } {
   return { x: world.home.x + 0.5, y: world.home.y + 0.5 }
 }
 
+/** Token radius at a zoom: half a tile, but never smaller than readable (ADR 0008). */
+const tokenRadius = (scale: number) => Math.max(6.5, scale * 0.42)
+
 /**
- * City areas, roads, buildings (walls and gates among them), piles, horses and carriages, at mid
- * zoom and closer.
+ * A building as a token (ADR 0008): a dark hex badge, its ring in the owner's relationship colour
+ * and a light glyph. The art's hex has a radius of 11 in its 24-unit box.
  */
-function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld) {
+function drawBuilding(
+  tokens: TokenLayer,
+  file: string,
+  x: number,
+  y: number,
+  r: number,
+  rel: Relationship | undefined,
+  alpha = 1,
+  glyph = GLYPH_COLOR,
+) {
+  const base = (r * 1.08 * 24) / 11
+  tokens.place(BASE_ART.hex, x, y, base, 0xffffff, alpha)
+  tokens.place(BASE_ART.hexRing, x, y, base, relationshipColor(rel), alpha)
+  tokens.place(file, x, y, r * 1.2, glyph, alpha)
+}
+
+/** A resource node as a token: a dark diamond with the glyph in the node's colour. */
+function drawNode(tokens: TokenLayer, kind: ResourceKind, x: number, y: number, r: number) {
+  tokens.place(BASE_ART.diamond, x, y, (r * 24) / 11)
+  tokens.place(NODE_ART[kind], x, y, r * 1.15, NODE_GLYPH_COLORS[kind])
+}
+
+/**
+ * City areas, roads, walls, buildings, piles, horses and carriages, at mid zoom and closer.
+ * `under` lies below the tokens, `over` above them.
+ */
+function drawStructures(
+  under: Graphics,
+  over: Graphics,
+  tokens: TokenLayer,
+  cam: Camera,
+  view: Size,
+  world: ClientWorld,
+) {
   const { cities, buildings, horses, carriages, piles } = world
   const tile = cam.scale
   const size = world.map.size
@@ -614,9 +679,9 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
     for (const key of cityAreaTiles(world, c, size)) {
       const [x, y] = key.split(',').map(Number) as [number, number]
       const b = box(x, y)
-      if (onScreen(b)) g.rect(...b)
+      if (onScreen(b)) under.rect(...b)
     }
-    g.fill({ color: CITY_AREA_COLOR, alpha: 0.18 })
+    under.fill({ color: CITY_AREA_COLOR, alpha: 0.18 })
   }
   // Roads under the buildings, as a wide light band through the middle of the tile joined to the
   // roads next to it (`CONTEXT.md`: Road, ADR 0008); a road site, and the step onto it, are faint.
@@ -631,9 +696,9 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
     const style = { color: ROAD_COLOR, alpha: site ? 0.4 : 1 }
     for (const r of roads.values()) {
       const c = centre(cam, view, size, r)
-      if (!!r.site === site && inSight(c)) g.circle(c[0], c[1], w / 2)
+      if (!!r.site === site && inSight(c)) under.circle(c[0], c[1], w / 2)
     }
-    g.fill(style)
+    under.fill(style)
     // Each join once, from the road to its right or below; faint if either end is a site.
     for (const r of roads.values()) {
       const [sx, sy] = centre(cam, view, size, r)
@@ -644,47 +709,102 @@ function drawStructures(g: Graphics, cam: Camera, view: Size, world: ClientWorld
       ] as const) {
         const next = roadAt(r.x + dx, r.y + dy)
         if (next && !!(r.site || next.site) === site) {
-          g.moveTo(sx, sy).lineTo(sx + dx * tile, sy + dy * tile)
+          under.moveTo(sx, sy).lineTo(sx + dx * tile, sy + dy * tile)
         }
       }
     }
-    g.stroke({ ...style, width: w })
+    under.stroke({ ...style, width: w })
   }
+
+  const cityById = new Map(cities.map((c) => [c.id, c]))
+  const viewer = {
+    realmId: world.home.realmId,
+    allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
+  }
+  const relOf = (b: Building) =>
+    cityRelationship(b.cityId === null ? undefined : cityById.get(b.cityId), viewer)
+  const near = (sx: number, sy: number) =>
+    sx > -tile * 2 && sy > -tile * 2 && sx < view.width + tile * 2 && sy < view.height + tile * 2
+
+  // Walls and gates as joined lines in the owner's colour over a dark edge (ADR 0008); a wall
+  // site shows faintly.
+  const walls = new Set(
+    buildings.filter((b) => b.kind === 'wall' || b.kind === 'gate').map((b) => `${b.x},${b.y}`),
+  )
+  const wallAt = (x: number, y: number) => walls.has(`${(x + size) % size},${(y + size) % size}`)
+  const edge = Math.max(3, tile * 0.34)
+  const band = Math.max(1.5, tile * 0.22)
+  const lines = new Map<string, [number, number, number, number][]>()
   for (const b of buildings) {
-    if (b.kind === 'road') continue
-    // Walls and gates fill their whole tile, so a wall reads as one band; an open gate shows lighter,
-    // a closed one nearly as solid as the wall.
-    if (b.kind === 'wall' || b.kind === 'gate') {
-      g.rect(...box(b.x, b.y)).fill({
-        color: WALL_COLOR,
-        alpha: b.site ? 0.3 : b.kind === 'gate' ? (b.closed ? 0.8 : 0.45) : 1,
-      })
-      continue
-    }
-    // A construction site shows faintly, as an outline of what it will be.
-    g.rect(...box(b.x, b.y, 0.08))
-      .fill({ color: BUILDING_COLORS[b.kind], alpha: b.site ? 0.35 : 1 })
-      .stroke({ width: b.site ? 2 : 1, color: b.site ? BUILDING_COLORS[b.kind] : 0x4f3a22 })
+    if (b.kind !== 'wall' && b.kind !== 'gate') continue
+    const [cx, cy] = centre(cam, view, size, b)
+    if (!near(cx, cy)) continue
+    const key = `${relationshipColor(relOf(b))},${b.site ? 0.35 : 1}`
+    const list = lines.get(key) ?? []
+    lines.set(key, list)
+    // A dot on every wall tile, so one standing alone shows, and a line to each wall right or below.
+    list.push([cx, cy, cx, cy])
+    if (wallAt(b.x + 1, b.y)) list.push([cx, cy, cx + tile, cy])
+    if (wallAt(b.x, b.y + 1)) list.push([cx, cy, cx, cy + tile])
+  }
+  const stroke = (width: number, color: number, alpha: number, segments: number[][]) => {
+    const dots = segments.filter(([x0, y0, x1, y1]) => x0 === x1 && y0 === y1)
+    for (const [x, y] of dots) under.rect(x! - width / 2, y! - width / 2, width, width)
+    under.fill({ color, alpha })
+    for (const [x0, y0, x1, y1] of segments)
+      if (x0 !== x1 || y0 !== y1) under.moveTo(x0!, y0!).lineTo(x1!, y1!)
+    under.stroke({ width, color, alpha, cap: 'square' })
+  }
+  for (const [key, segments] of lines)
+    stroke(edge, 0x0e1419, Number(key.split(',')[1]) * 0.85, segments)
+  for (const [key, segments] of lines) {
+    const [color, alpha] = key.split(',').map(Number) as [number, number]
+    stroke(band, color, alpha, segments)
+  }
+
+  // Buildings as icon tokens; a gate sits on its wall, smaller, its glyph in the owner's colour
+  // while closed. A construction site shows faintly.
+  const r = tokenRadius(tile)
+  for (const b of buildings) {
+    if (b.kind === 'road' || b.kind === 'wall') continue
+    const [cx, cy] = centre(cam, view, size, b)
+    if (!near(cx, cy)) continue
+    const rel = relOf(b)
+    const alpha = b.site ? 0.45 : 1
+    if (b.kind === 'gate')
+      drawBuilding(
+        tokens,
+        BUILDING_ART.gate,
+        cx,
+        cy,
+        r * 0.75,
+        rel,
+        alpha,
+        b.closed ? relationshipColor(rel) : GLYPH_COLOR,
+      )
+    else drawBuilding(tokens, BUILDING_ART[b.kind], cx, cy, r, rel, alpha)
   }
   for (const p of piles) {
     // A small heap in the tile's lower corner, so a building on the tile still shows.
     const [sx, sy] = tileToScreen(cam, view, size, p.x, p.y)
-    g.poly([
-      sx + tile * 0.55,
-      sy + tile * 0.92,
-      sx + tile * 0.92,
-      sy + tile * 0.92,
-      sx + tile * 0.735,
-      sy + tile * 0.6,
-    ])
+    over
+      .poly([
+        sx + tile * 0.55,
+        sy + tile * 0.92,
+        sx + tile * 0.92,
+        sy + tile * 0.92,
+        sx + tile * 0.735,
+        sy + tile * 0.6,
+      ])
       .fill(PILE_COLOR)
       .stroke({ width: 1, color: 0x4f3a22 })
   }
-  for (const h of horses) g.circle(...centre(cam, view, size, h), tile * 0.22).fill(HORSE_COLOR)
+  for (const h of horses) over.circle(...centre(cam, view, size, h), tile * 0.22).fill(HORSE_COLOR)
   // A Trade Org caravan's carriage stands out (`CONTEXT.md`: Caravan).
   const caravans = caravanParts(world.caravans).carriages
   for (const k of carriages) {
-    g.rect(...box(k.x, k.y, 0.22))
+    over
+      .rect(...box(k.x, k.y, 0.22))
       .fill(caravans.has(k.id) ? CARAVAN_COLOR : CARRIAGE_COLOR)
       .stroke({ width: 1, color: 0x121518 })
   }
