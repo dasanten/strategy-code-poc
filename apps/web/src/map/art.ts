@@ -1,4 +1,5 @@
 import type { BuildingKind, ResourceKind } from '@csp/shared'
+import type { Activity } from './figures.js'
 
 /**
  * The map's art registry (ADR 0008): which file in `assets/map/` draws each game kind. Glyphs are
@@ -40,6 +41,14 @@ export const UNIT_ART = {
   army: 'army-banner.svg',
 } as const
 
+/** The small icon by a resident's figure at close zoom: what they are doing (`figures.ts`). */
+export const ACTIVITY_ART: Record<Activity, string> = {
+  walking: 'activity-walking.svg',
+  carrying: 'activity-carrying.svg',
+  working: 'activity-working.svg',
+  fighting: 'activity-fighting.svg',
+}
+
 /**
  * Token bases: a building's dark hex badge and its ring (tinted per owner), a unit's dark round
  * badge and its ring, a node's diamond.
@@ -75,6 +84,7 @@ export const artInUse = (): string[] => [
     ...Object.values(BUILDING_ART),
     ...Object.values(NODE_ART),
     ...Object.values(UNIT_ART),
+    ...Object.values(ACTIVITY_ART),
     ...Object.values(BASE_ART),
     ...Object.values(CITY_ART),
   ]),
