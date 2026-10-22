@@ -23,7 +23,9 @@ import {
   hqRings,
   hqRingsSound,
 } from './hq-growth.js'
+import { updateCityMembership } from './cities.js'
 import { checkInvariants } from './invariants.js'
+import { Ground } from './placing.js'
 import { mulberry32, newResident } from './residents.js'
 import { addCity } from './test-terrain.js'
 import { foundTradeOrgHq, hqLayout } from './trade-org.js'
@@ -36,13 +38,13 @@ const terrain: TerrainMap = { size: 640, tiles: new Uint8Array(640 * 640).fill(T
 /** Where the HQ's town hall stands. */
 const MID = 320
 
-/** The Trade Org HQ at (MID, MID); realm r1 with city c1 at (20, 140). */
+/** The Trade Org HQ at (MID, MID); realm r1 with city c1 at (80, 560). */
 function setup() {
   const world = createWorld(terrain)
   const hq = foundTradeOrgHq(world, terrain, MID, MID, mulberry32(7))
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
-  addCity(world, { id: 'c1', realmId: 'r1', x: 20, y: 140 })
-  resident(world, 'a1', 20, 141, 'r1')
+  addCity(world, { id: 'c1', realmId: 'r1', x: 80, y: 560 })
+  resident(world, 'a1', 80, 563, 'r1')
   return { world, hq, walking: new Walking(terrain) }
 }
 
@@ -88,9 +90,10 @@ function run(world: WorldState, walking: Walking, ticks: number, until?: () => b
 
 /** The HQ's gates on its outer ring. */
 function outerGates(world: WorldState, hq: City): Building[] {
+  // From the middle of its town hall, which its rings are round.
   const hall = townHallOf(world, hq)!
   const d = (b: Building) =>
-    Math.hypot(wrapDelta(hall.x, b.x, terrain.size), wrapDelta(hall.y, b.y, terrain.size))
+    Math.hypot(wrapDelta(hall.x + 1, b.x, terrain.size), wrapDelta(hall.y + 1, b.y, terrain.size))
   return world.buildings.filter(
     (b) => b.cityId === hq.id && b.kind === 'gate' && d(b) > TRADE_ORG_HQ.innerRadius + 1,
   )
@@ -107,12 +110,12 @@ describe('the HQ closing its gates', () => {
     expect(hqSoldiers(world)).toHaveLength(8)
     const [gx, gy] = hqLayout(MID, MID).outerGates[0]!
     // As many as half its soldiers: the gates stay open.
-    const outsiders = armed(world, 'r1', 4, gx, gy - 4)
+    const outsiders = armed(world, 'r1', 4, gx, gy - 16)
     run(world, walking, 1)
     expect(armedOutsidersNear(world, hq, terrain.size)).toHaveLength(4)
     expect(outerGates(world, hq).every((g) => !g.closed)).toBe(true)
     // One more: it closes them all.
-    outsiders.push(...armed(world, 'r1', 1, gx, gy - 6, 'late'))
+    outsiders.push(...armed(world, 'r1', 1, gx, gy - 24, 'late'))
     run(world, walking, 1)
     expect(outerGates(world, hq)).toHaveLength(TRADE_ORG_HQ.gates)
     expect(outerGates(world, hq).every((g) => g.closed)).toBe(true)
@@ -126,7 +129,7 @@ describe('the HQ closing its gates', () => {
     const { world, hq, walking } = setup()
     const [gx, gy] = hqLayout(MID, MID).outerGates[0]!
     // No soldiers at all: a single armed outsider closes the gates.
-    armed(world, 'r1', 1, gx, gy - 4)
+    armed(world, 'r1', 1, gx, gy - 16)
     run(world, walking, 1)
     expect(outerGates(world, hq).every((g) => g.closed)).toBe(true)
   })
@@ -140,9 +143,9 @@ describe('the HQ against the strongest Organization', () => {
       { id: 'r2', userId: 8, leaderId: 'x' },
       { id: 'r3', userId: 9, leaderId: 'y' },
     )
-    armed(world, 'r1', 8, 10, 10)
-    armed(world, 'r2', 7, 10, 20)
-    armed(world, 'r3', 12, 10, 30)
+    armed(world, 'r1', 8, 40, 40)
+    armed(world, 'r2', 7, 40, 80)
+    armed(world, 'r3', 12, 40, 120)
     expect(strongestArmed(world)).toBe(12)
     world.alliances.push({
       id: 'al',
@@ -163,7 +166,7 @@ describe('the HQ against the strongest Organization', () => {
     const { world, hq, walking } = setup()
     const goods = world.buildings.find((b) => b.cityId === hq.id && b.stock?.wood !== undefined)!
     goods.stock!.spear = 40
-    armed(world, 'r1', 12, 20, 141)
+    armed(world, 'r1', 12, 80, 563)
     const wanted = Math.ceil(12 * TRADE_ORG_ARMY.strongestMultiple)
     expect(wanted).toBeGreaterThan(TRADE_ORG_ARMY.size)
     run(world, walking, 4 * TICKS_PER_GAME_DAY, () => hqSoldiers(world).length >= wanted)
@@ -180,7 +183,7 @@ describe('the HQ against the strongest Organization', () => {
  */
 function weak() {
   const s = setup()
-  armed(s.world, 'r1', 20, 10, 141)
+  armed(s.world, 'r1', 20, 40, 563)
   const storage = s.world.buildings.find((b) => b.cityId === s.hq.id && b.kind === 'storage')!
   storage.stock = { food: 20_000, wood: 2_000 }
   let i = 0
@@ -188,13 +191,28 @@ function weak() {
   return s
 }
 
-/** Fills every tile the HQ could put a house on with a storage, so its housing stays full. */
+/**
+ * Fills every spot between its rings the HQ could put a house on with a storage, so its housing
+ * stays full: storages wherever one fits, row by row, in one pass.
+ */
 function fillRoom(world: WorldState, hq: City, outermost: number) {
   const hall = townHallOf(world, hq)!
-  for (let t = hqHouseTile(world, hall, terrain, outermost), n = 0; t; n++) {
-    world.buildings.push({ id: `fill${n}`, kind: 'storage', cityId: hq.id, x: t.x, y: t.y })
-    t = hqHouseTile(world, hall, terrain, outermost)
+  const ground = new Ground(world, terrain)
+  const r = Math.ceil(hqRingRadius(outermost))
+  const between = (x: number, y: number) => {
+    const d = Math.hypot(x - MID, y - MID)
+    return d > TRADE_ORG_HQ.innerRadius && d <= r + 0.5
   }
+  let n = 0
+  for (let y = MID - r; y <= MID + r; y++) {
+    for (let x = MID - r; x <= MID + r; x++) {
+      if (!ground.fits('storage', x, y, between)) continue
+      ground.take('storage', x, y)
+      world.buildings.push({ id: `fill${n++}`, kind: 'storage', cityId: hq.id, x, y })
+    }
+  }
+  updateCityMembership(world, terrain.size)
+  expect(hqHouseTile(world, hall, terrain, outermost)).toBeUndefined()
 }
 
 describe('the HQ growing', () => {
@@ -231,7 +249,7 @@ describe('the HQ growing', () => {
     expect(next.building).toBe('gate')
     expect(fromHall(next)).toBeGreaterThan(hqRingRadius(1) - 1.5)
     expect(fromHall(next)).toBeLessThanOrEqual(hqRingRadius(1) + 0.5)
-    run(world, walking, TICKS_PER_GAME_DAY / 2, () =>
+    run(world, walking, 2 * TICKS_PER_GAME_DAY, () =>
       world.buildings.some(
         (b) => !b.site && b.kind === 'gate' && fromHall(b) > hqRingRadius(1) - 1.5,
       ),

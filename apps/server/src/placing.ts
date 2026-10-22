@@ -1,5 +1,4 @@
 import {
-  FOOTPRINT,
   NODE_WORKPLACE,
   OFF_NODES,
   ON_PLAINS,
@@ -63,7 +62,8 @@ export class Ground {
       }
       if (also && !also(tx, ty)) return false
     }
-    return OFF_NODES.includes(kind) || ON_PLAINS.includes(kind) || kind === 'road' || nodes === 1
+    // Only a node's workplace covers a node, and one of them.
+    return !onNode(kind) || nodes === 1
   }
 
   /** Marks a footprint as covered. */
@@ -89,5 +89,5 @@ export function nodeCorner(
   return undefined
 }
 
-/** Tiles along each side of a footprint of `kind`. */
-export const sideOf = (kind: BuildingKind) => FOOTPRINT[kind]
+/** Whether a kind of building goes on a resource node: mines, quarries and lumber camps. */
+const onNode = (kind: BuildingKind) => Object.values(NODE_WORKPLACE).includes(kind)

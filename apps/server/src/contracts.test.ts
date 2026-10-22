@@ -25,26 +25,26 @@ import { addCity } from './test-terrain.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 64, tiles: new Uint8Array(64 * 64).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 256, tiles: new Uint8Array(256 * 256).fill(Terrain.Plains) }
 const lenderPlayer = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 const hirerPlayer = { userId: 8, account: { name: 'Tobin', isAdmin: false } }
 
 /**
- * Realm r1 (Player 7, Leader a1) with city c1 at (10, 10) and its storage s1 at (11, 10), where
- * soldiers m1 and m2 live; realm r2 (Player 8, Leader b1) far away at (40, 40), whose b2 carries
+ * Realm r1 (Player 7, Leader a1) with city c1 at (40, 40) and its storage s1 at (44, 40), where
+ * soldiers m1 and m2 live; realm r2 (Player 8, Leader b1) far away at (160, 160), whose b2 carries
  * coins.
  */
 function setup() {
   const world = createWorld(terrain)
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
   world.realms.push({ id: 'r2', userId: 8, leaderId: 'b1' })
-  addCity(world, { id: 'c1', realmId: 'r1', x: 10, y: 10 })
-  world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 11, y: 10, stock: {} })
-  resident(world, 'a1', 'r1', 10, 11, 'c1')
-  resident(world, 'm1', 'r1', 12, 10, 'c1')
-  resident(world, 'm2', 'r1', 12, 11, 'c1')
-  resident(world, 'b1', 'r2', 40, 40)
-  resident(world, 'b2', 'r2', 40, 41).carried.coins = 30
+  addCity(world, { id: 'c1', realmId: 'r1', x: 40, y: 40 })
+  world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 44, y: 40, stock: {} })
+  resident(world, 'a1', 'r1', 40, 44, 'c1')
+  resident(world, 'm1', 'r1', 48, 40, 'c1')
+  resident(world, 'm2', 'r1', 48, 44, 'c1')
+  resident(world, 'b1', 'r2', 160, 160)
+  resident(world, 'b2', 'r2', 160, 164).carried.coins = 30
   return { world, queue: new OrderQueue(undefined, terrain), walking: new Walking(terrain) }
 }
 
@@ -119,7 +119,7 @@ function payWeeks(
   c: MercenaryContract,
   weeks = 1,
 ) {
-  Object.assign(at(world, 'b2'), { x: 11, y: 10 })
+  Object.assign(at(world, 'b2'), { x: 44, y: 40 })
   const answer = order(world, queue, hirerPlayer, {
     kind: 'pay',
     residentId: 'b2',
@@ -156,7 +156,7 @@ describe('mercenary contracts', () => {
   it('can be asked for by the hirer and accepted by the lender', () => {
     const { world, queue, walking } = setup()
     // r2 sees m1 through b1 standing nearby.
-    Object.assign(at(world, 'b1'), { x: 14, y: 10 })
+    Object.assign(at(world, 'b1'), { x: 56, y: 40 })
     const ask = { ...offer, realmId: undefined }
     expect(order(world, queue, hirerPlayer, ask)).toBe('ack')
     const c = world.contracts[0]!
@@ -200,7 +200,7 @@ describe('mercenary contracts', () => {
   it('makes the mercenaries take only the hirer’s orders, while the lender still sees them', () => {
     const { world, queue, walking } = setup()
     hire(world, queue)
-    const walk = { kind: 'walkTo', residentId: 'm1', x: 20, y: 10 }
+    const walk = { kind: 'walkTo', residentId: 'm1', x: 80, y: 40 }
     expect(order(world, queue, lenderPlayer, walk)).toBe('not one of your residents')
     expect(order(world, queue, hirerPlayer, walk)).toBe('ack')
     expect(at(world, 'm1').order).toMatchObject({ kind: 'walkTo' })
@@ -247,7 +247,7 @@ describe('mercenary contracts', () => {
         contractId: c.id,
         weeks: 1,
       }),
-    ).toBe('the resident must stand on the contract’s storage')
+    ).toBe('the resident must stand at the contract’s storage')
     expect(payWeeks(world, queue, walking, c, 3)).toBe('that is more weeks than are left')
     expect(payWeeks(world, queue, walking, c)).toBe('ack')
     expect(c.paidWeeks).toBe(1)
@@ -261,7 +261,7 @@ describe('mercenary contracts', () => {
     expect(standingOf(world, 'r2', 'r1')).toBeCloseTo(STANDING_PER_PAID_WEEK, 2)
     // Only the hirer pays, and only with coins in hand.
     at(world, 'a1').carried.coins = 50
-    Object.assign(at(world, 'a1'), { x: 11, y: 10 })
+    Object.assign(at(world, 'a1'), { x: 44, y: 40 })
     expect(
       order(world, queue, lenderPlayer, {
         kind: 'pay',
@@ -278,7 +278,7 @@ describe('mercenary contracts', () => {
     const { world, queue, walking } = setup()
     const c = hire(world, queue)
     payWeeks(world, queue, walking, c)
-    order(world, queue, hirerPlayer, { kind: 'walkTo', residentId: 'm1', x: 30, y: 10 })
+    order(world, queue, hirerPlayer, { kind: 'walkTo', residentId: 'm1', x: 120, y: 40 })
     run(world, walking, 200)
     // The first week is paid; the second is due when it ends.
     expect(contractPayBy(c)).toBe(c.startedAt! + 10 * TICKS_PER_GAME_DAY)
@@ -295,9 +295,9 @@ describe('mercenary contracts', () => {
     expect(standingOf(world, 'r1', 'r2')).toBeCloseTo(left, 0)
     expect(standingOf(world, 'r2', 'r1')).toBeCloseTo(STANDING_PER_PAID_WEEK, 0)
     expect(commanderOf(world, at(world, 'm1'))).toBe('r1')
-    expect(at(world, 'm1').order).toMatchObject({ kind: 'walkTo', target: { x: 10, y: 10 } })
+    expect(at(world, 'm1').order).toMatchObject({ kind: 'walkTo', target: { x: 40, y: 40 } })
     run(world, walking, 600)
-    expect(at(world, 'm1')).toMatchObject({ x: 10, y: 10 })
+    expect(at(world, 'm1')).toMatchObject({ x: 40, y: 40 })
   })
 
   it('breaks at once when the first week is never paid', () => {
@@ -335,7 +335,7 @@ describe('mercenary contracts', () => {
             { id: 'm1', name: at(world, 'm1').name },
             { id: 'm2', name: at(world, 'm2').name },
           ],
-          storage: { id: 's1', x: 11, y: 10 },
+          storage: { id: 's1', x: 44, y: 40 },
           weeks: 2,
           paidWeeks: 0,
           payBy: c.startedAt! + TICKS_PER_GAME_WEEK,
@@ -391,14 +391,14 @@ describe('contracts when a Leader dies', () => {
       (e) => e.kind === 'contract' && e.what !== 'offered' && e.what !== 'started',
     )
 
-  /** Gives r2 a carriage with a horse on m1's tile and has m1 haul with it to (30, 10). */
+  /** Gives r2 a carriage with a horse on m1's tile and has m1 haul with it to (120, 40). */
   function haulForHirer(world: WorldState, queue: OrderQueue) {
     world.horses.push({
       id: 'h2',
       realmId: 'r2',
       cityId: null,
-      x: 12,
-      y: 10,
+      x: 48,
+      y: 40,
       hunger: MAX_HUNGER,
       health: MAX_HEALTH,
     })
@@ -406,13 +406,13 @@ describe('contracts when a Leader dies', () => {
       id: 'k2',
       realmId: 'r2',
       cityId: null,
-      x: 12,
-      y: 10,
+      x: 48,
+      y: 40,
       horseId: null,
       load: {},
     })
     at(world, 'm1').carried.wood = 2
-    const haul = { kind: 'haul', residentId: 'm1', carriageId: 'k2', x: 30, y: 10, goods: ['wood'] }
+    const haul = { kind: 'haul', residentId: 'm1', carriageId: 'k2', x: 120, y: 40, goods: ['wood'] }
     expect(order(world, queue, hirerPlayer, { ...haul, keepFood: 0 })).toBe('ack')
     expect(at(world, 'm1').order).toMatchObject({ kind: 'haul' })
   }
@@ -434,10 +434,10 @@ describe('contracts when a Leader dies', () => {
     ])
     for (const id of ['m1', 'm2']) {
       expect(commanderOf(world, at(world, id))).toBe('r1')
-      expect(at(world, id).order).toMatchObject({ kind: 'walkTo', target: { x: 10, y: 10 } })
+      expect(at(world, id).order).toMatchObject({ kind: 'walkTo', target: { x: 40, y: 40 } })
     }
     run(world, walking, 100)
-    expect(at(world, 'm1')).toMatchObject({ x: 10, y: 10 })
+    expect(at(world, 'm1')).toMatchObject({ x: 40, y: 40 })
     expect(contractEvents(world).filter((e) => e.what === 'broken')).toEqual([])
     expect(world.standings).toEqual([])
   })
