@@ -130,37 +130,99 @@ interface WorkTaskRequest extends OrderRequest {
   makes?: Good
 }
 
+/** Haul: the haul order's input, to a tile (`CONTEXT.md`: Haul route). */
+interface HaulTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'haul'
+  residentId: string
+  carriageId: string
+  x: number
+  y: number
+  goods: Good[]
+  returnGoods?: Good[]
+  keepFood: number
+}
+
+interface TearDownTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'tearDown'
+  residentId: string
+  buildingId: string
+}
+
+type TaskRequest = WorkTaskRequest | HaulTaskRequest | TearDownTaskRequest
+
+/** The built-in order a task's request is checked as, for the resident. */
+function asOrder(o: Partial<TaskRequest>): OrderRequest {
+  const residentId = o.residentId
+  if (o.task === 'haul') {
+    // To a tile only; a supply line to an army stays the bare haul order's.
+    const { carriageId, x, y, goods, returnGoods, keepFood } = o
+    return { kind: 'haul', residentId, carriageId, x, y, goods, returnGoods, keepFood }
+  }
+  if (o.task === 'tearDown') return { kind: 'tearDown', residentId, buildingId: o.buildingId }
+  return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
+}
+
+/** The memory a task's default script starts from (`TaskMemory`), for resident `r`. */
+function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemory {
+  switch (order.task) {
+    case 'work': {
+      const memory: TaskMemory['work'] = { workplaceId: order.workplaceId }
+      if (order.makes !== undefined) memory.makes = order.makes
+      return { ...memory }
+    }
+    case 'haul': {
+      const memory: TaskMemory['haul'] = {
+        carriageId: order.carriageId,
+        from: { x: r.x, y: r.y },
+        to: { x: order.x, y: order.y },
+        goods: [...order.goods],
+        returnGoods: [...(order.returnGoods ?? [])],
+        keepFood: order.keepFood,
+      }
+      return { ...memory }
+    }
+    case 'tearDown': {
+      const memory: TaskMemory['tearDown'] = { buildingId: order.buildingId }
+      return { ...memory }
+    }
+  }
+}
+
 /**
  * The task order (`CONTEXT.md`: Order, Default script; ADR 0009): one of the Player's residents
  * runs the Player's version of the task's default script, from a memory holding the task's
- * target (`TaskMemory`). It ends whatever the resident was doing. Work is for the workplace the
- * resident stands on, checked as the work-at order checks it.
+ * target (`TaskMemory`). It ends whatever the resident was doing. Each task is checked as the
+ * built-in order its script starts: Work for the workplace the resident stands on as work-at,
+ * Haul as the haul order to a tile, Tear down as the tear-down order.
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
-    validate(world, sender, order) {
-      const o = order as Partial<WorkTaskRequest>
+    validate(world, sender, order, terrain) {
+      const o = order as Partial<TaskRequest>
       if (!isTask(o.task)) return 'no such task'
       const realm = realmOf(world, sender.userId)
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
-      if (typeof o.workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== o.workplaceId)
-        return 'not standing on that workplace'
-      const work = { kind: 'workAt', residentId: r.id, makes: o.makes }
-      const problem = orderKinds.workAt!.validate(world, sender, work)
+      if (o.task === 'work') {
+        const workplaceId = (o as Partial<WorkTaskRequest>).workplaceId
+        if (typeof workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== workplaceId)
+          return 'not standing on that workplace'
+      }
+      const built = asOrder(o)
+      const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)
       // Working there by a bare work-at order, as the starting residents do, they can still be
       // given the task; already running it there, they can't.
       if (problem === 'already working here' && !r.script) return undefined
       return problem
     },
     apply(world, sender, order) {
-      const { residentId, task, workplaceId, makes } = order as WorkTaskRequest
-      const r = world.residents.find((x) => x.id === residentId)
+      const o = order as TaskRequest
+      const r = world.residents.find((x) => x.id === o.residentId)
       if (!r) return
-      const memory: TaskMemory['work'] = { workplaceId }
-      if (makes !== undefined) memory.makes = makes
       r.order = null
-      r.script = { scriptId: host.defaultScript(sender.userId, task), memory: { ...memory } }
+      r.script = { scriptId: host.defaultScript(sender.userId, o.task), memory: taskMemory(o, r) }
     },
   }
 }

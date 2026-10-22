@@ -1,17 +1,21 @@
 import { parse, run } from '@csp/lang'
 import {
   DEFAULT_SCRIPTS,
+  MAX_HEALTH,
+  MAX_HUNGER,
   SCRIPT_MAX_CALL_DEPTH,
   SCRIPT_STEP_BUDGET,
   TASKS,
   Terrain,
   pileAt,
+  type ScriptMemory,
   type SeenEntity,
   type Task,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import { checkScript } from '@csp/lang'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AuthError } from './auth.js'
 import { openDb, schema, type Db, type OpenDb } from './db/index.js'
@@ -78,15 +82,17 @@ describe('a Player’s default scripts', () => {
   it('are in their library from the start, one per task, following the game’s default', () => {
     const list = listScripts(db, mara)
     expect(list.map((s) => [s.name, s.task, s.followsDefault])).toEqual([
+      ['Haul (default)', 'haul', true],
+      ['Tear down (default)', 'tearDown', true],
       ['Work (default)', 'work', true],
     ])
-    const work = getScript(db, mara, list[0]!.id)
+    const work = getScript(db, mara, workId())
     expect(work.versions.map((v) => v.source)).toEqual([WORK])
     expect(work.activeVersion).toBe(1)
     expect(work.gameDefault).toEqual({ source: WORK, editedFrom: null })
     // Listing again makes no second one.
-    expect(listScripts(db, mara)).toHaveLength(1)
-    expect(workId()).toBe(list[0]!.id)
+    expect(listScripts(db, mara)).toHaveLength(TASKS.length)
+    expect(list.map((s) => s.id)).toContain(workId())
   })
 
   it('ship without syntax errors', () => {
@@ -110,10 +116,13 @@ describe('a Player’s default scripts', () => {
     const old = db.select().from(schema.users).all().at(-1)!.id
     db.insert(schema.scripts).values({ userId: old, name: 'Work (default)' }).run()
     const names = listScripts(db, old).map((s) => [s.name, s.task])
-    expect(names).toEqual([
-      ['Work (default)', 'work'],
-      ['Work (default) 2', null],
-    ])
+    expect(names).toHaveLength(TASKS.length + 1)
+    expect(names).toEqual(
+      expect.arrayContaining([
+        ['Work (default)', 'work'],
+        ['Work (default) 2', null],
+      ]),
+    )
   })
 
   it('follow the game’s default as it changes, until the Player edits theirs', () => {
@@ -178,7 +187,7 @@ describe('a Player’s default scripts', () => {
   it('are flagged when one following the game’s default doesn’t run it (ADR 0004)', () => {
     const id = workId()
     db.insert(schema.scriptVersions).values({ scriptId: id, version: 2, source: 'let x = 1' }).run()
-    db.update(schema.scripts).set({ activeVersion: 2 }).run()
+    db.update(schema.scripts).set({ activeVersion: 2 }).where(eq(schema.scripts.id, id)).run()
     expect(checkScriptLibrary(db)).toEqual([
       expect.objectContaining({ invariant: 'default-scripts-follow' }),
     ])
@@ -347,6 +356,76 @@ describe('Work from the UI', () => {
   })
 })
 
+/** Carriage k1 of realm r1 with its horse, at w1's tile in `farmWorld`. */
+function withCarriage(world: WorldState) {
+  world.horses.push({
+    id: 'h1',
+    realmId: 'r1',
+    cityId: null,
+    x: 3,
+    y: 3,
+    hunger: MAX_HUNGER,
+    health: MAX_HEALTH,
+  })
+  const k1 = { id: 'k1', realmId: 'r1', cityId: null, x: 3, y: 3, horseId: null, load: {} }
+  world.carriages.push(k1)
+}
+
+/** What a default script finds as it runs: its memory, and the world made ready for it. */
+interface Case {
+  memory: ScriptMemory
+  prepare: (world: WorldState) => void
+}
+
+describe('Haul and Tear down from the UI', () => {
+  it('run the Player’s defaults with the route or the building in memory', () => {
+    const world = farmWorld()
+    withCarriage(world)
+    const orders = queue()
+    const order = (o: object) => orders.receive(world, sender(), 'q', { kind: 'task', ...o })
+    const haul = { task: 'haul', residentId: 'w1', carriageId: 'k1', x: 10, y: 3, keepFood: 4 }
+    // Checked as the haul order is; a supply line to an army stays the bare haul order's.
+    expect(order({ ...haul, goods: [] })).toMatchObject({ reason: 'pick the goods to haul' })
+    expect(order({ ...haul, goods: ['food'], x: 3 })).toMatchObject({
+      reason: 'the other stop must be another tile',
+    })
+    expect(order({ ...haul, goods: ['food'], x: undefined, armyId: 'a1' })).toMatchObject({
+      reason: 'the other stop must be a tile',
+    })
+    expect(order({ ...haul, goods: ['food'], returnGoods: ['wood'] })).toMatchObject({
+      type: 'ack',
+    })
+    // Checked as the tear-down order is.
+    expect(order({ task: 'tearDown', residentId: 'w2', buildingId: 'nope' })).toMatchObject({
+      reason: 'that building is not on the resident’s tile',
+    })
+    expect(order({ task: 'tearDown', residentId: 'w2', buildingId: 'farm' })).toMatchObject({
+      type: 'ack',
+    })
+    orders.applyAll(world)
+    const [w1, w2] = world.residents
+    expect(w1!.script).toEqual({
+      scriptId: defaultScriptId(db, mara, 'haul'),
+      memory: {
+        carriageId: 'k1',
+        from: { x: 3, y: 3 },
+        to: { x: 10, y: 3 },
+        goods: ['food'],
+        returnGoods: ['wood'],
+        keepFood: 4,
+      },
+    })
+    expect(w2!.script).toEqual({
+      scriptId: defaultScriptId(db, mara, 'tearDown'),
+      memory: { buildingId: 'farm' },
+    })
+    // Their first run starts the built-in orders.
+    expect(new ScriptRunner(terrain, host()).runAll(world, true)).toEqual([])
+    expect(w1!.order).toMatchObject({ kind: 'haul', to: { x: 10, y: 3 }, keepFood: 4 })
+    expect(w2!.order).toEqual({ kind: 'tearDown', buildingId: 'farm', at: { x: 3, y: 3 } })
+  })
+})
+
 describe('the step budget', () => {
   /** Mara's residents all at work on the farm by Work. */
   const working = (world: WorldState) => {
@@ -357,10 +436,9 @@ describe('the step budget', () => {
   }
 
   /** Steps a default script takes in one run for w1 of `farmWorld`, as it finds the world. */
-  function steps(task: Task, prepare: (world: WorldState) => void): number {
+  function steps(task: Task, { memory, prepare }: Case): number {
     const world = farmWorld()
     prepare(world)
-    const memory = structuredClone(world.residents[0]!.script?.memory ?? { workplaceId: 'farm' })
     const { globals } = bindScript({
       world,
       terrain,
@@ -380,48 +458,85 @@ describe('the step budget', () => {
   }
 
   it('keeps every default at most a quarter of a resident’s budget (ADR 0009)', () => {
-    const cases: Record<Task, ((world: WorldState) => void)[]> = {
+    const work = { workplaceId: 'farm' }
+    const route = {
+      carriageId: 'k1',
+      from: { x: 3, y: 3 },
+      to: { x: 10, y: 3 },
+      goods: ['food'],
+      returnGoods: ['wood'],
+      keepFood: 4,
+    }
+    const tearDown = { buildingId: 'farm' }
+    const cases: Record<Task, Case[]> = {
       work: [
         // Starting work, and working on.
-        () => {},
-        (world) => {
-          world.residents[0]!.order = {
-            kind: 'workAt',
-            buildingId: 'farm',
-            at: { x: 3, y: 3 },
-            progress: 0,
-          }
+        { memory: work, prepare: () => {} },
+        {
+          memory: work,
+          prepare: (world) => {
+            world.residents[0]!.order = {
+              kind: 'workAt',
+              buildingId: 'farm',
+              at: { x: 3, y: 3 },
+              progress: 0,
+            }
+          },
         },
         // Away from the workplace: walking back.
-        (world) => {
-          world.residents[0]!.x = 5
-        },
+        { memory: work, prepare: (world) => void (world.residents[0]!.x = 5) },
         // A full pile: picking who carries it, and the nearest of many storages.
-        (world) => {
-          working(world)
-          world.piles.push({ id: 'p', x: 3, y: 3, goods: { food: 200 } })
-          for (let i = 0; i < 10; i++) {
-            world.buildings.push({ id: `s${i}`, kind: 'storage', cityId: 'c1', x: 5 + i, y: 8 })
-          }
+        {
+          memory: work,
+          prepare: (world) => {
+            working(world)
+            world.piles.push({ id: 'p', x: 3, y: 3, goods: { food: 200 } })
+            for (let i = 0; i < 10; i++) {
+              world.buildings.push({ id: `s${i}`, kind: 'storage', cityId: 'c1', x: 5 + i, y: 8 })
+            }
+          },
         },
         // Carrying: storing the load at the storage.
-        (world) => {
-          world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 3, y: 3 })
-          const w1 = world.residents[0]!
-          w1.carried = { food: 30 }
-          w1.script = {
-            scriptId: 1,
-            memory: {
-              workplaceId: 'farm',
-              carry: { storageId: 's1', goods: ['food'], step: 'store' },
-            },
-          }
+        {
+          memory: { ...work, carry: { storageId: 's1', goods: ['food'], step: 'store' } },
+          prepare: (world) => {
+            world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 3, y: 3 })
+            world.residents[0]!.carried = { food: 30 }
+          },
         },
+      ],
+      haul: [
+        // Starting the route, and on it.
+        { memory: route, prepare: withCarriage },
+        {
+          memory: route,
+          prepare: (world) => {
+            withCarriage(world)
+            const { carriageId, to, goods, returnGoods, keepFood } = route
+            const haul = { kind: 'haul', residentId: 'w1', carriageId, ...to, goods, returnGoods }
+            orderKinds.haul!.apply(world, sender(), { ...haul, keepFood })
+          },
+        },
+        // Not at the first stop, and no carriage: nothing to start.
+        { memory: route, prepare: (world) => void (world.residents[0]!.x = 5) },
+        { memory: route, prepare: () => {} },
+      ],
+      tearDown: [
+        // Starting, tearing down, the building gone, and standing idle after.
+        { memory: tearDown, prepare: () => {} },
+        {
+          memory: tearDown,
+          prepare: (world) => {
+            world.residents[0]!.order = { kind: 'tearDown', buildingId: 'farm', at: { x: 3, y: 3 } }
+          },
+        },
+        { memory: tearDown, prepare: (world) => void (world.buildings = []) },
+        { memory: { ...tearDown, done: true }, prepare: (world) => void (world.buildings = []) },
       ],
     }
     for (const task of TASKS) {
-      for (const prepare of cases[task]) {
-        expect(steps(task, prepare)).toBeLessThanOrEqual(SCRIPT_STEP_BUDGET / 4)
+      for (const c of cases[task]) {
+        expect(steps(task, c)).toBeLessThanOrEqual(SCRIPT_STEP_BUDGET / 4)
       }
     }
   })

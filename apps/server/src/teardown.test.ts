@@ -15,7 +15,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   buildingsInPlace,
   checkInvariants,
@@ -24,6 +24,7 @@ import {
 } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
+import { defaultScripts } from './test-default-scripts.js'
 import { createWorld, stepWorld } from './world.js'
 
 /** Plains, with forest at (3, 3) and hills at (7, 7). */
@@ -50,7 +51,7 @@ function setup() {
   world.buildings.push({ id: 'b1', kind: 'mine', cityId: null, x: 7, y: 7 })
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'w1' })
   const r = resident(world, 'w1', 7, 7)
-  return { world, r, queue: new OrderQueue() }
+  return { world, r, queue: new OrderQueue(tasks.kinds) }
 }
 
 function resident(world: WorldState, id: string, x: number, y: number) {
@@ -61,24 +62,38 @@ function resident(world: WorldState, id: string, x: number, y: number) {
   return r
 }
 
-/** Steps the world, keeping residents fed. */
+const tasks = defaultScripts(terrain, [me, stranger])
+/**
+ * Whether tearing down is given as the Tear down task from the UI, whose default script starts
+ * the tear-down order (`CONTEXT.md`: Default script), instead of by the bare tear-down order.
+ */
+let byTask = false
+
+/** Steps the world, keeping residents fed; running scripts go first, as in the game. */
 function run(world: WorldState, ticks = 1) {
   for (let i = 0; i < ticks; i++) {
     for (const r of world.residents) r.hunger = 100
+    if (byTask) expect(tasks.runAll(world)).toEqual([])
     stepWorld(world, terrain)
   }
 }
 
 const tearDownOrder = (buildingId = 'b1', residentId = 'w1') => ({
-  kind: 'tearDown',
+  ...(byTask ? { kind: 'task', task: 'tearDown' } : { kind: 'tearDown' }),
   residentId,
   buildingId,
 })
 
+/** Applies the queued orders, and the scripts they start request their first actions. */
+function applyAll(world: WorldState, queue: OrderQueue) {
+  queue.applyAll(world)
+  if (byTask) expect(tasks.runAll(world)).toEqual([])
+}
+
 /** Sends an order, and if accepted runs the tick that starts it. */
 function order(world: WorldState, queue: OrderQueue, o: object, sender = me) {
   const answer = queue.receive(world, sender, 'q', o)
-  queue.applyAll(world)
+  applyAll(world, queue)
   run(world)
   return answer
 }
@@ -98,14 +113,24 @@ function allGoods(world: WorldState): Stock {
   return out
 }
 
-describe('tear-down order', () => {
+describe.each([
+  ['the tear-down order', false],
+  ['the Tear down task, running Tear down (default)', true],
+])('%s', (_, task) => {
+  beforeEach(() => {
+    byTask = task
+  })
+  afterEach(() => {
+    byTask = false
+  })
+
   it('works at the building until it is gone, leaving part of its materials on the tile', () => {
     const { world, r, queue } = setup()
     expect(queue.receive(world, me, 'q1', tearDownOrder())).toEqual({
       type: 'ack',
       requestId: 'q1',
     })
-    queue.applyAll(world)
+    applyAll(world, queue)
     expect(r.order).toEqual({ kind: 'tearDown', buildingId: 'b1', at: { x: 7, y: 7 } })
     const mine = world.buildings[0]!
     const need = teardownWork(mine)
@@ -131,6 +156,12 @@ describe('tear-down order', () => {
     ])
     expect(r.order).toBeNull()
     expect(checkInvariants(world, terrain)).toEqual([])
+    if (byTask) {
+      // With the building gone, Tear down (default) stands idle.
+      run(world, 5)
+      expect(r.order).toBeNull()
+      expect(r.script?.memory).toEqual({ buildingId: 'b1', done: true })
+    }
   })
 
   it('frees the tile, so it can be built on again', () => {
@@ -193,7 +224,7 @@ describe('tear-down order', () => {
     resident(world, 'w2', 7, 7)
     queue.receive(world, me, 'a', tearDownOrder('b1', 'w1'))
     queue.receive(world, me, 'b', tearDownOrder('b1', 'w2'))
-    queue.applyAll(world)
+    applyAll(world, queue)
     run(world, 5)
     expect(world.buildings[0]!.teardown).toBeCloseTo(10)
   })
@@ -226,7 +257,7 @@ describe('tear-down order', () => {
       return a.type === 'rejected' ? a.reason : 'ack'
     }
     expect(reject(tearDownOrder(), stranger)).toBe('not one of your residents')
-    expect(reject({ kind: 'tearDown', residentId: 'w1' })).toBe('which building?')
+    expect(reject({ ...tearDownOrder(), buildingId: undefined })).toBe('which building?')
     expect(reject(tearDownOrder('b9'))).toBe('that building is not on the resident’s tile')
     r.x = 6
     expect(reject(tearDownOrder())).toBe('that building is not on the resident’s tile')
