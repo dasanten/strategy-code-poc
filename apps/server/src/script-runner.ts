@@ -36,9 +36,14 @@ import { recordEvent } from './events.js'
 import type { InvariantViolation } from './invariants.js'
 import { npcSender, orderedResident } from './order-sender.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
-import { armyScriptRequestsSound, bindScript, scriptRequestsSound } from './script-bindings.js'
+import {
+  armyScriptRequestsSound,
+  bindScript,
+  scriptRequestsSound,
+  type ScriptContext,
+} from './script-bindings.js'
 import type { RunnableScript } from './scripts.js'
-import { entitiesInSight } from './sight.js'
+import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
 
 /**
@@ -309,6 +314,7 @@ export class ScriptRunner {
       if (!running || !sender) continue
       let seen: SeenEntity[] | undefined
       const seenOnce = () => (seen ??= entitiesInSight(world, this.terrain, realm.id))
+      const sees = seesOnce(world, this.terrain, realm.id)
       let left = SCRIPT_REALM_STEP_BUDGET
       const first = world.tick % running.length
       for (let i = 0; i < running.length; i++) {
@@ -320,7 +326,16 @@ export class ScriptRunner {
           continue
         }
         const steps = Math.min(SCRIPT_STEP_BUDGET, left)
-        left -= this.runOne(world, realm, sender, r, steps, seenOnce, used, check ? out : undefined)
+        left -= this.runOne(
+          world,
+          realm,
+          sender,
+          r,
+          steps,
+          { seen: seenOnce, sees },
+          used,
+          check ? out : undefined,
+        )
       }
     }
     this.programs = used
@@ -340,7 +355,7 @@ export class ScriptRunner {
     sender: OrderSender,
     r: Runner,
     steps: number,
-    seen: () => SeenEntity[],
+    { seen, sees }: Pick<ScriptContext, 'seen' | 'sees'>,
     used: Map<number, { source: string; program: Program }>,
     violations: InvariantViolation[] | undefined,
   ): number {
@@ -382,6 +397,7 @@ export class ScriptRunner {
       ...r.bind,
       memory,
       seen,
+      sees,
       explored: (x, y) => this.host.explored(realm.userId, x, y),
       kinds: this.kinds,
     })
@@ -549,7 +565,9 @@ export function runNpcScripts(
   for (const r of world.residents) {
     const city = r.cityId === null ? undefined : npc.get(r.cityId)
     if (!city || r.owner !== null || r.script?.scriptId !== 0 || !r.script.task) continue
-    byCity.set(city, [...(byCity.get(city) ?? []), r])
+    const list = byCity.get(city) ?? []
+    list.push(r)
+    byCity.set(city, list)
   }
   for (const [city, people] of byCity) runCityScripts(world, terrain, city, people, kinds)
 }
@@ -564,6 +582,7 @@ function runCityScripts(
   const sender = npcSender(city)
   let seen: SeenEntity[] | undefined
   const seenOnce = () => (seen ??= entitiesInSight(world, terrain, city.id))
+  const sees = seesOnce(world, terrain, city.id)
   for (const r of people) {
     const running = r.script
     // Its script may have ended this tick; a resident lent out is run by the hirer.
@@ -579,6 +598,7 @@ function runCityScripts(
       residentId: r.id,
       memory,
       seen: seenOnce,
+      sees,
       explored: () => true,
       kinds,
     })
@@ -603,7 +623,9 @@ export function oneCarrierAtATime(
     const s = r.script
     const place = s?.memory.workplaceId
     if (!s || typeof place !== 'string' || s.memory.carry == null || !counts(r)) continue
-    carriers.set(place, [...(carriers.get(place) ?? []), r.id])
+    const ids = carriers.get(place) ?? []
+    ids.push(r.id)
+    carriers.set(place, ids)
   }
   return [...carriers]
     .filter(([, ids]) => ids.length > 1)
@@ -612,4 +634,10 @@ export function oneCarrierAtATime(
       message: `${ids.length} residents carry ${place}'s output at once: ${ids.join(', ')}`,
       entityIds: [place, ...ids],
     }))
+}
+
+/** What a realm or an NPC city sees (`sightOf`), worked out once when first asked. */
+function seesOnce(world: WorldState, terrain: TerrainMap, side: string) {
+  let sight: ((at: { x: number; y: number }) => boolean) | undefined
+  return (at: { x: number; y: number }) => (sight ??= sightOf(world, terrain.size, side))(at)
 }

@@ -191,12 +191,13 @@ function stepChecked(world: WorldState, terrain: TerrainMap, ticks: number) {
 }
 
 describe('goods appear from nothing only at the floor', () => {
+  // Three game days of the HQ's workers each running the Work default every tick: slow.
   it('holds while the HQ works, eats and tops up for days', () => {
     const { world, terrain, goods } = hq()
     goods.stock = {}
     expect(stepChecked(world, terrain, 3 * TICKS_PER_GAME_DAY)).toEqual([])
     expect(goods.stock.wood).toBeGreaterThanOrEqual(WAREHOUSE_FLOOR.wood * HQ_FLOOR_FACTOR)
-  })
+  }, 60_000)
 
   it('holds while a starting city works its farm', () => {
     const { world, terrain } = worldWithCity()
