@@ -30,10 +30,25 @@ export const NODE_ART: Record<ResourceKind, string> = {
   goldOre: 'node-gold-ore.svg',
 }
 
-/** Token bases: a building's dark hex badge, its ring (tinted per owner), a node's diamond. */
+/** Residents, carriages, horses, Trade Org caravans and armies; your Leader gets the crown. */
+export const UNIT_ART = {
+  person: 'person.svg',
+  leader: 'crown.svg',
+  carriage: 'cart.svg',
+  horse: 'horse.svg',
+  caravan: 'caravan.svg',
+  army: 'army-banner.svg',
+} as const
+
+/**
+ * Token bases: a building's dark hex badge and its ring (tinted per owner), a unit's dark round
+ * badge and its ring, a node's diamond.
+ */
 export const BASE_ART = {
   hex: 'base-hex.svg',
   hexRing: 'base-hex-ring.svg',
+  round: 'base-round.svg',
+  roundRing: 'base-round-ring.svg',
   diamond: 'base-diamond.svg',
 } as const
 
@@ -53,6 +68,7 @@ export const artInUse = (): string[] => [
   ...new Set([
     ...Object.values(BUILDING_ART),
     ...Object.values(NODE_ART),
+    ...Object.values(UNIT_ART),
     ...Object.values(BASE_ART),
   ]),
 ]

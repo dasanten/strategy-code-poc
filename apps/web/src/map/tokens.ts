@@ -1,5 +1,6 @@
-import { Container, Sprite } from 'pixi.js'
+import { Container, Graphics, Sprite, Text } from 'pixi.js'
 import type { City, ResourceKind } from '@csp/shared'
+import { THEME } from '../theme.js'
 import type { Atlas } from './atlas.js'
 
 /** Who owns a token, seen from the Player's realm (ADR 0008). There is no "enemy": no war state. */
@@ -42,8 +43,13 @@ export function cityRelationship(
   if (!city) return undefined
   if (city.tradeOrg) return 'trade'
   if (city.realmId === null) return 'npc'
-  if (city.realmId === viewer.realmId) return 'own'
-  return viewer.allies.has(city.realmId) ? 'alliance' : 'other'
+  return realmRelationship(city.realmId, viewer)
+}
+
+/** How the viewer stands to a realm: their own, an alliance member or another realm. */
+export function realmRelationship(realmId: string, viewer: Viewer): Relationship {
+  if (realmId === viewer.realmId) return 'own'
+  return viewer.allies.has(realmId) ? 'alliance' : 'other'
 }
 
 export const relationshipColor = (rel: Relationship | undefined) =>
@@ -85,5 +91,60 @@ export class TokenLayer {
 
   end() {
     for (let i = this.used; i < this.sprites.length; i++) this.sprites[i]!.visible = false
+  }
+}
+
+/** Count badges: light pills with dark figures (ADR 0008). */
+const BADGE_COLOR = 0xe8eef4
+const BADGE_TEXT_COLOR = 0x0e1419
+/** The font size badge text is rasterised at; each badge scales it to its own size. */
+const BADGE_FONT = 32
+
+/** Count badges over the tokens, redrawn every frame like `TokenLayer`; texts are reused. */
+export class BadgeLayer {
+  readonly container = new Container()
+  private pills = new Graphics()
+  private texts: Text[] = []
+  private used = 0
+
+  constructor() {
+    this.container.addChild(this.pills)
+  }
+
+  begin() {
+    this.used = 0
+    this.pills.clear()
+  }
+
+  /** A pill with `label` centred at a screen point, its text `size` pixels high. */
+  place(label: string, x: number, y: number, size: number) {
+    let text = this.texts[this.used]
+    if (!text) {
+      text = new Text({
+        text: label,
+        anchor: 0.5,
+        style: {
+          fontFamily: THEME.font.ui,
+          fontSize: BADGE_FONT,
+          fontWeight: '700',
+          fill: BADGE_TEXT_COLOR,
+        },
+      })
+      this.container.addChild(text)
+      this.texts.push(text)
+    }
+    this.used++
+    if (text.text !== label) text.text = label
+    text.scale.set(size / BADGE_FONT)
+    text.position.set(x, y + size * 0.04)
+    text.visible = true
+    const h = size * 1.3
+    const w = Math.max(h, text.width + size * 0.6)
+    this.pills.roundRect(x - w / 2, y - h / 2, w, h, h / 2)
+  }
+
+  end() {
+    this.pills.fill(BADGE_COLOR).stroke({ width: 1, color: BADGE_TEXT_COLOR, alpha: 0.6 })
+    for (let i = this.used; i < this.texts.length; i++) this.texts[i]!.visible = false
   }
 }
