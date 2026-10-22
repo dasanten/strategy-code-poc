@@ -17,6 +17,7 @@ import {
   activeSource,
   checkScriptLibrary,
   createScript,
+  defaultScriptId,
   deleteScript,
   getScript,
   listScripts,
@@ -29,6 +30,9 @@ import { worldWithCity } from './test-terrain.js'
 
 const VALID = 'let x = 1\n'
 const VALID_2 = 'let x = 2\n'
+// The Player's own scripts, not their default scripts (default-scripts.test.ts has those).
+const own = (s: { task: unknown }) => s.task === null
+const OWN = { task: null, followsDefault: false }
 const BROKEN = 'let = \n'
 
 let opened: OpenDb
@@ -81,7 +85,11 @@ describe('script library', () => {
     )
     // Changing only the case of its own name is fine.
     expect(renameScript(db, mara, a.id, { name: 'Diggers' }).name).toBe('Diggers')
-    expect(listScripts(db, mara).map((s) => s.name)).toEqual(['Diggers', 'farmers'])
+    expect(
+      listScripts(db, mara)
+        .filter(own)
+        .map((s) => s.name),
+    ).toEqual(['Diggers', 'farmers'])
   })
 
   it('deletes a script with its history', () => {
@@ -90,13 +98,18 @@ describe('script library', () => {
     saveScript(db, mara, a.id, { source: VALID_2 })
     const b = createScript(db, mara, { name: 'farmers', source: VALID })
     deleteScript(db, mara, a.id)
-    expect(listScripts(db, mara).map((s) => s.id)).toEqual([b.id])
+    expect(
+      listScripts(db, mara)
+        .filter(own)
+        .map((s) => s.id),
+    ).toEqual([b.id])
     expect(
       db
         .select()
         .from(schema.scriptVersions)
         .all()
-        .map((v) => v.scriptId),
+        .map((v) => v.scriptId)
+        .filter((id) => id !== defaultScriptId(db, mara, 'work')),
     ).toEqual([b.id])
     expect(activeSource(db, a.id)).toBeUndefined()
     expect(() => getScript(db, mara, a.id)).toThrow(expect.objectContaining({ code: 'not-found' }))
@@ -112,7 +125,7 @@ describe('script library', () => {
     expect(() => renameScript(db, tobin, a.id, { name: 'mine' })).toThrow(notFound)
     expect(() => activateVersion(db, tobin, a.id, { version: 1 })).toThrow(notFound)
     expect(() => deleteScript(db, tobin, a.id)).toThrow(notFound)
-    expect(listScripts(db, tobin)).toEqual([])
+    expect(listScripts(db, tobin).filter(own)).toEqual([])
     expect(getScript(db, mara, a.id).latestVersion).toBe(1)
   })
 
@@ -216,8 +229,8 @@ describe('scripts last', () => {
     foundStartingCity(loaded, terrain, realm.userId)
     expect(realmOf(loaded, realm.userId)).toBeDefined()
 
-    expect(listScripts(db, realm.userId)).toEqual([
-      { id: s.id, name: 'miners', activeVersion: 1, latestVersion: 1 },
+    expect(listScripts(db, realm.userId).filter(own)).toEqual([
+      { id: s.id, name: 'miners', activeVersion: 1, latestVersion: 1, ...OWN },
     ])
     expect(activeSource(db, s.id)).toBe(VALID)
   })
@@ -250,17 +263,20 @@ describe('migration 0005', () => {
 
       const opened = await openDb(file)
       const lib = (userId: number) =>
-        listScripts(opened.db, userId).map((s) => ({
-          ...getScript(opened.db, userId, s.id),
-          id: 0,
-          versions: getScript(opened.db, userId, s.id).versions.map((v) => [v.version, v.source]),
-        }))
+        listScripts(opened.db, userId)
+          .filter(own)
+          .map((s) => ({
+            ...getScript(opened.db, userId, s.id),
+            id: 0,
+            versions: getScript(opened.db, userId, s.id).versions.map((v) => [v.version, v.source]),
+          }))
       expect(lib(1)).toEqual([
         {
           id: 0,
           name: 'Miners',
           activeVersion: null,
           latestVersion: 3,
+          ...OWN,
           versions: [
             [1, 'a'],
             [2, 'b'],
@@ -306,11 +322,21 @@ describe('script library API', () => {
     expect((await call('POST', `/api/scripts/${id}/name`, { name: 'diggers' })).json().name).toBe(
       'diggers',
     )
-    expect((await call('GET', '/api/scripts')).json()).toEqual([
-      { id, name: 'diggers', activeVersion: 1, latestVersion: 2 },
+    expect((await call('GET', '/api/scripts')).json().filter(own)).toEqual([
+      { id, name: 'diggers', activeVersion: 1, latestVersion: 2, ...OWN },
     ])
     expect((await call('GET', `/api/scripts/${id}`)).json().versions).toHaveLength(2)
     expect((await call('DELETE', `/api/scripts/${id}`)).statusCode).toBe(204)
+
+    // A default script can't be deleted, only reset.
+    const list = (await call('GET', '/api/scripts')).json() as { id: number; task: string }[]
+    const work = list.find((s) => s.task === 'work')!
+    const refusedDelete = await call('DELETE', `/api/scripts/${work.id}`)
+    expect(refusedDelete.statusCode).toBe(409)
+    expect(refusedDelete.json().error).toBe('default-script')
+    await call('POST', `/api/scripts/${work.id}/versions`, { source: VALID })
+    const reset = await call('POST', `/api/scripts/${work.id}/reset`)
+    expect(reset.json()).toMatchObject({ followsDefault: true, latestVersion: 3 })
     expect((await call('GET', `/api/scripts/${id}`)).statusCode).toBe(404)
   })
 

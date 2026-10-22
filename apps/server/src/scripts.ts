@@ -1,10 +1,15 @@
-import { and, asc, eq, max, sql } from 'drizzle-orm'
+import { and, asc, eq, isNotNull, max, sql } from 'drizzle-orm'
 import { checkScript } from '@csp/lang'
 import {
+  DEFAULT_SCRIPTS,
   SCRIPT_MAX_LENGTH,
   SCRIPT_NAME_MAX_LENGTH,
+  TASKS,
+  defaultScriptName,
+  isTask,
   type ScriptDetail,
   type ScriptSummary,
+  type Task,
 } from '@csp/shared'
 import { AuthError } from './auth.js'
 import { schema, type Db } from './db/index.js'
@@ -17,9 +22,14 @@ import type { InvariantViolation } from './invariants.js'
  * The active version is the one that runs. Saving a version without syntax errors makes it
  * active, so a saved change is picked up on the next tick; a version with errors is kept in the
  * history but never becomes active.
+ *
+ * Each Player also has their own version of every default script (`CONTEXT.md`: Default script;
+ * ADR 0009), made the first time their library is used. Until they edit it, it takes each new
+ * game default as a new version (`ensureDefaultScripts`); once edited it stays theirs until they
+ * reset it. Default scripts can't be renamed or deleted.
  */
 
-const { scripts, scriptVersions } = schema
+const { scripts, scriptVersions, users } = schema
 
 function validateName(name: unknown): string {
   const trimmed = typeof name === 'string' ? name.trim() : ''
@@ -62,6 +72,13 @@ function ownScript(db: Db, userId: number, id: number) {
   return row
 }
 
+/** A script that isn't a default script; those can't be renamed or deleted. */
+function notDefault(row: { task: string | null }, what: string): void {
+  if (row.task !== null) {
+    throw new AuthError('default-script', `A default script can’t be ${what}.`)
+  }
+}
+
 function latestVersion(db: Db, scriptId: number): number {
   const row = db
     .select({ v: max(scriptVersions.version) })
@@ -80,14 +97,95 @@ function addVersion(db: Db, scriptId: number, source: string): void {
   }
 }
 
-/** The Player's scripts, by name. */
+function sourceOf(db: Db, scriptId: number, version: number | null): string | undefined {
+  if (version === null) return undefined
+  return db
+    .select({ source: scriptVersions.source })
+    .from(scriptVersions)
+    .where(and(eq(scriptVersions.scriptId, scriptId), eq(scriptVersions.version, version)))
+    .get()?.source
+}
+
+/** A default script being edited by its Player stops following the game's default. */
+function markEdited(db: Db, row: { id: number; task: string | null; followsDefault: boolean }) {
+  if (row.task === null || !row.followsDefault || !isTask(row.task)) return
+  db.update(scripts)
+    .set({ followsDefault: false, editedFrom: DEFAULT_SCRIPTS[row.task].source })
+    .where(eq(scripts.id, row.id))
+    .run()
+}
+
+/**
+ * Makes sure the Player has their version of every default script, and that those they haven't
+ * edited run the game's current default: a changed default becomes their newest version. A
+ * script of theirs already called by a default script's name gets a number after its name.
+ */
+export function ensureDefaultScripts(db: Db, userId: number): void {
+  db.transaction((tx) => {
+    const txDb = tx as unknown as Db
+    for (const task of TASKS) {
+      const { source } = DEFAULT_SCRIPTS[task]
+      const row = tx
+        .select()
+        .from(scripts)
+        .where(and(eq(scripts.userId, userId), eq(scripts.task, task)))
+        .get()
+      if (!row) {
+        const name = defaultScriptName(task)
+        const clash = tx
+          .select({ id: scripts.id })
+          .from(scripts)
+          .where(and(eq(scripts.userId, userId), sql`lower(${scripts.name}) = lower(${name})`))
+          .get()
+        if (clash) {
+          let n = 2
+          while (nameTaken(txDb, userId, `${name} ${n}`)) n++
+          tx.update(scripts)
+            .set({ name: `${name} ${n}` })
+            .where(eq(scripts.id, clash.id))
+            .run()
+        }
+        const { id } = tx
+          .insert(scripts)
+          .values({ userId, name, task, followsDefault: true })
+          .returning({ id: scripts.id })
+          .get()
+        addVersion(txDb, id, source)
+      } else if (row.followsDefault && sourceOf(txDb, row.id, row.activeVersion) !== source) {
+        addVersion(txDb, row.id, source)
+      }
+    }
+  })
+}
+
+/** `ensureDefaultScripts` for every Player, as the server starts with perhaps new defaults. */
+export function syncDefaultScripts(db: Db): void {
+  for (const { id } of db.select({ id: users.id }).from(users).all()) {
+    ensureDefaultScripts(db, id)
+  }
+}
+
+/** The id of the Player's version of a task's default script, made if they have none yet. */
+export function defaultScriptId(db: Db, userId: number, task: Task): number {
+  ensureDefaultScripts(db, userId)
+  return db
+    .select({ id: scripts.id })
+    .from(scripts)
+    .where(and(eq(scripts.userId, userId), eq(scripts.task, task)))
+    .get()!.id
+}
+
+/** The Player's scripts, by name, their default scripts among them. */
 export function listScripts(db: Db, userId: number): ScriptSummary[] {
+  ensureDefaultScripts(db, userId)
   return db
     .select({
       id: scripts.id,
       name: scripts.name,
       activeVersion: scripts.activeVersion,
       latestVersion: sql<number>`coalesce(max(${scriptVersions.version}), 0)`,
+      task: scripts.task,
+      followsDefault: scripts.followsDefault,
     })
     .from(scripts)
     .leftJoin(scriptVersions, eq(scriptVersions.scriptId, scripts.id))
@@ -95,6 +193,7 @@ export function listScripts(db: Db, userId: number): ScriptSummary[] {
     .groupBy(scripts.id)
     .orderBy(sql`lower(${scripts.name})`)
     .all()
+    .map((s) => ({ ...s, task: isTask(s.task) ? s.task : null }))
 }
 
 /** One of the Player's scripts with its whole history. */
@@ -112,12 +211,23 @@ export function getScript(db: Db, userId: number, id: number): ScriptDetail {
       savedAt: Math.floor(v.createdAt.getTime() / 1000),
       errors: checkScript(v.source),
     }))
+  const task = isTask(script.task) ? script.task : null
   return {
     id: script.id,
     name: script.name,
     activeVersion: script.activeVersion,
     latestVersion: versions.at(-1)?.version ?? 0,
+    task,
+    followsDefault: script.followsDefault,
     versions,
+    ...(task === null
+      ? {}
+      : {
+          gameDefault: {
+            source: DEFAULT_SCRIPTS[task].source,
+            editedFrom: script.followsDefault ? null : script.editedFrom,
+          },
+        }),
   }
 }
 
@@ -129,6 +239,8 @@ export function createScript(
 ): ScriptDetail {
   const name = validateName(input.name)
   const source = validateSource(input.source)
+  // So a new script can't take a default script's name.
+  ensureDefaultScripts(db, userId)
   const id = db.transaction((tx) => {
     const txDb = tx as unknown as Db
     if (nameTaken(txDb, userId, name))
@@ -140,7 +252,10 @@ export function createScript(
   return getScript(db, userId, id)
 }
 
-/** Saves a new version of a script; earlier versions stay. */
+/**
+ * Saves a new version of a script; earlier versions stay. A default script the Player saves is
+ * theirs from then on.
+ */
 export function saveScript(
   db: Db,
   userId: number,
@@ -149,8 +264,9 @@ export function saveScript(
 ): ScriptDetail {
   const source = validateSource(input.source)
   db.transaction((tx) => {
-    ownScript(tx as unknown as Db, userId, id)
+    const row = ownScript(tx as unknown as Db, userId, id)
     addVersion(tx as unknown as Db, id, source)
+    markEdited(tx as unknown as Db, row)
   })
   return getScript(db, userId, id)
 }
@@ -162,9 +278,10 @@ export function renameScript(
   input: { name: unknown },
 ): ScriptDetail {
   const name = validateName(input.name)
+  ensureDefaultScripts(db, userId)
   db.transaction((tx) => {
     const txDb = tx as unknown as Db
-    ownScript(txDb, userId, id)
+    notDefault(ownScript(txDb, userId, id), 'renamed')
     if (nameTaken(txDb, userId, name, id))
       throw new AuthError('name-taken', 'You have a script by that name.')
     tx.update(scripts).set({ name }).where(eq(scripts.id, id)).run()
@@ -172,7 +289,10 @@ export function renameScript(
   return getScript(db, userId, id)
 }
 
-/** Makes an earlier (or later) version the one that runs; refused if it has syntax errors. */
+/**
+ * Makes an earlier (or later) version the one that runs; refused if it has syntax errors. For a
+ * default script that counts as editing it.
+ */
 export function activateVersion(
   db: Db,
   userId: number,
@@ -181,7 +301,7 @@ export function activateVersion(
 ): ScriptDetail {
   db.transaction((tx) => {
     const txDb = tx as unknown as Db
-    ownScript(txDb, userId, id)
+    const script = ownScript(txDb, userId, id)
     const row =
       typeof input.version === 'number'
         ? tx
@@ -199,6 +319,27 @@ export function activateVersion(
       )
     }
     tx.update(scripts).set({ activeVersion: row.version }).where(eq(scripts.id, id)).run()
+    markEdited(txDb, script)
+  })
+  return getScript(db, userId, id)
+}
+
+/**
+ * Resets a default script (`CONTEXT.md`: Default script): the game's current default becomes its
+ * newest version, and it follows the game's default again until the Player edits it.
+ */
+export function resetScript(db: Db, userId: number, id: number): ScriptDetail {
+  db.transaction((tx) => {
+    const txDb = tx as unknown as Db
+    const row = ownScript(txDb, userId, id)
+    if (!isTask(row.task)) {
+      throw new AuthError('default-script', 'Only a default script can be reset.')
+    }
+    addVersion(txDb, id, DEFAULT_SCRIPTS[row.task].source)
+    tx.update(scripts)
+      .set({ followsDefault: true, editedFrom: null })
+      .where(eq(scripts.id, id))
+      .run()
   })
   return getScript(db, userId, id)
 }
@@ -206,7 +347,7 @@ export function activateVersion(
 /** Deletes a script with its whole history. */
 export function deleteScript(db: Db, userId: number, id: number): void {
   db.transaction((tx) => {
-    ownScript(tx as unknown as Db, userId, id)
+    notDefault(ownScript(tx as unknown as Db, userId, id), 'deleted')
     tx.delete(scripts).where(eq(scripts.id, id)).run()
   })
 }
@@ -215,12 +356,18 @@ export function deleteScript(db: Db, userId: number, id: number): void {
 export interface RunnableScript {
   userId: number
   source: string
+  /** A default script its Player hasn't edited: running out of steps is the game's fault. */
+  followsDefault: boolean
 }
 
 /** A script that can run: its Player and active version; undefined if it has none (or is gone). */
 export function runnableScript(db: Db, scriptId: number): RunnableScript | undefined {
   return db
-    .select({ userId: scripts.userId, source: scriptVersions.source })
+    .select({
+      userId: scripts.userId,
+      source: scriptVersions.source,
+      followsDefault: scripts.followsDefault,
+    })
     .from(scripts)
     .innerJoin(
       scriptVersions,
@@ -250,8 +397,9 @@ export function activeSource(db: Db, scriptId: number): string | undefined {
 }
 
 /**
- * The script library's invariant (ADR 0004): every active version exists and has no syntax
- * errors.
+ * The script library's invariants (ADR 0004): every active version exists and has no syntax
+ * errors; every default script is for a task, and one its Player hasn't edited runs the game's
+ * current default (checked after `syncDefaultScripts`).
  */
 export function checkScriptLibrary(db: Db): InvariantViolation[] {
   const invariant = 'active-scripts-valid'
@@ -286,6 +434,31 @@ export function checkScriptLibrary(db: Db): InvariantViolation[] {
         message: `script ${r.id} has syntax errors in its active version ${r.activeVersion}`,
         entityIds,
       })
+    }
+  }
+  const defaults = db
+    .select({
+      id: scripts.id,
+      task: scripts.task,
+      followsDefault: scripts.followsDefault,
+      activeVersion: scripts.activeVersion,
+    })
+    .from(scripts)
+    .where(isNotNull(scripts.task))
+    .all()
+  for (const d of defaults) {
+    const fail = (message: string) =>
+      violations.push({
+        invariant: 'default-scripts-follow',
+        message: `default script ${d.id} ${message}`,
+        entityIds: [`script-${d.id}`],
+      })
+    if (!isTask(d.task)) fail(`is for no task: ${d.task}`)
+    else if (
+      d.followsDefault &&
+      sourceOf(db, d.id, d.activeVersion) !== DEFAULT_SCRIPTS[d.task].source
+    ) {
+      fail(`follows the game's default of ${d.task} but doesn't run it`)
     }
   }
   return violations

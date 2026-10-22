@@ -55,7 +55,10 @@ const SHARED: readonly ScriptBinding[] = [
   value('tick', 'The world tick this run is for.'),
   value('mapSize', 'Tiles along each side of the map; its opposite sides join.'),
 
-  list('residents', 'The residents the Player sees, their own included.'),
+  list(
+    'residents',
+    'The residents the Player sees, their own included; those of their own running a script with its `script.memory`, to read but not change.',
+  ),
   list('buildings', 'The buildings and construction sites the Player sees, roads included.'),
   list('cities', 'The cities the Player sees any of.'),
   list('horses', 'The horses the Player sees.'),

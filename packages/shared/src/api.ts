@@ -1,4 +1,5 @@
 /** HTTP API shapes shared by server and client (ADR 0005). */
+import type { Task } from './default-scripts.js'
 import type { AdminDirectiveView } from './directive.js'
 
 export interface Account {
@@ -37,6 +38,7 @@ export type ApiErrorCode =
   | 'not-explored'
   | 'rate-limited'
   | 'script-has-errors'
+  | 'default-script'
 
 export interface ApiError {
   error: ApiErrorCode
@@ -54,6 +56,13 @@ export interface ScriptSummary {
   /** The version that runs, always one without syntax errors; null while there is none. */
   activeVersion: number | null
   latestVersion: number
+  /**
+   * For the Player's version of a default script (`CONTEXT.md`: Default script), its task; it
+   * can't be renamed or deleted. Null for the Player's own scripts.
+   */
+  task: Task | null
+  /** A default script the Player hasn't edited, which follows the game's default. */
+  followsDefault: boolean
 }
 
 /** One saved version of a script, with the syntax errors it has (at most one). */
@@ -68,6 +77,19 @@ export interface ScriptVersion {
 /** A script with its whole history, oldest version first. */
 export interface ScriptDetail extends ScriptSummary {
   versions: ScriptVersion[]
+  /** For a default script: the game's default now and, once edited, the one it was edited from. */
+  gameDefault?: GameDefault
+}
+
+/**
+ * The game's side of a Player's default script. `editedFrom` differs from `source` when the game's
+ * default changed after the Player edited theirs; the editor shows them the difference.
+ */
+export interface GameDefault {
+  /** The game's current default. */
+  source: string
+  /** The game's default when the Player first edited theirs; null while they follow it. */
+  editedFrom: string | null
 }
 
 export interface CreateScriptRequest {

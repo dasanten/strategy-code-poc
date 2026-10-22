@@ -5,11 +5,23 @@ import { api } from './api.js'
 import { ScriptEditor } from './ScriptEditor.js'
 import {
   canMakeActive,
+  defaultStatus,
   describeDiagnostic,
   hasUnsavedChanges,
+  lineDiff,
   savedMessage,
   versionStatus,
+  type DiffLine,
 } from './script-editor.js'
+
+/** How a default script stands against the game's default (`CONTEXT.md`: Default script). */
+const DEFAULT_STATUS: Record<ReturnType<typeof defaultStatus>, string> = {
+  follows: 'follows the game’s default',
+  edited: 'edited by you',
+  'default changed': 'edited by you · game’s default changed',
+}
+
+const DIFF_CLASS: Record<DiffLine['op'], string> = { ' ': '', '-': 'removed', '+': 'added' }
 
 const STARTER = `// Runs once a tick for each resident or army running it.
 if (memory.role == null) { memory.role = "gatherer" }
@@ -27,9 +39,12 @@ interface Opened {
  */
 export function ScriptLibrary({
   onScripts,
+  toOpen,
 }: {
   /** Hears the list each time it is loaded, so residents can be given a script to run. */
   onScripts?: (scripts: ScriptSummary[]) => void
+  /** A script to open, such as the one a resident's task runs; a new `at` opens it again. */
+  toOpen?: { id: number; at: number }
 } = {}) {
   const [scripts, setListed] = useState<ScriptSummary[]>([])
   const setScripts = useCallback(
@@ -79,6 +94,24 @@ export function ScriptLibrary({
   async function open(id: number) {
     const detail = await act(() => api.script(id))
     if (detail) show(detail)
+  }
+
+  useEffect(() => {
+    if (toOpen) void open(toOpen.id)
+    // Only a new request opens a script, not a new `open`.
+  }, [toOpen])
+
+  /** Resets a default script to the game's current default, once the Player confirms. */
+  async function reset() {
+    if (!script) return
+    const ok = window.confirm(
+      `Reset ${script.name} to the game’s default? Your versions stay in the history; the game’s default becomes the newest and runs from the next tick.`,
+    )
+    if (!ok) return
+    const detail = await act(() => api.resetScript(script.id))
+    if (!detail) return
+    show(detail)
+    setMessage(`Reset to the game’s default as version ${detail.latestVersion}.`)
   }
 
   function startNew() {
@@ -159,7 +192,10 @@ export function ScriptLibrary({
                 onClick={() => open(s.id)}
               >
                 <span>{s.name}</span>
-                <small>{s.activeVersion === null ? 'none active' : `v${s.activeVersion}`}</small>
+                <small>
+                  {s.task && (s.followsDefault ? 'game’s · ' : 'edited · ')}
+                  {s.activeVersion === null ? 'none active' : `v${s.activeVersion}`}
+                </small>
               </button>
             </li>
           ))}
@@ -213,13 +249,23 @@ export function ScriptLibrary({
                     ? 'no active version'
                     : `version ${script.activeVersion} active`}
                 </span>
+                {script.task && <span>{DEFAULT_STATUS[defaultStatus(script)]}</span>}
                 <span className="spacer" />
-                <button type="button" onClick={() => setRename(script.name)}>
-                  Rename
-                </button>
-                <button type="button" onClick={remove}>
-                  Delete
-                </button>
+                {script.task ? (
+                  // A default script can't be renamed or deleted, only reset.
+                  <button type="button" onClick={reset} disabled={script.followsDefault}>
+                    Reset to default
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => setRename(script.name)}>
+                      Rename
+                    </button>
+                    <button type="button" onClick={remove}>
+                      Delete
+                    </button>
+                  </>
+                )}
               </>
             ) : (
               <form onSubmit={submitRename}>
@@ -251,6 +297,24 @@ export function ScriptLibrary({
           </form>
         )}
 
+        {script?.gameDefault && defaultStatus(script) === 'default changed' && (
+          <details className="default-changed">
+            <summary>The game’s default has changed since you edited yours.</summary>
+            <pre className="script-diff">
+              {lineDiff(script.gameDefault.editedFrom ?? '', script.gameDefault.source).map(
+                (l, i) => (
+                  <span key={i} className={DIFF_CLASS[l.op]}>
+                    {l.op} {l.text}
+                    {'\n'}
+                  </span>
+                ),
+              )}
+            </pre>
+            <p className="muted small">
+              From the default you edited to the game’s default now. Reset to default to take it.
+            </p>
+          </details>
+        )}
         <ScriptEditor key={opened.key} initialSource={opened.source} onChange={setDraft} />
         <div className="script-foot">
           <p className={`diagnostics${errors.length > 0 ? ' has-errors' : ''}`}>
