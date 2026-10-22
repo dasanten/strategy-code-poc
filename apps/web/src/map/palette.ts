@@ -1,17 +1,24 @@
 import { Terrain, UNEXPLORED, type BuildingKind, type ResourceKind } from '@csp/shared'
 
-/** Terrain colours from the Main Game Screen design, as 0xRRGGBB. */
+/** Roads, wide and light over the terrain (ADR 0008). */
+export const ROAD_COLOR = 0xe8cf97
+
+/** The painted board-game terrain colours (ADR 0008), as 0xRRGGBB. */
 export const TERRAIN_COLORS: Record<number, number> = {
-  [Terrain.Plains]: 0x7e9a52,
-  [Terrain.Forest]: 0x3f5e36,
-  [Terrain.Hills]: 0x9c8a5e,
-  [Terrain.Mountain]: 0x6f6a66,
-  [Terrain.Lake]: 0x3a6a8a,
-  [Terrain.Sea]: 0x2a4b66,
+  [Terrain.Plains]: 0x93c45a,
+  [Terrain.Forest]: 0x3f8c3c,
+  [Terrain.Hills]: 0xc9a65c,
+  [Terrain.Mountain]: 0x938f8a,
+  [Terrain.Lake]: 0x45aee0,
+  [Terrain.Sea]: 0x2f80c6,
   /** Never in a chunk: roads are drawn over the terrain, in this colour. */
-  [Terrain.Road]: 0xcdb98c,
+  [Terrain.Road]: ROAD_COLOR,
   [UNEXPLORED]: 0x1a1e22,
 }
+
+/** The small dark marks on the terrain (trees, hill arcs, peaks, waves, tufts), and how strong. */
+export const TERRAIN_MARK_COLOR = 0x1f3d17
+export const TERRAIN_MARK_ALPHA = 0.5
 
 /** Map background, behind terrain not loaded yet. */
 export const VOID_COLOR = 0x0b0d0f
@@ -65,7 +72,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   smelter: 0x9a4a2f,
   mint: 0xc9a227,
   smithy: 0x4a4e57,
-  road: 0xcdb98c,
+  road: ROAD_COLOR,
 }
 
 export const BUILDING_NAMES: Record<BuildingKind, string> = {
