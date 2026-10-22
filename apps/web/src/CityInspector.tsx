@@ -61,6 +61,8 @@ export function CityInspector({
   onTransfer,
   directives,
   onBuyOff,
+  openId,
+  onOpen,
 }: {
   cities: SeenCity[]
   residents: Resident[]
@@ -82,8 +84,11 @@ export function CityInspector({
   directives: DirectiveView[]
   /** Gives the buy-off order for a directive to one of the Player's residents on a warehouse. */
   onBuyOff: (residentId: string, directiveId: string, carriageId: string | null) => void
+  /** The city shown opened, such as one picked on the map. */
+  openId: string | undefined
+  /** Called with the city opened in the list, or undefined when it is closed. */
+  onOpen: (id: string | undefined) => void
 }) {
-  const [openId, setOpenId] = useState<string | undefined>()
   const views = cities.map((c) => describeCity(c, { residents, buildings }, realmId, realms))
   return (
     <section className="city-inspector" aria-label="Cities in sight">
@@ -97,7 +102,7 @@ export function CityInspector({
             <button
               type="button"
               aria-expanded={openId === v.id}
-              onClick={() => setOpenId((id) => (id === v.id ? undefined : v.id))}
+              onClick={() => onOpen(openId === v.id ? undefined : v.id)}
             >
               <strong>{v.name}</strong>
               <span>{v.whose}</span>

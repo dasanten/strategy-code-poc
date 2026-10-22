@@ -13,11 +13,10 @@ import {
   type KnownNode,
   type Resident,
   type ResourceKind,
-  type TerrainChunk,
 } from '@csp/shared'
 import {
   CLOSE_SCALE,
-  FAR_SCALE,
+  zoomTier,
   chunkToScreen,
   clampScale,
   panBy,
@@ -30,6 +29,7 @@ import {
   type Size,
 } from './map/camera.js'
 import { ChunkStore } from './map/chunks.js'
+import { TerrainLayer } from './map/terrain-layer.js'
 import {
   holderAt,
   holderLabel,
@@ -41,7 +41,6 @@ import {
 import {
   NODE_COLORS,
   NODE_NAMES,
-  BUILDING_COLORS,
   CARAVAN_COLOR,
   CARRIAGE_COLOR,
   HORSE_COLOR,
@@ -50,12 +49,15 @@ import {
   OTHER_COLOR,
   OWN_COLOR,
   CITY_AREA_COLOR,
+  ROAD_COLOR,
   TERRAIN_COLORS,
   TERRAIN_NAMES,
   VOID_COLOR,
   css,
 } from './map/palette.js'
-import { BASE_ART, BUILDING_ART, NODE_ART } from './map/art.js'
+import { BASE_ART, BUILDING_ART, CITY_ART, NODE_ART } from './map/art.js'
+import { EMBLEM_RADIUS, MARKER_RADIUS, cityEmblems, emblemAt, farMarkers } from './map/far.js'
+import { LabelLayer } from './map/labels.js'
 import { destroyAtlas, loadAtlas, type Atlas } from './map/atlas.js'
 import {
   GLYPH_COLOR,
@@ -64,6 +66,7 @@ import {
   cityRelationship,
   relationshipColor,
   type Relationship,
+  type Viewer,
 } from './map/tokens.js'
 import type { ClientWorld } from './useWorld.js'
 import { caravanAt, caravanParts } from './caravans.js'
@@ -87,9 +90,10 @@ interface Hover {
 type MapMode = 'terrain' | 'region'
 
 /**
- * The world map (T1.5): explored terrain loaded in chunks as the view needs them, one small
- * texture per chunk (one pixel per tile), drawn only while on screen. Zoomed out it draws only
- * terrain; closer in it adds resource nodes and residents, and up close the tile grid.
+ * The world map (T1.5): explored terrain loaded in chunks as the view needs them, painted per
+ * chunk with its terrain marks (`map/terrain-layer.ts`) and drawn only while on screen. Zoomed out
+ * it draws only terrain; closer in it adds resource nodes and residents, and up close the tile
+ * grid.
  * Drag or swipe to pan; wheel, pinch or the buttons to zoom.
  */
 export function MapView({
@@ -97,6 +101,8 @@ export function MapView({
   selectedId,
   onSelect,
   onSelectTile,
+  selectedCityId,
+  onSelectCity,
   picking = false,
   onPickTile,
   onNodesLoaded,
@@ -109,6 +115,10 @@ export function MapView({
   onSelect?: (id: string) => void
   /** Called with a tile clicked where there is no resident of the Player's realm. */
   onSelectTile?: (x: number, y: number) => void
+  /** The city whose emblem shows with a ring in the far tier, if any. */
+  selectedCityId?: string
+  /** Called with a city whose emblem was clicked in the far tier. */
+  onSelectCity?: (id: string) => void
   /** Waiting for a tile: the next click picks one instead of selecting. */
   picking?: boolean
   /** Called with a tile picked by click (while `picking`) or by right-click. */
@@ -125,6 +135,9 @@ export function MapView({
   onSelectRef.current = onSelect
   const onSelectTileRef = useRef(onSelectTile)
   onSelectTileRef.current = onSelectTile
+  const selectedCityRef = useRef(selectedCityId)
+  const onSelectCityRef = useRef(onSelectCity)
+  onSelectCityRef.current = onSelectCity
   const pickingRef = useRef(picking)
   pickingRef.current = picking
   const onPickTileRef = useRef(onPickTile)
@@ -164,6 +177,11 @@ export function MapView({
   }, [selectedId])
 
   useEffect(() => {
+    selectedCityRef.current = selectedCityId
+    redrawRef.current()
+  }, [selectedCityId])
+
+  useEffect(() => {
     worldRef.current = world
     if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
     redrawRef.current()
@@ -173,9 +191,8 @@ export function MapView({
     const host = hostRef.current!
     const across = chunksAcross(mapSize)
     const app = new Application()
-    const sprites = new Map<number, Sprite>()
     const nodes: KnownNode[][] = []
-    const terrainLayer = new Container()
+    const terrainLayer = new TerrainLayer(mapSize, (i) => worldRef.current.exploredChunks.has(i))
     // The Region map: territory over the terrain, one small texture per chunk like the terrain.
     const regionSprites = new Map<number, Sprite>()
     const regionLayer = new Container()
@@ -184,6 +201,7 @@ export function MapView({
     const tokens = new TokenLayer()
     let atlas: Atlas | undefined
     const overlay = new Graphics()
+    const labels = new LabelLayer()
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
     let cam: Camera = { ...homeCentre(worldRef.current), scale: START_SCALE }
     let disposed = false
@@ -194,18 +212,7 @@ export function MapView({
       () => worldRef.current.exploredChunks,
       across,
       (chunk) => {
-        const index = chunk.cy * across + chunk.cx
-        const old = sprites.get(index)
-        if (old) {
-          // Explored terrain grew: the same sprite gets the newer picture.
-          const stale = old.texture
-          old.texture = chunkTexture(chunk)
-          stale.destroy(true)
-        } else {
-          const sprite = new Sprite(chunkTexture(chunk))
-          terrainLayer.addChild(sprite)
-          sprites.set(index, sprite)
-        }
+        terrainLayer.set(chunk)
         nodes[chunk.cy * across + chunk.cx] = chunk.nodes
         onNodesLoadedRef.current?.((x, y) =>
           nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
@@ -260,8 +267,11 @@ export function MapView({
       // sides join); nearer chunks are loaded first.
       const onScreen = visibleChunks(cam, view, mapSize)
       const shown = new Set(onScreen)
-      regionLayer.visible = modeRef.current === 'region'
-      for (const [i, sprite] of [...sprites, ...regionSprites]) {
+      // Far out, territory always shows (ADR 0008: far tier).
+      regionLayer.visible = modeRef.current === 'region' || zoomTier(cam.scale) === 'far'
+      // Terrain whose edges still wait to be redone asks for another frame.
+      if (terrainLayer.draw(cam, view, shown)) redraw()
+      for (const [i, sprite] of regionSprites) {
         sprite.visible = shown.has(i)
         if (!sprite.visible) continue
         sprite.position.set(
@@ -282,8 +292,32 @@ export function MapView({
       g.clear()
       under.clear()
       tokens.begin()
-      if (cam.scale >= FAR_SCALE) drawMiddle(g, cam, view, onScreen)
+      labels.begin()
+      if (zoomTier(cam.scale) === 'far') drawFar(g, cam, view)
+      else drawMiddle(g, cam, view, onScreen)
+      labels.end()
       tokens.end()
+    }
+
+    /** Far out: an emblem with a name per city, armies and caravans as small markers. */
+    function drawFar(g: Graphics, cam: Camera, view: Size) {
+      const world = worldRef.current
+      for (const m of farMarkers(world)) {
+        const [sx, sy] = tileToScreen(cam, view, mapSize, m.x + 0.5, m.y + 0.5)
+        g.circle(sx, sy, MARKER_RADIUS)
+          .fill(relationshipColor(m.rel))
+          .stroke({ width: 1.5, color: 0x0e1419 })
+      }
+      for (const e of cityEmblems(world, viewerOf(world), mapSize)) {
+        const [sx, sy] = tileToScreen(cam, view, mapSize, e.x + 0.5, e.y + 0.5)
+        const r = EMBLEM_RADIUS[e.size]
+        if (sx < -r * 8 || sy < -r * 4 || sx > view.width + r * 8 || sy > view.height + r * 4)
+          continue
+        drawEmblem(tokens, sx, sy, r, e.rel)
+        labels.place(e.name, sx, sy + r + 12)
+        if (e.id === selectedCityRef.current)
+          g.circle(sx, sy, r + 6).stroke({ width: 2.5, color: 0xffffff })
+      }
     }
 
     function drawMiddle(g: Graphics, cam: Camera, view: Size, onScreen: number[]) {
@@ -418,6 +452,14 @@ export function MapView({
           onPickTileRef.current?.(tx, ty)
           return
         }
+        // Far out, a click picks the city whose emblem it falls on.
+        if (zoomTier(cam.scale) === 'far') {
+          const world = worldRef.current
+          const emblems = cityEmblems(world, viewerOf(world), mapSize)
+          const city = emblemAt(emblems, cam, size(), mapSize, p.x, p.y)
+          if (city) onSelectCityRef.current?.(city.id)
+          return
+        }
         const id = residentAt(p.x, p.y)
         if (id) onSelectRef.current?.(id)
         else onSelectTileRef.current?.(tx, ty)
@@ -468,7 +510,14 @@ export function MapView({
       app.canvas.addEventListener('wheel', onWheel, { passive: false })
       app.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
       app.renderer.on('resize', redraw)
-      app.stage.addChild(terrainLayer, regionLayer, under, tokens.container, overlay)
+      app.stage.addChild(
+        terrainLayer.container,
+        regionLayer,
+        under,
+        tokens.container,
+        overlay,
+        labels.container,
+      )
       ready = true
       void loadAtlas().then((loaded) => {
         if (disposed) return destroyAtlas(loaded)
@@ -489,9 +538,8 @@ export function MapView({
       regionRef.current = () => {}
       controlsRef.current = null
       if (ready) {
-        for (const sprite of [...sprites.values(), ...regionSprites.values()]) {
-          sprite.texture.destroy(true)
-        }
+        terrainLayer.destroy()
+        for (const sprite of regionSprites.values()) sprite.texture.destroy(true)
         app.destroy(true, { children: true })
       }
       if (atlas) destroyAtlas(atlas)
@@ -658,6 +706,20 @@ function drawBuilding(
   tokens.place(file, x, y, r * 1.2, glyph, alpha)
 }
 
+/** A city's emblem in the far tier (ADR 0008): a castle on a dark hex badge with a wide ring. */
+function drawEmblem(tokens: TokenLayer, x: number, y: number, r: number, rel: Relationship) {
+  const base = (r * 1.08 * 24) / 11
+  tokens.place(BASE_ART.hex, x, y, base)
+  tokens.place(CITY_ART.ring, x, y, base, relationshipColor(rel))
+  tokens.place(CITY_ART.glyph, x, y, r * 1.2, GLYPH_COLOR)
+}
+
+/** The Player's realm and its allies, for relationship colours. */
+const viewerOf = (world: ClientWorld): Viewer => ({
+  realmId: world.home.realmId,
+  allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
+})
+
 /** A resource node as a token: a dark diamond with the glyph in the node's colour. */
 function drawNode(tokens: TokenLayer, kind: ResourceKind, x: number, y: number, r: number) {
   tokens.place(BASE_ART.diamond, x, y, (r * 24) / 11)
@@ -699,22 +761,37 @@ function drawStructures(
     }
     under.fill({ color: CITY_AREA_COLOR, alpha: 0.18 })
   }
-  // Roads under the buildings, as a band through the middle of the tile joined to the roads next
-  // to it (`CONTEXT.md`: Road); a road site shows faintly.
+  // Roads under the buildings, as a wide light band through the middle of the tile joined to the
+  // roads next to it (`CONTEXT.md`: Road, ADR 0008); a road site, and the step onto it, are faint.
   const roads = new Map(
     buildings.filter((b) => b.kind === 'road').map((b) => [`${b.x},${b.y}`, b] as const),
   )
-  const joined = (x: number, y: number) => roads.has(`${(x + size) % size},${(y + size) % size}`)
-  for (const r of roads.values()) {
-    const [sx, sy] = tileToScreen(cam, view, size, r.x, r.y)
-    const w = tile * 0.36
-    const mid = (tile - w) / 2
-    under.rect(sx + mid, sy + mid, w, w)
-    if (joined(r.x - 1, r.y)) under.rect(sx, sy + mid, mid, w)
-    if (joined(r.x + 1, r.y)) under.rect(sx + mid + w, sy + mid, mid, w)
-    if (joined(r.x, r.y - 1)) under.rect(sx + mid, sy, w, mid)
-    if (joined(r.x, r.y + 1)) under.rect(sx + mid, sy + mid + w, w, mid)
-    under.fill({ color: BUILDING_COLORS.road, alpha: r.site ? 0.4 : 1 })
+  const roadAt = (x: number, y: number) => roads.get(`${(x + size) % size},${(y + size) % size}`)
+  const w = Math.max(3, tile * 0.36)
+  const inSight = ([sx, sy]: readonly number[]) =>
+    sx! > -tile && sy! > -tile && sx! < view.width + tile && sy! < view.height + tile
+  for (const site of [false, true]) {
+    const style = { color: ROAD_COLOR, alpha: site ? 0.4 : 1 }
+    for (const r of roads.values()) {
+      const c = centre(cam, view, size, r)
+      if (!!r.site === site && inSight(c)) under.circle(c[0], c[1], w / 2)
+    }
+    under.fill(style)
+    // Each join once, from the road to its right or below; faint if either end is a site.
+    for (const r of roads.values()) {
+      const [sx, sy] = centre(cam, view, size, r)
+      if (!inSight([sx, sy])) continue
+      for (const [dx, dy] of [
+        [1, 0],
+        [0, 1],
+      ] as const) {
+        const next = roadAt(r.x + dx, r.y + dy)
+        if (next && !!(r.site || next.site) === site) {
+          under.moveTo(sx, sy).lineTo(sx + dx * tile, sy + dy * tile)
+        }
+      }
+    }
+    under.stroke({ ...style, width: w })
   }
 
   const cityById = new Map(cities.map((c) => [c.id, c]))
@@ -814,7 +891,7 @@ function drawStructures(
 const centre = (cam: Camera, view: Size, size: number, e: { x: number; y: number }) =>
   tileToScreen(cam, view, size, e.x + 0.5, e.y + 0.5)
 
-/** A chunk's RGBA pixels as a texture, one pixel per tile, kept crisp like `chunkTexture`. */
+/** A chunk's RGBA pixels as a texture, one pixel per tile, scaled up crisp. */
 function pixelTexture(pixels: Uint8ClampedArray): Texture {
   const canvas = document.createElement('canvas')
   canvas.width = CHUNK_SIZE
@@ -822,26 +899,6 @@ function pixelTexture(pixels: Uint8ClampedArray): Texture {
   const image = new ImageData(CHUNK_SIZE, CHUNK_SIZE)
   image.data.set(pixels)
   canvas.getContext('2d')!.putImageData(image, 0, 0)
-  const texture = Texture.from(canvas)
-  texture.source.scaleMode = 'nearest'
-  return texture
-}
-
-/** One pixel per tile; scaled up with nearest-neighbour sampling, so tiles stay crisp. */
-function chunkTexture(chunk: TerrainChunk): Texture {
-  const canvas = document.createElement('canvas')
-  canvas.width = CHUNK_SIZE
-  canvas.height = CHUNK_SIZE
-  const ctx = canvas.getContext('2d')!
-  const image = ctx.createImageData(CHUNK_SIZE, CHUNK_SIZE)
-  chunk.tiles.forEach((t, i) => {
-    const c = TERRAIN_COLORS[t] ?? 0xff00ff
-    image.data[i * 4] = c >> 16
-    image.data[i * 4 + 1] = (c >> 8) & 0xff
-    image.data[i * 4 + 2] = c & 0xff
-    image.data[i * 4 + 3] = 255
-  })
-  ctx.putImageData(image, 0, 0)
   const texture = Texture.from(canvas)
   texture.source.scaleMode = 'nearest'
   return texture

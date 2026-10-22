@@ -6,7 +6,13 @@ import {
   type OrderRequest,
   type StandingView,
 } from '@csp/shared'
-import { formatStanding, standingName, standingWord } from './standing-view.js'
+import {
+  formatStanding,
+  standingName,
+  standingRelationship,
+  standingWord,
+} from './standing-view.js'
+import { relationshipClass } from './theme.js'
 
 /**
  * Standing (`CONTEXT.md`: Standing): how other Organizations regard the Player's realm, and how
@@ -67,7 +73,7 @@ export function StandingPanel({
       ) : (
         <ul className="alliance-list">
           {standings.map((s) => (
-            <li key={s.org}>
+            <li key={s.org} className={relationshipClass(standingRelationship(s))}>
               <span>{standingName(s)}</span>
               <span className="badge" title="How they regard you">
                 {standingWord(s.theirs)} {formatStanding(s.theirs)}
