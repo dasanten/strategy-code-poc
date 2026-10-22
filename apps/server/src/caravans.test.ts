@@ -28,13 +28,13 @@ const plains = (size: number): TerrainMap => ({
   tiles: new Uint8Array(size * size).fill(Terrain.Plains),
 })
 
-/** The Trade Org HQ at (32, 32) and one trading post south-east of it, with its caravan. */
+/** The Trade Org HQ at (128, 128) and one trading post south-east of it, with its caravan. */
 function route() {
-  const terrain = plains(128)
+  const terrain = plains(512)
   const world = createWorld(terrain)
   const rand = mulberry32(5)
-  const hq = foundTradeOrgHq(world, terrain, 32, 32, rand)
-  const post = foundTradingPost(world, terrain, 80, 80, undefined, rand)
+  const hq = foundTradeOrgHq(world, terrain, 128, 128, rand)
+  const post = foundTradingPost(world, terrain, 320, 320, undefined, rand)
   const [caravan] = placeCaravans(world)
   return { world, terrain, hq, post, caravan: caravan! }
 }
@@ -57,7 +57,7 @@ describe('placing caravans', () => {
     expect(caravan.postId).toBe(post.id)
     expect(caravan.escortIds).toHaveLength(CARAVAN_ESCORTS)
     const hall = world.buildings.find((b) => b.id === hq.townHallId)!
-    const [x, y] = hqLayout(hall.x, hall.y).goodsWarehouse
+    const [x, y] = hqLayout(hall.x + 1, hall.y + 1).goodsWarehouse
     const carriage = world.carriages.find((k) => k.id === caravan.carriageId)!
     expect(carriage).toMatchObject({ realmId: null, cityId: hq.id, x, y })
     expect(world.horses.find((h) => h.id === carriage.horseId)).toMatchObject({
@@ -73,14 +73,14 @@ describe('placing caravans', () => {
         y,
       })
     }
-    expect(caravansSound.check(world, plains(128))).toEqual([])
+    expect(caravansSound.check(world, plains(512))).toEqual([])
   })
 
   it('places none twice, and none without an HQ', () => {
     const { world, terrain } = route()
     expect(placeCaravans(world)).toEqual([])
     const bare = createWorld(terrain)
-    foundTradingPost(bare, terrain, 80, 80, undefined, mulberry32(1))
+    foundTradingPost(bare, terrain, 320, 320, undefined, mulberry32(1))
     expect(placeCaravans(bare)).toEqual([])
   })
 
@@ -157,7 +157,7 @@ describe('caravans on their route', () => {
     expect(crew.every((id) => world.residents.some((r) => r.id === id))).toBe(true)
     expect(world.cities.some((c) => c.id === post.id)).toBe(true)
     expect(checkInvariants(world, terrain)).toEqual([])
-  }, 60_000)
+  }, 180_000)
 
   it('breaks up when its driver is gone, leaving the escort to the HQ', () => {
     const { world, terrain, caravan } = route()

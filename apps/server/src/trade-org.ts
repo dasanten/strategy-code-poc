@@ -98,9 +98,19 @@ export interface HqLayout {
  * The HQ's shape around the middle tile (cx, cy) of its town hall: the storage and the two
  * warehouses next to the town hall inside the inner ring, the houses, smelter and mint in a
  * circle between the rings, clear of the straight ways from each gate of the outer ring to the
- * gate of the inner ring behind it.
+ * gate of the inner ring behind it. The same for the same tile, so it is worked out once.
  */
 export function hqLayout(cx: number, cy: number): HqLayout {
+  const key = `${cx},${cy}`
+  let layout = layouts.get(key)
+  if (!layout) layouts.set(key, (layout = workOutLayout(cx, cy)))
+  return layout
+}
+
+/** Layouts worked out so far (`hqLayout`), by their middle tile. */
+const layouts = new Map<string, HqLayout>()
+
+function workOutLayout(cx: number, cy: number): HqLayout {
   const { innerRadius, outerRadius } = TRADE_ORG_HQ
   const innerRing = roundRing(cx, cy, innerRadius)
   const outerRing = roundRing(cx, cy, outerRadius)

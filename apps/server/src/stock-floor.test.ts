@@ -43,7 +43,7 @@ function plains(size: number, nodes: [ResourceKind, number, number][]) {
 
 /** A trading post alone on a small map, and its warehouse. */
 function post() {
-  const { world, terrain } = plains(64, [['stone', 40, 20]])
+  const { world, terrain } = plains(128, [['stone', 70, 40]])
   const city = foundTradingPost(world, terrain, 20, 20, 'stone', mulberry32(3))
   const warehouse = world.buildings.find((b) => b.kind === 'warehouse' && b.cityId === city.id)!
   return { world, terrain, city, warehouse }
@@ -51,12 +51,12 @@ function post() {
 
 /** The Trade Org HQ alone on a map, and its coin and goods warehouses. */
 function hq() {
-  const mid = 80
-  const { world, terrain } = plains(160, [
-    ['forest', mid + 20, mid],
-    ['stone', mid + 20, mid + 3],
-    ['ironOre', mid + 22, mid - 3],
-    ['goldOre', mid + 24, mid],
+  const mid = 320
+  const { world, terrain } = plains(640, [
+    ['forest', mid + 80, mid],
+    ['stone', mid + 80, mid + 12],
+    ['ironOre', mid + 88, mid - 12],
+    ['goldOre', mid + 96, mid],
   ])
   const city = foundTradeOrgHq(world, terrain, mid, mid, mulberry32(7))
   const hall = townHallOf(world, city)!

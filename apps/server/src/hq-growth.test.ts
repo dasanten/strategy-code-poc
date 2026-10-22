@@ -31,10 +31,10 @@ import { armedOutsidersNear, hqSoldiers } from './trade-org-army.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 160, tiles: new Uint8Array(160 * 160).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 640, tiles: new Uint8Array(640 * 640).fill(Terrain.Plains) }
 
 /** Where the HQ's town hall stands. */
-const MID = 80
+const MID = 320
 
 /** The Trade Org HQ at (MID, MID); realm r1 with city c1 at (20, 140). */
 function setup() {
@@ -184,7 +184,7 @@ function weak() {
   const storage = s.world.buildings.find((b) => b.cityId === s.hq.id && b.kind === 'storage')!
   storage.stock = { food: 20_000, wood: 2_000 }
   let i = 0
-  while (freeHousing(s.world, s.hq) > 0) resident(s.world, `h${i++}`, MID, MID + 7, null)
+  while (freeHousing(s.world, s.hq) > 0) resident(s.world, `h${i++}`, MID, MID + 28, null)
   return s
 }
 
@@ -281,8 +281,8 @@ describe('hq-rings-sound', () => {
   it('reports a wall off its rings and a house outside them', () => {
     const { world, hq } = setup()
     world.buildings.push(
-      { id: 'stray', kind: 'wall', cityId: hq.id, x: MID + 7, y: MID },
-      { id: 'far', kind: 'house', cityId: hq.id, x: MID, y: MID + 12 },
+      { id: 'stray', kind: 'wall', cityId: hq.id, x: MID + 28, y: MID },
+      { id: 'far', kind: 'house', cityId: hq.id, x: MID, y: MID + 48 },
     )
     expect(hqRingsSound.check(world, terrain).map((v) => v.message)).toEqual([
       'wall stray of the Trade Org HQ stands on none of its rings',

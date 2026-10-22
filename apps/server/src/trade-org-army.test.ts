@@ -24,11 +24,11 @@ import { hqSoldiers, soldiersLacking, spareSoldiers, tradeOrgArmySound } from '.
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 160, tiles: new Uint8Array(160 * 160).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 640, tiles: new Uint8Array(640 * 640).fill(Terrain.Plains) }
 const player = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /** Where the HQ's town hall stands. */
-const MID = 80
+const MID = 320
 
 /**
  * The Trade Org HQ at (MID, MID) with a trading post p at (20, 20) and its warehouse w at
@@ -245,8 +245,8 @@ describe('the Trade Organization hiring mercenaries', () => {
         .map((r) => r.id),
     )
     s.world.residents = s.world.residents.filter((r) => r.cityId !== s.hq.id || keep.has(r.id))
-    resident(s.world, 'm1', MID - 20, MID, null).carried.spear = 1
-    resident(s.world, 'm2', MID - 21, MID, null).carried.spear = 1
+    resident(s.world, 'm1', MID - 80, MID, null).carried.spear = 1
+    resident(s.world, 'm2', MID - 84, MID, null).carried.spear = 1
     resident(s.world, 'm3', 20, 139, 'c1').carried.spear = 1
     at(s.world, 'a1').carried.spear = 1
     s.world.tick = TICKS_PER_GAME_DAY
