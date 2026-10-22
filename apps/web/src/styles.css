@@ -204,33 +204,10 @@ button.hud-logout {
   letter-spacing: 0.1em;
   color: var(--ui-muted);
 }
-.hud-drawer-head button,
-.game-inspector-close {
+.hud-drawer-head button {
   padding: 2px 8px;
   border: 0;
   background: var(--ui-raised);
-}
-.game-inspector {
-  position: absolute;
-  top: calc(var(--top-h) + 12px);
-  right: 12px;
-  z-index: 1;
-  width: min(380px, calc(100vw - var(--rail-w) - 24px));
-  max-height: calc(100% - var(--top-h) - 24px);
-  overflow: auto;
-  border-radius: 10px;
-}
-.game-inspector .inspector {
-  background: var(--ui-panel);
-  backdrop-filter: blur(10px);
-  border-color: var(--ui-line);
-  border-radius: 10px;
-}
-.game-inspector-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1;
 }
 .hud-backdrop {
   position: absolute;

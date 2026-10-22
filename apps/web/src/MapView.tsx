@@ -98,6 +98,7 @@ export function MapView({
   world,
   selectedId,
   onSelect,
+  onSelectTile,
   selectedCityId,
   onSelectCity,
   picking = false,
@@ -110,6 +111,8 @@ export function MapView({
   selectedId?: string
   /** Called with a resident of the Player's realm clicked on the map. */
   onSelect?: (id: string) => void
+  /** Called with a tile clicked where there is no resident of the Player's realm. */
+  onSelectTile?: (x: number, y: number) => void
   /** The city whose emblem shows with a ring in the far tier, if any. */
   selectedCityId?: string
   /** Called with a city whose emblem was clicked in the far tier. */
@@ -128,6 +131,8 @@ export function MapView({
   const selectedRef = useRef(selectedId)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const onSelectTileRef = useRef(onSelectTile)
+  onSelectTileRef.current = onSelectTile
   const selectedCityRef = useRef(selectedCityId)
   const onSelectCityRef = useRef(onSelectCity)
   onSelectCityRef.current = onSelectCity
@@ -424,14 +429,14 @@ export function MapView({
     const onUp = (e: PointerEvent) => {
       const wasPressed = pointers.delete(e.pointerId)
       // A press that hardly moved is a click: while picking it picks the tile, otherwise it
-      // picks the own resident under it, if any. A right-click always picks the tile.
+      // picks the own resident under it, or else the tile. A right-click always picks the tile.
       if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && dragged < 6) {
         const p = local(e)
+        const [tx, ty] = screenToTile(cam, size(), mapSize, p.x, p.y).map(Math.floor) as [
+          number,
+          number,
+        ]
         if (pickingRef.current || e.button === 2) {
-          const [tx, ty] = screenToTile(cam, size(), mapSize, p.x, p.y).map(Math.floor) as [
-            number,
-            number,
-          ]
           onPickTileRef.current?.(tx, ty)
           return
         }
@@ -445,6 +450,7 @@ export function MapView({
         }
         const id = residentAt(p.x, p.y)
         if (id) onSelectRef.current?.(id)
+        else onSelectTileRef.current?.(tx, ty)
       }
     }
 

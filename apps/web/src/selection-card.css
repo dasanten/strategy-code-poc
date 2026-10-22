@@ -1,0 +1,134 @@
+/* The selection card (ADR 0008): a dark translucent inspector docked top right over the map,
+   its left edge in the relationship colour of what is selected, actions as rows with keys. */
+.game-selection {
+  position: absolute;
+  top: calc(var(--top-h) + 12px);
+  right: 12px;
+  z-index: 1;
+  width: min(360px, calc(100vw - var(--rail-w) - 24px));
+  max-height: calc(100% - var(--top-h) - 24px);
+  overflow: auto;
+  border-radius: 10px;
+}
+.inspector.sel-card {
+  gap: 12px;
+  padding: 14px 14px 12px;
+  background: var(--ui-panel);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--ui-line);
+  border-left: 4px solid var(--ui-line-strong);
+  border-radius: 10px;
+  color: var(--ui-text);
+  font-family: var(--font-ui);
+}
+.sel-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.sel-title {
+  flex: 1;
+  min-width: 0;
+}
+.sel-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 2px solid currentColor;
+  border-radius: 8px;
+  background: var(--ui-ink);
+  color: var(--ui-muted);
+}
+.sel-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.sel-title .name-line h2 {
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.sel-line {
+  font-size: 0.8rem;
+  color: var(--ui-muted);
+}
+.sel-line strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+.sel-close {
+  padding: 2px 8px;
+  border: 0;
+  background: var(--ui-raised);
+}
+.sel-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sel-actions button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--ui-raised);
+  color: var(--ui-text);
+}
+.sel-actions button:hover:not(:disabled) {
+  background: var(--ui-raised-hover);
+}
+.sel-actions button.on {
+  border-color: var(--rel-own);
+  background: var(--ui-raised-hover);
+}
+.sel-actions button:disabled {
+  opacity: 0.45;
+}
+.sel-actions kbd {
+  display: grid;
+  place-items: center;
+  height: 20px;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ui-muted);
+}
+.sel-more {
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+.sel-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 10px;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+.sel-details summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--ui-muted);
+}
+.sel-details[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
