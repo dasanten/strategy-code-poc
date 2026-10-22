@@ -54,10 +54,8 @@ export const NODE_NAMES: Record<ResourceKind, string> = {
   goldOre: 'Gold ore',
 }
 
-/** Residents: your Leader, your other residents, everyone else. */
+/** The selection ring and a selected resident's way. */
 export const LEADER_COLOR = RELATIONSHIP_COLORS.own
-export const OWN_COLOR = 0xf2eee3
-export const OTHER_COLOR = RELATIONSHIP_COLORS.otherRealm
 
 /** City walls and buildings, from the design. */
 export const WALL_COLOR = 0x8a5a2b
@@ -98,8 +96,6 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   smithy: 'Smithy',
   road: 'Road',
 }
-export const HORSE_COLOR = 0x6b4f2e
-export const CARRIAGE_COLOR = 0xb79a6e
 /** A Trade Org caravan's carriage and crew (`CONTEXT.md`: Caravan). */
 export const CARAVAN_COLOR = RELATIONSHIP_COLORS.tradeOrg
 /** Goods lying on the ground. */

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#fff" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <title>Trade Org caravan</title>
+  <path d="M2 11h15v5H4z"/>
+  <path d="M4 11c0-5 11-5 11 0"/>
+  <path d="M17 13h5"/>
+  <circle cx="7" cy="19" r="2.6"/>
+  <circle cx="14" cy="19" r="2.6"/>
+</svg>

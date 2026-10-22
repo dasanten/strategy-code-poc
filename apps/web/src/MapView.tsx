@@ -42,12 +42,8 @@ import {
   NODE_COLORS,
   NODE_NAMES,
   CARAVAN_COLOR,
-  CARRIAGE_COLOR,
-  HORSE_COLOR,
   PILE_COLOR,
   LEADER_COLOR,
-  OTHER_COLOR,
-  OWN_COLOR,
   CITY_AREA_COLOR,
   ROAD_COLOR,
   TERRAIN_COLORS,
@@ -62,6 +58,7 @@ import { destroyAtlas, loadAtlas, type Atlas } from './map/atlas.js'
 import {
   GLYPH_COLOR,
   NODE_GLYPH_COLORS,
+  BadgeLayer,
   TokenLayer,
   cityRelationship,
   relationshipColor,
@@ -70,6 +67,7 @@ import {
 } from './map/tokens.js'
 import type { ClientWorld } from './useWorld.js'
 import { caravanAt, caravanParts } from './caravans.js'
+import { drawUnits } from './map/unit-tokens.js'
 
 /** Starting zoom, in screen pixels per tile. */
 const START_SCALE = 12
@@ -194,6 +192,7 @@ export function MapView({
     // Under the tokens: grid, city areas, roads and walls; over them: piles, carts and residents.
     const under = new Graphics()
     const tokens = new TokenLayer()
+    const badges = new BadgeLayer()
     let atlas: Atlas | undefined
     const overlay = new Graphics()
     const labels = new LabelLayer()
@@ -287,11 +286,13 @@ export function MapView({
       g.clear()
       under.clear()
       tokens.begin()
+      badges.begin()
       labels.begin()
       if (zoomTier(cam.scale) === 'far') drawFar(g, cam, view)
       else drawMiddle(g, cam, view, onScreen)
       labels.end()
       tokens.end()
+      badges.end()
     }
 
     /** Far out: an emblem with a name per city, armies and caravans as small markers. */
@@ -344,25 +345,12 @@ export function MapView({
 
       drawStructures(under, g, tokens, cam, view, worldRef.current)
 
-      const { home } = worldRef.current
-      const { crew } = caravanParts(worldRef.current.caravans)
-      const dot = Math.max(3, Math.min(8, cam.scale * 0.3))
-      for (const u of worldRef.current.residents) {
-        const [sx, sy] = tileToScreen(cam, view, mapSize, u.x + 0.5, u.y + 0.5)
-        if (sx < -dot || sy < -dot || sx > view.width + dot || sy > view.height + dot) continue
-        const color =
-          u.id === home.leaderId
-            ? LEADER_COLOR
-            : u.owner === home.realmId
-              ? OWN_COLOR
-              : crew.has(u.id)
-                ? CARAVAN_COLOR
-                : OTHER_COLOR
-        g.circle(sx, sy, dot).fill(color).stroke({ width: 2, color: 0x121518 })
-        if (u.id === selectedRef.current) {
-          g.circle(sx, sy, dot + 4).stroke({ width: 2.5, color: LEADER_COLOR })
-          drawPath(g, cam, view, mapSize, u)
-        }
+      const spots = drawUnits(tokens, badges, cam, view, worldRef.current)
+      const selected = worldRef.current.residents.find((u) => u.id === selectedRef.current)
+      const spot = selected && spots.get(selected.id)
+      if (selected && spot) {
+        g.circle(spot.x, spot.y, spot.r * 1.3).stroke({ width: 2.5, color: LEADER_COLOR })
+        drawPath(g, cam, view, mapSize, selected)
       }
     }
 
@@ -511,6 +499,7 @@ export function MapView({
         tokens.container,
         overlay,
         labels.container,
+        badges.container,
       )
       ready = true
       void loadAtlas().then((loaded) => {
@@ -721,7 +710,7 @@ function drawNode(tokens: TokenLayer, kind: ResourceKind, x: number, y: number, 
 }
 
 /**
- * City areas, roads, walls, buildings, piles, horses and carriages, at mid zoom and closer.
+ * City areas, roads, walls, buildings and piles, at mid zoom and closer.
  * `under` lies below the tokens, `over` above them.
  */
 function drawStructures(
@@ -732,7 +721,7 @@ function drawStructures(
   view: Size,
   world: ClientWorld,
 ) {
-  const { cities, buildings, horses, carriages, piles } = world
+  const { cities, buildings, piles } = world
   const tile = cam.scale
   const size = world.map.size
   const box = (x: number, y: number, inset = 0) => {
@@ -870,15 +859,6 @@ function drawStructures(
       ])
       .fill(PILE_COLOR)
       .stroke({ width: 1, color: 0x4f3a22 })
-  }
-  for (const h of horses) over.circle(...centre(cam, view, size, h), tile * 0.22).fill(HORSE_COLOR)
-  // A Trade Org caravan's carriage stands out (`CONTEXT.md`: Caravan).
-  const caravans = caravanParts(world.caravans).carriages
-  for (const k of carriages) {
-    over
-      .rect(...box(k.x, k.y, 0.22))
-      .fill(caravans.has(k.id) ? CARAVAN_COLOR : CARRIAGE_COLOR)
-      .stroke({ width: 1, color: 0x121518 })
   }
 }
 
