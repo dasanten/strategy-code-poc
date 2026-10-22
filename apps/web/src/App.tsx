@@ -111,8 +111,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (mode === 'haul' && carriage && haulSetup) {
-      const order = { kind: 'haul', residentId: selected.id, carriageId: carriage.id, x, y }
-      setOrderError(await sendOrder({ ...order, ...haulSetup }))
+      // The Haul task: they run the Player's Haul (default) script (`CONTEXT.md`: Default script).
+      const order = { kind: 'task', task: 'haul', residentId: selected.id, carriageId: carriage.id }
+      setOrderError(await sendOrder({ ...order, x, y, ...haulSetup }))
       return
     }
     if (mode === 'road') {
@@ -145,10 +146,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'task', task: 'work', residentId: selected.id, workplaceId, makes }
     setOrderError(await sendOrder(order))
   }
-  /** Orders the picked resident to tear down the building or site on their tile. */
+  /**
+   * Gives the picked resident the Tear down task for the building or site on their tile: they
+   * run the Player's Tear down (default) script.
+   */
   async function tearDown(buildingId: string) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'tearDown', residentId: selected.id, buildingId }))
+    const order = { kind: 'task', task: 'tearDown', residentId: selected.id, buildingId }
+    setOrderError(await sendOrder(order))
   }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */

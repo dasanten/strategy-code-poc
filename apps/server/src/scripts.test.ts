@@ -7,7 +7,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { SESSION_COOKIE } from '@csp/shared'
+import { SESSION_COOKIE, TASKS } from '@csp/shared'
 import { buildApp } from './app.js'
 import { createSession } from './auth.js'
 import { openDb, schema, type Db, type OpenDb } from './db/index.js'
@@ -109,7 +109,7 @@ describe('script library', () => {
         .from(schema.scriptVersions)
         .all()
         .map((v) => v.scriptId)
-        .filter((id) => id !== defaultScriptId(db, mara, 'work')),
+        .filter((id) => !TASKS.some((task) => id === defaultScriptId(db, mara, task))),
     ).toEqual([b.id])
     expect(activeSource(db, a.id)).toBeUndefined()
     expect(() => getScript(db, mara, a.id)).toThrow(expect.objectContaining({ code: 'not-found' }))
