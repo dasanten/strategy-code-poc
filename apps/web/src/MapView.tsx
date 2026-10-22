@@ -67,7 +67,7 @@ import {
 } from './map/tokens.js'
 import type { ClientWorld } from './useWorld.js'
 import { caravanAt, caravanParts } from './caravans.js'
-import { drawUnits } from './map/unit-tokens.js'
+import { drawUnits, type Spot } from './map/unit-tokens.js'
 
 /** Starting zoom, in screen pixels per tile. */
 const START_SCALE = 12
@@ -201,6 +201,8 @@ export function MapView({
     let atlas: Atlas | undefined
     const overlay = new Graphics()
     const labels = new LabelLayer()
+    // Where each resident's token was drawn last frame; up close each has its own figure.
+    let drawnSpots = new Map<string, Spot>()
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
     let cam: Camera = { ...homeCentre(worldRef.current), scale: START_SCALE }
     let disposed = false
@@ -351,6 +353,7 @@ export function MapView({
       drawStructures(under, g, tokens, cam, view, worldRef.current)
 
       const spots = drawUnits(tokens, badges, cam, view, worldRef.current)
+      drawnSpots = spots
       const selected = worldRef.current.residents.find((u) => u.id === selectedRef.current)
       const spot = selected && spots.get(selected.id)
       if (selected && spot) {
@@ -457,11 +460,17 @@ export function MapView({
     function residentAt(sx: number, sy: number): string | undefined {
       const view = size()
       const { home, residents } = worldRef.current
-      const reach = Math.max(10, cam.scale * 0.6)
+      const close = zoomTier(cam.scale) === 'close'
       let best: { id: string; d: number } | undefined
       for (const r of residents) {
         if (r.owner !== home.realmId) continue
-        const [rx, ry] = tileToScreen(cam, view, mapSize, r.x + 0.5, r.y + 0.5)
+        // Up close, the figure under the pointer; further out, the tile's token.
+        const spot = close ? drawnSpots.get(r.id) : undefined
+        if (close && !spot) continue
+        const [rx, ry] = spot
+          ? [spot.x, spot.y]
+          : tileToScreen(cam, view, mapSize, r.x + 0.5, r.y + 0.5)
+        const reach = spot ? Math.max(8, spot.r * 1.4) : Math.max(10, cam.scale * 0.6)
         const d = Math.hypot(rx - sx, ry - sy)
         if (d <= reach && (!best || d < best.d)) best = { id: r.id, d }
       }
@@ -672,8 +681,12 @@ function homeCentre(world: ClientWorld): { x: number; y: number } {
   return { x: world.home.x + 0.5, y: world.home.y + 0.5 }
 }
 
-/** Token radius at a zoom: half a tile, but never smaller than readable (ADR 0008). */
-const tokenRadius = (scale: number) => Math.max(6.5, scale * 0.42)
+/**
+ * Token radius at a zoom: up close a building's hex fills its tile (ADR 0008: close tier), further
+ * out a little less, but never smaller than readable.
+ */
+const tokenRadius = (scale: number) =>
+  zoomTier(scale) === 'close' ? scale * 0.48 : Math.max(6.5, scale * 0.42)
 
 /**
  * A building as a token (ADR 0008): a dark hex badge, its ring in the owner's relationship colour
