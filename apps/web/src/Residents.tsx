@@ -30,6 +30,7 @@ import {
   wallStrengthLeft,
   carryCapacity,
   materialsNeeded,
+  putAwayUnits,
   recipeGood,
   teardownReturns,
   teardownWork,
@@ -518,55 +519,23 @@ export function ResidentCard({
                   </p>
                 )}
                 {carried.map(([good, units]) => (
-                  <div className="goods-row" key={good}>
-                    <span>{GOOD_LABELS[good]}</span>
-                    <span className="mono">{units}</span>
-                    <span className="buttons">
-                      <button
-                        type="button"
-                        disabled={child}
-                        onClick={() => onDrop(ground, { [good]: units })}
-                      >
-                        Drop
-                      </button>
-                      {storage && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(inStorage, { [good]: units })}
-                        >
-                          Store
-                        </button>
-                      )}
-                      {(needed[good] ?? 0) > 0 && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(atSite, { [good]: units })}
-                        >
-                          Deliver
-                        </button>
-                      )}
-                      {(roadNeeded[good] ?? 0) > 0 && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(atRoadSite, { [good]: units })}
-                        >
-                          Deliver to road
-                        </button>
-                      )}
-                      {carriage && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(onCarriage, { [good]: units })}
-                        >
-                          Load
-                        </button>
-                      )}
-                    </span>
-                  </div>
+                  <GoodsRow
+                    key={good}
+                    good={good}
+                    units={units}
+                    byDefault={putAwayUnits(good, units)}
+                    disabled={child}
+                    actions={[
+                      { label: 'Drop', spot: ground },
+                      ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
+                      ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
+                      ...((roadNeeded[good] ?? 0) > 0
+                        ? [{ label: 'Deliver to road', spot: atRoadSite }]
+                        : []),
+                      ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
+                    ]}
+                    onAct={onDrop}
+                  />
                 ))}
               </section>
               {(pile || storage || site || roadSite || carriage) && (
@@ -1316,21 +1285,72 @@ function TileGoods({
       <div className="small muted">{title}</div>
       {goods.length === 0 && <p className="muted small">Nothing.</p>}
       {goods.map(([good, units]) => (
-        <div className="goods-row" key={good}>
-          <span>{GOOD_LABELS[good]}</span>
-          <span className="mono">{units}</span>
-          <span className="buttons">
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => onPickUp(spot, { [good]: units })}
-            >
-              Pick up
-            </button>
-          </span>
-        </div>
+        <GoodsRow
+          key={good}
+          good={good}
+          units={units}
+          byDefault={units}
+          disabled={disabled}
+          actions={[{ label: 'Pick up', spot }]}
+          onAct={onPickUp}
+        />
       ))}
     </>
+  )
+}
+
+/**
+ * One good with an amount and buttons that act on that many: `byDefault` until the Player types
+ * an exact amount, which is honoured as typed (`CONTEXT.md`: Own food).
+ */
+function GoodsRow({
+  good,
+  units,
+  byDefault,
+  disabled,
+  actions,
+  onAct,
+}: {
+  good: Good
+  units: number
+  byDefault: number
+  disabled: boolean
+  actions: { label: string; spot: GoodsSpot }[]
+  onAct: (spot: GoodsSpot, goods: Stock) => void
+}) {
+  const [typed, setTyped] = useState<number>()
+  const amount = Math.min(typed ?? byDefault, units)
+  return (
+    <div className="goods-row">
+      <span>{GOOD_LABELS[good]}</span>
+      <span className="mono">{units}</span>
+      <span className="buttons">
+        <input
+          className="amount"
+          type="number"
+          min={0}
+          max={units}
+          step={1}
+          aria-label={`${GOOD_LABELS[good]} amount`}
+          value={amount}
+          disabled={disabled}
+          onChange={(e) => setTyped(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+        />
+        {actions.map(({ label, spot }) => (
+          <button
+            key={label}
+            type="button"
+            disabled={disabled || amount === 0}
+            onClick={() => {
+              onAct(spot, { [good]: amount })
+              setTyped(undefined)
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </span>
+    </div>
   )
 }
 

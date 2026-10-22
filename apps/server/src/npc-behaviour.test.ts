@@ -1,7 +1,7 @@
 import {
   NPC_FETCH_UNITS,
   NPC_FOOD_LEFT_AT_WORK,
-  NPC_OWN_FOOD,
+  OWN_FOOD,
   NPC_VILLAGE,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
@@ -101,7 +101,7 @@ describe('NPC cities work and eat', () => {
     expect(r.order).toEqual({
       kind: 'drop',
       to: { kind: 'storage', storageId: storage.id },
-      goods: { food: 12 - NPC_OWN_FOOD },
+      goods: { food: 12 - OWN_FOOD },
     })
   })
 

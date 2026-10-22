@@ -292,12 +292,6 @@ export const NPC_FETCH_UNITS = 15
 export const NPC_FOOD_LEFT_AT_WORK = 4
 
 /**
- * Units of Food an NPC city's carrier keeps on them when putting the rest in the storage: what a
- * resident starts out with, so nobody walks to the storage for the food they carry anyway.
- */
-export const NPC_OWN_FOOD = START_CARRIED_FOOD
-
-/**
  * Share of an NPC city's adults it keeps as soldiers (`CONTEXT.md`: NPC city, Soldier), rounded
  * up so even a village keeps one: a starting village (6 residents) keeps 2, a town (16) keeps 4.
  */
@@ -605,6 +599,13 @@ export const FOOD_PER_DAY = 2
  * game day's meals (`CONTEXT.md`: Eating). They then take meals from their city's storage.
  */
 export const HOME_FOOD_LOW = 2
+
+/**
+ * A resident's own food (`CONTEXT.md`: Own food), in units: two game days of meals. Putting goods
+ * away leaves it in their hands unless the Player asks for an exact amount (`putAwayUnits`); NPC
+ * residents always keep it, so nobody walks to the storage for the food they carry anyway.
+ */
+export const OWN_FOOD = 2 * FOOD_PER_DAY
 
 /** Units of food in one meal, what a resident at home takes from storage at a time. */
 export const MEAL_UNITS = 1

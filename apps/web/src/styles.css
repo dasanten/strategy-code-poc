@@ -821,8 +821,14 @@ button.residents-row.selected:hover {
   align-items: center;
 }
 .goods-row .buttons {
+  flex-wrap: wrap;
+  justify-content: flex-end;
   display: flex;
   gap: 6px;
+}
+.goods-row .amount {
+  width: 4.5em;
+  min-height: 36px;
 }
 .goods-row button {
   min-height: 36px;
