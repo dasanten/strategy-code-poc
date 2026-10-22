@@ -18,6 +18,10 @@ import {
 /**
  * Balance numbers: how much, how fast, how often. The rules (what happens) are in `CONTEXT.md`;
  * these are the values Daniel tunes. One commented constant each.
+ *
+ * Work (eating, production, building, skill, spoilage, breeding) is counted in game days; social
+ * and political timers (memory, standing, persuasion, contracts, punishment, alliance delays) keep
+ * their real-time length (`CONTEXT.md`: Game time).
  */
 
 /** Tiles along each side of the map: once around is a ~12 h walk at ~30 s per plains tile. */
