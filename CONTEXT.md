@@ -405,8 +405,11 @@ The shared language of the game. Domain terms only — no implementation details
   the figure.
 - **Admin:** an account with admin rights: creates invite codes, resets passwords and gives
   admin directives, in an admin panel apart from the game. Being an admin has nothing to do with
-  the admin's own Player: it gives them no power or knowledge in the world, and they play like
-  anyone else.
+  the admin's own Player: it gives them no power in the world, and they play like anyone else.
+  The one exception is knowledge: the admin panel shows the whole world (the **admin map**), so
+  admins can watch over it. That knowledge is the admin's, never their Player's: the game screen
+  and their scripts still see only their Player's sight, and nothing in the admin panel acts in
+  the world except admin directives.
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
