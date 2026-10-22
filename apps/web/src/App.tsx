@@ -28,7 +28,15 @@ import { MapView } from './MapView.js'
 import { pageFor } from './pages.js'
 import { RealmLog } from './RealmLog.js'
 import { realmEnded } from './realm-log.js'
-import { ResidentInspector, ResidentsList, type HaulSetup, type Picking } from './Residents.js'
+import {
+  GOOD_LABELS,
+  ResidentCard,
+  ResidentsList,
+  type HaulSetup,
+  type Picking,
+} from './Residents.js'
+import { TileCard } from './SelectionCard.js'
+import { describeTile } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { useWorld } from './useWorld.js'
 
@@ -52,6 +60,9 @@ export function App() {
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
   const { world, status, sendOrder } = useWorld(onLoggedOut)
   const [selectedId, setSelectedId] = useState<string | undefined>()
+  // A tile picked on the map with no resident of the Player's on it; its card shows over the
+  // resident's, who stays picked to be sent there.
+  const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
   const [picking, setPicking] = useState<Picking>(false)
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
@@ -187,6 +198,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             selectedId={selectedId}
             onSelect={(id) => {
               setSelectedId(id)
+              setSelectedTile(undefined)
+              setPicking(false)
+              setArmyPick(undefined)
+              setOrderError(undefined)
+            }}
+            onSelectTile={(x, y) => {
+              const size = world.map.size
+              setSelectedTile({ x: ((x % size) + size) % size, y: ((y % size) + size) % size })
               setPicking(false)
               setArmyPick(undefined)
               setOrderError(undefined)
@@ -221,7 +240,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             leaderId={world.home.leaderId}
             tick={world.tick}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={(id) => {
+              setSelectedId(id)
+              setSelectedTile(undefined)
+            }}
           />,
         )}
       {world &&
@@ -327,20 +349,48 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onShowPlace={(p) => setFocus({ x: p.x, y: p.y })}
           />,
         )}
-      {world && selected && (
-        <div className="game-inspector">
-          <button
-            type="button"
-            className="game-inspector-close"
-            aria-label="Close the resident inspector"
-            onClick={() => {
-              setSelectedId(undefined)
-              setPicking(false)
+      {world && selectedTile && (
+        <div className="game-selection">
+          <TileCard
+            card={describeTile(
+              {
+                ...selectedTile,
+                buildings: world.buildings,
+                carriages: world.carriages,
+                piles: world.piles,
+                node: nodeAt?.(selectedTile.x, selectedTile.y),
+                strangers: world.residents.filter((r) => !own.includes(r)),
+                cities: world.cities,
+                viewer: {
+                  realmId: world.home.realmId,
+                  allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
+                },
+                workers: (b) => workersHere(world.residents, b),
+              },
+              GOOD_LABELS,
+            )}
+            building={world.buildings.find(
+              (b) => b.x === selectedTile.x && b.y === selectedTile.y && b.kind !== 'road',
+            )}
+            nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
+            actor={selected}
+            orderError={orderError}
+            onClose={() => setSelectedTile(undefined)}
+            onSendHere={async () => {
+              if (!selected) return
+              const order = { kind: 'walkTo', residentId: selected.id, ...selectedTile }
+              setOrderError(await sendOrder(order))
             }}
-          >
-            ✕
-          </button>
-          <ResidentInspector
+            onSetGate={async (gateId, open) =>
+              setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
+            }
+          />
+        </div>
+      )}
+      {world && selected && !selectedTile && (
+        <div className="game-selection">
+          <ResidentCard
+            key={selected.id}
             resident={selected}
             leaderId={world.home.leaderId}
             cityName={homeCity?.name}
@@ -382,6 +432,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 world.cities.find((c) => c.id === b.cityId)?.realmId !== world.home.realmId,
             )}
             onClimb={climb}
+            onClose={() => {
+              setSelectedId(undefined)
+              setPicking(false)
+            }}
           />
         </div>
       )}

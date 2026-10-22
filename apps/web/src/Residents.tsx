@@ -50,6 +50,8 @@ import {
 } from '@csp/shared'
 import { useState } from 'react'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
+import { ActionRows, SelectionCard } from './SelectionCard.js'
+import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
 
 /** Good names as the UI shows them. */
 export const GOOD_LABELS: Record<Good, string> = {
@@ -248,9 +250,13 @@ export function ResidentsList({
   )
 }
 
-/** Everything about one resident (`CONTEXT.md`: Resident, Stats, Skill). */
-export function ResidentInspector({
-  resident,
+/**
+ * The selection card for one of the Player's residents (ADR 0008; `CONTEXT.md`: Resident, Stats,
+ * Skill): who they are and what they do, then the actions that fit them and their tile as rows
+ * with keys. An action that needs more (goods, a partner, a target, a script) opens its panel.
+ */
+export function ResidentCard({
+  resident: r,
   leaderId,
   cityName,
   tick,
@@ -284,8 +290,9 @@ export function ResidentInspector({
   onStop,
   scripts,
   onRunScript,
+  onClose,
 }: {
-  resident: Resident | undefined
+  resident: Resident
   leaderId: string
   cityName: string | undefined
   tick: number
@@ -349,15 +356,11 @@ export function ResidentInspector({
   walls: Building[]
   /** Orders the resident to climb over a wall or gate next to them. */
   onClimb: (wallId: string) => void
+  /** Closes the card. */
+  onClose: () => void
 }) {
-  if (!resident) {
-    return (
-      <aside className="inspector" aria-label="Resident inspector">
-        <p className="muted">Pick a resident on the map or in the list.</p>
-      </aside>
-    )
-  }
-  const r = resident
+  // The panel an action opened; the card is keyed by resident, so it starts closed for each.
+  const [open, setOpen] = useState<ActionId>()
   const age = Math.floor(ageInYears(r, tick))
   const skills = (Object.keys(SKILL_LABELS) as SkillName[]).filter((s) => (r.skills[s] ?? 0) > 0)
   const carried = goodsIn(r.carried)
@@ -372,18 +375,40 @@ export function ResidentInspector({
   const roadSite = road?.site ? road : undefined
   const atRoadSite: GoodsSpot = { kind: 'site', siteId: roadSite?.id ?? '' }
   const roadNeeded = roadSite ? materialsNeeded(roadSite) : {}
+  const actions = residentActions({
+    adult: !child,
+    busy: !!(r.order || r.script),
+    inCity: r.cityId !== null,
+    carrying: carried.length > 0,
+    carriage,
+    pile,
+    storage,
+    building,
+    road,
+    node,
+    othersInSight: others.length,
+    wallsInSight: walls.length,
+    picking,
+  })
+  const shown = actions.some((a) => a.id === open) ? open : undefined
+  const act = (a: CardAction) => {
+    if (a.opens) return setOpen((now) => (now === a.id ? undefined : a.id))
+    if (a.id === 'walk') onWalkTo()
+    if (a.id === 'drive') onDriveTo()
+    if (a.id === 'roadTo') onRoadTo()
+    if (a.id === 'stop') onStop()
+  }
   return (
-    <aside className="inspector" aria-label="Resident inspector">
-      <div className="inspector-title">
-        <div className="name-line">
-          <h2>{r.name}</h2>
-          {r.id === leaderId && <span className="badge">Leader</span>}
-        </div>
-        <div className="muted">
-          {canWork(r, tick) ? 'Adult' : 'Child'} · {age} years{cityName ? ` · ${cityName}` : ''}
-        </div>
-      </div>
-
+    <SelectionCard
+      rel={r.owner === realmId ? 'own' : 'alliance'}
+      title={r.name}
+      badge={r.id === leaderId ? 'Leader' : undefined}
+      lines={[
+        `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}`,
+        <strong key="doing">{doing(r)}</strong>,
+      ]}
+      onClose={onClose}
+    >
       <div className="vitals">
         <Meter
           label="Health"
@@ -397,245 +422,258 @@ export function ResidentInspector({
         />
       </div>
 
-      <section className="inspector-block" aria-label="Order">
-        <div className="panel-head">
-          <h3>Order</h3>
-        </div>
-        <div className="doing-now">{doing(r)}</div>
-        <div className="order-buttons">
-          <button
-            type="button"
-            className={picking === 'walk' ? 'primary' : ''}
-            onClick={onWalkTo}
-            aria-pressed={picking === 'walk'}
-          >
-            {picking === 'walk' ? 'Pick a tile…' : 'Walk to'}
-          </button>
-          {carriage && (
-            <button
-              type="button"
-              className={picking === 'drive' ? 'primary' : ''}
-              onClick={onDriveTo}
-              aria-pressed={picking === 'drive'}
-              disabled={!canWork(r, tick)}
-            >
-              {picking === 'drive' ? 'Pick a tile…' : 'Drive carriage to'}
-            </button>
-          )}
-          {(r.order || r.script) && (
-            <button type="button" onClick={onStop}>
-              Stop
-            </button>
-          )}
-        </div>
-        <p className="muted small" role="status">
-          {orderError
-            ? `Order turned down: ${orderError}`
-            : picking
-              ? `Tap a tile on the map, or press ${PICKING_BUTTONS[picking]} again to cancel.`
-              : 'Right-click the map to walk there.'}
-        </p>
-        <RunScript script={r.script} scripts={scripts} onRunScript={onRunScript} />
-      </section>
+      <ActionRows actions={actions} open={shown} onAction={act} />
+      <p className="muted small" role="status">
+        {orderError
+          ? `Order turned down: ${orderError}`
+          : picking
+            ? `${PICKING_HINTS[picking]} Tap a tile on the map, or press ${PICKING_KEYS[picking]} again to cancel.`
+            : 'Right-click the map to walk there.'}
+      </p>
 
-      {carriage && (
-        <HaulBlock resident={r} tick={tick} picking={picking === 'haul'} onHaulTo={onHaulTo} />
+      {shown && (
+        <div className="sel-panel">
+          {shown === 'haul' && carriage && (
+            <HaulBlock resident={r} tick={tick} picking={picking === 'haul'} onHaulTo={onHaulTo} />
+          )}
+          {shown === 'work' && (
+            <WorkBlock
+              resident={r}
+              tick={tick}
+              building={building}
+              node={node}
+              workers={workers}
+              holders={holders}
+              realmId={realmId}
+              onWork={onWork}
+            />
+          )}
+          {shown === 'build' && (
+            <>
+              <BuildBlock
+                resident={r}
+                tick={tick}
+                building={building}
+                node={node}
+                onBuild={onBuild}
+              />
+              <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
+            </>
+          )}
+          {shown === 'tearDown' && (
+            <>
+              <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
+              <TearDownBlock resident={r} tick={tick} building={road} onTearDown={onTearDown} />
+            </>
+          )}
+          {shown === 'goods' && (
+            <>
+              <section className="inspector-block" aria-label="Carrying">
+                <div className="panel-head">
+                  <h3>Carrying</h3>
+                  <span className="mono small">
+                    {kg(stockWeight(r.carried))} / {kg(carryCapacity(r, tick))}
+                  </span>
+                </div>
+                {carried.length === 0 && (
+                  <p className="muted small">
+                    Nothing. Residents eat only what they carry; at home they take meals from
+                    storage.
+                  </p>
+                )}
+                {carried.map(([good, units]) => (
+                  <div className="goods-row" key={good}>
+                    <span>{GOOD_LABELS[good]}</span>
+                    <span className="mono">{units}</span>
+                    <span className="buttons">
+                      <button
+                        type="button"
+                        disabled={child}
+                        onClick={() => onDrop(ground, { [good]: units })}
+                      >
+                        Drop
+                      </button>
+                      {storage && (
+                        <button
+                          type="button"
+                          disabled={child}
+                          onClick={() => onDrop(inStorage, { [good]: units })}
+                        >
+                          Store
+                        </button>
+                      )}
+                      {(needed[good] ?? 0) > 0 && (
+                        <button
+                          type="button"
+                          disabled={child}
+                          onClick={() => onDrop(atSite, { [good]: units })}
+                        >
+                          Deliver
+                        </button>
+                      )}
+                      {(roadNeeded[good] ?? 0) > 0 && (
+                        <button
+                          type="button"
+                          disabled={child}
+                          onClick={() => onDrop(atRoadSite, { [good]: units })}
+                        >
+                          Deliver to road
+                        </button>
+                      )}
+                      {carriage && (
+                        <button
+                          type="button"
+                          disabled={child}
+                          onClick={() => onDrop(onCarriage, { [good]: units })}
+                        >
+                          Load
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </section>
+              {(pile || storage || site || roadSite || carriage) && (
+                <section className="inspector-block" aria-label="On this tile">
+                  <div className="panel-head">
+                    <h3>Here</h3>
+                    <span className="small muted">takes as much as fits</span>
+                  </div>
+                  <TileGoods
+                    title="On the ground"
+                    stock={pile?.goods}
+                    spot={ground}
+                    onPickUp={onPickUp}
+                    disabled={child}
+                  />
+                  {storage && (
+                    <TileGoods
+                      title={storage.kind === 'stable' ? 'In the stable' : 'In the storage'}
+                      stock={storage.stock}
+                      spot={inStorage}
+                      onPickUp={onPickUp}
+                      disabled={child}
+                    />
+                  )}
+                  {site && (
+                    <TileGoods
+                      title="Delivered to the site"
+                      stock={site.site!.delivered}
+                      spot={atSite}
+                      onPickUp={onPickUp}
+                      disabled={child}
+                    />
+                  )}
+                  {roadSite && (
+                    <TileGoods
+                      title="Delivered to the road site"
+                      stock={roadSite.site!.delivered}
+                      spot={atRoadSite}
+                      onPickUp={onPickUp}
+                      disabled={child}
+                    />
+                  )}
+                  {carriage && (
+                    <TileGoods
+                      title={`On the carriage · ${kg(stockWeight(carriage.load))} / ${kg(CARRIAGE_CAPACITY)}${carriage.horseId ? '' : ' · no horse hitched'}`}
+                      stock={carriage.load}
+                      spot={onCarriage}
+                      onPickUp={onPickUp}
+                      disabled={child}
+                    />
+                  )}
+                </section>
+              )}
+            </>
+          )}
+          {shown === 'pair' && (
+            <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
+          )}
+          {shown === 'attack' && (
+            <AttackBlock
+              resident={r}
+              others={others}
+              walls={walls}
+              mapSize={mapSize}
+              onAttack={onAttack}
+            />
+          )}
+          {shown === 'walls' && (
+            <WallsBlock
+              resident={r}
+              walls={walls}
+              mapSize={mapSize}
+              onBreak={onAttack}
+              onClimb={onClimb}
+            />
+          )}
+          {shown === 'script' && (
+            <section className="inspector-block" aria-label="Run script">
+              <div className="panel-head">
+                <h3>Run script</h3>
+              </div>
+              <RunScript script={r.script} scripts={scripts} onRunScript={onRunScript} />
+            </section>
+          )}
+        </div>
       )}
 
-      <section className="inspector-block" aria-label="Stats">
-        <div className="panel-head">
-          <h3>Stats</h3>
-          <span className="small muted">base + trained (cap)</span>
-        </div>
-        {STAT_NAMES.map((s) => {
-          const { base, trained } = r.stats[s]
-          const cap = trainedCap(base)
-          return (
-            <div className="stat" key={s}>
-              <span>{STAT_LABELS[s]}</span>
-              <span className="stat-bar" aria-hidden="true">
-                <span className="base" style={{ width: pct(base / STAT_SCALE) }} />
-                <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
-                <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
-              </span>
-              <span className="mono right">
-                {base} + {trained} ({cap})
-              </span>
-            </div>
-          )
-        })}
-      </section>
-
-      <section className="inspector-block" aria-label="Skills">
-        <h3>Skills</h3>
-        <div className="chips">
-          {skills.length === 0 && <span className="chip">None yet</span>}
-          {skills.map((s) => (
-            <span className="chip" key={s}>
-              {SKILL_LABELS[s]}{' '}
-              <span className="mono accent">{Math.floor(r.skills[s]! * 10) / 10}</span>
-            </span>
-          ))}
-        </div>
-      </section>
-
-      <section className="inspector-block" aria-label="Carrying">
-        <div className="panel-head">
-          <h3>Carrying</h3>
-          <span className="mono small">
-            {kg(stockWeight(r.carried))} / {kg(carryCapacity(r, tick))}
-          </span>
-        </div>
-        {carried.length === 0 && (
-          <p className="muted">
-            Nothing. Residents eat only what they carry; at home they take meals from storage.
-          </p>
-        )}
-        {carried.map(([good, units]) => (
-          <div className="goods-row" key={good}>
-            <span>{GOOD_LABELS[good]}</span>
-            <span className="mono">{units}</span>
-            <span className="buttons">
-              <button
-                type="button"
-                disabled={child}
-                onClick={() => onDrop(ground, { [good]: units })}
-              >
-                Drop
-              </button>
-              {storage && (
-                <button
-                  type="button"
-                  disabled={child}
-                  onClick={() => onDrop(inStorage, { [good]: units })}
-                >
-                  Store
-                </button>
-              )}
-              {(needed[good] ?? 0) > 0 && (
-                <button
-                  type="button"
-                  disabled={child}
-                  onClick={() => onDrop(atSite, { [good]: units })}
-                >
-                  Deliver
-                </button>
-              )}
-              {(roadNeeded[good] ?? 0) > 0 && (
-                <button
-                  type="button"
-                  disabled={child}
-                  onClick={() => onDrop(atRoadSite, { [good]: units })}
-                >
-                  Deliver to road
-                </button>
-              )}
-              {carriage && (
-                <button
-                  type="button"
-                  disabled={child}
-                  onClick={() => onDrop(onCarriage, { [good]: units })}
-                >
-                  Load
-                </button>
-              )}
-            </span>
-          </div>
-        ))}
-      </section>
-
-      <BuildBlock resident={r} tick={tick} building={building} node={node} onBuild={onBuild} />
-      <WorkBlock
-        resident={r}
-        tick={tick}
-        building={building}
-        node={node}
-        workers={workers}
-        holders={holders}
-        realmId={realmId}
-        onWork={onWork}
-      />
-      <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
-      <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
-      <RoadLineBlock resident={r} tick={tick} picking={picking === 'road'} onRoadTo={onRoadTo} />
-      <TearDownBlock resident={r} tick={tick} building={road} onTearDown={onTearDown} />
-      <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
-      <AttackBlock
-        resident={r}
-        others={others}
-        walls={walls}
-        mapSize={mapSize}
-        onAttack={onAttack}
-      />
-      <WallsBlock
-        resident={r}
-        walls={walls}
-        mapSize={mapSize}
-        onBreak={onAttack}
-        onClimb={onClimb}
-      />
-
-      {(pile || storage || site || roadSite || carriage) && (
-        <section className="inspector-block" aria-label="On this tile">
+      <details className="sel-details">
+        <summary>Stats and skills</summary>
+        <section className="inspector-block" aria-label="Stats">
           <div className="panel-head">
-            <h3>Here</h3>
-            <span className="small muted">takes as much as fits</span>
+            <h3>Stats</h3>
+            <span className="small muted">base + trained (cap)</span>
           </div>
-          <TileGoods
-            title="On the ground"
-            stock={pile?.goods}
-            spot={ground}
-            onPickUp={onPickUp}
-            disabled={child}
-          />
-          {storage && (
-            <TileGoods
-              title={storage.kind === 'stable' ? 'In the stable' : 'In the storage'}
-              stock={storage.stock}
-              spot={inStorage}
-              onPickUp={onPickUp}
-              disabled={child}
-            />
-          )}
-          {site && (
-            <TileGoods
-              title="Delivered to the site"
-              stock={site.site!.delivered}
-              spot={atSite}
-              onPickUp={onPickUp}
-              disabled={child}
-            />
-          )}
-          {roadSite && (
-            <TileGoods
-              title="Delivered to the road site"
-              stock={roadSite.site!.delivered}
-              spot={atRoadSite}
-              onPickUp={onPickUp}
-              disabled={child}
-            />
-          )}
-          {carriage && (
-            <TileGoods
-              title={`On the carriage · ${kg(stockWeight(carriage.load))} / ${kg(CARRIAGE_CAPACITY)}${carriage.horseId ? '' : ' · no horse hitched'}`}
-              stock={carriage.load}
-              spot={onCarriage}
-              onPickUp={onPickUp}
-              disabled={child}
-            />
-          )}
+          {STAT_NAMES.map((s) => {
+            const { base, trained } = r.stats[s]
+            const cap = trainedCap(base)
+            return (
+              <div className="stat" key={s}>
+                <span>{STAT_LABELS[s]}</span>
+                <span className="stat-bar" aria-hidden="true">
+                  <span className="base" style={{ width: pct(base / STAT_SCALE) }} />
+                  <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
+                  <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
+                </span>
+                <span className="mono right">
+                  {base} + {trained} ({cap})
+                </span>
+              </div>
+            )
+          })}
         </section>
-      )}
-    </aside>
+        <section className="inspector-block" aria-label="Skills">
+          <h3>Skills</h3>
+          <div className="chips">
+            {skills.length === 0 && <span className="chip">None yet</span>}
+            {skills.map((s) => (
+              <span className="chip" key={s}>
+                {SKILL_LABELS[s]}{' '}
+                <span className="mono accent">{Math.floor(r.skills[s]! * 10) / 10}</span>
+              </span>
+            ))}
+          </div>
+        </section>
+      </details>
+    </SelectionCard>
   )
 }
 
-/** The button that started picking a tile, to name in the hint for cancelling. */
-const PICKING_BUTTONS: Record<Exclude<Picking, false>, string> = {
-  walk: 'Walk to',
-  drive: 'Drive carriage to',
+/** The key that started picking a tile, to name in the hint for cancelling. */
+const PICKING_KEYS: Record<Exclude<Picking, false>, string> = {
+  walk: ACTION_KEYS.walk,
+  drive: ACTION_KEYS.drive,
   haul: 'Pick the other stop',
-  road: 'Build road to',
+  road: ACTION_KEYS.roadTo,
+}
+
+/** What picking a tile does, said while the map waits for it. */
+const PICKING_HINTS: Record<Exclude<Picking, false>, string> = {
+  walk: 'Walks there.',
+  drive: 'Drives the carriage there.',
+  haul: 'The other stop of the haul route.',
+  road: `Builds road from here to there, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the stone carried; without more, the resident waits on the next site until someone delivers it.`,
 }
 
 /**
@@ -707,7 +745,7 @@ function HaulBlock({
           disabled={!canWork(resident, tick) || goods.length === 0}
           onClick={() => onHaulTo({ goods, returnGoods, keepFood })}
         >
-          {picking ? 'Pick a tile…' : PICKING_BUTTONS.haul}
+          {picking ? 'Pick a tile…' : 'Pick the other stop'}
         </button>
       </div>
       <p className="muted small">
@@ -867,51 +905,6 @@ function RoadBlock({
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
           Build road
-        </button>
-      </div>
-    </section>
-  )
-}
-
-/**
- * A road along a line (`CONTEXT.md`: Road): the resident builds a road on each tile of the
- * straight line from their tile to one picked on the map, one tile after another, putting in the
- * stone they carry. Tiles that have a road already are skipped.
- */
-function RoadLineBlock({
-  resident,
-  tick,
-  picking,
-  onRoadTo,
-}: {
-  resident: Resident
-  tick: number
-  /** The map is waiting for the line's far end. */
-  picking: boolean
-  onRoadTo: () => void
-}) {
-  const stone = BUILD_MATERIALS.road?.stone ?? 0
-  const carried = resident.carried.stone ?? 0
-  const tiles = stone > 0 ? Math.floor(carried / stone) : ROAD_LINE_MAX_TILES
-  return (
-    <section className="inspector-block" aria-label="Road along a line">
-      <div className="panel-head">
-        <h3>Road along a line</h3>
-      </div>
-      <p className="muted small">
-        Builds road from here to a tile you pick, at most {ROAD_LINE_MAX_TILES} tiles, one after
-        another. The stone carried covers {tiles} tile{tiles === 1 ? '' : 's'}; without more, the
-        resident waits on the next site until someone delivers it.
-      </p>
-      <div className="order-buttons">
-        <button
-          type="button"
-          className={picking ? 'primary' : ''}
-          onClick={onRoadTo}
-          aria-pressed={picking}
-          disabled={!canWork(resident, tick)}
-        >
-          {picking ? 'Pick a tile…' : PICKING_BUTTONS.road}
         </button>
       </div>
     </section>

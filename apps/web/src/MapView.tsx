@@ -96,6 +96,7 @@ export function MapView({
   world,
   selectedId,
   onSelect,
+  onSelectTile,
   picking = false,
   onPickTile,
   onNodesLoaded,
@@ -106,6 +107,8 @@ export function MapView({
   selectedId?: string
   /** Called with a resident of the Player's realm clicked on the map. */
   onSelect?: (id: string) => void
+  /** Called with a tile clicked where there is no resident of the Player's realm. */
+  onSelectTile?: (x: number, y: number) => void
   /** Waiting for a tile: the next click picks one instead of selecting. */
   picking?: boolean
   /** Called with a tile picked by click (while `picking`) or by right-click. */
@@ -120,6 +123,8 @@ export function MapView({
   const selectedRef = useRef(selectedId)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const onSelectTileRef = useRef(onSelectTile)
+  onSelectTileRef.current = onSelectTile
   const pickingRef = useRef(picking)
   pickingRef.current = picking
   const onPickTileRef = useRef(onPickTile)
@@ -402,19 +407,20 @@ export function MapView({
     const onUp = (e: PointerEvent) => {
       const wasPressed = pointers.delete(e.pointerId)
       // A press that hardly moved is a click: while picking it picks the tile, otherwise it
-      // picks the own resident under it, if any. A right-click always picks the tile.
+      // picks the own resident under it, or else the tile. A right-click always picks the tile.
       if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && dragged < 6) {
         const p = local(e)
+        const [tx, ty] = screenToTile(cam, size(), mapSize, p.x, p.y).map(Math.floor) as [
+          number,
+          number,
+        ]
         if (pickingRef.current || e.button === 2) {
-          const [tx, ty] = screenToTile(cam, size(), mapSize, p.x, p.y).map(Math.floor) as [
-            number,
-            number,
-          ]
           onPickTileRef.current?.(tx, ty)
           return
         }
         const id = residentAt(p.x, p.y)
         if (id) onSelectRef.current?.(id)
+        else onSelectTileRef.current?.(tx, ty)
       }
     }
 
