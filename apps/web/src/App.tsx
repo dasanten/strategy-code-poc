@@ -78,6 +78,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
+  // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
+  const [scriptToOpen, setScriptToOpen] = useState<{ id: number; at: number }>()
   // A place from the realm log to show on the map.
   const [focus, setFocus] = useState<{ x: number; y: number }>()
   // The drawer open over the map, if any (ADR 0008: one at a time).
@@ -133,10 +135,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'build', residentId: selected.id, building }))
   }
-  /** Orders the picked resident to work the workplace on their tile, making `makes` at a smithy. */
+  /**
+   * Gives the picked resident the Work task at the workplace on their tile, making `makes` at a
+   * smithy: they run the Player's Work (default) script (`CONTEXT.md`: Default script).
+   */
   async function work(makes?: Good) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'workAt', residentId: selected.id, makes }))
+    const workplaceId = buildingHere?.id
+    const order = { kind: 'task', task: 'work', residentId: selected.id, workplaceId, makes }
+    setOrderError(await sendOrder(order))
   }
   /** Orders the picked resident to tear down the building or site on their tile. */
   async function tearDown(buildingId: string) {
@@ -347,7 +354,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />,
         )}
       {/* Mounted before the world arrives too: it loads the scripts the inspector can run. */}
-      {drawer('scripts', <ScriptLibrary onScripts={setScripts} />)}
+      {drawer('scripts', <ScriptLibrary onScripts={setScripts} toOpen={scriptToOpen} />)}
       {world &&
         drawer(
           'realmLog',
@@ -416,6 +423,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onStop={stop}
             scripts={scripts}
             onRunScript={runScript}
+            onEditScript={(id) => {
+              setScriptToOpen({ id, at: Date.now() })
+              setOpenDrawer('scripts')
+            }}
             orderError={orderError}
             pile={onTile(world.piles)}
             storage={onTile(world.buildings.filter((b) => KEEPS_GOODS.includes(b.kind) && !b.site))}

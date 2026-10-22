@@ -7,8 +7,13 @@ import {
   type ScriptObject,
 } from '@csp/lang'
 import {
+  buildingAt,
   commanderOf,
   commands,
+  isTask,
+  type Good,
+  type Task,
+  type TaskMemory,
   SCRIPT_LOG_INTERVAL,
   SCRIPT_MAX_CALL_DEPTH,
   SCRIPT_MEMORY_MAX,
@@ -98,6 +103,55 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
       if (!r) return
       r.order = null
       r.script = { scriptId, memory: {} }
+    },
+  }
+}
+
+/** Where a task order finds the Player's version of a task's default script. */
+export interface DefaultScriptHost {
+  /** The id of the Player's version of the task's default script, made if they have none. */
+  defaultScript(userId: number, task: Task): number
+}
+
+interface WorkTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'work'
+  residentId: string
+  workplaceId: string
+  makes?: Good
+}
+
+/**
+ * The task order (`CONTEXT.md`: Order, Default script; ADR 0009): one of the Player's residents
+ * runs the Player's version of the task's default script, from a memory holding the task's
+ * target (`TaskMemory`). It ends whatever the resident was doing. Work is for the workplace the
+ * resident stands on, checked as the work-at order checks it.
+ */
+export function taskOrder(host: DefaultScriptHost): OrderKind {
+  return {
+    validate(world, sender, order) {
+      const o = order as Partial<WorkTaskRequest>
+      if (!isTask(o.task)) return 'no such task'
+      const realm = realmOf(world, sender.userId)
+      const r = world.residents.find((x) => x.id === o.residentId)
+      if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+      if (typeof o.workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== o.workplaceId)
+        return 'not standing on that workplace'
+      const work = { kind: 'workAt', residentId: r.id, makes: o.makes }
+      const problem = orderKinds.workAt!.validate(world, sender, work)
+      // Working there by a bare work-at order, as the starting residents do, they can still be
+      // given the task; already running it there, they can't.
+      if (problem === 'already working here' && !r.script) return undefined
+      return problem
+    },
+    apply(world, sender, order) {
+      const { residentId, task, workplaceId, makes } = order as WorkTaskRequest
+      const r = world.residents.find((x) => x.id === residentId)
+      if (!r) return
+      const memory: TaskMemory['work'] = { workplaceId }
+      if (makes !== undefined) memory.makes = makes
+      r.order = null
+      r.script = { scriptId: host.defaultScript(sender.userId, task), memory: { ...memory } }
     },
   }
 }
@@ -246,6 +300,19 @@ export class ScriptRunner {
     if (violations) {
       const sound = 'armyId' in r.bind ? armyScriptRequestsSound : scriptRequestsSound
       violations.push(...sound(world, this.terrain, sender, r.id, requests, this.kinds))
+      // Invariant (ADR 0009): the game's defaults stay well within a resident's budget, so one
+      // running out of it unedited is the game's bug, not the Player's.
+      if (
+        result.status === 'out-of-steps' &&
+        script.followsDefault &&
+        steps >= SCRIPT_STEP_BUDGET
+      ) {
+        violations.push({
+          invariant: 'default-scripts-in-budget',
+          message: `${r.id} ran out of steps running unedited default script ${running.scriptId}`,
+          entityIds: [r.id],
+        })
+      }
     }
     // What it requested counts, even when it stopped with an error or out of steps.
     for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order, this.terrain)

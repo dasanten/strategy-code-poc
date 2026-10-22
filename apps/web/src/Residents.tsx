@@ -136,11 +136,41 @@ export interface HaulSetup {
   keepFood: number
 }
 
-/** What a resident is doing, from their order and the script they run. */
-function doing(r: Resident): string {
+/** What a resident is doing, from their order and the script they run, named if it is known. */
+function doing(r: Resident, scripts: ScriptSummary[] = []): string {
   const now = orderDoing(r)
   if (!r.script) return now
-  return now === 'Idle' ? 'Running a script' : `Running a script · ${now}`
+  const { scriptId } = r.script
+  const name = scripts.find((s) => s.id === scriptId)?.name ?? 'Running a script'
+  return now === 'Idle' ? name : `${name} · ${now}`
+}
+
+/**
+ * The script a resident runs, such as the default script of the task they were given
+ * (`CONTEXT.md`: Default script), with a button to open it in the library.
+ */
+function TaskScript({
+  scriptId,
+  scripts,
+  onEdit,
+}: {
+  scriptId: number
+  scripts: ScriptSummary[]
+  onEdit: (scriptId: number) => void
+}) {
+  const script = scripts.find((s) => s.id === scriptId)
+  const note = !script?.task ? '' : script.followsDefault ? 'the game’s default' : 'edited by you'
+  return (
+    <div className="task-script goods-row">
+      <span className="small">
+        Runs <strong>{script?.name ?? 'a script'}</strong>
+      </span>
+      <span className="muted small">{note}</span>
+      <button type="button" onClick={() => onEdit(scriptId)} disabled={!script}>
+        Edit
+      </button>
+    </div>
+  )
 }
 
 /** What a resident's built-in order has them doing. */
@@ -290,6 +320,7 @@ export function ResidentCard({
   onStop,
   scripts,
   onRunScript,
+  onEditScript,
   onClose,
 }: {
   resident: Resident
@@ -314,6 +345,8 @@ export function ResidentCard({
   scripts: ScriptSummary[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
   onRunScript: (scriptId: number) => void
+  /** Opens a script in the library, such as the one the resident's task runs. */
+  onEditScript: (scriptId: number) => void
   /** Why the last order was turned down, if it was. */
   orderError: string | undefined
   /** Goods lying on the resident's tile, if any are in sight. */
@@ -405,7 +438,7 @@ export function ResidentCard({
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
         `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}`,
-        <strong key="doing">{doing(r)}</strong>,
+        <strong key="doing">{doing(r, scripts)}</strong>,
       ]}
       onClose={onClose}
     >
@@ -422,6 +455,9 @@ export function ResidentCard({
         />
       </div>
 
+      {r.script && (
+        <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
+      )}
       <ActionRows actions={actions} open={shown} onAction={act} />
       <p className="muted small" role="status">
         {orderError
@@ -943,7 +979,9 @@ function WorkBlock({
   if (!building || max === undefined || !skill || (!good && recipes.length === 0)) return null
   const batches = BATCHES_PER_DAY[building.kind] ?? 0
   const o = resident.order
-  const working = o?.kind === 'workAt' && o.buildingId === building.id
+  // Working by the task's script; one working by a bare order (as the starting residents do) can
+  // still be given the task.
+  const working = o?.kind === 'workAt' && o.buildingId === building.id && !!resident.script
   const blocked = !canWork(resident, tick) || (!working && workers >= max)
   return (
     <section className="inspector-block" aria-label="Work">

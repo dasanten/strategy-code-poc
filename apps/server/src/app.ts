@@ -43,6 +43,7 @@ import {
   getScript,
   listScripts,
   renameScript,
+  resetScript,
   saveScript,
 } from './scripts.js'
 
@@ -80,6 +81,7 @@ const STATUS: Record<ApiError['error'], number> = {
   'not-explored': 403,
   'rate-limited': 429,
   'script-has-errors': 422,
+  'default-script': 409,
 }
 
 function fail(reply: FastifyReply, code: ApiError['error'], message: string) {
@@ -199,6 +201,8 @@ export async function buildApp(opts: AppOptions) {
     lib.post<ById>('/api/scripts/:id/active', async (req) =>
       activateVersion(db, req.user!.id, id(req), { version: body(req).version }),
     )
+    // Resetting a default script makes the game's current default its newest version.
+    lib.post<ById>('/api/scripts/:id/reset', async (req) => resetScript(db, req.user!.id, id(req)))
     lib.delete<ById>('/api/scripts/:id', async (req, reply) => {
       deleteScript(db, req.user!.id, id(req))
       return reply.code(204).send()

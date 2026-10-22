@@ -17,6 +17,7 @@ import {
   wrapDistance,
   type OrderRequest,
   type ResourceNode,
+  type RunningScript,
   type ScriptBinding,
   type SeenEntity,
   type TerrainMap,
@@ -24,6 +25,7 @@ import {
 } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
+import { realmOf } from './starting-city.js'
 
 /**
  * The game API bound for a running script (`CONTEXT.md`: Script, Memory, Step budget; ADR 0002).
@@ -92,9 +94,26 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const requests: OrderRequest[] = []
 
   let seen: readonly SeenEntity[] | undefined
-  const seenOf = (is: SeenEntity['is']): Value => {
+  const seenOf = (is: SeenEntity['is'], add?: (id: string) => object | undefined): Value => {
     seen ??= context.seen()
-    return seen.filter((e) => e.is === is).map(({ is: _, ...rest }) => toValue(rest))
+    return seen
+      .filter((e) => e.is === is)
+      .map(({ is: _, ...rest }) => toValue({ ...rest, ...add?.(rest.id) }))
+  }
+  // A script reads, never changes, the memory of its own Player's residents (`CONTEXT.md`:
+  // Memory); other Players' stays hidden.
+  let ownScripts: Map<string, RunningScript> | undefined
+  const ownMemory = (id: string) => {
+    if (!ownScripts) {
+      const realm = realmOf(world, sender.userId)
+      ownScripts = new Map(
+        world.residents.flatMap((r) =>
+          realm && r.owner === realm.id && r.script ? [[r.id, r.script] as const] : [],
+        ),
+      )
+    }
+    const running = ownScripts.get(id)
+    return running && { script: { scriptId: running.scriptId, memory: running.memory } }
   }
   let nodes: Value[] | undefined
   const exploredNodes = (): Value => {
@@ -105,7 +124,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   }
 
   const queries: Record<string, (args: Value[]) => Value> = {
-    residents: () => seenOf('resident'),
+    residents: () => seenOf('resident', ownMemory),
     buildings: () => seenOf('building'),
     cities: () => seenOf('city'),
     horses: () => seenOf('horse'),

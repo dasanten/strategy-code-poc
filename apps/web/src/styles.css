@@ -1032,6 +1032,22 @@ button.residents-row.selected:hover {
 .diagnostics.has-errors {
   color: var(--ui-bad);
 }
+.default-changed {
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+.script-diff {
+  margin: 4px 0;
+  max-height: 200px;
+  overflow: auto;
+  font-family: var(--font-mono);
+}
+.script-diff .added {
+  color: var(--ui-live);
+}
+.script-diff .removed {
+  color: var(--ui-bad);
+}
 .script-message {
   margin: 0;
   color: var(--ui-muted);
