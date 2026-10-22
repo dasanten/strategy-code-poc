@@ -37,6 +37,12 @@ export const BASE_ART = {
   diamond: 'base-diamond.svg',
 } as const
 
+/** A city's emblem in the far zoom tier: a castle on the dark hex badge, with a wider ring. */
+export const CITY_ART = {
+  glyph: 'city.svg',
+  ring: 'base-hex-ring-wide.svg',
+} as const
+
 /** The SVG source of every file in `assets/map/`, by file name. */
 export const ART_FILES: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(
@@ -54,5 +60,6 @@ export const artInUse = (): string[] => [
     ...Object.values(BUILDING_ART),
     ...Object.values(NODE_ART),
     ...Object.values(BASE_ART),
+    ...Object.values(CITY_ART),
   ]),
 ]

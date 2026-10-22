@@ -17,10 +17,19 @@ export interface Size {
 
 /** Closest zoom, in screen pixels per tile. */
 export const MAX_SCALE = 48
-/** Below this many pixels per tile, the map only draws terrain (no grid, nodes or units). */
-export const FAR_SCALE = 3
+/**
+ * Below this many pixels per tile, the map is in its far tier (ADR 0008): terrain, territory and
+ * one emblem per city, with armies and caravans as small markers.
+ */
+export const FAR_SCALE = 8
 /** From this many pixels per tile up, the tile grid is drawn. */
 export const CLOSE_SCALE = 14
+
+/** The map's zoom tiers (ADR 0008): what it shows depends on how far out it is. */
+export type ZoomTier = 'far' | 'middle' | 'close'
+
+export const zoomTier = (scale: number): ZoomTier =>
+  scale < FAR_SCALE ? 'far' : scale < CLOSE_SCALE ? 'middle' : 'close'
 
 /**
  * The furthest zoom: the map just fills the screen's longer side. Never further, so the screen

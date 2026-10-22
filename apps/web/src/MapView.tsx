@@ -17,7 +17,7 @@ import {
 } from '@csp/shared'
 import {
   CLOSE_SCALE,
-  FAR_SCALE,
+  zoomTier,
   chunkToScreen,
   clampScale,
   panBy,
@@ -55,7 +55,9 @@ import {
   VOID_COLOR,
   css,
 } from './map/palette.js'
-import { BASE_ART, BUILDING_ART, NODE_ART } from './map/art.js'
+import { BASE_ART, BUILDING_ART, CITY_ART, NODE_ART } from './map/art.js'
+import { EMBLEM_RADIUS, MARKER_RADIUS, cityEmblems, emblemAt, farMarkers } from './map/far.js'
+import { LabelLayer } from './map/labels.js'
 import { destroyAtlas, loadAtlas, type Atlas } from './map/atlas.js'
 import {
   GLYPH_COLOR,
@@ -64,6 +66,7 @@ import {
   cityRelationship,
   relationshipColor,
   type Relationship,
+  type Viewer,
 } from './map/tokens.js'
 import type { ClientWorld } from './useWorld.js'
 import { caravanAt, caravanParts } from './caravans.js'
@@ -96,6 +99,8 @@ export function MapView({
   world,
   selectedId,
   onSelect,
+  selectedCityId,
+  onSelectCity,
   picking = false,
   onPickTile,
   onNodesLoaded,
@@ -106,6 +111,10 @@ export function MapView({
   selectedId?: string
   /** Called with a resident of the Player's realm clicked on the map. */
   onSelect?: (id: string) => void
+  /** The city whose emblem shows with a ring in the far tier, if any. */
+  selectedCityId?: string
+  /** Called with a city whose emblem was clicked in the far tier. */
+  onSelectCity?: (id: string) => void
   /** Waiting for a tile: the next click picks one instead of selecting. */
   picking?: boolean
   /** Called with a tile picked by click (while `picking`) or by right-click. */
@@ -120,6 +129,9 @@ export function MapView({
   const selectedRef = useRef(selectedId)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const selectedCityRef = useRef(selectedCityId)
+  const onSelectCityRef = useRef(onSelectCity)
+  onSelectCityRef.current = onSelectCity
   const pickingRef = useRef(picking)
   pickingRef.current = picking
   const onPickTileRef = useRef(onPickTile)
@@ -159,6 +171,11 @@ export function MapView({
   }, [selectedId])
 
   useEffect(() => {
+    selectedCityRef.current = selectedCityId
+    redrawRef.current()
+  }, [selectedCityId])
+
+  useEffect(() => {
     worldRef.current = world
     if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
     redrawRef.current()
@@ -179,6 +196,7 @@ export function MapView({
     const tokens = new TokenLayer()
     let atlas: Atlas | undefined
     const overlay = new Graphics()
+    const labels = new LabelLayer()
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
     let cam: Camera = { ...homeCentre(worldRef.current), scale: START_SCALE }
     let disposed = false
@@ -255,7 +273,8 @@ export function MapView({
       // sides join); nearer chunks are loaded first.
       const onScreen = visibleChunks(cam, view, mapSize)
       const shown = new Set(onScreen)
-      regionLayer.visible = modeRef.current === 'region'
+      // Far out, territory always shows (ADR 0008: far tier).
+      regionLayer.visible = modeRef.current === 'region' || zoomTier(cam.scale) === 'far'
       for (const [i, sprite] of [...sprites, ...regionSprites]) {
         sprite.visible = shown.has(i)
         if (!sprite.visible) continue
@@ -277,8 +296,32 @@ export function MapView({
       g.clear()
       under.clear()
       tokens.begin()
-      if (cam.scale >= FAR_SCALE) drawMiddle(g, cam, view, onScreen)
+      labels.begin()
+      if (zoomTier(cam.scale) === 'far') drawFar(g, cam, view)
+      else drawMiddle(g, cam, view, onScreen)
+      labels.end()
       tokens.end()
+    }
+
+    /** Far out: an emblem with a name per city, armies and caravans as small markers. */
+    function drawFar(g: Graphics, cam: Camera, view: Size) {
+      const world = worldRef.current
+      for (const m of farMarkers(world)) {
+        const [sx, sy] = tileToScreen(cam, view, mapSize, m.x + 0.5, m.y + 0.5)
+        g.circle(sx, sy, MARKER_RADIUS)
+          .fill(relationshipColor(m.rel))
+          .stroke({ width: 1.5, color: 0x0e1419 })
+      }
+      for (const e of cityEmblems(world, viewerOf(world), mapSize)) {
+        const [sx, sy] = tileToScreen(cam, view, mapSize, e.x + 0.5, e.y + 0.5)
+        const r = EMBLEM_RADIUS[e.size]
+        if (sx < -r * 8 || sy < -r * 4 || sx > view.width + r * 8 || sy > view.height + r * 4)
+          continue
+        drawEmblem(tokens, sx, sy, r, e.rel)
+        labels.place(e.name, sx, sy + r + 12)
+        if (e.id === selectedCityRef.current)
+          g.circle(sx, sy, r + 6).stroke({ width: 2.5, color: 0xffffff })
+      }
     }
 
     function drawMiddle(g: Graphics, cam: Camera, view: Size, onScreen: number[]) {
@@ -413,6 +456,14 @@ export function MapView({
           onPickTileRef.current?.(tx, ty)
           return
         }
+        // Far out, a click picks the city whose emblem it falls on.
+        if (zoomTier(cam.scale) === 'far') {
+          const world = worldRef.current
+          const emblems = cityEmblems(world, viewerOf(world), mapSize)
+          const city = emblemAt(emblems, cam, size(), mapSize, p.x, p.y)
+          if (city) onSelectCityRef.current?.(city.id)
+          return
+        }
         const id = residentAt(p.x, p.y)
         if (id) onSelectRef.current?.(id)
       }
@@ -462,7 +513,14 @@ export function MapView({
       app.canvas.addEventListener('wheel', onWheel, { passive: false })
       app.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
       app.renderer.on('resize', redraw)
-      app.stage.addChild(terrainLayer, regionLayer, under, tokens.container, overlay)
+      app.stage.addChild(
+        terrainLayer,
+        regionLayer,
+        under,
+        tokens.container,
+        overlay,
+        labels.container,
+      )
       ready = true
       void loadAtlas().then((loaded) => {
         if (disposed) return destroyAtlas(loaded)
@@ -651,6 +709,20 @@ function drawBuilding(
   tokens.place(BASE_ART.hexRing, x, y, base, relationshipColor(rel), alpha)
   tokens.place(file, x, y, r * 1.2, glyph, alpha)
 }
+
+/** A city's emblem in the far tier (ADR 0008): a castle on a dark hex badge with a wide ring. */
+function drawEmblem(tokens: TokenLayer, x: number, y: number, r: number, rel: Relationship) {
+  const base = (r * 1.08 * 24) / 11
+  tokens.place(BASE_ART.hex, x, y, base)
+  tokens.place(CITY_ART.ring, x, y, base, relationshipColor(rel))
+  tokens.place(CITY_ART.glyph, x, y, r * 1.2, GLYPH_COLOR)
+}
+
+/** The Player's realm and its allies, for relationship colours. */
+const viewerOf = (world: ClientWorld): Viewer => ({
+  realmId: world.home.realmId,
+  allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
+})
 
 /** A resource node as a token: a dark diamond with the glyph in the node's colour. */
 function drawNode(tokens: TokenLayer, kind: ResourceKind, x: number, y: number, r: number) {
