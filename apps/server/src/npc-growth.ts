@@ -33,6 +33,7 @@ import {
   isAt,
   footprintTiles,
   FOOTPRINT,
+  NPC_WALL_TILES_PER_TRIP,
 } from '@csp/shared'
 import { hqGrows, hqProject } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
@@ -180,11 +181,15 @@ function takePart(
   if (deliver) {
     const site = project.kind === 'build' && buildingAt(world, project.x, project.y)
     const carried = site && site.site && pick(r.carried, materialsNeeded(site))
-    if (!site || !carried) return false
-    if (isAt(r, site)) {
-      r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
-    } else walkTo(r, site)
-    return true
+    if (site && carried) {
+      if (isAt(r, site)) {
+        r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
+      } else walkTo(r, site)
+      return true
+    }
+    // Carrying the materials of a few tiles of wall, they help with this one rather than take
+    // them back to the storage; the next tiles will want them.
+    if (!(project.kind === 'build' && forWall(project.building, r.carried))) return false
   }
   if (project.kind === 'tearDown') {
     const b = project.building
@@ -208,7 +213,10 @@ function takePart(
     else walkTo(r, site)
     return true
   }
-  const stocked = pick(storage?.stock, need)
+  // For a tile of wall, enough for a few tiles at once: the rest goes to the next ones.
+  const wall = building === 'wall' || building === 'gate'
+  const trip = wall ? times(need, NPC_WALL_TILES_PER_TRIP) : need
+  const stocked = !forWall(building, r.carried) && pick(storage?.stock, trip)
   if (storage && stocked) {
     if (isAt(r, storage)) {
       r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods: stocked }
@@ -216,6 +224,19 @@ function takePart(
     return true
   }
   return workNeeded(site) > 0 && build()
+}
+
+/** Whether a resident carries materials for walls or gates, for a project of `building`. */
+function forWall(building: BuildingKind, carried: Stock): boolean {
+  if (building !== 'wall' && building !== 'gate') return false
+  return pick(carried, BUILD_MATERIALS[building] ?? {}) !== undefined
+}
+
+/** `n` times the goods. */
+function times(goods: Stock, n: number): Stock {
+  const out: Stock = {}
+  for (const [good, units] of Object.entries(goods) as [Good, number][]) out[good] = units * n
+  return out
 }
 
 /** The goods of `wanted` that `stock` holds some of, as many as wanted; none if it holds none. */
@@ -391,8 +412,9 @@ interface WallTileState {
 }
 
 /**
- * The tiles of the city's new wall (`Rings.outer`), the gate first and then outward from it:
- * each either finished, begun, or free for it. Tiles that can take no wall (a farm stands there,
+ * The tiles of the city's new wall (`Rings.outer`), the gate first and then on round the ring
+ * from it, clockwise, so its builders work along the wall rather than back and forth across
+ * the gate: each either finished, begun, or free for it. Tiles that can take no wall (a farm stands there,
  * a node, Mountain) are left out, and the wall has a gap there.
  */
 export function newWall(
@@ -410,7 +432,8 @@ export function newWall(
       const x = wrap(home.x + dx, size)
       const y = wrap(home.y + dy, size)
       const kind = dx === rings.newGate.dx && dy === rings.newGate.dy ? 'gate' : 'wall'
-      const order = Math.hypot(dx - rings.newGate.dx, dy - rings.newGate.dy)
+      const turn = Math.atan2(dy, dx) - Math.atan2(rings.newGate.dy, rings.newGate.dx)
+      const order = (turn + 4 * Math.PI) % (2 * Math.PI)
       const here = buildingAt(world, x, y)
       if (here && (here.kind === 'wall' || here.kind === 'gate')) {
         out.push({

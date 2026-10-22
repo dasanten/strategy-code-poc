@@ -332,6 +332,13 @@ export const NPC_BUILDERS = 2
 export const NPC_WALL_STEP = 8
 
 /**
+ * How many tiles of wall an NPC city's builder fetches the materials for in one trip to the
+ * storage (`CONTEXT.md`: NPC city, Fetching materials): a 40 m stretch's worth, so a long wall is
+ * not one walk per tile. What a tile doesn't take goes to the next.
+ */
+export const NPC_WALL_TILES_PER_TRIP = 4
+
+/**
  * How far from its home an NPC city looks for a resource node to build a workplace on when it
  * needs a material it has no workplace for (`CONTEXT.md`: NPC city), in tiles: about twenty
  * minutes' walk on plains.
