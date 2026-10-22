@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
-  formatGameTime,
   holdersOf,
   KEEPS_GOODS,
   isWallOrGate,
@@ -22,6 +21,8 @@ import { ContractsPanel } from './Contracts.js'
 import { StandingPanel } from './Standing.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
+import { keyGoods, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
+import { CentredDialog, Drawer, ToolRail, TopBar, useEscapeCloses } from './Hud.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { pageFor } from './pages.js'
@@ -68,6 +69,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
   // A place from the realm log to show on the map.
   const [focus, setFocus] = useState<{ x: number; y: number }>()
+  // The drawer open over the map, if any (ADR 0008: one at a time).
+  const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
+  const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
+  useEscapeCloses(openDrawer, closeDrawer)
 
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
@@ -166,207 +171,233 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     onLoggedOut()
   }
 
+  const leader = world?.residents.find((r) => r.id === world.home.leaderId)
+  const drawer = (id: DrawerId, panel: ReactNode) => (
+    <Drawer id={id} open={openDrawer} onClose={closeDrawer}>
+      {panel}
+    </Drawer>
+  )
+
   return (
-    <div className="layout">
-      <header>
-        <h1>Code Strategy</h1>
-        {world && (
-          <span className="clock" title="1 game day = 1 real hour; 1 game year = 1 real day">
-            {formatGameTime(world.tick)}
-          </span>
+    <div className="game">
+      <section className="game-map">
+        {world ? (
+          <MapView
+            world={world}
+            selectedId={selectedId}
+            onSelect={(id) => {
+              setSelectedId(id)
+              setPicking(false)
+              setArmyPick(undefined)
+              setOrderError(undefined)
+            }}
+            picking={picking !== false || armyPick !== undefined}
+            onPickTile={goTo}
+            onNodesLoaded={onNodesLoaded}
+            focus={focus}
+          />
+        ) : (
+          <p className="game-waiting">Waiting for the server…</p>
         )}
-        <span className={`status ${status}`}>
-          {status === 'open' ? `tick ${world?.tick ?? '…'}` : status}
-        </span>
-        <span className="spacer" />
-        <span>{account.name}</span>
-        <button type="button" onClick={logout}>
-          Log out
-        </button>
-      </header>
-      <main>
-        <div className="play-column">
-          <section className="map-panel">
-            {world && realmEnded(world.events) && (
-              <div className="realm-ended" role="alert">
-                <p>
-                  Your Leader has died and your realm has ended. The realm log says what became of
-                  your cities. You start afresh with a new Leader and a new starting city.
-                </p>
-                <button type="button" onClick={() => window.location.reload()}>
-                  Start afresh
-                </button>
-              </div>
+      </section>
+      <TopBar
+        realm={account.name}
+        cityName={homeCity?.name}
+        tick={world?.tick}
+        status={status}
+        goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
+        leader={leader?.name}
+        onLogout={logout}
+      />
+      <ToolRail
+        open={openDrawer}
+        onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
+      />
+      {world &&
+        drawer(
+          'residents',
+          <ResidentsList
+            residents={own}
+            leaderId={world.home.leaderId}
+            tick={world.tick}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />,
+        )}
+      {world &&
+        drawer(
+          'armies',
+          <ArmiesPanel
+            armies={world.armies}
+            own={own}
+            inSight={world.residents}
+            realmId={world.home.realmId}
+            picking={armyPick}
+            onPick={(pick) => {
+              setArmyPick(pick)
+              setPicking(false)
+              setArmyError(undefined)
+            }}
+            pickError={armyError}
+            scripts={scripts}
+            sendOrder={sendOrder}
+          />,
+        )}
+      {world &&
+        drawer(
+          'contracts',
+          <ContractsPanel
+            contracts={world.diplomacy.contracts}
+            realmId={world.home.realmId}
+            own={own}
+            inSight={world.residents}
+            buildings={world.buildings}
+            cities={world.cities}
+            realms={[
+              ...(world.diplomacy.alliance?.members ?? []).filter(
+                (m) => m.realmId !== world.home.realmId,
+              ),
+              ...world.diplomacy.realmsInSight,
+            ]}
+            sendOrder={sendOrder}
+          />,
+        )}
+      {world &&
+        drawer(
+          'alliance',
+          <AlliancePanel
+            diplomacy={world.diplomacy}
+            residents={world.residents}
+            carriages={world.carriages}
+            realmId={world.home.realmId}
+            sendOrder={sendOrder}
+          />,
+        )}
+      {world &&
+        drawer(
+          'standing',
+          <StandingPanel
+            standings={world.diplomacy.standings}
+            joinRequests={world.diplomacy.joinRequests}
+            directives={world.diplomacy.directives}
+            sendOrder={sendOrder}
+          />,
+        )}
+      {world &&
+        drawer(
+          'cities',
+          <CityInspector
+            cities={world.cities}
+            residents={world.residents}
+            buildings={world.buildings}
+            realmId={world.home.realmId}
+            realms={world.diplomacy.realmsInSight}
+            carriages={world.carriages}
+            tick={world.tick}
+            mapSize={world.map.size}
+            onSetGate={async (gateId, open) =>
+              setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
+            }
+            onBuyCity={async (residentId, cityId) =>
+              setOrderError(await sendOrder({ kind: 'buyCity', residentId, cityId }))
+            }
+            onTrade={async ({ side, ...trade }) =>
+              setOrderError(await sendOrder({ kind: side, ...trade }))
+            }
+            onTransfer={async (transfer) =>
+              setOrderError(await sendOrder({ kind: 'transfer', ...transfer }))
+            }
+            directives={world.diplomacy.directives}
+            onBuyOff={async (residentId, directiveId, carriageId) =>
+              setOrderError(
+                await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
+              )
+            }
+          />,
+        )}
+      {/* Mounted before the world arrives too: it loads the scripts the inspector can run. */}
+      {drawer('scripts', <ScriptLibrary onScripts={setScripts} />)}
+      {world &&
+        drawer(
+          'realmLog',
+          <RealmLog
+            events={world.events}
+            realmId={world.home.realmId}
+            deliveries={world.diplomacy.deliveries}
+            onShowPlace={(p) => setFocus({ x: p.x, y: p.y })}
+          />,
+        )}
+      {world && selected && (
+        <div className="game-inspector">
+          <button
+            type="button"
+            className="game-inspector-close"
+            aria-label="Close the resident inspector"
+            onClick={() => {
+              setSelectedId(undefined)
+              setPicking(false)
+            }}
+          >
+            ✕
+          </button>
+          <ResidentInspector
+            resident={selected}
+            leaderId={world.home.leaderId}
+            cityName={homeCity?.name}
+            tick={world.tick}
+            picking={picking}
+            onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
+            carriage={onTile(world.carriages)}
+            onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
+            onRoadTo={() => setPicking((p) => (p === 'road' ? false : 'road'))}
+            onHaulTo={(setup) => {
+              setHaulSetup(setup)
+              setPicking((p) => (p === 'haul' ? false : 'haul'))
+            }}
+            onStop={stop}
+            scripts={scripts}
+            onRunScript={runScript}
+            orderError={orderError}
+            pile={onTile(world.piles)}
+            storage={onTile(world.buildings.filter((b) => KEEPS_GOODS.includes(b.kind) && !b.site))}
+            building={buildingHere}
+            road={roadHere}
+            node={nodeAt?.(selected.x, selected.y)}
+            onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
+            onDrop={(spot, goods) => carry('drop', spot, goods)}
+            onBuild={build}
+            workers={workersHere(world.residents, buildingHere)}
+            holders={heldBy(world.residents, buildingHere)}
+            realmId={world.home.realmId}
+            onWork={work}
+            onTearDown={tearDown}
+            residents={own}
+            onPair={pair}
+            others={world.residents.filter((r) => !own.includes(r))}
+            mapSize={world.map.size}
+            onAttack={attack}
+            walls={world.buildings.filter(
+              (b) =>
+                isWallOrGate(b) &&
+                world.cities.find((c) => c.id === b.cityId)?.realmId !== world.home.realmId,
             )}
-            {world ? (
-              <MapView
-                world={world}
-                selectedId={selectedId}
-                onSelect={(id) => {
-                  setSelectedId(id)
-                  setPicking(false)
-                  setArmyPick(undefined)
-                  setOrderError(undefined)
-                }}
-                picking={picking !== false || armyPick !== undefined}
-                onPickTile={goTo}
-                onNodesLoaded={onNodesLoaded}
-                focus={focus}
-              />
-            ) : (
-              <p>Waiting for the server…</p>
-            )}
-          </section>
-          {world && (
-            <ResidentsList
-              residents={own}
-              leaderId={world.home.leaderId}
-              tick={world.tick}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-            />
-          )}
+            onClimb={climb}
+          />
         </div>
-        <div className="side-column">
-          {world && (
-            <ResidentInspector
-              resident={selected}
-              leaderId={world.home.leaderId}
-              cityName={homeCity?.name}
-              tick={world.tick}
-              picking={picking}
-              onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
-              carriage={onTile(world.carriages)}
-              onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
-              onRoadTo={() => setPicking((p) => (p === 'road' ? false : 'road'))}
-              onHaulTo={(setup) => {
-                setHaulSetup(setup)
-                setPicking((p) => (p === 'haul' ? false : 'haul'))
-              }}
-              onStop={stop}
-              scripts={scripts}
-              onRunScript={runScript}
-              orderError={orderError}
-              pile={onTile(world.piles)}
-              storage={onTile(
-                world.buildings.filter((b) => KEEPS_GOODS.includes(b.kind) && !b.site),
-              )}
-              building={buildingHere}
-              road={roadHere}
-              node={selected && nodeAt?.(selected.x, selected.y)}
-              onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
-              onDrop={(spot, goods) => carry('drop', spot, goods)}
-              onBuild={build}
-              workers={workersHere(world.residents, buildingHere)}
-              holders={heldBy(world.residents, buildingHere)}
-              realmId={world.home.realmId}
-              onWork={work}
-              onTearDown={tearDown}
-              residents={own}
-              onPair={pair}
-              others={world.residents.filter((r) => !own.includes(r))}
-              mapSize={world.map.size}
-              onAttack={attack}
-              walls={world.buildings.filter(
-                (b) =>
-                  isWallOrGate(b) &&
-                  world.cities.find((c) => c.id === b.cityId)?.realmId !== world.home.realmId,
-              )}
-              onClimb={climb}
-            />
-          )}
-          {world && (
-            <ArmiesPanel
-              armies={world.armies}
-              own={own}
-              inSight={world.residents}
-              realmId={world.home.realmId}
-              picking={armyPick}
-              onPick={(pick) => {
-                setArmyPick(pick)
-                setPicking(false)
-                setArmyError(undefined)
-              }}
-              pickError={armyError}
-              scripts={scripts}
-              sendOrder={sendOrder}
-            />
-          )}
-          {world && (
-            <ContractsPanel
-              contracts={world.diplomacy.contracts}
-              realmId={world.home.realmId}
-              own={own}
-              inSight={world.residents}
-              buildings={world.buildings}
-              cities={world.cities}
-              realms={[
-                ...(world.diplomacy.alliance?.members ?? []).filter(
-                  (m) => m.realmId !== world.home.realmId,
-                ),
-                ...world.diplomacy.realmsInSight,
-              ]}
-              sendOrder={sendOrder}
-            />
-          )}
-          {world && (
-            <AlliancePanel
-              diplomacy={world.diplomacy}
-              residents={world.residents}
-              carriages={world.carriages}
-              realmId={world.home.realmId}
-              sendOrder={sendOrder}
-            />
-          )}
-          {world && (
-            <StandingPanel
-              standings={world.diplomacy.standings}
-              joinRequests={world.diplomacy.joinRequests}
-              directives={world.diplomacy.directives}
-              sendOrder={sendOrder}
-            />
-          )}
-          {world && (
-            <CityInspector
-              cities={world.cities}
-              residents={world.residents}
-              buildings={world.buildings}
-              realmId={world.home.realmId}
-              realms={world.diplomacy.realmsInSight}
-              carriages={world.carriages}
-              tick={world.tick}
-              mapSize={world.map.size}
-              onSetGate={async (gateId, open) =>
-                setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
-              }
-              onBuyCity={async (residentId, cityId) =>
-                setOrderError(await sendOrder({ kind: 'buyCity', residentId, cityId }))
-              }
-              onTrade={async ({ side, ...trade }) =>
-                setOrderError(await sendOrder({ kind: side, ...trade }))
-              }
-              onTransfer={async (transfer) =>
-                setOrderError(await sendOrder({ kind: 'transfer', ...transfer }))
-              }
-              directives={world.diplomacy.directives}
-              onBuyOff={async (residentId, directiveId, carriageId) =>
-                setOrderError(
-                  await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
-                )
-              }
-            />
-          )}
-          {world && (
-            <RealmLog
-              events={world.events}
-              realmId={world.home.realmId}
-              deliveries={world.diplomacy.deliveries}
-              onShowPlace={(p) => setFocus({ x: p.x, y: p.y })}
-            />
-          )}
-          <ScriptLibrary onScripts={setScripts} />
-        </div>
-      </main>
+      )}
+      {world && realmEnded(world.events) && (
+        <CentredDialog title="Your realm has ended">
+          <p>
+            Your Leader has died and your realm has ended. The realm log says what became of your
+            cities. You start afresh with a new Leader and a new starting city.
+          </p>
+          <div className="hud-dialog-actions">
+            <button type="button" className="primary" onClick={() => window.location.reload()}>
+              Start afresh
+            </button>
+          </div>
+        </CentredDialog>
+      )}
     </div>
   )
 }
