@@ -979,7 +979,9 @@ function WorkBlock({
   if (!building || max === undefined || !skill || (!good && recipes.length === 0)) return null
   const batches = BATCHES_PER_DAY[building.kind] ?? 0
   const o = resident.order
-  const working = o?.kind === 'workAt' && o.buildingId === building.id
+  // Working by the task's script; one working by a bare order (as the starting residents do) can
+  // still be given the task.
+  const working = o?.kind === 'workAt' && o.buildingId === building.id && !!resident.script
   const blocked = !canWork(resident, tick) || (!working && workers >= max)
   return (
     <section className="inspector-block" aria-label="Work">

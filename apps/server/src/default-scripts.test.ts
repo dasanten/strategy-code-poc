@@ -296,6 +296,22 @@ describe('Work from the UI', () => {
     })
   })
 
+  it('is given to a resident working by a bare work-at order, but not twice', () => {
+    const world = farmWorld()
+    const orders = queue()
+    const w1 = world.residents[0]!
+    w1.order = { kind: 'workAt', buildingId: 'farm', at: { x: 3, y: 3 }, progress: 0.5 }
+    const work = { kind: 'task', task: 'work', residentId: 'w1', workplaceId: 'farm' }
+    expect(orders.receive(world, sender(), 'q', work)).toMatchObject({ type: 'ack' })
+    orders.applyAll(world)
+    new ScriptRunner(terrain, host()).runAll(world)
+    expect(w1.script?.scriptId).toBe(workId())
+    expect(w1.order?.kind).toBe('workAt')
+    expect(orders.receive(world, sender(), 'q', work)).toMatchObject({
+      reason: 'already working here',
+    })
+  })
+
   it('plays as the work-at order did: the same Food on the farm’s pile, tick for tick', () => {
     const world = farmWorld()
     world.residents = world.residents.filter((r) => r.owner === 'r1')

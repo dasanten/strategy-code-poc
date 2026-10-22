@@ -138,7 +138,11 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       if (typeof o.workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== o.workplaceId)
         return 'not standing on that workplace'
       const work = { kind: 'workAt', residentId: r.id, makes: o.makes }
-      return orderKinds.workAt!.validate(world, sender, work)
+      const problem = orderKinds.workAt!.validate(world, sender, work)
+      // Working there by a bare work-at order, as the starting residents do, they can still be
+      // given the task; already running it there, they can't.
+      if (problem === 'already working here' && !r.script) return undefined
+      return problem
     },
     apply(world, sender, order) {
       const { residentId, task, workplaceId, makes } = order as WorkTaskRequest
