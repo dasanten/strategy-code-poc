@@ -54,6 +54,15 @@ function observersOf(world: WorldState, realmId: string): Spot[] {
 }
 
 /**
+ * Whether a realm's Player, or an NPC city, sees a spot (`CONTEXT.md`: Sight): within sight
+ * range of any of their residents or their alliance's, as `entitiesInSight` counts it.
+ */
+export function sightOf(world: WorldState, size: number, side: string): (at: Spot) => boolean {
+  const observers = observersOf(world, side)
+  return (at) => seen(size, observers, at)
+}
+
+/**
  * What a realm's Player sees (`CONTEXT.md`: Sight): everything within sight range of any of
  * their residents or their alliance's, their own things included. A city counts as seen when
  * any of it is.

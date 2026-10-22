@@ -1,6 +1,5 @@
 import {
   armyDrivenTo,
-  commands,
   armySpot,
   inContact,
   carriageCanEnter,
@@ -29,9 +28,9 @@ import {
   type WallMap,
   type WorldState,
 } from '@csp/shared'
+import { orderedResident } from './order-sender.js'
 import type { OrderKind, OrderSender } from './orders.js'
 import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
-import { realmOf } from './starting-city.js'
 import { waitingForArmy } from './armies.js'
 import { waitingForEscort } from './caravans.js'
 import { attackTarget } from './combat.js'
@@ -65,9 +64,8 @@ interface WalkToRequest extends OrderRequest {
 export const walkTo: OrderKind = {
   validate(world, sender: OrderSender, order: OrderRequest) {
     const o = order as Partial<WalkToRequest>
-    const realm = realmOf(world, sender.userId)
-    const r = world.residents.find((x) => x.id === o.residentId)
-    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    const r = orderedResident(world, sender, o.residentId)
+    if (!r) return 'not one of your residents'
     if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the target must be a tile'
     return undefined
   },

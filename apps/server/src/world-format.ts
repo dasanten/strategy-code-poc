@@ -1,6 +1,7 @@
 import {
   MAX_HEALTH,
   MAX_HUNGER,
+  RECIPES,
   START_HORSES,
   START_STABLE_FOOD,
   wrapDistance,
@@ -42,7 +43,7 @@ const isInsideWalls = (c: OldCity, x: number, y: number) =>
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with one recorded exception (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 35
+export const WORLD_FORMAT_VERSION = 36
 
 /**
  * Saves older than this format are from the disc-shaped map. The world was reset once when the
@@ -379,6 +380,21 @@ export const migrations: Record<number, MigrationStep> = {
       caravans: world.caravans.map((c) => ({ ...c, transfer: null })),
       transfers: [],
     }
+  },
+  // Working a workplace carries its output home (`CONTEXT.md`: Carrying the output), and NPC
+  // cities do it by the game's Work default: their residents working a farm, camp, quarry or
+  // mine by a bare work-at order run it for that workplace from now on.
+  35: (state) => {
+    const world = structuredClone(state) as WorldState
+    const npc = new Set(world.cities.filter((c) => c.realmId === null).map((c) => c.id))
+    const kinds = new Map(world.buildings.map((b) => [b.id, b.kind]))
+    for (const r of world.residents) {
+      const o = r.order
+      if (r.owner !== null || r.cityId === null || !npc.has(r.cityId) || r.script) continue
+      if (o?.kind !== 'workAt' || RECIPES[kinds.get(o.buildingId)!]) continue
+      r.script = { scriptId: 0, task: 'work', memory: { workplaceId: o.buildingId } }
+    }
+    return world
   },
 }
 

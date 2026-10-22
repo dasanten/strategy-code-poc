@@ -33,10 +33,10 @@ const value = (name: string, description: string): ScriptBinding => ({
   description,
 })
 
-const list = (name: string, description: string): ScriptBinding => ({
+const list = (name: string, description: string, params: string[] = []): ScriptBinding => ({
   name,
   is: 'query',
-  params: [],
+  params,
   cost: SCRIPT_LIST_QUERY_COST,
   description,
 })
@@ -54,6 +54,10 @@ const SHARED: readonly ScriptBinding[] = [
   value('memory', 'An object kept between ticks for whoever runs it; whatever is set on it stays.'),
   value('tick', 'The world tick this run is for.'),
   value('mapSize', 'Tiles along each side of the map; its opposite sides join.'),
+  value(
+    'random',
+    'A number from 0 up to 1, drawn anew each tick and the same for every script that tick, so residents can agree on a random pick.',
+  ),
 
   list(
     'residents',
@@ -69,6 +73,35 @@ const SHARED: readonly ScriptBinding[] = [
     'directives',
     'The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).',
   ),
+  list(
+    'withMemory',
+    'My realm’s residents running a script whose `memory[key]` is `value`, as `residents()` shows them, with their `script.memory`.',
+    ['key', 'value'],
+  ),
+  {
+    name: 'building',
+    is: 'query',
+    params: ['id'],
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The building or construction site with that id, if the Player sees it or it is one of my realm’s cities’; else null.',
+  },
+  {
+    name: 'pileAt',
+    is: 'query',
+    params: ['x', 'y'],
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The goods lying on a tile, like {food: 3}, if the Player sees it; null where none lie or it isn’t seen.',
+  },
+  {
+    name: 'outputOf',
+    is: 'query',
+    params: ['building'],
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The goods a workplace makes, as a list (at a smithy everything it can make); empty for any other building.',
+  },
   {
     name: 'terrainAt',
     is: 'query',
@@ -90,6 +123,26 @@ const SHARED: readonly ScriptBinding[] = [
 export const SCRIPT_API: readonly ScriptBinding[] = [
   value('me', 'The resident running the script, as the Player sees them, with their `age`.'),
   ...SHARED,
+  {
+    name: 'fits',
+    is: 'query',
+    params: ['good'],
+    cost: SCRIPT_TILE_QUERY_COST,
+    description: 'How many units of a good still fit in my hands.',
+  },
+  list(
+    'storages',
+    'The finished storages of my realm (of my city, for an NPC city’s resident); with `from`, something with `x` and `y`, nearest first by my `walkTime` from it.',
+    ['from?'],
+  ),
+  {
+    name: 'walkTime',
+    is: 'query',
+    params: ['a', 'b'],
+    cost: SCRIPT_LIST_QUERY_COST,
+    description:
+      'About how many ticks I take to walk from one thing with `x` and `y` to another: the straight way across the terrain, roads and walls left out.',
+  },
 
   action('walkTo', ['x', 'y'], 'Walk to a tile.'),
   action('drive', ['carriageId', 'x', 'y'], 'Drive the carriage on my tile to a tile.'),

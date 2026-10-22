@@ -24,6 +24,11 @@ import { buyOff } from './directives.js'
 export interface OrderSender {
   userId: number
   account: Account
+  /**
+   * Set when an NPC city's game default sends it for one of the residents the city runs
+   * (`CONTEXT.md`: NPC city, Default script); `userId` is then 0, nobody's.
+   */
+  npcCityId?: string
 }
 
 /**

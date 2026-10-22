@@ -76,6 +76,7 @@ const scriptHost: ScriptHost = {
     return user && { userId, account: user }
   },
   explored: (userId, x, y) => explored.isExplored({ id: userId }, x, y),
+  defaultScript: (userId, task) => defaultScriptId(db, userId, task),
 }
 const orders = new OrderQueue(
   {

@@ -22,6 +22,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import type { CarryAction } from './carrying.js'
+import { orderedResident } from './order-sender.js'
 import type { OrderKind } from './orders.js'
 import { armyStart, armyToSupply } from './driving.js'
 import { realmOf } from './starting-city.js'
@@ -129,9 +130,8 @@ interface StopRequest extends OrderRequest {
 export const stop: OrderKind = {
   validate(world, sender, order) {
     const o = order as Partial<StopRequest>
-    const realm = realmOf(world, sender.userId)
-    const r = world.residents.find((x) => x.id === o.residentId)
-    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    const r = orderedResident(world, sender, o.residentId)
+    if (!r) return 'not one of your residents'
     return undefined
   },
   apply(world, _sender, order) {
