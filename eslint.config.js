@@ -3,7 +3,8 @@ import tseslint from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**'] },
+  // `.claude/` holds other sessions' worktrees: whole copies of the repo that must not be linted.
+  { ignores: ['**/dist/**', '**/node_modules/**', '.claude/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

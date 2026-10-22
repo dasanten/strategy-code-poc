@@ -7,7 +7,7 @@ following `docs/tasks.md` and `CLAUDE.md`. `$ARGUMENTS` may name a ticket number
 
 ## 1. Pick
 
-1. Update `main` (`git checkout main && git pull --ff-only`); stop if the tree is dirty.
+1. Fetch (`git fetch origin`); stop if the tree is dirty.
 2. Open `bug` issues come first.
 3. Otherwise take the lowest open epic (label `epic`, by its number in the title) that has open
    sub-issues (`gh api repos/dasanten/strategy-code-poc/issues/<epic>/sub_issues`), and in it the
@@ -21,7 +21,9 @@ following `docs/tasks.md` and `CLAUDE.md`. `$ARGUMENTS` may name a ticket number
 ## 2. Claim
 
 Add the label `in progress`, assign yourself (`--add-assignee @me`), and comment the branch name.
-The branch is `t<issue number>-<short-slug>` from `main`.
+The branch is `t<issue number>-<short-slug>`, cut from the epic branch `origin/epic/<n>-<slug>`
+(ADR 0009). If the epic has no branch yet, create it from `origin/main` and push it. A `bug`
+branches from `origin/main` instead.
 
 ## 3. Build
 
@@ -39,13 +41,17 @@ The branch is `t<issue number>-<short-slug>` from `main`.
 
 ## 4. Pull request
 
-- Push and open a ready-for-review PR (not a draft) against `main`.
+- Merge the latest epic branch into yours and run `pnpm lint`, `pnpm typecheck`, `pnpm test`
+  again: ticket PRs get no CI, so this run is what lets the PR merge. Say in the PR body that it
+  passed.
+- Push and open a ready-for-review PR (not a draft) against the epic branch (a `bug` against
+  `main`).
 - Title: what changed. Body: what and why, balance values chosen, anything to check, then one
-  `Closes #<ticket>` line per ticket and `Part of #<epic>`. If this PR closes the epic's last open
-  ticket, add `Closes #<epic>` too.
+  `Closes #<ticket>` line per ticket and `Part of #<epic>`.
 - Turn on Auto-fix for the PR.
-- Leave `in progress` on the ticket until the PR merges; merging closes it.
-- Daniel merges. Never merge yourself.
+- Leave `in progress` on the ticket until the PR merges. Never merge yourself: the coordinating
+  session merges into the epic branch after its own local run and closes the tickets by hand
+  (GitHub only closes them on merges into `main`).
 
 ## 5. Keep going
 
