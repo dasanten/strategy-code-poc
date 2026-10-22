@@ -697,13 +697,45 @@ describe('world saves', () => {
         { id: 'caravan2', postId: 'c3', job },
       ],
     }
-    // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(35)
-    const v35 = migrateWorld(structuredClone(v34), 34, { terrain: smallTerrain() })
+    const v35 = migrateWorld(structuredClone(v34), 34, { terrain: smallTerrain() }, migrations, 35)
     expect(v35).toEqual({
       tick: 5,
       caravans: v34.caravans.map((c) => ({ ...c, transfer: null })),
       transfers: [],
+    })
+  })
+
+  it('puts NPC cities’ workers on the Work default (migration 35 → 36)', () => {
+    const work = (buildingId: string) => ({
+      kind: 'workAt',
+      buildingId,
+      at: { x: 1, y: 1 },
+      progress: 0,
+    })
+    const v35 = {
+      tick: 5,
+      cities: [
+        { id: 'npc', realmId: null },
+        { id: 'mine', realmId: 'r1' },
+      ],
+      buildings: [
+        { id: 'farm', kind: 'farm' },
+        { id: 'smelter', kind: 'smelter' },
+      ],
+      residents: [
+        { id: 'a', owner: null, cityId: 'npc', order: work('farm') },
+        { id: 'b', owner: null, cityId: 'npc', order: work('smelter') },
+        { id: 'c', owner: 'r1', cityId: 'mine', order: work('farm') },
+        { id: 'd', owner: null, cityId: 'npc', order: null },
+      ],
+    }
+    // The live format, so a step no version reaches would show here.
+    expect(WORLD_FORMAT_VERSION).toBe(36)
+    const v36 = migrateWorld(structuredClone(v35), 35, { terrain: smallTerrain() }) as typeof v35
+    const script = { scriptId: 0, task: 'work', memory: { workplaceId: 'farm' } }
+    expect(v36).toEqual({
+      ...v35,
+      residents: [{ ...v35.residents[0], script }, ...v35.residents.slice(1)],
     })
   })
 

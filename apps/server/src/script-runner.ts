@@ -8,6 +8,7 @@ import {
 } from '@csp/lang'
 import {
   buildingAt,
+  DEFAULT_SCRIPTS,
   commanderOf,
   commands,
   isTask,
@@ -19,8 +20,10 @@ import {
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
+  type City,
   type OrderRequest,
   type Realm,
+  type Resident,
   type RealmEventWhat,
   type RunningScript,
   type ScriptMemory,
@@ -31,10 +34,16 @@ import {
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import type { InvariantViolation } from './invariants.js'
+import { npcSender, orderedResident } from './order-sender.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
-import { armyScriptRequestsSound, bindScript, scriptRequestsSound } from './script-bindings.js'
+import {
+  armyScriptRequestsSound,
+  bindScript,
+  scriptRequestsSound,
+  type ScriptContext,
+} from './script-bindings.js'
 import type { RunnableScript } from './scripts.js'
-import { entitiesInSight } from './sight.js'
+import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
 
 /**
@@ -57,6 +66,11 @@ export interface ScriptHost {
   sender(userId: number): OrderSender | undefined
   /** Whether the Player has explored a tile. */
   explored(userId: number, x: number, y: number): boolean
+  /**
+   * The id of the Player's version of a task's default script, for a resident of theirs started
+   * on the task without one (`RunningScript.task`); without it such a script ends.
+   */
+  defaultScript?(userId: number, task: Task): number
 }
 
 interface RunScriptRequest extends OrderRequest {
@@ -280,8 +294,10 @@ export class ScriptRunner {
       // A script runs for the realm the resident takes orders from (`CONTEXT.md`: Alliance army);
       // a resident of no realm has no Player to run a script for.
       const realmId = commanderOf(world, r)
-      if (realmId === null) delete r.script
-      else {
+      // An NPC city runs its residents' game defaults itself (`runNpcScripts`).
+      if (realmId === null) {
+        if (!(r.script.task && r.script.scriptId === 0 && r.owner === null)) delete r.script
+      } else {
         const by = { residentId: r.id }
         add(realmId, { holder: r, id: r.id, name: r.name, by, bind: by })
       }
@@ -298,6 +314,7 @@ export class ScriptRunner {
       if (!running || !sender) continue
       let seen: SeenEntity[] | undefined
       const seenOnce = () => (seen ??= entitiesInSight(world, this.terrain, realm.id))
+      const sees = seesOnce(world, this.terrain, realm.id)
       let left = SCRIPT_REALM_STEP_BUDGET
       const first = world.tick % running.length
       for (let i = 0; i < running.length; i++) {
@@ -309,11 +326,25 @@ export class ScriptRunner {
           continue
         }
         const steps = Math.min(SCRIPT_STEP_BUDGET, left)
-        left -= this.runOne(world, realm, sender, r, steps, seenOnce, used, check ? out : undefined)
+        left -= this.runOne(
+          world,
+          realm,
+          sender,
+          r,
+          steps,
+          { seen: seenOnce, sees },
+          used,
+          check ? out : undefined,
+        )
       }
     }
     this.programs = used
-    if (check) out.push(...runningScriptsSound(world))
+    if (check) {
+      out.push(...runningScriptsSound(world))
+      const unedited = (r: Resident) =>
+        r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
+      out.push(...oneCarrierAtATime(world, unedited))
+    }
     return out
   }
 
@@ -324,11 +355,22 @@ export class ScriptRunner {
     sender: OrderSender,
     r: Runner,
     steps: number,
-    seen: () => SeenEntity[],
+    { seen, sees }: Pick<ScriptContext, 'seen' | 'sees'>,
     used: Map<number, { source: string; program: Program }>,
     violations: InvariantViolation[] | undefined,
   ): number {
     const running = r.holder.script!
+    // Started on a task without a script of the Player's, a resident of theirs runs their version
+    // of its default; one the realm commands but doesn't own (hired, lent) stops.
+    if (running.scriptId === 0) {
+      const owned = world.residents.some((x) => x.id === r.id && x.owner === realm.id)
+      const id = running.task && owned ? this.host.defaultScript?.(realm.userId, running.task) : 0
+      if (!id) {
+        delete r.holder.script
+        return 0
+      }
+      running.scriptId = id
+    }
     const script = this.host.script(running.scriptId)
     if (!script || script.userId !== realm.userId) {
       // Deleted, or the resident now belongs to another Player, whose script it isn't.
@@ -355,6 +397,7 @@ export class ScriptRunner {
       ...r.bind,
       memory,
       seen,
+      sees,
       explored: (x, y) => this.host.explored(realm.userId, x, y),
       kinds: this.kinds,
     })
@@ -468,7 +511,8 @@ export function keepMemory(memory: ScriptObject): ScriptMemory | string {
 }
 
 /**
- * Invariant (ADR 0004): every running script, a resident's or an army's, names a script, keeps
+ * Invariant (ADR 0004): every running script, a resident's or an army's, names a script (or a
+ * task, for its default), keeps
  * plain memory within `SCRIPT_MEMORY_MAX` and has logged no trouble in the future.
  */
 export function runningScriptsSound(world: WorldState): InvariantViolation[] {
@@ -485,7 +529,10 @@ export function runningScriptsSound(world: WorldState): InvariantViolation[] {
         message: `${what} ${id} ${message}`,
         entityIds: [id],
       })
-    if (!Number.isInteger(s.scriptId) || s.scriptId <= 0) fail(`runs script ${s.scriptId}`)
+    // 0 only while it runs a task's default without a script of the Player's.
+    const none = s.scriptId === 0 && s.task !== undefined && isTask(s.task)
+    if (!Number.isInteger(s.scriptId) || (s.scriptId <= 0 && !none))
+      fail(`runs script ${s.scriptId}`)
     const kept = keepMemory(s.memory as ScriptObject)
     if (typeof kept === 'string') fail(`keeps memory it can't: ${kept}`)
     else if (JSON.stringify(kept) !== JSON.stringify(s.memory))
@@ -496,4 +543,101 @@ export function runningScriptsSound(world: WorldState): InvariantViolation[] {
     }
   }
   return out
+}
+
+/** The game's default scripts as parsed, by source, for NPC cities. */
+const gamePrograms = new Map<string, Program>()
+
+/**
+ * An NPC city's residents run the game's default of their task (`CONTEXT.md`: NPC city, Default
+ * script; ADR 0009), through the same interpreter and game API as a Player's scripts, with the
+ * city as the sender: it sees what its residents see, explored or not, and has no realm budget.
+ * What they request is applied at once, as a Player's scripts' requests are. Run after
+ * `stepNpcCities` has put them to work.
+ */
+export function runNpcScripts(
+  world: WorldState,
+  terrain: TerrainMap,
+  kinds: Record<string, OrderKind> = orderKinds,
+): void {
+  const npc = new Map(world.cities.filter((c) => c.realmId === null).map((c) => [c.id, c]))
+  const byCity = new Map<City, Resident[]>()
+  for (const r of world.residents) {
+    const city = r.cityId === null ? undefined : npc.get(r.cityId)
+    if (!city || r.owner !== null || r.script?.scriptId !== 0 || !r.script.task) continue
+    const list = byCity.get(city) ?? []
+    list.push(r)
+    byCity.set(city, list)
+  }
+  for (const [city, people] of byCity) runCityScripts(world, terrain, city, people, kinds)
+}
+
+function runCityScripts(
+  world: WorldState,
+  terrain: TerrainMap,
+  city: City,
+  people: readonly Resident[],
+  kinds: Record<string, OrderKind>,
+): void {
+  const sender = npcSender(city)
+  let seen: SeenEntity[] | undefined
+  const seenOnce = () => (seen ??= entitiesInSight(world, terrain, city.id))
+  const sees = seesOnce(world, terrain, city.id)
+  for (const r of people) {
+    const running = r.script
+    // Its script may have ended this tick; a resident lent out is run by the hirer.
+    if (!running?.task || !orderedResident(world, sender, r.id)) continue
+    const { source } = DEFAULT_SCRIPTS[running.task]
+    let program = gamePrograms.get(source)
+    if (!program) gamePrograms.set(source, (program = parse(source)))
+    const memory = structuredClone(running.memory) as ScriptObject
+    const { globals, requests } = bindScript({
+      world,
+      terrain,
+      sender,
+      residentId: r.id,
+      memory,
+      seen: seenOnce,
+      sees,
+      explored: () => true,
+      kinds,
+    })
+    run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
+    const kept = keepMemory(memory)
+    if (typeof kept !== 'string' && r.script === running) running.memory = kept
+  }
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Carrying the output): at most one resident of a workplace is
+ * away carrying its output at once, among those running the Work default as the game ships it
+ * (`counts`): an NPC city's, or a Player's who hasn't edited it.
+ */
+export function oneCarrierAtATime(
+  world: WorldState,
+  counts: (r: Resident) => boolean,
+): InvariantViolation[] {
+  const carriers = new Map<string, string[]>()
+  for (const r of world.residents) {
+    const s = r.script
+    const place = s?.memory.workplaceId
+    if (!s || typeof place !== 'string' || s.memory.carry == null || !counts(r)) continue
+    const ids = carriers.get(place) ?? []
+    ids.push(r.id)
+    carriers.set(place, ids)
+  }
+  return [...carriers]
+    .filter(([, ids]) => ids.length > 1)
+    .map(([place, ids]) => ({
+      invariant: 'one-carrier-at-a-time',
+      message: `${ids.length} residents carry ${place}'s output at once: ${ids.join(', ')}`,
+      entityIds: [place, ...ids],
+    }))
+}
+
+/** What a realm or an NPC city sees (`sightOf`), worked out once when first asked. */
+function seesOnce(world: WorldState, terrain: TerrainMap, side: string) {
+  let sight: ((at: { x: number; y: number }) => boolean) | undefined
+  return (at: { x: number; y: number }) => (sight ??= sightOf(world, terrain.size, side))(at)
 }

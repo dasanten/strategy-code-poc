@@ -1,5 +1,4 @@
 import {
-  commands,
   GOODS,
   MAP_SIZE,
   canWork,
@@ -23,8 +22,8 @@ import { robCaravan } from './caravans.js'
 import { buildingOrganization, carriageOrganization, commitCrime } from './crimes.js'
 import { collectsFrom } from './deliveries.js'
 import { collectsTransferFrom } from './transfers.js'
+import { orderedResident } from './order-sender.js'
 import type { OrderKind, OrderSender } from './orders.js'
-import { realmOf } from './starting-city.js'
 import { dropGoods } from './survival.js'
 
 /**
@@ -78,9 +77,8 @@ function readSpot(spot: unknown): GoodsSpot | undefined {
 /** Checks what pick-up and drop orders share; returns the resident or a reason to reject. */
 function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   const o = order as Partial<CarryRequest>
-  const realm = realmOf(world, sender.userId)
-  const r = world.residents.find((x) => x.id === o.residentId)
-  if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+  const r = orderedResident(world, sender, o.residentId)
+  if (!r) return 'not one of your residents'
   if (!canWork(r, world.tick)) return 'children can’t pick up or put down goods'
   const spot = readSpot(o.spot)
   if (!spot) return 'the spot must be the ground, a storage, a construction site or a carriage'

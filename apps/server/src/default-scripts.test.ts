@@ -352,7 +352,7 @@ describe('Work from the UI', () => {
     // They really worked: Food on the pile, or the next unit coming along.
     const food = pileAt(world, 3, 3)?.goods.food ?? 0
     expect(food + progress.at(-1)![0]).toBeGreaterThan(progress[0]![0])
-    expect(world.residents[0]!.script?.memory).toEqual({ workplaceId: 'farm' })
+    expect(world.residents[0]!.script?.memory).toEqual({ workplaceId: 'farm', at: { x: 3, y: 3 } })
   })
 })
 
@@ -427,6 +427,14 @@ describe('Haul and Tear down from the UI', () => {
 })
 
 describe('the step budget', () => {
+  /** Mara's residents all at work on the farm by Work. */
+  const working = (world: WorldState) => {
+    for (const r of world.residents.filter((x) => x.owner === 'r1')) {
+      r.order = { kind: 'workAt', buildingId: 'farm', at: { x: 3, y: 3 }, progress: 0 }
+      r.script = { scriptId: 1, memory: { workplaceId: 'farm' } }
+    }
+  }
+
   /** Steps a default script takes in one run for w1 of `farmWorld`, as it finds the world. */
   function steps(task: Task, { memory, prepare }: Case): number {
     const world = farmWorld()
@@ -475,8 +483,27 @@ describe('the step budget', () => {
             }
           },
         },
-        // Nowhere to work: the request is turned down.
+        // Away from the workplace: walking back.
         { memory: work, prepare: (world) => void (world.residents[0]!.x = 5) },
+        // A full pile: picking who carries it, and the nearest of many storages.
+        {
+          memory: work,
+          prepare: (world) => {
+            working(world)
+            world.piles.push({ id: 'p', x: 3, y: 3, goods: { food: 200 } })
+            for (let i = 0; i < 10; i++) {
+              world.buildings.push({ id: `s${i}`, kind: 'storage', cityId: 'c1', x: 5 + i, y: 8 })
+            }
+          },
+        },
+        // Carrying: storing the load at the storage.
+        {
+          memory: { ...work, carry: { storageId: 's1', goods: ['food'], step: 'store' } },
+          prepare: (world) => {
+            world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 3, y: 3 })
+            world.residents[0]!.carried = { food: 30 }
+          },
+        },
       ],
       haul: [
         // Starting the route, and on it.

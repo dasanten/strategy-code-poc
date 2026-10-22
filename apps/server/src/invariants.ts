@@ -83,6 +83,7 @@ import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
+import { oneCarrierAtATime } from './script-runner.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -1318,6 +1319,16 @@ export const tradeOrgSound: Invariant = {
   },
 }
 
+/**
+ * At most one resident of a workplace away carrying its output at once (`CONTEXT.md`: Carrying
+ * the output), among those running the game's own Work default: NPC cities' residents. A Player's
+ * residents running it unedited are checked where their scripts run (`ScriptRunner.runAll`).
+ */
+export const gameDefaultCarriers: Invariant = {
+  name: 'one-carrier-at-a-time',
+  check: (world) => oneCarrierAtATime(world, (r) => r.script?.scriptId === 0),
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -1386,6 +1397,7 @@ export const worldInvariants: Invariant[] = [
   buyOffOrdersDone,
   hqRingsSound,
   roadLineOrdersSound,
+  gameDefaultCarriers,
 ]
 
 export function checkInvariants(

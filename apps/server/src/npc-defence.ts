@@ -26,7 +26,7 @@ import {
 } from '@csp/shared'
 import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
-import { walkTo } from './npc-behaviour.js'
+import { stopWork, walkTo } from './npc-behaviour.js'
 import { startWork } from './work.js'
 
 /** What an NPC city's smithy makes for its soldiers: the cheapest weapon (`RECIPES`). */
@@ -155,7 +155,10 @@ function keepSoldiers(
 ): void {
   const adults = people.filter((r) => canWork(r, world.tick))
   const soldiers = adults.filter(isArmed)
-  for (const r of soldiers) if (r.order?.kind === 'workAt') r.order = null
+  for (const r of soldiers) {
+    if (r.order?.kind === 'workAt') stopWork(r)
+    else delete r.script
+  }
   if (soldiers.length >= target) return
   const unarmed = adults.filter((r) => !isArmed(r) && r.order?.kind !== 'attack')
   if (unarmed.length === 0) return
@@ -225,7 +228,10 @@ function fetch(storage: Building, unarmed: Resident[], goods: Stock): void {
   if (coming) return
   const sent =
     unarmed.find((r) => r.order === null) ?? unarmed.find((r) => r.order?.kind === 'workAt')
-  if (sent) walkTo(sent, storage)
+  if (sent) {
+    delete sent.script
+    walkTo(sent, storage)
+  }
 }
 
 /**

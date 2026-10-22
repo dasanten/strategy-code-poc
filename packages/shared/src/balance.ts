@@ -279,17 +279,11 @@ export const CITY_PRICE_BY_BUILDING: Partial<Record<BuildingKind, number>> = {
 export const NPC_FOOD_SHORT_DAYS = 5
 
 /**
- * An NPC city sends one of a workplace's workers to carry its output to the storage once this
- * many units of it lie in the pile on the workplace's tile: about what a resident carries, so a
- * trip is worth the walk.
+ * Units of Food a farm's pile keeps when a worker carries its output away (`CONTEXT.md`:
+ * Carrying the output), so the workers there can still refill at their workplace (Refilling at a
+ * workplace). Written into the Work default's source, where a Player can change it.
  */
-export const NPC_FETCH_UNITS = 15
-
-/**
- * Units of Food an NPC city's carrier leaves in a farm's pile, so the workers there can still
- * refill at their workplace (`CONTEXT.md`: Refilling at a workplace).
- */
-export const NPC_FOOD_LEFT_AT_WORK = 4
+export const WORK_FOOD_KEPT = 4
 
 /**
  * Share of an NPC city's adults it keeps as soldiers (`CONTEXT.md`: NPC city, Soldier), rounded
