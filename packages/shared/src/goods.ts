@@ -1,4 +1,4 @@
-import { GOOD_WEIGHT, carryCapacity, stockWeight } from './balance.js'
+import { GOOD_WEIGHT, OWN_FOOD, carryCapacity, stockWeight } from './balance.js'
 import { KEEPS_GOODS } from './building.js'
 import type { Building, Good, GoodsSpot, Pile, Resident, Stock, WorldState } from './world.js'
 
@@ -60,4 +60,12 @@ export function goodsAtSpot(
 export function unitsThatFit(resident: Resident, good: Good, tick: number): number {
   const room = carryCapacity(resident, tick) - stockWeight(resident.carried)
   return Math.max(0, Math.floor(room / GOOD_WEIGHT[good] + 1e-9))
+}
+
+/**
+ * How many of a carried good a resident puts away (stores, drops, loads, delivers) unless asked
+ * for an exact amount: all of it, but Food only beyond their own food (`CONTEXT.md`: Own food).
+ */
+export function putAwayUnits(good: Good, carried: number): number {
+  return good === 'food' ? Math.max(0, carried - OWN_FOOD) : carried
 }

@@ -4,7 +4,7 @@ import {
   NPC_FETCH_UNITS,
   NPC_FOOD_LEFT_AT_WORK,
   NPC_FOOD_SHORT_DAYS,
-  NPC_OWN_FOOD,
+  OWN_FOOD,
   RECIPES,
   WORK_OUTPUT_PER_DAY,
   canWork,
@@ -15,6 +15,7 @@ import {
   isArmed,
   pileAt,
   punishers,
+  putAwayUnits,
   storedFood,
   workProblem,
   workersOf,
@@ -88,7 +89,7 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * farms first until it has a food surplus; moves workers to its farms while Food runs short
  * (`NPC_FOOD_SHORT_DAYS`); sends a worker to carry a
  * workplace's output to the storage once `NPC_FETCH_UNITS` of it lie there; sends workers who
- * run low on food where there is none to refill from home, and has residents take `NPC_OWN_FOOD`
+ * run low on food where there is none to refill from home, and has residents take `OWN_FOOD`
  * from the storage before they set out; gives idle adults their part in the city's growth
  * (`cityGrowth`); and brings idle residents with nothing to do home. Its soldiers (armed adults)
  * are put to no work and no building (`stepNpcDefence`). Children are left alone:
@@ -129,9 +130,9 @@ function runCity(
       continue
     }
     const food = storage?.stock?.food ?? 0
-    if (storage && food > 0 && (r.carried.food ?? 0) < NPC_OWN_FOOD) {
+    if (storage && food > 0 && (r.carried.food ?? 0) < OWN_FOOD) {
       if (r.x === storage.x && r.y === storage.y) {
-        const units = Math.min(food, NPC_OWN_FOOD - (r.carried.food ?? 0))
+        const units = Math.min(food, OWN_FOOD - (r.carried.food ?? 0))
         const from = { kind: 'storage' as const, storageId: storage.id }
         r.order = { kind: 'pickUp', from, goods: { food: units } }
       } else walkTo(r, storage)
@@ -209,14 +210,14 @@ function moveToFarms(world: WorldState, places: Building[]): void {
 }
 
 /**
- * What a resident carries for the storage: the goods workplaces make, all but `NPC_OWN_FOOD` Food
+ * What a resident carries for the storage: the goods workplaces make, all but `OWN_FOOD` Food
  * to eat; none if nothing. Weapons and armour stay on them.
  */
 function haul(r: Resident): Stock | undefined {
   const load: Stock = {}
   for (const [good, units] of Object.entries(r.carried) as [Good, number][]) {
     if (WORK_OUTPUT_PER_DAY[good] === undefined) continue
-    const n = good === 'food' ? units - NPC_OWN_FOOD : units
+    const n = putAwayUnits(good, units)
     if (n > 0) load[good] = n
   }
   return Object.keys(load).length > 0 ? load : undefined
