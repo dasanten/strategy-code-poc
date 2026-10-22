@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#fff" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <title>smelter</title>
+  <path d="M5 21V9h14v12"/>
+  <path d="M9 21v-4a3 3 0 0 1 6 0v4"/>
+  <path d="M15 9V3h3v6"/>
+  <path d="M12 15c-1-1 0-2 0-3 1 1 2 2 0 3z" fill="currentColor"/>
+</svg>

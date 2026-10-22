@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#fff" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <title>stable</title>
+  <path d="M7 4v8a5 5 0 0 0 10 0V4"/>
+  <path d="M5 4h4M15 4h4"/>
+  <circle cx="7" cy="8" r=".6" fill="currentColor"/>
+  <circle cx="17" cy="8" r=".6" fill="currentColor"/>
+  <path d="M3 21h18"/>
+</svg>
