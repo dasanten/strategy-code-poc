@@ -13,7 +13,6 @@ import {
   type KnownNode,
   type Resident,
   type ResourceKind,
-  type TerrainChunk,
 } from '@csp/shared'
 import {
   CLOSE_SCALE,
@@ -30,6 +29,7 @@ import {
   type Size,
 } from './map/camera.js'
 import { ChunkStore } from './map/chunks.js'
+import { TerrainLayer } from './map/terrain-layer.js'
 import {
   holderAt,
   holderLabel,
@@ -41,7 +41,6 @@ import {
 import {
   NODE_COLORS,
   NODE_NAMES,
-  BUILDING_COLORS,
   CARAVAN_COLOR,
   CARRIAGE_COLOR,
   HORSE_COLOR,
@@ -50,6 +49,7 @@ import {
   OTHER_COLOR,
   OWN_COLOR,
   CITY_AREA_COLOR,
+  ROAD_COLOR,
   TERRAIN_COLORS,
   TERRAIN_NAMES,
   VOID_COLOR,
@@ -90,9 +90,10 @@ interface Hover {
 type MapMode = 'terrain' | 'region'
 
 /**
- * The world map (T1.5): explored terrain loaded in chunks as the view needs them, one small
- * texture per chunk (one pixel per tile), drawn only while on screen. Zoomed out it draws only
- * terrain; closer in it adds resource nodes and residents, and up close the tile grid.
+ * The world map (T1.5): explored terrain loaded in chunks as the view needs them, painted per
+ * chunk with its terrain marks (`map/terrain-layer.ts`) and drawn only while on screen. Zoomed out
+ * it draws only terrain; closer in it adds resource nodes and residents, and up close the tile
+ * grid.
  * Drag or swipe to pan; wheel, pinch or the buttons to zoom.
  */
 export function MapView({
@@ -185,9 +186,8 @@ export function MapView({
     const host = hostRef.current!
     const across = chunksAcross(mapSize)
     const app = new Application()
-    const sprites = new Map<number, Sprite>()
     const nodes: KnownNode[][] = []
-    const terrainLayer = new Container()
+    const terrainLayer = new TerrainLayer(mapSize, (i) => worldRef.current.exploredChunks.has(i))
     // The Region map: territory over the terrain, one small texture per chunk like the terrain.
     const regionSprites = new Map<number, Sprite>()
     const regionLayer = new Container()
@@ -207,18 +207,7 @@ export function MapView({
       () => worldRef.current.exploredChunks,
       across,
       (chunk) => {
-        const index = chunk.cy * across + chunk.cx
-        const old = sprites.get(index)
-        if (old) {
-          // Explored terrain grew: the same sprite gets the newer picture.
-          const stale = old.texture
-          old.texture = chunkTexture(chunk)
-          stale.destroy(true)
-        } else {
-          const sprite = new Sprite(chunkTexture(chunk))
-          terrainLayer.addChild(sprite)
-          sprites.set(index, sprite)
-        }
+        terrainLayer.set(chunk)
         nodes[chunk.cy * across + chunk.cx] = chunk.nodes
         onNodesLoadedRef.current?.((x, y) =>
           nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
@@ -275,7 +264,9 @@ export function MapView({
       const shown = new Set(onScreen)
       // Far out, territory always shows (ADR 0008: far tier).
       regionLayer.visible = modeRef.current === 'region' || zoomTier(cam.scale) === 'far'
-      for (const [i, sprite] of [...sprites, ...regionSprites]) {
+      // Terrain whose edges still wait to be redone asks for another frame.
+      if (terrainLayer.draw(cam, view, shown)) redraw()
+      for (const [i, sprite] of regionSprites) {
         sprite.visible = shown.has(i)
         if (!sprite.visible) continue
         sprite.position.set(
@@ -514,7 +505,7 @@ export function MapView({
       app.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
       app.renderer.on('resize', redraw)
       app.stage.addChild(
-        terrainLayer,
+        terrainLayer.container,
         regionLayer,
         under,
         tokens.container,
@@ -541,9 +532,8 @@ export function MapView({
       regionRef.current = () => {}
       controlsRef.current = null
       if (ready) {
-        for (const sprite of [...sprites.values(), ...regionSprites.values()]) {
-          sprite.texture.destroy(true)
-        }
+        terrainLayer.destroy()
+        for (const sprite of regionSprites.values()) sprite.texture.destroy(true)
         app.destroy(true, { children: true })
       }
       if (atlas) destroyAtlas(atlas)
@@ -765,22 +755,37 @@ function drawStructures(
     }
     under.fill({ color: CITY_AREA_COLOR, alpha: 0.18 })
   }
-  // Roads under the buildings, as a band through the middle of the tile joined to the roads next
-  // to it (`CONTEXT.md`: Road); a road site shows faintly.
+  // Roads under the buildings, as a wide light band through the middle of the tile joined to the
+  // roads next to it (`CONTEXT.md`: Road, ADR 0008); a road site, and the step onto it, are faint.
   const roads = new Map(
     buildings.filter((b) => b.kind === 'road').map((b) => [`${b.x},${b.y}`, b] as const),
   )
-  const joined = (x: number, y: number) => roads.has(`${(x + size) % size},${(y + size) % size}`)
-  for (const r of roads.values()) {
-    const [sx, sy] = tileToScreen(cam, view, size, r.x, r.y)
-    const w = tile * 0.36
-    const mid = (tile - w) / 2
-    under.rect(sx + mid, sy + mid, w, w)
-    if (joined(r.x - 1, r.y)) under.rect(sx, sy + mid, mid, w)
-    if (joined(r.x + 1, r.y)) under.rect(sx + mid + w, sy + mid, mid, w)
-    if (joined(r.x, r.y - 1)) under.rect(sx + mid, sy, w, mid)
-    if (joined(r.x, r.y + 1)) under.rect(sx + mid, sy + mid + w, w, mid)
-    under.fill({ color: BUILDING_COLORS.road, alpha: r.site ? 0.4 : 1 })
+  const roadAt = (x: number, y: number) => roads.get(`${(x + size) % size},${(y + size) % size}`)
+  const w = Math.max(3, tile * 0.36)
+  const inSight = ([sx, sy]: readonly number[]) =>
+    sx! > -tile && sy! > -tile && sx! < view.width + tile && sy! < view.height + tile
+  for (const site of [false, true]) {
+    const style = { color: ROAD_COLOR, alpha: site ? 0.4 : 1 }
+    for (const r of roads.values()) {
+      const c = centre(cam, view, size, r)
+      if (!!r.site === site && inSight(c)) under.circle(c[0], c[1], w / 2)
+    }
+    under.fill(style)
+    // Each join once, from the road to its right or below; faint if either end is a site.
+    for (const r of roads.values()) {
+      const [sx, sy] = centre(cam, view, size, r)
+      if (!inSight([sx, sy])) continue
+      for (const [dx, dy] of [
+        [1, 0],
+        [0, 1],
+      ] as const) {
+        const next = roadAt(r.x + dx, r.y + dy)
+        if (next && !!(r.site || next.site) === site) {
+          under.moveTo(sx, sy).lineTo(sx + dx * tile, sy + dy * tile)
+        }
+      }
+    }
+    under.stroke({ ...style, width: w })
   }
 
   const cityById = new Map(cities.map((c) => [c.id, c]))
@@ -880,7 +885,7 @@ function drawStructures(
 const centre = (cam: Camera, view: Size, size: number, e: { x: number; y: number }) =>
   tileToScreen(cam, view, size, e.x + 0.5, e.y + 0.5)
 
-/** A chunk's RGBA pixels as a texture, one pixel per tile, kept crisp like `chunkTexture`. */
+/** A chunk's RGBA pixels as a texture, one pixel per tile, scaled up crisp. */
 function pixelTexture(pixels: Uint8ClampedArray): Texture {
   const canvas = document.createElement('canvas')
   canvas.width = CHUNK_SIZE
@@ -888,26 +893,6 @@ function pixelTexture(pixels: Uint8ClampedArray): Texture {
   const image = new ImageData(CHUNK_SIZE, CHUNK_SIZE)
   image.data.set(pixels)
   canvas.getContext('2d')!.putImageData(image, 0, 0)
-  const texture = Texture.from(canvas)
-  texture.source.scaleMode = 'nearest'
-  return texture
-}
-
-/** One pixel per tile; scaled up with nearest-neighbour sampling, so tiles stay crisp. */
-function chunkTexture(chunk: TerrainChunk): Texture {
-  const canvas = document.createElement('canvas')
-  canvas.width = CHUNK_SIZE
-  canvas.height = CHUNK_SIZE
-  const ctx = canvas.getContext('2d')!
-  const image = ctx.createImageData(CHUNK_SIZE, CHUNK_SIZE)
-  chunk.tiles.forEach((t, i) => {
-    const c = TERRAIN_COLORS[t] ?? 0xff00ff
-    image.data[i * 4] = c >> 16
-    image.data[i * 4 + 1] = (c >> 8) & 0xff
-    image.data[i * 4 + 2] = c & 0xff
-    image.data[i * 4 + 3] = 255
-  })
-  ctx.putImageData(image, 0, 0)
   const texture = Texture.from(canvas)
   texture.source.scaleMode = 'nearest'
   return texture
