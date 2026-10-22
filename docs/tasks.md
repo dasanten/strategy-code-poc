@@ -44,9 +44,16 @@ its tickets or closes.
   (a rule decision or manual step only Daniel can do; never picked up automatically).
 - **Dependencies:** a ticket's "Depends on #n" line. A ticket is ready when all of them are
   closed.
+- **Branches (ADR 0009):** each epic has a branch `epic/<n>-<slug>`, cut from `main` when its
+  first ticket starts. Ticket branches come from the epic branch and their PRs target it. Bugs
+  branch from `main` and go straight back to it.
 - **PRs:** one per ticket; tickets that can't ship apart share one. The body says
-  `Closes #<ticket>` for each and `Part of #<epic>`; the PR closing an epic's last ticket closes
-  the epic. Daniel merges; each merge to `main` deploys.
+  `Closes #<ticket>` for each and `Part of #<epic>`. Ticket PRs get no CI: the ticket session runs
+  `pnpm lint`, `pnpm typecheck` and `pnpm test`, and before merging into the epic branch the
+  coordinating session runs them again on the PR merged with the epic branch. Merging into a
+  non-default branch doesn't close the ticket, so whoever merges closes its tickets by hand.
+- **Epic PR:** when an epic's last ticket is on its branch, one PR `epic/<n>-…` → `main` with
+  `Closes #<epic>` runs CI and is merged once green; each merge to `main` deploys.
 - **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in
   `CONTEXT.md`. Balance numbers are picked in `packages/shared/src/balance.ts` and listed in the
   PR for review.

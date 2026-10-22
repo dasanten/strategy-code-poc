@@ -5,8 +5,9 @@
 - **Decisions:** `docs/adr/`. The game vision in `CONTEXT.md` wins over ADR 0001 where they
   conflict.
 - **What to do next:** GitHub tickets, how they work in `docs/tasks.md`. `/next-ticket` picks the
-  next one and works it into a PR. PRs reference their tickets (`Closes #n`, `Part of #epic`);
-  Daniel merges.
+  next one and works it into a PR. PRs reference their tickets (`Closes #n`, `Part of #epic`).
+- **CI minutes are scarce** (ADR 0009): ticket PRs go into the epic branch `epic/<n>-<slug>` and
+  are checked locally; only one PR per epic (and bug fixes) goes into `main` and runs CI.
 - **Balance numbers** live in `packages/shared/src/balance.ts`; pick sensible values and list them
   in the PR. Rules (what happens) are Daniel's call.
 - **Keep scripting cheap to add** (ADR 0002): everything goes through the game API in
