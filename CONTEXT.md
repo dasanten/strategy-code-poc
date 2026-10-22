@@ -445,12 +445,13 @@ The shared language of the game. Domain terms only — no implementation details
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
-  its own in NPC cities). Each pair has at most one child per game year. The only way, besides
-  integrating, that residents come into being. Once a game year has passed since they paired or
-  last had a child, and their city has free housing and a food surplus, one partner, chosen at
-  random, starts **Carrying** the child; the other keeps working as before.
+  its own in NPC cities). Each pair has one child at most, so at most one per game year. The only
+  way, besides integrating, that residents come into being. Once a game year has passed since
+  they paired, and their city has free housing and a food surplus, one partner, chosen at random,
+  starts **Carrying** the child; the other keeps working as before.
 - **Carrying:** a partner carrying a child can't work for 60 game days (24 real hours); then the
-  child is born.
+  child is born and the pair ends. For another child the Player pairs them again (NPC cities do
+  it on their own).
 - **Child:** a resident born to a pair. Each base stat is the parents' average plus a small
   random amount. Born where a parent stands, into their city and realm. Grows up for a while
   before it can work: until grown, a child can walk and eats what they take at home (Refilling at
