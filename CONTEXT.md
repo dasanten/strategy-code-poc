@@ -15,9 +15,9 @@ The shared language of the game. Domain terms only — no implementation details
   An unloaded resident walking once around it on flat land takes about **12 real hours**.
 - **Game time:** 1 game day = 1 real hour; 1 game week = 7 game days; 1 game year = 1 real day. Crossing the map takes about
   12 game days.
-- **Tile:** one cell of the map, about 40 m across, with one terrain type. An unloaded resident
-  walks one plains tile in about 30 seconds, so the map is 1,440 × 1,440 tiles. A building fills
-  one tile. Every tile exists; two places are at most 720 tiles apart along each direction.
+- **Tile:** one cell of the map, about 10 m across, with one terrain type. An unloaded resident
+  walks one plains tile in about 7.5 seconds, so the map is 5,760 × 5,760 tiles. Every tile
+  exists; two places are at most 2,880 tiles apart along each direction.
 - **Terrain:** what a tile is made of. It sets how fast residents move across it and how much
   food they burn there (relative to plains). Agility softens the speed penalty, Endurance the
   food penalty.
@@ -62,6 +62,11 @@ The shared language of the game. Domain terms only — no implementation details
     Coins, at fixed conversion rates. Anyone can build either. They have no storage: the ore
     they use is what their workers carry, then what lies in the pile on their tile; without it
     the workers stand idle. Both teach Smelting.
+- **Carrying the output:** working a workplace includes getting its output home. Once the
+  workplace's pile holds a full load, one of the residents working there, picked at random,
+  takes a load (beside their own food; a farm keeps some Food for refills) to the nearest storage
+  of their realm, stores it and comes back to work; only one carries at a time. With no storage
+  in reach the pile just grows.
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
 - **Spoilage:** Food slowly goes bad. Other goods don't.
@@ -77,13 +82,28 @@ The shared language of the game. Domain terms only — no implementation details
   Construction skill, which also covers tearing down. Materials delivered to a site are goods like any others and can be taken.
   A resident has to be on the tile to lay out a site. Like a workplace, a site has no owner:
   whoever works on it holds it, and an unattended site can be finished by anyone.
+- **Fetching materials:** building a site includes getting its materials there. While the site
+  still lacks some, one of the residents building it, picked at random, fetches a load of what is
+  missing from the nearest storage of their realm that holds it, delivers it to the site and goes
+  back to work; only one fetches at a time. With no storage holding them, they just build.
 - **Tearing down:** anyone with residents on the tile can tear down a building or construction
   site. It takes work, less than building; part of a building's materials (all of an unfinished
   site's) are left on the tile as goods, and the tile is free again.
-- **Where buildings go:** one building per tile, on passable terrain only. Mines, quarries and
-  lumber camps go on a resource node of their kind; farms and stables on Plains; everything else
-  on any passable terrain except Mountain. Only a node's workplace goes on a node. Anyone can build anywhere else, including in another
-  Organization's territory.
+- **Footprint:** the square of tiles a building or construction site covers, the same for every
+  building of a kind: Wall, Gate and Road 1×1; House, Storage, Smelter, Mint, Smithy, Mine,
+  Quarry and Lumber camp 2×2; Town hall, Warehouse and Stable 3×3; Farm 4×4. A site covers its
+  building's footprint from the moment it is laid out. Footprints are never turned.
+- **Where buildings go:** one building per tile: every tile of a footprint must be free and
+  passable. Mines, quarries and lumber camps go with one tile of their footprint on a resource
+  node of their kind; farms and stables wholly on Plains; everything else on any passable terrain
+  except Mountain. Only a node's workplace covers a node. Anyone can build anywhere else,
+  including in another Organization's territory.
+- **At a building:** standing on any tile of its footprint. Wherever a rule says "on a
+  building's tile", it means at the building. Laying out a site takes a resident on one tile of
+  the footprint it will cover.
+- **A building's pile:** goods lying anywhere on a building's footprint are one pile, reached by
+  anyone at the building: a workplace's output, a site's delivered materials, what a smelter
+  uses. Elsewhere a pile is the goods on one tile.
 
 ## Trade Organization
 
@@ -233,14 +253,15 @@ The shared language of the game. Domain terms only — no implementation details
 - **At home:** a resident standing in the area of a city of their own realm; for a resident of an
   NPC city, in the area of that city.
 - **NPC city:** a city run by the game. Self-managed cities are NPC cities. On its own it works
-  its farms and workplaces and carries the output to its storage (its workers take food from
+  its farms and workplaces and carries the output to its storage like anyone working a workplace
+  (Carrying the output, to the nearest storage of that city; its workers take food from
   the storage before they set out and come home for more when they run low), pairs its adults,
   builds a house when it has a food surplus and no free housing, and puts more residents on farms (or
   builds a farm, when every farm is full) when Food runs short. When it needs a material it has no
   workplace for (Wood for walls and houses), it builds the matching workplace on the nearest
   fitting resource node and works it like its other workplaces, carrying the output to its
   storage. It never founds new cities: when it has no room left inside its wall it grows its area
-  by building on the edge, puts up a new wall 2 tiles further out on every side, with the gate in
+  by building on the edge, puts up a new wall 8 tiles further out on every side, with the gate in
   the same place, and only once every tile of the new wall is finished tears down the old one.
   Its residents stand on its walls and pass its gates as a realm's do. It keeps some soldiers by
   its size, arms them from its smithy or by buying, fights attackers in its area and closes its
@@ -435,6 +456,9 @@ The shared language of the game. Domain terms only — no implementation details
   after about 2 game days. While the meter isn't empty, lost health slowly comes back.
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
+- **Own food:** the Food a resident keeps on them for their own meals, about two game days of
+  eating. Putting goods away (storing, dropping, loading, delivering) leaves it in their hands
+  unless the Player asks for an exact amount; NPC residents always keep it.
 - **Refilling at home:** a resident in their own city's area who is running low on food takes a
   meal from the city's storage into their hands, without an order.
 - **Refilling at a workplace:** a resident working at a workplace who is running low on food
@@ -488,7 +512,9 @@ The shared language of the game. Domain terms only — no implementation details
 ## Control
 
 - **Order:** an instruction a player gives through the UI (e.g. "work this mine"). It requests
-  the same actions a script could.
+  the same actions a script could. A one-off step (walk there, pick up, attack) is a single
+  action; a **task** that repeats or decides (work, build, haul, tear down) runs its default
+  script.
 - **Script:** a program in the game's own language that requests actions automatically, every
   tick. A Player keeps a library of named scripts, with their history, also across Leader deaths.
   **Running a script** is an order for a resident or an army: the script runs once a tick for
@@ -498,11 +524,22 @@ The shared language of the game. Domain terms only — no implementation details
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again.
+- **Default script:** the script behind a task the UI can give (working a workplace, building,
+  hauling, …). The game ships one per task; giving a resident that task from the UI runs it.
+  Each Player has their own version of every default script in their library, one per task,
+  for all their residents doing that task; editing it changes how they all do it, with history
+  like any script. **Resetting** it makes the game's current default its newest version again.
+  Until the Player edits it, their version follows the game's default as the game improves it;
+  once edited it stays theirs, and they are told when the game's default has changed since.
+  Default scripts can't be renamed or deleted. NPC cities always run the game's defaults.
 - **Memory:** the small store a running script or order keeps between ticks. Roles are just
-  something a script keeps there.
+  something a script keeps there. A script can read, never change, the memory of its own
+  Player's residents and armies, so residents doing the same task can agree on who does what;
+  other Players' memory stays hidden.
 - **Step budget:** how much work a script may do each tick, for each resident or army and for a
   whole realm. Out of budget, the script stops for that tick; what it already requested still
-  counts. A script sees only what its Player sees: their sight and explored terrain.
+  counts. Default scripts count like any other. NPC cities have no realm budget, only the one
+  for each resident. A script sees only what its Player sees: their sight and explored terrain.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

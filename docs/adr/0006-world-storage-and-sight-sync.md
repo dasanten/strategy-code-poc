@@ -4,8 +4,9 @@ Status: decided (2026-10-18, with Daniel). Replaces the storage and map parts of
 
 ## Decisions
 
-- **Scale:** a tile is about 40 m and takes an unloaded resident ~30 s on plains, so the map is
-  1,440 × 1,440 tiles (~2.1 million tiles), joined at opposite sides (a torus; `CONTEXT.md`: Map).
+- **Scale:** a tile is about 10 m and takes an unloaded resident ~7.5 s on plains, so the map is
+  5,760 × 5,760 tiles (~33 million tiles), joined at opposite sides (a torus; `CONTEXT.md`: Map).
+  (Until 2026-10-22 a tile was 40 m and the map 1,440 across; see the second reset below.)
 - **Terrain** is generated once from the seed when a world is created and stored as a binary blob
   (one byte per tile) in SQLite. The server keeps it in memory; roads change it in place. Later
   changes to the generator never reshape an existing world.
@@ -43,3 +44,13 @@ The map changed from a disc to a torus before anyone played for real. Daniel cho
 world once instead of migrating it: terrain, world saves and explored terrain were deleted, while
 accounts, sessions, invite codes and scripts were kept, and every Player got a new starting city
 on their next login. From then on the rule above holds again: no resets, migrations only.
+
+## Exception: the second reset (2026-10-22)
+
+Walking looked boringly slow: a resident took 30 s to cross one tile. Daniel chose a 4× finer
+grid (10 m tiles, 7.5 s each, 5,760 tiles across) with buildings covering several tiles
+(`CONTEXT.md`: Footprint), so real distances and travel times stay as they were. Migrating every
+position, building and distance before anyone played for real was not worth it, so the world was
+reset the same way as the first time: terrain, world saves and explored terrain deleted;
+accounts, sessions, invite codes and scripts kept; a new starting city for every Player on their
+next login. From then on the rule above holds again.
