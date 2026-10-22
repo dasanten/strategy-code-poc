@@ -9,6 +9,7 @@ import {
   type RealmLabel,
   type SeenResident,
 } from '@csp/shared'
+import { relationshipClass } from './theme.js'
 
 /**
  * The Player's alliance (`CONTEXT.md`: Alliance, Alliance leader): found one or answer
@@ -112,7 +113,10 @@ export function AlliancePanel({
       </div>
       <ul className="alliance-list">
         {alliance.members.map((m) => (
-          <li key={m.realmId}>
+          <li
+            key={m.realmId}
+            className={relationshipClass(m.realmId === realmId ? 'own' : 'alliance')}
+          >
             <span>
               {m.realmId === realmId ? 'Your realm' : labelOf(m)}
               {m.realmId === alliance.leaderId && <span className="badge">leader</span>}

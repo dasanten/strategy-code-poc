@@ -136,120 +136,138 @@ export function ScriptLibrary({
   const unsaved = script ? hasUnsavedChanges(script.versions, draft) : true
 
   return (
-    <section className="editor-panel script-library" aria-label="Scripts">
-      <div className="panel-head">
-        <h2>Scripts</h2>
-        <select
-          aria-label="Open a script"
-          value={script?.id ?? ''}
-          onChange={(e) => (e.target.value ? open(Number(e.target.value)) : startNew())}
-        >
-          <option value="">New script…</option>
+    <section className="script-library" aria-label="Scripts">
+      <nav className="script-list" aria-label="Script library">
+        <h3>Library</h3>
+        <ul>
+          <li>
+            <button
+              type="button"
+              className={script ? '' : 'on'}
+              aria-current={!script || undefined}
+              onClick={startNew}
+            >
+              + New script
+            </button>
+          </li>
           {scripts.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-              {s.activeVersion === null ? ' (none active)' : ''}
-            </option>
+            <li key={s.id}>
+              <button
+                type="button"
+                className={script?.id === s.id ? 'on' : ''}
+                aria-current={script?.id === s.id || undefined}
+                onClick={() => open(s.id)}
+              >
+                <span>{s.name}</span>
+                <small>{s.activeVersion === null ? 'none active' : `v${s.activeVersion}`}</small>
+              </button>
+            </li>
           ))}
-        </select>
-      </div>
+        </ul>
 
-      {script ? (
-        <div className="script-head">
-          {rename === undefined ? (
-            <>
-              <strong>{script.name}</strong>
-              <span>
-                {script.activeVersion === null
-                  ? 'no active version'
-                  : `version ${script.activeVersion} active`}
-              </span>
-              <span className="spacer" />
-              <button type="button" onClick={() => setRename(script.name)}>
-                Rename
-              </button>
-              <button type="button" onClick={remove}>
-                Delete
-              </button>
-            </>
-          ) : (
-            <form onSubmit={submitRename}>
-              <input
-                aria-label="New name"
-                value={rename}
-                maxLength={SCRIPT_NAME_MAX_LENGTH}
-                onChange={(e) => setRename(e.target.value)}
-              />
-              <button type="submit">Rename</button>
-              <button type="button" onClick={() => setRename(undefined)}>
-                Cancel
-              </button>
-            </form>
+        {script && script.versions.length > 0 && (
+          <>
+            <h3>History</h3>
+            <ul className="script-history">
+              {[...script.versions].reverse().map((v) => {
+                const status = versionStatus(script, v)
+                return (
+                  <li key={v.version} className={status.replace(' ', '-')}>
+                    <span>
+                      <strong>v{v.version}</strong>
+                      <em title={v.errors.map(describeDiagnostic).join('\n') || undefined}>
+                        {status}
+                      </em>
+                      <time dateTime={new Date(v.savedAt * 1000).toISOString()}>
+                        {new Date(v.savedAt * 1000).toLocaleString()}
+                      </time>
+                    </span>
+                    <span className="script-history-actions">
+                      <button type="button" onClick={() => show(script, v)}>
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => makeActive(v.version)}
+                        disabled={!canMakeActive(script, v)}
+                      >
+                        Make active
+                      </button>
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </>
+        )}
+      </nav>
+
+      <div className="script-main">
+        {script ? (
+          <div className="script-head">
+            {rename === undefined ? (
+              <>
+                <strong>{script.name}</strong>
+                <span>
+                  {script.activeVersion === null
+                    ? 'no active version'
+                    : `version ${script.activeVersion} active`}
+                </span>
+                <span className="spacer" />
+                <button type="button" onClick={() => setRename(script.name)}>
+                  Rename
+                </button>
+                <button type="button" onClick={remove}>
+                  Delete
+                </button>
+              </>
+            ) : (
+              <form onSubmit={submitRename}>
+                <input
+                  aria-label="New name"
+                  value={rename}
+                  maxLength={SCRIPT_NAME_MAX_LENGTH}
+                  onChange={(e) => setRename(e.target.value)}
+                />
+                <button type="submit">Rename</button>
+                <button type="button" onClick={() => setRename(undefined)}>
+                  Cancel
+                </button>
+              </form>
+            )}
+          </div>
+        ) : (
+          <form className="script-head" onSubmit={create}>
+            <input
+              aria-label="Script name"
+              placeholder="Name"
+              value={newName}
+              maxLength={SCRIPT_NAME_MAX_LENGTH}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+            <button type="submit" className="primary" disabled={newName.trim() === ''}>
+              Create
+            </button>
+          </form>
+        )}
+
+        <ScriptEditor key={opened.key} initialSource={opened.source} onChange={setDraft} />
+        <div className="script-foot">
+          <p className={`diagnostics${errors.length > 0 ? ' has-errors' : ''}`}>
+            {errors.length === 0
+              ? 'No syntax errors.'
+              : errors.map(describeDiagnostic).join('\n') +
+                '\nA version with syntax errors is kept but never runs.'}
+          </p>
+          {script && (
+            <button type="button" className="primary" onClick={save} disabled={!unsaved}>
+              {unsaved ? `Save as version ${script.latestVersion + 1}` : 'Saved'}
+            </button>
           )}
         </div>
-      ) : (
-        <form className="script-head" onSubmit={create}>
-          <input
-            aria-label="Script name"
-            placeholder="Name"
-            value={newName}
-            maxLength={SCRIPT_NAME_MAX_LENGTH}
-            onChange={(e) => setNewName(e.target.value)}
-          />
-          <button type="submit" className="primary" disabled={newName.trim() === ''}>
-            Create
-          </button>
-        </form>
-      )}
-
-      <ScriptEditor key={opened.key} initialSource={opened.source} onChange={setDraft} />
-      <p className="diagnostics">
-        {errors.length === 0
-          ? 'No syntax errors.'
-          : errors.map(describeDiagnostic).join('\n') +
-            '\nA version with syntax errors is kept but never runs.'}
-      </p>
-      {script && (
-        <button type="button" className="primary" onClick={save} disabled={!unsaved}>
-          {unsaved ? `Save as version ${script.latestVersion + 1}` : 'Saved'}
-        </button>
-      )}
-      {message && <p className="script-message">{message}</p>}
-      {error && <p className="error">{error}</p>}
-
-      {script && script.versions.length > 0 && (
-        <>
-          <h3>History</h3>
-          <ul className="script-history">
-            {[...script.versions].reverse().map((v) => {
-              const status = versionStatus(script, v)
-              return (
-                <li key={v.version} className={status.replace(' ', '-')}>
-                  <span>
-                    <strong>v{v.version}</strong>
-                    <time dateTime={new Date(v.savedAt * 1000).toISOString()}>
-                      {new Date(v.savedAt * 1000).toLocaleString()}
-                    </time>
-                    <em title={v.errors.map(describeDiagnostic).join('\n') || undefined}>
-                      {status}
-                    </em>
-                  </span>
-                  <button type="button" onClick={() => show(script, v)}>
-                    Open
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => makeActive(v.version)}
-                    disabled={!canMakeActive(script, v)}
-                  >
-                    Make active
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </>
-      )}
+        {message && <p className="script-message">{message}</p>}
+        {error && <p className="error">{error}</p>}
+      </div>
     </section>
   )
 }

@@ -7,6 +7,7 @@ import {
   type ScriptSummary,
 } from '@csp/shared'
 import { RunScript } from './Residents.js'
+import { relationshipClass } from './theme.js'
 
 /** An army order that needs a tile, picked on the map. */
 export type ArmyPick = { armyId: string; kind: 'armyWalkTo' | 'armyGuard' }
@@ -101,7 +102,7 @@ export function ArmiesPanel({
             const choices = inSight.filter((r) => !a.memberIds.includes(r.id))
             const enemy = inSight.find((r) => r.id === targetId)?.owner !== realmId
             return (
-              <li key={a.id} className="army">
+              <li key={a.id} className={`army ${relationshipClass('own')}`}>
                 <span>
                   <strong>{a.name}</strong> · {armyDoing(a, names)}
                   <br />

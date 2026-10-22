@@ -6,6 +6,7 @@ import { EditorView } from '@codemirror/view'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { checkScript } from '@csp/lang'
 import { diagnosticRange, scriptHighlighting } from './script-editor.js'
+import { THEME } from './theme.js'
 
 const language = StreamLanguage.define(scriptHighlighting)
 
@@ -20,6 +21,16 @@ const syntaxErrors = linter(
     }))
   },
   { delay: 300 },
+)
+
+/** One Dark's colours on the HUD's well, filling the height it is given (ADR 0008). */
+const hudLook = EditorView.theme(
+  {
+    '&': { height: '100%', backgroundColor: THEME.ui.well },
+    '.cm-gutters': { backgroundColor: THEME.ui.well, borderRight: `1px solid ${THEME.ui.line}` },
+    '.cm-scroller': { fontFamily: THEME.font.mono, fontSize: '13px', lineHeight: '1.55' },
+  },
+  { dark: true },
 )
 
 /**
@@ -43,6 +54,8 @@ export function ScriptEditor({
       parent: hostRef.current!,
       extensions: [
         basicSetup,
+        // Before One Dark, so its colours give way to the HUD's.
+        hudLook,
         oneDark,
         language,
         syntaxErrors,

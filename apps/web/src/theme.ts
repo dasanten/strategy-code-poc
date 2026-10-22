@@ -78,3 +78,8 @@ export function cssVariables(theme = THEME): Record<string, string> {
 export function applyTheme(style: Pick<CSSStyleDeclaration, 'setProperty'>) {
   for (const [name, value] of Object.entries(cssVariables())) style.setProperty(name, value)
 }
+
+/** The class that colours a HUD row or mark by who it belongs to: `rel-own`, `rel-other-realm`… */
+export function relationshipClass(rel: Relationship): string {
+  return `rel-${kebab(rel)}`
+}

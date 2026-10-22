@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#fff" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <title>city emblem</title>
+  <path d="M3 21V8h3v2h2V8h3v13M13 21V8h3v2h2V8h3v13"/>
+  <path d="M8 4h8v6"/>
+  <path d="M8 4v6"/>
+  <path d="M10 21v-4a2 2 0 0 1 4 0v4"/>
+  <path d="M2 21h20"/>
+</svg>

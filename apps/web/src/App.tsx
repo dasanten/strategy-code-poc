@@ -73,6 +73,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
+  // The city picked on the map or opened in the Cities drawer.
+  const [openCityId, setOpenCityId] = useState<string>()
 
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
@@ -191,6 +193,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setArmyPick(undefined)
               setOrderError(undefined)
             }}
+            selectedCityId={openCityId}
+            onSelectCity={(id) => {
+              setOpenCityId(id)
+              setOpenDrawer('cities')
+            }}
             picking={picking !== false || armyPick !== undefined}
             onPickTile={goTo}
             onNodesLoaded={onNodesLoaded}
@@ -308,6 +315,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOrderError(await sendOrder({ kind: 'transfer', ...transfer }))
             }
             directives={world.diplomacy.directives}
+            openId={openCityId}
+            onOpen={setOpenCityId}
             onBuyOff={async (residentId, directiveId, carriageId) =>
               setOrderError(
                 await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
