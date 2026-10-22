@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Terrain } from '@csp/shared'
 import { RELATIONSHIP_COLORS, TERRAIN_COLORS, VOID_COLOR } from './map/palette.js'
-import { THEME, applyTheme, cssVariables, hex } from './theme.js'
+import { THEME, applyTheme, cssVariables, hex, relationshipClass } from './theme.js'
 
 describe('theme', () => {
   it('turns #rrggbb into a Pixi colour and refuses anything else', () => {
@@ -30,5 +30,11 @@ describe('theme', () => {
     applyTheme({ setProperty: (name: string, value: string | null) => set.set(name, value!) })
     expect(set.get('--font-ui')).toContain('Inter')
     expect(set.get('--ui-panel')).toBe(THEME.ui.panel)
+  })
+
+  it('names a relationship class after its CSS variable', () => {
+    expect(relationshipClass('own')).toBe('rel-own')
+    expect(relationshipClass('otherRealm')).toBe('rel-other-realm')
+    expect(cssVariables()[`--${relationshipClass('tradeOrg')}`]).toBe(THEME.relationship.tradeOrg)
   })
 })

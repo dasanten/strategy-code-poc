@@ -1,6 +1,11 @@
 import { TRADE_ORG, TRADE_ORG_NAME } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { formatStanding, standingName, standingWord } from './standing-view.js'
+import {
+  formatStanding,
+  standingName,
+  standingRelationship,
+  standingWord,
+} from './standing-view.js'
 
 describe('standing in the UI', () => {
   it('puts a standing in words', () => {
@@ -27,5 +32,12 @@ describe('standing in the UI', () => {
     expect(standingName({ ...view, org: TRADE_ORG, name: TRADE_ORG_NAME, is: 'tradeOrg' })).toBe(
       TRADE_ORG_NAME,
     )
+  })
+
+  it('colours realms, NPC cities and the Trade Organization each their own way', () => {
+    const view = { theirs: 0, yours: 0, org: 'x', name: 'X' }
+    expect(standingRelationship({ ...view, is: 'realm' })).toBe('otherRealm')
+    expect(standingRelationship({ ...view, is: 'city' })).toBe('npcCity')
+    expect(standingRelationship({ ...view, is: 'tradeOrg' })).toBe('tradeOrg')
   })
 })
