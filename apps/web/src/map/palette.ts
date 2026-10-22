@@ -1,6 +1,9 @@
 import { Terrain, UNEXPLORED, type BuildingKind, type ResourceKind } from '@csp/shared'
 import { THEME, hex, type Relationship } from '../theme.js'
 
+/** Roads, wide and light over the terrain (ADR 0008). */
+export const ROAD_COLOR = hex(THEME.terrain.road)
+
 /** Terrain colours from the theme (ADR 0008), as 0xRRGGBB. */
 export const TERRAIN_COLORS: Record<number, number> = {
   [Terrain.Plains]: hex(THEME.terrain.plains),
@@ -10,9 +13,13 @@ export const TERRAIN_COLORS: Record<number, number> = {
   [Terrain.Lake]: hex(THEME.terrain.lake),
   [Terrain.Sea]: hex(THEME.terrain.sea),
   /** Never in a chunk: roads are drawn over the terrain, in this colour. */
-  [Terrain.Road]: hex(THEME.terrain.road),
+  [Terrain.Road]: ROAD_COLOR,
   [UNEXPLORED]: hex(THEME.terrain.unexplored),
 }
+
+/** The small dark marks on the terrain (trees, hill arcs, peaks, waves, tufts), and how strong. */
+export const TERRAIN_MARK_COLOR = 0x1f3d17
+export const TERRAIN_MARK_ALPHA = 0.5
 
 /** Map background, behind terrain not loaded yet. */
 export const VOID_COLOR = hex(THEME.terrain.void)
@@ -69,7 +76,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   smelter: 0x9a4a2f,
   mint: 0xc9a227,
   smithy: 0x4a4e57,
-  road: hex(THEME.terrain.road),
+  road: ROAD_COLOR,
 }
 
 export const BUILDING_NAMES: Record<BuildingKind, string> = {
