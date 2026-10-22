@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#fff" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <title>townHall</title>
+  <path d="M4 21V10l8-5 8 5v11"/>
+  <path d="M9 21v-5h6v5"/>
+  <path d="M12 5V1.5l4 1.5-4 1.5"/>
+  <path d="M3 21h18"/>
+</svg>

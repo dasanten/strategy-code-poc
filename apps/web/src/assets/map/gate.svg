@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#fff" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <title>gate</title>
+  <path d="M3 21V6h4v2h3V6h4v2h3V6h4v15"/>
+  <path d="M8 21v-6a4 4 0 0 1 8 0v6"/>
+</svg>
