@@ -1,20 +1,26 @@
 import { Terrain, UNEXPLORED, type BuildingKind, type ResourceKind } from '@csp/shared'
+import { THEME, hex, type Relationship } from '../theme.js'
 
-/** Terrain colours from the Main Game Screen design, as 0xRRGGBB. */
+/** Terrain colours from the theme (ADR 0008), as 0xRRGGBB. */
 export const TERRAIN_COLORS: Record<number, number> = {
-  [Terrain.Plains]: 0x7e9a52,
-  [Terrain.Forest]: 0x3f5e36,
-  [Terrain.Hills]: 0x9c8a5e,
-  [Terrain.Mountain]: 0x6f6a66,
-  [Terrain.Lake]: 0x3a6a8a,
-  [Terrain.Sea]: 0x2a4b66,
+  [Terrain.Plains]: hex(THEME.terrain.plains),
+  [Terrain.Forest]: hex(THEME.terrain.forest),
+  [Terrain.Hills]: hex(THEME.terrain.hills),
+  [Terrain.Mountain]: hex(THEME.terrain.mountain),
+  [Terrain.Lake]: hex(THEME.terrain.lake),
+  [Terrain.Sea]: hex(THEME.terrain.sea),
   /** Never in a chunk: roads are drawn over the terrain, in this colour. */
-  [Terrain.Road]: 0xcdb98c,
-  [UNEXPLORED]: 0x1a1e22,
+  [Terrain.Road]: hex(THEME.terrain.road),
+  [UNEXPLORED]: hex(THEME.terrain.unexplored),
 }
 
 /** Map background, behind terrain not loaded yet. */
-export const VOID_COLOR = 0x0b0d0f
+export const VOID_COLOR = hex(THEME.terrain.void)
+
+/** Who a token belongs to, seen from the Player (ADR 0008), as 0xRRGGBB. */
+export const RELATIONSHIP_COLORS = Object.fromEntries(
+  Object.entries(THEME.relationship).map(([k, v]) => [k, hex(v)]),
+) as Record<Relationship, number>
 
 export const TERRAIN_NAMES: Record<number, string> = {
   [Terrain.Plains]: 'Plains',
@@ -42,9 +48,9 @@ export const NODE_NAMES: Record<ResourceKind, string> = {
 }
 
 /** Residents: your Leader, your other residents, everyone else. */
-export const LEADER_COLOR = 0xe8a33d
+export const LEADER_COLOR = RELATIONSHIP_COLORS.own
 export const OWN_COLOR = 0xf2eee3
-export const OTHER_COLOR = 0xe0524a
+export const OTHER_COLOR = RELATIONSHIP_COLORS.otherRealm
 
 /** City walls and buildings, from the design. */
 export const WALL_COLOR = 0x8a5a2b
@@ -65,7 +71,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   smelter: 0x9a4a2f,
   mint: 0xc9a227,
   smithy: 0x4a4e57,
-  road: 0xcdb98c,
+  road: hex(THEME.terrain.road),
 }
 
 export const BUILDING_NAMES: Record<BuildingKind, string> = {
@@ -88,7 +94,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
 export const HORSE_COLOR = 0x6b4f2e
 export const CARRIAGE_COLOR = 0xb79a6e
 /** A Trade Org caravan's carriage and crew (`CONTEXT.md`: Caravan). */
-export const CARAVAN_COLOR = 0x3fb4c9
+export const CARAVAN_COLOR = RELATIONSHIP_COLORS.tradeOrg
 /** Goods lying on the ground. */
 export const PILE_COLOR = 0xd9c27a
 
