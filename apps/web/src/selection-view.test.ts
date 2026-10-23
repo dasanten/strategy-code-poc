@@ -387,8 +387,10 @@ describe('horses on the tile card', () => {
   })
   /** As sight sends a stranger's horse: without its hunger and health. */
   const unknown = (h: Partial<Horse>): SeenHorse => {
-    const { hunger: _h, health: _x, ...rest } = horse(h)
-    return rest
+    const seen: SeenHorse = horse(h)
+    delete seen.hunger
+    delete seen.health
+    return seen
   }
   const horseLine = (lines: string[]) => lines.find((l) => l.startsWith('Horse:'))
 
