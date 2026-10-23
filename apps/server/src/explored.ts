@@ -1,9 +1,11 @@
 import { sql } from 'drizzle-orm'
 import {
   CHUNK_SIZE,
+  OVERVIEW_SCALE,
   UNEXPLORED,
   chunksAcross,
   encodeChunk,
+  overviewAcross,
   tileIndex,
   type ResourceNode,
   type TerrainMap,
@@ -103,6 +105,33 @@ export class ExploredTerrain {
    * (they stay known like the terrain). Undefined when they have explored nothing in it.
    */
   chunk(viewer: Viewer, cx: number, cy: number): Uint8Array | undefined {
+    return this.encode(cx, cy, (x, y) => this.isExplored(viewer, x, y))
+  }
+
+  /**
+   * One chunk of terrain as it is, for admins only (`CONTEXT.md`: admin map): every tile and every
+   * resource node, explored or not. Undefined for a chunk off the map.
+   */
+  wholeChunk(cx: number, cy: number): Uint8Array | undefined {
+    return this.encode(cx, cy, () => true)
+  }
+
+  private overviewBytes: Uint8Array | undefined
+
+  /**
+   * The whole map for the admin map's far zoom (`terrainOverview`). Terrain never changes once
+   * generated (roads lie on top of it), so this is built on first request and kept.
+   */
+  overview(): Uint8Array {
+    return (this.overviewBytes ??= terrainOverview(this.terrain))
+  }
+
+  /** A chunk with the tiles and nodes `known` lets through; undefined if none or off the map. */
+  private encode(
+    cx: number,
+    cy: number,
+    known: (x: number, y: number) => boolean,
+  ): Uint8Array | undefined {
     const n = chunksAcross(this.terrain.size)
     if (!Number.isInteger(cx) || !Number.isInteger(cy) || cx < 0 || cy < 0 || cx >= n || cy >= n) {
       return undefined
@@ -118,7 +147,7 @@ export class ExploredTerrain {
         // A map whose side isn't a whole number of chunks leaves its last chunks part empty.
         if (x >= size || y >= size) {
           out[i] = UNEXPLORED
-        } else if (this.isExplored(viewer, x, y)) {
+        } else if (known(x, y)) {
           out[i] = tiles[y * size + x]!
           any = true
         } else {
@@ -127,9 +156,7 @@ export class ExploredTerrain {
       }
     }
     if (!any) return undefined
-    const nodes = (this.nodesByChunk.get(cy * n + cx) ?? []).filter((node) =>
-      this.isExplored(viewer, node.x, node.y),
-    )
+    const nodes = (this.nodesByChunk.get(cy * n + cx) ?? []).filter((node) => known(node.x, node.y))
     return encodeChunk(out, nodes, cx, cy)
   }
 
@@ -146,4 +173,30 @@ export class ExploredTerrain {
     }
     return [...found].sort((a, b) => a - b)
   }
+}
+
+/**
+ * The whole map downsampled for the admin map (`ADMIN_TERRAIN_OVERVIEW_PATH`): one byte per
+ * `OVERVIEW_SCALE`² tiles, the terrain most of them have (the lower code on a tie). A square at
+ * the edge of a map whose side isn't a whole number of squares counts only the tiles it has.
+ */
+export function terrainOverview(terrain: TerrainMap): Uint8Array {
+  const { size, tiles } = terrain
+  const n = overviewAcross(size)
+  const out = new Uint8Array(n * n)
+  const counts = new Uint32Array(256)
+  for (let oy = 0; oy < n; oy++) {
+    for (let ox = 0; ox < n; ox++) {
+      counts.fill(0)
+      const yEnd = Math.min(size, (oy + 1) * OVERVIEW_SCALE)
+      const xEnd = Math.min(size, (ox + 1) * OVERVIEW_SCALE)
+      for (let y = oy * OVERVIEW_SCALE; y < yEnd; y++) {
+        for (let x = ox * OVERVIEW_SCALE; x < xEnd; x++) counts[tiles[y * size + x]!]!++
+      }
+      let best = 0
+      for (let t = 1; t < counts.length; t++) if (counts[t]! > counts[best]!) best = t
+      out[oy * n + ox] = best
+    }
+  }
+  return out
 }
