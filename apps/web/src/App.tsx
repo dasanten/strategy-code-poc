@@ -402,6 +402,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 ...selectedTile,
                 buildings: world.buildings,
                 carriages: world.carriages,
+                horses: world.horses,
                 piles: world.piles,
                 node: nodeAt?.(selectedTile.x, selectedTile.y),
                 strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),

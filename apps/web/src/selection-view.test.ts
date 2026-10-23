@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   FOOTPRINT,
   MAP_SIZE,
+  MAX_HEALTH,
+  MAX_HUNGER,
   MAX_WORKERS,
+  STABLE_BREED_DAYS,
+  STABLE_CAPACITY,
+  TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   footprintTiles,
   type Building,
@@ -10,8 +15,10 @@ import {
   type City,
   type ContractView,
   type Diplomacy,
+  type Horse,
   type Pile,
   type Resident,
+  type SeenHorse,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 import {
@@ -254,6 +261,7 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
   y: 5,
   buildings: [],
   carriages: [],
+  horses: [],
   piles: [],
   node: undefined,
   strangers: [],
@@ -363,6 +371,118 @@ describe('the card for a tile', () => {
   it('shows strangers on it in their realm’s colour', () => {
     const r = { name: 'Brann', owner: 'them', cityId: null } as Resident
     expect(tile({ strangers: [r] })).toMatchObject({ title: 'Brann', rel: 'otherRealm' })
+  })
+})
+
+describe('horses on the tile card', () => {
+  const horse = (h: Partial<Horse> = {}): Horse => ({
+    id: 'h1',
+    realmId: 'me',
+    cityId: null,
+    x: 5,
+    y: 5,
+    hunger: MAX_HUNGER,
+    health: MAX_HEALTH,
+    ...h,
+  })
+  /** As sight sends a stranger's horse: without its hunger and health. */
+  const unknown = (h: Partial<Horse>): SeenHorse => {
+    const { hunger: _h, health: _x, ...rest } = horse(h)
+    return rest
+  }
+  const horseLine = (lines: string[]) => lines.find((l) => l.startsWith('Horse:'))
+
+  it('tells how the own carriage’s horse fares and how long the Food on board feeds it', () => {
+    const fed = tile({ carriages: [{ ...carriage, load: { food: 6 } }], horses: [horse()] })
+    expect(horseLine(fed.lines)).toBe('Horse: fed, healthy · Food on board for 4 game days')
+    const hungry = tile({
+      carriages: [carriage],
+      horses: [horse({ hunger: 10, health: MAX_HEALTH - 5 })],
+    })
+    expect(horseLine(hungry.lines)).toBe('Horse: hungry, hurt · no Food on board')
+    const starving = tile({ carriages: [carriage], horses: [horse({ hunger: 0 })] })
+    expect(horseLine(starving.lines)).toContain('Horse: starving')
+    // A hitched horse is not a loose one.
+    expect(fed.lines.some((l) => l.includes('1 horse ('))).toBe(false)
+  })
+
+  it('says only whether a stranger’s carriage has a horse', () => {
+    const { id, x, y } = carriage
+    const theirs = { id, x, y, realmId: 'r-other', cityId: null, loadLevel: 'empty' as const }
+    const hitched = tile({
+      carriages: [{ ...theirs, horseId: 'h1' }],
+      horses: [unknown({ realmId: 'r-other' })],
+    })
+    expect(hitched.lines.find((l) => l.startsWith('Carriage'))).toBe(
+      'Carriage (another realm) · empty · horse hitched',
+    )
+    expect(horseLine(hitched.lines)).toBeUndefined()
+    const bare = tile({ carriages: [{ ...theirs, horseId: null }] })
+    expect(bare.lines.find((l) => l.startsWith('Carriage'))).toBe(
+      'Carriage (another realm) · empty · no horse',
+    )
+    const mine = tile({ carriages: [{ ...carriage, horseId: null }] })
+    expect(mine.lines.find((l) => l.startsWith('Carriage'))).toContain('· no horse hitched')
+  })
+
+  it('counts loose horses on a tile, how they fare only for the Player’s own, and is named after them', () => {
+    const card = tile({
+      horses: [
+        horse({ id: 'h1' }),
+        horse({ id: 'h2', hunger: 5 }),
+        unknown({ id: 'h3', realmId: 'r-other' }),
+      ],
+    })
+    expect(card).toMatchObject({ title: '3 horses', what: 'horses', rel: 'own' })
+    expect(card.lines).toEqual(
+      expect.arrayContaining(['2 horses (yours) · 1 hungry', '1 horse (another realm)']),
+    )
+    expect(tile({ horses: [horse()] })).toMatchObject({ title: 'Horse', what: 'horses' })
+    expect(tile({ horses: [horse({ x: 6 })] }).what).toBe('tile')
+  })
+
+  it('shows a stable’s horses, room, Food and how long until the next foal while breeding', () => {
+    const stable = building({
+      kind: 'stable',
+      cityId: 'c-me',
+      stock: { food: 30 },
+      breeding: 3 * TICKS_PER_GAME_DAY,
+    })
+    // The carriage's hitched horse stands in the stable too, and breeds (`breedingPair`).
+    const pair = [horse({ id: 'h1' }), horse({ id: 'h2', x: 6, y: 6 })]
+    const card = tile({ buildings: [stable], horses: pair, carriages: [carriage] })
+    expect(card.what).toBe('building')
+    expect(card.lines).toEqual(
+      expect.arrayContaining([
+        '2 horses (yours)',
+        `Room for ${STABLE_CAPACITY - 2} more horses`,
+        'Holds 30 food',
+        `Next foal in about ${STABLE_BREED_DAYS - 3} game days`,
+      ]),
+    )
+    // One horse, or a hungry pair, or a stranger's pair whose condition is unknown: no breeding.
+    const alone = tile({ buildings: [stable], horses: [horse()] })
+    expect(alone.lines.some((l) => l.startsWith('Next foal'))).toBe(false)
+    const starved = tile({ buildings: [stable], horses: pair.map((h) => ({ ...h, hunger: 0 })) })
+    expect(starved.lines.some((l) => l.startsWith('Next foal'))).toBe(false)
+    const empty = tile({ buildings: [{ ...stable, stock: {} }] })
+    expect(empty.lines).toEqual(
+      expect.arrayContaining(['No horses in it', `Room for ${STABLE_CAPACITY} more horses`]),
+    )
+  })
+
+  it('keeps a stranger’s stable’s Food and its horses’ condition hidden', () => {
+    const theirs = building({ kind: 'stable', cityId: 'c-other' })
+    const card = tile({
+      buildings: [theirs],
+      horses: [
+        unknown({ id: 'h1', realmId: 'r-other' }),
+        unknown({ id: 'h2', realmId: 'r-other' }),
+      ],
+    })
+    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
+    expect(card.lines.some((l) => l.startsWith('Next foal'))).toBe(false)
+    expect(card.lines).toContain('2 horses (another realm)')
   })
 })
 

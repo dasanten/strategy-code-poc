@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { Building, Resident } from '@csp/shared'
-import { ART_FILES, BUILDING_ART, NODE_ART } from './map/art.js'
+import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
   actionForKey,
@@ -171,7 +171,9 @@ export function TileCard({
       ? BUILDING_ART[building.kind]
       : card.what === 'node' && nodeKind
         ? NODE_ART[nodeKind]
-        : undefined
+        : card.what === 'horses'
+          ? UNIT_ART.horse
+          : undefined
   return (
     <SelectionCard
       rel={card.rel}
