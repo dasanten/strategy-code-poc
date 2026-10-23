@@ -44,8 +44,8 @@ import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
 import { caravanFood } from './caravans.js'
 import { countSoldiersKilled } from './directives.js'
 
-/** How far one unit of food fills the hunger meter. */
-const FILL_PER_FOOD = (MAX_HUNGER * HUNGER_DAYS) / FOOD_PER_DAY
+/** How far one unit of food fills the hunger meter: a full meter holds `HUNGER_DAYS` of meals. */
+const FILL_PER_FOOD = MAX_HUNGER / (HUNGER_DAYS * FOOD_PER_DAY)
 
 /** What survival did this tick. */
 export interface SurvivalResult {

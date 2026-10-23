@@ -5,6 +5,8 @@ import {
   tradeOrgArmyWanted,
   WEAPONS,
   canWork,
+  carryCapacity,
+  stockWeight,
   contractOf,
   warehouseKeeps,
   defendsCity,
@@ -173,7 +175,7 @@ function keepSoldiers(
   if (smithy && takeFromSmithy(world, smithy, unarmed)) return
   const weapon = storage && weaponIn(storage.stock ?? {})
   if (storage && weapon) {
-    fetch(storage, unarmed, { [weapon]: 1 })
+    fetch(world, storage, unarmed, { [weapon]: 1 })
     return
   }
   const recipe = recipeFor('smithy', SMITHY_WEAPON)
@@ -183,7 +185,7 @@ function keepSoldiers(
   const enough = Object.entries(recipe.input).every(
     ([good, n]) => (stock[good as keyof Stock] ?? 0) >= n,
   )
-  if (enough) fetch(storage, unarmed, recipe.input)
+  if (enough) fetch(world, storage, unarmed, recipe.input)
 }
 
 /** The first weapon a stock holds, if any. */
@@ -210,9 +212,13 @@ function takeFromSmithy(world: WorldState, smithy: Building, unarmed: Resident[]
 
 /**
  * Sends one unarmed adult to the storage for `goods`, unless one is on the way already: one idle
- * there takes them; else an idle adult, or failing that a worker, sets out.
+ * there takes them; else an idle adult, or failing that a worker, sets out. Only adults with room
+ * left for `goods` go, so one laden with a load can't stand at the storage for ever.
  */
-function fetch(storage: Building, unarmed: Resident[], goods: Stock): void {
+function fetch(world: WorldState, storage: Building, unarmed: Resident[], goods: Stock): void {
+  const room = (r: Resident) =>
+    stockWeight(r.carried) + stockWeight(goods) <= carryCapacity(r, world.tick)
+  unarmed = unarmed.filter(room)
   const at = (r: Resident) => isAt(r, storage)
   const there = unarmed.find((r) => r.order === null && at(r))
   if (there) {

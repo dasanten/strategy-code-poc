@@ -116,7 +116,7 @@ export function resolveWork(world: WorldState, actions: WorkAction[]): void {
     } else {
       o.progress += workOutput(r, good, skill, world.tick)
     }
-    r.skills[skill] = (r.skills[skill] ?? 0) + workLearned(r, world.tick)
+    r.skills[skill] = (r.skills[skill] ?? 0) + workLearned(r, skill, world.tick)
     while (o.progress >= 1) {
       if (recipe && !hasInput(world, place, recipe)) {
         o.progress = Math.min(o.progress, 1 - 1e-9)

@@ -177,14 +177,14 @@ export const HOUSING_ROOM: Partial<Record<BuildingKind, number>> = {
 /** Houses a starting city gets beyond what its residents need. */
 export const START_SPARE_HOUSES = 1
 
-/** Food in a starting city's storage, in kg. */
-export const START_FOOD = 200
+/** Food in a starting city's storage, in kg: about twelve game days for its residents. */
+export const START_FOOD = 100
 
 /**
  * Food each resident of a starting city carries, in units: two game days' meals, so they have
  * something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
  */
-export const START_CARRIED_FOOD = 4
+export const START_CARRIED_FOOD = 2
 
 /** Horses in a starting city's stable: two, so they can breed (`CONTEXT.md`: Starting city). */
 export const START_HORSES = 2
@@ -193,13 +193,13 @@ export const START_HORSES = 2
  * Food in a starting city's stable, in units: ten game days for its horses, time to start
  * bringing it food from the farm.
  */
-export const START_STABLE_FOOD = 60
+export const START_STABLE_FOOD = 30
 
 /**
  * Food a horse eats per game day, in units (`CONTEXT.md`: Horse). More than a resident; its
  * hunger meter otherwise runs like a resident's (`HUNGER_DAYS`, `STARVE_DAYS`, `HEAL_DAYS`).
  */
-export const HORSE_FOOD_PER_DAY = 3
+export const HORSE_FOOD_PER_DAY = 1.5
 
 /**
  * How far from its tile a horse reaches Food lying on the ground, in tiles either way
@@ -276,10 +276,10 @@ export interface NpcCitySize {
 }
 
 /** A village: a starting city's square, a few fewer residents, one farm. */
-export const NPC_VILLAGE: NpcCitySize = { size: 29, residents: 6, houses: 2, farms: 1, food: 150 }
+export const NPC_VILLAGE: NpcCitySize = { size: 29, residents: 6, houses: 2, farms: 1, food: 75 }
 
 /** A town: a wider square, twice the residents of a starting city, two farms. */
-export const NPC_TOWN: NpcCitySize = { size: 45, residents: 16, houses: 5, farms: 2, food: 400 }
+export const NPC_TOWN: NpcCitySize = { size: 45, residents: 16, houses: 5, farms: 2, food: 200 }
 
 /**
  * What an NPC city asks for each resident living there when it is bought (`CONTEXT.md`: Buying a
@@ -314,7 +314,7 @@ export const NPC_FOOD_SHORT_DAYS = 5
  * Carrying the output), so the workers there can still refill at their workplace (Refilling at a
  * workplace). Written into the Work default's source, where a Player can change it.
  */
-export const WORK_FOOD_KEPT = 4
+export const WORK_FOOD_KEPT = 2
 
 /**
  * Share of an NPC city's adults it keeps as soldiers (`CONTEXT.md`: NPC city, Soldier), rounded
@@ -395,7 +395,7 @@ export const TRADE_ORG_HQ = {
   /** Farms outside the outer ring, by its gates. */
   farms: 4,
   /** Food in its storage, in units: about a week of what everyone eats. */
-  food: 450,
+  food: 225,
   /** Coins in its coin warehouse. */
   coins: 20_000,
   /** Goods in its goods warehouse, in units. */
@@ -432,7 +432,7 @@ export const TRADING_POST = {
   /** Farms outside the wall, by the gate. */
   farms: 1,
   /** Food in its storage, in units: about two weeks of what everyone eats. */
-  food: 100,
+  food: 50,
   /** Coins in its warehouse. */
   coins: 2_000,
   /** Goods in its warehouse, in units. */
@@ -514,10 +514,10 @@ export const CARAVAN_ROBBERIES_PER_ESCORT = 2
 export const CARAVAN_ESCORTS_MAX = 8
 
 /**
- * Extra Food a caravan keeps on board for each escort beyond `CARAVAN_ESCORTS`, in units: a
- * week of `FOOD_PER_DAY`, like `CARAVAN_FOOD`.
+ * Extra Food a caravan keeps on board for each escort beyond `CARAVAN_ESCORTS`, in units: the
+ * same ~16 game days of `FOOD_PER_DAY` as `CARAVAN_FOOD`.
  */
-export const CARAVAN_FOOD_PER_ESCORT = 14
+export const CARAVAN_FOOD_PER_ESCORT = 16
 
 /**
  * How near its carriage, in tiles, a caravan's escort defends it (`CONTEXT.md`: Caravan): they go
@@ -527,10 +527,10 @@ export const CARAVAN_GUARD_RANGE = 16
 
 /**
  * Food a caravan keeps on board for its crew and its horse, in units, topped up at the storage
- * at each end of its route (`CONTEXT.md`: Caravan): a driver, two escorts and a horse eat about
- * 9 a game day, so this lasts about a week, the longest leg on a full-size map.
+ * at each end of its route (`CONTEXT.md`: Caravan): a driver, two escorts and a horse eat 4.5 a
+ * game day, so this lasts about 16 game days, the longest leg on a full-size map (~15).
  */
-export const CARAVAN_FOOD = 60
+export const CARAVAN_FOOD = 72
 
 /**
  * How many tiles further along their way a caravan's driver or an escort may get than the one
@@ -627,13 +627,13 @@ export function carryCapacity(resident: Resident, tick: number): number {
 }
 
 /** Food a resident of average Endurance eats per game day, in units (`CONTEXT.md`: Hunger). */
-export const FOOD_PER_DAY = 2
+export const FOOD_PER_DAY = 1
 
 /**
  * A resident at home is running low on food when they carry fewer units than this: less than a
  * game day's meals (`CONTEXT.md`: Eating). They then take meals from their city's storage.
  */
-export const HOME_FOOD_LOW = 2
+export const HOME_FOOD_LOW = 1
 
 /**
  * A resident's own food (`CONTEXT.md`: Own food), in units: two game days of meals. Putting goods
@@ -645,11 +645,14 @@ export const OWN_FOOD = 2 * FOOD_PER_DAY
 /** Units of food in one meal, what a resident at home takes from storage at a time. */
 export const MEAL_UNITS = 1
 
-/** Game days a full hunger meter lasts without eating, at average Endurance. */
-export const HUNGER_DAYS = 1
+/**
+ * Game days a full hunger meter lasts without eating, at average Endurance. With `STARVE_DAYS`, a
+ * resident dies about 5 game days (2 real hours) after their last meal.
+ */
+export const HUNGER_DAYS = 2
 
 /** Game days an empty hunger meter takes to cost a resident all their health. */
-export const STARVE_DAYS = 1
+export const STARVE_DAYS = 3
 
 /** Game days a fed resident takes to heal from no health back to full. */
 export const HEAL_DAYS = 3
@@ -765,9 +768,10 @@ export const DELIVERY_LOAD = CARRIAGE_CAPACITY - CARAVAN_FOOD
 /**
  * Food a haul route keeps on board for its horse unless the Player picks another amount, in
  * units (`CONTEXT.md`: Haul route): five game days (two real hours) of the horse's eating, topped
- * up at each stop that has Food. A trip takes real time, so this keeps its real-time length.
+ * up at each stop that has Food. A trip takes real time, so this keeps its real-time length;
+ * rounded up to whole units.
  */
-export const HAUL_KEEP_FOOD = 5 * HORSE_FOOD_PER_DAY
+export const HAUL_KEEP_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
 
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
@@ -820,9 +824,9 @@ export function drivingLearned(resident: Resident, tick: number): number {
 
 /**
  * Share of the Food in one place (a storage, a resident's or carriage's load, a pile) that goes
- * bad each game day (`CONTEXT.md`: Spoilage). About a third of a stock is lost over a game year.
+ * bad each game day (`CONTEXT.md`: Spoilage). Half of a stock is gone in about 140 game days.
  */
-export const FOOD_SPOIL_PER_DAY = 0.02
+export const FOOD_SPOIL_PER_DAY = 0.005
 
 /**
  * Events kept in each Player's realm log; the oldest go first. A Player who logs
@@ -1052,31 +1056,46 @@ export const ROAD_LINE_MAX_TILES = 128
 /** The Strength at which a resident puts in one unit of building work per tick. */
 export const BUILD_STRENGTH_AVERAGE = 10
 
-/** How much more work each point of Construction skill puts in per tick. */
-export const CONSTRUCTION_SKILL_EFFECT = 0.05
+/** How much more work each point of Construction skill puts in per tick: 1 % a point. */
+export const CONSTRUCTION_SKILL_EFFECT = 0.01
 
-/** Construction skill a resident of average Intellect gains per game day of building work. */
-export const CONSTRUCTION_SKILL_PER_DAY = 1
+/**
+ * The furthest Construction skill speeds building work up, as a share of it: +100 %, reached at
+ * `CONSTRUCTION_SKILL_MAX` points, beyond which nobody learns.
+ */
+export const CONSTRUCTION_SKILL_LIMIT = 1
+
+/** The most Construction skill a resident can have: where it reaches `CONSTRUCTION_SKILL_LIMIT`. */
+export const CONSTRUCTION_SKILL_MAX = CONSTRUCTION_SKILL_LIMIT / CONSTRUCTION_SKILL_EFFECT
+
+/**
+ * Construction skill a resident of average Intellect gains per game day of building work: the
+ * cap takes about a game year (one real week).
+ */
+export const CONSTRUCTION_SKILL_PER_DAY = 100 / 420
 
 /** The Intellect at which a resident learns at the usual pace (`CONTEXT.md`: Stats). */
 export const INTELLECT_AVERAGE = 10
 
 /**
  * Building work a resident puts in per tick at the given tick (`CONTEXT.md`: Construction site):
- * in proportion to Strength, plus `CONSTRUCTION_SKILL_EFFECT` for each point of Construction.
+ * in proportion to Strength, plus `CONSTRUCTION_SKILL_EFFECT` for each point of Construction, up
+ * to `CONSTRUCTION_SKILL_LIMIT`.
  */
 export function buildWork(resident: Resident, tick: number): number {
   const strength = statValue(resident, 'strength', tick) / BUILD_STRENGTH_AVERAGE
-  return strength * (1 + (resident.skills.construction ?? 0) * CONSTRUCTION_SKILL_EFFECT)
+  const skill = (resident.skills.construction ?? 0) * CONSTRUCTION_SKILL_EFFECT
+  return strength * (1 + Math.min(CONSTRUCTION_SKILL_LIMIT, skill))
 }
 
 /**
  * Construction skill a resident learns from one tick of building work (`CONTEXT.md`: Skill,
- * learned by doing), faster with more Intellect.
+ * learned by doing), faster with more Intellect, and never past `CONSTRUCTION_SKILL_MAX`.
  */
 export function constructionLearned(resident: Resident, tick: number): number {
   const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
-  return (CONSTRUCTION_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
+  const room = Math.max(0, CONSTRUCTION_SKILL_MAX - (resident.skills.construction ?? 0))
+  return Math.min(room, (CONSTRUCTION_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace)
 }
 
 /**
@@ -1147,12 +1166,12 @@ export const BATCHES_PER_DAY: Partial<Record<BuildingKind, number>> = {
 }
 
 /**
- * Units of each good one worker of average Strength and no skill makes per game day. Food is more
- * than the `FOOD_PER_DAY` a resident eats, so a farm feeds its workers with some to spare; ore is
- * slow, and gold ore slowest.
+ * Units of each good one worker of average Strength and no skill makes per game day. Food is four
+ * times the `FOOD_PER_DAY` a resident eats, so about a quarter of a city farms; ore is slow, and
+ * gold ore slowest.
  */
 export const WORK_OUTPUT_PER_DAY: Partial<Record<Good, number>> = {
-  food: 3,
+  food: 4,
   wood: 4,
   stone: 3,
   ironOre: 2,
@@ -1162,16 +1181,28 @@ export const WORK_OUTPUT_PER_DAY: Partial<Record<Good, number>> = {
 /** The Strength at which a worker makes `WORK_OUTPUT_PER_DAY`. */
 export const WORK_STRENGTH_AVERAGE = 10
 
-/** How much more each point of the workplace's skill makes. */
-export const WORK_SKILL_EFFECT = 0.05
+/** How much more each point of the workplace's skill makes: 1 % a point. */
+export const WORK_SKILL_EFFECT = 0.01
 
-/** Skill a worker of average Intellect gains per game day of work at a workplace. */
-export const WORK_SKILL_PER_DAY = 1
+/**
+ * The furthest a workplace's skill raises output, as a share of it: +100 %, so a worker makes at
+ * most twice what an unskilled one does, reached at `WORK_SKILL_MAX` points.
+ */
+export const WORK_SKILL_LIMIT = 1
+
+/** The most of a workplace's skill a resident can have: where it reaches `WORK_SKILL_LIMIT`. */
+export const WORK_SKILL_MAX = WORK_SKILL_LIMIT / WORK_SKILL_EFFECT
+
+/**
+ * Skill a worker of average Intellect gains per game day of work at a workplace: the cap takes
+ * about a game year (one real week).
+ */
+export const WORK_SKILL_PER_DAY = 100 / 420
 
 /**
  * How much of a unit of `good` a worker makes per tick at the given tick, using `skill`
  * (`CONTEXT.md`: Workplace): in proportion to Strength, plus `WORK_SKILL_EFFECT` for each point
- * of the skill.
+ * of the skill, up to `WORK_SKILL_LIMIT`.
  */
 export function workOutput(resident: Resident, good: Good, skill: SkillName, tick: number): number {
   return workPace(resident, WORK_OUTPUT_PER_DAY[good] ?? 0, skill, tick)
@@ -1189,17 +1220,18 @@ export function batchWork(resident: Resident, kind: BuildingKind, tick: number):
 /** `perDay` a game day, as a share per tick: in proportion to Strength, more with the skill. */
 function workPace(resident: Resident, perDay: number, skill: SkillName, tick: number): number {
   const strength = statValue(resident, 'strength', tick) / WORK_STRENGTH_AVERAGE
-  const skilled = 1 + (resident.skills[skill] ?? 0) * WORK_SKILL_EFFECT
+  const skilled = 1 + Math.min(WORK_SKILL_LIMIT, (resident.skills[skill] ?? 0) * WORK_SKILL_EFFECT)
   return (perDay / TICKS_PER_GAME_DAY) * strength * skilled
 }
 
 /**
- * Skill a worker learns from one tick of work at a workplace (`CONTEXT.md`: Skill, learned by
- * doing), faster with more Intellect.
+ * How much of `skill` a worker learns from one tick of work at a workplace (`CONTEXT.md`: Skill,
+ * learned by doing), faster with more Intellect, and never past `WORK_SKILL_MAX`.
  */
-export function workLearned(resident: Resident, tick: number): number {
+export function workLearned(resident: Resident, skill: SkillName, tick: number): number {
   const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
-  return (WORK_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
+  const room = Math.max(0, WORK_SKILL_MAX - (resident.skills[skill] ?? 0))
+  return Math.min(room, (WORK_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace)
 }
 /**
  * Tearing down takes less work than building (`CONTEXT.md`: Tearing down): this share of the
