@@ -279,6 +279,12 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'info',
         places: [{ name: e.city, x: e.x, y: e.y }],
       }
+    case 'leaderHandedOver':
+      return {
+        text: `${e.from} handed your realm over to ${e.to} in ${e.city}; ${e.to} is your Leader now.`,
+        tone: 'info',
+        places: [{ name: e.city, x: e.x, y: e.y }],
+      }
     case 'foodSpoiled':
       return { text: `${e.units} Food spoiled.`, tone: 'info' }
     case 'born':

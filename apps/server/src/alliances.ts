@@ -252,6 +252,7 @@ export const handOverToAlliance = allianceOrder(
     for (const id of residentIds) {
       const r = world.residents.find((x) => x.id === id)
       if (!r || r.owner !== realmId) return 'not all of them are your residents'
+      if (world.realms.some((x) => x.leaderId === id)) return `${r.name} is your Leader`
       if (handedOverTo(world, id)) return `${r.name} is already in the alliance army`
       if (world.contracts.some((c) => c.residentIds.includes(id))) {
         return `${r.name} is in a mercenary contract`

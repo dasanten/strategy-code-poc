@@ -91,6 +91,7 @@ import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
+import { leadersServeNoOne } from './leader.js'
 import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 
 /**
@@ -1448,6 +1449,7 @@ export const worldInvariants: Invariant[] = [
   healthAndHungerInRange,
   agesInRange,
   realmsHaveLeaders,
+  leadersServeNoOne,
   buildingsInPlace,
   citiesFromBuildings,
   carriedWithinCapacity,
