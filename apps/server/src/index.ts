@@ -46,6 +46,7 @@ const {
 const { world, terrain } = loadOrCreateWorld(db, (seed) => generateTerrain(seed))
 const explored = ExploredTerrain.load(db, terrain, world.nodes)
 tagWorld(world)
+const territory = new TerritoryTracker()
 
 const app = await buildApp({
   db,
@@ -56,6 +57,8 @@ const app = await buildApp({
   webDist: config.webDist,
   tick: () => world.tick,
   world,
+  terrain,
+  territory,
 })
 if (sentryOn) setupFastifyErrorHandler(app)
 
@@ -82,7 +85,6 @@ const orders = new OrderQueue(
 const scripts = new ScriptRunner(terrain, scriptHost)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
-const territory = new TerritoryTracker()
 const reporter = createTickReporter(logger)
 // The script library lives in the database, so its invariant is checked at start and daily.
 reporter.invariantViolations(world, checkScriptLibrary(db))

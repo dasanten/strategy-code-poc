@@ -6,15 +6,26 @@ import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { eq } from 'drizzle-orm'
 import {
+  ADMIN_PLACES_PATH,
   ADMIN_TERRAIN_OVERVIEW_PATH,
+  ADMIN_TERRITORY_PATH,
+  ADMIN_WORLD_PATH,
   SESSION_COOKIE,
   type Account,
   type AdminDirectives,
   type ApiError,
   type InviteCreated,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import { LANGUAGE_VERSION } from '@csp/lang'
+import {
+  adminPlaces,
+  adminTerritory,
+  adminWorldView,
+  parseAdminView,
+  type AdminLookups,
+} from './admin-map.js'
 import {
   AuthError,
   SESSION_DAYS,
@@ -46,6 +57,7 @@ import {
   renameScript,
   saveScript,
 } from './scripts.js'
+import type { TerritoryTracker } from './territory.js'
 
 export interface AppOptions {
   db: Db
@@ -60,8 +72,12 @@ export interface AppOptions {
   explored?: ExploredTerrain
   /** Login and sign-up attempts allowed per IP and minute. */
   authRateLimit?: number
-  /** The running world, for admin directives. Without it there is no directive API. */
+  /** The running world, for admin directives and the admin map. Without it there is neither. */
   world?: WorldState
+  /** The world's terrain, for the admin map's wrapping view; needed with `world`. */
+  terrain?: TerrainMap
+  /** The world's territory, for the admin map's territory layer. */
+  territory?: TerritoryTracker
 }
 
 declare module 'fastify' {
@@ -246,6 +262,35 @@ export async function buildApp(opts: AppOptions) {
         .from(schema.users)
         .where(eq(schema.users.id, userId))
         .get()?.name
+
+    // The admin map's world (`CONTEXT.md`: admin map), read between ticks; never script sources.
+    const { terrain, territory } = opts
+    if (terrain) {
+      const lookups: AdminLookups = {
+        accountOf,
+        scriptName: (scriptId) =>
+          db
+            .select({ name: schema.scripts.name })
+            .from(schema.scripts)
+            .where(eq(schema.scripts.id, scriptId))
+            .get()?.name,
+      }
+      admin.get<{ Querystring: Record<string, string | undefined> }>(
+        ADMIN_WORLD_PATH,
+        async (req, reply) => {
+          const view = parseAdminView(req.query, terrain.size)
+          if (typeof view === 'string') return fail(reply, 'invalid-input', view)
+          return adminWorldView(world, terrain.size, view, lookups)
+        },
+      )
+      admin.get(ADMIN_PLACES_PATH, async () => adminPlaces(world, lookups))
+      admin.get(ADMIN_TERRITORY_PATH, async (_req, reply) => {
+        const current = territory?.current
+        if (!current) return fail(reply, 'not-found', 'Territory is not worked out yet.')
+        return adminTerritory(world, current, terrain.size)
+      })
+    }
+
     admin.get('/api/admin/directives', async () => {
       const shown: AdminDirectives = {
         directives: adminDirectives(world),
