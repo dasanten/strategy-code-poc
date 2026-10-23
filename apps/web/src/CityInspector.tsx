@@ -14,6 +14,8 @@ import {
   type SeenCity,
   type TradeQuote,
   type TradeSide,
+  type SeenResident,
+  type SeenCarriage,
 } from '@csp/shared'
 import {
   buildingCount,
@@ -65,11 +67,11 @@ export function CityInspector({
   onOpen,
 }: {
   cities: SeenCity[]
-  residents: Resident[]
+  residents: SeenResident[]
   buildings: Building[]
   realmId: string
   realms: RealmLabel[]
-  carriages: Carriage[]
+  carriages: SeenCarriage[]
   tick: number
   /** Tiles along each side of the map, for delivery fees. */
   mapSize: number
@@ -327,7 +329,7 @@ function Prices({
         {warehouse.prices.map((p) => (
           <tr key={p.good}>
             <th scope="row">{GOOD_LABELS[p.good]}</th>
-            <td>{p.stock}</td>
+            <td>{p.stock ?? '?'}</td>
             <td>{p.buy}</td>
             <td>{p.sell}</td>
           </tr>

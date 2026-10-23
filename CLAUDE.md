@@ -7,7 +7,9 @@
 - **What to do next:** GitHub tickets, how they work in `docs/tasks.md`. `/next-ticket` picks the
   next one and works it into a PR. PRs reference their tickets (`Closes #n`, `Part of #epic`).
 - **CI minutes are scarce** (ADR 0009): ticket PRs go into the epic branch `epic/<n>-<slug>` and
-  are checked locally; only one PR per epic (and bug fixes) goes into `main` and runs CI.
+  are checked locally; only one PR per epic (and bug fixes) goes into `dev` and runs CI.
+- **Releases** (ADR 0010): `main` is the live game and every merge into it deploys. Epics and bugs
+  collect on `dev`; a release is one PR `dev` → `main`, opened only when Daniel asks.
 - **Balance numbers** live in `packages/shared/src/balance.ts`; pick sensible values and list them
   in the PR. Rules (what happens) are Daniel's call.
 - **Wiki** (`/wiki`, `apps/web/src/Wiki.tsx`): a ticket that changes a rule also updates its wiki

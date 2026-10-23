@@ -1,6 +1,14 @@
-import type { Army, Building, Carriage, Horse, Resident, SeenCaravan, SeenCity } from '@csp/shared'
+import type {
+  Army,
+  Building,
+  SeenCaravan,
+  SeenCarriage,
+  SeenCity,
+  SeenHorse,
+  SeenResident,
+} from '@csp/shared'
 import { caravanParts } from '../caravans.js'
-import { ACTIVITY_ART, BASE_ART, UNIT_ART } from './art.js'
+import { ACTIVITY_ART, BASE_ART, PAINTED_UNIT_ART, UNIT_ART, paintedCell } from './art.js'
 import { tileToScreen, zoomTier, type Camera, type Size } from './camera.js'
 import { residentActivity, tileFigures, type Activity } from './figures.js'
 import {
@@ -23,9 +31,9 @@ import {
 /** What of the world the unit tokens need. */
 export interface UnitWorld {
   map: { size: number }
-  residents: readonly Resident[]
-  horses: readonly Horse[]
-  carriages: readonly Carriage[]
+  residents: readonly SeenResident[]
+  horses: readonly SeenHorse[]
+  carriages: readonly SeenCarriage[]
   armies: readonly Pick<Army, 'id' | 'realmId' | 'memberIds'>[]
   caravans: readonly SeenCaravan[]
   cities: readonly Pick<SeenCity, 'id' | 'realmId' | 'tradeOrg'>[]
@@ -53,6 +61,13 @@ function drawUnit(
 ) {
   const color = relationshipColor(rel)
   const base = (r * 24) / 11
+  const painted = PAINTED_UNIT_ART[file]
+  if (painted !== undefined) {
+    // Painted art (`docs/art.md`): the figure inside a ring in the relationship colour.
+    tokens.place(BASE_ART.roundRing, x, y, base, color)
+    tokens.place(paintedCell(painted), x, y, r * 1.7)
+    return
+  }
   tokens.place(BASE_ART.round, x, y, base)
   tokens.place(BASE_ART.roundRing, x, y, base, color)
   tokens.place(file, x, y, r * 1.2, color)

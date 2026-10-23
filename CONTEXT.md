@@ -133,7 +133,13 @@ The shared language of the game. Domain terms only — no implementation details
   storage kind. The HQ keeps its coins in one and its other goods in another, inside the inner
   ring.
 - **Trading post:** a small Trade Org city in a region, with a warehouse, so Players can trade
-  nearby. Goods move between posts and HQ by caravan.
+  nearby. Goods move between posts and HQ by caravan. It keeps soldiers like an NPC city, armed
+  from its warehouse, so it is captured only by beating them; they fight attackers in its area,
+  and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
+  A captured post joins the captor's realm like any city and leaves the Trade Organization: its
+  warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
+  route ends, and the deliveries and transfers waiting there go over to the HQ, which sends them
+  out of its own stock.
 - **Trading with the Trade Organization:** only in person, by a resident (or a carriage) on a
   warehouse's tile, at its HQ or a trading post. Selling hands the goods into the warehouse and
   takes its coins into the resident's hands, as far as they can carry; buying is the other way
@@ -306,8 +312,25 @@ The shared language of the game. Domain terms only — no implementation details
 - **Sight:** what a Player currently sees: everything within sight range of any of their
   residents, or of any resident of an alliance they belong to. People, goods, buildings,
   horses, carriages and armies are only visible in sight, a Player's own included.
+- **Seeing inside a storage:** what a storage, warehouse or stable holds is seen only by its own
+  realm and its allies, and by anyone with a resident at it. From further off others see only the
+  building (and a warehouse's or NPC city's prices, where those are shown).
+  A carriage's load goes the same way, with a resident on its tile; from further off others see
+  only how heavily it is loaded.
+- **Seeing how someone fares:** a resident's or horse's hunger and health are seen only by its
+  own realm and its allies. Others see that it is there.
 - **Explored terrain:** tiles a Player has ever had in sight. Their terrain and resource nodes stay
-  known; what is on them (people, goods, buildings) does not.
+  known, and so do the buildings on them (see Last seen); people, horses, carriages, armies and
+  goods on them do not.
+- **Last seen:** a building or construction site a Player has had in sight (their own included)
+  stays on their map after it leaves their sight, as it was when they last saw it: where it
+  stands, what it is, who held it and which city it belonged to, along with whatever else they
+  were allowed to see then (its prices, what it held). It is marked with when they saw it and
+  always shown apart from what is in sight now. It changes only when it comes back into sight:
+  once any tile it stood on is in sight again, the Player sees what is there now, and a building
+  that is gone is forgotten. A city stays remembered while any of its buildings does. Things that
+  move are never remembered. Like explored terrain, it grows only from sight: joining an alliance
+  does not hand over what its members saw before, and leaving one keeps what was seen through it.
 
 ## Military
 
@@ -400,6 +423,24 @@ The shared language of the game. Domain terms only — no implementation details
   sends its army to take back the value and punish: to the culprit's city nearest the crime, to
   carry home twice what it lost (coins first), fighting whoever resists. It never captures the
   city, and leaves once it has what it came for.
+
+## Bandits
+
+- **Bandit camp:** an Organization the game spawns in a remote spot out of every Player's sight,
+  with a storage and a band of armed residents. Its standing toward everyone is fixed at hostile:
+  it never trades, sells, hires out or joins an alliance, and attacking or robbing it is never a
+  crime. Bandits and their camps are seen only in sight, like everything else.
+- **Band:** a camp has a set size. It doesn't pair or farm; it eats from its loot and starves
+  without it. Lost bandits are slowly replaced by drifters arriving, up to its size. When a camp
+  is wiped out, a new one may later spawn elsewhere, out of every Player's sight.
+- **Raiding:** a band goes after caravans and carriages on the move, lone residents far from home,
+  and weak cities. It skips any target whose respect is higher than its own: more armed residents
+  and walls in its sight than the band has bandits. At a city it fights whoever resists, carries
+  off what it can from the storage (Food and Coins first) and goes home; it never captures a city.
+  A band that is losing a fight flees home.
+- **Bandit loot:** carried to the camp's storage. Bandits eat its Food and arm themselves from its
+  weapons and armour. Whoever wipes out the camp can take what is left.
+- **Wiping out a camp:** kill or drive off every bandit and tear down the camp.
 
 ## People
 
@@ -568,7 +609,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Step budget:** how much work a script may do each tick, for each resident or army and for a
   whole realm. Out of budget, the script stops for that tick; what it already requested still
   counts. Default scripts count like any other. NPC cities have no realm budget, only the one
-  for each resident. A script sees only what its Player sees: their sight and explored terrain.
+  for each resident. A script sees only what its Player sees: their sight, explored terrain and
+  what they last saw (Last seen), told apart from what is in sight now.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

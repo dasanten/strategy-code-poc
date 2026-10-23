@@ -23,7 +23,7 @@ import { foundStartingCity } from './starting-city.js'
 import { eventsFor } from './events.js'
 import { regionMapUnsound } from './region-map.js'
 import { shouldCheckInvariants } from './invariants.js'
-import { entitiesInSight, sentOutOfSight, type SightTracker } from './sight.js'
+import { entitiesInSight, sentInsideUnseen, sentOutOfSight, type SightTracker } from './sight.js'
 import type { TickReporter } from './tick.js'
 import { ClientView } from './sync.js'
 
@@ -80,7 +80,8 @@ export function attachRealtime(
     territory?: { current: Territory | null }
     /**
      * Checks, on the sampled share of ticks, that nothing is sent outside a Player's sight
-     * (`sentOutOfSight`), and reports what is.
+     * (`sentOutOfSight`) and nothing from inside they may not see (`sentInsideUnseen`), and
+     * reports what is.
      */
     sightCheck?: { reporter: TickReporter; sampleRate: number; rand?: () => number }
   },
@@ -93,7 +94,10 @@ export function attachRealtime(
   function checkSent(realmId: string, sent: SeenEntity[]) {
     const check = opts.sightCheck
     if (!check || !shouldCheckInvariants(check.sampleRate, check.rand)) return
-    const violations = sentOutOfSight(world, opts.terrain, realmId, sent)
+    const violations = [
+      ...sentOutOfSight(world, opts.terrain, realmId, sent),
+      ...sentInsideUnseen(world, opts.terrain, realmId, sent),
+    ]
     if (violations.length > 0) check.reporter.invariantViolations(world, violations)
   }
 

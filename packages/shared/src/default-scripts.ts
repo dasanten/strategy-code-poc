@@ -19,7 +19,8 @@ export interface TaskMemory {
   work: { workplaceId: string; makes?: string }
   /**
    * Build: the kind of building, with the north-west tile of its footprint `at` the tile the
-   * resident stood on when given it: they lay out the site there or join the one there.
+   * resident stood on when given it, or the one the task named: they walk there, then lay out the
+   * site there or join the one there.
    */
   build: { building: string; at: { x: number; y: number } }
   /**

@@ -22,8 +22,8 @@ following `docs/tasks.md` and `CLAUDE.md`. `$ARGUMENTS` may name a ticket number
 
 Add the label `in progress`, assign yourself (`--add-assignee @me`), and comment the branch name.
 The branch is `t<issue number>-<short-slug>`, cut from the epic branch `origin/epic/<n>-<slug>`
-(ADR 0009). If the epic has no branch yet, create it from `origin/main` and push it. A `bug`
-branches from `origin/main` instead.
+(ADR 0009). If the epic has no branch yet, create it from `origin/dev` and push it. A `bug`
+branches from `origin/dev` instead (ADR 0010).
 
 ## 3. Build
 
@@ -45,7 +45,7 @@ branches from `origin/main` instead.
   again: ticket PRs get no CI, so this run is what lets the PR merge. Say in the PR body that it
   passed.
 - Push and open a ready-for-review PR (not a draft) against the epic branch (a `bug` against
-  `main`).
+  `dev`).
 - Title: what changed. Body: what and why, balance values chosen, anything to check, then one
   `Closes #<ticket>` line per ticket and `Part of #<epic>`.
 - Turn on Auto-fix for the PR.

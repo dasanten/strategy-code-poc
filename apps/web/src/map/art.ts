@@ -24,6 +24,64 @@ export const BUILDING_ART: Record<BuildingKind, string> = {
   road: 'road.svg',
 }
 
+/**
+ * The painted sprite sheet drawn in place of tokens (`docs/art.md`): equal square cells on flat
+ * magenta, which is made transparent when it loads. Cells count from 0, top left, row by row.
+ */
+export const PAINTED_SHEET = { file: 'sheet.webp', columns: 6 } as const
+
+/** The atlas key of one cell of the painted sheet. */
+export const paintedCell = (cell: number) => `${PAINTED_SHEET.file}#${cell}`
+
+/** The sheet's cell for each building kind drawn painted; walls, gates and roads stay lines. */
+export const PAINTED_BUILDING_ART: Partial<Record<BuildingKind, number>> = {
+  townHall: 0,
+  house: 1,
+  storage: 2,
+  warehouse: 3,
+  farm: 4,
+  stable: 5,
+  mine: 6,
+  quarry: 7,
+  lumberCamp: 8,
+  smelter: 9,
+  mint: 10,
+  smithy: 11,
+}
+
+/** A construction site's cell by its building's footprint, 1×1 to 4×4 (`CONTEXT.md`: Footprint). */
+export const PAINTED_SITE_ART = [25, 26, 27, 28] as const
+
+/** The sheet's cell drawn in place of a unit glyph (`UNIT_ART`). */
+export const PAINTED_UNIT_ART: Readonly<Record<string, number>> = {
+  'person.svg': 29,
+  'crown.svg': 30,
+  'cart.svg': 31,
+  'horse.svg': 32,
+  'caravan.svg': 33,
+  'army-banner.svg': 34,
+}
+
+/** Every cell of the sheet the map draws, once. */
+export const paintedCellsInUse = (): number[] => [
+  ...new Set([
+    ...Object.values(PAINTED_BUILDING_ART),
+    ...PAINTED_SITE_ART,
+    ...Object.values(PAINTED_UNIT_ART),
+  ]),
+]
+
+/** The URL of every file in `assets/painted/`, by file name. */
+export const PAINTED_FILES: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(
+    import.meta.glob<string>('../assets/painted/*', {
+      query: '?url',
+      import: 'default',
+      eager: true,
+    }),
+  ).map(([path, url]) => [path.slice(path.lastIndexOf('/') + 1), url]),
+)
+
 export const NODE_ART: Record<ResourceKind, string> = {
   forest: 'node-forest.svg',
   stone: 'node-stone.svg',

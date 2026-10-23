@@ -14,6 +14,8 @@ import {
   type Stock,
   isAt,
   covers,
+  type SeenResident,
+  UNEXPLORED,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
@@ -39,8 +41,10 @@ import {
   type Picking,
 } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
-import { describeTile, makeLeaderProblem } from './selection-view.js'
+import { buildingNodeKind } from './building-info-view.js'
+import { describeTile, makeLeaderProblem, nodeFit } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
+import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
 
 export function App() {
@@ -81,7 +85,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // army or rented out, and, as its alliance leader, the ones handed over (`CONTEXT.md`: Alliance
   // army) and the mercenaries they hired (`CONTEXT.md`: Mercenary contract).
   const own = world
-    ? world.residents.filter((r) => commandsSeen(world.diplomacy, world.home.realmId, r))
+    ? world.residents.filter(
+        (r): r is Resident => commandsSeen(world.diplomacy, world.home.realmId, r) && faresKnown(r),
+      )
     : []
   const selected = own.find((r) => r.id === selectedId)
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
@@ -208,6 +214,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
     [],
   )
+  const [terrainAt, setTerrainAt] = useState<(x: number, y: number) => number | undefined>()
+  const onTerrainLoaded = useCallback(
+    (lookup: (x: number, y: number) => number | undefined) => setTerrainAt(() => lookup),
+    [],
+  )
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
     selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
   // A road may share its tile with a building (`CONTEXT.md`: Road); a building is wherever its
@@ -221,7 +232,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     onLoggedOut()
   }
 
-  const leader = world?.residents.find((r) => r.id === world.home.leaderId)
+  const leader = world?.residents.find(
+    (r): r is Resident => r.id === world.home.leaderId && faresKnown(r),
+  )
   const drawer = (id: DrawerId, panel: ReactNode) => (
     <Drawer id={id} open={openDrawer} onClose={closeDrawer}>
       {panel}
@@ -257,6 +270,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             picking={picking !== false || armyPick !== undefined}
             onPickTile={goTo}
             onNodesLoaded={onNodesLoaded}
+            onTerrainLoaded={onTerrainLoaded}
             focus={focus}
           />
         ) : (
@@ -403,22 +417,41 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 ...selectedTile,
                 buildings: world.buildings,
                 carriages: world.carriages,
+                horses: world.horses,
                 piles: world.piles,
                 node: nodeAt?.(selectedTile.x, selectedTile.y),
-                strangers: world.residents.filter((r) => !own.includes(r)),
+                nodeAt,
+                terrain: terrainAt?.(selectedTile.x, selectedTile.y),
+                strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),
+                residents: world.residents,
                 cities: world.cities,
+                tick: world.tick,
                 viewer: {
                   realmId: world.home.realmId,
                   allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
                 },
                 workers: (b) => workersHere(world.residents, b),
+                nodeFit: (() => {
+                  const node = nodeAt?.(selectedTile.x, selectedTile.y)
+                  if (!node || !terrainAt) return undefined
+                  // Terrain not loaded counts as unexplored: nothing is laid out there.
+                  const at = (x: number, y: number) => terrainAt(x, y) ?? UNEXPLORED
+                  return nodeFit(node, world, nodeAt!, { size: world.map.size, at })
+                })(),
               },
               GOOD_LABELS,
             )}
+            tick={world.tick}
             building={world.buildings.find(
               (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
             )}
             nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
+            buildingNode={buildingNodeKind(
+              world.buildings.find(
+                (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
+              ),
+              nodeAt,
+            )}
             actor={selected}
             orderError={orderError}
             onClose={() => setSelectedTile(undefined)}
@@ -427,9 +460,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               const order = { kind: 'walkTo', residentId: selected.id, ...selectedTile }
               setOrderError(await sendOrder(order))
             }}
+            onBuildHere={async (building, at) => {
+              // The Build task, walking to where the node's workplace fits first (ADR 0002).
+              if (!selected) return
+              const order = { kind: 'task', task: 'build', residentId: selected.id, building, at }
+              setOrderError(await sendOrder(order))
+            }}
             onSetGate={async (gateId, open) =>
               setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
             }
+            onOpenCity={(id) => {
+              setOpenCityId(id)
+              setOpenDrawer('cities')
+            }}
           />
         </div>
       )}
@@ -443,7 +486,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             tick={world.tick}
             picking={picking}
             onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
-            carriage={onTile(world.carriages)}
+            carriage={onTile(world.carriages.filter(loadKnown))}
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
             onRoadTo={() => setPicking((p) => (p === 'road' ? false : 'road'))}
             onHaulTo={(setup) => {
@@ -479,7 +522,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onTearDown={tearDown}
             residents={own}
             onPair={pair}
-            others={world.residents.filter((r) => !own.includes(r))}
+            others={world.residents.filter((r) => !own.some((o) => o.id === r.id))}
             mapSize={world.map.size}
             onAttack={attack}
             walls={world.buildings.filter(
@@ -533,13 +576,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
 }
 
 /** How many of the residents in sight work the building, if there is one. */
-function workersHere(residents: Resident[], building: Building | undefined): number {
+function workersHere(residents: SeenResident[], building: Building | undefined): number {
   if (!building) return 0
   return residents.filter((r) => r.order?.kind === 'workAt' && r.order.buildingId === building.id)
     .length
 }
 
 /** The realms holding the building, as far as the Player sees its workers. */
-function heldBy(residents: Resident[], building: Building | undefined): string[] {
+function heldBy(residents: SeenResident[], building: Building | undefined): string[] {
   return building ? holdersOf({ residents }, building) : []
 }

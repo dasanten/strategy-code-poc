@@ -126,9 +126,11 @@ export interface RunningScript {
 
 /**
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
- * memory, which stays on the server.
+ * memory, which stays on the server. Their hunger and health only for their own realm and its
+ * allies (`CONTEXT.md`: Seeing how someone fares).
  */
-export type SeenResident = Omit<Resident, 'script'> & { script?: Pick<RunningScript, 'scriptId'> }
+export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health'> &
+  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: Pick<RunningScript, 'scriptId'> }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
