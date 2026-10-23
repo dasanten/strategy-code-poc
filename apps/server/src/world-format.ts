@@ -5,15 +5,15 @@ import type { TerrainMap, WorldState } from '@csp/shared'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 36
+export const WORLD_FORMAT_VERSION = 37
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
  * (ADR 0006). The world was reset twice before anyone played for real: once when the map became
  * a torus (before format 6), and once for the 4× finer grid with buildings covering several
- * tiles (before format 36, "Exception: the second reset"). Never raise this again.
+ * tiles (before format 37, "Exception: the second reset"). Never raise this again.
  */
-export const RESET_BEFORE = 36
+export const RESET_BEFORE = 37
 
 /** What a migration step may look at besides the save itself. */
 export interface MigrationContext {

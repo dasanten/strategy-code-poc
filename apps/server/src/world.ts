@@ -40,6 +40,7 @@ import { stepStanding } from './standing.js'
 import { stepPersuasion } from './persuasion.js'
 import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
+import { runNpcScripts } from './script-runner.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
 import { stepNpcDefence } from './npc-defence.js'
 
@@ -158,6 +159,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepNpcHire(world, terrain.size)
   stepPunishments(world, terrain.size)
   stepNpcCities(world, terrain.size, terrain)
+  runNpcScripts(world, terrain)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
   const strikes = requestStrikes(world, terrain.size)

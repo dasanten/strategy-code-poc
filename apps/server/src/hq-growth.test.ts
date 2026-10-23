@@ -193,7 +193,8 @@ function weak() {
 
 /**
  * Fills every spot between its rings the HQ could put a house on, so its housing stays full:
- * warehouses wherever one fits, row by row, then storages in the gaps.
+ * warehouses wherever one fits, row by row, then smelters in the gaps: nothing an NPC city works
+ * or carries its output to, so the HQ goes on as it would.
  */
 function fillRoom(world: WorldState, hq: City, outermost: number) {
   const hall = townHallOf(world, hq)!
@@ -205,12 +206,14 @@ function fillRoom(world: WorldState, hq: City, outermost: number) {
   }
   let n = 0
   // The biggest footprints first, so there are few buildings and the ticks stay quick.
-  for (const kind of ['warehouse', 'storage'] as const) {
+  for (const kind of ['warehouse', 'smelter'] as const) {
     for (let y = MID - r; y <= MID + r; y++) {
       for (let x = MID - r; x <= MID + r; x++) {
         if (!ground.fits(kind, x, y, between)) continue
         ground.take(kind, x, y)
-        world.buildings.push({ id: `fill${n++}`, kind, cityId: hq.id, x, y })
+        // A workplace belongs to no city (`CONTEXT.md`: Workplace).
+        const cityId = kind === 'smelter' ? null : hq.id
+        world.buildings.push({ id: `fill${n++}`, kind, cityId, x, y })
       }
     }
   }

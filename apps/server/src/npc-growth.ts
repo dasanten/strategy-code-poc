@@ -351,6 +351,7 @@ function farmsFull(world: WorldState, city: City): boolean {
   return farms.every((f) => {
     const there = world.residents.filter(
       (r) =>
+        r.script?.memory.workplaceId === f.id ||
         (r.order?.kind === 'workAt' && r.order.buildingId === f.id) ||
         (r.order?.kind === 'walkTo' && r.order.target.x === f.x && r.order.target.y === f.y),
     ).length

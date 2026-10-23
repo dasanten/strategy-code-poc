@@ -80,6 +80,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
+  // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
+  const [scriptToOpen, setScriptToOpen] = useState<{ id: number; at: number }>()
   // A place from the realm log to show on the map.
   const [focus, setFocus] = useState<{ x: number; y: number }>()
   // The drawer open over the map, if any (ADR 0008: one at a time).
@@ -111,8 +113,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (mode === 'haul' && carriage && haulSetup) {
-      const order = { kind: 'haul', residentId: selected.id, carriageId: carriage.id, x, y }
-      setOrderError(await sendOrder({ ...order, ...haulSetup }))
+      // The Haul task: they run the Player's Haul (default) script (`CONTEXT.md`: Default script).
+      const order = { kind: 'task', task: 'haul', residentId: selected.id, carriageId: carriage.id }
+      setOrderError(await sendOrder({ ...order, x, y, ...haulSetup }))
       return
     }
     if (mode === 'road') {
@@ -135,15 +138,24 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'build', residentId: selected.id, building }))
   }
-  /** Orders the picked resident to work the workplace on their tile, making `makes` at a smithy. */
+  /**
+   * Gives the picked resident the Work task at the workplace on their tile, making `makes` at a
+   * smithy: they run the Player's Work (default) script (`CONTEXT.md`: Default script).
+   */
   async function work(makes?: Good) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'workAt', residentId: selected.id, makes }))
+    const workplaceId = buildingHere?.id
+    const order = { kind: 'task', task: 'work', residentId: selected.id, workplaceId, makes }
+    setOrderError(await sendOrder(order))
   }
-  /** Orders the picked resident to tear down the building or site on their tile. */
+  /**
+   * Gives the picked resident the Tear down task for the building or site on their tile: they
+   * run the Player's Tear down (default) script.
+   */
   async function tearDown(buildingId: string) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'tearDown', residentId: selected.id, buildingId }))
+    const order = { kind: 'task', task: 'tearDown', residentId: selected.id, buildingId }
+    setOrderError(await sendOrder(order))
   }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
@@ -351,7 +363,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />,
         )}
       {/* Mounted before the world arrives too: it loads the scripts the inspector can run. */}
-      {drawer('scripts', <ScriptLibrary onScripts={setScripts} />)}
+      {drawer('scripts', <ScriptLibrary onScripts={setScripts} toOpen={scriptToOpen} />)}
       {world &&
         drawer(
           'realmLog',
@@ -420,6 +432,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onStop={stop}
             scripts={scripts}
             onRunScript={runScript}
+            onEditScript={(id) => {
+              setScriptToOpen({ id, at: Date.now() })
+              setOpenDrawer('scripts')
+            }}
             orderError={orderError}
             pile={world.piles.find(
               (p) => p.x === (buildingHere ?? selected).x && p.y === (buildingHere ?? selected).y,

@@ -30,6 +30,7 @@ import {
   wallStrengthLeft,
   carryCapacity,
   materialsNeeded,
+  putAwayUnits,
   recipeGood,
   teardownReturns,
   teardownWork,
@@ -136,11 +137,41 @@ export interface HaulSetup {
   keepFood: number
 }
 
-/** What a resident is doing, from their order and the script they run. */
-function doing(r: Resident): string {
+/** What a resident is doing, from their order and the script they run, named if it is known. */
+function doing(r: Resident, scripts: ScriptSummary[] = []): string {
   const now = orderDoing(r)
   if (!r.script) return now
-  return now === 'Idle' ? 'Running a script' : `Running a script · ${now}`
+  const { scriptId } = r.script
+  const name = scripts.find((s) => s.id === scriptId)?.name ?? 'Running a script'
+  return now === 'Idle' ? name : `${name} · ${now}`
+}
+
+/**
+ * The script a resident runs, such as the default script of the task they were given
+ * (`CONTEXT.md`: Default script), with a button to open it in the library.
+ */
+function TaskScript({
+  scriptId,
+  scripts,
+  onEdit,
+}: {
+  scriptId: number
+  scripts: ScriptSummary[]
+  onEdit: (scriptId: number) => void
+}) {
+  const script = scripts.find((s) => s.id === scriptId)
+  const note = !script?.task ? '' : script.followsDefault ? 'the game’s default' : 'edited by you'
+  return (
+    <div className="task-script goods-row">
+      <span className="small">
+        Runs <strong>{script?.name ?? 'a script'}</strong>
+      </span>
+      <span className="muted small">{note}</span>
+      <button type="button" onClick={() => onEdit(scriptId)} disabled={!script}>
+        Edit
+      </button>
+    </div>
+  )
 }
 
 /** What a resident's built-in order has them doing. */
@@ -290,6 +321,7 @@ export function ResidentCard({
   onStop,
   scripts,
   onRunScript,
+  onEditScript,
   onClose,
 }: {
   resident: Resident
@@ -314,6 +346,8 @@ export function ResidentCard({
   scripts: ScriptSummary[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
   onRunScript: (scriptId: number) => void
+  /** Opens a script in the library, such as the one the resident's task runs. */
+  onEditScript: (scriptId: number) => void
   /** Why the last order was turned down, if it was. */
   orderError: string | undefined
   /** Goods lying on the resident's tile, if any are in sight. */
@@ -405,7 +439,7 @@ export function ResidentCard({
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
         `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}`,
-        <strong key="doing">{doing(r)}</strong>,
+        <strong key="doing">{doing(r, scripts)}</strong>,
       ]}
       onClose={onClose}
     >
@@ -422,6 +456,9 @@ export function ResidentCard({
         />
       </div>
 
+      {r.script && (
+        <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
+      )}
       <ActionRows actions={actions} open={shown} onAction={act} />
       <p className="muted small" role="status">
         {orderError
@@ -482,55 +519,23 @@ export function ResidentCard({
                   </p>
                 )}
                 {carried.map(([good, units]) => (
-                  <div className="goods-row" key={good}>
-                    <span>{GOOD_LABELS[good]}</span>
-                    <span className="mono">{units}</span>
-                    <span className="buttons">
-                      <button
-                        type="button"
-                        disabled={child}
-                        onClick={() => onDrop(ground, { [good]: units })}
-                      >
-                        Drop
-                      </button>
-                      {storage && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(inStorage, { [good]: units })}
-                        >
-                          Store
-                        </button>
-                      )}
-                      {(needed[good] ?? 0) > 0 && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(atSite, { [good]: units })}
-                        >
-                          Deliver
-                        </button>
-                      )}
-                      {(roadNeeded[good] ?? 0) > 0 && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(atRoadSite, { [good]: units })}
-                        >
-                          Deliver to road
-                        </button>
-                      )}
-                      {carriage && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(onCarriage, { [good]: units })}
-                        >
-                          Load
-                        </button>
-                      )}
-                    </span>
-                  </div>
+                  <GoodsRow
+                    key={good}
+                    good={good}
+                    units={units}
+                    byDefault={putAwayUnits(good, units)}
+                    disabled={child}
+                    actions={[
+                      { label: 'Drop', spot: ground },
+                      ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
+                      ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
+                      ...((roadNeeded[good] ?? 0) > 0
+                        ? [{ label: 'Deliver to road', spot: atRoadSite }]
+                        : []),
+                      ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
+                    ]}
+                    onAct={onDrop}
+                  />
                 ))}
               </section>
               {(pile || storage || site || roadSite || carriage) && (
@@ -943,7 +948,9 @@ function WorkBlock({
   if (!building || max === undefined || !skill || (!good && recipes.length === 0)) return null
   const batches = BATCHES_PER_DAY[building.kind] ?? 0
   const o = resident.order
-  const working = o?.kind === 'workAt' && o.buildingId === building.id
+  // Working by the task's script; one working by a bare order (as the starting residents do) can
+  // still be given the task.
+  const working = o?.kind === 'workAt' && o.buildingId === building.id && !!resident.script
   const blocked = !canWork(resident, tick) || (!working && workers >= max)
   return (
     <section className="inspector-block" aria-label="Work">
@@ -1278,21 +1285,72 @@ function TileGoods({
       <div className="small muted">{title}</div>
       {goods.length === 0 && <p className="muted small">Nothing.</p>}
       {goods.map(([good, units]) => (
-        <div className="goods-row" key={good}>
-          <span>{GOOD_LABELS[good]}</span>
-          <span className="mono">{units}</span>
-          <span className="buttons">
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => onPickUp(spot, { [good]: units })}
-            >
-              Pick up
-            </button>
-          </span>
-        </div>
+        <GoodsRow
+          key={good}
+          good={good}
+          units={units}
+          byDefault={units}
+          disabled={disabled}
+          actions={[{ label: 'Pick up', spot }]}
+          onAct={onPickUp}
+        />
       ))}
     </>
+  )
+}
+
+/**
+ * One good with an amount and buttons that act on that many: `byDefault` until the Player types
+ * an exact amount, which is honoured as typed (`CONTEXT.md`: Own food).
+ */
+function GoodsRow({
+  good,
+  units,
+  byDefault,
+  disabled,
+  actions,
+  onAct,
+}: {
+  good: Good
+  units: number
+  byDefault: number
+  disabled: boolean
+  actions: { label: string; spot: GoodsSpot }[]
+  onAct: (spot: GoodsSpot, goods: Stock) => void
+}) {
+  const [typed, setTyped] = useState<number>()
+  const amount = Math.min(typed ?? byDefault, units)
+  return (
+    <div className="goods-row">
+      <span>{GOOD_LABELS[good]}</span>
+      <span className="mono">{units}</span>
+      <span className="buttons">
+        <input
+          className="amount"
+          type="number"
+          min={0}
+          max={units}
+          step={1}
+          aria-label={`${GOOD_LABELS[good]} amount`}
+          value={amount}
+          disabled={disabled}
+          onChange={(e) => setTyped(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+        />
+        {actions.map(({ label, spot }) => (
+          <button
+            key={label}
+            type="button"
+            disabled={disabled || amount === 0}
+            onClick={() => {
+              onAct(spot, { [good]: amount })
+              setTyped(undefined)
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </span>
+    </div>
   )
 }
 

@@ -12,8 +12,8 @@ Status: decided (2026-10-18, with Daniel). Replaces the storage and map parts of
   changes to the generator never reshape an existing world.
 - **Everything else** (residents, buildings, goods, …) lives in memory and is saved as a
   compressed JSON **snapshot** every 30 ticks and on shutdown. Old snapshots are pruned: the last
-  20 are kept, plus one per game day for a week. A crash loses at most 30 s. Accounts, sessions,
-  invite codes and scripts are ordinary tables.
+  20 are kept, plus one per real hour for a real week. A crash loses at most 30 s. Accounts,
+  sessions, invite codes and scripts are ordinary tables.
 - **Migrations, always:** the snapshot carries a format version. Changing the shape of world state
   ships a migration function from the previous version, with a test. The world is never reset by
   a deploy. Schema changes to tables use Drizzle migrations as before.
@@ -53,4 +53,6 @@ grid (10 m tiles, 7.5 s each, 5,760 tiles across) with buildings covering severa
 position, building and distance before anyone played for real was not worth it, so the world was
 reset the same way as the first time: terrain, world saves and explored terrain deleted;
 accounts, sessions, invite codes and scripts kept; a new starting city for every Player on their
-next login. From then on the rule above holds again.
+next login. The new calendar (`CONTEXT.md`: Game time, Aging; 24-minute game days, 420-day
+years) rides the same reset, so ages and timers need no migration. From then on the rule above
+holds again.

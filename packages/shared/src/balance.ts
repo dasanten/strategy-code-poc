@@ -18,6 +18,10 @@ import {
 /**
  * Balance numbers: how much, how fast, how often. The rules (what happens) are in `CONTEXT.md`;
  * these are the values Daniel tunes. One commented constant each.
+ *
+ * Work (eating, production, building, skill, spoilage, breeding) is counted in game days; social
+ * and political timers (memory, standing, persuasion, contracts, punishment, alliance delays) keep
+ * their real-time length (`CONTEXT.md`: Game time).
  */
 
 /** Tiles along each side of the map: once around is a ~12 h walk at ~7.5 s per plains tile. */
@@ -281,23 +285,11 @@ export const CITY_PRICE_BY_BUILDING: Partial<Record<BuildingKind, number>> = {
 export const NPC_FOOD_SHORT_DAYS = 5
 
 /**
- * An NPC city sends one of a workplace's workers to carry its output to the storage once this
- * many units of it lie in the workplace's pile: about what a resident carries, so a
- * trip is worth the walk.
+ * Units of Food a farm's pile keeps when a worker carries its output away (`CONTEXT.md`:
+ * Carrying the output), so the workers there can still refill at their workplace (Refilling at a
+ * workplace). Written into the Work default's source, where a Player can change it.
  */
-export const NPC_FETCH_UNITS = 15
-
-/**
- * Units of Food an NPC city's carrier leaves in a farm's pile, so the workers there can still
- * refill at their workplace (`CONTEXT.md`: Refilling at a workplace).
- */
-export const NPC_FOOD_LEFT_AT_WORK = 4
-
-/**
- * Units of Food an NPC city's carrier keeps on them when putting the rest in the storage: what a
- * resident starts out with, so nobody walks to the storage for the food they carry anyway.
- */
-export const NPC_OWN_FOOD = START_CARRIED_FOOD
+export const WORK_FOOD_KEPT = 4
 
 /**
  * Share of an NPC city's adults it keeps as soldiers (`CONTEXT.md`: NPC city, Soldier), rounded
@@ -617,6 +609,13 @@ export const FOOD_PER_DAY = 2
  * game day's meals (`CONTEXT.md`: Eating). They then take meals from their city's storage.
  */
 export const HOME_FOOD_LOW = 2
+
+/**
+ * A resident's own food (`CONTEXT.md`: Own food), in units: two game days of meals. Putting goods
+ * away leaves it in their hands unless the Player asks for an exact amount (`putAwayUnits`); NPC
+ * residents always keep it, so nobody walks to the storage for the food they carry anyway.
+ */
+export const OWN_FOOD = 2 * FOOD_PER_DAY
 
 /** Units of food in one meal, what a resident at home takes from storage at a time. */
 export const MEAL_UNITS = 1

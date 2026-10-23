@@ -7,16 +7,28 @@ import {
 } from '@csp/lang'
 import {
   ARMY_SCRIPT_API,
+  GOODS,
   HAUL_KEEP_FOOD,
+  RECIPES,
   SCRIPT_API,
   Terrain,
   ageInYears,
   directivesFor,
   organizationLabel,
+  pileAt,
   terrainAt,
+  unitsThatFit,
+  walkSpeed,
+  workplaceGood,
+  wrap,
+  wrapDelta,
   wrapDistance,
+  type Good,
+  type Building,
   type OrderRequest,
+  type Resident,
   type ResourceNode,
+  type RunningScript,
   type ScriptBinding,
   type SeenEntity,
   type TerrainMap,
@@ -24,6 +36,9 @@ import {
 } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
+import { hash, mulberry32 } from './residents.js'
+import { sightOf } from './sight.js'
+import { realmOf } from './starting-city.js'
 
 /**
  * The game API bound for a running script (`CONTEXT.md`: Script, Memory, Step budget; ADR 0002).
@@ -49,6 +64,11 @@ export interface ScriptContext {
   memory: ScriptObject
   /** Everything the Player sees (`entitiesInSight`); called at most once a run. */
   seen: () => readonly SeenEntity[]
+  /**
+   * Whether the Player sees a spot (`sightOf`), shared by every run of theirs this tick; worked
+   * out for this run alone without it.
+   */
+  sees?: (at: { x: number; y: number }) => boolean
   /** Whether the Player has explored a tile (`ExploredTerrain.isExplored`). */
   explored: (x: number, y: number) => boolean
   /** The order kinds actions go through; the game's own by default. */
@@ -92,9 +112,40 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const requests: OrderRequest[] = []
 
   let seen: readonly SeenEntity[] | undefined
-  const seenOf = (is: SeenEntity['is']): Value => {
+  const seenOf = (is: SeenEntity['is'], add?: (id: string) => object | undefined): Value => {
     seen ??= context.seen()
-    return seen.filter((e) => e.is === is).map(({ is: _, ...rest }) => toValue(rest))
+    return seen
+      .filter((e) => e.is === is)
+      .map(({ is: _, ...rest }) => toValue({ ...rest, ...add?.(rest.id) }))
+  }
+  // Whose script it is: the Player's realm, or the NPC city running the game's defaults.
+  const side = sender.npcCityId ?? realmOf(world, sender.userId)?.id
+  const own = (r: Resident) =>
+    side !== undefined &&
+    (sender.npcCityId === undefined ? r.owner === side : r.owner === null && r.cityId === side)
+  let sees: ((at: { x: number; y: number }) => boolean) | undefined
+  const inSight = (at: { x: number; y: number }) =>
+    side !== undefined && (sees ??= context.sees ?? sightOf(world, terrain.size, side))(at)
+  // A building of one of the side's own cities, which it knows of in sight or not.
+  const ownBuilding = (b: Building) =>
+    side !== undefined &&
+    b.cityId !== null &&
+    (sender.npcCityId !== undefined
+      ? b.cityId === side
+      : world.cities.some((c) => c.id === b.cityId && c.realmId === side))
+  // A script reads, never changes, the memory of its own Player's residents (`CONTEXT.md`:
+  // Memory); other Players' stays hidden.
+  let ownScripts: Map<string, RunningScript> | undefined
+  const ownMemory = (id: string) => {
+    ownScripts ??= new Map(
+      world.residents.flatMap((r) => (own(r) && r.script ? [[r.id, r.script] as const] : [])),
+    )
+    const running = ownScripts.get(id)
+    return running && { script: { scriptId: running.scriptId, memory: running.memory } }
+  }
+  const asSeen = (r: Resident) => {
+    const { script, ...rest } = r
+    return toValue({ ...rest, script: { scriptId: script!.scriptId, memory: script!.memory } })
   }
   let nodes: Value[] | undefined
   const exploredNodes = (): Value => {
@@ -105,7 +156,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   }
 
   const queries: Record<string, (args: Value[]) => Value> = {
-    residents: () => seenOf('resident'),
+    residents: () => seenOf('resident', ownMemory),
     buildings: () => seenOf('building'),
     cities: () => seenOf('city'),
     horses: () => seenOf('horse'),
@@ -114,6 +165,33 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     nodes: exploredNodes,
     directives: () =>
       directivesFor(world, (org) => organizationLabel(world, org)).map((d) => toValue(d)),
+    withMemory: ([key, value]) => {
+      if (typeof key !== 'string') throw new ScriptRuntimeError('"withMemory" needs a key')
+      const wanted = JSON.stringify(plain(value) ?? null)
+      return world.residents
+        .filter(
+          (r) => own(r) && r.script && JSON.stringify(r.script.memory[key] ?? null) === wanted,
+        )
+        .map(asSeen)
+    },
+    building: ([id]) => {
+      const b = world.buildings.find((x) => x.id === id)
+      return b && (ownBuilding(b) || inSight(b)) ? toValue(b) : null
+    },
+    pileAt: ([x, y]) => {
+      const at = tile(x, y, 'pileAt')
+      return inSight(at) ? toValue(pileAt(world, at.x, at.y)?.goods) : null
+    },
+    outputOf: ([building]) => {
+      const id = (building as Record<string, Value> | null)?.id
+      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      if (!b || !(ownBuilding(b) || inSight(b))) return []
+      const recipes = RECIPES[b.kind]
+      const goods = recipes
+        ? [...new Set(recipes.flatMap((r) => Object.keys(r.output)))]
+        : [workplaceGood(world, b)].filter((g) => g !== undefined)
+      return Object.freeze(goods) as Value[]
+    },
     terrainAt: ([x, y]) => {
       const at = tile(x, y, 'terrainAt')
       if (!context.explored(at.x, at.y)) return null
@@ -163,6 +241,26 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     // The script's own state is `memory`, not part of `me`.
     me = toValue({ ...resident, script: undefined, age: ageInYears(resident, world.tick) })
     actions = residentActions(request, resident)
+    queries.fits = ([good]) => {
+      if (!(GOODS as readonly unknown[]).includes(good)) {
+        throw new ScriptRuntimeError(`"fits" needs a good, not ${String(good)}`)
+      }
+      return unitsThatFit(resident, good as Good, world.tick)
+    }
+    const time = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      walkTime(world, terrain, context.explored, resident, a, b)
+    queries.walkTime = ([a, b]) => time(spot(a, 'walkTime'), spot(b, 'walkTime'))
+    queries.storages = ([from]) => {
+      const storages = world.buildings.filter(
+        (b) => b.kind === 'storage' && !b.site && ownBuilding(b),
+      )
+      if (from !== undefined && from !== null) {
+        const at = spot(from, 'storages')
+        const by = new Map(storages.map((b) => [b, time(at, b)]))
+        storages.sort((a, b) => by.get(a)! - by.get(b)!)
+      }
+      return Object.freeze(storages.map((b) => toValue(b))) as Value[]
+    }
   }
 
   const values: Record<string, Value> = {
@@ -170,6 +268,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     memory: context.memory,
     tick: world.tick,
     mapSize: terrain.size,
+    random: tickRandom(world),
   }
 
   const globals: Record<string, Value> = {}
@@ -183,6 +282,44 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     globals[binding.name] = new NativeFunction(binding.name, call, binding.cost)
   }
   return { globals, requests }
+}
+
+/** The `random` value of a tick: drawn from the world's seed, the same for every script. */
+export function tickRandom(world: Pick<WorldState, 'seed' | 'tick'>): number {
+  return mulberry32(hash(`${world.seed}:${world.tick}:random`))()
+}
+
+/**
+ * About how many ticks a resident takes to walk from `a` to `b` (`walkTime`): step by step along
+ * the straight way, at their pace on each tile's terrain, Plains where they haven't explored.
+ * Tiles they can't walk on count at their slowest pace on land; roads and walls are left out.
+ */
+export function walkTime(
+  world: WorldState,
+  terrain: TerrainMap,
+  explored: (x: number, y: number) => boolean,
+  r: Resident,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  const size = terrain.size
+  const dx = wrapDelta(a.x, b.x, size)
+  const dy = wrapDelta(a.y, b.y, size)
+  const steps = Math.abs(dx) + Math.abs(dy)
+  const slowest = walkSpeed(r, Terrain.Mountain, world.tick)
+  let ticks = 0
+  let x = a.x
+  let y = a.y
+  for (let i = 0, sx = 0; i < steps; i++) {
+    // A step along x while the x steps so far lag behind the straight line.
+    if (sx < Math.abs(dx) && (sx + 0.5) * Math.abs(dy) <= (i - sx + 0.5) * Math.abs(dx)) {
+      x = wrap(x + Math.sign(dx), size)
+      sx++
+    } else y = wrap(y + Math.sign(dy), size)
+    const ground = explored(x, y) ? terrainAt(terrain, x, y) : Terrain.Plains
+    ticks += 1 / (walkSpeed(r, ground, world.tick) || slowest)
+  }
+  return Math.ceil(ticks)
 }
 
 /** The actions of a resident's script (`SCRIPT_API`), each asking for the order of its name. */

@@ -3,9 +3,11 @@ import { checkScript } from '@csp/lang'
 import { describe, expect, it } from 'vitest'
 import {
   canMakeActive,
+  defaultStatus,
   describeDiagnostic,
   diagnosticRange,
   hasUnsavedChanges,
+  lineDiff,
   savedMessage,
   scriptHighlighting,
   versionStatus,
@@ -139,5 +141,29 @@ describe('script history', () => {
     expect(hasUnsavedChanges([], '')).toBe(true)
     expect(hasUnsavedChanges([{ source: 'a' }, { source: 'b' }], 'b')).toBe(false)
     expect(hasUnsavedChanges([{ source: 'a' }, { source: 'b' }], 'a')).toBe(true)
+  })
+})
+
+describe('lineDiff', () => {
+  it('keeps common lines and marks removed and added ones', () => {
+    expect(lineDiff('a\nb\nc', 'a\nx\nc\nd')).toEqual([
+      { op: ' ', text: 'a' },
+      { op: '+', text: 'x' },
+      { op: '-', text: 'b' },
+      { op: ' ', text: 'c' },
+      { op: '+', text: 'd' },
+    ])
+    expect(lineDiff('same', 'same')).toEqual([{ op: ' ', text: 'same' }])
+  })
+})
+
+describe('defaultStatus', () => {
+  const gameDefault = (editedFrom: string | null) => ({ source: 'new', editedFrom })
+  it('tells following, edited, and edited before the game’s default changed apart', () => {
+    expect(defaultStatus({ followsDefault: true, gameDefault: gameDefault(null) })).toBe('follows')
+    expect(defaultStatus({ followsDefault: false, gameDefault: gameDefault('new') })).toBe('edited')
+    expect(defaultStatus({ followsDefault: false, gameDefault: gameDefault('old') })).toBe(
+      'default changed',
+    )
   })
 })

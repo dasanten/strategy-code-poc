@@ -242,6 +242,7 @@ describe('the Trade Organization under an admin directive', () => {
     expect(tradeOrgRefuses(world, 'r2')).toBe(false)
   })
 
+  // NPC cities' workers run the Work default every tick, which takes a while over game days.
   it('sends its army to the target’s city nearest the HQ, again and again', () => {
     const { world, walking } = setup()
     const d = give(world, 'r1')

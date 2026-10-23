@@ -13,8 +13,11 @@ The shared language of the game. Domain terms only — no implementation details
 - **Map:** a rectangle whose opposite sides join: walk off the east side and you come back in from
   the west, off the north and you come back from the south. The world has no edge and no centre.
   An unloaded resident walking once around it on flat land takes about **12 real hours**.
-- **Game time:** 1 game day = 1 real hour; 1 game week = 7 game days; 1 game year = 1 real day. Crossing the map takes about
-  12 game days.
+- **Game time:** 1 real second = 1 game minute, so 1 game day = 24 real minutes; 1 game week = 7
+  game days; 1 game year = 420 game days = 1 real week. Walking once around the map takes about
+  30 game days. Work is counted in game days (eating, production, building, skill, spoilage,
+  breeding); social and political timers (memory, standing, persuasion, contracts, punishment,
+  alliance delays) keep their real-time length, so they last more game days than before.
 - **Tile:** one cell of the map, about 10 m across, with one terrain type. An unloaded resident
   walks one plains tile in about 7.5 seconds, so the map is 5,760 × 5,760 tiles. Every tile
   exists; two places are at most 2,880 tiles apart along each direction.
@@ -289,7 +292,7 @@ The shared language of the game. Domain terms only — no implementation details
   any member falls too low. It keeps its own behaviour.
 - **Alliance army:** soldiers and carriages members hand over to the alliance leader's command.
   They stay in their own realm but take orders only from the alliance leader. Their owner can
-  recall them, which takes effect after a game day; leaving the alliance recalls them.
+  recall them, which takes effect after a real hour; leaving the alliance recalls them.
 - **Territory:** the area an Organization controls. Derived, not claimed: cities and guarded
   workplaces project control around them according to their size and garrison; where they
   overlap, the stronger wins. A workplace is **guarded** while an armed resident of whoever
@@ -409,6 +412,7 @@ The shared language of the game. Domain terms only — no implementation details
   anyone else.
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
+  The Leader role can pass to another resident before the Leader dies (details to follow).
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
   Leader was. Their cities become self-managed. The Player respawns as a new Leader with a fresh
   starting city on their next login.
@@ -441,16 +445,21 @@ The shared language of the game. Domain terms only — no implementation details
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
-  its own in NPC cities). A birth needs free housing and a food surplus; each pair has at most one
-  child per game year. The only way, besides integrating, that residents come into being.
-  A Player's pairing order takes up both residents' order; any other order for either ends the
-  pair. A child can come once a game year has passed since they paired or last had one.
+  its own in NPC cities). Each pair has one child at most, so at most one per game year. The only
+  way, besides integrating, that residents come into being. Once a game year has passed since
+  they paired, and their city has free housing and a food surplus, one partner, chosen at random,
+  starts **Carrying** the child; the other keeps working as before.
+- **Carrying:** a partner carrying a child can't work for 60 game days (24 real hours); then the
+  child is born and the pair ends. For another child the Player pairs them again (NPC cities do
+  it on their own).
 - **Child:** a resident born to a pair. Each base stat is the parents' average plus a small
   random amount. Born where a parent stands, into their city and realm. Grows up for a while
   before it can work: until grown, a child can walk and eats what they take at home (Refilling at
   home), but can't work, build, tear down, drive, pair, or pick up and put down goods.
 - **Aging:** residents grow old; their stats decline late in life, and they die of old age at
-  around 60 game years. Children are grown after about 14 game years.
+  around 60 game years. Children age faster: each year of age up to 14 takes 10 game days
+  (4 real hours), so a child is grown after about 140 game days (~56 real hours); from 14 on, a
+  year of age is a game year.
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and
   less with high Endurance. An empty hunger meter costs health; without food a resident dies
   after about 2 game days. While the meter isn't empty, lost health slowly comes back.

@@ -125,3 +125,53 @@ export function savedMessage(
       : `version ${detail.activeVersion} stays active`
   return `Saved version ${latest}, but it has syntax errors, so ${active}.`
 }
+
+/** One line of a line diff: kept, or only in the old or only in the new source. */
+export interface DiffLine {
+  op: ' ' | '-' | '+'
+  text: string
+}
+
+/**
+ * The lines that changed from `before` to `after`, by longest common subsequence: what the
+ * editor shows when the game's default changed since the Player edited theirs.
+ */
+export function lineDiff(before: string, after: string): DiffLine[] {
+  const a = before.split('\n')
+  const b = after.split('\n')
+  // common[i][j]: the longest common subsequence of a[i..] and b[j..].
+  const common = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      common[i]![j] =
+        a[i] === b[j]
+          ? common[i + 1]![j + 1]! + 1
+          : Math.max(common[i + 1]![j]!, common[i]![j + 1]!)
+    }
+  }
+  const out: DiffLine[] = []
+  let i = 0
+  let j = 0
+  while (i < a.length || j < b.length) {
+    if (i < a.length && j < b.length && a[i] === b[j]) {
+      out.push({ op: ' ', text: a[i++]! })
+      j++
+    } else if (j < b.length && (i === a.length || common[i]![j + 1]! >= common[i + 1]![j]!)) {
+      out.push({ op: '+', text: b[j++]! })
+    } else {
+      out.push({ op: '-', text: a[i++]! })
+    }
+  }
+  return out
+}
+
+/** How a default script stands against the game's default, for the editor's head. */
+export function defaultStatus(
+  detail: Pick<ScriptDetail, 'followsDefault' | 'gameDefault'>,
+): 'follows' | 'edited' | 'default changed' {
+  if (detail.followsDefault) return 'follows'
+  const { gameDefault } = detail
+  return gameDefault?.editedFrom != null && gameDefault.editedFrom !== gameDefault.source
+    ? 'default changed'
+    : 'edited'
+}

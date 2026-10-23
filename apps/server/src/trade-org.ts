@@ -356,6 +356,7 @@ export function foundTradeOrgHq(
     })
     r.carried = { food: START_CARRIED_FOOD }
     r.order = { kind: 'workAt', buildingId: farm.id, at: { x: farm.x, y: farm.y }, progress: 0 }
+    r.script = { scriptId: 0, task: 'work', memory: { workplaceId: farm.id } }
     return r
   })
   world.residents.push(...residents)

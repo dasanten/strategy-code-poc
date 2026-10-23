@@ -1,23 +1,20 @@
 import {
   HOME_FOOD_LOW,
   MAX_WORKERS,
-  NPC_FETCH_UNITS,
-  NPC_FOOD_LEFT_AT_WORK,
   NPC_FOOD_SHORT_DAYS,
-  NPC_OWN_FOOD,
+  OWN_FOOD,
   RECIPES,
   WORK_OUTPUT_PER_DAY,
   canWork,
   cityFoodUse,
   contractOf,
   hasFoodSurplus,
-  buildingPile,
   inCityArea,
   isArmed,
   isAt,
   punishers,
+  putAwayUnits,
   storedFood,
-  workProblem,
   workersOf,
   workplaceGood,
   type Building,
@@ -31,7 +28,6 @@ import {
 } from '@csp/shared'
 import { cityGrowth } from './npc-growth.js'
 import { refillSource } from './survival.js'
-import { startWork } from './work.js'
 import { caravanCrew } from './caravans.js'
 
 /**
@@ -71,8 +67,12 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
   const crew = caravanCrew(world)
   const away = punishers(world)
   for (const r of world.residents) {
-    if (r.owner !== null || r.cityId === null || crew.has(r.id) || away.has(r.id)) continue
-    if (contractOf(world, r.id)) continue
+    if (r.owner !== null || r.cityId === null) continue
+    if (crew.has(r.id) || away.has(r.id) || contractOf(world, r.id)) {
+      // Nor do they go on with the city's Work default.
+      if (r.script?.scriptId === 0) delete r.script
+      continue
+    }
     const list = residents.get(r.cityId) ?? []
     list.push(r)
     residents.set(r.cityId, list)
@@ -87,9 +87,10 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
 /**
  * What an NPC city does each tick: puts its idle adults to work on its farms and workplaces,
  * farms first until it has a food surplus; moves workers to its farms while Food runs short
- * (`NPC_FOOD_SHORT_DAYS`); sends a worker to carry a
- * workplace's output to the storage once `NPC_FETCH_UNITS` of it lie there; sends workers who
- * run low on food where there is none to refill from home, and has residents take `NPC_OWN_FOOD`
+ * (`NPC_FOOD_SHORT_DAYS`); has its workers run the game's Work default, which carries the
+ * output to the storage (`CONTEXT.md`: Carrying the output; run right after, `runNpcScripts`);
+ * sends workers who
+ * run low on food where there is none to refill from home, and has residents take `OWN_FOOD`
  * from the storage before they set out; gives idle adults their part in the city's growth
  * (`cityGrowth`); and brings idle residents with nothing to do home. Its soldiers (armed adults)
  * are put to no work and no building (`stepNpcDefence`). Children are left alone:
@@ -109,18 +110,24 @@ function runCity(
   const places = workplaces(world, city, !hasFoodSurplus(world, city))
   const adults = people.filter((r) => canWork(r, world.tick))
 
-  if (storage) for (const place of places) fetchOutput(world, place)
   if (short) moveToFarms(world, places)
   for (const r of adults) {
     const o = r.order
     const busy = o?.kind === 'workAt' || o?.kind === 'build' || o?.kind === 'tearDown'
-    if (busy && lowOnFood(r) && !refillSource(world, r, size)) r.order = null
+    if (busy && lowOnFood(r) && !refillSource(world, r, size)) stopWork(r)
+    // Home at the storage with the load stored, a carrier is free for whatever the city needs
+    // most (building, pairing), else back to work.
+    const carry = r.script?.scriptId === 0 ? r.script.memory.carry : undefined
+    const stored = typeof carry === 'object' && carry !== null && !Array.isArray(carry)
+    if (stored && carry.step === 'back' && storage && isAt(r, storage, size)) {
+      stopWork(r)
+    }
   }
   const home = npcHome(world, city)
   const growth = terrain && home && cityGrowth(world, city, home, adults, terrain, short)
 
   for (const r of adults) {
-    if (r.order !== null) continue
+    if (r.order !== null || r.script) continue
     if (growth && growth.assign(r, true)) continue
     const load = storage && haul(r)
     if (storage && load) {
@@ -130,9 +137,9 @@ function runCity(
       continue
     }
     const food = storage?.stock?.food ?? 0
-    if (storage && food > 0 && (r.carried.food ?? 0) < NPC_OWN_FOOD) {
+    if (storage && food > 0 && (r.carried.food ?? 0) < OWN_FOOD) {
       if (isAt(r, storage, size)) {
-        const units = Math.min(food, NPC_OWN_FOOD - (r.carried.food ?? 0))
+        const units = Math.min(food, OWN_FOOD - (r.carried.food ?? 0))
         const from = { kind: 'storage' as const, storageId: storage.id }
         r.order = { kind: 'pickUp', from, goods: { food: units } }
       } else walkTo(r, storage)
@@ -142,9 +149,7 @@ function runCity(
     if (!soldier && growth && growth.assign(r)) continue
     const place = !soldier && places.find((p) => room(world, p) > 0)
     if (place) {
-      if (isAt(r, place, size)) {
-        if (workProblem(world, r) === undefined) startWork(r, place)
-      } else walkTo(r, place)
+      putToWork(r, place)
       continue
     }
     if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
@@ -170,27 +175,37 @@ function workplaces(world: WorldState, city: City, farmsFirst: boolean): Buildin
   return places.sort((a, b) => (farmsFirst ? 1 : -1) * (farm(a) - farm(b)))
 }
 
-/** Room left at a workplace: its most workers, minus those at it and those walking to it. */
+/**
+ * Room left at a workplace: its most workers, minus those working it by its Work default (there,
+ * on their way or away carrying), on it by a bare work-at order, or walking to it.
+ */
 function room(world: WorldState, place: Building): number {
-  const coming = world.residents.filter(
+  return (MAX_WORKERS[place.kind] ?? 0) - takenPlaces(world, place)
+}
+
+/** Residents working a workplace by its Work default or a bare work-at order, or walking to it. */
+export function takenPlaces(world: WorldState, place: Building): number {
+  return world.residents.filter(
     (r) =>
-      r.order?.kind === 'walkTo' && r.order.target.x === place.x && r.order.target.y === place.y,
+      r.script?.memory.workplaceId === place.id ||
+      (r.order?.kind === 'workAt' && r.order.buildingId === place.id) ||
+      (r.order?.kind === 'walkTo' && r.order.target.x === place.x && r.order.target.y === place.y),
   ).length
-  return (MAX_WORKERS[place.kind] ?? 0) - workersOf(world, place).length - coming
 }
 
 /**
- * Once `NPC_FETCH_UNITS` of a workplace's good lie in its pile, one of its workers
- * stops to pick it up, leaving `NPC_FOOD_LEFT_AT_WORK` Food for the others to refill from.
+ * Puts one of the city's residents to work a workplace: they run the game's Work default for it
+ * (`runNpcScripts`), which walks them there.
  */
-function fetchOutput(world: WorldState, place: Building): void {
-  const good = workplaceGood(world, place)
-  if (!good) return
-  const lying = buildingPile(world, place)?.goods[good] ?? 0
-  const units = lying - (good === 'food' ? NPC_FOOD_LEFT_AT_WORK : 0)
-  if (lying < NPC_FETCH_UNITS || units <= 0) return
-  const worker = workersOf(world, place)[0]
-  if (worker) worker.order = { kind: 'pickUp', from: { kind: 'ground' }, goods: { [good]: units } }
+export function putToWork(r: Resident, place: Building): void {
+  const at = { x: place.x, y: place.y }
+  r.script = { scriptId: 0, task: 'work', memory: { workplaceId: place.id, at } }
+}
+
+/** Ends a resident's work: their order, and the Work default they run, if any. */
+export function stopWork(r: Resident): void {
+  r.order = null
+  delete r.script
 }
 
 /**
@@ -203,21 +218,21 @@ function moveToFarms(world: WorldState, places: Building[]): void {
     if (place.kind === 'farm') continue
     const worker = workersOf(world, place)[0]
     if (worker) {
-      worker.order = null
+      stopWork(worker)
       return
     }
   }
 }
 
 /**
- * What a resident carries for the storage: the goods workplaces make, all but `NPC_OWN_FOOD` Food
+ * What a resident carries for the storage: the goods workplaces make, all but `OWN_FOOD` Food
  * to eat; none if nothing. Weapons and armour stay on them.
  */
 function haul(r: Resident): Stock | undefined {
   const load: Stock = {}
   for (const [good, units] of Object.entries(r.carried) as [Good, number][]) {
     if (WORK_OUTPUT_PER_DAY[good] === undefined) continue
-    const n = good === 'food' ? units - NPC_OWN_FOOD : units
+    const n = putAwayUnits(good, units)
     if (n > 0) load[good] = n
   }
   return Object.keys(load).length > 0 ? load : undefined

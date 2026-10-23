@@ -70,7 +70,8 @@ function run(world: WorldState, terrain: TerrainMap, walking: Walking, ticks: nu
   }
 }
 
-describe('NPC cities defend themselves', () => {
+// NPC cities' workers run the Work default every tick, which takes a while over game days.
+describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
   it('keep a quarter of their adults as soldiers, rounded up', () => {
     expect(npcSoldierTarget(NPC_VILLAGE.residents)).toBe(2)
     expect(npcSoldierTarget(NPC_TOWN.residents)).toBe(4)

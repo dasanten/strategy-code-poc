@@ -294,6 +294,9 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
     })
     r.carried = { food: START_CARRIED_FOOD }
     r.order = { kind: 'workAt', buildingId: farm.id, at: { x: fx, y: fy }, progress: 0 }
+    // By the Work default (`CONTEXT.md`: Carrying the output), the Player's version from the
+    // first tick their scripts run.
+    r.script = { scriptId: 0, task: 'work', memory: { workplaceId: farm.id } }
     return r
   })
   const realm: Realm = { id: realmId, userId, leaderId: residents[0]!.id }

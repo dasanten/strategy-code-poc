@@ -1,3 +1,4 @@
+import type { Task } from './default-scripts.js'
 import { Terrain } from './terrain.js'
 
 export const TICK_MS = 1000
@@ -73,8 +74,17 @@ export interface ScriptMemory {
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
  */
 export interface RunningScript {
-  /** The script in the Player's library; its active version is what runs each tick. */
+  /**
+   * The script in the Player's library; its active version is what runs each tick. 0 while it
+   * runs the default of `task` without one: the game's own for an NPC city's resident, until a
+   * Player's resident first runs it as the Player's version.
+   */
   scriptId: number
+  /**
+   * Runs the default script of this task (`CONTEXT.md`: Default script) rather than one the
+   * Player picked, as an NPC city's residents and a starting city's farmers do.
+   */
+  task?: Task
   /** What the script kept between ticks, at most `SCRIPT_MEMORY_MAX` characters of JSON. */
   memory: ScriptMemory
   /** The tick its last error went into the realm log; errors are logged rate-limited. */

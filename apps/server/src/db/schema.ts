@@ -44,6 +44,11 @@ export const inviteCodes = sqliteTable('invite_codes', {
  * A Player's named scripts (`CONTEXT.md`: Script). They belong to the account, not the realm, so
  * they outlast a Leader's death. `activeVersion` is the version that runs: always one without
  * syntax errors, or null while there is none.
+ *
+ * A Player's version of a default script (`CONTEXT.md`: Default script) names its `task`, one
+ * per task. While `followsDefault`, it takes each new game default as a new version; once the
+ * Player edits it, `editedFrom` keeps the game's default it was edited from, so they can be told
+ * when that has changed since.
  */
 export const scripts = sqliteTable(
   'scripts',
@@ -54,10 +59,16 @@ export const scripts = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     activeVersion: integer('active_version'),
+    task: text('task'),
+    followsDefault: integer('follows_default', { mode: 'boolean' }).notNull().default(false),
+    editedFrom: text('edited_from'),
     createdAt: createdAt(),
   },
-  // Names are unique per Player regardless of case.
-  (t) => [uniqueIndex('scripts_user_name_lower').on(t.userId, sql`lower(${t.name})`)],
+  (t) => [
+    // Names are unique per Player regardless of case.
+    uniqueIndex('scripts_user_name_lower').on(t.userId, sql`lower(${t.name})`),
+    uniqueIndex('scripts_user_task').on(t.userId, t.task),
+  ],
 )
 
 /** Every save of a script is a new row, so the history is kept. */
