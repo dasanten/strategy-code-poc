@@ -6,6 +6,7 @@ import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { eq } from 'drizzle-orm'
 import {
+  ADMIN_TERRAIN_OVERVIEW_PATH,
   SESSION_COOKIE,
   type Account,
   type AdminDirectives,
@@ -205,7 +206,7 @@ export async function buildApp(opts: AppOptions) {
     })
   })
 
-  // Admin routes: invite codes, password resets and admin directives.
+  // Admin routes: invite codes, password resets, the admin map and admin directives.
   app.register(async (admin) => {
     admin.addHook('preHandler', async (req, reply) => {
       if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
@@ -220,6 +221,21 @@ export async function buildApp(opts: AppOptions) {
       await resetPassword(db, b.name, b.password)
       return reply.code(204).send()
     })
+
+    // The admin map's terrain (`CONTEXT.md`: admin map): any chunk, and the whole map downsampled.
+    if (explored) {
+      admin.get(ADMIN_TERRAIN_OVERVIEW_PATH, async (_req, reply) =>
+        reply.type('application/octet-stream').send(Buffer.from(explored.overview())),
+      )
+      admin.get<{ Params: { cx: string; cy: string } }>(
+        '/api/admin/terrain/:cx/:cy',
+        async (req, reply) => {
+          const chunk = explored.wholeChunk(Number(req.params.cx), Number(req.params.cy))
+          if (!chunk) return fail(reply, 'not-found', 'No such chunk.')
+          return reply.type('application/octet-stream').send(Buffer.from(chunk))
+        },
+      )
+    }
 
     // Admin directives (`CONTEXT.md`: Admin directive), given and lifted between ticks.
     const { world } = opts
