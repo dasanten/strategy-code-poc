@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  FOOTPRINT,
+  MAP_SIZE,
   MAX_WORKERS,
   TICKS_PER_GAME_YEAR,
+  footprintTiles,
   type Building,
   type Carriage,
   type City,
@@ -10,6 +13,7 @@ import {
   type Pile,
   type Resident,
 } from '@csp/shared'
+import { BUILDING_NAMES } from './map/palette.js'
 import {
   actionForKey,
   describeTile,
@@ -303,6 +307,36 @@ describe('the card for a tile', () => {
   it('ignores what stands on other tiles', () => {
     const far = { ...carriage, x: 6 }
     expect(tile({ carriages: [far] })).toMatchObject({ what: 'tile', title: 'Open ground' })
+  })
+
+  it('shows a building and its pile on every tile of its footprint, and not beside it', () => {
+    for (const kind of ['gate', 'storage', 'townHall', 'farm'] as const) {
+      const b = building({ kind, cityId: 'c-me' })
+      for (const [x, y] of footprintTiles(b)) {
+        const card = tile({ x, y, buildings: [b], piles: [pile] })
+        expect(card).toMatchObject({
+          what: 'building',
+          title: `Eastmere ${BUILDING_NAMES[kind].toLowerCase()}`,
+        })
+        expect(card.lines).toContain('On the ground: 4 stone')
+      }
+      const side = FOOTPRINT[kind]
+      expect(tile({ x: 5 + side, y: 5, buildings: [b] }).what).toBe('tile')
+      expect(tile({ x: 5, y: 5 + side, buildings: [b] }).what).toBe('tile')
+    }
+  })
+
+  it('finds a building across the map’s join', () => {
+    const b = building({
+      kind: 'storage',
+      cityId: 'c-me',
+      x: MAP_SIZE - 1,
+      y: MAP_SIZE - 1,
+      stock: { food: 3 },
+    })
+    const card = tile({ x: 0, y: 0, buildings: [b] })
+    expect(card.what).toBe('building')
+    expect(card.lines).toContain('Holds 3 food')
   })
 
   it('shows strangers on it in their realm’s colour', () => {
