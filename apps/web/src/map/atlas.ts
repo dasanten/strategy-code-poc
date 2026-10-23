@@ -1,5 +1,12 @@
 import { CanvasSource, Rectangle, Texture } from 'pixi.js'
-import { ART_FILES, artInUse } from './art.js'
+import {
+  ART_FILES,
+  PAINTED_FILES,
+  PAINTED_SHEET,
+  artInUse,
+  paintedCell,
+  paintedCellsInUse,
+} from './art.js'
 
 /** Pixels per symbol in the atlas: enough for the largest token at the closest zoom. */
 export const ATLAS_CELL = 96
@@ -35,12 +42,58 @@ export async function loadAtlas(): Promise<Atlas> {
     ctx.drawImage(img, x, y, width, height)
   })
   const source = new CanvasSource({ resource: canvas, autoGenerateMipmaps: true })
-  return new Map(files.map((f, i) => [f, new Texture({ source, frame: frame(i), label: f })]))
+  const atlas = new Map<string, Texture>(
+    files.map((f, i) => [f, new Texture({ source, frame: frame(i), label: f })]),
+  )
+  await addPaintedSheet(atlas)
+  return atlas
+}
+
+/** How far from magenta a pixel may be and still count as background. */
+const KEY_TOLERANCE = 90
+
+/**
+ * Cuts the painted sheet (`art.ts`) into its cells, each its own texture, with the magenta made
+ * transparent and the pink taken out of the edges it bled into.
+ */
+async function addPaintedSheet(atlas: Map<string, Texture>) {
+  const url = PAINTED_FILES[PAINTED_SHEET.file]
+  if (!url) return
+  const img = new Image()
+  img.src = url
+  await img.decode()
+  const cell = img.naturalWidth / PAINTED_SHEET.columns
+  const side = Math.floor(cell)
+  for (const i of paintedCellsInUse()) {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = side
+    const ctx = canvas.getContext('2d')!
+    const x = (i % PAINTED_SHEET.columns) * cell
+    const y = Math.floor(i / PAINTED_SHEET.columns) * cell
+    ctx.drawImage(img, x, y, cell, cell, 0, 0, side, side)
+    const pixels = ctx.getImageData(0, 0, side, side)
+    const d = pixels.data
+    for (let p = 0; p < d.length; p += 4) {
+      const [r, g, b] = [d[p]!, d[p + 1]!, d[p + 2]!]
+      const dist = Math.hypot(r - 255, g, b - 255)
+      if (dist < KEY_TOLERANCE)
+        d[p + 3] = Math.round(255 * Math.max(0, dist / KEY_TOLERANCE - 0.5) * 2)
+      // Despill: magenta is red and blue above green; take the excess out.
+      const spill = Math.min(r, b) - g
+      if (spill > 0) {
+        d[p] = r - spill
+        d[p + 2] = b - spill
+      }
+    }
+    ctx.putImageData(pixels, 0, 0)
+    const source = new CanvasSource({ resource: canvas, autoGenerateMipmaps: true })
+    atlas.set(paintedCell(i), new Texture({ source, label: paintedCell(i) }))
+  }
 }
 
 /** Frees the atlas's texture. */
 export function destroyAtlas(atlas: Atlas) {
-  atlas.values().next().value?.source.destroy()
+  for (const source of new Set([...atlas.values()].map((t) => t.source))) source.destroy()
 }
 
 /** An SVG as a loaded image at the atlas cell size; without a size some browsers draw it at 0. */
