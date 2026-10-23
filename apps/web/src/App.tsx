@@ -30,7 +30,8 @@ import { CentredDialog, Drawer, ToolRail, TopBar, useEscapeCloses } from './Hud.
 import { Founding } from './Founding.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
-import { pageFor } from './pages.js'
+import { isWikiPath, pageFor } from './pages.js'
+import { Wiki } from './Wiki.js'
 import { RealmLog } from './RealmLog.js'
 import { realmEnded } from './realm-log.js'
 import {
@@ -48,6 +49,12 @@ import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
 
 export function App() {
+  // The Wiki needs no account, so it shows without asking who is logged in.
+  if (isWikiPath(window.location.pathname)) return <Wiki />
+  return <Pages />
+}
+
+function Pages() {
   const [account, setAccount] = useState<Account | null | 'loading'>('loading')
 
   useEffect(() => {

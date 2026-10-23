@@ -39,6 +39,7 @@ I sleep.
 | 19  | [Admin map](https://github.com/dasanten/strategy-code-poc/issues/232)                           | ticketed                |
 | 20  | [Leader handover](https://github.com/dasanten/strategy-code-poc/issues/244)                     | ticketed                |
 | 21  | [Tile card info](https://github.com/dasanten/strategy-code-poc/issues/269)                      | ticketed                |
+| 22  | [Wiki](https://github.com/dasanten/strategy-code-poc/issues/276)                                | ticketed                |
 | 23  | [Names](https://github.com/dasanten/strategy-code-poc/issues/288)                               | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets

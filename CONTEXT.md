@@ -463,6 +463,11 @@ The shared language of the game. Domain terms only — no implementation details
   admins can watch over it. That knowledge is the admin's, never their Player's: the game screen
   and their scripts still see only their Player's sight, and nothing in the admin panel acts in
   the world except admin directives.
+- **Wiki:** the game's rules and numbers for Players, readable by anyone, logged in or not, apart
+  from the game. It states the rules in plain words with the game's current balance numbers and
+  what follows from them (how many residents one farmer feeds, what a worker's day is worth), so
+  Players can plan. It tells only what is true for everyone, never anything about the world's
+  current state. _Avoid:_ help, manual, guide.
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
   A Leader serves no one else: they are never hired out or handed over to an alliance army.

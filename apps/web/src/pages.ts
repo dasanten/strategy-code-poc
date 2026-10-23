@@ -1,9 +1,10 @@
 import type { Account } from '@csp/shared'
+import { WIKI_PATH } from './wiki-view.js'
 
 /** Where the admin panel lives, apart from the game (`CONTEXT.md`: Admin). */
 export const ADMIN_PATH = '/admin'
 
-export type Page = 'login' | 'game' | 'admin' | 'not-admin'
+export type Page = 'login' | 'game' | 'admin' | 'not-admin' | 'wiki'
 
 /** The admin panel's tabs, each at `/admin/<tab>`; `/admin` itself opens the map. */
 export const ADMIN_TABS = ['map', 'accounts', 'directives'] as const
@@ -16,11 +17,16 @@ function adminSubpath(pathname: string): string | undefined {
   return path.startsWith(`${ADMIN_PATH}/`) ? path.slice(ADMIN_PATH.length + 1) : undefined
 }
 
+/** Whether a path is the Wiki's, which anyone can read, logged in or not (`CONTEXT.md`: Wiki). */
+export const isWikiPath = (pathname: string) => pathname.replace(/\/+$/, '') === WIKI_PATH
+
 /**
- * Which page to show for a path. The admin panel is its own page: the game screen shows no admin
- * features, and the panel never opens the admin's realm.
+ * Which page to show for a path. The Wiki is for everyone, logged in or not. The admin panel is
+ * its own page: the game screen shows no admin features, and the panel never opens the admin's
+ * realm.
  */
 export function pageFor(pathname: string, account: Account | null): Page {
+  if (isWikiPath(pathname)) return 'wiki'
   if (!account) return 'login'
   if (adminSubpath(pathname) === undefined) return 'game'
   return account.isAdmin ? 'admin' : 'not-admin'
