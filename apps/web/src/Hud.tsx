@@ -9,6 +9,7 @@ import {
   type OpenDrawer,
 } from './hud-view.js'
 import type { ConnectionStatus } from './useWorld.js'
+import { WIKI_PATH } from './wiki-view.js'
 
 /** The HUD over the full-screen map (ADR 0008): top bar, tool rail, drawers and dialogs. */
 
@@ -172,6 +173,10 @@ export function TopBar({
         </>
       )}
       <span className="hud-sep" />
+      {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
+      <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener">
+        Wiki
+      </a>
       <button type="button" className="hud-logout" onClick={onLogout}>
         Log out
       </button>

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { MIN_PASSWORD_LENGTH, type Account } from '@csp/shared'
 import { api, ApiFailure } from './api.js'
+import { WIKI_PATH } from './wiki-view.js'
 
 /** Log in, or sign up with an invite code (ADR 0005). */
 export function Login({ onLoggedIn }: { onLoggedIn: (account: Account) => void }) {
@@ -75,6 +76,9 @@ export function Login({ onLoggedIn }: { onLoggedIn: (account: Account) => void }
         <button type="submit" className="primary" disabled={busy}>
           {signup ? 'Create account' : 'Log in'}
         </button>
+        <a className="login-wiki" href={WIKI_PATH}>
+          The game's rules and numbers: Wiki
+        </a>
       </form>
     </main>
   )
