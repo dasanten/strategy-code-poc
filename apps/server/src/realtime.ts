@@ -180,7 +180,8 @@ export function attachRealtime(
     // before the realm and its starting city are founded (`CONTEXT.md`: Realm name).
     const realm = realmOf(world, user.id)
     if (realm) welcome(socket, user, realm)
-    else send(socket, { type: 'founding', account, leaderName: suggestedLeaderName(world, user.id) })
+    else
+      send(socket, { type: 'founding', account, leaderName: suggestedLeaderName(world, user.id) })
 
     socket.on('message', (raw) => {
       let msg: ClientMessage
@@ -196,7 +197,8 @@ export function attachRealtime(
         if (problem) return send(socket, { type: 'rejected', requestId, reason: problem })
         // Founded from another tab meanwhile: that realm stands, under the names given there.
         const names = { realmName: msg.realmName, leaderName: msg.leaderName }
-        const realm = realmOf(world, user.id) ?? foundStartingCity(world, opts.terrain, user.id, names)
+        const realm =
+          realmOf(world, user.id) ?? foundStartingCity(world, opts.terrain, user.id, names)
         return welcome(socket, user, realm)
       }
       if (msg?.type === 'order') {

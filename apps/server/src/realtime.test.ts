@@ -236,7 +236,9 @@ describe('realtime', () => {
     expect(world.cities).toEqual([])
     // Exactly the longest name is fine.
     const longest = 'z'.repeat(REALM_NAME_MAX_LENGTH)
-    socket.send(JSON.stringify({ type: 'found', requestId: 'ok', realmName: longest, leaderName: 'B' }))
+    socket.send(
+      JSON.stringify({ type: 'found', requestId: 'ok', realmName: longest, leaderName: 'B' }),
+    )
     await next('welcome')
     expect(world.realms[0]!.name).toBe(longest)
   })

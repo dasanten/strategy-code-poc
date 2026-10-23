@@ -37,8 +37,7 @@ export function Founding({
       <form onSubmit={submit} className="login-form">
         <h1>Found your realm</h1>
         <p className="founding-hint">
-          Name your realm and your Leader. Others know your realm by its name, and it never
-          changes.
+          Name your realm and your Leader. Others know your realm by its name, and it never changes.
         </p>
         <label>
           Realm name
