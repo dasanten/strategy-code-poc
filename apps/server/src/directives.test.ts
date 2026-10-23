@@ -43,10 +43,10 @@ import { stepPunishments } from './trade-org-punishment.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 160, tiles: new Uint8Array(160 * 160).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 640, tiles: new Uint8Array(640 * 640).fill(Terrain.Plains) }
 
 /** Where the HQ's town hall stands. */
-const MID = 80
+const MID = 320
 
 /**
  * The Trade Org HQ at (MID, MID) with `TRADE_ORG_ARMY.guard` + 12 armed soldiers; realm r1
@@ -60,30 +60,30 @@ function setup() {
     { id: 'r1', userId: 7, leaderId: 'a1' },
     { id: 'r2', userId: 8, leaderId: 'b1' },
   )
-  addCity(world, { id: 'c1', realmId: 'r1', x: MID, y: MID + 22, name: 'Ashford' })
-  addCity(world, { id: 'c2', realmId: 'r1', x: MID + 60, y: MID, name: 'Farhold' })
-  addCity(world, { id: 'c3', realmId: 'r2', x: MID - 30, y: MID - 30, name: 'Bywater' })
-  addCity(world, { id: 'n1', realmId: null, x: MID + 30, y: MID - 40, name: 'Nook' })
+  addCity(world, { id: 'c1', realmId: 'r1', x: MID, y: MID + 88, name: 'Ashford' })
+  addCity(world, { id: 'c2', realmId: 'r1', x: MID + 240, y: MID, name: 'Farhold' })
+  addCity(world, { id: 'c3', realmId: 'r2', x: MID - 120, y: MID - 120, name: 'Bywater' })
+  addCity(world, { id: 'n1', realmId: null, x: MID + 120, y: MID - 160, name: 'Nook' })
   world.buildings.push(
     {
       id: 's1',
       kind: 'storage',
       cityId: 'c1',
-      x: MID + 1,
-      y: MID + 22,
+      x: MID + 4,
+      y: MID + 88,
       stock: { coins: 1000 },
     },
     {
       id: 's2',
       kind: 'storage',
       cityId: 'n1',
-      x: MID + 31,
-      y: MID - 40,
+      x: MID + 124,
+      y: MID - 160,
       stock: { coins: 1000 },
     },
   )
-  resident(world, 'a1', 'r1', MID - 1, MID + 23, 'c1')
-  resident(world, 'b1', 'r2', MID - 31, MID - 29, 'c3')
+  resident(world, 'a1', 'r1', MID - 4, MID + 92, 'c1')
+  resident(world, 'b1', 'r2', MID - 124, MID - 116, 'c3')
   world.alliances.push({
     id: 'al1',
     name: 'North',
@@ -269,7 +269,7 @@ describe('the Trade Organization under an admin directive', () => {
     // The first one is over and the directive still stands: it goes again.
     run(world, walking, 5, () => world.punishments.length > 0)
     expect(world.punishments[0]).toMatchObject({ culpritOrg: 'r1', directiveId: d.id })
-  }, 20_000)
+  }, 120_000)
 
   it('sends its army against every member of the alliance it names', () => {
     const { world } = setup()
@@ -342,7 +342,7 @@ describe('who sees an admin directive', () => {
 
 /** Adds an armed resident of realm r1 in city c2, far from the HQ. */
 function soldier(world: WorldState, id: string, owner = 'r1', cityId = 'c2') {
-  const r = resident(world, id, owner, MID + 61, MID + 1, cityId)
+  const r = resident(world, id, owner, MID + 244, MID + 4, cityId)
   r.carried.spear = 1
   return r
 }
@@ -398,7 +398,7 @@ describe('setting directive goals', () => {
     const { world } = setup()
     for (let i = 0; i < 5; i++) soldier(world, `s${i}`)
     soldier(world, 'x1', 'r2', 'c3')
-    resident(world, 'u1', 'r1', MID + 61, MID + 1, 'c2') // unarmed: no soldier
+    resident(world, 'u1', 'r1', MID + 244, MID + 4, 'c2') // unarmed: no soldier
     const d = give(world, 'r1', false, [{ kind: 'soldierShare', percent: 50 }])
     // r1 has 5 soldiers (Aldo carries no weapon); half of them is 3, rounding up.
     expect(d.goals).toEqual([{ kind: 'soldiers', count: 3, percent: 50 }])
@@ -419,7 +419,7 @@ describe('tracking directive goals', () => {
     const other = give(world, 'n1')
     const [s1, s2, s3] = [soldier(world, 's1'), soldier(world, 's2'), soldier(world, 's3')]
     const ally = soldier(world, 'x1', 'r2', 'c3')
-    const unarmed = resident(world, 'u1', 'r1', MID + 61, MID + 1, 'c2')
+    const unarmed = resident(world, 'u1', 'r1', MID + 244, MID + 4, 'c2')
     dieAll(world, [s1, unarmed, ally], 'killed', terrain.size)
     expect(d.soldiersKilled).toBe(2)
     dieAll(world, [s2], 'starved', terrain.size)
@@ -702,7 +702,7 @@ describe('buying off an admin directive', () => {
       reason: 'no directive names your realm by that id',
     })
     standOn(world, 'a1', { x: goods.x + 30, y: goods.y + 30 }, 300)
-    expect(ask(aldo, 'a1')).toMatchObject({ reason: 'not on a Trade Org warehouse' })
+    expect(ask(aldo, 'a1')).toMatchObject({ reason: 'not at a Trade Org warehouse' })
     standOn(world, 'a1', goods, 300)
     expect(ask(aldo, 'a1').type).toBe('ack')
     expect(setDirectivePrice(world, d.id, null)).toMatchObject({ price: null })

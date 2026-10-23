@@ -34,6 +34,12 @@ const MINER_FOOD = 6
  */
 const DRIVER_FOOD = 24
 
+/**
+ * Food for the horse on the carriage, in units: about six game days, for the drive out, building
+ * the mine and the first trip home. The route then keeps `HAUL_KEEP_FOOD` on board.
+ */
+const HORSE_FOOD = 18
+
 /** Iron ore that is home by morning at the least. */
 const MORNING_ORE = 30
 
@@ -157,7 +163,7 @@ describe('the PoC: iron from a far mine reaches home overnight', () => {
     s.move(miners[0]!, { wood: 20 }, s.inStorage, s.onCarriage)
     s.move(miners[1]!, { wood: 20 }, s.inStorage, s.onCarriage)
     s.move(miners[2]!, { stone: 20 }, s.inStorage, s.onCarriage)
-    s.move(miners[3]!, { food: HAUL_KEEP_FOOD }, s.inStorage, s.onCarriage)
+    s.move(miners[3]!, { food: HORSE_FOOD }, s.inStorage, s.onCarriage)
     for (const m of miners) {
       order({ kind: 'pickUp', residentId: m.id, spot: s.inStorage, goods: { food: MINER_FOOD } })
     }

@@ -9,6 +9,7 @@ import {
 } from './balance.js'
 import { MAX_WORKERS, workersOf } from './building.js'
 import { inCityArea, isCityBuilding } from './city.js'
+import { footprintTiles, nearFootprint } from './footprint.js'
 import { wrap, wrapDelta } from './terrain.js'
 import type { City, WorldState } from './world.js'
 
@@ -78,7 +79,9 @@ function source(id: string, owner: string, strength: number, tiles: ControlSourc
 export function controlSources(world: WorldState, size: number): ControlSource[] {
   const out: ControlSource[] = []
   for (const city of world.cities) {
-    const tiles = world.buildings.filter((b) => b.cityId === city.id && isCityBuilding(b))
+    const tiles = world.buildings
+      .filter((b) => b.cityId === city.id && isCityBuilding(b))
+      .flatMap((b) => footprintTiles(b, size).map(([x, y]) => ({ x, y })))
     if (tiles.length === 0) continue
     let strength = TERRITORY_CITY_BASE
     for (const r of world.residents) {
@@ -93,8 +96,7 @@ export function controlSources(world: WorldState, size: number): ControlSource[]
     const guards = new Map<string, number>()
     for (const r of world.residents) {
       if (r.owner === null || !isArmed(r)) continue
-      if (Math.abs(wrapDelta(b.x, r.x, size)) > 1 || Math.abs(wrapDelta(b.y, r.y, size)) > 1)
-        continue
+      if (!nearFootprint(b, r, 1, size)) continue
       guards.set(r.owner, (guards.get(r.owner) ?? 0) + 1)
     }
     if (guards.size === 0) continue
@@ -108,7 +110,14 @@ export function controlSources(world: WorldState, size: number): ControlSource[]
       if (g === 0) continue
       const strength =
         TERRITORY_WORKPLACE_BASE + n * TERRITORY_PER_RESIDENT + g * TERRITORY_PER_ARMED
-      out.push(source(b.id, owner, strength, [{ x: b.x, y: b.y }]))
+      out.push(
+        source(
+          b.id,
+          owner,
+          strength,
+          footprintTiles(b, size).map(([x, y]) => ({ x, y })),
+        ),
+      )
     }
   }
   return out
@@ -124,15 +133,9 @@ export function computeTerritory(world: WorldState, size: number): Territory {
   for (const s of controlSources(world, size)) {
     // A source with several tiles projects from the nearest of them.
     const reached = new Map<string, number>()
-    for (const t of s.tiles) {
-      for (let dy = -s.reach; dy <= s.reach; dy++) {
-        for (let dx = -s.reach; dx <= s.reach; dx++) {
-          const c = controlAt(s, Math.hypot(dx, dy))
-          if (c <= 0) continue
-          const key = `${wrap(t.x + dx, size)},${wrap(t.y + dy, size)}`
-          if (c > (reached.get(key) ?? 0)) reached.set(key, c)
-        }
-      }
+    for (const [key, d] of nearestWithin(s.tiles, s.reach, size)) {
+      const c = controlAt(s, d)
+      if (c > 0) reached.set(key, c)
     }
     for (const [key, c] of reached) {
       const here = best.get(key)
@@ -143,6 +146,78 @@ export function computeTerritory(world: WorldState, size: number): Territory {
   const owners = new Map<string, string>()
   for (const [key, { owner }] of best) if (owner !== null) owners.set(key, owner)
   return { tick: world.tick, owners }
+}
+
+/**
+ * Every tile within `reach` of the nearest of `tiles` (straight line, the short way round), with
+ * that distance, by "x,y" key: an exact distance transform over the box round the tiles, so a
+ * source of many tiles costs about its box rather than its tiles times its reach.
+ */
+function nearestWithin(
+  tiles: readonly { x: number; y: number }[],
+  reach: number,
+  size: number,
+): Map<string, number> {
+  const out = new Map<string, number>()
+  if (tiles.length === 0) return out
+  // Tiles as steps from the first, the short way round, and the box round them plus the reach.
+  const first = tiles[0]!
+  const at = tiles.map((t) => [wrapDelta(first.x, t.x, size), wrapDelta(first.y, t.y, size)])
+  const x0 = Math.min(...at.map(([x]) => x!)) - reach
+  const y0 = Math.min(...at.map(([, y]) => y!)) - reach
+  const w = Math.min(size, Math.max(...at.map(([x]) => x!)) + reach - x0 + 1)
+  const h = Math.min(size, Math.max(...at.map(([, y]) => y!)) + reach - y0 + 1)
+  const far = (w + h) ** 2
+  const grid = new Float64Array(w * h).fill(far)
+  for (const [x, y] of at) {
+    const gx = x! - x0
+    const gy = y! - y0
+    if (gx >= 0 && gy >= 0 && gx < w && gy < h) grid[gy * w + gx] = 0
+  }
+  // Squared distances along each column, then along each row (Felzenszwalb and Huttenlocher).
+  const column = new Float64Array(Math.max(w, h))
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) column[y] = grid[y * w + x]!
+    const d = transform1d(column, h)
+    for (let y = 0; y < h; y++) grid[y * w + x] = d[y]!
+  }
+  for (let y = 0; y < h; y++) {
+    const d = transform1d(grid.subarray(y * w, (y + 1) * w), w)
+    for (let x = 0; x < w; x++) {
+      const dist = Math.sqrt(d[x]!)
+      if (dist <= reach)
+        out.set(`${wrap(first.x + x0 + x, size)},${wrap(first.y + y0 + y, size)}`, dist)
+    }
+  }
+  return out
+}
+
+/** The 1D squared distance transform of the first `n` values of `f` (0 where a source is). */
+function transform1d(f: ArrayLike<number>, n: number): Float64Array {
+  const d = new Float64Array(n)
+  const v = new Int32Array(n)
+  const z = new Float64Array(n + 1)
+  let k = 0
+  v[0] = 0
+  z[0] = -Infinity
+  z[1] = Infinity
+  for (let q = 1; q < n; q++) {
+    let s = (f[q]! + q * q - (f[v[k]!]! + v[k]! * v[k]!)) / (2 * q - 2 * v[k]!)
+    while (s <= z[k]!) {
+      k--
+      s = (f[q]! + q * q - (f[v[k]!]! + v[k]! * v[k]!)) / (2 * q - 2 * v[k]!)
+    }
+    k++
+    v[k] = q
+    z[k] = s
+    z[k + 1] = Infinity
+  }
+  k = 0
+  for (let q = 0; q < n; q++) {
+    while (z[k + 1]! < q) k++
+    d[q] = (q - v[k]!) ** 2 + f[v[k]!]!
+  }
+  return d
 }
 
 /** The Organization holding a tile, if any. */

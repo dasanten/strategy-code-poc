@@ -309,6 +309,7 @@ export function climbLanding(
   const x = wrap(wall.x + wrapDelta(from.x, wall.x, size), size)
   const y = wrap(wall.y + wrapDelta(from.y, wall.y, size), size)
   const t = tileIndex(size, x, y)
+  // Walls and gates are 1×1 (`CONTEXT.md`: Footprint): their tile is their footprint.
   const walled = world.buildings.some((b) => b.x === x && b.y === y && isWallOrGate(b))
   if (walled || !isPassableTerrain(terrain.tiles[t]!)) return { x: wall.x, y: wall.y }
   return { x, y }

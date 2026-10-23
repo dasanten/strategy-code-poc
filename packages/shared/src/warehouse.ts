@@ -18,6 +18,7 @@ import {
 } from './balance.js'
 import { townHallOf } from './city.js'
 import { KEEPS_GOODS } from './building.js'
+import { covers, isAt } from './footprint.js'
 import { tradeOrgRefuses } from './standing.js'
 import {
   GOODS,
@@ -31,10 +32,11 @@ import {
 } from './world.js'
 
 /**
- * Where the Trade Org HQ's coin warehouse stands from its town hall (`CONTEXT.md`: Warehouse):
- * the HQ keeps its coins there and its other goods in its other warehouse.
+ * Where the Trade Org HQ's coin warehouse stands from its town hall, north-west tile from
+ * north-west tile (`CONTEXT.md`: Warehouse): the HQ keeps its coins there and its other goods in
+ * its other warehouse.
  */
-export const HQ_COIN_WAREHOUSE = { dx: 1, dy: -1 }
+export const HQ_COIN_WAREHOUSE = { dx: 4, dy: -4 }
 
 /** Goods other than coins: what a warehouse puts a price on. */
 export const PRICED_GOODS = GOODS.filter((g): g is Exclude<Good, 'coins'> => g !== 'coins')
@@ -143,7 +145,8 @@ export function tradeCoinWarehouse(
 
 /**
  * The Trade Org warehouse a resident on tile (x, y) can trade at (`CONTEXT.md`: Trading with the
- * Trade Organization): a finished one that prices goods and has its coins at hand
+ * Trade Organization, At a building): a finished one covering the tile that prices goods and has
+ * its coins at hand
  * (`tradeCoinWarehouse`).
  */
 export function tradingWarehouseAt(
@@ -153,10 +156,7 @@ export function tradingWarehouseAt(
 ): Building | undefined {
   return world.buildings.find(
     (b) =>
-      KEEPS_GOODS.includes(b.kind) &&
-      b.x === x &&
-      b.y === y &&
-      tradeCoinWarehouse(world, b) !== undefined,
+      KEEPS_GOODS.includes(b.kind) && covers(b, x, y) && tradeCoinWarehouse(world, b) !== undefined,
   )
 }
 
@@ -255,7 +255,7 @@ export function tradeProblem(
   if (tradeOrgRefuses(world, realmId)) return 'the Trade Organization won’t trade with you'
   if (!canWork(resident, world.tick)) return 'children can’t trade'
   const warehouse = tradingWarehouseAt(world, resident.x, resident.y)
-  if (!warehouse) return 'not on a Trade Org warehouse'
+  if (!warehouse) return 'not at a Trade Org warehouse'
   if (!(PRICED_GOODS as readonly unknown[]).includes(good)) return 'not a good warehouses trade'
   if (stockFloor(world, warehouse)[good as PricedGood] === undefined) {
     return 'this warehouse doesn’t trade that good'
@@ -265,8 +265,7 @@ export function tradeProblem(
   if (carriageId !== null && carriageId !== undefined) {
     const k = world.carriages.find((x) => x.id === carriageId)
     if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
-    if (k.x !== resident.x || k.y !== resident.y)
-      return 'that carriage is not on the resident’s tile'
+    if (!isAt(k, warehouse)) return 'that carriage is not at the warehouse'
     stock = k.load
   }
   if (cityId !== null && cityId !== undefined) {
@@ -297,9 +296,7 @@ export function buyOffCoinWarehouseAt(
   x: number,
   y: number,
 ): Building | undefined {
-  const here = world.buildings.find(
-    (b) => b.x === x && b.y === y && warehouseKeeps(world, b).length > 0,
-  )
+  const here = world.buildings.find((b) => covers(b, x, y) && warehouseKeeps(world, b).length > 0)
   if (!here) return undefined
   if (warehouseKeeps(world, here).includes('coins')) return here
   return tradeCoinWarehouse(world, here)
@@ -323,13 +320,16 @@ export function buyOffProblem(
   if (!d || d.target !== realmId) return 'no directive names your realm by that id'
   if (d.price === null) return 'this directive can’t be bought off'
   if (!canWork(resident, world.tick)) return 'children can’t pay'
-  if (!buyOffCoinWarehouseAt(world, resident.x, resident.y)) return 'not on a Trade Org warehouse'
+  const at = world.buildings.find(
+    (b) => covers(b, resident.x, resident.y) && warehouseKeeps(world, b).length > 0,
+  )
+  if (!at || !buyOffCoinWarehouseAt(world, resident.x, resident.y))
+    return 'not at a Trade Org warehouse'
   let stock = resident.carried
   if (carriageId !== null && carriageId !== undefined) {
     const k = world.carriages.find((x) => x.id === carriageId)
     if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
-    if (k.x !== resident.x || k.y !== resident.y)
-      return 'that carriage is not on the resident’s tile'
+    if (!isAt(k, at)) return 'that carriage is not at the warehouse'
     stock = k.load
   }
   if ((stock.coins ?? 0) < d.price) return `it costs ${d.price} coins`

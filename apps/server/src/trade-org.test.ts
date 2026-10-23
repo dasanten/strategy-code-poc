@@ -35,19 +35,19 @@ const plains = (size: number): TerrainMap => ({
 })
 
 /** Where the test HQ's town hall stands on its map. */
-const MID = 80
+const MID = 320
 
 /** A resource node of each kind a little way east of the middle, on terrain that fits it. */
 const NODES: [ResourceKind, number, number][] = [
-  ['forest', MID + 20, MID],
-  ['stone', MID + 20, MID + 3],
-  ['ironOre', MID + 22, MID - 3],
-  ['goldOre', MID + 24, MID],
+  ['forest', MID + 80, MID],
+  ['stone', MID + 80, MID + 12],
+  ['ironOre', MID + 88, MID - 12],
+  ['goldOre', MID + 96, MID],
 ]
 
-/** The HQ alone on a Plains map 160 across, with one node of each kind near it. */
+/** The HQ alone on a Plains map 640 across, with one node of each kind near it. */
 function hq(): { world: WorldState; terrain: TerrainMap; city: City } {
-  const terrain = plains(160)
+  const terrain = plains(640)
   for (const [kind, x, y] of NODES) {
     terrain.tiles[tileIndex(terrain.size, x, y)] =
       kind === 'forest' ? Terrain.Forest : Terrain.Hills
@@ -88,7 +88,7 @@ describe('the Trade Org HQ', () => {
     expect(tradeOrgHq(world)).toBe(city)
     const own = world.buildings.filter((b) => b.cityId === city.id)
     const count = (k: string) => own.filter((b) => b.kind === k).length
-    expect(townHallOf(world, city)).toMatchObject({ x: MID, y: MID })
+    expect(townHallOf(world, city)).toMatchObject({ x: MID - 1, y: MID - 1 })
     expect(count('townHall')).toBe(1)
     expect(count('storage')).toBe(1)
     expect(count('house')).toBe(TRADE_ORG_HQ.houses)
@@ -103,12 +103,12 @@ describe('the Trade Org HQ', () => {
     }
     // The rings hold: from the town hall nobody gets past the inner ring without a gate, nor past
     // the outer one.
-    const insideInner = reached([...inner, ...outer], TRADE_ORG_HQ.outerRadius + 3)
+    const insideInner = reached([...inner, ...outer], TRADE_ORG_HQ.outerRadius + 12)
     for (const key of insideInner) {
       const [x, y] = key.split(',').map(Number) as [number, number]
       expect(Math.hypot(x - MID, y - MID)).toBeLessThan(TRADE_ORG_HQ.innerRadius)
     }
-    const insideOuter = reached(outer, TRADE_ORG_HQ.outerRadius + 3)
+    const insideOuter = reached(outer, TRADE_ORG_HQ.outerRadius + 12)
     for (const key of insideOuter) {
       const [x, y] = key.split(',').map(Number) as [number, number]
       expect(Math.hypot(x - MID, y - MID)).toBeLessThan(TRADE_ORG_HQ.outerRadius)
@@ -152,7 +152,7 @@ describe('the Trade Org HQ', () => {
     const realm = foundStartingCity(world, terrain, 1)
     const scout = world.residents.find((r) => r.owner === realm.id)!
     // Far to the south nothing of it is in sight; in its south gate, its middle is.
-    Object.assign(scout, { x: MID, y: MID + 40, order: null })
+    Object.assign(scout, { x: MID, y: MID + 160, order: null })
     expect(entitiesInSight(world, terrain, realm.id).some((e) => e.id === city.id)).toBe(false)
     Object.assign(scout, { x: MID, y: MID + TRADE_ORG_HQ.outerRadius })
     const seen = entitiesInSight(world, terrain, realm.id)
@@ -181,15 +181,15 @@ describe('the Trade Org HQ', () => {
 
 describe('placing the Trade Org HQ', () => {
   it('places it as far from every city as the map allows', () => {
-    const terrain = plains(256)
+    const terrain = plains(1024)
     const world = createWorld(terrain)
     world.nodes = []
-    addCity(world, { id: 'c1', realmId: 'realm1', x: 40, y: 40 })
+    addCity(world, { id: 'c1', realmId: 'realm1', x: 160, y: 160 })
     const site = findHqSite(world, terrain, mulberry32(1))!
-    // The far corner of the map is about 181 tiles away; the HQ never straddles a join.
+    // The far corner of the map is about 724 tiles away; the HQ never straddles a join.
     expect(
-      wrapDistance(terrain.size, { x: 40, y: 40 }, { x: site[0], y: site[1] }),
-    ).toBeGreaterThan(170)
+      wrapDistance(terrain.size, { x: 160, y: 160 }, { x: site[0], y: site[1] }),
+    ).toBeGreaterThan(680)
   })
 
   it('places none on a map with no room for it', () => {
@@ -201,7 +201,7 @@ describe('placing the Trade Org HQ', () => {
     let terrain: TerrainMap
     let world: WorldState
     beforeAll(() => {
-      terrain = generateTerrain(1, 720)
+      terrain = generateTerrain(1, 2880)
       world = generateWorld(terrain)
     })
 

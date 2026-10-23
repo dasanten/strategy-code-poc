@@ -11,10 +11,13 @@ import {
   sharingSight,
   wrapDistance,
   type Army,
+  type Placed,
   type Caravan,
   type SeenEntity,
   type TerrainMap,
   type WorldState,
+  FOOTPRINT,
+  footprintTiles,
 } from '@csp/shared'
 import type { ExploredTerrain } from './explored.js'
 import type { InvariantViolation } from './invariants.js'
@@ -28,6 +31,14 @@ interface Spot {
 /** Whether any of the observers is within sight range of the spot (plus `reach`). */
 function seen(size: number, observers: Spot[], at: Spot, reach = 0): boolean {
   return observers.some((o) => wrapDistance(size, o, at) <= SIGHT_RANGE + reach)
+}
+
+/** Whether any tile of a building's footprint is in sight of the observers (`CONTEXT.md`: Sight). */
+function buildingSeen(size: number, observers: Spot[], b: Placed): boolean {
+  const side = FOOTPRINT[b.kind]
+  if (side === 1) return seen(size, observers, b)
+  if (!seen(size, observers, b, side * Math.SQRT2)) return false
+  return footprintTiles(b, size).some(([x, y]) => seen(size, observers, { x, y }))
 }
 
 /** Whether any of the army's members is in sight (`CONTEXT.md`: Sight). */
@@ -90,7 +101,7 @@ export function entitiesInSight(
   const seenCities = new Set<string>()
   const seenStorages = new Set<string>()
   for (const b of world.buildings) {
-    if (!seen(size, observers, b)) continue
+    if (!buildingSeen(size, observers, b)) continue
     out.push({ is: 'building', ...b })
     if (b.cityId !== null) seenCities.add(b.cityId)
     if (b.cityId !== null && b.kind === 'storage' && !b.site) seenStorages.add(b.cityId)
@@ -160,7 +171,8 @@ function caravanSeen(
 /**
  * Invariant (ADR 0004): nothing is sent to a Player outside their own or their alliance's sight.
  * Checks the entities about to go out to a realm's Player against the world as it is, each on
- * its own: a city is in sight when any of its buildings is.
+ * its own: a city is in sight when any of its buildings is, a building when any tile of its
+ * footprint is.
  */
 export function sentOutOfSight(
   world: WorldState,
@@ -172,12 +184,14 @@ export function sentOutOfSight(
   const inSight = (at: Spot) => seen(terrain.size, observers, at)
   const out = sent.filter((e) =>
     e.is === 'city'
-      ? !world.buildings.some((b) => b.cityId === e.id && inSight(b))
+      ? !world.buildings.some((b) => b.cityId === e.id && buildingSeen(terrain.size, observers, b))
       : e.is === 'army'
         ? !armySeen(world, e, inSight)
         : e.is === 'caravan'
           ? !caravanSeen(world, e, inSight)
-          : !inSight(e),
+          : e.is === 'building'
+            ? !buildingSeen(terrain.size, observers, e)
+            : !inSight(e),
   )
   return out.map((e) => ({
     invariant: 'sent-only-in-sight',

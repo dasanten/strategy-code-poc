@@ -1,4 +1,5 @@
 import {
+  FOOTPRINT,
   OWN_FOOD,
   WORK_FOOD_KEPT,
   NPC_VILLAGE,
@@ -136,8 +137,8 @@ describe('NPC cities work and eat', () => {
   it('puts residents on the farms first when Food runs short', () => {
     const { world, terrain, city } = village()
     const farm = farmOf(world, city)
-    // A lumber camp of the village's on a forest node next to the farm, worked by one resident.
-    const at = { x: farm.x + 1, y: farm.y }
+    // A lumber camp of the village’s on a forest node just east of the farm, worked by one resident.
+    const at = { x: farm.x + FOOTPRINT.farm, y: farm.y }
     terrain.tiles[at.y * terrain.size + at.x] = Terrain.Forest
     world.nodes.push({ id: 'n1', kind: 'forest', ...at })
     const camp: Building = { id: 'camp', kind: 'lumberCamp', cityId: city.id, ...at }

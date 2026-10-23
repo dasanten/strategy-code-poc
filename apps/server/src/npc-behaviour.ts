@@ -11,6 +11,7 @@ import {
   hasFoodSurplus,
   inCityArea,
   isArmed,
+  isAt,
   punishers,
   putAwayUnits,
   storedFood,
@@ -118,7 +119,7 @@ function runCity(
     // most (building, pairing), else back to work.
     const carry = r.script?.scriptId === 0 ? r.script.memory.carry : undefined
     const stored = typeof carry === 'object' && carry !== null && !Array.isArray(carry)
-    if (stored && carry.step === 'back' && storage && r.x === storage.x && r.y === storage.y) {
+    if (stored && carry.step === 'back' && storage && isAt(r, storage, size)) {
       stopWork(r)
     }
   }
@@ -130,14 +131,14 @@ function runCity(
     if (growth && growth.assign(r, true)) continue
     const load = storage && haul(r)
     if (storage && load) {
-      if (r.x === storage.x && r.y === storage.y) {
+      if (isAt(r, storage, size)) {
         r.order = { kind: 'drop', to: { kind: 'storage', storageId: storage.id }, goods: load }
       } else walkTo(r, storage)
       continue
     }
     const food = storage?.stock?.food ?? 0
     if (storage && food > 0 && (r.carried.food ?? 0) < OWN_FOOD) {
-      if (r.x === storage.x && r.y === storage.y) {
+      if (isAt(r, storage, size)) {
         const units = Math.min(food, OWN_FOOD - (r.carried.food ?? 0))
         const from = { kind: 'storage' as const, storageId: storage.id }
         r.order = { kind: 'pickUp', from, goods: { food: units } }

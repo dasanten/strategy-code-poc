@@ -25,11 +25,13 @@ import {
   type Resident,
   type SeenCity,
   type WarehousePrice,
+  isAt,
 } from '@csp/shared'
 
 /** What the city inspector says about a city in sight, from what the Player sees of it. */
 export interface CityView {
   id: string
+  /** A warehouse, or an NPC city’s storage: its footprint is where traders stand. */
   name: string
   /** Whose city it is (`CONTEXT.md`: City, NPC city). */
   whose: string
@@ -118,7 +120,7 @@ export function describeBuying(
   if (city.price === undefined) return undefined
   const hall = seen.buildings.find((b) => b.id === city.townHallId)
   if (!hall) return { price: city.price, coins: 0 }
-  const here = seen.residents.filter((r) => r.owner === realmId && r.x === hall.x && r.y === hall.y)
+  const here = seen.residents.filter((r) => r.owner === realmId && isAt(r, hall))
   return {
     price: city.price,
     townHall: { x: hall.x, y: hall.y },
@@ -130,6 +132,8 @@ export function describeBuying(
 /** A Trade Org warehouse in sight and its prices (`CONTEXT.md`: Warehouse prices). */
 export interface WarehouseView {
   id: string
+  /** A warehouse, or an NPC city’s storage: its footprint is where traders stand. */
+  kind: BuildingKind
   x: number
   y: number
   prices: WarehousePrice[]
@@ -145,7 +149,7 @@ export function warehousesInSight(
 ): WarehouseView[] {
   return seen.buildings
     .filter((b) => b.kind === 'warehouse' && b.cityId === city.id)
-    .map((b) => ({ id: b.id, x: b.x, y: b.y, prices: warehousePrices(seen, b) }))
+    .map((b) => ({ id: b.id, kind: b.kind, x: b.x, y: b.y, prices: warehousePrices(seen, b) }))
     .filter((w) => w.prices.length > 0)
 }
 
@@ -159,13 +163,13 @@ export interface TradersView {
   carriages: Carriage[]
 }
 
-/** The Player's residents and carriages on a warehouse's tile. */
+/** The Player’s residents and carriages at a warehouse (or an NPC city’s storage). */
 export function tradersAt(
-  warehouse: { x: number; y: number },
+  warehouse: Pick<Building, 'kind' | 'x' | 'y'>,
   seen: { residents: Resident[]; carriages: Carriage[] },
   realmId: string,
 ): TradersView {
-  const here = (t: { x: number; y: number }) => t.x === warehouse.x && t.y === warehouse.y
+  const here = (t: { x: number; y: number }) => isAt(t, warehouse)
   return {
     residents: seen.residents.filter((r) => r.owner === realmId && here(r)),
     carriages: seen.carriages.filter((k) => k.realmId === realmId && here(k)),
@@ -199,6 +203,7 @@ export function previewTrade(
 /** A city of the Player's that a delivery can go to or a pick-up come from, and its storage. */
 export interface DeliveryCity {
   id: string
+  /** A warehouse, or an NPC city’s storage: its footprint is where traders stand. */
   name: string
   storage: Building
 }
@@ -291,7 +296,7 @@ export function npcStoragesInSight(
   if (!prices) return []
   return seen.buildings
     .filter((b) => b.kind === 'storage' && !b.site && b.cityId === city.id)
-    .map((b) => ({ id: b.id, x: b.x, y: b.y, prices }))
+    .map((b) => ({ id: b.id, kind: b.kind, x: b.x, y: b.y, prices }))
 }
 
 /**

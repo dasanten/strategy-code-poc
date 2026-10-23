@@ -15,10 +15,13 @@ import {
   type ResourceKind,
   type TerrainMap,
   type WorldState,
+  footprintKeys,
+  FOOTPRINT,
 } from '@csp/shared'
 import { CITY_NAMES, updateCityMembership } from './cities.js'
 import { hash, mulberry32, newResident } from './residents.js'
-import { FARM_RING, newId } from './starting-city.js'
+import { Ground, nodeCorner } from './placing.js'
+import { FARM_RING, newId, residentTiles } from './starting-city.js'
 
 /** A tile as [x, y]. */
 type Tile = [number, number]
@@ -70,7 +73,10 @@ export function gatesOf(cx: number, cy: number, ring: Tile[]): Tile[] {
   )
 }
 
-/** Where the HQ's buildings stand around its town hall at (cx, cy) (`CONTEXT.md`: Trade Org HQ). */
+/**
+ * Where the HQ's buildings stand around the middle tile (cx, cy) of its town hall (`CONTEXT.md`:
+ * Trade Org HQ), each by the north-west tile of its footprint; its rings are round that tile.
+ */
 export interface HqLayout {
   hall: Tile
   /** The storage with Food for its residents, inside the inner ring. */
@@ -89,34 +95,46 @@ export interface HqLayout {
 }
 
 /**
- * The HQ's shape around its town hall at (cx, cy): the storage and the two warehouses next to the
- * town hall inside the inner ring, the houses, smelter and mint in a circle between the rings,
- * clear of the straight ways from each gate of the outer ring to the gate of the inner ring
- * behind it.
+ * The HQ's shape around the middle tile (cx, cy) of its town hall: the storage and the two
+ * warehouses next to the town hall inside the inner ring, the houses, smelter and mint in a
+ * circle between the rings, clear of the straight ways from each gate of the outer ring to the
+ * gate of the inner ring behind it. The same for the same tile, so it is worked out once.
  */
 export function hqLayout(cx: number, cy: number): HqLayout {
+  const key = `${cx},${cy}`
+  let layout = layouts.get(key)
+  if (!layout) layouts.set(key, (layout = workOutLayout(cx, cy)))
+  return layout
+}
+
+/** Layouts worked out so far (`hqLayout`), by their middle tile. */
+const layouts = new Map<string, HqLayout>()
+
+function workOutLayout(cx: number, cy: number): HqLayout {
   const { innerRadius, outerRadius } = TRADE_ORG_HQ
   const innerRing = roundRing(cx, cy, innerRadius)
   const outerRing = roundRing(cx, cy, outerRadius)
   const between = Math.round((innerRadius + outerRadius) / 2)
-  // Keep a tile and a half clear on either side of each way in.
-  const clear = Math.asin(1.5 / between)
+  // Keep a tile and a half clear on either side of each way in, beside the houses' footprints.
+  const clear = Math.asin((1.5 + FOOTPRINT.house) / between)
   const slots = roundRing(cx, cy, between)
     .filter((t) =>
       gateAngles(TRADE_ORG_HQ.gates).every((a) => angleApart(angleOf(cx, cy, t), a) > clear),
     )
     .sort((p, q) => angleOf(cx, cy, p) - angleOf(cx, cy, q))
   const wanted = TRADE_ORG_HQ.houses + 2
-  if (slots.length < wanted) throw new Error('the Trade Org HQ has no room for its houses')
+  if (slots.length < wanted * (FOOTPRINT.house + 1))
+    throw new Error('the Trade Org HQ has no room for its houses')
   const spread = Array.from(
     { length: wanted },
     (_, i) => slots[Math.floor((i * slots.length) / wanted)]!,
   )
+  const hall: Tile = [cx - 1, cy - 1]
   return {
-    hall: [cx, cy],
-    storage: [cx - 1, cy - 1],
-    coinWarehouse: [cx + HQ_COIN_WAREHOUSE.dx, cy + HQ_COIN_WAREHOUSE.dy],
-    goodsWarehouse: [cx + 1, cy + 1],
+    hall,
+    storage: [hall[0] - FOOTPRINT.storage - 1, hall[1] - FOOTPRINT.storage - 1],
+    coinWarehouse: [hall[0] + HQ_COIN_WAREHOUSE.dx, hall[1] + HQ_COIN_WAREHOUSE.dy],
+    goodsWarehouse: [hall[0] + HQ_COIN_WAREHOUSE.dx, hall[1] - HQ_COIN_WAREHOUSE.dy],
     innerRing,
     innerGates: gatesOf(cx, cy, innerRing),
     outerRing,
@@ -130,21 +148,18 @@ export function hqLayout(cx: number, cy: number): HqLayout {
 /** How far the HQ's ground reaches from its town hall: its outer ring and the farms beyond it. */
 export const HQ_FOOTPRINT = TRADE_ORG_HQ.outerRadius + FARM_RING
 
-/** Tiles something stands on: nodes, buildings, residents, horses, carriages and piles. */
-function takenTiles(world: WorldState): Set<string> {
-  const things = [
-    ...world.nodes,
-    ...world.buildings,
-    ...world.residents,
-    ...world.horses,
-    ...world.carriages,
-    ...world.piles,
-  ]
-  return new Set(things.map((e) => `${e.x},${e.y}`))
+/** The ground with what stands on it: nodes, footprints, residents, horses, carriages, piles. */
+function takenGround(world: WorldState, terrain: TerrainMap): Ground {
+  const nodes = world.nodes.map((n) => `${n.x},${n.y}`)
+  return new Ground(world, terrain, [...nodes, ...residentTiles(world)])
 }
 
-/** Tiles just past the HQ's area where its farms may go: Plains, nearest an outer gate first. */
-function farmTiles(terrain: TerrainMap, cx: number, cy: number, taken: Set<string>): Tile[] {
+/**
+ * Where the HQ's farms go, by the north-west tiles of their footprints: wholly just past its area
+ * on Plains, apart from each other, nearest an outer gate first. As many as it gets, or fewer
+ * when there is no room for more.
+ */
+function farmTiles(ground: Ground, cx: number, cy: number): Tile[] {
   const { outerRing, outerGates } = hqLayout(cx, cy)
   const near = new Set<string>()
   for (const [x, y] of outerRing) {
@@ -152,31 +167,46 @@ function farmTiles(terrain: TerrainMap, cx: number, cy: number, taken: Set<strin
       for (let dx = -CITY_AREA_MARGIN; dx <= CITY_AREA_MARGIN; dx++) near.add(`${x + dx},${y + dy}`)
     }
   }
+  const side = FOOTPRINT.farm
   const toGate = (t: Tile) =>
-    Math.min(...outerGates.map((g) => Math.hypot(t[0] - g[0], t[1] - g[1])))
-  return roundRing(cx, cy, HQ_FOOTPRINT)
-    .filter(
-      ([x, y]) =>
-        !near.has(`${x},${y}`) &&
-        !taken.has(`${x},${y}`) &&
-        terrainAt(terrain, x, y) === Terrain.Plains,
+    Math.min(
+      ...outerGates.map((g) =>
+        Math.hypot(t[0] + (side - 1) / 2 - g[0], t[1] + (side - 1) / 2 - g[1]),
+      ),
     )
-    .sort((p, q) => toGate(p) - toGate(q))
+  // North-west tiles of footprints that reach no further in than the ring just past the area.
+  const candidates = new Map<string, Tile>()
+  for (let k = 0; k < side; k++) {
+    for (const t of roundRing(cx, cy, HQ_FOOTPRINT + k)) candidates.set(`${t[0]},${t[1]}`, t)
+  }
+  const mine = new Set<string>()
+  const out: Tile[] = []
+  for (const t of [...candidates.values()].sort((p, q) => toGate(p) - toGate(q))) {
+    if (out.length >= TRADE_ORG_HQ.farms) break
+    const fits = ground.fits('farm', t[0], t[1], (x, y) => {
+      const key = `${x},${y}`
+      return !near.has(key) && !mine.has(key) && within(x - cx, y - cy, HQ_FOOTPRINT + side)
+    })
+    if (!fits) continue
+    out.push(t)
+    for (const key of footprintKeys({ kind: 'farm', x: t[0], y: t[1] })) mine.add(key)
+  }
+  return out
 }
 
 /**
- * Whether the HQ fits with its town hall at (cx, cy): its round ground within `HQ_FOOTPRINT`
- * all open land (Plains, Forest or Hills) with nothing on it, room for its farms on Plains, and
- * none of it in sight of a Player's resident.
+ * Whether the HQ fits with the middle of its town hall at (cx, cy): its round ground within
+ * `HQ_FOOTPRINT` all open land (Plains, Forest or Hills) with nothing on it, room for its farms
+ * on Plains, and none of it in sight of a Player's resident.
  */
 export function hqSiteFits(
   world: WorldState,
   terrain: TerrainMap,
   cx: number,
   cy: number,
-  taken: Set<string> = takenTiles(world),
+  ground: Ground = takenGround(world, terrain),
 ): boolean {
-  const unseen = SIGHT_RANGE + HQ_FOOTPRINT + 1
+  const unseen = SIGHT_RANGE + HQ_FOOTPRINT + FOOTPRINT.farm
   for (const r of world.residents) {
     if (r.owner !== null && wrapDistance(terrain.size, r, { x: cx, y: cy }) <= unseen) return false
   }
@@ -185,14 +215,14 @@ export function hqSiteFits(
       if (!within(dx, dy, HQ_FOOTPRINT)) continue
       const t = terrainAt(terrain, cx + dx, cy + dy)
       if (t !== Terrain.Plains && t !== Terrain.Forest && t !== Terrain.Hills) return false
-      if (taken.has(`${cx + dx},${cy + dy}`)) return false
+      if (!ground.free(cx + dx, cy + dy)) return false
     }
   }
-  return farmTiles(terrain, cx, cy, taken).length >= TRADE_ORG_HQ.farms
+  return farmTiles(ground, cx, cy).length >= TRADE_ORG_HQ.farms
 }
 
 /** How far apart candidate sites for the HQ lie, in tiles along each direction. */
-const SITE_STEP = 6
+const SITE_STEP = 24
 
 /**
  * Picks the site for the HQ's town hall (`hqSiteFits`): as far from the nearest city as the map
@@ -204,7 +234,7 @@ export function findHqSite(
   terrain: TerrainMap,
   rand: () => number,
 ): Tile | undefined {
-  const edge = HQ_FOOTPRINT + 1
+  const edge = HQ_FOOTPRINT + FOOTPRINT.farm
   const halls = world.cities.flatMap((c) => townHallOf(world, c) ?? [])
   const candidates: { at: Tile; far: number; order: number }[] = []
   for (let y = edge; y < terrain.size - edge; y += SITE_STEP) {
@@ -214,34 +244,38 @@ export function findHqSite(
     }
   }
   candidates.sort((a, b) => b.far - a.far || a.order - b.order)
-  const taken = takenTiles(world)
-  return candidates.find((c) => hqSiteFits(world, terrain, c.at[0], c.at[1], taken))?.at
+  const ground = takenGround(world, terrain)
+  return candidates.find((c) => hqSiteFits(world, terrain, c.at[0], c.at[1], ground))?.at
 }
 
-/** The nearest resource node of `kind` with no building on it, from (cx, cy). */
+/**
+ * The nearest resource node of `kind` from (cx, cy) whose workplace can still be laid out on it
+ * (`nodeCorner`): where that workplace goes, by the north-west tile of its footprint.
+ */
 export function nearestFreeNode(
   world: WorldState,
-  size: number,
+  terrain: TerrainMap,
   kind: ResourceKind,
   cx: number,
   cy: number,
-) {
-  const built = new Set(world.buildings.map((b) => `${b.x},${b.y}`))
-  let best: { x: number; y: number } | undefined
-  let bestD = Infinity
-  for (const n of world.nodes) {
-    if (n.kind !== kind || built.has(`${n.x},${n.y}`)) continue
-    const d = wrapDistance(size, n, { x: cx, y: cy })
-    if (d < bestD) [best, bestD] = [n, d]
+): { x: number; y: number } | undefined {
+  const nodes = world.nodes
+    .filter((n) => n.kind === kind)
+    .map((n) => ({ n, d: wrapDistance(terrain.size, n, { x: cx, y: cy }) }))
+    .sort((a, b) => a.d - b.d)
+  for (const { n } of nodes) {
+    const corner = nodeCorner(world, terrain, n)
+    if (corner) return corner
   }
-  return best
+  return undefined
 }
 
 /** The resource kinds the HQ runs a workplace on, one each: wood, stone, iron ore and gold ore. */
 const HQ_NODES: readonly ResourceKind[] = ['forest', 'stone', 'ironOre', 'goldOre']
 
 /**
- * Lays out the Trade Org HQ with its town hall at (cx, cy) (`CONTEXT.md`: Trade Org HQ): the
+ * Lays out the Trade Org HQ with the middle of its town hall at (cx, cy) (`CONTEXT.md`: Trade
+ * Org HQ): the
  * town hall in the middle, the storage with Food and the coin and goods warehouses next to it,
  * an inner and an outer round ring of wall with gates, houses, a smelter and a mint between the
  * rings, farms outside the outer ring by its gates, and a lumber camp, a quarry and an iron and a
@@ -284,10 +318,7 @@ export function foundTradeOrgHq(
       if (!gates.some((g) => g[0] === t[0] && g[1] === t[1])) return building('wall', t)
       return closed ? { ...building('gate', t), closed } : building('gate', t)
     })
-  const taken = takenTiles(world)
-  const farms = farmTiles(terrain, cx, cy, taken)
-    .slice(0, TRADE_ORG_HQ.farms)
-    .map((t) => building('farm', t))
+  const farms = farmTiles(takenGround(world, terrain), cx, cy).map((t) => building('farm', t))
   const buildings: Building[] = [
     hall,
     { ...building('storage', layout.storage), stock: { food: TRADE_ORG_HQ.food } },
@@ -301,14 +332,18 @@ export function foundTradeOrgHq(
   const workplaces = [
     building('smelter', layout.smelter, null),
     building('mint', layout.mint, null),
-    ...HQ_NODES.flatMap((kind) => {
-      const node = nearestFreeNode(world, terrain.size, kind, cx, cy)
-      return node ? [building(NODE_WORKPLACE[kind], [node.x, node.y], null)] : []
-    }),
   ]
   city.workplaceIds = workplaces.map((b) => b.id)
   world.cities.push(city)
   world.buildings.push(...buildings, ...workplaces)
+  // One on each kind of node, each laid out once the others stand, so none overlaps another.
+  for (const kind of HQ_NODES) {
+    const spot = nearestFreeNode(world, terrain, kind, cx, cy)
+    if (!spot) continue
+    const b = building(NODE_WORKPLACE[kind], [spot.x, spot.y], null)
+    city.workplaceIds.push(b.id)
+    world.buildings.push(b)
+  }
   const residents = Array.from({ length: TRADE_ORG_HQ.residents }, (_, i) => {
     const farm = farms[i % farms.length]!
     const r = newResident(rand, {

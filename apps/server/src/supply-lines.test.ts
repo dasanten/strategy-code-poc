@@ -26,7 +26,7 @@ const me = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /**
  * A world with realm r1 (Player 7) whose city Ash stands at (5, 5), with a storage of plenty of
- * Food at (6, 5) where its Leader a1 stays fed. Carriage k1 of r1 and its horse h1 stand at the
+ * Food at (8, 5) where its Leader a1 stays fed. Carriage k1 of r1 and its horse h1 stand at the
  * storage with driver d1, who carries Food for a long trip. Soldiers s1 and s2 of r1 stand far
  * from home at (30, 30) and (30, 31) with nothing to eat, in army Foot.
  */
@@ -39,20 +39,20 @@ function setup() {
     id: 'st',
     kind: 'storage',
     cityId: 'c1',
-    x: 6,
+    x: 8,
     y: 5,
     stock: { food: 1000 },
   }
   world.buildings.push(storage)
-  resident(world, 'a1', 6, 5)
-  resident(world, 'd1', 6, 5).carried = { food: 30 }
+  resident(world, 'a1', 8, 5)
+  resident(world, 'd1', 8, 5).carried = { food: 30 }
   resident(world, 's1', 30, 30)
   resident(world, 's2', 30, 31)
   const horse: Horse = {
     id: 'h1',
     realmId: 'r1',
     cityId: null,
-    x: 6,
+    x: 8,
     y: 5,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
@@ -62,7 +62,7 @@ function setup() {
     id: 'k1',
     realmId: 'r1',
     cityId: null,
-    x: 6,
+    x: 8,
     y: 5,
     horseId: null,
     load: {},
@@ -180,7 +180,8 @@ describe('supply lines', () => {
       expect(s).toMatchObject({ x: 40, y: 20 })
       expect(s!.hunger).toBeGreaterThan(0)
     }
-    expect(wrapDistance(terrain.size, carriage, { x: 40, y: 20 })).toBeLessThanOrEqual(1)
+    // Right next to the army, diagonals included.
+    expect(wrapDistance(terrain.size, carriage, { x: 40, y: 20 })).toBeLessThan(1.5)
     expect(carriage.load.food).toBeLessThan(60)
     // Disbanding the army ends its supply wagon's drive.
     expect(order(world, queue, { kind: 'disbandArmy', armyId })).toBe('ack')

@@ -85,10 +85,10 @@ function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   const goods = readGoods(o.goods)
   if (!goods) return 'goods must be whole units of known goods'
   if (spot.kind === 'storage' && storageAt(world, r.x, r.y)?.id !== spot.storageId) {
-    return 'that storage is not on the resident’s tile'
+    return 'the resident is not at that storage'
   }
   if (spot.kind === 'site' && !siteAt(world, r.x, r.y, spot.siteId)) {
-    return 'that construction site is not on the resident’s tile'
+    return 'the resident is not at that construction site'
   }
   if (spot.kind === 'carriage' && !goodsAtSpot(world, r.x, r.y, spot)) {
     return 'that carriage is not on the resident’s tile'

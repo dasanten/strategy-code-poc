@@ -1,5 +1,4 @@
 import {
-  CITY_BUILDING_REACH,
   MAP_SIZE,
   NPC_CITY_MIN_DISTANCE,
   NPC_TOWN,
@@ -20,7 +19,17 @@ import {
 } from '@csp/shared'
 import { CITY_NAMES, updateCityMembership } from './cities.js'
 import { hash, mulberry32, newResident } from './residents.js'
-import { FARM_RING, newId, plainsOutside, ringTiles, wallSquare } from './starting-city.js'
+import { Ground } from './placing.js'
+import {
+  FARM_RING,
+  hallTile,
+  houseTile,
+  newId,
+  residentTiles,
+  ringTiles,
+  spotsOutside,
+  wallSquare,
+} from './starting-city.js'
 
 /** How many cities of a kind a map of `size` gets: `perFullMap` on a full-size map, by area. */
 export function npcCityCount(perFullMap: number, size: number): number {
@@ -32,8 +41,9 @@ const footprintRadius = (kind: NpcCitySize) => (kind.size / 2 + FARM_RING) * Mat
 
 /**
  * Whether an NPC city of `kind` with its top-left wall tile at (x, y) fits there: its square and
- * the ring around it all Plains with nothing on them, at least `NPC_CITY_MIN_DISTANCE` from every
- * city, and out of sight of every Player's resident (`CONTEXT.md`: NPC city, Sight).
+ * the ring around it all Plains with nothing on them, room for its farms outside the wall, at
+ * least `NPC_CITY_MIN_DISTANCE` from every city, and out of sight of every Player's resident
+ * (`CONTEXT.md`: NPC city, Sight).
  */
 export function npcSiteFits(
   world: WorldState,
@@ -41,7 +51,7 @@ export function npcSiteFits(
   kind: NpcCitySize,
   x: number,
   y: number,
-  taken: Set<string> = takenTiles(world),
+  ground: Ground = takenGround(world, terrain),
 ): boolean {
   const size = terrain.size
   const centre = { x: x + kind.size / 2, y: y + kind.size / 2 }
@@ -57,24 +67,23 @@ export function npcSiteFits(
   for (let ty = y - FARM_RING; ty < y + kind.size + FARM_RING; ty++) {
     for (let tx = x - FARM_RING; tx < x + kind.size + FARM_RING; tx++) {
       if (terrainAt(terrain, tx, ty) !== Terrain.Plains) return false
-      if (taken.has(`${tx},${ty}`)) return false
+      if (!ground.free(tx, ty)) return false
     }
   }
-  return true
+  return spotsOutside(ground, wallSquare(x, y, kind.size), farmKinds(kind)) !== undefined
 }
 
-/** Tiles something stands on: nodes, buildings, residents, horses, carriages and piles. */
-export function takenTiles(world: WorldState): Set<string> {
-  const things = [
-    ...world.nodes,
-    ...world.buildings,
-    ...world.residents,
-    ...world.horses,
-    ...world.carriages,
-    ...world.piles,
-  ]
-  return new Set(things.map((e) => `${e.x},${e.y}`))
+/**
+ * The ground with what stands on it (`Ground`): nodes, footprints, residents, horses, carriages
+ * and piles.
+ */
+export function takenGround(world: WorldState, terrain: TerrainMap): Ground {
+  const nodes = world.nodes.map((n) => `${n.x},${n.y}`)
+  return new Ground(world, terrain, [...nodes, ...residentTiles(world)])
 }
+
+/** One farm for each of a city's farms. */
+const farmKinds = (kind: NpcCitySize): 'farm'[] => Array<'farm'>(kind.farms).fill('farm')
 
 /**
  * Picks a site for an NPC city of `kind` (`npcSiteFits`), or none when the map has no room left
@@ -88,11 +97,11 @@ export function findNpcCitySite(
 ): [number, number] | undefined {
   const span = terrain.size - kind.size - 2 * FARM_RING
   if (span <= 0) return undefined
-  const taken = takenTiles(world)
+  const ground = takenGround(world, terrain)
   for (let attempt = 0; attempt < 3000; attempt++) {
     const x = FARM_RING + Math.floor(rand() * span)
     const y = FARM_RING + Math.floor(rand() * span)
-    if (npcSiteFits(world, terrain, kind, x, y, taken)) return [x, y]
+    if (npcSiteFits(world, terrain, kind, x, y, ground)) return [x, y]
   }
   return undefined
 }
@@ -127,18 +136,17 @@ export function foundNpcCity(
     x: bx,
     y: by,
   })
-  const hall = building('townHall', x + mid, y + mid + 1)
+  const hall = building('townHall', ...hallTile(x, y, kind.size))
   city.townHallId = hall.id
-  // The row of houses lies near enough to the storage for the city's chain to reach it, and from
-  // the houses on to the wall (`CITY_BUILDING_REACH`).
-  const houseRow = y + Math.max(1, mid - CITY_BUILDING_REACH)
-  const farms = plainsOutside(terrain, square, FARM_RING)
-    .slice(0, kind.farms)
-    .map(([fx, fy]) => building('farm', fx, fy))
+  const farms = (spotsOutside(takenGround(world, terrain), square, farmKinds(kind)) ?? []).map(
+    ([fx, fy]) => building('farm', fx, fy),
+  )
   const buildings: Building[] = [
     hall,
     { ...building('storage', x + mid, y + mid), stock: { food: kind.food } },
-    ...Array.from({ length: kind.houses }, (_, i) => building('house', x + 1 + i * 2, houseRow)),
+    ...Array.from({ length: kind.houses }, (_, i) =>
+      building('house', ...houseTile(x, y, kind.size, i)),
+    ),
     ...ringTiles(square).map(([wx, wy]) =>
       building(wx === square.gate.x && wy === square.gate.y ? 'gate' : 'wall', wx, wy),
     ),

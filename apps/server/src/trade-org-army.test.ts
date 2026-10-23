@@ -7,6 +7,7 @@ import {
   commanderOf,
   inInnerRing,
   isArmed,
+  middleOf,
   townHallOf,
   wrapDistance,
   type City,
@@ -24,28 +25,28 @@ import { hqSoldiers, soldiersLacking, spareSoldiers, tradeOrgArmySound } from '.
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 160, tiles: new Uint8Array(160 * 160).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 640, tiles: new Uint8Array(640 * 640).fill(Terrain.Plains) }
 const player = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /** Where the HQ's town hall stands. */
-const MID = 80
+const MID = 320
 
 /**
  * The Trade Org HQ at (MID, MID) with a trading post p at (20, 20) and its warehouse w at
- * (21, 20); realm r1 (Player 7, Leader a1) with city c1 at (20, 140), its storage s1 at
- * (21, 140) and its resident b1 there.
+ * (23, 20); realm r1 (Player 7, Leader a1) with city c1 at (20, 140), its storage s1 at
+ * (23, 140) and its resident b1 there.
  */
 function setup() {
   const world = createWorld(terrain)
   const hq = foundTradeOrgHq(world, terrain, MID, MID, mulberry32(7))
   const post = addCity(world, { id: 'p', realmId: null, x: 20, y: 20 })
   post.tradeOrg = 'post'
-  world.buildings.push({ id: 'w', kind: 'warehouse', cityId: 'p', x: 21, y: 20, stock: {} })
+  world.buildings.push({ id: 'w', kind: 'warehouse', cityId: 'p', x: 23, y: 20, stock: {} })
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
   addCity(world, { id: 'c1', realmId: 'r1', x: 20, y: 140 })
-  world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 21, y: 140, stock: {} })
+  world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 23, y: 140, stock: {} })
   resident(world, 'a1', 20, 141, 'c1')
-  resident(world, 'b1', 21, 141, 'c1')
+  resident(world, 'b1', 23, 141, 'c1')
   return { world, hq, queue: new OrderQueue(undefined, terrain), walking: new Walking(terrain) }
 }
 
@@ -136,7 +137,7 @@ describe('hiring the Trade Org army', () => {
     const s = setup()
     arm(s.world, s.hq, TRADE_ORG_ARMY.guard + 4)
     const b1 = at(s.world, 'b1')
-    b1.x = 21
+    b1.x = 23
     b1.y = 20
     b1.carried.coins = 200
     return s
@@ -228,7 +229,7 @@ describe('guarding the inner ring', () => {
       (b) =>
         b.kind === 'gate' &&
         b.cityId === hq.id &&
-        wrapDistance(terrain.size, hall, b) <= TRADE_ORG_HQ.innerRadius + 1,
+        wrapDistance(terrain.size, middleOf(hall), b) <= TRADE_ORG_HQ.innerRadius + 1,
     )
     expect(gates).toHaveLength(TRADE_ORG_HQ.gates)
     for (const g of gates) expect(g.closed).toBe(true)
@@ -245,8 +246,8 @@ describe('the Trade Organization hiring mercenaries', () => {
         .map((r) => r.id),
     )
     s.world.residents = s.world.residents.filter((r) => r.cityId !== s.hq.id || keep.has(r.id))
-    resident(s.world, 'm1', MID - 20, MID, null).carried.spear = 1
-    resident(s.world, 'm2', MID - 21, MID, null).carried.spear = 1
+    resident(s.world, 'm1', MID - 80, MID, null).carried.spear = 1
+    resident(s.world, 'm2', MID - 84, MID, null).carried.spear = 1
     resident(s.world, 'm3', 20, 139, 'c1').carried.spear = 1
     at(s.world, 'a1').carried.spear = 1
     s.world.tick = TICKS_PER_GAME_DAY
@@ -291,7 +292,9 @@ describe('the Trade Organization hiring mercenaries', () => {
       const m = at(world, id)
       expect(m.order).toBeNull()
       expect(inInnerRing(world, m, terrain.size)).toBe(false)
-      expect(wrapDistance(terrain.size, hall, m)).toBeLessThanOrEqual(TRADE_ORG_HQ.innerRadius + 2)
+      expect(wrapDistance(terrain.size, middleOf(hall), m)).toBeLessThanOrEqual(
+        TRADE_ORG_HQ.innerRadius + 2,
+      )
     }
   }, 120_000)
 
@@ -312,7 +315,8 @@ describe('trade-org-army-sound', () => {
     const hall = townHallOf(world, hq)!
     const gate = world.buildings.find(
       (b) =>
-        b.kind === 'gate' && wrapDistance(terrain.size, hall, b) <= TRADE_ORG_HQ.innerRadius + 1,
+        b.kind === 'gate' &&
+        wrapDistance(terrain.size, middleOf(hall), b) <= TRADE_ORG_HQ.innerRadius + 1,
     )!
     delete gate.closed
     world.contracts.push({

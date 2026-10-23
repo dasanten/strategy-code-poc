@@ -15,9 +15,7 @@ import {
   armyOf,
   inContact,
   spareFood,
-  carriagesAt,
   inCityArea,
-  pileAt,
   unitsThatFit,
   type Building,
   type City,
@@ -32,6 +30,11 @@ import {
   type Stock,
   type TerrainMap,
   type WorldState,
+  MAP_SIZE,
+  pileTile,
+  covers,
+  isAt,
+  buildingPile,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import { rememberFormerPlayer } from './standing.js'
@@ -135,16 +138,38 @@ export function die(world: WorldState, r: Resident): void {
   dropGoods(world, r.x, r.y, r.carried)
 }
 
-/** Puts goods in the pile on a tile, starting one if there is none and there is anything to drop. */
-export function dropGoods(world: WorldState, x: number, y: number, stock: Stock): void {
+/**
+ * Puts goods in the pile reached from a tile, starting one if there is none and there is
+ * anything to drop: on a building's footprint its one pile (`CONTEXT.md`: A building's pile),
+ * kept on its north-west tile (`pileTile`).
+ */
+export function dropGoods(
+  world: WorldState,
+  x: number,
+  y: number,
+  stock: Stock,
+  size = MAP_SIZE,
+): void {
   const goods = Object.entries(stock).filter(([, n]) => n > 0) as [Good, number][]
   if (goods.length === 0) return
-  let pile = world.piles.find((p) => p.x === x && p.y === y)
+  const at = pileTile(world, x, y, size)
+  let pile = world.piles.find((p) => p.x === at.x && p.y === at.y)
   if (!pile) {
-    pile = { id: `pile${world.nextId++}`, x, y, goods: {} }
+    pile = { id: `pile${world.nextId++}`, x: at.x, y: at.y, goods: {} }
     world.piles.push(pile)
   }
   for (const [good, n] of goods) pile.goods[good] = (pile.goods[good] ?? 0) + n
+}
+
+/**
+ * Gathers the piles lying on a building's footprint into its one pile on its north-west tile
+ * (`CONTEXT.md`: A building's pile), as when a site is laid out over goods on the ground.
+ */
+export function gatherPile(world: WorldState, b: Building, size = MAP_SIZE): void {
+  const lying = world.piles.filter((p) => covers(b, p.x, p.y, size) && (p.x !== b.x || p.y !== b.y))
+  if (lying.length === 0) return
+  world.piles = world.piles.filter((p) => !lying.includes(p))
+  for (const p of lying) dropGoods(world, b.x, b.y, p.goods, size)
 }
 
 /**
@@ -277,8 +302,8 @@ const whole = (stock: Stock | undefined): RefillSource | undefined =>
 
 /**
  * Where a resident running low on food takes a meal from, if anywhere (`CONTEXT.md`: Refilling):
- * at home, their city's storage (a mercenary of the Trade Org's, the HQ's); working at a workplace, the Food in the pile on its tile, else on
- * a carriage standing there; in an army, a carriage of their realm on or next to their tile, but
+ * at home, their city's storage (a mercenary of the Trade Org's, the HQ's); working at a
+ * workplace, the Food in its pile, else on a carriage standing at it; in an army, a carriage of their realm on or next to their tile, but
  * not the Food a haul route keeps on board for the horse (`spareFood`); on a caravan's crew, its
  * carriage close by (`caravanFood`). Elsewhere nowhere. `size`
  * is the map's.
@@ -293,10 +318,10 @@ export function refillSource(
   const o = r.order
   const atWork = o?.kind === 'workAt' && r.x === o.at.x && r.y === o.at.y
   const place = atWork && world.buildings.find((b) => b.id === o.buildingId)
-  if (place && !place.site && place.x === r.x && place.y === r.y) {
-    const pile = pileAt(world, r.x, r.y)
+  if (place && !place.site && isAt(r, place, size)) {
+    const pile = buildingPile(world, place)
     if ((pile?.goods.food ?? 0) > 0) return whole(pile!.goods)
-    const here = carriagesAt(world, r.x, r.y).find((k) => (k.load.food ?? 0) > 0)
+    const here = world.carriages.find((k) => isAt(k, place, size) && (k.load.food ?? 0) > 0)
     if (here) return whole(here.load)
   }
   const caravan = caravanFood(world, r, size)

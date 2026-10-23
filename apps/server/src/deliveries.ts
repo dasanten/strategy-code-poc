@@ -20,6 +20,7 @@ import {
   type GoodsSpot,
   type Resident,
   type WorldState,
+  isAt,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
@@ -150,7 +151,7 @@ export function runDelivery(
   }
   const b = stepBuilding(world, job)
   if (!b) return finish(caravan)
-  if (driver.x !== b.x || driver.y !== b.y) {
+  if (!isAt(driver, b)) {
     if (atStorage && job.misses >= DELIVERY_DRIVE_TRIES) return turnBack(world, caravan, job, d!)
     job.misses++
     const target = { x: b.x, y: b.y }

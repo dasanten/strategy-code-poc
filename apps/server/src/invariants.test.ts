@@ -3,7 +3,9 @@ import {
   MAX_HEALTH,
   MAX_HUNGER,
   Terrain,
+  buildingAt,
   carryCapacity,
+  covers,
   trainedCap,
   type Resident,
 } from '@csp/shared'
@@ -12,6 +14,12 @@ import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { stepWorld } from './world.js'
 
 const terrain = cityTerrain()
+
+/** The nearest tile east of (x, y) that no footprint covers. */
+function offFootprints(world: Parameters<typeof buildingAt>[0], x: number, y: number) {
+  while (buildingAt(world, x, y, terrain.size)) x++
+  return { x, y }
+}
 
 describe('invariants', () => {
   it('hold on a fresh world and after many ticks', () => {
@@ -95,7 +103,8 @@ describe('invariants', () => {
     world.piles.push(
       { id: 'p1', ...at, goods: { wood: 3 } },
       { id: 'p2', ...at, goods: { wood: 2 } },
-      { id: 'p3', x: r.x + 1, y: r.y, goods: {} },
+      // Off every footprint, so it is one tile's pile and not the farm's.
+      { id: 'p3', ...offFootprints(world, r.x, r.y), goods: {} },
     )
     const ids = checkInvariants(world, terrain)
       .filter((v) => v.invariant === 'goods-in-place')
@@ -133,7 +142,10 @@ describe('invariants', () => {
     const house = world.buildings.find((b) => b.kind === 'house')!
     const storage = world.buildings.find((b) => b.kind === 'storage')!
     const farm = world.buildings.find((b) => b.kind === 'farm')!
-    Object.assign(house, { x: wall.x, y: wall.y }) // onto the wall
+    Object.assign(house, { x: wall.x, y: wall.y }) // onto the wall and the walls next to it
+    const walls = world.buildings.filter(
+      (b) => b.kind === 'wall' && covers(house, b.x, b.y, terrain.size),
+    )
     storage.stock = { food: -1 }
     const forest = terrain.tiles.indexOf(Terrain.Forest)
     farm.x = forest % terrain.size
@@ -141,7 +153,8 @@ describe('invariants', () => {
     const ids = checkInvariants(world, terrain)
       .filter((v) => v.invariant === 'buildings-in-place')
       .map((v) => v.entityIds[0])
-    expect(ids.sort()).toEqual([farm.id, wall.id, storage.id].sort())
+    expect(walls.length).toBeGreaterThan(1)
+    expect(ids.sort()).toEqual([farm.id, storage.id, ...walls.map((b) => b.id)].sort())
   })
 
   it('catch goods kept in a building that is not a storage', () => {

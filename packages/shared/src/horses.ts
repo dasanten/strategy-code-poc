@@ -1,5 +1,7 @@
 import { HORSE_REACH, STABLE_BREED_DAYS, STABLE_CAPACITY } from './balance.js'
 import { carriagePulledBy } from './carriages.js'
+import { covers, isAt } from './footprint.js'
+import { pileAt } from './goods.js'
 import { wrap } from './terrain.js'
 import {
   TICKS_PER_GAME_DAY,
@@ -14,9 +16,9 @@ import {
 /** Ticks of breeding a stable needs for one foal (`STABLE_BREED_DAYS`). */
 export const STABLE_BREED_TICKS = STABLE_BREED_DAYS * TICKS_PER_GAME_DAY
 
-/** The finished stable on a tile, if there is one. */
+/** The finished stable whose footprint covers a tile, if there is one. */
 export function stableAt(world: WorldState, x: number, y: number): Building | undefined {
-  return world.buildings.find((b) => b.kind === 'stable' && !b.site && b.x === x && b.y === y)
+  return world.buildings.find((b) => b.kind === 'stable' && !b.site && covers(b, x, y))
 }
 
 /** The horses standing on a tile. */
@@ -40,7 +42,7 @@ export function horseFood(world: WorldState, horse: Horse, mapSize: number): Sto
     for (let dx = -HORSE_REACH; dx <= HORSE_REACH; dx++) {
       const x = wrap(horse.x + dx, mapSize)
       const y = wrap(horse.y + dy, mapSize)
-      const pile = world.piles.find((p) => p.x === x && p.y === y)
+      const pile = pileAt(world, x, y)
       if ((pile?.goods.food ?? 0) > 0 && !out.includes(pile!.goods)) out.push(pile!.goods)
     }
   }
@@ -52,7 +54,7 @@ export function horseFood(world: WorldState, horse: Horse, mapSize: number): Sto
  * undefined when there are none or the stable has no room for another horse.
  */
 export function breedingPair(world: WorldState, stable: Building): [Horse, Horse] | undefined {
-  const here = horsesAt(world, stable.x, stable.y)
+  const here = world.horses.filter((h) => isAt(h, stable))
   if (stable.site || stable.kind !== 'stable' || here.length >= STABLE_CAPACITY) return undefined
   const fed = here.filter((h) => h.hunger > 0)
   for (const a of fed) {

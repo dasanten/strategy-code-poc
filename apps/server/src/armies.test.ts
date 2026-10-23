@@ -1,4 +1,11 @@
-import { ARMY_SPREAD, Terrain, wrapDistance, type TerrainMap, type WorldState } from '@csp/shared'
+import {
+  ARMY_SPREAD,
+  Terrain,
+  WALK_TICKS_PER_TILE,
+  wrapDistance,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { armiesSound } from './armies.js'
 import { checkInvariants } from './invariants.js'
@@ -85,14 +92,14 @@ describe('armies', () => {
     resident(world, 'slow', 'r1', 10, 12, 1)
     // On their own, the fast one gets there well before the slow one.
     const alone = structuredClone(world)
-    order(alone, queue, { kind: 'walkTo', residentId: 'fast', x: 20, y: 12 })
-    order(alone, queue, { kind: 'walkTo', residentId: 'slow', x: 20, y: 12 })
+    order(alone, queue, { kind: 'walkTo', residentId: 'fast', x: 30, y: 12 })
+    order(alone, queue, { kind: 'walkTo', residentId: 'slow', x: 30, y: 12 })
     const arrivals = (w: WorldState, walk: Walking) => {
       const got: Record<string, number> = {}
       for (let t = 1; t <= 1000 && Object.keys(got).length < 2; t++) {
         run(w, walk)
         for (const id of ['fast', 'slow']) {
-          if (!got[id] && at(w, id).x === 20) got[id] = t
+          if (!got[id] && at(w, id).x === 30) got[id] = t
         }
         const gap = wrapDistance(terrain.size, at(w, 'fast'), at(w, 'slow'))
         if (w !== alone) expect(gap).toBeLessThanOrEqual(ARMY_SPREAD + 1)
@@ -100,11 +107,11 @@ describe('armies', () => {
       return got
     }
     const apart = arrivals(alone, new Walking(terrain))
-    expect(apart.slow! - apart.fast!).toBeGreaterThan(50)
+    expect(apart.slow! - apart.fast!).toBeGreaterThan(3 * WALK_TICKS_PER_TILE)
 
     order(world, queue, { kind: 'formArmy', name: 'Foot', residentIds: ['fast', 'slow'] })
     expect(
-      order(world, queue, { kind: 'armyWalkTo', armyId: world.armies[0]!.id, x: 20, y: 12 }),
+      order(world, queue, { kind: 'armyWalkTo', armyId: world.armies[0]!.id, x: 30, y: 12 }),
     ).toBe('ack')
     const together = arrivals(world, walking)
     // The army arrives when its slowest does, and its fast member barely before.
@@ -120,7 +127,7 @@ describe('armies', () => {
     resident(world, 'a3', 'r1', 10, 13)
     order(world, queue, { kind: 'formArmy', name: 'Foot', residentIds: ['a2', 'a3'] })
     const army = world.armies[0]!
-    order(world, queue, { kind: 'armyWalkTo', armyId: army.id, x: 20, y: 12 })
+    order(world, queue, { kind: 'armyWalkTo', armyId: army.id, x: 30, y: 12 })
     run(world, walking, 3)
     expect(at(world, 'a2').order).toMatchObject({ kind: 'walkTo', army: army.id })
     order(world, queue, { kind: 'walkTo', residentId: 'a2', x: 5, y: 5 })

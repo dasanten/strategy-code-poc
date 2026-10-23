@@ -35,6 +35,7 @@ import {
   type TradeOrder,
   type TradeSide,
   type WorldState,
+  isAt,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import type { Invariant } from './invariants.js'
@@ -169,7 +170,7 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
       o.carriageId === null ? undefined : world.carriages.find((k) => k.id === o.carriageId)
     if (o.carriageId !== null) {
       if (realm === null || !commandsCarriage(world, realm, carriage)) continue
-      if (carriage.x !== r.x || carriage.y !== r.y) continue
+      if (!isAt(carriage, warehouse)) continue
     }
     const holder = carriage ? loadOf(carriage) : handsOf(r, world.tick)
     const parties = [holder.stock, (warehouse.stock ??= {}), (coinWarehouse.stock ??= {})]
@@ -250,7 +251,7 @@ function tradeWithCity(
     o.carriageId === null ? undefined : world.carriages.find((k) => k.id === o.carriageId)
   if (o.carriageId !== null) {
     if (realm === null || !commandsCarriage(world, realm, carriage)) return false
-    if (carriage.x !== r.x || carriage.y !== r.y) return false
+    if (!isAt(carriage, storage)) return false
   }
   const holder = carriage ? loadOf(carriage) : handsOf(r, world.tick)
   const parties = [holder.stock, (storage.stock ??= {})]

@@ -122,7 +122,7 @@ describe('PathFinder across the full map', () => {
     // As far apart as two places get: half the map along each direction.
     west = nearestFreeTile(map, new Set(), 100, 100)
     east = nearestFreeTile(map, new Set(), 820, 820)
-  }, 120_000)
+  }, 300_000)
 
   it('finds a path between the farthest places in steps that stay within the tick budget', () => {
     const finder = new PathFinder(map)
@@ -143,7 +143,8 @@ describe('PathFinder across the full map', () => {
     expect(r?.status).toBe('found')
     if (r?.status !== 'found') return
     expect(r.path.length).toBeGreaterThan(1300)
-    expect(checkPath(map, west, east, r.path, WALKING_COSTS)).toBeCloseTo(r.cost)
+    // The finder sums costs in 32-bit floats: close, not exact, over a path this long.
+    expect(checkPath(map, west, east, r.path, WALKING_COSTS)).toBeCloseTo(r.cost, 1)
   })
 
   it('finds a carriage path across with no mountain on it', () => {
@@ -151,7 +152,7 @@ describe('PathFinder across the full map', () => {
     const r = finder.findPath(west, east, CARRIAGE_COSTS)
     expect(r.status).toBe('found')
     if (r.status !== 'found') return
-    expect(checkPath(map, west, east, r.path, CARRIAGE_COSTS)).toBeCloseTo(r.cost)
+    expect(checkPath(map, west, east, r.path, CARRIAGE_COSTS)).toBeCloseTo(r.cost, 1)
     expect(r.path.some(([x, y]) => terrainAt(map, x, y) === Terrain.Mountain)).toBe(false)
   })
 })

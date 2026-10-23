@@ -99,7 +99,7 @@ describe('capturing a city', () => {
   it('needs the attacker armed and inside the city area', () => {
     const { world, npc } = setup()
     const a2 = resident(world, 'a2', 'r1', 21, 21)
-    resident(world, 'a3', 'r1', 23, 23).carried.sword = 1
+    resident(world, 'a3', 'r1', 28, 28).carried.sword = 1
     stepWorld(world, terrain)
     expect(npc.realmId).toBeNull()
     armed(a2)
@@ -169,7 +169,7 @@ describe('capturing a city', () => {
   it('takes a Player’s city with its horses and carriages, and both realm logs show it', () => {
     const { world } = setup()
     const city = addCity(world, { id: 'c2', realmId: 'r2', x: 40, y: 40, name: 'Hartwell' })
-    world.buildings.push({ id: 'h2', kind: 'house', cityId: 'c2', x: 42, y: 40 })
+    world.buildings.push({ id: 'h2', kind: 'house', cityId: 'c2', x: 43, y: 40 })
     const leader = world.residents.find((r) => r.id === 'b1')!
     const a1 = world.residents.find((r) => r.id === 'a1')!
     Object.assign(leader, { x: 40, y: 41, cityId: 'c2' })

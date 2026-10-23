@@ -4,6 +4,7 @@ import {
   standingOf,
   CARRIAGE_CAPACITY,
   GOOD_WEIGHT,
+  FOOTPRINT,
   HQ_COIN_WAREHOUSE,
   Terrain,
   carryCapacity,
@@ -46,10 +47,10 @@ function plains(size: number, nodes: [ResourceKind, number, number][]) {
  * standing on the warehouse.
  */
 function post() {
-  const { world, terrain } = plains(64, [['stone', 40, 20]])
+  const { world, terrain } = plains(128, [['stone', 70, 40]])
   const city = foundTradingPost(world, terrain, 20, 20, 'stone', mulberry32(3))
   const warehouse = world.buildings.find((b) => b.kind === 'warehouse' && b.cityId === city.id)!
-  resident(world, 'a1', 50, 50)
+  resident(world, 'a1', 110, 110)
   const p1 = resident(world, 'p1', warehouse.x, warehouse.y)
   return { world, terrain, warehouse, p1, queue: new OrderQueue(undefined, terrain) }
 }
@@ -214,12 +215,12 @@ describe('trading at a warehouse', () => {
   })
 
   it('at the HQ, takes and pays coins from its coin warehouse', () => {
-    const mid = 80
-    const { world, terrain } = plains(160, [
-      ['forest', mid + 20, mid],
-      ['stone', mid + 20, mid + 3],
-      ['ironOre', mid + 22, mid - 3],
-      ['goldOre', mid + 24, mid],
+    const mid = 320
+    const { world, terrain } = plains(640, [
+      ['forest', mid + 80, mid],
+      ['stone', mid + 80, mid + 12],
+      ['ironOre', mid + 88, mid - 12],
+      ['goldOre', mid + 96, mid],
     ])
     const city = foundTradeOrgHq(world, terrain, mid, mid, mulberry32(7))
     const hall = townHallOf(world, city)!
@@ -244,7 +245,7 @@ describe('trading at a warehouse', () => {
     p1.y = coins.y
     p1.carried = { iron: 5 }
     expect(order(world, queue, { kind: 'sell', good: 'iron', units: 5 })).toBe(
-      'not on a Trade Org warehouse',
+      'not at a Trade Org warehouse',
     )
   })
 
@@ -297,9 +298,9 @@ describe('trading at a warehouse', () => {
       'children can’t trade',
     )
     p1.bornAt = -20 * 24 * 3600
-    p1.x += 1
+    p1.x += FOOTPRINT.warehouse
     expect(order(world, queue, { kind: 'buy', good: 'iron', units: 1 })).toBe(
-      'not on a Trade Org warehouse',
+      'not at a Trade Org warehouse',
     )
   })
 

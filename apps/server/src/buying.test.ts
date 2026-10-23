@@ -34,10 +34,10 @@ function setup(coins: [number, number] = [PRICE - 100, 300]) {
   const world = createWorld(terrain)
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
   const npc = addCity(world, { id: 'npc', realmId: null, x: 20, y: 20, name: 'Dunmere' })
-  world.buildings.push({ id: 'house', kind: 'house', cityId: 'npc', x: 21, y: 20 })
+  world.buildings.push({ id: 'house', kind: 'house', cityId: 'npc', x: 24, y: 20 })
   world.buildings.push({ id: 'farm', kind: 'farm', cityId: 'npc', x: 23, y: 23 })
   resident(world, 'a1', 'r1', 50, 50)
-  resident(world, 'n1', null, 21, 20, 'npc')
+  resident(world, 'n1', null, 24, 20, 'npc')
   resident(world, 'n2', null, 23, 23, 'npc')
   resident(world, 'p1', 'r1', 20, 20).carried.coins = coins[0]
   resident(world, 'p2', 'r1', 20, 20).carried.coins = coins[1]
@@ -122,7 +122,7 @@ describe('buying an NPC city', () => {
 
   it('counts only coins carried on the town hall itself', () => {
     const { world, npc, queue, walking } = setup()
-    at(world, 'p2').x = 21
+    at(world, 'p2').x = 23
     expect(order(world, queue, buy)).toMatch(/^it costs/)
     at(world, 'p2').x = 20
     expect(order(world, queue, buy)).toBe('ack')
@@ -183,8 +183,8 @@ describe('buying an NPC city', () => {
 
   it('needs the resident on its town hall, and an NPC city', () => {
     const { world, queue } = setup()
-    at(world, 'p1').x = 21
-    expect(order(world, queue, buy)).toBe('the resident must stand on its town hall')
+    at(world, 'p1').x = 23
+    expect(order(world, queue, buy)).toBe('the resident must stand at its town hall')
     expect(order(world, queue, { ...buy, residentId: 'n1' })).toBe('not one of your residents')
     addCity(world, { id: 'post', realmId: null, x: 18, y: 24 })
     world.cities.find((c) => c.id === 'post')!.tradeOrg = 'post'

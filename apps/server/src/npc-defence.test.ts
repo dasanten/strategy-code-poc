@@ -1,4 +1,5 @@
 import {
+  CITY_AREA_MARGIN,
   MAX_HEALTH,
   NPC_GATE_WATCH_RANGE,
   NPC_TOWN,
@@ -31,7 +32,7 @@ const plains = (size: number): TerrainMap => ({
 
 /** A village alone on a small Plains map, its top-left wall tile at (20, 20). */
 function village(): { world: WorldState; terrain: TerrainMap; city: City } {
-  const terrain = plains(64)
+  const terrain = plains(160)
   const world = createWorld(terrain)
   const city = foundNpcCity(world, terrain, NPC_VILLAGE, 20, 20, mulberry32(7))
   return { world, terrain, city }
@@ -92,7 +93,7 @@ describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
     const { world, terrain, city } = village()
     const hall = buildingOf(world, city, 'townHall')
     // A smithy is no city building; the city works it as one of its own workplaces.
-    world.buildings.push({ id: 'smithy', kind: 'smithy', cityId: null, x: hall.x + 1, y: hall.y })
+    world.buildings.push({ id: 'smithy', kind: 'smithy', cityId: null, x: hall.x + 3, y: hall.y })
     city.workplaceIds = ['smithy']
     Object.assign(buildingOf(world, city, 'storage').stock!, { iron: 10, wood: 20 })
     run(world, terrain, new Walking(terrain), 3 * TICKS_PER_GAME_DAY)
@@ -130,7 +131,8 @@ describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
     const hall = buildingOf(world, city, 'townHall')
     const walking = new Walking(terrain)
     const [own] = citizens(world, city)
-    const p = outsider(world, 'p1', gate.x, gate.y + 3)
+    // Just outside its area, as far from its gate as an armed outsider gets without taking it.
+    const p = outsider(world, 'p1', gate.x, gate.y + CITY_AREA_MARGIN + 2)
     p.carried.sword = 1
     Object.assign(own!, { x: gate.x, y: gate.y + 2, order: null })
     const home = { x: hall.x, y: hall.y }
@@ -138,7 +140,7 @@ describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
     for (let t = 0; t < TICKS_PER_GAME_DAY && own!.order?.kind === 'walkTo'; t++) {
       stepWorld(world, terrain, walking)
       // The outsider stays put, so the gate stays shut.
-      Object.assign(p, { x: gate.x, y: gate.y + 3 })
+      Object.assign(p, { x: gate.x, y: gate.y + CITY_AREA_MARGIN + 2 })
       expect(gate.closed).toBe(true)
     }
     expect([own!.x, own!.y]).toEqual([hall.x, hall.y])
@@ -176,8 +178,8 @@ describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
     const [victim, soldier] = citizens(world, city)
     Object.assign(soldier!, { x: hall.x, y: hall.y, order: null })
     soldier!.carried.spear = 1
-    Object.assign(victim!, { x: 50, y: 50 })
-    const p = outsider(world, 'p1', 51, 50)
+    Object.assign(victim!, { x: 120, y: 120 })
+    const p = outsider(world, 'p1', 121, 120)
     p.order = attackOrder(victim!.id)
     stepNpcDefence(world, terrain.size)
     expect(soldier!.order).toBeNull()

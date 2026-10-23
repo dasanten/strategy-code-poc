@@ -397,7 +397,7 @@ describe('Haul and Tear down from the UI', () => {
     })
     // Checked as the tear-down order is.
     expect(order({ task: 'tearDown', residentId: 'w2', buildingId: 'nope' })).toMatchObject({
-      reason: 'that building is not on the resident’s tile',
+      reason: 'the resident is not at that building',
     })
     expect(order({ task: 'tearDown', residentId: 'w2', buildingId: 'farm' })).toMatchObject({
       type: 'ack',

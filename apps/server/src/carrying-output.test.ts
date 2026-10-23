@@ -37,7 +37,7 @@ function farmWorld(): { world: WorldState; terrain: TerrainMap; farm: Building }
   }
   const world = createWorld(terrain)
   world.realms.push({ id: 'r1', userId: 1, leaderId: 'w1' })
-  addCity(world, { id: 'c1', realmId: 'r1', x: 13, y: 6 })
+  addCity(world, { id: 'c1', realmId: 'r1', x: 20, y: 6 })
   const farm: Building = { id: 'farm', kind: 'farm', cityId: 'c1', x: 6, y: 6 }
   world.buildings.push(farm)
   for (const id of ['w1', 'w2', 'w3']) addWorker(world, id, farm)
@@ -111,7 +111,7 @@ describe('carrying the output', () => {
     storage(world, 'south', farm.x, farm.y + 7)
     // Another realm's storage, nearer still, is not theirs to fill.
     world.cities.push({ id: 'c2', name: 'Elsewhere', realmId: 'r2', townHallId: 'none' })
-    world.buildings.push({ id: 'theirs', kind: 'storage', cityId: 'c2', x: farm.x + 1, y: farm.y })
+    world.buildings.push({ id: 'theirs', kind: 'storage', cityId: 'c2', x: farm.x + 4, y: farm.y })
     world.piles.push({ id: 'p', x: farm.x, y: farm.y, goods: { food: 100 } })
     new ScriptRunner(terrain, host()).runAll(world)
     expect(carriers(world).map((r) => r.script!.memory.carry)).toEqual([
@@ -186,12 +186,12 @@ describe('carrying the output', () => {
     const { world, terrain, farm } = farmWorld()
     // Only another realm's storage, and a site of theirs not yet finished.
     world.cities.push({ id: 'c2', name: 'Elsewhere', realmId: 'r2', townHallId: 'none' })
-    world.buildings.push({ id: 'theirs', kind: 'storage', cityId: 'c2', x: farm.x + 1, y: farm.y })
+    world.buildings.push({ id: 'theirs', kind: 'storage', cityId: 'c2', x: farm.x + 4, y: farm.y })
     world.buildings.push({
       id: 'site',
       kind: 'storage',
       cityId: 'c1',
-      x: farm.x + 2,
+      x: farm.x + 6,
       y: farm.y,
       site: { work: 0, delivered: {} },
     })

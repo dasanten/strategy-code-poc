@@ -22,30 +22,30 @@ import { SCRIPT_ORDER_KINDS, bindScript, scriptRequestsSound } from './script-bi
 import { entitiesInSight } from './sight.js'
 import { createWorld } from './world.js'
 
-const SIZE = 64
+const SIZE = 256
 const tiles = new Uint8Array(SIZE * SIZE).fill(Terrain.Plains)
 tiles[10 * SIZE + 11] = Terrain.Forest
-tiles[50 * SIZE + 50] = Terrain.Hills
+tiles[200 * SIZE + 200] = Terrain.Hills
 const terrain: TerrainMap = { size: SIZE, tiles }
 const sender = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /**
  * Realm r1 (Player 7) with a1 at (10, 10) and a pile of food under them; realm r2 (Player 8) with
- * b1 next to a1, in sight, and b2 at (40, 40), out of sight. Player 7 explored around a1.
+ * b1 next to a1, in sight, and b2 at (160, 160), out of sight. Player 7 explored around a1.
  */
 function setup() {
   const world = createWorld(terrain)
   world.nodes = [
     { id: 'n1', kind: 'forest', x: 11, y: 10 },
-    { id: 'n2', kind: 'stone', x: 50, y: 50 },
+    { id: 'n2', kind: 'stone', x: 200, y: 200 },
   ]
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
   world.realms.push({ id: 'r2', userId: 8, leaderId: 'b1' })
   const a1 = resident(world, 'a1', 'r1', 10, 10)
   resident(world, 'b1', 'r2', 11, 10)
-  resident(world, 'b2', 'r2', 40, 40)
+  resident(world, 'b2', 'r2', 160, 160)
   world.piles.push({ id: 'p1', x: 10, y: 10, goods: { food: 5 } })
-  world.piles.push({ id: 'p2', x: 40, y: 40, goods: { wood: 5 } })
+  world.piles.push({ id: 'p2', x: 160, y: 160, goods: { wood: 5 } })
   const explored = new ExploredTerrain(terrain, world.nodes)
   explored.explore(7, 10, 10, SIGHT_RANGE)
   return { world, a1, explored }
@@ -151,8 +151,8 @@ describe('script bindings', () => {
       memory.piles = ids(piles())
       memory.nodes = ids(nodes())
       memory.here = terrainAt(11, 10)
-      memory.far = terrainAt(50, 50)
-      memory.d = distance(me, { x: 60, y: 10 })
+      memory.far = terrainAt(200, 200)
+      memory.d = distance(me, { x: 250, y: 10 })
       `,
       memory,
     )
@@ -161,8 +161,8 @@ describe('script bindings', () => {
     expect(memory.nodes).toEqual(['n1'])
     expect(memory.here).toBe('forest')
     expect(memory.far).toBeNull()
-    // Round the side of the map: 10 → 60 is 14 tiles the short way.
-    expect(memory.d).toBe(14)
+    // Round the side of the map: 10 → 250 is 16 tiles the short way.
+    expect(memory.d).toBe(16)
   })
 
   it('list the admin directives in force with their price, never who gave them', () => {
@@ -240,7 +240,7 @@ describe('script bindings', () => {
       { kind: 'handIn', good: 'coins', units: 50, toCityId: 'c2', carriageId: null },
     ],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
-    ['roadLine(60, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 60, y: 10 } }],
+    ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],
   ]
 
   it.each(actions)('request %s exactly as the UI order would be', (call, order) => {

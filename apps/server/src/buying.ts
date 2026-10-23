@@ -9,6 +9,7 @@ import {
   sellsTo,
   townHallOf,
   type WorldState,
+  isAt,
 } from '@csp/shared'
 import { joinRealm } from './capture.js'
 import { recordEvent } from './events.js'
@@ -52,7 +53,7 @@ export function resolvePurchases(world: WorldState, size: number): number {
     const hall = city && townHallOf(world, city)
     const realm = r.owner
     if (!city || !hall || realm === null || !sellsTo(world, city, realm)) continue
-    if (r.x !== hall.x || r.y !== hall.y) continue
+    if (!isAt(r, hall, size)) continue
     const price = cityPrice(world, city, realm)
     const coins = coinsAtTownHall(world, city, realm)
     if (coins < price) {

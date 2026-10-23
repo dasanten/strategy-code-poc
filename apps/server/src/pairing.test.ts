@@ -4,6 +4,7 @@ import {
   STAT_NAMES,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
+  buildProblem,
   canWork,
   cityAreaTiles,
   cityResidents,
@@ -59,12 +60,12 @@ function years(world: WorldState, n: number): Resident[] {
   return born
 }
 
-/** Adds a finished house to the city, on a free tile in its area (`CONTEXT.md`: City area). */
+/** Adds a finished house to the city, where one fits in its area (`CONTEXT.md`: City area). */
 function addHouse(world: WorldState) {
   const city = world.cities[0]!
   for (const key of cityAreaTiles(world, city, cityTerrain().size)) {
     const [x, y] = key.split(',').map(Number) as [number, number]
-    if (world.buildings.some((b) => b.x === x && b.y === y)) continue
+    if (buildProblem(world, x, y, 'house', cityTerrain())) continue
     world.buildings.push({ id: `h${x},${y}`, kind: 'house', cityId: city.id, x, y })
     return
   }

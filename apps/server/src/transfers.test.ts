@@ -47,11 +47,11 @@ const plains = (size: number): TerrainMap => ({
  * resident p1 standing on the post's warehouse with 1,000 coins.
  */
 function setup() {
-  const terrain = plains(128)
+  const terrain = plains(512)
   const world = createWorld(terrain)
   const rand = mulberry32(5)
-  foundTradeOrgHq(world, terrain, 32, 32, rand)
-  foundTradingPost(world, terrain, 80, 80, undefined, rand)
+  foundTradeOrgHq(world, terrain, 128, 128, rand)
+  foundTradingPost(world, terrain, 320, 320, undefined, rand)
   const [caravan] = placeCaravans(world)
   const realm = foundStartingCity(world, terrain, mara.userId)
   const other = foundStartingCity(world, terrain, ivo.userId)
@@ -166,19 +166,19 @@ describe('transfer fees and quotes', () => {
   })
 
   it('take what is held, up to one load and the coins for the fee', () => {
-    expect(quoteTransfer({ iron: 50, coins: 10_000 }, 'iron', 30, 40)).toEqual({
+    expect(quoteTransfer({ iron: 50, coins: 10_000 }, 'iron', 30, 160)).toEqual({
       units: 30,
-      fee: transferFee(30, 40),
+      fee: transferFee(30, 160),
     })
-    expect(quoteTransfer({ iron: 12, coins: 10_000 }, 'iron', 30, 40).units).toBe(12)
-    const load = quoteTransfer({ stone: 10_000, coins: 100_000 }, 'stone', 10_000, 40)
+    expect(quoteTransfer({ iron: 12, coins: 10_000 }, 'iron', 30, 160).units).toBe(12)
+    const load = quoteTransfer({ stone: 10_000, coins: 100_000 }, 'stone', 10_000, 160)
     expect(load.units).toBe(Math.floor(DELIVERY_LOAD / GOOD_WEIGHT.stone))
     // Short of coins for the whole fee, it takes fewer.
-    const poor = quoteTransfer({ iron: 100, coins: transferFee(10, 40) }, 'iron', 100, 40)
-    expect(poor).toEqual({ units: 10, fee: transferFee(10, 40) })
-    expect(quoteTransfer({ iron: 100 }, 'iron', 100, 40).units).toBe(0)
+    const poor = quoteTransfer({ iron: 100, coins: transferFee(10, 160) }, 'iron', 100, 160)
+    expect(poor).toEqual({ units: 10, fee: transferFee(10, 160) })
+    expect(quoteTransfer({ iron: 100 }, 'iron', 100, 160).units).toBe(0)
     // Coins pay their own fee out of the same coins.
-    const coins = quoteTransfer({ coins: 500 }, 'coins', 1_000, 40)
+    const coins = quoteTransfer({ coins: 500 }, 'coins', 1_000, 160)
     expect(coins.units + coins.fee).toBeLessThanOrEqual(500)
     expect(coins.units).toBeGreaterThan(0)
   })

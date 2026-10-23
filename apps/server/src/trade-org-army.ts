@@ -24,6 +24,7 @@ import {
   type MercenaryContract,
   type Resident,
   type WorldState,
+  middleOf,
 } from '@csp/shared'
 import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
@@ -156,11 +157,12 @@ function payMercenaries(world: WorldState, hq: City): void {
 
 /** The HQ's inner gates: its gates on the inner ring, not the outer. */
 function innerGates(world: WorldState, hq: City, hall: Building, size: number): Building[] {
+  const c = middleOf(hall, size)
   return world.buildings.filter(
     (b) =>
       b.cityId === hq.id &&
       b.kind === 'gate' &&
-      Math.hypot(wrapDelta(hall.x, b.x, size), wrapDelta(hall.y, b.y, size)) <=
+      Math.hypot(wrapDelta(c.x, b.x, size), wrapDelta(c.y, b.y, size)) <=
         TRADE_ORG_HQ.innerRadius + 1,
   )
 }
@@ -250,9 +252,10 @@ function mercenaries(world: WorldState): Resident[] {
  * hall, round the ring.
  */
 function guardPosts(hall: Building): { x: number; y: number }[] {
-  return hqLayout(hall.x, hall.y).innerGates.map(([x, y]) => {
-    const d = Math.hypot(x - hall.x, y - hall.y) || 1
-    return { x: x + Math.round((x - hall.x) / d), y: y + Math.round((y - hall.y) / d) }
+  const c = middleOf(hall)
+  return hqLayout(c.x, c.y).innerGates.map(([x, y]) => {
+    const d = Math.hypot(x - c.x, y - c.y) || 1
+    return { x: x + Math.round((x - c.x) / d), y: y + Math.round((y - c.y) / d) }
   })
 }
 

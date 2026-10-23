@@ -11,6 +11,7 @@ import {
   type OrderRequest,
   type TerrainMap,
   type WorldState,
+  isAt,
 } from '@csp/shared'
 import { dissolveCity, updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime } from './crimes.js'
@@ -79,7 +80,7 @@ export function resolveTearingDown(
     const o = r?.order
     if (!r || o?.kind !== 'tearDown') continue
     const b = world.buildings.find((x) => x.id === o.buildingId)
-    if (!b || r.x !== o.at.x || r.y !== o.at.y || b.x !== r.x || b.y !== r.y) {
+    if (!b || r.x !== o.at.x || r.y !== o.at.y || !isAt(r, b, terrain?.size)) {
       r.order = null
       continue
     }

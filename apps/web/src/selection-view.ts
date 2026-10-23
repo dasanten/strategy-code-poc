@@ -16,6 +16,7 @@ import {
   type Pile,
   type Resident,
   type Stock,
+  covers,
 } from '@csp/shared'
 import type { Relationship } from './theme.js'
 import { cityRelationship, type Viewer } from './map/tokens.js'
@@ -239,11 +240,12 @@ function goodsText(stock: Stock | undefined, labels: Record<string, string>): st
 export function describeTile(t: TileThings, goodLabels: Record<string, string>): TileCard {
   const here = <T extends { x: number; y: number }>(xs: T[]) =>
     xs.filter((v) => v.x === t.x && v.y === t.y)
-  const buildings = here(t.buildings)
-  const building = buildings.find((b) => b.kind !== 'road')
-  const road = buildings.find((b) => b.kind === 'road')
+  // A building shows on every tile of its footprint, with its one pile (`CONTEXT.md`: At a building).
+  const building = t.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+  const road = here(t.buildings).find((b) => b.kind === 'road')
   const carriage = here(t.carriages)[0]
-  const pile = here(t.piles)[0]
+  const pileTile = building ?? t
+  const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
   const cityOf = (b: Building) => t.cities.find((c) => c.id === b.cityId)
   const lines: string[] = []
   let card: Omit<TileCard, 'lines'> | undefined

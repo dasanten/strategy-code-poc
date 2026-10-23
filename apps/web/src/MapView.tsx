@@ -13,6 +13,8 @@ import {
   type KnownNode,
   type Resident,
   type ResourceKind,
+  footprintKeys,
+  FOOTPRINT,
 } from '@csp/shared'
 import {
   CLOSE_SCALE,
@@ -335,9 +337,11 @@ export function MapView({
         under.stroke({ width: 1, color: 0x000000, alpha: 0.12 })
       }
 
-      // A node under a building shows as the building.
+      // A node under a building's footprint shows as the building.
       const built = new Set(
-        worldRef.current.buildings.filter((b) => b.kind !== 'road').map((b) => `${b.x},${b.y}`),
+        worldRef.current.buildings
+          .filter((b) => b.kind !== 'road')
+          .flatMap((b) => footprintKeys(b, worldRef.current.map.size)),
       )
       const r = tokenRadius(cam.scale)
       for (const i of onScreen) {
@@ -829,15 +833,27 @@ function drawStructures(
     stroke(band, color, alpha, segments)
   }
 
-  // Buildings as icon tokens; a gate sits on its wall, smaller, its glyph in the owner's colour
-  // while closed. A construction site shows faintly.
+  // Buildings as icon tokens over their footprint (`CONTEXT.md`: Footprint): a plate in the
+  // owner's colour under a bigger token in its middle; a gate sits on its wall, smaller, its
+  // glyph in the owner's colour while closed. A construction site shows faintly.
   const r = tokenRadius(tile)
   for (const b of buildings) {
     if (b.kind === 'road' || b.kind === 'wall') continue
-    const [cx, cy] = centre(cam, view, size, b)
-    if (!near(cx, cy)) continue
+    const side = FOOTPRINT[b.kind]
+    const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
+    const [cx, cy] = [sx + (side * tile) / 2, sy + (side * tile) / 2]
+    if (!near(cx - (side - 1) * tile, cy - (side - 1) * tile) && !near(cx, cy)) continue
     const rel = relOf(b)
     const alpha = b.site ? 0.45 : 1
+    if (side > 1) {
+      const inset = tile * 0.08
+      under
+        .rect(sx + inset, sy + inset, side * tile - 2 * inset, side * tile - 2 * inset)
+        .fill({ color: relationshipColor(rel), alpha: 0.14 * alpha })
+        .stroke({ width: 1, color: relationshipColor(rel), alpha: 0.5 * alpha })
+      drawBuilding(tokens, BUILDING_ART[b.kind], cx, cy, tokenRadius(tile * 2), rel, alpha)
+      continue
+    }
     if (b.kind === 'gate')
       drawBuilding(
         tokens,
