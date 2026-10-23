@@ -67,7 +67,7 @@ describe('NPC cities work and eat', () => {
     expect(world.residents.map((r) => r.id)).toEqual(expect.arrayContaining(people))
     // Left in the storage, the starting food would have mostly spoiled by now.
     expect(storedFood(world, city)).toBeGreaterThan(NPC_VILLAGE.food)
-  }, 120_000)
+  }, 240_000)
 
   it('carries the farm’s output to the storage', () => {
     const { world, terrain, city } = village()

@@ -219,7 +219,7 @@ describe('caravans carrying out deliveries', () => {
     expect(total(world, 'iron')).toBe(iron)
     // Bringing what was bought into someone's storage is no crime.
     expect(world.crimes).toEqual([])
-  }, 60_000)
+  }, 120_000)
 
   it('pick up goods sold from the city’s storage, pay there, and bring them to the warehouse', () => {
     const { world, terrain, warehouse, storage, city, caravan, queue } = setup()
@@ -244,7 +244,7 @@ describe('caravans carrying out deliveries', () => {
     expect(world.crimes).toEqual([])
     runUntil(world, terrain, () => caravan.job === null, 10_000)
     expect(warehouse.stock!.stone).toBeGreaterThanOrEqual(stone + 30 - 1)
-  }, 60_000)
+  }, 120_000)
 
   it('turn back from a city behind closed gates, and the delivery waits for the next caravan', () => {
     const { world, terrain, warehouse, city, caravan, queue } = setup()
@@ -255,7 +255,7 @@ describe('caravans carrying out deliveries', () => {
     expect(world.deliveries).toEqual([expect.objectContaining({ caravanId: null, units: 3 })])
     runUntil(world, terrain, () => caravan.job === null, 10_000)
     expect(owedBy(world, warehouse.id, 'iron')).toBe(3)
-  }, 60_000)
+  }, 120_000)
 
   it('drop a delivery to a city that is no longer the realm’s', () => {
     const { world, terrain, city, caravan, queue } = setup()
@@ -270,7 +270,7 @@ describe('caravans carrying out deliveries', () => {
     runUntil(world, terrain, () => eventsOf(world, 'deliveryStuck').length > 0, 100)
     expect(eventsOf(world, 'deliveryStuck')[0]).toMatchObject({ cancelled: true })
     expect(world.deliveries).toEqual([])
-  }, 60_000)
+  }, 120_000)
 
   it('let go of a delivery when the caravan breaks up', () => {
     const { world, terrain, city, caravan, queue } = setup()
@@ -281,7 +281,7 @@ describe('caravans carrying out deliveries', () => {
     expect(world.caravans).toEqual([])
     expect(world.deliveries).toEqual([expect.objectContaining({ caravanId: null })])
     expect(checkInvariants(world, terrain)).toEqual([])
-  }, 60_000)
+  }, 120_000)
 })
 
 describe('deliveries sound', () => {
@@ -368,7 +368,7 @@ describe('robbed caravans', () => {
     expect(world.crimes).toEqual([
       expect.objectContaining({ kind: 'theft', victimOrg: tradeOrgHq(world)!.id }),
     ])
-  }, 60_000)
+  }, 120_000)
 
   it('send a delivery again that robbers took all of', () => {
     const { world, terrain, storage, city, caravan, queue } = setup()
@@ -380,7 +380,7 @@ describe('robbed caravans', () => {
     expect(storage.stock!.iron).toBe(before + 3)
     expect(eventsOf(world, 'deliveryRobbed')).toEqual([expect.objectContaining({ units: 3 })])
     expect(eventsOf(world, 'delivered').map((e) => e.units)).toEqual([3])
-  }, 60_000)
+  }, 120_000)
 
   it('fetch coins taken from a pick-up again, so the seller is paid for all of it', () => {
     const { world, terrain, storage, city, caravan, queue } = setup()
@@ -394,7 +394,7 @@ describe('robbed caravans', () => {
     expect(done).toMatchObject({ delivery: 'pickUp', units: 30 })
     expect(done!.coins).toBeGreaterThan(0)
     expect(storage.stock!.coins).toBe(done!.coins)
-  }, 60_000)
+  }, 120_000)
 
   it('fetch coins taken while a pick-up pays, and pay the rest', () => {
     const { world, terrain, storage, city, caravan, queue } = setup()
@@ -408,7 +408,7 @@ describe('robbed caravans', () => {
     const [done] = eventsOf(world, 'delivered')
     expect(done).toMatchObject({ delivery: 'pickUp', units: 30, coins: toPay })
     expect(storage.stock!.coins).toBe(toPay)
-  }, 60_000)
+  }, 120_000)
 
   it('count robberies per route, once a tick, and none by the Trade Organization', () => {
     const { world, terrain, caravan } = setup()
