@@ -47,7 +47,6 @@ import {
   computeTerritory,
   controlAt,
   controlSources,
-  wrapDistance,
   isCityBuilding,
   STAT_NAMES,
   terrainAt,
@@ -780,12 +779,40 @@ export const territorySound: Invariant = {
       ...world.cities.filter((c) => c.realmId === null).map(cityOrganization),
     ])
     const sources = controlSources(world, size)
+    // Each source's tiles as a box round its first one, to pass over the sources out of reach.
+    const boxes = sources.map((s) => {
+      const o = s.tiles[0]!
+      const dxs = s.tiles.map((t) => wrapDelta(o.x, t.x, size))
+      const dys = s.tiles.map((t) => wrapDelta(o.y, t.y, size))
+      return {
+        o,
+        x0: Math.min(...dxs),
+        x1: Math.max(...dxs),
+        y0: Math.min(...dys),
+        y1: Math.max(...dys),
+      }
+    })
     // Each Organization's control on a tile, worked out apart from the territory.
     const controlAtTile = (x: number, y: number) => {
       const control = new Map<string, number>()
-      for (const s of sources) {
-        let d = Infinity
-        for (const t of s.tiles) d = Math.min(d, wrapDistance(size, t, { x, y }))
+      for (const [k, s] of sources.entries()) {
+        const { o, x0, x1, y0, y1 } = boxes[k]!
+        const dx = wrapDelta(o.x, x, size)
+        const dy = wrapDelta(o.y, y, size)
+        // Measured the short way round from its first tile, the box holds only while it and the
+        // reach take up less than half the map.
+        const small = Math.max(x1 - x0, y1 - y0) + s.reach < size / 2
+        const gap = Math.hypot(Math.max(x0 - dx, 0, dx - x1), Math.max(y0 - dy, 0, dy - y1))
+        if (small && gap > s.reach) continue
+        // The nearest of its tiles, by squared distance, passing over those too far along a side.
+        let d2 = Infinity
+        for (const t of s.tiles) {
+          const tx = wrapDelta(t.x, x, size)
+          if (tx * tx >= d2) continue
+          const ty = wrapDelta(t.y, y, size)
+          d2 = Math.min(d2, tx * tx + ty * ty)
+        }
+        const d = Math.sqrt(d2)
         const c = controlAt(s, d)
         if (c > (control.get(s.owner) ?? 0)) control.set(s.owner, c)
       }

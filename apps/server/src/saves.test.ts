@@ -63,7 +63,7 @@ describe('world saves', () => {
 
   it.each([
     ['from the disc-shaped map', 5],
-    ['from before the finer grid (the second reset)', 35],
+    ['from before the finer grid (the second reset)', RESET_BEFORE - 1],
   ])('discards a world %s, keeping accounts (ADR 0006)', async (_, version) => {
     const { db, close } = await openDb(':memory:')
     await createAdmin(db, 'Daniel', 'admin password')
