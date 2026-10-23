@@ -20,6 +20,7 @@ import {
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
+  type BuildingKind,
   type City,
   type OrderRequest,
   type Realm,
@@ -155,7 +156,14 @@ interface TearDownTaskRequest extends OrderRequest {
   buildingId: string
 }
 
-type TaskRequest = WorkTaskRequest | HaulTaskRequest | TearDownTaskRequest
+interface BuildTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'build'
+  residentId: string
+  building: BuildingKind
+}
+
+type TaskRequest = WorkTaskRequest | BuildTaskRequest | HaulTaskRequest | TearDownTaskRequest
 
 /** The built-in order a task's request is checked as, for the resident. */
 function asOrder(o: Partial<TaskRequest>): OrderRequest {
@@ -166,6 +174,7 @@ function asOrder(o: Partial<TaskRequest>): OrderRequest {
     return { kind: 'haul', residentId, carriageId, x, y, goods, returnGoods, keepFood }
   }
   if (o.task === 'tearDown') return { kind: 'tearDown', residentId, buildingId: o.buildingId }
+  if (o.task === 'build') return { kind: 'build', residentId, building: o.building }
   return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
 }
 
@@ -175,6 +184,10 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
     case 'work': {
       const memory: TaskMemory['work'] = { workplaceId: order.workplaceId }
       if (order.makes !== undefined) memory.makes = order.makes
+      return { ...memory }
+    }
+    case 'build': {
+      const memory: TaskMemory['build'] = { building: order.building, at: { x: r.x, y: r.y } }
       return { ...memory }
     }
     case 'haul': {
@@ -200,7 +213,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * runs the Player's version of the task's default script, from a memory holding the task's
  * target (`TaskMemory`). It ends whatever the resident was doing. Each task is checked as the
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
- * Haul as the haul order to a tile, Tear down as the tear-down order.
+ * Build as the build order on the resident's tile, Haul as the haul order to a tile, Tear down as
+ * the tear-down order.
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
@@ -343,7 +357,7 @@ export class ScriptRunner {
       out.push(...runningScriptsSound(world))
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
-      out.push(...oneCarrierAtATime(world, unedited))
+      out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
     }
     return out
   }
@@ -618,22 +632,49 @@ export function oneCarrierAtATime(
   world: WorldState,
   counts: (r: Resident) => boolean,
 ): InvariantViolation[] {
-  const carriers = new Map<string, string[]>()
+  return oneAwayAtATime(world, counts, 'workplaceId', 'carry').map(([place, ids]) => ({
+    invariant: 'one-carrier-at-a-time',
+    message: `${ids.length} residents carry ${place}'s output at once: ${ids.join(', ')}`,
+    entityIds: [place, ...ids],
+  }))
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Fetching materials): at most one resident building a site
+ * is away fetching its materials at once, among those running the Build default as the game
+ * ships it (`counts`).
+ */
+export function oneFetcherAtATime(
+  world: WorldState,
+  counts: (r: Resident) => boolean,
+): InvariantViolation[] {
+  return oneAwayAtATime(world, counts, 'siteId', 'fetch').map(([site, ids]) => ({
+    invariant: 'one-fetcher-at-a-time',
+    message: `${ids.length} residents fetch materials for ${site} at once: ${ids.join(', ')}`,
+    entityIds: [site, ...ids],
+  }))
+}
+
+/**
+ * The residents counted (`counts`) whose script memory has `away` set, by the `key` in their
+ * memory they share, where more than one share it.
+ */
+function oneAwayAtATime(
+  world: WorldState,
+  counts: (r: Resident) => boolean,
+  key: string,
+  away: string,
+): [string, string[]][] {
+  const byKey = new Map<string, string[]>()
   for (const r of world.residents) {
     const s = r.script
-    const place = s?.memory.workplaceId
-    if (!s || typeof place !== 'string' || s.memory.carry == null || !counts(r)) continue
-    const ids = carriers.get(place) ?? []
+    const at = s?.memory[key]
+    if (!s || typeof at !== 'string' || s.memory[away] == null || !counts(r)) continue
+    const ids = byKey.get(at) ?? []
     ids.push(r.id)
-    carriers.set(place, ids)
+    byKey.set(at, ids)
   }
-  return [...carriers]
-    .filter(([, ids]) => ids.length > 1)
-    .map(([place, ids]) => ({
-      invariant: 'one-carrier-at-a-time',
-      message: `${ids.length} residents carry ${place}'s output at once: ${ids.join(', ')}`,
-      entityIds: [place, ...ids],
-    }))
+  return [...byKey].filter(([, ids]) => ids.length > 1)
 }
 
 /** What a realm or an NPC city sees (`sightOf`), worked out once when first asked. */

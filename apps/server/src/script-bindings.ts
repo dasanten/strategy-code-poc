@@ -14,6 +14,7 @@ import {
   Terrain,
   ageInYears,
   directivesFor,
+  materialsNeeded,
   organizationLabel,
   pileAt,
   terrainAt,
@@ -192,6 +193,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         : [workplaceGood(world, b)].filter((g) => g !== undefined)
       return Object.freeze(goods) as Value[]
     },
+    materialsNeeded: ([site]) => {
+      const id = (site as Record<string, Value> | null)?.id
+      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      if (!b?.site || !(ownBuilding(b) || inSight(b))) return []
+      const need = Object.entries(materialsNeeded(b)).map(([good, units]) => ({ good, units }))
+      return Object.freeze(need.map((m) => toValue(m))) as Value[]
+    },
     terrainAt: ([x, y]) => {
       const at = tile(x, y, 'terrainAt')
       if (!context.explored(at.x, at.y)) return null
@@ -250,9 +258,18 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const time = (a: { x: number; y: number }, b: { x: number; y: number }) =>
       walkTime(world, terrain, context.explored, resident, a, b)
     queries.walkTime = ([a, b]) => time(spot(a, 'walkTime'), spot(b, 'walkTime'))
-    queries.storages = ([from]) => {
+    queries.storages = ([from, goods]) => {
+      const wanted = goods === undefined || goods === null ? undefined : plain(goods)
+      if (
+        wanted !== undefined &&
+        !(Array.isArray(wanted) && wanted.every((g) => (GOODS as readonly unknown[]).includes(g)))
+      ) {
+        throw new ScriptRuntimeError('"storages" needs a list of goods')
+      }
+      const holds = (b: Building) =>
+        !wanted || (wanted as Good[]).some((g) => (b.stock?.[g] ?? 0) > 0)
       const storages = world.buildings.filter(
-        (b) => b.kind === 'storage' && !b.site && ownBuilding(b),
+        (b) => b.kind === 'storage' && !b.site && ownBuilding(b) && holds(b),
       )
       if (from !== undefined && from !== null) {
         const at = spot(from, 'storages')

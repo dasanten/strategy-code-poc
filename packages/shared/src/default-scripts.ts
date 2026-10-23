@@ -10,13 +10,18 @@
 import { OWN_FOOD, WORK_FOOD_KEPT } from './balance.js'
 
 /** The tasks that run a default script. */
-export const TASKS = ['work', 'haul', 'tearDown'] as const
+export const TASKS = ['work', 'build', 'haul', 'tearDown'] as const
 export type Task = (typeof TASKS)[number]
 
 /** What giving a task from the UI writes into the script's memory. */
 export interface TaskMemory {
   /** Work: the workplace to work, the one the resident stands on; `makes` at a smithy. */
   work: { workplaceId: string; makes?: string }
+  /**
+   * Build: the kind of building, with the north-west tile of its footprint `at` the tile the
+   * resident stood on when given it: they lay out the site there or join the one there.
+   */
+  build: { building: string; at: { x: number; y: number } }
   /**
    * Haul: the carriage, the route's stops (`from` the tile the resident stood on when given it),
    * the goods going to `to` and those coming back, and the Food kept on board for the horse.
@@ -163,6 +168,136 @@ while ((i + 1) / workers.length <= random) { i = i + 1 }
 if (workers[i].id != me.id) { return }
 pickUp({kind: "ground"}, load)
 memory.carry = {storageId: stores[0].id, goods: goods, step: "store", walked: false}
+`,
+  },
+  build: {
+    name: 'Build',
+    source: `// Build (default): build a memory.building with the north-west tile of its
+// footprint at memory.at, laying out the site or joining the one there.
+// While the site lacks materials, one of us building it, picked at random,
+// fetches a load of what is missing from the nearest storage of my realm
+// that holds it, delivers it and comes back to build. With none in storage
+// we just build.
+if (memory.done || memory.stuck) { return }
+
+fn at(spot) { return me.x == spot.x && me.y == spot.y }
+fn walking() { return me.order != null && me.order.kind == "walkTo" }
+fn units(stock, good) {
+  if (stock == null || stock[good] == null) { return 0 }
+  return stock[good]
+}
+// What someone carries of what the site lacks; null if nothing.
+fn carriedOf(r, missing) {
+  let load = null
+  for (m of missing) {
+    let n = r.carried[m.good]
+    if (n != null && n > 0) {
+      if (n > m.units) { n = m.units }
+      if (load == null) { load = {} }
+      load[m.good] = n
+    }
+  }
+  return load
+}
+
+// The site, once laid out. Finished or gone, building is done.
+let site = null
+if (memory.siteId != null) {
+  site = building(memory.siteId)
+  if (at(memory.at) && (site == null || site.site == null)) {
+    memory.done = true
+    return
+  }
+}
+
+// Fetching: to the storage, pick up the load, back to the site.
+let fetch = memory.fetch
+fn next(step) {
+  fetch.step = step
+  fetch.walked = false
+}
+// Walks to a spot; true once there. A way that can't be walked is lost.
+fn goTo(spot) {
+  if (at(spot)) { return true }
+  if (!walking()) {
+    if (fetch.walked) { fetch.lost = true }
+    else {
+      walkTo(spot.x, spot.y)
+      fetch.walked = true
+    }
+  }
+  return false
+}
+if (fetch != null) {
+  if (fetch.step == "pickUp") {
+    let storage = building(fetch.storageId)
+    if (storage == null || fetch.lost) {
+      fetch.lost = false
+      next("back")
+    } else {
+      if (!goTo(storage)) { return }
+      pickUp({kind: "storage", storageId: storage.id}, fetch.goods)
+      next("back")
+      return
+    }
+  }
+  if (!goTo(memory.at)) {
+    if (fetch.lost) {
+      memory.fetch = null
+      memory.stuck = true
+    }
+    return
+  }
+  memory.fetch = null
+}
+
+// Building.
+if (!at(memory.at)) {
+  if (!walking()) { walkTo(memory.at.x, memory.at.y) }
+  return
+}
+if (site != null) {
+  // What I carry of what it lacks goes in first.
+  let mine = carriedOf(me, materialsNeeded(site))
+  if (mine != null) {
+    drop({kind: "site", siteId: site.id}, mine)
+    return
+  }
+}
+if (me.order == null || me.order.kind != "build") {
+  // Turned down, such as with the tile taken, build says why: done.
+  if (build(memory.building) != null) { memory.done = true }
+  return
+}
+if (me.order.siteId == null) { return } // laid out at the end of the tick
+memory.siteId = me.order.siteId
+if (site == null) { return }
+
+// While it lacks materials, one of us fetches them, picked at random.
+let missing = materialsNeeded(site)
+if (missing.length == 0) { return }
+let goods = []
+for (m of missing) { goods[goods.length] = m.good }
+let stores = storages(site, goods) // nearest first, holding some
+if (stores.length == 0) { return } // none in storage: we just build
+let builders = []
+for (r of withMemory("siteId", site.id)) {
+  if (r.script.memory.fetch != null) { return } // one fetches at a time
+  if (carriedOf(r, missing) != null) { return } // someone brings some already
+  if (r.order != null && r.order.kind == "build") { builders[builders.length] = r }
+}
+if (builders.length == 0) { return }
+let i = 0
+while ((i + 1) / builders.length <= random) { i = i + 1 }
+if (builders[i].id != me.id) { return }
+let from = stores[0]
+let load = {}
+for (m of missing) {
+  let n = units(from.stock, m.good)
+  if (n > m.units) { n = m.units }
+  if (n > 0) { load[m.good] = n }
+}
+memory.fetch = {storageId: from.id, goods: load, step: "pickUp", walked: false}
 `,
   },
   haul: {

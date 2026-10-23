@@ -85,7 +85,7 @@ import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
-import { oneCarrierAtATime } from './script-runner.js'
+import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -1374,6 +1374,16 @@ export const gameDefaultCarriers: Invariant = {
   check: (world) => oneCarrierAtATime(world, (r) => r.script?.scriptId === 0),
 }
 
+/**
+ * At most one resident building a site away fetching its materials at once (`CONTEXT.md`:
+ * Fetching materials), among NPC cities' residents running the game's own Build default; a
+ * Player's are checked where their scripts run.
+ */
+export const gameDefaultFetchers: Invariant = {
+  name: 'one-fetcher-at-a-time',
+  check: (world) => oneFetcherAtATime(world, (r) => r.script?.scriptId === 0),
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -1443,6 +1453,7 @@ export const worldInvariants: Invariant[] = [
   hqRingsSound,
   roadLineOrdersSound,
   gameDefaultCarriers,
+  gameDefaultFetchers,
 ]
 
 export function checkInvariants(

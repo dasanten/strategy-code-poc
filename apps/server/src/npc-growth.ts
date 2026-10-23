@@ -111,17 +111,20 @@ export function cityGrowth(
     return undefined
   }
   pairAdults(world, city, adults, size)
+  const storage = world.buildings.find(
+    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
+  )
   for (const r of adults) {
     const o = r.order
     const site = o?.kind === 'build' && world.buildings.find((b) => b.id === o.siteId)
-    if (site && site.site && workNeeded(site) === 0) r.order = null
+    if (site && site.site && !canDoMore(r, site, storage)) {
+      r.order = null
+      delete r.script
+    }
   }
   let free = NPC_BUILDERS - adults.filter(isBuilder).length
   if (free <= 0) return undefined
   let project: Project | null | undefined = null
-  const storage = world.buildings.find(
-    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-  )
   return {
     assign(r, deliver = false) {
       if (free <= 0) return false
@@ -137,10 +140,21 @@ export function cityGrowth(
   }
 }
 
-/** Whether a resident is building, tearing down or delivering materials to a site. */
+/**
+ * Whether a builder can still help a site: it needs work, or materials they carry or the storage
+ * holds (which its Build default fetches), or they are fetching some.
+ */
+function canDoMore(r: Resident, site: Building, storage: Building | undefined): boolean {
+  if (workNeeded(site) > 0 || r.script?.memory.fetch != null) return true
+  const need = materialsNeeded(site)
+  return pick(r.carried, need) !== undefined || pick(storage?.stock, need) !== undefined
+}
+
+/** Whether a resident is building (by the Build default or not), tearing down or delivering. */
 function isBuilder(r: Resident): boolean {
   const o = r.order
   return (
+    (r.script?.scriptId === 0 && r.script.task === 'build') ||
     o?.kind === 'build' ||
     o?.kind === 'tearDown' ||
     (o?.kind === 'drop' && o.to.kind === 'site') ||
@@ -167,9 +181,10 @@ function pairAdults(world: WorldState, city: City, adults: Resident[], size: num
 
 /**
  * Gives a resident their part in a project, if there is one for them: walking to the tile and
- * laying out, building or tearing down there; for a site that still needs materials, carrying
- * them from the storage, or building ahead while none are there. False when they can't help.
- * With `deliver`, only bringing materials they carry.
+ * tearing down there; or building it by the game's Build default (`CONTEXT.md`: Fetching
+ * materials), which walks there, delivers what they carry of its materials and fetches what is
+ * missing from the storage. For a tile of wall they first take enough for a few tiles from the
+ * storage. False when they can't help. With `deliver`, only bringing materials they carry.
  */
 function takePart(
   world: WorldState,
@@ -180,16 +195,11 @@ function takePart(
 ): boolean {
   if (deliver) {
     const site = project.kind === 'build' && buildingAt(world, project.x, project.y)
-    const carried = site && site.site && pick(r.carried, materialsNeeded(site))
-    if (site && carried) {
-      if (isAt(r, site)) {
-        r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
-      } else walkTo(r, site)
-      return true
-    }
+    const carries = site && site.site && pick(r.carried, materialsNeeded(site))
     // Carrying the materials of a few tiles of wall, they help with this one rather than take
     // them back to the storage; the next tiles will want them.
-    if (!(project.kind === 'build' && forWall(project.building, r.carried))) return false
+    const wall = project.kind === 'build' && forWall(project.building, r.carried)
+    if (!carries && !wall) return false
   }
   if (project.kind === 'tearDown') {
     const b = project.building
@@ -198,33 +208,28 @@ function takePart(
     return true
   }
   const { x, y, building } = project
-  const here = r.x === x && r.y === y
   const site = buildingAt(world, x, y)
   const build = () => {
-    if (here) r.order = { kind: 'build', building, at: { x, y }, siteId: null }
-    else walkTo(r, { x, y })
+    r.order = null
+    r.script = { scriptId: 0, task: 'build', memory: { building, at: { x, y } } }
     return true
   }
   if (!site?.site) return build()
   const need = materialsNeeded(site)
-  const carried = pick(r.carried, need)
-  if (carried) {
-    if (isAt(r, site))
-      r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
-    else walkTo(r, site)
-    return true
-  }
+  if (pick(r.carried, need)) return build()
   // For a tile of wall, enough for a few tiles at once: the rest goes to the next ones.
   const wall = building === 'wall' || building === 'gate'
-  const trip = wall ? times(need, NPC_WALL_TILES_PER_TRIP) : need
-  const stocked = !forWall(building, r.carried) && pick(storage?.stock, trip)
+  const stocked =
+    wall &&
+    !forWall(building, r.carried) &&
+    pick(storage?.stock, times(need, NPC_WALL_TILES_PER_TRIP))
   if (storage && stocked) {
     if (isAt(r, storage)) {
       r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods: stocked }
     } else walkTo(r, storage)
     return true
   }
-  return workNeeded(site) > 0 && build()
+  return canDoMore(r, site, storage) && build()
 }
 
 /** Whether a resident carries materials for walls or gates, for a project of `building`. */

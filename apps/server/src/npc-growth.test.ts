@@ -1,4 +1,5 @@
 import {
+  BUILD_MATERIALS,
   MAX_WORKERS,
   NPC_ADULTS_PER_PAIR,
   NPC_VILLAGE,
@@ -215,6 +216,29 @@ describe('NPC cities grow', () => {
     world.residents.pop()
     expect(nextProject(world, city, home, terrain)).toBeUndefined()
   })
+
+  it('builds the house by the game’s Build default, one builder fetching its Wood from the storage', () => {
+    const { world, terrain, city, home } = village()
+    fillHouses(world, city, home)
+    const storage = storageOf(world, city)
+    storage.stock = { food: 400, wood: 100 }
+    const houses = () => world.buildings.filter((b) => b.kind === 'house' && b.cityId === city.id)
+    const before = houses().length
+    const walking = new Walking(terrain)
+    let fetched = false
+    for (let t = 0; t < 10 * TICKS_PER_GAME_DAY && houses().length === before; t++) {
+      stepWorld(world, terrain, walking)
+      const fetchers = world.residents.filter(
+        (r) => r.script?.task === 'build' && r.script.memory.fetch,
+      )
+      expect(fetchers.length).toBeLessThanOrEqual(1)
+      fetched ||= fetchers.length > 0
+      if (world.tick % TICKS_PER_GAME_DAY === 0) expect(checkInvariants(world, terrain)).toEqual([])
+    }
+    expect(houses().length).toBe(before + 1)
+    expect(fetched).toBe(true)
+    expect(storage.stock.wood).toBe(100 - BUILD_MATERIALS.house!.wood!)
+  }, 60_000)
 
   it('with no room left inside, builds on its edge, then puts up a new wall from its gate', () => {
     const { world, terrain, city, home } = village()
