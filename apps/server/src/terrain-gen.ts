@@ -308,10 +308,7 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
     if (!isLand(t) || relief[t]! >= hillsCut) continue
     flatTiles[flat++] = growth[t]!
   }
-  const forestCut = quantile(
-    flatTiles.subarray(0, flat),
-    1 - (TERRAIN_SHARES.forest * n) / flat,
-  )
+  const forestCut = quantile(flatTiles.subarray(0, flat), 1 - (TERRAIN_SHARES.forest * n) / flat)
   for (let t = 0; t < n; t++) {
     if (!isLand(t)) continue
     tiles[t] =
