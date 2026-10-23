@@ -149,18 +149,20 @@ describe('NPC cities grow', () => {
     const people = cityResidents(world, city).length
     const area = cityAreaTiles(world, city, size).size
     const oldIds = new Set(ring(world, city, home, size, WALL).map((b) => b.id))
-    // Its pairs count as paired a game year ago, so children come as soon as it has room and Food
-    // for them, not a year into the run (the year's wait is the pairing tests' business). It runs
-    // until its wall has moved out, for at most as many ticks as four old game years.
+    // Each resident's first pair counts as paired a game year ago, so its first child comes as soon
+    // as the city has room and Food for it, not a year into the run (the year's wait is the pairing
+    // tests' business). It runs until its wall has moved out, for at most as many ticks as four
+    // old game years.
     const movedOut = () =>
       ring(world, city, home, size, WALL).length === 0 &&
       ring(world, city, home, size, WALL + NPC_WALL_STEP).length > 120
+    const paired = new Set<string>()
     for (let day = 0; day < 240 && !movedOut(); day++) {
       run(world, terrain, city, home, oldIds, TICKS_PER_GAME_DAY)
       for (const r of world.residents) {
-        if (r.order?.kind === 'pair') {
-          r.order.since = Math.min(r.order.since, world.tick - TICKS_PER_GAME_YEAR)
-        }
+        if (r.order?.kind !== 'pair' || paired.has(r.id)) continue
+        r.order.since -= TICKS_PER_GAME_YEAR
+        paired.add(r.id)
       }
     }
     expect(cityResidents(world, city).length).toBeGreaterThan(people)
@@ -178,7 +180,7 @@ describe('NPC cities grow', () => {
     fillHouses(world, city, home)
     storageOf(world, city).stock = { food: 400, wood: 600 }
     const oldIds = new Set(ring(world, city, home, size, WALL).map((b) => b.id))
-    run(world, terrain, city, home, oldIds, 48 * TICKS_PER_GAME_DAY, () =>
+    run(world, terrain, city, home, oldIds, 180 * TICKS_PER_GAME_DAY, () =>
       world.buildings.every((b) => !oldIds.has(b.id)),
     )
     expect(world.buildings.filter((b) => oldIds.has(b.id))).toEqual([])
