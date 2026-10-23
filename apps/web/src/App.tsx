@@ -15,6 +15,7 @@ import {
   isAt,
   covers,
   type SeenResident,
+  type TerrainLookup,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
@@ -39,7 +40,7 @@ import {
   type Picking,
 } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
-import { describeTile, makeLeaderProblem } from './selection-view.js'
+import { describeTile, makeLeaderProblem, nodeFit } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
@@ -201,8 +202,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await sendOrder({ kind: 'climb', residentId: selected.id, wallId }))
   }
   const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
+  const [knownTerrain, setKnownTerrain] = useState<TerrainLookup>()
   const onNodesLoaded = useCallback(
-    (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
+    (lookup: (x: number, y: number) => KnownNode | undefined, terrain: TerrainLookup) => {
+      setNodeAt(() => lookup)
+      setKnownTerrain(terrain)
+    },
     [],
   )
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
@@ -411,9 +416,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
                 },
                 workers: (b) => workersHere(world.residents, b),
+                nodeFit: (() => {
+                  const node = nodeAt?.(selectedTile.x, selectedTile.y)
+                  return node && knownTerrain && nodeFit(node, world, nodeAt!, knownTerrain)
+                })(),
               },
               GOOD_LABELS,
             )}
+            tick={world.tick}
             building={world.buildings.find(
               (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
             )}
@@ -424,6 +434,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onSendHere={async () => {
               if (!selected) return
               const order = { kind: 'walkTo', residentId: selected.id, ...selectedTile }
+              setOrderError(await sendOrder(order))
+            }}
+            onBuildHere={async (building, at) => {
+              // The Build task, walking to where the node's workplace fits first (ADR 0002).
+              if (!selected) return
+              const order = { kind: 'task', task: 'build', residentId: selected.id, building, at }
               setOrderError(await sendOrder(order))
             }}
             onSetGate={async (gateId, open) =>

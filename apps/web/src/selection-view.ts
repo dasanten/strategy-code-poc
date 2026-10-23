@@ -1,4 +1,5 @@
 import {
+  BUILD_MATERIALS,
   BUILD_WORK,
   BUILDABLE,
   CARRIAGE_CAPACITY,
@@ -7,8 +8,14 @@ import {
   NODE_GOOD,
   NODE_WORKPLACE,
   RECIPES,
+  TICKS_PER_GAME_DAY,
+  WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
+  canWork,
+  nodeCorner,
   stockWeight,
+  type BuildingKind,
+  type TerrainLookup,
   type Building,
   type Carriage,
   type City,
@@ -17,6 +24,8 @@ import {
   type Resident,
   type Stock,
   covers,
+  wrap,
+  FOOTPRINT,
   handOverProblem,
   type Alliance,
   type Diplomacy,
@@ -302,6 +311,11 @@ export interface TileCard {
   lines: string[]
   /** An own gate on the tile, to open or close. */
   gate?: Building
+  /**
+   * A resource node with nothing built on it: its workplace, and the north-west tile where that
+   * fits (`nodeFit`), if anywhere.
+   */
+  buildHere?: { kind: BuildingKind; at: { x: number; y: number } | undefined }
 }
 
 /** What the Player sees on a tile, for the tile card. */
@@ -318,6 +332,66 @@ export interface TileThings {
   viewer: Viewer
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
+  /** Where the node's workplace fits on what the Player knows (`nodeFit`), if anywhere. */
+  nodeFit?: { x: number; y: number }
+}
+
+/**
+ * Where the workplace of a resource node can be laid out, as far as the Player knows
+ * (`nodeCorner`, `CONTEXT.md`: Where buildings go): the buildings they see, the nodes and terrain
+ * they have explored. The server checks again when the order arrives.
+ */
+export function nodeFit(
+  node: KnownNode,
+  seen: { buildings: Building[]; cities: City[] },
+  nodeAt: (x: number, y: number) => KnownNode | undefined,
+  terrain: TerrainLookup,
+): { x: number; y: number } | undefined {
+  // The nodes a footprint over this one could also cover.
+  const reach = FOOTPRINT[NODE_WORKPLACE[node.kind]] - 1
+  const nodes: KnownNode[] = []
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const n = nodeAt(wrap(node.x + dx, terrain.size), wrap(node.y + dy, terrain.size))
+      if (n) nodes.push(n)
+    }
+  }
+  return nodeCorner({ ...seen, nodes }, terrain, node)
+}
+
+/** A node's kind in words: "forest", "iron ore". */
+const nodeKindName = (node: KnownNode) => NODE_NAMES[node.kind].replace(/ node$/, '').toLowerCase()
+
+/** "a mine", "an iron ore node". */
+const aOrAn = (words: string) => `${/^[aeiou]/.test(words) ? 'an' : 'a'} ${words}`
+
+const capital = (words: string) => `${words[0]!.toUpperCase()}${words.slice(1)}`
+
+/**
+ * What an unbuilt resource node's card says (`CONTEXT.md`: Resource node, Workplace): what can be
+ * built on it and whether it fits, what that takes, makes and teaches, and what a worker of
+ * average Strength and no skill makes there a game day.
+ */
+function unbuiltNodeLines(
+  node: KnownNode,
+  fit: { x: number; y: number } | undefined,
+  goodLabels: Record<string, string>,
+): string[] {
+  const kind = NODE_WORKPLACE[node.kind]
+  const name = BUILDING_NAMES[kind].toLowerCase()
+  const good = NODE_GOOD[node.kind]
+  const goodName = goodLabels[good]!.toLowerCase()
+  const materials = BUILD_MATERIALS[kind] ?? {}
+  const days = (BUILD_WORK[kind] ?? 0) / TICKS_PER_GAME_DAY
+  const skill = WORKPLACE_SKILL[kind]!
+  const needs =
+    Object.keys(materials).length > 0 ? goodsText(materials, goodLabels) : 'no materials'
+  return [
+    fit ? `${capital(aOrAn(name))} can be built here` : `No room for ${aOrAn(name)} here`,
+    `Needs ${needs} and ${days} game day${days === 1 ? '' : 's'} of one resident’s work`,
+    `Makes ${goodName} · teaches ${capital(skill)}`,
+    `Up to ${MAX_WORKERS[kind]} workers · about ${WORK_OUTPUT_PER_DAY[good]} ${goodName} each a game day at average Strength`,
+  ]
 }
 
 /** Goods in words: "4 iron ore, 2 wood". */
@@ -344,6 +418,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const cityOf = (b: Building) => t.cities.find((c) => c.id === b.cityId)
   const lines: string[] = []
   let card: Omit<TileCard, 'lines'> | undefined
+  let buildHere: TileCard['buildHere']
   if (building) {
     const city = cityOf(building)
     const rel = themeRelationship(cityRelationship(city, t.viewer))
@@ -384,13 +459,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     lines.push(`On the ground: ${goodsText(pile.goods, goodLabels)}`)
   }
   if (t.node) {
-    card ??= { title: `${NODE_NAMES[t.node.kind]} node`, what: 'node' }
-    const workplace = BUILDING_NAMES[NODE_WORKPLACE[t.node.kind]].toLowerCase()
-    lines.push(
-      building
-        ? `On a ${NODE_NAMES[t.node.kind].toLowerCase()} node`
-        : `Resource node · a ${workplace} can be built here`,
-    )
+    const kindName = nodeKindName(t.node)
+    card ??= { title: `${capital(kindName)} node`, what: 'node' }
+    // Only a node's workplace covers a node: one on it, or its site, has built it over.
+    if (building) lines.push(`On ${aOrAn(kindName)} node`)
+    else {
+      lines.push(...unbuiltNodeLines(t.node, t.nodeFit, goodLabels))
+      buildHere = { kind: NODE_WORKPLACE[t.node.kind], at: t.nodeFit }
+    }
   }
   if (t.strangers.length > 0) {
     const r = t.strangers[0]!
@@ -411,17 +487,34 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   return {
     ...(card ?? { title: road && !road.site ? 'Road' : 'Open ground', what: 'tile' }),
     lines,
+    ...(buildHere ? { buildHere } : {}),
   }
 }
 
 /**
- * The actions a tile's card offers: send the resident picked last there, and open or close an own
- * gate. Everything else a resident does on the tile is on their own card once they stand there.
+ * The actions a tile's card offers: send the resident picked last there, or have them build an
+ * unbuilt node's workplace there (`buildHere`), and open or close an own gate. Everything else a
+ * resident does on the tile is on their own card once they stand there. `tick` tells whether the
+ * resident is still a child.
  */
-export function tileActions(card: TileCard, actor: Resident | undefined): CardAction[] {
+export function tileActions(card: TileCard, actor: Resident | undefined, tick = 0): CardAction[] {
   const actions: CardAction[] = []
   if (actor)
     actions.push({ id: 'sendHere', label: `Send ${actor.name} here`, key: ACTION_KEYS.sendHere })
+  if (actor && card.buildHere) {
+    const name = BUILDING_NAMES[card.buildHere.kind].toLowerCase()
+    const reason = !card.buildHere.at
+      ? `no room for ${aOrAn(name)} here`
+      : !canWork(actor, tick)
+        ? 'children can’t build'
+        : undefined
+    actions.push({
+      id: 'build',
+      label: `Build ${aOrAn(name)} here`,
+      key: ACTION_KEYS.build,
+      ...(reason ? { disabled: true as const, reason } : {}),
+    })
+  }
   if (card.gate)
     actions.push({
       id: 'gate',

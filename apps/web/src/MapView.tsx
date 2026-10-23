@@ -11,6 +11,7 @@ import {
   wrapDelta,
   type Building,
   type KnownNode,
+  type TerrainLookup,
   type SeenResident,
   type ResourceKind,
   footprintKeys,
@@ -137,8 +138,14 @@ export function MapView({
   picking?: boolean
   /** Called with a tile picked by click (while `picking`) or by right-click. */
   onPickTile?: (x: number, y: number) => void
-  /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
-  onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
+  /**
+   * Called with a lookup of known resource nodes by tile and one of loaded explored terrain
+   * (`UNEXPLORED` elsewhere), and again whenever more load.
+   */
+  onNodesLoaded?: (
+    nodeAt: (x: number, y: number) => KnownNode | undefined,
+    terrain: TerrainLookup,
+  ) => void
   /**
    * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
    * at (the zoom in place if none); a new object each time.
@@ -252,10 +259,16 @@ export function MapView({
       (chunk) => {
         terrainLayer.set(chunk)
         nodes[chunk.cy * across + chunk.cx] = chunk.nodes
-        onNodesLoadedRef.current?.((x, y) =>
-          nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
-            (n) => n.x === x && n.y === y,
-          ),
+        const chunkOf = (x: number, y: number) =>
+          Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)
+        onNodesLoadedRef.current?.(
+          (x, y) => nodes[chunkOf(x, y)]?.find((n) => n.x === x && n.y === y),
+          {
+            size: mapSize,
+            at: (x, y) =>
+              store.get(chunkOf(x, y))?.tiles[(y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)] ??
+              UNEXPLORED,
+          },
         )
         redraw()
       },

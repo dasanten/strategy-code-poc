@@ -7,6 +7,7 @@ import {
   type ScriptObject,
 } from '@csp/lang'
 import {
+  buildAtProblem,
   buildingAt,
   DEFAULT_SCRIPTS,
   commanderOf,
@@ -161,6 +162,11 @@ interface BuildTaskRequest extends OrderRequest {
   task: 'build'
   residentId: string
   building: BuildingKind
+  /**
+   * The north-west tile of the footprint, to walk to first, such as where a node's workplace fits
+   * (`nodeCorner`); the resident's own tile without it.
+   */
+  at?: { x: number; y: number }
 }
 
 type TaskRequest = WorkTaskRequest | BuildTaskRequest | HaulTaskRequest | TearDownTaskRequest
@@ -187,7 +193,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
       return { ...memory }
     }
     case 'build': {
-      const memory: TaskMemory['build'] = { building: order.building, at: { x: r.x, y: r.y } }
+      const at = order.at ? { x: order.at.x, y: order.at.y } : { x: r.x, y: r.y }
+      const memory: TaskMemory['build'] = { building: order.building, at }
       return { ...memory }
     }
     case 'haul': {
@@ -213,7 +220,7 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * runs the Player's version of the task's default script, from a memory holding the task's
  * target (`TaskMemory`). It ends whatever the resident was doing. Each task is checked as the
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
- * Build as the build order on the resident's tile, Haul as the haul order to a tile, Tear down as
+ * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
  * the tear-down order.
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
@@ -228,6 +235,13 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
         const workplaceId = (o as Partial<WorkTaskRequest>).workplaceId
         if (typeof workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== workplaceId)
           return 'not standing on that workplace'
+      }
+      if (o.task === 'build' && o.at !== undefined) {
+        // Somewhere else: checked as the build order there, once they have walked to it.
+        const at = o.at as Partial<{ x: number; y: number }> | null
+        if (!at || !Number.isInteger(at.x) || !Number.isInteger(at.y))
+          return 'the target must be a tile'
+        return buildAtProblem(world, r!, o.building, at as { x: number; y: number }, terrain)
       }
       const built = asOrder(o)
       const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)

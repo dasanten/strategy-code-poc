@@ -1,5 +1,6 @@
 import {
   CITY_AREA_MARGIN,
+  nodeCorner,
   HQ_COIN_WAREHOUSE,
   NODE_WORKPLACE,
   SIGHT_RANGE,
@@ -20,7 +21,7 @@ import {
 } from '@csp/shared'
 import { CITY_NAMES, updateCityMembership } from './cities.js'
 import { hash, mulberry32, newResident } from './residents.js'
-import { Ground, nodeCorner } from './placing.js'
+import { Ground } from './placing.js'
 import { FARM_RING, newId, residentTiles } from './starting-city.js'
 
 /** A tile as [x, y]. */
