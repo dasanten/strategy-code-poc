@@ -26,10 +26,19 @@ export const NODE_GLYPH_COLORS: Record<ResourceKind, number> = {
   goldOre: 0xffd34d,
 }
 
+/**
+ * What colours a token: how the viewer stands to its owner, or on the admin map, which has no
+ * viewer, a realm's own colour as 0xRRGGBB (`CONTEXT.md`: admin map). NPC cities and the Trade
+ * Organization keep their relationship colours there.
+ */
+export type Tone = Relationship | number
+
 /** The viewer: the Player's realm and the realms in their alliance. */
 export interface Viewer {
   realmId: string
   allies: ReadonlySet<string>
+  /** On the admin map: each realm in its own colour instead of by relationship. */
+  realmColour?: (realmId: string) => number
 }
 
 /**
@@ -39,7 +48,7 @@ export interface Viewer {
 export function cityRelationship(
   city: Pick<City, 'realmId' | 'tradeOrg'> | undefined,
   viewer: Viewer,
-): Relationship | undefined {
+): Tone | undefined {
   if (!city) return undefined
   if (city.tradeOrg) return 'trade'
   if (city.realmId === null) return 'npc'
@@ -47,13 +56,27 @@ export function cityRelationship(
 }
 
 /** How the viewer stands to a realm: their own, an alliance member or another realm. */
-export function realmRelationship(realmId: string, viewer: Viewer): Relationship {
+export function realmRelationship(realmId: string, viewer: Viewer): Tone {
+  if (viewer.realmColour) return viewer.realmColour(realmId)
   if (realmId === viewer.realmId) return 'own'
   return viewer.allies.has(realmId) ? 'alliance' : 'other'
 }
 
-export const relationshipColor = (rel: Relationship | undefined) =>
-  rel ? RELATIONSHIP_COLORS[rel] : UNOWNED_COLOR
+export const relationshipColor = (rel: Tone | undefined) =>
+  typeof rel === 'number' ? rel : rel ? RELATIONSHIP_COLORS[rel] : UNOWNED_COLOR
+
+/** Where a tone ranks among relationships, for ties and crowded tiles: a realm's colour as other. */
+export const rankedAs = (rel: Tone | undefined): Relationship | undefined =>
+  typeof rel === 'number' ? 'other' : rel
+
+/**
+ * Whose token wears the crown: on the game map the Player's Leader, on the admin map every
+ * Leader.
+ */
+export type Leaders = string | ReadonlySet<string> | null | undefined
+
+export const isLeader = (leaders: Leaders, id: string): boolean =>
+  typeof leaders === 'string' ? leaders === id : (leaders?.has(id) ?? false)
 
 /**
  * Sprites from the atlas, redrawn every frame: `begin`, `place` each, `end`. Sprites are reused

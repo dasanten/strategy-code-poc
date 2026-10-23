@@ -93,7 +93,7 @@ function adminOrganization(
 
 /**
  * Every entity in the rectangle, each with its Organization (`AdminWorldView`): residents, cities
- * (where their town hall stands), buildings, horses, carriages, piles, armies (when any member is
+ * (where their town hall stands, with their finished houses), buildings, horses, carriages, piles, armies (when any member is
  * in it) and caravans (when their carriage or any of their crew is). With `citiesOnly`, cities
  * alone.
  */
@@ -109,11 +109,18 @@ export function adminWorldView(
     const city = cityId === null ? undefined : cities.get(cityId)
     return city ? cityOrganization(city) : null
   }
+  const houses = new Map<string, number>()
+  for (const b of world.buildings) {
+    if (b.kind === 'house' && !b.site && b.cityId !== null)
+      houses.set(b.cityId, (houses.get(b.cityId) ?? 0) + 1)
+  }
   const out: AdminEntity[] = []
   for (const c of world.cities) {
     const hall = townHallOf(world, c)
-    if (hall && here(hall))
-      out.push({ is: 'city', ...c, x: hall.x, y: hall.y, org: cityOrganization(c) })
+    if (hall && here(hall)) {
+      const at = { x: hall.x, y: hall.y, houses: houses.get(c.id) ?? 0 }
+      out.push({ is: 'city', ...c, ...at, org: cityOrganization(c) })
+    }
   }
   if (!view.citiesOnly) {
     for (const r of world.residents) {

@@ -1,5 +1,14 @@
 import type { Army, City, Resident } from '@csp/shared'
-import { cityRelationship, realmRelationship, type Relationship, type Viewer } from './tokens.js'
+import {
+  cityRelationship,
+  isLeader,
+  rankedAs,
+  realmRelationship,
+  type Leaders,
+  type Relationship,
+  type Tone,
+  type Viewer,
+} from './tokens.js'
 
 /** What else decides who a thing belongs to: the cities in sight, and the Trade Org caravans' parts. */
 export interface Known {
@@ -19,11 +28,7 @@ export type Owned = { id: string; cityId?: string | null } & (
  * member's or another realm's; one of no realm goes by its city (NPC city or Trade Organization).
  * Undefined for one of nobody.
  */
-export function entityRelationship(
-  e: Owned,
-  viewer: Viewer,
-  known: Known,
-): Relationship | undefined {
+export function entityRelationship(e: Owned, viewer: Viewer, known: Known): Tone | undefined {
   if (known.caravan.has(e.id)) return 'trade'
   const realm = 'owner' in e ? e.owner : e.realmId
   if (realm !== null) return realmRelationship(realm, viewer)
@@ -45,20 +50,20 @@ export interface ResidentGroup {
   x: number
   y: number
   ids: string[]
-  /** The relationship of the largest group of them, which colours the token. */
-  rel: Relationship | undefined
-  /** The viewer's Leader is among them: the token shows the crown. */
+  /** The tone of the largest group of them, which colours the token. */
+  rel: Tone | undefined
+  /** A Leader who wears the crown is among them (`Leaders`): the token shows it. */
   leader: boolean
 }
 
 /**
- * Residents grouped per tile, each group coloured by its largest relationship. Residents in
- * `skip` (soldiers under their army's banner) are left out.
+ * Residents grouped per tile, each group coloured by its largest relationship (or on the admin
+ * map, realm). Residents in `skip` (soldiers under their army's banner) are left out.
  */
 export function residentGroups(
   residents: readonly Pick<Resident, 'id' | 'x' | 'y'>[],
-  relOf: (id: string) => Relationship | undefined,
-  leaderId: string | null | undefined,
+  relOf: (id: string) => Tone | undefined,
+  leaders: Leaders,
   skip: ReadonlySet<string> = new Set(),
 ): ResidentGroup[] {
   const byTile = new Map<string, { x: number; y: number; ids: string[] }>()
@@ -70,15 +75,16 @@ export function residentGroups(
     tile.ids.push(r.id)
   }
   return [...byTile.values()].map((t) => {
-    const counts = new Map<Relationship | undefined, number>()
+    const counts = new Map<Tone | undefined, number>()
     for (const id of t.ids) counts.set(relOf(id), (counts.get(relOf(id)) ?? 0) + 1)
-    let rel: Relationship | undefined
+    let rel: Tone | undefined
     let most = 0
-    for (const r of TIE_ORDER) {
-      const n = counts.get(r) ?? 0
-      if (n > most) [rel, most] = [r, n]
+    let rank = TIE_ORDER.length
+    for (const [r, n] of counts) {
+      const at = TIE_ORDER.indexOf(rankedAs(r))
+      if (n > most || (n === most && at < rank)) [rel, most, rank] = [r, n, at]
     }
-    return { ...t, rel, leader: leaderId != null && t.ids.includes(leaderId) }
+    return { ...t, rel, leader: t.ids.some((id) => isLeader(leaders, id)) }
   })
 }
 

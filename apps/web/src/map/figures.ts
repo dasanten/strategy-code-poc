@@ -1,5 +1,5 @@
 import { PROTECTION, WEAPONS, type Good, type Resident } from '@csp/shared'
-import type { Relationship } from './tokens.js'
+import { isLeader, rankedAs, type Leaders, type Relationship, type Tone } from './tokens.js'
 
 /**
  * What a resident is doing, as the small icon by their figure at close zoom (ADR 0008). A resident
@@ -84,15 +84,16 @@ export interface TileFigures {
 /**
  * Lays out the residents on one tile as single figures (ADR 0008, close zoom): up to
  * `FIGURES_PER_TILE`; with more, one place fewer and a "+N" badge in the last. The viewer's Leader
- * comes first, then residents by how close they stand to the viewer (own, alliance, others), so
- * the ones the Player cares about are the ones drawn. Otherwise they keep their order.
+ * (on the admin map every Leader) comes first, then residents by how close they stand to the
+ * viewer (own, alliance, others), so the ones the Player cares about are the ones drawn. Otherwise
+ * they keep their order.
  */
 export function tileFigures(
   ids: readonly string[],
-  relOf: (id: string) => Relationship | undefined,
-  leaderId?: string | null,
+  relOf: (id: string) => Tone | undefined,
+  leaders?: Leaders,
 ): TileFigures {
-  const rank = (id: string) => (id === leaderId ? -1 : RANK.indexOf(relOf(id)))
+  const rank = (id: string) => (isLeader(leaders, id) ? -1 : RANK.indexOf(rankedAs(relOf(id))))
   const sorted = ids
     .map((id, i) => ({ id, i, rank: rank(id) }))
     .sort((a, b) => a.rank - b.rank || a.i - b.i)

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 import {
+  ADMIN_MAP_INFO_PATH,
   ADMIN_PLACES_PATH,
   ADMIN_TERRITORY_PATH,
   ADMIN_VIEW_MAX_SIDE,
@@ -178,14 +179,36 @@ describe('admin world view', () => {
   })
 
   it('gives cities alone, where their town hall stands, for the far zoom', () => {
+    const world = setup()
+    // Nook has two houses and a house site; the site doesn't count.
+    for (const [id, site] of [
+      ['nh1', false],
+      ['nh2', false],
+      ['nh3', true],
+    ] as const) {
+      world.buildings.push({
+        id,
+        kind: 'house',
+        cityId: 'n1',
+        x: 41,
+        y: 41,
+        ...(site ? { site: { delivered: {}, work: 0 } } : {}),
+      })
+    }
     const view = adminWorldView(
-      setup(),
+      world,
       size,
       { x: 0, y: 0, w: 64, h: 64, citiesOnly: true },
       lookups,
     )
     expect(view.entities.map((e) => e.is)).toEqual(['city', 'city', 'city', 'city'])
-    expect(view.entities.find((e) => e.id === 'n1')).toMatchObject({ x: 40, y: 40, org: 'n1' })
+    expect(view.entities.find((e) => e.id === 'n1')).toMatchObject({
+      x: 40,
+      y: 40,
+      houses: 2,
+      org: 'n1',
+    })
+    expect(view.entities.find((e) => e.id === 'c1')).toMatchObject({ houses: 0 })
   })
 
   it('reads a rectangle of whole numbers, capped unless for cities only', () => {
@@ -291,6 +314,9 @@ describe('admin map API', () => {
       (await get(adminWorldPath({ x: 0, y: 0, w: 64, h: 64, citiesOnly: true }), admin)).statusCode,
     ).toBe(200)
 
+    const map = await get(ADMIN_MAP_INFO_PATH, admin)
+    expect(map.json()).toEqual({ seed: world.seed, size })
+
     const places = await get(ADMIN_PLACES_PATH, admin)
     expect(places.statusCode).toBe(200)
     expect(places.json().tradeOrg.hq.name).toBe('Exchange')
@@ -308,7 +334,7 @@ describe('admin map API', () => {
       ]),
     )
 
-    for (const url of [worldUrl, ADMIN_PLACES_PATH, ADMIN_TERRITORY_PATH]) {
+    for (const url of [ADMIN_MAP_INFO_PATH, worldUrl, ADMIN_PLACES_PATH, ADMIN_TERRITORY_PATH]) {
       const refused = await get(url, player)
       expect(refused.statusCode).toBe(403)
       expect(refused.json().error).toBe('not-admin')

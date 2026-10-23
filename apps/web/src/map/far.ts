@@ -1,6 +1,6 @@
 import { cityMembership, type Building, type Carriage, type City, type Resident } from '@csp/shared'
 import { tileToScreen, type Camera, type Size } from './camera.js'
-import { cityRelationship, type Relationship, type Viewer } from './tokens.js'
+import { cityRelationship, type Tone, type Viewer } from './tokens.js'
 
 /**
  * What the far zoom tier shows (ADR 0008): one emblem per city, sized by the city's size, and
@@ -34,7 +34,7 @@ export interface CityEmblem {
   x: number
   y: number
   size: CitySize
-  rel: Relationship
+  rel: Tone
 }
 
 /** One emblem per city whose town hall is in sight, sized by its houses in sight. */
@@ -74,7 +74,7 @@ export interface FarMarker {
   kind: 'army' | 'caravan'
   x: number
   y: number
-  rel: Relationship
+  rel: Tone
 }
 
 /**

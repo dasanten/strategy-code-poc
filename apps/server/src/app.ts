@@ -6,6 +6,7 @@ import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { eq } from 'drizzle-orm'
 import {
+  ADMIN_MAP_INFO_PATH,
   ADMIN_PLACES_PATH,
   ADMIN_TERRAIN_OVERVIEW_PATH,
   ADMIN_TERRITORY_PATH,
@@ -15,6 +16,7 @@ import {
   type AdminDirectives,
   type ApiError,
   type InviteCreated,
+  type MapInfo,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -283,6 +285,10 @@ export async function buildApp(opts: AppOptions) {
           return adminWorldView(world, terrain.size, view, lookups)
         },
       )
+      admin.get(ADMIN_MAP_INFO_PATH, async (): Promise<MapInfo> => ({
+        seed: world.seed,
+        size: terrain.size,
+      }))
       admin.get(ADMIN_PLACES_PATH, async () => adminPlaces(world, lookups))
       admin.get(ADMIN_TERRITORY_PATH, async (_req, reply) => {
         const current = territory?.current
