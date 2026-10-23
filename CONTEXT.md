@@ -412,6 +412,14 @@ The shared language of the game. Domain terms only — no implementation details
   the world except admin directives.
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
+- **Leader handover:** the Player makes another resident their Leader while the old one lives,
+  so the realm passes to a younger one. The new Leader is an adult of the realm who isn't serving
+  anyone else (in a mercenary contract or the alliance army); both stand
+  inside the same city of the realm when it happens, so a Leader out in the field comes home
+  first. Only the Player chooses it (by hand or from a script); nothing else forces it. It is
+  free and instant, also while the city is under attack. The old Leader stays on as
+  an ordinary resident of the realm. Contracts, alliances, standing, scripts and the realm log
+  belong to the Player and carry over; the realm log records the handover.
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
   Leader was. Their cities become self-managed. The Player respawns as a new Leader with a fresh
   starting city on their next login.
