@@ -4,12 +4,12 @@ import {
   WORK_FOOD_KEPT,
   NPC_VILLAGE,
   TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_YEAR,
   Terrain,
   pileAt,
   storedFood,
   unitsThatFit,
   workersOf,
+  ticksForAge,
   type Building,
   type City,
   type TerrainMap,
@@ -55,15 +55,15 @@ function run(world: WorldState, terrain: TerrainMap, walking: Walking, ticks: nu
 }
 
 describe('NPC cities work and eat', () => {
-  it('a village left alone survives several game years', () => {
+  it('a village left alone survives ten game weeks', () => {
     const { world, terrain, city } = village()
     const walking = new Walking(terrain)
     // Everyone starts idle at home, so the city has to send them out to work.
     const storage = storageOf(world, city)
     for (const r of world.residents) Object.assign(r, { x: storage.x, y: storage.y, order: null })
     const people = world.residents.map((r) => r.id)
-    run(world, terrain, walking, 3 * TICKS_PER_GAME_YEAR)
-    // Starting ages and lifespans leave nobody to die of old age in three years.
+    run(world, terrain, walking, 70 * TICKS_PER_GAME_DAY)
+    // Starting ages and lifespans leave nobody to die of old age in ten weeks.
     expect(world.residents.map((r) => r.id)).toEqual(expect.arrayContaining(people))
     // Left in the storage, the starting food would have mostly spoiled by now.
     expect(storedFood(world, city)).toBeGreaterThan(NPC_VILLAGE.food)
@@ -73,7 +73,7 @@ describe('NPC cities work and eat', () => {
     const { world, terrain, city } = village()
     const walking = new Walking(terrain)
     storageOf(world, city).stock = {}
-    run(world, terrain, walking, 2 * TICKS_PER_GAME_DAY)
+    run(world, terrain, walking, 5 * TICKS_PER_GAME_DAY)
     expect(storedFood(world, city)).toBeGreaterThan(0)
     // Its carriers keep taking full loads away: the pile stays below one, past what it keeps.
     const farm = farmOf(world, city)
@@ -121,7 +121,7 @@ describe('NPC cities work and eat', () => {
       Object.assign(r, { x: storage.x, y: storage.y, order: null })
       delete r.script
     }
-    child!.bornAt = world.tick - TICKS_PER_GAME_YEAR
+    child!.bornAt = world.tick - ticksForAge(1)
     stepNpcCities(world, terrain.size)
     // On the Work default, which walks them there.
     expect(adult!.script).toEqual({

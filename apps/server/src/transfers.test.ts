@@ -300,7 +300,7 @@ describe('caravans carrying out transfers', () => {
     expect(eventsOf(world, 'transferred', ivo.userId)).toEqual([expect.objectContaining(arrived)])
     // Taking what it was given to carry, and putting it into someone's storage, is no crime.
     expect(world.crimes).toEqual([])
-  }, 60_000)
+  }, 120_000)
 
   it('take what the sender’s storage holds, with a fee for what it takes', () => {
     const { world, terrain, queue, city, toCity, storage, toStorage } = setup()

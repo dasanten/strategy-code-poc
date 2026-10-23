@@ -2,9 +2,9 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   Terrain,
-  TICKS_PER_GAME_YEAR,
   buildWork,
   constructionLearned,
+  ticksForAge,
   type Building,
   type TerrainMap,
   type WorldState,
@@ -258,9 +258,9 @@ describe('build order', () => {
       'a lumberCamp goes with one tile on a fitting resource node',
     )
     r.x = 3
-    r.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
+    r.bornAt = world.tick - ticksForAge(5)
     expect(reject(buildOrder('lumberCamp'))).toBe('children can’t build')
-    r.bornAt = world.tick - 30 * TICKS_PER_GAME_YEAR
+    r.bornAt = world.tick - ticksForAge(30)
     world.buildings.push({ id: 'b9', kind: 'lumberCamp', cityId: null, x: 3, y: 3 })
     expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building there')
     world.buildings = [{ id: 'b9', kind: 'wall', cityId: null, x: 3, y: 3 }]

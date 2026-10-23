@@ -140,7 +140,7 @@ function run(
 }
 
 describe('NPC cities grow', () => {
-  it('a village grows in residents and area over game years', () => {
+  it('a village grows in residents and area over game weeks', () => {
     const { world, terrain, city, home } = village()
     const size = terrain.size
     fillInside(world, terrain, home)
@@ -148,7 +148,20 @@ describe('NPC cities grow', () => {
     const people = cityResidents(world, city).length
     const area = cityAreaTiles(world, city, size).size
     const oldIds = new Set(ring(world, city, home, size, WALL).map((b) => b.id))
-    run(world, terrain, city, home, oldIds, 4 * TICKS_PER_GAME_YEAR)
+    // Its pairs count as paired a game year ago, so children come as soon as it has room and Food
+    // for them, not a year into the run (the year's wait is the pairing tests' business). It runs
+    // until its wall has moved out, for at most as many ticks as four old game years.
+    const movedOut = () =>
+      ring(world, city, home, size, WALL).length === 0 &&
+      ring(world, city, home, size, WALL + NPC_WALL_STEP).length > 120
+    for (let day = 0; day < 240 && !movedOut(); day++) {
+      run(world, terrain, city, home, oldIds, TICKS_PER_GAME_DAY)
+      for (const r of world.residents) {
+        if (r.order?.kind === 'pair') {
+          r.order.since = Math.min(r.order.since, world.tick - TICKS_PER_GAME_YEAR)
+        }
+      }
+    }
     expect(cityResidents(world, city).length).toBeGreaterThan(people)
     expect(cityAreaTiles(world, city, size).size).toBeGreaterThan(area)
     // It built its own lumber camp for the wood, and moved its wall out.
@@ -164,7 +177,7 @@ describe('NPC cities grow', () => {
     fillHouses(world, city, home)
     storageOf(world, city).stock = { food: 400, wood: 600 }
     const oldIds = new Set(ring(world, city, home, size, WALL).map((b) => b.id))
-    run(world, terrain, city, home, oldIds, 2 * TICKS_PER_GAME_YEAR, () =>
+    run(world, terrain, city, home, oldIds, 48 * TICKS_PER_GAME_DAY, () =>
       world.buildings.every((b) => !oldIds.has(b.id)),
     )
     expect(world.buildings.filter((b) => oldIds.has(b.id))).toEqual([])

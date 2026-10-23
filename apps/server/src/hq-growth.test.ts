@@ -169,7 +169,7 @@ describe('the HQ against the strongest Organization', () => {
     armed(world, 'r1', 12, 80, 563)
     const wanted = Math.ceil(12 * TRADE_ORG_ARMY.strongestMultiple)
     expect(wanted).toBeGreaterThan(TRADE_ORG_ARMY.size)
-    run(world, walking, 4 * TICKS_PER_GAME_DAY, () => hqSoldiers(world).length >= wanted)
+    run(world, walking, 10 * TICKS_PER_GAME_DAY, () => hqSoldiers(world).length >= wanted)
     expect(hqSoldiers(world)).toHaveLength(wanted)
     expect(hqPeople(world, hq).filter((r) => !isArmed(r)).length).toBeGreaterThanOrEqual(
       TRADE_ORG_ARMY.workers,

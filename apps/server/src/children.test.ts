@@ -5,6 +5,7 @@ import {
   STAT_NAMES,
   TICKS_PER_GAME_YEAR,
   canWork,
+  ticksForAge,
   type Resident,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
@@ -75,7 +76,7 @@ describe('children', () => {
     expect(canWork(child, world.tick)).toBe(false)
     expect(workAt()).toMatchObject({ type: 'rejected', reason: 'children can’t work' })
 
-    world.tick = child.bornAt + ADULT_AGE * TICKS_PER_GAME_YEAR - 1
+    world.tick = child.bornAt + ticksForAge(ADULT_AGE) - 1
     expect(stepAging(world, terrain.size).grown).toEqual([])
     expect(workAt()).toMatchObject({ type: 'rejected', reason: 'children can’t work' })
     expect(world.events.some((e) => e.kind === 'grownUp')).toBe(false)
@@ -83,7 +84,7 @@ describe('children', () => {
     // The running world's tick ages them past ADULT_AGE.
     world.tick--
     stepWorld(world, terrain)
-    expect(world.tick).toBe(child.bornAt + ADULT_AGE * TICKS_PER_GAME_YEAR - 1)
+    expect(world.tick).toBe(child.bornAt + ticksForAge(ADULT_AGE) - 1)
     stepWorld(world, terrain)
     expect(canWork(child, world.tick)).toBe(true)
     expect(world.events.filter((e) => e.kind === 'grownUp')).toEqual([

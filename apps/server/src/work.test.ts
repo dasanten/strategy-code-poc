@@ -9,10 +9,10 @@ import {
   START_RESIDENTS,
   Terrain,
   TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_YEAR,
   holdersOf,
   pileAt,
   workOutput,
+  ticksForAge,
   type BuildingKind,
   type Resident,
   type ResourceKind,
@@ -100,9 +100,9 @@ describe('work-at order', () => {
       })
     reject('not one of your residents', 'w1', stranger)
     reject('not one of your residents', 'nobody')
-    r.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
+    r.bornAt = world.tick - ticksForAge(5)
     reject('children can’t work')
-    r.bornAt = world.tick - 30 * TICKS_PER_GAME_YEAR
+    r.bornAt = world.tick - ticksForAge(30)
     r.x = 8
     reject('there is no workplace to work here')
     r.x = 3
@@ -191,7 +191,7 @@ describe('farm work', () => {
     r.carried = { food: 5 }
     order(world, queue)
     order(world, queue, 'w2')
-    run(world, 3000)
+    run(world, 1200)
     // Two workers make 4 units in that time: the one who had none takes meals from the pile
     // until no longer low, the rest stays there; a resident who doesn't work there gets none.
     expect(r.carried.food).toBe(5)

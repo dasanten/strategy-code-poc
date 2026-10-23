@@ -181,7 +181,7 @@ describe('trading with an NPC city', () => {
     const { world, npc } = setup()
     const seen = entitiesInSight(world, terrain, 'r1').find((e) => e.id === npc.id)
     expect(seen).toMatchObject({
-      hire: { spare: spareResidents(world, npc).length, pricePerResidentWeek: 12 },
+      hire: { spare: spareResidents(world, npc).length, pricePerResidentWeek: 5 },
     })
     expect((seen as { trade: unknown[] }).trade.length).toBeGreaterThan(0)
   })

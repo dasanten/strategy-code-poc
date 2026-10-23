@@ -174,7 +174,7 @@ describe('mercenary contracts', () => {
       order(world, queue, from, { ...offer, ...o })
     expect(bad({ residentIds: ['m1', 'b1'] })).toBe('the residents must all be of one realm')
     expect(bad({ realmId: 'r1' })).toBe('offer them to another realm')
-    expect(bad({ days: 0 })).toBe('a contract runs 1 to 48 game days')
+    expect(bad({ days: 0 })).toBe('a contract runs 1 to 120 game days')
     expect(bad({ pricePerWeek: 0 })).toBe('the price is a whole number of coins a week, at least 1')
     expect(bad({ storageId: 'c1-hall' })).toBe(
       'the coins go into a storage of the realm renting them out',

@@ -1,7 +1,7 @@
 import { Terrain } from './terrain.js'
 import {
   TICKS_PER_GAME_DAY,
-  ageInYears,
+  TICKS_PER_GAME_YEAR,
   effective,
   type BuildingKind,
   type CrimeKind,
@@ -97,6 +97,31 @@ export const LIFESPAN_MAX = 65
  * can work, build, tear down and pair.
  */
 export const ADULT_AGE = 14
+
+/**
+ * Game days each year of age up to `ADULT_AGE` takes: children age faster, so a newborn is grown
+ * after 140 game days (~56 real hours). Later years take a full game year (`CONTEXT.md`: Aging).
+ */
+export const CHILD_YEAR_DAYS = 10
+
+/** Ticks from birth until a resident is grown up. */
+const CHILDHOOD_TICKS = ADULT_AGE * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY
+
+/**
+ * A resident's age in game years at the given tick: each year up to `ADULT_AGE` takes
+ * `CHILD_YEAR_DAYS`, later years a full game year (`CONTEXT.md`: Aging).
+ */
+export function ageInYears(resident: Resident, tick: number): number {
+  const lived = tick - resident.bornAt
+  if (lived <= CHILDHOOD_TICKS) return lived / (CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY)
+  return ADULT_AGE + (lived - CHILDHOOD_TICKS) / TICKS_PER_GAME_YEAR
+}
+
+/** The ticks a resident has lived at an age in game years: the inverse of `ageInYears`. */
+export function ticksForAge(age: number): number {
+  if (age <= ADULT_AGE) return age * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY
+  return CHILDHOOD_TICKS + (age - ADULT_AGE) * TICKS_PER_GAME_YEAR
+}
 
 /** Whether a resident is grown up, so they can work, build or take any job (`CONTEXT.md`: Child). */
 export function canWork(resident: Resident, tick: number): boolean {
@@ -739,10 +764,10 @@ export const DELIVERY_LOAD = CARRIAGE_CAPACITY - CARAVAN_FOOD
 
 /**
  * Food a haul route keeps on board for its horse unless the Player picks another amount, in
- * units (`CONTEXT.md`: Haul route): two game days of the horse's eating, topped up at each stop
- * that has Food.
+ * units (`CONTEXT.md`: Haul route): five game days (two real hours) of the horse's eating, topped
+ * up at each stop that has Food. A trip takes real time, so this keeps its real-time length.
  */
-export const HAUL_KEEP_FOOD = 2 * HORSE_FOOD_PER_DAY
+export const HAUL_KEEP_FOOD = 5 * HORSE_FOOD_PER_DAY
 
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
@@ -807,9 +832,10 @@ export const REALM_LOG_LENGTH = 100
 
 /**
  * How long, in game days, an Organization remembers a crime once it is known and nobody carries
- * news of it any more (`CONTEXT.md`: Crime). A week: long enough to count as "recent".
+ * news of it any more (`CONTEXT.md`: Crime). About seven real hours: long enough to count as
+ * "recent".
  */
-export const CRIME_MEMORY_DAYS = 7
+export const CRIME_MEMORY_DAYS = 18
 
 /** How far standing goes each way from neutral (`CONTEXT.md`: Standing): -100 to +100. */
 export const STANDING_RANGE = 100
@@ -832,16 +858,16 @@ export const CRIME_STANDING_LOSS: Record<CrimeKind, number> = {
 export const STANDING_TRADE_COINS_PER_POINT = 50
 
 /** Standing each paid game week of a mercenary contract raises, both ways between its sides. */
-export const STANDING_PER_PAID_WEEK = 2
+export const STANDING_PER_PAID_WEEK = 0.8
 
 /** What a contract broken by an unpaid week costs in the lender's standing toward the hirer. */
 export const STANDING_CONTRACT_BROKEN_LOSS = 20
 
 /**
  * Points standing drifts back toward neutral each game day (`CONTEXT.md`: Standing): a killing is
- * forgotten in about 30 game days, a little over a real day.
+ * forgotten in about 75 game days, a little over a real day.
  */
-export const STANDING_DRIFT_PER_DAY = 1
+export const STANDING_DRIFT_PER_DAY = 0.4
 
 /**
  * Below this standing toward an Organization an NPC city won't trade with it or hire out to it
@@ -879,7 +905,7 @@ export const NPC_TRADE = {
    * What it asks for each resident it lends and game week, in coins, at neutral standing: less
    * than a Trade Org soldier (`TRADE_ORG_ARMY.pricePerSoldierWeek`), as they come mostly unarmed.
    */
-  pricePerResidentWeek: 12,
+  pricePerResidentWeek: 5,
   /** Share of its adults, rounded up, it keeps at home to defend it and never lends. */
   defenceShare: 0.25,
 }
@@ -892,20 +918,21 @@ export const PERSUADE_STANDING = 50
 
 /**
  * How often, in ticks, an NPC city weighs whether to ask a realm to join (`CONTEXT.md`:
- * Persuading a city): once a game minute, so standing and respect aren't counted every tick.
+ * Persuading a city): once a game hour (a real minute), so standing and respect aren't counted
+ * every tick.
  */
 export const PERSUADE_CHECK_TICKS = 60
 
 /**
  * Game days an NPC city waits after a realm declined it before it asks that realm again
- * (`CONTEXT.md`: Persuading a city). A week, like a remembered crime.
+ * (`CONTEXT.md`: Persuading a city). As long as a remembered crime.
  */
-export const PERSUADE_ASK_AGAIN_DAYS = 7
+export const PERSUADE_ASK_AGAIN_DAYS = 18
 
 /**
  * The standing a self-managed city starts out holding its former Player in (`CONTEXT.md`:
- * Self-managed city): good, and like any standing gone in about 60 game days, two and a half real
- * days.
+ * Self-managed city): good, and like any standing gone in about 150 game days, two and a half
+ * real days.
  */
 export const FORMER_PLAYER_STANDING = 60
 
@@ -913,7 +940,7 @@ export const FORMER_PLAYER_STANDING = 60
  * Below this standing toward an Organization the Trade Organization refuses to trade with it
  * (`CONTEXT.md`: Trade Org reaction): no buying or selling at its warehouses, no hiring its
  * soldiers, no hiring theirs. Any known crime against it gets there; a theft is forgiven in about
- * five game days.
+ * 12 game days.
  */
 export const TRADE_ORG_REFUSES_TRADE_BELOW = -5
 
@@ -944,7 +971,7 @@ export const TRADE_ORG_LOSS: Record<Exclude<CrimeKind, 'theft'>, number> = {
 export const TRADE_ORG_PUNISH = {
   times: 2,
   soldiers: 8,
-  giveUpDays: 5,
+  giveUpDays: 12,
 }
 
 /**
@@ -1188,15 +1215,15 @@ export const TEARDOWN_MATERIALS_RETURNED = 0.5
 
 /**
  * How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
- * being a member (`CONTEXT.md`: Alliance): one game day, time enough for the others to react.
+ * being a member (`CONTEXT.md`: Alliance): one real hour, time enough for the others to react.
  */
-export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
+export const ALLIANCE_LEAVE_DELAY = 3600
 
 /**
  * How long after its owner recalls a soldier or carriage from the alliance army it is theirs to
- * command again (`CONTEXT.md`: Alliance army): a game day.
+ * command again (`CONTEXT.md`: Alliance army): one real hour.
  */
-export const ALLIANCE_RECALL_DELAY = TICKS_PER_GAME_DAY
+export const ALLIANCE_RECALL_DELAY = 3600
 
 /**
  * The standing an NPC city must hold toward every member of an alliance to accept its
@@ -1366,9 +1393,9 @@ export const ARMY_SPREAD = 4
 
 /**
  * The longest a mercenary contract may run, in game days (`CONTEXT.md`: Mercenary contract): two
- * game years, so a contract is a campaign, not a permanent transfer of residents.
+ * real days, so a contract is a campaign, not a permanent transfer of residents.
  */
-export const CONTRACT_MAX_DAYS = 48
+export const CONTRACT_MAX_DAYS = 120
 
 /** The Trade Org army (`CONTEXT.md`: Trade Org army). */
 export const TRADE_ORG_ARMY = {
@@ -1378,17 +1405,17 @@ export const TRADE_ORG_ARMY = {
   workers: 12,
   /** Soldiers that always stay at the HQ: it never hires out more than the rest. */
   guard: 8,
-  /** What it asks for each soldier and game week, in coins: about a spear's price. */
-  pricePerSoldierWeek: 20,
+  /** What it asks for each soldier and game week, in coins: about a spear's price each seven real hours. */
+  pricePerSoldierWeek: 8,
   /**
    * It has lost too many once its soldiers, the adults it could still arm and its mercenaries
    * are fewer than this share of `size`.
    */
   hireBelow: 0.6,
   /** What it offers for each mercenary and game week, in coins: less than it asks itself. */
-  hirePricePerSoldierWeek: 12,
-  /** How long it hires mercenaries for, in game days: two game weeks. */
-  hireDays: 14,
+  hirePricePerSoldierWeek: 5,
+  /** How long it hires mercenaries for, in game days: 14 real hours. */
+  hireDays: 35,
   /**
    * The HQ keeps at least this many times the strongest Organization's armed residents as
    * soldiers (`CONTEXT.md`: Trade Org HQ), and `size` at the least: a little more than any

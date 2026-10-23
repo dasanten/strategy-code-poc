@@ -8,7 +8,7 @@ import { generateWorld } from './world.js'
 
 /** How many of the newest saves are always kept. */
 export const KEEP_LATEST = 20
-/** Beyond those, one save per game day (one real hour) is kept for this long. */
+/** Beyond those, one save per real hour is kept for this long. */
 export const KEEP_HOURLY_FOR_S = 7 * 24 * 60 * 60
 
 export function saveWorld(db: Db, world: WorldState): void {

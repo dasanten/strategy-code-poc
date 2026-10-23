@@ -1,9 +1,4 @@
-import {
-  REALM_LOG_LENGTH,
-  TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_YEAR,
-  type WorldState,
-} from '@csp/shared'
+import { REALM_LOG_LENGTH, TICKS_PER_GAME_DAY, ticksForAge, type WorldState } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { stepAging } from './aging.js'
 import { eventsFor, recordEvent } from './events.js'
@@ -51,7 +46,7 @@ describe('realm events', () => {
     world.events = []
     const realm = world.realms[0]!
     const r = world.residents.find((x) => x.id !== realm.leaderId)!
-    r.bornAt = world.tick - r.lifespan * TICKS_PER_GAME_YEAR
+    r.bornAt = world.tick - ticksForAge(r.lifespan)
     stepAging(world, terrain.size)
     expect(eventsFor(world, realm.userId)).toEqual([
       {

@@ -56,7 +56,7 @@ describe('mercenary contracts in the UI', () => {
     expect(contractStatus(contract, 'r2')).toBe('Offered to you')
     const inForce = { ...contract, startedAt: 0, endsAt: 36000, paidWeeks: 1, payBy: 36000 }
     expect(contractStatus(inForce, 'r2')).toBe(
-      '1 of 2 weeks paid · next week due by Year 1 · Day 11 · 00:00',
+      '1 of 2 weeks paid · next week due by Year 1 · Day 26 · 00:00',
     )
   })
 
