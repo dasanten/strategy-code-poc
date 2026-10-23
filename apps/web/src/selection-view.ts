@@ -3,10 +3,17 @@ import {
   BUILDABLE,
   CARRIAGE_CAPACITY,
   GOODS,
+  HORSE_FOOD_PER_DAY,
+  HORSE_HUNGRY_SHARE,
+  MAX_HEALTH,
+  MAX_HUNGER,
   MAX_WORKERS,
   NODE_GOOD,
   NODE_WORKPLACE,
   RECIPES,
+  STABLE_BREED_TICKS,
+  STABLE_CAPACITY,
+  TICKS_PER_GAME_DAY,
   WORKPLACE_SKILL,
   stockWeight,
   type Building,
@@ -24,6 +31,8 @@ import {
   type SeenResident,
   type SeenCarriage,
   type LoadLevel,
+  type Horse,
+  type SeenHorse,
   type Good,
   type SeenBuilding,
   type SeenCity,
@@ -45,7 +54,7 @@ import {
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
-import { faresKnown } from './seen.js'
+import { faresKnown, horseFaresKnown } from './seen.js'
 
 /**
  * What the selection card shows (ADR 0008): one of the Player's residents, or a tile of the map
@@ -318,7 +327,7 @@ export interface TileCard {
   title: string
   rel?: Relationship
   /** What the card is named after, which picks its icon. */
-  what: 'building' | 'carriage' | 'pile' | 'node' | 'residents' | 'tile'
+  what: 'building' | 'carriage' | 'pile' | 'node' | 'residents' | 'horses' | 'tile'
   lines: string[]
   /** An own gate on the tile, to open or close. */
   gate?: Building
@@ -332,6 +341,7 @@ export interface TileThings {
   y: number
   buildings: SeenBuilding[]
   carriages: SeenCarriage[]
+  horses: SeenHorse[]
   piles: Pile[]
   node: KnownNode | undefined
   /** The known resource node on a tile, to find the one under a workplace's footprint. */
@@ -357,6 +367,54 @@ function goodsText(stock: Stock | undefined, labels: Record<string, string>): st
   return parts.length > 0 ? parts.join(', ') : 'nothing'
 }
 
+/** How a horse fares in words: fed, hungry or starving, and healthy or hurt. */
+function horseFares(h: Horse): { hunger: 'fed' | 'hungry' | 'starving'; health: string } {
+  const hunger =
+    h.hunger <= 0 ? 'starving' : h.hunger < HORSE_HUNGRY_SHARE * MAX_HUNGER ? 'hungry' : 'fed'
+  return { hunger, health: h.health < MAX_HEALTH ? 'hurt' : 'healthy' }
+}
+
+/**
+ * Lines for horses standing together, one per owner: "2 horses (yours) · 1 hungry". How they fare
+ * only for those the Player knows it of (`CONTEXT.md`: Seeing how someone fares).
+ */
+function horseLines(
+  horses: SeenHorse[],
+  rel: (h: SeenHorse) => Relationship | undefined,
+): string[] {
+  const groups = new Map<string, SeenHorse[]>()
+  for (const h of horses) {
+    const key = `${h.realmId}/${h.cityId}`
+    groups.set(key, [...(groups.get(key) ?? []), h])
+  }
+  return [...groups.values()].map((group) => {
+    const r = rel(group[0]!)
+    const owner = r ? RELATIONSHIP_NAMES[r].toLowerCase() : 'nobody’s'
+    const parts = [`${group.length} ${group.length === 1 ? 'horse' : 'horses'} (${owner})`]
+    const known = group.filter(horseFaresKnown).map(horseFares)
+    const hungry = known.filter((f) => f.hunger !== 'fed').length
+    const hurt = known.filter((f) => f.health === 'hurt').length
+    if (hungry > 0) parts.push(`${hungry} hungry`)
+    if (hurt > 0) parts.push(`${hurt} hurt`)
+    return parts.join(' · ')
+  })
+}
+
+/**
+ * Game days until a stable's next foal while two fed horses of one owner stand in it with room
+ * for another (`CONTEXT.md`: Stable, `breedingPair`), as far as the Player knows how they fare.
+ */
+function daysToFoal(stable: Building, inIt: SeenHorse[]): number | undefined {
+  if (inIt.length >= STABLE_CAPACITY) return undefined
+  const fed = inIt.filter((h) => horseFaresKnown(h) && h.hunger > 0)
+  const pair = fed.some((a) =>
+    fed.some((b) => b !== a && b.realmId === a.realmId && b.cityId === a.cityId),
+  )
+  if (!pair) return undefined
+  const left = STABLE_BREED_TICKS - (stable.breeding ?? 0)
+  return Math.max(1, Math.ceil(left / TICKS_PER_GAME_DAY))
+}
+
 /**
  * The card for a tile: named after the most important thing on it (a building or site, then a
  * carriage, goods on the ground, a resource node, strangers), with a line for everything there.
@@ -371,6 +429,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const pileTile = building ?? t
   const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
   const cityOf = (b: Building) => t.cities.find((c) => c.id === b.cityId)
+  // Every horse in the stable on the tile, hitched or not, as it breeds and fills up
+  // (`breedingPair`); elsewhere the horses on the tile not pulling a carriage.
+  const hitched = new Set(t.carriages.map((k) => k.horseId))
+  const stable = building?.kind === 'stable' && !building.site ? building : undefined
+  const horsesHere = t.horses.filter((h) =>
+    stable ? covers(stable, h.x, h.y) : !hitched.has(h.id) && h.x === t.x && h.y === t.y,
+  )
+  const horseRel = (h: SeenHorse) => realmRelationship(h.realmId, h.cityId, t.cities, t.viewer)
   const lines: string[] = []
   let card: Omit<TileCard, 'lines'> | undefined
   if (building) {
@@ -394,9 +460,17 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     } else {
       const max = MAX_WORKERS[building.kind]
       if (max !== undefined) lines.push(`${t.workers(building)} / ${max} workers`)
+      if (stable) {
+        lines.push(
+          ...(horsesHere.length > 0 ? horseLines(horsesHere, horseRel) : ['No horses in it']),
+        )
+        lines.push(`Room for ${Math.max(0, STABLE_CAPACITY - horsesHere.length)} more horses`)
+      }
       const makes = makesLine(building, t, pile, goodLabels)
       if (makes) lines.push(makes)
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
+      const foal = stable && daysToFoal(stable, horsesHere)
+      if (foal) lines.push(`Next foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         lines.push(...townHallLines(city.id, t))
@@ -417,9 +491,31 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const load = carriage.load
       ? `${Math.round(stockWeight(carriage.load))} / ${CARRIAGE_CAPACITY} kg`
       : LOAD_LEVEL_NAMES[carriage.loadLevel]
+    // How its horse fares only for the Player's own and allies' (`CONTEXT.md`: Seeing how someone fares).
+    const horse = t.horses.find((h) => h.id === carriage.horseId)
+    const fares = horse && horseFaresKnown(horse) ? horseFares(horse) : undefined
+    const ours = rel === 'own' || rel === 'alliance'
+    const horseText = !carriage.horseId
+      ? ours
+        ? ' · no horse hitched'
+        : ' · no horse'
+      : fares
+        ? ''
+        : ' · horse hitched'
     lines.push(
-      `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${load}${carriage.horseId ? '' : ' · no horse hitched'}`,
+      `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${load}${horseText}`,
     )
+    if (fares) {
+      const food = carriage.load?.food ?? 0
+      const days = Math.floor(food / HORSE_FOOD_PER_DAY + 1e-9)
+      const feeds =
+        days <= 0
+          ? 'Food on board for less than a game day'
+          : `Food on board for ${days} game ${days === 1 ? 'day' : 'days'}`
+      lines.push(
+        `Horse: ${fares.hunger}, ${fares.health} · ${food > 0 ? feeds : 'no Food on board'}`,
+      )
+    }
   }
   if (pile) {
     card ??= { title: 'Goods on the ground', what: 'pile' }
@@ -448,6 +544,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${gear ? ` · ${gear}` : ''}`,
       )
     } else lines.push(...strangersLines(t.strangers))
+  }
+  if (!stable && horsesHere.length > 0) {
+    card ??= {
+      title: horsesHere.length === 1 ? 'Horse' : `${horsesHere.length} horses`,
+      rel: horseRel(horsesHere[0]!),
+      what: 'horses',
+    }
+    lines.push(...horseLines(horsesHere, horseRel))
   }
   const terrain = terrainLine(t.terrain, road)
   if (road) {

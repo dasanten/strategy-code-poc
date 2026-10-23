@@ -42,6 +42,7 @@ const tile = (more: Partial<TileThings> = {}) =>
       y: 5,
       buildings: [],
       carriages: [],
+      horses: [],
       piles: [],
       node: undefined,
       strangers: [],

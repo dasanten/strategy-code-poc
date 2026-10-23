@@ -208,6 +208,12 @@ export const HORSE_FOOD_PER_DAY = 1.5
  */
 export const HORSE_REACH = 1
 
+/**
+ * Share of a full hunger meter below which the tile card calls a horse hungry rather than fed;
+ * at 0 it is starving.
+ */
+export const HORSE_HUNGRY_SHARE = 0.25
+
 /** Most horses a stable has room for; it breeds no foal once that many stand in it. */
 export const STABLE_CAPACITY = 6
 
