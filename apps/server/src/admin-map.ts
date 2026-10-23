@@ -1,22 +1,30 @@
 import {
   ADMIN_VIEW_MAX_SIDE,
+  GOODS,
   TRADE_ORGANIZATION,
   TRADE_ORG_NAME,
   allianceOf,
   cityOrganization,
+  isArmed,
   realmName,
   regionMapFor,
   townHallOf,
   wrap,
   type AdminEntity,
+  type AdminInspectTarget,
+  type AdminInspection,
+  type AdminNamed,
   type AdminOrganization,
   type AdminPlace,
   type AdminPlaces,
   type AdminScript,
   type AdminViewRequest,
   type AdminWorldView,
+  type Building,
+  type Caravan,
   type RegionMap,
   type RunningScript,
+  type Stock,
   type Territory,
   type WorldState,
 } from '@csp/shared'
@@ -236,4 +244,145 @@ export function adminPlaces(world: WorldState, lookups: AdminLookups): AdminPlac
 /** The whole map's territory (`CONTEXT.md`: Territory): the Region map without the explored filter. */
 export function adminTerritory(world: WorldState, territory: Territory, size: number): RegionMap {
   return regionMapFor(world, territory, size, () => true)
+}
+
+/**
+ * One thing in the world as the admin map's inspector shows it (`AdminInspection`), or undefined
+ * when there is no such thing (any more). Never a script's source.
+ */
+export function adminInspection(
+  world: WorldState,
+  target: AdminInspectTarget,
+  lookups: AdminLookups,
+): AdminInspection | undefined {
+  const org = (id: string | null) => (id === null ? null : adminOrganization(world, id, lookups))
+  const cityById = (id: string | null) =>
+    id === null ? undefined : world.cities.find((c) => c.id === id)
+  const cityOrg = (id: string | null) => {
+    const city = cityById(id)
+    return city ? cityOrganization(city) : null
+  }
+  const named = (x: { id: string; name: string } | undefined): AdminNamed | null =>
+    x ? { id: x.id, name: x.name } : null
+  const residentNamed = (id: string) => named(world.residents.find((r) => r.id === id))
+  const postName = (c: Caravan) => cityById(c.postId)?.name ?? 'a lost post'
+  const caravanNamed = (c: Caravan | undefined) => (c ? { id: c.id, name: postName(c) } : null)
+  const { tick } = world
+  const { id } = target
+
+  switch (target.kind) {
+    case 'resident': {
+      const r = world.residents.find((x) => x.id === id)
+      if (!r) return undefined
+      const { script, ...rest } = r
+      const army = world.armies.find((a) => a.memberIds.includes(id))
+      const caravan = world.caravans.find((c) => c.driverId === id || c.escortIds.includes(id))
+      return {
+        tick,
+        org: org(r.owner ?? cityOrg(r.cityId)),
+        is: 'resident',
+        resident: { ...rest, ...(script ? { script: adminScript(script, lookups) } : {}) },
+        city: named(cityById(r.cityId)),
+        army: named(army),
+        caravan: caravanNamed(caravan),
+        leader: world.realms.some((realm) => realm.leaderId === id),
+      }
+    }
+    case 'city': {
+      const c = cityById(id)
+      const hall = c && townHallOf(world, c)
+      if (!c || !hall) return undefined
+      const residents = world.residents.filter((r) => r.cityId === id)
+      const finished = world.buildings.filter((b) => b.cityId === id && !b.site)
+      const counts = new Map<Building['kind'], number>()
+      for (const b of finished) counts.set(b.kind, (counts.get(b.kind) ?? 0) + 1)
+      const storage: Stock = {}
+      for (const b of finished.filter((b) => b.kind === 'storage')) {
+        for (const g of GOODS) {
+          const n = b.stock?.[g] ?? 0
+          if (n > 0) storage[g] = (storage[g] ?? 0) + n
+        }
+      }
+      const gates = finished.filter((b) => b.kind === 'gate')
+      return {
+        tick,
+        org: org(cityOrganization(c)),
+        is: 'city',
+        city: { ...c, x: hall.x, y: hall.y },
+        residents: residents.map((r) => ({ id: r.id, name: r.name })),
+        buildings: [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+        storage,
+        gates: {
+          open: gates.filter((g) => !g.closed).length,
+          shut: gates.filter((g) => g.closed).length,
+        },
+        soldiers: residents.filter(isArmed).length,
+      }
+    }
+    case 'building': {
+      const b = world.buildings.find((x) => x.id === id)
+      if (!b) return undefined
+      return {
+        tick,
+        org: org(cityOrg(b.cityId)),
+        is: 'building',
+        building: b,
+        city: named(cityById(b.cityId)),
+      }
+    }
+    case 'horse': {
+      const h = world.horses.find((x) => x.id === id)
+      if (!h) return undefined
+      return { tick, org: org(h.realmId ?? cityOrg(h.cityId)), is: 'horse', horse: h }
+    }
+    case 'carriage': {
+      const k = world.carriages.find((x) => x.id === id)
+      if (!k) return undefined
+      const caravan = world.caravans.find((c) => c.carriageId === id)
+      const driver = world.residents.find(
+        (r) => (r.order?.kind === 'drive' || r.order?.kind === 'haul') && r.order.carriageId === id,
+      )
+      return {
+        tick,
+        org: org(caravan ? TRADE_ORGANIZATION : (k.realmId ?? cityOrg(k.cityId))),
+        is: 'carriage',
+        carriage: k,
+        driver: named(driver) ?? (caravan ? residentNamed(caravan.driverId) : null),
+        caravan: caravanNamed(caravan),
+      }
+    }
+    case 'pile': {
+      const p = world.piles.find((x) => x.id === id)
+      return p && { tick, org: null, is: 'pile', pile: p }
+    }
+    case 'army': {
+      const a = world.armies.find((x) => x.id === id)
+      if (!a) return undefined
+      const { script, ...rest } = a
+      const members = a.memberIds.flatMap((m) => {
+        const r = world.residents.find((x) => x.id === m)
+        return r ? [{ id: r.id, name: r.name, x: r.x, y: r.y }] : []
+      })
+      return {
+        tick,
+        org: org(a.realmId),
+        is: 'army',
+        army: { ...rest, ...(script ? { script: adminScript(script, lookups) } : {}) },
+        members,
+      }
+    }
+    case 'caravan': {
+      const c = world.caravans.find((x) => x.id === id)
+      if (!c) return undefined
+      return {
+        tick,
+        org: org(TRADE_ORGANIZATION),
+        is: 'caravan',
+        caravan: c,
+        post: named(cityById(c.postId)),
+        carriage: world.carriages.find((k) => k.id === c.carriageId) ?? null,
+        crew: [c.driverId, ...c.escortIds].flatMap((m) => residentNamed(m) ?? []),
+      }
+    }
+  }
 }

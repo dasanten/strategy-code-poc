@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { ADMIN_PATH, adminTabFor, adminTabPath, pageFor } from './pages.js'
+import {
+  ADMIN_PATH,
+  adminDirectivePath,
+  adminTabFor,
+  adminTabPath,
+  directiveTargetFor,
+  pageFor,
+} from './pages.js'
 
 const player = { name: 'Mara', isAdmin: false }
 const admin = { name: 'Daniel', isAdmin: true }
@@ -36,5 +43,15 @@ describe('admin tabs', () => {
     expect(adminTabFor('/admin/directives')).toBe('directives')
     expect(adminTabFor('/admin/nothing')).toBe('map')
     expect(adminTabPath('directives')).toBe('/admin/directives')
+  })
+})
+
+describe('directive shortcut', () => {
+  it('opens the Directives tab with the target chosen', () => {
+    const path = adminDirectivePath('city 7')
+    const [pathname, search] = path.split('?')
+    expect(adminTabFor(pathname!)).toBe('directives')
+    expect(directiveTargetFor(`?${search}`)).toBe('city 7')
+    expect(directiveTargetFor('')).toBe('')
   })
 })

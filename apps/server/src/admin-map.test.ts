@@ -9,13 +9,21 @@ import {
   TRADE_ORGANIZATION,
   TRADE_ORG_NAME,
   Terrain,
+  adminInspectPath,
   adminWorldPath,
+  type AdminInspectKind,
   type AdminWorldView,
   type Caravan,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
-import { adminPlaces, adminWorldView, parseAdminView, type AdminLookups } from './admin-map.js'
+import {
+  adminInspection,
+  adminPlaces,
+  adminWorldView,
+  parseAdminView,
+  type AdminLookups,
+} from './admin-map.js'
 import { buildApp } from './app.js'
 import { createAdmin, createInviteCode, createSession, signUp } from './auth.js'
 import { openDb, schema } from './db/index.js'
@@ -257,6 +265,102 @@ describe('admin places', () => {
   })
 })
 
+describe('admin inspection', () => {
+  const inspect = (world: WorldState, kind: AdminInspectKind, id: string) =>
+    adminInspection(world, { kind, id }, lookups)
+
+  it('shows a resident with their Organization, city, army and script name, never its source', () => {
+    const world = setup()
+    world.residents[0]!.carried = { spear: 1, food: 2 }
+    const r = inspect(world, 'resident', 'a1')!
+    expect(r).toMatchObject({
+      is: 'resident',
+      org: { id: 'r1', is: 'realm', account: 'Mara' },
+      city: { id: 'c1', name: 'Ashford' },
+      army: { id: 'ar1', name: 'Vanguard' },
+      caravan: null,
+      leader: true,
+      resident: { carried: { spear: 1, food: 2 }, script: { name: 'Miner', memory: { trips: 3 } } },
+    })
+    expect(inspect(world, 'resident', 'd1')).toMatchObject({
+      org: { is: 'tradeOrg' },
+      caravan: { id: 'cv1', name: 'Ferry' },
+      leader: false,
+    })
+    expect(inspect(world, 'resident', 'gone')).toBeUndefined()
+  })
+
+  it('shows a city with its residents, buildings, storage, gates and soldiers', () => {
+    const world = setup()
+    world.buildings.push(
+      { id: 's1', kind: 'storage', cityId: 'c1', x: 2, y: 1, stock: { wood: 5, food: 1 } },
+      { id: 's2', kind: 'storage', cityId: 'c1', x: 3, y: 1, stock: { wood: 2 } },
+      { id: 'g1', kind: 'gate', cityId: 'c1', x: 4, y: 1, closed: true },
+      { id: 'g2', kind: 'gate', cityId: 'c1', x: 5, y: 1 },
+      {
+        id: 'h-site',
+        kind: 'house',
+        cityId: 'c1',
+        x: 6,
+        y: 1,
+        site: { delivered: {}, work: 0 },
+      },
+    )
+    resident(world, 'c1-a', 'r1', 'c1', 2, 2).carried = { sword: 1 }
+    const c = inspect(world, 'city', 'c1')!
+    expect(c).toMatchObject({
+      is: 'city',
+      org: { id: 'r1', is: 'realm' },
+      city: { name: 'Ashford', x: 1, y: 1 },
+      residents: [
+        { id: 'a1', name: 'a1' },
+        { id: 'c1-a', name: 'c1-a' },
+      ],
+      buildings: [
+        ['gate', 2],
+        ['storage', 2],
+        ['townHall', 1],
+      ],
+      storage: { wood: 7, food: 1 },
+      gates: { open: 1, shut: 1 },
+      soldiers: 1,
+    })
+    expect(inspect(world, 'city', 'n1')).toMatchObject({ org: { id: 'n1', is: 'city' } })
+    expect(inspect(world, 'city', 'hq')).toMatchObject({ org: { is: 'tradeOrg' } })
+  })
+
+  it('shows carriages, caravans, armies and the rest', () => {
+    const world = setup()
+    world.carriages[0]!.load = { iron: 3 }
+    expect(inspect(world, 'carriage', 'k1')).toMatchObject({
+      is: 'carriage',
+      org: { is: 'tradeOrg' },
+      carriage: { load: { iron: 3 } },
+      driver: { id: 'd1' },
+      caravan: { id: 'cv1', name: 'Ferry' },
+    })
+    expect(inspect(world, 'caravan', 'cv1')).toMatchObject({
+      is: 'caravan',
+      post: { id: 'p1', name: 'Ferry' },
+      carriage: { id: 'k1' },
+      crew: [{ id: 'd1' }],
+    })
+    world.armies[0]!.script = { scriptId: 1, memory: {} }
+    expect(inspect(world, 'army', 'ar1')).toMatchObject({
+      is: 'army',
+      org: { id: 'r1' },
+      army: { name: 'Vanguard', script: { name: 'Miner' } },
+      members: [{ id: 'a1', x: 62, y: 2 }],
+    })
+    expect(inspect(world, 'building', 'c1-hall')).toMatchObject({
+      org: { id: 'r1' },
+      city: { name: 'Ashford' },
+    })
+    expect(inspect(world, 'horse', 'h1')).toMatchObject({ org: { id: 'n1' } })
+    expect(inspect(world, 'pile', 'pl1')).toMatchObject({ org: null, pile: { goods: { wood: 4 } } })
+  })
+})
+
 describe('admin map API', () => {
   async function start() {
     const opened = await openDb(':memory:')
@@ -321,6 +425,14 @@ describe('admin map API', () => {
     expect(places.statusCode).toBe(200)
     expect(places.json().tradeOrg.hq.name).toBe('Exchange')
 
+    const inspectUrl = adminInspectPath({ kind: 'resident', id: 'a1' })
+    const inspected = await get(inspectUrl, admin)
+    expect(inspected.statusCode).toBe(200)
+    expect(inspected.json().resident.script.name).toBe('Miner')
+    expect(inspected.body).not.toContain('secret source')
+    expect((await get(adminInspectPath({ kind: 'city', id: 'gone' }), admin)).statusCode).toBe(404)
+    expect((await get('/api/admin/inspect/realm/r1', admin)).statusCode).toBe(400)
+
     expect((await get(ADMIN_TERRITORY_PATH, admin)).statusCode).toBe(404)
     territory.update(world, terrain)
     const region = await get(ADMIN_TERRITORY_PATH, admin)
@@ -334,7 +446,13 @@ describe('admin map API', () => {
       ]),
     )
 
-    for (const url of [ADMIN_MAP_INFO_PATH, worldUrl, ADMIN_PLACES_PATH, ADMIN_TERRITORY_PATH]) {
+    for (const url of [
+      ADMIN_MAP_INFO_PATH,
+      worldUrl,
+      ADMIN_PLACES_PATH,
+      ADMIN_TERRITORY_PATH,
+      inspectUrl,
+    ]) {
       const refused = await get(url, player)
       expect(refused.statusCode).toBe(403)
       expect(refused.json().error).toBe('not-admin')
@@ -353,6 +471,8 @@ describe('admin map API', () => {
       adminWorldPath({ x: 0, y: 0, w: 64, h: 64, citiesOnly: true }),
       ADMIN_PLACES_PATH,
       ADMIN_TERRITORY_PATH,
+      adminInspectPath({ kind: 'city', id: 'c1' }),
+      adminInspectPath({ kind: 'army', id: 'ar1' }),
     ]) {
       expect((await get(url, admin)).statusCode).toBe(200)
     }

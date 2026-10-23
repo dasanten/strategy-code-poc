@@ -3,10 +3,13 @@ import {
   ADMIN_PLACES_PATH,
   ADMIN_TERRAIN_OVERVIEW_PATH,
   ADMIN_TERRITORY_PATH,
+  adminInspectPath,
   adminWorldPath,
   type Account,
   type AdminDirectiveView,
   type AdminDirectives,
+  type AdminInspectTarget,
+  type AdminInspection,
   type AdminPlaces,
   type AdminViewRequest,
   type AdminWorldView,
@@ -70,6 +73,8 @@ export const api = {
   adminMap: () => call<MapInfo>('GET', ADMIN_MAP_INFO_PATH),
   adminWorld: (view: AdminViewRequest) => call<AdminWorldView>('GET', adminWorldPath(view)),
   adminPlaces: () => call<AdminPlaces>('GET', ADMIN_PLACES_PATH),
+  adminInspect: (target: AdminInspectTarget) =>
+    call<AdminInspection>('GET', adminInspectPath(target)),
   adminTerritory: () => call<RegionMap>('GET', ADMIN_TERRITORY_PATH),
   adminOverview: async () => {
     const res = await fetch(ADMIN_TERRAIN_OVERVIEW_PATH, { credentials: 'same-origin' }).catch(

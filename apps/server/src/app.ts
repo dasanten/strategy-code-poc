@@ -6,6 +6,8 @@ import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { eq } from 'drizzle-orm'
 import {
+  ADMIN_INSPECT_KINDS,
+  ADMIN_INSPECT_PATH,
   ADMIN_MAP_INFO_PATH,
   ADMIN_PLACES_PATH,
   ADMIN_TERRAIN_OVERVIEW_PATH,
@@ -22,6 +24,7 @@ import {
 } from '@csp/shared'
 import { LANGUAGE_VERSION } from '@csp/lang'
 import {
+  adminInspection,
   adminPlaces,
   adminTerritory,
   adminWorldView,
@@ -290,6 +293,15 @@ export async function buildApp(opts: AppOptions) {
         size: terrain.size,
       }))
       admin.get(ADMIN_PLACES_PATH, async () => adminPlaces(world, lookups))
+      admin.get<{ Params: { kind: string; id: string } }>(
+        `${ADMIN_INSPECT_PATH}/:kind/:id`,
+        async (req, reply) => {
+          const kind = ADMIN_INSPECT_KINDS.find((k) => k === req.params.kind)
+          if (!kind) return fail(reply, 'invalid-input', 'Nothing of that kind to inspect.')
+          const found = adminInspection(world, { kind, id: req.params.id }, lookups)
+          return found ?? fail(reply, 'not-found', 'It is not there any more.')
+        },
+      )
       admin.get(ADMIN_TERRITORY_PATH, async (_req, reply) => {
         const current = territory?.current
         if (!current) return fail(reply, 'not-found', 'Territory is not worked out yet.')

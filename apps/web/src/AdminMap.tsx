@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   adminTerrainChunkPath,
+  type AdminInspectTarget,
   type AdminPlaces,
   type AdminWorldView,
   type MapInfo,
@@ -15,6 +16,8 @@ import {
   mapViewSearch,
   parseMapView,
 } from './admin-map.js'
+import { pickOnTile } from './admin-inspector.js'
+import { AdminInspector } from './AdminInspector.js'
 import { MapView } from './MapView.js'
 import type { Camera, Size } from './map/camera.js'
 import { applyRegionMap, type RegionState } from './map/region.js'
@@ -23,15 +26,19 @@ import { applyRegionMap, type RegionState } from './map/region.js'
  * The admin panel's Map tab (`CONTEXT.md`: admin map): the whole world on the game's map, the
  * part in view loaded again every few seconds and whenever the view moves. Its view is kept in
  * the URL (`search`, reported back through `onSearch`), so a link lands on the same spot. Nothing
- * on it gives orders.
+ * on it gives orders; what is clicked shows in the inspector, which can lead to the Directives tab.
  */
 export function AdminMap({
   search,
   onSearch,
+  onDirective,
 }: {
   search: string
   onSearch: (search: string) => void
+  /** Called with a realm or NPC city to give a directive against, from the inspector. */
+  onDirective: (org: string) => void
 }) {
+  const [inspecting, setInspecting] = useState<AdminInspectTarget | null>(null)
   const [map, setMap] = useState<MapInfo | null>(null)
   const [overview, setOverview] = useState<Uint8Array | null>(null)
   const [view, setView] = useState<AdminWorldView | null>(null)
@@ -114,9 +121,26 @@ export function AdminMap({
   return (
     <div className="admin-map">
       {world && start ? (
-        <MapView world={world} terrainPath={adminTerrainChunkPath} start={start} onView={onView} />
+        <MapView
+          world={world}
+          terrainPath={adminTerrainChunkPath}
+          start={start}
+          onView={onView}
+          selectedId={inspecting?.kind === 'resident' ? inspecting.id : undefined}
+          selectedCityId={inspecting?.kind === 'city' ? inspecting.id : undefined}
+          onSelectTile={(x, y) => setInspecting(pickOnTile(view, x, y) ?? null)}
+          onSelectCity={(id) => setInspecting({ kind: 'city', id })}
+        />
       ) : (
         <p className="admin-map-note">{error ?? 'Loading the map…'}</p>
+      )}
+      {inspecting && (
+        <AdminInspector
+          target={inspecting}
+          onInspect={setInspecting}
+          onClose={() => setInspecting(null)}
+          onDirective={onDirective}
+        />
       )}
       {world && error && <p className="admin-map-note error">{error}</p>}
     </div>
