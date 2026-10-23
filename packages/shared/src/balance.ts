@@ -1518,3 +1518,9 @@ export const SCRIPT_MEMORY_MAX = 4000
  * or running out of steps), so a script failing every tick doesn't flood the log. A minute.
  */
 export const SCRIPT_LOG_INTERVAL = 60
+
+/** The longest realm name a Player may give, in characters after trimming (`CONTEXT.md`: Realm name). */
+export const REALM_NAME_MAX_LENGTH = 30
+
+/** The longest name a Player may give a resident, the Leader included, in characters after trimming. */
+export const RESIDENT_NAME_MAX_LENGTH = 30

@@ -20,6 +20,7 @@ import { buy, sell } from './trading.js'
 import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
 import { handOver } from './leader.js'
+import { rename } from './renaming.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -71,6 +72,7 @@ export const orderKinds: Record<string, OrderKind> = {
   transfer,
   buyOff,
   handOver,
+  rename,
   ...allianceOrders,
   ...armyOrders,
   ...contractOrders,
@@ -121,9 +123,9 @@ export class OrderQueue {
     this.pending = []
     for (const { sender, order } of batch) {
       // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
-      // script). Pairing and the Leader handover change nobody's order, so they leave scripts
-      // running too.
-      if (order.kind !== 'runScript' && order.kind !== 'pair' && order.kind !== 'handOver') {
+      // script). Pairing, the Leader handover and renaming change nobody's order, so they leave
+      // scripts running too.
+      if (!['runScript', 'pair', 'handOver', 'rename'].includes(order.kind)) {
         const r = world.residents.find((x) => x.id === order.residentId)
         if (r) delete r.script
       }

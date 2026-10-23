@@ -186,6 +186,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'handOver', residentId: world.home.leaderId, newLeaderId: selected.id }
     setOrderError(await sendOrder(order))
   }
+  /**
+   * Renames the picked resident (`CONTEXT.md`: Renaming a resident), with the realm name when it
+   * is the Leader of an unnamed realm: the same `rename` order a script's `rename` requests.
+   */
+  async function rename(name: string, realmName?: string) {
+    if (!selected) return
+    const order = { kind: 'rename', residentId: selected.id, targetId: selected.id, name }
+    setOrderError(await sendOrder(realmName === undefined ? order : { ...order, realmName }))
+  }
   /** Orders the picked resident to attack a resident of another realm. */
   async function attack(targetId: string) {
     if (!selected) return
@@ -501,6 +510,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             leaderName={leader?.name}
             onMakeLeader={makeLeader}
+            rename={
+              selected.owner === world.home.realmId
+                ? {
+                    needsRealmName:
+                      selected.id === world.home.leaderId && world.home.realmName === null,
+                  }
+                : undefined
+            }
+            onRename={rename}
             onClose={() => {
               setSelectedId(undefined)
               setPicking(false)

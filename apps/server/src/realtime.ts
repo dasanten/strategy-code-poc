@@ -60,6 +60,8 @@ interface Client {
   regionTick: number | null
   /** The realm's Leader last sent, so a tick sends it only when it changed (Leader handover). */
   leaderId: string
+  /** The realm name last sent, null while it has none, so a tick sends it once it is named. */
+  realmName: string | null
 }
 
 /**
@@ -145,6 +147,7 @@ export function attachRealtime(
       lastDiplomacy: '',
       regionTick: null,
       leaderId: realm.leaderId,
+      realmName: realm.name ?? null,
     }
     clients.set(socket, client)
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
@@ -165,7 +168,14 @@ export function attachRealtime(
       tick: world.tick,
       map: { seed: world.seed, size: opts.terrain.size },
       exploredChunks: opts.explored.exploredChunks(user),
-      home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city?.id ?? null, x: cx, y: cy },
+      home: {
+        realmId: realm.id,
+        leaderId: realm.leaderId,
+        realmName: client.realmName,
+        cityId: city?.id ?? null,
+        x: cx,
+        y: cy,
+      },
       entities,
       events,
       diplomacy,
@@ -208,9 +218,13 @@ export function attachRealtime(
         const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
         client.lastDiplomacy = json
         const region = regionFor(client, grown)
-        const leaderId = world.realms.find((r) => r.id === client.realmId)?.leaderId
+        const realm = world.realms.find((r) => r.id === client.realmId)
+        const leaderId = realm?.leaderId
         const newLeader = leaderId !== undefined && leaderId !== client.leaderId
         if (newLeader) client.leaderId = leaderId
+        const realmName = realm?.name ?? null
+        const named = realmName !== null && realmName !== client.realmName
+        if (named) client.realmName = realmName
         const tick = {
           tick: world.tick,
           changed,
@@ -220,6 +234,7 @@ export function attachRealtime(
           ...fresh,
           ...(region ? { region } : {}),
           ...(newLeader ? { leaderId } : {}),
+          ...(named ? { realmName } : {}),
         }
         send(socket, { type: 'tick', ...tick })
       }

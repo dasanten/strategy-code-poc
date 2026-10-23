@@ -73,8 +73,18 @@ export type ServerMessage =
       map: MapInfo
       /** Chunks with explored terrain, to load from `terrainChunkPath` (see `chunksAcross`). */
       exploredChunks: number[]
-      /** The Player's realm and the city the view starts on. */
-      home: { realmId: string; leaderId: string; cityId: string | null; x: number; y: number }
+      /**
+       * The Player's realm and the city the view starts on; `realmName` is the realm's own name,
+       * null while it has none (`CONTEXT.md`: Realm name).
+       */
+      home: {
+        realmId: string
+        leaderId: string
+        realmName: string | null
+        cityId: string | null
+        x: number
+        y: number
+      }
       /** Everything the Player's residents see. */
       entities: SeenEntity[]
       /** The Player's realm log as kept, oldest first. */
@@ -89,7 +99,8 @@ export type ServerMessage =
    * terrain grew (load them again), the Player's new realm events and
    * their alliance matters when those changed, and the Region map when territory was worked out
    * again (all of it) or their explored terrain grew (the grown chunks), and the realm's Leader
-   * when the Player handed the realm to another (`CONTEXT.md`: Leader handover).
+   * when the Player handed the realm to another (`CONTEXT.md`: Leader handover), and the
+   * realm name once the Player named it (`CONTEXT.md`: Realm name).
    */
   | {
       type: 'tick'
@@ -101,6 +112,7 @@ export type ServerMessage =
       diplomacy?: Diplomacy
       region?: RegionMap
       leaderId?: string
+      realmName?: string
     }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }

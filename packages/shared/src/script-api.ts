@@ -212,6 +212,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'As my realm’s Leader, make another resident its Leader: an adult of my realm serving no one else (no mercenary contract, not in the alliance army), standing in the same city of my realm as I do. Free and at once; I stay on as an ordinary resident.',
   ),
   action(
+    'rename',
+    ['residentId', 'name', 'realmName?'],
+    'Give a resident of my realm, me or my Leader included, a new name: free and at once, from anywhere. Renaming the Leader of a realm with no realm name yet needs `realmName` too, which names the realm; a named realm keeps its name.',
+  ),
+  action(
     'roadLine',
     ['x', 'y'],
     'Build road on each tile of the line from my tile to (x, y), one after another, with the stone I carry.',
