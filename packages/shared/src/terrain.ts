@@ -97,3 +97,25 @@ export function chunksAcross(size: number): number {
 export function terrainChunkPath(cx: number, cy: number): string {
   return `/api/terrain/${cx}/${cy}`
 }
+
+/**
+ * Where an admin loads any chunk of terrain, explored or not (`CONTEXT.md`: admin map): the same
+ * format as `terrainChunkPath`, with every tile and every resource node in it.
+ */
+export function adminTerrainChunkPath(cx: number, cy: number): string {
+  return `/api/admin/terrain/${cx}/${cy}`
+}
+
+/** Tiles a side that one byte of the admin terrain overview stands for. */
+export const OVERVIEW_SCALE = 8
+
+/** How many overview bytes fit across the map. */
+export function overviewAcross(size: number): number {
+  return Math.ceil(size / OVERVIEW_SCALE)
+}
+
+/**
+ * Where an admin loads the whole map's terrain for the far zoom: `overviewAcross(size)`² bytes,
+ * row-major, each the most common terrain of its `OVERVIEW_SCALE`² tiles.
+ */
+export const ADMIN_TERRAIN_OVERVIEW_PATH = '/api/admin/terrain/overview'

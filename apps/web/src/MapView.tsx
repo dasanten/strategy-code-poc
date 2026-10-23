@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js'
+import { Application, Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi.js'
 import {
   CHUNK_SIZE,
   TERRAIN_SPEED,
@@ -52,7 +52,14 @@ import {
   css,
 } from './map/palette.js'
 import { BASE_ART, BUILDING_ART, CITY_ART, NODE_ART } from './map/art.js'
-import { EMBLEM_RADIUS, MARKER_RADIUS, cityEmblems, emblemAt, farMarkers } from './map/far.js'
+import {
+  EMBLEM_RADIUS,
+  MARKER_RADIUS,
+  cityEmblems,
+  emblemAt,
+  farMarkers,
+  type CityEmblem,
+} from './map/far.js'
 import { LabelLayer } from './map/labels.js'
 import { destroyAtlas, loadAtlas, type Atlas } from './map/atlas.js'
 import {
@@ -62,10 +69,12 @@ import {
   TokenLayer,
   cityRelationship,
   relationshipColor,
-  type Relationship,
+  type Leaders,
+  type Tone,
   type Viewer,
 } from './map/tokens.js'
-import type { ClientWorld } from './useWorld.js'
+import type { MapWorld } from './map/map-world.js'
+import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
 
@@ -93,6 +102,8 @@ type MapMode = 'terrain' | 'region'
  * it draws only terrain; closer in it adds resource nodes and residents, and up close the tile
  * grid.
  * Drag or swipe to pan; wheel, pinch or the buttons to zoom.
+ * The admin map (`world.admin`) draws the whole world the same way, coloured by Organization, with
+ * its far tier from the terrain overview and territory only when toggled on.
  */
 export function MapView({
   world,
@@ -105,8 +116,11 @@ export function MapView({
   onPickTile,
   onNodesLoaded,
   focus,
+  terrainPath,
+  start,
+  onView,
 }: {
-  world: ClientWorld
+  world: MapWorld
   /** The resident shown with a ring, if any. */
   selectedId?: string
   /** Called with a resident of the Player's realm clicked on the map. */
@@ -123,8 +137,17 @@ export function MapView({
   onPickTile?: (x: number, y: number) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
   onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
-  /** A tile to centre the view on, such as a place named in the realm log; a new object each time. */
-  focus?: { x: number; y: number }
+  /**
+   * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
+   * at (the zoom in place if none); a new object each time.
+   */
+  focus?: { x: number; y: number; scale?: number }
+  /** Where terrain chunks load from; the Player's explored terrain by default. */
+  terrainPath?: (cx: number, cy: number) => string
+  /** Where the view starts, instead of the home city at the starting zoom. */
+  start?: Camera
+  /** Called with the camera and the screen's size whenever the view moves or resizes. */
+  onView?: (cam: Camera, view: Size) => void
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef(world)
@@ -142,19 +165,25 @@ export function MapView({
   onPickTileRef.current = onPickTile
   const onNodesLoadedRef = useRef(onNodesLoaded)
   onNodesLoadedRef.current = onNodesLoaded
+  const onViewRef = useRef(onView)
+  onViewRef.current = onView
+  const startRef = useRef(start)
+  const terrainPathRef = useRef(terrainPath)
+  const overviewRef = useRef<(overview: Uint8Array | null) => void>(() => {})
   const redrawRef = useRef<() => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
   const regionRef = useRef<(region: RegionState | null) => void>(() => {})
   const controlsRef = useRef<{
     zoom(factor: number): void
     centre(): void
-    goTo(x: number, y: number): void
+    goTo(x: number, y: number, scale?: number): void
   } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
   const [mode, setMode] = useState<MapMode>('terrain')
   const modeRef = useRef(mode)
   const mapSize = world.map.size
+  const admin = world.admin !== undefined
 
   useEffect(() => {
     modeRef.current = mode
@@ -162,11 +191,15 @@ export function MapView({
   }, [mode])
 
   useEffect(() => {
-    if (focus) controlsRef.current?.goTo(focus.x, focus.y)
+    if (focus) controlsRef.current?.goTo(focus.x, focus.y, focus.scale)
   }, [focus])
 
   // The Region map changes once a game hour, and where explored terrain grows.
   useEffect(() => regionRef.current(world.region), [world.region])
+
+  // The admin map's far terrain, once it has loaded.
+  const overview = world.admin?.overview ?? null
+  useEffect(() => overviewRef.current(overview), [overview])
 
   // What is in sight changes every tick; the scene reads the latest through the ref.
   useEffect(() => {
@@ -194,6 +227,8 @@ export function MapView({
     // The Region map: territory over the terrain, one small texture per chunk like the terrain.
     const regionSprites = new Map<number, Sprite>()
     const regionLayer = new Container()
+    // The admin map's far terrain: the overview, repeated so the map's sides join.
+    let overviewSprite: TilingSprite | undefined
     // Under the tokens: grid, city areas, roads and walls; over them: piles, carts and residents.
     const under = new Graphics()
     const tokens = new TokenLayer()
@@ -204,7 +239,7 @@ export function MapView({
     // Where each resident's token was drawn last frame; up close each has its own figure.
     let drawnSpots = new Map<string, Spot>()
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
-    let cam: Camera = { ...homeCentre(worldRef.current), scale: START_SCALE }
+    let cam: Camera = startRef.current ?? { ...homeCentre(worldRef.current), scale: START_SCALE }
     let disposed = false
     let ready = false
     let frame = 0
@@ -222,6 +257,7 @@ export function MapView({
         )
         redraw()
       },
+      terrainPathRef.current,
     )
 
     function redraw() {
@@ -262,16 +298,44 @@ export function MapView({
     }
     regionRef.current = updateRegion
 
+    /** Shows the admin map's overview, or drops it. */
+    function updateOverview(overview: Uint8Array | null) {
+      if (!ready) return
+      if (overviewSprite) {
+        overviewSprite.texture.destroy(true)
+        overviewSprite.destroy()
+        overviewSprite = undefined
+      }
+      if (overview) {
+        const side = overviewSide(overview)
+        const texture = pixelTexture(overviewPixels(overview), side)
+        texture.source.scaleMode = 'linear'
+        overviewSprite = new TilingSprite({ texture })
+        app.stage.addChildAt(overviewSprite, app.stage.getChildIndex(terrainLayer.container))
+      }
+      redraw()
+    }
+    overviewRef.current = updateOverview
+
     function draw() {
       const view = size()
+      const far = zoomTier(cam.scale) === 'far'
+      const admin = worldRef.current.admin
       // Only chunks on screen are drawn, each at its copy nearest the view's centre (the map's
-      // sides join); nearer chunks are loaded first.
-      const onScreen = visibleChunks(cam, view, mapSize)
+      // sides join); nearer chunks are loaded first. The admin map's far tier draws the overview
+      // instead, so zooming out over the whole map loads no chunks.
+      const fromOverview = far && admin !== undefined
+      const onScreen = fromOverview ? [] : visibleChunks(cam, view, mapSize)
       const shown = new Set(onScreen)
-      // Far out, territory always shows (ADR 0008: far tier).
-      regionLayer.visible = modeRef.current === 'region' || zoomTier(cam.scale) === 'far'
+      // Far out, territory always shows (ADR 0008: far tier); on the admin map only when toggled.
+      regionLayer.visible = modeRef.current === 'region' || (far && !admin)
+      terrainLayer.container.visible = !fromOverview
+      if (overviewSprite) {
+        overviewSprite.visible = fromOverview
+        if (fromOverview) placeOverview(overviewSprite, view)
+      }
       // Terrain whose edges still wait to be redone asks for another frame.
-      if (terrainLayer.draw(cam, view, shown)) redraw()
+      if (!fromOverview && terrainLayer.draw(cam, view, shown)) redraw()
       for (const [i, sprite] of regionSprites) {
         sprite.visible = shown.has(i)
         if (!sprite.visible) continue
@@ -287,6 +351,17 @@ export function MapView({
         )
       store.want([...onScreen].sort((a, b) => away(a) - away(b)))
       drawOverlay(overlay, cam, view, onScreen)
+    }
+
+    /** The overview fills the screen, its map's top left corner where tile (0, 0) appears. */
+    function placeOverview(sprite: TilingSprite, view: Size) {
+      const side = sprite.texture.width
+      sprite.width = view.width
+      sprite.height = view.height
+      // Stretched to the map, so a map whose size isn't a multiple of the scale still joins.
+      sprite.tileScale.set((cam.scale * mapSize) / side)
+      const [ox, oy] = tileToScreen(cam, view, mapSize, 0, 0)
+      sprite.tilePosition.set(ox, oy)
     }
 
     function drawOverlay(g: Graphics, cam: Camera, view: Size, onScreen: number[]) {
@@ -305,13 +380,13 @@ export function MapView({
     /** Far out: an emblem with a name per city, armies and caravans as small markers. */
     function drawFar(g: Graphics, cam: Camera, view: Size) {
       const world = worldRef.current
-      for (const m of farMarkers(world)) {
+      for (const m of world.admin?.markers ?? farMarkers(world)) {
         const [sx, sy] = tileToScreen(cam, view, mapSize, m.x + 0.5, m.y + 0.5)
         g.circle(sx, sy, MARKER_RADIUS)
           .fill(relationshipColor(m.rel))
           .stroke({ width: 1.5, color: 0x0e1419 })
       }
-      for (const e of cityEmblems(world, viewerOf(world), mapSize)) {
+      for (const e of emblemsOf(world)) {
         const [sx, sy] = tileToScreen(cam, view, mapSize, e.x + 0.5, e.y + 0.5)
         const r = EMBLEM_RADIUS[e.size]
         if (sx < -r * 8 || sy < -r * 4 || sx > view.width + r * 8 || sy > view.height + r * 4)
@@ -352,7 +427,8 @@ export function MapView({
 
       drawStructures(under, g, tokens, cam, view, worldRef.current)
 
-      const spots = drawUnits(tokens, badges, cam, view, worldRef.current)
+      const world = worldRef.current
+      const spots = drawUnits(tokens, badges, cam, view, world, viewerOf(world), leadersOf(world))
       drawnSpots = spots
       const selected = worldRef.current.residents.find((u) => u.id === selectedRef.current)
       const spot = selected && spots.get(selected.id)
@@ -365,6 +441,7 @@ export function MapView({
     function setCam(next: Camera) {
       cam = next
       setScale(next.scale)
+      onViewRef.current?.(cam, size())
       redraw()
     }
 
@@ -376,12 +453,15 @@ export function MapView({
       const chunk = store.get(Math.floor(ty / CHUNK_SIZE) * across + Math.floor(tx / CHUNK_SIZE))
       const byte = chunk?.tiles[(ty % CHUNK_SIZE) * CHUNK_SIZE + (tx % CHUNK_SIZE)]
       const node = chunk?.nodes.find((n) => n.x === tx && n.y === ty)
-      const explored = byte !== undefined && byte !== UNEXPLORED
       const [wx, wy] = [wrap(tx, mapSize), wrap(ty, mapSize)]
+      // On the admin map, where far out no chunks load, the overview tells the terrain.
+      const overview = worldRef.current.admin?.overview
+      const terrain = byte ?? (overview ? overviewTerrainAt(overview, wx, wy) : undefined)
+      const explored = terrain !== undefined && terrain !== UNEXPLORED
       setHover({
         x: tx,
         y: ty,
-        terrain: byte === undefined ? 'Unexplored' : (TERRAIN_NAMES[byte] ?? '?'),
+        terrain: terrain === undefined ? 'Unexplored' : (TERRAIN_NAMES[terrain] ?? '?'),
         node: node && NODE_NAMES[node.kind],
         holder: explored
           ? holderLabel(holderAt(worldRef.current.region, mapSize, wx, wy))
@@ -445,9 +525,7 @@ export function MapView({
         }
         // Far out, a click picks the city whose emblem it falls on.
         if (zoomTier(cam.scale) === 'far') {
-          const world = worldRef.current
-          const emblems = cityEmblems(world, viewerOf(world), mapSize)
-          const city = emblemAt(emblems, cam, size(), mapSize, p.x, p.y)
+          const city = emblemAt(emblemsOf(worldRef.current), cam, size(), mapSize, p.x, p.y)
           if (city) onSelectCityRef.current?.(city.id)
           return
         }
@@ -488,7 +566,12 @@ export function MapView({
         setCam(zoomAt(cam, view, mapSize, factor, view.width / 2, view.height / 2))
       },
       centre: () => setCam({ ...cam, ...homeCentre(worldRef.current) }),
-      goTo: (x, y) => setCam({ ...cam, x: x + 0.5, y: y + 0.5 }),
+      goTo: (x, y, scale) =>
+        setCam({
+          x: x + 0.5,
+          y: y + 0.5,
+          scale: scale === undefined ? cam.scale : clampScale(scale, mapSize, size()),
+        }),
     }
 
     void app.init({ resizeTo: host, background: VOID_COLOR, antialias: true }).then(() => {
@@ -506,7 +589,10 @@ export function MapView({
       app.canvas.addEventListener('pointerleave', () => setHover(null))
       app.canvas.addEventListener('wheel', onWheel, { passive: false })
       app.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
-      app.renderer.on('resize', redraw)
+      app.renderer.on('resize', () => {
+        onViewRef.current?.(cam, size())
+        redraw()
+      })
       app.stage.addChild(
         terrainLayer.container,
         regionLayer,
@@ -524,6 +610,7 @@ export function MapView({
         redraw()
       })
       updateRegion(worldRef.current.region)
+      updateOverview(worldRef.current.admin?.overview ?? null)
       setCam({ ...cam, scale: clampScale(cam.scale, mapSize, size()) })
     })
 
@@ -534,9 +621,11 @@ export function MapView({
       redrawRef.current = () => {}
       forgetRef.current = () => {}
       regionRef.current = () => {}
+      overviewRef.current = () => {}
       controlsRef.current = null
       if (ready) {
         terrainLayer.destroy()
+        overviewSprite?.texture.destroy(true)
         for (const sprite of regionSprites.values()) sprite.texture.destroy(true)
         app.destroy(true, { children: true })
       }
@@ -562,21 +651,23 @@ export function MapView({
             <path d="M3 9h12" />
           </svg>
         </button>
+        {!admin && (
+          <button
+            type="button"
+            aria-label="Centre on my residents"
+            onClick={() => controlsRef.current?.centre()}
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
+              <circle cx="9" cy="9" r="5" />
+              <path d="M9 1v3M9 14v3M1 9h3M14 9h3" />
+            </svg>
+          </button>
+        )}
         <button
           type="button"
-          aria-label="Centre on my residents"
-          onClick={() => controlsRef.current?.centre()}
-        >
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
-            <circle cx="9" cy="9" r="5" />
-            <path d="M9 1v3M9 14v3M1 9h3M14 9h3" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          aria-label="Region map"
+          aria-label={admin ? 'Territory' : 'Region map'}
           aria-pressed={mode === 'region'}
-          title="Region map"
+          title={admin ? 'Territory' : 'Region map'}
           onClick={() => setMode(mode === 'region' ? 'terrain' : 'region')}
         >
           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
@@ -677,7 +768,7 @@ function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: Residen
 }
 
 /** Where the view starts and re-centres: the middle of the Player's home city. */
-function homeCentre(world: ClientWorld): { x: number; y: number } {
+function homeCentre(world: MapWorld): { x: number; y: number } {
   return { x: world.home.x + 0.5, y: world.home.y + 0.5 }
 }
 
@@ -698,7 +789,7 @@ function drawBuilding(
   x: number,
   y: number,
   r: number,
-  rel: Relationship | undefined,
+  rel: Tone | undefined,
   alpha = 1,
   glyph = GLYPH_COLOR,
 ) {
@@ -709,18 +800,26 @@ function drawBuilding(
 }
 
 /** A city's emblem in the far tier (ADR 0008): a castle on a dark hex badge with a wide ring. */
-function drawEmblem(tokens: TokenLayer, x: number, y: number, r: number, rel: Relationship) {
+function drawEmblem(tokens: TokenLayer, x: number, y: number, r: number, rel: Tone) {
   const base = (r * 1.08 * 24) / 11
   tokens.place(BASE_ART.hex, x, y, base)
   tokens.place(CITY_ART.ring, x, y, base, relationshipColor(rel))
   tokens.place(CITY_ART.glyph, x, y, r * 1.2, GLYPH_COLOR)
 }
 
-/** The Player's realm and its allies, for relationship colours. */
-const viewerOf = (world: ClientWorld): Viewer => ({
+/** The Player's realm and its allies, for relationship colours; on the admin map, realm colours. */
+const viewerOf = (world: MapWorld): Viewer => ({
   realmId: world.home.realmId,
   allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
+  ...(world.admin ? { realmColour: world.admin.realmColour } : {}),
 })
+
+/** Who wears the crown: the Player's Leader, or on the admin map every Leader. */
+const leadersOf = (world: MapWorld): Leaders => world.admin?.leaders ?? world.home.leaderId
+
+/** The far tier's city emblems: those in sight, or on the admin map every city. */
+const emblemsOf = (world: MapWorld): readonly CityEmblem[] =>
+  world.admin?.emblems ?? cityEmblems(world, viewerOf(world), world.map.size)
 
 /** A resource node as a token: a dark diamond with the glyph in the node's colour. */
 function drawNode(tokens: TokenLayer, kind: ResourceKind, x: number, y: number, r: number) {
@@ -738,7 +837,7 @@ function drawStructures(
   tokens: TokenLayer,
   cam: Camera,
   view: Size,
-  world: ClientWorld,
+  world: MapWorld,
 ) {
   const { cities, buildings, piles } = world
   const tile = cam.scale
@@ -797,10 +896,7 @@ function drawStructures(
   }
 
   const cityById = new Map(cities.map((c) => [c.id, c]))
-  const viewer = {
-    realmId: world.home.realmId,
-    allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
-  }
+  const viewer = viewerOf(world)
   const relOf = (b: Building) =>
     cityRelationship(b.cityId === null ? undefined : cityById.get(b.cityId), viewer)
   const near = (sx: number, sy: number) =>
@@ -884,12 +980,12 @@ function drawStructures(
 const centre = (cam: Camera, view: Size, size: number, e: { x: number; y: number }) =>
   tileToScreen(cam, view, size, e.x + 0.5, e.y + 0.5)
 
-/** A chunk's RGBA pixels as a texture, one pixel per tile, scaled up crisp. */
-function pixelTexture(pixels: Uint8ClampedArray): Texture {
+/** A chunk's RGBA pixels (or another square's, `side` across) as a texture, one pixel per tile, scaled up crisp. */
+function pixelTexture(pixels: Uint8ClampedArray, side = CHUNK_SIZE): Texture {
   const canvas = document.createElement('canvas')
-  canvas.width = CHUNK_SIZE
-  canvas.height = CHUNK_SIZE
-  const image = new ImageData(CHUNK_SIZE, CHUNK_SIZE)
+  canvas.width = side
+  canvas.height = side
+  const image = new ImageData(side, side)
   image.data.set(pixels)
   canvas.getContext('2d')!.putImageData(image, 0, 0)
   const texture = Texture.from(canvas)

@@ -1,6 +1,7 @@
 import { allianceOf, realmName } from './alliance.js'
 import { CHUNK_SIZE, chunksAcross } from './terrain.js'
-import type { Territory } from './territory.js'
+import { TRADE_ORGANIZATION, type Territory } from './territory.js'
+import { TRADE_ORG_NAME } from './trade-org.js'
 import type { WorldState } from './world.js'
 
 /** What the Region map shows (`CONTEXT.md`: Region map), as the server sends it to a Player. */
@@ -29,11 +30,15 @@ export interface RegionMap {
   holders: RegionHolder[]
 }
 
-/** How an Organization is called on the Region map: a realm by its Leader, a city by its name. */
+/**
+ * How an Organization is called on the Region map: a realm by its Leader, a city by its name, the
+ * Trade Organization by its own.
+ */
 export function organizationName(
   world: Pick<WorldState, 'realms' | 'residents' | 'cities'>,
   orgId: string,
 ): string {
+  if (orgId === TRADE_ORGANIZATION) return TRADE_ORG_NAME
   if (world.realms.some((r) => r.id === orgId)) return realmName(world, orgId)
   return world.cities.find((c) => c.id === orgId)?.name ?? 'a lost city'
 }

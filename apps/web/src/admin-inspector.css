@@ -1,0 +1,38 @@
+/* The admin map's inspector: the selection card's look, docked top right, with no actions. */
+.admin-inspector {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  width: min(360px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow: auto;
+  border-radius: 10px;
+}
+.admin-inspector-rows {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 0.8rem;
+}
+.admin-inspector-rows > div {
+  display: contents;
+}
+.admin-inspector-rows dt {
+  color: var(--ui-muted);
+}
+.admin-inspector-rows dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.admin-inspector-rows button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

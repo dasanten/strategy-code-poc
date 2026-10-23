@@ -113,4 +113,10 @@ describe('tileFigures', () => {
     expect(figures.map((f) => f.id)).toEqual(['me', 'me2', 'ally'])
     expect(tileFigures(['o2', 'o1'], relOf).figures.map((f) => f.id)).toEqual(['o2', 'o1'])
   })
+
+  it('on the admin map, draws every Leader first and realms in their colour like others', () => {
+    const tones: Record<string, number | 'npc'> = { a: 0x111111, b: 0x222222, n: 'npc' }
+    const { figures } = tileFigures(['n', 'a', 'b'], (id) => tones[id], new Set(['b']))
+    expect(figures.map((f) => f.id)).toEqual(['b', 'a', 'n'])
+  })
 })

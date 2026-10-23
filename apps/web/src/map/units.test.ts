@@ -39,6 +39,16 @@ describe('entityRelationship', () => {
     )
     expect(entityRelationship({ id: 'k', realmId: null, cityId: 'npc' }, viewer, known)).toBe('npc')
     expect(entityRelationship({ id: 'army', realmId: 'r1' }, viewer, known)).toBe('own')
+    // The admin map has no viewer: each realm in its own colour, cities and caravans as ever.
+    const admin = { ...viewer, realmColour: (id: string) => (id === 'r1' ? 0xabcdef : 0x123456) }
+    expect(entityRelationship({ id: 'army', realmId: 'r1' }, admin, known)).toBe(0xabcdef)
+    expect(entityRelationship({ id: 'h', realmId: 'r2', cityId: null }, admin, known)).toBe(
+      0x123456,
+    )
+    expect(entityRelationship({ id: 'k', realmId: null, cityId: 'npc' }, admin, known)).toBe('npc')
+    expect(entityRelationship({ id: 'wagon', realmId: null, cityId: null }, admin, known)).toBe(
+      'trade',
+    )
     // A city out of sight: nothing to go by.
     expect(
       entityRelationship({ id: 'k2', realmId: null, cityId: 'far' }, viewer, known),
@@ -90,6 +100,23 @@ describe('residentGroups', () => {
     )
     expect(groups.find((g) => g.x === 0)).toMatchObject({ ids: ['me'], leader: true })
     expect(groups.find((g) => g.x === 5)!.leader).toBe(false)
+  })
+
+  it('on the admin map, colours by realm and crowns every Leader', () => {
+    const tones: Record<string, number | 'npc'> = { a: 0x111111, a2: 0x111111, b: 0x222222 }
+    const groups = residentGroups(
+      [at('a', 0, 0), at('a2', 0, 0), at('b', 0, 0), at('b', 3, 3)],
+      (id) => tones[id],
+      new Set(['b']),
+    )
+    expect(groups.find((g) => g.x === 0)).toMatchObject({ rel: 0x111111, leader: true })
+    // A realm's colour ranks like another realm: an NPC city's resident doesn't win a tie.
+    const [tie] = residentGroups(
+      [at('n', 0, 0), at('b', 0, 0)],
+      (id) => (id === 'n' ? 'npc' : 0x222222),
+      undefined,
+    )
+    expect(tie!.rel).toBe(0x222222)
   })
 })
 

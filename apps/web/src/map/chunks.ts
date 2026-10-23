@@ -18,6 +18,8 @@ export class ChunkStore {
     private readonly explored: () => ReadonlySet<number>,
     private readonly across: number,
     private readonly onLoaded: (chunk: TerrainChunk) => void,
+    /** Where a chunk loads from: the Player's explored terrain, or on the admin map any chunk. */
+    private readonly path: (cx: number, cy: number) => string = terrainChunkPath,
     private readonly fetchChunk: (path: string) => Promise<ArrayBuffer> = defaultFetch,
   ) {}
 
@@ -55,7 +57,7 @@ export class ChunkStore {
       this.inFlight++
       const cx = index % this.across
       const cy = Math.floor(index / this.across)
-      this.fetchChunk(terrainChunkPath(cx, cy))
+      this.fetchChunk(this.path(cx, cy))
         .then((buf) => {
           if (this.stopped) return
           const chunk = decodeChunk(cx, cy, new Uint8Array(buf))

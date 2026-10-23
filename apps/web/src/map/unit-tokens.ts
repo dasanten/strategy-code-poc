@@ -3,7 +3,15 @@ import { caravanParts } from '../caravans.js'
 import { ACTIVITY_ART, BASE_ART, UNIT_ART } from './art.js'
 import { tileToScreen, zoomTier, type Camera, type Size } from './camera.js'
 import { residentActivity, tileFigures, type Activity } from './figures.js'
-import { relationshipColor, type BadgeLayer, type Relationship, type TokenLayer } from './tokens.js'
+import {
+  isLeader,
+  relationshipColor,
+  type BadgeLayer,
+  type Leaders,
+  type Tone,
+  type TokenLayer,
+  type Viewer,
+} from './tokens.js'
 import {
   armyBanners,
   entityRelationship,
@@ -15,7 +23,6 @@ import {
 /** What of the world the unit tokens need. */
 export interface UnitWorld {
   map: { size: number }
-  home: { realmId: string; leaderId?: string | null }
   residents: readonly Resident[]
   horses: readonly Horse[]
   carriages: readonly Carriage[]
@@ -23,7 +30,6 @@ export interface UnitWorld {
   caravans: readonly SeenCaravan[]
   cities: readonly Pick<SeenCity, 'id' | 'realmId' | 'tradeOrg'>[]
   buildings: readonly Pick<Building, 'kind' | 'x' | 'y'>[]
-  diplomacy: { alliance?: { members: { realmId: string }[] } | null }
 }
 
 /** Where a resident's token was drawn this frame, for the selection ring. */
@@ -43,7 +49,7 @@ function drawUnit(
   x: number,
   y: number,
   r: number,
-  rel: Relationship | undefined,
+  rel: Tone | undefined,
 ) {
   const color = relationshipColor(rel)
   const base = (r * 24) / 11
@@ -58,6 +64,7 @@ function drawUnit(
  * or up close as single figures with their activity (`drawFigures`);
  * an army as a banner with its soldier count; carts and caravans; horses not hitched to a cart.
  * Units on a tile with a building or a cart step aside to its corners so both show.
+ * Tokens are coloured as `viewer` sees them; the `leaders` wear the crown.
  */
 export function drawUnits(
   tokens: TokenLayer,
@@ -65,14 +72,12 @@ export function drawUnits(
   cam: Camera,
   view: Size,
   world: UnitWorld,
+  viewer: Viewer,
+  leaders: Leaders,
 ): Map<string, Spot> {
   const size = world.map.size
   const tile = cam.scale
   const parts = caravanParts(world.caravans)
-  const viewer = {
-    realmId: world.home.realmId,
-    allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
-  }
   const known: Known = {
     cities: new Map(world.cities.map((c) => [c.id, c])),
     caravan: new Set([...parts.carriages, ...parts.crew]),
@@ -144,7 +149,7 @@ export function drawUnits(
   const groups = residentGroups(
     world.residents,
     (id) => rels.get(id),
-    world.home.leaderId,
+    leaders,
     new Set(banners.flatMap((b) => b.under)),
   )
   const close = zoomTier(tile) === 'close'
@@ -154,7 +159,7 @@ export function drawUnits(
       if (!near(at(g.x, g.y))) continue
       drawFigures(tokens, badges, g, (dx, dy) => at(g.x, g.y, dx - 0.5, dy - 0.5), tile, {
         relOf: (id) => rels.get(id),
-        leaderId: world.home.leaderId,
+        leaders,
         activityOf: (id) => residentActivity(byId.get(id)!),
         spots,
       })
@@ -184,18 +189,18 @@ function drawFigures(
   at: (dx: number, dy: number) => readonly [number, number],
   tile: number,
   of: {
-    relOf: (id: string) => Relationship | undefined
-    leaderId: string | null | undefined
+    relOf: (id: string) => Tone | undefined
+    leaders: Leaders
     activityOf: (id: string) => Activity | undefined
     spots: Map<string, Spot>
   },
 ) {
-  const { figures, more } = tileFigures(g.ids, of.relOf, of.leaderId)
+  const { figures, more } = tileFigures(g.ids, of.relOf, of.leaders)
   const r = tile * 0.2
   for (const f of figures) {
     const [x, y] = at(f.dx, f.dy)
     const rel = of.relOf(f.id)
-    const leader = f.id === of.leaderId
+    const leader = isLeader(of.leaders, f.id)
     drawUnit(tokens, leader ? UNIT_ART.leader : UNIT_ART.person, x, y, r, rel)
     of.spots.set(f.id, { x, y, r })
     const activity = of.activityOf(f.id)

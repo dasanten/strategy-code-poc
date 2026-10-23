@@ -6,14 +6,31 @@ import rateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import { eq } from 'drizzle-orm'
 import {
+  ADMIN_INSPECT_KINDS,
+  ADMIN_INSPECT_PATH,
+  ADMIN_MAP_INFO_PATH,
+  ADMIN_PLACES_PATH,
+  ADMIN_TERRAIN_OVERVIEW_PATH,
+  ADMIN_TERRITORY_PATH,
+  ADMIN_WORLD_PATH,
   SESSION_COOKIE,
   type Account,
   type AdminDirectives,
   type ApiError,
   type InviteCreated,
+  type MapInfo,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import { LANGUAGE_VERSION } from '@csp/lang'
+import {
+  adminInspection,
+  adminPlaces,
+  adminTerritory,
+  adminWorldView,
+  parseAdminView,
+  type AdminLookups,
+} from './admin-map.js'
 import {
   AuthError,
   SESSION_DAYS,
@@ -45,6 +62,7 @@ import {
   renameScript,
   saveScript,
 } from './scripts.js'
+import type { TerritoryTracker } from './territory.js'
 
 export interface AppOptions {
   db: Db
@@ -59,8 +77,12 @@ export interface AppOptions {
   explored?: ExploredTerrain
   /** Login and sign-up attempts allowed per IP and minute. */
   authRateLimit?: number
-  /** The running world, for admin directives. Without it there is no directive API. */
+  /** The running world, for admin directives and the admin map. Without it there is neither. */
   world?: WorldState
+  /** The world's terrain, for the admin map's wrapping view; needed with `world`. */
+  terrain?: TerrainMap
+  /** The world's territory, for the admin map's territory layer. */
+  territory?: TerritoryTracker
 }
 
 declare module 'fastify' {
@@ -205,7 +227,7 @@ export async function buildApp(opts: AppOptions) {
     })
   })
 
-  // Admin routes: invite codes, password resets and admin directives.
+  // Admin routes: invite codes, password resets, the admin map and admin directives.
   app.register(async (admin) => {
     admin.addHook('preHandler', async (req, reply) => {
       if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
@@ -221,6 +243,21 @@ export async function buildApp(opts: AppOptions) {
       return reply.code(204).send()
     })
 
+    // The admin map's terrain (`CONTEXT.md`: admin map): any chunk, and the whole map downsampled.
+    if (explored) {
+      admin.get(ADMIN_TERRAIN_OVERVIEW_PATH, async (_req, reply) =>
+        reply.type('application/octet-stream').send(Buffer.from(explored.overview())),
+      )
+      admin.get<{ Params: { cx: string; cy: string } }>(
+        '/api/admin/terrain/:cx/:cy',
+        async (req, reply) => {
+          const chunk = explored.wholeChunk(Number(req.params.cx), Number(req.params.cy))
+          if (!chunk) return fail(reply, 'not-found', 'No such chunk.')
+          return reply.type('application/octet-stream').send(Buffer.from(chunk))
+        },
+      )
+    }
+
     // Admin directives (`CONTEXT.md`: Admin directive), given and lifted between ticks.
     const { world } = opts
     if (!world) return
@@ -230,6 +267,48 @@ export async function buildApp(opts: AppOptions) {
         .from(schema.users)
         .where(eq(schema.users.id, userId))
         .get()?.name
+
+    // The admin map's world (`CONTEXT.md`: admin map), read between ticks; never script sources.
+    const { terrain, territory } = opts
+    if (terrain) {
+      const lookups: AdminLookups = {
+        accountOf,
+        scriptName: (scriptId) =>
+          db
+            .select({ name: schema.scripts.name })
+            .from(schema.scripts)
+            .where(eq(schema.scripts.id, scriptId))
+            .get()?.name,
+      }
+      admin.get<{ Querystring: Record<string, string | undefined> }>(
+        ADMIN_WORLD_PATH,
+        async (req, reply) => {
+          const view = parseAdminView(req.query, terrain.size)
+          if (typeof view === 'string') return fail(reply, 'invalid-input', view)
+          return adminWorldView(world, terrain.size, view, lookups)
+        },
+      )
+      admin.get(ADMIN_MAP_INFO_PATH, async (): Promise<MapInfo> => ({
+        seed: world.seed,
+        size: terrain.size,
+      }))
+      admin.get(ADMIN_PLACES_PATH, async () => adminPlaces(world, lookups))
+      admin.get<{ Params: { kind: string; id: string } }>(
+        `${ADMIN_INSPECT_PATH}/:kind/:id`,
+        async (req, reply) => {
+          const kind = ADMIN_INSPECT_KINDS.find((k) => k === req.params.kind)
+          if (!kind) return fail(reply, 'invalid-input', 'Nothing of that kind to inspect.')
+          const found = adminInspection(world, { kind, id: req.params.id }, lookups)
+          return found ?? fail(reply, 'not-found', 'It is not there any more.')
+        },
+      )
+      admin.get(ADMIN_TERRITORY_PATH, async (_req, reply) => {
+        const current = territory?.current
+        if (!current) return fail(reply, 'not-found', 'Territory is not worked out yet.')
+        return adminTerritory(world, current, terrain.size)
+      })
+    }
+
     admin.get('/api/admin/directives', async () => {
       const shown: AdminDirectives = {
         directives: adminDirectives(world),
