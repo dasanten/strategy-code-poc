@@ -82,6 +82,7 @@ describe('a Player’s default scripts', () => {
   it('are in their library from the start, one per task, following the game’s default', () => {
     const list = listScripts(db, mara)
     expect(list.map((s) => [s.name, s.task, s.followsDefault])).toEqual([
+      ['Build (default)', 'build', true],
       ['Haul (default)', 'haul', true],
       ['Tear down (default)', 'tearDown', true],
       ['Work (default)', 'work', true],
@@ -444,7 +445,8 @@ describe('the step budget', () => {
       terrain,
       sender: sender(),
       residentId: 'w1',
-      memory,
+      // A copy: the run changes it, and cases share theirs.
+      memory: structuredClone(memory),
       seen: seenAll(world),
       explored: () => true,
     })
@@ -468,7 +470,59 @@ describe('the step budget', () => {
       keepFood: 4,
     }
     const tearDown = { buildingId: 'farm' }
+    const stable = { building: 'stable', at: { x: 3, y: 3 }, siteId: 'site' }
+    /** Mara's residents all building a stable's site where the farm was, lacking its Wood. */
+    const building = (world: WorldState) => {
+      world.buildings = world.buildings.filter((b) => b.id !== 'farm')
+      const site = { delivered: {}, work: 0 }
+      world.buildings.push({ id: 'site', kind: 'stable', cityId: null, x: 3, y: 3, site })
+      for (const r of world.residents.filter((x) => x.owner === 'r1')) {
+        r.order = { kind: 'build', building: 'stable', at: { x: 3, y: 3 }, siteId: 'site' }
+        r.script = { scriptId: 1, memory: { ...stable } }
+      }
+    }
     const cases: Record<Task, Case[]> = {
+      build: [
+        // Starting: laying out, or turned down with the tile taken.
+        { memory: { building: 'stable', at: { x: 3, y: 3 } }, prepare: () => {} },
+        // Away from the site: walking there.
+        { memory: stable, prepare: (world) => void (world.residents[0]!.x = 5) },
+        // Picking who fetches, from the nearest of many storages, the farthest holding Wood.
+        {
+          memory: stable,
+          prepare: (world) => {
+            building(world)
+            for (let i = 0; i < 10; i++) {
+              const stock = i === 9 ? { wood: 100 } : { stone: 5 }
+              world.buildings.push({
+                id: `s${i}`,
+                kind: 'storage',
+                cityId: 'c1',
+                x: 5 + 2 * i,
+                y: 12,
+                stock,
+              })
+            }
+          },
+        },
+        // Fetching: picking up at the storage.
+        {
+          memory: { ...stable, fetch: { storageId: 's1', goods: { wood: 40 }, step: 'pickUp' } },
+          prepare: (world) => {
+            building(world)
+            world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 3, y: 5 })
+            world.residents[0]!.y = 5
+          },
+        },
+        // Back with it: delivering.
+        {
+          memory: stable,
+          prepare: (world) => {
+            building(world)
+            world.residents[0]!.carried = { food: 4, wood: 40 }
+          },
+        },
+      ],
       work: [
         // Starting work, and working on.
         { memory: work, prepare: () => {} },
