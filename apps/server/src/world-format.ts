@@ -5,7 +5,7 @@ import type { TerrainMap, WorldState } from '@csp/shared'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 37
+export const WORLD_FORMAT_VERSION = 38
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -27,7 +27,11 @@ export type MigrationStep = (state: unknown, ctx: MigrationContext) => unknown
  * `migrations[n]` turns a version-n save into version n + 1. Steps start at `RESET_BEFORE`;
  * the steps for older worlds went with the resets.
  */
-export const migrations: Record<number, MigrationStep> = {}
+export const migrations: Record<number, MigrationStep> = {
+  // Last seen (`CONTEXT.md`): every Player starts with an empty memory. It is not filled from
+  // explored terrain, which would hand them buildings and prices they never saw.
+  37: (state) => ({ ...(state as object), lastSeen: {} }),
+}
 
 export class WorldFormatError extends Error {}
 

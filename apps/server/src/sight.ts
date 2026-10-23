@@ -39,17 +39,64 @@ interface Spot {
   y: number
 }
 
-/** Whether any of the observers is within sight range of the spot (plus `reach`). */
-function seen(size: number, observers: Spot[], at: Spot, reach = 0): boolean {
-  return observers.some((o) => wrapDistance(size, o, at) <= SIGHT_RANGE + reach)
+/** Whether any of a side's observers is within sight range of a spot, plus `reach` (`eyesOf`). */
+interface Eyes {
+  size: number
+  sees(at: Spot, reach?: number): boolean
+}
+
+/**
+ * The observers' eyes: whether any of them is within sight range of a spot, plus `reach` (at
+ * most `SIGHT_RANGE`). The observers are sorted into squares at least twice the sight range
+ * across, so a spot is checked only against those in its square and the ones next to it.
+ */
+function eyesOf(size: number, observers: Spot[]): Eyes {
+  const across = Math.max(1, Math.floor(size / (2 * SIGHT_RANGE)))
+  const side = size / across
+  const square = (v: number) =>
+    Math.min(across - 1, Math.floor((((v % size) + size) % size) / side))
+  // The squares next to one, across the joins; on a map only a few squares across, every one.
+  const steps = across < 3 ? [...Array(across).keys()] : [-1, 0, 1]
+  const around = (s: number, d: number) => (across < 3 ? d : (s + d + across) % across)
+  const grid = new Map<number, Spot[]>()
+  // The squares with an observer in or next to them: anywhere else nothing is seen.
+  const watched = new Set<number>()
+  for (const o of observers) {
+    const [sx, sy] = [square(o.x), square(o.y)]
+    const key = sy * across + sx
+    const list = grid.get(key)
+    if (list) list.push(o)
+    else grid.set(key, [o])
+    for (const dy of steps) {
+      for (const dx of steps) watched.add(around(sy, dy) * across + around(sx, dx))
+    }
+  }
+  return {
+    size,
+    sees: (at, reach = 0) => {
+      const [sx, sy] = [square(at.x), square(at.y)]
+      if (!watched.has(sy * across + sx)) return false
+      for (const dy of steps) {
+        for (const dx of steps) {
+          const near = grid.get(around(sy, dy) * across + around(sx, dx))
+          if (!near) continue
+          for (const o of near) if (wrapDistance(size, o, at) <= SIGHT_RANGE + reach) return true
+        }
+      }
+      return false
+    },
+  }
 }
 
 /** Whether any tile of a building's footprint is in sight of the observers (`CONTEXT.md`: Sight). */
-function buildingSeen(size: number, observers: Spot[], b: Placed): boolean {
+function buildingSeen(eyes: Eyes, b: Placed): boolean {
   const side = FOOTPRINT[b.kind]
-  if (side === 1) return seen(size, observers, b)
-  if (!seen(size, observers, b, side * Math.SQRT2)) return false
-  return footprintTiles(b, size).some(([x, y]) => seen(size, observers, { x, y }))
+  if (side === 1) return eyes.sees(b)
+  // Every tile of it is within this of its corner, so close enough to that, all of it is seen.
+  const across = side * Math.SQRT2
+  if (!eyes.sees(b, across)) return false
+  if (eyes.sees(b, -across)) return true
+  return footprintTiles(b, eyes.size).some(([x, y]) => eyes.sees({ x, y }))
 }
 
 /** Whether any of the army's members is in sight (`CONTEXT.md`: Sight). */
@@ -80,8 +127,8 @@ function observersOf(world: WorldState, realmId: string): Spot[] {
  * range of any of their residents or their alliance's, as `entitiesInSight` counts it.
  */
 export function sightOf(world: WorldState, size: number, side: string): (at: Spot) => boolean {
-  const observers = observersOf(world, side)
-  return (at) => seen(size, observers, at)
+  const eyes = eyesOf(size, observersOf(world, side))
+  return (at) => eyes.sees(at)
 }
 
 /**
@@ -194,9 +241,11 @@ export function entitiesInSight(
   if (observers.length === 0) return []
   const size = terrain.size
   const insight = insightOf(world, size, realmId, observers)
+  const eyes = eyesOf(size, observers)
+  const inSight = (at: Spot) => eyes.sees(at)
   const out: SeenEntity[] = []
   for (const r of world.residents) {
-    if (!seen(size, observers, r)) continue
+    if (!inSight(r)) continue
     // Which script a resident runs is seen; its memory stays on the server.
     const { script, ...rest } = r
     const shown: SeenEntity = {
@@ -210,10 +259,52 @@ export function entitiesInSight(
     }
     out.push(shown)
   }
+  out.push(...places(world, realmId, eyes, insight))
+  for (const h of world.horses) {
+    if (!inSight(h)) continue
+    const shown: SeenEntity = { is: 'horse', ...h }
+    if (!insight.ours(h.realmId, h.cityId)) {
+      delete shown.hunger
+      delete shown.health
+    }
+    out.push(shown)
+  }
+  for (const k of world.carriages) {
+    if (inSight(k)) out.push({ is: 'carriage', ...seenCarriage(insight, k) })
+  }
+  for (const p of world.piles) if (inSight(p)) out.push({ is: 'pile', ...p })
+  // An army is seen through its members; the Player gets only their own.
+  for (const a of world.armies) {
+    if (a.realmId === realmId && armySeen(world, a, inSight)) {
+      // As for residents: which script it runs is seen, its memory isn't.
+      const { script, ...rest } = a
+      out.push({
+        is: 'army',
+        ...rest,
+        ...(script ? { script: { scriptId: script.scriptId } } : {}),
+      })
+    }
+  }
+  // A caravan is seen through its carriage and its crew (`CONTEXT.md`: Caravan).
+  for (const c of world.caravans) {
+    if (caravanSeen(world, c, inSight)) {
+      const { id, postId, carriageId, driverId, escortIds, heading } = c
+      out.push({ is: 'caravan', id, postId, carriageId, driverId, escortIds, heading })
+    }
+  }
+  return out
+}
+
+/** A building or city as a Player sees it. */
+export type SeenPlace = Extract<SeenEntity, { is: 'building' | 'city' }>
+
+/** The buildings and cities in a realm's sight, as `entitiesInSight` shows them. */
+function places(world: WorldState, realmId: string, eyes: Eyes, insight: Insight): SeenPlace[] {
+  const out: SeenPlace[] = []
   const seenCities = new Set<string>()
   const seenStorages = new Set<string>()
   for (const b of world.buildings) {
-    if (!buildingSeen(size, observers, b)) continue
+    if (!buildingSeen(eyes, b)) continue
     out.push({ is: 'building', ...seenBuilding(world, insight, b) })
     if (b.cityId !== null) seenCities.add(b.cityId)
     if (b.cityId !== null && b.kind === 'storage' && !b.site) seenStorages.add(b.cityId)
@@ -244,39 +335,24 @@ export function entitiesInSight(
           }
     out.push({ is: 'city', ...c, ...sale, ...refuses, ...deal })
   }
-  for (const h of world.horses) {
-    if (!seen(size, observers, h)) continue
-    const shown: SeenEntity = { is: 'horse', ...h }
-    if (!insight.ours(h.realmId, h.cityId)) {
-      delete shown.hunger
-      delete shown.health
-    }
-    out.push(shown)
-  }
-  for (const k of world.carriages) {
-    if (seen(size, observers, k)) out.push({ is: 'carriage', ...seenCarriage(insight, k) })
-  }
-  for (const p of world.piles) if (seen(size, observers, p)) out.push({ is: 'pile', ...p })
-  // An army is seen through its members; the Player gets only their own.
-  for (const a of world.armies) {
-    if (a.realmId === realmId && armySeen(world, a, (at) => seen(size, observers, at))) {
-      // As for residents: which script it runs is seen, its memory isn't.
-      const { script, ...rest } = a
-      out.push({
-        is: 'army',
-        ...rest,
-        ...(script ? { script: { scriptId: script.scriptId } } : {}),
-      })
-    }
-  }
-  // A caravan is seen through its carriage and its crew (`CONTEXT.md`: Caravan).
-  for (const c of world.caravans) {
-    if (caravanSeen(world, c, (at) => seen(size, observers, at))) {
-      const { id, postId, carriageId, driverId, escortIds, heading } = c
-      out.push({ is: 'caravan', id, postId, carriageId, driverId, escortIds, heading })
-    }
-  }
   return out
+}
+
+/**
+ * The buildings and cities a realm's Player sees, as `entitiesInSight` shows them, and whether
+ * any tile of a footprint is in their sight (`CONTEXT.md`: Last seen).
+ */
+export function placesInSight(
+  world: WorldState,
+  size: number,
+  realmId: string,
+): { seen: SeenPlace[]; sees: (b: Placed) => boolean } {
+  const observers = observersOf(world, realmId)
+  const eyes = eyesOf(size, observers)
+  const sees = (b: Placed) => buildingSeen(eyes, b)
+  if (observers.length === 0) return { seen: [], sees }
+  const insight = insightOf(world, size, realmId, observers)
+  return { seen: places(world, realmId, eyes, insight), sees }
 }
 
 /** Whether a caravan's carriage or any of its crew is in sight. */
@@ -304,17 +380,17 @@ export function sentOutOfSight(
   realmId: string,
   sent: SeenEntity[],
 ): InvariantViolation[] {
-  const observers = observersOf(world, realmId)
-  const inSight = (at: Spot) => seen(terrain.size, observers, at)
+  const eyes = eyesOf(terrain.size, observersOf(world, realmId))
+  const inSight = (at: Spot) => eyes.sees(at)
   const out = sent.filter((e) =>
     e.is === 'city'
-      ? !world.buildings.some((b) => b.cityId === e.id && buildingSeen(terrain.size, observers, b))
+      ? !world.buildings.some((b) => b.cityId === e.id && buildingSeen(eyes, b))
       : e.is === 'army'
         ? !armySeen(world, e, inSight)
         : e.is === 'caravan'
           ? !caravanSeen(world, e, inSight)
           : e.is === 'building'
-            ? !buildingSeen(terrain.size, observers, e)
+            ? !buildingSeen(eyes, e)
             : !inSight(e),
   )
   return out.map((e) => ({

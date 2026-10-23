@@ -91,6 +91,15 @@ export type SeenEntity =
   /** A Trade Org caravan; its carriage and crew are what is seen of it (`CONTEXT.md`: Caravan). */
   | ({ is: 'caravan' } & SeenCaravan)
 
+/**
+ * A building, construction site or city as the Player last saw it (`CONTEXT.md`: Last seen):
+ * exactly what they were allowed to see then, with the tick they last had it in sight
+ * (`seenAt`). It changes only when it comes back into sight.
+ */
+export type Remembered = (({ is: 'building' } & SeenBuilding) | ({ is: 'city' } & SeenCity)) & {
+  seenAt: number
+}
+
 /** Messages the server pushes over the WebSocket (ADR 0006). */
 export type ServerMessage =
   /** On connect: who you are, the map and everything in your sight. */
@@ -105,6 +114,8 @@ export type ServerMessage =
       home: { realmId: string; leaderId: string; cityId: string | null; x: number; y: number }
       /** Everything the Player's residents see. */
       entities: SeenEntity[]
+      /** What the Player remembers and is out of their sight now (`CONTEXT.md`: Last seen). */
+      lastSeen: Remembered[]
       /** The Player's realm log as kept, oldest first. */
       events: RealmEvent[]
       /** The Player's alliance, invitations and the realms they could invite. */
@@ -113,7 +124,9 @@ export type ServerMessage =
       region: RegionMap | null
     }
   /**
-   * Every tick: entities in sight that changed, ids that left sight, chunks whose explored
+   * Every tick: entities in sight that changed, ids that left sight, the Player's Last seen out
+   * of sight that changed and the ids that came back into sight or were forgotten (`lastSeen`,
+   * only when any did), chunks whose explored
    * terrain grew (load them again), the Player's new realm events and
    * their alliance matters when those changed, and the Region map when territory was worked out
    * again (all of it) or their explored terrain grew (the grown chunks), and the realm's Leader
@@ -124,6 +137,7 @@ export type ServerMessage =
       tick: number
       changed: SeenEntity[]
       gone: string[]
+      lastSeen?: { changed: Remembered[]; gone: string[] }
       explored: number[]
       events: RealmEvent[]
       diplomacy?: Diplomacy

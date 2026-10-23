@@ -9,6 +9,7 @@ import {
   type Account,
   type ClientMessage,
   type RegionMap,
+  type Remembered,
   type SeenEntity,
   type ServerMessage,
   type TerrainMap,
@@ -26,6 +27,7 @@ import { shouldCheckInvariants } from './invariants.js'
 import { entitiesInSight, sentInsideUnseen, sentOutOfSight, type SightTracker } from './sight.js'
 import type { TickReporter } from './tick.js'
 import { ClientView } from './sync.js'
+import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
 
 function readCookie(header: string | undefined, name: string): string | undefined {
   for (const part of header?.split(';') ?? []) {
@@ -52,6 +54,8 @@ interface Client {
   userId: number
   realmId: string
   view: ClientView
+  /** What has been sent of the Player's Last seen out of sight (`CONTEXT.md`: Last seen). */
+  lastSeenView: ClientView<Remembered>
   /** The number of the last realm event sent, so each tick sends only newer ones. */
   lastEventSeq: number
   /** The alliance matters last sent, as JSON, so a tick sends them only when they changed. */
@@ -101,6 +105,14 @@ export function attachRealtime(
     if (violations.length > 0) check.reporter.invariantViolations(world, violations)
   }
 
+  /** Reports Last seen about to go to a realm's Player that is in their sight, as `checkSent`. */
+  function checkLastSeen(realmId: string, sent: Remembered[]) {
+    const check = opts.sightCheck
+    if (!check || sent.length === 0 || !shouldCheckInvariants(check.sampleRate, check.rand)) return
+    const violations = lastSeenInSight(world, opts.terrain, realmId, sent)
+    if (violations.length > 0) check.reporter.invariantViolations(world, violations)
+  }
+
   /**
    * The Region map to send a client, if any: all of it when territory was worked out again since
    * the last one went out, else the chunks whose explored terrain grew. Checked like `checkSent`.
@@ -145,6 +157,7 @@ export function attachRealtime(
       userId: user.id,
       realmId: realm.id,
       view: new ClientView(),
+      lastSeenView: new ClientView<Remembered>(),
       lastEventSeq: 0,
       lastDiplomacy: '',
       regionTick: null,
@@ -159,6 +172,8 @@ export function attachRealtime(
     const [cx, cy] = [start.x, start.y]
     const entities = client.view.initial(entitiesInSight(world, opts.terrain, realm.id))
     checkSent(realm.id, entities)
+    const lastSeen = client.lastSeenView.initial(lastSeenOutOfSight(world, user.id))
+    checkLastSeen(realm.id, lastSeen)
     const events = eventsFor(world, user.id)
     client.lastEventSeq = events.at(-1)?.seq ?? 0
     const diplomacy = diplomacyFor(world, realm.id, realmsSeen(entities))
@@ -171,6 +186,7 @@ export function attachRealtime(
       exploredChunks: opts.explored.exploredChunks(user),
       home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city?.id ?? null, x: cx, y: cy },
       entities,
+      lastSeen,
       events,
       diplomacy,
       region: regionFor(client, []) ?? null,
@@ -204,6 +220,12 @@ export function attachRealtime(
         const inSight = entitiesInSight(world, opts.terrain, client.realmId)
         const { changed, gone } = client.view.diff(inSight)
         checkSent(client.realmId, changed)
+        const remembered = client.lastSeenView.diff(lastSeenOutOfSight(world, client.userId))
+        checkLastSeen(client.realmId, remembered.changed)
+        const lastSeen =
+          remembered.changed.length > 0 || remembered.gone.length > 0
+            ? { lastSeen: remembered }
+            : {}
         const grown = [...(explored.get(client.userId) ?? [])]
         const events = eventsFor(world, client.userId, client.lastEventSeq)
         client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq
@@ -219,6 +241,7 @@ export function attachRealtime(
           tick: world.tick,
           changed,
           gone,
+          ...lastSeen,
           explored: grown,
           events,
           ...fresh,

@@ -11,7 +11,7 @@ import { createAdmin } from './auth.js'
 import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
-import { smallTerrain } from './test-terrain.js'
+import { smallTerrain, worldWithCity } from './test-terrain.js'
 import {
   RESET_BEFORE,
   WORLD_FORMAT_VERSION,
@@ -99,8 +99,17 @@ describe('world saves', () => {
   })
 
   it('has no migration steps from before the second reset', () => {
-    expect(WORLD_FORMAT_VERSION).toBe(RESET_BEFORE)
-    expect(Object.keys(migrations)).toEqual([])
+    expect(Math.min(...Object.keys(migrations).map(Number))).toBe(RESET_BEFORE)
+  })
+
+  it('migrates a format 37 world: every Player starts with an empty Last seen', () => {
+    const { world } = worldWithCity()
+    const old: Partial<typeof world> = { ...world }
+    delete old.lastSeen
+    const migrated = migrateWorld(old, 37, { terrain: smallTerrain() })
+    expect(WORLD_FORMAT_VERSION).toBe(38)
+    expect(migrated.lastSeen).toEqual({})
+    expect(migrated.buildings).toEqual(world.buildings)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

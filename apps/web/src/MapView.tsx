@@ -388,12 +388,17 @@ export function MapView({
           .fill(relationshipColor(m.rel))
           .stroke({ width: 1.5, color: 0x0e1419 })
       }
-      for (const e of emblemsOf(world)) {
+      // Cities remembered out of sight first, faded, under those in sight.
+      const emblems = [
+        ...lastSeenEmblemsOf(world).map((e) => ({ ...e, fade: LAST_SEEN_FADE })),
+        ...emblemsOf(world).map((e) => ({ ...e, fade: 1 })),
+      ]
+      for (const e of emblems) {
         const [sx, sy] = tileToScreen(cam, view, mapSize, e.x + 0.5, e.y + 0.5)
         const r = EMBLEM_RADIUS[e.size]
         if (sx < -r * 8 || sy < -r * 4 || sx > view.width + r * 8 || sy > view.height + r * 4)
           continue
-        drawEmblem(tokens, sx, sy, r, e.rel)
+        drawEmblem(tokens, sx, sy, r, e.rel, e.fade)
         labels.place(e.name, sx, sy + r + 12)
         if (e.id === selectedCityRef.current)
           g.circle(sx, sy, r + 6).stroke({ width: 2.5, color: 0xffffff })
@@ -416,7 +421,7 @@ export function MapView({
 
       // A node under a building's footprint shows as the building.
       const built = new Set(
-        worldRef.current.buildings
+        [...worldRef.current.buildings, ...(worldRef.current.lastSeen?.buildings ?? [])]
           .filter((b) => b.kind !== 'road')
           .flatMap((b) => footprintKeys(b, worldRef.current.map.size)),
       )
@@ -429,6 +434,11 @@ export function MapView({
         }
       }
 
+      const remembered = worldRef.current.lastSeen
+      if (remembered) {
+        const past = { ...worldRef.current, ...remembered, piles: [] }
+        drawStructures(under, g, tokens, cam, view, past, LAST_SEEN_FADE)
+      }
       drawStructures(under, g, tokens, cam, view, worldRef.current)
 
       const world = worldRef.current
@@ -529,7 +539,10 @@ export function MapView({
         }
         // Far out, a click picks the city whose emblem it falls on.
         if (zoomTier(cam.scale) === 'far') {
-          const city = emblemAt(emblemsOf(worldRef.current), cam, size(), mapSize, p.x, p.y)
+          // A city only remembered can be picked too (`CONTEXT.md`: Last seen).
+          const w = worldRef.current
+          const emblems = [...emblemsOf(w), ...lastSeenEmblemsOf(w)]
+          const city = emblemAt(emblems, cam, size(), mapSize, p.x, p.y)
           if (city) onSelectCityRef.current?.(city.id)
           return
         }
@@ -804,11 +817,11 @@ function drawBuilding(
 }
 
 /** A city's emblem in the far tier (ADR 0008): a castle on a dark hex badge with a wide ring. */
-function drawEmblem(tokens: TokenLayer, x: number, y: number, r: number, rel: Tone) {
+function drawEmblem(tokens: TokenLayer, x: number, y: number, r: number, rel: Tone, alpha = 1) {
   const base = (r * 1.08 * 24) / 11
-  tokens.place(BASE_ART.hex, x, y, base)
-  tokens.place(CITY_ART.ring, x, y, base, relationshipColor(rel))
-  tokens.place(CITY_ART.glyph, x, y, r * 1.2, GLYPH_COLOR)
+  tokens.place(BASE_ART.hex, x, y, base, 0xffffff, alpha)
+  tokens.place(CITY_ART.ring, x, y, base, relationshipColor(rel), alpha)
+  tokens.place(CITY_ART.glyph, x, y, r * 1.2, GLYPH_COLOR, alpha)
 }
 
 /** The Player's realm and its allies, for relationship colours; on the admin map, realm colours. */
@@ -825,6 +838,13 @@ const leadersOf = (world: MapWorld): Leaders => world.admin?.leaders ?? world.ho
 const emblemsOf = (world: MapWorld): readonly CityEmblem[] =>
   world.admin?.emblems ?? cityEmblems(world, viewerOf(world), world.map.size)
 
+/** How strongly what the Player only remembers is drawn (`CONTEXT.md`: Last seen). */
+const LAST_SEEN_FADE = 0.4
+
+/** The far tier's emblems for the cities the Player remembers out of sight; none on the admin map. */
+const lastSeenEmblemsOf = (world: MapWorld): readonly CityEmblem[] =>
+  world.lastSeen && !world.admin ? cityEmblems(world.lastSeen, viewerOf(world), world.map.size) : []
+
 /** A resource node as a token: a dark diamond with the glyph in the node's colour. */
 function drawNode(tokens: TokenLayer, kind: ResourceKind, x: number, y: number, r: number) {
   tokens.place(BASE_ART.diamond, x, y, (r * 24) / 11)
@@ -833,7 +853,8 @@ function drawNode(tokens: TokenLayer, kind: ResourceKind, x: number, y: number, 
 
 /**
  * City areas, roads, walls, buildings and piles, at mid zoom and closer.
- * `under` lies below the tokens, `over` above them.
+ * `under` lies below the tokens, `over` above them. `fade` thins it all out, for what the Player
+ * only remembers (`CONTEXT.md`: Last seen).
  */
 function drawStructures(
   under: Graphics,
@@ -842,6 +863,7 @@ function drawStructures(
   cam: Camera,
   view: Size,
   world: MapWorld,
+  fade = 1,
 ) {
   const { cities, buildings, piles } = world
   const tile = cam.scale
@@ -864,7 +886,7 @@ function drawStructures(
       const b = box(x, y)
       if (onScreen(b)) under.rect(...b)
     }
-    under.fill({ color: CITY_AREA_COLOR, alpha: 0.18 })
+    under.fill({ color: CITY_AREA_COLOR, alpha: 0.18 * fade })
   }
   // Roads under the buildings, as a wide light band through the middle of the tile joined to the
   // roads next to it (`CONTEXT.md`: Road, ADR 0008); a road site, and the step onto it, are faint.
@@ -876,7 +898,7 @@ function drawStructures(
   const inSight = ([sx, sy]: readonly number[]) =>
     sx! > -tile && sy! > -tile && sx! < view.width + tile && sy! < view.height + tile
   for (const site of [false, true]) {
-    const style = { color: ROAD_COLOR, alpha: site ? 0.4 : 1 }
+    const style = { color: ROAD_COLOR, alpha: (site ? 0.4 : 1) * fade }
     for (const r of roads.values()) {
       const c = centre(cam, view, size, r)
       if (!!r.site === site && inSight(c)) under.circle(c[0], c[1], w / 2)
@@ -919,7 +941,7 @@ function drawStructures(
     if (b.kind !== 'wall' && b.kind !== 'gate') continue
     const [cx, cy] = centre(cam, view, size, b)
     if (!near(cx, cy)) continue
-    const key = `${relationshipColor(relOf(b))},${b.site ? 0.35 : 1}`
+    const key = `${relationshipColor(relOf(b))},${(b.site ? 0.35 : 1) * fade}`
     const list = lines.get(key) ?? []
     lines.set(key, list)
     // A dot on every wall tile, so one standing alone shows, and a line to each wall right or below.
@@ -953,7 +975,7 @@ function drawStructures(
     const [cx, cy] = [sx + (side * tile) / 2, sy + (side * tile) / 2]
     if (!near(cx - (side - 1) * tile, cy - (side - 1) * tile) && !near(cx, cy)) continue
     const rel = relOf(b)
-    const alpha = b.site ? 0.45 : 1
+    const alpha = (b.site ? 0.45 : 1) * fade
     if (side > 1) {
       const inset = tile * 0.08
       under

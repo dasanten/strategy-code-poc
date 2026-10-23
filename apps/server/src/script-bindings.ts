@@ -39,6 +39,7 @@ import type { InvariantViolation } from './invariants.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
 import { sightOf } from './sight.js'
+import { lastSeenOutOfSight } from './last-seen.js'
 import { realmOf } from './starting-city.js'
 
 /**
@@ -166,6 +167,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     carriages: () => seenOf('carriage'),
     piles: () => seenOf('pile'),
     nodes: exploredNodes,
+    // A Player's memory, apart from what is in sight (`CONTEXT.md`: Last seen); an NPC city has none.
+    lastSeen: () =>
+      sender.npcCityId !== undefined
+        ? []
+        : lastSeenOutOfSight(world, sender.userId).map((e) => toValue(e)),
     directives: () =>
       directivesFor(world, (org) => organizationLabel(world, org)).map((d) => toValue(d)),
     withMemory: ([key, value]) => {

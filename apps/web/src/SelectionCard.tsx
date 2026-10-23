@@ -177,12 +177,19 @@ export function TileCard({
       rel={card.rel}
       icon={icon}
       title={card.title}
-      lines={card.lines.slice(0, 1)}
+      lines={card.lastSeen ? [card.lastSeen.when] : card.lines.slice(0, 1)}
       onClose={onClose}
     >
-      {card.lines.length > 1 && (
+      {card.lastSeen && (
+        <ul className="sel-facts sel-past" aria-label="As last seen">
+          {card.lastSeen.lines.map((l) => (
+            <li key={l}>{l}</li>
+          ))}
+        </ul>
+      )}
+      {card.lines.length > (card.lastSeen ? 0 : 1) && (
         <ul className="sel-facts">
-          {card.lines.slice(1).map((l) => (
+          {card.lines.slice(card.lastSeen ? 0 : 1).map((l) => (
             <li key={l}>{l}</li>
           ))}
         </ul>

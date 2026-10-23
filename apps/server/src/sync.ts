@@ -2,20 +2,21 @@ import type { SeenEntity } from '@csp/shared'
 
 /**
  * What one connection has been sent so far, so each tick only sends the difference
- * (ADR 0006): entities in sight that changed, and ids that left sight.
+ * (ADR 0006): entities in sight that changed, and ids that left sight. The same keeps a
+ * Player's Last seen out of sight in step.
  */
-export class ClientView {
+export class ClientView<T extends { id: string } = SeenEntity> {
   private sent = new Map<string, string>()
 
   /** Everything in sight, for the welcome message; remembers it as sent. */
-  initial(entities: SeenEntity[]): SeenEntity[] {
+  initial(entities: T[]): T[] {
     this.sent.clear()
     for (const e of entities) this.sent.set(e.id, JSON.stringify(e))
     return entities
   }
 
-  diff(entities: SeenEntity[]): { changed: SeenEntity[]; gone: string[] } {
-    const changed: SeenEntity[] = []
+  diff(entities: T[]): { changed: T[]; gone: string[] } {
+    const changed: T[] = []
     const seen = new Set<string>()
     for (const e of entities) {
       seen.add(e.id)

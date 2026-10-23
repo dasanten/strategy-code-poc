@@ -28,6 +28,7 @@ import {
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
+import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 
 /**
  * What the selection card shows (ADR 0008): one of the Player's residents, or a tile of the map
@@ -302,6 +303,11 @@ export interface TileCard {
   lines: string[]
   /** An own gate on the tile, to open or close. */
   gate?: Building
+  /**
+   * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
+   * and what they saw of it then, shown apart from the lines about what is there now.
+   */
+  lastSeen?: { when: string; lines: string[] }
 }
 
 /** What the Player sees on a tile, for the tile card. */
@@ -318,6 +324,8 @@ export interface TileThings {
   viewer: Viewer
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
+  /** The buildings the Player remembers out of sight, and the tick now (`CONTEXT.md`: Last seen). */
+  lastSeen?: { buildings: LastSeenBuilding[]; tick: number }
 }
 
 /** Goods in words: "4 iron ore, 2 wood". */
@@ -331,15 +339,21 @@ function goodsText(stock: Stock | undefined, labels: Record<string, string>): st
 /**
  * The card for a tile: named after the most important thing on it (a building or site, then a
  * carriage, goods on the ground, a resource node, strangers), with a line for everything there.
+ * Where no building is in sight but the Player remembers one, the card is named after that, says
+ * when they last saw it and what they saw then, and offers nothing to do with it.
  */
 export function describeTile(t: TileThings, goodLabels: Record<string, string>): TileCard {
   const here = <T extends { x: number; y: number }>(xs: T[]) =>
     xs.filter((v) => v.x === t.x && v.y === t.y)
   // A building shows on every tile of its footprint, with its one pile (`CONTEXT.md`: At a building).
-  const building = t.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+  const live = t.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+  const remembered = live
+    ? undefined
+    : t.lastSeen?.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+  const building = live ?? remembered
   const road = here(t.buildings).find((b) => b.kind === 'road')
   const carriage = here(t.carriages)[0]
-  const pileTile = building ?? t
+  const pileTile = live ?? t
   const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
   const cityOf = (b: Building) => t.cities.find((c) => c.id === b.cityId)
   const lines: string[] = []
@@ -352,7 +366,10 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       title: building.site ? `${name} site` : city ? `${city.name} ${name.toLowerCase()}` : name,
       rel,
       what: 'building',
-      gate: building.kind === 'gate' && !building.site && rel === 'own' ? building : undefined,
+      gate:
+        building === live && building.kind === 'gate' && !building.site && rel === 'own'
+          ? building
+          : undefined,
     }
     lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
     if (building.site) {
@@ -363,9 +380,18 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       )
     } else {
       const max = MAX_WORKERS[building.kind]
-      if (max !== undefined) lines.push(`${t.workers(building)} / ${max} workers`)
+      // Who works a building out of sight is not known.
+      if (max !== undefined && building === live) {
+        lines.push(`${t.workers(building)} / ${max} workers`)
+      }
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
+    }
+    if (remembered && t.lastSeen) {
+      card.lastSeen = {
+        when: lastSeenText(remembered.seenAt, t.lastSeen.tick),
+        lines: lines.splice(0),
+      }
     }
   }
   if (carriage) {
