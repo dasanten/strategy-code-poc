@@ -3,11 +3,11 @@ import {
   ALLIANCE_NAME_MAX_LENGTH,
   formatGameTime,
   isArmed,
-  type Carriage,
   type Diplomacy,
   type OrderRequest,
   type RealmLabel,
   type SeenResident,
+  type SeenCarriage,
 } from '@csp/shared'
 import { relationshipClass } from './theme.js'
 
@@ -29,7 +29,7 @@ export function AlliancePanel({
   /** Residents in sight, the Player's own among them. */
   residents: SeenResident[]
   /** Carriages in sight, the Player's own among them. */
-  carriages: Carriage[]
+  carriages: SeenCarriage[]
   sendOrder: (order: OrderRequest) => Promise<string | undefined>
 }) {
   const [name, setName] = useState('')
@@ -209,7 +209,7 @@ function AllianceArmy({
   leaving: boolean
   realmId: string
   residents: SeenResident[]
-  carriages: Carriage[]
+  carriages: SeenCarriage[]
   order: (o: OrderRequest) => Promise<void>
 }) {
   const [pick, setPick] = useState('')

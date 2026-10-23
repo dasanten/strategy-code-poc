@@ -1,5 +1,6 @@
 import {
   BUILD_MATERIALS,
+  nodeCorner,
   MAX_WORKERS,
   NODE_GOOD,
   NODE_WORKPLACE,
@@ -39,7 +40,7 @@ import { hqGrows, hqProject } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
 import { npcSender } from './order-sender.js'
 import { pair } from './pairing.js'
-import { Ground, nodeCorner } from './placing.js'
+import { Ground } from './placing.js'
 
 /**
  * How an NPC city grows (`CONTEXT.md`: NPC city): it pairs its adults, builds a house when it has a

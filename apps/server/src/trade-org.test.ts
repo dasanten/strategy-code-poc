@@ -10,6 +10,7 @@ import {
   storedFood,
   tileIndex,
   townHallOf,
+  warehousePrices,
   wrapDistance,
   type City,
   type ResourceKind,
@@ -157,8 +158,15 @@ describe('the Trade Org HQ', () => {
     const seen = entitiesInSight(world, terrain, realm.id)
     expect(seen).toContainEqual({ is: 'city', ...city })
     expect(seen).toContainEqual({ is: 'building', ...townHallOf(world, city)! })
-    const warehouses = world.buildings.filter((b) => b.kind === 'warehouse')
-    for (const b of warehouses) expect(seen).toContainEqual({ is: 'building', ...b })
+    // Its warehouses with their prices, but not what they hold: the scout isn't at one
+    // (`CONTEXT.md`: Seeing inside a storage).
+    for (const b of world.buildings.filter((x) => x.kind === 'warehouse')) {
+      const shown = seen.find((e) => e.id === b.id)
+      expect(shown).toMatchObject({ is: 'building', kind: 'warehouse', x: b.x, y: b.y })
+      expect(shown).not.toHaveProperty('stock')
+      const prices = warehousePrices(world, b).map(({ good, buy, sell }) => ({ good, buy, sell }))
+      expect(shown && 'prices' in shown ? (shown.prices ?? []) : []).toEqual(prices)
+    }
   })
 
   it('left alone keeps itself fed over seven game weeks', () => {

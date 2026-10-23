@@ -1,4 +1,5 @@
 import type { Task } from './default-scripts.js'
+import type { Remembered } from './protocol.js'
 import { Terrain } from './terrain.js'
 
 export const TICK_MS = 1000
@@ -126,9 +127,11 @@ export interface RunningScript {
 
 /**
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
- * memory, which stays on the server.
+ * memory, which stays on the server. Their hunger and health only for their own realm and its
+ * allies (`CONTEXT.md`: Seeing how someone fares).
  */
-export type SeenResident = Omit<Resident, 'script'> & { script?: Pick<RunningScript, 'scriptId'> }
+export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health'> &
+  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: Pick<RunningScript, 'scriptId'> }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -404,6 +407,11 @@ export interface WorldState {
   punishments: Punishment[]
   /** Admin directives in force, oldest first (`CONTEXT.md`: Admin directive). */
   directives: Directive[]
+  /**
+   * What each Player has seen of buildings and cities, by their account id (`CONTEXT.md`: Last
+   * seen): what is in their sight now as of this tick, and what left it as they last saw it.
+   */
+  lastSeen: Record<number, Remembered[]>
 }
 
 /**

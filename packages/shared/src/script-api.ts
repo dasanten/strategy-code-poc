@@ -70,6 +70,10 @@ const SHARED: readonly ScriptBinding[] = [
   list('piles', 'The piles of goods the Player sees.'),
   list('nodes', 'The resource nodes on terrain the Player has explored.'),
   list(
+    'lastSeen',
+    'The buildings, construction sites and cities the Player has seen and that are out of their sight now, as they last saw them: each with `is` ("building" or "city") and `seenAt`, the tick they were last seen.',
+  ),
+  list(
     'directives',
     'The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).',
   ),

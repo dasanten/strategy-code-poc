@@ -90,18 +90,19 @@ describe('city inspector', () => {
 })
 
 describe('warehouse prices in sight', () => {
-  it('lists each warehouse of a trading post in sight with its prices from its stock', () => {
+  it('lists each warehouse of a trading post in sight with the prices the server names', () => {
     const post = { ...city(null), tradeOrg: 'post' as const }
-    const warehouse = { ...b('w1', 'warehouse', 'city1'), stock: { iron: 3 } }
+    // Seen from afar: prices without what it holds (`CONTEXT.md`: Seeing inside a storage).
+    const prices = PRICED_GOODS.map((good) => ({
+      good,
+      ...priceFor(good, 0, WAREHOUSE_FLOOR[good]),
+    }))
+    const warehouse = { ...b('w1', 'warehouse', 'city1'), prices }
     const seen = { cities: [post], buildings: [b('b1', 'townHall', 'city1'), warehouse] }
     const [view] = warehousesInSight(post, seen)
     expect(view!.id).toBe('w1')
-    expect(view!.prices.map((p) => p.good)).toEqual(PRICED_GOODS)
-    expect(view!.prices.find((p) => p.good === 'iron')).toEqual({
-      good: 'iron',
-      stock: 3,
-      ...priceFor('iron', 3, WAREHOUSE_FLOOR.iron),
-    })
+    expect(view!.prices).toEqual(prices)
+    expect(view!.prices.every((p) => p.stock === undefined)).toBe(true)
   })
 
   it('shows nothing for a city without warehouses in sight', () => {
@@ -127,6 +128,8 @@ describe('trading at a warehouse in the inspector', () => {
     carried: { iron: 2, coins: 100 },
     bornAt: -1e9,
     stats: { strength: { base: 10, trained: 0 } },
+    hunger: 100,
+    health: 100,
   } as unknown as Resident
 
   it('finds the Player’s residents and carriages on the warehouse', () => {

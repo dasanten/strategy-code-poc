@@ -243,6 +243,42 @@ describe('realtime', () => {
     expect(world.realms[0]!.name).toBe(longest)
   })
 
+  it('sends what left sight as Last seen, apart from sight, and drops it when back in sight', async () => {
+    const { url, token, world, realtime, violations } = await start()
+    const first = connect(url, token)
+    await first.next('welcome')
+    stepWorld(world, terrain)
+    realtime.broadcastTick()
+    await first.next('tick')
+    // Everyone walks far off: the city leaves sight and comes back as Last seen.
+    const homes = world.residents.map((r) => ({ x: r.x, y: r.y }))
+    for (const r of world.residents)
+      Object.assign(r, { x: (r.x + 400) % terrain.size, order: null })
+    stepWorld(world, terrain)
+    realtime.broadcastTick()
+    const away = await first.next('tick')
+    const city = world.cities[0]!
+    const hall = city.townHallId
+    if (away.type !== 'tick') throw new Error('no tick')
+    expect(away.gone).toContain(hall)
+    expect(away.lastSeen?.changed.map((e) => e.id)).toEqual(expect.arrayContaining([hall, city.id]))
+    expect(away.lastSeen?.changed.find((e) => e.id === hall)).toMatchObject({ seenAt: 1 })
+    // A new connection gets it in the welcome, apart from what is in sight.
+    const welcome = await connect(url, token).next('welcome')
+    if (welcome.type !== 'welcome') throw new Error('no welcome')
+    expect(welcome.lastSeen.map((e) => e.id)).toContain(hall)
+    expect(welcome.entities.map((e) => e.id)).not.toContain(hall)
+    // Back home: in sight again, no longer Last seen.
+    world.residents.forEach((r, i) => Object.assign(r, homes[i]))
+    stepWorld(world, terrain)
+    realtime.broadcastTick()
+    const back = await first.next('tick')
+    if (back.type !== 'tick') throw new Error('no tick')
+    expect(back.changed.map((e) => e.id)).toContain(hall)
+    expect(back.lastSeen?.gone).toContain(hall)
+    expect(violations).toEqual([])
+  })
+
   it('keeps one realm per Player across logins', async () => {
     const { url, token, world } = await start()
     const first = await connect(url, token).next('welcome')
