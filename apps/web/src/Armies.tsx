@@ -5,6 +5,7 @@ import {
   type OrderRequest,
   type Resident,
   type ScriptSummary,
+  type SeenResident,
 } from '@csp/shared'
 import { RunScript } from './Residents.js'
 import { relationshipClass } from './theme.js'
@@ -43,7 +44,7 @@ export function ArmiesPanel({
   /** The Player's residents. */
   own: Resident[]
   /** Everyone in sight, the Player's own included. */
-  inSight: Resident[]
+  inSight: SeenResident[]
   realmId: string
   /** The army order waiting for a tile on the map, if any. */
   picking: ArmyPick | undefined

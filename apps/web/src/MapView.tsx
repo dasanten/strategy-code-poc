@@ -11,7 +11,7 @@ import {
   wrapDelta,
   type Building,
   type KnownNode,
-  type Resident,
+  type SeenResident,
   type ResourceKind,
   footprintKeys,
   FOOTPRINT,
@@ -752,7 +752,7 @@ function RegionLegend({ region }: { region: RegionState | null }) {
 }
 
 /** The selected resident's way ahead, as a dashed line to the target (design: Main Game Screen). */
-function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: Resident) {
+function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: SeenResident) {
   const o = r.order
   if (o?.kind !== 'walkTo') return
   const [tx, ty] = tileToScreen(cam, view, size, o.target.x + 0.5, o.target.y + 0.5)

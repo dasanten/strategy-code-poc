@@ -8,11 +8,16 @@ import {
   diplomacyFor,
   type Realm,
   wrapDistance,
+  CARRIAGE_CAPACITY,
+  CARRIAGE_LIGHT_LOAD,
+  GOOD_WEIGHT,
+  footprintTiles,
+  loadLevel,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { ExploredTerrain } from './explored.js'
 import { stepAlliances } from './alliances.js'
-import { SightTracker, entitiesInSight, sentOutOfSight } from './sight.js'
+import { SightTracker, entitiesInSight, sentInsideUnseen, sentOutOfSight } from './sight.js'
 import { foundStartingCity } from './starting-city.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { createWorld } from './world.js'
@@ -226,5 +231,119 @@ describe('shared sight', () => {
     // Once Tobin's residents leave the alliance, what they see is outside Mara's sight.
     world.alliances[0]!.members.pop()
     expect(sentOutOfSight(world, terrain, mara.id, tobins).length).toBeGreaterThan(0)
+  })
+})
+
+describe('seeing inside (`CONTEXT.md`: Seeing inside a storage, Seeing how someone fares)', () => {
+  /** Two Players far apart, and a scout of Tobin's standing in Mara's city near its storage. */
+  function twoRealms() {
+    const world = createWorld(terrain)
+    foundStartingCity(world, terrain, 1)
+    foundStartingCity(world, terrain, 2)
+    const [mara, tobin] = world.realms as [Realm, Realm]
+    const city = world.cities.find((c) => c.realmId === mara.id)!
+    const storage = world.buildings.find((b) => b.cityId === city.id && b.kind === 'storage')!
+    const carriage = world.carriages.find((k) => k.realmId === mara.id)!
+    Object.assign(carriage, { x: storage.x + 6, y: storage.y, load: { food: 40 } })
+    const scout = world.residents.find((r) => r.owner === tobin.id)!
+    Object.assign(scout, { x: storage.x + 3, y: storage.y + 3, order: null })
+    const seenBy = (realm: Realm) => {
+      const seen = entitiesInSight(world, terrain, realm.id)
+      const find = (id: string) => seen.find((e) => e.id === id)
+      return { seen, find }
+    }
+    return { world, mara, tobin, storage, carriage, scout, seenBy }
+  }
+
+  it('shows its own Organization what is inside and how its people fare', () => {
+    const { world, mara, storage, carriage, seenBy } = twoRealms()
+    const { seen, find } = seenBy(mara)
+    expect(find(storage.id)).toHaveProperty('stock', storage.stock)
+    expect(find(carriage.id)).toMatchObject({ load: { food: 40 }, loadLevel: 'light' })
+    for (const e of seen.filter((e) => e.is === 'resident' || e.is === 'horse')) {
+      if (e.is === 'resident' && e.owner !== mara.id) continue
+      expect(e.hunger).toBeTypeOf('number')
+      expect(e.health).toBeTypeOf('number')
+    }
+    expect(sentInsideUnseen(world, terrain, mara.id, seen)).toEqual([])
+  })
+
+  it('shows a stranger in sight only the building, how heavily a carriage is loaded, and no one’s hunger or health', () => {
+    const { world, mara, tobin, storage, carriage, seenBy } = twoRealms()
+    const { seen, find } = seenBy(tobin)
+    expect(find(storage.id)).toBeDefined()
+    expect(find(storage.id)).not.toHaveProperty('stock')
+    expect(find(carriage.id)).toMatchObject({ loadLevel: 'light' })
+    expect(find(carriage.id)).not.toHaveProperty('load')
+    const theirs = seen.filter(
+      (e) =>
+        (e.is === 'resident' && e.owner === mara.id) || (e.is === 'horse' && e.realmId === mara.id),
+    )
+    expect(theirs.length).toBeGreaterThan(0)
+    for (const e of theirs) {
+      expect(e).not.toHaveProperty('hunger')
+      expect(e).not.toHaveProperty('health')
+    }
+    expect(sentInsideUnseen(world, terrain, tobin.id, seen)).toEqual([])
+  })
+
+  it('shows a stranger with a resident at the storage, or on the carriage’s tile, what is inside', () => {
+    const { mara, tobin, storage, carriage, scout, seenBy } = twoRealms()
+    // On the far tile of the storage's footprint: any tile of it counts (`CONTEXT.md`: At a building).
+    const [fx, fy] = footprintTiles(storage, terrain.size).at(-1)!
+    Object.assign(scout, { x: fx, y: fy })
+    let seen = seenBy(tobin)
+    expect(seen.find(storage.id)).toHaveProperty('stock', storage.stock)
+    expect(seen.find(carriage.id)).not.toHaveProperty('load')
+    Object.assign(scout, { x: carriage.x, y: carriage.y })
+    seen = seenBy(tobin)
+    expect(seen.find(carriage.id)).toHaveProperty('load', { food: 40 })
+    expect(seen.find(storage.id)).not.toHaveProperty('stock')
+    // Standing there tells nothing of how Mara's people fare.
+    const theirs = seen.seen.filter((e) => e.is === 'resident' && e.owner === mara.id)
+    for (const e of theirs) expect(e).not.toHaveProperty('hunger')
+  })
+
+  it('shows an ally what is inside and how their people fare', () => {
+    const { world, mara, tobin, storage, carriage, seenBy } = twoRealms()
+    world.alliances.push({
+      id: 'alliance-1',
+      name: 'North',
+      leaderId: mara.id,
+      members: [mara, tobin].map((r) => ({ realmId: r.id, joinedAt: 0, leaving: null })),
+      invites: [],
+      army: [],
+    })
+    const { seen, find } = seenBy(tobin)
+    expect(find(storage.id)).toHaveProperty('stock', storage.stock)
+    expect(find(carriage.id)).toHaveProperty('load', { food: 40 })
+    const theirs = seen.filter((e) => e.is === 'resident' && e.owner === mara.id)
+    expect(theirs.length).toBeGreaterThan(0)
+    for (const e of theirs) expect(e).toHaveProperty('hunger')
+  })
+
+  it('flags, as an invariant, anything inside sent to a stranger', () => {
+    const { world, mara, tobin, storage, carriage, seenBy } = twoRealms()
+    // What Mara sees, sent to Tobin by mistake: everything of hers he has in sight.
+    const inHisSight = new Set(seenBy(tobin).seen.map((e) => e.id))
+    const leaked = seenBy(mara).seen.filter((e) => inHisSight.has(e.id))
+    const flagged = new Set(
+      sentInsideUnseen(world, terrain, tobin.id, leaked).flatMap((v) => v.entityIds),
+    )
+    expect(flagged).toContain(storage.id)
+    expect(flagged).toContain(carriage.id)
+    const hers = world.residents.find((r) => r.owner === mara.id && inHisSight.has(r.id))!
+    expect(flagged).toContain(hers.id)
+  })
+})
+
+describe('loadLevel', () => {
+  it('names how heavily a carriage is loaded by weight against its capacity', () => {
+    const food = (kg: number) => ({ food: kg / GOOD_WEIGHT.food })
+    expect(loadLevel({})).toBe('empty')
+    expect(loadLevel(food(CARRIAGE_CAPACITY * CARRIAGE_LIGHT_LOAD))).toBe('light')
+    expect(loadLevel(food(CARRIAGE_CAPACITY / 2))).toBe('half')
+    expect(loadLevel(food(CARRIAGE_CAPACITY * 0.9))).toBe('heavy')
+    expect(loadLevel(food(CARRIAGE_CAPACITY))).toBe('full')
   })
 })

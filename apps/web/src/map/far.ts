@@ -1,4 +1,10 @@
-import { cityMembership, type Building, type Carriage, type City, type Resident } from '@csp/shared'
+import {
+  cityMembership,
+  type Building,
+  type City,
+  type SeenCarriage,
+  type SeenResident,
+} from '@csp/shared'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { cityRelationship, type Tone, type Viewer } from './tokens.js'
 
@@ -84,8 +90,8 @@ export interface FarMarker {
 export function farMarkers(world: {
   armies: readonly { memberIds: readonly string[] }[]
   caravans: readonly { carriageId: string }[]
-  residents: readonly Resident[]
-  carriages: readonly Carriage[]
+  residents: readonly SeenResident[]
+  carriages: readonly SeenCarriage[]
 }): FarMarker[] {
   const residents = new Map(world.residents.map((r) => [r.id, r]))
   const carriages = new Map(world.carriages.map((k) => [k.id, k]))

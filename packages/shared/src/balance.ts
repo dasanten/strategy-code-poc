@@ -769,6 +769,15 @@ export function walkSpeed(resident: Resident, terrain: number, tick: number): nu
 export const CARRIAGE_CAPACITY = 400
 
 /**
+ * Up to this share of `CARRIAGE_CAPACITY` a carriage whose load a Player can't see looks lightly
+ * loaded (`CONTEXT.md`: Seeing inside a storage, `loadLevel`).
+ */
+export const CARRIAGE_LIGHT_LOAD = 1 / 3
+
+/** Up to this share of `CARRIAGE_CAPACITY` it looks half loaded; above it, heavily. */
+export const CARRIAGE_HALF_LOAD = 2 / 3
+
+/**
  * The most one delivery or pick-up carries, in kg (`CONTEXT.md`: Delivery): a caravan's carriage
  * with room left for the Food it keeps on board (`CARAVAN_FOOD`, a kg a unit).
  */

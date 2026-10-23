@@ -14,6 +14,7 @@ import {
   type Stock,
   isAt,
   covers,
+  type SeenResident,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
@@ -40,6 +41,7 @@ import {
 import { TileCard } from './SelectionCard.js'
 import { describeTile, makeLeaderProblem } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
+import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
 
 export function App() {
@@ -74,7 +76,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // army or rented out, and, as its alliance leader, the ones handed over (`CONTEXT.md`: Alliance
   // army) and the mercenaries they hired (`CONTEXT.md`: Mercenary contract).
   const own = world
-    ? world.residents.filter((r) => commandsSeen(world.diplomacy, world.home.realmId, r))
+    ? world.residents.filter(
+        (r): r is Resident => commandsSeen(world.diplomacy, world.home.realmId, r) && faresKnown(r),
+      )
     : []
   const selected = own.find((r) => r.id === selectedId)
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
@@ -214,7 +218,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     onLoggedOut()
   }
 
-  const leader = world?.residents.find((r) => r.id === world.home.leaderId)
+  const leader = world?.residents.find(
+    (r): r is Resident => r.id === world.home.leaderId && faresKnown(r),
+  )
   const drawer = (id: DrawerId, panel: ReactNode) => (
     <Drawer id={id} open={openDrawer} onClose={closeDrawer}>
       {panel}
@@ -398,7 +404,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 carriages: world.carriages,
                 piles: world.piles,
                 node: nodeAt?.(selectedTile.x, selectedTile.y),
-                strangers: world.residents.filter((r) => !own.includes(r)),
+                strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),
                 cities: world.cities,
                 viewer: {
                   realmId: world.home.realmId,
@@ -436,7 +442,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             tick={world.tick}
             picking={picking}
             onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
-            carriage={onTile(world.carriages)}
+            carriage={onTile(world.carriages.filter(loadKnown))}
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
             onRoadTo={() => setPicking((p) => (p === 'road' ? false : 'road'))}
             onHaulTo={(setup) => {
@@ -472,7 +478,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onTearDown={tearDown}
             residents={own}
             onPair={pair}
-            others={world.residents.filter((r) => !own.includes(r))}
+            others={world.residents.filter((r) => !own.some((o) => o.id === r.id))}
             mapSize={world.map.size}
             onAttack={attack}
             walls={world.buildings.filter(
@@ -526,13 +532,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
 }
 
 /** How many of the residents in sight work the building, if there is one. */
-function workersHere(residents: Resident[], building: Building | undefined): number {
+function workersHere(residents: SeenResident[], building: Building | undefined): number {
   if (!building) return 0
   return residents.filter((r) => r.order?.kind === 'workAt' && r.order.buildingId === building.id)
     .length
 }
 
 /** The realms holding the building, as far as the Player sees its workers. */
-function heldBy(residents: Resident[], building: Building | undefined): string[] {
+function heldBy(residents: SeenResident[], building: Building | undefined): string[] {
   return building ? holdersOf({ residents }, building) : []
 }

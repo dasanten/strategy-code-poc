@@ -296,7 +296,10 @@ export function hasInput(world: WorldState, workplace: Building, recipe: Recipe)
 }
 
 /** The residents working a workplace: holding a work-at order for it and standing at it. */
-export function workersOf(world: Pick<WorldState, 'residents'>, workplace: Building): Resident[] {
+export function workersOf<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
+  world: { residents: readonly R[] },
+  workplace: Building,
+): R[] {
   return world.residents.filter(
     (r) => r.order?.kind === 'workAt' && r.order.buildingId === workplace.id && isAt(r, workplace),
   )
@@ -307,7 +310,10 @@ export function workersOf(world: Pick<WorldState, 'residents'>, workplace: Build
  * it, and so get its output. There is no ownership flag, and the city a farm was laid out for
  * doesn't count; nobody holds a workplace that nobody works.
  */
-export function holdersOf(world: Pick<WorldState, 'residents'>, workplace: Building): string[] {
+export function holdersOf(
+  world: { residents: readonly Pick<Resident, 'order' | 'x' | 'y' | 'owner'>[] },
+  workplace: Building,
+): string[] {
   const realms = workersOf(world, workplace).map((r) => r.owner)
   return [...new Set(realms.filter((id): id is string => id !== null))].sort()
 }

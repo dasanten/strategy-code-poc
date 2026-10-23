@@ -10,7 +10,6 @@ import {
   quoteTrade,
   tradeCoinWarehouse,
   wrapDistance,
-  warehousePrices,
   type Building,
   type BuildingKind,
   type Carriage,
@@ -26,7 +25,12 @@ import {
   type SeenCity,
   type WarehousePrice,
   isAt,
+  type SeenResident,
+  type SeenCarriage,
+  type SeenBuilding,
+  type Shown,
 } from '@csp/shared'
+import { faresKnown, loadKnown } from './seen.js'
 
 /** What the city inspector says about a city in sight, from what the Player sees of it. */
 export interface CityView {
@@ -72,7 +76,7 @@ export function buildingCount(kind: BuildingKind, n: number): string {
  */
 export function describeCity(
   city: City,
-  seen: { residents: Resident[]; buildings: Building[] },
+  seen: { residents: SeenResident[]; buildings: Building[] },
   realmId: string,
   realms: RealmLabel[],
 ): CityView {
@@ -114,7 +118,7 @@ export interface BuyView {
 /** How the Player could buy a city in sight, or undefined when it isn't for sale. */
 export function describeBuying(
   city: SeenCity,
-  seen: { residents: Resident[]; buildings: Building[] },
+  seen: { residents: SeenResident[]; buildings: Building[] },
   realmId: string,
 ): BuyView | undefined {
   if (city.price === undefined) return undefined
@@ -136,20 +140,22 @@ export interface WarehouseView {
   kind: BuildingKind
   x: number
   y: number
-  prices: WarehousePrice[]
+  prices: Shown<WarehousePrice>[]
 }
 
 /**
- * The prices of a city's warehouses in sight: anyone with a resident in sight of a warehouse
- * sees its prices. Warehouses that price nothing (the HQ's coin warehouse) are left out.
+ * The prices of a city's warehouses in sight, as the server names them: anyone with a resident in
+ * sight of a warehouse sees its prices, and what it holds only when they see inside
+ * (`CONTEXT.md`: Seeing inside a storage). Warehouses that price nothing (the HQ's coin warehouse)
+ * are left out.
  */
 export function warehousesInSight(
   city: City,
-  seen: { cities: City[]; buildings: Building[] },
+  seen: { cities: City[]; buildings: SeenBuilding[] },
 ): WarehouseView[] {
   return seen.buildings
     .filter((b) => b.kind === 'warehouse' && b.cityId === city.id)
-    .map((b) => ({ id: b.id, kind: b.kind, x: b.x, y: b.y, prices: warehousePrices(seen, b) }))
+    .map((b) => ({ id: b.id, kind: b.kind, x: b.x, y: b.y, prices: b.prices ?? [] }))
     .filter((w) => w.prices.length > 0)
 }
 
@@ -166,13 +172,13 @@ export interface TradersView {
 /** The Player’s residents and carriages at a warehouse (or an NPC city’s storage). */
 export function tradersAt(
   warehouse: Pick<Building, 'kind' | 'x' | 'y'>,
-  seen: { residents: Resident[]; carriages: Carriage[] },
+  seen: { residents: SeenResident[]; carriages: SeenCarriage[] },
   realmId: string,
 ): TradersView {
   const here = (t: { x: number; y: number }) => isAt(t, warehouse)
   return {
-    residents: seen.residents.filter((r) => r.owner === realmId && here(r)),
-    carriages: seen.carriages.filter((k) => k.realmId === realmId && here(k)),
+    residents: seen.residents.filter((r) => r.owner === realmId && here(r)).filter(faresKnown),
+    carriages: seen.carriages.filter((k) => k.realmId === realmId && here(k)).filter(loadKnown),
   }
 }
 

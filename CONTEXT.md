@@ -306,6 +306,13 @@ The shared language of the game. Domain terms only — no implementation details
 - **Sight:** what a Player currently sees: everything within sight range of any of their
   residents, or of any resident of an alliance they belong to. People, goods, buildings,
   horses, carriages and armies are only visible in sight, a Player's own included.
+- **Seeing inside a storage:** what a storage, warehouse or stable holds is seen only by its own
+  realm and its allies, and by anyone with a resident at it. From further off others see only the
+  building (and a warehouse's or NPC city's prices, where those are shown).
+  A carriage's load goes the same way, with a resident on its tile; from further off others see
+  only how heavily it is loaded.
+- **Seeing how someone fares:** a resident's or horse's hunger and health are seen only by its
+  own realm and its allies. Others see that it is there.
 - **Explored terrain:** tiles a Player has ever had in sight. Their terrain and resource nodes stay
   known; what is on them (people, goods, buildings) does not.
 

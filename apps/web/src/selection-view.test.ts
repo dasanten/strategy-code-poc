@@ -304,6 +304,27 @@ describe('the card for a tile', () => {
     expect(card.lines.some((l) => l.startsWith('Carriage'))).toBe(true)
   })
 
+  it('says only how heavily loaded a carriage is, and nothing of what a storage holds, when it can’t see inside', () => {
+    // As sight sends them to a stranger (`CONTEXT.md`: Seeing inside a storage).
+    const { id, x, y, horseId } = carriage
+    const theirs = {
+      id,
+      x,
+      y,
+      horseId,
+      realmId: 'r-other',
+      cityId: null,
+      loadLevel: 'half' as const,
+    }
+    const card = tile({
+      buildings: [building({ kind: 'storage', cityId: 'c-other' })],
+      carriages: [theirs],
+    })
+    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
+    expect(card.lines.find((l) => l.startsWith('Carriage'))).toContain('· half loaded')
+    expect(card.lines.find((l) => l.startsWith('Carriage'))).not.toContain('kg')
+  })
+
   it('ignores what stands on other tiles', () => {
     const far = { ...carriage, x: 6 }
     expect(tile({ carriages: [far] })).toMatchObject({ what: 'tile', title: 'Open ground' })
