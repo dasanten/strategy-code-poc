@@ -18,7 +18,7 @@ import {
   type Stock,
 } from '@csp/shared'
 import type { Relationship } from './theme.js'
-import { cityRelationship, type Viewer } from './map/tokens.js'
+import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 
 /**
@@ -175,7 +175,8 @@ function realmRelationship(
 }
 
 /** The map's short relationship names to the theme's. */
-function themeRelationship(rel: ReturnType<typeof cityRelationship>): Relationship | undefined {
+function themeRelationship(tone: ReturnType<typeof cityRelationship>): Relationship | undefined {
+  const rel = rankedAs(tone)
   if (!rel) return undefined
   return (
     {

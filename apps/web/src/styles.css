@@ -423,6 +423,45 @@ label > select {
   margin: 0;
   padding-left: 1.2rem;
 }
+/* The admin map fills the screen under the header (`CONTEXT.md`: admin map). */
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.admin-tabs button {
+  padding: 4px 14px;
+}
+.layout main.admin-map-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+}
+.admin-map {
+  position: absolute;
+  inset: 0;
+}
+.admin-map .map-view {
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+.admin-map-note {
+  margin: 1rem;
+  color: var(--ui-muted);
+}
+.admin-map-note.error {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--ui-panel);
+  color: var(--rel-other-realm);
+}
 .map-view {
   position: relative;
   height: min(70vh, 720px);

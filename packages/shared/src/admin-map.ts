@@ -15,6 +15,8 @@ import type {
  * admins only, read between ticks. Script sources are never in it.
  */
 
+/** Where an admin loads the map they draw: its seed and size (`MapInfo`). */
+export const ADMIN_MAP_INFO_PATH = '/api/admin/map'
 /** Where an admin loads every entity in a rectangle of tiles (`adminWorldPath`). */
 export const ADMIN_WORLD_PATH = '/api/admin/world'
 /** Where an admin loads the jump list's places, for the whole world (`AdminPlaces`). */
@@ -72,12 +74,12 @@ export interface AdminScript {
 /**
  * Something on the admin map, tagged with what it is and the Organization it belongs to (`org`,
  * one of `AdminWorldView.orgs`; null for what belongs to none, such as a pile or a workplace). A
- * city carries its town hall's position.
+ * city carries its town hall's position and how many houses it has, which size its far emblem.
  */
 export type AdminEntity = { org: string | null } & (
   | ({ is: 'resident' } & Omit<Resident, 'script'> & { script?: AdminScript })
   | ({ is: 'building' } & Building)
-  | ({ is: 'city' } & City & { x: number; y: number })
+  | ({ is: 'city' } & City & { x: number; y: number; houses: number })
   | ({ is: 'horse' } & Horse)
   | ({ is: 'carriage' } & Carriage)
   | ({ is: 'pile' } & Pile)
