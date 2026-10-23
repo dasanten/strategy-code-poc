@@ -38,6 +38,7 @@ I sleep.
 | 18  | [Livelier pace and default scripts](https://github.com/dasanten/strategy-code-poc/issues/220)   | ticketed                |
 | 19  | [Admin map](https://github.com/dasanten/strategy-code-poc/issues/232)                           | ticketed                |
 | 20  | [Leader handover](https://github.com/dasanten/strategy-code-poc/issues/244)                     | ticketed                |
+| 21  | [Tile card info](https://github.com/dasanten/strategy-code-poc/issues/269)                      | ticketed                |
 | 23  | [Names](https://github.com/dasanten/strategy-code-poc/issues/288)                               | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
@@ -50,16 +51,18 @@ its tickets or closes.
   (a rule decision or manual step only Daniel can do; never picked up automatically).
 - **Dependencies:** a ticket's "Depends on #n" line. A ticket is ready when all of them are
   closed.
-- **Branches (ADR 0009):** each epic has a branch `epic/<n>-<slug>`, cut from `main` when its
-  first ticket starts. Ticket branches come from the epic branch and their PRs target it. Bugs
-  branch from `main` and go straight back to it.
+- **Branches (ADR 0009, 0010):** each epic has a branch `epic/<n>-<slug>`, cut from `dev` when
+  its first ticket starts. Ticket branches come from the epic branch and their PRs target it.
+  Bugs branch from `dev` and go straight back to it.
 - **PRs:** one per ticket; tickets that can't ship apart share one. The body says
   `Closes #<ticket>` for each and `Part of #<epic>`. Ticket PRs get no CI: the ticket session runs
   `pnpm lint`, `pnpm typecheck` and `pnpm test`, and before merging into the epic branch the
   coordinating session runs them again on the PR merged with the epic branch. Merging into a
   non-default branch doesn't close the ticket, so whoever merges closes its tickets by hand.
-- **Epic PR:** when an epic's last ticket is on its branch, one PR `epic/<n>-…` → `main` with
-  `Closes #<epic>` runs CI and is merged once green; each merge to `main` deploys.
+- **Epic PR:** when an epic's last ticket is on its branch, one PR `epic/<n>-…` → `dev` with
+  `Closes #<epic>` runs CI and is merged once green; whoever merges closes the epic by hand.
+- **Release:** when Daniel asks, one PR `dev` → `main` lists the epics and bugs it ships, runs CI
+  and is merged once green. Only merges into `main` deploy.
 - **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in
   `CONTEXT.md`. Balance numbers are picked in `packages/shared/src/balance.ts` and listed in the
   PR for review.

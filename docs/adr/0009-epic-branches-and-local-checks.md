@@ -1,6 +1,7 @@
 # Epic branches, local checks, CI only into main
 
-Status: decided (2026-10-22, with Daniel).
+Status: decided (2026-10-22, with Daniel). Amended by ADR 0010: epic PRs and bugs go into `dev`,
+and `main` changes only with a release.
 
 GitHub Actions minutes for this private repo ran out within days: every push ran CI twice (`push`
 and `pull_request`) plus a Docker build, and with several ticket PRs open at once, each merge of

@@ -3,8 +3,6 @@ import {
   OFF_NODES,
   ON_PLAINS,
   Terrain,
-  buildProblem,
-  cornersCovering,
   footprintKeys,
   footprintTiles,
   isPassableTerrain,
@@ -80,23 +78,6 @@ export class Ground {
   take(kind: BuildingKind, x: number, y: number): void {
     for (const k of footprintKeys({ kind, x, y }, this.terrain.size)) this.taken.add(k)
   }
-}
-
-/**
- * Where a node's workplace can be laid out (`CONTEXT.md`: Where buildings go): the north-west
- * tile of a footprint that covers the node and fits, the node's own tile first; none when no
- * footprint over it fits.
- */
-export function nodeCorner(
-  world: WorldState,
-  terrain: TerrainMap,
-  node: ResourceNode,
-): { x: number; y: number } | undefined {
-  const kind = NODE_WORKPLACE[node.kind]
-  for (const [x, y] of cornersCovering(kind, node.x, node.y, terrain.size)) {
-    if (!buildProblem(world, x, y, kind, terrain)) return { x, y }
-  }
-  return undefined
 }
 
 /** Whether a kind of building goes on a resource node: mines, quarries and lumber camps. */

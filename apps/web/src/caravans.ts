@@ -1,4 +1,4 @@
-import type { Carriage, Resident, SeenCaravan } from '@csp/shared'
+import type { SeenCaravan, SeenCarriage, SeenResident } from '@csp/shared'
 
 /** What of the Trade Org's caravans is in sight (`CONTEXT.md`: Caravan): their carriages and crew, by id. */
 export interface CaravanParts {
@@ -17,7 +17,7 @@ export function caravanParts(caravans: readonly SeenCaravan[]): CaravanParts {
 /** Whether a caravan's carriage or one of its crew stands on tile (x, y), for the map's hover line. */
 export function caravanAt(
   parts: CaravanParts,
-  world: { residents: readonly Resident[]; carriages: readonly Carriage[] },
+  world: { residents: readonly SeenResident[]; carriages: readonly SeenCarriage[] },
   x: number,
   y: number,
 ): boolean {

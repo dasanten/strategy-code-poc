@@ -70,6 +70,10 @@ const SHARED: readonly ScriptBinding[] = [
   list('piles', 'The piles of goods the Player sees.'),
   list('nodes', 'The resource nodes on terrain the Player has explored.'),
   list(
+    'lastSeen',
+    'The buildings, construction sites and cities the Player has seen and that are out of their sight now, as they last saw them: each with `is` ("building" or "city") and `seenAt`, the tick they were last seen.',
+  ),
+  list(
     'directives',
     'The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).',
   ),
@@ -215,6 +219,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'rename',
     ['residentId', 'name', 'realmName?'],
     'Give a resident of my realm, me or my Leader included, a new name: free and at once, from anywhere. Renaming the Leader of a realm with no realm name yet needs `realmName` too, which names the realm; a named realm keeps its name.',
+  ),
+  action(
+    'renameCity',
+    ['cityId', 'name'],
+    'Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.',
   ),
   action(
     'roadLine',

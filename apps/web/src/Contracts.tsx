@@ -10,6 +10,7 @@ import {
   type RealmLabel,
   type Resident,
   isAt,
+  type SeenResident,
 } from '@csp/shared'
 import { contractStatus, sideName } from './contract-view.js'
 
@@ -37,7 +38,7 @@ export function ContractsPanel({
   /** The residents whose orders the Player gives. */
   own: Resident[]
   /** Everyone in sight, the Player's own included. */
-  inSight: Resident[]
+  inSight: SeenResident[]
   buildings: Building[]
   /** Cities in sight; an NPC city that doesn't refuse the Player says what it would lend. */
   cities: SeenCity[]

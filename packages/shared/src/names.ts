@@ -1,5 +1,5 @@
-import { REALM_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH } from './balance.js'
-import type { Realm, Resident } from './world.js'
+import { CITY_NAME_MAX_LENGTH, REALM_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH } from './balance.js'
+import type { City, Realm, Resident } from './world.js'
 
 /**
  * What is wrong with a name a Player gives, if anything: it must be text, and trimmed not empty
@@ -52,4 +52,19 @@ export function renameProblem(
       : 'only renaming your Leader names your realm'
   }
   return undefined
+}
+
+/**
+ * Why the Player of `realm` can't rename `city` to `name` now (`CONTEXT.md`: Renaming a city),
+ * or undefined when they can: any city of their realm, from anywhere. NPC cities and other
+ * realms' cities keep their names.
+ */
+export function cityRenameProblem(
+  realm: Pick<Realm, 'id'>,
+  city: City | undefined,
+  name: unknown,
+): string | undefined {
+  if (!city || city.realmId !== realm.id) return 'not one of your cities'
+  const bad = nameProblem(name, CITY_NAME_MAX_LENGTH)
+  return bad ? `Name: ${bad}` : undefined
 }

@@ -12,7 +12,7 @@ import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.j
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { checkInvariants } from './invariants.js'
-import { smallTerrain, worldWithPost } from './test-terrain.js'
+import { smallTerrain, worldWithCity, worldWithPost } from './test-terrain.js'
 import {
   RESET_BEFORE,
   WORLD_FORMAT_VERSION,
@@ -128,11 +128,20 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(39)
-    const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land })
+    expect(WORLD_FORMAT_VERSION).toBe(40)
+    const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
     expect(checkInvariants(v39, land)).toEqual([])
+  })
+
+  it('migrates a format 39 world: every Player starts with an empty Last seen (migration 39 → 40)', () => {
+    const { world } = worldWithCity()
+    const old: Partial<typeof world> = { ...world }
+    delete old.lastSeen
+    const migrated = migrateWorld(old, 39, { terrain: smallTerrain() })
+    expect(migrated.lastSeen).toEqual({})
+    expect(migrated.buildings).toEqual(world.buildings)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

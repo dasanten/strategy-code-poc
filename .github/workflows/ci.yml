@@ -1,13 +1,14 @@
 name: CI
 
-# CI minutes are scarce (ADR 0009): CI runs only for PRs into main and pushes to main. Ticket PRs
-# go into an epic branch and are checked locally; docs-only changes skip CI.
+# CI minutes are scarce (ADR 0009, 0010): CI runs for PRs into dev (epics and bugs), for release
+# PRs dev -> main, and for pushes to main (which deploy). Ticket PRs go into an epic branch and are
+# checked locally; docs-only changes skip CI.
 on:
   push:
     branches: [main]
     paths-ignore: ['docs/**', '**/*.md']
   pull_request:
-    branches: [main]
+    branches: [main, dev]
     paths-ignore: ['docs/**', '**/*.md']
 
 # A newer push to a PR supersedes the run in progress; runs on main always finish (they deploy).
@@ -30,10 +31,11 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
-  # Builds the production image for every PR into main, so a broken Dockerfile shows up before
-  # main. On main it is pushed to GHCR and deployed (ADR 0007).
+  # Builds the production image for release PRs into main, so a broken Dockerfile shows up before
+  # main. On main it is pushed to GHCR and deployed (ADR 0007). PRs into dev skip it.
   image:
     needs: check
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
