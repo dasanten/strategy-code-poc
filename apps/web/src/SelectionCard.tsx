@@ -153,6 +153,7 @@ export function TileCard({
   onClose,
   onSendHere,
   onSetGate,
+  onOpenCity,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -164,6 +165,8 @@ export function TileCard({
   onClose: () => void
   onSendHere: () => void
   onSetGate: (gateId: string, open: boolean) => void
+  /** Opens the city inspector at a city. */
+  onOpenCity: (cityId: string) => void
 }) {
   const actions = tileActions(card, actor)
   const icon =
@@ -196,6 +199,7 @@ export function TileCard({
           onAction={(a) => {
             if (a.id === 'sendHere') onSendHere()
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)
+            if (a.id === 'openCity' && card.city) onOpenCity(card.city.id)
           }}
         />
       )}
