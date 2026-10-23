@@ -1,6 +1,6 @@
 import type { Remembered, TerrainMap, WorldState } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
-import { placesInSight, type SeenPlace } from './sight.js'
+import { buildingsBySquare, placesInSight, type SeenPlace } from './sight.js'
 
 /**
  * Brings every Player's Last seen up to date with their sight (`CONTEXT.md`: Last seen): each
@@ -10,8 +10,9 @@ import { placesInSight, type SeenPlace } from './sight.js'
  * the world has stepped, so what is in sight carries this tick.
  */
 export function stepLastSeen(world: WorldState, size: number): void {
+  const bySquare = world.realms.length > 0 ? buildingsBySquare(world, size) : undefined
   for (const realm of world.realms) {
-    const { seen, sees } = placesInSight(world, size, realm.id)
+    const { seen, sees } = placesInSight(world, size, realm.id, bySquare)
     const before = world.lastSeen[realm.userId] ?? []
     if (seen.length === 0 && before.length === 0) continue
     const memory = new Map(before.map((e) => [e.id, e]))

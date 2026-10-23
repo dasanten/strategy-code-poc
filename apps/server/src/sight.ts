@@ -43,18 +43,46 @@ interface Spot {
 interface Eyes {
   size: number
   sees(at: Spot, reach?: number): boolean
+  /** The squares (`squaresOf`) anything in sight can stand in. */
+  watched: ReadonlySet<number>
 }
 
 /**
- * The observers' eyes: whether any of them is within sight range of a spot, plus `reach` (at
- * most `SIGHT_RANGE`). The observers are sorted into squares at least twice the sight range
- * across, so a spot is checked only against those in its square and the ones next to it.
+ * The map cut into squares at least twice the sight range across, so what is in sight of someone
+ * stands in their square or one next to it: `square` gives the column or row of a coordinate.
  */
-function eyesOf(size: number, observers: Spot[]): Eyes {
+function squaresOf(size: number) {
   const across = Math.max(1, Math.floor(size / (2 * SIGHT_RANGE)))
   const side = size / across
   const square = (v: number) =>
     Math.min(across - 1, Math.floor((((v % size) + size) % size) / side))
+  return { across, square, key: (at: Spot) => square(at.y) * across + square(at.x) }
+}
+
+/**
+ * Where each building stands, by square (`squaresOf`): its place in `world.buildings`. Made
+ * once for a tick, it lets every realm look only at the buildings near its observers (`places`).
+ * A building's footprint is far smaller than a square, so its corner's square will do.
+ */
+export function buildingsBySquare(world: WorldState, size: number): Map<number, number[]> {
+  const { key } = squaresOf(size)
+  const out = new Map<number, number[]>()
+  world.buildings.forEach((b, i) => {
+    const k = key(b)
+    const list = out.get(k)
+    if (list) list.push(i)
+    else out.set(k, [i])
+  })
+  return out
+}
+
+/**
+ * The observers' eyes: whether any of them is within sight range of a spot, plus `reach` (at
+ * most `SIGHT_RANGE`). The observers are sorted into squares (`squaresOf`), so a spot is
+ * checked only against those in its square and the ones next to it.
+ */
+function eyesOf(size: number, observers: Spot[]): Eyes {
+  const { across, square } = squaresOf(size)
   // The squares next to one, across the joins; on a map only a few squares across, every one.
   const steps = across < 3 ? [...Array(across).keys()] : [-1, 0, 1]
   const around = (s: number, d: number) => (across < 3 ? d : (s + d + across) % across)
@@ -73,6 +101,7 @@ function eyesOf(size: number, observers: Spot[]): Eyes {
   }
   return {
     size,
+    watched,
     sees: (at, reach = 0) => {
       const [sx, sy] = [square(at.x), square(at.y)]
       if (!watched.has(sy * across + sx)) return false
@@ -299,11 +328,24 @@ export function entitiesInSight(
 export type SeenPlace = Extract<SeenEntity, { is: 'building' | 'city' }>
 
 /** The buildings and cities in a realm's sight, as `entitiesInSight` shows them. */
-function places(world: WorldState, realmId: string, eyes: Eyes, insight: Insight): SeenPlace[] {
+function places(
+  world: WorldState,
+  realmId: string,
+  eyes: Eyes,
+  insight: Insight,
+  bySquare?: Map<number, number[]>,
+): SeenPlace[] {
   const out: SeenPlace[] = []
   const seenCities = new Set<string>()
   const seenStorages = new Set<string>()
-  for (const b of world.buildings) {
+  // Only the buildings near the observers, in the world's order, when they are sorted by square.
+  const near = bySquare
+    ? [...eyes.watched]
+        .flatMap((k) => bySquare.get(k) ?? [])
+        .sort((a, b) => a - b)
+        .map((i) => world.buildings[i]!)
+    : world.buildings
+  for (const b of near) {
     if (!buildingSeen(eyes, b)) continue
     out.push({ is: 'building', ...seenBuilding(world, insight, b) })
     if (b.cityId !== null) seenCities.add(b.cityId)
@@ -340,19 +382,21 @@ function places(world: WorldState, realmId: string, eyes: Eyes, insight: Insight
 
 /**
  * The buildings and cities a realm's Player sees, as `entitiesInSight` shows them, and whether
- * any tile of a footprint is in their sight (`CONTEXT.md`: Last seen).
+ * any tile of a footprint is in their sight (`CONTEXT.md`: Last seen). `bySquare`, from
+ * `buildingsBySquare` this tick, saves looking at every building.
  */
 export function placesInSight(
   world: WorldState,
   size: number,
   realmId: string,
+  bySquare?: Map<number, number[]>,
 ): { seen: SeenPlace[]; sees: (b: Placed) => boolean } {
   const observers = observersOf(world, realmId)
   const eyes = eyesOf(size, observers)
   const sees = (b: Placed) => buildingSeen(eyes, b)
   if (observers.length === 0) return { seen: [], sees }
   const insight = insightOf(world, size, realmId, observers)
-  return { seen: places(world, realmId, eyes, insight), sees }
+  return { seen: places(world, realmId, eyes, insight, bySquare), sees }
 }
 
 /** Whether a caravan's carriage or any of its crew is in sight. */
