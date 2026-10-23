@@ -2,7 +2,6 @@ import {
   NODE_WORKPLACE,
   NPC_CITY_MIN_DISTANCE,
   TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_YEAR,
   TRADE_ORG_HQ,
   TRADE_ORG_HQ_MIN_DISTANCE,
   Terrain,
@@ -162,15 +161,15 @@ describe('the Trade Org HQ', () => {
     for (const b of warehouses) expect(seen).toContainEqual({ is: 'building', ...b })
   })
 
-  it('left alone keeps itself fed over game years', () => {
+  it('left alone keeps itself fed over seven game weeks', () => {
     const { world, terrain, city } = hq()
     const walking = new Walking(terrain)
     const people = world.residents.map((r) => r.id)
-    for (let t = 0; t < 2 * TICKS_PER_GAME_YEAR; t++) {
+    for (let t = 0; t < 49 * TICKS_PER_GAME_DAY; t++) {
       stepWorld(world, terrain, walking)
       if (world.tick % TICKS_PER_GAME_DAY === 0) expect(checkInvariants(world, terrain)).toEqual([])
     }
-    // Starting ages and lifespans leave nobody to die of old age in two years.
+    // Starting ages and lifespans leave nobody to die of old age in seven weeks.
     expect(world.residents.map((r) => r.id)).toEqual(expect.arrayContaining(people))
     expect(storedFood(world, city)).toBeGreaterThan(0)
     // Its workplaces on the nodes were worked too.

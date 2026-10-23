@@ -105,7 +105,7 @@ describe('the Trade Org army', () => {
     run(
       world,
       walking,
-      3 * TICKS_PER_GAME_DAY,
+      8 * TICKS_PER_GAME_DAY,
       () => hqSoldiers(world).length >= TRADE_ORG_ARMY.size,
     )
     expect(hqSoldiers(world)).toHaveLength(TRADE_ORG_ARMY.size)
@@ -284,7 +284,7 @@ describe('the Trade Organization hiring mercenaries', () => {
     expect(bank.stock!.coins).toBe(before - c.pricePerWeek)
     for (const id of c.residentIds) expect(commanderOf(world, at(world, id))).toBe(TRADE_ORG)
     // Its mercenaries walk to the HQ and stand guard outside the inner ring.
-    run(world, walking, TICKS_PER_GAME_DAY / 2, () =>
+    run(world, walking, (3 * TICKS_PER_GAME_DAY) / 2, () =>
       ['m1', 'm2'].every((id) => at(world, id).order === null),
     )
     const hall = townHallOf(world, hq)!

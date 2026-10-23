@@ -3,10 +3,10 @@ import { Terrain } from './terrain.js'
 
 export const TICK_MS = 1000
 
-/** One game day is one real hour (`CONTEXT.md`: Game time). */
-export const TICKS_PER_GAME_DAY = 3600
-/** One game year is one real day. */
-export const TICKS_PER_GAME_YEAR = 24 * TICKS_PER_GAME_DAY
+/** One game day is 24 real minutes: a real second is a game minute (`CONTEXT.md`: Game time). */
+export const TICKS_PER_GAME_DAY = 1440
+/** One game year is 420 game days, one real week. */
+export const TICKS_PER_GAME_YEAR = 420 * TICKS_PER_GAME_DAY
 
 /** A resident's stats (`CONTEXT.md`: Stats). */
 export const STAT_NAMES = ['strength', 'endurance', 'agility', 'intellect'] as const
@@ -332,11 +332,6 @@ export type ResidentOrder =
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
   return stat.base + stat.trained
-}
-
-/** A resident's age in game years at the given tick. */
-export function ageInYears(resident: Resident, tick: number): number {
-  return (tick - resident.bornAt) / TICKS_PER_GAME_YEAR
 }
 
 /**

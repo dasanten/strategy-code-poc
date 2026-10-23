@@ -12,6 +12,7 @@ import {
   hasFoodSurplus,
   housingRoom,
   surplusFoodLine,
+  ticksForAge,
   type Resident,
   type WorldState,
 } from '@csp/shared'
@@ -127,9 +128,9 @@ describe('pairing order', () => {
     expect(reason(pairOf(a, a))).toMatch(/themselves/)
     expect(reason(pairOf(a, b), stranger)).toMatch(/not one of your residents/)
     expect(reason({ kind: 'pair', residentId: a.id, partnerId: 'nobody' })).toMatch(/not one/)
-    b.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
+    b.bornAt = world.tick - ticksForAge(5)
     expect(reason(pairOf(a, b))).toMatch(/children/)
-    b.bornAt = world.tick - 30 * TICKS_PER_GAME_YEAR
+    b.bornAt = world.tick - ticksForAge(30)
     b.cityId = null
     expect(reason(pairOf(a, b))).toMatch(/same city/)
     // A resident of the same realm but another city.
@@ -287,8 +288,12 @@ describe('births', () => {
     const storage = storageOf(world)
     for (const r of [a, b]) Object.assign(r, { x: storage.x - 2, y: storage.y + 2 })
     pairUp(world, queue, a, b)
+    // They paired a game year less a game day ago: the last day runs in the world.
+    for (const r of [a, b]) {
+      if (r.order?.kind === 'pair') r.order.since -= TICKS_PER_GAME_YEAR - TICKS_PER_GAME_DAY
+    }
     const before = world.residents.length
-    for (let t = 0; t < TICKS_PER_GAME_YEAR + 1; t++) stepWorld(world, terrain)
+    for (let t = 0; t < TICKS_PER_GAME_DAY + 1; t++) stepWorld(world, terrain)
     expect(world.residents.length).toBe(before + 1)
     expect(checkInvariants(world, terrain)).toEqual([])
   })

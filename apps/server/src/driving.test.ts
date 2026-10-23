@@ -3,12 +3,12 @@ import {
   CARRIAGE_SPEED,
   MAX_HEALTH,
   MAX_HUNGER,
-  TICKS_PER_GAME_YEAR,
   Terrain,
   WALK_TICKS_PER_TILE,
   driveSpeed,
   horseFood,
   terrainAt,
+  ticksForAge,
   type Carriage,
   type Horse,
   type Resident,
@@ -114,7 +114,7 @@ describe('the drive order', () => {
       reason: 'that carriage is not on the resident’s tile',
     })
     carriage.x = 2
-    w1.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
+    w1.bornAt = world.tick - ticksForAge(5)
     expect(order({ x: 8, y: 2 })).toMatchObject({ reason: 'children can’t drive' })
   })
 

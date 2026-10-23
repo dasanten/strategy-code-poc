@@ -5,10 +5,10 @@ import {
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
   Terrain,
-  TICKS_PER_GAME_YEAR,
   buildWork,
   teardownReturns,
   teardownWork,
+  ticksForAge,
   type Building,
   type Good,
   type Stock,
@@ -262,9 +262,9 @@ describe.each([
     r.x = 6
     expect(reject(tearDownOrder())).toBe('the resident is not at that building')
     r.x = 7
-    r.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
+    r.bornAt = world.tick - ticksForAge(5)
     expect(reject(tearDownOrder())).toBe('children can’t tear down buildings')
-    r.bornAt = world.tick - 30 * TICKS_PER_GAME_YEAR
+    r.bornAt = world.tick - ticksForAge(30)
     world.buildings.push({ id: 'b2', kind: 'storage', cityId: 'c1', x: 7, y: 7 })
     expect(reject(tearDownOrder('b2'))).toBe('a storage can’t be torn down yet')
     expect(queue.size).toBe(0)
