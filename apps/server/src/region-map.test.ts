@@ -1,5 +1,7 @@
 import {
   CHUNK_SIZE,
+  TRADE_ORGANIZATION,
+  TRADE_ORG_NAME,
   Terrain,
   chunksAcross,
   organizationName,
@@ -58,6 +60,7 @@ describe('region map', () => {
     const world = setup()
     expect(organizationName(world, 'r2')).toBe('Bo')
     expect(organizationName(world, 'c3')).toBe('Oakmoor')
+    expect(organizationName(world, TRADE_ORGANIZATION)).toBe(TRADE_ORG_NAME)
   })
 
   it('shows every holder over explored terrain, alliance members with their alliance', () => {
