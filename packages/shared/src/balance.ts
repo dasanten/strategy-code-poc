@@ -1539,3 +1539,6 @@ export const REALM_NAME_MAX_LENGTH = 30
 
 /** The longest name a Player may give a resident, the Leader included, in characters after trimming. */
 export const RESIDENT_NAME_MAX_LENGTH = 30
+
+/** The longest name a Player may give a city of their realm, in characters after trimming. */
+export const CITY_NAME_MAX_LENGTH = 30

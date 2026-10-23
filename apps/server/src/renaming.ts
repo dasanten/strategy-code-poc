@@ -1,5 +1,7 @@
 import {
+  CITY_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
+  cityRenameProblem,
   nameProblem,
   renameProblem,
   type OrderRequest,
@@ -54,6 +56,68 @@ export const rename: OrderKind = {
     const target = world.residents.find((r) => r.id === targetId)!
     target.name = name.trim()
     if (target.id === realm.leaderId && !realm.name) realm.name = realmName!.trim()
+  },
+}
+
+/*
+ * Renaming a city (`CONTEXT.md`: Renaming a city) works the same way. Others learn the new name
+ * only by sight: their Last seen keeps the copy of the city they saw, old name and all.
+ */
+
+/** The input of a city rename order: `cityId` gets `name`; `residentId` is who asked. */
+interface RenameCityRequest extends OrderRequest {
+  kind: 'renameCity'
+  residentId: string
+  cityId: string
+  name: string
+}
+
+function cityProblem(
+  world: WorldState,
+  sender: OrderSender,
+  order: OrderRequest,
+): string | undefined {
+  const realm = realmOf(world, sender.userId)
+  if (!realm) return 'you have no realm'
+  const o = order as Partial<RenameCityRequest>
+  const asker = world.residents.find((r) => r.id === o.residentId)
+  if (!asker || asker.owner !== realm.id) return 'not one of your residents'
+  return cityRenameProblem(
+    realm,
+    world.cities.find((c) => c.id === o.cityId),
+    o.name,
+  )
+}
+
+/** The city rename order: the city of the Player's realm takes the new name, trimmed. */
+export const renameCity: OrderKind = {
+  validate(world, sender, order) {
+    return cityProblem(world, sender, order)
+  },
+  apply(world, sender, order) {
+    if (cityProblem(world, sender, order)) return
+    const { cityId, name } = order as RenameCityRequest
+    world.cities.find((c) => c.id === cityId)!.name = name.trim()
+  },
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Renaming a city): every city's name is trimmed, not empty
+ * and at most `CITY_NAME_MAX_LENGTH`.
+ */
+export const cityNamesWellFormed: Invariant = {
+  name: 'city-names-well-formed',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const c of world.cities) {
+      const p =
+        nameProblem(c.name, CITY_NAME_MAX_LENGTH) ??
+        (c.name !== c.name.trim() ? 'not trimmed' : undefined)
+      if (p) {
+        out.push({ invariant: this.name, message: `city ${c.id}'s name: ${p}`, entityIds: [c.id] })
+      }
+    }
+    return out
   },
 }
 

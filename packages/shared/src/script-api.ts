@@ -221,6 +221,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'Give a resident of my realm, me or my Leader included, a new name: free and at once, from anywhere. Renaming the Leader of a realm with no realm name yet needs `realmName` too, which names the realm; a named realm keeps its name.',
   ),
   action(
+    'renameCity',
+    ['cityId', 'name'],
+    'Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.',
+  ),
+  action(
     'roadLine',
     ['x', 'y'],
     'Build road on each tile of the line from my tile to (x, y), one after another, with the stone I carry.',

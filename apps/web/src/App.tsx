@@ -482,6 +482,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOpenCityId(id)
               setOpenDrawer('cities')
             }}
+            // The same `renameCity` order a script's `renameCity` requests, asked by the Leader.
+            onRenameCity={async (cityId, name) => {
+              const order = { kind: 'renameCity', residentId: world.home.leaderId, cityId, name }
+              setOrderError(await sendOrder(order))
+            }}
           />
         </div>
       )}

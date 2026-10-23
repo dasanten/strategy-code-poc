@@ -90,6 +90,7 @@ export type ActionId =
   | 'sendHere'
   | 'gate'
   | 'openCity'
+  | 'renameCity'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -111,6 +112,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   sendHere: 'W',
   gate: 'O',
   openCity: 'C',
+  renameCity: 'N',
 }
 
 /**
@@ -351,6 +353,8 @@ export interface TileCard {
   buildHere?: { kind: BuildingKind; at: { x: number; y: number } | undefined }
   /** A city the card links to in the city inspector: an own town hall's, or where prices are. */
   city?: { id: string; label: string }
+  /** A city of the Player's own whose town hall is in sight on the tile, which they may rename. */
+  renameCity?: { id: string; name: string }
   /**
    * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
    * and what they saw of it then, shown apart from the lines about what is there now.
@@ -572,6 +576,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         if (live) lines.push(...townHallLines(city.id, t))
         if (rel === 'own')
           card.city = { id: city.id, label: `Open ${city.name} in the city inspector` }
+        // Renaming a city (`CONTEXT.md`): from its town hall's card, while it is the Player's.
+        if (rel === 'own' && live) card.renameCity = { id: city.id, name: city.name }
       }
       if (city && sellsHere(building, city)) {
         lines.push('Buys and sells here · prices in the city inspector')
@@ -876,6 +882,13 @@ export function tileActions(card: TileCard, actor: Resident | undefined, tick = 
       key: ACTION_KEYS.gate,
     })
   if (card.city) actions.push({ id: 'openCity', label: card.city.label, key: ACTION_KEYS.openCity })
+  if (card.renameCity)
+    actions.push({
+      id: 'renameCity',
+      label: 'Rename the city…',
+      key: ACTION_KEYS.renameCity,
+      opens: true,
+    })
   return actions
 }
 

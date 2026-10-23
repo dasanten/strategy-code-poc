@@ -1,5 +1,6 @@
 import { parse, run } from '@csp/lang'
 import {
+  CITY_NAME_MAX_LENGTH,
   REALM_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
   SCRIPT_API,
@@ -11,7 +12,8 @@ import {
 import { describe, expect, it } from 'vitest'
 import { recordEvent } from './events.js'
 import { OrderQueue } from './orders.js'
-import { residentNamesWellFormed } from './renaming.js'
+import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
+import { lastSeenOutOfSight, stepLastSeen } from './last-seen.js'
 import { bindScript } from './script-bindings.js'
 import { entitiesInSight } from './sight.js'
 import { foundStartingCity } from './starting-city.js'
@@ -218,6 +220,174 @@ describe('resident-names-well-formed invariant', () => {
     expect(residentNamesWellFormed.check(world, terrain).map((v) => v.entityIds)).toEqual([
       [leader.id],
       [miner.id],
+    ])
+  })
+})
+
+describe('Renaming a city', () => {
+  /** Mara's starting city and Tobin's; `renameCity` renames by hand, from Mara's Leader. */
+  function citySetup() {
+    const s = setup()
+    const city = s.world.cities.find((c) => c.realmId === s.realm.id)!
+    const theirs = s.world.cities.find((c) => c.realmId === s.stranger.owner)!
+    const renameCity = (cityId: string, name: unknown, sender = mara, residentId = s.leader.id) =>
+      s.order({ kind: 'renameCity', residentId, cityId, name }, sender)
+    return { ...s, city, theirs, renameCity }
+  }
+
+  it('gives a city of your realm the new name, trimmed, from anywhere', () => {
+    const { world, terrain, leader, city, renameCity } = citySetup()
+    Object.assign(leader, { x: leader.x + 60, y: leader.y + 60 })
+    expect(renameCity(city.id, '  Ironhold ')).toBe('ok')
+    expect(city.name).toBe('Ironhold')
+    expect(cityNamesWellFormed.check(world, terrain)).toEqual([])
+  })
+
+  it('lets city names repeat', () => {
+    const { city, theirs, renameCity } = citySetup()
+    expect(renameCity(city.id, theirs.name)).toBe('ok')
+    expect(city.name).toBe(theirs.name)
+  })
+
+  it('refuses other realms’ cities and NPC cities', () => {
+    const { world, city, theirs, renameCity, stranger } = citySetup()
+    const before = theirs.name
+    expect(renameCity(theirs.id, 'Mine now')).toBe('not one of your cities')
+    expect(theirs.name).toBe(before)
+    // An NPC city keeps its name, also when a Player's resident is the one asking.
+    city.realmId = null
+    expect(renameCity(city.id, 'Mine now')).toBe('not one of your cities')
+    // Nor through a resident of someone else's.
+    city.realmId = stranger.owner
+    expect(renameCity(city.id, 'X', mara, stranger.id)).toBe('not one of your residents')
+    expect(world.cities.every((c) => c.name !== 'Mine now' && c.name !== 'X')).toBe(true)
+  })
+
+  it('refuses bad names', () => {
+    const { city, renameCity } = citySetup()
+    const before = city.name
+    expect(renameCity(city.id, '')).toBe('Name: needs a name')
+    expect(renameCity(city.id, '  ')).toBe('Name: needs a name')
+    expect(renameCity(city.id, 7)).toBe('Name: needs a name')
+    expect(renameCity(city.id, 'x'.repeat(CITY_NAME_MAX_LENGTH + 1))).toBe(
+      `Name: at most ${CITY_NAME_MAX_LENGTH} characters`,
+    )
+    expect(city.name).toBe(before)
+    expect(renameCity(city.id, 'x'.repeat(CITY_NAME_MAX_LENGTH))).toBe('ok')
+  })
+
+  it('keeps its name when it changes hands, until its new owner renames it', () => {
+    const { city, stranger, renameCity } = citySetup()
+    const before = city.name
+    city.realmId = stranger.owner
+    expect(city.name).toBe(before)
+    expect(renameCity(city.id, 'Ironhold')).toBe('not one of your cities')
+    expect(renameCity(city.id, 'Tobinsby', tobin, stranger.id)).toBe('ok')
+    expect(city.name).toBe('Tobinsby')
+  })
+
+  it('keeps the old name in realm log entries from before', () => {
+    const { world, city, renameCity } = citySetup()
+    const before = city.name
+    const logged = JSON.stringify(world.events)
+    expect(
+      world.events.some((e) => e.userId === mara.userId && 'city' in e && e.city === before),
+    ).toBe(true)
+    expect(renameCity(city.id, 'Ironhold')).toBe('ok')
+    expect(JSON.stringify(world.events)).toBe(logged)
+  })
+
+  it('is learnt by others only by sight: their Last seen keeps the old name', () => {
+    const { world, terrain, city, stranger, renameCity } = citySetup()
+    const hall = world.buildings.find((b) => b.id === city.townHallId)!
+    const tobins = world.residents.filter((r) => r.owner === stranger.owner)
+    const homes = tobins.map((r) => ({ x: r.x, y: r.y }))
+    const step = () => {
+      world.tick++
+      stepLastSeen(world, terrain.size)
+    }
+    const remembered = () =>
+      lastSeenOutOfSight(world, tobin.userId).find((e) => e.id === city.id) as
+        { name: string } | undefined
+    const before = city.name
+    // Tobin's people stand at Mara's town hall, then go home.
+    for (const r of tobins) Object.assign(r, { x: hall.x, y: hall.y + 3 })
+    step()
+    tobins.forEach((r, i) => Object.assign(r, homes[i]))
+    step()
+    expect(remembered()?.name).toBe(before)
+
+    expect(renameCity(city.id, 'Ironhold')).toBe('ok')
+    step()
+    step()
+    expect(remembered()?.name).toBe(before)
+    // What Tobin is sent of it keeps the old name too.
+    const seen = entitiesInSight(world, terrain, stranger.owner!)
+    expect(seen.some((e) => e.id === city.id)).toBe(false)
+
+    // Back in sight: Tobin sees the new name, and no longer remembers the old one.
+    for (const r of tobins) Object.assign(r, { x: hall.x, y: hall.y + 3 })
+    step()
+    expect(remembered()).toBeUndefined()
+    expect(
+      entitiesInSight(world, terrain, stranger.owner!).find((e) => e.id === city.id),
+    ).toMatchObject({
+      name: 'Ironhold',
+    })
+    tobins.forEach((r, i) => Object.assign(r, homes[i]))
+    step()
+    expect(remembered()?.name).toBe('Ironhold')
+  })
+})
+
+describe('Renaming a city from a script', () => {
+  it('is in the script API and does what the order does', () => {
+    expect(SCRIPT_API.some((b) => b.name === 'renameCity' && b.is === 'action')).toBe(true)
+    const { world, terrain, realm, miner, stranger } = setup()
+    const city = world.cities.find((c) => c.realmId === realm.id)!
+    const theirs = world.cities.find((c) => c.realmId === stranger.owner)!
+    const memory: { answer?: unknown } = {}
+    const script = (source: string) => {
+      const { globals, requests } = bindScript({
+        world,
+        terrain,
+        sender: mara,
+        residentId: miner.id,
+        memory,
+        seen: () => entitiesInSight(world, terrain, realm.id),
+        explored: () => true,
+      })
+      run(parse(source), { globals, steps: 10_000, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+      return requests
+    }
+    const requests = script(`memory.answer = renameCity("${city.id}", "Ironhold")`)
+    expect(memory.answer).toBeNull()
+    expect(requests).toEqual([
+      { kind: 'renameCity', residentId: miner.id, cityId: city.id, name: 'Ironhold' },
+    ])
+    const queue = new OrderQueue(undefined, terrain)
+    expect(queue.receive(world, mara, 'q', requests[0]).type).toBe('ack')
+    queue.applyAll(world)
+    expect(city.name).toBe('Ironhold')
+
+    expect(script(`memory.answer = renameCity("${theirs.id}", "Mine")`)).toEqual([])
+    expect(memory.answer).toBe('not one of your cities')
+    script(`memory.answer = renameCity("${city.id}", "")`)
+    expect(memory.answer).toBe('Name: needs a name')
+  })
+})
+
+describe('city-names-well-formed invariant', () => {
+  it('reports an empty, untrimmed or too long name', () => {
+    const { world, terrain, realm, stranger } = setup()
+    expect(cityNamesWellFormed.check(world, terrain)).toEqual([])
+    const city = world.cities.find((c) => c.realmId === realm.id)!
+    const theirs = world.cities.find((c) => c.realmId === stranger.owner)!
+    city.name = 'Ironhold '
+    theirs.name = ''
+    expect(cityNamesWellFormed.check(world, terrain).map((v) => v.entityIds)).toEqual([
+      [city.id],
+      [theirs.id],
     ])
   })
 })

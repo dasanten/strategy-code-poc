@@ -1,5 +1,12 @@
-import { useEffect, useRef, type ReactNode } from 'react'
-import type { Building, BuildingKind, Resident, ResourceKind } from '@csp/shared'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  CITY_NAME_MAX_LENGTH,
+  nameProblem,
+  type Building,
+  type BuildingKind,
+  type Resident,
+  type ResourceKind,
+} from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
 import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
@@ -158,6 +165,7 @@ export function TileCard({
   onBuildHere,
   onSetGate,
   onOpenCity,
+  onRenameCity,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -176,8 +184,12 @@ export function TileCard({
   onSetGate: (gateId: string, open: boolean) => void
   /** Opens the city inspector at a city. */
   onOpenCity: (cityId: string) => void
+  /** Renames a city of the Player's realm (`CONTEXT.md`: Renaming a city). */
+  onRenameCity: (cityId: string, name: string) => void
 }) {
   const actions = tileActions(card, actor, tick)
+  const [open, setOpen] = useState<string | undefined>()
+  const shown = actions.some((a) => a.id === open) ? open : undefined
   const icon =
     card.what === 'building' && building
       ? BUILDING_ART[building.kind]
@@ -218,13 +230,25 @@ export function TileCard({
       {actions.length > 0 && (
         <ActionRows
           actions={actions}
-          open={undefined}
+          open={shown}
           onAction={(a) => {
+            if (a.opens) setOpen(shown === a.id ? undefined : a.id)
             if (a.id === 'sendHere') onSendHere()
             if (a.id === 'build' && card.buildHere?.at)
               onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)
             if (a.id === 'openCity' && card.city) onOpenCity(card.city.id)
+          }}
+        />
+      )}
+      {shown === 'renameCity' && card.renameCity && (
+        <CityRenameBlock
+          // Starts again from the new name once the rename comes back.
+          key={card.renameCity.name}
+          name={card.renameCity.name}
+          onRename={(name) => {
+            setOpen(undefined)
+            onRenameCity(card.renameCity!.id, name)
           }}
         />
       )}
@@ -236,5 +260,46 @@ export function TileCard({
             : 'Pick one of your residents to send them here.'}
       </p>
     </SelectionCard>
+  )
+}
+
+/**
+ * Renaming a city (`CONTEXT.md`): a new name for a city of the Player's realm. Others learn it
+ * only when they see the city again.
+ */
+function CityRenameBlock({ name, onRename }: { name: string; onRename: (name: string) => void }) {
+  const [value, setValue] = useState(name)
+  const problem = nameProblem(value, CITY_NAME_MAX_LENGTH)
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    if (problem) return
+    onRename(value.trim())
+  }
+  return (
+    <section className="inspector-block" aria-label="Rename the city">
+      <div className="panel-head">
+        <h3>Rename the city</h3>
+        <span className="small muted">free, at once</span>
+      </div>
+      <form onSubmit={submit}>
+        <div className="order-buttons">
+          <input
+            value={value}
+            maxLength={CITY_NAME_MAX_LENGTH}
+            aria-label="New city name"
+            onChange={(e) => setValue(e.target.value)}
+            required
+          />
+        </div>
+        <p className="small muted">
+          Others go on knowing it by its old name until they see it again.
+        </p>
+        <div className="order-buttons">
+          <button type="submit" className="primary" disabled={!!problem}>
+            Rename
+          </button>
+        </div>
+      </form>
+    </section>
   )
 }

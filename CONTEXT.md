@@ -333,7 +333,7 @@ The shared language of the game. Domain terms only — no implementation details
   goods on them do not.
 - **Last seen:** a building or construction site a Player has had in sight (their own included)
   stays on their map after it leaves their sight, as it was when they last saw it: where it
-  stands, what it is, who held it and which city it belonged to, along with whatever else they
+  stands, what it is, who held it and which city it belonged to (by that city's name then), along with whatever else they
   were allowed to see then (its prices, what it held). It is marked with when they saw it and
   always shown apart from what is in sight now. It changes only when it comes back into sight:
   once any tile it stood on is in sight again, the Player sees what is there now, and a building

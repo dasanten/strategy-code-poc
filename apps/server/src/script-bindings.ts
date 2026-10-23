@@ -416,6 +416,8 @@ function residentActions(
         name: plain(name),
         ...(realmName === undefined || realmName === null ? {} : { realmName: plain(realmName) }),
       }),
+    renameCity: ([cityId, name]) =>
+      request('renameCity', { cityId: plain(cityId), name: plain(name) }),
     roadLine: ([x, y]) =>
       request('roadLine', {
         from: { x: resident.x, y: resident.y },
