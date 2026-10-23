@@ -29,6 +29,7 @@ import {
 } from '@csp/shared'
 import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
+import { knownThieves } from './crimes.js'
 import { stopWork, walkTo } from './npc-behaviour.js'
 import { startWork } from './work.js'
 
@@ -44,10 +45,12 @@ export function npcSoldierTarget(adults: number): number {
 }
 
 /**
- * One tick of NPC cities defending themselves (`CONTEXT.md`: NPC city, Combat): every city run by
- * the game sends its armed residents in its area after attackers there; one that isn't the Trade
- * Organization's also keeps soldiers by its size and closes its gates while armed outsiders are
- * near, and the Trade Org HQ builds its army (`tradeOrgArmyTarget`). Like the rest of an NPC city's behaviour it only gives orders a Player could give
+ * One tick of NPC cities defending themselves (`CONTEXT.md`: NPC city, Combat, Trading post):
+ * every city run by the game sends its armed residents in its area after attackers there, a
+ * trading post's after the thieves it knows of too; one that isn't the Trade Organization's also
+ * keeps soldiers by its size and closes its gates while armed outsiders are near, a trading post
+ * keeps soldiers by its size, and the Trade Org HQ builds its army (`tradeOrgArmyTarget`). Like
+ * the rest of an NPC city's behaviour it only gives orders a Player could give
  * (ADR 0002), or opens and closes its own gates as a realm does. Run before `stepNpcCities`, so
  * the work it hands out passes its soldiers by. `size` is the map's.
  */
@@ -83,6 +86,11 @@ export function stepNpcDefence(world: WorldState, size: number): void {
         tradeOrgArmyTarget(adults, tradeOrgArmyWanted(world)),
         goods,
       )
+    }
+    if (city.tradeOrg === 'post') {
+      // A trading post's warehouse keeps weapons in stock (`CONTEXT.md`: Stock floor).
+      const warehouse = world.buildings.find((b) => b.cityId === city.id && b.kind === 'warehouse')
+      keepSoldiers(world, city, people, npcSoldierTarget(adults), warehouse)
     }
     if (city.tradeOrg) continue
     const storage = world.buildings.find(
@@ -127,11 +135,24 @@ export function attackersOf(world: WorldState, city: City, size: number): Reside
 }
 
 /**
+ * The thieves a trading post goes after (`CONTEXT.md`: Trading post): the living culprits of
+ * thefts from it that it knows of or one of its residents saw, standing in its area.
+ */
+export function thievesOf(world: WorldState, city: City, size: number): Resident[] {
+  const thieves = knownThieves(world, city)
+  return world.residents.filter(
+    (r) => thieves.has(r.id) && r.health > 0 && inCityArea(world, city, r.x, r.y, size),
+  )
+}
+
+/**
  * A city's soldiers fight attackers in its area on their own (`CONTEXT.md`: Combat): each of its
- * defenders there (`defendsCity`) not already fighting goes after the nearest attacker.
+ * defenders there (`defendsCity`) not already fighting goes after the nearest attacker, a trading
+ * post's after the nearest thief it knows of too (`thievesOf`).
  */
 function fightAttackers(world: WorldState, city: City, people: Resident[], size: number): void {
   const attackers = attackersOf(world, city, size)
+  if (city.tradeOrg === 'post') attackers.push(...thievesOf(world, city, size))
   if (attackers.length === 0) return
   for (const r of people) {
     if (r.order?.kind === 'attack' || !defendsCity(world, city, r, size)) continue

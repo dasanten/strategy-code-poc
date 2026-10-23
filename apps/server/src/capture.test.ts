@@ -1,5 +1,13 @@
-import { Terrain, captorOf, type TerrainMap, type WorldState } from '@csp/shared'
+import {
+  TICKS_PER_GAME_DAY,
+  Terrain,
+  captorOf,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
 import { describe, expect, it } from 'vitest'
+import { captureCity } from './capture.js'
+import { routeEnd } from './caravans.js'
 import { attackOrder } from './combat.js'
 import {
   checkInvariants,
@@ -8,7 +16,8 @@ import {
   type Invariant,
 } from './invariants.js'
 import { mulberry32, newResident } from './residents.js'
-import { addCity } from './test-terrain.js'
+import { stepStockFloor } from './stock-floor.js'
+import { addCity, worldWithPost } from './test-terrain.js'
 import { stepWorld } from './world.js'
 import { createWorld } from './world.js'
 
@@ -311,5 +320,42 @@ describe('capturing a city', () => {
     for (const r of world.residents) if (r.cityId === 'npc') r.owner = 'r1'
     expect(n2.owner).toBe('r1')
     expect(checkInvariants(world, terrain, capture)).toEqual([])
+  })
+})
+
+describe('Capturing a trading post', () => {
+  it('takes it out of the Trade Organization: its warehouse a storage, its orders to the HQ', () => {
+    const { world, terrain: land, post } = worldWithPost()
+    const realm = world.realms[0]!
+    const home = world.cities.find((c) => c.realmId === realm.id)!
+    const warehouse = world.buildings.find((b) => b.cityId === post.id && b.kind === 'warehouse')!
+    const route = world.caravans.find((c) => c.postId === post.id)!
+    const goods = routeEnd(world, route, 'hq').warehouse!
+    const delivery = {
+      id: 'delivery1',
+      kind: 'delivery' as const,
+      realmId: realm.id,
+      warehouseId: warehouse.id,
+      cityId: home.id,
+      good: 'wood' as const,
+      units: 5,
+      fee: 10,
+      caravanId: null,
+    }
+    world.deliveries.push(delivery)
+    const people = world.residents.filter((r) => r.cityId === post.id)
+    captureCity(world, post, realm.id, land.size)
+    expect(post).toMatchObject({ realmId: realm.id })
+    expect(post.tradeOrg).toBeUndefined()
+    for (const r of people) expect(r.owner).toBe(realm.id)
+    expect(warehouse.kind).toBe('storage')
+    expect(world.caravans.some((c) => c.postId === post.id)).toBe(false)
+    expect(world.deliveries).toEqual([{ ...delivery, warehouseId: goods.id }])
+    // No stock floor any more: what it holds runs out like any storage's.
+    warehouse.stock = {}
+    world.tick = TICKS_PER_GAME_DAY - 1
+    stepStockFloor(world)
+    expect(warehouse.stock).toEqual({})
+    expect(checkInvariants(world, land)).toEqual([])
   })
 })
