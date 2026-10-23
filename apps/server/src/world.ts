@@ -43,6 +43,7 @@ import { stepNpcCities } from './npc-behaviour.js'
 import { runNpcScripts } from './script-runner.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
 import { stepNpcDefence } from './npc-defence.js'
+import { stepLastSeen } from './last-seen.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -74,6 +75,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     joinRequests: [],
     punishments: [],
     directives: [],
+    lastSeen: {},
   }
 }
 
@@ -195,6 +197,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepStanding(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
+  stepLastSeen(world, terrain.size)
   const actions =
     steps.length +
     strikes.length +

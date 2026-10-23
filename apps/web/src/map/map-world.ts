@@ -30,6 +30,11 @@ export interface MapWorld {
   piles: Pile[]
   armies: Pick<Army, 'id' | 'realmId' | 'memberIds'>[]
   caravans: SeenCaravan[]
+  /**
+   * Buildings and cities the Player remembers out of their sight (`CONTEXT.md`: Last seen), drawn
+   * faded; none on the admin map.
+   */
+  lastSeen?: { cities: SeenCity[]; buildings: Building[] }
   diplomacy: { alliance?: { members: readonly { realmId: string }[] } | null }
   region: RegionState | null
   /** Set on the admin map, which looks at the world as nobody's (`CONTEXT.md`: admin map). */

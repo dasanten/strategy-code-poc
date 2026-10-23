@@ -62,6 +62,7 @@ import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
+import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 
 /**
  * What the selection card shows (ADR 0008): one of the Player's residents, or a tile of the map
@@ -345,6 +346,11 @@ export interface TileCard {
   buildHere?: { kind: BuildingKind; at: { x: number; y: number } | undefined }
   /** A city the card links to in the city inspector: an own town hall's, or where prices are. */
   city?: { id: string; label: string }
+  /**
+   * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
+   * and what they saw of it then, shown apart from the lines about what is there now.
+   */
+  lastSeen?: { when: string; lines: string[] }
 }
 
 /** What the Player sees on a tile, for the tile card. */
@@ -369,6 +375,8 @@ export interface TileThings {
   tick?: number
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
+  /** The buildings the Player remembers out of sight, and the tick now (`CONTEXT.md`: Last seen). */
+  lastSeen?: { buildings: LastSeenBuilding[]; tick: number }
   /** Where the node's workplace fits on what the Player knows (`nodeFit`), if anywhere. */
   nodeFit?: { x: number; y: number }
 }
@@ -490,21 +498,28 @@ function daysToFoal(stable: Building, inIt: SeenHorse[]): number | undefined {
 /**
  * The card for a tile: named after the most important thing on it (a building or site, then a
  * carriage, goods on the ground, a resource node, strangers), with a line for everything there.
+ * Where no building is in sight but the Player remembers one, the card is named after that, says
+ * when they last saw it and what they saw then, and offers nothing to do with it.
  */
 export function describeTile(t: TileThings, goodLabels: Record<string, string>): TileCard {
   const here = <T extends { x: number; y: number }>(xs: T[]) =>
     xs.filter((v) => v.x === t.x && v.y === t.y)
   // A building shows on every tile of its footprint, with its one pile (`CONTEXT.md`: At a building).
-  const building = t.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+  const live = t.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+  const remembered = live
+    ? undefined
+    : t.lastSeen?.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+  const building = live ?? remembered
   const road = here(t.buildings).find((b) => b.kind === 'road')
   const carriage = here(t.carriages)[0]
-  const pileTile = building ?? t
+  const pileTile = live ?? t
   const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
   const cityOf = (b: Building) => t.cities.find((c) => c.id === b.cityId)
   // Every horse in the stable on the tile, hitched or not, as it breeds and fills up
   // (`breedingPair`); elsewhere the horses on the tile not pulling a carriage.
   const hitched = new Set(t.carriages.map((k) => k.horseId))
-  const stable = building?.kind === 'stable' && !building.site ? building : undefined
+  // Who is in or at a building only remembered is not known.
+  const stable = live?.kind === 'stable' && !live.site ? live : undefined
   const horsesHere = t.horses.filter((h) =>
     stable ? covers(stable, h.x, h.y) : !hitched.has(h.id) && h.x === t.x && h.y === t.y,
   )
@@ -520,7 +535,10 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       title: building.site ? `${name} site` : city ? `${city.name} ${name.toLowerCase()}` : name,
       rel,
       what: 'building',
-      gate: building.kind === 'gate' && !building.site && rel === 'own' ? building : undefined,
+      gate:
+        building === live && building.kind === 'gate' && !building.site && rel === 'own'
+          ? building
+          : undefined,
     }
     lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
     if (building.site) {
@@ -532,21 +550,21 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       lines.push(stillNeeded(building, goodLabels))
     } else {
       const max = MAX_WORKERS[building.kind]
-      if (max !== undefined) lines.push(`${t.workers(building)} / ${max} workers`)
+      if (max !== undefined && live) lines.push(`${t.workers(live)} / ${max} workers`)
       if (stable) {
         lines.push(
           ...(horsesHere.length > 0 ? horseLines(horsesHere, horseRel) : ['No horses in it']),
         )
         lines.push(`Room for ${Math.max(0, STABLE_CAPACITY - horsesHere.length)} more horses`)
       }
-      const makes = makesLine(building, t, pile, goodLabels)
+      const makes = live && makesLine(live, t, pile, goodLabels)
       if (makes) lines.push(makes)
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       const foal = stable && daysToFoal(stable, horsesHere)
       if (foal) lines.push(`Next foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
-        lines.push(...townHallLines(city.id, t))
+        if (live) lines.push(...townHallLines(city.id, t))
         if (rel === 'own')
           card.city = { id: city.id, label: `Open ${city.name} in the city inspector` }
       }
@@ -556,6 +574,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       }
     }
     if (building.teardown) lines.push(teardownLine(building))
+    if (remembered && t.lastSeen) {
+      card.lastSeen = {
+        when: lastSeenText(remembered.seenAt, t.lastSeen.tick),
+        lines: lines.splice(0),
+      }
+    }
   }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)

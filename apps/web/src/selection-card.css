@@ -72,6 +72,12 @@
   flex-direction: column;
   gap: 2px;
 }
+/* What the Player only remembers (`CONTEXT.md`: Last seen): greyed, apart from what is there now. */
+.sel-past,
+.last-seen {
+  color: var(--ui-muted);
+  font-style: italic;
+}
 .sel-actions {
   display: flex;
   flex-direction: column;

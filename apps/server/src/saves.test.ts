@@ -12,7 +12,7 @@ import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.j
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { checkInvariants } from './invariants.js'
-import { smallTerrain, worldWithPost } from './test-terrain.js'
+import { smallTerrain, worldWithCity, worldWithPost } from './test-terrain.js'
 import {
   RESET_BEFORE,
   WORLD_FORMAT_VERSION,
@@ -112,7 +112,7 @@ describe('world saves', () => {
     for (const r of v37.residents) if (r.cityId === post.id) r.owner = realm.id
     v37.routeRobberies[post.id] = 2
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(38)
+    expect(WORLD_FORMAT_VERSION).toBe(39)
     const v38 = migrateWorld(structuredClone(v37), 37, { terrain: land })
     const city = v38.cities.find((c) => c.id === post.id)!
     expect(city.tradeOrg).toBeUndefined()
@@ -124,6 +124,15 @@ describe('world saves', () => {
     expect(v38.caravans.some((c) => c.postId === post.id)).toBe(false)
     expect(v38.routeRobberies).toEqual({})
     expect(checkInvariants(v38, land)).toEqual([])
+  })
+
+  it('migrates a format 38 world: every Player starts with an empty Last seen', () => {
+    const { world } = worldWithCity()
+    const old: Partial<typeof world> = { ...world }
+    delete old.lastSeen
+    const migrated = migrateWorld(old, 38, { terrain: smallTerrain() })
+    expect(migrated.lastSeen).toEqual({})
+    expect(migrated.buildings).toEqual(world.buildings)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

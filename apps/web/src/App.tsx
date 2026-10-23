@@ -361,6 +361,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           'cities',
           <CityInspector
             cities={world.cities}
+            lastSeen={world.lastSeen}
             residents={world.residents}
             buildings={world.buildings}
             realmId={world.home.realmId}
@@ -417,7 +418,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 terrain: terrainAt?.(selectedTile.x, selectedTile.y),
                 strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),
                 residents: world.residents,
-                cities: world.cities,
+                // A building remembered out of sight is named after its city as last seen.
+                cities: [...world.cities, ...world.lastSeen.cities],
+                lastSeen: { buildings: world.lastSeen.buildings, tick: world.tick },
                 tick: world.tick,
                 viewer: {
                   realmId: world.home.realmId,
@@ -435,7 +438,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               GOOD_LABELS,
             )}
             tick={world.tick}
-            building={world.buildings.find(
+            building={[...world.buildings, ...world.lastSeen.buildings].find(
               (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
             )}
             nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
