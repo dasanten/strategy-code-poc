@@ -136,6 +136,25 @@ export function commitCrime(
 }
 
 /**
+ * Who stole from an NPC city, as far as it knows (`CONTEXT.md`: Trading post): the culprits of
+ * thefts from it that it knows of or one of its residents saw.
+ */
+export function knownThieves(world: WorldState, city: City): Set<string> {
+  const ours = (id: string) =>
+    world.residents.some((r) => r.id === id && r.owner === null && r.cityId === city.id)
+  return new Set(
+    world.crimes
+      .filter(
+        (c) =>
+          c.kind === 'theft' &&
+          c.victimOrg === city.id &&
+          (c.knownBy.includes(city.id) || c.witnesses.some(ours)),
+      )
+      .map((c) => c.culprit.residentId),
+  )
+}
+
+/**
  * Spreads news of crimes (`CONTEXT.md`: Witness), on a map of `size` tiles. A witness who died
  * takes the news with them. One standing in the area of a city of their own Organization makes
  * the crime known to it, and is done; when that is the victim's Organization, the crime goes in

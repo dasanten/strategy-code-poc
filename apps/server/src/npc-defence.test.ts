@@ -5,8 +5,10 @@ import {
   NPC_TOWN,
   NPC_VILLAGE,
   TICKS_PER_GAME_DAY,
+  TRADING_POST,
   Terrain,
   canWork,
+  captorOf,
   isArmed,
   onOwnWall,
   type Building,
@@ -16,11 +18,14 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
+import { stepCaptures } from './capture.js'
 import { attackOrder } from './combat.js'
+import { commitCrime } from './crimes.js'
 import { checkInvariants } from './invariants.js'
 import { foundNpcCity } from './npc-cities.js'
 import { npcSoldierTarget, stepNpcDefence } from './npc-defence.js'
 import { mulberry32, newResident } from './residents.js'
+import { foundTradingPost } from './trading-posts.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
@@ -229,5 +234,66 @@ describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
     world.buildings = world.buildings.filter((b) => b !== gate)
     stepNpcDefence(world, terrain.size)
     expect(world.buildings.some((b) => b.cityId === city.id && b.closed)).toBe(false)
+  })
+})
+
+describe('Trading posts defend themselves', { timeout: 20_000 }, () => {
+  /** A trading post alone on a small Plains map, its top-left wall tile at (20, 20). */
+  function post(): { world: WorldState; terrain: TerrainMap; city: City } {
+    const terrain = plains(160)
+    const world = createWorld(terrain)
+    const city = foundTradingPost(world, terrain, 20, 20, undefined, mulberry32(7))
+    return { world, terrain, city }
+  }
+
+  it('arm soldiers from the warehouse, so one armed outsider does not capture the post', () => {
+    const { world, terrain, city } = post()
+    const hall = buildingOf(world, city, 'townHall')
+    const p = outsider(world, 'p1', hall.x, hall.y)
+    p.carried.sword = 1
+    expect(captorOf(world, city, terrain.size)).toBe('r1')
+    p.x = 140
+    run(world, terrain, new Walking(terrain), 2 * TICKS_PER_GAME_DAY)
+    const adults = citizens(world, city).filter((r) => canWork(r, world.tick))
+    expect(adults.filter(isArmed)).toHaveLength(npcSoldierTarget(TRADING_POST.residents))
+    const soldier = adults.find(isArmed)!
+    Object.assign(soldier, { x: hall.x, y: hall.y })
+    Object.assign(p, { x: hall.x, y: hall.y })
+    expect(captorOf(world, city, terrain.size)).toBeNull()
+    expect(stepCaptures(world, terrain.size)).toEqual([])
+    expect(citizens(world, city)).toHaveLength(TRADING_POST.residents)
+  })
+
+  it('go after a thief they saw, and commit no crime by it', () => {
+    const { world, terrain, city } = post()
+    const warehouse = buildingOf(world, city, 'warehouse')
+    const [soldier, bystander] = citizens(world, city)
+    for (const r of [soldier!, bystander!]) Object.assign(r, { x: warehouse.x, y: warehouse.y })
+    soldier!.carried.spear = 1
+    const honest = outsider(world, 'p0', warehouse.x - 1, warehouse.y)
+    const thief = outsider(world, 'p1', warehouse.x + 1, warehouse.y)
+    stepNpcDefence(world, terrain.size)
+    expect(soldier!.order?.kind).not.toBe('attack')
+    commitCrime(world, terrain.size, 'theft', thief, { victimOrg: city.id, goods: { coins: 5 } })
+    stepNpcDefence(world, terrain.size)
+    expect(soldier!.order).toMatchObject({ kind: 'attack', targetId: thief.id })
+    expect(bystander!.order?.kind).not.toBe('attack')
+    run(world, terrain, new Walking(terrain), TICKS_PER_GAME_DAY / 4)
+    expect(thief.health).toBeLessThan(MAX_HEALTH)
+    expect(honest.health).toBe(MAX_HEALTH)
+    expect(world.crimes.filter((c) => c.culprit.residentId === soldier!.id)).toEqual([])
+  })
+
+  it('leave a thief alone that nobody of theirs saw', () => {
+    const { world, terrain, city } = post()
+    const warehouse = buildingOf(world, city, 'warehouse')
+    const [soldier] = citizens(world, city)
+    Object.assign(soldier!, { x: warehouse.x, y: warehouse.y, order: null })
+    soldier!.carried.spear = 1
+    const thief = outsider(world, 'p1', warehouse.x + 1, warehouse.y)
+    commitCrime(world, terrain.size, 'theft', thief, { victimOrg: city.id, goods: { coins: 5 } })
+    world.crimes[0]!.witnesses = []
+    stepNpcDefence(world, terrain.size)
+    expect(soldier!.order).toBeNull()
   })
 })
