@@ -11,7 +11,8 @@ import { createAdmin } from './auth.js'
 import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
-import { smallTerrain } from './test-terrain.js'
+import { checkInvariants } from './invariants.js'
+import { smallTerrain, worldWithPost } from './test-terrain.js'
 import {
   RESET_BEFORE,
   WORLD_FORMAT_VERSION,
@@ -99,8 +100,30 @@ describe('world saves', () => {
   })
 
   it('has no migration steps from before the second reset', () => {
-    expect(WORLD_FORMAT_VERSION).toBe(RESET_BEFORE)
-    expect(Object.keys(migrations)).toEqual([])
+    expect(Object.keys(migrations).every((v) => Number(v) >= RESET_BEFORE)).toBe(true)
+  })
+
+  it('lets trading posts already captured leave the Trade Organization (migration 37 → 38)', () => {
+    const { world: v37, terrain: land, post } = worldWithPost()
+    const realm = v37.realms[0]!
+    const warehouse = v37.buildings.find((b) => b.cityId === post.id && b.kind === 'warehouse')!
+    // Captured the old way: the realm's, but still a Trade Org post with its caravan.
+    post.realmId = realm.id
+    for (const r of v37.residents) if (r.cityId === post.id) r.owner = realm.id
+    v37.routeRobberies[post.id] = 2
+    // The live format, so a step no version reaches would show here.
+    expect(WORLD_FORMAT_VERSION).toBe(38)
+    const v38 = migrateWorld(structuredClone(v37), 37, { terrain: land })
+    const city = v38.cities.find((c) => c.id === post.id)!
+    expect(city.tradeOrg).toBeUndefined()
+    expect(v38.buildings.find((b) => b.id === warehouse.id)).toMatchObject({
+      kind: 'storage',
+      stock: warehouse.stock,
+    })
+    expect(v37.caravans.some((c) => c.postId === post.id)).toBe(true)
+    expect(v38.caravans.some((c) => c.postId === post.id)).toBe(false)
+    expect(v38.routeRobberies).toEqual({})
+    expect(checkInvariants(v38, land)).toEqual([])
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

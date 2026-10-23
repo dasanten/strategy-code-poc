@@ -133,7 +133,13 @@ The shared language of the game. Domain terms only — no implementation details
   storage kind. The HQ keeps its coins in one and its other goods in another, inside the inner
   ring.
 - **Trading post:** a small Trade Org city in a region, with a warehouse, so Players can trade
-  nearby. Goods move between posts and HQ by caravan.
+  nearby. Goods move between posts and HQ by caravan. It keeps soldiers like an NPC city, armed
+  from its warehouse, so it is captured only by beating them; they fight attackers in its area,
+  and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
+  A captured post joins the captor's realm like any city and leaves the Trade Organization: its
+  warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
+  route ends, and the deliveries and transfers waiting there go over to the HQ, which sends them
+  out of its own stock.
 - **Trading with the Trade Organization:** only in person, by a resident (or a carriage) on a
   warehouse's tile, at its HQ or a trading post. Selling hands the goods into the warehouse and
   takes its coins into the resident's hands, as far as they can carry; buying is the other way
@@ -417,6 +423,24 @@ The shared language of the game. Domain terms only — no implementation details
   sends its army to take back the value and punish: to the culprit's city nearest the crime, to
   carry home twice what it lost (coins first), fighting whoever resists. It never captures the
   city, and leaves once it has what it came for.
+
+## Bandits
+
+- **Bandit camp:** an Organization the game spawns in a remote spot out of every Player's sight,
+  with a storage and a band of armed residents. Its standing toward everyone is fixed at hostile:
+  it never trades, sells, hires out or joins an alliance, and attacking or robbing it is never a
+  crime. Bandits and their camps are seen only in sight, like everything else.
+- **Band:** a camp has a set size. It doesn't pair or farm; it eats from its loot and starves
+  without it. Lost bandits are slowly replaced by drifters arriving, up to its size. When a camp
+  is wiped out, a new one may later spawn elsewhere, out of every Player's sight.
+- **Raiding:** a band goes after caravans and carriages on the move, lone residents far from home,
+  and weak cities. It skips any target whose respect is higher than its own: more armed residents
+  and walls in its sight than the band has bandits. At a city it fights whoever resists, carries
+  off what it can from the storage (Food and Coins first) and goes home; it never captures a city.
+  A band that is losing a fight flees home.
+- **Bandit loot:** carried to the camp's storage. Bandits eat its Food and arm themselves from its
+  weapons and armour. Whoever wipes out the camp can take what is left.
+- **Wiping out a camp:** kill or drive off every bandit and tear down the camp.
 
 ## People
 

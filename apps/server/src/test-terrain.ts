@@ -1,7 +1,8 @@
 import type { Building, City, TerrainMap, WorldState } from '@csp/shared'
 import { foundStartingCity } from './starting-city.js'
 import { generateTerrain } from './terrain-gen.js'
-import { createWorld } from './world.js'
+import { createWorld, generateWorld } from './world.js'
+import { tradingPosts } from './trading-posts.js'
 
 let small: TerrainMap | undefined
 let medium: TerrainMap | undefined
@@ -49,4 +50,15 @@ export function worldWithCity(): { world: WorldState; terrain: TerrainMap } {
   const world = createWorld(terrain)
   foundStartingCity(world, terrain, 1)
   return { world, terrain }
+}
+
+/**
+ * A generated world on `cityTerrain`, with its trading post and that post's caravan, where
+ * Player 1 has founded their starting city.
+ */
+export function worldWithPost(): { world: WorldState; terrain: TerrainMap; post: City } {
+  const terrain = cityTerrain()
+  const world = generateWorld(terrain, 1)
+  foundStartingCity(world, terrain, 1)
+  return { world, terrain, post: tradingPosts(world)[0]! }
 }

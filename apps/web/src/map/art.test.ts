@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { NODE_KINDS } from '@csp/shared'
-import { ACTIVITY_ART, ART_FILES, BUILDING_ART, NODE_ART, artInUse } from './art.js'
+import { FOOTPRINT, NODE_KINDS } from '@csp/shared'
+import {
+  ACTIVITY_ART,
+  ART_FILES,
+  BUILDING_ART,
+  NODE_ART,
+  PAINTED_FILES,
+  PAINTED_SHEET,
+  PAINTED_SITE_ART,
+  artInUse,
+  paintedCellsInUse,
+} from './art.js'
 import type { Activity } from './figures.js'
 import { BUILDING_NAMES } from './palette.js'
 
@@ -21,6 +31,13 @@ describe('map art registry', () => {
   it("has art for every resident's activity", () => {
     const activities: Activity[] = ['walking', 'carrying', 'working', 'fighting']
     for (const a of activities) expect(isSvg(ACTIVITY_ART[a]), a).toBe(true)
+  })
+
+  it('draws painted art from cells of the sheet, one site per footprint size', () => {
+    expect(PAINTED_FILES[PAINTED_SHEET.file]).toBeDefined()
+    const cells = PAINTED_SHEET.columns ** 2
+    for (const cell of paintedCellsInUse()) expect(cell >= 0 && cell < cells, `${cell}`).toBe(true)
+    expect(PAINTED_SITE_ART).toHaveLength(Math.max(...Object.values(FOOTPRINT)))
   })
 
   it('points to every SVG in the assets folder, each with a viewBox', () => {

@@ -8,6 +8,7 @@ import {
   type Horse,
   type WorldState,
 } from '@csp/shared'
+import { leaveTradeOrg } from './caravans.js'
 import { recordEvent } from './events.js'
 
 /** A city that changed realm by capture this tick. */
@@ -52,7 +53,8 @@ export function captureCity(world: WorldState, city: City, captor: string, size:
 
 /**
  * A city joins the realm `captor` with everything in it, as `captureCity` says, whether captured
- * or bought (`CONTEXT.md`: Buying a city). Returns how many of its residents joined.
+ * or bought (`CONTEXT.md`: Buying a city); a trading post leaves the Trade Organization
+ * (`leaveTradeOrg`). Returns how many of its residents joined.
  */
 export function joinRealm(world: WorldState, city: City, captor: string, size: number): number {
   const from = city.realmId
@@ -96,5 +98,6 @@ export function joinRealm(world: WorldState, city: City, captor: string, size: n
       r.order = null
   }
   city.realmId = captor
+  leaveTradeOrg(world, city)
   return joining.length
 }
