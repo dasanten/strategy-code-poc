@@ -58,9 +58,11 @@ describe('generateTerrain', () => {
     let ms: number
 
     beforeAll(() => {
-      const start = performance.now()
+      // CPU time, not the clock: other test files running alongside don't count against it.
+      const start = process.cpuUsage()
       map = generateTerrain(1)
-      ms = performance.now() - start
+      const used = process.cpuUsage(start)
+      ms = (used.user + used.system) / 1000
     }, 300_000)
 
     it('generates in under a minute', () => {

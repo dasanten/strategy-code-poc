@@ -412,7 +412,14 @@ describe('contracts when a Leader dies', () => {
       load: {},
     })
     at(world, 'm1').carried.wood = 2
-    const haul = { kind: 'haul', residentId: 'm1', carriageId: 'k2', x: 120, y: 40, goods: ['wood'] }
+    const haul = {
+      kind: 'haul',
+      residentId: 'm1',
+      carriageId: 'k2',
+      x: 120,
+      y: 40,
+      goods: ['wood'],
+    }
     expect(order(world, queue, hirerPlayer, { ...haul, keepFood: 0 })).toBe('ack')
     expect(at(world, 'm1').order).toMatchObject({ kind: 'haul' })
   }

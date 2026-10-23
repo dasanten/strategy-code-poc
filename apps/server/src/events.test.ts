@@ -76,11 +76,17 @@ describe('realm events', () => {
     world.buildings.find((b) => b.kind === 'stable')!.stock = {}
     world.carriages[0]!.load = { food: 100 }
     world.piles.push({ id: 'p1', x: world.residents[0]!.x, y: 0, goods: { food: 500 } })
+    const carried = () => world.residents.reduce((n, r) => n + (r.carried.food ?? 0), 0)
+    const carriedBefore = carried()
     for (let t = 0; t < TICKS_PER_GAME_DAY; t++) {
       stepSpoilage(world)
       world.tick++
     }
-    const lost = 1100 - storageOf(world).stock!.food! - world.carriages[0]!.load.food!
+    const lost =
+      1100 -
+      storageOf(world).stock!.food! -
+      world.carriages[0]!.load.food! +
+      (carriedBefore - carried())
     expect(lost).toBeGreaterThan(0)
     expect(eventsFor(world, realm.userId)).toEqual([
       expect.objectContaining({ kind: 'foodSpoiled', units: lost }),

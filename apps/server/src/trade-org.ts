@@ -170,7 +170,9 @@ function farmTiles(ground: Ground, cx: number, cy: number): Tile[] {
   const side = FOOTPRINT.farm
   const toGate = (t: Tile) =>
     Math.min(
-      ...outerGates.map((g) => Math.hypot(t[0] + (side - 1) / 2 - g[0], t[1] + (side - 1) / 2 - g[1])),
+      ...outerGates.map((g) =>
+        Math.hypot(t[0] + (side - 1) / 2 - g[0], t[1] + (side - 1) / 2 - g[1]),
+      ),
     )
   // North-west tiles of footprints that reach no further in than the ring just past the area.
   const candidates = new Map<string, Tile>()
@@ -327,7 +329,10 @@ export function foundTradeOrgHq(
     ...layout.houses.map((t) => building('house', t)),
     ...farms,
   ]
-  const workplaces = [building('smelter', layout.smelter, null), building('mint', layout.mint, null)]
+  const workplaces = [
+    building('smelter', layout.smelter, null),
+    building('mint', layout.mint, null),
+  ]
   city.workplaceIds = workplaces.map((b) => b.id)
   world.cities.push(city)
   world.buildings.push(...buildings, ...workplaces)

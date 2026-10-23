@@ -83,7 +83,7 @@ function siteFits(terrain: TerrainMap, ground: Ground, x: number, y: number): bo
     for (let tx = x - FARM_RING; tx < x + START_CITY_SIZE + FARM_RING; tx++) {
       const t = terrainAt(terrain, tx, ty)
       if (t !== Terrain.Plains && t !== Terrain.Forest && t !== Terrain.Hills) return false
-      if (!ground.free(tx, ty)) return false
+      if (!ground.free(tx, ty) || ground.nodeAt(tx, ty)) return false
     }
   }
   // Room outside the wall for the farm and the stable.
@@ -274,10 +274,11 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
   ]
   // Outside the wall, just past the city's area by the gate: the farm, and the stable next to it
   // with a little food.
-  const [[fx, fy], [sx, sy]] = spotsOutside(new Ground(world, terrain, residentTiles(world)), square, [
-    'farm',
-    'stable',
-  ])! as [[number, number], [number, number]]
+  const [[fx, fy], [sx, sy]] = spotsOutside(
+    new Ground(world, terrain, residentTiles(world)),
+    square,
+    ['farm', 'stable'],
+  )! as [[number, number], [number, number]]
   const farm = building('farm', fx, fy)
   buildings.push(farm, { ...building('stable', sx, sy), stock: { food: START_STABLE_FOOD } })
 

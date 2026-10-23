@@ -44,9 +44,7 @@ export function npcTradingStorageAt(
   x: number,
   y: number,
 ): { city: City; storage: Building } | undefined {
-  const storage = world.buildings.find(
-    (b) => b.kind === 'storage' && !b.site && covers(b, x, y),
-  )
+  const storage = world.buildings.find((b) => b.kind === 'storage' && !b.site && covers(b, x, y))
   const city = storage && world.cities.find((c) => c.id === storage.cityId)
   return city && forSale(city) ? { city, storage: storage! } : undefined
 }

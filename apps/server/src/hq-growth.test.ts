@@ -192,8 +192,8 @@ function weak() {
 }
 
 /**
- * Fills every spot between its rings the HQ could put a house on with a storage, so its housing
- * stays full: storages wherever one fits, row by row, in one pass.
+ * Fills every spot between its rings the HQ could put a house on, so its housing stays full:
+ * warehouses wherever one fits, row by row, then storages in the gaps.
  */
 function fillRoom(world: WorldState, hq: City, outermost: number) {
   const hall = townHallOf(world, hq)!
@@ -204,11 +204,14 @@ function fillRoom(world: WorldState, hq: City, outermost: number) {
     return d > TRADE_ORG_HQ.innerRadius && d <= r + 0.5
   }
   let n = 0
-  for (let y = MID - r; y <= MID + r; y++) {
-    for (let x = MID - r; x <= MID + r; x++) {
-      if (!ground.fits('storage', x, y, between)) continue
-      ground.take('storage', x, y)
-      world.buildings.push({ id: `fill${n++}`, kind: 'storage', cityId: hq.id, x, y })
+  // The biggest footprints first, so there are few buildings and the ticks stay quick.
+  for (const kind of ['warehouse', 'storage'] as const) {
+    for (let y = MID - r; y <= MID + r; y++) {
+      for (let x = MID - r; x <= MID + r; x++) {
+        if (!ground.fits(kind, x, y, between)) continue
+        ground.take(kind, x, y)
+        world.buildings.push({ id: `fill${n++}`, kind, cityId: hq.id, x, y })
+      }
     }
   }
   updateCityMembership(world, terrain.size)

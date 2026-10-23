@@ -45,7 +45,6 @@ export function idNumber(id: string): number {
   return Number(id.replace(/^\D+/, ''))
 }
 
-
 /**
  * Which city each finished city building belongs to (`CONTEXT.md`: City building), by id; a
  * building missing from it belongs to none. A town hall belongs to its own city. Cities grow
@@ -76,7 +75,12 @@ export function cityMembership(
     for (let dy = from; dy <= to; dy++) {
       for (let dx = from; dx <= to; dx++) {
         const n = byTile.get(`${wrap(b.x + dx, size)},${wrap(b.y + dy, size)}`)
-        if (n && n !== b && n.kind !== 'townHall' && footprintsNear(b, n, CITY_BUILDING_REACH, size))
+        if (
+          n &&
+          n !== b &&
+          n.kind !== 'townHall' &&
+          footprintsNear(b, n, CITY_BUILDING_REACH, size)
+        )
           out.push(n)
       }
     }
@@ -124,7 +128,9 @@ export function inCityArea(
 ): boolean {
   return world.buildings.some(
     (b) =>
-      b.cityId === city.id && isCityBuilding(b) && nearFootprint(b, { x, y }, CITY_AREA_MARGIN, size),
+      b.cityId === city.id &&
+      isCityBuilding(b) &&
+      nearFootprint(b, { x, y }, CITY_AREA_MARGIN, size),
   )
 }
 

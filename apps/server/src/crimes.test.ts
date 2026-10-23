@@ -20,7 +20,7 @@ import { resolveTearingDown } from './teardown.js'
 import { addCity } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
 
-const size = 64
+const size = 256
 const terrain: TerrainMap = { size, tiles: new Uint8Array(size * size).fill(Terrain.Plains) }
 
 /**

@@ -296,9 +296,7 @@ export function buyOffCoinWarehouseAt(
   x: number,
   y: number,
 ): Building | undefined {
-  const here = world.buildings.find(
-    (b) => covers(b, x, y) && warehouseKeeps(world, b).length > 0,
-  )
+  const here = world.buildings.find((b) => covers(b, x, y) && warehouseKeeps(world, b).length > 0)
   if (!here) return undefined
   if (warehouseKeeps(world, here).includes('coins')) return here
   return tradeCoinWarehouse(world, here)

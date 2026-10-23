@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { wrapDelta } from '@csp/shared'
 import { smallTerrain } from './test-terrain.js'
+import { generateTerrain } from './terrain-gen.js'
 import { createWorld, isWalkable, nearestFreeTile, stepWorld } from './world.js'
 
 const terrain = smallTerrain()
@@ -11,7 +12,8 @@ describe('world', () => {
   })
 
   it('starts with resource nodes and nobody yet', () => {
-    const world = createWorld(terrain)
+    // Nodes are a sixteenth per tile of what they were on the old grid: a small map has none.
+    const world = createWorld(generateTerrain(1, 512))
     expect(world.nodes.length).toBeGreaterThan(0)
     expect(world).toMatchObject({
       tick: 0,

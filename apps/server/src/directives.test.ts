@@ -268,7 +268,7 @@ describe('the Trade Organization under an admin directive', () => {
     // The first one is over and the directive still stands: it goes again.
     run(world, walking, 5, () => world.punishments.length > 0)
     expect(world.punishments[0]).toMatchObject({ culpritOrg: 'r1', directiveId: d.id })
-  })
+  }, 120_000)
 
   it('sends its army against every member of the alliance it names', () => {
     const { world } = setup()

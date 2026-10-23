@@ -1278,9 +1278,10 @@ export const WALL_STRENGTH: Record<'wall' | 'gate', number> = { wall: 600, gate:
 
 /**
  * Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
- * less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered.
+ * less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
+ * enough that a tile of wall leaves a unit of Wood.
  */
-export const BROKEN_MATERIALS_RETURNED = 0.3
+export const BROKEN_MATERIALS_RETURNED = 0.34
 
 /**
  * Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): a

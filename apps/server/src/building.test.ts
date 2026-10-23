@@ -195,6 +195,43 @@ describe('build order', () => {
     expect(world.buildings).toHaveLength(1)
   })
 
+  it('lays out the footprint from its north-west tile, the node on any tile; others join from any tile of it', () => {
+    const { world, r, queue } = setup()
+    // The forest node at (3, 3) is the south-east tile of a camp laid out from (2, 2).
+    r.x = r.y = 2
+    order(world, queue, buildOrder('lumberCamp'))
+    const site = siteOf(world)!
+    expect(site).toMatchObject({ kind: 'lumberCamp', x: 2, y: 2 })
+    const w2 = resident(world, 'w2', 3, 2)
+    expect(order(world, queue, buildOrder('lumberCamp', 'w2'))).toMatchObject({ type: 'ack' })
+    expect(w2.order).toMatchObject({ kind: 'build', siteId: site.id })
+    expect(world.buildings).toHaveLength(1)
+    // A tile next to the footprint is not at the site: there, a camp would be a new one.
+    resident(world, 'w3', 4, 2)
+    expect(queue.receive(world, me, 'x', buildOrder('lumberCamp', 'w3'))).toMatchObject({
+      type: 'rejected',
+      reason: 'a lumberCamp goes with one tile on a fitting resource node',
+    })
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('gathers goods lying on the footprint into the site’s one pile when it is laid out', () => {
+    const { world, r, queue } = setup()
+    r.x = r.y = 2
+    world.piles.push(
+      { id: 'p1', x: 3, y: 3, goods: { wood: 2 } },
+      { id: 'p2', x: 2, y: 3, goods: { wood: 1, stone: 4 } },
+      { id: 'p3', x: 4, y: 3, goods: { food: 5 } }, // just off it
+    )
+    order(world, queue, buildOrder('lumberCamp'))
+    expect(siteOf(world)).toMatchObject({ x: 2, y: 2 })
+    expect(world.piles.map((p) => [p.x, p.y, p.goods])).toEqual([
+      [4, 3, { food: 5 }],
+      [2, 2, { wood: 3, stone: 4 }],
+    ])
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
   it('stops when the resident leaves the tile; an unattended site stays for anyone', () => {
     const { world, r, queue } = setup()
     order(world, queue, buildOrder('lumberCamp'))
@@ -213,9 +250,13 @@ describe('build order', () => {
     }
     expect(reject(buildOrder('lumberCamp'), stranger)).toBe('not one of your residents')
     expect(reject(buildOrder('storage'))).toBe('that can’t be built')
-    expect(reject(buildOrder('quarry'))).toBe('a quarry goes with one tile on a fitting resource node')
+    expect(reject(buildOrder('quarry'))).toBe(
+      'a quarry goes with one tile on a fitting resource node',
+    )
     r.x = 1
-    expect(reject(buildOrder('lumberCamp'))).toBe('a lumberCamp goes with one tile on a fitting resource node')
+    expect(reject(buildOrder('lumberCamp'))).toBe(
+      'a lumberCamp goes with one tile on a fitting resource node',
+    )
     r.x = 3
     r.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
     expect(reject(buildOrder('lumberCamp'))).toBe('children can’t build')
@@ -223,6 +264,9 @@ describe('build order', () => {
     world.buildings.push({ id: 'b9', kind: 'lumberCamp', cityId: null, x: 3, y: 3 })
     expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building there')
     world.buildings = [{ id: 'b9', kind: 'wall', cityId: null, x: 3, y: 3 }]
+    expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building there')
+    // A wall on another tile of the camp's footprint is in the way too.
+    world.buildings = [{ id: 'b9', kind: 'wall', cityId: null, x: 4, y: 4 }]
     expect(reject(buildOrder('lumberCamp'))).toBe('there is already a building there')
     expect(queue.size).toBe(0)
   })

@@ -110,7 +110,14 @@ export function controlSources(world: WorldState, size: number): ControlSource[]
       if (g === 0) continue
       const strength =
         TERRITORY_WORKPLACE_BASE + n * TERRITORY_PER_RESIDENT + g * TERRITORY_PER_ARMED
-      out.push(source(b.id, owner, strength, footprintTiles(b, size).map(([x, y]) => ({ x, y }))))
+      out.push(
+        source(
+          b.id,
+          owner,
+          strength,
+          footprintTiles(b, size).map(([x, y]) => ({ x, y })),
+        ),
+      )
     }
   }
   return out
@@ -178,7 +185,8 @@ function nearestWithin(
     const d = transform1d(grid.subarray(y * w, (y + 1) * w), w)
     for (let x = 0; x < w; x++) {
       const dist = Math.sqrt(d[x]!)
-      if (dist <= reach) out.set(`${wrap(first.x + x0 + x, size)},${wrap(first.y + y0 + y, size)}`, dist)
+      if (dist <= reach)
+        out.set(`${wrap(first.x + x0 + x, size)},${wrap(first.y + y0 + y, size)}`, dist)
     }
   }
   return out

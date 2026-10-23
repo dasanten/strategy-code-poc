@@ -28,7 +28,7 @@ import { addCity } from './test-terrain.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 128, tiles: new Uint8Array(128 * 128).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 512, tiles: new Uint8Array(512 * 512).fill(Terrain.Plains) }
 const me = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 const them = { userId: 8, account: { name: 'Tom', isAdmin: false } }
 

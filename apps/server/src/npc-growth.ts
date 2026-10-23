@@ -209,7 +209,8 @@ function takePart(
   const need = materialsNeeded(site)
   const carried = pick(r.carried, need)
   if (carried) {
-    if (isAt(r, site)) r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
+    if (isAt(r, site))
+      r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
     else walkTo(r, site)
     return true
   }
@@ -293,8 +294,7 @@ function makes(world: WorldState, city: City, good: Good): boolean {
  */
 function nearestNode(world: WorldState, home: Building, terrain: TerrainMap, good: Good) {
   let best:
-    | { node: (typeof world.nodes)[number]; at: { x: number; y: number }; d: number }
-    | undefined
+    { node: (typeof world.nodes)[number]; at: { x: number; y: number }; d: number } | undefined
   for (const node of world.nodes) {
     if (NODE_GOOD[node.kind] !== good) continue
     const d = wrapDistance(terrain.size, home, node)

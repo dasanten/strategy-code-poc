@@ -1,4 +1,5 @@
 import {
+  FOOTPRINT,
   HOME_FOOD_LOW,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_MAX_WORKERS,
@@ -139,7 +140,7 @@ describe('work-at order', () => {
   it('stops when the resident leaves the farm', () => {
     const { world, r, queue } = setup()
     order(world, queue)
-    r.x = 4
+    r.x = 3 + FOOTPRINT.farm // just off its footprint
     run(world)
     expect(r.order).toBeNull()
   })
@@ -157,6 +158,18 @@ describe('farm work', () => {
     expect(o.kind === 'workAt' && o.progress + piled).toBeCloseTo(FARM_FOOD_PER_DAY, 0)
     expect(r.carried).toEqual({ food: HOME_FOOD_LOW })
     expect(r.skills.farming).toBeCloseTo(1, 1)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('is worked from any tile of the farm, onto its one pile on the north-west tile', () => {
+    const { world, r, queue } = setup()
+    r.x = r.y = 3 + FOOTPRINT.farm - 1 // its south-east tile
+    order(world, queue)
+    expect(r.order).toMatchObject({ kind: 'workAt', buildingId: 'farm', at: { x: 6, y: 6 } })
+    run(world, TICKS_PER_GAME_DAY - 2)
+    expect(world.piles.map((p) => [p.x, p.y])).toEqual([[3, 3]])
+    expect(pileAt(world, 6, 6)).toBe(pileAt(world, 3, 3))
+    expect(pileAt(world, 3, 3)!.goods.food).toBeGreaterThan(0)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
@@ -204,7 +217,7 @@ describe('farm work', () => {
   it('catches a worker who is not on their farm, or a farm with too many workers', () => {
     const { world, r, queue } = setup()
     order(world, queue)
-    r.x = 4
+    r.x = 3 + FOOTPRINT.farm // just off its footprint
     expect(workOrdersOnWorkplaces.check(world, terrain)).toEqual([
       expect.objectContaining({ entityIds: ['w1', 'farm'] }),
     ])
@@ -337,7 +350,7 @@ describe('holding a workplace', () => {
     order(world, queue)
     expect(holdersOf(world, farm)).toEqual(['r1'])
     // r1's worker walks off: the farm (built for r1's city) is nobody's now.
-    r.x = 4
+    r.x = 3 + FOOTPRINT.farm // just off its footprint
     run(world)
     expect(holdersOf(world, farm)).toEqual([])
     const s = rival(world, 3, 3)

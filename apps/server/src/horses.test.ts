@@ -133,8 +133,9 @@ describe('horse hunger', () => {
 
   it('eats from its stable before food on the ground, and an emptied pile is gone', () => {
     const { world, stable } = setup(1)
-    const h = horse(world, 'h1', 8, 8)
-    world.piles.push({ id: 'p1', x: 8, y: 9, goods: { food: 1 } })
+    // On the stable's south edge, with food just past it.
+    const h = horse(world, 'h1', 8, 10)
+    world.piles.push({ id: 'p1', x: 8, y: 11, goods: { food: 1 } })
     h.hunger = 0
     stepHorses(world, terrain)
     expect(stable.stock).toEqual({})
@@ -173,7 +174,7 @@ describe('stable breeding', () => {
     const lone = setup(1000)
     horse(lone.world, 'h1', 8, 8)
     // A horse next to the stable is not in it.
-    horse(lone.world, 'h2', 8, 9)
+    horse(lone.world, 'h2', 8, 11)
     stepHorses(lone.world, terrain)
     expect(lone.stable.breeding).toBeUndefined()
 

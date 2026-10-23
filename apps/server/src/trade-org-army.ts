@@ -157,11 +157,12 @@ function payMercenaries(world: WorldState, hq: City): void {
 
 /** The HQ's inner gates: its gates on the inner ring, not the outer. */
 function innerGates(world: WorldState, hq: City, hall: Building, size: number): Building[] {
+  const c = middleOf(hall, size)
   return world.buildings.filter(
     (b) =>
       b.cityId === hq.id &&
       b.kind === 'gate' &&
-      Math.hypot(wrapDelta(hall.x, b.x, size), wrapDelta(hall.y, b.y, size)) <=
+      Math.hypot(wrapDelta(c.x, b.x, size), wrapDelta(c.y, b.y, size)) <=
         TRADE_ORG_HQ.innerRadius + 1,
   )
 }

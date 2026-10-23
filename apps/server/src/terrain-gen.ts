@@ -107,12 +107,37 @@ function fbmField(size: number, spacing: number, octaves: number, seed: number):
   return out
 }
 
-/** The value below which `share` of `values` lie. */
+/**
+ * The value below which `share` of `values` lie: the one that would stand at that place if they
+ * were sorted, found without sorting them (quickselect), as a full map has 33 million.
+ */
 function quantile(values: Float32Array, share: number): number {
   if (values.length === 0) return Infinity
-  const sorted = values.slice().sort()
-  const i = Math.min(sorted.length - 1, Math.max(0, Math.floor(share * sorted.length)))
-  return sorted[i]!
+  const a = values.slice()
+  const k = Math.min(a.length - 1, Math.max(0, Math.floor(share * a.length)))
+  let lo = 0
+  let hi = a.length - 1
+  while (lo < hi) {
+    // The middle of three as the pivot, then Hoare's partition around it.
+    const mid = (lo + hi) >>> 1
+    const [p, q, r] = [a[lo]!, a[mid]!, a[hi]!]
+    const pivot = Math.max(Math.min(p, q), Math.min(Math.max(p, q), r))
+    let i = lo
+    let j = hi
+    while (i <= j) {
+      while (a[i]! < pivot) i++
+      while (a[j]! > pivot) j--
+      if (i <= j) {
+        const t = a[i]!
+        a[i++] = a[j]!
+        a[j--] = t
+      }
+    }
+    if (k <= j) hi = j
+    else if (k >= i) lo = i
+    else break
+  }
+  return a[k]!
 }
 
 /** The four tiles sharing a side with tile `t`, across the joins. */
@@ -125,6 +150,19 @@ export function neighbours(size: number, t: number): [number, number, number, nu
     wrap(y + 1, size) * size + x,
     wrap(y - 1, size) * size + x,
   ]
+}
+
+/**
+ * The `i`th (0 to 3) of `neighbours(size, t)`, without making an array: for the loops over every
+ * tile of a full map.
+ */
+function neighbour(size: number, t: number, i: number): number {
+  const x = t % size
+  const y = (t - x) / size
+  if (i === 0) return y * size + (x + 1 === size ? 0 : x + 1)
+  if (i === 1) return y * size + (x === 0 ? size - 1 : x - 1)
+  if (i === 2) return (y + 1 === size ? 0 : y + 1) * size + x
+  return (y === 0 ? size - 1 : y - 1) * size + x
 }
 
 /** Steps from every tile to the nearest tile where `from` is true (4 neighbours, across joins). */
@@ -141,7 +179,8 @@ function stepsFrom(size: number, from: (t: number) => boolean): Int32Array {
   }
   while (head < tail) {
     const t = queue[head++]!
-    for (const n of neighbours(size, t)) {
+    for (let i = 0; i < 4; i++) {
+      const n = neighbour(size, t, i)
       if (dist[n] === -1) {
         dist[n] = dist[t]! + 1
         queue[tail++] = n
@@ -156,20 +195,23 @@ export function landGroups(map: TerrainMap): { group: Int32Array; sizes: number[
   const { size, tiles } = map
   const group = new Int32Array(size * size).fill(-1)
   const sizes: number[] = []
-  const stack: number[] = []
+  // Each tile goes on the stack at most once, labelled as it does.
+  const stack = new Int32Array(size * size)
+  let top = 0
   for (let start = 0; start < size * size; start++) {
     if (group[start] !== -1 || !isPassableTerrain(tiles[start]!)) continue
     const g = sizes.length
     let count = 0
     group[start] = g
-    stack.push(start)
-    while (stack.length > 0) {
-      const t = stack.pop()!
+    stack[top++] = start
+    while (top > 0) {
+      const t = stack[--top]!
       count++
-      for (const n of neighbours(size, t)) {
+      for (let i = 0; i < 4; i++) {
+        const n = neighbour(size, t, i)
         if (group[n] === -1 && isPassableTerrain(tiles[n]!)) {
           group[n] = g
-          stack.push(n)
+          stack[top++] = n
         }
       }
     }
@@ -220,19 +262,19 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
 
   // Lakes: the lowest spots of a blobby field, only well away from the sea.
   const fromSea = stepsFrom(size, (t) => tiles[t] === Terrain.Sea)
-  const lakeAt: number[] = []
-  const lakeField: number[] = []
+  // Typed arrays filled up to a count, here and below: a full map has too many tiles for plain ones.
+  const lakeAt = new Int32Array(n)
+  const lakeTiles = new Float32Array(n)
+  let lakes = 0
   const lakeNoise = fbmField(size, 360, 3, seed + 1)
   for (let t = 0; t < n; t++) {
     if (tiles[t] === Terrain.Sea || fromSea[t]! <= LAKE_COAST_MARGIN) continue
-    lakeAt.push(t)
-    lakeField.push(lakeNoise[t]!)
+    lakeAt[lakes] = t
+    lakeTiles[lakes++] = lakeNoise[t]!
   }
-  const lakeCut = quantile(
-    Float32Array.from(lakeField),
-    (TERRAIN_SHARES.lake * n) / lakeField.length,
-  )
-  for (let k = 0; k < lakeAt.length; k++) {
+  const lakeField = lakeTiles.subarray(0, lakes)
+  const lakeCut = quantile(lakeField, (TERRAIN_SHARES.lake * n) / lakes)
+  for (let k = 0; k < lakes; k++) {
     if (lakeField[k]! < lakeCut) tiles[lakeAt[k]!] = Terrain.Lake
   }
 
@@ -240,7 +282,8 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
   // The highest ridge tiles are mountains, the band below them hills.
   const isLand = (t: number) => tiles[t] !== Terrain.Sea && tiles[t] !== Terrain.Lake
   const relief = new Float32Array(n)
-  const landRelief: number[] = []
+  const landTiles = new Float32Array(n)
+  let landCount = 0
   const ridges = fbmField(size, 640, 4, seed + 2)
   const masks = fbmField(size, 1600, 2, seed + 3)
   for (let t = 0; t < n; t++) {
@@ -248,10 +291,9 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
     const ridge = 1 - Math.abs(2 * ridges[t]! - 1)
     const mask = masks[t]!
     relief[t] = ridge * ridge * mask
-    landRelief.push(relief[t]!)
+    landTiles[landCount++] = relief[t]!
   }
-  const reliefSorted = Float32Array.from(landRelief)
-  const landCount = landRelief.length
+  const reliefSorted = landTiles.subarray(0, landCount)
   const mountainCut = quantile(reliefSorted, 1 - (TERRAIN_SHARES.mountain * n) / landCount)
   const hillsCut = quantile(
     reliefSorted,
@@ -260,14 +302,15 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
 
   // Forest: patches of a separate field among the remaining land; plains everywhere else.
   const growth = fbmField(size, 280, 4, seed + 4)
-  const flatGrowth: number[] = []
+  const flatTiles = new Float32Array(n)
+  let flat = 0
   for (let t = 0; t < n; t++) {
     if (!isLand(t) || relief[t]! >= hillsCut) continue
-    flatGrowth.push(growth[t]!)
+    flatTiles[flat++] = growth[t]!
   }
   const forestCut = quantile(
-    Float32Array.from(flatGrowth),
-    1 - (TERRAIN_SHARES.forest * n) / flatGrowth.length,
+    flatTiles.subarray(0, flat),
+    1 - (TERRAIN_SHARES.forest * n) / flat,
   )
   for (let t = 0; t < n; t++) {
     if (!isLand(t)) continue

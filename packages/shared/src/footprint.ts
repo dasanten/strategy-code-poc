@@ -87,8 +87,9 @@ export function nearFootprint(
 }
 
 /**
- * Whether two footprints come within `reach` tiles of each other along each direction (0: they
- * touch or overlap), the short way round.
+ * Whether two footprints come within `reach` steps of each other along each direction, from the
+ * edge of one to the edge of the other (0: they overlap or are in line, 1: they touch), the short
+ * way round.
  */
 export function footprintsNear(a: Placed, b: Placed, reach: number, size = MAP_SIZE): boolean {
   const sa = FOOTPRINT[a.kind]

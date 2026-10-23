@@ -298,8 +298,7 @@ export function hasInput(world: WorldState, workplace: Building, recipe: Recipe)
 /** The residents working a workplace: holding a work-at order for it and standing at it. */
 export function workersOf(world: Pick<WorldState, 'residents'>, workplace: Building): Resident[] {
   return world.residents.filter(
-    (r) =>
-      r.order?.kind === 'workAt' && r.order.buildingId === workplace.id && isAt(r, workplace),
+    (r) => r.order?.kind === 'workAt' && r.order.buildingId === workplace.id && isAt(r, workplace),
   )
 }
 

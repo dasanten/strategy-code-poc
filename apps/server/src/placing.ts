@@ -42,11 +42,21 @@ export class Ground {
     return !this.taken.has(`${x},${y}`)
   }
 
+  /** The resource node on the tile, if there is one. */
+  nodeAt(x: number, y: number): ResourceNode | undefined {
+    return this.nodes.get(`${x},${y}`)
+  }
+
   /**
    * Whether a building of `kind` fits with the north-west tile of its footprint on (x, y), by the
    * rules `buildProblem` checks (the house's city area aside), and every tile passes `also`.
    */
-  fits(kind: BuildingKind, x: number, y: number, also?: (x: number, y: number) => boolean): boolean {
+  fits(
+    kind: BuildingKind,
+    x: number,
+    y: number,
+    also?: (x: number, y: number) => boolean,
+  ): boolean {
     const tiles = footprintTiles({ kind, x, y }, this.terrain.size)
     let nodes = 0
     for (const [tx, ty] of tiles) {

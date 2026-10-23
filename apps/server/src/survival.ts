@@ -166,9 +166,7 @@ export function dropGoods(
  * (`CONTEXT.md`: A building's pile), as when a site is laid out over goods on the ground.
  */
 export function gatherPile(world: WorldState, b: Building, size = MAP_SIZE): void {
-  const lying = world.piles.filter(
-    (p) => covers(b, p.x, p.y, size) && (p.x !== b.x || p.y !== b.y),
-  )
+  const lying = world.piles.filter((p) => covers(b, p.x, p.y, size) && (p.x !== b.x || p.y !== b.y))
   if (lying.length === 0) return
   world.piles = world.piles.filter((p) => !lying.includes(p))
   for (const p of lying) dropGoods(world, b.x, b.y, p.goods, size)
