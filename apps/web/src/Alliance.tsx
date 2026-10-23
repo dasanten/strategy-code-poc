@@ -297,7 +297,7 @@ function AllianceArmy({
   )
 }
 
-/** How a member is called: a realm by its Leader's name, an NPC city by its own. */
+/** How a member is called: a realm by its realm name, an NPC city by its own. */
 function labelOf(m: RealmLabel): string {
   return m.city ? `${m.realm} (NPC city)` : `Realm of ${m.realm}`
 }

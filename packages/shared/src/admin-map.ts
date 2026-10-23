@@ -56,7 +56,7 @@ export function adminWorldPath(view: AdminViewRequest): string {
 export interface AdminOrganization {
   id: string
   is: 'realm' | 'city' | 'tradeOrg'
-  /** A realm by its Leader's name, an NPC city by its own, the Trade Organization by its. */
+  /** A realm by its realm name, an NPC city by its own, the Trade Organization by its. */
   name: string
   /** A realm's Player's account name. */
   account?: string
@@ -114,7 +114,7 @@ export interface AdminPlaces {
     id: string
     /** The Player's account name; null if the account is gone. */
     account: string | null
-    /** The realm by its Leader's name. */
+    /** The realm by its realm name. */
     name: string
     alliance: { id: string; name: string } | null
     /** Where its Leader stands; null while it has none. */

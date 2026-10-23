@@ -237,9 +237,18 @@ The shared language of the game. Domain terms only — no implementation details
   Trade Organization.
 - **Realm:** everything one Player controls through their Leader: cities, residents, workplaces,
   carriages. Breaks up into self-managed cities when the Leader dies.
+- **Realm name:** what others know a realm by. The Player gives it when the realm is founded (their
+  first spawn, and each respawn after a Leader death, since that founds a new realm) and it never
+  changes; a Leader handover keeps it. Not the Leader's name. A realm from before realm names
+  existed goes by its Leader's name until the Player names it, which they must do the first time
+  they rename their Leader.
 - **City:** a settlement with residents, buildings and usually a wall. Sizes range from
   **village** to large town. Every city has exactly one town hall; without it there is no city.
   Its shape is derived from its buildings, never drawn.
+- **Renaming a city:** a new city gets a name from the game; the Player can rename any city of
+  their realm, by hand or from a script: free, instant, from anywhere. Names need not be unique.
+  NPC cities keep their names. A city that changes hands keeps its name until its new owner
+  renames it. Others learn a new name only by sight (see Last seen).
 - **Town hall:** the building that makes a city. Building one founds a new city, belonging to the
   realm whose residents finished it. Tearing it down dissolves the city: its buildings and
   residents stay where they are, and its residents are homeless.
@@ -449,8 +458,10 @@ The shared language of the game. Domain terms only — no implementation details
   an ordinary resident of the realm. Contracts, alliances, standing, scripts and the realm log
   belong to the Player and carry over; the realm log records the handover.
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
-  Leader was. Their cities become self-managed. The Player respawns as a new Leader with a fresh
-  starting city on their next login.
+  Leader was. Their cities become self-managed and the realm ends: its alliance membership,
+  contracts and standing end with it. The Player respawns as a new Leader with a fresh starting
+  city on their next login, founding a new realm: they give its realm name and their new
+  Leader's name (one from the game they may keep); the starting city gets one from the game.
   Their realm log tells them how their Leader died and what became of each city, and where it
   stands, so they can find it again on the map.
 - **Self-managed city:** a city with no living Leader in charge. It runs on its own behaviour and
@@ -466,6 +477,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Resident:** a person living in the world. Has stats, skills, health, hunger and an age.
   Needs food or dies; dies of old age eventually. Lives in one city, wherever they are standing.
   _Avoid:_ unit (old code term).
+- **Renaming a resident:** the Player can rename any resident of their realm, their Leader
+  included, by hand or from a script: free, instant, from anywhere. Names need not be unique.
+  Renaming the Leader never renames the realm (see Realm name). The realm log keeps the names
+  things had when they happened.
 - **Stats:** Strength, Endurance, Agility, Intellect. Each has a **base value** and a
   **trained bonus**; the effective value is both together.
   - Strength: carry capacity, mining output, melee damage.
