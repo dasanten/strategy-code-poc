@@ -15,7 +15,7 @@ import {
   isAt,
   covers,
   type SeenResident,
-  type TerrainLookup,
+  UNEXPLORED,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
@@ -40,6 +40,7 @@ import {
   type Picking,
 } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
+import { buildingNodeKind } from './building-info-view.js'
 import { describeTile, makeLeaderProblem, nodeFit } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { faresKnown, loadKnown } from './seen.js'
@@ -202,12 +203,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await sendOrder({ kind: 'climb', residentId: selected.id, wallId }))
   }
   const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
-  const [knownTerrain, setKnownTerrain] = useState<TerrainLookup>()
   const onNodesLoaded = useCallback(
-    (lookup: (x: number, y: number) => KnownNode | undefined, terrain: TerrainLookup) => {
-      setNodeAt(() => lookup)
-      setKnownTerrain(terrain)
-    },
+    (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
+    [],
+  )
+  const [terrainAt, setTerrainAt] = useState<(x: number, y: number) => number | undefined>()
+  const onTerrainLoaded = useCallback(
+    (lookup: (x: number, y: number) => number | undefined) => setTerrainAt(() => lookup),
     [],
   )
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
@@ -261,6 +263,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             picking={picking !== false || armyPick !== undefined}
             onPickTile={goTo}
             onNodesLoaded={onNodesLoaded}
+            onTerrainLoaded={onTerrainLoaded}
             focus={focus}
           />
         ) : (
@@ -407,10 +410,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 ...selectedTile,
                 buildings: world.buildings,
                 carriages: world.carriages,
+                horses: world.horses,
                 piles: world.piles,
                 node: nodeAt?.(selectedTile.x, selectedTile.y),
+                nodeAt,
+                terrain: terrainAt?.(selectedTile.x, selectedTile.y),
                 strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),
+                residents: world.residents,
                 cities: world.cities,
+                tick: world.tick,
                 viewer: {
                   realmId: world.home.realmId,
                   allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
@@ -418,7 +426,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 workers: (b) => workersHere(world.residents, b),
                 nodeFit: (() => {
                   const node = nodeAt?.(selectedTile.x, selectedTile.y)
-                  return node && knownTerrain && nodeFit(node, world, nodeAt!, knownTerrain)
+                  if (!node || !terrainAt) return undefined
+                  // Terrain not loaded counts as unexplored: nothing is laid out there.
+                  const at = (x: number, y: number) => terrainAt(x, y) ?? UNEXPLORED
+                  return nodeFit(node, world, nodeAt!, { size: world.map.size, at })
                 })(),
               },
               GOOD_LABELS,
@@ -428,6 +439,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
             )}
             nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
+            buildingNode={buildingNodeKind(
+              world.buildings.find(
+                (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
+              ),
+              nodeAt,
+            )}
             actor={selected}
             orderError={orderError}
             onClose={() => setSelectedTile(undefined)}
@@ -445,6 +462,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onSetGate={async (gateId, open) =>
               setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
             }
+            onOpenCity={(id) => {
+              setOpenCityId(id)
+              setOpenDrawer('cities')
+            }}
           />
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { Building, BuildingKind, Resident } from '@csp/shared'
-import { ART_FILES, BUILDING_ART, NODE_ART } from './map/art.js'
+import type { Building, BuildingKind, Resident, ResourceKind } from '@csp/shared'
+import { BuildingInfo } from './BuildingInfo.js'
+import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
   actionForKey,
@@ -148,6 +149,7 @@ export function TileCard({
   card,
   building,
   nodeKind,
+  buildingNode,
   actor,
   tick,
   orderError,
@@ -155,11 +157,14 @@ export function TileCard({
   onSendHere,
   onBuildHere,
   onSetGate,
+  onOpenCity,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
   building: Building | undefined
   nodeKind: keyof typeof NODE_ART | undefined
+  /** The node under the building's footprint, which picks what a mine yields. */
+  buildingNode?: ResourceKind
   /** The resident picked last, to send here. */
   actor: Resident | undefined
   tick: number
@@ -169,6 +174,8 @@ export function TileCard({
   /** Has the actor build a node's workplace with the north-west tile of its footprint `at`. */
   onBuildHere: (building: BuildingKind, at: { x: number; y: number }) => void
   onSetGate: (gateId: string, open: boolean) => void
+  /** Opens the city inspector at a city. */
+  onOpenCity: (cityId: string) => void
 }) {
   const actions = tileActions(card, actor, tick)
   const icon =
@@ -176,7 +183,9 @@ export function TileCard({
       ? BUILDING_ART[building.kind]
       : card.what === 'node' && nodeKind
         ? NODE_ART[nodeKind]
-        : undefined
+        : card.what === 'horses'
+          ? UNIT_ART.horse
+          : undefined
   return (
     <SelectionCard
       rel={card.rel}
@@ -192,6 +201,13 @@ export function TileCard({
           ))}
         </ul>
       )}
+      {card.what === 'building' && building && (
+        <BuildingInfo
+          kind={building.kind}
+          node={buildingNode}
+          site={building.site ? building : undefined}
+        />
+      )}
       {actions.length > 0 && (
         <ActionRows
           actions={actions}
@@ -201,6 +217,7 @@ export function TileCard({
             if (a.id === 'build' && card.buildHere?.at)
               onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)
+            if (a.id === 'openCity' && card.city) onOpenCity(card.city.id)
           }}
         />
       )}

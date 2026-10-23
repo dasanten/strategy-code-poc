@@ -11,7 +11,6 @@ import {
   wrapDelta,
   type Building,
   type KnownNode,
-  type TerrainLookup,
   type SeenResident,
   type ResourceKind,
   footprintKeys,
@@ -118,6 +117,7 @@ export function MapView({
   picking = false,
   onPickTile,
   onNodesLoaded,
+  onTerrainLoaded,
   focus,
   terrainPath,
   start,
@@ -138,14 +138,10 @@ export function MapView({
   picking?: boolean
   /** Called with a tile picked by click (while `picking`) or by right-click. */
   onPickTile?: (x: number, y: number) => void
-  /**
-   * Called with a lookup of known resource nodes by tile and one of loaded explored terrain
-   * (`UNEXPLORED` elsewhere), and again whenever more load.
-   */
-  onNodesLoaded?: (
-    nodeAt: (x: number, y: number) => KnownNode | undefined,
-    terrain: TerrainLookup,
-  ) => void
+  /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
+  onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
+  /** Called as terrain chunks load, with a lookup of a tile's explored terrain. */
+  onTerrainLoaded?: (terrainAt: (x: number, y: number) => number | undefined) => void
   /**
    * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
    * at (the zoom in place if none); a new object each time.
@@ -174,6 +170,8 @@ export function MapView({
   onPickTileRef.current = onPickTile
   const onNodesLoadedRef = useRef(onNodesLoaded)
   onNodesLoadedRef.current = onNodesLoaded
+  const onTerrainLoadedRef = useRef(onTerrainLoaded)
+  onTerrainLoadedRef.current = onTerrainLoaded
   const onViewRef = useRef(onView)
   onViewRef.current = onView
   const startRef = useRef(start)
@@ -259,16 +257,16 @@ export function MapView({
       (chunk) => {
         terrainLayer.set(chunk)
         nodes[chunk.cy * across + chunk.cx] = chunk.nodes
-        const chunkOf = (x: number, y: number) =>
-          Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)
-        onNodesLoadedRef.current?.(
-          (x, y) => nodes[chunkOf(x, y)]?.find((n) => n.x === x && n.y === y),
-          {
-            size: mapSize,
-            at: (x, y) =>
-              store.get(chunkOf(x, y))?.tiles[(y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)] ??
-              UNEXPLORED,
-          },
+        onNodesLoadedRef.current?.((x, y) =>
+          nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
+            (n) => n.x === x && n.y === y,
+          ),
+        )
+        onTerrainLoadedRef.current?.(
+          (x, y) =>
+            store.get(Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE))?.tiles[
+              (y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)
+            ],
         )
         redraw()
       },
