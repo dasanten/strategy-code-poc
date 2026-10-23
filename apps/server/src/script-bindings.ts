@@ -113,11 +113,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const requests: OrderRequest[] = []
 
   let seen: readonly SeenEntity[] | undefined
+  const untagged = ({ is: _, ...rest }: SeenEntity) => rest
   const seenOf = (is: SeenEntity['is'], add?: (id: string) => object | undefined): Value => {
     seen ??= context.seen()
     return seen
       .filter((e) => e.is === is)
-      .map(({ is: _, ...rest }) => toValue({ ...rest, ...add?.(rest.id) }))
+      .map(untagged)
+      .map((rest) => toValue({ ...rest, ...add?.(rest.id) }))
   }
   // Whose script it is: the Player's realm, or the NPC city running the game's defaults.
   const side = sender.npcCityId ?? realmOf(world, sender.userId)?.id
@@ -177,7 +179,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     },
     building: ([id]) => {
       const b = world.buildings.find((x) => x.id === id)
-      return b && (ownBuilding(b) || inSight(b)) ? toValue(b) : null
+      if (!b) return null
+      if (ownBuilding(b)) return toValue(b)
+      // Another's as the Player sees it, its stock only when they see inside (`CONTEXT.md`:
+      // Seeing inside a storage).
+      seen ??= context.seen()
+      const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
+      return shown ? toValue(untagged(shown)) : null
     },
     pileAt: ([x, y]) => {
       const at = tile(x, y, 'pileAt')

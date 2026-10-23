@@ -10,10 +10,21 @@ import {
   spareResidents,
   sharingSight,
   wrapDistance,
+  carriageCommanderOf,
+  cityOrganization,
+  loadLevel,
+  tradeCoinWarehouse,
+  warehousePrices,
   type Army,
+  type Building,
+  type Carriage,
   type Placed,
   type Caravan,
+  type Resident,
+  type SeenBuilding,
+  type SeenCarriage,
   type SeenEntity,
+  type Shown,
   type TerrainMap,
   type WorldState,
   FOOTPRINT,
@@ -74,9 +85,104 @@ export function sightOf(world: WorldState, size: number, side: string): (at: Spo
 }
 
 /**
+ * What a side knows of what it sees (`CONTEXT.md`: Seeing inside a storage, Seeing how someone
+ * fares): how its own Organization's and its allies' residents and horses fare and what their
+ * storages and carriages hold, and what is inside where one of the residents it sees through
+ * stands.
+ */
+interface Insight {
+  /** Whether a thing of this realm, or else of this city, is its own or its allies'. */
+  ours(realmId: string | null, cityId: string | null): boolean
+  /** Whether it sees what a storage, warehouse or stable holds. */
+  insideBuilding(b: Building): boolean
+  /** Whether it sees what a city's storages hold together (an NPC city's stock in its prices). */
+  insideCity(cityId: string): boolean
+  /** Whether it sees a carriage's load. */
+  insideCarriage(k: Carriage): boolean
+  /** Whether it sees how a resident fares. */
+  fares(r: Resident): boolean
+}
+
+function insightOf(world: WorldState, size: number, side: string, observers: Spot[]): Insight {
+  const cities = new Map(world.cities.map((c) => [c.id, c]))
+  const orgs = new Set(sharingSight(world, side))
+  // A Trade Org city sees for its Organization, as all of the Trade Org's cities are one.
+  const sideCity = cities.get(side)
+  if (sideCity) orgs.add(cityOrganization(sideCity))
+  const ours = (realmId: string | null, cityId: string | null) => {
+    if (realmId !== null) return orgs.has(realmId)
+    const city = cityId === null ? undefined : cities.get(cityId)
+    return city !== undefined && (orgs.has(city.id) || orgs.has(cityOrganization(city)))
+  }
+  const standing = new Set(observers.map((o) => `${o.x},${o.y}`))
+  const at = (b: Building) => footprintTiles(b, size).some(([x, y]) => standing.has(`${x},${y}`))
+  // Trading at a warehouse of the HQ draws on its coin warehouse, so a resident at one sees
+  // those coins too (`tradeCoinWarehouse`).
+  let coinsSeen: Set<string> | undefined
+  const coinWarehouseSeen = (b: Building) =>
+    (coinsSeen ??= new Set(
+      world.buildings
+        .filter((w) => w.kind === 'warehouse' && at(w))
+        .flatMap((w) => tradeCoinWarehouse(world, w)?.id ?? []),
+    )).has(b.id)
+  const insideBuilding = (b: Building) => ours(null, b.cityId) || at(b) || coinWarehouseSeen(b)
+  return {
+    ours,
+    insideBuilding,
+    insideCity: (cityId) =>
+      ours(null, cityId) ||
+      world.buildings.some((b) => b.cityId === cityId && b.kind === 'storage' && at(b)),
+    insideCarriage: (k) => {
+      const by = carriageCommanderOf(world, k)
+      return (
+        ours(k.realmId, k.cityId) || (by !== null && orgs.has(by)) || standing.has(`${k.x},${k.y}`)
+      )
+    },
+    fares: (r) => {
+      const by = commanderOf(world, r)
+      return ours(r.owner, r.cityId) || (by !== null && orgs.has(by))
+    },
+  }
+}
+
+/** Price lines as the side sees them: without what is held unless it sees inside. */
+function shownLines<P extends { stock: number }>(lines: P[], inside: boolean): Shown<P>[] {
+  if (inside) return lines
+  return lines.map((line) => {
+    const shown: Shown<P> = { ...line }
+    delete shown.stock
+    return shown
+  })
+}
+
+/**
+ * A building as the side sees it: its stock only when it sees inside, and a Trade Org
+ * warehouse's prices either way (`CONTEXT.md`: Seeing inside a storage, Warehouse prices).
+ */
+function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBuilding {
+  const inside = insight.insideBuilding(b)
+  const shown: SeenBuilding = { ...b }
+  if (!inside) delete shown.stock
+  if (b.kind === 'warehouse') {
+    const prices = warehousePrices(world, b)
+    if (prices.length > 0) shown.prices = shownLines(prices, inside)
+  }
+  return shown
+}
+
+/** A carriage as the side sees it: how heavily it is loaded, its load only when it sees inside. */
+function seenCarriage(insight: Insight, k: Carriage): SeenCarriage {
+  const level = loadLevel(k.load)
+  if (insight.insideCarriage(k)) return { ...k, loadLevel: level }
+  const { id, realmId, cityId, x, y, horseId } = k
+  return { id, realmId, cityId, x, y, horseId, loadLevel: level }
+}
+
+/**
  * What a realm's Player sees (`CONTEXT.md`: Sight): everything within sight range of any of
  * their residents or their alliance's, their own things included. A city counts as seen when
- * any of it is.
+ * any of it is. What is inside, and how residents and horses fare, only as `CONTEXT.md` says
+ * (Seeing inside a storage, Seeing how someone fares).
  */
 export function entitiesInSight(
   world: WorldState,
@@ -87,22 +193,28 @@ export function entitiesInSight(
   const observers = observersOf(world, realmId)
   if (observers.length === 0) return []
   const size = terrain.size
+  const insight = insightOf(world, size, realmId, observers)
   const out: SeenEntity[] = []
   for (const r of world.residents) {
     if (!seen(size, observers, r)) continue
     // Which script a resident runs is seen; its memory stays on the server.
     const { script, ...rest } = r
-    out.push({
+    const shown: SeenEntity = {
       is: 'resident',
       ...rest,
       ...(script ? { script: { scriptId: script.scriptId } } : {}),
-    })
+    }
+    if (!insight.fares(r)) {
+      delete shown.hunger
+      delete shown.health
+    }
+    out.push(shown)
   }
   const seenCities = new Set<string>()
   const seenStorages = new Set<string>()
   for (const b of world.buildings) {
     if (!buildingSeen(size, observers, b)) continue
-    out.push({ is: 'building', ...b })
+    out.push({ is: 'building', ...seenBuilding(world, insight, b) })
     if (b.cityId !== null) seenCities.add(b.cityId)
     if (b.cityId !== null && b.kind === 'storage' && !b.site) seenStorages.add(b.cityId)
   }
@@ -126,12 +238,24 @@ export function entitiesInSight(
               spare: spareResidents(world, c).length,
               pricePerResidentWeek: npcHirePrice(world, c, realmId),
             },
-            ...(seenStorages.has(c.id) ? { trade: npcCityPrices(world, c, realmId) } : {}),
+            ...(seenStorages.has(c.id)
+              ? { trade: shownLines(npcCityPrices(world, c, realmId), insight.insideCity(c.id)) }
+              : {}),
           }
     out.push({ is: 'city', ...c, ...sale, ...refuses, ...deal })
   }
-  for (const h of world.horses) if (seen(size, observers, h)) out.push({ is: 'horse', ...h })
-  for (const k of world.carriages) if (seen(size, observers, k)) out.push({ is: 'carriage', ...k })
+  for (const h of world.horses) {
+    if (!seen(size, observers, h)) continue
+    const shown: SeenEntity = { is: 'horse', ...h }
+    if (!insight.ours(h.realmId, h.cityId)) {
+      delete shown.hunger
+      delete shown.health
+    }
+    out.push(shown)
+  }
+  for (const k of world.carriages) {
+    if (seen(size, observers, k)) out.push({ is: 'carriage', ...seenCarriage(insight, k) })
+  }
   for (const p of world.piles) if (seen(size, observers, p)) out.push({ is: 'pile', ...p })
   // An army is seen through its members; the Player gets only their own.
   for (const a of world.armies) {
@@ -196,6 +320,54 @@ export function sentOutOfSight(
   return out.map((e) => ({
     invariant: 'sent-only-in-sight',
     message: `${e.is} ${e.id} was sent to realm ${realmId}, outside its sight`,
+    entityIds: [e.id, realmId],
+  }))
+}
+
+/**
+ * Invariant (ADR 0004): nothing a Player may not see inside goes out to them (`CONTEXT.md`: Seeing
+ * inside a storage, Seeing how someone fares): no other Organization's stock, prices with what is
+ * held or carriage load without a resident there, no stranger's hunger or health. Checks the
+ * entities about to go out against the world as it is.
+ */
+export function sentInsideUnseen(
+  world: WorldState,
+  terrain: TerrainMap,
+  realmId: string,
+  sent: SeenEntity[],
+): InvariantViolation[] {
+  const insight = insightOf(world, terrain.size, realmId, observersOf(world, realmId))
+  const byId = <T extends { id: string }>(list: T[], id: string) => list.find((x) => x.id === id)
+  const hasStock = (lines: { stock?: number }[] | undefined) =>
+    lines?.some((l) => l.stock !== undefined) ?? false
+  const out = sent.filter((e) => {
+    switch (e.is) {
+      case 'building': {
+        const b = byId(world.buildings, e.id)
+        return (e.stock !== undefined || hasStock(e.prices)) && !(b && insight.insideBuilding(b))
+      }
+      case 'carriage': {
+        const k = byId(world.carriages, e.id)
+        return e.load !== undefined && !(k && insight.insideCarriage(k))
+      }
+      case 'city':
+        return hasStock(e.trade) && !insight.insideCity(e.id)
+      case 'resident': {
+        const r = byId(world.residents, e.id)
+        return (e.hunger !== undefined || e.health !== undefined) && !(r && insight.fares(r))
+      }
+      case 'horse': {
+        const h = byId(world.horses, e.id)
+        const told = e.hunger !== undefined || e.health !== undefined
+        return told && !(h && insight.ours(h.realmId, h.cityId))
+      }
+      default:
+        return false
+    }
+  })
+  return out.map((e) => ({
+    invariant: 'sent-only-what-is-seen-inside',
+    message: `what is inside ${e.is} ${e.id}, or how it fares, was sent to realm ${realmId}`,
     entityIds: [e.id, realmId],
   }))
 }

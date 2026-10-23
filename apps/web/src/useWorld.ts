@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   WS_PATH,
-  type Building,
+  type SeenBuilding,
   type Army,
-  type Carriage,
+  type SeenCarriage,
   type SeenCity,
   type Diplomacy,
-  type Horse,
+  type SeenHorse,
   type MapInfo,
   type OrderRequest,
   type Pile,
   type RealmEvent,
-  type Resident,
+  type SeenResident,
   type SeenCaravan,
   type SeenEntity,
   type ServerMessage,
@@ -33,11 +33,11 @@ export interface ClientWorld {
   /** The Player's realm and home city, where the view starts. */
   home: Extract<ServerMessage, { type: 'welcome' }>['home']
   /** What the Player's residents see, by kind (`CONTEXT.md`: Sight). */
-  residents: Resident[]
+  residents: SeenResident[]
   cities: SeenCity[]
-  buildings: Building[]
-  horses: Horse[]
-  carriages: Carriage[]
+  buildings: SeenBuilding[]
+  horses: SeenHorse[]
+  carriages: SeenCarriage[]
   piles: Pile[]
   /** The Player's own armies (`CONTEXT.md`: Army). */
   armies: Army[]
@@ -54,21 +54,21 @@ export interface ClientWorld {
 /** Sorts what is in sight by kind, dropping the tag. */
 function byKind(entities: Iterable<SeenEntity>) {
   const out = {
-    residents: [] as Resident[],
+    residents: [] as SeenResident[],
     cities: [] as SeenCity[],
-    buildings: [] as Building[],
-    horses: [] as Horse[],
-    carriages: [] as Carriage[],
+    buildings: [] as SeenBuilding[],
+    horses: [] as SeenHorse[],
+    carriages: [] as SeenCarriage[],
     piles: [] as Pile[],
     armies: [] as Army[],
     caravans: [] as SeenCaravan[],
   }
   for (const { is, ...e } of entities) {
-    if (is === 'resident') out.residents.push(e as Resident)
+    if (is === 'resident') out.residents.push(e as SeenResident)
     else if (is === 'city') out.cities.push(e as SeenCity)
-    else if (is === 'building') out.buildings.push(e as Building)
-    else if (is === 'horse') out.horses.push(e as Horse)
-    else if (is === 'carriage') out.carriages.push(e as Carriage)
+    else if (is === 'building') out.buildings.push(e as SeenBuilding)
+    else if (is === 'horse') out.horses.push(e as SeenHorse)
+    else if (is === 'carriage') out.carriages.push(e as SeenCarriage)
     else if (is === 'army') out.armies.push(e as Army)
     else if (is === 'caravan') out.caravans.push(e as SeenCaravan)
     else out.piles.push(e as Pile)

@@ -1,7 +1,9 @@
 import type { Account } from './api.js'
 import type { Diplomacy } from './alliance.js'
 import type { RegionMap } from './region-map.js'
+import type { LoadLevel } from './carriages.js'
 import type { NpcCityPrice } from './npc-trade.js'
+import type { WarehousePrice } from './warehouse.js'
 import type {
   Building,
   Carriage,
@@ -37,15 +39,41 @@ export interface OrderRequest {
  * with them, hire out to them or let their residents through its gates (`CONTEXT.md`: NPC city
  * reaction). An NPC city that doesn't refuse them says how many residents it would lend and what
  * it asks for each a week (`hire`, `CONTEXT.md`: Hiring from an NPC city) and, with a storage of
- * it in sight, its prices to them (`trade`, `CONTEXT.md`: Trading with an NPC city).
+ * it in sight, its prices to them (`trade`, `CONTEXT.md`: Trading with an NPC city). What its
+ * storages hold together is left out of those unless the Player sees inside one of them.
  */
 export type SeenCity = City & {
   price?: number
   wontSell?: true
   refuses?: true
   hire?: { spare: number; pricePerResidentWeek: number }
-  trade?: NpcCityPrice[]
+  trade?: Shown<NpcCityPrice>[]
 }
+
+/**
+ * A price line as a Player sees it: what is held only when they see inside (`CONTEXT.md`: Seeing
+ * inside a storage).
+ */
+export type Shown<P extends { stock: number }> = Omit<P, 'stock'> & { stock?: number }
+
+/**
+ * A building as Players see it (`CONTEXT.md`: Seeing inside a storage): its stock only for its own
+ * Organization, their allies and anyone with a resident at it. A Trade Org warehouse names its
+ * prices either way (`prices`, `CONTEXT.md`: Warehouse prices), worked out on the server.
+ */
+export type SeenBuilding = Building & { prices?: Shown<WarehousePrice>[] }
+
+/** A horse as Players see it: its hunger and health only for its own realm and allies. */
+export type SeenHorse = Omit<Horse, 'hunger' | 'health'> & Partial<Pick<Horse, 'hunger' | 'health'>>
+
+/**
+ * A carriage as Players see it (`CONTEXT.md`: Seeing inside a storage): how heavily it is loaded,
+ * and the load itself only for its own Organization, their allies and anyone with a resident on
+ * its tile.
+ */
+export type SeenCarriage =
+  | (Carriage & { loadLevel?: LoadLevel })
+  | (Omit<Carriage, 'load'> & { load?: undefined; loadLevel: LoadLevel })
 
 /**
  * Something a Player sees (`CONTEXT.md`: Sight), tagged with what it is. Ids are unique across
@@ -53,10 +81,10 @@ export type SeenCity = City & {
  */
 export type SeenEntity =
   | ({ is: 'resident' } & SeenResident)
-  | ({ is: 'building' } & Building)
+  | ({ is: 'building' } & SeenBuilding)
   | ({ is: 'city' } & SeenCity)
-  | ({ is: 'horse' } & Horse)
-  | ({ is: 'carriage' } & Carriage)
+  | ({ is: 'horse' } & SeenHorse)
+  | ({ is: 'carriage' } & SeenCarriage)
   | ({ is: 'pile' } & Pile)
   /** One of the Player's own armies; its members are what is seen of it. */
   | ({ is: 'army' } & SeenArmy)

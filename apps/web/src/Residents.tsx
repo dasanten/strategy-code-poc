@@ -50,6 +50,7 @@ import {
   type SkillName,
   type StatName,
   type Stock,
+  type SeenResident,
 } from '@csp/shared'
 import { useState } from 'react'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
@@ -406,7 +407,7 @@ export function ResidentCard({
   /** Orders the resident to pair with another of the Player's residents. */
   onPair: (partnerId: string) => void
   /** Residents of other realms, or of none, in sight: whom the resident can attack. */
-  others: Resident[]
+  others: SeenResident[]
   /** Tiles along each side of the map, to tell who is nearest. */
   mapSize: number
   /** Orders the resident to attack another realm's resident, or to break a wall or gate. */
@@ -1290,7 +1291,7 @@ function AttackBlock({
   onAttack,
 }: {
   resident: Resident
-  others: Resident[]
+  others: SeenResident[]
   walls: Building[]
   mapSize: number
   onAttack: (targetId: string) => void

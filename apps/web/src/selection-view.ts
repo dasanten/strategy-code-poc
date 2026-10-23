@@ -21,6 +21,9 @@ import {
   type Alliance,
   type Diplomacy,
   type MercenaryContract,
+  type SeenResident,
+  type SeenCarriage,
+  type LoadLevel,
 } from '@csp/shared'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
@@ -281,6 +284,15 @@ export const RELATIONSHIP_NAMES: Record<Relationship, string> = {
   tradeOrg: 'Trade Organization',
 }
 
+/** How heavily a carriage looks loaded, when the Player can't see its load (`loadLevel`). */
+export const LOAD_LEVEL_NAMES: Record<LoadLevel, string> = {
+  empty: 'empty',
+  light: 'lightly loaded',
+  half: 'half loaded',
+  heavy: 'heavily loaded',
+  full: 'fully loaded',
+}
+
 /** What the card's head shows: a name, the owner's colour, and a few lines about it. */
 export interface TileCard {
   title: string
@@ -297,11 +309,11 @@ export interface TileThings {
   x: number
   y: number
   buildings: Building[]
-  carriages: Carriage[]
+  carriages: SeenCarriage[]
   piles: Pile[]
   node: KnownNode | undefined
   /** Residents in sight on the tile that are not the Player's to command. */
-  strangers: Resident[]
+  strangers: SeenResident[]
   cities: Pick<City, 'id' | 'name' | 'realmId' | 'tradeOrg'>[]
   viewer: Viewer
   /** Residents in sight working each building, by building id. */
@@ -359,8 +371,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
     card ??= { title: 'Carriage', rel, what: 'carriage' }
+    // Its load only when the Player sees inside (`CONTEXT.md`: Seeing inside a storage).
+    const load = carriage.load
+      ? `${Math.round(stockWeight(carriage.load))} / ${CARRIAGE_CAPACITY} kg`
+      : LOAD_LEVEL_NAMES[carriage.loadLevel]
     lines.push(
-      `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${Math.round(stockWeight(carriage.load))} / ${CARRIAGE_CAPACITY} kg${carriage.horseId ? '' : ' · no horse hitched'}`,
+      `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${load}${carriage.horseId ? '' : ' · no horse hitched'}`,
     )
   }
   if (pile) {

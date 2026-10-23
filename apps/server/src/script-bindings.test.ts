@@ -165,6 +165,38 @@ describe('script bindings', () => {
     expect(memory.d).toBe(16)
   })
 
+  it('show what is inside and how others fare only as the Player sees it', () => {
+    const { world, explored } = setup()
+    // Realm r2's storage, in sight of a1 but with no one of r1's at it (`CONTEXT.md`: Seeing
+    // inside a storage, Seeing how someone fares).
+    world.cities.push({ id: 'c2', name: 'Elm', realmId: 'r2', townHallId: 'th2' })
+    world.buildings.push({
+      id: 's2',
+      kind: 'storage',
+      cityId: 'c2',
+      x: 14,
+      y: 10,
+      stock: { iron: 4 },
+    })
+    const memory: ScriptObject = {}
+    runAs(
+      world,
+      explored,
+      `
+      memory.storage = building("s2")
+      for (r of residents()) { if (r.id == "b1") { memory.b1 = r } }
+      memory.me = me.hunger
+      `,
+      memory,
+    )
+    expect(memory.storage).toMatchObject({ id: 's2', kind: 'storage' })
+    expect(memory.storage).not.toHaveProperty('stock')
+    expect(memory.b1).toMatchObject({ id: 'b1' })
+    expect(memory.b1).not.toHaveProperty('hunger')
+    expect(memory.b1).not.toHaveProperty('health')
+    expect(memory.me).toBeTypeOf('number')
+  })
+
   it('list the admin directives in force with their price, never who gave them', () => {
     const { world, explored } = setup()
     world.directives.push({
