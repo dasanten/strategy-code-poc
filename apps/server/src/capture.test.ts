@@ -175,8 +175,8 @@ describe('capturing a city', () => {
     Object.assign(leader, { x: 40, y: 41, cityId: 'c2' })
     const b2 = resident(world, 'b2', 'r2', 41, 41, 'c2')
     const b3 = resident(world, 'b3', 'r2', 41, 40, 'c2')
-    b2.order = { kind: 'pair', partnerId: 'b3', since: 0 }
-    b3.order = { kind: 'pair', partnerId: 'b2', since: 0 }
+    b2.pair = { partnerId: 'b3', since: 0 }
+    b3.pair = { partnerId: 'b2', since: 0 }
     const away = resident(world, 'b4', 'r2', 41, 39)
     world.horses.push({
       id: 'hA',
@@ -220,7 +220,7 @@ describe('capturing a city', () => {
     expect(city.realmId).toBe('r1')
     expect([b2.owner, b3.owner]).toEqual(['r1', 'r1'])
     // A pair who both join holds together; nobody keeps attacking their own realm.
-    expect(b2.order).toMatchObject({ kind: 'pair', partnerId: 'b3' })
+    expect(b2.pair).toMatchObject({ partnerId: 'b3' })
     expect(a2.order).toBeNull()
     // The Leader is never captured: they stay in their realm, homeless.
     expect(leader).toMatchObject({ owner: 'r2', cityId: null })
@@ -242,11 +242,11 @@ describe('capturing a city', () => {
     const leader = world.residents.find((r) => r.id === 'b1')!
     Object.assign(leader, { cityId: 'c2' })
     const b2 = resident(world, 'b2', 'r2', 41, 41, 'c2')
-    leader.order = { kind: 'pair', partnerId: 'b2', since: 0 }
-    b2.order = { kind: 'pair', partnerId: 'b1', since: 0 }
+    leader.pair = { partnerId: 'b2', since: 0 }
+    b2.pair = { partnerId: 'b1', since: 0 }
     armed(resident(world, 'a2', 'r1', 40, 40))
     stepWorld(world, terrain)
-    expect([leader.order, b2.order]).toEqual([null, null])
+    expect([leader.pair, b2.pair]).toEqual([undefined, undefined])
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 

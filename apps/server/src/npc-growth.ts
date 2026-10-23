@@ -37,6 +37,8 @@ import {
 } from '@csp/shared'
 import { hqGrows, hqProject } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
+import { npcSender } from './order-sender.js'
+import { pair } from './pairing.js'
 import { Ground, nodeCorner } from './placing.js'
 
 /**
@@ -89,8 +91,8 @@ export interface Growth {
 }
 
 /**
- * One tick of an NPC city's growth, before its idle adults get work: ends pairs while Food runs
- * short, pairs idle adults at home while it has a food surplus (one pair for every
+ * One tick of an NPC city's growth, before its idle adults get work: ends pairs with no child on
+ * the way while Food runs short, pairs adults while it has a food surplus (one pair for every
  * `NPC_ADULTS_PER_PAIR` adults), and stops builders who can do no more until materials come.
  * Returns how the city gives idle adults a part in its next project, if it has one and a free
  * builder's place (`NPC_BUILDERS`).
@@ -105,12 +107,12 @@ export function cityGrowth(
 ): Growth | undefined {
   // The Trade Organization's cities grow only while the HQ is too weak (`hqGrows`).
   if (city.tradeOrg && (city.tradeOrg !== 'hq' || !hqGrows(world, adults))) return undefined
-  const size = terrain.size
   if (short) {
-    for (const r of adults) if (r.order?.kind === 'pair') r.order = null
+    // A pair whose child is on the way stays together until it is born.
+    for (const r of adults) if (r.pair && !r.carrying && !partnerCarrying(world, r)) delete r.pair
     return undefined
   }
-  pairAdults(world, city, adults, size)
+  pairAdults(world, city, adults)
   const storage = world.buildings.find(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
@@ -162,19 +164,27 @@ function isBuilder(r: Resident): boolean {
   )
 }
 
+/** Whether a resident's partner carries their child. */
+function partnerCarrying(world: WorldState, r: Resident): boolean {
+  const partner = r.pair && world.residents.find((x) => x.id === r.pair!.partnerId)
+  return !!partner && partner.carrying?.partnerId === r.id
+}
+
 /**
- * Pairs idle adults standing at home two by two (`CONTEXT.md`: Pairing) while the city has a food
- * surplus, until it holds one pair for every `NPC_ADULTS_PER_PAIR` adults.
+ * Pairs unpaired adults two by two (`CONTEXT.md`: Pairing) while the city has a food surplus,
+ * until it holds one pair for every `NPC_ADULTS_PER_PAIR` adults, by the pairing order as a
+ * Player would (ADR 0002). Pairing stops nobody's work; only the partner who comes to carry the
+ * child does.
  */
-function pairAdults(world: WorldState, city: City, adults: Resident[], size: number): void {
+function pairAdults(world: WorldState, city: City, adults: Resident[]): void {
   if (!hasFoodSurplus(world, city)) return
-  const pairs = adults.filter((r) => r.order?.kind === 'pair').length / 2
+  const pairs = adults.filter((r) => r.pair).length / 2
   let wanted = Math.floor(adults.length / NPC_ADULTS_PER_PAIR) - Math.floor(pairs)
-  const idle = adults.filter((r) => r.order === null && inCityArea(world, city, r.x, r.y, size))
-  while (wanted > 0 && idle.length >= 2) {
-    const [a, b] = idle.splice(0, 2) as [Resident, Resident]
-    a.order = { kind: 'pair', partnerId: b.id, since: world.tick }
-    b.order = { kind: 'pair', partnerId: a.id, since: world.tick }
+  const single = adults.filter((r) => !r.pair && !r.carrying)
+  const sender = npcSender(city)
+  while (wanted > 0 && single.length >= 2) {
+    const [a, b] = single.splice(0, 2) as [Resident, Resident]
+    pair.apply(world, sender, { kind: 'pair', residentId: a.id, partnerId: b.id })
     wanted--
   }
 }

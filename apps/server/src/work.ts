@@ -1,4 +1,5 @@
 import {
+  CARRYING_A_CHILD,
   GOODS,
   MAX_WORKERS,
   RECIPES,
@@ -56,6 +57,7 @@ export const workAt: OrderKind = {
     const r = orderedResident(world, sender, o.residentId)
     if (!r) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t work'
+    if (r.carrying) return CARRYING_A_CHILD
     if (o.makes !== undefined && !(GOODS as readonly unknown[]).includes(o.makes))
       return 'no such good'
     return workProblem(world, r, o.makes)

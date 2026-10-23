@@ -5,6 +5,8 @@ import {
   BUILDABLE,
   BATCHES_PER_DAY,
   CARRIAGE_CAPACITY,
+  CARRYING_DAYS,
+  CARRYING_TICKS,
   GOODS,
   HAUL_KEEP_FOOD,
   NODE_WORKPLACE,
@@ -137,9 +139,30 @@ export interface HaulSetup {
   keepFood: number
 }
 
+/**
+ * A resident's pair and the child they carry (`CONTEXT.md`: Pairing, Carrying): who carries, and
+ * how many game days are left until it is born; undefined for one who is neither.
+ */
+export function familyLine(r: Resident, residents: Resident[], tick: number): string | undefined {
+  const days = (until: number) => Math.max(0, Math.ceil((until - tick) / TICKS_PER_GAME_DAY))
+  if (r.carrying) {
+    const left = days(r.carrying.since + CARRYING_TICKS)
+    return `Carrying ${r.carrying.partnerName}’s child · born in ${left} game day${left === 1 ? '' : 's'}`
+  }
+  if (!r.pair) return undefined
+  const partnerId = r.pair.partnerId
+  const partner = residents.find((x) => x.id === partnerId)
+  const name = partner?.name ?? 'someone out of sight'
+  if (partner?.carrying) {
+    const left = days(partner.carrying.since + CARRYING_TICKS)
+    return `${name} is carrying their child · born in ${left} game day${left === 1 ? '' : 's'}`
+  }
+  return `Paired with ${name}`
+}
+
 /** What a resident is doing, from their order and the script they run, named if it is known. */
 function doing(r: Resident, scripts: ScriptSummary[] = []): string {
-  const now = orderDoing(r)
+  const now = r.carrying && !r.order ? 'Carrying a child' : orderDoing(r)
   if (!r.script) return now
   const { scriptId } = r.script
   const name = scripts.find((s) => s.id === scriptId)?.name ?? 'Running a script'
@@ -205,7 +228,6 @@ function orderDoing(r: Resident): string {
   }
   if (o?.kind === 'workAt')
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
-  if (o?.kind === 'pair') return 'Paired'
   if (o?.kind === 'pay') return 'Paying for mercenaries'
   if (o?.kind === 'buyCity') return 'Buying a city'
   if (o?.kind === 'buyOff') return 'Buying off a directive'
@@ -400,6 +422,7 @@ export function ResidentCard({
   const carried = goodsIn(r.carried)
   // Children can't pick up or put down goods (`CONTEXT.md`: Child).
   const child = !canWork(r, tick)
+  const family = familyLine(r, residents, tick)
   const ground: GoodsSpot = { kind: 'ground' }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
   const site = building?.site ? building : undefined
@@ -440,6 +463,7 @@ export function ResidentCard({
       lines={[
         `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}`,
         <strong key="doing">{doing(r, scripts)}</strong>,
+        ...(family ? [family] : []),
       ]}
       onClose={onClose}
     >
@@ -1085,27 +1109,32 @@ function PairBlock({
 }) {
   const [partnerId, setPartnerId] = useState('')
   if (!canWork(resident, tick) || resident.cityId === null) return null
-  const o = resident.order
-  const partner = o?.kind === 'pair' ? residents.find((x) => x.id === o.partnerId) : undefined
+  const o = resident.pair
+  const partner = o ? residents.find((x) => x.id === o.partnerId) : undefined
   const choices = residents.filter(
-    (x) => x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick),
+    (x) => x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick) && !x.carrying,
   )
-  const days =
-    o?.kind === 'pair'
-      ? Math.max(0, Math.ceil((o.since + TICKS_PER_GAME_YEAR - tick) / TICKS_PER_GAME_DAY))
-      : 0
+  const days = o
+    ? Math.max(0, Math.ceil((o.since + TICKS_PER_GAME_YEAR - tick) / TICKS_PER_GAME_DAY))
+    : 0
+  const expecting = resident.carrying || partner?.carrying
   return (
     <section className="inspector-block" aria-label="Pairing">
       <div className="panel-head">
         <h3>Pairing</h3>
         <span className="small muted">one child a year at most</span>
       </div>
-      {o?.kind === 'pair' && (
-        <p className="muted small">
-          Paired with {partner?.name ?? 'someone out of sight'}.{' '}
-          {days > 0 ? `A child can come in about ${days} game days` : 'A child can come now'}, once
-          the city has free housing and a food surplus.
-        </p>
+      {expecting ? (
+        <p className="muted small">{familyLine(resident, residents, tick)}.</p>
+      ) : (
+        o && (
+          <p className="muted small">
+            Paired with {partner?.name ?? 'someone out of sight'}.{' '}
+            {days > 0 ? `In about ${days} game days` : 'Now'}, once the city has free housing and a
+            food surplus, one of them starts carrying a child for {CARRYING_DAYS} game days; the
+            other keeps working.
+          </p>
+        )
       )}
       <div className="order-buttons">
         <select
@@ -1120,7 +1149,11 @@ function PairBlock({
             </option>
           ))}
         </select>
-        <button type="button" disabled={!partnerId} onClick={() => onPair(partnerId)}>
+        <button
+          type="button"
+          disabled={!partnerId || !!resident.carrying}
+          onClick={() => onPair(partnerId)}
+        >
           Pair
         </button>
       </div>

@@ -1,4 +1,5 @@
 import {
+  CARRYING_A_CHILD,
   commands,
   commandsCarriage,
   CARRIAGE_CAPACITY,
@@ -65,6 +66,7 @@ export const haul: OrderKind = {
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
     if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    if (r.carrying) return CARRYING_A_CHILD
     const carriage = world.carriages.find((k) => k.id === o.carriageId)
     if (!commandsCarriage(world, realm.id, carriage)) return 'not one of your carriages'
     if (o.armyId !== undefined) {

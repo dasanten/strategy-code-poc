@@ -74,7 +74,7 @@ export function dissolveCity(world: WorldState, city: City): void {
   for (const r of world.residents) {
     if (r.cityId !== city.id) continue
     r.cityId = null
-    if (r.order?.kind === 'pair') r.order = null
+    delete r.pair
   }
   for (const k of [...world.horses, ...world.carriages]) {
     if (k.cityId === city.id) k.cityId = null

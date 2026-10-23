@@ -330,10 +330,19 @@ export const NPC_GATE_WATCH_RANGE = 32
 
 /**
  * An NPC city keeps one pair for every this many of its adults (`CONTEXT.md`: NPC city,
- * Pairing): a village of six one pair, a town of sixteen two. A pair stops working while it waits
- * for its child, so most adults keep working.
+ * Pairing): a village of six one pair, a town of sixteen two. Only the partner carrying the child
+ * stops working, and only for `CARRYING_DAYS`.
  */
 export const NPC_ADULTS_PER_PAIR = 6
+
+/**
+ * Game days a partner carries a child before it is born (`CONTEXT.md`: Carrying), not working
+ * meanwhile: 60 game days, 24 real hours.
+ */
+export const CARRYING_DAYS = 60
+
+/** Ticks from the start of carrying until the child is born (`CARRYING_DAYS`). */
+export const CARRYING_TICKS = CARRYING_DAYS * TICKS_PER_GAME_DAY
 
 /**
  * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying

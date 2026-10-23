@@ -160,8 +160,8 @@ describe('NPC cities grow', () => {
     for (let day = 0; day < 240 && !movedOut(); day++) {
       run(world, terrain, city, home, oldIds, TICKS_PER_GAME_DAY)
       for (const r of world.residents) {
-        if (r.order?.kind !== 'pair' || paired.has(r.id)) continue
-        r.order.since -= TICKS_PER_GAME_YEAR
+        if (!r.pair || paired.has(r.id)) continue
+        r.pair.since -= TICKS_PER_GAME_YEAR
         paired.add(r.id)
       }
     }
@@ -193,17 +193,45 @@ describe('NPC cities grow', () => {
     )
   }, 300_000)
 
-  it('pairs idle adults at home while it has a food surplus, and ends pairs when Food runs short', () => {
+  it('pairs adults while it has a food surplus, and ends pairs when Food runs short', () => {
     const { world, terrain, city, home } = village()
     for (const r of world.residents) Object.assign(r, { x: home.x, y: home.y, order: null })
     storageOf(world, city).stock = { food: 400 }
     stepNpcCities(world, terrain.size, terrain)
-    const paired = world.residents.filter((r) => r.order?.kind === 'pair')
+    const paired = world.residents.filter((r) => r.pair)
     expect(paired).toHaveLength(2 * Math.floor(NPC_VILLAGE.residents / NPC_ADULTS_PER_PAIR))
-    expect(paired[0]!.order).toEqual({ kind: 'pair', partnerId: paired[1]!.id, since: 0 })
+    expect(paired[0]!.pair).toEqual({ partnerId: paired[1]!.id, since: 0 })
+    // Pairing stops nobody: the pair are put to work like everyone else.
+    expect(paired.every((r) => r.order !== null || r.script)).toBe(true)
     storageOf(world, city).stock = { food: 1 }
     stepNpcCities(world, terrain.size, terrain)
-    expect(world.residents.filter((r) => r.order?.kind === 'pair')).toEqual([])
+    expect(world.residents.filter((r) => r.pair)).toEqual([])
+  })
+
+  it('keeps a resident carrying a child out of work, at home; the partner works', () => {
+    const { world, terrain, city, home } = village()
+    for (const r of world.residents) Object.assign(r, { x: home.x, y: home.y, order: null })
+    storageOf(world, city).stock = { food: 400 }
+    stepNpcCities(world, terrain.size, terrain)
+    const [a, b] = world.residents.filter((r) => r.pair) as [Resident, Resident]
+    for (const r of [a, b]) {
+      r.order = null
+      delete r.script
+    }
+    a.carrying = {
+      since: world.tick,
+      partnerId: b.id,
+      partnerName: b.name,
+      partnerBase: { strength: 10, endurance: 10, agility: 10, intellect: 10 },
+    }
+    stepNpcCities(world, terrain.size, terrain)
+    expect(a.order).toBeNull()
+    expect(a.script).toBeUndefined()
+    expect(b.order !== null || b.script !== undefined).toBe(true)
+    // Food running short doesn't end a pair with a child on the way.
+    storageOf(world, city).stock = { food: 1 }
+    stepNpcCities(world, terrain.size, terrain)
+    expect([a.pair?.partnerId, b.pair?.partnerId]).toEqual([b.id, a.id])
   })
 
   it('builds a house inside its wall when it has a food surplus and no free housing', () => {
@@ -309,7 +337,7 @@ describe('NPC cities grow', () => {
     for (const r of world.residents) Object.assign(r, { x: home.x, y: home.y, order: null })
     storageOf(world, city).stock = { food: 400 }
     stepNpcCities(world, terrain.size, terrain)
-    expect(world.residents.some((r) => r.order?.kind === 'pair')).toBe(false)
+    expect(world.residents.some((r) => r.pair)).toBe(false)
   })
 })
 

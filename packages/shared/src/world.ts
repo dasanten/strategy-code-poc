@@ -60,7 +60,38 @@ export interface Resident {
    * when they run none.
    */
   script?: RunningScript
+  /** The resident's pair (`CONTEXT.md`: Pairing), if they are paired. Not an order. */
+  pair?: Pair
+  /** The child the resident is carrying (`CONTEXT.md`: Carrying), if any. */
+  carrying?: Carrying
 }
+
+/**
+ * Pairing (`CONTEXT.md`: Pairing): the resident and their partner, two adults of the same city,
+ * are set to have a child. Both hold a pair naming the other, with the same `since`: the tick they
+ * paired. Pairing is no order: both go on with whatever they do. Once a game year has passed since
+ * then, and their city has free housing and a food surplus, one of them starts carrying the
+ * child; the pair ends when it is born.
+ */
+export interface Pair {
+  partnerId: string
+  since: number
+}
+
+/**
+ * Carrying a child (`CONTEXT.md`: Carrying): since the tick `since` the resident can't work,
+ * build, tear down or haul; `CARRYING_DAYS` later the child is born. The other parent's name and
+ * base stats are kept, so the child is born even if that parent is gone by then.
+ */
+export interface Carrying {
+  since: number
+  partnerId: string
+  partnerName: string
+  partnerBase: Record<StatName, number>
+}
+
+/** Why a resident carrying a child is turned down for work, building, tearing down or hauling. */
+export const CARRYING_A_CHILD = 'carrying a child'
 
 /** A script value as plain data, the only kind a script's memory keeps between ticks. */
 export type MemoryValue = number | string | boolean | null | MemoryValue[] | ScriptMemory
@@ -182,18 +213,6 @@ export interface TearDownOrder {
   kind: 'tearDown'
   buildingId: string
   at: { x: number; y: number }
-}
-
-/**
- * Pairing (`CONTEXT.md`: Pairing): the resident and their partner, two adults of the same city,
- * are set to have children. Both hold a pair order naming the other, with the same `since`: the
- * tick they paired or last had a child. A child can come once a game year has passed since then,
- * while their city has free housing and a food surplus. Any other order for either ends it.
- */
-export interface PairOrder {
-  kind: 'pair'
-  partnerId: string
-  since: number
 }
 
 /**
@@ -319,7 +338,6 @@ export type ResidentOrder =
   | BuildOrder
   | TearDownOrder
   | WorkOrder
-  | PairOrder
   | AttackOrder
   | ClimbOrder
   | RoadLineOrder
