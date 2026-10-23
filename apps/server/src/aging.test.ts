@@ -13,6 +13,7 @@ import {
   hungerFactor,
   stockWeight,
   walkSpeed,
+  ticksForAge,
   type Resident,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
@@ -25,7 +26,7 @@ const terrain = cityTerrain()
 
 /** Makes a resident the given age in game years at `tick`. */
 function aged(r: Resident, years: number, tick: number) {
-  r.bornAt = tick - Math.round(years * TICKS_PER_GAME_YEAR)
+  r.bornAt = tick - Math.ceil(ticksForAge(years))
 }
 
 describe('aging', () => {
@@ -72,8 +73,8 @@ describe('aging', () => {
     const child = world.residents[1]!
     aged(child, 0, world.tick)
     expect(canWork(child, world.tick)).toBe(false)
-    expect(canWork(child, world.tick + (ADULT_AGE - 0.01) * TICKS_PER_GAME_YEAR)).toBe(false)
-    expect(canWork(child, world.tick + ADULT_AGE * TICKS_PER_GAME_YEAR)).toBe(true)
+    expect(canWork(child, world.tick + ticksForAge(ADULT_AGE - 0.01))).toBe(false)
+    expect(canWork(child, world.tick + ticksForAge(ADULT_AGE))).toBe(true)
     expect(world.residents.every((r) => r === child || canWork(r, world.tick))).toBe(true)
   })
 

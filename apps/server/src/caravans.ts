@@ -31,6 +31,8 @@ import {
   type Resident,
   type Stock,
   type WorldState,
+  isAt,
+  middleOf,
 } from '@csp/shared'
 import { attackOrder } from './combat.js'
 import { organizationOf } from './crimes.js'
@@ -76,7 +78,8 @@ export function routeEnd(world: WorldState, caravan: Caravan, end: Caravan['head
   const hq = tradeOrgHq(world)
   const hall = hq && townHallOf(world, hq)
   if (!hall) return { storage: undefined, warehouse: undefined }
-  const { storage, goodsWarehouse } = hqLayout(hall.x, hall.y)
+  const middle = middleOf(hall)
+  const { storage, goodsWarehouse } = hqLayout(middle.x, middle.y)
   const at = (kind: Building['kind'], [x, y]: [number, number]) =>
     world.buildings.find((b) => b.kind === kind && b.x === x && b.y === y && finished(b))
   return { storage: at('storage', storage), warehouse: at('warehouse', goodsWarehouse) }
@@ -92,7 +95,8 @@ export function placeCaravans(world: WorldState): Caravan[] {
   const hq = tradeOrgHq(world)
   const hall = hq && townHallOf(world, hq)
   if (!hq || !hall) return []
-  const [x, y] = hqLayout(hall.x, hall.y).goodsWarehouse
+  const middle = middleOf(hall)
+  const [x, y] = hqLayout(middle.x, middle.y).goodsWarehouse
   const served = new Set(world.caravans.map((c) => c.postId))
   const placed: Caravan[] = []
   for (const post of tradingPosts(world)) {
@@ -242,7 +246,7 @@ function guardCaravan(world: WorldState, caravan: Caravan, carriage: Carriage, s
  */
 function manEscort(world: WorldState, caravan: Caravan, carriage: Carriage, size: number): boolean {
   const warehouse = routeEnd(world, caravan, 'hq').warehouse
-  if (!warehouse || carriage.x !== warehouse.x || carriage.y !== warehouse.y) return false
+  if (!warehouse || !isAt(carriage, warehouse, size)) return false
   const wanted = caravanEscortsWanted(world, caravan.postId)
   if (caravan.escortIds.length < wanted) {
     const crew = caravanCrew(world)
@@ -284,7 +288,7 @@ function manEscort(world: WorldState, caravan: Caravan, carriage: Carriage, size
     )
     if (!weapon) continue
     arming = true
-    if (r.x === warehouse.x && r.y === warehouse.y) {
+    if (isAt(r, warehouse, size)) {
       r.order = {
         kind: 'pickUp',
         from: { kind: 'storage', storageId: warehouse.id },
@@ -339,7 +343,7 @@ function runCaravan(
     else depart(caravan)
     return
   }
-  if (driver.x !== stop.x || driver.y !== stop.y) {
+  if (!isAt(driver, stop, size)) {
     const target = { x: stop.x, y: stop.y }
     driver.order = { kind: 'drive', carriageId: carriage.id, target, path: null, progress: 0 }
     return

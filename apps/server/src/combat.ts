@@ -27,6 +27,7 @@ import {
   type Realm,
   type Resident,
   type WorldState,
+  isAt,
 } from '@csp/shared'
 import { updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime, organizationOf } from './crimes.js'
@@ -301,7 +302,7 @@ function react(world: WorldState, t: Resident, a: Resident): void {
   if (!hall) return
   const o = t.order
   const fleeing = o?.kind === 'walkTo' && o.target.x === hall.x && o.target.y === hall.y
-  if (fleeing || (t.x === hall.x && t.y === hall.y)) return
+  if (fleeing || isAt(t, hall)) return
   t.order = { kind: 'walkTo', target: { x: hall.x, y: hall.y }, path: null, progress: 0 }
   recordEvent(world, t.owner, { kind: 'fled', residentId: t.id, name: t.name })
 }

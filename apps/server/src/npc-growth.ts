@@ -8,7 +8,6 @@ import {
   NPC_FARM_REACH,
   NPC_NODE_REACH,
   NPC_WALL_STEP,
-  Terrain,
   buildProblem,
   buildingAt,
   cityAreaTiles,
@@ -17,9 +16,7 @@ import {
   hasFoodSurplus,
   inCityArea,
   isCityBuilding,
-  isPassableTerrain,
   materialsNeeded,
-  terrainAt,
   workNeeded,
   workplaceGood,
   wrap,
@@ -33,9 +30,16 @@ import {
   type Stock,
   type TerrainMap,
   type WorldState,
+  isAt,
+  footprintTiles,
+  FOOTPRINT,
+  NPC_WALL_TILES_PER_TRIP,
 } from '@csp/shared'
 import { hqGrows, hqProject } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
+import { npcSender } from './order-sender.js'
+import { pair } from './pairing.js'
+import { Ground, nodeCorner } from './placing.js'
 
 /**
  * How an NPC city grows (`CONTEXT.md`: NPC city): it pairs its adults, builds a house when it has a
@@ -87,8 +91,8 @@ export interface Growth {
 }
 
 /**
- * One tick of an NPC city's growth, before its idle adults get work: ends pairs while Food runs
- * short, pairs idle adults at home while it has a food surplus (one pair for every
+ * One tick of an NPC city's growth, before its idle adults get work: ends pairs with no child on
+ * the way while Food runs short, pairs adults while it has a food surplus (one pair for every
  * `NPC_ADULTS_PER_PAIR` adults), and stops builders who can do no more until materials come.
  * Returns how the city gives idle adults a part in its next project, if it has one and a free
  * builder's place (`NPC_BUILDERS`).
@@ -103,23 +107,26 @@ export function cityGrowth(
 ): Growth | undefined {
   // The Trade Organization's cities grow only while the HQ is too weak (`hqGrows`).
   if (city.tradeOrg && (city.tradeOrg !== 'hq' || !hqGrows(world, adults))) return undefined
-  const size = terrain.size
   if (short) {
-    for (const r of adults) if (r.order?.kind === 'pair') r.order = null
+    // A pair whose child is on the way stays together until it is born.
+    for (const r of adults) if (r.pair && !r.carrying && !partnerCarrying(world, r)) delete r.pair
     return undefined
   }
-  pairAdults(world, city, adults, size)
+  pairAdults(world, city, adults)
+  const storage = world.buildings.find(
+    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
+  )
   for (const r of adults) {
     const o = r.order
     const site = o?.kind === 'build' && world.buildings.find((b) => b.id === o.siteId)
-    if (site && site.site && workNeeded(site) === 0) r.order = null
+    if (site && site.site && !canDoMore(r, site, storage)) {
+      r.order = null
+      delete r.script
+    }
   }
   let free = NPC_BUILDERS - adults.filter(isBuilder).length
   if (free <= 0) return undefined
   let project: Project | null | undefined = null
-  const storage = world.buildings.find(
-    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-  )
   return {
     assign(r, deliver = false) {
       if (free <= 0) return false
@@ -135,10 +142,21 @@ export function cityGrowth(
   }
 }
 
-/** Whether a resident is building, tearing down or delivering materials to a site. */
+/**
+ * Whether a builder can still help a site: it needs work, or materials they carry or the storage
+ * holds (which its Build default fetches), or they are fetching some.
+ */
+function canDoMore(r: Resident, site: Building, storage: Building | undefined): boolean {
+  if (workNeeded(site) > 0 || r.script?.memory.fetch != null) return true
+  const need = materialsNeeded(site)
+  return pick(r.carried, need) !== undefined || pick(storage?.stock, need) !== undefined
+}
+
+/** Whether a resident is building (by the Build default or not), tearing down or delivering. */
 function isBuilder(r: Resident): boolean {
   const o = r.order
   return (
+    (r.script?.scriptId === 0 && r.script.task === 'build') ||
     o?.kind === 'build' ||
     o?.kind === 'tearDown' ||
     (o?.kind === 'drop' && o.to.kind === 'site') ||
@@ -146,28 +164,37 @@ function isBuilder(r: Resident): boolean {
   )
 }
 
+/** Whether a resident's partner carries their child. */
+function partnerCarrying(world: WorldState, r: Resident): boolean {
+  const partner = r.pair && world.residents.find((x) => x.id === r.pair!.partnerId)
+  return !!partner && partner.carrying?.partnerId === r.id
+}
+
 /**
- * Pairs idle adults standing at home two by two (`CONTEXT.md`: Pairing) while the city has a food
- * surplus, until it holds one pair for every `NPC_ADULTS_PER_PAIR` adults.
+ * Pairs unpaired adults two by two (`CONTEXT.md`: Pairing) while the city has a food surplus,
+ * until it holds one pair for every `NPC_ADULTS_PER_PAIR` adults, by the pairing order as a
+ * Player would (ADR 0002). Pairing stops nobody's work; only the partner who comes to carry the
+ * child does.
  */
-function pairAdults(world: WorldState, city: City, adults: Resident[], size: number): void {
+function pairAdults(world: WorldState, city: City, adults: Resident[]): void {
   if (!hasFoodSurplus(world, city)) return
-  const pairs = adults.filter((r) => r.order?.kind === 'pair').length / 2
+  const pairs = adults.filter((r) => r.pair).length / 2
   let wanted = Math.floor(adults.length / NPC_ADULTS_PER_PAIR) - Math.floor(pairs)
-  const idle = adults.filter((r) => r.order === null && inCityArea(world, city, r.x, r.y, size))
-  while (wanted > 0 && idle.length >= 2) {
-    const [a, b] = idle.splice(0, 2) as [Resident, Resident]
-    a.order = { kind: 'pair', partnerId: b.id, since: world.tick }
-    b.order = { kind: 'pair', partnerId: a.id, since: world.tick }
+  const single = adults.filter((r) => !r.pair && !r.carrying)
+  const sender = npcSender(city)
+  while (wanted > 0 && single.length >= 2) {
+    const [a, b] = single.splice(0, 2) as [Resident, Resident]
+    pair.apply(world, sender, { kind: 'pair', residentId: a.id, partnerId: b.id })
     wanted--
   }
 }
 
 /**
  * Gives a resident their part in a project, if there is one for them: walking to the tile and
- * laying out, building or tearing down there; for a site that still needs materials, carrying
- * them from the storage, or building ahead while none are there. False when they can't help.
- * With `deliver`, only bringing materials they carry.
+ * tearing down there; or building it by the game's Build default (`CONTEXT.md`: Fetching
+ * materials), which walks there, delivers what they carry of its materials and fetches what is
+ * missing from the storage. For a tile of wall they first take enough for a few tiles from the
+ * storage. False when they can't help. With `deliver`, only bringing materials they carry.
  */
 function takePart(
   world: WorldState,
@@ -178,43 +205,54 @@ function takePart(
 ): boolean {
   if (deliver) {
     const site = project.kind === 'build' && buildingAt(world, project.x, project.y)
-    const carried = site && site.site && pick(r.carried, materialsNeeded(site))
-    if (!site || !carried) return false
-    if (r.x === site.x && r.y === site.y) {
-      r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
-    } else walkTo(r, site)
-    return true
+    const carries = site && site.site && pick(r.carried, materialsNeeded(site))
+    // Carrying the materials of a few tiles of wall, they help with this one rather than take
+    // them back to the storage; the next tiles will want them.
+    const wall = project.kind === 'build' && forWall(project.building, r.carried)
+    if (!carries && !wall) return false
   }
   if (project.kind === 'tearDown') {
     const b = project.building
-    if (r.x !== b.x || r.y !== b.y) walkTo(r, b)
+    if (!isAt(r, b)) walkTo(r, b)
     else r.order = { kind: 'tearDown', buildingId: b.id, at: { x: r.x, y: r.y } }
     return true
   }
   const { x, y, building } = project
-  const here = r.x === x && r.y === y
   const site = buildingAt(world, x, y)
   const build = () => {
-    if (here) r.order = { kind: 'build', building, at: { x, y }, siteId: null }
-    else walkTo(r, { x, y })
+    r.order = null
+    r.script = { scriptId: 0, task: 'build', memory: { building, at: { x, y } } }
     return true
   }
   if (!site?.site) return build()
   const need = materialsNeeded(site)
-  const carried = pick(r.carried, need)
-  if (carried) {
-    if (here) r.order = { kind: 'drop', to: { kind: 'site', siteId: site.id }, goods: carried }
-    else walkTo(r, site)
-    return true
-  }
-  const stocked = pick(storage?.stock, need)
+  if (pick(r.carried, need)) return build()
+  // For a tile of wall, enough for a few tiles at once: the rest goes to the next ones.
+  const wall = building === 'wall' || building === 'gate'
+  const stocked =
+    wall &&
+    !forWall(building, r.carried) &&
+    pick(storage?.stock, times(need, NPC_WALL_TILES_PER_TRIP))
   if (storage && stocked) {
-    if (r.x === storage.x && r.y === storage.y) {
+    if (isAt(r, storage)) {
       r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods: stocked }
     } else walkTo(r, storage)
     return true
   }
-  return workNeeded(site) > 0 && build()
+  return canDoMore(r, site, storage) && build()
+}
+
+/** Whether a resident carries materials for walls or gates, for a project of `building`. */
+function forWall(building: BuildingKind, carried: Stock): boolean {
+  if (building !== 'wall' && building !== 'gate') return false
+  return pick(carried, BUILD_MATERIALS[building] ?? {}) !== undefined
+}
+
+/** `n` times the goods. */
+function times(goods: Stock, n: number): Stock {
+  const out: Stock = {}
+  for (const [good, units] of Object.entries(goods) as [Good, number][]) out[good] = units * n
+  return out
 }
 
 /** The goods of `wanted` that `stock` holds some of, as many as wanted; none if it holds none. */
@@ -252,7 +290,7 @@ export function nextProject(
   for (const [good, units] of Object.entries(need) as [Good, number][]) {
     if ((storage?.stock?.[good] ?? 0) >= units || makes(world, city, good)) continue
     const node = nearestNode(world, home, terrain, good)
-    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.kind], x: node.x, y: node.y }
+    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.node.kind], ...node.at }
   }
   return want
 }
@@ -265,17 +303,21 @@ function makes(world: WorldState, city: City, good: Good): boolean {
   )
 }
 
-/** The nearest free resource node yielding `good` within `NPC_NODE_REACH` of the home. */
+/**
+ * The nearest free resource node yielding `good` within `NPC_NODE_REACH` of the home, with where
+ * its workplace goes (`nodeCorner`).
+ */
 function nearestNode(world: WorldState, home: Building, terrain: TerrainMap, good: Good) {
-  let best: { node: (typeof world.nodes)[number]; d: number } | undefined
+  let best:
+    { node: (typeof world.nodes)[number]; at: { x: number; y: number }; d: number } | undefined
   for (const node of world.nodes) {
     if (NODE_GOOD[node.kind] !== good) continue
     const d = wrapDistance(terrain.size, home, node)
     if (d > NPC_NODE_REACH || (best && d >= best.d)) continue
-    if (buildProblem(world, node.x, node.y, NODE_WORKPLACE[node.kind], terrain)) continue
-    best = { node, d }
+    const at = nodeCorner(world, terrain, node)
+    if (at) best = { node, at, d }
   }
-  return best?.node
+  return best
 }
 
 /**
@@ -324,6 +366,7 @@ function farmsFull(world: WorldState, city: City): boolean {
   return farms.every((f) => {
     const there = world.residents.filter(
       (r) =>
+        r.script?.memory.workplaceId === f.id ||
         (r.order?.kind === 'workAt' && r.order.buildingId === f.id) ||
         (r.order?.kind === 'walkTo' && r.order.target.x === f.x && r.order.target.y === f.y),
     ).length
@@ -385,8 +428,9 @@ interface WallTileState {
 }
 
 /**
- * The tiles of the city's new wall (`Rings.outer`), the gate first and then outward from it:
- * each either finished, begun, or free for it. Tiles that can take no wall (a farm stands there,
+ * The tiles of the city's new wall (`Rings.outer`), the gate first and then on round the ring
+ * from it, clockwise, so its builders work along the wall rather than back and forth across
+ * the gate: each either finished, begun, or free for it. Tiles that can take no wall (a farm stands there,
  * a node, Mountain) are left out, and the wall has a gap there.
  */
 export function newWall(
@@ -404,7 +448,8 @@ export function newWall(
       const x = wrap(home.x + dx, size)
       const y = wrap(home.y + dy, size)
       const kind = dx === rings.newGate.dx && dy === rings.newGate.dy ? 'gate' : 'wall'
-      const order = Math.hypot(dx - rings.newGate.dx, dy - rings.newGate.dy)
+      const turn = Math.atan2(dy, dx) - Math.atan2(rings.newGate.dy, rings.newGate.dx)
+      const order = (turn + 4 * Math.PI) % (2 * Math.PI)
       const here = buildingAt(world, x, y)
       if (here && (here.kind === 'wall' || here.kind === 'gate')) {
         out.push({
@@ -483,18 +528,23 @@ function oldWallToTearDown(
   return [...old].sort((a, b) => far(b) - far(a) || a.id.localeCompare(b.id))[0]
 }
 
-/** Whether a tile is free to build on: passable, not Mountain, no node and no building. */
-function freeTile(world: WorldState, terrain: TerrainMap, x: number, y: number): boolean {
-  const t = terrainAt(terrain, x, y)
-  if (!isPassableTerrain(t) || t === Terrain.Mountain) return false
-  return !buildingAt(world, x, y) && !world.nodes.some((n) => n.x === x && n.y === y)
+/** The rings round the home that a footprint's tiles lie on, nearest and farthest. */
+function ringsOf(
+  home: Building,
+  b: { kind: BuildingKind; x: number; y: number },
+  size: number,
+): { near: number; far: number } {
+  const rings = footprintTiles(b, size).map(([x, y]) =>
+    ringOf({ dx: wrapDelta(home.x, x, size), dy: wrapDelta(home.y, y, size) }),
+  )
+  return { near: Math.min(...rings), far: Math.max(...rings) }
 }
 
 /**
- * Where the city puts its next house (`CONTEXT.md`: House): a free tile of its area inside its
- * wall, nearest its home first; when it is expanding, inside the new wall. With no room left
- * there, a tile on its edge just outside the wall, which starts its expansion. A city without
- * walls builds anywhere in its area.
+ * Where the city puts its next house (`CONTEXT.md`: House), by the north-west tile of its
+ * footprint: wholly on free ground of its area inside its wall, nearest its home first; when it is
+ * expanding, inside the new wall. With no room left there, on its edge just outside the wall,
+ * which starts its expansion. A city without walls builds anywhere in its area.
  */
 export function houseTile(
   world: WorldState,
@@ -504,26 +554,27 @@ export function houseTile(
   rings: Rings | undefined,
 ): { x: number; y: number } | undefined {
   const size = terrain.size
-  const tiles = [...cityAreaTiles(world, city, size)].map((k) => {
-    const [x, y] = k.split(',').map(Number) as [number, number]
-    return {
-      x,
-      y,
-      ring: ringOf({ dx: wrapDelta(home.x, x, size), dy: wrapDelta(home.y, y, size) }),
-    }
-  })
-  const free = tiles
-    .filter((t) => freeTile(world, terrain, t.x, t.y))
-    .sort((a, b) => a.ring - b.ring || a.y - b.y || a.x - b.x)
-  if (!rings) return free[0]
-  const inside = free.find((t) => t.ring < rings.outer)
-  if (inside || rings.expanding) return inside
-  return free.find((t) => t.ring === rings.inner + 1)
+  const area = cityAreaTiles(world, city, size)
+  const ground = new Ground(world, terrain)
+  const inArea = (x: number, y: number) => area.has(`${x},${y}`)
+  const free = [...area]
+    .map((k) => {
+      const [x, y] = k.split(',').map(Number) as [number, number]
+      return { x, y, ...ringsOf(home, { kind: 'house', x, y }, size) }
+    })
+    .filter((t) => ground.fits('house', t.x, t.y, inArea))
+    .sort((a, b) => a.near - b.near || a.y - b.y || a.x - b.x)
+  const at = (t: { x: number; y: number } | undefined) => t && { x: t.x, y: t.y }
+  if (!rings) return at(free[0])
+  const inside = free.find((t) => t.far < rings.outer)
+  if (inside || rings.expanding) return at(inside)
+  return at(free.find((t) => t.near === rings.inner + 1))
 }
 
 /**
- * Where the city lays out its next farm: the free Plains tile nearest its gate beyond where its
- * next wall would stand, up to `NPC_FARM_REACH` further out, off the way out of its gate.
+ * Where the city lays out its next farm, by the north-west tile of its footprint: wholly on free
+ * Plains beyond where its next wall would stand, nearest that wall first and then nearest its gate,
+ * up to `NPC_FARM_REACH` further out, off the way out of its gate.
  */
 export function farmTile(
   world: WorldState,
@@ -535,23 +586,32 @@ export function farmTile(
   const wall = rings ? rings.outer : 0
   const gate = rings?.newGate ?? { dx: 0, dy: wall }
   const from = wall + NPC_WALL_STEP + 1
+  const side = FOOTPRINT.farm
+  const ground = new Ground(world, terrain)
+  // Keep the way out of the gate open, and stay beyond the next wall.
+  const fine = (x: number, y: number) => {
+    const dx = wrapDelta(home.x, x, size)
+    const dy = wrapDelta(home.y, y, size)
+    const lane =
+      Math.abs(gate.dy) >= Math.abs(gate.dx)
+        ? dx === gate.dx && Math.sign(dy) === Math.sign(gate.dy)
+        : dy === gate.dy && Math.sign(dx) === Math.sign(gate.dx)
+    return !lane && ringOf({ dx, dy }) >= from
+  }
   for (let d = from; d < from + NPC_FARM_REACH; d++) {
     let best: { x: number; y: number; dist: number } | undefined
-    for (let dy = -d; dy <= d; dy++) {
-      for (let dx = -d; dx <= d; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue
-        // Keep the way out of the gate open.
-        const lane =
-          Math.abs(gate.dy) >= Math.abs(gate.dx)
-            ? dx === gate.dx && Math.sign(dy) === Math.sign(gate.dy)
-            : dy === gate.dy && Math.sign(dx) === Math.sign(gate.dx)
-        if (lane) continue
-        const x = wrap(home.x + dx, size)
-        const y = wrap(home.y + dy, size)
-        if (terrainAt(terrain, x, y) !== Terrain.Plains || !freeTile(world, terrain, x, y)) continue
-        const dist = Math.hypot(dx - gate.dx, dy - gate.dy)
-        if (!best || dist < best.dist) best = { x, y, dist }
-      }
+    // North-west tiles of footprints whose nearest tile to the home is on ring `d`: touching it
+    // from outside on one of its four sides.
+    const candidates: [number, number][] = []
+    for (let t = -d - side + 1; t <= d; t++) {
+      candidates.push([t, -d - side + 1], [t, d], [-d - side + 1, t], [d, t])
+    }
+    for (const [dx, dy] of candidates) {
+      const x = wrap(home.x + dx, size)
+      const y = wrap(home.y + dy, size)
+      if (!ground.fits('farm', x, y, fine)) continue
+      const dist = Math.hypot(dx + (side - 1) / 2 - gate.dx, dy + (side - 1) / 2 - gate.dy)
+      if (!best || dist < best.dist) best = { x, y, dist }
     }
     if (best) return { x: best.x, y: best.y }
   }

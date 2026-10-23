@@ -14,13 +14,14 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openDb } from './db/index.js'
 import { checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { loadOrCreateWorld, saveWorld } from './saves.js'
 import { dropGoods } from './survival.js'
+import { defaultScripts } from './test-default-scripts.js'
 import { addCity } from './test-terrain.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
@@ -65,17 +66,24 @@ function setup(map: TerrainMap = open) {
     load: {},
   }
   world.carriages.push(carriage)
-  addCity(world, { id: 'c1', name: 'Ash', realmId: 'r1', x: 10, y: 1 })
+  addCity(world, { id: 'c1', name: 'Ash', realmId: 'r1', x: 13, y: 2 })
   const storage: Building = { id: 's1', kind: 'storage', cityId: 'c1', x: 10, y: 2, stock: {} }
   world.buildings.push(storage)
   return { world, w1, horse, carriage, storage }
 }
 
+const tasks = defaultScripts(open, [me])
+/**
+ * Whether routes start as the Haul task from the UI, whose default script starts the haul order
+ * (`CONTEXT.md`: Default script), instead of by the bare haul order.
+ */
+let byTask = false
+
 /** w1 starts hauling `goods` with carriage k1 from their tile to (10, 2). */
 function haul(world: WorldState, goods: Good[], keepFood = 0, extra: object = {}) {
-  const q = new OrderQueue(undefined, open)
+  const q = new OrderQueue(tasks.kinds, open)
   const answer = q.receive(world, me, 'q', {
-    kind: 'haul',
+    ...(byTask ? { kind: 'task', task: 'haul' } : { kind: 'haul' }),
     residentId: 'w1',
     carriageId: 'k1',
     x: 10,
@@ -85,6 +93,7 @@ function haul(world: WorldState, goods: Good[], keepFood = 0, extra: object = {}
     ...extra,
   })
   q.applyAll(world)
+  if (byTask) expect(tasks.runAll(world)).toEqual([])
   return answer
 }
 
@@ -97,6 +106,7 @@ function run(
   map: TerrainMap = open,
 ) {
   for (let t = 0; t < ticks && !until(); t++) {
+    if (byTask) expect(tasks.runAll(world)).toEqual([])
     stepWorld(world, map, walking)
     expect(checkInvariants(world, map)).toEqual([])
   }
@@ -160,7 +170,17 @@ describe('the haul order', () => {
   })
 })
 
-describe('a haul route', () => {
+describe.each([
+  ['by the haul order', false],
+  ['as the Haul task, running Haul (default)', true],
+])('a haul route %s', (_, task) => {
+  beforeEach(() => {
+    byTask = task
+  })
+  afterEach(() => {
+    byTask = false
+  })
+
   it('loads at the first stop, unloads at the other, and comes back for more', () => {
     const { world, w1, carriage, storage } = setup()
     pile(world, 2, 2, { ironOre: 50, wood: 5 })
@@ -245,6 +265,7 @@ describe('a haul route', () => {
     })
     q.applyAll(world)
     expect(w1.order).toBeNull()
+    expect(w1.script).toBeUndefined()
   })
 
   it('ends when the carriage loses its horse', () => {

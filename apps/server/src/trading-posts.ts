@@ -8,9 +8,11 @@ import {
   type ResourceKind,
   type TerrainMap,
   type WorldState,
+  FOOTPRINT,
 } from '@csp/shared'
 import { updateCityMembership } from './cities.js'
-import { foundNpcCity, npcSiteFits, takenTiles } from './npc-cities.js'
+import { foundNpcCity, npcSiteFits, takenGround } from './npc-cities.js'
+import type { Ground } from './placing.js'
 import { mulberry32 } from './residents.js'
 import { FARM_RING, newId } from './starting-city.js'
 import { nearestFreeNode } from './trade-org.js'
@@ -75,7 +77,7 @@ export function findTradingPostSite(
   world: WorldState,
   terrain: TerrainMap,
   region: Region,
-  taken: Set<string> = takenTiles(world),
+  ground: Ground = takenGround(world, terrain),
 ): [number, number] | undefined {
   const { size } = TRADING_POST
   const candidates: { at: [number, number]; off: number }[] = []
@@ -86,13 +88,13 @@ export function findTradingPostSite(
     }
   }
   candidates.sort((a, b) => a.off - b.off)
-  return candidates.find((c) => npcSiteFits(world, terrain, TRADING_POST, c.at[0], c.at[1], taken))
+  return candidates.find((c) => npcSiteFits(world, terrain, TRADING_POST, c.at[0], c.at[1], ground))
     ?.at
 }
 
 /**
  * Lays out a trading post with its top-left wall tile at (x, y) (`CONTEXT.md`: Trading post): an
- * NPC village (`foundNpcCity`) of the Trade Organization's, with a warehouse next to its storage
+ * NPC village (`foundNpcCity`) of the Trade Organization's, with a warehouse east of its storage
  * and a workplace on the nearest free node of `resource`, the region's most common.
  */
 export function foundTradingPost(
@@ -110,21 +112,21 @@ export function foundTradingPost(
     id: newId(world, 'b'),
     kind: 'warehouse',
     cityId: city.id,
-    x: x + mid + 1,
+    x: x + mid + FOOTPRINT.storage + 1,
     y: y + mid,
     stock: { coins: TRADING_POST.coins, ...TRADING_POST.goods },
   }
   world.buildings.push(warehouse)
   const hall = townHallOf(world, city)!
-  const node = resource && nearestFreeNode(world, terrain.size, resource, hall.x, hall.y)
+  const spot = resource && nearestFreeNode(world, terrain, resource, hall.x, hall.y)
   city.workplaceIds = []
-  if (node) {
+  if (spot) {
     const workplace: Building = {
       id: newId(world, 'b'),
       kind: NODE_WORKPLACE[resource],
       cityId: null,
-      x: node.x,
-      y: node.y,
+      x: spot.x,
+      y: spot.y,
     }
     world.buildings.push(workplace)
     city.workplaceIds.push(workplace.id)

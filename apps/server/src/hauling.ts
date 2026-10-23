@@ -1,4 +1,5 @@
 import {
+  CARRYING_A_CHILD,
   commands,
   commandsCarriage,
   CARRIAGE_CAPACITY,
@@ -22,6 +23,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import type { CarryAction } from './carrying.js'
+import { orderedResident } from './order-sender.js'
 import type { OrderKind } from './orders.js'
 import { armyStart, armyToSupply } from './driving.js'
 import { realmOf } from './starting-city.js'
@@ -64,6 +66,7 @@ export const haul: OrderKind = {
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
     if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    if (r.carrying) return CARRYING_A_CHILD
     const carriage = world.carriages.find((k) => k.id === o.carriageId)
     if (!commandsCarriage(world, realm.id, carriage)) return 'not one of your carriages'
     if (o.armyId !== undefined) {
@@ -129,9 +132,8 @@ interface StopRequest extends OrderRequest {
 export const stop: OrderKind = {
   validate(world, sender, order) {
     const o = order as Partial<StopRequest>
-    const realm = realmOf(world, sender.userId)
-    const r = world.residents.find((x) => x.id === o.residentId)
-    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    const r = orderedResident(world, sender, o.residentId)
+    if (!r) return 'not one of your residents'
     return undefined
   },
   apply(world, _sender, order) {

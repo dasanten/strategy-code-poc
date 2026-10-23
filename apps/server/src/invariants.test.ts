@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CARRYING_TICKS,
   MAX_HEALTH,
   MAX_HUNGER,
   Terrain,
+  buildingAt,
   carryCapacity,
+  covers,
   trainedCap,
   type Resident,
 } from '@csp/shared'
@@ -12,6 +15,12 @@ import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { stepWorld } from './world.js'
 
 const terrain = cityTerrain()
+
+/** The nearest tile east of (x, y) that no footprint covers. */
+function offFootprints(world: Parameters<typeof buildingAt>[0], x: number, y: number) {
+  while (buildingAt(world, x, y, terrain.size)) x++
+  return { x, y }
+}
 
 describe('invariants', () => {
   it('hold on a fresh world and after many ticks', () => {
@@ -76,6 +85,21 @@ describe('invariants', () => {
     ])
   })
 
+  it('catch a work or Construction skill above its most (100)', () => {
+    const world = worldWithCity().world
+    const [a, b, c] = world.residents as [Resident, Resident, Resident]
+    a.skills = { farming: 100, construction: 100, combat: 250 }
+    expect(checkInvariants(world, terrain)).toEqual([])
+    a.skills.farming = 100.5
+    b.skills = { construction: 101 }
+    c.skills = { mining: -1 }
+    expect(checkInvariants(world, terrain)).toEqual([
+      expect.objectContaining({ invariant: 'skills-within-cap', entityIds: [a.id] }),
+      expect.objectContaining({ invariant: 'skills-within-cap', entityIds: [b.id] }),
+      expect.objectContaining({ invariant: 'skills-within-cap', entityIds: [c.id] }),
+    ])
+  })
+
   it('catch a resident carrying more than their capacity', () => {
     const world = worldWithCity().world
     const r = world.residents[0]!
@@ -95,7 +119,8 @@ describe('invariants', () => {
     world.piles.push(
       { id: 'p1', ...at, goods: { wood: 3 } },
       { id: 'p2', ...at, goods: { wood: 2 } },
-      { id: 'p3', x: r.x + 1, y: r.y, goods: {} },
+      // Off every footprint, so it is one tile's pile and not the farm's.
+      { id: 'p3', ...offFootprints(world, r.x, r.y), goods: {} },
     )
     const ids = checkInvariants(world, terrain)
       .filter((v) => v.invariant === 'goods-in-place')
@@ -133,7 +158,10 @@ describe('invariants', () => {
     const house = world.buildings.find((b) => b.kind === 'house')!
     const storage = world.buildings.find((b) => b.kind === 'storage')!
     const farm = world.buildings.find((b) => b.kind === 'farm')!
-    Object.assign(house, { x: wall.x, y: wall.y }) // onto the wall
+    Object.assign(house, { x: wall.x, y: wall.y }) // onto the wall and the walls next to it
+    const walls = world.buildings.filter(
+      (b) => b.kind === 'wall' && covers(house, b.x, b.y, terrain.size),
+    )
     storage.stock = { food: -1 }
     const forest = terrain.tiles.indexOf(Terrain.Forest)
     farm.x = forest % terrain.size
@@ -141,7 +169,8 @@ describe('invariants', () => {
     const ids = checkInvariants(world, terrain)
       .filter((v) => v.invariant === 'buildings-in-place')
       .map((v) => v.entityIds[0])
-    expect(ids.sort()).toEqual([farm.id, wall.id, storage.id].sort())
+    expect(walls.length).toBeGreaterThan(1)
+    expect(ids.sort()).toEqual([farm.id, storage.id, ...walls.map((b) => b.id)].sort())
   })
 
   it('catch goods kept in a building that is not a storage', () => {
@@ -219,21 +248,42 @@ describe('invariants', () => {
     const [a, b, c] = world.residents as [Resident, Resident, Resident]
     const pairs = () =>
       checkInvariants(world, terrain).filter((v) => v.invariant === 'pairs-hold-together')
-    a.order = { kind: 'pair', partnerId: b.id, since: world.tick }
-    b.order = { kind: 'pair', partnerId: a.id, since: world.tick }
+    a.pair = { partnerId: b.id, since: world.tick }
+    b.pair = { partnerId: a.id, since: world.tick }
     expect(pairs()).toEqual([])
-    c.order = { kind: 'pair', partnerId: a.id, since: world.tick }
+    c.pair = { partnerId: a.id, since: world.tick }
     expect(pairs().map((v) => v.message)).toEqual([expect.stringMatching(/doesn't pair back/)])
-    c.order = null
-    b.order.since = world.tick + 1
+    delete c.pair
+    b.pair.since = world.tick + 1
     expect(pairs().map((v) => v.message)).toEqual([
       expect.stringMatching(/pairs since/),
       expect.stringMatching(/pairs since/),
       expect.stringMatching(/after now/),
     ])
-    b.order.since = world.tick
+    b.pair.since = world.tick
     b.bornAt = world.tick
     expect(pairs().map((v) => v.message)).toEqual([expect.stringMatching(/as a child/)])
+  })
+
+  it('catch a resident carrying a child who works, or carries past the time', () => {
+    const world = worldWithCity().world
+    const [a, b] = world.residents as [Resident, Resident]
+    const carrying = () =>
+      checkInvariants(world, terrain).filter((v) => v.invariant === 'carrying-doesnt-work')
+    a.order = null
+    a.carrying = {
+      since: world.tick,
+      partnerId: b.id,
+      partnerName: b.name,
+      partnerBase: { strength: 10, endurance: 10, agility: 10, intellect: 10 },
+    }
+    expect(carrying()).toEqual([])
+    const farm = world.buildings.find((x) => x.kind === 'farm')!
+    a.order = { kind: 'workAt', buildingId: farm.id, at: { x: a.x, y: a.y }, progress: 0 }
+    expect(carrying().map((v) => v.message)).toEqual([expect.stringMatching(/workAt order/)])
+    a.order = null
+    world.tick += CARRYING_TICKS + 1
+    expect(carrying().map((v) => v.message)).toEqual([expect.stringMatching(/past its time/)])
   })
 
   it('are checked every tick at rate 1 and sampled below it', () => {

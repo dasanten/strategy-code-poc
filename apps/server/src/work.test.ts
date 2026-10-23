@@ -1,17 +1,21 @@
 import {
+  WORK_SKILL_PER_DAY,
+  FOOTPRINT,
   HOME_FOOD_LOW,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_MAX_WORKERS,
   WORK_SKILL_EFFECT,
   MAX_HEALTH,
   START_CARRIED_FOOD,
+  START_HORSES,
+  START_STABLE_FOOD,
   START_RESIDENTS,
   Terrain,
   TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_YEAR,
   holdersOf,
   pileAt,
   workOutput,
+  ticksForAge,
   type BuildingKind,
   type Resident,
   type ResourceKind,
@@ -99,10 +103,10 @@ describe('work-at order', () => {
       })
     reject('not one of your residents', 'w1', stranger)
     reject('not one of your residents', 'nobody')
-    r.bornAt = world.tick - 5 * TICKS_PER_GAME_YEAR
+    r.bornAt = world.tick - ticksForAge(5)
     reject('children can’t work')
-    r.bornAt = world.tick - 30 * TICKS_PER_GAME_YEAR
-    r.x = 5
+    r.bornAt = world.tick - ticksForAge(30)
+    r.x = 8
     reject('there is no workplace to work here')
     r.x = 3
     world.buildings[0]!.site = { delivered: {}, work: 0 }
@@ -139,7 +143,7 @@ describe('work-at order', () => {
   it('stops when the resident leaves the farm', () => {
     const { world, r, queue } = setup()
     order(world, queue)
-    r.x = 4
+    r.x = 3 + FOOTPRINT.farm // just off its footprint
     run(world)
     expect(r.order).toBeNull()
   })
@@ -156,7 +160,19 @@ describe('farm work', () => {
     const piled = pileAt(world, 3, 3)?.goods.food ?? 0
     expect(o.kind === 'workAt' && o.progress + piled).toBeCloseTo(FARM_FOOD_PER_DAY, 0)
     expect(r.carried).toEqual({ food: HOME_FOOD_LOW })
-    expect(r.skills.farming).toBeCloseTo(1, 1)
+    expect(r.skills.farming).toBeCloseTo(WORK_SKILL_PER_DAY, 2)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('is worked from any tile of the farm, onto its one pile on the north-west tile', () => {
+    const { world, r, queue } = setup()
+    r.x = r.y = 3 + FOOTPRINT.farm - 1 // its south-east tile
+    order(world, queue)
+    expect(r.order).toMatchObject({ kind: 'workAt', buildingId: 'farm', at: { x: 6, y: 6 } })
+    run(world, TICKS_PER_GAME_DAY - 2)
+    expect(world.piles.map((p) => [p.x, p.y])).toEqual([[3, 3]])
+    expect(pileAt(world, 6, 6)).toBe(pileAt(world, 3, 3))
+    expect(pileAt(world, 3, 3)!.goods.food).toBeGreaterThan(0)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
@@ -178,7 +194,7 @@ describe('farm work', () => {
     r.carried = { food: 5 }
     order(world, queue)
     order(world, queue, 'w2')
-    run(world, 3000)
+    run(world, 1000)
     // Two workers make 4 units in that time: the one who had none takes meals from the pile
     // until no longer low, the rest stays there; a resident who doesn't work there gets none.
     expect(r.carried.food).toBe(5)
@@ -204,7 +220,7 @@ describe('farm work', () => {
   it('catches a worker who is not on their farm, or a farm with too many workers', () => {
     const { world, r, queue } = setup()
     order(world, queue)
-    r.x = 4
+    r.x = 3 + FOOTPRINT.farm // just off its footprint
     expect(workOrdersOnWorkplaces.check(world, terrain)).toEqual([
       expect.objectContaining({ entityIds: ['w1', 'farm'] }),
     ])
@@ -249,7 +265,7 @@ describe('workplaces on nodes', () => {
       const piled = pileAt(world, x, 1)?.goods[good] ?? 0
       const made = (o.kind === 'workAt' ? o.progress : 0) + piled
       expect(made).toBeCloseTo(WORK_OUTPUT_PER_DAY[good]!, 0)
-      expect(r.skills[skill]).toBeCloseTo(1, 1)
+      expect(r.skills[skill]).toBeCloseTo(WORK_SKILL_PER_DAY, 2)
       expect(r.skills.farming ?? 0).toBe(0)
       expect(checkInvariants(world, terrain)).toEqual([])
     },
@@ -337,7 +353,7 @@ describe('holding a workplace', () => {
     order(world, queue)
     expect(holdersOf(world, farm)).toEqual(['r1'])
     // r1's worker walks off: the farm (built for r1's city) is nobody's now.
-    r.x = 4
+    r.x = 3 + FOOTPRINT.farm // just off its footprint
     run(world)
     expect(holdersOf(world, farm)).toEqual([])
     const s = rival(world, 3, 3)
@@ -382,6 +398,43 @@ describe('a starting city', () => {
     const carried = world.residents.reduce((n, r) => n + (r.carried.food ?? 0), 0)
     const piled = world.piles.reduce((n, p) => n + (p.goods.food ?? 0), 0)
     expect(carried + piled).toBeGreaterThan(START_RESIDENTS * START_CARRIED_FOOD)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('holds its Food over 10 game days with 2 of 8 on the farm, horses included', () => {
+    const { world, terrain } = worldWithCity()
+    const storage = world.buildings.find((b) => b.kind === 'storage')!
+    const stable = world.buildings.find((b) => b.kind === 'stable')!
+    // The two strongest stay on the farm, as a Player would pick them; the other six are at home
+    // by the storage, doing nothing.
+    const byStrength = [...world.residents].sort(
+      (a, b) => b.stats.strength.base - a.stats.strength.base,
+    )
+    for (const r of byStrength.slice(2)) {
+      r.order = null
+      r.x = storage.x
+      r.y = storage.y
+    }
+    const food = () =>
+      (storage.stock?.food ?? 0) +
+      world.piles.reduce((n, p) => n + (p.goods.food ?? 0), 0) +
+      world.residents.reduce((n, r) => n + (r.carried.food ?? 0), 0)
+    const atStart = food()
+    let fewest = atStart
+    for (let day = 0; day < 10; day++) {
+      for (let t = 0; t < TICKS_PER_GAME_DAY; t++) stepWorld(world, terrain)
+      fewest = Math.min(fewest, food())
+    }
+    expect(world.residents).toHaveLength(8)
+    for (const r of world.residents) expect(r.health).toBe(MAX_HEALTH)
+    // The horses eat from the stable's own ten game days of food; a foal may have come.
+    expect(world.horses.length).toBeGreaterThanOrEqual(START_HORSES)
+    for (const h of world.horses) expect(h.health).toBe(MAX_HEALTH)
+    expect(stable.stock?.food ?? 0).toBeLessThan(START_STABLE_FOOD)
+    // Only the residents' own food above `HOME_FOOD_LOW` is eaten down; the farm makes up the rest.
+    const ownFoodEaten = START_RESIDENTS * (START_CARRIED_FOOD - HOME_FOOD_LOW)
+    expect(fewest).toBeGreaterThanOrEqual(atStart - ownFoodEaten - 2)
+    expect(food()).toBeGreaterThanOrEqual(atStart - ownFoodEaten)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 })

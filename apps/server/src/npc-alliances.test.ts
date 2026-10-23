@@ -22,7 +22,7 @@ import { changeStanding } from './standing.js'
 import { addCity } from './test-terrain.js'
 import { createWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 64, tiles: new Uint8Array(64 * 64).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 256, tiles: new Uint8Array(256 * 256).fill(Terrain.Plains) }
 const player = (userId: number) => ({ userId, account: { name: `p${userId}`, isAdmin: false } })
 const [mara, tobin] = [player(1), player(2)]
 
@@ -51,11 +51,11 @@ function setup() {
     { id: 'r1', userId: 1, leaderId: 'a1' },
     { id: 'r2', userId: 2, leaderId: 'b1' },
   )
-  resident(world, 'a1', 'r1', 5, 5)
-  resident(world, 'b1', 'r2', 40, 5)
-  addCity(world, { id: 'npc', realmId: null, x: 20, y: 20, name: 'Dunmere' })
-  resident(world, 'n1', null, 21, 20)
-  addCity(world, { id: 'post', realmId: null, x: 50, y: 50, name: 'Post' }).tradeOrg = 'post'
+  resident(world, 'a1', 'r1', 20, 20)
+  resident(world, 'b1', 'r2', 160, 20)
+  addCity(world, { id: 'npc', realmId: null, x: 80, y: 80, name: 'Dunmere' })
+  resident(world, 'n1', null, 84, 80)
+  addCity(world, { id: 'post', realmId: null, x: 200, y: 200, name: 'Post' }).tradeOrg = 'post'
   const queue = new OrderQueue()
   const order = (sender: ReturnType<typeof player>, o: object) => {
     const answer = queue.receive(world, sender, 'q', o)
@@ -88,8 +88,8 @@ function crimeAgainstCity(world: WorldState, tick: number, known: boolean): Crim
     id: 'x1',
     kind: 'theft',
     tick,
-    x: 20,
-    y: 20,
+    x: 80,
+    y: 80,
     culprit: { residentId: 'b1', name: 'Tobin', org: 'r2', orgName: 'the realm of Tobin' },
     victimOrg: 'npc',
     goods: { food: 1 },
@@ -215,11 +215,11 @@ describe('NPC cities in alliances', () => {
 
   it('shares walls and shows as an NPC city in alliance matters', () => {
     const { world, order } = wellRegarded()
-    world.buildings.push({ id: 'w', kind: 'wall', cityId: 'npc', x: 22, y: 22 })
+    world.buildings.push({ id: 'w', kind: 'wall', cityId: 'npc', x: 88, y: 88 })
     expect(diplomacyFor(world, 'r1', ['npc', 'post']).realmsInSight).toEqual([
       { realmId: 'npc', realm: 'Dunmere', city: true },
     ])
-    const wallSides = () => wallMap(world, terrain).tiles.get(22 * terrain.size + 22)!.realms
+    const wallSides = () => wallMap(world, terrain).tiles.get(88 * terrain.size + 88)!.realms
     expect(wallSides()).toEqual(['npc'])
     order(mara, { kind: 'inviteToAlliance', realmId: 'npc' })
     expect(wallSides()).toEqual(['r1', 'r2', 'npc'])
@@ -234,7 +234,7 @@ describe('NPC cities in alliances', () => {
 
   it('shares sight: members see through its residents', () => {
     const { world, order } = wellRegarded()
-    resident(world, 'stranger', null, 24, 24)
+    resident(world, 'stranger', null, 96, 96)
     world.residents.find((r) => r.id === 'stranger')!.cityId = null
     const seen = () => entitiesInSight(world, terrain, 'r1').some((e) => e.id === 'stranger')
     expect(seen()).toBe(false)

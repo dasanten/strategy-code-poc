@@ -8,7 +8,7 @@ import { generateWorld } from './world.js'
 
 /** How many of the newest saves are always kept. */
 export const KEEP_LATEST = 20
-/** Beyond those, one save per game day (one real hour) is kept for this long. */
+/** Beyond those, one save per real hour is kept for this long. */
 export const KEEP_HOURLY_FOR_S = 7 * 24 * 60 * 60
 
 export function saveWorld(db: Db, world: WorldState): void {
@@ -37,8 +37,9 @@ export function loadOrCreateWorld(
 ): { world: WorldState; terrain: TerrainMap } {
   let save = latestSave(db)
   if (save && save.version < RESET_BEFORE) {
-    // The one reset (ADR 0006): a world from the disc-shaped map is thrown away with its
-    // terrain and explored terrain. Accounts, sessions, invite codes and scripts stay.
+    // The resets (ADR 0006): a world from before the finer grid is thrown away with its terrain
+    // and explored terrain. Accounts, sessions, invite codes and scripts stay, and every Player
+    // gets a new starting city on their next login.
     resetWorld(db)
     save = undefined
   }

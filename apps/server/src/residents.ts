@@ -9,7 +9,7 @@ import {
   STAT_NAMES,
   START_AGE_MAX,
   START_AGE_MIN,
-  TICKS_PER_GAME_YEAR,
+  ticksForAge,
   type Resident,
   type Stat,
   type StatName,
@@ -98,28 +98,40 @@ export function newResident(
     skills: {},
     health: MAX_HEALTH,
     hunger: MAX_HUNGER,
-    bornAt: tick - Math.round(age * TICKS_PER_GAME_YEAR),
+    bornAt: tick - Math.round(ticksForAge(age)),
     lifespan: drawLifespan(rand),
     carried: {},
     order: null,
   }
 }
 
+/** A resident's base stats (`CONTEXT.md`: Base value), the only part a child inherits. */
+export function baseStats(r: Resident): Record<StatName, number> {
+  return Object.fromEntries(STAT_NAMES.map((s) => [s, r.stats[s].base])) as Record<StatName, number>
+}
+
 /**
- * A child of two parents, born at `tick` (`CONTEXT.md`: Child): each base stat is the parents'
+ * A child of two parents, given by their base stats, born at `tick` (`CONTEXT.md`: Child): each base stat is the parents'
  * average, rounded, plus a whole random amount of at most `CHILD_STAT_SPREAD` either way, and at
  * least 1. Nothing trained or learned, since neither is inherited; full health and hunger meter;
  * a lifespan between `LIFESPAN_MIN` and `LIFESPAN_MAX`.
  */
 export function newChild(
   rand: () => number,
-  parents: [Resident, Resident],
-  fields: { id: string; owner: string | null; cityId: string; x: number; y: number; tick: number },
+  parents: [Record<StatName, number>, Record<StatName, number>],
+  fields: {
+    id: string
+    owner: string | null
+    cityId: string | null
+    x: number
+    y: number
+    tick: number
+  },
 ): Resident {
   const [a, b] = parents
   const stats = Object.fromEntries(
     STAT_NAMES.map((s) => {
-      const average = Math.round((a.stats[s].base + b.stats[s].base) / 2)
+      const average = Math.round((a[s] + b[s]) / 2)
       const base = average + between(rand, -CHILD_STAT_SPREAD, CHILD_STAT_SPREAD)
       return [s, { base: Math.max(1, base), trained: 0 }]
     }),

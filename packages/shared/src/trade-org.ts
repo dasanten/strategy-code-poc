@@ -1,5 +1,6 @@
 import { TRADE_ORG_ARMY, TRADE_ORG_HQ, isArmed } from './balance.js'
 import { townHallOf } from './city.js'
+import { middleOf, type Placed } from './footprint.js'
 import { wrapDelta } from './terrain.js'
 import type { City, Resident, WorldState } from './world.js'
 
@@ -41,7 +42,8 @@ export function contractSide(world: Pick<WorldState, 'cities'>, r: Resident): st
 
 /**
  * Whether a tile is on or inside the Trade Org HQ's inner ring (`CONTEXT.md`: Trade Org HQ), on a
- * map of `size` tiles: within its inner radius of the town hall, the ring itself included.
+ * map of `size` tiles: within its inner radius of the middle of the town hall, the ring itself
+ * included.
  */
 export function inInnerRing(
   world: Pick<WorldState, 'cities' | 'buildings'>,
@@ -55,11 +57,12 @@ export function inInnerRing(
 
 /** `inInnerRing` for the HQ whose town hall is `hall`. */
 export function inInnerRingAround(
-  hall: { x: number; y: number },
+  hall: Placed,
   at: { x: number; y: number },
   size: number,
 ): boolean {
-  const d = Math.hypot(wrapDelta(hall.x, at.x, size), wrapDelta(hall.y, at.y, size))
+  const c = middleOf(hall, size)
+  const d = Math.hypot(wrapDelta(c.x, at.x, size), wrapDelta(c.y, at.y, size))
   return d <= TRADE_ORG_HQ.innerRadius + 0.5
 }
 

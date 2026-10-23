@@ -36,13 +36,13 @@ describe('stepSpoilage', () => {
     const [r] = world.residents
     const [k] = world.carriages
     r!.carried = { food: 10, stone: 5 }
-    k!.load = { food: 500 }
-    world.piles.push({ id: 'p1', x: r!.x, y: r!.y, goods: { food: 500, iron: 2 } })
+    k!.load = { food: 400 }
+    world.piles.push({ id: 'p1', x: r!.x, y: r!.y, goods: { food: 400, iron: 2 } })
     wait(world, 1)
     expect(r!.carried.food).toBeLessThanOrEqual(10)
     expect(r!.carried.stone).toBe(5)
-    expect(k!.load).toEqual({ food: 500 - 500 * FOOD_SPOIL_PER_DAY })
-    expect(world.piles[0]!.goods).toEqual({ food: 500 - 500 * FOOD_SPOIL_PER_DAY, iron: 2 })
+    expect(k!.load).toEqual({ food: 400 - 400 * FOOD_SPOIL_PER_DAY })
+    expect(world.piles[0]!.goods).toEqual({ food: 400 - 400 * FOOD_SPOIL_PER_DAY, iron: 2 })
   })
 
   it('keeps small stocks in whole units and spoils them at the right rate on average', () => {

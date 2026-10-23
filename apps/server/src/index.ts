@@ -23,9 +23,15 @@ import {
   ScriptRunner,
   armyRunScriptOrder,
   runScriptOrder,
+  taskOrder,
   type ScriptHost,
 } from './script-runner.js'
-import { checkScriptLibrary, runnableScript } from './scripts.js'
+import {
+  checkScriptLibrary,
+  defaultScriptId,
+  runnableScript,
+  syncDefaultScripts,
+} from './scripts.js'
 import { generateTerrain } from './terrain-gen.js'
 import { TerritoryTracker } from './territory.js'
 import { runTick } from './tick.js'
@@ -73,12 +79,14 @@ const scriptHost: ScriptHost = {
     return user && { userId, account: user }
   },
   explored: (userId, x, y) => explored.isExplored({ id: userId }, x, y),
+  defaultScript: (userId, task) => defaultScriptId(db, userId, task),
 }
 const orders = new OrderQueue(
   {
     ...orderKinds,
     runScript: runScriptOrder(scriptHost),
     armyRunScript: armyRunScriptOrder(scriptHost),
+    task: taskOrder({ defaultScript: (userId, task) => defaultScriptId(db, userId, task) }),
   },
   terrain,
 )
@@ -86,6 +94,8 @@ const scripts = new ScriptRunner(terrain, scriptHost)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
 const reporter = createTickReporter(logger)
+// Players who haven't edited a default script run the game's current default from now on.
+syncDefaultScripts(db)
 // The script library lives in the database, so its invariant is checked at start and daily.
 reporter.invariantViolations(world, checkScriptLibrary(db))
 const realtime = attachRealtime(app.server, {

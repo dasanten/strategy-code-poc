@@ -9,11 +9,13 @@ import {
   type Recipe,
 } from './balance.js'
 import { citiesAt } from './city.js'
+import { FOOTPRINT, covers, footprintTiles, isAt } from './footprint.js'
 import {
   NODE_WORKPLACE,
   type Building,
   type BuildingKind,
   type Good,
+  type Pile,
   type Resident,
   type ResourceKind,
   type Stock,
@@ -97,11 +99,35 @@ export const ON_PLAINS: readonly BuildingKind[] = ['stable', 'farm']
 export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'warehouse', 'stable']
 
 /**
- * The building or construction site on a tile, if there is one (one per tile). A road is not one
- * of them: it may share the tile with a building (`roadAt`).
+ * The building or construction site whose footprint covers a tile, if there is one (one per
+ * tile). A road is not one of them: it may share the tile with a building (`roadAt`).
  */
-export function buildingAt(world: WorldState, x: number, y: number): Building | undefined {
-  return world.buildings.find((b) => b.x === x && b.y === y && b.kind !== 'road')
+export function buildingAt(
+  world: Pick<WorldState, 'buildings'>,
+  x: number,
+  y: number,
+  size = MAP_SIZE,
+): Building | undefined {
+  return world.buildings.find((b) => b.kind !== 'road' && covers(b, x, y, size))
+}
+
+/**
+ * Where goods lying on (x, y) are kept (`CONTEXT.md`: A building's pile): on a building's
+ * footprint, its north-west tile, so goods anywhere on it are one pile; elsewhere the tile itself.
+ */
+export function pileTile(
+  world: Pick<WorldState, 'buildings'>,
+  x: number,
+  y: number,
+  size = MAP_SIZE,
+): { x: number; y: number } {
+  const b = buildingAt(world, x, y, size)
+  return b ? { x: b.x, y: b.y } : { x, y }
+}
+
+/** A building's pile (`CONTEXT.md`: A building's pile), if goods lie on its footprint. */
+export function buildingPile(world: Pick<WorldState, 'piles'>, b: Building): Pile | undefined {
+  return world.piles.find((p) => p.x === b.x && p.y === b.y)
 }
 
 /** The road or road construction site on a tile, if there is one (`CONTEXT.md`: Road). */
@@ -150,12 +176,14 @@ export function workNeeded(site: Building): number {
 }
 
 /**
- * Why a building of this kind can't be laid out on the tile (`CONTEXT.md`: Where buildings go),
- * or undefined if it can: workplaces go on a resource node of their kind, stables and farms on
- * Plains off any node, smelters, mints, smithies, town halls, houses, walls and gates off any node
- * and off Mountain, a house only in a city's area (`CONTEXT.md`: House), one building per tile. A road goes on any passable land but Mountain, node or not, and next to
- * a building on its tile, but one road per tile (`CONTEXT.md`: Road). Without `terrain` the
- * terrain rules are not checked.
+ * Why a building of this kind can't be laid out with the north-west tile of its footprint on
+ * (x, y) (`CONTEXT.md`: Where buildings go, Footprint), or undefined if it can: every tile of the
+ * footprint passable and free of other buildings; workplaces with one tile on a resource node of
+ * their kind, stables and farms wholly on Plains, smelters, mints, smithies, town halls, houses,
+ * walls and gates off Mountain, a house only in a city's area (`CONTEXT.md`: House); only a
+ * node's workplace covers a node. A road goes on any passable land but Mountain, node or not, and
+ * next to a building on its tile, but one road per tile (`CONTEXT.md`: Road). Without `terrain`
+ * the terrain rules are not checked.
  */
 export function buildProblem(
   world: WorldState,
@@ -172,19 +200,44 @@ export function buildProblem(
     if (roadAt(world, x, y)) return 'there is already a road on this tile'
     return undefined
   }
-  const node = world.nodes.find((n) => n.x === x && n.y === y)
+  const size = terrain?.size ?? MAP_SIZE
+  const placed = { kind, x, y }
+  const tiles = footprintTiles(placed, size)
+  const nodes = world.nodes.filter((n) => covers(placed, n.x, n.y, size))
+  const all = (ok: (t: Terrain) => boolean) =>
+    !terrain || tiles.every(([tx, ty]) => ok(terrainAt(terrain, tx, ty)))
+  if (!all(isPassableTerrain)) return `a ${kind} goes on passable land`
   if (ON_PLAINS.includes(kind)) {
-    if (node || (terrain && terrainAt(terrain, x, y) !== Terrain.Plains))
-      return `a ${kind} goes on Plains, off any resource node`
+    if (nodes.length > 0 || !all((t) => t === Terrain.Plains))
+      return `a ${kind} goes wholly on Plains, off any resource node`
   } else if (OFF_NODES.includes(kind)) {
-    if (node || (terrain && terrainAt(terrain, x, y) === Terrain.Mountain))
+    if (nodes.length > 0 || !all((t) => t !== Terrain.Mountain))
       return `a ${kind} goes off any resource node, and not on Mountain`
-    if (kind === 'house' && citiesAt(world, x, y, terrain?.size ?? MAP_SIZE).length === 0)
+    if (kind === 'house' && tiles.some(([tx, ty]) => citiesAt(world, tx, ty, size).length === 0))
       return 'a house goes in a city’s area'
-  } else if (!node || NODE_WORKPLACE[node.kind] !== kind)
-    return `a ${kind} goes on a fitting resource node`
-  if (buildingAt(world, x, y)) return 'there is already a building on this tile'
+  } else if (nodes.length !== 1 || NODE_WORKPLACE[nodes[0]!.kind] !== kind)
+    return `a ${kind} goes with one tile on a fitting resource node`
+  if (tiles.some(([tx, ty]) => buildingAt(world, tx, ty, size)))
+    return 'there is already a building there'
   return undefined
+}
+
+/**
+ * The north-west tiles a footprint of `kind` may have so that it covers (x, y), the tile itself
+ * first: where a resident standing there could lay it out (`CONTEXT.md`: At a building).
+ */
+export function cornersCovering(
+  kind: BuildingKind,
+  x: number,
+  y: number,
+  size = MAP_SIZE,
+): [number, number][] {
+  const side = FOOTPRINT[kind]
+  const out: [number, number][] = []
+  for (let dy = 0; dy < side; dy++) {
+    for (let dx = 0; dx < side; dx++) out.push([wrap(x - dx, size), wrap(y - dy, size)])
+  }
+  return out
 }
 
 /** Most workers each kind of workplace takes, for the kinds residents can work so far. */
@@ -215,18 +268,18 @@ export function workplaceGood(
     const recipe = recipeFor(workplace.kind, makes)
     return recipe && recipeGood(recipe)
   }
-  const node = world.nodes.find((n) => n.x === workplace.x && n.y === workplace.y)
+  const node = world.nodes.find((n) => covers(workplace, n.x, n.y))
   return node ? NODE_GOOD[node.kind] : undefined
 }
 
 /**
  * The goods a workplace that processes goods can use up for its next batches (`CONTEXT.md`:
- * Smelter, Smithy): the input of any of its recipes that its workers carry and that lies in the
- * pile on its tile.
+ * Smelter, Smithy): the input of any of its recipes that its workers carry and that lies in its
+ * pile (`CONTEXT.md`: A building's pile).
  */
 export function inputAt(world: WorldState, workplace: Building): Stock {
   const out: Stock = {}
-  const pile = world.piles.find((p) => p.x === workplace.x && p.y === workplace.y)
+  const pile = buildingPile(world, workplace)
   const goods = new Set((RECIPES[workplace.kind] ?? []).flatMap((r) => Object.keys(r.input)))
   for (const good of goods as Set<Good>) {
     const carried = workersOf(world, workplace).reduce((n, w) => n + (w.carried[good] ?? 0), 0)
@@ -242,14 +295,10 @@ export function hasInput(world: WorldState, workplace: Building, recipe: Recipe)
   return (Object.entries(recipe.input) as [Good, number][]).every(([g, n]) => (at[g] ?? 0) >= n)
 }
 
-/** The residents working a workplace: holding a work-at order for it and standing on it. */
+/** The residents working a workplace: holding a work-at order for it and standing at it. */
 export function workersOf(world: Pick<WorldState, 'residents'>, workplace: Building): Resident[] {
   return world.residents.filter(
-    (r) =>
-      r.order?.kind === 'workAt' &&
-      r.order.buildingId === workplace.id &&
-      r.x === workplace.x &&
-      r.y === workplace.y,
+    (r) => r.order?.kind === 'workAt' && r.order.buildingId === workplace.id && isAt(r, workplace),
   )
 }
 
@@ -321,8 +370,8 @@ export function teardownReturns(b: Building): Stock {
 }
 
 /**
- * Why the building or site can't be torn down by a resident on (x, y), or undefined if it can.
- * So far only what can be built can be torn down, and its sites.
+ * Why the building or site can't be torn down by a resident on (x, y), or undefined if it can:
+ * they must stand at it. So far only what can be built can be torn down, and its sites.
  */
 export function tearDownProblem(
   world: WorldState,
@@ -331,7 +380,7 @@ export function tearDownProblem(
   buildingId: string,
 ): string | undefined {
   const b = world.buildings.find((c) => c.id === buildingId)
-  if (!b || b.x !== x || b.y !== y) return 'that building is not on the resident’s tile'
+  if (!b || !covers(b, x, y)) return 'the resident is not at that building'
   if (!BUILDABLE.includes(b.kind)) return `a ${b.kind} can’t be torn down yet`
   return undefined
 }

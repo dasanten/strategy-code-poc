@@ -1,11 +1,12 @@
+import type { Task } from './default-scripts.js'
 import { Terrain } from './terrain.js'
 
 export const TICK_MS = 1000
 
-/** One game day is one real hour (`CONTEXT.md`: Game time). */
-export const TICKS_PER_GAME_DAY = 3600
-/** One game year is one real day. */
-export const TICKS_PER_GAME_YEAR = 24 * TICKS_PER_GAME_DAY
+/** One game day is 24 real minutes: a real second is a game minute (`CONTEXT.md`: Game time). */
+export const TICKS_PER_GAME_DAY = 1440
+/** One game year is 420 game days, one real week. */
+export const TICKS_PER_GAME_YEAR = 420 * TICKS_PER_GAME_DAY
 
 /** A resident's stats (`CONTEXT.md`: Stats). */
 export const STAT_NAMES = ['strength', 'endurance', 'agility', 'intellect'] as const
@@ -59,7 +60,38 @@ export interface Resident {
    * when they run none.
    */
   script?: RunningScript
+  /** The resident's pair (`CONTEXT.md`: Pairing), if they are paired. Not an order. */
+  pair?: Pair
+  /** The child the resident is carrying (`CONTEXT.md`: Carrying), if any. */
+  carrying?: Carrying
 }
+
+/**
+ * Pairing (`CONTEXT.md`: Pairing): the resident and their partner, two adults of the same city,
+ * are set to have a child. Both hold a pair naming the other, with the same `since`: the tick they
+ * paired. Pairing is no order: both go on with whatever they do. Once a game year has passed since
+ * then, and their city has free housing and a food surplus, one of them starts carrying the
+ * child; the pair ends when it is born.
+ */
+export interface Pair {
+  partnerId: string
+  since: number
+}
+
+/**
+ * Carrying a child (`CONTEXT.md`: Carrying): since the tick `since` the resident can't work,
+ * build, tear down or haul; `CARRYING_DAYS` later the child is born. The other parent's name and
+ * base stats are kept, so the child is born even if that parent is gone by then.
+ */
+export interface Carrying {
+  since: number
+  partnerId: string
+  partnerName: string
+  partnerBase: Record<StatName, number>
+}
+
+/** Why a resident carrying a child is turned down for work, building, tearing down or hauling. */
+export const CARRYING_A_CHILD = 'carrying a child'
 
 /** A script value as plain data, the only kind a script's memory keeps between ticks. */
 export type MemoryValue = number | string | boolean | null | MemoryValue[] | ScriptMemory
@@ -73,8 +105,17 @@ export interface ScriptMemory {
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
  */
 export interface RunningScript {
-  /** The script in the Player's library; its active version is what runs each tick. */
+  /**
+   * The script in the Player's library; its active version is what runs each tick. 0 while it
+   * runs the default of `task` without one: the game's own for an NPC city's resident, until a
+   * Player's resident first runs it as the Player's version.
+   */
   scriptId: number
+  /**
+   * Runs the default script of this task (`CONTEXT.md`: Default script) rather than one the
+   * Player picked, as an NPC city's residents and a starting city's farmers do.
+   */
+  task?: Task
   /** What the script kept between ticks, at most `SCRIPT_MEMORY_MAX` characters of JSON. */
   memory: ScriptMemory
   /** The tick its last error went into the realm log; errors are logged rate-limited. */
@@ -172,18 +213,6 @@ export interface TearDownOrder {
   kind: 'tearDown'
   buildingId: string
   at: { x: number; y: number }
-}
-
-/**
- * Pairing (`CONTEXT.md`: Pairing): the resident and their partner, two adults of the same city,
- * are set to have children. Both hold a pair order naming the other, with the same `since`: the
- * tick they paired or last had a child. A child can come once a game year has passed since then,
- * while their city has free housing and a food surplus. Any other order for either ends it.
- */
-export interface PairOrder {
-  kind: 'pair'
-  partnerId: string
-  since: number
 }
 
 /**
@@ -309,7 +338,6 @@ export type ResidentOrder =
   | BuildOrder
   | TearDownOrder
   | WorkOrder
-  | PairOrder
   | AttackOrder
   | ClimbOrder
   | RoadLineOrder
@@ -322,11 +350,6 @@ export type ResidentOrder =
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
   return stat.base + stat.trained
-}
-
-/** A resident's age in game years at the given tick. */
-export function ageInYears(resident: Resident, tick: number): number {
-  return (tick - resident.bornAt) / TICKS_PER_GAME_YEAR
 }
 
 /**

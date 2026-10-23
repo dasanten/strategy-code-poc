@@ -23,7 +23,7 @@ import { addCity } from './test-terrain.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 128, tiles: new Uint8Array(128 * 128).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 512, tiles: new Uint8Array(512 * 512).fill(Terrain.Plains) }
 const GATE = { x: 8, y: 11 }
 
 /**
@@ -79,9 +79,9 @@ describe('walls and gates', () => {
     const { world } = setup()
     const walls = wallMap(world, terrain)
     expect(walls.inside.size).toBe(25)
-    expect(walls.inside.has(tileIndex(128, 8, 8))).toBe(true)
-    expect(walls.inside.has(tileIndex(128, 8, 12))).toBe(false)
-    expect(walls.tiles.get(tileIndex(128, GATE.x, GATE.y))?.realmId).toBe('r1')
+    expect(walls.inside.has(tileIndex(terrain.size, 8, 8))).toBe(true)
+    expect(walls.inside.has(tileIndex(terrain.size, 8, 12))).toBe(false)
+    expect(walls.tiles.get(tileIndex(terrain.size, GATE.x, GATE.y))?.realmId).toBe('r1')
   })
 
   it('paths go round walls and in only through an open gate', () => {
@@ -130,7 +130,7 @@ describe('walls and gates', () => {
   it('an attacker comes into contact with a defender up on a wall', () => {
     const { world } = setup()
     const p = path(world, [8, 1], [8, 5], { realmId: 'r2', near: true })!
-    expect(inContact(128, { x: p.at(-1)![0], y: p.at(-1)![1] }, { x: 8, y: 5 })).toBe(true)
+    expect(inContact(terrain.size, { x: p.at(-1)![0], y: p.at(-1)![1] }, { x: 8, y: 5 })).toBe(true)
     expect(p.at(-1)).toEqual([8, 4])
   })
 
@@ -150,8 +150,9 @@ describe('walls and gates', () => {
     walking.resolve(world, [{ kind: 'step', residentId: 'b1', to: { ...GATE } }])
     expect([b.x, b.y]).toEqual([8, 12])
     expect(b.order).toMatchObject({ kind: 'walkTo', path: null, progress: 0 })
-    // With the gate shut there is no way in, so the order ends.
-    walking.requestSteps(world)
+    // With the gate shut there is no way in, so the order ends once the search has looked
+    // everywhere, which on this map takes a few ticks.
+    for (let i = 0; i < 20 && b.order; i++) walking.requestSteps(world)
     expect(b.order).toBeNull()
   })
 })

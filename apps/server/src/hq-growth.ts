@@ -6,8 +6,6 @@ import {
   freeHousing,
   hasFoodSurplus,
   inCityArea,
-  isPassableTerrain,
-  terrainAt,
   townHallOf,
   tradeOrgHq,
   tradeOrgArmyWanted,
@@ -18,9 +16,13 @@ import {
   type Resident,
   type TerrainMap,
   type WorldState,
+  middleOf,
+  cityAreaTiles,
+  footprintTiles,
 } from '@csp/shared'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import type { Project } from './npc-growth.js'
+import { Ground } from './placing.js'
 import { angleApart, angleOf, gateAngles, gatesOf, roundRing, within } from './trade-org.js'
 
 /*
@@ -42,12 +44,13 @@ interface RingTile {
 }
 
 /**
- * The tiles of the HQ's `k`th outer ring round its town hall, on a map of `size` tiles: its gates
- * first, evenly round it like the others' (`gatesOf`), then outward from them.
+ * The tiles of the HQ's `k`th outer ring round the middle of its town hall, on a map of `size`
+ * tiles: its gates first, evenly round it like the others' (`gatesOf`), then outward from them.
  */
-export function hqRingTiles(hall: { x: number; y: number }, k: number, size: number): RingTile[] {
-  const ring = roundRing(hall.x, hall.y, hqRingRadius(k))
-  const gates = gatesOf(hall.x, hall.y, ring)
+export function hqRingTiles(hall: Building, k: number, size: number): RingTile[] {
+  const c = middleOf(hall, size)
+  const ring = roundRing(c.x, c.y, hqRingRadius(k))
+  const gates = gatesOf(c.x, c.y, ring)
   const toGate = ([x, y]: [number, number]) =>
     Math.min(...gates.map(([gx, gy]) => Math.hypot(x - gx, y - gy)))
   return ring
@@ -96,9 +99,9 @@ export function hqGrows(world: WorldState, adults: Resident[]): boolean {
 }
 
 /**
- * Where the HQ puts its next house: a free tile in its area between its inner ring and its
- * outermost ring, off its rings and clear of the straight ways in from its gates (as in
- * `hqLayout`), nearest the town hall first.
+ * Where the HQ puts its next house, by the north-west tile of its footprint: wholly in its area
+ * between its inner ring and its outermost ring, off its rings and clear of the straight ways in
+ * from its gates (as in `hqLayout`), nearest the town hall first.
  */
 export function hqHouseTile(
   world: WorldState,
@@ -107,25 +110,32 @@ export function hqHouseTile(
   outermost: number,
 ): { x: number; y: number } | undefined {
   const size = terrain.size
+  const c = middleOf(hall, size)
   const radius = hqRingRadius(outermost)
   const rings = new Set<string>()
   for (let k = 0; k <= outermost; k++) {
     for (const t of hqRingTiles(hall, k, size)) rings.add(`${t.x},${t.y}`)
   }
+  const hq = world.cities.find((city) => city.id === hall.cityId)
+  const area = hq ? cityAreaTiles(world, hq, size) : new Set<string>()
+  const ground = new Ground(world, terrain)
+  const gates = gateAngles(TRADE_ORG_HQ.gates)
+  const fine = (x: number, y: number) => {
+    const dx = wrapDelta(c.x, x, size)
+    const dy = wrapDelta(c.y, y, size)
+    if (!within(dx, dy, radius) || within(dx, dy, TRADE_ORG_HQ.innerRadius)) return false
+    const clear = Math.asin(Math.min(1, 1.5 / Math.hypot(dx, dy)))
+    const angle = angleOf(0, 0, [dx, dy])
+    if (gates.some((a) => angleApart(angle, a) <= clear)) return false
+    return !rings.has(`${x},${y}`) && area.has(`${x},${y}`)
+  }
   const free: { x: number; y: number; d: number }[] = []
   const r = Math.ceil(radius)
   for (let dy = -r; dy <= r; dy++) {
     for (let dx = -r; dx <= r; dx++) {
-      if (!within(dx, dy, radius) || within(dx, dy, TRADE_ORG_HQ.innerRadius)) continue
-      const d = Math.hypot(dx, dy)
-      const angle = angleOf(0, 0, [dx, dy])
-      const clear = Math.asin(Math.min(1, 1.5 / d))
-      if (gateAngles(TRADE_ORG_HQ.gates).some((a) => angleApart(angle, a) <= clear)) continue
-      const x = wrap(hall.x + dx, size)
-      const y = wrap(hall.y + dy, size)
-      if (rings.has(`${x},${y}`) || !isPassableTerrain(terrainAt(terrain, x, y))) continue
-      if (buildProblem(world, x, y, 'house', terrain)) continue
-      free.push({ x, y, d })
+      const x = wrap(c.x + dx, size)
+      const y = wrap(c.y + dy, size)
+      if (ground.fits('house', x, y, fine)) free.push({ x, y, d: Math.hypot(dx, dy) })
     }
   }
   free.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x)
@@ -187,8 +197,9 @@ export const hqRingsSound: Invariant = {
     const size = terrain.size
     const rings = hqRings(world, hall, terrain)
     const top = rings.building ?? rings.outermost
+    const c = middleOf(hall, size)
     const onRing = new Set(
-      roundRing(hall.x, hall.y, TRADE_ORG_HQ.innerRadius).map(
+      roundRing(c.x, c.y, TRADE_ORG_HQ.innerRadius).map(
         ([x, y]) => `${wrap(x, size)},${wrap(y, size)}`,
       ),
     )
@@ -201,8 +212,11 @@ export const hqRingsSound: Invariant = {
         fail(`${b.kind} ${b.id} of the Trade Org HQ stands on none of its rings`, b)
       }
       if (b.kind !== 'house') continue
-      const d = Math.hypot(wrapDelta(hall.x, b.x, size), wrapDelta(hall.y, b.y, size))
-      if (d <= TRADE_ORG_HQ.innerRadius + 0.5 || d > hqRingRadius(top) + 0.5) {
+      const out = footprintTiles(b, size).some(([x, y]) => {
+        const d = Math.hypot(wrapDelta(c.x, x, size), wrapDelta(c.y, y, size))
+        return d <= TRADE_ORG_HQ.innerRadius + 0.5 || d > hqRingRadius(top) + 0.5
+      })
+      if (out) {
         fail(`house ${b.id} of the Trade Org HQ stands outside its rings`, b)
       }
     }

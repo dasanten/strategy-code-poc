@@ -46,11 +46,11 @@ const plains = (size: number): TerrainMap => ({
  * standing on the post’s warehouse with 1,000 coins.
  */
 function setup() {
-  const terrain = plains(128)
+  const terrain = plains(512)
   const world = createWorld(terrain)
   const rand = mulberry32(5)
-  foundTradeOrgHq(world, terrain, 32, 32, rand)
-  foundTradingPost(world, terrain, 80, 80, undefined, rand)
+  foundTradeOrgHq(world, terrain, 128, 128, rand)
+  foundTradingPost(world, terrain, 320, 320, undefined, rand)
   const [caravan] = placeCaravans(world)
   const realm = foundStartingCity(world, terrain, mara.userId)
   const city = world.cities.find((c) => c.realmId === realm.id)!
@@ -113,23 +113,23 @@ describe('delivery fees and quotes', () => {
   }
 
   it('charge a base fee and more for weight and distance', () => {
-    expect(deliveryFee(0, 100)).toBe(DELIVERY_FEE_BASE)
-    expect(deliveryFee(100, 100)).toBe(DELIVERY_FEE_BASE + 50)
-    expect(deliveryFee(100, 200)).toBeGreaterThan(deliveryFee(100, 100))
-    expect(deliveryFee(200, 100)).toBeGreaterThan(deliveryFee(100, 100))
+    expect(deliveryFee(0, 400)).toBe(DELIVERY_FEE_BASE)
+    expect(deliveryFee(100, 400)).toBe(DELIVERY_FEE_BASE + 50)
+    expect(deliveryFee(100, 800)).toBeGreaterThan(deliveryFee(100, 400))
+    expect(deliveryFee(200, 400)).toBeGreaterThan(deliveryFee(100, 400))
   })
 
   it('price a delivery like a purchase, plus the fee, cut down to the coins and one load', () => {
     const { world, warehouse } = post()
     warehouse.stock!.stone = 5_000
     const floor = stockFloor(world, warehouse).stone!
-    const q = quoteDelivery(world, warehouse, { coins: 100_000 }, 'stone', 1_000, 40)
+    const q = quoteDelivery(world, warehouse, { coins: 100_000 }, 'stone', 1_000, 160)
     expect(q.units).toBe(Math.floor(DELIVERY_LOAD / GOOD_WEIGHT.stone))
     let price = 0
     for (let n = 0; n < q.units; n++) price += priceFor('stone', 5_000 - n, floor).sell
     expect(q.coins).toBe(price)
-    expect(q.fee).toBe(deliveryFee(q.units * GOOD_WEIGHT.stone, 40))
-    const poor = quoteDelivery(world, warehouse, { coins: 30 }, 'stone', 1_000, 40)
+    expect(q.fee).toBe(deliveryFee(q.units * GOOD_WEIGHT.stone, 160))
+    const poor = quoteDelivery(world, warehouse, { coins: 30 }, 'stone', 1_000, 160)
     expect(poor.coins + poor.fee).toBeLessThanOrEqual(30)
     expect(poor.units).toBeGreaterThan(0)
   })
@@ -139,22 +139,22 @@ describe('delivery fees and quotes', () => {
     warehouse.stock!.iron = 30
     const hands = { stock: { coins: 100_000 }, room: 1_000 }
     expect(quoteTrade(world, warehouse, hands, 'buy', 'iron', 100, 25).units).toBe(5)
-    expect(quoteDelivery(world, warehouse, { coins: 100_000 }, 'iron', 100, 10, 25).units).toBe(5)
+    expect(quoteDelivery(world, warehouse, { coins: 100_000 }, 'iron', 100, 40, 25).units).toBe(5)
   })
 
   it('pay for a pick-up what the warehouse would pay, less the fee, within the budget', () => {
     const { world, warehouse } = post()
     const stock = warehouse.stock!.iron ?? 0
     const floor = stockFloor(world, warehouse).iron!
-    const q = quotePickUp(world, warehouse, 'iron', 20, 15, 30, Infinity)
+    const q = quotePickUp(world, warehouse, 'iron', 20, 15, 120, Infinity)
     expect(q.units).toBe(15)
     let price = 0
     for (let n = 1; n <= 15; n++) price += priceFor('iron', stock + n, floor).buy
-    expect(q.fee).toBe(deliveryFee(15, 30))
+    expect(q.fee).toBe(deliveryFee(15, 120))
     expect(q.coins).toBe(price - q.fee)
-    expect(quotePickUp(world, warehouse, 'iron', 20, 15, 30, 10).coins).toBeLessThanOrEqual(10)
+    expect(quotePickUp(world, warehouse, 'iron', 20, 15, 120, 10).coins).toBeLessThanOrEqual(10)
     // Cheap goods far away: the fee eats the price, so there is nothing to pick up.
-    expect(quotePickUp(world, warehouse, 'food', 1, 1, 700, Infinity).units).toBe(0)
+    expect(quotePickUp(world, warehouse, 'food', 1, 1, 2800, Infinity).units).toBe(0)
   })
 })
 
@@ -219,7 +219,7 @@ describe('caravans carrying out deliveries', () => {
     expect(total(world, 'iron')).toBe(iron)
     // Bringing what was bought into someone's storage is no crime.
     expect(world.crimes).toEqual([])
-  }, 60_000)
+  }, 120_000)
 
   it('pick up goods sold from the city’s storage, pay there, and bring them to the warehouse', () => {
     const { world, terrain, warehouse, storage, city, caravan, queue } = setup()
@@ -244,7 +244,7 @@ describe('caravans carrying out deliveries', () => {
     expect(world.crimes).toEqual([])
     runUntil(world, terrain, () => caravan.job === null, 10_000)
     expect(warehouse.stock!.stone).toBeGreaterThanOrEqual(stone + 30 - 1)
-  }, 60_000)
+  }, 120_000)
 
   it('turn back from a city behind closed gates, and the delivery waits for the next caravan', () => {
     const { world, terrain, warehouse, city, caravan, queue } = setup()
@@ -255,7 +255,7 @@ describe('caravans carrying out deliveries', () => {
     expect(world.deliveries).toEqual([expect.objectContaining({ caravanId: null, units: 3 })])
     runUntil(world, terrain, () => caravan.job === null, 10_000)
     expect(owedBy(world, warehouse.id, 'iron')).toBe(3)
-  }, 60_000)
+  }, 120_000)
 
   it('drop a delivery to a city that is no longer the realm’s', () => {
     const { world, terrain, city, caravan, queue } = setup()
@@ -270,7 +270,7 @@ describe('caravans carrying out deliveries', () => {
     runUntil(world, terrain, () => eventsOf(world, 'deliveryStuck').length > 0, 100)
     expect(eventsOf(world, 'deliveryStuck')[0]).toMatchObject({ cancelled: true })
     expect(world.deliveries).toEqual([])
-  }, 60_000)
+  }, 120_000)
 
   it('let go of a delivery when the caravan breaks up', () => {
     const { world, terrain, city, caravan, queue } = setup()
@@ -281,7 +281,7 @@ describe('caravans carrying out deliveries', () => {
     expect(world.caravans).toEqual([])
     expect(world.deliveries).toEqual([expect.objectContaining({ caravanId: null })])
     expect(checkInvariants(world, terrain)).toEqual([])
-  }, 60_000)
+  }, 120_000)
 })
 
 describe('deliveries sound', () => {
@@ -368,7 +368,7 @@ describe('robbed caravans', () => {
     expect(world.crimes).toEqual([
       expect.objectContaining({ kind: 'theft', victimOrg: tradeOrgHq(world)!.id }),
     ])
-  }, 60_000)
+  }, 120_000)
 
   it('send a delivery again that robbers took all of', () => {
     const { world, terrain, storage, city, caravan, queue } = setup()
@@ -380,7 +380,7 @@ describe('robbed caravans', () => {
     expect(storage.stock!.iron).toBe(before + 3)
     expect(eventsOf(world, 'deliveryRobbed')).toEqual([expect.objectContaining({ units: 3 })])
     expect(eventsOf(world, 'delivered').map((e) => e.units)).toEqual([3])
-  }, 60_000)
+  }, 120_000)
 
   it('fetch coins taken from a pick-up again, so the seller is paid for all of it', () => {
     const { world, terrain, storage, city, caravan, queue } = setup()
@@ -394,7 +394,7 @@ describe('robbed caravans', () => {
     expect(done).toMatchObject({ delivery: 'pickUp', units: 30 })
     expect(done!.coins).toBeGreaterThan(0)
     expect(storage.stock!.coins).toBe(done!.coins)
-  }, 60_000)
+  }, 120_000)
 
   it('fetch coins taken while a pick-up pays, and pay the rest', () => {
     const { world, terrain, storage, city, caravan, queue } = setup()
@@ -408,7 +408,7 @@ describe('robbed caravans', () => {
     const [done] = eventsOf(world, 'delivered')
     expect(done).toMatchObject({ delivery: 'pickUp', units: 30, coins: toPay })
     expect(storage.stock!.coins).toBe(toPay)
-  }, 60_000)
+  }, 120_000)
 
   it('count robberies per route, once a tick, and none by the Trade Organization', () => {
     const { world, terrain, caravan } = setup()

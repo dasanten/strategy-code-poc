@@ -9,6 +9,7 @@ import {
   type OrderRequest,
   type RealmLabel,
   type Resident,
+  isAt,
 } from '@csp/shared'
 import { contractStatus, sideName } from './contract-view.js'
 
@@ -120,8 +121,7 @@ export function ContractsPanel({
               !lender && !offered && c.paidWeeks < c.weeks && c.storage
                 ? own.filter(
                     (r) =>
-                      r.x === c.storage!.x &&
-                      r.y === c.storage!.y &&
+                      isAt(r, { kind: 'storage', ...c.storage! }) &&
                       (r.carried.coins ?? 0) >= c.pricePerWeek,
                   )
                 : []

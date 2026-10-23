@@ -477,11 +477,10 @@ describe('admin map API', () => {
       expect((await get(url, admin)).statusCode).toBe(200)
     }
     expect(JSON.stringify(world)).toBe(before)
-    // The admin's own Player still sees only what their residents see: not Nook or the HQ.
+    // The admin's own Player still sees only what their residents see. (On the 10 m grid their
+    // sight covers most of this small map, so this compares with before instead of naming places.)
     const sight = entitiesInSight(world, terrain, 'r1')
     expect(sight).toEqual(sightBefore)
-    expect(sight.map((e) => e.id)).not.toContain('n1')
-    expect(sight.map((e) => e.id)).not.toContain('hq')
     await close()
   })
 })

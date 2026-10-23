@@ -1,4 +1,5 @@
 import {
+  WORK_SKILL_PER_DAY,
   BATCHES_PER_DAY,
   BUILDABLE,
   BUILD_MATERIALS,
@@ -119,7 +120,7 @@ describe('the smithy', () => {
     expect(pileAt(world, 2, 2)?.goods[made]).toBe(batches)
     expect(r.carried.iron).toBe(20 - batches * recipe.input.iron!)
     expect(r.carried.wood).toBe(10 - batches * recipe.input.wood!)
-    expect(r.skills.smithing).toBeCloseTo(1, 1)
+    expect(r.skills.smithing).toBeCloseTo(WORK_SKILL_PER_DAY, 2)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 

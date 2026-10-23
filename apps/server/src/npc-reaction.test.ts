@@ -36,15 +36,16 @@ import { createWorld } from './world.js'
 const terrain: TerrainMap = { size: 64, tiles: new Uint8Array(64 * 64).fill(Terrain.Plains) }
 
 /** What the NPC city of `setup` is worth: two residents, its town hall, a house and a gate. */
-const WORTH =
+const WORTH = Math.round(
   2 * CITY_PRICE_PER_RESIDENT +
-  CITY_PRICE_BY_BUILDING.townHall! +
-  CITY_PRICE_BY_BUILDING.house! +
-  (CITY_PRICE_BY_BUILDING.gate ?? 0)
+    CITY_PRICE_BY_BUILDING.townHall! +
+    CITY_PRICE_BY_BUILDING.house! +
+    (CITY_PRICE_BY_BUILDING.gate ?? 0),
+)
 
 /**
  * Realm r1 (Leader a1 far away), realm r2, and the NPC city npc, its town hall at (20, 20), a
- * house and an open gate at (20, 17), where n1 and n2 live. r1's p1 stands on the town hall
+ * house at (23, 20) and an open gate at (20, 17), where n1 and n2 live. r1’s p1 stands on the town hall
  * carrying plenty of coins.
  */
 function setup() {
@@ -52,11 +53,11 @@ function setup() {
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
   world.realms.push({ id: 'r2', userId: 8, leaderId: 'b1' })
   const npc = addCity(world, { id: 'npc', realmId: null, x: 20, y: 20, name: 'Dunmere' })
-  world.buildings.push({ id: 'house', kind: 'house', cityId: 'npc', x: 21, y: 20 })
+  world.buildings.push({ id: 'house', kind: 'house', cityId: 'npc', x: 23, y: 20 })
   world.buildings.push({ id: 'gate', kind: 'gate', cityId: 'npc', x: 20, y: 17 })
   resident(world, 'a1', 'r1', 50, 50)
   resident(world, 'b1', 'r2', 52, 50)
-  resident(world, 'n1', null, 21, 20, 'npc')
+  resident(world, 'n1', null, 23, 20, 'npc')
   resident(world, 'n2', null, 20, 19, 'npc')
   resident(world, 'p1', 'r1', 20, 20).carried.coins = 10 * WORTH
   return { world, npc }

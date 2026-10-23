@@ -1,4 +1,5 @@
 import {
+  BUILD_MATERIALS,
   NPC_CITY_REFUSES_STANDING,
   NPC_TRADE,
   Terrain,
@@ -35,17 +36,17 @@ const player = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /**
  * Realm r1 (Player 7, Leader a1 far away) and the NPC city npc: its town hall at (20, 20), a
- * storage at (21, 20) and a farm at (24, 20), where n1 to n6 live. r1's p1 stands on the storage.
+ * storage at (23, 20) and a farm at (25, 20), where n1 to n6 live. r1's p1 stands on the storage.
  */
 function setup() {
   const world = createWorld(terrain)
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
   const npc = addCity(world, { id: 'npc', realmId: null, x: 20, y: 20, name: 'Dunmere' })
-  world.buildings.push({ id: 'store', kind: 'storage', cityId: 'npc', x: 21, y: 20, stock: {} })
-  world.buildings.push({ id: 'farm', kind: 'farm', cityId: 'npc', x: 24, y: 20 })
+  world.buildings.push({ id: 'store', kind: 'storage', cityId: 'npc', x: 23, y: 20, stock: {} })
+  world.buildings.push({ id: 'farm', kind: 'farm', cityId: 'npc', x: 25, y: 20 })
   resident(world, 'a1', 'r1', 50, 50)
   for (let i = 1; i <= 6; i++) resident(world, `n${i}`, null, 20, 21, 'npc')
-  const p1 = resident(world, 'p1', 'r1', 21, 20)
+  const p1 = resident(world, 'p1', 'r1', 23, 20)
   return { world, npc, p1, queue: new OrderQueue(undefined, terrain) }
 }
 
@@ -101,7 +102,9 @@ describe('trading with an NPC city', () => {
     const { world, npc } = setup()
     const reserve = npcCityReserve(world, npc)
     expect(reserve.food).toBeGreaterThan(0)
-    expect(reserve.wood).toBe(20 + 10 * NPC_TRADE.reserveWallStretches)
+    expect(reserve.wood).toBe(
+      BUILD_MATERIALS.house!.wood! + BUILD_MATERIALS.wall!.wood! * NPC_TRADE.reserveWallStretches,
+    )
     expect(reserve.stone).toBeUndefined()
   })
 
@@ -178,7 +181,7 @@ describe('trading with an NPC city', () => {
     const { world, npc } = setup()
     const seen = entitiesInSight(world, terrain, 'r1').find((e) => e.id === npc.id)
     expect(seen).toMatchObject({
-      hire: { spare: spareResidents(world, npc).length, pricePerResidentWeek: 12 },
+      hire: { spare: spareResidents(world, npc).length, pricePerResidentWeek: 5 },
     })
     expect((seen as { trade: unknown[] }).trade.length).toBeGreaterThan(0)
   })
@@ -202,7 +205,7 @@ describe('hiring from an NPC city', () => {
       at(world, id).order = {
         kind: 'workAt',
         buildingId: 'farm',
-        at: { x: 24, y: 20 },
+        at: { x: 25, y: 20 },
         progress: 0,
       }
     }

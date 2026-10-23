@@ -16,8 +16,8 @@ import {
 import { recordEvent } from './events.js'
 import { newId } from './starting-city.js'
 
-/** How far one unit of food fills a horse's hunger meter. */
-const FILL_PER_FOOD = (MAX_HUNGER * HUNGER_DAYS) / HORSE_FOOD_PER_DAY
+/** How far one unit of food fills a horse's hunger meter: a full meter holds `HUNGER_DAYS` of food. */
+const FILL_PER_FOOD = MAX_HUNGER / (HUNGER_DAYS * HORSE_FOOD_PER_DAY)
 
 /**
  * One tick of horses (`CONTEXT.md`: Horse, Horses have no inventory, Stable). Their hunger meter

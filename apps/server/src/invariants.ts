@@ -30,6 +30,7 @@ import {
   LIFESPAN_MIN,
   MAX_HEALTH,
   ageInYears,
+  CARRYING_TICKS,
   canWork,
   MAX_HUNGER,
   STABLE_BREED_TICKS,
@@ -47,22 +48,29 @@ import {
   computeTerritory,
   controlAt,
   controlSources,
-  wrap,
-  wrapDistance,
   isCityBuilding,
   STAT_NAMES,
   terrainAt,
   carryCapacity,
   stockWeight,
   trainedCap,
+  CONSTRUCTION_SKILL_MAX,
+  WORK_SKILL_MAX,
+  WORKPLACE_SKILL,
+  type SkillName,
   type Stock,
   type TerrainMap,
   type Resident,
   type WorldState,
+  footprintTiles,
+  isPassableTerrain,
+  buildingAt,
+  isAt,
 } from '@csp/shared'
 import { tallyGoods } from './goods-made.js'
 import { refillSource } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
+import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
 import { joinRequestsSound } from './persuasion.js'
@@ -83,6 +91,7 @@ import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
+import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -168,10 +177,12 @@ export const realmsHaveLeaders: Invariant = {
 }
 
 /**
- * Buildings and construction sites: one per tile, and next to it at most one road or road site,
- * on passable land off Mountain and of no city (`CONTEXT.md`: Road); farms and stables on Plains, mines, quarries
- * and lumber camps on a resource node of their kind and of no city; smelters, mints, town halls,
- * walls and gates off nodes and off Mountain, smelters and mints of no city; a stable, farm,
+ * Buildings and construction sites (`CONTEXT.md`: Footprint, Where buildings go): no two
+ * footprints overlap, and next to a building at most one road or road site per tile, on passable
+ * land off Mountain and of no city (`CONTEXT.md`: Road); every footprint on passable land; farms
+ * and stables wholly on Plains, mines, quarries and lumber camps with one tile on a resource node
+ * of their kind and of no city; smelters, mints, town halls, walls and gates off nodes and off
+ * Mountain, smelters and mints of no city; no node under any other building; a stable, farm,
  * house or storage of no city or of one that exists; no stock below zero.
  */
 export const buildingsInPlace: Invariant = {
@@ -181,33 +192,39 @@ export const buildingsInPlace: Invariant = {
     const fail = (id: string, message: string) =>
       out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
     const cities = new Map(world.cities.map((c) => [c.id, c]))
-    const tiles = new Set<string>()
+    const size = terrain.size
+    const tiles = new Map<string, string>()
+    const nodesAt = new Map(world.nodes.map((n) => [`${n.x},${n.y}`, n]))
     for (const b of world.buildings) {
-      const key = `${b.x},${b.y}`
-      const layer = b.kind === 'road' ? `road ${key}` : key
-      if (tiles.has(layer))
-        fail(b.id, `shares tile (${key}) with another ${b.kind === 'road' ? 'road' : 'building'}`)
-      tiles.add(layer)
+      const footprint = footprintTiles(b, size)
+      const terrains = footprint.map(([x, y]) => terrainAt(terrain, x, y))
+      const nodes = footprint.flatMap(([x, y]) => nodesAt.get(`${x},${y}`) ?? [])
+      for (const [x, y] of footprint) {
+        const key = `${x},${y}`
+        const layer = b.kind === 'road' ? `road ${key}` : key
+        const other = tiles.get(layer)
+        if (other) fail(b.id, `overlaps ${other} on tile (${key})`)
+        tiles.set(layer, b.id)
+      }
+      if (!terrains.every(isPassableTerrain)) fail(b.id, `is a ${b.kind} on impassable land`)
       if (b.kind === 'road') {
-        if (terrainAt(terrain, b.x, b.y) === Terrain.Mountain) fail(b.id, 'is a road on Mountain')
+        if (terrains[0] === Terrain.Mountain) fail(b.id, 'is a road on Mountain')
         if (b.cityId !== null) fail(b.id, `is a road of city ${b.cityId}`)
         if (b.stock) fail(b.id, 'is a road with a stock')
       } else if (OFF_NODES.includes(b.kind)) {
-        if (world.nodes.some((n) => n.x === b.x && n.y === b.y))
-          fail(b.id, `is a ${b.kind} on a resource node`)
-        if (terrainAt(terrain, b.x, b.y) === Terrain.Mountain)
-          fail(b.id, `is a ${b.kind} on Mountain`)
+        if (nodes.length > 0) fail(b.id, `is a ${b.kind} on a resource node`)
+        if (terrains.includes(Terrain.Mountain)) fail(b.id, `is a ${b.kind} on Mountain`)
         if (PROCESSING.includes(b.kind) && b.cityId !== null)
           fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
       } else if (BUILDABLE.includes(b.kind) && !ON_PLAINS.includes(b.kind)) {
-        const node = world.nodes.find((n) => n.x === b.x && n.y === b.y)
-        if (!node || NODE_WORKPLACE[node.kind] !== b.kind) fail(b.id, `is a ${b.kind} off its node`)
+        if (nodes.length !== 1 || NODE_WORKPLACE[nodes[0]!.kind] !== b.kind)
+          fail(b.id, `is a ${b.kind} off its node`)
         if (b.cityId !== null) fail(b.id, `is a ${b.kind} of city ${b.cityId}`)
-      }
+      } else if (nodes.length > 0) fail(b.id, `is a ${b.kind} on a resource node`)
       if (b.cityId !== null && !cities.has(b.cityId)) fail(b.id, `belongs to no city (${b.cityId})`)
       if (
         (b.kind === 'farm' || b.kind === 'stable') &&
-        terrainAt(terrain, b.x, b.y) !== Terrain.Plains
+        terrains.some((t) => t !== Terrain.Plains)
       ) {
         fail(b.id, `is a ${b.kind} off Plains`)
       }
@@ -263,6 +280,31 @@ export const trainedWithinCap: Invariant = {
         message: `resident ${r.id} has ${s} ${r.stats[s].base} + ${r.stats[s].trained} trained (cap ${trainedCap(r.stats[s].base)})`,
         entityIds: [r.id],
       })),
+    )
+  },
+}
+
+/** The skills that cap at a most (`WORK_SKILL_MAX`, `CONSTRUCTION_SKILL_MAX`): work and Construction. */
+const CAPPED_SKILLS = new Map<SkillName, number>([
+  ...Object.values(WORKPLACE_SKILL).map((s): [SkillName, number] => [s, WORK_SKILL_MAX]),
+  ['construction', CONSTRUCTION_SKILL_MAX],
+])
+
+/** No work or Construction skill is below 0 or above its most (`CONTEXT.md`: Skill). */
+export const skillsWithinCap: Invariant = {
+  name: 'skills-within-cap',
+  check(world) {
+    return world.residents.flatMap((r) =>
+      [...CAPPED_SKILLS]
+        .filter(([s, max]) => {
+          const v = r.skills[s] ?? 0
+          return !(v >= 0 && v <= max + 1e-9)
+        })
+        .map(([s, max]) => ({
+          invariant: this.name,
+          message: `resident ${r.id} has ${s} ${r.skills[s]} (most ${max})`,
+          entityIds: [r.id],
+        })),
     )
   },
 }
@@ -365,11 +407,12 @@ export const carriedWithinCapacity: Invariant = {
 
 /**
  * Goods are never negative wherever they are, only storages and stables among buildings hold any,
- * and a pile is never empty; one pile per tile.
+ * and a pile is never empty; one pile per tile, and every pile on a building's footprint is that
+ * building's one pile, on its north-west tile (`CONTEXT.md`: A building's pile).
  */
 export const goodsInPlace: Invariant = {
   name: 'goods-in-place',
-  check(world) {
+  check(world, terrain) {
     const out: InvariantViolation[] = []
     const fail = (id: string, message: string) =>
       out.push({ invariant: this.name, message: `${id} ${message}`, entityIds: [id] })
@@ -388,6 +431,9 @@ export const goodsInPlace: Invariant = {
       const key = `${p.x},${p.y}`
       if (tiles.has(key)) fail(p.id, `is a second pile on tile (${key})`)
       tiles.add(key)
+      const on = buildingAt(world, p.x, p.y, terrain.size)
+      if (on && (on.x !== p.x || on.y !== p.y))
+        fail(p.id, `lies on ${on.id} but is not its pile (on its north-west tile)`)
     }
     return out
   },
@@ -466,7 +512,7 @@ export const sitesWithinNeeds: Invariant = {
 }
 
 /**
- * After a tick, a resident with a build order on a site stands on that site, and it is still a
+ * After a tick, a resident with a build order on a site stands at that site, and it is still a
  * site (`resolveBuilding` ends the orders of a finished or vanished one).
  */
 export const buildOrdersOnSites: Invariant = {
@@ -476,11 +522,11 @@ export const buildOrdersOnSites: Invariant = {
       const o = r.order
       if (o?.kind !== 'build' || o.siteId === null) return []
       const site = world.buildings.find((b) => b.id === o.siteId)
-      if (site?.site && site.x === r.x && site.y === r.y) return []
+      if (site?.site && isAt(r, site)) return []
       return [
         {
           invariant: this.name,
-          message: `resident ${r.id} builds ${o.siteId}, which is not a site on their tile`,
+          message: `resident ${r.id} builds ${o.siteId}, which is not a site they stand at`,
           entityIds: [r.id, o.siteId],
         },
       ]
@@ -512,7 +558,7 @@ export const teardownsWithinNeeds: Invariant = {
 }
 
 /**
- * After a tick, a resident with a tear-down order stands on that building or site, and it is
+ * After a tick, a resident with a tear-down order stands at that building or site, and it is
  * still there (`resolveTearingDown` ends the orders on one that is gone).
  */
 export const tearDownOrdersOnBuildings: Invariant = {
@@ -522,11 +568,11 @@ export const tearDownOrdersOnBuildings: Invariant = {
       const o = r.order
       if (o?.kind !== 'tearDown') return []
       const b = world.buildings.find((x) => x.id === o.buildingId)
-      if (b && b.x === r.x && b.y === r.y) return []
+      if (b && isAt(r, b)) return []
       return [
         {
           invariant: this.name,
-          message: `resident ${r.id} tears down ${o.buildingId}, which is not on their tile`,
+          message: `resident ${r.id} tears down ${o.buildingId}, which they don’t stand at`,
           entityIds: [r.id, o.buildingId],
         },
       ]
@@ -586,8 +632,8 @@ export const workOrdersOnWorkplaces: Invariant = {
         fail(o.makes === undefined ? 'making nothing' : `making ${o.makes} with nothing to choose`)
       else if (!workplaceGood(world, place, o.makes))
         fail(o.makes === undefined ? 'which makes nothing' : `which can't make ${o.makes}`)
-      else if (place.x !== r.x || place.y !== r.y || o.at.x !== r.x || o.at.y !== r.y)
-        fail('which is not on their tile')
+      else if (!isAt(r, place) || o.at.x !== r.x || o.at.y !== r.y)
+        fail('which they don’t stand at')
       if (!(o.progress >= 0 && o.progress < 1)) fail(`with progress ${o.progress}`)
       workers.set(o.buildingId, (workers.get(o.buildingId) ?? 0) + 1)
     }
@@ -747,8 +793,13 @@ export const haulRoutesSound: Invariant = {
  * Territory is derived soundly (`CONTEXT.md`: Territory): every tile in it belongs to an
  * Organization that exists (a realm, or a city of no realm) and lies within reach of one of that
  * Organization's cities or guarded workplaces, and no other Organization projects as much
- * control onto it.
+ * control onto it. The control on a tile is worked out apart from the territory, straight from
+ * each source's tiles, for every `TERRITORY_CHECK_STRIDE`th tile of it (a city's territory is
+ * thousands of tiles).
  */
+/** How many of a territory's tiles `territorySound` passes over for each it works out again. */
+const TERRITORY_CHECK_STRIDE = 37
+
 export const territorySound: Invariant = {
   name: 'territory-sound',
   check(world, terrain) {
@@ -758,28 +809,54 @@ export const territorySound: Invariant = {
       ...world.realms.map((r) => r.id),
       ...world.cities.filter((c) => c.realmId === null).map(cityOrganization),
     ])
-    // Each Organization's control on every tile it reaches, worked out apart from the territory.
-    const controlByTile = new Map<string, Map<string, number>>()
-    for (const s of controlSources(world, size)) {
-      for (const t of s.tiles) {
-        for (let dy = -s.reach; dy <= s.reach; dy++) {
-          for (let dx = -s.reach; dx <= s.reach; dx++) {
-            const at = { x: wrap(t.x + dx, size), y: wrap(t.y + dy, size) }
-            const c = controlAt(s, wrapDistance(size, t, at))
-            if (c <= 0) continue
-            const key = `${at.x},${at.y}`
-            const here = controlByTile.get(key) ?? new Map<string, number>()
-            controlByTile.set(key, here)
-            if (c > (here.get(s.owner) ?? 0)) here.set(s.owner, c)
-          }
-        }
+    const sources = controlSources(world, size)
+    // Each source's tiles as a box round its first one, to pass over the sources out of reach.
+    const boxes = sources.map((s) => {
+      const o = s.tiles[0]!
+      const dxs = s.tiles.map((t) => wrapDelta(o.x, t.x, size))
+      const dys = s.tiles.map((t) => wrapDelta(o.y, t.y, size))
+      return {
+        o,
+        x0: Math.min(...dxs),
+        x1: Math.max(...dxs),
+        y0: Math.min(...dys),
+        y1: Math.max(...dys),
       }
+    })
+    // Each Organization's control on a tile, worked out apart from the territory.
+    const controlAtTile = (x: number, y: number) => {
+      const control = new Map<string, number>()
+      for (const [k, s] of sources.entries()) {
+        const { o, x0, x1, y0, y1 } = boxes[k]!
+        const dx = wrapDelta(o.x, x, size)
+        const dy = wrapDelta(o.y, y, size)
+        // Measured the short way round from its first tile, the box holds only while it and the
+        // reach take up less than half the map.
+        const small = Math.max(x1 - x0, y1 - y0) + s.reach < size / 2
+        const gap = Math.hypot(Math.max(x0 - dx, 0, dx - x1), Math.max(y0 - dy, 0, dy - y1))
+        if (small && gap > s.reach) continue
+        // The nearest of its tiles, by squared distance, passing over those too far along a side.
+        let d2 = Infinity
+        for (const t of s.tiles) {
+          const tx = wrapDelta(t.x, x, size)
+          if (tx * tx >= d2) continue
+          const ty = wrapDelta(t.y, y, size)
+          d2 = Math.min(d2, tx * tx + ty * ty)
+        }
+        const d = Math.sqrt(d2)
+        const c = controlAt(s, d)
+        if (c > (control.get(s.owner) ?? 0)) control.set(s.owner, c)
+      }
+      return control
     }
+    let i = 0
     for (const [key, owner] of computeTerritory(world, size).owners) {
       const fail = (message: string) =>
         out.push({ invariant: this.name, message: `tile (${key}) ${message}`, entityIds: [owner] })
       if (!organizations.has(owner)) fail(`belongs to ${owner}, which is no Organization`)
-      const control = controlByTile.get(key) ?? new Map<string, number>()
+      if (i++ % TERRITORY_CHECK_STRIDE !== 0) continue
+      const [x, y] = key.split(',').map(Number) as [number, number]
+      const control = controlAtTile(x, y)
       const own = control.get(owner) ?? 0
       if (own <= 0) fail(`belongs to ${owner}, which projects no control there`)
       for (const [other, c] of control) {
@@ -975,19 +1052,19 @@ export const npcFightsOutsiders: Invariant = {
 /**
  * After a tick, pairs hold together (`CONTEXT.md`: Pairing): a resident's partner pairs back
  * with the same `since`, which is not after now; both are adults of the same city. Broken pairs
- * end in `requestBirths`.
+ * end in `requestBirths`, and a pair ends with a partner's death.
  */
 export const pairsHoldTogether: Invariant = {
   name: 'pairs-hold-together',
   check(world) {
     const byId = new Map(world.residents.map((r) => [r.id, r]))
     return world.residents.flatMap((r) => {
-      const o = r.order
-      if (o?.kind !== 'pair') return []
+      const o = r.pair
+      if (!o) return []
       const partner = byId.get(o.partnerId)
-      const back = partner?.order
+      const back = partner?.pair
       const problems: string[] = []
-      if (!partner || back?.kind !== 'pair' || back.partnerId !== r.id) {
+      if (!partner || !back || back.partnerId !== r.id) {
         problems.push(`pairs with ${o.partnerId}, who doesn't pair back`)
       } else {
         if (back.since !== o.since)
@@ -1002,6 +1079,31 @@ export const pairsHoldTogether: Invariant = {
         invariant: this.name,
         message: `resident ${r.id} ${p}`,
         entityIds: [r.id, o.partnerId],
+      }))
+    })
+  },
+}
+
+/**
+ * A resident carrying a child (`CONTEXT.md`: Carrying) holds no order to work, build, tear down or
+ * haul, is grown, and gives birth once `CARRYING_DAYS` have passed.
+ */
+export const carryingDoesntWork: Invariant = {
+  name: 'carrying-doesnt-work',
+  check(world) {
+    return world.residents.flatMap((r) => {
+      const c = r.carrying
+      if (!c) return []
+      const problems: string[] = []
+      if (r.order && CARRYING_BLOCKS.has(r.order.kind))
+        problems.push(`holds a ${r.order.kind} order while carrying a child`)
+      if (!canWork(r, world.tick)) problems.push('carries a child as a child')
+      if (c.since > world.tick) problems.push(`carries since ${c.since}, after now`)
+      if (world.tick - c.since > CARRYING_TICKS) problems.push('carries a child past its time')
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `resident ${r.id} ${p}`,
+        entityIds: [r.id],
       }))
     })
   },
@@ -1318,10 +1420,31 @@ export const tradeOrgSound: Invariant = {
   },
 }
 
+/**
+ * At most one resident of a workplace away carrying its output at once (`CONTEXT.md`: Carrying
+ * the output), among those running the game's own Work default: NPC cities' residents. A Player's
+ * residents running it unedited are checked where their scripts run (`ScriptRunner.runAll`).
+ */
+export const gameDefaultCarriers: Invariant = {
+  name: 'one-carrier-at-a-time',
+  check: (world) => oneCarrierAtATime(world, (r) => r.script?.scriptId === 0),
+}
+
+/**
+ * At most one resident building a site away fetching its materials at once (`CONTEXT.md`:
+ * Fetching materials), among NPC cities' residents running the game's own Build default; a
+ * Player's are checked where their scripts run.
+ */
+export const gameDefaultFetchers: Invariant = {
+  name: 'one-fetcher-at-a-time',
+  check: (world) => oneFetcherAtATime(world, (r) => r.script?.scriptId === 0),
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
   trainedWithinCap,
+  skillsWithinCap,
   healthAndHungerInRange,
   agesInRange,
   realmsHaveLeaders,
@@ -1349,6 +1472,7 @@ export const worldInvariants: Invariant[] = [
   npcFightsOutsiders,
   cityWorkplacesSound,
   pairsHoldTogether,
+  carryingDoesntWork,
   childrenDontWork,
   carriagesInPlace,
   driversOnCarriages,
@@ -1386,6 +1510,8 @@ export const worldInvariants: Invariant[] = [
   buyOffOrdersDone,
   hqRingsSound,
   roadLineOrdersSound,
+  gameDefaultCarriers,
+  gameDefaultFetchers,
 ]
 
 export function checkInvariants(

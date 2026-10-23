@@ -143,7 +143,10 @@ export function TopBar({
       {cityName && <span className="hud-muted">{cityName}</span>}
       <span className="hud-sep" />
       {tick !== undefined && (
-        <span className="hud-clock" title="1 game day = 1 real hour; 1 game year = 1 real day">
+        <span
+          className="hud-clock"
+          title="1 game day = 24 real minutes; 1 game year = 420 game days = 1 real week"
+        >
           {formatGameTime(tick)}
         </span>
       )}

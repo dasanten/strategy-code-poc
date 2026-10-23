@@ -65,7 +65,6 @@ describe('residentActivity', () => {
     expect(
       residentActivity(resident({ kind: 'climb', wallId: 'w', at: { x: 3, y: 4 }, progress: 0 })),
     ).toBe('walking')
-    expect(residentActivity(resident({ kind: 'pair', partnerId: 'p', since: 0 }))).toBeUndefined()
     expect(residentActivity(resident(null))).toBeUndefined()
   })
 })

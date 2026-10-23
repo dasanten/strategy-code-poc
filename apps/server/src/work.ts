@@ -1,5 +1,5 @@
 import {
-  commands,
+  CARRYING_A_CHILD,
   GOODS,
   MAX_WORKERS,
   RECIPES,
@@ -8,7 +8,6 @@ import {
   buildingAt,
   canWork,
   hasInput,
-  pileAt,
   recipeFor,
   workLearned,
   workOutput,
@@ -21,9 +20,11 @@ import {
   type Resident,
   type Stock,
   type WorldState,
+  isAt,
+  buildingPile,
 } from '@csp/shared'
+import { orderedResident } from './order-sender.js'
 import type { OrderKind } from './orders.js'
-import { realmOf } from './starting-city.js'
 import { noteMade } from './goods-made.js'
 import { dropGoods } from './survival.js'
 
@@ -53,10 +54,10 @@ interface WorkRequest extends OrderRequest {
 export const workAt: OrderKind = {
   validate(world, sender, order) {
     const o = order as Partial<WorkRequest>
-    const realm = realmOf(world, sender.userId)
-    const r = world.residents.find((x) => x.id === o.residentId)
-    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    const r = orderedResident(world, sender, o.residentId)
+    if (!r) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t work'
+    if (r.carrying) return CARRYING_A_CHILD
     if (o.makes !== undefined && !(GOODS as readonly unknown[]).includes(o.makes))
       return 'no such good'
     return workProblem(world, r, o.makes)
@@ -103,7 +104,7 @@ export function resolveWork(world: WorldState, actions: WorkAction[]): void {
     const max = place ? (MAX_WORKERS[place.kind] ?? 0) : 0
     const good = place && workplaceGood(world, place, o.makes)
     const skill = place && WORKPLACE_SKILL[place.kind]
-    const onIt = place && !place.site && place.x === r.x && place.y === r.y
+    const onIt = place && !place.site && isAt(r, place)
     if (!place || !onIt || !good || !skill || r.x !== o.at.x || r.y !== o.at.y || count >= max) {
       r.order = null
       continue
@@ -117,7 +118,7 @@ export function resolveWork(world: WorldState, actions: WorkAction[]): void {
     } else {
       o.progress += workOutput(r, good, skill, world.tick)
     }
-    r.skills[skill] = (r.skills[skill] ?? 0) + workLearned(r, world.tick)
+    r.skills[skill] = (r.skills[skill] ?? 0) + workLearned(r, skill, world.tick)
     while (o.progress >= 1) {
       if (recipe && !hasInput(world, place, recipe)) {
         o.progress = Math.min(o.progress, 1 - 1e-9)
@@ -136,7 +137,7 @@ export function resolveWork(world: WorldState, actions: WorkAction[]): void {
 
 /**
  * Takes a batch's input from what a processing workplace's workers carry, the most laden first, and
- * then from the pile on its tile (`inputAt`). The caller has checked it is all there.
+ * then from its pile (`inputAt`). The caller has checked it is all there.
  */
 function useUp(world: WorldState, place: Building, input: Stock): void {
   for (const [good, units] of Object.entries(input) as [Good, number][]) {
@@ -144,7 +145,7 @@ function useUp(world: WorldState, place: Building, input: Stock): void {
     const carriers = workersOf(world, place).sort(
       (a, b) => (b.carried[good] ?? 0) - (a.carried[good] ?? 0),
     )
-    const pile = pileAt(world, place.x, place.y)
+    const pile = buildingPile(world, place)
     for (const stock of [...carriers.map((w) => w.carried), ...(pile ? [pile.goods] : [])]) {
       const take = Math.min(left, stock[good] ?? 0)
       if (take <= 0) continue
@@ -156,7 +157,7 @@ function useUp(world: WorldState, place: Building, input: Stock): void {
   world.piles = world.piles.filter((p) => Object.values(p.goods).some((n) => n > 0))
 }
 
-/** One unit of a workplace's good, left on the pile on its tile (`CONTEXT.md`: Workplace). */
+/** One unit of a workplace's good, left in its pile (`CONTEXT.md`: Workplace, A building's pile). */
 function produce(world: WorldState, place: Building, good: Good): void {
   dropGoods(world, place.x, place.y, { [good]: 1 })
   noteMade(world, { [good]: 1 })

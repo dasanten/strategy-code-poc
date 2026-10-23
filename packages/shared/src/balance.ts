@@ -1,7 +1,7 @@
 import { Terrain } from './terrain.js'
 import {
   TICKS_PER_GAME_DAY,
-  ageInYears,
+  TICKS_PER_GAME_YEAR,
   effective,
   type BuildingKind,
   type CrimeKind,
@@ -18,10 +18,14 @@ import {
 /**
  * Balance numbers: how much, how fast, how often. The rules (what happens) are in `CONTEXT.md`;
  * these are the values Daniel tunes. One commented constant each.
+ *
+ * Work (eating, production, building, skill, spoilage, breeding) is counted in game days; social
+ * and political timers (memory, standing, persuasion, contracts, punishment, alliance delays) keep
+ * their real-time length (`CONTEXT.md`: Game time).
  */
 
-/** Tiles along each side of the map: once around is a ~12 h walk at ~30 s per plains tile. */
-export const MAP_SIZE = 1440
+/** Tiles along each side of the map: once around is a ~12 h walk at ~7.5 s per plains tile. */
+export const MAP_SIZE = 5760
 
 /**
  * Share of the map's tiles each terrain covers in a freshly generated map. Plains take the rest.
@@ -40,18 +44,19 @@ export const TERRAIN_SHARES = {
 } as const
 
 /**
- * Resource nodes per tile of each terrain they lie on, when the world is created. Ore is denser
- * in Mountain than in Hills; gold is rare.
+ * Resource nodes per tile of each terrain they lie on, when the world is created: as many per
+ * area as on the old 40 m grid, so a sixteenth per tile. Ore is denser in Mountain than in Hills;
+ * gold is rare.
  */
 export const NODE_DENSITY = {
-  forest: { [Terrain.Forest]: 1 / 300 },
-  stone: { [Terrain.Hills]: 1 / 250 },
-  ironOre: { [Terrain.Hills]: 1 / 1500, [Terrain.Mountain]: 1 / 300 },
-  goldOre: { [Terrain.Hills]: 1 / 15000, [Terrain.Mountain]: 1 / 3000 },
+  forest: { [Terrain.Forest]: 1 / 4800 },
+  stone: { [Terrain.Hills]: 1 / 4000 },
+  ironOre: { [Terrain.Hills]: 1 / 24000, [Terrain.Mountain]: 1 / 4800 },
+  goldOre: { [Terrain.Hills]: 1 / 240000, [Terrain.Mountain]: 1 / 48000 },
 } as const satisfies Record<ResourceKind, Partial<Record<Terrain, number>>>
 
 /** No two resource nodes lie closer than this many tiles (in either direction). */
-export const NODE_MIN_SPACING = 4
+export const NODE_MIN_SPACING = 16
 
 /**
  * How fast an unloaded resident crosses each terrain, relative to Plains (`CONTEXT.md`:
@@ -93,6 +98,31 @@ export const LIFESPAN_MAX = 65
  */
 export const ADULT_AGE = 14
 
+/**
+ * Game days each year of age up to `ADULT_AGE` takes: children age faster, so a newborn is grown
+ * after 140 game days (~56 real hours). Later years take a full game year (`CONTEXT.md`: Aging).
+ */
+export const CHILD_YEAR_DAYS = 10
+
+/** Ticks from birth until a resident is grown up. */
+const CHILDHOOD_TICKS = ADULT_AGE * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY
+
+/**
+ * A resident's age in game years at the given tick: each year up to `ADULT_AGE` takes
+ * `CHILD_YEAR_DAYS`, later years a full game year (`CONTEXT.md`: Aging).
+ */
+export function ageInYears(resident: Resident, tick: number): number {
+  const lived = tick - resident.bornAt
+  if (lived <= CHILDHOOD_TICKS) return lived / (CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY)
+  return ADULT_AGE + (lived - CHILDHOOD_TICKS) / TICKS_PER_GAME_YEAR
+}
+
+/** The ticks a resident has lived at an age in game years: the inverse of `ageInYears`. */
+export function ticksForAge(age: number): number {
+  if (age <= ADULT_AGE) return age * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY
+  return CHILDHOOD_TICKS + (age - ADULT_AGE) * TICKS_PER_GAME_YEAR
+}
+
 /** Whether a resident is grown up, so they can work, build or take any job (`CONTEXT.md`: Child). */
 export function canWork(resident: Resident, tick: number): boolean {
   return ageInYears(resident, tick) >= ADULT_AGE
@@ -127,8 +157,11 @@ export function trainedCap(base: number): number {
   return Math.floor(base * TRAINED_CAP_SHARE)
 }
 
-/** Tiles along each side of a starting city, wall included: 5×5 tiles inside the wall. */
-export const START_CITY_SIZE = 7
+/**
+ * Tiles along each side of a starting city, wall included: 27×27 tiles inside the wall. An odd
+ * number, so its storage has a middle tile.
+ */
+export const START_CITY_SIZE = 29
 
 /** Residents in a starting city, the Leader included. */
 export const START_RESIDENTS = 8
@@ -144,14 +177,14 @@ export const HOUSING_ROOM: Partial<Record<BuildingKind, number>> = {
 /** Houses a starting city gets beyond what its residents need. */
 export const START_SPARE_HOUSES = 1
 
-/** Food in a starting city's storage, in kg. */
-export const START_FOOD = 200
+/** Food in a starting city's storage, in kg: about twelve game days for its residents. */
+export const START_FOOD = 100
 
 /**
  * Food each resident of a starting city carries, in units: two game days' meals, so they have
  * something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
  */
-export const START_CARRIED_FOOD = 4
+export const START_CARRIED_FOOD = 2
 
 /** Horses in a starting city's stable: two, so they can breed (`CONTEXT.md`: Starting city). */
 export const START_HORSES = 2
@@ -160,17 +193,18 @@ export const START_HORSES = 2
  * Food in a starting city's stable, in units: ten game days for its horses, time to start
  * bringing it food from the farm.
  */
-export const START_STABLE_FOOD = 60
+export const START_STABLE_FOOD = 30
 
 /**
  * Food a horse eats per game day, in units (`CONTEXT.md`: Horse). More than a resident; its
  * hunger meter otherwise runs like a resident's (`HUNGER_DAYS`, `STARVE_DAYS`, `HEAL_DAYS`).
  */
-export const HORSE_FOOD_PER_DAY = 3
+export const HORSE_FOOD_PER_DAY = 1.5
 
 /**
  * How far from its tile a horse reaches Food lying on the ground, in tiles either way
- * (`CONTEXT.md`: Horses have no inventory): its own tile and the eight around it.
+ * (`CONTEXT.md`: Horses have no inventory, "on its tile or right next to it"): its own tile and
+ * the eight around it.
  */
 export const HORSE_REACH = 1
 
@@ -187,29 +221,30 @@ export const STABLE_BREED_DAYS = 10
  * Starting cities lie at least this many tiles apart (about 2.5 hours' walk on plains), when the
  * map has room; otherwise as far apart as it allows.
  */
-export const CITY_MIN_DISTANCE = 300
+export const CITY_MIN_DISTANCE = 1200
 
 /**
  * How near a city building must stand to the city's town hall, or to another building already
  * part of that city, to be part of it too (`CONTEXT.md`: City building), in tiles along each
- * direction. A wall with gaps of up to two tiles still holds together.
+ * direction from footprint to footprint. A wall with gaps of up to eleven tiles still holds
+ * together.
  */
-export const CITY_BUILDING_REACH = 3
+export const CITY_BUILDING_REACH = 12
 
 /**
- * How far around each of its buildings a city's area reaches (`CONTEXT.md`: City area), in tiles
- * along each direction: the tiles right next to them.
+ * How far around each of its buildings' footprints a city's area reaches (`CONTEXT.md`: City
+ * area), in tiles along each direction: about the old 40 m tile right next to them.
  */
-export const CITY_AREA_MARGIN = 1
+export const CITY_AREA_MARGIN = 4
 
 /**
  * Most tiles a ring of walls and gates can shut in (`CONTEXT.md`: Walls in combat): ground cut
- * off by walls from more than this, a square of 100 tiles along each side, counts as outside.
+ * off by walls from more than this, a square of 400 tiles along each side, counts as outside.
  */
-export const WALL_ENCLOSES_MAX = 10_000
+export const WALL_ENCLOSES_MAX = 160_000
 
 /** How far a resident sees, in tiles (`CONTEXT.md`: Sight). */
-export const SIGHT_RANGE = 12
+export const SIGHT_RANGE = 48
 
 /**
  * NPC villages placed on a full-size map (`CONTEXT.md`: NPC city); a smaller map gets fewer, by
@@ -224,11 +259,11 @@ export const NPC_TOWNS = 4
  * NPC cities lie at least this many tiles from every other city, starting cities and NPC cities
  * alike (about an hour's walk on plains), the short way round the map.
  */
-export const NPC_CITY_MIN_DISTANCE = 120
+export const NPC_CITY_MIN_DISTANCE = 480
 
 /** What an NPC city is placed with, by its size: a walled square like a starting city's. */
 export interface NpcCitySize {
-  /** Tiles along each side, wall included. */
+  /** Tiles along each side, wall included: an odd number, so its storage has a middle tile. */
   size: number
   /** Adult residents, with random stats like a starting city's. */
   residents: number
@@ -241,10 +276,10 @@ export interface NpcCitySize {
 }
 
 /** A village: a starting city's square, a few fewer residents, one farm. */
-export const NPC_VILLAGE: NpcCitySize = { size: 7, residents: 6, houses: 2, farms: 1, food: 150 }
+export const NPC_VILLAGE: NpcCitySize = { size: 29, residents: 6, houses: 2, farms: 1, food: 75 }
 
 /** A town: a wider square, twice the residents of a starting city, two farms. */
-export const NPC_TOWN: NpcCitySize = { size: 11, residents: 16, houses: 5, farms: 2, food: 400 }
+export const NPC_TOWN: NpcCitySize = { size: 45, residents: 16, houses: 5, farms: 2, food: 200 }
 
 /**
  * What an NPC city asks for each resident living there when it is bought (`CONTEXT.md`: Buying a
@@ -256,7 +291,7 @@ export const CITY_PRICE_PER_RESIDENT = 200
  * What an NPC city asks for each of its finished buildings when it is bought, in Coins, by kind;
  * a kind missing here adds nothing. A village (6 residents, a town hall, a storage, 2 houses, a
  * farm and its wall ring) comes to about 1 600 coins, which three residents can carry; a town to
- * about 4 000.
+ * about 4 000. A stretch of wall is a quarter of what it was on the old 40 m tiles.
  */
 export const CITY_PRICE_BY_BUILDING: Partial<Record<BuildingKind, number>> = {
   townHall: 200,
@@ -264,8 +299,8 @@ export const CITY_PRICE_BY_BUILDING: Partial<Record<BuildingKind, number>> = {
   storage: 50,
   farm: 30,
   stable: 40,
-  wall: 2,
-  gate: 5,
+  wall: 0.5,
+  gate: 1.25,
 }
 
 /**
@@ -275,23 +310,11 @@ export const CITY_PRICE_BY_BUILDING: Partial<Record<BuildingKind, number>> = {
 export const NPC_FOOD_SHORT_DAYS = 5
 
 /**
- * An NPC city sends one of a workplace's workers to carry its output to the storage once this
- * many units of it lie in the pile on the workplace's tile: about what a resident carries, so a
- * trip is worth the walk.
+ * Units of Food a farm's pile keeps when a worker carries its output away (`CONTEXT.md`:
+ * Carrying the output), so the workers there can still refill at their workplace (Refilling at a
+ * workplace). Written into the Work default's source, where a Player can change it.
  */
-export const NPC_FETCH_UNITS = 15
-
-/**
- * Units of Food an NPC city's carrier leaves in a farm's pile, so the workers there can still
- * refill at their workplace (`CONTEXT.md`: Refilling at a workplace).
- */
-export const NPC_FOOD_LEFT_AT_WORK = 4
-
-/**
- * Units of Food an NPC city's carrier keeps on them when putting the rest in the storage: what a
- * resident starts out with, so nobody walks to the storage for the food they carry anyway.
- */
-export const NPC_OWN_FOOD = START_CARRIED_FOOD
+export const WORK_FOOD_KEPT = 2
 
 /**
  * Share of an NPC city's adults it keeps as soldiers (`CONTEXT.md`: NPC city, Soldier), rounded
@@ -303,14 +326,23 @@ export const NPC_SOLDIER_SHARE = 0.25
  * How near to an NPC city's gate, in tiles, an armed outsider makes it close its gates
  * (`CONTEXT.md`: NPC city): a little inside sight, so the gate shuts before they reach it.
  */
-export const NPC_GATE_WATCH_RANGE = 8
+export const NPC_GATE_WATCH_RANGE = 32
 
 /**
  * An NPC city keeps one pair for every this many of its adults (`CONTEXT.md`: NPC city,
- * Pairing): a village of six one pair, a town of sixteen two. A pair stops working while it waits
- * for its child, so most adults keep working.
+ * Pairing): a village of six one pair, a town of sixteen two. Only the partner carrying the child
+ * stops working, and only for `CARRYING_DAYS`.
  */
 export const NPC_ADULTS_PER_PAIR = 6
+
+/**
+ * Game days a partner carries a child before it is born (`CONTEXT.md`: Carrying), not working
+ * meanwhile: 60 game days, 24 real hours.
+ */
+export const CARRYING_DAYS = 60
+
+/** Ticks from the start of carrying until the child is born (`CARRYING_DAYS`). */
+export const CARRYING_TICKS = CARRYING_DAYS * TICKS_PER_GAME_DAY
 
 /**
  * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
@@ -323,36 +355,46 @@ export const NPC_BUILDERS = 2
  * the old one (`CONTEXT.md`: NPC city), on every side, with the gate in the same place. At most
  * `CITY_BUILDING_REACH`, so the new wall stays part of the city once the old one is gone.
  */
-export const NPC_WALL_STEP = 2
+export const NPC_WALL_STEP = 8
+
+/**
+ * How many tiles of wall an NPC city's builder fetches the materials for in one trip to the
+ * storage (`CONTEXT.md`: NPC city, Fetching materials): a 40 m stretch's worth, so a long wall is
+ * not one walk per tile. What a tile doesn't take goes to the next.
+ */
+export const NPC_WALL_TILES_PER_TRIP = 4
 
 /**
  * How far from its home an NPC city looks for a resource node to build a workplace on when it
  * needs a material it has no workplace for (`CONTEXT.md`: NPC city), in tiles: about twenty
  * minutes' walk on plains.
  */
-export const NPC_NODE_REACH = 40
+export const NPC_NODE_REACH = 160
 
 /**
  * How far beyond its wall an NPC city looks for Plains to lay out a new farm on, in tiles. Farms
  * go beyond where its next wall would stand.
  */
-export const NPC_FARM_REACH = 12
+export const NPC_FARM_REACH = 48
 
 /**
  * What the Trade Org HQ is placed with (`CONTEXT.md`: Trade Org HQ): a round city, the largest on
  * the map, with two rings of wall around its town hall.
  */
 export const TRADE_ORG_HQ = {
-  /** Tiles from the town hall to the inner ring of wall, which holds its warehouses. */
-  innerRadius: 4,
-  /** Tiles from the town hall to the outer ring of wall; twice an NPC town's width across. */
-  outerRadius: 10,
+  /** Tiles from the middle of the town hall to the inner ring of wall, which holds its warehouses. */
+  innerRadius: 16,
+  /**
+   * Tiles from the middle of the town hall to the outer ring of wall; about twice an NPC town's
+   * width across.
+   */
+  outerRadius: 40,
   /**
    * Tiles from one outer ring to the next one it grows (`CONTEXT.md`: Trade Org HQ): as far as a
    * city building reaches (`CITY_BUILDING_REACH`), so the new ring joins the HQ, with a band of
    * houses between.
    */
-  ringStep: 3,
+  ringStep: 12,
   /** Gates in each ring, evenly round it, the first due north. */
   gates: 4,
   /** Adult residents, with random stats like a starting city's. */
@@ -362,7 +404,7 @@ export const TRADE_ORG_HQ = {
   /** Farms outside the outer ring, by its gates. */
   farms: 4,
   /** Food in its storage, in units: about a week of what everyone eats. */
-  food: 450,
+  food: 225,
   /** Coins in its coin warehouse. */
   coins: 20_000,
   /** Goods in its goods warehouse, in units. */
@@ -376,14 +418,14 @@ export const TRADE_ORG_HQ = {
  * (`CITY_MIN_DISTANCE` for other starting cities), and the HQ is placed as far from every city
  * as the map allows.
  */
-export const TRADE_ORG_HQ_MIN_DISTANCE = 400
+export const TRADE_ORG_HQ_MIN_DISTANCE = 1600
 
 /**
  * How wide a region is for trading posts (`CONTEXT.md`: Trading post), in tiles along each side:
  * the map is cut into a grid of about this size, one post in each square. A full-size map gets
  * 4 × 4 = 16 posts, as many as it gets NPC cities; a small map gets at least one.
  */
-export const TRADING_POST_REGION = 360
+export const TRADING_POST_REGION = 1440
 
 /**
  * What a trading post is placed with (`CONTEXT.md`: Trading post): a walled village with a
@@ -391,7 +433,7 @@ export const TRADING_POST_REGION = 360
  */
 export const TRADING_POST = {
   /** Tiles along each side, wall included: a village's square. */
-  size: 7,
+  size: 29,
   /** Adult residents: enough for its farm and its one workplace. */
   residents: 4,
   /** Houses inside the wall: room for everyone. */
@@ -399,7 +441,7 @@ export const TRADING_POST = {
   /** Farms outside the wall, by the gate. */
   farms: 1,
   /** Food in its storage, in units: about two weeks of what everyone eats. */
-  food: 100,
+  food: 50,
   /** Coins in its warehouse. */
   coins: 2_000,
   /** Goods in its warehouse, in units. */
@@ -481,30 +523,30 @@ export const CARAVAN_ROBBERIES_PER_ESCORT = 2
 export const CARAVAN_ESCORTS_MAX = 8
 
 /**
- * Extra Food a caravan keeps on board for each escort beyond `CARAVAN_ESCORTS`, in units: a
- * week of `FOOD_PER_DAY`, like `CARAVAN_FOOD`.
+ * Extra Food a caravan keeps on board for each escort beyond `CARAVAN_ESCORTS`, in units: the
+ * same ~16 game days of `FOOD_PER_DAY` as `CARAVAN_FOOD`.
  */
-export const CARAVAN_FOOD_PER_ESCORT = 14
+export const CARAVAN_FOOD_PER_ESCORT = 16
 
 /**
  * How near its carriage, in tiles, a caravan's escort defends it (`CONTEXT.md`: Caravan): they go
  * after robbers and attackers of the crew this close, and give up a chase that leads further.
  */
-export const CARAVAN_GUARD_RANGE = 4
+export const CARAVAN_GUARD_RANGE = 16
 
 /**
  * Food a caravan keeps on board for its crew and its horse, in units, topped up at the storage
- * at each end of its route (`CONTEXT.md`: Caravan): a driver, two escorts and a horse eat about
- * 9 a game day, so this lasts about a week, the longest leg on a full-size map.
+ * at each end of its route (`CONTEXT.md`: Caravan): a driver, two escorts and a horse eat 4.5 a
+ * game day, so this lasts about 16 game days, the longest leg on a full-size map (~15).
  */
-export const CARAVAN_FOOD = 60
+export const CARAVAN_FOOD = 72
 
 /**
  * How many tiles further along their way a caravan's driver or an escort may get than the one
  * furthest behind (`CONTEXT.md`: Caravan): one ahead waits, so the escort keeps up with the
  * carriage.
  */
-export const CARAVAN_SPREAD = 2
+export const CARAVAN_SPREAD = 8
 
 /**
  * The part of a delivery's fee every delivery or pick-up pays, in coins (`CONTEXT.md`:
@@ -514,10 +556,10 @@ export const DELIVERY_FEE_BASE = 5
 
 /**
  * The part of a delivery's fee that grows with weight and distance, in coins per kg and tile from
- * the warehouse to the city's storage (`CONTEXT.md`: Delivery). 100 kg over 100 tiles, about a
+ * the warehouse to the city's storage (`CONTEXT.md`: Delivery). 100 kg over 400 tiles, about a
  * trading post's region, costs 50: a tenth of what 100 iron fetch, a lot for cheap Food.
  */
-export const DELIVERY_FEE_PER_KG_TILE = 0.005
+export const DELIVERY_FEE_PER_KG_TILE = 0.00125
 
 /**
  * How often a caravan's drive towards a delivery's storage may end short of it before it turns
@@ -594,22 +636,32 @@ export function carryCapacity(resident: Resident, tick: number): number {
 }
 
 /** Food a resident of average Endurance eats per game day, in units (`CONTEXT.md`: Hunger). */
-export const FOOD_PER_DAY = 2
+export const FOOD_PER_DAY = 1
 
 /**
  * A resident at home is running low on food when they carry fewer units than this: less than a
  * game day's meals (`CONTEXT.md`: Eating). They then take meals from their city's storage.
  */
-export const HOME_FOOD_LOW = 2
+export const HOME_FOOD_LOW = 1
+
+/**
+ * A resident's own food (`CONTEXT.md`: Own food), in units: two game days of meals. Putting goods
+ * away leaves it in their hands unless the Player asks for an exact amount (`putAwayUnits`); NPC
+ * residents always keep it, so nobody walks to the storage for the food they carry anyway.
+ */
+export const OWN_FOOD = 2 * FOOD_PER_DAY
 
 /** Units of food in one meal, what a resident at home takes from storage at a time. */
 export const MEAL_UNITS = 1
 
-/** Game days a full hunger meter lasts without eating, at average Endurance. */
-export const HUNGER_DAYS = 1
+/**
+ * Game days a full hunger meter lasts without eating, at average Endurance. With `STARVE_DAYS`, a
+ * resident dies about 5 game days (2 real hours) after their last meal.
+ */
+export const HUNGER_DAYS = 2
 
 /** Game days an empty hunger meter takes to cost a resident all their health. */
-export const STARVE_DAYS = 1
+export const STARVE_DAYS = 3
 
 /** Game days a fed resident takes to heal from no health back to full. */
 export const HEAL_DAYS = 3
@@ -676,8 +728,11 @@ export const FOOD_SURPLUS_DAYS = 10
  */
 export const CHILD_STAT_SPREAD = 2
 
-/** Ticks (real seconds) an unloaded resident of average Agility takes to walk a plains tile. */
-export const WALK_TICKS_PER_TILE = 30
+/**
+ * Ticks (real seconds) an unloaded resident of average Agility takes to walk a plains tile
+ * (`CONTEXT.md`: Tile). Carriages go at a multiple of this (`CARRIAGE_SPEED`).
+ */
+export const WALK_TICKS_PER_TILE = 7.5
 
 /** The Agility at which a resident walks at the usual speed. */
 export const AGILITY_AVERAGE = 10
@@ -721,10 +776,11 @@ export const DELIVERY_LOAD = CARRIAGE_CAPACITY - CARAVAN_FOOD
 
 /**
  * Food a haul route keeps on board for its horse unless the Player picks another amount, in
- * units (`CONTEXT.md`: Haul route): two game days of the horse's eating, topped up at each stop
- * that has Food.
+ * units (`CONTEXT.md`: Haul route): five game days (two real hours) of the horse's eating, topped
+ * up at each stop that has Food. A trip takes real time, so this keeps its real-time length;
+ * rounded up to whole units.
  */
-export const HAUL_KEEP_FOOD = 2 * HORSE_FOOD_PER_DAY
+export const HAUL_KEEP_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
 
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
@@ -777,9 +833,9 @@ export function drivingLearned(resident: Resident, tick: number): number {
 
 /**
  * Share of the Food in one place (a storage, a resident's or carriage's load, a pile) that goes
- * bad each game day (`CONTEXT.md`: Spoilage). About a third of a stock is lost over a game year.
+ * bad each game day (`CONTEXT.md`: Spoilage). Half of a stock is gone in about 140 game days.
  */
-export const FOOD_SPOIL_PER_DAY = 0.02
+export const FOOD_SPOIL_PER_DAY = 0.005
 
 /**
  * Events kept in each Player's realm log; the oldest go first. A Player who logs
@@ -789,9 +845,10 @@ export const REALM_LOG_LENGTH = 100
 
 /**
  * How long, in game days, an Organization remembers a crime once it is known and nobody carries
- * news of it any more (`CONTEXT.md`: Crime). A week: long enough to count as "recent".
+ * news of it any more (`CONTEXT.md`: Crime). About seven real hours: long enough to count as
+ * "recent".
  */
-export const CRIME_MEMORY_DAYS = 7
+export const CRIME_MEMORY_DAYS = 18
 
 /** How far standing goes each way from neutral (`CONTEXT.md`: Standing): -100 to +100. */
 export const STANDING_RANGE = 100
@@ -814,16 +871,16 @@ export const CRIME_STANDING_LOSS: Record<CrimeKind, number> = {
 export const STANDING_TRADE_COINS_PER_POINT = 50
 
 /** Standing each paid game week of a mercenary contract raises, both ways between its sides. */
-export const STANDING_PER_PAID_WEEK = 2
+export const STANDING_PER_PAID_WEEK = 0.8
 
 /** What a contract broken by an unpaid week costs in the lender's standing toward the hirer. */
 export const STANDING_CONTRACT_BROKEN_LOSS = 20
 
 /**
  * Points standing drifts back toward neutral each game day (`CONTEXT.md`: Standing): a killing is
- * forgotten in about 30 game days, a little over a real day.
+ * forgotten in about 75 game days, a little over a real day.
  */
-export const STANDING_DRIFT_PER_DAY = 1
+export const STANDING_DRIFT_PER_DAY = 0.4
 
 /**
  * Below this standing toward an Organization an NPC city won't trade with it or hire out to it
@@ -854,14 +911,14 @@ export const NPC_TRADE = {
   reserveFoodDays: 15,
   /**
    * Stretches of wall whose materials it keeps in reserve, beside a house's (`BUILD_MATERIALS`):
-   * with a house that makes 60 Wood.
+   * with a house that makes 68 Wood.
    */
-  reserveWallStretches: 4,
+  reserveWallStretches: 16,
   /**
    * What it asks for each resident it lends and game week, in coins, at neutral standing: less
    * than a Trade Org soldier (`TRADE_ORG_ARMY.pricePerSoldierWeek`), as they come mostly unarmed.
    */
-  pricePerResidentWeek: 12,
+  pricePerResidentWeek: 5,
   /** Share of its adults, rounded up, it keeps at home to defend it and never lends. */
   defenceShare: 0.25,
 }
@@ -874,20 +931,21 @@ export const PERSUADE_STANDING = 50
 
 /**
  * How often, in ticks, an NPC city weighs whether to ask a realm to join (`CONTEXT.md`:
- * Persuading a city): once a game minute, so standing and respect aren't counted every tick.
+ * Persuading a city): once a game hour (a real minute), so standing and respect aren't counted
+ * every tick.
  */
 export const PERSUADE_CHECK_TICKS = 60
 
 /**
  * Game days an NPC city waits after a realm declined it before it asks that realm again
- * (`CONTEXT.md`: Persuading a city). A week, like a remembered crime.
+ * (`CONTEXT.md`: Persuading a city). As long as a remembered crime.
  */
-export const PERSUADE_ASK_AGAIN_DAYS = 7
+export const PERSUADE_ASK_AGAIN_DAYS = 18
 
 /**
  * The standing a self-managed city starts out holding its former Player in (`CONTEXT.md`:
- * Self-managed city): good, and like any standing gone in about 60 game days, two and a half real
- * days.
+ * Self-managed city): good, and like any standing gone in about 150 game days, two and a half
+ * real days.
  */
 export const FORMER_PLAYER_STANDING = 60
 
@@ -895,7 +953,7 @@ export const FORMER_PLAYER_STANDING = 60
  * Below this standing toward an Organization the Trade Organization refuses to trade with it
  * (`CONTEXT.md`: Trade Org reaction): no buying or selling at its warehouses, no hiring its
  * soldiers, no hiring theirs. Any known crime against it gets there; a theft is forgiven in about
- * five game days.
+ * 12 game days.
  */
 export const TRADE_ORG_REFUSES_TRADE_BELOW = -5
 
@@ -926,7 +984,7 @@ export const TRADE_ORG_LOSS: Record<Exclude<CrimeKind, 'theft'>, number> = {
 export const TRADE_ORG_PUNISH = {
   times: 2,
   soldiers: 8,
-  giveUpDays: 5,
+  giveUpDays: 12,
 }
 
 /**
@@ -960,10 +1018,15 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   mint: { stone: 40, iron: 10 },
   smithy: { stone: 30, wood: 20, iron: 10 },
   townHall: { wood: 60, stone: 40 },
-  wall: { wood: 10 },
-  gate: { wood: 15 },
-  /** A tile of road (`CONTEXT.md`: Road): a little Stone, so a quarry pays for a long road. */
-  road: { stone: 5 },
+  /** A tile of wall: about a quarter of what a 40 m stretch took. */
+  wall: { wood: 3 },
+  /** A gate, of a wall's tile. */
+  gate: { wood: 4 },
+  /**
+   * A tile of road (`CONTEXT.md`: Road): a little Stone, so a quarry pays for a long road; about a
+   * quarter of what a 40 m tile took.
+   */
+  road: { stone: 1 },
   /** A house (`CONTEXT.md`: House): timber for four residents' room. */
   house: { wood: 20 },
   /** A farm is fields on Plains: work, but no materials, so a city can always feed itself. */
@@ -973,8 +1036,9 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
- * a mint 5, a smithy 5, a town hall 6. A stretch of wooden wall takes a quarter of a game
- * day, a gate half of one, a tile of road a quarter, a house one game day and a farm half of one. More or stronger workers finish it sooner (`buildWork`).
+ * a mint 5, a smithy 5, a town hall 6. A tile of wooden wall takes a sixteenth of a game day, a
+ * gate an eighth, a tile of road a sixteenth (a quarter of what a 40 m tile took), a house one
+ * game day and a farm half of one. More or stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -985,9 +1049,9 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   mint: 5 * TICKS_PER_GAME_DAY,
   smithy: 5 * TICKS_PER_GAME_DAY,
   townHall: 6 * TICKS_PER_GAME_DAY,
-  wall: TICKS_PER_GAME_DAY / 4,
-  gate: TICKS_PER_GAME_DAY / 2,
-  road: TICKS_PER_GAME_DAY / 4,
+  wall: TICKS_PER_GAME_DAY / 16,
+  gate: TICKS_PER_GAME_DAY / 8,
+  road: TICKS_PER_GAME_DAY / 16,
   house: TICKS_PER_GAME_DAY,
   farm: TICKS_PER_GAME_DAY / 2,
 }
@@ -996,36 +1060,51 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
  * The most tiles one road order along a line may cover (`roadLine`): about a game week of one
  * resident's work, so a long road is a few orders rather than one that runs for months.
  */
-export const ROAD_LINE_MAX_TILES = 32
+export const ROAD_LINE_MAX_TILES = 128
 
 /** The Strength at which a resident puts in one unit of building work per tick. */
 export const BUILD_STRENGTH_AVERAGE = 10
 
-/** How much more work each point of Construction skill puts in per tick. */
-export const CONSTRUCTION_SKILL_EFFECT = 0.05
+/** How much more work each point of Construction skill puts in per tick: 1 % a point. */
+export const CONSTRUCTION_SKILL_EFFECT = 0.01
 
-/** Construction skill a resident of average Intellect gains per game day of building work. */
-export const CONSTRUCTION_SKILL_PER_DAY = 1
+/**
+ * The furthest Construction skill speeds building work up, as a share of it: +100 %, reached at
+ * `CONSTRUCTION_SKILL_MAX` points, beyond which nobody learns.
+ */
+export const CONSTRUCTION_SKILL_LIMIT = 1
+
+/** The most Construction skill a resident can have: where it reaches `CONSTRUCTION_SKILL_LIMIT`. */
+export const CONSTRUCTION_SKILL_MAX = CONSTRUCTION_SKILL_LIMIT / CONSTRUCTION_SKILL_EFFECT
+
+/**
+ * Construction skill a resident of average Intellect gains per game day of building work: the
+ * cap takes about a game year (one real week).
+ */
+export const CONSTRUCTION_SKILL_PER_DAY = 100 / 420
 
 /** The Intellect at which a resident learns at the usual pace (`CONTEXT.md`: Stats). */
 export const INTELLECT_AVERAGE = 10
 
 /**
  * Building work a resident puts in per tick at the given tick (`CONTEXT.md`: Construction site):
- * in proportion to Strength, plus `CONSTRUCTION_SKILL_EFFECT` for each point of Construction.
+ * in proportion to Strength, plus `CONSTRUCTION_SKILL_EFFECT` for each point of Construction, up
+ * to `CONSTRUCTION_SKILL_LIMIT`.
  */
 export function buildWork(resident: Resident, tick: number): number {
   const strength = statValue(resident, 'strength', tick) / BUILD_STRENGTH_AVERAGE
-  return strength * (1 + (resident.skills.construction ?? 0) * CONSTRUCTION_SKILL_EFFECT)
+  const skill = (resident.skills.construction ?? 0) * CONSTRUCTION_SKILL_EFFECT
+  return strength * (1 + Math.min(CONSTRUCTION_SKILL_LIMIT, skill))
 }
 
 /**
  * Construction skill a resident learns from one tick of building work (`CONTEXT.md`: Skill,
- * learned by doing), faster with more Intellect.
+ * learned by doing), faster with more Intellect, and never past `CONSTRUCTION_SKILL_MAX`.
  */
 export function constructionLearned(resident: Resident, tick: number): number {
   const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
-  return (CONSTRUCTION_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
+  const room = Math.max(0, CONSTRUCTION_SKILL_MAX - (resident.skills.construction ?? 0))
+  return Math.min(room, (CONSTRUCTION_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace)
 }
 
 /**
@@ -1096,12 +1175,12 @@ export const BATCHES_PER_DAY: Partial<Record<BuildingKind, number>> = {
 }
 
 /**
- * Units of each good one worker of average Strength and no skill makes per game day. Food is more
- * than the `FOOD_PER_DAY` a resident eats, so a farm feeds its workers with some to spare; ore is
- * slow, and gold ore slowest.
+ * Units of each good one worker of average Strength and no skill makes per game day. Food is four
+ * times the `FOOD_PER_DAY` a resident eats, so about a quarter of a city farms; ore is slow, and
+ * gold ore slowest.
  */
 export const WORK_OUTPUT_PER_DAY: Partial<Record<Good, number>> = {
-  food: 3,
+  food: 4,
   wood: 4,
   stone: 3,
   ironOre: 2,
@@ -1111,16 +1190,28 @@ export const WORK_OUTPUT_PER_DAY: Partial<Record<Good, number>> = {
 /** The Strength at which a worker makes `WORK_OUTPUT_PER_DAY`. */
 export const WORK_STRENGTH_AVERAGE = 10
 
-/** How much more each point of the workplace's skill makes. */
-export const WORK_SKILL_EFFECT = 0.05
+/** How much more each point of the workplace's skill makes: 1 % a point. */
+export const WORK_SKILL_EFFECT = 0.01
 
-/** Skill a worker of average Intellect gains per game day of work at a workplace. */
-export const WORK_SKILL_PER_DAY = 1
+/**
+ * The furthest a workplace's skill raises output, as a share of it: +100 %, so a worker makes at
+ * most twice what an unskilled one does, reached at `WORK_SKILL_MAX` points.
+ */
+export const WORK_SKILL_LIMIT = 1
+
+/** The most of a workplace's skill a resident can have: where it reaches `WORK_SKILL_LIMIT`. */
+export const WORK_SKILL_MAX = WORK_SKILL_LIMIT / WORK_SKILL_EFFECT
+
+/**
+ * Skill a worker of average Intellect gains per game day of work at a workplace: the cap takes
+ * about a game year (one real week).
+ */
+export const WORK_SKILL_PER_DAY = 100 / 420
 
 /**
  * How much of a unit of `good` a worker makes per tick at the given tick, using `skill`
  * (`CONTEXT.md`: Workplace): in proportion to Strength, plus `WORK_SKILL_EFFECT` for each point
- * of the skill.
+ * of the skill, up to `WORK_SKILL_LIMIT`.
  */
 export function workOutput(resident: Resident, good: Good, skill: SkillName, tick: number): number {
   return workPace(resident, WORK_OUTPUT_PER_DAY[good] ?? 0, skill, tick)
@@ -1138,17 +1229,18 @@ export function batchWork(resident: Resident, kind: BuildingKind, tick: number):
 /** `perDay` a game day, as a share per tick: in proportion to Strength, more with the skill. */
 function workPace(resident: Resident, perDay: number, skill: SkillName, tick: number): number {
   const strength = statValue(resident, 'strength', tick) / WORK_STRENGTH_AVERAGE
-  const skilled = 1 + (resident.skills[skill] ?? 0) * WORK_SKILL_EFFECT
+  const skilled = 1 + Math.min(WORK_SKILL_LIMIT, (resident.skills[skill] ?? 0) * WORK_SKILL_EFFECT)
   return (perDay / TICKS_PER_GAME_DAY) * strength * skilled
 }
 
 /**
- * Skill a worker learns from one tick of work at a workplace (`CONTEXT.md`: Skill, learned by
- * doing), faster with more Intellect.
+ * How much of `skill` a worker learns from one tick of work at a workplace (`CONTEXT.md`: Skill,
+ * learned by doing), faster with more Intellect, and never past `WORK_SKILL_MAX`.
  */
-export function workLearned(resident: Resident, tick: number): number {
+export function workLearned(resident: Resident, skill: SkillName, tick: number): number {
   const pace = statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE
-  return (WORK_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
+  const room = Math.max(0, WORK_SKILL_MAX - (resident.skills[skill] ?? 0))
+  return Math.min(room, (WORK_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace)
 }
 /**
  * Tearing down takes less work than building (`CONTEXT.md`: Tearing down): this share of the
@@ -1157,22 +1249,22 @@ export function workLearned(resident: Resident, tick: number): number {
 export const TEARDOWN_WORK_SHARE = 0.5
 
 /**
- * Share of a finished building's materials left on the tile when it is torn down, rounded down
+ * Share of a finished building's materials left in its pile when it is torn down, rounded down
  * to whole units. An unfinished site leaves all its delivered materials.
  */
 export const TEARDOWN_MATERIALS_RETURNED = 0.5
 
 /**
  * How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
- * being a member (`CONTEXT.md`: Alliance): one game day, time enough for the others to react.
+ * being a member (`CONTEXT.md`: Alliance): one real hour, time enough for the others to react.
  */
-export const ALLIANCE_LEAVE_DELAY = TICKS_PER_GAME_DAY
+export const ALLIANCE_LEAVE_DELAY = 3600
 
 /**
  * How long after its owner recalls a soldier or carriage from the alliance army it is theirs to
- * command again (`CONTEXT.md`: Alliance army): a game day.
+ * command again (`CONTEXT.md`: Alliance army): one real hour.
  */
-export const ALLIANCE_RECALL_DELAY = TICKS_PER_GAME_DAY
+export const ALLIANCE_RECALL_DELAY = 3600
 
 /**
  * The standing an NPC city must hold toward every member of an alliance to accept its
@@ -1208,12 +1300,12 @@ export const TERRITORY_PER_ARMED = 3
 
 /**
  * How far control reaches, in tiles, per square root of its strength: a city of 5 control reaches
- * 4 tiles, one of 30 ten, one of 100 twenty.
+ * 17 tiles, one of 30 forty-three, one of 100 eighty.
  */
-export const TERRITORY_REACH_PER_ROOT = 2
+export const TERRITORY_REACH_PER_ROOT = 8
 
 /** The farthest any one city or workplace projects control, in tiles. */
-export const TERRITORY_MAX_REACH = 24
+export const TERRITORY_MAX_REACH = 96
 
 /**
  * Ticks between two blows of a resident in a fight (`CONTEXT.md`: Combat): a blow every two
@@ -1253,13 +1345,14 @@ export const WALL_STRENGTH: Record<'wall' | 'gate', number> = { wall: 600, gate:
 
 /**
  * Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
- * less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered.
+ * less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
+ * enough that a tile of wall leaves a unit of Wood.
  */
-export const BROKEN_MATERIALS_RETURNED = 0.3
+export const BROKEN_MATERIALS_RETURNED = 0.34
 
 /**
  * Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): a
- * minute, as long as walking two tiles of plains, all the while unable to dodge or strike back.
+ * minute, as long as walking eight tiles of plains, all the while unable to dodge or strike back.
  */
 export const CLIMB_TICKS = 60
 
@@ -1337,13 +1430,13 @@ export function combatLearned(resident: Resident, tick: number): number {
  * How many tiles further along an army's way a member may get than the one furthest behind
  * (`CONTEXT.md`: Army): one ahead waits, so the army keeps together at the pace of the slowest.
  */
-export const ARMY_SPREAD = 1
+export const ARMY_SPREAD = 4
 
 /**
  * The longest a mercenary contract may run, in game days (`CONTEXT.md`: Mercenary contract): two
- * game years, so a contract is a campaign, not a permanent transfer of residents.
+ * real days, so a contract is a campaign, not a permanent transfer of residents.
  */
-export const CONTRACT_MAX_DAYS = 48
+export const CONTRACT_MAX_DAYS = 120
 
 /** The Trade Org army (`CONTEXT.md`: Trade Org army). */
 export const TRADE_ORG_ARMY = {
@@ -1353,17 +1446,17 @@ export const TRADE_ORG_ARMY = {
   workers: 12,
   /** Soldiers that always stay at the HQ: it never hires out more than the rest. */
   guard: 8,
-  /** What it asks for each soldier and game week, in coins: about a spear's price. */
-  pricePerSoldierWeek: 20,
+  /** What it asks for each soldier and game week, in coins: about a spear's price each seven real hours. */
+  pricePerSoldierWeek: 8,
   /**
    * It has lost too many once its soldiers, the adults it could still arm and its mercenaries
    * are fewer than this share of `size`.
    */
   hireBelow: 0.6,
   /** What it offers for each mercenary and game week, in coins: less than it asks itself. */
-  hirePricePerSoldierWeek: 12,
-  /** How long it hires mercenaries for, in game days: two game weeks. */
-  hireDays: 14,
+  hirePricePerSoldierWeek: 5,
+  /** How long it hires mercenaries for, in game days: 14 real hours. */
+  hireDays: 35,
   /**
    * The HQ keeps at least this many times the strongest Organization's armed residents as
    * soldiers (`CONTEXT.md`: Trade Org HQ), and `size` at the least: a little more than any
@@ -1379,7 +1472,7 @@ export const TRADE_ORG_ARMY = {
    * How near to one of the HQ's outer gates, in tiles, an armed outsider counts as near it, as
    * well as anywhere in its area: as for an NPC city (`NPC_GATE_WATCH_RANGE`).
    */
-  gateWatchRange: 8,
+  gateWatchRange: 32,
 }
 
 /**

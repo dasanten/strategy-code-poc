@@ -29,6 +29,7 @@ import {
   type Transfer,
   type TransferJob,
   type WorldState,
+  isAt,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
@@ -419,7 +420,7 @@ export function runTransfer(
   }
   const b = stepBuilding(world, job, t)
   if (!b) return finish(caravan)
-  if (driver.x !== b.x || driver.y !== b.y) {
+  if (!isAt(driver, b)) {
     const toStorage = collecting || job.step === 'deliver'
     if (toStorage && job.misses >= DELIVERY_DRIVE_TRIES) return turnBack(world, job, t!)
     job.misses++

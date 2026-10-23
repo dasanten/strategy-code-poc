@@ -1,14 +1,15 @@
 import {
-  NPC_FETCH_UNITS,
-  NPC_FOOD_LEFT_AT_WORK,
-  NPC_OWN_FOOD,
+  FOOTPRINT,
+  OWN_FOOD,
+  WORK_FOOD_KEPT,
   NPC_VILLAGE,
   TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_YEAR,
   Terrain,
   pileAt,
   storedFood,
+  unitsThatFit,
   workersOf,
+  ticksForAge,
   type Building,
   type City,
   type TerrainMap,
@@ -19,6 +20,7 @@ import { checkInvariants } from './invariants.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
 import { mulberry32 } from './residents.js'
+import { runNpcScripts } from './script-runner.js'
 import { endRealm } from './survival.js'
 import { worldWithCity } from './test-terrain.js'
 import { Walking } from './walking.js'
@@ -53,43 +55,47 @@ function run(world: WorldState, terrain: TerrainMap, walking: Walking, ticks: nu
 }
 
 describe('NPC cities work and eat', () => {
-  it('a village left alone survives several game years', () => {
+  it('a village left alone survives ten game weeks', () => {
     const { world, terrain, city } = village()
     const walking = new Walking(terrain)
     // Everyone starts idle at home, so the city has to send them out to work.
     const storage = storageOf(world, city)
     for (const r of world.residents) Object.assign(r, { x: storage.x, y: storage.y, order: null })
     const people = world.residents.map((r) => r.id)
-    run(world, terrain, walking, 3 * TICKS_PER_GAME_YEAR)
-    // Starting ages and lifespans leave nobody to die of old age in three years.
+    run(world, terrain, walking, 70 * TICKS_PER_GAME_DAY)
+    // Starting ages and lifespans leave nobody to die of old age in ten weeks.
     expect(world.residents.map((r) => r.id)).toEqual(expect.arrayContaining(people))
     // Left in the storage, the starting food would have mostly spoiled by now.
     expect(storedFood(world, city)).toBeGreaterThan(NPC_VILLAGE.food)
-  }, 120_000)
+  }, 240_000)
 
   it('carries the farm’s output to the storage', () => {
     const { world, terrain, city } = village()
     const walking = new Walking(terrain)
     storageOf(world, city).stock = {}
-    run(world, terrain, walking, 2 * TICKS_PER_GAME_DAY)
+    run(world, terrain, walking, 5 * TICKS_PER_GAME_DAY)
     expect(storedFood(world, city)).toBeGreaterThan(0)
-    expect(
-      pileAt(world, farmOf(world, city).x, farmOf(world, city).y)?.goods.food ?? 0,
-    ).toBeLessThan(NPC_FETCH_UNITS)
+    // Its carriers keep taking full loads away: the pile stays below one, past what it keeps.
+    const farm = farmOf(world, city)
+    const load = Math.max(
+      ...world.residents.map((r) => unitsThatFit({ ...r, carried: {} }, 'food', world.tick)),
+    )
+    expect(pileAt(world, farm.x, farm.y)?.goods.food ?? 0).toBeLessThan(load + WORK_FOOD_KEPT)
   })
 
-  it('sends one worker to pick up a full pile, leaving food for the others', () => {
-    const { world, city } = village()
+  it('sends one worker by the Work default to pick up a full pile, leaving food for the others', () => {
+    const { world, terrain, city } = village()
     const farm = farmOf(world, city)
-    world.piles.push({ id: 'pile1', x: farm.x, y: farm.y, goods: { food: NPC_FETCH_UNITS } })
-    stepNpcCities(world, 64)
+    world.piles.push({ id: 'pile1', x: farm.x, y: farm.y, goods: { food: 100 } })
+    runNpcScripts(world, terrain)
     const picking = world.residents.filter((r) => r.order?.kind === 'pickUp')
     expect(picking).toHaveLength(1)
     expect(picking[0]!.order).toEqual({
       kind: 'pickUp',
       from: { kind: 'ground' },
-      goods: { food: NPC_FETCH_UNITS - NPC_FOOD_LEFT_AT_WORK },
+      goods: { food: 100 - WORK_FOOD_KEPT },
     })
+    expect(picking[0]!.script?.memory.carry).toMatchObject({ storageId: storageOf(world, city).id })
   })
 
   it('takes what a carrier brings home into the storage, keeping a little to eat', () => {
@@ -97,11 +103,12 @@ describe('NPC cities work and eat', () => {
     const storage = storageOf(world, city)
     const r = world.residents[0]!
     Object.assign(r, { x: storage.x, y: storage.y, order: null, carried: { food: 12 } })
+    delete r.script
     stepNpcCities(world, 64)
     expect(r.order).toEqual({
       kind: 'drop',
       to: { kind: 'storage', storageId: storage.id },
-      goods: { food: 12 - NPC_OWN_FOOD },
+      goods: { food: 12 - OWN_FOOD },
     })
   })
 
@@ -110,9 +117,19 @@ describe('NPC cities work and eat', () => {
     const farm = farmOf(world, city)
     const storage = storageOf(world, city)
     const [adult, child] = world.residents
-    for (const r of [adult!, child!]) Object.assign(r, { x: storage.x, y: storage.y, order: null })
-    child!.bornAt = world.tick - TICKS_PER_GAME_YEAR
+    for (const r of [adult!, child!]) {
+      Object.assign(r, { x: storage.x, y: storage.y, order: null })
+      delete r.script
+    }
+    child!.bornAt = world.tick - ticksForAge(1)
     stepNpcCities(world, terrain.size)
+    // On the Work default, which walks them there.
+    expect(adult!.script).toEqual({
+      scriptId: 0,
+      task: 'work',
+      memory: { workplaceId: farm.id, at: { x: farm.x, y: farm.y } },
+    })
+    runNpcScripts(world, terrain)
     expect(adult!.order).toMatchObject({ kind: 'walkTo', target: { x: farm.x, y: farm.y } })
     expect(child!.order).toBeNull()
   })
@@ -120,14 +137,15 @@ describe('NPC cities work and eat', () => {
   it('puts residents on the farms first when Food runs short', () => {
     const { world, terrain, city } = village()
     const farm = farmOf(world, city)
-    // A lumber camp of the village's on a forest node next to the farm, worked by one resident.
-    const at = { x: farm.x + 1, y: farm.y }
+    // A lumber camp of the village’s on a forest node just east of the farm, worked by one resident.
+    const at = { x: farm.x + FOOTPRINT.farm, y: farm.y }
     terrain.tiles[at.y * terrain.size + at.x] = Terrain.Forest
     world.nodes.push({ id: 'n1', kind: 'forest', ...at })
     const camp: Building = { id: 'camp', kind: 'lumberCamp', cityId: city.id, ...at }
     world.buildings.push(camp)
     const r = world.residents[0]!
     Object.assign(r, { ...at, order: { kind: 'workAt', buildingId: camp.id, at, progress: 0 } })
+    delete r.script
 
     storageOf(world, city).stock = { food: 1000 }
     stepNpcCities(world, terrain.size)
@@ -135,6 +153,7 @@ describe('NPC cities work and eat', () => {
 
     storageOf(world, city).stock = {}
     stepNpcCities(world, terrain.size)
+    runNpcScripts(world, terrain)
     expect(r.order).toMatchObject({ kind: 'walkTo', target: { x: farm.x, y: farm.y } })
   })
 

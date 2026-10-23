@@ -5,12 +5,13 @@ import {
   tradeOrgArmyWanted,
   WEAPONS,
   canWork,
+  carryCapacity,
+  stockWeight,
   contractOf,
   warehouseKeeps,
   defendsCity,
   inCityArea,
   isArmed,
-  pileAt,
   punishers,
   recipeFor,
   wallSide,
@@ -23,10 +24,12 @@ import {
   type Stock,
   type Weapon,
   type WorldState,
+  buildingPile,
+  isAt,
 } from '@csp/shared'
 import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
-import { walkTo } from './npc-behaviour.js'
+import { stopWork, walkTo } from './npc-behaviour.js'
 import { startWork } from './work.js'
 
 /** What an NPC city's smithy makes for its soldiers: the cheapest weapon (`RECIPES`). */
@@ -155,7 +158,10 @@ function keepSoldiers(
 ): void {
   const adults = people.filter((r) => canWork(r, world.tick))
   const soldiers = adults.filter(isArmed)
-  for (const r of soldiers) if (r.order?.kind === 'workAt') r.order = null
+  for (const r of soldiers) {
+    if (r.order?.kind === 'workAt') stopWork(r)
+    else delete r.script
+  }
   if (soldiers.length >= target) return
   const unarmed = adults.filter((r) => !isArmed(r) && r.order?.kind !== 'attack')
   if (unarmed.length === 0) return
@@ -169,7 +175,7 @@ function keepSoldiers(
   if (smithy && takeFromSmithy(world, smithy, unarmed)) return
   const weapon = storage && weaponIn(storage.stock ?? {})
   if (storage && weapon) {
-    fetch(storage, unarmed, { [weapon]: 1 })
+    fetch(world, storage, unarmed, { [weapon]: 1 })
     return
   }
   const recipe = recipeFor('smithy', SMITHY_WEAPON)
@@ -179,7 +185,7 @@ function keepSoldiers(
   const enough = Object.entries(recipe.input).every(
     ([good, n]) => (stock[good as keyof Stock] ?? 0) >= n,
   )
-  if (enough) fetch(storage, unarmed, recipe.input)
+  if (enough) fetch(world, storage, unarmed, recipe.input)
 }
 
 /** The first weapon a stock holds, if any. */
@@ -188,16 +194,15 @@ function weaponIn(stock: Stock): Weapon | undefined {
 }
 
 /**
- * A weapon lies on the smithy's pile: an unarmed adult working there, or idle on its tile, picks
- * it up. Whether one does.
+ * A weapon lies on the smithy's pile: an unarmed adult working there, or idle at it, picks it
+ * up. Whether one does.
  */
 function takeFromSmithy(world: WorldState, smithy: Building, unarmed: Resident[]): boolean {
-  const weapon = weaponIn(pileAt(world, smithy.x, smithy.y)?.goods ?? {})
+  const weapon = weaponIn(buildingPile(world, smithy)?.goods ?? {})
   if (!weapon) return false
   const here = unarmed.find(
     (r) =>
-      r.x === smithy.x &&
-      r.y === smithy.y &&
+      isAt(r, smithy) &&
       (r.order === null || (r.order.kind === 'workAt' && r.order.buildingId === smithy.id)),
   )
   if (!here) return false
@@ -207,10 +212,14 @@ function takeFromSmithy(world: WorldState, smithy: Building, unarmed: Resident[]
 
 /**
  * Sends one unarmed adult to the storage for `goods`, unless one is on the way already: one idle
- * there takes them; else an idle adult, or failing that a worker, sets out.
+ * there takes them; else an idle adult, or failing that a worker, sets out. Only adults with room
+ * left for `goods` go, so one laden with a load can't stand at the storage for ever.
  */
-function fetch(storage: Building, unarmed: Resident[], goods: Stock): void {
-  const at = (r: Resident) => r.x === storage.x && r.y === storage.y
+function fetch(world: WorldState, storage: Building, unarmed: Resident[], goods: Stock): void {
+  const room = (r: Resident) =>
+    stockWeight(r.carried) + stockWeight(goods) <= carryCapacity(r, world.tick)
+  unarmed = unarmed.filter(room)
+  const at = (r: Resident) => isAt(r, storage)
   const there = unarmed.find((r) => r.order === null && at(r))
   if (there) {
     there.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods }
@@ -225,7 +234,10 @@ function fetch(storage: Building, unarmed: Resident[], goods: Stock): void {
   if (coming) return
   const sent =
     unarmed.find((r) => r.order === null) ?? unarmed.find((r) => r.order?.kind === 'workAt')
-  if (sent) walkTo(sent, storage)
+  if (sent) {
+    delete sent.script
+    walkTo(sent, storage)
+  }
 }
 
 /**
@@ -249,7 +261,7 @@ function smithing(world: WorldState, smithy: Building, unarmed: Resident[], inpu
   )
   if (!smith) return false
   if (smith.order !== null) return true
-  if (smith.x !== smithy.x || smith.y !== smithy.y) {
+  if (!isAt(smith, smithy)) {
     walkTo(smith, smithy)
     return true
   }

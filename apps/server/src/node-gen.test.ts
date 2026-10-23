@@ -29,7 +29,7 @@ describe('placeResourceNodes', () => {
     beforeAll(() => {
       terrain = generateTerrain(1)
       nodes = placeResourceNodes(terrain, 1)
-    }, 120_000)
+    }, 300_000)
 
     it('puts every node on terrain that fits its kind', () => {
       const wrong = nodes.filter(

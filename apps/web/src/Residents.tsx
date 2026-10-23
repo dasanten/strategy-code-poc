@@ -5,6 +5,8 @@ import {
   BUILDABLE,
   BATCHES_PER_DAY,
   CARRIAGE_CAPACITY,
+  CARRYING_DAYS,
+  CARRYING_TICKS,
   GOODS,
   HAUL_KEEP_FOOD,
   NODE_WORKPLACE,
@@ -30,6 +32,7 @@ import {
   wallStrengthLeft,
   carryCapacity,
   materialsNeeded,
+  putAwayUnits,
   recipeGood,
   teardownReturns,
   teardownWork,
@@ -136,11 +139,62 @@ export interface HaulSetup {
   keepFood: number
 }
 
-/** What a resident is doing, from their order and the script they run. */
-function doing(r: Resident): string {
-  const now = orderDoing(r)
+/**
+ * A resident's pair and the child they carry (`CONTEXT.md`: Pairing, Carrying): who carries, and
+ * how many game days are left until it is born; undefined for one who is neither.
+ */
+export function familyLine(r: Resident, residents: Resident[], tick: number): string | undefined {
+  const days = (until: number) => Math.max(0, Math.ceil((until - tick) / TICKS_PER_GAME_DAY))
+  if (r.carrying) {
+    const left = days(r.carrying.since + CARRYING_TICKS)
+    return `Carrying ${r.carrying.partnerName}’s child · born in ${left} game day${left === 1 ? '' : 's'}`
+  }
+  if (!r.pair) return undefined
+  const partnerId = r.pair.partnerId
+  const partner = residents.find((x) => x.id === partnerId)
+  const name = partner?.name ?? 'someone out of sight'
+  if (partner?.carrying) {
+    const left = days(partner.carrying.since + CARRYING_TICKS)
+    return `${name} is carrying their child · born in ${left} game day${left === 1 ? '' : 's'}`
+  }
+  return `Paired with ${name}`
+}
+
+/** What a resident is doing, from their order and the script they run, named if it is known. */
+function doing(r: Resident, scripts: ScriptSummary[] = []): string {
+  const now = r.carrying && !r.order ? 'Carrying a child' : orderDoing(r)
   if (!r.script) return now
-  return now === 'Idle' ? 'Running a script' : `Running a script · ${now}`
+  const { scriptId } = r.script
+  const name = scripts.find((s) => s.id === scriptId)?.name ?? 'Running a script'
+  return now === 'Idle' ? name : `${name} · ${now}`
+}
+
+/**
+ * The script a resident runs, such as the default script of the task they were given
+ * (`CONTEXT.md`: Default script), with a button to open it in the library.
+ */
+function TaskScript({
+  scriptId,
+  scripts,
+  onEdit,
+}: {
+  scriptId: number
+  scripts: ScriptSummary[]
+  onEdit: (scriptId: number) => void
+}) {
+  const script = scripts.find((s) => s.id === scriptId)
+  const note = !script?.task ? '' : script.followsDefault ? 'the game’s default' : 'edited by you'
+  return (
+    <div className="task-script goods-row">
+      <span className="small">
+        Runs <strong>{script?.name ?? 'a script'}</strong>
+      </span>
+      <span className="muted small">{note}</span>
+      <button type="button" onClick={() => onEdit(scriptId)} disabled={!script}>
+        Edit
+      </button>
+    </div>
+  )
 }
 
 /** What a resident's built-in order has them doing. */
@@ -174,7 +228,6 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
   }
   if (o?.kind === 'workAt')
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
-  if (o?.kind === 'pair') return 'Paired'
   if (o?.kind === 'pay') return 'Paying for mercenaries'
   if (o?.kind === 'buyCity') return 'Buying a city'
   if (o?.kind === 'buyOff') return 'Buying off a directive'
@@ -290,6 +343,7 @@ export function ResidentCard({
   onStop,
   scripts,
   onRunScript,
+  onEditScript,
   onClose,
 }: {
   resident: Resident
@@ -314,6 +368,8 @@ export function ResidentCard({
   scripts: ScriptSummary[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
   onRunScript: (scriptId: number) => void
+  /** Opens a script in the library, such as the one the resident's task runs. */
+  onEditScript: (scriptId: number) => void
   /** Why the last order was turned down, if it was. */
   orderError: string | undefined
   /** Goods lying on the resident's tile, if any are in sight. */
@@ -366,6 +422,7 @@ export function ResidentCard({
   const carried = goodsIn(r.carried)
   // Children can't pick up or put down goods (`CONTEXT.md`: Child).
   const child = !canWork(r, tick)
+  const family = familyLine(r, residents, tick)
   const ground: GoodsSpot = { kind: 'ground' }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
   const site = building?.site ? building : undefined
@@ -405,7 +462,8 @@ export function ResidentCard({
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
         `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}`,
-        <strong key="doing">{doing(r)}</strong>,
+        <strong key="doing">{doing(r, scripts)}</strong>,
+        ...(family ? [family] : []),
       ]}
       onClose={onClose}
     >
@@ -422,6 +480,9 @@ export function ResidentCard({
         />
       </div>
 
+      {r.script && (
+        <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
+      )}
       <ActionRows actions={actions} open={shown} onAction={act} />
       <p className="muted small" role="status">
         {orderError
@@ -482,55 +543,23 @@ export function ResidentCard({
                   </p>
                 )}
                 {carried.map(([good, units]) => (
-                  <div className="goods-row" key={good}>
-                    <span>{GOOD_LABELS[good]}</span>
-                    <span className="mono">{units}</span>
-                    <span className="buttons">
-                      <button
-                        type="button"
-                        disabled={child}
-                        onClick={() => onDrop(ground, { [good]: units })}
-                      >
-                        Drop
-                      </button>
-                      {storage && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(inStorage, { [good]: units })}
-                        >
-                          Store
-                        </button>
-                      )}
-                      {(needed[good] ?? 0) > 0 && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(atSite, { [good]: units })}
-                        >
-                          Deliver
-                        </button>
-                      )}
-                      {(roadNeeded[good] ?? 0) > 0 && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(atRoadSite, { [good]: units })}
-                        >
-                          Deliver to road
-                        </button>
-                      )}
-                      {carriage && (
-                        <button
-                          type="button"
-                          disabled={child}
-                          onClick={() => onDrop(onCarriage, { [good]: units })}
-                        >
-                          Load
-                        </button>
-                      )}
-                    </span>
-                  </div>
+                  <GoodsRow
+                    key={good}
+                    good={good}
+                    units={units}
+                    byDefault={putAwayUnits(good, units)}
+                    disabled={child}
+                    actions={[
+                      { label: 'Drop', spot: ground },
+                      ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
+                      ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
+                      ...((roadNeeded[good] ?? 0) > 0
+                        ? [{ label: 'Deliver to road', spot: atRoadSite }]
+                        : []),
+                      ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
+                    ]}
+                    onAct={onDrop}
+                  />
                 ))}
               </section>
               {(pile || storage || site || roadSite || carriage) && (
@@ -943,7 +972,9 @@ function WorkBlock({
   if (!building || max === undefined || !skill || (!good && recipes.length === 0)) return null
   const batches = BATCHES_PER_DAY[building.kind] ?? 0
   const o = resident.order
-  const working = o?.kind === 'workAt' && o.buildingId === building.id
+  // Working by the task's script; one working by a bare order (as the starting residents do) can
+  // still be given the task.
+  const working = o?.kind === 'workAt' && o.buildingId === building.id && !!resident.script
   const blocked = !canWork(resident, tick) || (!working && workers >= max)
   return (
     <section className="inspector-block" aria-label="Work">
@@ -1078,27 +1109,32 @@ function PairBlock({
 }) {
   const [partnerId, setPartnerId] = useState('')
   if (!canWork(resident, tick) || resident.cityId === null) return null
-  const o = resident.order
-  const partner = o?.kind === 'pair' ? residents.find((x) => x.id === o.partnerId) : undefined
+  const o = resident.pair
+  const partner = o ? residents.find((x) => x.id === o.partnerId) : undefined
   const choices = residents.filter(
-    (x) => x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick),
+    (x) => x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick) && !x.carrying,
   )
-  const days =
-    o?.kind === 'pair'
-      ? Math.max(0, Math.ceil((o.since + TICKS_PER_GAME_YEAR - tick) / TICKS_PER_GAME_DAY))
-      : 0
+  const days = o
+    ? Math.max(0, Math.ceil((o.since + TICKS_PER_GAME_YEAR - tick) / TICKS_PER_GAME_DAY))
+    : 0
+  const expecting = resident.carrying || partner?.carrying
   return (
     <section className="inspector-block" aria-label="Pairing">
       <div className="panel-head">
         <h3>Pairing</h3>
         <span className="small muted">one child a year at most</span>
       </div>
-      {o?.kind === 'pair' && (
-        <p className="muted small">
-          Paired with {partner?.name ?? 'someone out of sight'}.{' '}
-          {days > 0 ? `A child can come in about ${days} game days` : 'A child can come now'}, once
-          the city has free housing and a food surplus.
-        </p>
+      {expecting ? (
+        <p className="muted small">{familyLine(resident, residents, tick)}.</p>
+      ) : (
+        o && (
+          <p className="muted small">
+            Paired with {partner?.name ?? 'someone out of sight'}.{' '}
+            {days > 0 ? `In about ${days} game days` : 'Now'}, once the city has free housing and a
+            food surplus, one of them starts carrying a child for {CARRYING_DAYS} game days; the
+            other keeps working.
+          </p>
+        )
       )}
       <div className="order-buttons">
         <select
@@ -1113,7 +1149,11 @@ function PairBlock({
             </option>
           ))}
         </select>
-        <button type="button" disabled={!partnerId} onClick={() => onPair(partnerId)}>
+        <button
+          type="button"
+          disabled={!partnerId || !!resident.carrying}
+          onClick={() => onPair(partnerId)}
+        >
           Pair
         </button>
       </div>
@@ -1278,21 +1318,72 @@ function TileGoods({
       <div className="small muted">{title}</div>
       {goods.length === 0 && <p className="muted small">Nothing.</p>}
       {goods.map(([good, units]) => (
-        <div className="goods-row" key={good}>
-          <span>{GOOD_LABELS[good]}</span>
-          <span className="mono">{units}</span>
-          <span className="buttons">
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => onPickUp(spot, { [good]: units })}
-            >
-              Pick up
-            </button>
-          </span>
-        </div>
+        <GoodsRow
+          key={good}
+          good={good}
+          units={units}
+          byDefault={units}
+          disabled={disabled}
+          actions={[{ label: 'Pick up', spot }]}
+          onAct={onPickUp}
+        />
       ))}
     </>
+  )
+}
+
+/**
+ * One good with an amount and buttons that act on that many: `byDefault` until the Player types
+ * an exact amount, which is honoured as typed (`CONTEXT.md`: Own food).
+ */
+function GoodsRow({
+  good,
+  units,
+  byDefault,
+  disabled,
+  actions,
+  onAct,
+}: {
+  good: Good
+  units: number
+  byDefault: number
+  disabled: boolean
+  actions: { label: string; spot: GoodsSpot }[]
+  onAct: (spot: GoodsSpot, goods: Stock) => void
+}) {
+  const [typed, setTyped] = useState<number>()
+  const amount = Math.min(typed ?? byDefault, units)
+  return (
+    <div className="goods-row">
+      <span>{GOOD_LABELS[good]}</span>
+      <span className="mono">{units}</span>
+      <span className="buttons">
+        <input
+          className="amount"
+          type="number"
+          min={0}
+          max={units}
+          step={1}
+          aria-label={`${GOOD_LABELS[good]} amount`}
+          value={amount}
+          disabled={disabled}
+          onChange={(e) => setTyped(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+        />
+        {actions.map(({ label, spot }) => (
+          <button
+            key={label}
+            type="button"
+            disabled={disabled || amount === 0}
+            onClick={() => {
+              onAct(spot, { [good]: amount })
+              setTyped(undefined)
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </span>
+    </div>
   )
 }
 

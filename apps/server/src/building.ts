@@ -1,8 +1,8 @@
 import {
+  CARRYING_A_CHILD,
   MAX_WORKERS,
   ON_PLAINS,
   PROCESSING,
-  commands,
   BUILDABLE,
   BUILD_WORK,
   MAP_SIZE,
@@ -11,6 +11,7 @@ import {
   canWork,
   constructionAt,
   constructionLearned,
+  isAt,
   materialsNeeded,
   workNeeded,
   type BuildOrder,
@@ -25,18 +26,23 @@ import {
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
 import { foundCity, updateCityMembership } from './cities.js'
-import { newId, realmOf } from './starting-city.js'
+import { orderedResident } from './order-sender.js'
+import { newId } from './starting-city.js'
+import { gatherPile } from './survival.js'
 
 /**
- * An action a resident with a build order requests: lay out the construction site on their tile,
- * or put a tick's work into it. The world checks and resolves it at the end of the tick.
+ * An action a resident with a build order requests: lay out the construction site from their
+ * tile, or put a tick's work into it. The world checks and resolves it at the end of the tick.
  */
 export interface BuildAction {
   kind: 'layOut' | 'work'
   residentId: string
 }
 
-/** The input of a build order: which resident, and what to build on the tile they stand on. */
+/**
+ * The input of a build order: which resident, and what to build with the north-west tile of its
+ * footprint on the tile they stand on.
+ */
 interface BuildRequest extends OrderRequest {
   kind: 'build'
   residentId: string
@@ -45,16 +51,17 @@ interface BuildRequest extends OrderRequest {
 
 /**
  * The build order (`CONTEXT.md`: Building): one of the Player's adult residents lays out a
- * construction site on the tile they stand on, or joins the unfinished one of that kind already
- * there, and works on it until it is finished. Laying out and working happen in later ticks.
+ * construction site whose footprint runs east and south from the tile they stand on, or joins the
+ * unfinished one of that kind they stand at, and works on it until it is finished. Laying out and
+ * working happen in later ticks.
  */
 export const build: OrderKind = {
   validate(world, sender, order, terrain) {
     const o = order as Partial<BuildRequest>
-    const realm = realmOf(world, sender.userId)
-    const r = world.residents.find((x) => x.id === o.residentId)
-    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    const r = orderedResident(world, sender, o.residentId)
+    if (!r) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t build'
+    if (r.carrying) return CARRYING_A_CHILD
     if (!BUILDABLE.includes(o.building as BuildingKind)) return 'that can’t be built'
     const here = constructionAt(world, r.x, r.y, o.building!)
     if (here?.site && here.kind === o.building) return undefined
@@ -152,9 +159,10 @@ export function requestBuilding(world: WorldState): BuildAction[] {
 
 /**
  * Resolves build actions (ADR 0002), one after another. A resident who has left the tile stops.
- * Laying out joins an unfinished site of the same kind already on the tile, or else lays out a new
- * one where the building may go; otherwise the order ends. Work goes into the site on the tile,
- * up to what it needs, and teaches Construction. A site with all its materials and work becomes
+ * Laying out joins an unfinished site of the same kind they stand at, or else lays out a new one
+ * with the north-west tile of its footprint on theirs, where the building may go, gathering the
+ * goods lying on its footprint into its pile (`gatherPile`); otherwise the order ends. Work goes
+ * into the site they stand at, up to what it needs, and teaches Construction. A site with all its materials and work becomes
  * the building, and everyone's build order for it is done. A finished town hall founds a city of
  * the realm whose resident finished it, and any finished city building may grow a city
  * (`updateCityMembership`). A road order along a line builds its tiles this way: where its tile
@@ -181,21 +189,23 @@ export function resolveBuilding(
       else if (buildProblem(world, r.x, r.y, part.building, terrain)) nextTile(r)
       else {
         const id = newId(world, 'b')
-        world.buildings.push({
+        const site: Building = {
           id,
           kind: part.building,
           cityId: laidOutFor(world, r, part.building),
           x: r.x,
           y: r.y,
           site: { delivered: {}, work: 0 },
-        })
+        }
+        world.buildings.push(site)
+        gatherPile(world, site, terrain?.size ?? MAP_SIZE)
         o.siteId = id
         ownWorkplace(world, r, part.building, id)
       }
       continue
     }
     const site = world.buildings.find((b) => b.id === o.siteId)
-    if (!site?.site || site.x !== r.x || site.y !== r.y) {
+    if (!site?.site || !isAt(r, site, terrain?.size ?? MAP_SIZE)) {
       r.order = null
       continue
     }

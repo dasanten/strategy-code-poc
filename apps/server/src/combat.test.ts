@@ -6,8 +6,10 @@ import {
   MAX_HEALTH,
   MIN_BLOW_DAMAGE,
   PROTECTION_DEFENCE,
+  SIGHT_RANGE,
   STRIKE_TICKS,
   Terrain,
+  WALK_TICKS_PER_TILE,
   WEAPON_ATTACK,
   attackPower,
   bestWeapon,
@@ -30,7 +32,7 @@ import { addCity } from './test-terrain.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 64, tiles: new Uint8Array(64 * 64).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 256, tiles: new Uint8Array(256 * 256).fill(Terrain.Plains) }
 const me = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /** A world with realm r1 (Player 7, Leader a1) and realm r2 (Player 8, Leader b1). */
@@ -140,7 +142,7 @@ describe('the attack order', () => {
     resident(world, 'a2', 'r1', 12, 12)
     expect(order(world, queue, 'a1', 'a2')).toBe('that is one of your own residents')
     expect(order(world, queue, 'a1', 'nobody')).toBe('no such resident')
-    b.x = 40
+    b.x = 10 + SIGHT_RANGE + 2
     expect(order(world, queue, 'a1', 'b1')).toBe('that resident is out of sight')
     b.x = 11
     expect(order(world, queue, 'a1', 'b1')).toBe('ack')
@@ -152,8 +154,8 @@ describe('the attack order', () => {
     b.x = 16
     expect(order(world, queue, 'a1', 'b1')).toBe('ack')
     const hit = untilHit(world, 'b1', 600, new Walking(terrain))
-    // Four tiles to walk at about 30 ticks each before the first blow.
-    expect(hit).toBeGreaterThan(90)
+    // Five tiles to walk, the last one into contact, before the first blow.
+    expect(hit).toBeGreaterThan(4 * WALK_TICKS_PER_TILE)
     expect(inContact(terrain.size, live(world, 'a1')!, b)).toBe(true)
     expect(live(world, 'a1')!.x).toBe(15)
   })
@@ -161,7 +163,7 @@ describe('the attack order', () => {
   it('ends when the target gets out of the attacker’s sight', () => {
     const { world, queue, b } = setup()
     expect(order(world, queue, 'a1', 'b1')).toBe('ack')
-    b.x = 40
+    b.x = 10 + SIGHT_RANGE + 2
     run(world)
     expect(live(world, 'a1')!.order).toBeNull()
   })

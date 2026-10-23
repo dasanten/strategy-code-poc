@@ -32,11 +32,11 @@ import { refusedTradeNothing, tradesOf } from './trading.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-const terrain: TerrainMap = { size: 160, tiles: new Uint8Array(160 * 160).fill(Terrain.Plains) }
+const terrain: TerrainMap = { size: 640, tiles: new Uint8Array(640 * 640).fill(Terrain.Plains) }
 const player = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /** Where the HQ's town hall stands. */
-const MID = 80
+const MID = 320
 
 /**
  * The Trade Org HQ at (MID, MID) with `TRADE_ORG_ARMY.guard` + 4 soldiers; realm r1 (Player 7,
@@ -46,10 +46,10 @@ function setup(stock: Stock = { coins: 1000, iron: 40 }) {
   const world = createWorld(terrain)
   const hq = foundTradeOrgHq(world, terrain, MID, MID, mulberry32(7))
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
-  addCity(world, { id: 'c1', realmId: 'r1', x: MID, y: MID + 22, name: 'Ashford' })
-  world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: MID + 1, y: MID + 22, stock })
-  addCity(world, { id: 'c2', realmId: 'r1', x: MID + 60, y: MID, name: 'Farhold' })
-  resident(world, 'a1', MID - 1, MID + 23, 'c1')
+  addCity(world, { id: 'c1', realmId: 'r1', x: MID, y: MID + 88, name: 'Ashford' })
+  world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: MID + 4, y: MID + 88, stock })
+  addCity(world, { id: 'c2', realmId: 'r1', x: MID + 240, y: MID, name: 'Farhold' })
+  resident(world, 'a1', MID - 4, MID + 92, 'c1')
   const soldiers = hqPeople(world, hq).slice(0, TRADE_ORG_ARMY.guard + 4)
   for (const r of soldiers) r.carried.spear = 1
   return { world, hq, queue: new OrderQueue(undefined, terrain), walking: new Walking(terrain) }
@@ -85,7 +85,7 @@ function theft(world: WorldState, hq: City, goods: Stock): Crime {
     kind: 'theft',
     tick: world.tick,
     x: MID,
-    y: MID + 15,
+    y: MID + 60,
     culprit: { residentId: 'a1', name: 'Aldo', org: 'r1', orgName: 'the realm of Aldo' },
     victimOrg: hq.id,
     goods,
@@ -251,7 +251,7 @@ describe('the Trade Organization punishing', () => {
   it('goes for the culprit’s city nearest the crime', () => {
     const { world, hq } = setup()
     const crime = theft(world, hq, { iron: 10 })
-    crime.x = MID + 55
+    crime.x = MID + 220
     crime.y = MID
     stepPunishments(world, 160)
     expect(world.punishments[0]!.cityId).toBe('c2')
@@ -262,7 +262,7 @@ describe('the Trade Organization punishing', () => {
     theft(world, hq, { iron: 10 })
     stepPunishments(world, 160)
     const target = world.punishments[0]!.members[0]!.residentId
-    const defender = resident(world, 'd1', MID, MID + 20, 'c1')
+    const defender = resident(world, 'd1', MID, MID + 80, 'c1')
     defender.carried.spear = 1
     defender.order = attackOrder(target)
     stepPunishments(world, 160)

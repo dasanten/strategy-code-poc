@@ -1,7 +1,10 @@
 import {
+  HUNGER_DAYS,
+  HUNGER_ENDURANCE_LIMIT,
   REALM_LOG_LENGTH,
+  STARVE_DAYS,
   TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_YEAR,
+  ticksForAge,
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
@@ -24,7 +27,9 @@ describe('realm events', () => {
     const people = world.residents.map((r) => r.id)
     for (const r of world.residents) r.carried = {}
     const deaths: { id: string; tick: number }[] = []
-    for (let t = 0; t < 3 * TICKS_PER_GAME_DAY; t++) {
+    // Long enough for the toughest to starve: Endurance slows the meter by up to its limit.
+    const days = HUNGER_DAYS / (1 - HUNGER_ENDURANCE_LIMIT) + STARVE_DAYS + 0.2
+    for (let t = 0; t < days * TICKS_PER_GAME_DAY; t++) {
       for (const r of stepSurvival(world, terrain).died) deaths.push({ id: r.id, tick: world.tick })
       world.tick++
     }
@@ -51,7 +56,7 @@ describe('realm events', () => {
     world.events = []
     const realm = world.realms[0]!
     const r = world.residents.find((x) => x.id !== realm.leaderId)!
-    r.bornAt = world.tick - r.lifespan * TICKS_PER_GAME_YEAR
+    r.bornAt = world.tick - ticksForAge(r.lifespan)
     stepAging(world, terrain.size)
     expect(eventsFor(world, realm.userId)).toEqual([
       {
@@ -76,11 +81,17 @@ describe('realm events', () => {
     world.buildings.find((b) => b.kind === 'stable')!.stock = {}
     world.carriages[0]!.load = { food: 100 }
     world.piles.push({ id: 'p1', x: world.residents[0]!.x, y: 0, goods: { food: 500 } })
+    const carried = () => world.residents.reduce((n, r) => n + (r.carried.food ?? 0), 0)
+    const carriedBefore = carried()
     for (let t = 0; t < TICKS_PER_GAME_DAY; t++) {
       stepSpoilage(world)
       world.tick++
     }
-    const lost = 1100 - storageOf(world).stock!.food! - world.carriages[0]!.load.food!
+    const lost =
+      1100 -
+      storageOf(world).stock!.food! -
+      world.carriages[0]!.load.food! +
+      (carriedBefore - carried())
     expect(lost).toBeGreaterThan(0)
     expect(eventsFor(world, realm.userId)).toEqual([
       expect.objectContaining({ kind: 'foodSpoiled', units: lost }),

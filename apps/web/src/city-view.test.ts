@@ -258,7 +258,7 @@ describe('trading with an NPC city in the inspector', () => {
       buildings: [storage, b('s2', 'storage', 'city1', true), b('h', 'house', 'city1')],
     }
     expect(npcStoragesInSight({ ...city(null), trade: [food] }, seen)).toEqual([
-      { id: 's1', x: 0, y: 0, prices: [food] },
+      { id: 's1', kind: 'storage', x: 0, y: 0, prices: [food] },
     ])
     expect(npcStoragesInSight(city(null), seen)).toEqual([])
   })

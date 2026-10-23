@@ -37,13 +37,13 @@ const plains = (size: number): TerrainMap => ({
   tiles: new Uint8Array(size * size).fill(Terrain.Plains),
 })
 
-/** The Trade Org HQ at (32, 32), one trading post with its caravan, and a Player's realm. */
+/** The Trade Org HQ at (128, 128), one trading post with its caravan, and a Player's realm. */
 function route() {
-  const terrain = plains(128)
+  const terrain = plains(512)
   const world = createWorld(terrain)
   const rand = mulberry32(5)
-  foundTradeOrgHq(world, terrain, 32, 32, rand)
-  const post = foundTradingPost(world, terrain, 80, 80, undefined, rand)
+  foundTradeOrgHq(world, terrain, 128, 128, rand)
+  const post = foundTradingPost(world, terrain, 320, 320, undefined, rand)
   const [caravan] = placeCaravans(world)
   const realm = foundStartingCity(world, terrain, 7)
   const carriage = world.carriages.find((k) => k.id === caravan!.carriageId)!
@@ -54,7 +54,7 @@ function route() {
 const byId = (world: WorldState, id: string) => world.residents.find((r) => r.id === id)!
 
 /**
- * The caravan out on its way at (60, 60), heading for the post, its escort armed with spears:
+ * The caravan out on its way at (240, 240), heading for the post, its escort armed with spears:
  * a carriage away from the HQ, whose own soldiers don't come into it.
  */
 function onTheWay(world: WorldState, caravan: ReturnType<typeof route>['caravan']) {
@@ -65,8 +65,8 @@ function onTheWay(world: WorldState, caravan: ReturnType<typeof route>['caravan'
     horse,
     ...[caravan.driverId, ...caravan.escortIds].map((id) => byId(world, id)),
   ]) {
-    thing.x = 60
-    thing.y = 60
+    thing.x = 240
+    thing.y = 240
   }
   for (const id of caravan.escortIds) byId(world, id).carried.spear = 1
   caravan.heading = 'post'
@@ -99,7 +99,7 @@ describe('caravan escorts', () => {
   it('defend their caravan against a robber, which is no crime', () => {
     const { world, terrain, caravan, realm } = route()
     const carriage = onTheWay(world, caravan)
-    const thief = outsider(world, realm.id, 'thief', 60, 60)
+    const thief = outsider(world, realm.id, 'thief', 240, 240)
     thief.order = {
       kind: 'pickUp',
       from: { kind: 'carriage', carriageId: carriage.id },
@@ -134,7 +134,7 @@ describe('caravan escorts', () => {
   it('defend its driver against an attacker, and the carriage waits for them', () => {
     const { world, terrain, caravan, realm } = route()
     const carriage = onTheWay(world, caravan)
-    const raider = outsider(world, realm.id, 'raider', 61, 60)
+    const raider = outsider(world, realm.id, 'raider', 241, 240)
     raider.carried.spear = 1
     raider.order = attackOrder(caravan.driverId)
     expect(caravanThreats(world, caravan, carriage, terrain.size)).toEqual([raider])
@@ -146,7 +146,7 @@ describe('caravan escorts', () => {
     driver.order = {
       kind: 'drive',
       carriageId: carriage.id,
-      target: { x: 80, y: 80 },
+      target: { x: 320, y: 320 },
       path: null,
       progress: 0,
     }
@@ -156,9 +156,9 @@ describe('caravan escorts', () => {
   it('leave alone who is far from the carriage, fighting back, or of the Trade Organization', () => {
     const { world, terrain, caravan, realm } = route()
     const carriage = onTheWay(world, caravan)
-    const far = outsider(world, realm.id, 'far', 60 + CARAVAN_GUARD_RANGE + 1, 60)
+    const far = outsider(world, realm.id, 'far', 240 + CARAVAN_GUARD_RANGE + 1, 240)
     far.order = attackOrder(caravan.driverId)
-    const back = outsider(world, realm.id, 'back', 61, 60)
+    const back = outsider(world, realm.id, 'back', 241, 240)
     back.order = attackOrder(caravan.escortIds[0]!, true, true)
     const driver = byId(world, caravan.driverId)
     driver.order = {

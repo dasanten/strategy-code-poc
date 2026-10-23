@@ -1,4 +1,5 @@
 import {
+  CARRYING_A_CHILD,
   commands,
   ROAD_LINE_MAX_TILES,
   MAP_SIZE,
@@ -43,6 +44,7 @@ export const roadLine: OrderKind = {
     const r = world.residents.find((x) => x.id === o.residentId)
     if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t build'
+    if (r.carrying) return CARRYING_A_CHILD
     if (!isTile(o.from) || !isTile(o.to)) return 'the line must run between two tiles'
     const tiles = lineTiles(o.from, o.to, terrain?.size ?? MAP_SIZE)
     if (tiles.length > ROAD_LINE_MAX_TILES) {

@@ -1,4 +1,5 @@
 import {
+  CARRYING_A_CHILD,
   commands,
   buildWork,
   canWork,
@@ -11,6 +12,7 @@ import {
   type OrderRequest,
   type TerrainMap,
   type WorldState,
+  isAt,
 } from '@csp/shared'
 import { dissolveCity, updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime } from './crimes.js'
@@ -43,6 +45,7 @@ export const tearDown: OrderKind = {
     const r = world.residents.find((x) => x.id === o.residentId)
     if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t tear down buildings'
+    if (r.carrying) return CARRYING_A_CHILD
     if (typeof o.buildingId !== 'string') return 'which building?'
     return tearDownProblem(world, r.x, r.y, o.buildingId)
   },
@@ -79,7 +82,7 @@ export function resolveTearingDown(
     const o = r?.order
     if (!r || o?.kind !== 'tearDown') continue
     const b = world.buildings.find((x) => x.id === o.buildingId)
-    if (!b || r.x !== o.at.x || r.y !== o.at.y || b.x !== r.x || b.y !== r.y) {
+    if (!b || r.x !== o.at.x || r.y !== o.at.y || !isAt(r, b, terrain?.size)) {
       r.order = null
       continue
     }
