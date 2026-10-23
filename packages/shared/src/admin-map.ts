@@ -8,6 +8,7 @@ import type {
   Pile,
   Resident,
   ScriptMemory,
+  Stock,
 } from './world.js'
 
 /*
@@ -134,3 +135,82 @@ export interface AdminPlaces {
   /** Each where one of its members stands; an army with none left is not listed. */
   armies: (AdminPlace & { realmId: string; realm: string })[]
 }
+
+/** Where an admin loads one thing on the map for the inspector (`adminInspectPath`). */
+export const ADMIN_INSPECT_PATH = '/api/admin/inspect'
+
+/** What the admin map's inspector can show (`CONTEXT.md`: admin map). */
+export const ADMIN_INSPECT_KINDS = [
+  'resident',
+  'city',
+  'building',
+  'horse',
+  'carriage',
+  'pile',
+  'army',
+  'caravan',
+] as const
+export type AdminInspectKind = (typeof ADMIN_INSPECT_KINDS)[number]
+
+/** Something to inspect: what it is and its id. */
+export interface AdminInspectTarget {
+  kind: AdminInspectKind
+  id: string
+}
+
+export function adminInspectPath(target: AdminInspectTarget): string {
+  return `${ADMIN_INSPECT_PATH}/${target.kind}/${encodeURIComponent(target.id)}`
+}
+
+/** Something an inspection names, such as a resident or a city. */
+export interface AdminNamed {
+  id: string
+  name: string
+}
+
+/**
+ * One thing on the admin map as its inspector shows it, read-only, with the Organization it
+ * belongs to (null for what belongs to none, such as a pile). Script sources are never in it.
+ * - `resident`: the resident, the city they live in, the army they march with, the caravan they
+ *   drive or escort, and whether they are their realm's Leader.
+ * - `city`: where its town hall stands, its residents, its finished buildings by kind, what its
+ *   storages hold together, its finished gates open and shut, and its soldiers (armed residents).
+ * - `carriage`: its load, the resident driving it, and the caravan it is.
+ * - `caravan`: its trading post, carriage and crew.
+ * - `army`: its members.
+ */
+export type AdminInspection = { tick: number; org: AdminOrganization | null } & (
+  | {
+      is: 'resident'
+      resident: Omit<Resident, 'script'> & { script?: AdminScript }
+      city: AdminNamed | null
+      army: AdminNamed | null
+      caravan: AdminNamed | null
+      leader: boolean
+    }
+  | {
+      is: 'city'
+      city: City & { x: number; y: number }
+      residents: AdminNamed[]
+      buildings: [Building['kind'], number][]
+      storage: Stock
+      gates: { open: number; shut: number }
+      soldiers: number
+    }
+  | { is: 'building'; building: Building; city: AdminNamed | null }
+  | { is: 'horse'; horse: Horse }
+  | { is: 'carriage'; carriage: Carriage; driver: AdminNamed | null; caravan: AdminNamed | null }
+  | { is: 'pile'; pile: Pile }
+  | {
+      is: 'army'
+      army: Omit<Army, 'script'> & { script?: AdminScript }
+      members: (AdminNamed & { x: number; y: number })[]
+    }
+  | {
+      is: 'caravan'
+      caravan: Caravan
+      post: AdminNamed | null
+      carriage: Carriage | null
+      crew: AdminNamed[]
+    }
+)

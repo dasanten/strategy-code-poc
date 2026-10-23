@@ -144,7 +144,7 @@ function doing(r: Resident): string {
 }
 
 /** What a resident's built-in order has them doing. */
-function orderDoing(r: Resident): string {
+export function orderDoing(r: Pick<Resident, 'order'>): string {
   const o = r.order
   if (o?.kind === 'walkTo') {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`

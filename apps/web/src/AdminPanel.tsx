@@ -14,7 +14,14 @@ import {
 } from '@csp/shared'
 import { api, ApiFailure } from './api.js'
 import { AdminMap } from './AdminMap.js'
-import { ADMIN_TABS, adminTabFor, adminTabPath, type AdminTab } from './pages.js'
+import {
+  ADMIN_TABS,
+  adminDirectivePath,
+  adminTabFor,
+  adminTabPath,
+  directiveTargetFor,
+  type AdminTab,
+} from './pages.js'
 
 /** What each admin tab is called. */
 const TAB_NAMES: Record<AdminTab, string> = {
@@ -32,11 +39,16 @@ export function AdminPage({ account, onLoggedOut }: { account: Account; onLogged
   const [tab, setTab] = useState<AdminTab>(() => adminTabFor(window.location.pathname))
   // The map's view, kept while another tab is open so going back lands on the same spot.
   const [mapSearch, setMapSearch] = useState(() => (tab === 'map' ? window.location.search : ''))
+  // The directive target chosen in the URL, such as from the admin map's inspector.
+  const [directiveTarget, setDirectiveTarget] = useState(() =>
+    tab === 'directives' ? directiveTargetFor(window.location.search) : '',
+  )
 
   useEffect(() => {
     const onPop = () => {
       setTab(adminTabFor(window.location.pathname))
       if (adminTabFor(window.location.pathname) === 'map') setMapSearch(window.location.search)
+      else setDirectiveTarget(directiveTargetFor(window.location.search))
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
@@ -46,7 +58,15 @@ export function AdminPage({ account, onLoggedOut }: { account: Account; onLogged
     if (next === tab) return
     history.pushState(null, '', adminTabPath(next) + (next === 'map' ? mapSearch : ''))
     setTab(next)
+    setDirectiveTarget('')
   }
+
+  // The inspector's shortcut: the Directives tab with the target chosen.
+  const giveDirective = useCallback((org: string) => {
+    history.pushState(null, '', adminDirectivePath(org))
+    setDirectiveTarget(org)
+    setTab('directives')
+  }, [])
 
   const onMapSearch = useCallback((search: string) => {
     setMapSearch(search)
@@ -90,11 +110,15 @@ export function AdminPage({ account, onLoggedOut }: { account: Account; onLogged
         </main>
       ) : tab === 'map' ? (
         <main className="admin-map-main">
-          <AdminMap search={mapSearch} onSearch={onMapSearch} />
+          <AdminMap search={mapSearch} onSearch={onMapSearch} onDirective={giveDirective} />
         </main>
       ) : (
         <main className="admin-main">
-          {tab === 'accounts' ? <AdminPanel /> : <DirectivesPanel />}
+          {tab === 'accounts' ? (
+            <AdminPanel />
+          ) : (
+            <DirectivesPanel key={directiveTarget} initialTarget={directiveTarget} />
+          )}
         </main>
       )}
     </div>
@@ -171,11 +195,12 @@ function AdminPanel() {
 /**
  * Admin directives (`CONTEXT.md`: Admin directive): give one naming an Organization, optionally
  * with its alliance, a reason every Player sees, goals that end it and maybe a price to buy it
- * off; see how far each goal has come; change that price or lift one in force.
+ * off; see how far each goal has come; change that price or lift one in force. `initialTarget`
+ * comes chosen, as from the admin map's inspector.
  */
-function DirectivesPanel() {
+function DirectivesPanel({ initialTarget }: { initialTarget: string }) {
   const [shown, setShown] = useState<AdminDirectives>()
-  const [target, setTarget] = useState('')
+  const [target, setTarget] = useState(initialTarget)
   const [withAlliance, setWithAlliance] = useState(false)
   const [reason, setReason] = useState('')
   const [buyOff, setBuyOff] = useState(false)

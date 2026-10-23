@@ -33,3 +33,15 @@ export function adminTabFor(pathname: string): AdminTab {
 }
 
 export const adminTabPath = (tab: AdminTab) => `${ADMIN_PATH}/${tab}`
+
+/**
+ * The Directives tab with a target already chosen (`CONTEXT.md`: Admin directive), where the admin
+ * map's inspector leads: `/admin/directives?target=<org>`.
+ */
+export const adminDirectivePath = (org: string) =>
+  `${adminTabPath('directives')}?target=${encodeURIComponent(org)}`
+
+/** The directive target chosen in the Directives tab's URL, or '' for none. */
+export function directiveTargetFor(search: string): string {
+  return new URLSearchParams(search).get('target') ?? ''
+}
