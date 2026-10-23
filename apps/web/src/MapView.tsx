@@ -137,8 +137,11 @@ export function MapView({
   onPickTile?: (x: number, y: number) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
   onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
-  /** A tile to centre the view on, such as a place named in the realm log; a new object each time. */
-  focus?: { x: number; y: number }
+  /**
+   * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
+   * at (the zoom in place if none); a new object each time.
+   */
+  focus?: { x: number; y: number; scale?: number }
   /** Where terrain chunks load from; the Player's explored terrain by default. */
   terrainPath?: (cx: number, cy: number) => string
   /** Where the view starts, instead of the home city at the starting zoom. */
@@ -173,7 +176,7 @@ export function MapView({
   const controlsRef = useRef<{
     zoom(factor: number): void
     centre(): void
-    goTo(x: number, y: number): void
+    goTo(x: number, y: number, scale?: number): void
   } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
@@ -188,7 +191,7 @@ export function MapView({
   }, [mode])
 
   useEffect(() => {
-    if (focus) controlsRef.current?.goTo(focus.x, focus.y)
+    if (focus) controlsRef.current?.goTo(focus.x, focus.y, focus.scale)
   }, [focus])
 
   // The Region map changes once a game hour, and where explored terrain grows.
@@ -563,7 +566,12 @@ export function MapView({
         setCam(zoomAt(cam, view, mapSize, factor, view.width / 2, view.height / 2))
       },
       centre: () => setCam({ ...cam, ...homeCentre(worldRef.current) }),
-      goTo: (x, y) => setCam({ ...cam, x: x + 0.5, y: y + 0.5 }),
+      goTo: (x, y, scale) =>
+        setCam({
+          x: x + 0.5,
+          y: y + 0.5,
+          scale: scale === undefined ? cam.scale : clampScale(scale, mapSize, size()),
+        }),
     }
 
     void app.init({ resizeTo: host, background: VOID_COLOR, antialias: true }).then(() => {

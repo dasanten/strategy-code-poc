@@ -15,15 +15,20 @@ import {
   mapViewSearch,
   parseMapView,
 } from './admin-map.js'
+import { jumpScale, type JumpEntry, type JumpKind } from './admin-jump.js'
+import { AdminJumpList } from './AdminJumpList.js'
 import { MapView } from './MapView.js'
 import type { Camera, Size } from './map/camera.js'
 import { applyRegionMap, type RegionState } from './map/region.js'
 
+/** Jump list entries that are cities: the far tier rings their emblem. */
+const JUMP_CITY_KINDS: ReadonlySet<JumpKind> = new Set(['city', 'npcCity', 'hq', 'post'])
+
 /**
  * The admin panel's Map tab (`CONTEXT.md`: admin map): the whole world on the game's map, the
  * part in view loaded again every few seconds and whenever the view moves. Its view is kept in
- * the URL (`search`, reported back through `onSearch`), so a link lands on the same spot. Nothing
- * on it gives orders.
+ * the URL (`search`, reported back through `onSearch`), so a link lands on the same spot. The
+ * jump list beside it centres the map on a place by name. Nothing on it gives orders.
  */
 export function AdminMap({
   search,
@@ -105,6 +110,15 @@ export function AdminMap({
     [refresh],
   )
 
+  // A place picked from the jump list: the map centres on it and rings it.
+  const [jumped, setJumped] = useState<JumpEntry>()
+  const [focus, setFocus] = useState<{ x: number; y: number; scale: number }>()
+  const onJump = useCallback((e: JumpEntry) => {
+    if (!e.at) return
+    setJumped(e)
+    setFocus({ ...e.at, scale: jumpScale(e.kind) })
+  }, [])
+
   const start = useMemo(() => map && parseMapView(searchRef.current, map.size), [map])
   const world = useMemo(
     () => map && adminMapWorld({ map, view, places, region, overview }),
@@ -113,12 +127,23 @@ export function AdminMap({
 
   return (
     <div className="admin-map">
-      {world && start ? (
-        <MapView world={world} terrainPath={adminTerrainChunkPath} start={start} onView={onView} />
-      ) : (
-        <p className="admin-map-note">{error ?? 'Loading the map…'}</p>
-      )}
-      {world && error && <p className="admin-map-note error">{error}</p>}
+      <AdminJumpList places={places} selectedKey={jumped?.key} onJump={onJump} />
+      <div className="admin-map-area">
+        {world && start ? (
+          <MapView
+            world={world}
+            terrainPath={adminTerrainChunkPath}
+            start={start}
+            onView={onView}
+            focus={focus}
+            selectedId={jumped?.kind === 'leader' ? jumped.id : undefined}
+            selectedCityId={jumped && JUMP_CITY_KINDS.has(jumped.kind) ? jumped.id : undefined}
+          />
+        ) : (
+          <p className="admin-map-note">{error ?? 'Loading the map…'}</p>
+        )}
+        {world && error && <p className="admin-map-note error">{error}</p>}
+      </div>
     </div>
   )
 }
