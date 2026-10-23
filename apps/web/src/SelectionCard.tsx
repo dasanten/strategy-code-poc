@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { Building, Resident, ResourceKind } from '@csp/shared'
+import type { Building, BuildingKind, Resident, ResourceKind } from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
 import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
@@ -151,9 +151,11 @@ export function TileCard({
   nodeKind,
   buildingNode,
   actor,
+  tick,
   orderError,
   onClose,
   onSendHere,
+  onBuildHere,
   onSetGate,
   onOpenCity,
 }: {
@@ -165,14 +167,17 @@ export function TileCard({
   buildingNode?: ResourceKind
   /** The resident picked last, to send here. */
   actor: Resident | undefined
+  tick: number
   orderError: string | undefined
   onClose: () => void
   onSendHere: () => void
+  /** Has the actor build a node's workplace with the north-west tile of its footprint `at`. */
+  onBuildHere: (building: BuildingKind, at: { x: number; y: number }) => void
   onSetGate: (gateId: string, open: boolean) => void
   /** Opens the city inspector at a city. */
   onOpenCity: (cityId: string) => void
 }) {
-  const actions = tileActions(card, actor)
+  const actions = tileActions(card, actor, tick)
   const icon =
     card.what === 'building' && building
       ? BUILDING_ART[building.kind]
@@ -216,6 +221,8 @@ export function TileCard({
           open={undefined}
           onAction={(a) => {
             if (a.id === 'sendHere') onSendHere()
+            if (a.id === 'build' && card.buildHere?.at)
+              onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)
             if (a.id === 'openCity' && card.city) onOpenCity(card.city.id)
           }}
