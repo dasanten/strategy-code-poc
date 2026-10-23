@@ -751,22 +751,36 @@ function RegionLegend({ region }: { region: RegionState | null }) {
   )
 }
 
-/** The selected resident's way ahead, as a dashed line to the target (design: Main Game Screen). */
-function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: Resident) {
+/** Where the selected resident is walking, driving or going after someone, and the way there. */
+function wayAhead(
+  r: Resident,
+): { target: { x: number; y: number }; path: [number, number][] | null } | undefined {
   const o = r.order
-  if (o?.kind !== 'walkTo') return
-  const [tx, ty] = tileToScreen(cam, view, size, o.target.x + 0.5, o.target.y + 0.5)
-  if (o.path) {
-    // Dashes: every other step of the way, from the resident on.
+  if (o?.kind === 'walkTo' || o?.kind === 'drive') return o
+  if (o?.kind === 'haul' && o.phase === 'driving')
+    return { target: o.stop === 'from' ? o.from : o.to, path: o.path }
+  // Going after a resident: the way ends where they were when it was found; none once in contact.
+  const last = o?.kind === 'attack' ? o.path?.at(-1) : undefined
+  if (o?.kind === 'attack' && last) return { target: { x: last[0], y: last[1] }, path: o.path }
+  return undefined
+}
+
+/** The selected resident's way ahead, as a line to the target (design: Main Game Screen). */
+function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: Resident) {
+  const way = wayAhead(r)
+  if (!way) return
+  const [tx, ty] = tileToScreen(cam, view, size, way.target.x + 0.5, way.target.y + 0.5)
+  if (way.path) {
     let [px, py] = tileToScreen(cam, view, size, r.x + 0.5, r.y + 0.5)
-    o.path.forEach(([x, y], i) => {
+    g.moveTo(px, py)
+    for (const [x, y] of way.path) {
       const [nx, ny] = tileToScreen(cam, view, size, x + 0.5, y + 0.5)
       // A step across a join shows up far away on screen; don't draw a line across the map.
-      if (i % 2 === 0 && Math.hypot(nx - px, ny - py) < cam.scale * 1.5)
-        g.moveTo(px, py).lineTo(nx, ny)
+      if (Math.hypot(nx - px, ny - py) < cam.scale * 1.5) g.lineTo(nx, ny)
+      else g.moveTo(nx, ny)
       ;[px, py] = [nx, ny]
-    })
-    g.stroke({ width: 2.5, color: LEADER_COLOR, cap: 'round' })
+    }
+    g.stroke({ width: 2.5, color: LEADER_COLOR, cap: 'round', join: 'round' })
   }
   g.circle(tx, ty, 5).fill(LEADER_COLOR)
 }
