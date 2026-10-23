@@ -38,6 +38,7 @@ I sleep.
 | 18  | [Livelier pace and default scripts](https://github.com/dasanten/strategy-code-poc/issues/220)   | ticketed                |
 | 19  | [Admin map](https://github.com/dasanten/strategy-code-poc/issues/232)                           | ticketed                |
 | 20  | [Leader handover](https://github.com/dasanten/strategy-code-poc/issues/244)                     | ticketed                |
+| 22  | [Wiki](https://github.com/dasanten/strategy-code-poc/issues/276)                                | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

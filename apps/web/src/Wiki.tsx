@@ -1,0 +1,863 @@
+import { useEffect, type ReactNode } from 'react'
+import {
+  ADULT_AGE,
+  AGILITY_LIMIT,
+  AGILITY_SPEED_EFFECT,
+  AGILITY_TERRAIN_EFFECT,
+  ALLIANCE_LEAVE_DELAY,
+  ALLIANCE_RECALL_DELAY,
+  BLOW_BASE,
+  BLOW_PER_STRENGTH,
+  BROKEN_MATERIALS_RETURNED,
+  BUILD_MATERIALS,
+  BUY_SHARE,
+  CARAVAN_ESCORTS,
+  CARAVAN_ESCORTS_MAX,
+  CARAVAN_ROBBERIES_PER_ESCORT,
+  CARRIAGE_CAPACITY,
+  CARRY_BASE,
+  CARRY_PER_STRENGTH,
+  CARRYING_DAYS,
+  CHILD_STAT_SPREAD,
+  CHILD_YEAR_DAYS,
+  CITY_AREA_MARGIN,
+  CITY_BUILDING_REACH,
+  CITY_PRICE_BY_BUILDING,
+  CITY_PRICE_PER_RESIDENT,
+  CITY_PRICE_STANDING_SWING,
+  CLIMB_TICKS,
+  COMBAT_SKILL_EFFECT,
+  COMBAT_SKILL_PER_BLOW,
+  CONSTRUCTION_SKILL_EFFECT,
+  CONSTRUCTION_SKILL_MAX,
+  CONSTRUCTION_SKILL_PER_DAY,
+  CONTRACT_MAX_DAYS,
+  CRIME_MEMORY_DAYS,
+  DECLINE_AGE,
+  DECLINE_FLOOR,
+  DECLINE_PER_YEAR,
+  DELIVERY_FEE_BASE,
+  DELIVERY_FEE_PER_KG_TILE,
+  DELIVERY_LOAD,
+  DODGE_LIMIT,
+  DODGE_PER_AGILITY,
+  DRIVING_SKILL_EFFECT,
+  DRIVING_SKILL_LIMIT,
+  DRIVING_SKILL_PER_DAY,
+  STARVE_DAYS,
+  FOOD_SPOIL_PER_DAY,
+  FOOD_SURPLUS_DAYS,
+  FORMER_PLAYER_STANDING,
+  GAME_DAYS_PER_YEAR,
+  GOOD_WEIGHT,
+  HAUL_KEEP_FOOD,
+  HEAL_DAYS,
+  HORSE_FOOD_PER_DAY,
+  HOUSING_ROOM,
+  HUNGER_DAYS,
+  HUNGER_ENDURANCE_EFFECT,
+  HUNGER_ENDURANCE_LIMIT,
+  ENDURANCE_TERRAIN_EFFECT,
+  LIFESPAN_MAX,
+  LIFESPAN_MIN,
+  MAP_SIZE,
+  MAX_HEALTH,
+  MIN_BLOW_DAMAGE,
+  NPC_ALLIANCE_JOIN_STANDING,
+  NPC_ALLIANCE_LEAVE_STANDING,
+  NPC_CITY_REFUSES_STANDING,
+  NPC_CITY_WONT_SELL_STANDING,
+  NPC_TRADE,
+  OWN_FOOD,
+  PERSUADE_ASK_AGAIN_DAYS,
+  PERSUADE_STANDING,
+  PRICE_ELASTICITY,
+  PRICE_RANGE,
+  PRICE_REFERENCE_FLOORS,
+  PROTECTION_DEFENCE,
+  ROAD_LINE_MAX_TILES,
+  SCRIPT_ACTION_COST,
+  SCRIPT_LIST_QUERY_COST,
+  SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_MEMORY_MAX,
+  SCRIPT_REALM_STEP_BUDGET,
+  SCRIPT_STEP_BUDGET,
+  SCRIPT_TILE_QUERY_COST,
+  SIGHT_RANGE,
+  STABLE_BREED_DAYS,
+  STABLE_CAPACITY,
+  STANDING_CONTRACT_BROKEN_LOSS,
+  STANDING_DRIFT_PER_DAY,
+  STANDING_PER_PAID_WEEK,
+  STANDING_RANGE,
+  STANDING_TRADE_COINS_PER_POINT,
+  START_RESIDENTS,
+  STAT_BASE_MAX,
+  STAT_BASE_MIN,
+  STRIKE_TICKS,
+  TEARDOWN_MATERIALS_RETURNED,
+  TEARDOWN_WORK_SHARE,
+  TERRAIN_FOOD,
+  TERRAIN_SPEED,
+  TERRITORY_CITY_BASE,
+  TERRITORY_MAX_REACH,
+  TERRITORY_PER_ARMED,
+  TERRITORY_PER_RESIDENT,
+  TERRITORY_REACH_PER_ROOT,
+  TERRITORY_WORKPLACE_BASE,
+  TICKS_PER_GAME_DAY,
+  TRADE_ORG_ARMY,
+  TRADE_ORG_LOSS,
+  TRADE_ORG_PUNISH,
+  TRADE_ORG_PUNISHES_BELOW,
+  TRADE_ORG_REFUSES_TRADE_BELOW,
+  TRAINED_CAP_SHARE,
+  TRANSFER_FEE_FACTOR,
+  Terrain,
+  WALL_DEFENCE,
+  WALL_STRENGTH,
+  WALK_TICKS_PER_TILE,
+  WAREHOUSE_BASE_PRICE,
+  WEAPON_ATTACK,
+  WORK_SKILL_EFFECT,
+  WORK_SKILL_MAX,
+  WORKPLACE_MAX_WORKERS,
+  WORKPLACE_SKILL,
+  RECIPES,
+  BATCHES_PER_DAY,
+  WORK_OUTPUT_PER_DAY,
+  carryCapacity,
+  walkSpeed,
+  type BuildingKind,
+  type CrimeKind,
+  type Good,
+  type Stock,
+} from '@csp/shared'
+import { BUILDING_NAMES } from './map/palette.js'
+import { GOOD_LABELS } from './Residents.js'
+import {
+  AVERAGE,
+  AVERAGE_CARRY,
+  AVERAGE_STATS,
+  COMBAT_SKILL_MAX,
+  TERRAIN_NAMES,
+  batchesPerDay,
+  blow,
+  breakTicks,
+  buildCosts,
+  cityControl,
+  coinsPerMintWorkerDay,
+  crimeForgotten,
+  days,
+  daysToWorkSkillMax,
+  duration,
+  feeExamples,
+  foodEatenPerDay,
+  foodHalfLifeDays,
+  goldMinersPerMintWorker,
+  jobDays,
+  minersPerSmelterWorker,
+  num,
+  outputPerDay,
+  pct,
+  priceAt,
+  realSeconds,
+  realTimeOf,
+  signed,
+  residentsPerFarmer,
+  transport,
+  wikiResident,
+  type PricedGood,
+} from './wiki-view.js'
+
+/** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
+export const WIKI_TOPICS = [
+  { id: 'time', title: 'Time & map' },
+  { id: 'terrain', title: 'Terrain & walking' },
+  { id: 'residents', title: 'Residents & stats' },
+  { id: 'food', title: 'Food & hunger' },
+  { id: 'work', title: 'Workplaces & output' },
+  { id: 'building', title: 'Building & tearing down' },
+  { id: 'transport', title: 'Carrying & transport' },
+  { id: 'trade', title: 'Trade & prices' },
+  { id: 'standing', title: 'Standing & reactions' },
+  { id: 'combat', title: 'Combat & walls' },
+  { id: 'territory', title: 'Territory' },
+  { id: 'scripts', title: 'Scripting budgets' },
+] as const
+
+type TopicId = (typeof WIKI_TOPICS)[number]['id']
+
+function Section({ id, children }: { id: TopicId; children: ReactNode }) {
+  const title = WIKI_TOPICS.find((t) => t.id === id)!.title
+  return (
+    <section id={id} className="wiki-section">
+      <h2>
+        <a href={`#${id}`}>{title}</a>
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+/** Goods as a list: "40 wood, 20 stone"; "nothing" for none. */
+function goods(stock: Stock): string {
+  const entries = (Object.entries(stock) as [Good, number][]).filter(([, n]) => n > 0)
+  if (!entries.length) return 'nothing'
+  return entries.map(([g, n]) => `${num(n)} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')
+}
+
+const kindName = (kind: BuildingKind) => BUILDING_NAMES[kind]
+const goodName = (good: Good) => GOOD_LABELS[good]
+const skillName = (kind: BuildingKind) => {
+  const skill = WORKPLACE_SKILL[kind] ?? ''
+  return skill.charAt(0).toUpperCase() + skill.slice(1)
+}
+
+const CRIME_NAMES: Record<CrimeKind, string> = {
+  theft: 'Theft',
+  attack: 'Attack',
+  tearDown: 'Tearing down a building',
+  killing: 'Killing',
+}
+
+const NODE_WORK: { kind: BuildingKind; good: Good }[] = [
+  { kind: 'farm', good: 'food' },
+  { kind: 'lumberCamp', good: 'wood' },
+  { kind: 'quarry', good: 'stone' },
+  { kind: 'mine', good: 'ironOre' },
+  { kind: 'mine', good: 'goldOre' },
+]
+
+/** The Wiki (`CONTEXT.md`: Wiki): the rules in plain words, with the game's current numbers. */
+export function Wiki() {
+  // The page renders after the browser looked for the anchor, so go to it once it is there.
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1))
+    if (id) document.getElementById(id)?.scrollIntoView()
+  }, [])
+  const avg = AVERAGE_STATS.strength
+  const strong = wikiResident({ strength: avg * 1.5 }, { mining: WORK_SKILL_MAX / 10 })
+  const strongAgile = wikiResident({ agility: avg * 1.5 })
+  const plainsTicksPerTile = 1 / walkSpeed(AVERAGE, Terrain.Plains, 0)
+  const unarmed = blow()
+  const sword = blow({ sword: 1 })
+  const swordSkilled = blow({ sword: 1 }, COMBAT_SKILL_MAX)
+  const dodge = Math.min(DODGE_LIMIT, avg * DODGE_PER_AGILITY)
+  const loads: [number, number][] = [
+    [100, 100],
+    [100, 400],
+    [DELIVERY_LOAD, 1000],
+  ]
+  return (
+    <main className="wiki">
+      <header className="wiki-head">
+        <h1>Code Strategy Wiki</h1>
+        <p>
+          The game's rules in plain words, with its current numbers and what follows from them.
+          Figures are for an average resident (every stat at {num(avg)}, no skills) unless they say
+          otherwise. Times are game time first, real time after.
+        </p>
+        <nav className="wiki-toc" aria-label="Contents">
+          <ol>
+            {WIKI_TOPICS.map((t) => (
+              <li key={t.id}>
+                <a href={`#${t.id}`}>{t.title}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </header>
+
+      <Section id="time">
+        <p>
+          The world keeps running while nobody is online. One tick is one real second and one game
+          minute, so a game day lasts {realTimeOf(TICKS_PER_GAME_DAY)}, and a game year of{' '}
+          {num(GAME_DAYS_PER_YEAR)} game days lasts{' '}
+          {realTimeOf(GAME_DAYS_PER_YEAR * TICKS_PER_GAME_DAY)}.
+        </p>
+        <p>
+          The map is {num(MAP_SIZE)} × {num(MAP_SIZE)} tiles, and its opposite sides join: walk off
+          the east side and you come back in from the west. Walking once around it on plains takes
+          an average resident {duration(MAP_SIZE * plainsTicksPerTile)}. A resident sees{' '}
+          {num(SIGHT_RANGE)} tiles around them.
+        </p>
+      </Section>
+
+      <Section id="terrain">
+        <p>
+          An unloaded average resident walks a plains tile in {duration(WALK_TICKS_PER_TILE)}.
+          Terrain changes how fast they walk and how much food they burn; lakes and sea can't be
+          entered. A road is as fast whatever lies beneath it.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Terrain</th>
+              <th>Speed</th>
+              <th>Food burnt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {TERRAIN_NAMES.map((t) => (
+              <tr key={t}>
+                <td>{t}</td>
+                <td>{pct(TERRAIN_SPEED[Terrain[t]])}</td>
+                <td>{pct(TERRAIN_FOOD[Terrain[t]])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          Each point of Agility above average walks {pct(AGILITY_SPEED_EFFECT)} faster and takes{' '}
+          {pct(AGILITY_TERRAIN_EFFECT)} off a terrain's slowdown (slower below average), each by at
+          most {pct(AGILITY_LIMIT)}. Each point of Endurance takes {pct(ENDURANCE_TERRAIN_EFFECT)}{' '}
+          off a terrain's extra food, at most {pct(HUNGER_ENDURANCE_LIMIT)}.
+        </p>
+        <p>
+          Example: with Agility {num(strongAgile.stats.agility.base)} a resident crosses a plains
+          tile in {duration(1 / walkSpeed(strongAgile, Terrain.Plains, 0))} and a hills tile in{' '}
+          {duration(1 / walkSpeed(strongAgile, Terrain.Hills, 0))}, against{' '}
+          {duration(1 / walkSpeed(AVERAGE, Terrain.Hills, 0))} at average.
+        </p>
+      </Section>
+
+      <Section id="residents">
+        <p>
+          Every resident has four stats: Strength (carrying, work output, building, blows),
+          Endurance (food needed, hard terrain), Agility (walking, dodging) and Intellect (how fast
+          they learn). A stat is its base value, from {num(STAT_BASE_MIN)} to {num(STAT_BASE_MAX)}{' '}
+          for residents nobody passed theirs on to, plus a trained bonus of at most{' '}
+          {pct(TRAINED_CAP_SHARE)} of the base. A child's base stats are the parents' average, give
+          or take up to {num(CHILD_STAT_SPREAD)}.
+        </p>
+        <p>
+          Skills are learned by doing and never inherited. Work skills and Construction run up to{' '}
+          {num(WORK_SKILL_MAX)} points; each point adds {pct(WORK_SKILL_EFFECT)} to output, so a
+          master does twice what a beginner does. An average learner gets there after{' '}
+          {days(daysToWorkSkillMax)} of work; Intellect speeds learning in proportion (twice the
+          Intellect, twice as fast).
+        </p>
+        <p>
+          A pair has one child at a time: once a game year has passed since they paired, and their
+          city has free housing and a food surplus, one partner carries the child for{' '}
+          {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
+          {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a child is grown after{' '}
+          {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Stats
+          decline from age {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below{' '}
+          {pct(DECLINE_FLOOR)}; residents die of old age between {num(LIFESPAN_MIN)} and{' '}
+          {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs
+          up to {num(MAX_HEALTH)}.
+        </p>
+      </Section>
+
+      <Section id="food">
+        <p>
+          Residents eat only food they carry. An average resident eats {num(foodEatenPerDay())} Food
+          a game day on plains; each point of Endurance above average needs{' '}
+          {pct(HUNGER_ENDURANCE_EFFECT)} less (more below), at most {pct(HUNGER_ENDURANCE_LIMIT)}.
+          They keep {num(OWN_FOOD)} Food of their own on them, and at home take a meal from the
+          storage when they run low.
+        </p>
+        <p>
+          A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
+          health in {days(STARVE_DAYS)}, so a resident without food dies{' '}
+          {days(HUNGER_DAYS + STARVE_DAYS)} after their last meal. Fed again, they heal from nothing
+          to full in {days(HEAL_DAYS)}.
+        </p>
+        <p>
+          Food spoils: {pct(FOOD_SPOIL_PER_DAY)} of every stock goes bad each game day, half of it
+          in {days(foodHalfLifeDays)}. A city has a food surplus when its storages hold more Food
+          than its residents eat in {days(FOOD_SURPLUS_DAYS)}.
+        </p>
+        <p>
+          <b>One average farmer feeds {num(residentsPerFarmer())} residents</b>, themselves
+          included: a farmer makes {num(outputPerDay('food', 'farming'))} Food a game day. A horse
+          eats {num(HORSE_FOOD_PER_DAY)} Food a game day.
+        </p>
+      </Section>
+
+      <Section id="work">
+        <p>
+          Workers make goods in proportion to their Strength, plus {pct(WORK_SKILL_EFFECT)} for each
+          point of the workplace's skill. Output lands in the workplace's pile; one worker at a time
+          carries a full load to the nearest storage of their realm.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Workplace</th>
+              <th>Makes a game day</th>
+              <th>Skill</th>
+              <th>Workers</th>
+            </tr>
+          </thead>
+          <tbody>
+            {NODE_WORK.map(({ kind, good }) => (
+              <tr key={good}>
+                <td>{kindName(kind)}</td>
+                <td>
+                  {num(WORK_OUTPUT_PER_DAY[good] ?? 0)} {goodName(good)}
+                </td>
+                <td>{skillName(kind)}</td>
+                <td>{num(WORKPLACE_MAX_WORKERS[kind] ?? 0)}</td>
+              </tr>
+            ))}
+            {(Object.keys(RECIPES) as BuildingKind[]).flatMap((kind) =>
+              RECIPES[kind]!.map((r, i) => (
+                <tr key={`${kind}${i}`}>
+                  <td>{kindName(kind)}</td>
+                  <td>
+                    {goods(r.output)} from {goods(r.input)}, {num(BATCHES_PER_DAY[kind] ?? 0)} times
+                  </td>
+                  <td>{skillName(kind)}</td>
+                  <td>{num(WORKPLACE_MAX_WORKERS[kind] ?? 0)}</td>
+                </tr>
+              )),
+            )}
+          </tbody>
+        </table>
+        <h3>Production chains</h3>
+        <ul>
+          <li>One farmer feeds {num(residentsPerFarmer())} residents.</li>
+          <li>
+            {num(minersPerSmelterWorker())} iron miners keep one smelter worker busy, who makes{' '}
+            {num(batchesPerDay('smelter') * (RECIPES.smelter![0]!.output.iron ?? 0))} Iron a game
+            day.
+          </li>
+          <li>
+            {num(goldMinersPerMintWorker())} gold miners keep one mint worker busy, who strikes{' '}
+            {num(coinsPerMintWorkerDay())} Coins a game day.
+          </li>
+        </ul>
+        <h3>Coins per worker-day</h3>
+        <p>
+          What a day's work fetches at a warehouse's base price, and at the {pct(BUY_SHARE)} of it a
+          warehouse pays when it buys. For smelters, mints and smithies, the value added is the
+          output less what went into it, both at the base price.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Job</th>
+              <th>Makes a game day</th>
+              <th>Base price</th>
+              <th>Warehouse pays</th>
+              <th>Value added</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobDays().map((j, i) => (
+              <tr key={i}>
+                <td>{j.job}</td>
+                <td>
+                  {goods(j.makes)}
+                  {Object.keys(j.uses).length > 0 && ` from ${goods(j.uses)}`}
+                </td>
+                <td>{num(j.sell)}</td>
+                <td>{num(j.buy)}</td>
+                <td>{num(j.added)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          Example: a miner with Strength {num(strong.stats.strength.base)} and Mining{' '}
+          {num(strong.skills.mining ?? 0)} digs {num(outputPerDay('ironOre', 'mining', strong))}{' '}
+          iron ore a game day, against {num(outputPerDay('ironOre', 'mining'))} at average.
+        </p>
+      </Section>
+
+      <Section id="building">
+        <p>
+          A construction site becomes its building once its materials are there and builders have
+          put in its work. Building goes in proportion to Strength, plus{' '}
+          {pct(CONSTRUCTION_SKILL_EFFECT)} for each point of Construction (at most{' '}
+          {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
+          more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
+          leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a building's materials on the tile (all of an
+          unfinished site's).
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Building</th>
+              <th>Size</th>
+              <th>Materials</th>
+              <th>One builder</th>
+              <th>Tearing down</th>
+              <th>Left when torn down</th>
+            </tr>
+          </thead>
+          <tbody>
+            {buildCosts().map((b) => (
+              <tr key={b.kind}>
+                <td>{kindName(b.kind)}</td>
+                <td>
+                  {num(b.footprint)}×{num(b.footprint)}
+                </td>
+                <td>{goods(b.materials)}</td>
+                <td>{duration(b.buildTicks)}</td>
+                <td>{duration(b.teardownTicks)}</td>
+                <td>{goods(b.returned)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          A city building (town hall, house, storage, wall, gate) belongs to a city when it stands
+          within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
+          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them.
+        </p>
+      </Section>
+
+      <Section id="transport">
+        <p>
+          A resident carries {num(CARRY_BASE)} kg plus {num(CARRY_PER_STRENGTH)} kg for each point
+          of Strength: {num(AVERAGE_CARRY)} kg at average, {num(carryCapacity(strong, 0))} kg with
+          Strength {num(strong.stats.strength.base)}. A carriage carries {num(CARRIAGE_CAPACITY)}{' '}
+          kg; each point of its driver's Driving skill makes it {pct(DRIVING_SKILL_EFFECT)} faster,
+          at most {pct(DRIVING_SKILL_LIMIT)}, learned at {num(DRIVING_SKILL_PER_DAY)} a game day of
+          driving. Carriages can't enter mountains.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Goods</th>
+              {(Object.keys(GOOD_WEIGHT) as Good[]).map((g) => (
+                <th key={g}>{goodName(g)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>kg a unit</td>
+              {(Object.keys(GOOD_WEIGHT) as Good[]).map((g) => (
+                <td key={g}>{num(GOOD_WEIGHT[g])}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+        <h3>Moving goods, per game hour</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Terrain</th>
+              <th>On foot, tiles</th>
+              <th>On foot, kg × tiles</th>
+              <th>Carriage, tiles</th>
+              <th>Carriage, kg × tiles</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transport().map((t) => (
+              <tr key={t.terrain}>
+                <td>{t.terrain}</td>
+                <td>{num(t.footTiles, 1)}</td>
+                <td>{num(t.footKgTiles, 0)}</td>
+                <td>{t.carriageTiles ? num(t.carriageTiles, 1) : 'can’t enter'}</td>
+                <td>{t.carriageTiles ? num(t.carriageKgTiles, 0) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          A road tile takes {goods(BUILD_MATERIALS.road ?? {})} and{' '}
+          {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work;
+          one road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles.
+        </p>
+        <p>
+          Horses eat {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the carriage's load
+          or food on the ground next to them. Two fed horses at a stable breed a foal every{' '}
+          {days(STABLE_BREED_DAYS)}, up to {num(STABLE_CAPACITY)} horses a stable. A haul route
+          keeps {num(HAUL_KEEP_FOOD)} Food on board for its horse.
+        </p>
+        <h3>Deliveries and transfers</h3>
+        <p>
+          A Trade Org caravan brings what you buy to your city's storage, at most{' '}
+          {num(DELIVERY_LOAD)} kg at a time, for {num(DELIVERY_FEE_BASE)} coins plus{' '}
+          {num(DELIVERY_FEE_PER_KG_TILE, 5)} coins for each kg and tile. A transfer to another realm
+          costs {num(TRANSFER_FEE_FACTOR)} times a delivery's fee over the caravan's whole way.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Load</th>
+              <th>Distance</th>
+              <th>Delivery fee</th>
+              <th>Transfer fee</th>
+            </tr>
+          </thead>
+          <tbody>
+            {feeExamples(loads).map((f) => (
+              <tr key={`${f.kg}-${f.tiles}`}>
+                <td>{num(f.kg)} kg</td>
+                <td>{num(f.tiles)} tiles</td>
+                <td>{num(f.delivery)} coins</td>
+                <td>{num(f.transfer)} coins</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          Caravans walk with {num(CARAVAN_ESCORTS)} escorts, one more for every{' '}
+          {num(CARAVAN_ROBBERIES_PER_ESCORT)} robberies of their route, at most{' '}
+          {num(CARAVAN_ESCORTS_MAX)}.
+        </p>
+      </Section>
+
+      <Section id="trade">
+        <p>
+          Each warehouse prices every good from its own stock. At {num(PRICE_REFERENCE_FLOORS)}{' '}
+          times its stock floor it sells at the base price; less stock costs more (to the power{' '}
+          {num(PRICE_ELASTICITY)}), between {pct(PRICE_RANGE.min)} and {pct(PRICE_RANGE.max)} of the
+          base price. It buys at {pct(BUY_SHARE)} of its selling price. Each unit is priced as it
+          moves, so a big trade moves the price as it goes.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Good</th>
+              <th>Base price</th>
+              <th>Warehouse pays</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(Object.keys(WAREHOUSE_BASE_PRICE) as PricedGood[]).map((g) => {
+              const p = priceAt(g, PRICE_REFERENCE_FLOORS)
+              return (
+                <tr key={g}>
+                  <td>{goodName(g)}</td>
+                  <td>{num(p.sell)}</td>
+                  <td>{num(p.buy)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <h3>How Iron's price follows stock</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Stock, in floors</th>
+              <th>Sells at</th>
+              <th>Pays</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              0.5,
+              1,
+              2,
+              PRICE_REFERENCE_FLOORS,
+              PRICE_REFERENCE_FLOORS * 2,
+              PRICE_REFERENCE_FLOORS * 8,
+            ].map((f) => {
+              const p = priceAt('iron', f)
+              return (
+                <tr key={f}>
+                  <td>{num(f)}</td>
+                  <td>{num(p.sell)}</td>
+                  <td>{num(p.buy)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <h3>NPC cities</h3>
+        <p>
+          An NPC city sells only what it holds above its reserve ({days(NPC_TRADE.reserveFoodDays)}{' '}
+          of Food for everyone, and the materials for a house and{' '}
+          {num(NPC_TRADE.reserveWallStretches)} tiles of wall) and buys only what it is short of. It
+          lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week, keeping{' '}
+          {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires out
+          soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A contract
+          runs at most {days(CONTRACT_MAX_DAYS)}.
+        </p>
+        <p>
+          Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,
+          for its buildings:{' '}
+          {(Object.entries(CITY_PRICE_BY_BUILDING) as [BuildingKind, number][])
+            .map(([k, c]) => `${kindName(k).toLowerCase()} ${num(c)}`)
+            .join(', ')}
+          . Standing moves that price by up to {pct(CITY_PRICE_STANDING_SWING)} either way: cheaper
+          the better it holds you.
+        </p>
+        <p>
+          Every {num(STANDING_TRADE_COINS_PER_POINT)} coins of trade with the Trade Organization or
+          an NPC city raise standing by a point, both ways.
+        </p>
+      </Section>
+
+      <Section id="standing">
+        <p>
+          Standing runs from {signed(-STANDING_RANGE)} to {signed(STANDING_RANGE)}. A known crime
+          lowers the victim's standing toward the culprit; standing drifts back toward neutral by{' '}
+          {num(STANDING_DRIFT_PER_DAY)} a game day. A crime is remembered for{' '}
+          {days(CRIME_MEMORY_DAYS)} after the news stops spreading.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Crime</th>
+              <th>Standing lost</th>
+              <th>Forgotten after</th>
+            </tr>
+          </thead>
+          <tbody>
+            {crimeForgotten().map((c) => (
+              <tr key={c.crime}>
+                <td>{CRIME_NAMES[c.crime]}</td>
+                <td>{signed(-c.loss)}</td>
+                <td>{days(c.days)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          Each paid week of a mercenary contract raises standing by {num(STANDING_PER_PAID_WEEK)}{' '}
+          both ways; an unpaid week breaks it and costs {num(STANDING_CONTRACT_BROKEN_LOSS)}.
+        </p>
+        <h3>Thresholds</h3>
+        <ul>
+          <li>
+            Below {signed(NPC_CITY_REFUSES_STANDING)} an NPC city won't trade or hire out to you and
+            keeps its gates shut to you; below {signed(NPC_CITY_WONT_SELL_STANDING)} it won't sell
+            itself to you.
+          </li>
+          <li>
+            At {signed(PERSUADE_STANDING)} and with enough respect an NPC city asks to join you;
+            declined, it asks again after {days(PERSUADE_ASK_AGAIN_DAYS)}.
+          </li>
+          <li>
+            An NPC city joins an alliance when it holds every member at{' '}
+            {signed(NPC_ALLIANCE_JOIN_STANDING)} or better, and leaves when any falls below{' '}
+            {signed(NPC_ALLIANCE_LEAVE_STANDING)}.
+          </li>
+          <li>
+            Below {signed(TRADE_ORG_REFUSES_TRADE_BELOW)} the Trade Organization won't trade with
+            you; below {signed(TRADE_ORG_PUNISHES_BELOW)} its army (up to{' '}
+            {num(TRADE_ORG_PUNISH.soldiers)} soldiers) comes to take {num(TRADE_ORG_PUNISH.times)}{' '}
+            times what it lost, giving up after {days(TRADE_ORG_PUNISH.giveUpDays)}. Besides stolen
+            goods it counts{' '}
+            {(Object.entries(TRADE_ORG_LOSS) as [CrimeKind, number][])
+              .map(([c, n]) => `${CRIME_NAMES[c].toLowerCase()} as ${num(n)} coins`)
+              .join(', ')}
+            .
+          </li>
+          <li>
+            A city whose Leader died starts out holding its former Player at{' '}
+            {signed(FORMER_PLAYER_STANDING)}.
+          </li>
+        </ul>
+        <p>
+          Leaving an alliance takes {realSeconds(ALLIANCE_LEAVE_DELAY)}; soldiers recalled from its
+          army are back under their owner's command after {realSeconds(ALLIANCE_RECALL_DELAY)}.
+        </p>
+      </Section>
+
+      <Section id="combat">
+        <p>
+          Residents in contact strike every {duration(STRIKE_TICKS)}. A blow does {num(BLOW_BASE)}{' '}
+          plus {num(BLOW_PER_STRENGTH)} for each point of Strength plus the weapon's attack, then{' '}
+          {pct(COMBAT_SKILL_EFFECT)} more for each point of Combat skill (at most twice as hard).
+          Protection takes damage off, but a blow that lands does at least {num(MIN_BLOW_DAMAGE)}.
+          Each point of Agility dodges {pct(DODGE_PER_AGILITY)} of blows, at most {pct(DODGE_LIMIT)}
+          . Combat skill grows by {num(COMBAT_SKILL_PER_BLOW)} with every blow struck or taken.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Gear</th>
+              <th>Attack</th>
+              <th>Defence</th>
+              <th>kg</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(Object.entries(WEAPON_ATTACK) as [Good, number][]).map(([g, a]) => (
+              <tr key={g}>
+                <td>{goodName(g)}</td>
+                <td>{signed(a)}</td>
+                <td>—</td>
+                <td>{num(GOOD_WEIGHT[g])}</td>
+              </tr>
+            ))}
+            {(Object.entries(PROTECTION_DEFENCE) as [Good, number][]).map(([g, d]) => (
+              <tr key={g}>
+                <td>{goodName(g)}</td>
+                <td>—</td>
+                <td>{signed(-d)}</td>
+                <td>{num(GOOD_WEIGHT[g])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          An average resident hits for {num(unarmed)} with bare fists, {num(sword)} with a sword,
+          and {num(swordSkilled)} with a sword at full Combat skill ({num(COMBAT_SKILL_MAX)}{' '}
+          points); they dodge {pct(dodge)} of blows. A resident has {num(MAX_HEALTH)} health.
+        </p>
+        <p>
+          Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall
+          takes {num(WALL_STRENGTH.wall)} damage to break and a gate {num(WALL_STRENGTH.gate)}: an
+          average unarmed resident alone needs {duration(breakTicks('wall'))} for a wall and{' '}
+          {duration(breakTicks('gate'))} for a gate. A broken one leaves{' '}
+          {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
+          {duration(CLIMB_TICKS)}, unable to dodge or strike back.
+        </p>
+      </Section>
+
+      <Section id="territory">
+        <p>
+          Cities and guarded workplaces project control. A city starts at {num(TERRITORY_CITY_BASE)}
+          , a guarded workplace at {num(TERRITORY_WORKPLACE_BASE)}; each resident adds{' '}
+          {num(TERRITORY_PER_RESIDENT)} and each armed one {num(TERRITORY_PER_ARMED)} more. Control
+          reaches {num(TERRITORY_REACH_PER_ROOT)} tiles times the square root of its strength, at
+          most {num(TERRITORY_MAX_REACH)} tiles, fading with distance; where two overlap, the
+          stronger wins.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>City</th>
+              <th>Control</th>
+              <th>Reach</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              cityControl(0, 0),
+              cityControl(START_RESIDENTS, 0),
+              cityControl(START_RESIDENTS, START_RESIDENTS / 2),
+              cityControl(START_RESIDENTS * 4, START_RESIDENTS),
+            ].map((c) => (
+              <tr key={`${c.residents}-${c.armed}`}>
+                <td>
+                  {num(c.residents)} residents, {num(c.armed)} of them armed
+                </td>
+                <td>{num(c.strength)}</td>
+                <td>{num(c.reach)} tiles</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Section>
+
+      <Section id="scripts">
+        <p>
+          Scripts run once a tick (a real second) for each resident or army running them. Each
+          evaluated step costs one; asking for a list of things costs {num(SCRIPT_LIST_QUERY_COST)}{' '}
+          more, a question about a tile {num(SCRIPT_TILE_QUERY_COST)} more, and requesting an action{' '}
+          {num(SCRIPT_ACTION_COST)} more.
+        </p>
+        <ul>
+          <li>Each resident's or army's script: {num(SCRIPT_STEP_BUDGET)} steps a tick.</li>
+          <li>All of a realm's scripts together: {num(SCRIPT_REALM_STEP_BUDGET)} steps a tick.</li>
+          <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
+          <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
+        </ul>
+      </Section>
+    </main>
+  )
+}

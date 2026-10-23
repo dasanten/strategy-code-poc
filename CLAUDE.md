@@ -10,6 +10,8 @@
   are checked locally; only one PR per epic (and bug fixes) goes into `main` and runs CI.
 - **Balance numbers** live in `packages/shared/src/balance.ts`; pick sensible values and list them
   in the PR. Rules (what happens) are Daniel's call.
+- **Wiki** (`/wiki`, `apps/web/src/Wiki.tsx`): a ticket that changes a rule also updates its wiki
+  section. Numbers come from `@csp/shared`, never typed into its text.
 - **Keep scripting cheap to add** (ADR 0002): everything goes through the game API in
   `packages/shared`; orders only request actions; order state is plain serialisable data.
 - **World state is never reset** (ADR 0006): a change to its shape bumps `WORLD_FORMAT_VERSION`

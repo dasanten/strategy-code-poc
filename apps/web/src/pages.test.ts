@@ -7,6 +7,7 @@ import {
   directiveTargetFor,
   pageFor,
 } from './pages.js'
+import { WIKI_PATH } from './wiki-view.js'
 
 const player = { name: 'Mara', isAdmin: false }
 const admin = { name: 'Daniel', isAdmin: true }
@@ -32,6 +33,17 @@ describe('pages', () => {
   it('keeps Players out of the admin panel and its map', () => {
     expect(pageFor(ADMIN_PATH, player)).toBe('not-admin')
     expect(pageFor('/admin/map', player)).toBe('not-admin')
+  })
+})
+
+describe('wiki', () => {
+  it('shows the wiki to anyone, logged in or not', () => {
+    for (const account of [null, player, admin]) {
+      expect(pageFor(WIKI_PATH, account)).toBe('wiki')
+      expect(pageFor(`${WIKI_PATH}/`, account)).toBe('wiki')
+    }
+    // A path that only starts like the wiki's is the game's.
+    expect(pageFor('/wikipedia', player)).toBe('game')
   })
 })
 
