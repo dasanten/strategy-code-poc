@@ -231,7 +231,9 @@ describe('town halls (`CONTEXT.md`: Town hall)', () => {
     })
     world.residents.push(partner)
     r.cityId = 'c1'
-    partner.order = { kind: 'pair', partnerId: r.id, since: 0 }
+    // Pairing changes no order: paired, they still tear down.
+    partner.pair = { partnerId: r.id, since: 0 }
+    r.pair = { partnerId: partner.id, since: 0 }
     const hall = world.buildings.find((b) => b.id === city.townHallId)!
     r.order = { kind: 'tearDown', buildingId: hall.id, at: { x: r.x, y: r.y } }
     // Almost torn down already: one tick of work finishes it.
@@ -242,7 +244,7 @@ describe('town halls (`CONTEXT.md`: Town hall)', () => {
     expect(house).toMatchObject({ cityId: null, x: 5, y: 1 })
     expect(farm.cityId).toBeNull()
     expect(world.residents.map((x) => x.cityId)).toEqual([null, null])
-    expect(partner.order).toBeNull()
+    expect([r.pair, partner.pair]).toEqual([undefined, undefined])
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 

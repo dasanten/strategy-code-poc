@@ -132,10 +132,15 @@ function take(stock: Stock, good: Good, units: number): void {
   else delete stock[good]
 }
 
-/** Removes a dead resident; what they carried drops in a pile on their tile (`CONTEXT.md`: Loot). */
+/**
+ * Removes a dead resident; what they carried drops in a pile on their tile (`CONTEXT.md`: Loot).
+ * Their pair ends with them.
+ */
 export function die(world: WorldState, r: Resident): void {
   world.residents = world.residents.filter((x) => x !== r)
   dropGoods(world, r.x, r.y, r.carried)
+  const partner = r.pair && world.residents.find((x) => x.id === r.pair!.partnerId)
+  if (partner?.pair?.partnerId === r.id) delete partner.pair
 }
 
 /**

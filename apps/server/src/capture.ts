@@ -38,7 +38,7 @@ export function stepCaptures(world: WorldState, size: number): Capture[] {
  * Integrating): its buildings, the residents who live there, wherever they stand, loyal at once,
  * and the horses and carriages of its former owner standing in its area. A Leader is never
  * captured: one who lived there stays in their realm and is homeless. Those who join drop the
- * orders their former owner gave them, except pairing with a partner who joins too; whoever else
+ * orders their former owner gave them, and their pair unless the partner joins too; whoever else
  * drove a carriage that joins stops driving it, and nobody keeps attacking their own realm. Both
  * realms' logs show it.
  */
@@ -61,13 +61,13 @@ export function joinRealm(world: WorldState, city: City, captor: string, size: n
   const joined = new Set(joining.map((r) => r.id))
   for (const r of world.residents) {
     if (r.cityId !== city.id) continue
-    const o = r.order
     if (joined.has(r.id)) {
       r.owner = captor
-      if (!(o?.kind === 'pair' && joined.has(o.partnerId))) r.order = null
+      r.order = null
+      if (r.pair && !joined.has(r.pair.partnerId)) delete r.pair
     } else {
       r.cityId = null
-      if (o?.kind === 'pair') r.order = null
+      delete r.pair
     }
   }
   const inArea = (t: { x: number; y: number }) => inCityArea(world, city, t.x, t.y, size)

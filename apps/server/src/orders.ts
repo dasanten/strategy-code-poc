@@ -119,8 +119,8 @@ export class OrderQueue {
     this.pending = []
     for (const { sender, order } of batch) {
       // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
-      // script).
-      if (order.kind !== 'runScript') {
+      // script). Pairing changes nobody's order, so it leaves scripts running too.
+      if (order.kind !== 'runScript' && order.kind !== 'pair') {
         const r = world.residents.find((x) => x.id === order.residentId)
         if (r) delete r.script
       }

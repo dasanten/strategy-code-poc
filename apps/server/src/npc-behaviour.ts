@@ -39,7 +39,6 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'pickUp',
   'drop',
   'workAt',
-  'pair',
   'build',
   'tearDown',
   'attack',
@@ -94,7 +93,7 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * from the storage before they set out; gives idle adults their part in the city's growth
  * (`cityGrowth`); and brings idle residents with nothing to do home. Its soldiers (armed adults)
  * are put to no work and no building (`stepNpcDefence`). Children are left alone:
- * they refill at home.
+ * they refill at home. A resident carrying a child gets no work and goes home.
  */
 function runCity(
   world: WorldState,
@@ -131,6 +130,11 @@ function runCity(
 
   for (const r of adults) {
     if (r.order !== null || r.script) continue
+    // Carrying a child, they get no work and stay at home, where they take their meals.
+    if (r.carrying) {
+      if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
+      continue
+    }
     if (growth && growth.assign(r, true)) continue
     const load = storage && haul(r)
     if (storage && load) {

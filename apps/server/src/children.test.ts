@@ -1,5 +1,6 @@
 import {
   ADULT_AGE,
+  CARRYING_TICKS,
   CHILD_STAT_SPREAD,
   HOME_FOOD_LOW,
   STAT_NAMES,
@@ -13,7 +14,7 @@ import { stepAging } from './aging.js'
 import { checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { requestBirths, resolveBirths } from './pairing.js'
-import { mulberry32, newChild } from './residents.js'
+import { baseStats, mulberry32, newChild } from './residents.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { Walking } from './walking.js'
 import { stepWorld } from './world.js'
@@ -34,6 +35,8 @@ function bornOnTheFarm() {
   queue.receive(world, me, 'q', { kind: 'pair', residentId: a.id, partnerId: b.id })
   queue.applyAll(world)
   world.tick += TICKS_PER_GAME_YEAR
+  resolveBirths(world, requestBirths(world))
+  world.tick += CARRYING_TICKS
   const [child] = resolveBirths(world, requestBirths(world))
   return { world, queue, child: child!, parents: [a, b] as const }
 }
@@ -47,7 +50,7 @@ describe('children', () => {
     a.skills = { farming: 9 }
     const offsets = new Map<number, number>()
     for (let seed = 0; seed < 500; seed++) {
-      const child = newChild(mulberry32(seed), [a, b], {
+      const child = newChild(mulberry32(seed), [baseStats(a), baseStats(b)], {
         id: `c${seed}`,
         owner: a.owner,
         cityId: a.cityId!,

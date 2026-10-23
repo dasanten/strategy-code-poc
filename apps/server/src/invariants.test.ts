@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CARRYING_TICKS,
   MAX_HEALTH,
   MAX_HUNGER,
   Terrain,
@@ -232,21 +233,42 @@ describe('invariants', () => {
     const [a, b, c] = world.residents as [Resident, Resident, Resident]
     const pairs = () =>
       checkInvariants(world, terrain).filter((v) => v.invariant === 'pairs-hold-together')
-    a.order = { kind: 'pair', partnerId: b.id, since: world.tick }
-    b.order = { kind: 'pair', partnerId: a.id, since: world.tick }
+    a.pair = { partnerId: b.id, since: world.tick }
+    b.pair = { partnerId: a.id, since: world.tick }
     expect(pairs()).toEqual([])
-    c.order = { kind: 'pair', partnerId: a.id, since: world.tick }
+    c.pair = { partnerId: a.id, since: world.tick }
     expect(pairs().map((v) => v.message)).toEqual([expect.stringMatching(/doesn't pair back/)])
-    c.order = null
-    b.order.since = world.tick + 1
+    delete c.pair
+    b.pair.since = world.tick + 1
     expect(pairs().map((v) => v.message)).toEqual([
       expect.stringMatching(/pairs since/),
       expect.stringMatching(/pairs since/),
       expect.stringMatching(/after now/),
     ])
-    b.order.since = world.tick
+    b.pair.since = world.tick
     b.bornAt = world.tick
     expect(pairs().map((v) => v.message)).toEqual([expect.stringMatching(/as a child/)])
+  })
+
+  it('catch a resident carrying a child who works, or carries past the time', () => {
+    const world = worldWithCity().world
+    const [a, b] = world.residents as [Resident, Resident]
+    const carrying = () =>
+      checkInvariants(world, terrain).filter((v) => v.invariant === 'carrying-doesnt-work')
+    a.order = null
+    a.carrying = {
+      since: world.tick,
+      partnerId: b.id,
+      partnerName: b.name,
+      partnerBase: { strength: 10, endurance: 10, agility: 10, intellect: 10 },
+    }
+    expect(carrying()).toEqual([])
+    const farm = world.buildings.find((x) => x.kind === 'farm')!
+    a.order = { kind: 'workAt', buildingId: farm.id, at: { x: a.x, y: a.y }, progress: 0 }
+    expect(carrying().map((v) => v.message)).toEqual([expect.stringMatching(/workAt order/)])
+    a.order = null
+    world.tick += CARRYING_TICKS + 1
+    expect(carrying().map((v) => v.message)).toEqual([expect.stringMatching(/past its time/)])
   })
 
   it('are checked every tick at rate 1 and sampled below it', () => {

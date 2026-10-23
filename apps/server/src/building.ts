@@ -1,4 +1,5 @@
 import {
+  CARRYING_A_CHILD,
   MAX_WORKERS,
   ON_PLAINS,
   PROCESSING,
@@ -60,6 +61,7 @@ export const build: OrderKind = {
     const r = orderedResident(world, sender, o.residentId)
     if (!r) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t build'
+    if (r.carrying) return CARRYING_A_CHILD
     if (!BUILDABLE.includes(o.building as BuildingKind)) return 'that can’t be built'
     const here = constructionAt(world, r.x, r.y, o.building!)
     if (here?.site && here.kind === o.building) return undefined

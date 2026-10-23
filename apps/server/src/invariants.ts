@@ -30,6 +30,7 @@ import {
   LIFESPAN_MIN,
   MAX_HEALTH,
   ageInYears,
+  CARRYING_TICKS,
   canWork,
   MAX_HUNGER,
   STABLE_BREED_TICKS,
@@ -65,6 +66,7 @@ import {
 import { tallyGoods } from './goods-made.js'
 import { refillSource } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
+import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
 import { joinRequestsSound } from './persuasion.js'
@@ -1021,19 +1023,19 @@ export const npcFightsOutsiders: Invariant = {
 /**
  * After a tick, pairs hold together (`CONTEXT.md`: Pairing): a resident's partner pairs back
  * with the same `since`, which is not after now; both are adults of the same city. Broken pairs
- * end in `requestBirths`.
+ * end in `requestBirths`, and a pair ends with a partner's death.
  */
 export const pairsHoldTogether: Invariant = {
   name: 'pairs-hold-together',
   check(world) {
     const byId = new Map(world.residents.map((r) => [r.id, r]))
     return world.residents.flatMap((r) => {
-      const o = r.order
-      if (o?.kind !== 'pair') return []
+      const o = r.pair
+      if (!o) return []
       const partner = byId.get(o.partnerId)
-      const back = partner?.order
+      const back = partner?.pair
       const problems: string[] = []
-      if (!partner || back?.kind !== 'pair' || back.partnerId !== r.id) {
+      if (!partner || !back || back.partnerId !== r.id) {
         problems.push(`pairs with ${o.partnerId}, who doesn't pair back`)
       } else {
         if (back.since !== o.since)
@@ -1048,6 +1050,31 @@ export const pairsHoldTogether: Invariant = {
         invariant: this.name,
         message: `resident ${r.id} ${p}`,
         entityIds: [r.id, o.partnerId],
+      }))
+    })
+  },
+}
+
+/**
+ * A resident carrying a child (`CONTEXT.md`: Carrying) holds no order to work, build, tear down or
+ * haul, is grown, and gives birth once `CARRYING_DAYS` have passed.
+ */
+export const carryingDoesntWork: Invariant = {
+  name: 'carrying-doesnt-work',
+  check(world) {
+    return world.residents.flatMap((r) => {
+      const c = r.carrying
+      if (!c) return []
+      const problems: string[] = []
+      if (r.order && CARRYING_BLOCKS.has(r.order.kind))
+        problems.push(`holds a ${r.order.kind} order while carrying a child`)
+      if (!canWork(r, world.tick)) problems.push('carries a child as a child')
+      if (c.since > world.tick) problems.push(`carries since ${c.since}, after now`)
+      if (world.tick - c.since > CARRYING_TICKS) problems.push('carries a child past its time')
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `resident ${r.id} ${p}`,
+        entityIds: [r.id],
       }))
     })
   },
@@ -1415,6 +1442,7 @@ export const worldInvariants: Invariant[] = [
   npcFightsOutsiders,
   cityWorkplacesSound,
   pairsHoldTogether,
+  carryingDoesntWork,
   childrenDontWork,
   carriagesInPlace,
   driversOnCarriages,
