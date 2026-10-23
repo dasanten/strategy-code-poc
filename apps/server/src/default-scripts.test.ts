@@ -7,7 +7,9 @@ import {
   SCRIPT_STEP_BUDGET,
   TASKS,
   Terrain,
+  nodeCorner,
   pileAt,
+  ticksForAge,
   type ScriptMemory,
   type SeenEntity,
   type Task,
@@ -39,6 +41,7 @@ import {
   syncDefaultScripts,
 } from './scripts.js'
 import { addCity } from './test-terrain.js'
+import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
 /**
@@ -424,6 +427,51 @@ describe('Haul and Tear down from the UI', () => {
     expect(new ScriptRunner(terrain, host()).runAll(world, true)).toEqual([])
     expect(w1!.order).toMatchObject({ kind: 'haul', to: { x: 10, y: 3 }, keepFood: 4 })
     expect(w2!.order).toEqual({ kind: 'tearDown', buildingId: 'farm', at: { x: 3, y: 3 } })
+  })
+})
+
+describe('Build a … here from a node’s card', () => {
+  it('walks the resident to where the node’s workplace fits and lays out its site there', () => {
+    const world = farmWorld()
+    world.residents = world.residents.filter((r) => r.owner === 'r1')
+    // A forest node with the farm's corner west of it: the footprint over the node goes east.
+    world.nodes.push({ id: 'n1', kind: 'forest', x: 11, y: 9 })
+    const corner = nodeCorner(world, terrain, world.nodes[0]!)
+    expect(corner).toEqual({ x: 11, y: 9 })
+    const orders = queue()
+    const order = (o: object) =>
+      orders.receive(world, sender(), 'q', { kind: 'task', task: 'build', residentId: 'w1', ...o })
+    // Checked as the build order there: off the node it doesn't fit, nor for a child.
+    expect(order({ building: 'lumberCamp', at: { x: 1, y: 12 } })).toMatchObject({
+      reason: 'a lumberCamp goes with one tile on a fitting resource node',
+    })
+    expect(order({ building: 'lumberCamp', at: { x: 11.5, y: 9 } })).toMatchObject({
+      reason: 'the target must be a tile',
+    })
+    const w2 = world.residents[1]!
+    w2.bornAt = world.tick - ticksForAge(5)
+    expect(order({ residentId: 'w2', building: 'lumberCamp', at: corner })).toMatchObject({
+      reason: 'children can’t build',
+    })
+    expect(order({ building: 'lumberCamp', at: corner })).toMatchObject({ type: 'ack' })
+    orders.applyAll(world)
+    const w1 = world.residents[0]!
+    expect(w1.script?.memory).toEqual({ building: 'lumberCamp', at: corner })
+    const runner = new ScriptRunner(terrain, host())
+    const walking = new Walking(terrain)
+    for (
+      let tick = 0;
+      tick < 500 && !world.buildings.some((b) => b.kind === 'lumberCamp');
+      tick++
+    ) {
+      for (const r of world.residents) r.hunger = MAX_HUNGER
+      expect(runner.runAll(world, true)).toEqual([])
+      stepWorld(world, terrain, walking)
+    }
+    expect(w1).toMatchObject(corner!)
+    const site = world.buildings.find((b) => b.kind === 'lumberCamp')
+    expect(site).toMatchObject({ ...corner, site: { work: expect.any(Number) } })
+    expect(w1.order).toMatchObject({ kind: 'build', siteId: site!.id })
   })
 })
 

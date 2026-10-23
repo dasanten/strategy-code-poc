@@ -1,14 +1,12 @@
 import {
-  CARRYING_A_CHILD,
   MAX_WORKERS,
   ON_PLAINS,
   PROCESSING,
-  BUILDABLE,
   BUILD_WORK,
   MAP_SIZE,
+  buildAtProblem,
   buildProblem,
   buildWork,
-  canWork,
   constructionAt,
   constructionLearned,
   isAt,
@@ -59,13 +57,7 @@ export const build: OrderKind = {
   validate(world, sender, order, terrain) {
     const o = order as Partial<BuildRequest>
     const r = orderedResident(world, sender, o.residentId)
-    if (!r) return 'not one of your residents'
-    if (!canWork(r, world.tick)) return 'children can’t build'
-    if (r.carrying) return CARRYING_A_CHILD
-    if (!BUILDABLE.includes(o.building as BuildingKind)) return 'that can’t be built'
-    const here = constructionAt(world, r.x, r.y, o.building!)
-    if (here?.site && here.kind === o.building) return undefined
-    return buildProblem(world, r.x, r.y, o.building!, terrain)
+    return r ? buildAtProblem(world, r, o.building, r, terrain) : 'not one of your residents'
   },
   apply(world, _sender, order) {
     const { residentId, building } = order as BuildRequest

@@ -6,11 +6,13 @@ import {
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
   WORKPLACE_MAX_WORKERS,
+  canWork,
   type Recipe,
 } from './balance.js'
 import { citiesAt } from './city.js'
 import { FOOTPRINT, covers, footprintTiles, isAt } from './footprint.js'
 import {
+  CARRYING_A_CHILD,
   NODE_WORKPLACE,
   type Building,
   type BuildingKind,
@@ -18,6 +20,7 @@ import {
   type Pile,
   type Resident,
   type ResourceKind,
+  type ResourceNode,
   type Stock,
   type WorldState,
 } from './world.js'
@@ -131,7 +134,11 @@ export function buildingPile(world: Pick<WorldState, 'piles'>, b: Building): Pil
 }
 
 /** The road or road construction site on a tile, if there is one (`CONTEXT.md`: Road). */
-export function roadAt(world: WorldState, x: number, y: number): Building | undefined {
+export function roadAt(
+  world: Pick<WorldState, 'buildings'>,
+  x: number,
+  y: number,
+): Building | undefined {
   return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'road')
 }
 
@@ -176,6 +183,26 @@ export function workNeeded(site: Building): number {
 }
 
 /**
+ * The terrain of tiles as far as it is known, for checking where buildings go: the client knows
+ * only its explored chunks and says `UNEXPLORED` for the rest, where no building goes.
+ */
+export interface TerrainLookup {
+  size: number
+  at: (x: number, y: number) => number
+}
+
+/** What `buildProblem` looks at: the buildings, the resource nodes, and the cities for a house. */
+export type PlacingWorld = Pick<WorldState, 'buildings' | 'cities'> & {
+  nodes: readonly Pick<ResourceNode, 'kind' | 'x' | 'y'>[]
+}
+
+function lookupOf(terrain: TerrainMap | TerrainLookup): (x: number, y: number) => Terrain {
+  return 'tiles' in terrain
+    ? (x, y) => terrainAt(terrain, x, y)
+    : (x, y) => terrain.at(x, y) as Terrain
+}
+
+/**
  * Why a building of this kind can't be laid out with the north-west tile of its footprint on
  * (x, y) (`CONTEXT.md`: Where buildings go, Footprint), or undefined if it can: every tile of the
  * footprint passable and free of other buildings; workplaces with one tile on a resource node of
@@ -186,15 +213,16 @@ export function workNeeded(site: Building): number {
  * the terrain rules are not checked.
  */
 export function buildProblem(
-  world: WorldState,
+  world: PlacingWorld,
   x: number,
   y: number,
   kind: BuildingKind,
-  terrain?: TerrainMap,
+  terrain?: TerrainMap | TerrainLookup,
 ): string | undefined {
   if (!BUILDABLE.includes(kind)) return `a ${kind} can't be built yet`
+  const at = terrain && lookupOf(terrain)
   if (kind === 'road') {
-    const t = terrain && terrainAt(terrain, x, y)
+    const t = at?.(x, y)
     if (t !== undefined && (!isPassableTerrain(t) || t === Terrain.Mountain))
       return 'a road goes on passable land, not on Mountain'
     if (roadAt(world, x, y)) return 'there is already a road on this tile'
@@ -204,8 +232,7 @@ export function buildProblem(
   const placed = { kind, x, y }
   const tiles = footprintTiles(placed, size)
   const nodes = world.nodes.filter((n) => covers(placed, n.x, n.y, size))
-  const all = (ok: (t: Terrain) => boolean) =>
-    !terrain || tiles.every(([tx, ty]) => ok(terrainAt(terrain, tx, ty)))
+  const all = (ok: (t: Terrain) => boolean) => !at || tiles.every(([tx, ty]) => ok(at(tx, ty)))
   if (!all(isPassableTerrain)) return `a ${kind} goes on passable land`
   if (ON_PLAINS.includes(kind)) {
     if (nodes.length > 0 || !all((t) => t === Terrain.Plains))
@@ -238,6 +265,44 @@ export function cornersCovering(
     for (let dx = 0; dx < side; dx++) out.push([wrap(x - dx, size), wrap(y - dy, size)])
   }
   return out
+}
+
+/**
+ * Why resident `r` can't build `building` with the north-west tile of its footprint `at` once they
+ * stand there, or undefined if they can: lay out a site there, or join the unfinished one of that
+ * kind there (`CONTEXT.md`: Construction site, Child).
+ */
+export function buildAtProblem(
+  world: WorldState,
+  r: Resident,
+  building: unknown,
+  at: { x: number; y: number },
+  terrain?: TerrainMap,
+): string | undefined {
+  if (!canWork(r, world.tick)) return 'children can’t build'
+  if (r.carrying) return CARRYING_A_CHILD
+  if (!BUILDABLE.includes(building as BuildingKind)) return 'that can’t be built'
+  const kind = building as BuildingKind
+  const here = constructionAt(world, at.x, at.y, kind)
+  if (here?.site && here.kind === kind) return undefined
+  return buildProblem(world, at.x, at.y, kind, terrain)
+}
+
+/**
+ * Where a node's workplace can be laid out (`CONTEXT.md`: Where buildings go): the north-west
+ * tile of a footprint that covers the node and fits, the node's own tile first; none when no
+ * footprint over it fits.
+ */
+export function nodeCorner(
+  world: PlacingWorld,
+  terrain: TerrainMap | TerrainLookup,
+  node: Pick<ResourceNode, 'kind' | 'x' | 'y'>,
+): { x: number; y: number } | undefined {
+  const kind = NODE_WORKPLACE[node.kind]
+  for (const [x, y] of cornersCovering(kind, node.x, node.y, terrain.size)) {
+    if (!buildProblem(world, x, y, kind, terrain)) return { x, y }
+  }
+  return undefined
 }
 
 /** Most workers each kind of workplace takes, for the kinds residents can work so far. */
