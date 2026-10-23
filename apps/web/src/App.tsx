@@ -39,6 +39,7 @@ import {
   type Picking,
 } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
+import { buildingNodeKind } from './building-info-view.js'
 import { describeTile, makeLeaderProblem } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { faresKnown, loadKnown } from './seen.js'
@@ -418,6 +419,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
             )}
             nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
+            buildingNode={buildingNodeKind(
+              world.buildings.find(
+                (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
+              ),
+              nodeAt,
+            )}
             actor={selected}
             orderError={orderError}
             onClose={() => setSelectedTile(undefined)}
