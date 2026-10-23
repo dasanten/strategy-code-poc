@@ -16,6 +16,7 @@ import {
   type Caravan,
   type Stock,
 } from '@csp/shared'
+import type { JumpEntry, JumpKind } from './admin-jump.js'
 import { buildingCount } from './city-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { GOOD_LABELS, orderDoing } from './Residents.js'
@@ -297,4 +298,22 @@ export function inspectorCard(ins: AdminInspection): InspectorCard {
       })
     }
   }
+}
+
+/** What each kind of jump list entry inspects; a realm is no one thing, so nothing. */
+const JUMP_INSPECTS: Record<JumpKind, AdminInspectTarget['kind'] | undefined> = {
+  realm: undefined,
+  leader: 'resident',
+  city: 'city',
+  npcCity: 'city',
+  hq: 'city',
+  post: 'city',
+  caravan: 'caravan',
+  army: 'army',
+}
+
+/** What a place picked from the jump list inspects. */
+export function jumpInspectTarget(entry: JumpEntry): AdminInspectTarget | undefined {
+  const kind = JUMP_INSPECTS[entry.kind]
+  return kind && { kind, id: entry.id }
 }

@@ -16,8 +16,10 @@ import {
   mapViewSearch,
   parseMapView,
 } from './admin-map.js'
-import { pickOnTile } from './admin-inspector.js'
+import { jumpInspectTarget, pickOnTile } from './admin-inspector.js'
 import { AdminInspector } from './AdminInspector.js'
+import { jumpScale, type JumpEntry } from './admin-jump.js'
+import { AdminJumpList } from './AdminJumpList.js'
 import { MapView } from './MapView.js'
 import type { Camera, Size } from './map/camera.js'
 import { applyRegionMap, type RegionState } from './map/region.js'
@@ -25,8 +27,9 @@ import { applyRegionMap, type RegionState } from './map/region.js'
 /**
  * The admin panel's Map tab (`CONTEXT.md`: admin map): the whole world on the game's map, the
  * part in view loaded again every few seconds and whenever the view moves. Its view is kept in
- * the URL (`search`, reported back through `onSearch`), so a link lands on the same spot. Nothing
- * on it gives orders; what is clicked shows in the inspector, which can lead to the Directives tab.
+ * the URL (`search`, reported back through `onSearch`), so a link lands on the same spot. The
+ * jump list beside it centres the map on a place by name. Nothing on it gives orders; what is
+ * clicked or picked shows in the inspector, which can lead to the Directives tab.
  */
 export function AdminMap({
   search,
@@ -112,6 +115,21 @@ export function AdminMap({
     [refresh],
   )
 
+  // A place picked from the jump list: the map centres on it and inspects it, which rings it.
+  const [jumped, setJumped] = useState<JumpEntry>()
+  const [focus, setFocus] = useState<{ x: number; y: number; scale: number }>()
+  const onJump = useCallback((e: JumpEntry) => {
+    if (!e.at) return
+    setJumped(e)
+    setFocus({ ...e.at, scale: jumpScale(e.kind) })
+    setInspecting(jumpInspectTarget(e) ?? null)
+  }, [])
+  // Something clicked on the map or the inspector is no longer the place picked from the list.
+  const inspect = useCallback((target: AdminInspectTarget | null) => {
+    setInspecting(target)
+    setJumped(undefined)
+  }, [])
+
   const start = useMemo(() => map && parseMapView(searchRef.current, map.size), [map])
   const world = useMemo(
     () => map && adminMapWorld({ map, view, places, region, overview }),
@@ -120,29 +138,33 @@ export function AdminMap({
 
   return (
     <div className="admin-map">
-      {world && start ? (
-        <MapView
-          world={world}
-          terrainPath={adminTerrainChunkPath}
-          start={start}
-          onView={onView}
-          selectedId={inspecting?.kind === 'resident' ? inspecting.id : undefined}
-          selectedCityId={inspecting?.kind === 'city' ? inspecting.id : undefined}
-          onSelectTile={(x, y) => setInspecting(pickOnTile(view, x, y) ?? null)}
-          onSelectCity={(id) => setInspecting({ kind: 'city', id })}
-        />
-      ) : (
-        <p className="admin-map-note">{error ?? 'Loading the map…'}</p>
-      )}
-      {inspecting && (
-        <AdminInspector
-          target={inspecting}
-          onInspect={setInspecting}
-          onClose={() => setInspecting(null)}
-          onDirective={onDirective}
-        />
-      )}
-      {world && error && <p className="admin-map-note error">{error}</p>}
+      <AdminJumpList places={places} selectedKey={jumped?.key} onJump={onJump} />
+      <div className="admin-map-area">
+        {world && start ? (
+          <MapView
+            world={world}
+            terrainPath={adminTerrainChunkPath}
+            start={start}
+            onView={onView}
+            focus={focus}
+            selectedId={inspecting?.kind === 'resident' ? inspecting.id : undefined}
+            selectedCityId={inspecting?.kind === 'city' ? inspecting.id : undefined}
+            onSelectTile={(x, y) => inspect(pickOnTile(view, x, y) ?? null)}
+            onSelectCity={(id) => inspect({ kind: 'city', id })}
+          />
+        ) : (
+          <p className="admin-map-note">{error ?? 'Loading the map…'}</p>
+        )}
+        {inspecting && (
+          <AdminInspector
+            target={inspecting}
+            onInspect={inspect}
+            onClose={() => inspect(null)}
+            onDirective={onDirective}
+          />
+        )}
+        {world && error && <p className="admin-map-note error">{error}</p>}
+      </div>
     </div>
   )
 }

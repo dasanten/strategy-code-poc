@@ -6,7 +6,14 @@ import type {
   AdminWorldView,
   Resident,
 } from '@csp/shared'
-import { inspectorCard, ownerText, pickOnTile, type InspectorCard } from './admin-inspector.js'
+import {
+  inspectorCard,
+  jumpInspectTarget,
+  ownerText,
+  pickOnTile,
+  type InspectorCard,
+} from './admin-inspector.js'
+import type { JumpEntry } from './admin-jump.js'
 
 const realm: AdminOrganization = {
   id: 'r1',
@@ -278,5 +285,25 @@ describe('the admin inspector', () => {
       horse: { id: 'h', realmId: null, cityId: 'n1', x: 1, y: 1, hunger: 40, health: 90 },
     })
     expect(row(horse, 'Health')?.text).toBe('90 / 100')
+  })
+})
+
+describe('what a place picked from the jump list inspects', () => {
+  const entry = (kind: JumpEntry['kind']): JumpEntry => ({
+    key: `${kind}:x`,
+    id: 'x',
+    kind,
+    name: 'X',
+    nested: false,
+    at: { x: 1, y: 1 },
+  })
+
+  it('inspects a Leader, a city of any kind, a caravan or an army; a realm is nothing', () => {
+    expect(jumpInspectTarget(entry('leader'))).toEqual({ kind: 'resident', id: 'x' })
+    for (const k of ['city', 'npcCity', 'hq', 'post'] as const)
+      expect(jumpInspectTarget(entry(k))).toEqual({ kind: 'city', id: 'x' })
+    expect(jumpInspectTarget(entry('caravan'))).toEqual({ kind: 'caravan', id: 'x' })
+    expect(jumpInspectTarget(entry('army'))).toEqual({ kind: 'army', id: 'x' })
+    expect(jumpInspectTarget(entry('realm'))).toBeUndefined()
   })
 })
