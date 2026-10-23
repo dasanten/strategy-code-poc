@@ -208,6 +208,12 @@ export const HORSE_FOOD_PER_DAY = 1.5
  */
 export const HORSE_REACH = 1
 
+/**
+ * Share of a full hunger meter below which the tile card calls a horse hungry rather than fed;
+ * at 0 it is starving.
+ */
+export const HORSE_HUNGRY_SHARE = 0.25
+
 /** Most horses a stable has room for; it breeds no foal once that many stand in it. */
 export const STABLE_CAPACITY = 6
 
@@ -770,6 +776,15 @@ export function walkSpeed(resident: Resident, terrain: number, tick: number): nu
  * average Strength, so one carriage moves what a whole starting city could carry.
  */
 export const CARRIAGE_CAPACITY = 400
+
+/**
+ * Up to this share of `CARRIAGE_CAPACITY` a carriage whose load a Player can't see looks lightly
+ * loaded (`CONTEXT.md`: Seeing inside a storage, `loadLevel`).
+ */
+export const CARRIAGE_LIGHT_LOAD = 1 / 3
+
+/** Up to this share of `CARRIAGE_CAPACITY` it looks half loaded; above it, heavily. */
+export const CARRIAGE_HALF_LOAD = 2 / 3
 
 /**
  * The most one delivery or pick-up carries, in kg (`CONTEXT.md`: Delivery): a caravan's carriage

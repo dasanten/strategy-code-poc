@@ -11,7 +11,7 @@ import {
   wrapDelta,
   type Building,
   type KnownNode,
-  type Resident,
+  type SeenResident,
   type ResourceKind,
   footprintKeys,
   FOOTPRINT,
@@ -125,6 +125,7 @@ export function MapView({
   picking = false,
   onPickTile,
   onNodesLoaded,
+  onTerrainLoaded,
   focus,
   terrainPath,
   start,
@@ -147,6 +148,8 @@ export function MapView({
   onPickTile?: (x: number, y: number) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
   onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
+  /** Called as terrain chunks load, with a lookup of a tile's explored terrain. */
+  onTerrainLoaded?: (terrainAt: (x: number, y: number) => number | undefined) => void
   /**
    * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
    * at (the zoom in place if none); a new object each time.
@@ -175,6 +178,8 @@ export function MapView({
   onPickTileRef.current = onPickTile
   const onNodesLoadedRef = useRef(onNodesLoaded)
   onNodesLoadedRef.current = onNodesLoaded
+  const onTerrainLoadedRef = useRef(onTerrainLoaded)
+  onTerrainLoadedRef.current = onTerrainLoaded
   const onViewRef = useRef(onView)
   onViewRef.current = onView
   const startRef = useRef(start)
@@ -264,6 +269,12 @@ export function MapView({
           nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
             (n) => n.x === x && n.y === y,
           ),
+        )
+        onTerrainLoadedRef.current?.(
+          (x, y) =>
+            store.get(Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE))?.tiles[
+              (y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)
+            ],
         )
         redraw()
       },
@@ -761,7 +772,7 @@ function RegionLegend({ region }: { region: RegionState | null }) {
 
 /** Where the selected resident is walking, driving or going after someone, and the way there. */
 function wayAhead(
-  r: Resident,
+  r: SeenResident,
 ): { target: { x: number; y: number }; path: [number, number][] | null } | undefined {
   const o = r.order
   if (o?.kind === 'walkTo' || o?.kind === 'drive') return o
@@ -774,7 +785,7 @@ function wayAhead(
 }
 
 /** The selected resident's way ahead, as a line to the target (design: Main Game Screen). */
-function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: Resident) {
+function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: SeenResident) {
   const way = wayAhead(r)
   if (!way) return
   const [tx, ty] = tileToScreen(cam, view, size, way.target.x + 0.5, way.target.y + 0.5)
