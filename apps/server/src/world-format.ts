@@ -6,7 +6,7 @@ import { leaveTradeOrg } from './caravans.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 38
+export const WORLD_FORMAT_VERSION = 39
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -37,6 +37,9 @@ export const migrations: Record<number, MigrationStep> = {
       if (c.tradeOrg === 'post' && c.realmId !== null) leaveTradeOrg(world, c)
     return world
   },
+  // Realms get a realm name (`CONTEXT.md`: Realm name). Realms from before have none and go by
+  // their Leader's name until the Player names them, so the step leaves them as they are.
+  38: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

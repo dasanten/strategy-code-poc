@@ -4,6 +4,8 @@ import {
   SCRIPT_MAX_CALL_DEPTH,
   allianceOf,
   canWork,
+  diplomacyFor,
+  realmName,
   townHallOf,
   type Resident,
   type WorldState,
@@ -302,5 +304,59 @@ describe('Leader handover from a script', () => {
     expect(handOver(heir)).toBe('ok')
     expect(leader.script).toBeDefined()
     expect(checkInvariants(world, terrain)).toEqual([])
+  })
+})
+
+describe('Realm name', () => {
+  /** How Tobin sees Mara's realm in his alliance, contracts, standing and directives. */
+  function seenByTobin(s: ReturnType<typeof setup>) {
+    const d = diplomacyFor(s.world, s.realmOf(tobin).id, [])
+    return [
+      ...d.alliance!.members.filter((m) => m.realmId === s.realm.id).map((m) => m.realm),
+      ...d.contracts.map((c) => c.lender.realm),
+      ...d.standings.map((x) => x.name),
+      ...d.directives.map((x) => x.targetName),
+    ]
+  }
+
+  /** Mara and Tobin in one alliance, with a contract, a standing and a directive naming her. */
+  function named() {
+    const s = setup()
+    const { world, realm, realmOf, heir, order } = s
+    expect(order({ kind: 'foundAlliance', name: 'North' })).toBe('ok')
+    allianceOf(world, realm.id)!.members.push({ realmId: realmOf(tobin).id, joinedAt: 0 })
+    const lent = world.residents.find(
+      (r) => r.owner === realm.id && r.id !== realm.leaderId && r.id !== heir.id,
+    )!
+    contract(world, lent, realm.id, realmOf(tobin).id)
+    world.standings.push({ of: realm.id, toward: realmOf(tobin).id, value: -20 })
+    world.directives.push({
+      id: 'd1',
+      target: realm.id,
+      withAlliance: false,
+      reason: 'raids',
+      givenBy: 'admin',
+      givenAt: 0,
+      goals: [],
+      soldiersKilled: 0,
+      price: null,
+    })
+    return s
+  }
+
+  it('is what other Players see, and a Leader handover keeps it', () => {
+    const s = named()
+    s.realm.name = 'Ironvale'
+    expect(seenByTobin(s)).toEqual(['Ironvale', 'Ironvale', 'Ironvale', 'Ironvale'])
+    expect(s.handOver(s.heir)).toBe('ok')
+    expect(realmName(s.world, s.realm.id)).toBe('Ironvale')
+    expect(seenByTobin(s)).toEqual(['Ironvale', 'Ironvale', 'Ironvale', 'Ironvale'])
+  })
+
+  it('falls back to the Leader’s name while the realm has none', () => {
+    const s = named()
+    expect(seenByTobin(s)).toEqual(Array(4).fill(s.leader.name))
+    expect(s.handOver(s.heir)).toBe('ok')
+    expect(seenByTobin(s)).toEqual(Array(4).fill(s.heir.name))
   })
 })
