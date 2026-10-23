@@ -301,7 +301,7 @@ describe('script bindings', () => {
       { kind: 'rename', targetId: 'b1', name: 'Mara', realmName: 'Ironvale' },
     ],
     ['renameCity("c1", "Ironhold")', { kind: 'renameCity', cityId: 'c1', name: 'Ironhold' }],
-    ['roadLine(13, 10)',{ kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
+    ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],
   ]
 
