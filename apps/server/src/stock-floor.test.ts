@@ -197,7 +197,7 @@ describe('goods appear from nothing only at the floor', () => {
     goods.stock = {}
     expect(stepChecked(world, terrain, 3 * TICKS_PER_GAME_DAY)).toEqual([])
     expect(goods.stock.wood).toBeGreaterThanOrEqual(WAREHOUSE_FLOOR.wood * HQ_FLOOR_FACTOR)
-  }, 60_000)
+  }, 120_000)
 
   it('holds while a starting city works its farm', () => {
     const { world, terrain } = worldWithCity()

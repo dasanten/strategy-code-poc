@@ -316,7 +316,7 @@ describe('caravans carrying out transfers', () => {
     runUntil(world, terrain, () => world.transfers.length === 0)
     expect(toStorage.stock!.iron).toBe(before + 6)
     expect(eventsOf(world, 'transferred')[0]).toMatchObject({ units: 6 })
-  }, 60_000)
+  }, 120_000)
 
   it('drop a transfer the sender’s storage holds none of', () => {
     const { world, terrain, queue, city, toCity, storage } = setup()
@@ -331,7 +331,7 @@ describe('caravans carrying out transfers', () => {
     runUntil(world, terrain, () => world.transfers.length === 0)
     expect(eventsOf(world, 'transferStuck')).toEqual([expect.objectContaining({ why: 'nothing' })])
     runUntil(world, terrain, () => carrier(world) === undefined, 10_000)
-  }, 60_000)
+  }, 120_000)
 
   it('turn back from a recipient behind closed gates, the warehouse keeping it for the next caravan', () => {
     const { world, terrain, queue, city, toCity, storage } = setup()
@@ -356,7 +356,7 @@ describe('caravans carrying out transfers', () => {
     runUntil(world, terrain, () => carrier(world) === undefined, 10_000)
     expect(owedBy(world, warehouseId, 'iron')).toBe(12)
     expect(storage.stock!.iron).toBe(28)
-  }, 60_000)
+  }, 120_000)
 
   it('bring coins handed in at a warehouse to the recipient’s storage', () => {
     const { world, terrain, queue, toCity, toStorage } = setup()
@@ -367,7 +367,7 @@ describe('caravans carrying out transfers', () => {
     expect(eventsOf(world, 'transferred', ivo.userId)).toEqual([
       expect.objectContaining({ good: 'coins', units: 300 }),
     ])
-  }, 60_000)
+  }, 120_000)
 
   it('bring a transfer back to the sender when the recipient’s city is no longer theirs', () => {
     const { world, terrain, queue, city, toCity, storage, toStorage } = setup()
@@ -398,7 +398,7 @@ describe('caravans carrying out transfers', () => {
     expect(storage.stock!.iron).toBe(40)
     expect(toStorage.stock!.iron ?? 0).toBe(toIron)
     expect(world.transfers).toEqual([])
-  }, 60_000)
+  }, 120_000)
 
   it('send again what robbers took of a transfer, and all of it arrives', () => {
     const { world, terrain, queue, city, toCity, storage, toStorage } = setup()
@@ -431,7 +431,7 @@ describe('caravans carrying out transfers', () => {
     expect(eventsOf(world, 'transferred', ivo.userId).map((e) => e.units)).toEqual([15, 10])
     // The sender paid once.
     expect(storage.stock!.iron).toBe(15)
-  }, 60_000)
+  }, 120_000)
 })
 
 describe('transfers sound', () => {

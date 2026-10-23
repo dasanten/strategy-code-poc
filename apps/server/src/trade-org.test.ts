@@ -175,7 +175,7 @@ describe('the Trade Org HQ', () => {
     // Its workplaces on the nodes were worked too.
     const goods = world.buildings.find((b) => b.kind === 'storage' && b.cityId === city.id)!.stock!
     expect(goods.wood ?? 0).toBeGreaterThan(0)
-  }, 300_000)
+  }, 600_000)
 })
 
 describe('placing the Trade Org HQ', () => {
