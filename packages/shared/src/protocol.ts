@@ -65,6 +65,12 @@ export type SeenEntity =
 
 /** Messages the server pushes over the WebSocket (ADR 0006). */
 export type ServerMessage =
+  /**
+   * On connect, to a Player without a realm (first login, or after a Leader death): they name the
+   * realm and their Leader with a `found` request before the world shows (`CONTEXT.md`: Realm
+   * name). `leaderName` is a name from the game they may keep. The welcome follows the founding.
+   */
+  | { type: 'founding'; account: Account; leaderName: string }
   /** On connect: who you are, the map and everything in your sight. */
   | {
       type: 'welcome'
@@ -118,7 +124,13 @@ export type ServerMessage =
   | { type: 'rejected'; requestId: string; reason: string }
 
 /** Messages the client sends over the WebSocket. */
-export type ClientMessage = { type: 'order'; requestId: string; order: OrderRequest }
+export type ClientMessage =
+  | { type: 'order'; requestId: string; order: OrderRequest }
+  /**
+   * Founds the Player's realm and starting city with these names, answered with `rejected` (see
+   * `foundingProblem`) or the welcome.
+   */
+  | { type: 'found'; requestId: string; realmName: string; leaderName: string }
 
 export const WS_PATH = '/ws'
 export const SESSION_COOKIE = 'csp_session'

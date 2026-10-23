@@ -30,7 +30,7 @@ import {
 } from '@csp/shared'
 import { CITY_NAMES, updateCityMembership } from './cities.js'
 import { recordEvent } from './events.js'
-import { mulberry32, newResident } from './residents.js'
+import { mulberry32, newResident, residentName } from './residents.js'
 import { welcomeFormerPlayer } from './standing.js'
 import { Ground } from './placing.js'
 
@@ -42,6 +42,14 @@ export function newId(world: WorldState, prefix: string): string {
 /** The Player's realm, if they have one. */
 export function realmOf(world: WorldState, userId: number): Realm | undefined {
   return world.realms.find((r) => r.userId === userId)
+}
+
+/**
+ * The Leader's name from the game offered to a Player founding a realm, which they may keep
+ * (`CONTEXT.md`: Leader death).
+ */
+export function suggestedLeaderName(world: WorldState, userId: number): string {
+  return residentName(mulberry32(world.seed * 6151 + userId * 31 + world.tick))
 }
 
 /**
@@ -234,8 +242,16 @@ export function findCitySite(
  * next to it with horses and a little food, and a carriage at the stable with a horse hitched to
  * it. The residents start on the farm, working it, each carrying a little food.
  * The same world and Player always get the same city.
+ * `names`, from the Player's `found` request, name the realm and the Leader (`CONTEXT.md`: Realm
+ * name); trimmed here, checked before (`foundingProblem`). Without them the realm goes by its
+ * Leader's name from the game, as in tests.
  */
-export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId: number): Realm {
+export function foundStartingCity(
+  world: WorldState,
+  terrain: TerrainMap,
+  userId: number,
+  names?: { realmName: string; leaderName: string },
+): Realm {
   const existing = realmOf(world, userId)
   if (existing) return existing
 
@@ -300,6 +316,10 @@ export function foundStartingCity(world: WorldState, terrain: TerrainMap, userId
     return r
   })
   const realm: Realm = { id: realmId, userId, leaderId: residents[0]!.id }
+  if (names) {
+    realm.name = names.realmName.trim()
+    residents[0]!.name = names.leaderName.trim()
+  }
 
   world.realms.push(realm)
   welcomeFormerPlayer(world, realm)

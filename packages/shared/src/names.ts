@@ -14,6 +14,18 @@ export function nameProblem(name: unknown, maxLength: number): string | undefine
 }
 
 /**
+ * What is wrong with the names a Player gives when founding their realm (`CONTEXT.md`: Realm
+ * name, Leader death), if anything. The server founds with the names trimmed.
+ */
+export function foundingProblem(realmName: unknown, leaderName: unknown): string | undefined {
+  const realm = nameProblem(realmName, REALM_NAME_MAX_LENGTH)
+  if (realm) return `Realm name: ${realm}`
+  const leader = nameProblem(leaderName, RESIDENT_NAME_MAX_LENGTH)
+  if (leader) return `Leader name: ${leader}`
+  return undefined
+}
+
+/**
  * Why the Player of `realm` can't rename `target` to `name` now (`CONTEXT.md`: Renaming a
  * resident, Realm name), or undefined when they can: any living resident of their realm, from
  * anywhere. Renaming the Leader of a realm with no realm name yet needs `realmName` too, which

@@ -84,6 +84,8 @@ function byKind(entities: Iterable<SeenEntity>) {
  */
 export function useWorld(onLoggedOut: () => void) {
   const [world, setWorld] = useState<ClientWorld | null>(null)
+  // Set while the Player has no realm and is to name it: the Leader's name from the game.
+  const [founding, setFounding] = useState<{ leaderName: string } | null>(null)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const socketRef = useRef<WebSocket | null>(null)
   const answers = useRef(new Map<string, (rejected: string | undefined) => void>())
@@ -102,7 +104,18 @@ export function useWorld(onLoggedOut: () => void) {
       socket.onopen = () => setStatus('open')
       socket.onmessage = (ev) => {
         const msg = JSON.parse(ev.data as string) as ServerMessage
-        if (msg.type === 'welcome') {
+        if (msg.type === 'founding') {
+          setWorld(null)
+          setFounding({ leaderName: msg.leaderName })
+        } else if (msg.type === 'welcome') {
+          setFounding(null)
+          // The founding request, if one was waiting, succeeded.
+          for (const [id, answer] of answers.current) {
+            if (id.startsWith('found-')) {
+              answers.current.delete(id)
+              answer(undefined)
+            }
+          }
           entities = new Map(msg.entities.map((e) => [e.id, e]))
           setWorld({
             map: msg.map,
@@ -190,5 +203,21 @@ export function useWorld(onLoggedOut: () => void) {
     })
   }, [])
 
-  return { world, status, sendOrder }
+  /**
+   * Founds the Player's realm with these names (`CONTEXT.md`: Realm name). Resolves with the
+   * server's reason when it is refused, or undefined once the world arrives.
+   */
+  const found = useCallback((realmName: string, leaderName: string) => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return Promise.resolve<string | undefined>('not connected')
+    }
+    const requestId = `found-${crypto.randomUUID()}`
+    return new Promise<string | undefined>((resolve) => {
+      answers.current.set(requestId, resolve)
+      socket.send(JSON.stringify({ type: 'found', requestId, realmName, leaderName }))
+    })
+  }, [])
+
+  return { world, founding, status, sendOrder, found }
 }
