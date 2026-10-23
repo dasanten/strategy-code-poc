@@ -1,5 +1,6 @@
 import {
   BUILD_MATERIALS,
+  BUILDING_PURPOSE,
   ROAD_LINE_MAX_TILES,
   BUILD_WORK,
   BUILDABLE,
@@ -72,20 +73,6 @@ export const GOOD_LABELS: Record<Good, string> = {
   armour: 'Armour',
 }
 
-/** What a building off any node is for, shown before what it needs. */
-const BUILD_BLURBS: Partial<Record<BuildingKind, string>> = {
-  road: 'A road: residents walk and carriages drive faster on it, on any land but Mountain, and it can run through a gate. Nobody owns it. ',
-  stable: 'A stable keeps horses and their Food, and breeds them; on Plains only. ',
-  farm: 'A farm makes Food and teaches Farming; on Plains only. ',
-  house: 'A house is room for a few residents; only in a city’s area, and it grows the city. ',
-  smelter: 'A smelter turns iron ore into iron; not on Mountain. ',
-  mint: 'A mint turns gold ore into coins; not on Mountain. ',
-  smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain. ',
-  townHall: 'A town hall founds a new city of your realm; tearing it down dissolves the city. ',
-  wall: 'A stretch of wall; walls grow the city they stand by, like houses. ',
-  gate: 'A gate in a wall; it grows the city like a wall does. ',
-}
-
 /** A weight in kg, to one decimal (coins weigh little). */
 const kg = (weight: number) => `${Math.round(weight * 10) / 10} kg`
 
@@ -106,7 +93,8 @@ const STAT_LABELS: Record<StatName, string> = {
   intellect: 'Intellect',
 }
 
-const SKILL_LABELS: Record<SkillName, string> = {
+/** Skill names as the UI shows them. */
+export const SKILL_LABELS: Record<SkillName, string> = {
   mining: 'Mining',
   woodcutting: 'Woodcutting',
   smelting: 'Smelting',
@@ -906,8 +894,7 @@ function BuildBlock({
           return (
             <div key={kind}>
               <p className="muted small">
-                {BUILD_BLURBS[kind]}
-                Needs{' '}
+                {BUILDING_PURPOSE[kind]} Needs{' '}
                 {materials.length === 0
                   ? 'no materials'
                   : materials
@@ -969,9 +956,9 @@ function RoadBlock({
         <h3>Road</h3>
       </div>
       <p className="muted small">
-        {BUILD_BLURBS.road}
-        Needs {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and
-        about {days} game days of one resident’s work.
+        {BUILDING_PURPOSE.road} Needs{' '}
+        {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
+        {days} game days of one resident’s work.
       </p>
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
