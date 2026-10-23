@@ -434,18 +434,21 @@ export const TRADING_POST_REGION = 1440
 export const TRADING_POST = {
   /** Tiles along each side, wall included: a village's square. */
   size: 29,
-  /** Adult residents: enough for its farm and its one workplace. */
-  residents: 4,
+  /**
+   * Adult residents: enough for its farm and its one workplace, besides the quarter it keeps as
+   * soldiers (`NPC_SOLDIER_SHARE`).
+   */
+  residents: 6,
   /** Houses inside the wall: room for everyone. */
   houses: 2,
   /** Farms outside the wall, by the gate. */
   farms: 1,
   /** Food in its storage, in units: about two weeks of what everyone eats. */
-  food: 50,
+  food: 75,
   /** Coins in its warehouse. */
   coins: 2_000,
   /** Goods in its warehouse, in units. */
-  goods: { wood: 50, stone: 50, ironOre: 20, iron: 10 } as Partial<Record<Good, number>>,
+  goods: { wood: 50, stone: 50, ironOre: 20, iron: 10, spear: 4 } as Partial<Record<Good, number>>,
 }
 
 /**

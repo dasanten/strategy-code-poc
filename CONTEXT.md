@@ -133,7 +133,13 @@ The shared language of the game. Domain terms only — no implementation details
   storage kind. The HQ keeps its coins in one and its other goods in another, inside the inner
   ring.
 - **Trading post:** a small Trade Org city in a region, with a warehouse, so Players can trade
-  nearby. Goods move between posts and HQ by caravan.
+  nearby. Goods move between posts and HQ by caravan. It keeps soldiers like an NPC city, armed
+  from its warehouse, so it is captured only by beating them; they fight attackers in its area,
+  and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
+  A captured post joins the captor's realm like any city and leaves the Trade Organization: its
+  warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
+  route ends, and the deliveries and transfers waiting there go over to the HQ, which sends them
+  out of its own stock.
 - **Trading with the Trade Organization:** only in person, by a resident (or a carriage) on a
   warehouse's tile, at its HQ or a trading post. Selling hands the goods into the warehouse and
   takes its coins into the resident's hands, as far as they can carry; buying is the other way
