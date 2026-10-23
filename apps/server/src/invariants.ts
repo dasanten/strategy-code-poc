@@ -54,6 +54,10 @@ import {
   carryCapacity,
   stockWeight,
   trainedCap,
+  CONSTRUCTION_SKILL_MAX,
+  WORK_SKILL_MAX,
+  WORKPLACE_SKILL,
+  type SkillName,
   type Stock,
   type TerrainMap,
   type Resident,
@@ -276,6 +280,31 @@ export const trainedWithinCap: Invariant = {
         message: `resident ${r.id} has ${s} ${r.stats[s].base} + ${r.stats[s].trained} trained (cap ${trainedCap(r.stats[s].base)})`,
         entityIds: [r.id],
       })),
+    )
+  },
+}
+
+/** The skills that cap at a most (`WORK_SKILL_MAX`, `CONSTRUCTION_SKILL_MAX`): work and Construction. */
+const CAPPED_SKILLS = new Map<SkillName, number>([
+  ...Object.values(WORKPLACE_SKILL).map((s): [SkillName, number] => [s, WORK_SKILL_MAX]),
+  ['construction', CONSTRUCTION_SKILL_MAX],
+])
+
+/** No work or Construction skill is below 0 or above its most (`CONTEXT.md`: Skill). */
+export const skillsWithinCap: Invariant = {
+  name: 'skills-within-cap',
+  check(world) {
+    return world.residents.flatMap((r) =>
+      [...CAPPED_SKILLS]
+        .filter(([s, max]) => {
+          const v = r.skills[s] ?? 0
+          return !(v >= 0 && v <= max + 1e-9)
+        })
+        .map(([s, max]) => ({
+          invariant: this.name,
+          message: `resident ${r.id} has ${s} ${r.skills[s]} (most ${max})`,
+          entityIds: [r.id],
+        })),
     )
   },
 }
@@ -1415,6 +1444,7 @@ export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
   trainedWithinCap,
+  skillsWithinCap,
   healthAndHungerInRange,
   agesInRange,
   realmsHaveLeaders,

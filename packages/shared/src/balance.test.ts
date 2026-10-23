@@ -5,8 +5,15 @@ import {
   CARRY_PER_STRENGTH,
   CHILD_YEAR_DAYS,
   GOOD_WEIGHT,
+  CONSTRUCTION_SKILL_MAX,
+  WORK_OUTPUT_PER_DAY,
+  WORK_SKILL_MAX,
   ageInYears,
+  buildWork,
   canWork,
+  constructionLearned,
+  workLearned,
+  workOutput,
   carryCapacity,
   stockWeight,
   ticksForAge,
@@ -61,5 +68,37 @@ describe('aging', () => {
       expect(ageInYears(newborn, ticksForAge(age))).toBeCloseTo(age, 9)
     }
     expect(ticksForAge(ADULT_AGE)).toBe(140 * day)
+  })
+})
+
+describe('work and Construction skill', () => {
+  /** An adult of average Strength and Intellect with the given skills. */
+  const worker = (skills: Resident['skills']) =>
+    ({
+      stats: { strength: { base: 10, trained: 0 }, intellect: { base: 10, trained: 0 } },
+      skills,
+      bornAt: -ticksForAge(25),
+    }) as unknown as Resident
+
+  it('never makes more than twice what an unskilled worker does', () => {
+    const unskilled = workOutput(worker({}), 'food', 'farming', 0)
+    expect(unskilled * TICKS_PER_GAME_DAY).toBeCloseTo(WORK_OUTPUT_PER_DAY.food!)
+    expect(workOutput(worker({ farming: 50 }), 'food', 'farming', 0)).toBeCloseTo(unskilled * 1.5)
+    for (const farming of [100, 150, 1000]) {
+      expect(workOutput(worker({ farming }), 'food', 'farming', 0)).toBeCloseTo(unskilled * 2)
+    }
+    const unskilledBuild = buildWork(worker({}), 0)
+    expect(buildWork(worker({ construction: 1000 }), 0)).toBeCloseTo(unskilledBuild * 2)
+  })
+
+  it('takes an average worker about a game year to learn up to 100, and no further', () => {
+    const year = TICKS_PER_GAME_YEAR
+    expect(WORK_SKILL_MAX).toBe(100)
+    expect(CONSTRUCTION_SKILL_MAX).toBe(100)
+    expect(workLearned(worker({}), 'farming', 0) * year).toBeCloseTo(WORK_SKILL_MAX)
+    expect(constructionLearned(worker({}), 0) * year).toBeCloseTo(CONSTRUCTION_SKILL_MAX)
+    expect(workLearned(worker({ farming: 100 }), 'farming', 0)).toBe(0)
+    expect(workLearned(worker({ farming: 100 - 1e-6 }), 'farming', 0)).toBeCloseTo(1e-6, 9)
+    expect(constructionLearned(worker({ construction: 100 }), 0)).toBe(0)
   })
 })

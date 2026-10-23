@@ -1,4 +1,12 @@
-import { REALM_LOG_LENGTH, TICKS_PER_GAME_DAY, ticksForAge, type WorldState } from '@csp/shared'
+import {
+  HUNGER_DAYS,
+  HUNGER_ENDURANCE_LIMIT,
+  REALM_LOG_LENGTH,
+  STARVE_DAYS,
+  TICKS_PER_GAME_DAY,
+  ticksForAge,
+  type WorldState,
+} from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { stepAging } from './aging.js'
 import { eventsFor, recordEvent } from './events.js'
@@ -19,7 +27,9 @@ describe('realm events', () => {
     const people = world.residents.map((r) => r.id)
     for (const r of world.residents) r.carried = {}
     const deaths: { id: string; tick: number }[] = []
-    for (let t = 0; t < 3 * TICKS_PER_GAME_DAY; t++) {
+    // Long enough for the toughest to starve: Endurance slows the meter by up to its limit.
+    const days = HUNGER_DAYS / (1 - HUNGER_ENDURANCE_LIMIT) + STARVE_DAYS + 0.2
+    for (let t = 0; t < days * TICKS_PER_GAME_DAY; t++) {
       for (const r of stepSurvival(world, terrain).died) deaths.push({ id: r.id, tick: world.tick })
       world.tick++
     }

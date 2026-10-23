@@ -1,4 +1,5 @@
 import {
+  CONSTRUCTION_SKILL_EFFECT,
   BUILD_MATERIALS,
   BUILD_WORK,
   Terrain,
@@ -116,7 +117,7 @@ describe('build order', () => {
     const strong = structuredClone(r)
     strong.stats.strength.base = 15
     strong.skills.construction = 10
-    expect(buildWork(strong, world.tick)).toBeCloseTo(1.5 * 1.5)
+    expect(buildWork(strong, world.tick)).toBeCloseTo(1.5 * (1 + 10 * CONSTRUCTION_SKILL_EFFECT))
   })
 
   it('finishes a lumber camp once enough work is in, and the order is done', () => {

@@ -1,6 +1,8 @@
 import {
   FOOD_PER_DAY,
   HOME_FOOD_LOW,
+  HUNGER_DAYS,
+  STARVE_DAYS,
   START_FOOD,
   carryCapacity,
   HUNGER_ENDURANCE_LIMIT,
@@ -24,6 +26,9 @@ import { stepWorld } from './world.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 
 const terrain = cityTerrain()
+
+/** Game days from a full hunger meter with no food to death, at average Endurance. */
+const DEATH_DAYS = HUNGER_DAYS + STARVE_DAYS
 
 /** Runs survival for some game days; returns everyone who died, in order. */
 function live(world: WorldState, days: number): Resident[] {
@@ -71,20 +76,22 @@ describe('stepSurvival', () => {
 
   it('never eats straight from storage, also at home (`CONTEXT.md`: Eating)', () => {
     const { world } = worldWithCity()
+    averageEndurance(world)
     const city = world.cities[0]!
     const before = structuredClone(storageOf(world).stock)
     for (const r of world.residents) {
       Object.assign(r, { x: storageOf(world).x, y: storageOf(world).y, order: null, carried: {} })
       expect(inCityArea(world, city, r.x, r.y, terrain.size)).toBe(true)
     }
-    expect(live(world, 2.6)).toHaveLength(8)
+    expect(live(world, DEATH_DAYS + 0.5)).toHaveLength(8)
     expect(storageOf(world).stock).toEqual(before)
   })
 
-  it('starves a city without food in about 2 game days', () => {
+  it('starves a city without food in about 5 game days', () => {
     const { world } = worldWithCity()
+    averageEndurance(world)
     for (const r of world.residents) r.carried = {}
-    expect(live(world, 1.6)).toEqual([])
+    expect(live(world, DEATH_DAYS - 0.5)).toEqual([])
     const died = live(world, 1)
     expect(died).toHaveLength(8)
     expect(world.residents).toEqual([])
@@ -95,29 +102,31 @@ describe('stepSurvival', () => {
     averageEndurance(world)
     const r = world.residents[1]!
     r.carried = { food: 3 }
-    live(world, 1.1) // two meals: half a day in, and at the end of the day
+    live(world, 2.1) // two meals: one a game day, each when the meter has room for it
     expect(r.carried.food).toBe(1)
   })
 
   it('drops what a dead resident carried in a pile on their tile', () => {
     const { world } = worldWithCity()
+    averageEndurance(world)
     const city = world.cities[0]!
     const r = world.residents[1]!
     Object.assign(r, { ...awayFrom(world, city), carried: { stone: 4 } })
     world.piles.push({ id: 'p0', x: r.x, y: r.y, goods: { stone: 1, wood: 2 } })
-    live(world, 2.6)
+    live(world, DEATH_DAYS + 0.5)
     expect(world.piles).toEqual([{ id: 'p0', x: r.x, y: r.y, goods: { stone: 5, wood: 2 } }])
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
   it('ends the realm when the Leader dies; the Player gets a new city next time', () => {
     const { world } = worldWithCity()
+    averageEndurance(world)
     const realm = world.realms[0]!
     const leader = world.residents.find((r) => r.id === realm.leaderId)!
     const city = world.cities[0]!
     Object.assign(leader, { ...awayFrom(world, city), order: null, carried: {} })
     const ended: string[] = []
-    for (let t = 0; t < 2.6 * TICKS_PER_GAME_DAY; t++) {
+    for (let t = 0; t < (DEATH_DAYS + 0.5) * TICKS_PER_GAME_DAY; t++) {
       ended.push(...stepSurvival(world, terrain).ended.map((x) => x.id))
       world.tick++
     }
@@ -160,8 +169,8 @@ describe('stepSurvival', () => {
     }
     stock(tough, 15)
     stock(frail, 5)
-    live(tough, 6)
-    live(frail, 6)
+    live(tough, 10)
+    live(frail, 10)
     const left = (world: WorldState) => world.residents.reduce((n, r) => n + r.carried.food!, 0)
     expect(left(tough)).toBeGreaterThan(left(frail) + 20)
   })
@@ -245,7 +254,9 @@ describe('stepRefill', () => {
     stepRefill(world, terrain.size)
     expect(r.carried.food).toBe(HOME_FOOD_LOW)
     for (const other of world.residents.slice(1)) expect(other.carried.food).toBe(HOME_FOOD_LOW)
-    expect(storage.stock!.food).toBe(START_FOOD - (world.residents.length * HOME_FOOD_LOW - 1))
+    expect(storage.stock!.food).toBe(
+      START_FOOD - ((world.residents.length - 1) * HOME_FOOD_LOW + 1),
+    )
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 

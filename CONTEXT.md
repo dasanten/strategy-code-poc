@@ -441,7 +441,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Trained bonus:** what training adds on top of the base value. Capped relative to the base,
   so birth still matters. Never inherited.
 - **Skill:** something learned by doing or training (Mining, Woodcutting, Smelting, Smithing, Construction, Farming, Combat, Driving, …). Starts at 0,
-  never inherited. Not a stat.
+  never inherited. Not a stat. Work skills (Mining, Woodcutting, Smelting, Smithing, Farming)
+  and Construction run from 0 to 100: each point adds 1 % to output or building work, so a
+  skilled resident does at most twice what an unskilled one does; an average learner takes about
+  a game year to get there.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
@@ -462,7 +465,8 @@ The shared language of the game. Domain terms only — no implementation details
   year of age is a game year.
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and
   less with high Endurance. An empty hunger meter costs health; without food a resident dies
-  after about 2 game days. While the meter isn't empty, lost health slowly comes back.
+  after about 5 game days (2 real hours). While the meter isn't empty, lost health slowly comes
+  back.
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
 - **Own food:** the Food a resident keeps on them for their own meals, about two game days of
@@ -480,7 +484,7 @@ The shared language of the game. Domain terms only — no implementation details
 ## Transport
 
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
-  hunger meter costs health, and a horse without food dies after about 2 game days. Bred at a
+  hunger meter costs health, and a horse without food dies after about 5 game days. Bred at a
   stable, or bought from the Trade Organization.
 - **Horses have no inventory:** a horse eats only what is in reach. At a stable it eats from the
   stable's storage; pulling a carriage, from the carriage's load; anywhere, from Food lying on the

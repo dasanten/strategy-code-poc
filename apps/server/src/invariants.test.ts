@@ -85,6 +85,21 @@ describe('invariants', () => {
     ])
   })
 
+  it('catch a work or Construction skill above its most (100)', () => {
+    const world = worldWithCity().world
+    const [a, b, c] = world.residents as [Resident, Resident, Resident]
+    a.skills = { farming: 100, construction: 100, combat: 250 }
+    expect(checkInvariants(world, terrain)).toEqual([])
+    a.skills.farming = 100.5
+    b.skills = { construction: 101 }
+    c.skills = { mining: -1 }
+    expect(checkInvariants(world, terrain)).toEqual([
+      expect.objectContaining({ invariant: 'skills-within-cap', entityIds: [a.id] }),
+      expect.objectContaining({ invariant: 'skills-within-cap', entityIds: [b.id] }),
+      expect.objectContaining({ invariant: 'skills-within-cap', entityIds: [c.id] }),
+    ])
+  })
+
   it('catch a resident carrying more than their capacity', () => {
     const world = worldWithCity().world
     const r = world.residents[0]!

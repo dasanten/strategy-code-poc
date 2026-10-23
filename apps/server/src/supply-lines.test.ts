@@ -1,5 +1,8 @@
 import {
+  FOOD_PER_DAY,
   HOME_FOOD_LOW,
+  HUNGER_DAYS,
+  STARVE_DAYS,
   MAX_HEALTH,
   MAX_HUNGER,
   TICKS_PER_GAME_DAY,
@@ -214,7 +217,8 @@ describe('supply lines', () => {
     // The driver is killed on the way: nothing comes any more.
     run(cut.world, cut.walking, 0.05)
     die(cut.world, find(cut.world, 'd1')!)
-    run(cut.world, cut.walking, 4)
+    // What they carried, then a full meter, then starving.
+    run(cut.world, cut.walking, HOME_FOOD_LOW / FOOD_PER_DAY + HUNGER_DAYS + STARVE_DAYS + 0.5)
     expect(soldiers(cut.world)).toEqual([undefined, undefined])
   })
 

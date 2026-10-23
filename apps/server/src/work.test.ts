@@ -1,4 +1,5 @@
 import {
+  WORK_SKILL_PER_DAY,
   FOOTPRINT,
   HOME_FOOD_LOW,
   WORK_OUTPUT_PER_DAY,
@@ -6,6 +7,8 @@ import {
   WORK_SKILL_EFFECT,
   MAX_HEALTH,
   START_CARRIED_FOOD,
+  START_HORSES,
+  START_STABLE_FOOD,
   START_RESIDENTS,
   Terrain,
   TICKS_PER_GAME_DAY,
@@ -157,7 +160,7 @@ describe('farm work', () => {
     const piled = pileAt(world, 3, 3)?.goods.food ?? 0
     expect(o.kind === 'workAt' && o.progress + piled).toBeCloseTo(FARM_FOOD_PER_DAY, 0)
     expect(r.carried).toEqual({ food: HOME_FOOD_LOW })
-    expect(r.skills.farming).toBeCloseTo(1, 1)
+    expect(r.skills.farming).toBeCloseTo(WORK_SKILL_PER_DAY, 2)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
@@ -191,7 +194,7 @@ describe('farm work', () => {
     r.carried = { food: 5 }
     order(world, queue)
     order(world, queue, 'w2')
-    run(world, 1200)
+    run(world, 1000)
     // Two workers make 4 units in that time: the one who had none takes meals from the pile
     // until no longer low, the rest stays there; a resident who doesn't work there gets none.
     expect(r.carried.food).toBe(5)
@@ -262,7 +265,7 @@ describe('workplaces on nodes', () => {
       const piled = pileAt(world, x, 1)?.goods[good] ?? 0
       const made = (o.kind === 'workAt' ? o.progress : 0) + piled
       expect(made).toBeCloseTo(WORK_OUTPUT_PER_DAY[good]!, 0)
-      expect(r.skills[skill]).toBeCloseTo(1, 1)
+      expect(r.skills[skill]).toBeCloseTo(WORK_SKILL_PER_DAY, 2)
       expect(r.skills.farming ?? 0).toBe(0)
       expect(checkInvariants(world, terrain)).toEqual([])
     },
@@ -395,6 +398,43 @@ describe('a starting city', () => {
     const carried = world.residents.reduce((n, r) => n + (r.carried.food ?? 0), 0)
     const piled = world.piles.reduce((n, p) => n + (p.goods.food ?? 0), 0)
     expect(carried + piled).toBeGreaterThan(START_RESIDENTS * START_CARRIED_FOOD)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('holds its Food over 10 game days with 2 of 8 on the farm, horses included', () => {
+    const { world, terrain } = worldWithCity()
+    const storage = world.buildings.find((b) => b.kind === 'storage')!
+    const stable = world.buildings.find((b) => b.kind === 'stable')!
+    // The two strongest stay on the farm, as a Player would pick them; the other six are at home
+    // by the storage, doing nothing.
+    const byStrength = [...world.residents].sort(
+      (a, b) => b.stats.strength.base - a.stats.strength.base,
+    )
+    for (const r of byStrength.slice(2)) {
+      r.order = null
+      r.x = storage.x
+      r.y = storage.y
+    }
+    const food = () =>
+      (storage.stock?.food ?? 0) +
+      world.piles.reduce((n, p) => n + (p.goods.food ?? 0), 0) +
+      world.residents.reduce((n, r) => n + (r.carried.food ?? 0), 0)
+    const atStart = food()
+    let fewest = atStart
+    for (let day = 0; day < 10; day++) {
+      for (let t = 0; t < TICKS_PER_GAME_DAY; t++) stepWorld(world, terrain)
+      fewest = Math.min(fewest, food())
+    }
+    expect(world.residents).toHaveLength(8)
+    for (const r of world.residents) expect(r.health).toBe(MAX_HEALTH)
+    // The horses eat from the stable's own ten game days of food; a foal may have come.
+    expect(world.horses.length).toBeGreaterThanOrEqual(START_HORSES)
+    for (const h of world.horses) expect(h.health).toBe(MAX_HEALTH)
+    expect(stable.stock?.food ?? 0).toBeLessThan(START_STABLE_FOOD)
+    // Only the residents' own food above `HOME_FOOD_LOW` is eaten down; the farm makes up the rest.
+    const ownFoodEaten = START_RESIDENTS * (START_CARRIED_FOOD - HOME_FOOD_LOW)
+    expect(fewest).toBeGreaterThanOrEqual(atStart - ownFoodEaten - 2)
+    expect(food()).toBeGreaterThanOrEqual(atStart - ownFoodEaten)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 })
