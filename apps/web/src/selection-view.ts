@@ -24,10 +24,28 @@ import {
   type SeenResident,
   type SeenCarriage,
   type LoadLevel,
+  type Good,
+  type SeenBuilding,
+  type SeenCity,
+  BUILD_MATERIALS,
+  FOOD_PER_DAY,
+  HOUSING_ROOM,
+  PROTECTION,
+  TERRAIN_FOOD,
+  TERRAIN_SPEED,
+  Terrain,
+  WEAPONS,
+  footprintTiles,
+  hungerFactor,
+  recipeFor,
+  recipeGood,
+  teardownWork,
+  UNEXPLORED,
 } from '@csp/shared'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
-import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
+import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
+import { faresKnown } from './seen.js'
 
 /**
  * What the selection card shows (ADR 0008): one of the Player's residents, or a tile of the map
@@ -53,6 +71,7 @@ export type ActionId =
   | 'makeLeader'
   | 'sendHere'
   | 'gate'
+  | 'openCity'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -72,6 +91,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   makeLeader: 'L',
   sendHere: 'W',
   gate: 'O',
+  openCity: 'C',
 }
 
 /**
@@ -302,20 +322,29 @@ export interface TileCard {
   lines: string[]
   /** An own gate on the tile, to open or close. */
   gate?: Building
+  /** A city the card links to in the city inspector: an own town hall's, or where prices are. */
+  city?: { id: string; label: string }
 }
 
 /** What the Player sees on a tile, for the tile card. */
 export interface TileThings {
   x: number
   y: number
-  buildings: Building[]
+  buildings: SeenBuilding[]
   carriages: SeenCarriage[]
   piles: Pile[]
   node: KnownNode | undefined
+  /** The known resource node on a tile, to find the one under a workplace's footprint. */
+  nodeAt?: (x: number, y: number) => KnownNode | undefined
+  /** The tile's explored terrain (`Terrain`), undefined while unknown. */
+  terrain?: number
   /** Residents in sight on the tile that are not the Player's to command. */
   strangers: SeenResident[]
-  cities: Pick<City, 'id' | 'name' | 'realmId' | 'tradeOrg'>[]
+  /** Everyone in sight, for who works where and who lives in a city. */
+  residents?: SeenResident[]
+  cities: Pick<SeenCity, 'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade'>[]
   viewer: Viewer
+  tick?: number
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
 }
@@ -361,12 +390,25 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       lines.push(
         `${done}% of the work done · delivered ${goodsText(building.site.delivered, goodLabels)}`,
       )
+      lines.push(stillNeeded(building, goodLabels))
     } else {
       const max = MAX_WORKERS[building.kind]
       if (max !== undefined) lines.push(`${t.workers(building)} / ${max} workers`)
+      const makes = makesLine(building, t, pile, goodLabels)
+      if (makes) lines.push(makes)
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
+      if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
+        lines.push(...townHallLines(city.id, t))
+        if (rel === 'own')
+          card.city = { id: city.id, label: `Open ${city.name} in the city inspector` }
+      }
+      if (city && sellsHere(building, city)) {
+        lines.push('Buys and sells here · prices in the city inspector')
+        card.city = { id: city.id, label: 'See its prices in the city inspector' }
+      }
     }
+    if (building.teardown) lines.push(teardownLine(building))
   }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
@@ -400,23 +442,205 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       rel,
       what: 'residents',
     }
-    lines.push(
-      t.strangers.length === 1
-        ? `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}`
-        : `${t.strangers.length} residents of other realms`,
-    )
+    if (t.strangers.length === 1) {
+      const gear = gearText(r, goodLabels)
+      lines.push(
+        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${gear ? ` · ${gear}` : ''}`,
+      )
+    } else lines.push(...strangersLines(t.strangers))
   }
-  if (road) lines.push(road.site ? 'Road site' : 'Road')
+  const terrain = terrainLine(t.terrain, road)
+  if (road) {
+    lines.push(road.site ? 'Road site' : terrain!)
+    if (road.teardown) lines.push(teardownLine(road))
+  }
+  if (terrain && !(road && !road.site)) lines.push(terrain)
   lines.push(`Tile ${t.x}, ${t.y}`)
   return {
-    ...(card ?? { title: road && !road.site ? 'Road' : 'Open ground', what: 'tile' }),
+    ...(card ?? {
+      title: road && !road.site ? 'Road' : (groundName(t.terrain) ?? 'Open ground'),
+      what: 'tile',
+    }),
     lines,
   }
 }
 
+/** The explored terrain's name, undefined while it is unknown. */
+function groundName(terrain: number | undefined): string | undefined {
+  return terrain === undefined || terrain === UNEXPLORED ? undefined : TERRAIN_NAMES[terrain]
+}
+
 /**
- * The actions a tile's card offers: send the resident picked last there, and open or close an own
- * gate. Everything else a resident does on the tile is on their own card once they stand there.
+ * How the tile's ground walks and feeds (`CONTEXT.md`: Terrain, Road): "Hills · speed ~70% · food
+ * 130%", or a finished road's speed on whatever it lies on.
+ */
+function terrainLine(terrain: number | undefined, road: Building | undefined): string | undefined {
+  const speed = (v: number) => `speed ${v === 1 ? '' : '~'}${Math.round(v * 100)}%`
+  const food = (v: number) => `food ${Math.round(v * 100)}%`
+  const name = groundName(terrain)
+  if (road && !road.site) {
+    const on = name ? ` on ${name.toLowerCase()}` : ''
+    return `Road${on} · ${speed(TERRAIN_SPEED[Terrain.Road])} · ${food(TERRAIN_FOOD[Terrain.Road])}`
+  }
+  if (!name) return undefined
+  const s = (TERRAIN_SPEED as Partial<Record<number, number>>)[terrain!]
+  const f = (TERRAIN_FOOD as Partial<Record<number, number>>)[terrain!]
+  return s === undefined || f === undefined
+    ? `${name} · impassable`
+    : `${name} · ${speed(s)} · ${food(f)}`
+}
+
+/** What a construction site still lacks of its materials (`CONTEXT.md`: Construction site). */
+function stillNeeded(site: Building, labels: Record<string, string>): string {
+  const needs = BUILD_MATERIALS[site.kind] ?? {}
+  if (Object.keys(needs).length === 0) return 'Needs no materials, only work'
+  const left: Stock = {}
+  for (const [good, units] of Object.entries(needs) as [Good, number][]) {
+    const missing = units - (site.site?.delivered[good] ?? 0)
+    if (missing > 0) left[good] = missing
+  }
+  return Object.keys(left).length === 0
+    ? 'All materials delivered'
+    : `Still needs ${goodsText(left, labels)}`
+}
+
+/**
+ * What a workplace makes and how much of it lies in its pile (`CONTEXT.md`: Workplace); at a
+ * smithy, what its workers in sight are making (`CONTEXT.md`: Smithy).
+ */
+function makesLine(
+  b: Building,
+  t: TileThings,
+  pile: Pile | undefined,
+  labels: Record<string, string>,
+): string | undefined {
+  if (MAX_WORKERS[b.kind] === undefined || !WORKPLACE_SKILL[b.kind]) return undefined
+  const label = (g: Good) => labels[g]!.toLowerCase()
+  const inPile = (g: Good) => pile?.goods[g] ?? 0
+  if ((RECIPES[b.kind]?.length ?? 0) > 1) {
+    const making = new Map<Good, number>()
+    for (const r of t.residents ?? []) {
+      const o = r.order
+      if (o?.kind !== 'workAt' || o.buildingId !== b.id) continue
+      const recipe = recipeFor(b.kind, o.makes)
+      if (recipe) making.set(recipeGood(recipe), (making.get(recipeGood(recipe)) ?? 0) + 1)
+    }
+    const made = RECIPES[b.kind]!.map(recipeGood)
+    const piled = made.filter((g) => inPile(g) > 0).map((g) => `${inPile(g)} ${label(g)}`)
+    const pileText = ` · in its pile: ${piled.length > 0 ? piled.join(', ') : 'nothing made'}`
+    if (making.size === 0) return `Makes weapons and armour, nobody at it${pileText}`
+    const list = [...making].map(([g, n]) => `${label(g)} (${n})`).join(', ')
+    return `Its workers make ${list}${pileText}`
+  }
+  const node =
+    NODE_WORKPLACE_KINDS.has(b.kind) && t.nodeAt
+      ? footprintTiles(b)
+          .map(([x, y]) => t.nodeAt!(x, y))
+          .find((n) => n && NODE_WORKPLACE[n.kind] === b.kind)
+      : undefined
+  const recipe = RECIPES[b.kind]?.[0]
+  const good: Good | undefined =
+    b.kind === 'farm' ? 'food' : node ? NODE_GOOD[node.kind] : recipe && recipeGood(recipe)
+  if (!good) return undefined
+  return `Makes ${label(good)} · ${inPile(good)} in its pile`
+}
+
+/** The kinds of workplace built on a resource node. */
+const NODE_WORKPLACE_KINDS = new Set<string>(Object.values(NODE_WORKPLACE))
+
+/** The weapons and armour a resident carries (`CONTEXT.md`: Weapons and armour), in words. */
+function gearText(
+  r: Pick<Resident, 'carried'>,
+  labels: Record<string, string>,
+): string | undefined {
+  const has = (g: Good) => (r.carried[g] ?? 0) > 0
+  const gear = [...WEAPONS, ...PROTECTION].filter(has).map((g) => labels[g]!.toLowerCase())
+  if (gear.length === 0) return undefined
+  return WEAPONS.some(has) ? `armed: ${gear.join(', ')}` : `unarmed, with ${gear.join(', ')}`
+}
+
+/** The army a resident's order is for, if it is one (`CONTEXT.md`: Army). */
+function armyOf(r: SeenResident): string | undefined {
+  return (r.order as { army?: string } | null)?.army
+}
+
+/**
+ * Several strangers on a tile: each army among them as "Army · 12 soldiers" (`CONTEXT.md`:
+ * Soldier, Army), then the rest and how many of them are armed.
+ */
+function strangersLines(strangers: SeenResident[]): string[] {
+  const armies = new Map<string, SeenResident[]>()
+  const rest: SeenResident[] = []
+  for (const r of strangers) {
+    const a = armyOf(r)
+    if (a) armies.set(a, [...(armies.get(a) ?? []), r])
+    else rest.push(r)
+  }
+  const armed = (rs: SeenResident[]) =>
+    rs.filter((r) => WEAPONS.some((w) => (r.carried[w] ?? 0) > 0)).length
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+  const lines = [...armies.values()].map((rs) => {
+    const soldiers = armed(rs)
+    const unarmed = rs.length - soldiers
+    return `Army · ${plural(soldiers, 'soldier', 'soldiers')}${unarmed > 0 ? ` · ${unarmed} unarmed` : ''}`
+  })
+  if (rest.length > 0) {
+    const n = armed(rest)
+    lines.push(
+      `${plural(rest.length, 'resident', 'residents')} of other realms${n > 0 ? ` · ${n} armed` : ''}`,
+    )
+  }
+  return lines
+}
+
+/**
+ * An own or allied city's town hall: its residents, free housing (`CONTEXT.md`: House) and how
+ * many game days the Food in its storages lasts them, from what the Player sees of it.
+ */
+function townHallLines(cityId: string, t: TileThings): string[] {
+  const residents = (t.residents ?? []).filter((r) => r.cityId === cityId)
+  const mine = t.buildings.filter((b) => b.cityId === cityId && !b.site)
+  const room = mine.reduce((n, b) => n + (HOUSING_ROOM[b.kind] ?? 0), 0)
+  const lines = [`${residents.length} residents · ${room - residents.length} free housing`]
+  const food = mine
+    .filter((b) => b.kind === 'storage')
+    .reduce((n, b) => n + (b.stock?.food ?? 0), 0)
+  const perDay = residents
+    .filter(faresKnown)
+    .reduce((n, r) => n + FOOD_PER_DAY * hungerFactor(r, t.tick ?? 0), 0)
+  if (perDay > 0) {
+    const days = Math.floor(food / perDay)
+    lines.push(
+      days < 1
+        ? 'Food for less than a game day'
+        : `Food for ${days} game ${days === 1 ? 'day' : 'days'}`,
+    )
+  }
+  return lines
+}
+
+/**
+ * Whether the building is where the Player trades with a Trade Org warehouse or an NPC city
+ * (`CONTEXT.md`: Warehouse prices, Trading with an NPC city), with prices they are shown.
+ */
+function sellsHere(b: SeenBuilding, city: TileThings['cities'][number]): boolean {
+  if (b.kind === 'warehouse') return (b.prices?.length ?? 0) > 0
+  return (
+    b.kind === 'storage' && city.realmId === null && !city.tradeOrg && (city.trade?.length ?? 0) > 0
+  )
+}
+
+/** How far tearing a building or site down has come (`CONTEXT.md`: Tearing down). */
+function teardownLine(b: Building): string {
+  const work = teardownWork(b)
+  const done = work > 0 ? Math.min(100, Math.floor(((b.teardown ?? 0) / work) * 100)) : 100
+  return `Being torn down · ${done}% done`
+}
+
+/**
+ * The actions a tile's card offers: send the resident picked last there, open or close an own
+ * gate, and open the city inspector at the city the card links to. Everything else a resident
+ * does on the tile is on their own card once they stand there.
  */
 export function tileActions(card: TileCard, actor: Resident | undefined): CardAction[] {
   const actions: CardAction[] = []
@@ -428,6 +652,7 @@ export function tileActions(card: TileCard, actor: Resident | undefined): CardAc
       label: card.gate.closed ? 'Open the gate' : 'Close the gate',
       key: ACTION_KEYS.gate,
     })
+  if (card.city) actions.push({ id: 'openCity', label: card.city.label, key: ACTION_KEYS.openCity })
   return actions
 }
 
