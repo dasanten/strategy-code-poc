@@ -122,6 +122,9 @@ function runCity(
     if (stored && carry.step === 'back' && storage && isAt(r, storage, size)) {
       stopWork(r)
     }
+    // Done with the Build default (built, or the site gone or out of reach), a builder is free.
+    const built = r.script?.scriptId === 0 && r.script.task === 'build' ? r.script.memory : null
+    if (built && (built.done === true || built.stuck === true)) stopWork(r)
   }
   const home = npcHome(world, city)
   const growth = terrain && home && cityGrowth(world, city, home, adults, terrain, short)

@@ -103,6 +103,14 @@ const SHARED: readonly ScriptBinding[] = [
       'The goods a workplace makes, as a list (at a smithy everything it can make); empty for any other building.',
   },
   {
+    name: 'materialsNeeded',
+    is: 'query',
+    params: ['site'],
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The materials a construction site still lacks, as a list like [{good: "wood", units: 12}]; empty once it has them all, and for a finished building.',
+  },
+  {
     name: 'terrainAt',
     is: 'query',
     params: ['x', 'y'],
@@ -132,8 +140,8 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   },
   list(
     'storages',
-    'The finished storages of my realm (of my city, for an NPC city’s resident); with `from`, something with `x` and `y`, nearest first by my `walkTime` from it.',
-    ['from?'],
+    'The finished storages of my realm (of my city, for an NPC city’s resident); with `from`, something with `x` and `y`, nearest first by my `walkTime` from it; with `goods`, a list of goods, only those holding any of them.',
+    ['from?', 'goods?'],
   ),
   {
     name: 'walkTime',

@@ -2,7 +2,6 @@ import {
   MAX_WORKERS,
   ON_PLAINS,
   PROCESSING,
-  commands,
   BUILDABLE,
   BUILD_WORK,
   MAP_SIZE,
@@ -26,7 +25,8 @@ import {
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
 import { foundCity, updateCityMembership } from './cities.js'
-import { newId, realmOf } from './starting-city.js'
+import { orderedResident } from './order-sender.js'
+import { newId } from './starting-city.js'
 import { gatherPile } from './survival.js'
 
 /**
@@ -57,9 +57,8 @@ interface BuildRequest extends OrderRequest {
 export const build: OrderKind = {
   validate(world, sender, order, terrain) {
     const o = order as Partial<BuildRequest>
-    const realm = realmOf(world, sender.userId)
-    const r = world.residents.find((x) => x.id === o.residentId)
-    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    const r = orderedResident(world, sender, o.residentId)
+    if (!r) return 'not one of your residents'
     if (!canWork(r, world.tick)) return 'children can’t build'
     if (!BUILDABLE.includes(o.building as BuildingKind)) return 'that can’t be built'
     const here = constructionAt(world, r.x, r.y, o.building!)

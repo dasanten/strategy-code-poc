@@ -133,10 +133,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await sendOrder({ kind, residentId: selected.id, spot, goods }))
   }
-  /** Orders the picked resident to build on their tile, or to join the site there. */
+  /**
+   * Gives the picked resident the Build task on their tile, laying out a site or joining the one
+   * there: they run the Player's Build (default) script, which fetches missing materials from
+   * the realm's storages (`CONTEXT.md`: Fetching materials).
+   */
   async function build(building: BuildingKind) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'build', residentId: selected.id, building }))
+    const order = { kind: 'task', task: 'build', residentId: selected.id, building }
+    setOrderError(await sendOrder(order))
   }
   /**
    * Gives the picked resident the Work task at the workplace on their tile, making `makes` at a
