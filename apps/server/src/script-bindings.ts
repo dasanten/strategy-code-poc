@@ -395,6 +395,7 @@ function residentActions(
         directiveId: plain(directiveId),
         carriageId: plain(carriageId ?? null),
       }),
+    handOver: ([newLeaderId]) => request('handOver', { newLeaderId: plain(newLeaderId) }),
     roadLine: ([x, y]) =>
       request('roadLine', {
         from: { x: resident.x, y: resident.y },

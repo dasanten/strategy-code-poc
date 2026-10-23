@@ -135,6 +135,7 @@ export function useWorld(onLoggedOut: () => void) {
             return {
               ...w,
               ...seen,
+              home: msg.leaderId ? { ...w.home, leaderId: msg.leaderId } : w.home,
               tick: msg.tick,
               exploredChunks,
               grownChunks: grown,

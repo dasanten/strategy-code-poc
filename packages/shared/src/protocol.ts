@@ -88,7 +88,8 @@ export type ServerMessage =
    * Every tick: entities in sight that changed, ids that left sight, chunks whose explored
    * terrain grew (load them again), the Player's new realm events and
    * their alliance matters when those changed, and the Region map when territory was worked out
-   * again (all of it) or their explored terrain grew (the grown chunks).
+   * again (all of it) or their explored terrain grew (the grown chunks), and the realm's Leader
+   * when the Player handed the realm to another (`CONTEXT.md`: Leader handover).
    */
   | {
       type: 'tick'
@@ -99,6 +100,7 @@ export type ServerMessage =
       events: RealmEvent[]
       diplomacy?: Diplomacy
       region?: RegionMap
+      leaderId?: string
     }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }

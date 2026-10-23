@@ -415,6 +415,7 @@ The shared language of the game. Domain terms only — no implementation details
   the world except admin directives.
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
+  A Leader serves no one else: they are never hired out or handed over to an alliance army.
 - **Leader handover:** the Player makes another resident their Leader while the old one lives,
   so the realm passes to a younger one. The new Leader is an adult of the realm who isn't serving
   anyone else (in a mercenary contract or the alliance army); both stand

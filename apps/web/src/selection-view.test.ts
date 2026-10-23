@@ -3,9 +3,13 @@ import {
   FOOTPRINT,
   MAP_SIZE,
   MAX_WORKERS,
+  TICKS_PER_GAME_YEAR,
   footprintTiles,
   type Building,
   type Carriage,
+  type City,
+  type ContractView,
+  type Diplomacy,
   type Pile,
   type Resident,
 } from '@csp/shared'
@@ -13,6 +17,7 @@ import { BUILDING_NAMES } from './map/palette.js'
 import {
   actionForKey,
   describeTile,
+  makeLeaderProblem,
   residentActions,
   tileActions,
   type ResidentHere,
@@ -134,9 +139,103 @@ describe('the actions on a resident’s card', () => {
       road: building({ kind: 'road' }),
       othersInSight: 1,
       wallsInSight: 1,
+      makeLeader: { problem: undefined },
     })
     const keys = residentActions(all).map((a) => a.key)
     expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  it('offers Make Leader only for an own resident who isn’t the Leader', () => {
+    expect(ids(here())).not.toContain('makeLeader')
+    const make = residentActions(here({ makeLeader: { problem: undefined } })).find(
+      (a) => a.id === 'makeLeader',
+    )
+    expect(make).toMatchObject({ label: 'Make Leader…', key: 'L', opens: true })
+    expect(make?.disabled).toBeUndefined()
+  })
+
+  it('turns Make Leader off with the reason when the handover would be refused', () => {
+    const problem = 'Ana must stand in the same city as your Leader'
+    const a = residentActions(here({ makeLeader: { problem } }))
+    expect(a.find((x) => x.id === 'makeLeader')).toMatchObject({ disabled: true, reason: problem })
+    expect(actionForKey(a, 'l')).toBeUndefined()
+  })
+})
+
+describe('whether a resident can be made Leader', () => {
+  const realm = { id: 'me', leaderId: 'lead' }
+  const grown = -30 * TICKS_PER_GAME_YEAR
+  const person = (r: Partial<Resident> & Pick<Resident, 'id' | 'name'>): Resident =>
+    ({ owner: 'me', health: 100, bornAt: grown, x: 10, y: 10, cityId: 'c1', ...r }) as Resident
+  const leader = person({ id: 'lead', name: 'Old Bram' })
+  const ana = person({ id: 'ana', name: 'Ana', x: 11 })
+  const city = { id: 'c1', name: 'Oakford', realmId: 'me' } as City
+  const contract = (startedAt: number | null): ContractView =>
+    ({
+      id: 'k1',
+      lender: { realmId: 'me', realm: 'Me' },
+      hirer: { realmId: 'them', realm: 'Them' },
+      offeredBy: 'hirer',
+      residents: [{ id: 'ana', name: 'Ana' }],
+      days: 10,
+      pricePerWeek: 5,
+      storage: null,
+      startedAt,
+      endsAt: null,
+      weeks: 0,
+      paidWeeks: 0,
+      payBy: null,
+    }) as ContractView
+  const seen = (diplomacy: Partial<Pick<Diplomacy, 'alliance' | 'contracts'>> = {}) => ({
+    tick: 0,
+    diplomacy: { alliance: null, contracts: [], ...diplomacy },
+    cities: [city],
+    buildings: [building({ id: 'th', kind: 'townHall', cityId: 'c1', x: 10, y: 10 })],
+    mapSize: 256,
+  })
+
+  it('can when both stand in the same city of the realm and the resident serves no one', () => {
+    expect(makeLeaderProblem(seen(), realm, leader, ana)).toBeUndefined()
+  })
+
+  it('can’t while the Leader is out of the city', () => {
+    const away = { ...leader, x: 60, y: 60 }
+    expect(makeLeaderProblem(seen(), realm, away, ana)).toBe(
+      'Ana must stand in the same city as your Leader',
+    )
+  })
+
+  it('can’t make a child Leader', () => {
+    const child = { ...ana, bornAt: 0 }
+    expect(makeLeaderProblem(seen(), realm, leader, child)).toBe('Ana is a child')
+  })
+
+  it('can’t make someone in a mercenary contract or named in an offer Leader', () => {
+    expect(makeLeaderProblem(seen({ contracts: [contract(0)] }), realm, leader, ana)).toBe(
+      'Ana is in a mercenary contract',
+    )
+    expect(makeLeaderProblem(seen({ contracts: [contract(null)] }), realm, leader, ana)).toBe(
+      'Ana is named in a mercenary contract offer',
+    )
+  })
+
+  it('can’t make someone in the alliance army Leader', () => {
+    const alliance = {
+      id: 'a1',
+      name: 'North',
+      leaderId: 'them',
+      members: [],
+      invites: [],
+      army: [{ realmId: 'me', realm: 'Me', is: 'resident' as const, id: 'ana', recallAt: null }],
+    }
+    expect(makeLeaderProblem(seen({ alliance }), realm, leader, ana)).toBe(
+      'Ana is in the alliance army',
+    )
+  })
+
+  it('can’t make another realm’s resident Leader', () => {
+    const theirs = { ...ana, owner: 'them' }
+    expect(makeLeaderProblem(seen(), realm, leader, theirs)).toBe('not one of your residents')
   })
 })
 

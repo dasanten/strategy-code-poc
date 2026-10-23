@@ -254,6 +254,21 @@ describe('realtime', () => {
     expect(violations).toEqual([])
   })
 
+  it('sends the new Leader once the Player handed the realm over (Leader handover)', async () => {
+    const { url, token, world, realtime } = await start()
+    const { next } = connect(url, token)
+    await next('welcome')
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('leaderId')
+    const realm = world.realms[0]!
+    const heir = world.residents.find((r) => r.owner === realm.id && r.id !== realm.leaderId)!
+    realm.leaderId = heir.id
+    realtime.broadcastTick()
+    expect(await next('tick')).toMatchObject({ leaderId: heir.id })
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('leaderId')
+  })
+
   it('sends the Player their alliance matters on connect, and again only when they change', async () => {
     const { url, token, world, realtime, orders } = await start()
     const { socket, next } = connect(url, token)

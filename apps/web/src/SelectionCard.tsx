@@ -104,7 +104,10 @@ export function ActionRows({
             onClick={() => onAction(a)}
           >
             <kbd>{a.key}</kbd>
-            <span>{a.label}</span>
+            <span>
+              {a.label}
+              {a.reason && <span className="sel-reason">{a.reason}</span>}
+            </span>
             {a.opens && (
               <span className="sel-more" aria-hidden="true">
                 {on ? '▾' : '▸'}

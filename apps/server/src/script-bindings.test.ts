@@ -239,6 +239,7 @@ describe('script bindings', () => {
       'handIn("coins", 50, "c2")',
       { kind: 'handIn', good: 'coins', units: 50, toCityId: 'c2', carriageId: null },
     ],
+    ['handOver("b1")', { kind: 'handOver', newLeaderId: 'b1' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],
   ]
