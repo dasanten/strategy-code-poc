@@ -94,7 +94,7 @@ import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
 import { leadersServeNoOne } from './leader.js'
-import { namesWellFormed } from './renaming.js'
+import { residentNamesWellFormed } from './renaming.js'
 import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 
 /**
@@ -1462,7 +1462,7 @@ export const worldInvariants: Invariant[] = [
   agesInRange,
   realmsHaveLeaders,
   leadersServeNoOne,
-  namesWellFormed,
+  residentNamesWellFormed,
   buildingsInPlace,
   citiesFromBuildings,
   carriedWithinCapacity,

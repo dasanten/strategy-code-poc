@@ -11,7 +11,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { recordEvent } from './events.js'
 import { OrderQueue } from './orders.js'
-import { namesWellFormed } from './renaming.js'
+import { residentNamesWellFormed } from './renaming.js'
 import { bindScript } from './script-bindings.js'
 import { entitiesInSight } from './sight.js'
 import { foundStartingCity } from './starting-city.js'
@@ -57,7 +57,7 @@ describe('Renaming a resident', () => {
     expect(rename(miner.id, '  Old Gerd  ')).toBe('ok')
     expect(miner.name).toBe('Old Gerd')
     expect(realm.name).toBeUndefined()
-    expect(namesWellFormed.check(world, terrain)).toEqual([])
+    expect(residentNamesWellFormed.check(world, terrain)).toEqual([])
   })
 
   it('lets names repeat', () => {
@@ -209,15 +209,15 @@ describe('Renaming from a script', () => {
   })
 })
 
-describe('names-well-formed invariant', () => {
+describe('resident-names-well-formed invariant', () => {
   it('reports an empty, untrimmed or too long name', () => {
-    const { world, terrain, realm, miner } = setup()
-    expect(namesWellFormed.check(world, terrain)).toEqual([])
+    const { world, terrain, leader, miner } = setup()
+    expect(residentNamesWellFormed.check(world, terrain)).toEqual([])
     miner.name = ' Gerd'
-    realm.name = 'x'.repeat(REALM_NAME_MAX_LENGTH + 1)
-    expect(namesWellFormed.check(world, terrain).map((v) => v.entityIds)).toEqual([
+    leader.name = 'x'.repeat(RESIDENT_NAME_MAX_LENGTH + 1)
+    expect(residentNamesWellFormed.check(world, terrain).map((v) => v.entityIds)).toEqual([
+      [leader.id],
       [miner.id],
-      [realm.id],
     ])
   })
 })

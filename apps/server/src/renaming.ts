@@ -1,5 +1,4 @@
 import {
-  REALM_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
   nameProblem,
   renameProblem,
@@ -59,32 +58,24 @@ export const rename: OrderKind = {
 }
 
 /**
- * Invariant (ADR 0004; `CONTEXT.md`: Renaming a resident, Realm name): every resident's name and
- * every realm name given is trimmed, not empty and no longer than its most.
+ * Invariant (ADR 0004; `CONTEXT.md`: Renaming a resident): every resident's name is trimmed, not
+ * empty and at most `RESIDENT_NAME_MAX_LENGTH`. Realm names are `realmsHaveLeaders`' to check.
  */
-export const namesWellFormed: Invariant = {
-  name: 'names-well-formed',
+export const residentNamesWellFormed: Invariant = {
+  name: 'resident-names-well-formed',
   check(world) {
     const out: InvariantViolation[] = []
-    const bad = (name: string, max: number) =>
-      nameProblem(name, max) ?? (name !== name.trim() ? 'not trimmed' : undefined)
     for (const r of world.residents) {
-      const p = bad(r.name, RESIDENT_NAME_MAX_LENGTH)
-      if (p)
+      const p =
+        nameProblem(r.name, RESIDENT_NAME_MAX_LENGTH) ??
+        (r.name !== r.name.trim() ? 'not trimmed' : undefined)
+      if (p) {
         out.push({
           invariant: this.name,
           message: `resident ${r.id}'s name: ${p}`,
           entityIds: [r.id],
         })
-    }
-    for (const realm of world.realms) {
-      const p = realm.name === undefined ? undefined : bad(realm.name, REALM_NAME_MAX_LENGTH)
-      if (p)
-        out.push({
-          invariant: this.name,
-          message: `realm ${realm.id}'s name: ${p}`,
-          entityIds: [realm.id],
-        })
+      }
     }
     return out
   },
