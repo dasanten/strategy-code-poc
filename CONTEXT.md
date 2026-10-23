@@ -408,11 +408,21 @@ The shared language of the game. Domain terms only — no implementation details
   the figure.
 - **Admin:** an account with admin rights: creates invite codes, resets passwords and gives
   admin directives, in an admin panel apart from the game. Being an admin has nothing to do with
-  the admin's own Player: it gives them no power or knowledge in the world, and they play like
-  anyone else.
+  the admin's own Player: it gives them no power in the world, and they play like anyone else.
+  The one exception is knowledge: the admin panel shows the whole world (the **admin map**), so
+  admins can watch over it. That knowledge is the admin's, never their Player's: the game screen
+  and their scripts still see only their Player's sight, and nothing in the admin panel acts in
+  the world except admin directives.
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
-  The Leader role can pass to another resident before the Leader dies (details to follow).
+- **Leader handover:** the Player makes another resident their Leader while the old one lives,
+  so the realm passes to a younger one. The new Leader is an adult of the realm who isn't serving
+  anyone else (in a mercenary contract or the alliance army); both stand
+  inside the same city of the realm when it happens, so a Leader out in the field comes home
+  first. Only the Player chooses it (by hand or from a script); nothing else forces it. It is
+  free and instant, also while the city is under attack. The old Leader stays on as
+  an ordinary resident of the realm. Contracts, alliances, standing, scripts and the realm log
+  belong to the Player and carry over; the realm log records the handover.
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
   Leader was. Their cities become self-managed. The Player respawns as a new Leader with a fresh
   starting city on their next login.

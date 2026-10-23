@@ -1,17 +1,30 @@
-import type {
-  Account,
-  AdminDirectiveView,
-  AdminDirectives,
-  ApiError,
-  CreateScriptRequest,
-  DirectivePriceRequest,
-  GiveDirectiveRequest,
-  InviteCreated,
-  LoginRequest,
-  ResetPasswordRequest,
-  ScriptDetail,
-  ScriptSummary,
-  SignUpRequest,
+import {
+  ADMIN_MAP_INFO_PATH,
+  ADMIN_PLACES_PATH,
+  ADMIN_TERRAIN_OVERVIEW_PATH,
+  ADMIN_TERRITORY_PATH,
+  adminInspectPath,
+  adminWorldPath,
+  type Account,
+  type AdminDirectiveView,
+  type AdminDirectives,
+  type AdminInspectTarget,
+  type AdminInspection,
+  type AdminPlaces,
+  type AdminViewRequest,
+  type AdminWorldView,
+  type ApiError,
+  type CreateScriptRequest,
+  type DirectivePriceRequest,
+  type GiveDirectiveRequest,
+  type InviteCreated,
+  type LoginRequest,
+  type MapInfo,
+  type RegionMap,
+  type ResetPasswordRequest,
+  type ScriptDetail,
+  type ScriptSummary,
+  type SignUpRequest,
 } from '@csp/shared'
 
 /** A failed API call, with the server's message for the user. */
@@ -56,6 +69,22 @@ export const api = {
   logout: () => call<void>('POST', '/api/logout'),
   createInvite: () => call<InviteCreated>('POST', '/api/admin/invites'),
   resetPassword: (req: ResetPasswordRequest) => call<void>('POST', '/api/admin/password', req),
+  // The admin map (`CONTEXT.md`: admin map): the whole world, for admins only.
+  adminMap: () => call<MapInfo>('GET', ADMIN_MAP_INFO_PATH),
+  adminWorld: (view: AdminViewRequest) => call<AdminWorldView>('GET', adminWorldPath(view)),
+  adminPlaces: () => call<AdminPlaces>('GET', ADMIN_PLACES_PATH),
+  adminInspect: (target: AdminInspectTarget) =>
+    call<AdminInspection>('GET', adminInspectPath(target)),
+  adminTerritory: () => call<RegionMap>('GET', ADMIN_TERRITORY_PATH),
+  adminOverview: async () => {
+    const res = await fetch(ADMIN_TERRAIN_OVERVIEW_PATH, { credentials: 'same-origin' }).catch(
+      () => {
+        throw new ApiFailure('network', 'Cannot reach the server.')
+      },
+    )
+    if (!res.ok) throw new ApiFailure('network', `Request failed (${res.status}).`)
+    return new Uint8Array(await res.arrayBuffer())
+  },
   // Admin directives (`CONTEXT.md`: Admin directive).
   directives: () => call<AdminDirectives>('GET', '/api/admin/directives'),
   giveDirective: (req: GiveDirectiveRequest) =>

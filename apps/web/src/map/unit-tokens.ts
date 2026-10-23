@@ -1,14 +1,28 @@
 import type { Army, Building, Carriage, Horse, Resident, SeenCaravan, SeenCity } from '@csp/shared'
 import { caravanParts } from '../caravans.js'
-import { BASE_ART, UNIT_ART } from './art.js'
-import { tileToScreen, type Camera, type Size } from './camera.js'
-import { relationshipColor, type BadgeLayer, type Relationship, type TokenLayer } from './tokens.js'
-import { armyBanners, entityRelationship, residentGroups, type Known } from './units.js'
+import { ACTIVITY_ART, BASE_ART, UNIT_ART } from './art.js'
+import { tileToScreen, zoomTier, type Camera, type Size } from './camera.js'
+import { residentActivity, tileFigures, type Activity } from './figures.js'
+import {
+  isLeader,
+  relationshipColor,
+  type BadgeLayer,
+  type Leaders,
+  type Tone,
+  type TokenLayer,
+  type Viewer,
+} from './tokens.js'
+import {
+  armyBanners,
+  entityRelationship,
+  residentGroups,
+  type Known,
+  type ResidentGroup,
+} from './units.js'
 
 /** What of the world the unit tokens need. */
 export interface UnitWorld {
   map: { size: number }
-  home: { realmId: string; leaderId?: string | null }
   residents: readonly Resident[]
   horses: readonly Horse[]
   carriages: readonly Carriage[]
@@ -16,7 +30,6 @@ export interface UnitWorld {
   caravans: readonly SeenCaravan[]
   cities: readonly Pick<SeenCity, 'id' | 'realmId' | 'tradeOrg'>[]
   buildings: readonly Pick<Building, 'kind' | 'x' | 'y'>[]
-  diplomacy: { alliance?: { members: { realmId: string }[] } | null }
 }
 
 /** Where a resident's token was drawn this frame, for the selection ring. */
@@ -36,7 +49,7 @@ function drawUnit(
   x: number,
   y: number,
   r: number,
-  rel: Relationship | undefined,
+  rel: Tone | undefined,
 ) {
   const color = relationshipColor(rel)
   const base = (r * 24) / 11
@@ -47,9 +60,11 @@ function drawUnit(
 
 /**
  * Residents, carriages, horses, Trade Org caravans and armies at middle zoom and closer
- * (ADR 0008): residents on one tile as one token with a count, coloured by the largest group;
+ * (ADR 0008): residents on one tile as one token with a count, coloured by the largest group,
+ * or up close as single figures with their activity (`drawFigures`);
  * an army as a banner with its soldier count; carts and caravans; horses not hitched to a cart.
  * Units on a tile with a building or a cart step aside to its corners so both show.
+ * Tokens are coloured as `viewer` sees them; the `leaders` wear the crown.
  */
 export function drawUnits(
   tokens: TokenLayer,
@@ -57,14 +72,12 @@ export function drawUnits(
   cam: Camera,
   view: Size,
   world: UnitWorld,
+  viewer: Viewer,
+  leaders: Leaders,
 ): Map<string, Spot> {
   const size = world.map.size
   const tile = cam.scale
   const parts = caravanParts(world.caravans)
-  const viewer = {
-    realmId: world.home.realmId,
-    allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
-  }
   const known: Known = {
     cities: new Map(world.cities.map((c) => [c.id, c])),
     caravan: new Set([...parts.carriages, ...parts.crew]),
@@ -136,10 +149,22 @@ export function drawUnits(
   const groups = residentGroups(
     world.residents,
     (id) => rels.get(id),
-    world.home.leaderId,
+    leaders,
     new Set(banners.flatMap((b) => b.under)),
   )
+  const close = zoomTier(tile) === 'close'
+  const byId = new Map(world.residents.map((r) => [r.id, r]))
   for (const g of groups) {
+    if (close) {
+      if (!near(at(g.x, g.y))) continue
+      drawFigures(tokens, badges, g, (dx, dy) => at(g.x, g.y, dx - 0.5, dy - 0.5), tile, {
+        relOf: (id) => rels.get(id),
+        leaders,
+        activityOf: (id) => residentActivity(byId.get(id)!),
+        spots,
+      })
+      continue
+    }
     const spot = place(g.x, g.y, Math.max(5.5, tile * 0.36))
     if (!near([spot.x, spot.y])) continue
     drawUnit(tokens, g.leader ? UNIT_ART.leader : UNIT_ART.person, spot.x, spot.y, spot.r, g.rel)
@@ -147,4 +172,47 @@ export function drawUnits(
     for (const id of g.ids) spots.set(id, spot)
   }
   return spots
+}
+
+/** From this many pixels per tile up, figures get their activity icon; below it they are too small. */
+const ACTIVITY_SCALE = 22
+
+/**
+ * The residents on one tile as single figures at close zoom (ADR 0008): up to four, each in its
+ * own relationship colour with an activity icon at its lower right; with more, three and a "+N"
+ * badge. Residents left out are found at the badge.
+ */
+function drawFigures(
+  tokens: TokenLayer,
+  badges: BadgeLayer,
+  g: ResidentGroup,
+  at: (dx: number, dy: number) => readonly [number, number],
+  tile: number,
+  of: {
+    relOf: (id: string) => Tone | undefined
+    leaders: Leaders
+    activityOf: (id: string) => Activity | undefined
+    spots: Map<string, Spot>
+  },
+) {
+  const { figures, more } = tileFigures(g.ids, of.relOf, of.leaders)
+  const r = tile * 0.2
+  for (const f of figures) {
+    const [x, y] = at(f.dx, f.dy)
+    const rel = of.relOf(f.id)
+    const leader = isLeader(of.leaders, f.id)
+    drawUnit(tokens, leader ? UNIT_ART.leader : UNIT_ART.person, x, y, r, rel)
+    of.spots.set(f.id, { x, y, r })
+    const activity = of.activityOf(f.id)
+    if (activity && tile >= ACTIVITY_SCALE) {
+      const [ax, ay] = [x + r * 0.85, y + r * 0.8]
+      tokens.place(BASE_ART.round, ax, ay, r * 1.05)
+      tokens.place(ACTIVITY_ART[activity], ax, ay, r * 0.62, relationshipColor(rel))
+    }
+  }
+  if (more) {
+    const [x, y] = at(more.dx, more.dy)
+    badges.place(`+${more.ids.length}`, x, y, Math.max(8, tile * 0.22))
+    for (const id of more.ids) of.spots.set(id, { x, y, r })
+  }
 }

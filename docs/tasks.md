@@ -7,7 +7,8 @@ the next one and works it into a PR (`.claude/commands/next-ticket.md`).
 **Priority rule:** bugs first, then epics in order, so the game becomes playable sooner:
 survive → produce → transport → grow → trade → fight → alliances → scripts → roads. Exception:
 the UI redesign (Epic 17, ADR 0008), then the livelier pace and default scripts (Epic 18, ADR
-0009), go ahead of the remaining gameplay epics.
+0009), go ahead of the remaining gameplay epics. The admin map (Epic 19) runs in parallel with
+Epic 18, ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -35,6 +36,7 @@ I sleep.
 | 16  | [Bandits](https://github.com/dasanten/strategy-code-poc/issues/144)                             | scope only              |
 | 17  | [Game UI redesign](https://github.com/dasanten/strategy-code-poc/issues/202)                    | ticketed                |
 | 18  | [Livelier pace and default scripts](https://github.com/dasanten/strategy-code-poc/issues/220)   | ticketed                |
+| 19  | [Admin map](https://github.com/dasanten/strategy-code-poc/issues/232)                           | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
