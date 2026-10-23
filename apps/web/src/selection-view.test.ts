@@ -361,7 +361,7 @@ describe('the card for a tile', () => {
   })
 
   it('shows strangers on it in their realm’s colour', () => {
-    const r = { name: 'Brann', owner: 'them', cityId: null } as Resident
+    const r = { name: 'Brann', owner: 'them', cityId: null, carried: {} } as Resident
     expect(tile({ strangers: [r] })).toMatchObject({ title: 'Brann', rel: 'otherRealm' })
   })
 })

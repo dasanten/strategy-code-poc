@@ -205,6 +205,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     (lookup: (x: number, y: number) => KnownNode | undefined) => setNodeAt(() => lookup),
     [],
   )
+  const [terrainAt, setTerrainAt] = useState<(x: number, y: number) => number | undefined>()
+  const onTerrainLoaded = useCallback(
+    (lookup: (x: number, y: number) => number | undefined) => setTerrainAt(() => lookup),
+    [],
+  )
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
     selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
   // A road may share its tile with a building (`CONTEXT.md`: Road); a building is wherever its
@@ -256,6 +261,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             picking={picking !== false || armyPick !== undefined}
             onPickTile={goTo}
             onNodesLoaded={onNodesLoaded}
+            onTerrainLoaded={onTerrainLoaded}
             focus={focus}
           />
         ) : (
@@ -404,8 +410,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 carriages: world.carriages,
                 piles: world.piles,
                 node: nodeAt?.(selectedTile.x, selectedTile.y),
+                nodeAt,
+                terrain: terrainAt?.(selectedTile.x, selectedTile.y),
                 strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),
+                residents: world.residents,
                 cities: world.cities,
+                tick: world.tick,
                 viewer: {
                   realmId: world.home.realmId,
                   allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
@@ -429,6 +439,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onSetGate={async (gateId, open) =>
               setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
             }
+            onOpenCity={(id) => {
+              setOpenCityId(id)
+              setOpenDrawer('cities')
+            }}
           />
         </div>
       )}

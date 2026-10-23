@@ -117,6 +117,7 @@ export function MapView({
   picking = false,
   onPickTile,
   onNodesLoaded,
+  onTerrainLoaded,
   focus,
   terrainPath,
   start,
@@ -139,6 +140,8 @@ export function MapView({
   onPickTile?: (x: number, y: number) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
   onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
+  /** Called as terrain chunks load, with a lookup of a tile's explored terrain. */
+  onTerrainLoaded?: (terrainAt: (x: number, y: number) => number | undefined) => void
   /**
    * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
    * at (the zoom in place if none); a new object each time.
@@ -167,6 +170,8 @@ export function MapView({
   onPickTileRef.current = onPickTile
   const onNodesLoadedRef = useRef(onNodesLoaded)
   onNodesLoadedRef.current = onNodesLoaded
+  const onTerrainLoadedRef = useRef(onTerrainLoaded)
+  onTerrainLoadedRef.current = onTerrainLoaded
   const onViewRef = useRef(onView)
   onViewRef.current = onView
   const startRef = useRef(start)
@@ -256,6 +261,12 @@ export function MapView({
           nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
             (n) => n.x === x && n.y === y,
           ),
+        )
+        onTerrainLoadedRef.current?.(
+          (x, y) =>
+            store.get(Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE))?.tiles[
+              (y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)
+            ],
         )
         redraw()
       },
