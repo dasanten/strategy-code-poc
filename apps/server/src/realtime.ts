@@ -4,10 +4,12 @@ import {
   SESSION_COOKIE,
   WS_PATH,
   diplomacyFor,
+  foundingProblem,
   regionMapFor,
   townHallOf,
   type Account,
   type ClientMessage,
+  type Realm,
   type RegionMap,
   type SeenEntity,
   type ServerMessage,
@@ -19,7 +21,7 @@ import { getSessionUser, type SessionUser } from './auth.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
-import { foundStartingCity } from './starting-city.js'
+import { foundStartingCity, realmOf, suggestedLeaderName } from './starting-city.js'
 import { eventsFor } from './events.js'
 import { regionMapUnsound } from './region-map.js'
 import { shouldCheckInvariants } from './invariants.js'
@@ -130,11 +132,9 @@ export function attachRealtime(
     },
   })
 
-  wss.on('connection', (socket, req) => {
-    const user = users.get(req)!
-    // A Player without a realm (new, or from before realms) gets their starting city now, and
-    // their residents look around before the welcome goes out.
-    const realm = foundStartingCity(world, opts.terrain, user.id)
+  /** Starts sending a Player with a realm their world: the welcome now, then every tick. */
+  function welcome(socket: WebSocket, user: SessionUser, realm: Realm) {
+    // Their residents look around before the welcome goes out.
     opts.sight.update(world, opts.explored)
     const client: Client = {
       account: { name: user.name, isAdmin: user.isAdmin },
@@ -171,6 +171,17 @@ export function attachRealtime(
       diplomacy,
       region: regionFor(client, []) ?? null,
     })
+  }
+
+  wss.on('connection', (socket, req) => {
+    const user = users.get(req)!
+    const account = { name: user.name, isAdmin: user.isAdmin }
+    // A Player without a realm (first login, or after a Leader death) names it and their Leader
+    // before the realm and its starting city are founded (`CONTEXT.md`: Realm name).
+    const realm = realmOf(world, user.id)
+    if (realm) welcome(socket, user, realm)
+    else
+      send(socket, { type: 'founding', account, leaderName: suggestedLeaderName(world, user.id) })
 
     socket.on('message', (raw) => {
       let msg: ClientMessage
@@ -179,7 +190,20 @@ export function attachRealtime(
       } catch {
         return send(socket, { type: 'rejected', requestId: '', reason: 'not JSON' })
       }
+      const client = clients.get(socket)
+      if (msg?.type === 'found' && !client) {
+        const requestId = typeof msg.requestId === 'string' ? msg.requestId : ''
+        const problem = foundingProblem(msg.realmName, msg.leaderName)
+        if (problem) return send(socket, { type: 'rejected', requestId, reason: problem })
+        // Founded from another tab meanwhile: that realm stands, under the names given there.
+        const names = { realmName: msg.realmName, leaderName: msg.leaderName }
+        const realm =
+          realmOf(world, user.id) ?? foundStartingCity(world, opts.terrain, user.id, names)
+        return welcome(socket, user, realm)
+      }
       if (msg?.type === 'order') {
+        const requestId = typeof msg.requestId === 'string' ? msg.requestId : ''
+        if (!client) return send(socket, { type: 'rejected', requestId, reason: 'no realm yet' })
         const sender = { userId: client.userId, account: client.account }
         send(socket, opts.orders.receive(world, sender, msg.requestId, msg.order))
       }
