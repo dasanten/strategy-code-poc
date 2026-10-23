@@ -344,6 +344,9 @@ export function ResidentCard({
   scripts,
   onRunScript,
   onEditScript,
+  makeLeader,
+  leaderName,
+  onMakeLeader,
   onClose,
 }: {
   resident: Resident
@@ -412,6 +415,15 @@ export function ResidentCard({
   walls: Building[]
   /** Orders the resident to climb over a wall or gate next to them. */
   onClimb: (wallId: string) => void
+  /**
+   * For one of the Player's own residents who isn't their Leader: why they can't be made Leader
+   * now, if they can't (`makeLeaderProblem`). Undefined for the Leader and others' residents.
+   */
+  makeLeader: { problem: string | undefined } | undefined
+  /** The Player's Leader's name, for the handover's confirm. */
+  leaderName: string | undefined
+  /** Orders the Leader to hand the realm over to this resident (`CONTEXT.md`: Leader handover). */
+  onMakeLeader: () => void
   /** Closes the card. */
   onClose: () => void
 }) {
@@ -446,6 +458,7 @@ export function ResidentCard({
     othersInSight: others.length,
     wallsInSight: walls.length,
     picking,
+    makeLeader,
   })
   const shown = actions.some((a) => a.id === open) ? open : undefined
   const act = (a: CardAction) => {
@@ -642,6 +655,34 @@ export function ResidentCard({
                 <h3>Run script</h3>
               </div>
               <RunScript script={r.script} scripts={scripts} onRunScript={onRunScript} />
+            </section>
+          )}
+          {shown === 'makeLeader' && makeLeader && (
+            <section className="inspector-block" aria-label="Make Leader">
+              <div className="panel-head">
+                <h3>Make Leader</h3>
+              </div>
+              <p className="small">
+                Hand your realm to {r.name}? {leaderName ?? 'Your Leader'} stays on as an ordinary
+                resident.
+              </p>
+              {makeLeader.problem && <p className="muted small">{makeLeader.problem}.</p>}
+              <div className="order-buttons">
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={!!makeLeader.problem}
+                  onClick={() => {
+                    setOpen(undefined)
+                    onMakeLeader()
+                  }}
+                >
+                  Make {r.name} Leader
+                </button>
+                <button type="button" onClick={() => setOpen(undefined)}>
+                  Cancel
+                </button>
+              </div>
             </section>
           )}
         </div>

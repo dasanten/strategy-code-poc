@@ -38,7 +38,7 @@ import {
   type Picking,
 } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
-import { describeTile } from './selection-view.js'
+import { describeTile, makeLeaderProblem } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { useWorld } from './useWorld.js'
 
@@ -176,6 +176,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function pair(partnerId: string) {
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'pair', residentId: selected.id, partnerId }))
+  }
+  /**
+   * Orders the Player's Leader to hand the realm over to the picked resident (`CONTEXT.md`:
+   * Leader handover), the same `handOver` order a script's `handOver` requests.
+   */
+  async function makeLeader() {
+    if (!selected || !world) return
+    const order = { kind: 'handOver', residentId: world.home.leaderId, newLeaderId: selected.id }
+    setOrderError(await sendOrder(order))
   }
   /** Orders the picked resident to attack a resident of another realm. */
   async function attack(targetId: string) {
@@ -472,6 +481,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 world.cities.find((c) => c.id === b.cityId)?.realmId !== world.home.realmId,
             )}
             onClimb={climb}
+            makeLeader={
+              selected.owner === world.home.realmId && selected.id !== world.home.leaderId
+                ? {
+                    problem: makeLeaderProblem(
+                      {
+                        tick: world.tick,
+                        diplomacy: world.diplomacy,
+                        cities: world.cities,
+                        buildings: world.buildings,
+                        mapSize: world.map.size,
+                      },
+                      { id: world.home.realmId, leaderId: world.home.leaderId },
+                      leader,
+                      selected,
+                    ),
+                  }
+                : undefined
+            }
+            leaderName={leader?.name}
+            onMakeLeader={makeLeader}
             onClose={() => {
               setSelectedId(undefined)
               setPicking(false)

@@ -17,6 +17,10 @@ import {
   type Resident,
   type Stock,
   covers,
+  handOverProblem,
+  type Alliance,
+  type Diplomacy,
+  type MercenaryContract,
 } from '@csp/shared'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
@@ -43,6 +47,7 @@ export type ActionId =
   | 'attack'
   | 'walls'
   | 'script'
+  | 'makeLeader'
   | 'sendHere'
   | 'gate'
 
@@ -61,6 +66,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   attack: 'A',
   walls: 'C',
   script: 'X',
+  makeLeader: 'L',
   sendHere: 'W',
   gate: 'O',
 }
@@ -75,6 +81,8 @@ export interface CardAction {
   key: string
   opens?: true
   disabled?: true
+  /** Why a disabled action can't run now, shown with it. */
+  reason?: string
   /** The map is waiting for a tile for this action. */
   active?: true
 }
@@ -101,6 +109,12 @@ export interface ResidentHere {
   wallsInSight: number
   /** What the map is waiting for a tile for. */
   picking: false | 'walk' | 'drive' | 'haul' | 'road'
+  /**
+   * For one of the Player's own residents who isn't their Leader: why the Leader can't hand the
+   * realm over to them now (`CONTEXT.md`: Leader handover), undefined when they can. Absent for
+   * the Leader and for anyone else's resident, who get no Make Leader row.
+   */
+  makeLeader?: { problem: string | undefined }
 }
 
 /**
@@ -155,7 +169,75 @@ export function residentActions(h: ResidentHere): CardAction[] {
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
   if (h.wallsInSight > 0) add(row('walls', 'Break or climb a wall…', { opens: true }))
   add(row('script', 'Run script…', { opens: true }))
+  if (h.makeLeader) {
+    const { problem } = h.makeLeader
+    add(
+      row('makeLeader', 'Make Leader…', {
+        opens: true,
+        ...(problem ? { disabled: true as const, reason: problem } : {}),
+      }),
+    )
+  }
   return actions
+}
+
+/** What the Player knows that the handover check needs: their diplomacy and what is in sight. */
+export interface HandOverSeen {
+  tick: number
+  diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>
+  cities: City[]
+  buildings: Building[]
+  mapSize: number
+}
+
+/**
+ * The shared handover check (`handOverProblem`, the one the server runs) on what the Player
+ * sees: their alliance's army and their realm's contracts stand in for the world's. The server
+ * checks again when the order arrives.
+ */
+export function makeLeaderProblem(
+  seen: HandOverSeen,
+  realm: { id: string; leaderId: string },
+  leader: Resident | undefined,
+  target: Resident,
+): string | undefined {
+  const a = seen.diplomacy.alliance
+  const alliances: Alliance[] = a
+    ? [
+        {
+          id: a.id,
+          name: a.name,
+          leaderId: a.leaderId,
+          members: a.members.map((m) => ({
+            realmId: m.realmId,
+            joinedAt: m.joinedAt,
+            leaving: m.leavesAt === null ? null : { at: m.leavesAt, removed: false },
+          })),
+          invites: a.invites.map((i) => i.realmId),
+          army: a.army.map((p) => ({ is: p.is, id: p.id, recallAt: p.recallAt })),
+        },
+      ]
+    : []
+  const contracts: MercenaryContract[] = seen.diplomacy.contracts.map((c) => ({
+    id: c.id,
+    lenderId: c.lender.realmId,
+    hirerId: c.hirer.realmId,
+    offeredBy: c.offeredBy,
+    residentIds: c.residents.map((r) => r.id),
+    days: c.days,
+    pricePerWeek: c.pricePerWeek,
+    storageId: c.storage?.id ?? '',
+    startedAt: c.startedAt,
+    paidWeeks: c.paidWeeks,
+  }))
+  const world = {
+    tick: seen.tick,
+    alliances,
+    contracts,
+    cities: seen.cities,
+    buildings: seen.buildings,
+  }
+  return handOverProblem(world, realm, leader, target, seen.mapSize)
 }
 
 /** The relationship of a carriage's or a resident's owner (ADR 0008), seen from the viewer. */
