@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import type { Building, Resident } from '@csp/shared'
+import type { Building, Resident, ResourceKind } from '@csp/shared'
+import { BuildingInfo } from './BuildingInfo.js'
 import { ART_FILES, BUILDING_ART, NODE_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
@@ -148,6 +149,7 @@ export function TileCard({
   card,
   building,
   nodeKind,
+  buildingNode,
   actor,
   orderError,
   onClose,
@@ -159,6 +161,8 @@ export function TileCard({
   /** The building the card is named after, for its icon. */
   building: Building | undefined
   nodeKind: keyof typeof NODE_ART | undefined
+  /** The node under the building's footprint, which picks what a mine yields. */
+  buildingNode?: ResourceKind
   /** The resident picked last, to send here. */
   actor: Resident | undefined
   orderError: string | undefined
@@ -189,6 +193,13 @@ export function TileCard({
             <li key={l}>{l}</li>
           ))}
         </ul>
+      )}
+      {card.what === 'building' && building && (
+        <BuildingInfo
+          kind={building.kind}
+          node={buildingNode}
+          site={building.site ? building : undefined}
+        />
       )}
       {actions.length > 0 && (
         <ActionRows
