@@ -72,6 +72,9 @@ function sideExists(world: WorldState, id: string): boolean {
   return world.realms.some((r) => r.id === id) || npcCity(world, id) !== undefined
 }
 
+/** Whether the resident is a realm's Leader (`CONTEXT.md`: Leader), whom nobody hires. */
+const isLeader = (world: WorldState, id: string) => world.realms.some((r) => r.leaderId === id)
+
 /** Whether the resident is named in any contract, offered or in force. */
 const contracted = (world: WorldState, id: string) =>
   world.contracts.some((c) => c.residentIds.includes(id))
@@ -135,6 +138,7 @@ function readOffer(
   if (ids.some((id) => handedOverTo(world, id as string))) {
     return 'a resident is in an alliance army'
   }
+  if (ids.some((id) => isLeader(world, id as string))) return 'a Leader is never hired out'
   let hirerId: string
   if (lenderId === realmId) {
     if (order.realmId === TRADE_ORG) return 'the Trade Organization hires only by its own offers'
@@ -284,6 +288,7 @@ export function cannotStart(world: WorldState, c: MercenaryContract): string | u
   const lenders = (id: string) =>
     world.residents.some((r) => r.id === id && contractSide(world, r) === c.lenderId)
   if (!c.residentIds.every(lenders)) return 'the residents are no longer all the lender’s'
+  if (c.residentIds.some((id) => isLeader(world, id))) return 'a Leader is never hired out'
   if (storageRealm(world, c.storageId) !== c.lenderId)
     return 'the storage is no longer the lender’s'
   return undefined

@@ -383,6 +383,28 @@ describe('realm log', () => {
     expect(realmEnded(log)).toBe(false)
   })
 
+  it('says who handed the realm over to whom, and where', () => {
+    expect(
+      describeEvent({
+        kind: 'leaderHandedOver',
+        fromId: 'r1',
+        from: 'Mara',
+        toId: 'r2',
+        to: 'Ysolde',
+        cityId: 'c1',
+        city: 'Ashford',
+        x: 3,
+        y: 9,
+        seq: 1,
+        ...at,
+      }),
+    ).toEqual({
+      text: 'Mara handed your realm over to Ysolde in Ashford; Ysolde is your Leader now.',
+      tone: 'info',
+      places: [{ name: 'Ashford', x: 3, y: 9 }],
+    })
+  })
+
   it('keeps the latest events, as many as the server does', () => {
     const event = (seq: number): RealmEvent => ({ kind: 'foodSpoiled', units: 1, seq, ...at })
     const log = Array.from({ length: REALM_LOG_LENGTH }, (_, i) => event(i))

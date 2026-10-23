@@ -1127,6 +1127,21 @@ export type RealmEventWhat =
       x: number
       y: number
     }
+  /**
+   * The Player's Leader `from` handed the realm over to `to` (`CONTEXT.md`: Leader handover) in
+   * the city `city`, standing at (`x`, `y`); `from` stays on as an ordinary resident.
+   */
+  | {
+      kind: 'leaderHandedOver'
+      fromId: string
+      from: string
+      toId: string
+      to: string
+      cityId: string
+      city: string
+      x: number
+      y: number
+    }
   /** Food went bad over the game day in the realm's storages, residents' loads and carriages. */
   | { kind: 'foodSpoiled'; units: number }
   /** A pair had a child (`CONTEXT.md`: Pairing, Child); `parents` are their names. */

@@ -58,6 +58,8 @@ interface Client {
   lastDiplomacy: string
   /** The tick of the territory the Region map last went out from; null before any did. */
   regionTick: number | null
+  /** The realm's Leader last sent, so a tick sends it only when it changed (Leader handover). */
+  leaderId: string
 }
 
 /**
@@ -142,6 +144,7 @@ export function attachRealtime(
       lastEventSeq: 0,
       lastDiplomacy: '',
       regionTick: null,
+      leaderId: realm.leaderId,
     }
     clients.set(socket, client)
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
@@ -205,6 +208,9 @@ export function attachRealtime(
         const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
         client.lastDiplomacy = json
         const region = regionFor(client, grown)
+        const leaderId = world.realms.find((r) => r.id === client.realmId)?.leaderId
+        const newLeader = leaderId !== undefined && leaderId !== client.leaderId
+        if (newLeader) client.leaderId = leaderId
         const tick = {
           tick: world.tick,
           changed,
@@ -213,6 +219,7 @@ export function attachRealtime(
           events,
           ...fresh,
           ...(region ? { region } : {}),
+          ...(newLeader ? { leaderId } : {}),
         }
         send(socket, { type: 'tick', ...tick })
       }
