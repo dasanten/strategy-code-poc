@@ -38,6 +38,9 @@ import {
   teardownWork,
   stockWeight,
   trainedCap,
+  nameProblem,
+  REALM_NAME_MAX_LENGTH,
+  RESIDENT_NAME_MAX_LENGTH,
   type Building,
   type Carriage,
   type BuildingKind,
@@ -51,7 +54,7 @@ import {
   type StatName,
   type Stock,
 } from '@csp/shared'
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -347,6 +350,8 @@ export function ResidentCard({
   makeLeader,
   leaderName,
   onMakeLeader,
+  rename,
+  onRename,
   onClose,
 }: {
   resident: Resident
@@ -424,6 +429,13 @@ export function ResidentCard({
   leaderName: string | undefined
   /** Orders the Leader to hand the realm over to this resident (`CONTEXT.md`: Leader handover). */
   onMakeLeader: () => void
+  /**
+   * For one of the Player's own residents: whether renaming them needs a realm name too (the
+   * Leader of an unnamed realm). Undefined for others' residents, who can't be renamed.
+   */
+  rename: { needsRealmName: boolean } | undefined
+  /** Renames the resident (`CONTEXT.md`: Renaming a resident), naming the realm when it asks. */
+  onRename: (name: string, realmName?: string) => void
   /** Closes the card. */
   onClose: () => void
 }) {
@@ -459,6 +471,7 @@ export function ResidentCard({
     wallsInSight: walls.length,
     picking,
     makeLeader,
+    renamable: !!rename,
   })
   const shown = actions.some((a) => a.id === open) ? open : undefined
   const act = (a: CardAction) => {
@@ -684,6 +697,18 @@ export function ResidentCard({
                 </button>
               </div>
             </section>
+          )}
+          {shown === 'rename' && rename && (
+            <RenameBlock
+              // Starts again from the new name once the rename comes back.
+              key={r.name}
+              resident={r}
+              needsRealmName={rename.needsRealmName}
+              onRename={(name, realmName) => {
+                setOpen(undefined)
+                onRename(name, realmName)
+              }}
+            />
           )}
         </div>
       )}
@@ -1198,6 +1223,73 @@ function PairBlock({
           Pair
         </button>
       </div>
+    </section>
+  )
+}
+
+/**
+ * Renaming a resident (`CONTEXT.md`): a new name for one of the Player's own, and with it the
+ * realm name when this is the Leader of a realm that has none yet (`CONTEXT.md`: Realm name).
+ */
+function RenameBlock({
+  resident,
+  needsRealmName,
+  onRename,
+}: {
+  resident: Resident
+  needsRealmName: boolean
+  onRename: (name: string, realmName?: string) => void
+}) {
+  const [name, setName] = useState(resident.name)
+  const [realmName, setRealmName] = useState('')
+  const problem =
+    nameProblem(name, RESIDENT_NAME_MAX_LENGTH) ??
+    (needsRealmName ? nameProblem(realmName, REALM_NAME_MAX_LENGTH) : undefined)
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    if (problem) return
+    onRename(name.trim(), needsRealmName ? realmName.trim() : undefined)
+  }
+  return (
+    <section className="inspector-block" aria-label="Rename">
+      <div className="panel-head">
+        <h3>Rename</h3>
+        <span className="small muted">free, at once</span>
+      </div>
+      <form onSubmit={submit}>
+        <div className="order-buttons">
+          <input
+            value={name}
+            maxLength={RESIDENT_NAME_MAX_LENGTH}
+            aria-label="New name"
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </div>
+        {needsRealmName && (
+          <>
+            <p className="small">
+              Your realm has no name yet: name it now. Others will know it by this name, and it
+              never changes.
+            </p>
+            <div className="order-buttons">
+              <input
+                value={realmName}
+                maxLength={REALM_NAME_MAX_LENGTH}
+                placeholder="Realm name"
+                aria-label="Realm name"
+                onChange={(e) => setRealmName(e.target.value)}
+                required
+              />
+            </div>
+          </>
+        )}
+        <div className="order-buttons">
+          <button type="submit" className="primary" disabled={!!problem}>
+            Rename
+          </button>
+        </div>
+      </form>
     </section>
   )
 }

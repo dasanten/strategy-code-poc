@@ -140,6 +140,7 @@ describe('the actions on a resident’s card', () => {
       othersInSight: 1,
       wallsInSight: 1,
       makeLeader: { problem: undefined },
+      renamable: true,
     })
     const keys = residentActions(all).map((a) => a.key)
     expect(new Set(keys).size).toBe(keys.length)
@@ -152,6 +153,12 @@ describe('the actions on a resident’s card', () => {
     )
     expect(make).toMatchObject({ label: 'Make Leader…', key: 'L', opens: true })
     expect(make?.disabled).toBeUndefined()
+  })
+
+  it('offers Rename only for an own resident', () => {
+    expect(ids(here())).not.toContain('rename')
+    const a = residentActions(here({ renamable: true })).find((x) => x.id === 'rename')
+    expect(a).toMatchObject({ label: 'Rename…', key: 'N', opens: true })
   })
 
   it('turns Make Leader off with the reason when the handover would be refused', () => {

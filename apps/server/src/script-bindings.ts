@@ -396,6 +396,12 @@ function residentActions(
         carriageId: plain(carriageId ?? null),
       }),
     handOver: ([newLeaderId]) => request('handOver', { newLeaderId: plain(newLeaderId) }),
+    rename: ([targetId, name, realmName]) =>
+      request('rename', {
+        targetId: plain(targetId),
+        name: plain(name),
+        ...(realmName === undefined || realmName === null ? {} : { realmName: plain(realmName) }),
+      }),
     roadLine: ([x, y]) =>
       request('roadLine', {
         from: { x: resident.x, y: resident.y },

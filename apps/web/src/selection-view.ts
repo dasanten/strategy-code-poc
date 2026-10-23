@@ -48,6 +48,7 @@ export type ActionId =
   | 'walls'
   | 'script'
   | 'makeLeader'
+  | 'rename'
   | 'sendHere'
   | 'gate'
 
@@ -67,6 +68,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   walls: 'C',
   script: 'X',
   makeLeader: 'L',
+  rename: 'N',
   sendHere: 'W',
   gate: 'O',
 }
@@ -115,6 +117,8 @@ export interface ResidentHere {
    * the Leader and for anyone else's resident, who get no Make Leader row.
    */
   makeLeader?: { problem: string | undefined }
+  /** One of the Player's own residents, whom they can rename (`CONTEXT.md`: Renaming a resident). */
+  renamable?: boolean
 }
 
 /**
@@ -178,6 +182,7 @@ export function residentActions(h: ResidentHere): CardAction[] {
       }),
     )
   }
+  if (h.renamable) add(row('rename', 'Rename…', { opens: true }))
   return actions
 }
 
