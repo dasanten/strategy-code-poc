@@ -3,6 +3,7 @@ import {
   CARRYING_TICKS,
   MAX_HEALTH,
   MAX_HUNGER,
+  REALM_NAME_MAX_LENGTH,
   Terrain,
   buildingAt,
   carryCapacity,
@@ -150,6 +151,19 @@ describe('invariants', () => {
     expect(checkInvariants(world, terrain)).toEqual([
       expect.objectContaining({ invariant: 'realms-have-leaders', entityIds: [realm!.id] }),
     ])
+  })
+
+  it('catch a realm name that is blank, untrimmed or too long', () => {
+    const { world } = worldWithCity()
+    const realm = world.realms[0]!
+    for (const name of ['', '  ', ' Ironvale', 'x'.repeat(REALM_NAME_MAX_LENGTH + 1)]) {
+      realm.name = name
+      expect(checkInvariants(world, terrain)).toEqual([
+        expect.objectContaining({ invariant: 'realms-have-leaders', entityIds: [realm.id] }),
+      ])
+    }
+    realm.name = 'Ironvale'
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 
   it('catch buildings out of place, a farm off Plains and negative stock', () => {

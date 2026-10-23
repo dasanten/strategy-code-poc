@@ -60,6 +60,11 @@ const NAMES = [
   'Jutta',
 ]
 
+/** A name from the game for a resident. */
+export function residentName(rand: () => number): string {
+  return NAMES[Math.floor(rand() * NAMES.length)]!
+}
+
 /** A lifespan in game years between `LIFESPAN_MIN` and `LIFESPAN_MAX` (`CONTEXT.md`: Aging). */
 export function drawLifespan(rand: () => number): number {
   return LIFESPAN_MIN + rand() * (LIFESPAN_MAX - LIFESPAN_MIN)

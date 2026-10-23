@@ -381,6 +381,11 @@ label > select {
 .login-form input {
   padding: 8px 10px;
 }
+.founding-hint {
+  margin: 0;
+  color: var(--ui-muted);
+  line-height: 1.45;
+}
 .login-form button.primary {
   margin-top: 4px;
   padding: 9px 12px;

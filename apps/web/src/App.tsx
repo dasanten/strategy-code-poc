@@ -25,6 +25,7 @@ import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { keyGoods, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
 import { CentredDialog, Drawer, ToolRail, TopBar, useEscapeCloses } from './Hud.js'
+import { Founding } from './Founding.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { pageFor } from './pages.js'
@@ -60,7 +61,7 @@ export function App() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, status, sendOrder } = useWorld(onLoggedOut)
+  const { world, founding, status, sendOrder, found } = useWorld(onLoggedOut)
   const [selectedId, setSelectedId] = useState<string | undefined>()
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
@@ -220,6 +221,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       {panel}
     </Drawer>
   )
+
+  // A Player without a realm names it before the world shows (`CONTEXT.md`: Realm name).
+  if (founding && !world) return <Founding leaderName={founding.leaderName} onFound={found} />
 
   return (
     <div className="game">
