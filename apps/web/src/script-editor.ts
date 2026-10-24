@@ -483,7 +483,7 @@ export function viewBefore(
 }
 
 /** How a field's kind of value reads: "number", "resident", "list of building". */
-function typeText(type: ScriptType): string {
+export function typeText(type: ScriptType): string {
   if (typeof type === 'string') return type
   return 'list' in type ? `list of ${typeText(type.list)}` : type.view
 }
