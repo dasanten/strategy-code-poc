@@ -776,6 +776,20 @@ label > select {
   display: flex;
   flex-direction: column;
 }
+/* One city's residents under its name and count. */
+.residents-group {
+  display: flex;
+  flex-direction: column;
+}
+.hud-drawer .residents-group h3 {
+  margin: 12px 0 0;
+  padding: 0 6px 4px;
+  border-bottom: 1px solid var(--ui-line-strong);
+}
+.residents-group h3 span {
+  font-weight: 400;
+  color: var(--ui-muted);
+}
 .residents-row {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) 26px minmax(0, 1.5fr) 48px 58px;

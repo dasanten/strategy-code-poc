@@ -90,6 +90,27 @@ export function zoomAt(
   }
 }
 
+/**
+ * The camera that shows a tile in the middle of what is left of the screen when pixels on its
+ * left (an open drawer) and right (the selection card) are covered, at the given zoom.
+ */
+export function centreBeside(
+  tx: number,
+  ty: number,
+  cover: Covered,
+  scale: number,
+  size: number,
+): Camera {
+  const offset = (cover.left - cover.right) / 2
+  return { x: wrap(tx + 0.5 - offset / scale, size), y: wrap(ty + 0.5, size), scale }
+}
+
+/** Screen pixels covered from the left and from the right of the map. */
+export interface Covered {
+  left: number
+  right: number
+}
+
 /** Moves the view by a screen distance, as dragging the map does; it never stops at a side. */
 export function panBy(cam: Camera, size: number, dx: number, dy: number): Camera {
   return { ...cam, x: wrap(cam.x - dx / cam.scale, size), y: wrap(cam.y - dy / cam.scale, size) }

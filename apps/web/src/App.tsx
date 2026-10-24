@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import {
   holdersOf,
   KEEPS_GOODS,
@@ -25,8 +25,17 @@ import { ContractsPanel } from './Contracts.js'
 import { StandingPanel } from './Standing.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
-import { keyGoods, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
-import { CentredDialog, Drawer, ToolRail, TopBar, useEscapeCloses } from './Hud.js'
+import { keyGoods, showBeside, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
+import {
+  CentredDialog,
+  Drawer,
+  ToolRail,
+  TopBar,
+  mapCovered,
+  useEscapeCloses,
+} from './Hud.js'
+import type { Covered } from './map/camera.js'
+import { groupResidents } from './residents-view.js'
 import { Founding } from './Founding.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
@@ -96,12 +105,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
   // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
   const [scriptToOpen, setScriptToOpen] = useState<{ id: number; at: number }>()
-  // A place from the realm log to show on the map.
-  const [focus, setFocus] = useState<{ x: number; y: number }>()
+  // A place to show on the map, such as one from the realm log or a resident picked in the list:
+  // asked for, then centred between the open drawer and the selection card once they are drawn.
+  const [toShow, setToShow] = useState<{ x: number; y: number }>()
+  const [focus, setFocus] = useState<{ x: number; y: number; cover: Covered }>()
   // The drawer open over the map, if any (ADR 0008: one at a time).
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
+  useLayoutEffect(() => {
+    if (!toShow) return
+    const covered = mapCovered()
+    const shown = showBeside(window.innerWidth, covered.left, covered.right)
+    if (shown.closeDrawer) closeDrawer()
+    setFocus({ ...toShow, cover: shown })
+  }, [toShow, closeDrawer])
+  const showOnMap = (x: number, y: number) => setToShow({ x, y })
   // The city picked on the map or opened in the Cities drawer.
   const [openCityId, setOpenCityId] = useState<string>()
 
@@ -307,13 +326,21 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         drawer(
           'residents',
           <ResidentsList
-            residents={own}
+            groups={groupResidents(own, {
+              cities: world.cities,
+              realmId: world.home.realmId,
+              homeCityId: world.home.cityId,
+              leaderId: world.home.leaderId,
+              diplomacy: world.diplomacy,
+            })}
             leaderId={world.home.leaderId}
             tick={world.tick}
             selectedId={selectedId}
             onSelect={(id) => {
               setSelectedId(id)
               setSelectedTile(undefined)
+              const r = own.find((x) => x.id === id)
+              if (r) showOnMap(Math.floor(r.x), Math.floor(r.y))
             }}
           />,
         )}
@@ -420,7 +447,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             events={world.events}
             realmId={world.home.realmId}
             deliveries={world.diplomacy.deliveries}
-            onShowPlace={(p) => setFocus({ x: p.x, y: p.y })}
+            onShowPlace={(p) => showOnMap(p.x, p.y)}
           />,
         )}
       {world && selectedTile && (
