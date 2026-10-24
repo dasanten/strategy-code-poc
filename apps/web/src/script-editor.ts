@@ -2,11 +2,16 @@ import type { StreamParser, StringStream } from '@codemirror/language'
 import { KEYWORDS, checkNames, tokenize, type Diagnostic, type Token } from '@csp/lang'
 import {
   ARMY_SCRIPT_API,
+  RESIDENT_OR_ARMY,
   SCRIPT_API,
+  SCRIPT_VIEWS,
   scriptCheckEnv,
   type ScriptCheckEnv,
   type ScriptBinding,
   type ScriptDetail,
+  type ScriptField,
+  type ScriptType,
+  type ScriptViewName,
   type ScriptSummary,
   type ScriptVersion,
 } from '@csp/shared'
@@ -99,15 +104,20 @@ export function describeDiagnostic(d: Diagnostic): string {
 
 const checkEnvs = new Map<boolean, ScriptCheckEnv>()
 
+/** What a script is checked against; a default script is checked as a resident's alone. */
+function checkEnvFor(defaultScript: boolean): ScriptCheckEnv {
+  let env = checkEnvs.get(defaultScript)
+  if (!env) checkEnvs.set(defaultScript, (env = scriptCheckEnv({ defaultScript })))
+  return env
+}
+
 /**
  * The checker's warnings for a script (`CONTEXT.md`: Script view): unknown names, calls with the
  * wrong number of arguments, fields a view doesn't have. They never stop a version from becoming
- * active; only syntax errors do. A default script is checked as a resident's alone.
+ * active; only syntax errors do.
  */
 export function scriptWarnings(source: string, defaultScript: boolean): Diagnostic[] {
-  let env = checkEnvs.get(defaultScript)
-  if (!env) checkEnvs.set(defaultScript, (env = scriptCheckEnv({ defaultScript })))
-  return checkNames(source, env).warnings
+  return checkNames(source, checkEnvFor(defaultScript)).warnings
 }
 
 /** The editor's foot: syntax errors, or that there are none, then how many warnings. */
@@ -279,7 +289,7 @@ export function apiInfo(n: ApiName): string {
 /** A completion the editor offers, kept free of CodeMirror so it can be tested. */
 export interface NameCompletion {
   label: string
-  type: 'keyword' | 'variable' | 'function' | 'constant'
+  type: 'keyword' | 'variable' | 'function' | 'constant' | 'property'
   detail?: string
   info?: string
   /** A snippet to insert instead of the label: a call, with its required parameters to fill. */
@@ -413,4 +423,144 @@ export function apiHover(
   const word = source.slice(from, to)
   const n = apiNames(options.defaultScript).find((a) => a.name === word)
   return n ? { from, to, text: apiInfo(n) } : null
+}
+
+/** Stands in for the field being typed, so the script parses and the checker reads it. */
+const PLACEHOLDER = '__field__'
+
+/**
+ * What closes the brackets left open in `source`, or null if it doesn't lex. The head of an
+ * `if`, `while` or `for` gets an empty block after it, which it needs to parse.
+ */
+function closers(source: string): string | null {
+  const open: string[] = []
+  const pairs: Record<string, string> = { '(': ')', '[': ']', '{': '}' }
+  try {
+    let previous: Token | undefined
+    for (const t of tokenize(source)) {
+      if (t.type === 'punctuator' && t.value in pairs) {
+        const head =
+          t.value === '(' &&
+          previous?.type === 'keyword' &&
+          ['if', 'while', 'for'].includes(previous.value)
+        open.push(head ? ') {}' : pairs[t.value]!)
+      } else if (t.type === 'punctuator' && t.value === open.at(-1)?.[0]) open.pop()
+      previous = t
+    }
+  } catch {
+    return null
+  }
+  return open.reverse().join('\n')
+}
+
+/**
+ * The view of the value before the `.` that ends at `dot`, if the checker is sure of it (`me`,
+ * a query's result, a `for … of` over one, a `let` holding one): the field from `dot` to `to`
+ * is put in place by a placeholder, and the checker says which view it read that from. Tried on
+ * the whole script, then on what comes before the cursor with its brackets closed, since the
+ * rest may not parse while the Player types.
+ */
+export function viewBefore(
+  source: string,
+  dot: number,
+  to: number,
+  defaultScript: boolean,
+): string | null {
+  // The rest of a word the cursor is inside goes too.
+  while (to < source.length && /\w/.test(source[to]!)) to++
+  const before = source.slice(0, dot) + PLACEHOLDER
+  const close = closers(before)
+  for (const attempt of [
+    before + source.slice(to),
+    close === null ? null : `${before}\n${close}`,
+  ]) {
+    if (attempt === null) continue
+    const { reads } = checkNames(attempt, checkEnvFor(defaultScript))
+    const read = reads.find((r) => r.field === PLACEHOLDER)
+    if (read) return read.shape
+  }
+  return null
+}
+
+/** How a field's kind of value reads: "number", "resident", "list of building". */
+function typeText(type: ScriptType): string {
+  if (typeof type === 'string') return type
+  return 'list' in type ? `list of ${typeText(type.list)}` : type.view
+}
+
+/** What hovering a field, or its completion's info, shows: its kind, description and when null. */
+function fieldInfo(f: ScriptField): string {
+  const lines = [`${f.name}: ${typeText(f.type)}`, f.description]
+  if (f.nullWhen) lines.push(`null ${f.nullWhen}.`)
+  return lines.join('\n')
+}
+
+/**
+ * The fields a view offers, each with its info; for `me` where it may be a resident or an army,
+ * both views' fields, each marked where it is only one's.
+ */
+function viewFields(shape: string): { field: ScriptField; mark: string | null; info: string }[] {
+  if (shape !== RESIDENT_OR_ARMY) {
+    const view = SCRIPT_VIEWS[shape as ScriptViewName]
+    return view ? view.fields.map((field) => ({ field, mark: null, info: fieldInfo(field) })) : []
+  }
+  const resident = SCRIPT_VIEWS.resident.fields
+  const army = SCRIPT_VIEWS.army.fields
+  const out = resident.map((field) => {
+    const a = army.find((f) => f.name === field.name)
+    if (!a) return { field, mark: 'resident only', info: fieldInfo(field) }
+    const info =
+      a.description === field.description
+        ? fieldInfo(field)
+        : `Resident: ${fieldInfo(field)}\nArmy: ${fieldInfo(a)}`
+    return { field, mark: null, info }
+  })
+  for (const field of army) {
+    if (!resident.some((f) => f.name === field.name)) {
+      out.push({ field, mark: 'army only', info: fieldInfo(field) })
+    }
+  }
+  return out
+}
+
+/**
+ * The fields to offer after the `.` that ends at `dot`, for the word from there to `to`: those
+ * of the view the value before it holds, or null where that isn't certain.
+ */
+export function fieldCompletions(
+  source: string,
+  dot: number,
+  to: number,
+  options: { defaultScript: boolean },
+): NameCompletion[] | null {
+  const shape = viewBefore(source, dot, to, options.defaultScript)
+  if (shape === null) return null
+  const prefix = source.slice(dot, to).toLowerCase()
+  return viewFields(shape)
+    .filter(({ field }) => field.name.toLowerCase().startsWith(prefix))
+    .map(({ field, mark, info }) => ({
+      label: field.name,
+      type: 'property',
+      detail: [typeText(field.type), mark].filter(Boolean).join(' · '),
+      info,
+    }))
+}
+
+/** The field under `pos`, for its hover, when the view it belongs to is certain. */
+export function fieldHover(
+  source: string,
+  pos: number,
+  options: { defaultScript: boolean },
+): { from: number; to: number; text: string } | null {
+  let from = pos
+  let to = pos
+  while (from > 0 && /\w/.test(source[from - 1]!)) from--
+  while (to < source.length && /\w/.test(source[to]!)) to++
+  if (from === to || source[from - 1] !== '.') return null
+  const shape = viewBefore(source, from, to, options.defaultScript)
+  const found =
+    shape === null
+      ? undefined
+      : viewFields(shape).find((f) => f.field.name === source.slice(from, to))
+  return found ? { from, to, text: found.info } : null
 }

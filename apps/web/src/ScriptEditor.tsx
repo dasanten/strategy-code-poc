@@ -15,6 +15,8 @@ import { checkScript, type Diagnostic } from '@csp/lang'
 import {
   apiHover,
   diagnosticRange,
+  fieldCompletions,
+  fieldHover,
   nameCompletions,
   scriptHighlighting,
   scriptWarnings,
@@ -51,14 +53,20 @@ function inText(context: CompletionContext): boolean {
   return name === 'comment' || name === 'string'
 }
 
-/** Completes keywords, game API names and the script's own names (not fields after a `.`). */
+/**
+ * Completes keywords, game API names and the script's own names; after a `.`, the fields of the
+ * value's script view where it is certain.
+ */
 function names(defaultScript: boolean) {
   return (context: CompletionContext): CompletionResult | null => {
     const word = context.matchBefore(/\w*/)
     if (!word || inText(context)) return null
-    if (word.from === word.to && !context.explicit) return null
-    if (context.state.sliceDoc(word.from - 1, word.from) === '.') return null
     const source = context.state.doc.toString()
+    if (context.state.sliceDoc(word.from - 1, word.from) === '.') {
+      const fields = fieldCompletions(source, word.from, word.to, { defaultScript })
+      return fields && { from: word.from, options: fields, validFor: /^\w*$/ }
+    }
+    if (word.from === word.to && !context.explicit) return null
     const options = nameCompletions(source, word.from, word.text, { defaultScript }).map(
       ({ snippet, ...c }): Completion => (snippet ? snippetCompletion(snippet, c) : c),
     )
@@ -66,10 +74,12 @@ function names(defaultScript: boolean) {
   }
 }
 
-/** Shows a game API name's parameters, cost and description on hover. */
+/** Shows a game API name's parameters, cost and description, or a field's, on hover. */
 function apiTooltips(defaultScript: boolean) {
   return hoverTooltip((view, pos) => {
-    const hover = apiHover(view.state.doc.toString(), pos, { defaultScript })
+    const source = view.state.doc.toString()
+    const hover =
+      apiHover(source, pos, { defaultScript }) ?? fieldHover(source, pos, { defaultScript })
     if (!hover) return null
     return {
       pos: hover.from,
