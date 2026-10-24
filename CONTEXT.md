@@ -626,6 +626,11 @@ The shared language of the game. Domain terms only — no implementation details
   counts. Default scripts count like any other. NPC cities have no realm budget, only the one
   for each resident. A script sees only what its Player sees: their sight, explored terrain and
   what they last saw (Last seen), told apart from what is in sight now.
+- **Script view:** what a script gets of each kind of thing (a resident, a building, a city, …):
+  a fixed set of fields, the same for every Player and listed in the Wiki. A field the Player
+  isn't allowed to see is always there and `null`, never missing. A script sees no field beyond
+  these. The game may add fields at any time; renaming or removing one tells each Player whose
+  scripts read it in their realm log, naming the field and the scripts.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

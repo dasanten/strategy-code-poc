@@ -1,4 +1,5 @@
 import { SCRIPT_ACTION_COST, SCRIPT_LIST_QUERY_COST, SCRIPT_TILE_QUERY_COST } from './balance.js'
+import type { ScriptType, ScriptViewName } from './script-views.js'
 
 /**
  * The game API as a script sees it (`CONTEXT.md`: Script, Memory, Step budget; ADR 0002): the
@@ -14,7 +15,8 @@ import { SCRIPT_ACTION_COST, SCRIPT_LIST_QUERY_COST, SCRIPT_TILE_QUERY_COST } fr
  *   is. It answers `null` when requested, or why not as a string; a script can request nothing
  *   an order couldn't.
  *
- * `cost` is the steps one call costs on top of the 1 every evaluated node costs.
+ * `cost` is the steps one call costs on top of the 1 every evaluated node costs. `returns` is
+ * what a value holds or a call answers, in terms of the script views (ADR 0011).
  */
 export interface ScriptBinding {
   name: string
@@ -23,62 +25,85 @@ export interface ScriptBinding {
   params: readonly string[]
   cost: number
   description: string
+  returns: ScriptType
 }
 
-const value = (name: string, description: string): ScriptBinding => ({
+const value = (name: string, returns: ScriptType, description: string): ScriptBinding => ({
   name,
   is: 'value',
   params: [],
   cost: 0,
   description,
+  returns,
 })
 
-const list = (name: string, description: string, params: string[] = []): ScriptBinding => ({
+const list = (
+  name: string,
+  of: ScriptViewName,
+  description: string,
+  params: string[] = [],
+): ScriptBinding => ({
   name,
   is: 'query',
   params,
   cost: SCRIPT_LIST_QUERY_COST,
   description,
+  returns: { list: { view: of } },
 })
 
+/** An action answers `null` when its order was requested, or why not as a string. */
 const action = (name: string, params: string[], description: string): ScriptBinding => ({
   name,
   is: 'action',
   params,
   cost: SCRIPT_ACTION_COST,
   description,
+  returns: 'string',
 })
 
 /** The values every script gets but `me`, and the queries. */
 const SHARED: readonly ScriptBinding[] = [
-  value('memory', 'An object kept between ticks for whoever runs it; whatever is set on it stays.'),
-  value('tick', 'The world tick this run is for.'),
-  value('mapSize', 'Tiles along each side of the map; its opposite sides join.'),
+  value(
+    'memory',
+    'any',
+    'An object kept between ticks for whoever runs it; whatever is set on it stays.',
+  ),
+  value('tick', 'number', 'The world tick this run is for.'),
+  value('mapSize', 'number', 'Tiles along each side of the map; its opposite sides join.'),
   value(
     'random',
+    'number',
     'A number from 0 up to 1, drawn anew each tick and the same for every script that tick, so residents can agree on a random pick.',
   ),
 
   list(
     'residents',
+    'resident',
     'The residents the Player sees, their own included; those of their own running a script with its `script.memory`, to read but not change.',
   ),
-  list('buildings', 'The buildings and construction sites the Player sees, roads included.'),
-  list('cities', 'The cities the Player sees any of.'),
-  list('horses', 'The horses the Player sees.'),
-  list('carriages', 'The carriages the Player sees.'),
-  list('piles', 'The piles of goods the Player sees.'),
-  list('nodes', 'The resource nodes on terrain the Player has explored.'),
   list(
+    'buildings',
+    'building',
+    'The buildings and construction sites the Player sees, roads included.',
+  ),
+  list('cities', 'city', 'The cities the Player sees any of.'),
+  list('horses', 'horse', 'The horses the Player sees.'),
+  list('carriages', 'carriage', 'The carriages the Player sees.'),
+  list('piles', 'pile', 'The piles of goods the Player sees.'),
+  list('nodes', 'node', 'The resource nodes on terrain the Player has explored.'),
+  list(
+    'lastSeen',
     'lastSeen',
     'The buildings, construction sites and cities the Player has seen and that are out of their sight now, as they last saw them: each with `is` ("building" or "city") and `seenAt`, the tick they were last seen.',
   ),
   list(
     'directives',
+    'directive',
     'The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).',
   ),
   list(
     'withMemory',
+    'resident',
     'My realm’s residents running a script whose `memory[key]` is `value`, as `residents()` shows them, with their `script.memory`.',
     ['key', 'value'],
   ),
@@ -86,6 +111,7 @@ const SHARED: readonly ScriptBinding[] = [
     name: 'building',
     is: 'query',
     params: ['id'],
+    returns: { view: 'building' },
     cost: SCRIPT_TILE_QUERY_COST,
     description:
       'The building or construction site with that id, if the Player sees it or it is one of my realm’s cities’; else null.',
@@ -94,6 +120,7 @@ const SHARED: readonly ScriptBinding[] = [
     name: 'pileAt',
     is: 'query',
     params: ['x', 'y'],
+    returns: { view: 'goods' },
     cost: SCRIPT_TILE_QUERY_COST,
     description:
       'The goods lying on a tile, like {food: 3}, if the Player sees it; null where none lie or it isn’t seen.',
@@ -102,6 +129,7 @@ const SHARED: readonly ScriptBinding[] = [
     name: 'outputOf',
     is: 'query',
     params: ['building'],
+    returns: { list: 'string' },
     cost: SCRIPT_TILE_QUERY_COST,
     description:
       'The goods a workplace makes, as a list (at a smithy everything it can make); empty for any other building.',
@@ -110,6 +138,7 @@ const SHARED: readonly ScriptBinding[] = [
     name: 'materialsNeeded',
     is: 'query',
     params: ['site'],
+    returns: { list: { view: 'material' } },
     cost: SCRIPT_TILE_QUERY_COST,
     description:
       'The materials a construction site still lacks, as a list like [{good: "wood", units: 12}]; empty once it has them all, and for a finished building.',
@@ -118,6 +147,7 @@ const SHARED: readonly ScriptBinding[] = [
     name: 'terrainAt',
     is: 'query',
     params: ['x', 'y'],
+    returns: 'string',
     cost: SCRIPT_TILE_QUERY_COST,
     description:
       'The terrain of a tile ("plains", "forest", "hills", "mountain", "lake" or "sea"), or null where the Player hasn’t explored.',
@@ -126,6 +156,7 @@ const SHARED: readonly ScriptBinding[] = [
     name: 'distance',
     is: 'query',
     params: ['a', 'b'],
+    returns: 'number',
     cost: SCRIPT_TILE_QUERY_COST,
     description: 'Tiles between two things with `x` and `y`, the short way round the map.',
   },
@@ -133,17 +164,23 @@ const SHARED: readonly ScriptBinding[] = [
 
 /** The game API of a resident's script. */
 export const SCRIPT_API: readonly ScriptBinding[] = [
-  value('me', 'The resident running the script, as the Player sees them, with their `age`.'),
+  value(
+    'me',
+    { view: 'resident' },
+    'The resident running the script, as the Player sees them, with their `age`.',
+  ),
   ...SHARED,
   {
     name: 'fits',
     is: 'query',
     params: ['good'],
+    returns: 'number',
     cost: SCRIPT_TILE_QUERY_COST,
     description: 'How many units of a good still fit in my hands.',
   },
   list(
     'storages',
+    'building',
     'The finished storages of my realm (of my city, for an NPC city’s resident); with `from`, something with `x` and `y`, nearest first by my `walkTime` from it; with `goods`, a list of goods, only those holding any of them.',
     ['from?', 'goods?'],
   ),
@@ -151,6 +188,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     name: 'walkTime',
     is: 'query',
     params: ['a', 'b'],
+    returns: 'number',
     cost: SCRIPT_LIST_QUERY_COST,
     description:
       'About how many ticks I take to walk from one thing with `x` and `y` to another: the straight way across the terrain, roads and walls left out.',
@@ -239,6 +277,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
 export const ARMY_SCRIPT_API: readonly ScriptBinding[] = [
   value(
     'me',
+    { view: 'army' },
     'The army running the script: its `name`, `order`, `memberIds`, and its `members` as the Player sees them.',
   ),
   ...SHARED,
