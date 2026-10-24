@@ -862,19 +862,21 @@ export const territorySound: Invariant = {
       }
       return control
     }
+    // Made once, not per tile: a territory holds hundreds of thousands of tiles.
+    const fail = (key: string, owner: string, message: string) =>
+      out.push({ invariant: this.name, message: `tile (${key}) ${message}`, entityIds: [owner] })
     let i = 0
     for (const [key, owner] of computeTerritory(world, size).owners) {
-      const fail = (message: string) =>
-        out.push({ invariant: this.name, message: `tile (${key}) ${message}`, entityIds: [owner] })
-      if (!organizations.has(owner)) fail(`belongs to ${owner}, which is no Organization`)
+      if (!organizations.has(owner))
+        fail(key, owner, `belongs to ${owner}, which is no Organization`)
       if (i++ % TERRITORY_CHECK_STRIDE !== 0) continue
       const [x, y] = key.split(',').map(Number) as [number, number]
       const control = controlAtTile(x, y)
       const own = control.get(owner) ?? 0
-      if (own <= 0) fail(`belongs to ${owner}, which projects no control there`)
+      if (own <= 0) fail(key, owner, `belongs to ${owner}, which projects no control there`)
       for (const [other, c] of control) {
         if (other !== owner && c >= own)
-          fail(`belongs to ${owner}, but ${other} is as strong there`)
+          fail(key, owner, `belongs to ${owner}, but ${other} is as strong there`)
       }
     }
     return out

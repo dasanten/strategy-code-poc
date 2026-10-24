@@ -2,7 +2,6 @@ import {
   TRADE_ORG_ARMY,
   TRADE_ORG_HQ,
   buildProblem,
-  buildingAt,
   freeHousing,
   hasFoodSurplus,
   inCityArea,
@@ -62,9 +61,25 @@ export function hqRingTiles(hall: Building, k: number, size: number): RingTile[]
     }))
 }
 
-/** The wall or gate on a tile, finished or begun, if one stands there. */
-function wallAt(world: WorldState, t: { x: number; y: number }): Building | undefined {
-  const b = buildingAt(world, t.x, t.y)
+/**
+ * The buildings and construction sites by the "x,y" tiles they cover, as `buildingAt` finds them:
+ * looking each ring tile up among all the buildings is too slow for rings of hundreds of tiles.
+ */
+function buildingsByTile(world: WorldState): Map<string, Building> {
+  const out = new Map<string, Building>()
+  for (const b of world.buildings) {
+    if (b.kind === 'road') continue
+    for (const [x, y] of footprintTiles(b)) {
+      const key = `${x},${y}`
+      if (!out.has(key)) out.set(key, b)
+    }
+  }
+  return out
+}
+
+/** The wall or gate on a tile, finished or begun, if one stands there (`buildingsByTile`). */
+function wallAt(byTile: Map<string, Building>, t: { x: number; y: number }): Building | undefined {
+  const b = byTile.get(`${t.x},${t.y}`)
   return b && (b.kind === 'wall' || b.kind === 'gate') ? b : undefined
 }
 
@@ -79,12 +94,17 @@ export interface HqRings {
  * it, begun or finished, is the one it is putting up until every tile of it that can take one has
  * a finished wall or gate.
  */
-export function hqRings(world: WorldState, hall: Building, terrain: TerrainMap): HqRings {
+export function hqRings(
+  world: WorldState,
+  hall: Building,
+  terrain: TerrainMap,
+  byTile = buildingsByTile(world),
+): HqRings {
   let k = 0
-  while (hqRingTiles(hall, k + 1, terrain.size).some((t) => wallAt(world, t))) k++
+  while (hqRingTiles(hall, k + 1, terrain.size).some((t) => wallAt(byTile, t))) k++
   if (k === 0) return { outermost: 0, building: undefined }
   const done = hqRingTiles(hall, k, terrain.size).every((t) => {
-    const b = wallAt(world, t)
+    const b = wallAt(byTile, t)
     return b ? !b.site : buildProblem(world, t.x, t.y, t.kind, terrain) !== undefined
   })
   return done ? { outermost: k, building: undefined } : { outermost: k - 1, building: k }
@@ -156,7 +176,8 @@ export function hqProject(
   const hall = townHallOf(world, hq)
   if (!hall) return undefined
   const size = terrain.size
-  const rings = hqRings(world, hall, terrain)
+  const byTile = buildingsByTile(world)
+  const rings = hqRings(world, hall, terrain, byTile)
   const ring = hqRingTiles(hall, rings.building ?? rings.outermost + 1, size)
   const build = (b: { kind: Building['kind']; x: number; y: number }) => ({
     kind: 'build' as const,
@@ -167,10 +188,10 @@ export function hqProject(
   const begun =
     world.buildings.find(
       (b) => b.site && b.kind === 'house' && inCityArea(world, hq, b.x, b.y, size),
-    ) ?? ring.flatMap((t) => wallAt(world, t) ?? []).find((b) => b.site)
+    ) ?? ring.flatMap((t) => wallAt(byTile, t) ?? []).find((b) => b.site)
   if (begun) return build(begun)
   const nextOfRing = ring.find(
-    (t) => !wallAt(world, t) && !buildProblem(world, t.x, t.y, t.kind, terrain),
+    (t) => !wallAt(byTile, t) && !buildProblem(world, t.x, t.y, t.kind, terrain),
   )
   if (hasFoodSurplus(world, hq) && freeHousing(world, hq) <= 0) {
     const house = hqHouseTile(world, hall, terrain, rings.outermost)
