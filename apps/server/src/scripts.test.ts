@@ -66,6 +66,15 @@ describe('script library', () => {
     expect(checkScriptLibrary(db)).toEqual([])
   })
 
+  it('makes a version with warnings but no syntax errors the active version', () => {
+    const mara = addUser('Mara')
+    const s = createScript(db, mara, { name: 'typos', source: VALID })
+    // An unknown field, an unknown name and too few arguments: warnings in the editor only.
+    const after = saveScript(db, mara, s.id, { source: 'me.hungr\nresdents()\nwalkTo(3)\n' })
+    expect(after).toMatchObject({ activeVersion: 2, latestVersion: 2 })
+    expect(after.versions.at(-1)!.errors).toEqual([])
+  })
+
   it('renames a script, keeping its history; names are unique per Player regardless of case', () => {
     const mara = addUser('Mara')
     const tobin = addUser('Tobin')

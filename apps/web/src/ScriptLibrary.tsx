@@ -7,9 +7,11 @@ import {
   canMakeActive,
   defaultStatus,
   describeDiagnostic,
+  diagnosticsText,
   hasUnsavedChanges,
   lineDiff,
   savedMessage,
+  scriptWarnings,
   versionStatus,
   type DiffLine,
 } from './script-editor.js'
@@ -166,6 +168,7 @@ export function ScriptLibrary({
   }
 
   const errors = checkScript(draft)
+  const warnings = scriptWarnings(draft, script?.task != null)
   const unsaved = script ? hasUnsavedChanges(script.versions, draft) : true
 
   return (
@@ -322,11 +325,10 @@ export function ScriptLibrary({
           onChange={setDraft}
         />
         <div className="script-foot">
-          <p className={`diagnostics${errors.length > 0 ? ' has-errors' : ''}`}>
-            {errors.length === 0
-              ? 'No syntax errors.'
-              : errors.map(describeDiagnostic).join('\n') +
-                '\nA version with syntax errors is kept but never runs.'}
+          <p
+            className={`diagnostics${errors.length > 0 ? ' has-errors' : warnings.length > 0 ? ' has-warnings' : ''}`}
+          >
+            {diagnosticsText(errors, warnings)}
           </p>
           {script && (
             <button type="button" className="primary" onClick={save} disabled={!unsaved}>

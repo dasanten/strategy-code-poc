@@ -1,8 +1,10 @@
 import type { StreamParser, StringStream } from '@codemirror/language'
-import { KEYWORDS, tokenize, type Diagnostic, type Token } from '@csp/lang'
+import { KEYWORDS, checkNames, tokenize, type Diagnostic, type Token } from '@csp/lang'
 import {
   ARMY_SCRIPT_API,
   SCRIPT_API,
+  scriptCheckEnv,
+  type ScriptCheckEnv,
   type ScriptBinding,
   type ScriptDetail,
   type ScriptSummary,
@@ -93,6 +95,32 @@ export function diagnosticRange(source: string, d: Diagnostic): { from: number; 
 /** An error the way the server words it: `line:column message`. */
 export function describeDiagnostic(d: Diagnostic): string {
   return `${d.line}:${d.column} ${d.message}`
+}
+
+const checkEnvs = new Map<boolean, ScriptCheckEnv>()
+
+/**
+ * The checker's warnings for a script (`CONTEXT.md`: Script view): unknown names, calls with the
+ * wrong number of arguments, fields a view doesn't have. They never stop a version from becoming
+ * active; only syntax errors do. A default script is checked as a resident's alone.
+ */
+export function scriptWarnings(source: string, defaultScript: boolean): Diagnostic[] {
+  let env = checkEnvs.get(defaultScript)
+  if (!env) checkEnvs.set(defaultScript, (env = scriptCheckEnv({ defaultScript })))
+  return checkNames(source, env).warnings
+}
+
+/** The editor's foot: syntax errors, or that there are none, then how many warnings. */
+export function diagnosticsText(errors: Diagnostic[], warnings: Diagnostic[]): string {
+  if (errors.length > 0) {
+    return (
+      errors.map(describeDiagnostic).join('\n') +
+      '\nA version with syntax errors is kept but never runs.'
+    )
+  }
+  if (warnings.length === 0) return 'No syntax errors.'
+  const n = warnings.length === 1 ? '1 warning' : `${warnings.length} warnings`
+  return `No syntax errors; ${n}, marked in yellow. Warnings don’t stop a version from running.`
 }
 
 /** How a saved version shows in the history list. */
