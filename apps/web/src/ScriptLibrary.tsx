@@ -315,7 +315,12 @@ export function ScriptLibrary({
             </p>
           </details>
         )}
-        <ScriptEditor key={opened.key} initialSource={opened.source} onChange={setDraft} />
+        <ScriptEditor
+          key={opened.key}
+          initialSource={opened.source}
+          defaultScript={script?.task != null}
+          onChange={setDraft}
+        />
         <div className="script-foot">
           <p className={`diagnostics${errors.length > 0 ? ' has-errors' : ''}`}>
             {errors.length === 0

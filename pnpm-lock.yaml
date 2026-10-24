@@ -87,6 +87,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@codemirror/autocomplete':
+        specifier: ^6.20.3
+        version: 6.20.3
       '@codemirror/language':
         specifier: ^6.13.1
         version: 6.13.1
