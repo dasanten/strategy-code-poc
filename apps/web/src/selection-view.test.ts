@@ -156,6 +156,7 @@ describe('the actions on a resident’s card', () => {
       othersInSight: 1,
       wallsInSight: 1,
       makeLeader: { problem: undefined },
+      renamable: true,
     })
     const keys = residentActions(all).map((a) => a.key)
     expect(new Set(keys).size).toBe(keys.length)
@@ -168,6 +169,12 @@ describe('the actions on a resident’s card', () => {
     )
     expect(make).toMatchObject({ label: 'Make Leader…', key: 'L', opens: true })
     expect(make?.disabled).toBeUndefined()
+  })
+
+  it('offers Rename only for an own resident', () => {
+    expect(ids(here())).not.toContain('rename')
+    const a = residentActions(here({ renamable: true })).find((x) => x.id === 'rename')
+    expect(a).toMatchObject({ label: 'Rename…', key: 'N', opens: true })
   })
 
   it('turns Make Leader off with the reason when the handover would be refused', () => {
@@ -381,6 +388,28 @@ describe('the card for a tile', () => {
     const r = { name: 'Brann', owner: 'them', cityId: null, carried: {} } as Resident
     expect(tile({ strangers: [r] })).toMatchObject({ title: 'Brann', rel: 'otherRealm' })
   })
+
+  it('shows a building only remembered as last seen, apart from what is there now', () => {
+    const storage = building({ kind: 'storage', cityId: 'c-npc', stock: { food: 3 } })
+    const card = tile({
+      lastSeen: { buildings: [{ ...storage, seenAt: 0 }], tick: 3 * TICKS_PER_GAME_DAY },
+      piles: [pile],
+    })
+    expect(card).toMatchObject({ title: 'Oakhollow storage', rel: 'npcCity', what: 'building' })
+    expect(card.lastSeen).toEqual({
+      when: 'Last seen: day 1, 00:00 (3 days ago)',
+      lines: ['NPC city', 'Holds 3 food'],
+    })
+    // What is in sight there now stays apart from it.
+    expect(card.lines).toEqual(['On the ground: 4 stone', 'Tile 5, 5'])
+    // A building in sight wins over a memory of the tile.
+    const now = tile({
+      buildings: [building({ kind: 'farm', cityId: 'c-me' })],
+      lastSeen: { buildings: [{ ...storage, seenAt: 0 }], tick: 10 },
+    })
+    expect(now.title).toBe('Eastmere farm')
+    expect(now.lastSeen).toBeUndefined()
+  })
 })
 
 describe('horses on the tile card', () => {
@@ -511,6 +540,12 @@ describe('the actions on a tile’s card', () => {
     expect(tileActions(own, undefined).map((a) => a.label)).toEqual(['Open the gate'])
     const theirs = tile({ buildings: [building({ kind: 'gate', cityId: 'c-npc' })] })
     expect(tileActions(theirs, undefined)).toEqual([])
+  })
+
+  it('offers nothing to do with a building only remembered, but still sends there', () => {
+    const gate = { ...building({ kind: 'gate', cityId: 'c-me', closed: true }), seenAt: 0 }
+    const card = tile({ lastSeen: { buildings: [gate], tick: 10 } })
+    expect(tileActions(card, actor).map((a) => a.label)).toEqual(['Send Ada here'])
   })
 })
 

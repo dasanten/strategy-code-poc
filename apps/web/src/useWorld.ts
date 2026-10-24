@@ -14,11 +14,13 @@ import {
   type SeenResident,
   type SeenCaravan,
   type SeenEntity,
+  type Remembered,
   type ServerMessage,
 } from '@csp/shared'
 import { api } from './api.js'
 import { appendEvents } from './realm-log.js'
 import { applyRegionMap, type RegionState } from './map/region.js'
+import { lastSeenByKind, type LastSeen } from './last-seen.js'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed'
 
@@ -43,6 +45,11 @@ export interface ClientWorld {
   armies: Army[]
   /** The Trade Org caravans in sight (`CONTEXT.md`: Caravan). */
   caravans: SeenCaravan[]
+  /**
+   * What the Player remembers out of their sight (`CONTEXT.md`: Last seen), kept apart from what
+   * is in sight: never both at once.
+   */
+  lastSeen: LastSeen
   /** The Player's realm log, oldest first. */
   events: RealmEvent[]
   /** The Player's alliance, invitations and the realms they could invite. */
@@ -78,12 +85,14 @@ function byKind(entities: Iterable<SeenEntity>) {
 
 /**
  * Keeps the client's copy of what the Player sees in sync with the server (ADR 0006): the
- * welcome message brings everything in sight and the realm log, every tick brings changes, ids
- * that left sight and new realm events.
+ * welcome message brings everything in sight, the Player's Last seen and the realm log, every
+ * tick brings changes, ids that left sight, changes to Last seen and new realm events.
  * Calls `onLoggedOut` when the session is no longer valid.
  */
 export function useWorld(onLoggedOut: () => void) {
   const [world, setWorld] = useState<ClientWorld | null>(null)
+  // Set while the Player has no realm and is to name it: the Leader's name from the game.
+  const [founding, setFounding] = useState<{ leaderName: string } | null>(null)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const socketRef = useRef<WebSocket | null>(null)
   const answers = useRef(new Map<string, (rejected: string | undefined) => void>())
@@ -93,6 +102,7 @@ export function useWorld(onLoggedOut: () => void) {
     let retry: ReturnType<typeof setTimeout> | undefined
     let stopped = false
     let entities = new Map<string, SeenEntity>()
+    let remembered = new Map<string, Remembered>()
 
     const connect = () => {
       setStatus('connecting')
@@ -102,8 +112,20 @@ export function useWorld(onLoggedOut: () => void) {
       socket.onopen = () => setStatus('open')
       socket.onmessage = (ev) => {
         const msg = JSON.parse(ev.data as string) as ServerMessage
-        if (msg.type === 'welcome') {
+        if (msg.type === 'founding') {
+          setWorld(null)
+          setFounding({ leaderName: msg.leaderName })
+        } else if (msg.type === 'welcome') {
+          setFounding(null)
+          // The founding request, if one was waiting, succeeded.
+          for (const [id, answer] of answers.current) {
+            if (id.startsWith('found-')) {
+              answers.current.delete(id)
+              answer(undefined)
+            }
+          }
           entities = new Map(msg.entities.map((e) => [e.id, e]))
+          remembered = new Map(msg.lastSeen.map((e) => [e.id, e]))
           setWorld({
             map: msg.map,
             exploredChunks: new Set(msg.exploredChunks),
@@ -114,6 +136,7 @@ export function useWorld(onLoggedOut: () => void) {
             diplomacy: msg.diplomacy,
             region: msg.region && applyRegionMap(null, msg.region, msg.map.size),
             ...byKind(entities.values()),
+            lastSeen: lastSeenByKind(remembered.values()),
           })
         } else if (msg.type === 'ack' || msg.type === 'rejected') {
           const answer = answers.current.get(msg.requestId)
@@ -123,19 +146,27 @@ export function useWorld(onLoggedOut: () => void) {
           for (const e of msg.changed) entities.set(e.id, e)
           for (const id of msg.gone) entities.delete(id)
           const changed = msg.changed.length > 0 || msg.gone.length > 0
+          for (const e of msg.lastSeen?.changed ?? []) remembered.set(e.id, e)
+          for (const id of msg.lastSeen?.gone ?? []) remembered.delete(id)
           setWorld((w) => {
             if (!w) return w
             const grown = msg.explored
             const exploredChunks =
               grown.length > 0 ? new Set([...w.exploredChunks, ...grown]) : w.exploredChunks
             const seen = changed ? byKind(entities.values()) : {}
+            const lastSeen = msg.lastSeen ? { lastSeen: lastSeenByKind(remembered.values()) } : {}
             const events = appendEvents(w.events, msg.events)
             const diplomacy = msg.diplomacy ?? w.diplomacy
             const region = msg.region ? applyRegionMap(w.region, msg.region, w.map.size) : w.region
             return {
               ...w,
               ...seen,
-              home: msg.leaderId ? { ...w.home, leaderId: msg.leaderId } : w.home,
+              ...lastSeen,
+              home: {
+                ...w.home,
+                ...(msg.leaderId ? { leaderId: msg.leaderId } : {}),
+                ...(msg.realmName ? { realmName: msg.realmName } : {}),
+              },
               tick: msg.tick,
               exploredChunks,
               grownChunks: grown,
@@ -186,5 +217,21 @@ export function useWorld(onLoggedOut: () => void) {
     })
   }, [])
 
-  return { world, status, sendOrder }
+  /**
+   * Founds the Player's realm with these names (`CONTEXT.md`: Realm name). Resolves with the
+   * server's reason when it is refused, or undefined once the world arrives.
+   */
+  const found = useCallback((realmName: string, leaderName: string) => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return Promise.resolve<string | undefined>('not connected')
+    }
+    const requestId = `found-${crypto.randomUUID()}`
+    return new Promise<string | undefined>((resolve) => {
+      answers.current.set(requestId, resolve)
+      socket.send(JSON.stringify({ type: 'found', requestId, realmName, leaderName }))
+    })
+  }, [])
+
+  return { world, founding, status, sendOrder, found }
 }

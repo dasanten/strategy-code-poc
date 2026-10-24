@@ -203,6 +203,34 @@ describe('buildings on a tile’s card', () => {
     expect(theirs.lines.some((l) => l.includes('residents') || l.startsWith('Food'))).toBe(false)
   })
 
+  it('offers renaming only an own city, at its town hall in sight', () => {
+    const cities = [
+      { id: 'c-me', name: 'Eastmere', realmId: 'me' },
+      { id: 'c-npc', name: 'Oakhollow', realmId: null },
+    ]
+    const hall = (cityId: string) => building({ id: `th-${cityId}`, kind: 'townHall', cityId })
+    const viewer = { realmId: 'me', allies: new Set<string>() }
+    const own = tile({ buildings: [hall('c-me')], cities, viewer })
+    expect(own.renameCity).toEqual({ id: 'c-me', name: 'Eastmere' })
+    expect(tileActions(own, undefined).find((a) => a.id === 'renameCity')).toMatchObject({
+      label: 'Rename the city…',
+      key: 'N',
+      opens: true,
+    })
+    expect(tile({ buildings: [hall('c-npc')], cities, viewer }).renameCity).toBeUndefined()
+    // Nor another of the city's buildings, nor its town hall only remembered.
+    const house = building({ kind: 'house', cityId: 'c-me' })
+    expect(tile({ buildings: [house], cities, viewer }).renameCity).toBeUndefined()
+    const remembered = tile({
+      buildings: [],
+      cities,
+      viewer,
+      lastSeen: { buildings: [{ ...hall('c-me'), seenAt: 0 }], tick: 10 },
+    })
+    expect(remembered.title).toContain('Eastmere')
+    expect(remembered.renameCity).toBeUndefined()
+  })
+
   it('says how far tearing down a building or a road has come', () => {
     const house = building({ kind: 'house', cityId: 'c-me' })
     const half = { ...house, teardown: teardownWork(house) / 2 }

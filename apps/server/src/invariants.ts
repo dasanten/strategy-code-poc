@@ -4,6 +4,8 @@ import {
   ALLIANCE_LEAVE_DELAY,
   ALLIANCE_RECALL_DELAY,
   ALLIANCE_NAME_MAX_LENGTH,
+  REALM_NAME_MAX_LENGTH,
+  nameProblem,
   isAllianceCity,
   BUILDABLE,
   BUILD_MATERIALS,
@@ -92,6 +94,7 @@ import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
 import { leadersServeNoOne } from './leader.js'
+import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 
 /**
@@ -157,7 +160,10 @@ export const positionsOnMap: Invariant = {
   },
 }
 
-/** Every realm has a Player and a living Leader who belongs to it; one realm per Player. */
+/**
+ * Every realm has a Player and a living Leader who belongs to it; one realm per Player. A realm
+ * name, once given, is trimmed, not empty and no longer than `REALM_NAME_MAX_LENGTH`.
+ */
 export const realmsHaveLeaders: Invariant = {
   name: 'realms-have-leaders',
   check(world) {
@@ -168,6 +174,12 @@ export const realmsHaveLeaders: Invariant = {
       if (!leader || leader.owner !== realm.id) problems.push(`has no Leader ${realm.leaderId}`)
       if (seen.has(realm.userId)) problems.push(`is a second realm of Player ${realm.userId}`)
       seen.add(realm.userId)
+      if (
+        realm.name !== undefined &&
+        (realm.name !== realm.name.trim() || nameProblem(realm.name, REALM_NAME_MAX_LENGTH))
+      ) {
+        problems.push(`has a bad name ${JSON.stringify(realm.name)}`)
+      }
       return problems.map((p) => ({
         invariant: this.name,
         message: `realm ${realm.id} ${p}`,
@@ -1450,6 +1462,8 @@ export const worldInvariants: Invariant[] = [
   agesInRange,
   realmsHaveLeaders,
   leadersServeNoOne,
+  residentNamesWellFormed,
+  cityNamesWellFormed,
   buildingsInPlace,
   citiesFromBuildings,
   carriedWithinCapacity,

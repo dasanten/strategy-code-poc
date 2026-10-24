@@ -216,6 +216,29 @@ describe('script bindings', () => {
     expect(JSON.stringify(memory.d)).not.toContain('Daniel')
   })
 
+  it('list Last seen out of sight apart from what is in sight, as the Player remembers it', () => {
+    const { world, explored } = setup()
+    world.tick = 10
+    const house = { id: 'h1', kind: 'house' as const, cityId: 'c1', x: 160, y: 160 }
+    const city = { id: 'c1', name: 'Far', realmId: 'r2', townHallId: 'h0' }
+    world.lastSeen[7] = [
+      { is: 'building', ...house, seenAt: 4 },
+      { is: 'city', ...city, seenAt: 4 },
+      // Seen this tick: in sight now, so not Last seen.
+      { is: 'building', id: 'h2', kind: 'house', cityId: null, x: 11, y: 10, seenAt: 10 },
+    ]
+    // Another Player's memory stays theirs.
+    world.lastSeen[8] = [
+      { is: 'building', id: 'h3', kind: 'house', cityId: null, x: 1, y: 1, seenAt: 4 },
+    ]
+    const memory: ScriptObject = {}
+    runAs(world, explored, 'memory.ls = lastSeen()', memory)
+    expect(memory.ls).toEqual([
+      { is: 'building', ...house, seenAt: 4 },
+      { is: 'city', ...city, seenAt: 4 },
+    ])
+  })
+
   it('stop at a query used wrong', () => {
     const { world, explored } = setup()
     const { result } = runAs(world, explored, 'terrainAt("here")')
@@ -272,6 +295,12 @@ describe('script bindings', () => {
       { kind: 'handIn', good: 'coins', units: 50, toCityId: 'c2', carriageId: null },
     ],
     ['handOver("b1")', { kind: 'handOver', newLeaderId: 'b1' }],
+    ['rename("b1", "Gerd")', { kind: 'rename', targetId: 'b1', name: 'Gerd' }],
+    [
+      'rename("b1", "Mara", "Ironvale")',
+      { kind: 'rename', targetId: 'b1', name: 'Mara', realmName: 'Ironvale' },
+    ],
+    ['renameCity("c1", "Ironhold")', { kind: 'renameCity', cityId: 'c1', name: 'Ironhold' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],
   ]

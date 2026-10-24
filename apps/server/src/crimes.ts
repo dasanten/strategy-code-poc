@@ -51,12 +51,12 @@ export function carriageOrganization(k: Carriage): string | null {
   return k.realmId ?? k.cityId
 }
 
-/** An Organization's name for the log: a realm by its Leader's name, a city by its own. */
+/** An Organization's name for the log: a realm by its realm name, a city by its own. */
 function organizationName(world: WorldState, org: string): string {
   const realm = world.realms.find((x) => x.id === org)
   if (realm) {
-    const leader = world.residents.find((x) => x.id === realm.leaderId)
-    return leader ? `the realm of ${leader.name}` : 'a realm'
+    const name = realm.name ?? world.residents.find((x) => x.id === realm.leaderId)?.name
+    return name ? `the realm of ${name}` : 'a realm'
   }
   return world.cities.find((c) => c.id === org)?.name ?? 'nobody'
 }

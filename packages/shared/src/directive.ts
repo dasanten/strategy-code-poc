@@ -73,7 +73,7 @@ export type DirectiveGoalView =
 export interface DirectiveView {
   id: string
   target: string
-  /** The target's name: a realm's by its Leader's name, an NPC city's its own. */
+  /** The target's name: a realm's by its realm name, an NPC city's its own. */
   targetName: string
   withAlliance: boolean
   reason: string

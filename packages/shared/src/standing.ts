@@ -49,7 +49,7 @@ export function formerPlayerStanding(city: Pick<City, 'formerPlayer'>, tick: num
   return Math.max(0, FORMER_PLAYER_STANDING - STANDING_DRIFT_PER_DAY * days)
 }
 
-/** How Players call an Organization: a realm by its Leader's name, a city by its own. */
+/** How Players call an Organization: a realm by its realm name, a city by its own. */
 export function organizationLabel(
   world: Pick<WorldState, 'realms' | 'residents' | 'cities'>,
   org: string,

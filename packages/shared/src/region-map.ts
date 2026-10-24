@@ -10,7 +10,7 @@ import type { WorldState } from './world.js'
 export interface RegionHolder {
   /** The Organization's id: a realm's, or a city's for a city that belongs to no realm. */
   id: string
-  /** A realm by its Leader's name, a city by its own. */
+  /** A realm by its realm name, a city by its own. */
   name: string
   /** The alliance a realm is a member of: it shows in the alliance's colour. */
   alliance: { id: string; name: string } | null
@@ -31,7 +31,7 @@ export interface RegionMap {
 }
 
 /**
- * How an Organization is called on the Region map: a realm by its Leader, a city by its name, the
+ * How an Organization is called on the Region map: a realm by its realm name, a city by its name, the
  * Trade Organization by its own.
  */
 export function organizationName(

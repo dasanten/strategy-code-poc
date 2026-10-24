@@ -1,7 +1,15 @@
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WebSocket } from 'ws'
-import { SESSION_COOKIE, WS_PATH, chunksAcross, realmName, type ServerMessage } from '@csp/shared'
+import {
+  REALM_NAME_MAX_LENGTH,
+  RESIDENT_NAME_MAX_LENGTH,
+  SESSION_COOKIE,
+  WS_PATH,
+  chunksAcross,
+  realmName,
+  type ServerMessage,
+} from '@csp/shared'
 import { buildApp } from './app.js'
 import { createAdmin, createInviteCode, createSession, signUp } from './auth.js'
 import { recordEvent } from './events.js'
@@ -75,12 +83,26 @@ async function start() {
   }
 }
 
-/** Opens a socket and collects every message it receives. */
-function connect(url: string, token?: string) {
+/**
+ * Opens a socket and collects every message it receives. A Player without a realm founds one
+ * named `found` gives, keeping the Leader's name from the game; `found: null` leaves it to the test.
+ */
+function connect(
+  url: string,
+  token?: string,
+  found: { realmName: string; leaderName?: string } | null = { realmName: 'Ironvale' },
+) {
   const headers = token ? { cookie: `${SESSION_COOKIE}=${token}` } : undefined
   const socket = new WebSocket(url, { headers })
   const messages: ServerMessage[] = []
-  socket.on('message', (raw) => messages.push(JSON.parse(String(raw)) as ServerMessage))
+  socket.on('message', (raw) => {
+    const msg = JSON.parse(String(raw)) as ServerMessage
+    messages.push(msg)
+    if (msg.type === 'founding' && found) {
+      const leaderName = found.leaderName ?? msg.leaderName
+      socket.send(JSON.stringify({ type: 'found', requestId: 'f', ...found, leaderName }))
+    }
+  })
   // Closing a refused socket mid-handshake reports an error; the tests check status codes instead.
   socket.on('error', () => {})
   cleanup.push(() => socket.terminate())
@@ -147,6 +169,113 @@ describe('realtime', () => {
     realtime.broadcastTick()
     const tick = await next('tick')
     if (tick.type === 'tick') expect(tick.tick).toBe(1)
+    expect(violations).toEqual([])
+  })
+
+  it('founds nothing on connect: a Player without a realm names it and their Leader first', async () => {
+    const { url, token, userId, world } = await start()
+    const { socket, next } = connect(url, token, null)
+    const founding = await next('founding')
+    if (founding.type !== 'founding') throw new Error('no founding')
+    expect(founding.account).toEqual({ name: 'Daniel', isAdmin: true })
+    expect(founding.leaderName).toMatch(/^\w+$/)
+    expect(world.realms).toEqual([])
+    expect(world.cities).toEqual([])
+
+    // Nothing to order around yet.
+    socket.send(JSON.stringify({ type: 'order', requestId: 'o1', order: { kind: 'fly' } }))
+    expect(await next('rejected')).toEqual({
+      type: 'rejected',
+      requestId: 'o1',
+      reason: 'no realm yet',
+    })
+
+    const names = { realmName: '  Ironvale ', leaderName: ' Brann  ' }
+    socket.send(JSON.stringify({ type: 'found', requestId: 'f1', ...names }))
+    const welcome = await next('welcome')
+    const realm = realmOf(world, userId)!
+    expect(realm.name).toBe('Ironvale')
+    const leader = world.residents.find((r) => r.id === realm.leaderId)!
+    expect(leader.name).toBe('Brann')
+    expect(welcome).toMatchObject({ home: { realmId: realm.id, leaderId: leader.id } })
+    expect(world.cities).toHaveLength(1)
+    // The log names the Leader as founded.
+    expect(welcome.type === 'welcome' && welcome.events[0]).toMatchObject({
+      kind: 'founded',
+      name: 'Brann',
+    })
+    // Founded once: asking again changes nothing.
+    socket.send(JSON.stringify({ type: 'found', requestId: 'f2', realmName: 'X', leaderName: 'Y' }))
+    socket.send(JSON.stringify({ type: 'order', requestId: 'o2', order: { kind: 'fly' } }))
+    expect(await next('rejected')).toMatchObject({ requestId: 'o2' })
+    expect(realm.name).toBe('Ironvale')
+    expect(world.realms).toHaveLength(1)
+  })
+
+  it('refuses to found with an empty or too long name', async () => {
+    const { url, token, world } = await start()
+    const { socket, next } = connect(url, token, null)
+    await next('founding')
+    const tooLong = 'x'.repeat(REALM_NAME_MAX_LENGTH + 1)
+    const tries = [
+      { realmName: '   ', leaderName: 'Brann', reason: 'Realm name: needs a name' },
+      { realmName: tooLong, leaderName: 'Brann', reason: `Realm name: at most 30 characters` },
+      { realmName: 'Ironvale', leaderName: '', reason: 'Leader name: needs a name' },
+      {
+        realmName: 'Ironvale',
+        leaderName: 'y'.repeat(RESIDENT_NAME_MAX_LENGTH + 1),
+        reason: 'Leader name: at most 30 characters',
+      },
+      { realmName: 7, leaderName: 'Brann', reason: 'Realm name: needs a name' },
+    ]
+    for (const [i, { reason, ...names }] of tries.entries()) {
+      socket.send(JSON.stringify({ type: 'found', requestId: `f${i}`, ...names }))
+      expect(await next('rejected')).toEqual({ type: 'rejected', requestId: `f${i}`, reason })
+    }
+    expect(world.realms).toEqual([])
+    expect(world.cities).toEqual([])
+    // Exactly the longest name is fine.
+    const longest = 'z'.repeat(REALM_NAME_MAX_LENGTH)
+    socket.send(
+      JSON.stringify({ type: 'found', requestId: 'ok', realmName: longest, leaderName: 'B' }),
+    )
+    await next('welcome')
+    expect(world.realms[0]!.name).toBe(longest)
+  })
+
+  it('sends what left sight as Last seen, apart from sight, and drops it when back in sight', async () => {
+    const { url, token, world, realtime, violations } = await start()
+    const first = connect(url, token)
+    await first.next('welcome')
+    stepWorld(world, terrain)
+    realtime.broadcastTick()
+    await first.next('tick')
+    // Everyone walks far off: the city leaves sight and comes back as Last seen.
+    const homes = world.residents.map((r) => ({ x: r.x, y: r.y }))
+    for (const r of world.residents)
+      Object.assign(r, { x: (r.x + 400) % terrain.size, order: null })
+    stepWorld(world, terrain)
+    realtime.broadcastTick()
+    const away = await first.next('tick')
+    const city = world.cities[0]!
+    const hall = city.townHallId
+    if (away.type !== 'tick') throw new Error('no tick')
+    expect(away.gone).toContain(hall)
+    expect(away.lastSeen?.changed.map((e) => e.id)).toEqual(expect.arrayContaining([hall, city.id]))
+    expect(away.lastSeen?.changed.find((e) => e.id === hall)).toMatchObject({ seenAt: 1 })
+    // A new connection gets it in the welcome, apart from what is in sight.
+    const welcome = await connect(url, token).next('welcome')
+    if (welcome.type !== 'welcome') throw new Error('no welcome')
+    expect(welcome.lastSeen.map((e) => e.id)).toContain(hall)
+    expect(welcome.entities.map((e) => e.id)).not.toContain(hall)
+    // Back home: in sight again, no longer Last seen.
+    world.residents.forEach((r, i) => Object.assign(r, homes[i]))
+    stepWorld(world, terrain)
+    realtime.broadcastTick()
+    const back = await first.next('tick')
+    if (back.type !== 'tick') throw new Error('no tick')
+    expect(back.changed.map((e) => e.id)).toContain(hall)
+    expect(back.lastSeen?.gone).toContain(hall)
     expect(violations).toEqual([])
   })
 
@@ -233,12 +362,18 @@ describe('realtime', () => {
     expect(tick.type === 'tick' && tick.events.map((e) => e.kind)).toEqual(['died', 'selfManaged'])
     first.socket.close()
 
-    // On the next login: a new Leader and starting city, and the whole story in the log.
+    // On the next login: they name a new realm and Leader, then get a new starting city, and the
+    // whole story in the log.
     territory.update(world, terrain)
-    const welcome = await connect(url, token).next('welcome')
+    const again = connect(url, token, { realmName: 'Ashford', leaderName: 'Odo' })
+    expect(await again.next('founding')).toMatchObject({ type: 'founding' })
+    const welcome = await again.next('welcome')
     if (welcome.type !== 'welcome') throw new Error('no welcome')
     const fresh = realmOf(world, userId)!
     expect(fresh.id).not.toBe(realm.id)
+    expect(fresh.name).toBe('Ashford')
+    expect(realmName(world, fresh.id)).toBe('Ashford')
+    expect(world.residents.find((r) => r.id === fresh.leaderId)?.name).toBe('Odo')
     expect(welcome.home).toMatchObject({ realmId: fresh.id, leaderId: fresh.leaderId })
     expect(welcome.home.cityId).not.toBe(city.id)
     expect(welcome.events.map((e) => e.kind)).toEqual(['founded', 'died', 'selfManaged', 'founded'])

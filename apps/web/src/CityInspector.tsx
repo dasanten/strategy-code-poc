@@ -36,6 +36,7 @@ import {
   type WarehouseView,
 } from './city-view.js'
 import { GOOD_LABELS } from './Residents.js'
+import { lastSeenText, type LastSeen } from './last-seen.js'
 
 /**
  * The city inspector: every city in sight (`CONTEXT.md`: City, NPC city), whose it is, and,
@@ -47,9 +48,12 @@ import { GOOD_LABELS } from './Residents.js'
  * NPC city that doesn't refuse the Player lists its prices at its storages in sight, where their
  * residents trade with it the same way (`CONTEXT.md`: Trading with an NPC city).
  * A city of another realm takes transfers from the Player's cities (`CONTEXT.md`: Transfer).
+ * Below them, the cities the Player remembers out of sight (`CONTEXT.md`: Last seen): as they
+ * last saw them and when, greyed, with nothing to do there.
  */
 export function CityInspector({
   cities,
+  lastSeen,
   residents,
   buildings,
   realmId,
@@ -67,6 +71,8 @@ export function CityInspector({
   onOpen,
 }: {
   cities: SeenCity[]
+  /** What the Player remembers out of sight. */
+  lastSeen: LastSeen
   residents: SeenResident[]
   buildings: Building[]
   realmId: string
@@ -222,7 +228,77 @@ export function CityInspector({
           </li>
         ))}
       </ul>
+      {lastSeen.cities.length > 0 && (
+        <>
+          <div className="panel-head">
+            <h2>Last seen</h2>
+            <span>{lastSeen.cities.length}</span>
+          </div>
+          <ul className="city-list" aria-label="Cities last seen">
+            {lastSeen.cities.map((c) => (
+              <RememberedCity
+                key={c.id}
+                city={c}
+                lastSeen={lastSeen}
+                realmId={realmId}
+                realms={realms}
+                tick={tick}
+                open={openId === c.id}
+                onOpen={onOpen}
+              />
+            ))}
+          </ul>
+        </>
+      )}
     </section>
+  )
+}
+
+/**
+ * A city the Player remembers out of sight (`CONTEXT.md`: Last seen): when they last saw it, then
+ * its buildings and prices as they were, greyed. Nothing can be done there from here.
+ */
+function RememberedCity({
+  city,
+  lastSeen,
+  realmId,
+  realms,
+  tick,
+  open,
+  onOpen,
+}: {
+  city: LastSeen['cities'][number]
+  lastSeen: LastSeen
+  realmId: string
+  realms: RealmLabel[]
+  tick: number
+  open: boolean
+  onOpen: (id: string | undefined) => void
+}) {
+  const v = describeCity(city, { residents: [], buildings: lastSeen.buildings }, realmId, realms)
+  return (
+    <li>
+      <button type="button" aria-expanded={open} onClick={() => onOpen(open ? undefined : city.id)}>
+        <strong>{v.name}</strong>
+        <span>{v.whose}</span>
+      </button>
+      {open && (
+        <div className="last-seen">
+          <p className="city-details">{lastSeenText(city.seenAt, tick)}</p>
+          {v.buildings.length > 0 && (
+            <p className="city-details">
+              {v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}
+            </p>
+          )}
+          {warehousesInSight(city, lastSeen).map((w) => (
+            <Prices key={w.id} warehouse={w} />
+          ))}
+          {npcStoragesInSight(city, lastSeen).map((s) => (
+            <Prices key={s.id} warehouse={s} place="Storage" />
+          ))}
+        </div>
+      )}
+    </li>
   )
 }
 

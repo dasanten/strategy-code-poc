@@ -27,6 +27,7 @@ import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { keyGoods, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
 import { CentredDialog, Drawer, ToolRail, TopBar, useEscapeCloses } from './Hud.js'
+import { Founding } from './Founding.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { isWikiPath, pageFor } from './pages.js'
@@ -71,7 +72,7 @@ function Pages() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, status, sendOrder } = useWorld(onLoggedOut)
+  const { world, founding, status, sendOrder, found } = useWorld(onLoggedOut)
   const [selectedId, setSelectedId] = useState<string | undefined>()
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
@@ -199,6 +200,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'handOver', residentId: world.home.leaderId, newLeaderId: selected.id }
     setOrderError(await sendOrder(order))
   }
+  /**
+   * Renames the picked resident (`CONTEXT.md`: Renaming a resident), with the realm name when it
+   * is the Leader of an unnamed realm: the same `rename` order a script's `rename` requests.
+   */
+  async function rename(name: string, realmName?: string) {
+    if (!selected) return
+    const order = { kind: 'rename', residentId: selected.id, targetId: selected.id, name }
+    setOrderError(await sendOrder(realmName === undefined ? order : { ...order, realmName }))
+  }
   /** Orders the picked resident to attack a resident of another realm. */
   async function attack(targetId: string) {
     if (!selected) return
@@ -240,6 +250,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       {panel}
     </Drawer>
   )
+
+  // A Player without a realm names it before the world shows (`CONTEXT.md`: Realm name).
+  if (founding && !world) return <Founding leaderName={founding.leaderName} onFound={found} />
 
   return (
     <div className="game">
@@ -368,6 +381,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           'cities',
           <CityInspector
             cities={world.cities}
+            lastSeen={world.lastSeen}
             residents={world.residents}
             buildings={world.buildings}
             realmId={world.home.realmId}
@@ -424,7 +438,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 terrain: terrainAt?.(selectedTile.x, selectedTile.y),
                 strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),
                 residents: world.residents,
-                cities: world.cities,
+                // A building remembered out of sight is named after its city as last seen.
+                cities: [...world.cities, ...world.lastSeen.cities],
+                lastSeen: { buildings: world.lastSeen.buildings, tick: world.tick },
                 tick: world.tick,
                 viewer: {
                   realmId: world.home.realmId,
@@ -442,7 +458,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               GOOD_LABELS,
             )}
             tick={world.tick}
-            building={world.buildings.find(
+            building={[...world.buildings, ...world.lastSeen.buildings].find(
               (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
             )}
             nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
@@ -472,6 +488,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onOpenCity={(id) => {
               setOpenCityId(id)
               setOpenDrawer('cities')
+            }}
+            // The same `renameCity` order a script's `renameCity` requests, asked by the Leader.
+            onRenameCity={async (cityId, name) => {
+              const order = { kind: 'renameCity', residentId: world.home.leaderId, cityId, name }
+              setOrderError(await sendOrder(order))
             }}
           />
         </div>
@@ -551,6 +572,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             leaderName={leader?.name}
             onMakeLeader={makeLeader}
+            rename={
+              selected.owner === world.home.realmId
+                ? {
+                    needsRealmName:
+                      selected.id === world.home.leaderId && world.home.realmName === null,
+                  }
+                : undefined
+            }
+            onRename={rename}
             onClose={() => {
               setSelectedId(undefined)
               setPicking(false)
