@@ -39,6 +39,12 @@ The shared language of the game. Domain terms only — no implementation details
   work) on any passable land except Mountain, and it may share a tile with a building, so roads
   can lead through gates. On a road residents and carriages move at road speed whatever the
   terrain beneath, and eat as on Plains. Nobody owns a road; anyone can walk it or tear it down.
+- **Step:** a move onto one of the eight tiles around, straight or diagonal. A diagonal step is
+  √2 (about 1.41) times as far as a straight one, so it takes that much longer on the same
+  ground. A diagonal step can't squeeze between two corners: it is only possible when both
+  straight tiles beside it could be stepped onto as well, so no wall, gate in the way, Lake, Sea
+  or (for a carriage) Mountain may stand on either. Two wall tiles touching at a corner close
+  the way like a straight stretch.
 - No rivers and no water vehicles (for now), so all land is joined: any tile can be reached on
   foot from any other, if only the long way round.
 

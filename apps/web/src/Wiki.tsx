@@ -57,6 +57,7 @@ import {
   HUNGER_DAYS,
   HUNGER_ENDURANCE_EFFECT,
   HUNGER_ENDURANCE_LIMIT,
+  DIAGONAL_STEP,
   ENDURANCE_TERRAIN_EFFECT,
   LIFESPAN_MAX,
   LIFESPAN_MIN,
@@ -380,6 +381,13 @@ export function Wiki() {
           An unloaded average resident walks a plains tile in {duration(WALK_TICKS_PER_TILE)}.
           Terrain changes how fast they walk and how much food they burn; lakes and sea can't be
           entered. A road is as fast whatever lies beneath it.
+        </p>
+        <p>
+          Residents and carriages step onto any of the eight tiles around, diagonals too. A diagonal
+          step is {num(DIAGONAL_STEP, 2)} times as far, so it takes that much longer on the same
+          ground. It can't squeeze between two corners: both straight tiles beside it must be ones
+          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage)
+          mountain. Two walls touching at a corner close the way like a straight stretch.
         </p>
         <table>
           <thead>

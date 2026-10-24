@@ -16,7 +16,8 @@ import {
   wallsKey,
   roadTiles,
   walkSpeed,
-  wrapDelta,
+  besideStep,
+  stepLength,
   type AttackOrder,
   type DriveOrder,
   type HaulOrder,
@@ -127,7 +128,7 @@ function attackHolds(world: WorldState, r: Resident, o: AttackOrder, size: numbe
 /**
  * A carriage going after an army (`CONTEXT.md`: Supply line) that need not drive this tick. With
  * the army gone, the drive or haul route ends. Where the order heads (`target`, or a haul route's
- * `to`) follows the army once it has moved on from there (`armySpot`), and a path that no longer
+ * `to`) follows the army (`armySpot`), and a path that no longer
  * ends in contact with it is found again. In contact with the army, a supply wagon stands with it
  * and a haul route starts on its stop.
  */
@@ -143,11 +144,11 @@ function followHolds(
     r.order = null
     return true
   }
+  // A path found is kept while it ends in contact with the army (below), so heading always for
+  // the spot itself costs no search; heading for a tile beside it could end two tiles off.
   const to = o.kind === 'drive' ? o.target : o.to
-  if (!inContact(size, to, spot)) {
-    to.x = spot.x
-    to.y = spot.y
-  }
+  to.x = spot.x
+  to.y = spot.y
   if (inContact(size, r, spot)) {
     if (o.kind === 'haul') arrive(r, o)
     o.path = null
@@ -256,7 +257,9 @@ export class Walking {
       } else {
         o.progress += walkSpeed(r, ground, world.tick)
       }
-      if (o.progress < 1) continue
+      // A diagonal step is further, so it waits for that much more progress (`CONTEXT.md`: Step).
+      const length = stepLength(this.terrain.size, r.x, r.y, next[0], next[1]) || 1
+      if (o.progress < length) continue
       const to = { x: next[0], y: next[1] }
       const carriageId = onFoot(o) ? undefined : o.carriageId
       steps.push({ kind: 'step', residentId: r.id, to, ...(carriageId ? { carriageId } : {}) })
@@ -301,9 +304,11 @@ export class Walking {
 
   /**
    * Resolves step actions (ADR 0002): a step happens only if the resident still exists, the
-   * tile is next to them and can be entered, walls and gates letting them (`mayStep`). A driver's step also needs their carriage on their
-   * tile with a horse to pull it, and a tile a carriage can enter; the carriage and its horse,
-   * hitched now if it wasn't, go along. Each step taken uses up one tile of progress.
+   * tile is one of the eight around them and can be entered, walls and gates letting them
+   * (`mayStep`), and for a diagonal step both straight tiles beside it could be stepped onto too
+   * (`CONTEXT.md`: Step). A driver's step also needs their carriage on their tile with a horse to
+   * pull it, and tiles a carriage can enter; the carriage and its horse, hitched now if it
+   * wasn't, go along. Each step taken uses up its length in tiles of progress.
    */
   resolve(world: WorldState, steps: StepAction[]): number {
     let taken = 0
@@ -313,17 +318,25 @@ export class Walking {
       const r = world.residents.find((x) => x.id === step.residentId)
       if (!r) continue
       const size = this.terrain.size
-      const near =
-        Math.abs(wrapDelta(r.x, step.to.x, size)) + Math.abs(wrapDelta(r.y, step.to.y, size)) === 1
+      const length = stepLength(size, r.x, r.y, step.to.x, step.to.y)
       const ground = groundAt(this.terrain, roads, step.to.x, step.to.y)
-      if (!near || !isPassableTerrain(ground)) {
+      if (!length || !isPassableTerrain(ground)) {
         r.order = null
         continue
       }
       const from = tileIndex(size, r.x, r.y)
       const to = tileIndex(size, step.to.x, step.to.y)
-      const stranded = strandedOnWall(walls, wallSide(r), from)
-      if (!mayStep(walls, wallSide(r), from, to, !step.carriageId, stranded)) {
+      const side = wallSide(r)
+      const onWalls = !step.carriageId
+      const stranded = strandedOnWall(walls, side, from)
+      const enterable = (t: number) => {
+        const g = groundAt(this.terrain, roads, t % size, Math.floor(t / size))
+        return onWalls ? isPassableTerrain(g) : carriageCanEnter(g)
+      }
+      const corners = besideStep(size, r.x, r.y, step.to.x, step.to.y).every(
+        (t) => enterable(t) && mayStep(walls, side, from, t, onWalls, stranded),
+      )
+      if (!corners || !mayStep(walls, side, from, to, onWalls, stranded)) {
         const o = moveOrder(r)
         if (o) {
           o.path = null
@@ -350,7 +363,7 @@ export class Walking {
       const o = moveOrder(r)
       if (!o?.path) continue
       o.path.shift()
-      o.progress -= 1
+      o.progress -= length
       if (o.path.length === 0) arrive(r, o)
     }
     return taken
