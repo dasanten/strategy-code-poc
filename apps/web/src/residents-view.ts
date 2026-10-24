@@ -1,0 +1,63 @@
+import type { City, Diplomacy, Resident } from '@csp/shared'
+
+/** One heading of the Residents drawer and the residents under it. */
+export interface ResidentGroup<R> {
+  /** A city's id, or `hired`, `army` or `homeless`. */
+  key: string
+  label: string
+  residents: R[]
+}
+
+/**
+ * The residents the Player commands, grouped for the Residents drawer: by the city they live in
+ * (`CONTEXT.md`: Resident), the home city first and the Player's other cities by name, then the
+ * mercenaries they hired (`CONTEXT.md`: Mercenary contract), what was handed over to their
+ * alliance army (`CONTEXT.md`: Alliance army) and the homeless. Empty groups are left out. The
+ * Leader comes first in their group; the rest keep the order they came in, so rows don't jump
+ * around as residents change what they do.
+ */
+export function groupResidents<R extends Pick<Resident, 'id' | 'cityId'>>(
+  residents: readonly R[],
+  {
+    cities,
+    realmId,
+    homeCityId,
+    leaderId,
+    diplomacy,
+  }: {
+    cities: readonly Pick<City, 'id' | 'name' | 'realmId'>[]
+    realmId: string
+    homeCityId: string | null
+    leaderId: string
+    diplomacy: Pick<Diplomacy, 'alliance' | 'contracts'>
+  },
+): ResidentGroup<R>[] {
+  const own = cities
+    .filter((c) => c.realmId === realmId)
+    .sort((a, b) =>
+      a.id === homeCityId ? -1 : b.id === homeCityId ? 1 : a.name.localeCompare(b.name),
+    )
+  const army = new Set(diplomacy.alliance?.army.map((p) => p.id))
+  const hired = new Set(
+    diplomacy.contracts
+      .filter((c) => c.startedAt !== null && c.hirer.realmId === realmId)
+      .flatMap((c) => c.residents.map((r) => r.id)),
+  )
+  const groupOf = (r: R): string => {
+    if (army.has(r.id)) return 'army'
+    if (hired.has(r.id)) return 'hired'
+    return own.some((c) => c.id === r.cityId) ? r.cityId! : 'homeless'
+  }
+  const groups: ResidentGroup<R>[] = [
+    ...own.map((c) => ({ key: c.id, label: c.name, residents: [] })),
+    { key: 'hired', label: 'Hired', residents: [] },
+    { key: 'army', label: 'Alliance army', residents: [] },
+    { key: 'homeless', label: 'Homeless', residents: [] },
+  ]
+  for (const r of residents) {
+    const group = groups.find((g) => g.key === groupOf(r))!
+    if (r.id === leaderId) group.residents.unshift(r)
+    else group.residents.push(r)
+  }
+  return groups.filter((g) => g.residents.length > 0)
+}

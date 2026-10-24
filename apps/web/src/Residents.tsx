@@ -56,7 +56,8 @@ import {
   type Stock,
   type SeenResident,
 } from '@csp/shared'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import type { ResidentGroup } from './residents-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -237,28 +238,41 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
   return 'Idle'
 }
 
-/** The Player's residents, one row each; click a row to inspect that resident. */
+/**
+ * The Player's residents, one row each under the city they live in (see `groupResidents`); click
+ * a row to inspect that resident and show them on the map. Picking one elsewhere, such as on the
+ * map, scrolls their row into view.
+ */
 export function ResidentsList({
-  residents,
+  groups,
   leaderId,
   tick,
   selectedId,
   onSelect,
 }: {
-  residents: Resident[]
+  groups: ResidentGroup<Resident>[]
   leaderId: string
   tick: number
   selectedId: string | undefined
   onSelect: (id: string) => void
 }) {
+  const tableRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!selectedId) return
+    const row = tableRef.current?.querySelector(`[data-resident="${CSS.escape(selectedId)}"]`)
+    // Its heading first, then the row itself, which wins when both don't fit.
+    row?.closest('.residents-group')?.firstElementChild?.scrollIntoView({ block: 'nearest' })
+    row?.scrollIntoView({ block: 'nearest' })
+  }, [selectedId])
+  const count = groups.reduce((n, g) => n + g.residents.length, 0)
   return (
     <section className="residents" aria-label="Residents">
       <div className="panel-head">
         <h2>Residents</h2>
-        <span>{residents.length} in sight</span>
+        <span>{count} in sight</span>
       </div>
       <div className="residents-scroll">
-        <div className="residents-table">
+        <div className="residents-table" ref={tableRef}>
           <div className="residents-row heading" aria-hidden="true">
             <span>Name</span>
             <span>Age</span>
@@ -266,28 +280,36 @@ export function ResidentsList({
             <span>Hunger</span>
             <span>Carrying</span>
           </div>
-          {residents.map((r) => (
-            <button
-              type="button"
-              key={r.id}
-              className={`residents-row${r.id === selectedId ? ' selected' : ''}`}
-              aria-pressed={r.id === selectedId}
-              onClick={() => onSelect(r.id)}
-            >
-              <span className="name">
-                {r.name}
-                {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
-              </span>
-              <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
-              <span className="doing">{doing(r)}</span>
-              <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
-                <span
-                  className={meterClass(r.hunger / MAX_HUNGER)}
-                  style={{ width: pct(r.hunger / MAX_HUNGER) }}
-                />
-              </span>
-              <span className="mono">{kg(stockWeight(r.carried))}</span>
-            </button>
+          {groups.map((g) => (
+            <div className="residents-group" key={g.key} role="group" aria-label={g.label}>
+              <h3>
+                {g.label} <span>· {g.residents.length}</span>
+              </h3>
+              {g.residents.map((r) => (
+                <button
+                  type="button"
+                  key={r.id}
+                  data-resident={r.id}
+                  className={`residents-row${r.id === selectedId ? ' selected' : ''}`}
+                  aria-pressed={r.id === selectedId}
+                  onClick={() => onSelect(r.id)}
+                >
+                  <span className="name">
+                    {r.name}
+                    {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
+                  </span>
+                  <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
+                  <span className="doing">{doing(r)}</span>
+                  <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
+                    <span
+                      className={meterClass(r.hunger / MAX_HUNGER)}
+                      style={{ width: pct(r.hunger / MAX_HUNGER) }}
+                    />
+                  </span>
+                  <span className="mono">{kg(stockWeight(r.carried))}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       </div>

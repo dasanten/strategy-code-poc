@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { Building } from '@csp/shared'
-import { DRAWERS, isWide, keyGoods, toggleDrawer, type OpenDrawer } from './hud-view.js'
+import {
+  DRAWERS,
+  MIN_OPEN_MAP,
+  isWide,
+  keyGoods,
+  showBeside,
+  toggleDrawer,
+  type OpenDrawer,
+} from './hud-view.js'
 
 describe('drawers', () => {
   it('has a drawer for every tool on the rail, once each', () => {
@@ -37,6 +45,24 @@ describe('drawers', () => {
 
   it('makes only the Scripts drawer wide', () => {
     expect(DRAWERS.filter((d) => isWide(d.id)).map((d) => d.id)).toEqual(['scripts'])
+  })
+
+  it('shows a place between the open drawer and the card', () => {
+    expect(showBeside(1280, 0, 0)).toEqual({ left: 0, right: 0, closeDrawer: false })
+    expect(showBeside(1280, 428, 0)).toEqual({ left: 428, right: 0, closeDrawer: false })
+    expect(showBeside(1024, 428, 372)).toEqual({ left: 428, right: 372, closeDrawer: false })
+    const room = 1024 - 428 - MIN_OPEN_MAP
+    expect(showBeside(1024, 428, room)).toEqual({ left: 428, right: room, closeDrawer: false })
+  })
+
+  it('closes a drawer that leaves too little map, and uses the whole screen if need be', () => {
+    // Drawer and card leave 100 px: without the drawer there is room beside the card.
+    expect(showBeside(900, 428, 372)).toEqual({ left: 0, right: 372, closeDrawer: true })
+    // A phone: the drawer covers the map, and the card nearly all of it.
+    expect(showBeside(375, 375, 0)).toEqual({ left: 0, right: 0, closeDrawer: true })
+    expect(showBeside(375, 375, 351)).toEqual({ left: 0, right: 0, closeDrawer: true })
+    // No drawer open and a card that leaves too little: the whole screen.
+    expect(showBeside(375, 0, 351)).toEqual({ left: 0, right: 0, closeDrawer: false })
   })
 })
 
