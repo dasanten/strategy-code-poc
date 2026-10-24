@@ -111,6 +111,17 @@ body {
 .hud-leader .icon {
   color: var(--rel-own);
 }
+a.hud-wiki {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--ui-text);
+  text-decoration: none;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 6px;
+}
+a.hud-wiki:hover {
+  background: var(--ui-raised-hover);
+}
 button.hud-logout {
   padding: 3px 10px;
   font-size: 12px;
@@ -380,6 +391,11 @@ label > select {
 }
 .login-form input {
   padding: 8px 10px;
+}
+.founding-hint {
+  margin: 0;
+  color: var(--ui-muted);
+  line-height: 1.45;
 }
 .login-form button.primary {
   margin-top: 4px;
@@ -1291,4 +1307,66 @@ button.residents-row.selected:hover {
 }
 .hud-drawer fieldset input[type='number'] {
   width: 64px;
+}
+
+/* ---------- Wiki (`CONTEXT.md`: Wiki): one readable page, a section per topic ---------- */
+.wiki {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.wiki h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+}
+.wiki h2 {
+  margin: 32px 0 8px;
+  padding-bottom: 4px;
+  font-size: 18px;
+  border-bottom: 1px solid var(--ui-line);
+}
+.wiki h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+.wiki h3 {
+  margin: 18px 0 6px;
+  font-size: 14px;
+}
+.wiki a {
+  color: var(--rel-own);
+}
+.wiki-section {
+  scroll-margin-top: 16px;
+}
+.wiki-toc ol {
+  columns: 2;
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+.wiki table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 8px 0;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.wiki th,
+.wiki td {
+  padding: 4px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--ui-line);
+  vertical-align: top;
+}
+.wiki th {
+  color: var(--ui-muted);
+  font-weight: 600;
+}
+.login-wiki {
+  align-self: center;
+  font-size: 12px;
+  color: var(--ui-muted);
 }

@@ -1,4 +1,5 @@
 import type { Task } from './default-scripts.js'
+import type { Remembered } from './protocol.js'
 import { Terrain } from './terrain.js'
 
 export const TICK_MS = 1000
@@ -126,9 +127,11 @@ export interface RunningScript {
 
 /**
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
- * memory, which stays on the server.
+ * memory, which stays on the server. Their hunger and health only for their own realm and its
+ * allies (`CONTEXT.md`: Seeing how someone fares).
  */
-export type SeenResident = Omit<Resident, 'script'> & { script?: Pick<RunningScript, 'scriptId'> }
+export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health'> &
+  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: Pick<RunningScript, 'scriptId'> }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -404,6 +407,11 @@ export interface WorldState {
   punishments: Punishment[]
   /** Admin directives in force, oldest first (`CONTEXT.md`: Admin directive). */
   directives: Directive[]
+  /**
+   * What each Player has seen of buildings and cities, by their account id (`CONTEXT.md`: Last
+   * seen): what is in their sight now as of this tick, and what left it as they last saw it.
+   */
+  lastSeen: Record<number, Remembered[]>
 }
 
 /**
@@ -920,7 +928,7 @@ export type RealmEventWhat =
   | { kind: 'fled'; residentId: string; name: string }
   /**
    * A city changed realm by capture (`CONTEXT.md`: Capturing a city): this realm took `city`,
-   * with its `residents`, from the realm of `other` (by its Leader's name; null for an NPC
+   * with its `residents`, from the realm of `other` (by its realm name; null for an NPC
    * city), or, when not `captor`, the realm of `other` took it from this one.
    */
   | {
@@ -1155,7 +1163,7 @@ export type RealmEventWhat =
   /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */
   | { kind: 'allianceInvited'; allianceId: string; name: string }
   /**
-   * A realm (`realm`, by its Leader's name) joined the alliance: this one, or another. `city`
+   * A realm (`realm`, by its realm name) joined the alliance: this one, or another. `city`
    * when it is an NPC city (`CONTEXT.md`: NPC city in an alliance), `realm` then its name.
    */
   | {
@@ -1209,7 +1217,7 @@ export type RealmEventWhat =
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
   /**
    * A mercenary contract (`CONTEXT.md`: Mercenary contract) with the realm `other` (by its
-   * Leader's name) changed: `offered` to this realm, `started` once accepted, `paid` for `weeks`
+   * realm name) changed: `offered` to this realm, `started` once accepted, `paid` for `weeks`
    * more game weeks, `ended` when its time was up, or `broken` when a week went unpaid; or
    * `declined` by the Trade Organization (`CONTEXT.md`: Trade Org army). `lender` when this realm
    * rents out the residents. `leaderDied` says which side's Leader died when that ended it early
@@ -1283,6 +1291,11 @@ export interface Realm {
   userId: number
   /** The resident who is the Player's Leader. */
   leaderId: string
+  /**
+   * What others know the realm by (`CONTEXT.md`: Realm name); never changes once given. Realms
+   * from before realm names have none and go by their Leader's name until named.
+   */
+  name?: string
 }
 
 /**

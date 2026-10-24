@@ -176,8 +176,9 @@ export function sharingSight(world: Pick<WorldState, 'alliances'>, realmId: stri
 }
 
 /**
- * How a realm is called to other Players: by its Leader's name. The Trade Organization, a side
- * like a realm in contracts, by its own.
+ * How a realm is called to other Players: by its realm name, or its Leader's name while it has
+ * none (`CONTEXT.md`: Realm name). The Trade Organization, a side like a realm in contracts, by
+ * its own.
  */
 export function realmName(
   world: Pick<WorldState, 'realms' | 'residents'>,
@@ -185,6 +186,7 @@ export function realmName(
 ): string {
   if (realmId === TRADE_ORG) return TRADE_ORG_NAME
   const realm = world.realms.find((r) => r.id === realmId)
+  if (realm?.name) return realm.name
   const leader = realm && world.residents.find((r) => r.id === realm.leaderId)
   return leader?.name ?? 'a fallen realm'
 }
@@ -205,7 +207,7 @@ export function realmsStandingTogether(
 
 /**
  * A member as a Player sees it in alliance matters: its id and its name, a realm's by its
- * Leader's name, an NPC city's (`city`) its own.
+ * realm name, an NPC city's (`city`) its own.
  */
 export interface RealmLabel {
   realmId: string

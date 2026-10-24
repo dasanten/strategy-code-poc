@@ -133,7 +133,13 @@ The shared language of the game. Domain terms only — no implementation details
   storage kind. The HQ keeps its coins in one and its other goods in another, inside the inner
   ring.
 - **Trading post:** a small Trade Org city in a region, with a warehouse, so Players can trade
-  nearby. Goods move between posts and HQ by caravan.
+  nearby. Goods move between posts and HQ by caravan. It keeps soldiers like an NPC city, armed
+  from its warehouse, so it is captured only by beating them; they fight attackers in its area,
+  and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
+  A captured post joins the captor's realm like any city and leaves the Trade Organization: its
+  warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
+  route ends, and the deliveries and transfers waiting there go over to the HQ, which sends them
+  out of its own stock.
 - **Trading with the Trade Organization:** only in person, by a resident (or a carriage) on a
   warehouse's tile, at its HQ or a trading post. Selling hands the goods into the warehouse and
   takes its coins into the resident's hands, as far as they can carry; buying is the other way
@@ -231,9 +237,18 @@ The shared language of the game. Domain terms only — no implementation details
   Trade Organization.
 - **Realm:** everything one Player controls through their Leader: cities, residents, workplaces,
   carriages. Breaks up into self-managed cities when the Leader dies.
+- **Realm name:** what others know a realm by. The Player gives it when the realm is founded (their
+  first spawn, and each respawn after a Leader death, since that founds a new realm) and it never
+  changes; a Leader handover keeps it. Not the Leader's name. A realm from before realm names
+  existed goes by its Leader's name until the Player names it, which they must do the first time
+  they rename their Leader.
 - **City:** a settlement with residents, buildings and usually a wall. Sizes range from
   **village** to large town. Every city has exactly one town hall; without it there is no city.
   Its shape is derived from its buildings, never drawn.
+- **Renaming a city:** a new city gets a name from the game; the Player can rename any city of
+  their realm, by hand or from a script: free, instant, from anywhere. Names need not be unique.
+  NPC cities keep their names. A city that changes hands keeps its name until its new owner
+  renames it. Others learn a new name only by sight (see Last seen).
 - **Town hall:** the building that makes a city. Building one founds a new city, belonging to the
   realm whose residents finished it. Tearing it down dissolves the city: its buildings and
   residents stay where they are, and its residents are homeless.
@@ -306,8 +321,25 @@ The shared language of the game. Domain terms only — no implementation details
 - **Sight:** what a Player currently sees: everything within sight range of any of their
   residents, or of any resident of an alliance they belong to. People, goods, buildings,
   horses, carriages and armies are only visible in sight, a Player's own included.
+- **Seeing inside a storage:** what a storage, warehouse or stable holds is seen only by its own
+  realm and its allies, and by anyone with a resident at it. From further off others see only the
+  building (and a warehouse's or NPC city's prices, where those are shown).
+  A carriage's load goes the same way, with a resident on its tile; from further off others see
+  only how heavily it is loaded.
+- **Seeing how someone fares:** a resident's or horse's hunger and health are seen only by its
+  own realm and its allies. Others see that it is there.
 - **Explored terrain:** tiles a Player has ever had in sight. Their terrain and resource nodes stay
-  known; what is on them (people, goods, buildings) does not.
+  known, and so do the buildings on them (see Last seen); people, horses, carriages, armies and
+  goods on them do not.
+- **Last seen:** a building or construction site a Player has had in sight (their own included)
+  stays on their map after it leaves their sight, as it was when they last saw it: where it
+  stands, what it is, who held it and which city it belonged to (by that city's name then), along with whatever else they
+  were allowed to see then (its prices, what it held). It is marked with when they saw it and
+  always shown apart from what is in sight now. It changes only when it comes back into sight:
+  once any tile it stood on is in sight again, the Player sees what is there now, and a building
+  that is gone is forgotten. A city stays remembered while any of its buildings does. Things that
+  move are never remembered. Like explored terrain, it grows only from sight: joining an alliance
+  does not hand over what its members saw before, and leaving one keeps what was seen through it.
 
 ## Military
 
@@ -401,6 +433,24 @@ The shared language of the game. Domain terms only — no implementation details
   carry home twice what it lost (coins first), fighting whoever resists. It never captures the
   city, and leaves once it has what it came for.
 
+## Bandits
+
+- **Bandit camp:** an Organization the game spawns in a remote spot out of every Player's sight,
+  with a storage and a band of armed residents. Its standing toward everyone is fixed at hostile:
+  it never trades, sells, hires out or joins an alliance, and attacking or robbing it is never a
+  crime. Bandits and their camps are seen only in sight, like everything else.
+- **Band:** a camp has a set size. It doesn't pair or farm; it eats from its loot and starves
+  without it. Lost bandits are slowly replaced by drifters arriving, up to its size. When a camp
+  is wiped out, a new one may later spawn elsewhere, out of every Player's sight.
+- **Raiding:** a band goes after caravans and carriages on the move, lone residents far from home,
+  and weak cities. It skips any target whose respect is higher than its own: more armed residents
+  and walls in its sight than the band has bandits. At a city it fights whoever resists, carries
+  off what it can from the storage (Food and Coins first) and goes home; it never captures a city.
+  A band that is losing a fight flees home.
+- **Bandit loot:** carried to the camp's storage. Bandits eat its Food and arm themselves from its
+  weapons and armour. Whoever wipes out the camp can take what is left.
+- **Wiping out a camp:** kill or drive off every bandit and tear down the camp.
+
 ## People
 
 - **Player:** the human behind an account. Owns nothing physically; joins alliances. Not a thing
@@ -413,6 +463,11 @@ The shared language of the game. Domain terms only — no implementation details
   admins can watch over it. That knowledge is the admin's, never their Player's: the game screen
   and their scripts still see only their Player's sight, and nothing in the admin panel acts in
   the world except admin directives.
+- **Wiki:** the game's rules and numbers for Players, readable by anyone, logged in or not, apart
+  from the game. It states the rules in plain words with the game's current balance numbers and
+  what follows from them (how many residents one farmer feeds, what a worker's day is worth), so
+  Players can plan. It tells only what is true for everyone, never anything about the world's
+  current state. _Avoid:_ help, manual, guide.
 - **Leader:** the Player's figure in the world. A resident like any other (stats, food, can die),
   except that the Player controls their cities and residents only while their Leader lives.
   A Leader serves no one else: they are never hired out or handed over to an alliance army.
@@ -425,8 +480,10 @@ The shared language of the game. Domain terms only — no implementation details
   an ordinary resident of the realm. Contracts, alliances, standing, scripts and the realm log
   belong to the Player and carry over; the realm log records the handover.
 - **Leader death:** the Player instantly loses control of everything they held, wherever the
-  Leader was. Their cities become self-managed. The Player respawns as a new Leader with a fresh
-  starting city on their next login.
+  Leader was. Their cities become self-managed and the realm ends: its alliance membership,
+  contracts and standing end with it. The Player respawns as a new Leader with a fresh starting
+  city on their next login, founding a new realm: they give its realm name and their new
+  Leader's name (one from the game they may keep); the starting city gets one from the game.
   Their realm log tells them how their Leader died and what became of each city, and where it
   stands, so they can find it again on the map.
 - **Self-managed city:** a city with no living Leader in charge. It runs on its own behaviour and
@@ -442,6 +499,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Resident:** a person living in the world. Has stats, skills, health, hunger and an age.
   Needs food or dies; dies of old age eventually. Lives in one city, wherever they are standing.
   _Avoid:_ unit (old code term).
+- **Renaming a resident:** the Player can rename any resident of their realm, their Leader
+  included, by hand or from a script: free, instant, from anywhere. Names need not be unique.
+  Renaming the Leader never renames the realm (see Realm name). The realm log keeps the names
+  things had when they happened.
 - **Stats:** Strength, Endurance, Agility, Intellect. Each has a **base value** and a
   **trained bonus**; the effective value is both together.
   - Strength: carry capacity, mining output, melee damage.
@@ -563,7 +624,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Step budget:** how much work a script may do each tick, for each resident or army and for a
   whole realm. Out of budget, the script stops for that tick; what it already requested still
   counts. Default scripts count like any other. NPC cities have no realm budget, only the one
-  for each resident. A script sees only what its Player sees: their sight and explored terrain.
+  for each resident. A script sees only what its Player sees: their sight, explored terrain and
+  what they last saw (Last seen), told apart from what is in sight now.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

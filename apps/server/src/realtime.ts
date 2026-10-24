@@ -4,11 +4,14 @@ import {
   SESSION_COOKIE,
   WS_PATH,
   diplomacyFor,
+  foundingProblem,
   regionMapFor,
   townHallOf,
   type Account,
   type ClientMessage,
+  type Realm,
   type RegionMap,
+  type Remembered,
   type SeenEntity,
   type ServerMessage,
   type TerrainMap,
@@ -19,13 +22,14 @@ import { getSessionUser, type SessionUser } from './auth.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
-import { foundStartingCity } from './starting-city.js'
+import { foundStartingCity, realmOf, suggestedLeaderName } from './starting-city.js'
 import { eventsFor } from './events.js'
 import { regionMapUnsound } from './region-map.js'
 import { shouldCheckInvariants } from './invariants.js'
-import { entitiesInSight, sentOutOfSight, type SightTracker } from './sight.js'
+import { entitiesInSight, sentInsideUnseen, sentOutOfSight, type SightTracker } from './sight.js'
 import type { TickReporter } from './tick.js'
 import { ClientView } from './sync.js'
+import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
 
 function readCookie(header: string | undefined, name: string): string | undefined {
   for (const part of header?.split(';') ?? []) {
@@ -52,6 +56,8 @@ interface Client {
   userId: number
   realmId: string
   view: ClientView
+  /** What has been sent of the Player's Last seen out of sight (`CONTEXT.md`: Last seen). */
+  lastSeenView: ClientView<Remembered>
   /** The number of the last realm event sent, so each tick sends only newer ones. */
   lastEventSeq: number
   /** The alliance matters last sent, as JSON, so a tick sends them only when they changed. */
@@ -60,6 +66,8 @@ interface Client {
   regionTick: number | null
   /** The realm's Leader last sent, so a tick sends it only when it changed (Leader handover). */
   leaderId: string
+  /** The realm name last sent, null while it has none, so a tick sends it once it is named. */
+  realmName: string | null
 }
 
 /**
@@ -80,7 +88,8 @@ export function attachRealtime(
     territory?: { current: Territory | null }
     /**
      * Checks, on the sampled share of ticks, that nothing is sent outside a Player's sight
-     * (`sentOutOfSight`), and reports what is.
+     * (`sentOutOfSight`) and nothing from inside they may not see (`sentInsideUnseen`), and
+     * reports what is.
      */
     sightCheck?: { reporter: TickReporter; sampleRate: number; rand?: () => number }
   },
@@ -93,7 +102,18 @@ export function attachRealtime(
   function checkSent(realmId: string, sent: SeenEntity[]) {
     const check = opts.sightCheck
     if (!check || !shouldCheckInvariants(check.sampleRate, check.rand)) return
-    const violations = sentOutOfSight(world, opts.terrain, realmId, sent)
+    const violations = [
+      ...sentOutOfSight(world, opts.terrain, realmId, sent),
+      ...sentInsideUnseen(world, opts.terrain, realmId, sent),
+    ]
+    if (violations.length > 0) check.reporter.invariantViolations(world, violations)
+  }
+
+  /** Reports Last seen about to go to a realm's Player that is in their sight, as `checkSent`. */
+  function checkLastSeen(realmId: string, sent: Remembered[]) {
+    const check = opts.sightCheck
+    if (!check || sent.length === 0 || !shouldCheckInvariants(check.sampleRate, check.rand)) return
+    const violations = lastSeenInSight(world, opts.terrain, realmId, sent)
     if (violations.length > 0) check.reporter.invariantViolations(world, violations)
   }
 
@@ -130,21 +150,21 @@ export function attachRealtime(
     },
   })
 
-  wss.on('connection', (socket, req) => {
-    const user = users.get(req)!
-    // A Player without a realm (new, or from before realms) gets their starting city now, and
-    // their residents look around before the welcome goes out.
-    const realm = foundStartingCity(world, opts.terrain, user.id)
+  /** Starts sending a Player with a realm their world: the welcome now, then every tick. */
+  function welcome(socket: WebSocket, user: SessionUser, realm: Realm) {
+    // Their residents look around before the welcome goes out.
     opts.sight.update(world, opts.explored)
     const client: Client = {
       account: { name: user.name, isAdmin: user.isAdmin },
       userId: user.id,
       realmId: realm.id,
       view: new ClientView(),
+      lastSeenView: new ClientView<Remembered>(),
       lastEventSeq: 0,
       lastDiplomacy: '',
       regionTick: null,
       leaderId: realm.leaderId,
+      realmName: realm.name ?? null,
     }
     clients.set(socket, client)
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
@@ -155,6 +175,8 @@ export function attachRealtime(
     const [cx, cy] = [start.x, start.y]
     const entities = client.view.initial(entitiesInSight(world, opts.terrain, realm.id))
     checkSent(realm.id, entities)
+    const lastSeen = client.lastSeenView.initial(lastSeenOutOfSight(world, user.id))
+    checkLastSeen(realm.id, lastSeen)
     const events = eventsFor(world, user.id)
     client.lastEventSeq = events.at(-1)?.seq ?? 0
     const diplomacy = diplomacyFor(world, realm.id, realmsSeen(entities))
@@ -165,12 +187,31 @@ export function attachRealtime(
       tick: world.tick,
       map: { seed: world.seed, size: opts.terrain.size },
       exploredChunks: opts.explored.exploredChunks(user),
-      home: { realmId: realm.id, leaderId: realm.leaderId, cityId: city?.id ?? null, x: cx, y: cy },
+      home: {
+        realmId: realm.id,
+        leaderId: realm.leaderId,
+        realmName: client.realmName,
+        cityId: city?.id ?? null,
+        x: cx,
+        y: cy,
+      },
       entities,
+      lastSeen,
       events,
       diplomacy,
       region: regionFor(client, []) ?? null,
     })
+  }
+
+  wss.on('connection', (socket, req) => {
+    const user = users.get(req)!
+    const account = { name: user.name, isAdmin: user.isAdmin }
+    // A Player without a realm (first login, or after a Leader death) names it and their Leader
+    // before the realm and its starting city are founded (`CONTEXT.md`: Realm name).
+    const realm = realmOf(world, user.id)
+    if (realm) welcome(socket, user, realm)
+    else
+      send(socket, { type: 'founding', account, leaderName: suggestedLeaderName(world, user.id) })
 
     socket.on('message', (raw) => {
       let msg: ClientMessage
@@ -179,7 +220,20 @@ export function attachRealtime(
       } catch {
         return send(socket, { type: 'rejected', requestId: '', reason: 'not JSON' })
       }
+      const client = clients.get(socket)
+      if (msg?.type === 'found' && !client) {
+        const requestId = typeof msg.requestId === 'string' ? msg.requestId : ''
+        const problem = foundingProblem(msg.realmName, msg.leaderName)
+        if (problem) return send(socket, { type: 'rejected', requestId, reason: problem })
+        // Founded from another tab meanwhile: that realm stands, under the names given there.
+        const names = { realmName: msg.realmName, leaderName: msg.leaderName }
+        const realm =
+          realmOf(world, user.id) ?? foundStartingCity(world, opts.terrain, user.id, names)
+        return welcome(socket, user, realm)
+      }
       if (msg?.type === 'order') {
+        const requestId = typeof msg.requestId === 'string' ? msg.requestId : ''
+        if (!client) return send(socket, { type: 'rejected', requestId, reason: 'no realm yet' })
         const sender = { userId: client.userId, account: client.account }
         send(socket, opts.orders.receive(world, sender, msg.requestId, msg.order))
       }
@@ -200,6 +254,12 @@ export function attachRealtime(
         const inSight = entitiesInSight(world, opts.terrain, client.realmId)
         const { changed, gone } = client.view.diff(inSight)
         checkSent(client.realmId, changed)
+        const remembered = client.lastSeenView.diff(lastSeenOutOfSight(world, client.userId))
+        checkLastSeen(client.realmId, remembered.changed)
+        const lastSeen =
+          remembered.changed.length > 0 || remembered.gone.length > 0
+            ? { lastSeen: remembered }
+            : {}
         const grown = [...(explored.get(client.userId) ?? [])]
         const events = eventsFor(world, client.userId, client.lastEventSeq)
         client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq
@@ -208,18 +268,24 @@ export function attachRealtime(
         const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
         client.lastDiplomacy = json
         const region = regionFor(client, grown)
-        const leaderId = world.realms.find((r) => r.id === client.realmId)?.leaderId
+        const realm = world.realms.find((r) => r.id === client.realmId)
+        const leaderId = realm?.leaderId
         const newLeader = leaderId !== undefined && leaderId !== client.leaderId
         if (newLeader) client.leaderId = leaderId
+        const realmName = realm?.name ?? null
+        const named = realmName !== null && realmName !== client.realmName
+        if (named) client.realmName = realmName
         const tick = {
           tick: world.tick,
           changed,
           gone,
+          ...lastSeen,
           explored: grown,
           events,
           ...fresh,
           ...(region ? { region } : {}),
           ...(newLeader ? { leaderId } : {}),
+          ...(named ? { realmName } : {}),
         }
         send(socket, { type: 'tick', ...tick })
       }

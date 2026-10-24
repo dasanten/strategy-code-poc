@@ -1,5 +1,6 @@
 import {
   BUILD_MATERIALS,
+  BUILDING_PURPOSE,
   ROAD_LINE_MAX_TILES,
   BUILD_WORK,
   BUILDABLE,
@@ -38,6 +39,9 @@ import {
   teardownWork,
   stockWeight,
   trainedCap,
+  nameProblem,
+  REALM_NAME_MAX_LENGTH,
+  RESIDENT_NAME_MAX_LENGTH,
   type Building,
   type Carriage,
   type BuildingKind,
@@ -50,8 +54,9 @@ import {
   type SkillName,
   type StatName,
   type Stock,
+  type SeenResident,
 } from '@csp/shared'
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -69,20 +74,6 @@ export const GOOD_LABELS: Record<Good, string> = {
   sword: 'Sword',
   shield: 'Shield',
   armour: 'Armour',
-}
-
-/** What a building off any node is for, shown before what it needs. */
-const BUILD_BLURBS: Partial<Record<BuildingKind, string>> = {
-  road: 'A road: residents walk and carriages drive faster on it, on any land but Mountain, and it can run through a gate. Nobody owns it. ',
-  stable: 'A stable keeps horses and their Food, and breeds them; on Plains only. ',
-  farm: 'A farm makes Food and teaches Farming; on Plains only. ',
-  house: 'A house is room for a few residents; only in a city’s area, and it grows the city. ',
-  smelter: 'A smelter turns iron ore into iron; not on Mountain. ',
-  mint: 'A mint turns gold ore into coins; not on Mountain. ',
-  smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain. ',
-  townHall: 'A town hall founds a new city of your realm; tearing it down dissolves the city. ',
-  wall: 'A stretch of wall; walls grow the city they stand by, like houses. ',
-  gate: 'A gate in a wall; it grows the city like a wall does. ',
 }
 
 /** A weight in kg, to one decimal (coins weigh little). */
@@ -105,7 +96,8 @@ const STAT_LABELS: Record<StatName, string> = {
   intellect: 'Intellect',
 }
 
-const SKILL_LABELS: Record<SkillName, string> = {
+/** Skill names as the UI shows them. */
+export const SKILL_LABELS: Record<SkillName, string> = {
   mining: 'Mining',
   woodcutting: 'Woodcutting',
   smelting: 'Smelting',
@@ -347,6 +339,8 @@ export function ResidentCard({
   makeLeader,
   leaderName,
   onMakeLeader,
+  rename,
+  onRename,
   onClose,
 }: {
   resident: Resident
@@ -406,7 +400,7 @@ export function ResidentCard({
   /** Orders the resident to pair with another of the Player's residents. */
   onPair: (partnerId: string) => void
   /** Residents of other realms, or of none, in sight: whom the resident can attack. */
-  others: Resident[]
+  others: SeenResident[]
   /** Tiles along each side of the map, to tell who is nearest. */
   mapSize: number
   /** Orders the resident to attack another realm's resident, or to break a wall or gate. */
@@ -424,6 +418,13 @@ export function ResidentCard({
   leaderName: string | undefined
   /** Orders the Leader to hand the realm over to this resident (`CONTEXT.md`: Leader handover). */
   onMakeLeader: () => void
+  /**
+   * For one of the Player's own residents: whether renaming them needs a realm name too (the
+   * Leader of an unnamed realm). Undefined for others' residents, who can't be renamed.
+   */
+  rename: { needsRealmName: boolean } | undefined
+  /** Renames the resident (`CONTEXT.md`: Renaming a resident), naming the realm when it asks. */
+  onRename: (name: string, realmName?: string) => void
   /** Closes the card. */
   onClose: () => void
 }) {
@@ -459,6 +460,7 @@ export function ResidentCard({
     wallsInSight: walls.length,
     picking,
     makeLeader,
+    renamable: !!rename,
   })
   const shown = actions.some((a) => a.id === open) ? open : undefined
   const act = (a: CardAction) => {
@@ -685,6 +687,18 @@ export function ResidentCard({
               </div>
             </section>
           )}
+          {shown === 'rename' && rename && (
+            <RenameBlock
+              // Starts again from the new name once the rename comes back.
+              key={r.name}
+              resident={r}
+              needsRealmName={rename.needsRealmName}
+              onRename={(name, realmName) => {
+                setOpen(undefined)
+                onRename(name, realmName)
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -905,8 +919,7 @@ function BuildBlock({
           return (
             <div key={kind}>
               <p className="muted small">
-                {BUILD_BLURBS[kind]}
-                Needs{' '}
+                {BUILDING_PURPOSE[kind]} Needs{' '}
                 {materials.length === 0
                   ? 'no materials'
                   : materials
@@ -968,9 +981,9 @@ function RoadBlock({
         <h3>Road</h3>
       </div>
       <p className="muted small">
-        {BUILD_BLURBS.road}
-        Needs {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and
-        about {days} game days of one resident’s work.
+        {BUILDING_PURPOSE.road} Needs{' '}
+        {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
+        {days} game days of one resident’s work.
       </p>
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
@@ -1202,6 +1215,73 @@ function PairBlock({
   )
 }
 
+/**
+ * Renaming a resident (`CONTEXT.md`): a new name for one of the Player's own, and with it the
+ * realm name when this is the Leader of a realm that has none yet (`CONTEXT.md`: Realm name).
+ */
+function RenameBlock({
+  resident,
+  needsRealmName,
+  onRename,
+}: {
+  resident: Resident
+  needsRealmName: boolean
+  onRename: (name: string, realmName?: string) => void
+}) {
+  const [name, setName] = useState(resident.name)
+  const [realmName, setRealmName] = useState('')
+  const problem =
+    nameProblem(name, RESIDENT_NAME_MAX_LENGTH) ??
+    (needsRealmName ? nameProblem(realmName, REALM_NAME_MAX_LENGTH) : undefined)
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    if (problem) return
+    onRename(name.trim(), needsRealmName ? realmName.trim() : undefined)
+  }
+  return (
+    <section className="inspector-block" aria-label="Rename">
+      <div className="panel-head">
+        <h3>Rename</h3>
+        <span className="small muted">free, at once</span>
+      </div>
+      <form onSubmit={submit}>
+        <div className="order-buttons">
+          <input
+            value={name}
+            maxLength={RESIDENT_NAME_MAX_LENGTH}
+            aria-label="New name"
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </div>
+        {needsRealmName && (
+          <>
+            <p className="small">
+              Your realm has no name yet: name it now. Others will know it by this name, and it
+              never changes.
+            </p>
+            <div className="order-buttons">
+              <input
+                value={realmName}
+                maxLength={REALM_NAME_MAX_LENGTH}
+                placeholder="Realm name"
+                aria-label="Realm name"
+                onChange={(e) => setRealmName(e.target.value)}
+                required
+              />
+            </div>
+          </>
+        )}
+        <div className="order-buttons">
+          <button type="submit" className="primary" disabled={!!problem}>
+            Rename
+          </button>
+        </div>
+      </form>
+    </section>
+  )
+}
+
 /** Most walls and gates the walls list offers, nearest first. */
 const WALL_CHOICES = 8
 
@@ -1290,7 +1370,7 @@ function AttackBlock({
   onAttack,
 }: {
   resident: Resident
-  others: Resident[]
+  others: SeenResident[]
   walls: Building[]
   mapSize: number
   onAttack: (targetId: string) => void

@@ -30,7 +30,7 @@ import {
   isAt,
 } from '@csp/shared'
 import { updateCityMembership } from './cities.js'
-import { buildingOrganization, commitCrime, organizationOf } from './crimes.js'
+import { buildingOrganization, commitCrime, knownThieves, organizationOf } from './crimes.js'
 import { recordEvent } from './events.js'
 import { noteMade } from './goods-made.js'
 import type { OrderKind } from './orders.js'
@@ -86,7 +86,8 @@ export function attackOrder(targetId: string, started = false, defending = false
  * who hit them, nor when `t` is attacking someone of `a`'s Organization on their own account, or
  * breaking or climbing one of its walls or gates (`CONTEXT.md`: Walls in combat). The Trade Org
  * HQ's mercenaries stand with the HQ, and its soldiers keep its inner ring clear by force, never
- * a crime (`CONTEXT.md`: Trade Org army). `size` is the map's.
+ * a crime (`CONTEXT.md`: Trade Org army); nor is a trading post's going after a thief it knows of
+ * (`CONTEXT.md`: Trading post). `size` is the map's.
  */
 function isAggression(world: WorldState, a: Resident, t: Resident, size: number): boolean {
   if (a.order?.kind === 'attack' && a.order.defending) return false
@@ -94,6 +95,9 @@ function isAggression(world: WorldState, a: Resident, t: Resident, size: number)
   if (hq && ofTradeOrgHq(world, a) && !ofTradeOrgHq(world, t) && inInnerRing(world, t, size)) {
     return false
   }
+  const post =
+    a.owner === null && world.cities.find((c) => c.id === a.cityId && c.tradeOrg === 'post')
+  if (post && knownThieves(world, post).has(t.id)) return false
   const sides = new Set([organizationOf(a)])
   if (hq && contractOf(world, a.id)?.hirerId === TRADE_ORG) sides.add(hq.id)
   const o = t.order

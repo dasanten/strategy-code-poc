@@ -2,22 +2,38 @@ import { describe, expect, it } from 'vitest'
 import {
   FOOTPRINT,
   MAP_SIZE,
+  MAX_HEALTH,
+  MAX_HUNGER,
   MAX_WORKERS,
+  STABLE_BREED_DAYS,
+  STABLE_CAPACITY,
+  TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
+  BUILD_MATERIALS,
+  BUILD_WORK,
+  NODE_GOOD,
+  NODE_WORKPLACE,
+  Terrain,
+  UNEXPLORED,
+  WORK_OUTPUT_PER_DAY,
+  ticksForAge,
   footprintTiles,
   type Building,
   type Carriage,
   type City,
   type ContractView,
   type Diplomacy,
+  type Horse,
   type Pile,
   type Resident,
+  type SeenHorse,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 import {
   actionForKey,
   describeTile,
   makeLeaderProblem,
+  nodeFit,
   residentActions,
   tileActions,
   type ResidentHere,
@@ -140,6 +156,7 @@ describe('the actions on a resident’s card', () => {
       othersInSight: 1,
       wallsInSight: 1,
       makeLeader: { problem: undefined },
+      renamable: true,
     })
     const keys = residentActions(all).map((a) => a.key)
     expect(new Set(keys).size).toBe(keys.length)
@@ -152,6 +169,12 @@ describe('the actions on a resident’s card', () => {
     )
     expect(make).toMatchObject({ label: 'Make Leader…', key: 'L', opens: true })
     expect(make?.disabled).toBeUndefined()
+  })
+
+  it('offers Rename only for an own resident', () => {
+    expect(ids(here())).not.toContain('rename')
+    const a = residentActions(here({ renamable: true })).find((x) => x.id === 'rename')
+    expect(a).toMatchObject({ label: 'Rename…', key: 'N', opens: true })
   })
 
   it('turns Make Leader off with the reason when the handover would be refused', () => {
@@ -254,6 +277,7 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
   y: 5,
   buildings: [],
   carriages: [],
+  horses: [],
   piles: [],
   node: undefined,
   strangers: [],
@@ -304,6 +328,27 @@ describe('the card for a tile', () => {
     expect(card.lines.some((l) => l.startsWith('Carriage'))).toBe(true)
   })
 
+  it('says only how heavily loaded a carriage is, and nothing of what a storage holds, when it can’t see inside', () => {
+    // As sight sends them to a stranger (`CONTEXT.md`: Seeing inside a storage).
+    const { id, x, y, horseId } = carriage
+    const theirs = {
+      id,
+      x,
+      y,
+      horseId,
+      realmId: 'r-other',
+      cityId: null,
+      loadLevel: 'half' as const,
+    }
+    const card = tile({
+      buildings: [building({ kind: 'storage', cityId: 'c-other' })],
+      carriages: [theirs],
+    })
+    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
+    expect(card.lines.find((l) => l.startsWith('Carriage'))).toContain('· half loaded')
+    expect(card.lines.find((l) => l.startsWith('Carriage'))).not.toContain('kg')
+  })
+
   it('ignores what stands on other tiles', () => {
     const far = { ...carriage, x: 6 }
     expect(tile({ carriages: [far] })).toMatchObject({ what: 'tile', title: 'Open ground' })
@@ -340,8 +385,144 @@ describe('the card for a tile', () => {
   })
 
   it('shows strangers on it in their realm’s colour', () => {
-    const r = { name: 'Brann', owner: 'them', cityId: null } as Resident
+    const r = { name: 'Brann', owner: 'them', cityId: null, carried: {} } as Resident
     expect(tile({ strangers: [r] })).toMatchObject({ title: 'Brann', rel: 'otherRealm' })
+  })
+
+  it('shows a building only remembered as last seen, apart from what is there now', () => {
+    const storage = building({ kind: 'storage', cityId: 'c-npc', stock: { food: 3 } })
+    const card = tile({
+      lastSeen: { buildings: [{ ...storage, seenAt: 0 }], tick: 3 * TICKS_PER_GAME_DAY },
+      piles: [pile],
+    })
+    expect(card).toMatchObject({ title: 'Oakhollow storage', rel: 'npcCity', what: 'building' })
+    expect(card.lastSeen).toEqual({
+      when: 'Last seen: day 1, 00:00 (3 days ago)',
+      lines: ['NPC city', 'Holds 3 food'],
+    })
+    // What is in sight there now stays apart from it.
+    expect(card.lines).toEqual(['On the ground: 4 stone', 'Tile 5, 5'])
+    // A building in sight wins over a memory of the tile.
+    const now = tile({
+      buildings: [building({ kind: 'farm', cityId: 'c-me' })],
+      lastSeen: { buildings: [{ ...storage, seenAt: 0 }], tick: 10 },
+    })
+    expect(now.title).toBe('Eastmere farm')
+    expect(now.lastSeen).toBeUndefined()
+  })
+})
+
+describe('horses on the tile card', () => {
+  const horse = (h: Partial<Horse> = {}): Horse => ({
+    id: 'h1',
+    realmId: 'me',
+    cityId: null,
+    x: 5,
+    y: 5,
+    hunger: MAX_HUNGER,
+    health: MAX_HEALTH,
+    ...h,
+  })
+  /** As sight sends a stranger's horse: without its hunger and health. */
+  const unknown = (h: Partial<Horse>): SeenHorse => {
+    const seen: SeenHorse = horse(h)
+    delete seen.hunger
+    delete seen.health
+    return seen
+  }
+  const horseLine = (lines: string[]) => lines.find((l) => l.startsWith('Horse:'))
+
+  it('tells how the own carriage’s horse fares and how long the Food on board feeds it', () => {
+    const fed = tile({ carriages: [{ ...carriage, load: { food: 6 } }], horses: [horse()] })
+    expect(horseLine(fed.lines)).toBe('Horse: fed, healthy · Food on board for 4 game days')
+    const hungry = tile({
+      carriages: [carriage],
+      horses: [horse({ hunger: 10, health: MAX_HEALTH - 5 })],
+    })
+    expect(horseLine(hungry.lines)).toBe('Horse: hungry, hurt · no Food on board')
+    const starving = tile({ carriages: [carriage], horses: [horse({ hunger: 0 })] })
+    expect(horseLine(starving.lines)).toContain('Horse: starving')
+    // A hitched horse is not a loose one.
+    expect(fed.lines.some((l) => l.includes('1 horse ('))).toBe(false)
+  })
+
+  it('says only whether a stranger’s carriage has a horse', () => {
+    const { id, x, y } = carriage
+    const theirs = { id, x, y, realmId: 'r-other', cityId: null, loadLevel: 'empty' as const }
+    const hitched = tile({
+      carriages: [{ ...theirs, horseId: 'h1' }],
+      horses: [unknown({ realmId: 'r-other' })],
+    })
+    expect(hitched.lines.find((l) => l.startsWith('Carriage'))).toBe(
+      'Carriage (another realm) · empty · horse hitched',
+    )
+    expect(horseLine(hitched.lines)).toBeUndefined()
+    const bare = tile({ carriages: [{ ...theirs, horseId: null }] })
+    expect(bare.lines.find((l) => l.startsWith('Carriage'))).toBe(
+      'Carriage (another realm) · empty · no horse',
+    )
+    const mine = tile({ carriages: [{ ...carriage, horseId: null }] })
+    expect(mine.lines.find((l) => l.startsWith('Carriage'))).toContain('· no horse hitched')
+  })
+
+  it('counts loose horses on a tile, how they fare only for the Player’s own, and is named after them', () => {
+    const card = tile({
+      horses: [
+        horse({ id: 'h1' }),
+        horse({ id: 'h2', hunger: 5 }),
+        unknown({ id: 'h3', realmId: 'r-other' }),
+      ],
+    })
+    expect(card).toMatchObject({ title: '3 horses', what: 'horses', rel: 'own' })
+    expect(card.lines).toEqual(
+      expect.arrayContaining(['2 horses (yours) · 1 hungry', '1 horse (another realm)']),
+    )
+    expect(tile({ horses: [horse()] })).toMatchObject({ title: 'Horse', what: 'horses' })
+    expect(tile({ horses: [horse({ x: 6 })] }).what).toBe('tile')
+  })
+
+  it('shows a stable’s horses, room, Food and how long until the next foal while breeding', () => {
+    const stable = building({
+      kind: 'stable',
+      cityId: 'c-me',
+      stock: { food: 30 },
+      breeding: 3 * TICKS_PER_GAME_DAY,
+    })
+    // The carriage's hitched horse stands in the stable too, and breeds (`breedingPair`).
+    const pair = [horse({ id: 'h1' }), horse({ id: 'h2', x: 6, y: 6 })]
+    const card = tile({ buildings: [stable], horses: pair, carriages: [carriage] })
+    expect(card.what).toBe('building')
+    expect(card.lines).toEqual(
+      expect.arrayContaining([
+        '2 horses (yours)',
+        `Room for ${STABLE_CAPACITY - 2} more horses`,
+        'Holds 30 food',
+        `Next foal in about ${STABLE_BREED_DAYS - 3} game days`,
+      ]),
+    )
+    // One horse, or a hungry pair, or a stranger's pair whose condition is unknown: no breeding.
+    const alone = tile({ buildings: [stable], horses: [horse()] })
+    expect(alone.lines.some((l) => l.startsWith('Next foal'))).toBe(false)
+    const starved = tile({ buildings: [stable], horses: pair.map((h) => ({ ...h, hunger: 0 })) })
+    expect(starved.lines.some((l) => l.startsWith('Next foal'))).toBe(false)
+    const empty = tile({ buildings: [{ ...stable, stock: {} }] })
+    expect(empty.lines).toEqual(
+      expect.arrayContaining(['No horses in it', `Room for ${STABLE_CAPACITY} more horses`]),
+    )
+  })
+
+  it('keeps a stranger’s stable’s Food and its horses’ condition hidden', () => {
+    const theirs = building({ kind: 'stable', cityId: 'c-other' })
+    const card = tile({
+      buildings: [theirs],
+      horses: [
+        unknown({ id: 'h1', realmId: 'r-other' }),
+        unknown({ id: 'h2', realmId: 'r-other' }),
+      ],
+    })
+    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
+    expect(card.lines.some((l) => l.startsWith('Next foal'))).toBe(false)
+    expect(card.lines).toContain('2 horses (another realm)')
   })
 })
 
@@ -359,5 +540,147 @@ describe('the actions on a tile’s card', () => {
     expect(tileActions(own, undefined).map((a) => a.label)).toEqual(['Open the gate'])
     const theirs = tile({ buildings: [building({ kind: 'gate', cityId: 'c-npc' })] })
     expect(tileActions(theirs, undefined)).toEqual([])
+  })
+
+  it('offers nothing to do with a building only remembered, but still sends there', () => {
+    const gate = { ...building({ kind: 'gate', cityId: 'c-me', closed: true }), seenAt: 0 }
+    const card = tile({ lastSeen: { buildings: [gate], tick: 10 } })
+    expect(tileActions(card, actor).map((a) => a.label)).toEqual(['Send Ada here'])
+  })
+})
+
+describe('the card for a resource node', () => {
+  const kinds = [
+    ['forest', 'lumber camp', 'Lumber camp', 'wood', 'Woodcutting'],
+    ['stone', 'quarry', 'Quarry', 'stone', 'Mining'],
+    ['ironOre', 'mine', 'Mine', 'iron ore', 'Mining'],
+    ['goldOre', 'mine', 'Mine', 'gold ore', 'Mining'],
+  ] as const
+  const fit = { x: 4, y: 5 }
+
+  it.each(kinds)('says a %s node’s workplace can be built there when it fits', (k, name) => {
+    const kind = NODE_WORKPLACE[k]
+    const card = tile({ node: { kind: k, x: 5, y: 5 }, nodeFit: fit })
+    expect(card.what).toBe('node')
+    expect(card.lines[0]).toBe(`A ${name} can be built here`)
+    const work = BUILD_WORK[kind]! / TICKS_PER_GAME_DAY
+    const materials = Object.keys(BUILD_MATERIALS[kind]!).length > 0
+    expect(card.lines[1]).toMatch(materials ? /^Needs \d+ \w+/ : /^Needs no materials/)
+    expect(card.lines[1]).toContain(`${work} game days of one resident’s work`)
+    expect(card.buildHere).toEqual({ kind, at: fit })
+  })
+
+  it.each(kinds)('says what a %s node’s workplace makes, teaches and takes', (k, ...rest) => {
+    const [, , good, skill] = rest
+    const kind = NODE_WORKPLACE[k]
+    const card = tile({ node: { kind: k, x: 5, y: 5 }, nodeFit: fit })
+    expect(card.lines).toContain(`Makes ${good} · teaches ${skill}`)
+    expect(card.lines).toContain(
+      `Up to ${MAX_WORKERS[kind]} workers · about ${WORK_OUTPUT_PER_DAY[NODE_GOOD[k]]} ${good} each a game day at average Strength`,
+    )
+  })
+
+  it.each(kinds)('says there is no room on a %s node where it doesn’t fit', (k, name) => {
+    const card = tile({ node: { kind: k, x: 5, y: 5 } })
+    expect(card.lines[0]).toBe(`No room for a ${name} here`)
+    expect(card.buildHere).toEqual({ kind: NODE_WORKPLACE[k], at: undefined })
+  })
+
+  it.each(kinds)('keeps the short line on a %s node built over', (k) => {
+    const workplace = building({ kind: NODE_WORKPLACE[k], cityId: null })
+    const card = tile({ node: { kind: k, x: 5, y: 5 }, buildings: [workplace], nodeFit: fit })
+    expect(card.what).toBe('building')
+    const words = {
+      forest: 'a forest',
+      stone: 'a stone',
+      ironOre: 'an iron ore',
+      goldOre: 'a gold ore',
+    }[k]
+    expect(card.lines).toContain(`On ${words} node`)
+    expect(card.lines.some((l) => l.includes('can be built'))).toBe(false)
+    expect(card.buildHere).toBeUndefined()
+  })
+
+  it('is named after the node’s kind', () => {
+    expect(tile({ node: { kind: 'forest', x: 5, y: 5 } }).title).toBe('Forest node')
+    expect(tile({ node: { kind: 'ironOre', x: 5, y: 5 } }).title).toBe('Iron ore node')
+  })
+})
+
+describe('where a node’s workplace fits on what the Player knows', () => {
+  const SIZE = 64
+  const seen = { buildings: [] as Building[], cities: [] as City[] }
+  const forest = { kind: 'forest' as const, x: 10, y: 10 }
+  const nodes = [forest]
+  const nodeAt = (x: number, y: number) => nodes.find((n) => n.x === x && n.y === y)
+  const lookup = (at: (x: number, y: number) => number) => ({ size: SIZE, at })
+
+  it('lays it out with the node’s own tile north-west on open, explored land', () => {
+    expect(
+      nodeFit(
+        forest,
+        seen,
+        nodeAt,
+        lookup(() => Terrain.Forest),
+      ),
+    ).toEqual({ x: 10, y: 10 })
+  })
+
+  it('moves the footprint round a building in the way, and finds none when it is boxed in', () => {
+    const east = building({ kind: 'house', x: 11, y: 9 })
+    const within = { ...seen, buildings: [east] }
+    expect(
+      nodeFit(
+        forest,
+        within,
+        nodeAt,
+        lookup(() => Terrain.Forest),
+      ),
+    ).toEqual({ x: 9, y: 10 })
+    const water = lookup((x, y) => (x === 9 && y === 11 ? Terrain.Lake : Terrain.Forest))
+    const boxed = { ...seen, buildings: [east, building({ kind: 'house', x: 9, y: 8 })] }
+    expect(nodeFit(forest, boxed, nodeAt, water)).toBeUndefined()
+  })
+
+  it('doesn’t lay it out on unexplored land', () => {
+    expect(
+      nodeFit(
+        forest,
+        seen,
+        nodeAt,
+        lookup(() => UNEXPLORED),
+      ),
+    ).toBeUndefined()
+  })
+})
+
+describe('Build a … here on a node’s card', () => {
+  const adult = { id: 'r1', name: 'Ada', bornAt: -ticksForAge(30) } as Resident
+  const child = { id: 'r2', name: 'Pip', bornAt: -ticksForAge(5) } as Resident
+  const node = { kind: 'forest' as const, x: 5, y: 5 }
+  const build = (card: ReturnType<typeof tile>, actor: Resident | undefined) =>
+    tileActions(card, actor, 0).find((a) => a.id === 'build')
+
+  it('has the resident picked last build there, on key B', () => {
+    const a = build(tile({ node, nodeFit: { x: 5, y: 5 } }), adult)
+    expect(a).toMatchObject({ label: 'Build a lumber camp here', key: 'B' })
+    expect(a?.disabled).toBeUndefined()
+    expect(build(tile({ node, nodeFit: { x: 5, y: 5 } }), undefined)).toBeUndefined()
+  })
+
+  it('is turned off with the reason where it doesn’t fit or for a child', () => {
+    expect(build(tile({ node }), adult)).toMatchObject({
+      disabled: true,
+      reason: 'no room for a lumber camp here',
+    })
+    expect(build(tile({ node, nodeFit: { x: 5, y: 5 } }), child)).toMatchObject({
+      disabled: true,
+      reason: 'children can’t build',
+    })
+  })
+
+  it('isn’t offered on a node built over', () => {
+    const camp = building({ kind: 'lumberCamp' })
+    expect(build(tile({ node, buildings: [camp], nodeFit: { x: 5, y: 5 } }), adult)).toBeUndefined()
   })
 })

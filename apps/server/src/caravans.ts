@@ -26,6 +26,7 @@ import {
   type Building,
   type Caravan,
   type Carriage,
+  type City,
   type Good,
   type GoodsSpot,
   type Resident,
@@ -83,6 +84,41 @@ export function routeEnd(world: WorldState, caravan: Caravan, end: Caravan['head
   const at = (kind: Building['kind'], [x, y]: [number, number]) =>
     world.buildings.find((b) => b.kind === kind && b.x === x && b.y === y && finished(b))
   return { storage: at('storage', storage), warehouse: at('warehouse', goodsWarehouse) }
+}
+
+/**
+ * A trading post that a realm took leaves the Trade Organization (`CONTEXT.md`: Trading post):
+ * it becomes a plain city, its warehouse a storage with all it holds, so it has no stock floor
+ * and no prices any more. Its caravan breaks up and its route's robberies are forgotten. The
+ * deliveries and transfers that wait at its warehouse go over to the HQ's goods warehouse, which
+ * sends them out of its own stock (`CONTEXT.md`: Guaranteed carriage).
+ */
+export function leaveTradeOrg(world: WorldState, post: City): void {
+  if (post.tradeOrg !== 'post') return
+  delete post.tradeOrg
+  const warehouses = new Set<string>()
+  for (const b of world.buildings) {
+    if (b.cityId !== post.id || b.kind !== 'warehouse') continue
+    b.kind = 'storage'
+    warehouses.add(b.id)
+  }
+  world.caravans = world.caravans.filter((caravan) => {
+    if (caravan.postId !== post.id) return true
+    releaseDelivery(world, caravan)
+    releaseTransfer(world, caravan)
+    return false
+  })
+  delete world.routeRobberies[post.id]
+  const hq = tradeOrgHq(world)
+  const hall = hq && townHallOf(world, hq)
+  const middle = hall && middleOf(hall)
+  const [x, y] = middle ? hqLayout(middle.x, middle.y).goodsWarehouse : [NaN, NaN]
+  const goods = world.buildings.find((b) => b.kind === 'warehouse' && b.x === x && b.y === y)
+  for (const job of [...world.deliveries, ...world.transfers]) {
+    if (warehouses.has(job.warehouseId) && goods) job.warehouseId = goods.id
+  }
+  world.deliveries = world.deliveries.filter((d) => !warehouses.has(d.warehouseId))
+  world.transfers = world.transfers.filter((t) => !warehouses.has(t.warehouseId))
 }
 
 /**

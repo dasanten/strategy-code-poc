@@ -142,7 +142,7 @@ export type DirectiveGoalRequest =
 /** An Organization an admin can name in a directive. */
 export interface DirectiveTarget {
   org: string
-  /** A realm's Leader's name, or an NPC city's name. */
+  /** A realm's realm name, or an NPC city's name. */
   name: string
   is: 'realm' | 'city'
   /** A realm's Player's account name. */

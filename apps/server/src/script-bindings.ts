@@ -39,6 +39,7 @@ import type { InvariantViolation } from './invariants.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
 import { sightOf } from './sight.js'
+import { lastSeenOutOfSight } from './last-seen.js'
 import { realmOf } from './starting-city.js'
 
 /**
@@ -113,11 +114,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const requests: OrderRequest[] = []
 
   let seen: readonly SeenEntity[] | undefined
+  const untagged = ({ is: _, ...rest }: SeenEntity) => rest
   const seenOf = (is: SeenEntity['is'], add?: (id: string) => object | undefined): Value => {
     seen ??= context.seen()
     return seen
       .filter((e) => e.is === is)
-      .map(({ is: _, ...rest }) => toValue({ ...rest, ...add?.(rest.id) }))
+      .map(untagged)
+      .map((rest) => toValue({ ...rest, ...add?.(rest.id) }))
   }
   // Whose script it is: the Player's realm, or the NPC city running the game's defaults.
   const side = sender.npcCityId ?? realmOf(world, sender.userId)?.id
@@ -164,6 +167,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     carriages: () => seenOf('carriage'),
     piles: () => seenOf('pile'),
     nodes: exploredNodes,
+    // A Player's memory, apart from what is in sight (`CONTEXT.md`: Last seen); an NPC city has none.
+    lastSeen: () =>
+      sender.npcCityId !== undefined
+        ? []
+        : lastSeenOutOfSight(world, sender.userId).map((e) => toValue(e)),
     directives: () =>
       directivesFor(world, (org) => organizationLabel(world, org)).map((d) => toValue(d)),
     withMemory: ([key, value]) => {
@@ -177,7 +185,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     },
     building: ([id]) => {
       const b = world.buildings.find((x) => x.id === id)
-      return b && (ownBuilding(b) || inSight(b)) ? toValue(b) : null
+      if (!b) return null
+      if (ownBuilding(b)) return toValue(b)
+      // Another's as the Player sees it, its stock only when they see inside (`CONTEXT.md`:
+      // Seeing inside a storage).
+      seen ??= context.seen()
+      const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
+      return shown ? toValue(untagged(shown)) : null
     },
     pileAt: ([x, y]) => {
       const at = tile(x, y, 'pileAt')
@@ -396,6 +410,14 @@ function residentActions(
         carriageId: plain(carriageId ?? null),
       }),
     handOver: ([newLeaderId]) => request('handOver', { newLeaderId: plain(newLeaderId) }),
+    rename: ([targetId, name, realmName]) =>
+      request('rename', {
+        targetId: plain(targetId),
+        name: plain(name),
+        ...(realmName === undefined || realmName === null ? {} : { realmName: plain(realmName) }),
+      }),
+    renameCity: ([cityId, name]) =>
+      request('renameCity', { cityId: plain(cityId), name: plain(name) }),
     roadLine: ([x, y]) =>
       request('roadLine', {
         from: { x: resident.x, y: resident.y },

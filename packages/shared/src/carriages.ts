@@ -5,6 +5,8 @@ import {
   CARAVAN_FOOD_PER_ESCORT,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
+  CARRIAGE_HALF_LOAD,
+  CARRIAGE_LIGHT_LOAD,
   GOOD_WEIGHT,
   canWork,
   stockWeight,
@@ -17,6 +19,7 @@ import {
   type GoodsSpot,
   type Horse,
   type Resident,
+  type Stock,
   type WorldState,
 } from './world.js'
 
@@ -125,4 +128,19 @@ export function driveProblem(
 export function unitsThatFitCarriage(carriage: Carriage, good: Good): number {
   const room = CARRIAGE_CAPACITY - stockWeight(carriage.load)
   return Math.max(0, Math.floor(room / GOOD_WEIGHT[good] + 1e-9))
+}
+
+/**
+ * How heavily a carriage looks loaded to a Player who can't see its load (`CONTEXT.md`: Seeing
+ * inside a storage).
+ */
+export type LoadLevel = 'empty' | 'light' | 'half' | 'heavy' | 'full'
+
+/** How heavily a load looks, by its weight against `CARRIAGE_CAPACITY`. */
+export function loadLevel(load: Stock): LoadLevel {
+  const share = stockWeight(load) / CARRIAGE_CAPACITY
+  if (share <= 0) return 'empty'
+  if (share <= CARRIAGE_LIGHT_LOAD) return 'light'
+  if (share <= CARRIAGE_HALF_LOAD) return 'half'
+  return share < 1 - 1e-9 ? 'heavy' : 'full'
 }
