@@ -8,6 +8,8 @@ import {
   defaultStatus,
   describeDiagnostic,
   diagnosticsText,
+  fieldCompletions,
+  fieldHover,
   diagnosticRange,
   hasUnsavedChanges,
   lineDiff,
@@ -296,3 +298,55 @@ describe('script warnings in the editor', () => {
     expect(diagnosticsText([w], [w])).toMatch(/^1:1 x\n.*never runs/)
   })
 })
+
+/** The fields offered at `|`, which follows a `.` and maybe part of a field. */
+function fieldLabels(marked: string, defaultScript = false): string[] | null {
+  const [source, at] = cursor(marked)
+  const typed = /\w*$/.exec(source.slice(0, at))![0]
+  const out = fieldCompletions(source, at - typed.length, at, { defaultScript })
+  return out && out.map((c) => c.label)
+}
+
+describe('field completions', () => {
+  it('offer the fields of `me`, both views marked in a Player’s script', () => {
+    const all = nameCompletionsOf('me.|')
+    expect(all.map((c) => c.label)).toEqual(
+      expect.arrayContaining(['hunger', 'carried', 'members']),
+    )
+    expect(all.find((c) => c.label === 'hunger')?.detail).toBe('number · resident only')
+    expect(all.find((c) => c.label === 'members')?.detail).toBe('list of resident · army only')
+    expect(all.find((c) => c.label === 'x')?.detail).toBe('number · resident only')
+    expect(fieldLabels('me.|', true)).not.toContain('members')
+    expect(fieldLabels('me.hu|')).toEqual(['hunger'])
+  })
+
+  it('follow a loop over a query, a let holding one, and fields to their views', () => {
+    expect(fieldLabels('for (r of residents()) { r.| }')).toEqual(
+      expect.arrayContaining(['name', 'stats', 'order']),
+    )
+    expect(fieldLabels('for (r of residents()) {\n  if (r.|')).toContain('hunger')
+    expect(fieldLabels('let b = building("x")\nb.site.|')).toEqual(['delivered', 'work'])
+    expect(fieldLabels('storages()[0].st|')).toEqual(['stock'])
+    expect(fieldLabels('me.stats.strength.|', true)).toEqual(['base', 'trained'])
+  })
+
+  it('offer nothing for a value it isn’t sure of', () => {
+    expect(fieldLabels('memory.|')).toBeNull()
+    expect(fieldLabels('fn f(p) { return p.| }')).toBeNull()
+    expect(fieldLabels('let x = {a: 1}\nx.|')).toBeNull()
+  })
+
+  it('show a field’s kind, description and when it is null on hover', () => {
+    const hover = fieldHover('me.hunger', 5, { defaultScript: true })!
+    expect(hover).toMatchObject({ from: 3, to: 9 })
+    expect(hover.text).toBe(
+      'hunger: number\nFully fed is 100, empty 0.\nnull for a resident of another realm that isn’t allied.',
+    )
+    expect(fieldHover('memory.hunger', 9, { defaultScript: true })).toBeNull()
+  })
+})
+
+function nameCompletionsOf(marked: string) {
+  const [source, at] = cursor(marked)
+  return fieldCompletions(source, at, at, { defaultScript: false }) ?? []
+}
