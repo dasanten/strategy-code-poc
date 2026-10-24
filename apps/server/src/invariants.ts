@@ -68,6 +68,9 @@ import {
   isPassableTerrain,
   buildingAt,
   isAt,
+  besideStep,
+  stepLength,
+  tileIndex,
 } from '@csp/shared'
 import { tallyGoods } from './goods-made.js'
 import { refillSource } from './survival.js'
@@ -1365,6 +1368,44 @@ export const climbOrdersSound: Invariant = {
 }
 
 /**
+ * Every step left on a moving order's path (`CONTEXT.md`: Step), from the resident's tile on, goes
+ * onto one of the eight tiles around the one before, onto land they can enter, and a diagonal one
+ * never cuts a corner past land they can't (Lake, Sea, or Mountain for a carriage). So every step
+ * taken is one too. Walls and gates are left out: they may change under a path found earlier, and
+ * the step is checked against them when it is taken (`Walking.resolve`).
+ */
+export const pathsAreSteps: Invariant = {
+  name: 'paths-are-steps',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const { size } = terrain
+    for (const r of world.residents) {
+      const o = r.order
+      if (!o || !('path' in o) || !o.path) continue
+      const driving = o.kind === 'drive' || o.kind === 'haul'
+      const enterable = (t: number) =>
+        driving ? carriageCanEnter(terrain.tiles[t]!) : isPassableTerrain(terrain.tiles[t]!)
+      let [x, y] = [r.x, r.y]
+      const bad = o.path.findIndex(([nx, ny]) => {
+        const ok =
+          stepLength(size, x, y, nx, ny) > 0 &&
+          enterable(tileIndex(size, nx, ny)) &&
+          besideStep(size, x, y, nx, ny).every(enterable)
+        ;[x, y] = [nx, ny]
+        return !ok
+      })
+      if (bad >= 0)
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} has a path whose step ${bad} is no step they can take`,
+          entityIds: [r.id],
+        })
+    }
+    return out
+  },
+}
+
+/**
  * Road orders along a line are sound (`CONTEXT.md`: Road): they have tiles left, at most
  * `ROAD_LINE_MAX_TILES`, each next to the one before; and after a tick one building on a site
  * stands on that road site, on the order's first tile (`resolveBuilding` moves the order on from
@@ -1528,6 +1569,7 @@ export const worldInvariants: Invariant[] = [
   buyOffOrdersDone,
   hqRingsSound,
   roadLineOrdersSound,
+  pathsAreSteps,
   gameDefaultCarriers,
   gameDefaultFetchers,
 ]

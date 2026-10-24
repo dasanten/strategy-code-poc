@@ -12,6 +12,7 @@ import {
   RECIPES,
   SCRIPT_API,
   Terrain,
+  DIAGONAL_STEP,
   ageInYears,
   directivesFor,
   materialsNeeded,
@@ -322,8 +323,9 @@ export function tickRandom(world: Pick<WorldState, 'seed' | 'tick'>): number {
 
 /**
  * About how many ticks a resident takes to walk from `a` to `b` (`walkTime`): step by step along
- * the straight way, at their pace on each tile's terrain, Plains where they haven't explored.
- * Tiles they can't walk on count at their slowest pace on land; roads and walls are left out.
+ * the straight way, diagonally where it slants (`CONTEXT.md`: Step), at their pace on each tile's
+ * terrain, Plains where they haven't explored. Tiles they can't walk on count at their slowest
+ * pace on land; roads and walls are left out.
  */
 export function walkTime(
   world: WorldState,
@@ -336,19 +338,22 @@ export function walkTime(
   const size = terrain.size
   const dx = wrapDelta(a.x, b.x, size)
   const dy = wrapDelta(a.y, b.y, size)
-  const steps = Math.abs(dx) + Math.abs(dy)
+  const alongX = Math.abs(dx) >= Math.abs(dy)
+  const long = alongX ? Math.abs(dx) : Math.abs(dy)
+  const short = alongX ? Math.abs(dy) : Math.abs(dx)
   const slowest = walkSpeed(r, Terrain.Mountain, world.tick)
   let ticks = 0
   let x = a.x
   let y = a.y
-  for (let i = 0, sx = 0; i < steps; i++) {
-    // A step along x while the x steps so far lag behind the straight line.
-    if (sx < Math.abs(dx) && (sx + 0.5) * Math.abs(dy) <= (i - sx + 0.5) * Math.abs(dx)) {
-      x = wrap(x + Math.sign(dx), size)
-      sx++
-    } else y = wrap(y + Math.sign(dy), size)
+  for (let i = 0, slanted = 0; i < long; i++) {
+    // Each step goes along the longer direction, and diagonally while the steps along the
+    // shorter one so far lag behind the straight line.
+    const diagonal = (slanted + 0.5) * long <= (i + 1) * short
+    if (diagonal) slanted++
+    if (alongX || diagonal) x = wrap(x + Math.sign(dx), size)
+    if (!alongX || diagonal) y = wrap(y + Math.sign(dy), size)
     const ground = explored(x, y) ? terrainAt(terrain, x, y) : Terrain.Plains
-    ticks += 1 / (walkSpeed(r, ground, world.tick) || slowest)
+    ticks += (diagonal ? DIAGONAL_STEP : 1) / (walkSpeed(r, ground, world.tick) || slowest)
   }
   return Math.ceil(ticks)
 }

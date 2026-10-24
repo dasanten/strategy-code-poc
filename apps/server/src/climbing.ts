@@ -24,7 +24,11 @@ interface ClimbRequest extends OrderRequest {
   wallId: string
 }
 
-/** Whether two tiles are side by side, the short way round a map of `size` tiles. */
+/**
+ * Whether two tiles are side by side, the short way round a map of `size` tiles. Only straight:
+ * climbing over a wall from a corner would squeeze between two corners (`CONTEXT.md`: Step), and
+ * the climber comes down straight across (`climbLanding`).
+ */
 function besides(size: number, a: { x: number; y: number }, b: { x: number; y: number }): boolean {
   return Math.abs(wrapDelta(a.x, b.x, size)) + Math.abs(wrapDelta(a.y, b.y, size)) === 1
 }

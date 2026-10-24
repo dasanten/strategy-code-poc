@@ -153,7 +153,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     params: ['a', 'b'],
     cost: SCRIPT_LIST_QUERY_COST,
     description:
-      'About how many ticks I take to walk from one thing with `x` and `y` to another: the straight way across the terrain, roads and walls left out.',
+      'About how many ticks I take to walk from one thing with `x` and `y` to another: the straight way across the terrain, diagonally where it slants, roads and walls left out.',
   },
 
   action('walkTo', ['x', 'y'], 'Walk to a tile.'),
