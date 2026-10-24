@@ -68,6 +68,11 @@ export function isPassableTerrain(t: number): boolean {
   )
 }
 
+/** A road goes on any passable land but Mountain (`CONTEXT.md`: Road). */
+export function roadMayGoOn(t: number): boolean {
+  return isPassableTerrain(t) && t !== Terrain.Mountain
+}
+
 /**
  * What is underfoot on (x, y) (`CONTEXT.md`: Road): `Terrain.Road` where `roads` (tile indices,
  * from `roadTiles`) holds a finished road, whatever the terrain beneath; elsewhere the terrain.

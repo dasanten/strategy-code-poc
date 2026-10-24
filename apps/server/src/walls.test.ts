@@ -102,6 +102,22 @@ describe('walls and gates', () => {
     expect(path(world, [8, 14], [8, 8], { realmId: 'r1' })).toContainEqual([GATE.x, GATE.y])
   })
 
+  it('a goal shut in behind a closed gate is unreachable before any search', () => {
+    const { world, gate } = setup()
+    gate.closed = true
+    const finder = new PathFinder(terrain)
+    finder.setWalls(wallMap(world, terrain))
+    finder.request('out', [300, 300], [8, 8], undefined, { realmId: 'r2', onWalls: true })
+    finder.request('own', [300, 300], [8, 8], undefined, { realmId: 'r1', onWalls: true })
+    // One turn of the finder's loop: a check, or one batch of a search, far too few for a search
+    // across 300 tiles of open plains to give up.
+    let t = 0
+    finder.advance(2, () => t++)
+    expect(finder.result('out')).toEqual({ status: 'unreachable' })
+    while (finder.pending > 0) finder.advance(Infinity)
+    expect(finder.result('own')?.status).toBe('found')
+  })
+
   it('the city’s realm goes up on its walls from inside, never over them', () => {
     const { world, gate } = setup()
     gate.closed = true

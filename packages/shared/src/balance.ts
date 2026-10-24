@@ -743,6 +743,17 @@ export const CHILD_STAT_SPREAD = 2
  */
 export const WALK_TICKS_PER_TILE = 7.5
 
+/**
+ * How dear a way may be before a path search gives up on it: this many times the cheapest the
+ * way could possibly cost (every step on the cheapest ground), plus `PATH_DETOUR_SLACK`. A goal
+ * only behind a longer detour counts as unreachable, so a search for one never crosses the
+ * whole map.
+ */
+export const PATH_DETOUR_LIMIT = 8
+
+/** The fixed part of a path search's limit (`PATH_DETOUR_LIMIT`), in plains-tiles on foot. */
+export const PATH_DETOUR_SLACK = 500
+
 /** The Agility at which a resident walks at the usual speed. */
 export const AGILITY_AVERAGE = 10
 

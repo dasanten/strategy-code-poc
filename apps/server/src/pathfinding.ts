@@ -1,7 +1,11 @@
 import {
   CARRIAGE_SPEED,
+  PATH_DETOUR_LIMIT,
+  PATH_DETOUR_SLACK,
   TERRAIN_SPEED,
   Terrain,
+  WALL_ENCLOSES_MAX,
+  roadMayGoOn,
   tileIndex,
   wrap,
   wrapDelta,
@@ -35,6 +39,25 @@ function costsFrom(speeds: Partial<Record<number, number>>): TerrainCosts {
   return costs
 }
 
+const tables = new WeakMap<TerrainCosts, Float64Array>()
+
+/** The costs as a typed array by ground, for the search's inner loop; one per set of costs. */
+function tableOf(costs: TerrainCosts): Float64Array {
+  let table = tables.get(costs)
+  if (!table) {
+    table = new Float64Array(256)
+    for (let t = 0; t < 256; t++) table[t] = costs[t] ?? Infinity
+    tables.set(costs, table)
+  }
+  return table
+}
+
+/**
+ * Side of the window that short paths are searched in (`PathFinder`), in tiles. A path whose ends
+ * lie within a quarter of it along each direction counts as short.
+ */
+export const LOCAL_SIDE = 1024
+
 export type Point = readonly [x: number, y: number]
 
 /** How a path request stands: still searching, a path found, or no path at all. */
@@ -61,10 +84,272 @@ interface Request extends PathOptions {
   from: Point
   to: Point
   costs: TerrainCosts
-  /** The cheapest a step can cost, for the heuristic; set when the search starts. */
+  /** The costs by ground (`tableOf`); set when the request is checked. */
+  table?: Float64Array
+  /** The cheapest a step can cost, for the heuristic; set when the request is checked. */
   cheapest?: number
-  /** Whether the search starts stuck on a wall (`strandedOnWall`); set when it starts. */
+  /** The start's tile index; set when the request is checked. */
+  start?: number
+  /** Whether the search starts stuck on a wall (`strandedOnWall`); set when it is checked. */
   stranded?: boolean
+  /** Whether the quick checks before any search (`check`) have run. */
+  checked?: boolean
+}
+
+/** `Ground.flags` bits. */
+const ROAD = 1
+const WALL = 2
+
+/** What the searches step across: the terrain, its roads, and the walls and gates on it. */
+class Ground {
+  readonly size: number
+  readonly tiles: Uint8Array
+  /** Per tile: `ROAD` where a finished road is, `WALL` where a wall or gate stands. */
+  readonly flags: Uint8Array
+  walls: WallMap | undefined
+  private roadList: number[] = []
+  private wallList: number[] = []
+
+  constructor(terrain: TerrainMap) {
+    this.size = terrain.size
+    this.tiles = terrain.tiles
+    this.flags = new Uint8Array(terrain.size * terrain.size)
+  }
+
+  setRoads(roads: Iterable<number>): void {
+    for (const t of this.roadList) this.flags[t]! &= ~ROAD
+    this.roadList = [...roads]
+    for (const t of this.roadList) this.flags[t]! |= ROAD
+  }
+
+  get hasRoads(): boolean {
+    return this.roadList.length > 0
+  }
+
+  setWalls(walls: WallMap | undefined): void {
+    if (walls === this.walls) return
+    for (const t of this.wallList) this.flags[t]! &= ~WALL
+    this.walls = walls
+    this.wallList = walls ? [...walls.tiles.keys()] : []
+    for (const t of this.wallList) this.flags[t]! |= WALL
+  }
+
+  /** What is underfoot on tile index `t`: a road, or the terrain. */
+  at(t: number): number {
+    return this.flags[t]! & ROAD ? Terrain.Road : this.tiles[t]!
+  }
+
+  /** Whether the request may step from tile index `t` to the next tile `nt`, walls and gates aside. */
+  mayStep(req: Request, t: number, nt: number): boolean {
+    if (!this.walls || !((this.flags[t]! | this.flags[nt]!) & WALL)) return true
+    const stranded = !!req.stranded && t === req.start
+    return mayStep(this.walls, req.realmId ?? null, t, nt, !!req.onWalls, stranded)
+  }
+}
+
+/** A region label for land that falls into too many small regions to label each. */
+const MANY = 0xffff
+
+const regionCache = new WeakMap<Uint8Array, Map<Float64Array, Uint16Array>>()
+
+/**
+ * Labels each tile with the stretch of land it lies in for a traveller with these costs: tiles
+ * with the same label reach each other, walls and gates aside, tiles with different ones never.
+ * 0 can't be entered. Roads don't join stretches, as they never go where the terrain beneath
+ * can't be crossed by someone it carries (`roadMayGoOn`). The terrain never changes, so the
+ * labels are worked out once per map and set of costs.
+ */
+function regionsOf(ground: Ground, table: Float64Array): Uint16Array {
+  let byTable = regionCache.get(ground.tiles)
+  if (!byTable) regionCache.set(ground.tiles, (byTable = new Map()))
+  const known = byTable.get(table)
+  if (known) return known
+  const { size, tiles } = ground
+  const n = size * size
+  const road = table[Terrain.Road]! < Infinity
+  const passable = (t: number) => {
+    const terrain = tiles[t]!
+    return table[terrain]! < Infinity || (road && roadMayGoOn(terrain))
+  }
+  const labels = new Uint16Array(n)
+  const stack = new Int32Array(n)
+  let next = 1
+  for (let s = 0; s < n; s++) {
+    if (labels[s] !== 0 || !passable(s)) continue
+    const label = next < MANY ? next++ : MANY
+    labels[s] = label
+    let top = 0
+    stack[top++] = s
+    while (top > 0) {
+      const t = stack[--top]!
+      const x = t % size
+      const row = t - x
+      const ns = [
+        row + (x + 1 === size ? 0 : x + 1),
+        row + (x === 0 ? size - 1 : x - 1),
+        (t + size) % n,
+        (t - size + n) % n,
+      ]
+      for (const nt of ns) {
+        if (labels[nt] !== 0 || !passable(nt)) continue
+        labels[nt] = label
+        stack[top++] = nt
+      }
+    }
+  }
+  byTable.set(table, labels)
+  return labels
+}
+
+/** Steps along both directions to the goal, the short way round the map; for a `near` request,
+ * to the nearest tile in contact with it. */
+function stepsTo(req: Request, size: number, x: number, y: number): number {
+  const dx = Math.abs(wrapDelta(x, req.to[0], size))
+  const dy = Math.abs(wrapDelta(y, req.to[1], size))
+  return req.near ? Math.max(0, dx - 1) + Math.max(0, dy - 1) : dx + dy
+}
+
+/** Whether a search may stop on (x, y): the goal, or for a `near` request beside it. */
+function reached(req: Request, size: number, x: number, y: number): boolean {
+  if (!req.near) return x === req.to[0] && y === req.to[1]
+  return (
+    Math.abs(wrapDelta(x, req.to[0], size)) <= 1 && Math.abs(wrapDelta(y, req.to[1], size)) <= 1
+  )
+}
+
+/**
+ * One A* search at a time over a square window of the map, the whole map or a smaller one, kept
+ * in typed arrays the size of the window. Tiles outside the window can't be entered. A search
+ * gives up once every way left would cost more than `PATH_DETOUR_LIMIT` allows.
+ */
+class Search {
+  /** Whether the window is the whole map, so its sides join. */
+  readonly full: boolean
+  /** Cost so far to each tile, in single precision: plenty across the map, at half the memory. */
+  private readonly g: Float32Array
+  private readonly cameFrom: Int32Array
+  /** `2 * search` on tiles this search has reached, one more once they are closed. */
+  private readonly stamp: Uint32Array
+  private search = 0
+  private readonly heap = new MinHeap()
+  /** The window's north-west corner on the map. */
+  private x0 = 0
+  private y0 = 0
+  private limit = Infinity
+  private req: Request | undefined
+  /** Whether the search came up against a side of its window, so a way may lie beyond it. */
+  clipped = false
+
+  constructor(
+    private readonly ground: Ground,
+    readonly side: number,
+  ) {
+    this.full = side === ground.size
+    const n = side * side
+    this.g = new Float32Array(n)
+    this.cameFrom = new Int32Array(n)
+    this.stamp = new Uint32Array(n)
+  }
+
+  /** Starts on a checked request, with the window centred between its ends. */
+  begin(req: Request): void {
+    const { size } = this.ground
+    const [fx, fy] = req.from
+    const [tx, ty] = req.to
+    const half = this.side / 2
+    this.x0 = this.full ? 0 : wrap(fx + Math.round(wrapDelta(fx, tx, size) / 2) - half, size)
+    this.y0 = this.full ? 0 : wrap(fy + Math.round(wrapDelta(fy, ty, size) / 2) - half, size)
+    this.search++
+    this.heap.clear()
+    this.clipped = false
+    const l = wrap(fy - this.y0, size) * this.side + wrap(fx - this.x0, size)
+    this.stamp[l] = 2 * this.search
+    this.g[l] = 0
+    this.cameFrom[l] = -1
+    const best = stepsTo(req, size, fx, fy) * req.cheapest!
+    this.limit = PATH_DETOUR_LIMIT * best + PATH_DETOUR_SLACK * req.table![Terrain.Plains]!
+    this.heap.push(l, best)
+    this.req = req
+  }
+
+  /** Expands up to `count` tiles; returns the result once the search ends. */
+  expand(count: number): PathResult | undefined {
+    const req = this.req!
+    const { size } = this.ground
+    const side = this.side
+    const closed = 2 * this.search + 1
+    for (let i = 0; i < count; i++) {
+      if (this.heap.top > this.limit) return { status: 'unreachable' }
+      const l = this.heap.pop()
+      if (l === undefined) return { status: 'unreachable' }
+      if (this.stamp[l] === closed) continue
+      this.stamp[l] = closed
+      const lx = l % side
+      const ly = (l - lx) / side
+      const x = this.x0 + lx < size ? this.x0 + lx : this.x0 + lx - size
+      const y = this.y0 + ly < size ? this.y0 + ly : this.y0 + ly - size
+      if (reached(req, size, x, y))
+        return { status: 'found', path: this.pathTo(l), cost: this.g[l]! }
+      const t = y * size + x
+      // Past a side of the map, the step continues on the opposite side.
+      this.visit(req, t, l, x + 1 === size ? 0 : x + 1, y, lx + 1, ly)
+      this.visit(req, t, l, x === 0 ? size - 1 : x - 1, y, lx - 1, ly)
+      this.visit(req, t, l, x, y + 1 === size ? 0 : y + 1, lx, ly + 1)
+      this.visit(req, t, l, x, y === 0 ? size - 1 : y - 1, lx, ly - 1)
+    }
+    return undefined
+  }
+
+  /** Considers the step from tile `t` (window tile `l`) to (nx, ny), window tile (nlx, nly). */
+  private visit(
+    req: Request,
+    t: number,
+    l: number,
+    nx: number,
+    ny: number,
+    nlx: number,
+    nly: number,
+  ): void {
+    const side = this.side
+    if (nlx < 0 || nlx >= side || nly < 0 || nly >= side) {
+      if (!this.full) {
+        this.clipped = true
+        return
+      }
+      nlx = nx
+      nly = ny
+    }
+    const ground = this.ground
+    const nt = ny * ground.size + nx
+    const step = req.table![ground.at(nt)]!
+    if (step === Infinity) return
+    const nl = nly * side + nlx
+    const stamp = this.stamp[nl]
+    if (stamp === 2 * this.search + 1) return
+    if (!ground.mayStep(req, t, nt)) return
+    const g = Math.fround(this.g[l]! + step)
+    if (stamp === 2 * this.search && g >= this.g[nl]!) return
+    this.stamp[nl] = 2 * this.search
+    this.g[nl] = g
+    this.cameFrom[nl] = l
+    this.heap.push(nl, g + stepsTo(req, ground.size, nx, ny) * req.cheapest!)
+  }
+
+  private pathTo(goal: number): Point[] {
+    const { size } = this.ground
+    const side = this.side
+    const path: Point[] = []
+    for (let l = goal; this.cameFrom[l] !== -1; l = this.cameFrom[l]!)
+      path.push([(this.x0 + (l % side)) % size, (this.y0 + Math.floor(l / side)) % size])
+    return path.reverse()
+  }
+}
+
+/** Requests waiting for one `Search`, and the one it is working on. */
+interface Lane {
+  search: Search
+  queue: Request[]
+  current: Request | undefined
 }
 
 /**
@@ -74,35 +359,33 @@ interface Request extends PathOptions {
  * across the map's joins too. Tiles with a finished road (`setRoads`) cost a road's step, so
  * paths prefer roads (`CONTEXT.md`: Road). Walls and gates (`setWalls`) block the way as
  * `mayStep` says, for the realm a request names (`CONTEXT.md`: Walls in combat).
+ *
+ * Short paths go in their own lane, searched in a `LOCAL_SIDE` window, so a long search under
+ * way never holds them up; one that finds no way within its window tries the whole map. A goal
+ * on land the start can't reach (`regionsOf`), or shut in by walls the one going can't pass, is
+ * unreachable before any search.
+ *
  * The search state is scratch memory, not world state; requests lost on a restart are simply
  * asked for again.
  */
 export class PathFinder {
-  private readonly n: number
-  /** Cost so far to each tile, in single precision: plenty across the map, at half the memory. */
-  private readonly g: Float32Array
-  private readonly cameFrom: Int32Array
-  /** Which search last touched a tile, so the arrays never need clearing. */
-  private readonly stamp: Uint32Array
-  private readonly closed: Uint32Array
-  /** 1 on tiles with a finished road. */
-  private readonly road: Uint8Array
-  private roadList: number[] = []
-  private walls: WallMap | undefined
-  private search = 0
-  private heap = new MinHeap()
-
-  private queue: Request[] = []
-  private current: Request | undefined
+  private readonly ground: Ground
+  private readonly local: Lane
+  private readonly global: Lane
   private results = new Map<string, PathResult>()
 
-  constructor(private readonly terrain: TerrainMap) {
-    this.n = terrain.size * terrain.size
-    this.g = new Float32Array(this.n)
-    this.cameFrom = new Int32Array(this.n)
-    this.stamp = new Uint32Array(this.n)
-    this.closed = new Uint32Array(this.n)
-    this.road = new Uint8Array(this.n)
+  constructor(terrain: TerrainMap, localSide = LOCAL_SIDE) {
+    this.ground = new Ground(terrain)
+    const lane = (side: number): Lane => ({
+      search: new Search(this.ground, side),
+      queue: [],
+      current: undefined,
+    })
+    this.global = lane(terrain.size)
+    this.local = localSide < terrain.size ? lane(localSide) : this.global
+    // Labelled up front for the usual travellers, so no tick waits on it.
+    regionsOf(this.ground, tableOf(WALKING_COSTS))
+    regionsOf(this.ground, tableOf(CARRIAGE_COSTS))
   }
 
   /**
@@ -110,19 +393,12 @@ export class PathFinder {
    * next step they take; one under way keeps its heuristic.
    */
   setRoads(roads: Iterable<number>): void {
-    for (const t of this.roadList) this.road[t] = 0
-    this.roadList = [...roads]
-    for (const t of this.roadList) this.road[t] = 1
+    this.ground.setRoads(roads)
   }
 
   /** The walls and gates on the map (`wallMap`); searches use them from the next step they take. */
   setWalls(walls: WallMap | undefined): void {
-    this.walls = walls
-  }
-
-  /** What is underfoot on tile index `t`: a road, or the terrain. */
-  private ground(t: number): number {
-    return this.road[t] ? Terrain.Road : this.terrain.tiles[t]!
+    this.ground.setWalls(walls)
   }
 
   /** Asks for a path from one tile to another; replaces an earlier request with the same id. */
@@ -134,14 +410,21 @@ export class PathFinder {
     options: PathOptions = {},
   ): void {
     this.cancel(id)
-    this.queue.push({ ...options, id, from, to, costs })
+    const { size } = this.ground
+    const reach = this.local.search.side / 4
+    const short =
+      Math.abs(wrapDelta(from[0], to[0], size)) <= reach &&
+      Math.abs(wrapDelta(from[1], to[1], size)) <= reach
+    ;(short ? this.local : this.global).queue.push({ ...options, id, from, to, costs })
     this.results.set(id, { status: 'searching' })
   }
 
   /** Forgets a request and its result. */
   cancel(id: string): void {
-    this.queue = this.queue.filter((r) => r.id !== id)
-    if (this.current?.id === id) this.current = undefined
+    for (const lane of this.lanes()) {
+      lane.queue = lane.queue.filter((r) => r.id !== id)
+      if (lane.current?.id === id) lane.current = undefined
+    }
     this.results.delete(id)
   }
 
@@ -154,24 +437,23 @@ export class PathFinder {
 
   /** How many requests are still being searched. */
   get pending(): number {
-    return this.queue.length + (this.current ? 1 : 0)
+    let n = 0
+    for (const lane of this.lanes()) n += lane.queue.length + (lane.current ? 1 : 0)
+    return n
   }
 
-  /** Works on waiting requests until `budgetMs` has passed. */
+  /**
+   * Works on waiting requests until `budgetMs` has passed: short ones first, but while long ones
+   * wait, they get at least half the budget.
+   */
   advance(budgetMs: number, now: () => number = () => performance.now()): void {
     const deadline = now() + budgetMs
-    while (now() < deadline) {
-      if (!this.current) {
-        const next = this.queue.shift()
-        if (!next) return
-        if (!this.start(next)) continue
-      }
-      const done = this.expand(1024)
-      if (done) {
-        this.results.set(this.current!.id, done)
-        this.current = undefined
-      }
+    if (this.local !== this.global) {
+      const longWaiting = !!this.global.current || this.global.queue.length > 0
+      this.work(this.local, longWaiting ? now() + budgetMs / 2 : deadline, now)
     }
+    this.work(this.global, deadline, now)
+    if (this.local !== this.global) this.work(this.local, deadline, now)
   }
 
   /** Searches to the end in one go, for tests and short paths. */
@@ -187,113 +469,109 @@ export class PathFinder {
     return this.result(id)!
   }
 
-  private passable(costs: TerrainCosts, x: number, y: number): boolean {
-    return costs[this.ground(tileIndex(this.terrain.size, x, y))]! < Infinity
+  private lanes(): Lane[] {
+    return this.local === this.global ? [this.global] : [this.local, this.global]
+  }
+
+  /** Works through one lane's requests until `deadline`. */
+  private work(lane: Lane, deadline: number, now: () => number): void {
+    while (now() < deadline) {
+      if (!lane.current) {
+        const next = lane.queue.shift()
+        if (!next) return
+        if (!next.checked) {
+          next.checked = true
+          const settled = this.check(next)
+          if (settled) {
+            this.results.set(next.id, settled)
+            continue
+          }
+        }
+        lane.search.begin(next)
+        lane.current = next
+      }
+      const done = lane.search.expand(1024)
+      if (!done) continue
+      const req = lane.current
+      lane.current = undefined
+      // No way within the window; there may be one round outside it.
+      if (done.status === 'unreachable' && lane.search.clipped) this.global.queue.push(req)
+      else this.results.set(req.id, done)
+    }
   }
 
   /**
-   * Steps along both directions to the goal, the short way round the map; for a `near` request,
-   * to the nearest tile in contact with it.
+   * Readies a request for its search, and settles it at once if it needs none: already there,
+   * or the goal can't be entered, lies on land the start can't reach, or is shut in.
    */
-  private stepsTo(req: Request, x: number, y: number): number {
-    const { size } = this.terrain
-    const dx = Math.abs(wrapDelta(x, req.to[0], size))
-    const dy = Math.abs(wrapDelta(y, req.to[1], size))
-    return req.near ? Math.max(0, dx - 1) + Math.max(0, dy - 1) : dx + dy
-  }
-
-  /** Whether the search may stop on (x, y): the goal, or for a `near` request beside it. */
-  private reached(req: Request, x: number, y: number): boolean {
-    if (!req.near) return x === req.to[0] && y === req.to[1]
-    const { size } = this.terrain
-    return (
-      Math.abs(wrapDelta(x, req.to[0], size)) <= 1 && Math.abs(wrapDelta(y, req.to[1], size)) <= 1
-    )
-  }
-
-  /** Whether the request may step from tile index `t` to the next tile `nt`, walls and gates aside. */
-  private mayStep(req: Request, t: number, nt: number): boolean {
-    if (!this.walls) return true
-    const start = tileIndex(this.terrain.size, req.from[0], req.from[1])
-    const stranded = !!req.stranded && t === start
-    return mayStep(this.walls, req.realmId ?? null, t, nt, !!req.onWalls, stranded)
-  }
-
-  /** Begins a search; settles requests that need no search at all. */
-  private start(req: Request): boolean {
-    const { size } = this.terrain
+  private check(req: Request): PathResult | undefined {
+    const ground = this.ground
+    const { size } = ground
     req.from = [wrap(req.from[0], size), wrap(req.from[1], size)]
     req.to = [wrap(req.to[0], size), wrap(req.to[1], size)]
-    const [fx, fy] = req.from
-    const [tx, ty] = req.to
-    if (!this.passable(req.costs, fx, fy) || (!req.near && !this.passable(req.costs, tx, ty))) {
-      this.results.set(req.id, { status: 'unreachable' })
-      return false
+    const table = (req.table = tableOf(req.costs))
+    const s = tileIndex(size, req.from[0], req.from[1])
+    const goal = tileIndex(size, req.to[0], req.to[1])
+    req.start = s
+    if (table[ground.at(s)] === Infinity || (!req.near && table[ground.at(goal)] === Infinity))
+      return { status: 'unreachable' }
+    if (reached(req, size, req.from[0], req.from[1])) return { status: 'found', path: [], cost: 0 }
+    const regions = regionsOf(ground, table)
+    const region = regions[s]!
+    if (region !== MANY) {
+      const goals: number[] = [goal]
+      if (req.near)
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++)
+            goals.push(tileIndex(size, req.to[0] + dx, req.to[1] + dy))
+      if (goals.every((t) => regions[t] !== region && regions[t] !== MANY))
+        return { status: 'unreachable' }
     }
-    if (this.reached(req, fx, fy)) {
-      this.results.set(req.id, { status: 'found', path: [], cost: 0 })
-      return false
-    }
-    this.search++
-    this.heap.clear()
-    const s = fy * size + fx
-    this.stamp[s] = this.search
-    this.g[s] = 0
-    this.cameFrom[s] = -1
-    req.stranded = !!this.walls && strandedOnWall(this.walls, req.realmId ?? null, s)
+    const walls = ground.walls
+    req.stranded = !!walls && strandedOnWall(walls, req.realmId ?? null, s)
+    if (!req.near && walls?.inside.has(goal) && this.shutIn(req, goal))
+      return { status: 'unreachable' }
     // A road is the cheapest ground, but only counts while there are any: the heuristic stays as
     // sharp as it can, so searches stay short.
-    const costs = Object.entries(req.costs)
-      .filter(([t]) => Number(t) !== Terrain.Road || this.roadList.length > 0)
-      .map(([, c]) => c)
-    req.cheapest = Math.min(...costs)
-    this.heap.push(s, this.stepsTo(req, fx, fy) * req.cheapest)
-    this.current = req
-    return true
-  }
-
-  /** Expands up to `count` tiles of the current search; returns its result once it ends. */
-  private expand(count: number): PathResult | undefined {
-    const req = this.current!
-    const { costs } = req
-    const d = this.terrain.size
-    // The cheapest possible cost to the goal: every step on the cheapest ground.
-    const cheapest = req.cheapest!
-    for (let i = 0; i < count; i++) {
-      const t = this.heap.pop()
-      if (t === undefined) return { status: 'unreachable' }
-      if (this.closed[t] === this.search) continue
-      this.closed[t] = this.search
-      const x = t % d
-      const y = (t - x) / d
-      if (this.reached(req, x, y))
-        return { status: 'found', path: this.pathTo(t), cost: this.g[t]! }
-      for (let k = 0; k < 4; k++) {
-        // Past a side of the map, the step continues on the opposite side.
-        const nx = wrap(k === 0 ? x + 1 : k === 1 ? x - 1 : x, d)
-        const ny = wrap(k === 2 ? y + 1 : k === 3 ? y - 1 : y, d)
-        const nt = ny * d + nx
-        const step = costs[this.ground(nt)]!
-        if (step === Infinity || this.closed[nt] === this.search) continue
-        if (!this.mayStep(req, t, nt)) continue
-        const g = Math.fround(this.g[t]! + step)
-        if (this.stamp[nt] === this.search && g >= this.g[nt]!) continue
-        this.stamp[nt] = this.search
-        this.g[nt] = g
-        this.cameFrom[nt] = t
-        const h = this.stepsTo(req, nx, ny) * cheapest
-        this.heap.push(nt, g + h)
-      }
-    }
+    let cheapest = Infinity
+    for (let t = 0; t < 256; t++)
+      if (t !== Terrain.Road || ground.hasRoads) cheapest = Math.min(cheapest, table[t]!)
+    req.cheapest = cheapest
     return undefined
   }
 
-  private pathTo(goal: number): Point[] {
-    const d = this.terrain.size
-    const path: Point[] = []
-    for (let t = goal; this.cameFrom[t] !== -1; t = this.cameFrom[t]!)
-      path.push([t % d, Math.floor(t / d)])
-    return path.reverse()
+  /**
+   * Whether the goal, inside a ring of walls, can't be reached from the start: going back from
+   * it, every way ends at walls or gates the one going can't pass. Gives up (false) once it is
+   * out of the ring, or past the most a ring can shut in.
+   */
+  private shutIn(req: Request, goal: number): boolean {
+    const ground = this.ground
+    const walls = ground.walls!
+    const { size } = ground
+    const n = size * size
+    const seen = new Set([goal])
+    const todo = [goal]
+    while (todo.length > 0) {
+      const t = todo.pop()!
+      const x = t % size
+      const row = t - x
+      const ns = [
+        row + (x + 1 === size ? 0 : x + 1),
+        row + (x === 0 ? size - 1 : x - 1),
+        (t + size) % n,
+        (t - size + n) % n,
+      ]
+      for (const p of ns) {
+        if (seen.has(p) || req.table![ground.at(p)] === Infinity) continue
+        if (!ground.mayStep(req, p, t)) continue
+        if (p === req.start || (!walls.inside.has(p) && !walls.tiles.has(p))) return false
+        seen.add(p)
+        if (seen.size > WALL_ENCLOSES_MAX) return false
+        todo.push(p)
+      }
+    }
+    return true
   }
 }
 
@@ -305,6 +583,11 @@ class MinHeap {
 
   clear(): void {
     this.size = 0
+  }
+
+  /** The lowest priority waiting; Infinity when empty. */
+  get top(): number {
+    return this.size > 0 ? this.prio[0]! : Infinity
   }
 
   push(item: number, priority: number): void {
