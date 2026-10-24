@@ -27,6 +27,7 @@ import {
 import {
   Terrain,
   isPassableTerrain,
+  roadMayGoOn,
   terrainAt,
   tileIndex,
   wrap,
@@ -223,8 +224,7 @@ export function buildProblem(
   const at = terrain && lookupOf(terrain)
   if (kind === 'road') {
     const t = at?.(x, y)
-    if (t !== undefined && (!isPassableTerrain(t) || t === Terrain.Mountain))
-      return 'a road goes on passable land, not on Mountain'
+    if (t !== undefined && !roadMayGoOn(t)) return 'a road goes on passable land, not on Mountain'
     if (roadAt(world, x, y)) return 'there is already a road on this tile'
     return undefined
   }
