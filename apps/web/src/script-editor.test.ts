@@ -7,12 +7,14 @@ import {
   canMakeActive,
   defaultStatus,
   describeDiagnostic,
+  diagnosticsText,
   diagnosticRange,
   hasUnsavedChanges,
   lineDiff,
   nameCompletions,
   namesInScope,
   savedMessage,
+  scriptWarnings,
   scriptHighlighting,
   versionStatus,
 } from './script-editor.js'
@@ -273,5 +275,24 @@ describe('the game API in the editor', () => {
     expect(hover.text).toContain('Army: The army walks to a tile together.')
     expect(apiHover(source, 10, { defaultScript: false })).toBeNull()
     expect(apiHover(source, 8, { defaultScript: false })?.text).toMatch(/^me · value/)
+  })
+})
+
+describe('script warnings in the editor', () => {
+  it('warns of a typo in a field, never of a syntax error', () => {
+    expect(scriptWarnings('me.hungr', false)).toEqual([
+      { message: '"hungr" is not a field of a resident or an army', line: 1, column: 4 },
+    ])
+    expect(scriptWarnings('me.hungr', true)[0]?.message).toBe(
+      '"hungr" is not a field of a resident',
+    )
+    expect(scriptWarnings('let = me.hungr', false)).toEqual([])
+  })
+
+  it('says how many warnings there are, and that they don’t stop a version running', () => {
+    const w = { message: 'x', line: 1, column: 1 }
+    expect(diagnosticsText([], [])).toBe('No syntax errors.')
+    expect(diagnosticsText([], [w])).toMatch(/^No syntax errors; 1 warning, .*don’t stop/)
+    expect(diagnosticsText([w], [w])).toMatch(/^1:1 x\n.*never runs/)
   })
 })

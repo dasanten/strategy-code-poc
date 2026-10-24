@@ -11,24 +11,39 @@ import { StreamLanguage, syntaxTree } from '@codemirror/language'
 import { linter, lintGutter, type Diagnostic as LintDiagnostic } from '@codemirror/lint'
 import { EditorView, hoverTooltip } from '@codemirror/view'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { checkScript } from '@csp/lang'
-import { apiHover, diagnosticRange, nameCompletions, scriptHighlighting } from './script-editor.js'
+import { checkScript, type Diagnostic } from '@csp/lang'
+import {
+  apiHover,
+  diagnosticRange,
+  nameCompletions,
+  scriptHighlighting,
+  scriptWarnings,
+} from './script-editor.js'
 import { THEME } from './theme.js'
 
 const language = StreamLanguage.define(scriptHighlighting)
 
-/** Marks syntax errors inline, with the same check the server runs on every saved version. */
-const syntaxErrors = linter(
-  (view): LintDiagnostic[] => {
-    const source = view.state.doc.toString()
-    return checkScript(source).map((d) => ({
-      ...diagnosticRange(source, d),
-      severity: 'error',
-      message: d.message,
-    }))
-  },
-  { delay: 300 },
-)
+/**
+ * Marks syntax errors inline in red, with the same check the server runs on every saved
+ * version, and the checker's warnings in yellow, which never stop a version from running.
+ */
+function diagnostics(defaultScript: boolean) {
+  return linter(
+    (view): LintDiagnostic[] => {
+      const source = view.state.doc.toString()
+      const mark = (severity: 'error' | 'warning') => (d: Diagnostic) => ({
+        ...diagnosticRange(source, d),
+        severity,
+        message: d.message,
+      })
+      return [
+        ...checkScript(source).map(mark('error')),
+        ...scriptWarnings(source, defaultScript).map(mark('warning')),
+      ]
+    },
+    { delay: 300 },
+  )
+}
 
 /** Whether `pos` is inside a comment or a string, where nothing is completed. */
 function inText(context: CompletionContext): boolean {
@@ -116,7 +131,7 @@ export function ScriptEditor({
         language,
         autocompletion({ override: [names(defaultScript)] }),
         apiTooltips(defaultScript),
-        syntaxErrors,
+        diagnostics(defaultScript),
         lintGutter(),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) onChangeRef.current(u.state.doc.toString())
