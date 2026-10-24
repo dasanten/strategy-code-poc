@@ -1,4 +1,5 @@
 import {
+  DIAGONAL_STEP,
   Terrain,
   WALK_TICKS_PER_TILE,
   isPassableTerrain,
@@ -9,7 +10,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { checkInvariants } from './invariants.js'
+import { checkInvariants, pathsAreSteps } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { Walking } from './walking.js'
@@ -107,6 +108,71 @@ describe('walking', () => {
     expect(walkSpeed(r, Terrain.Forest, 0) / walkSpeed(r, Terrain.Plains, 0)).toBeGreaterThan(
       walkSpeed(s, Terrain.Forest, 0) / walkSpeed(s, Terrain.Plains, 0),
     )
+  })
+
+  it('takes √2 times as long for a diagonal step as for a straight one', () => {
+    const straight = ticksUntil(...walker(open, 10), 3, 2)
+    const { world, r } = oneWalker(open, 2, 2)
+    walkTo(r, 3, 3)
+    const diagonal = ticksUntil(world, open, r, 3, 3)
+    expect(Math.abs(diagonal - straight * DIAGONAL_STEP)).toBeLessThanOrEqual(2)
+    expect(r.order).toBeNull()
+  })
+
+  it('takes a diagonal step only between two steppable tiles, using up √2 of progress', () => {
+    const map = draw(['......', '......', '...~..', '......', '......', '......'])
+    const { world, r } = oneWalker(map, 2, 2)
+    const walking = new Walking(map)
+    const step = (x: number, y: number, path: [number, number][]) => {
+      r.order = { kind: 'walkTo', target: { x, y }, path, progress: 2 }
+      return walking.resolve(world, [{ kind: 'step', residentId: r.id, to: { x, y } }])
+    }
+    // Past the lake's corner at (3, 2): refused, and a new path is found.
+    expect(step(3, 3, [[3, 3]])).toBe(0)
+    expect(r).toMatchObject({ x: 2, y: 2, order: { path: null, progress: 0 } })
+    // The other way round is open.
+    expect(
+      step(1, 3, [
+        [1, 3],
+        [0, 3],
+      ]),
+    ).toBe(1)
+    expect(r).toMatchObject({ x: 1, y: 3 })
+    expect(r.order?.kind === 'walkTo' && r.order.progress).toBeCloseTo(2 - DIAGONAL_STEP)
+    // Two tiles off is no step at all.
+    expect(step(3, 5, [[3, 5]])).toBe(0)
+    expect(r.order).toBeNull()
+  })
+
+  it('has an invariant that every step on a path is one to take', () => {
+    const map = draw(['......', '......', '...~..', '......', '......', '......'])
+    const { world, r } = oneWalker(map, 2, 2)
+    const broken = (path: [number, number][]) => {
+      r.order = { kind: 'walkTo', target: { x: 0, y: 0 }, path, progress: 0 }
+      return pathsAreSteps.check(world, map).length > 0
+    }
+    expect(
+      broken([
+        [1, 1],
+        [0, 0],
+      ]),
+    ).toBe(false)
+    expect(broken([[3, 3]])).toBe(true) // past the lake's corner
+    expect(
+      broken([
+        [2, 3],
+        [2, 5],
+      ]),
+    ).toBe(true) // a leap
+    expect(broken([[3, 2]])).toBe(true) // into the lake
+    // A walk across open plains keeps it all the way.
+    walkTo(r, 5, 5)
+    const walking = new Walking(map)
+    for (let t = 0; t < 600 && r.order; t++) {
+      stepWorld(world, map, walking)
+      expect(pathsAreSteps.check(world, map)).toEqual([])
+    }
+    expect([r.x, r.y]).toEqual([5, 5])
   })
 
   it('walks across a join of the map', () => {

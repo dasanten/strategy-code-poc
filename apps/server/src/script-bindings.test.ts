@@ -5,7 +5,9 @@ import {
   SCRIPT_MAX_CALL_DEPTH,
   SIGHT_RANGE,
   TICKS_PER_GAME_YEAR,
+  DIAGONAL_STEP,
   Terrain,
+  walkSpeed,
   type OrderRequest,
   type TerrainMap,
   type WorldState,
@@ -18,7 +20,7 @@ import { persuasionOrders } from './persuasion.js'
 import { ExploredTerrain } from './explored.js'
 import { OrderQueue, orderKinds } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
-import { SCRIPT_ORDER_KINDS, bindScript, scriptRequestsSound } from './script-bindings.js'
+import { SCRIPT_ORDER_KINDS, bindScript, scriptRequestsSound, walkTime } from './script-bindings.js'
 import { entitiesInSight } from './sight.js'
 import { createWorld } from './world.js'
 
@@ -414,5 +416,20 @@ describe('invariant: a script can request nothing an order couldn’t', () => {
       { ...orderKinds, stop: never },
     )
     expect(found).toHaveLength(1)
+  })
+})
+
+describe('walkTime', () => {
+  it('goes diagonally where the straight way slants', () => {
+    const world = createWorld(terrain)
+    const r = newResident(mulberry32(1), { id: 'w1', owner: 'r1', x: 50, y: 50, tick: 0 })
+    const tile = 1 / walkSpeed(r, Terrain.Plains, world.tick)
+    const time = (x: number, y: number) =>
+      walkTime(world, terrain, () => true, r, { x: 50, y: 50 }, { x, y })
+    const about = (ticks: number, tiles: number) =>
+      expect(Math.abs(ticks - tiles * tile)).toBeLessThanOrEqual(1)
+    about(time(60, 50), 10)
+    about(time(60, 60), 10 * DIAGONAL_STEP)
+    about(time(54, 40), 6 + 4 * DIAGONAL_STEP)
   })
 })

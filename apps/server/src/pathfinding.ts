@@ -1,5 +1,6 @@
 import {
   CARRIAGE_SPEED,
+  DIAGONAL_STEP,
   PATH_DETOUR_LIMIT,
   PATH_DETOUR_SLACK,
   TERRAIN_SPEED,
@@ -156,8 +157,9 @@ const regionCache = new WeakMap<Uint8Array, Map<Float64Array, Uint16Array>>()
  * Labels each tile with the stretch of land it lies in for a traveller with these costs: tiles
  * with the same label reach each other, walls and gates aside, tiles with different ones never.
  * 0 can't be entered. Roads don't join stretches, as they never go where the terrain beneath
- * can't be crossed by someone it carries (`roadMayGoOn`). The terrain never changes, so the
- * labels are worked out once per map and set of costs.
+ * can't be crossed by someone it carries (`roadMayGoOn`), and diagonal steps don't either, as
+ * they never cut a corner. The terrain never changes, so the labels are worked out once per map
+ * and set of costs.
  */
 function regionsOf(ground: Ground, table: Float64Array): Uint16Array {
   let byTable = regionCache.get(ground.tiles)
@@ -201,12 +203,19 @@ function regionsOf(ground: Ground, table: Float64Array): Uint16Array {
   return labels
 }
 
-/** Steps along both directions to the goal, the short way round the map; for a `near` request,
- * to the nearest tile in contact with it. */
+/**
+ * How far the goal is in straight steps, the short way round the map, going diagonally as far as
+ * that helps (a diagonal step counting `DIAGONAL_STEP`); for a `near` request, to the nearest tile
+ * in contact with it.
+ */
 function stepsTo(req: Request, size: number, x: number, y: number): number {
-  const dx = Math.abs(wrapDelta(x, req.to[0], size))
-  const dy = Math.abs(wrapDelta(y, req.to[1], size))
-  return req.near ? Math.max(0, dx - 1) + Math.max(0, dy - 1) : dx + dy
+  let dx = Math.abs(wrapDelta(x, req.to[0], size))
+  let dy = Math.abs(wrapDelta(y, req.to[1], size))
+  if (req.near) {
+    dx = Math.max(0, dx - 1)
+    dy = Math.max(0, dy - 1)
+  }
+  return dx > dy ? dx + (DIAGONAL_STEP - 1) * dy : dy + (DIAGONAL_STEP - 1) * dx
 }
 
 /** Whether a search may stop on (x, y): the goal, or for a `near` request beside it. */
@@ -292,15 +301,27 @@ class Search {
         return { status: 'found', path: this.pathTo(l), cost: this.g[l]! }
       const t = y * size + x
       // Past a side of the map, the step continues on the opposite side.
-      this.visit(req, t, l, x + 1 === size ? 0 : x + 1, y, lx + 1, ly)
-      this.visit(req, t, l, x === 0 ? size - 1 : x - 1, y, lx - 1, ly)
-      this.visit(req, t, l, x, y + 1 === size ? 0 : y + 1, lx, ly + 1)
-      this.visit(req, t, l, x, y === 0 ? size - 1 : y - 1, lx, ly - 1)
+      const e = x + 1 === size ? 0 : x + 1
+      const w = x === 0 ? size - 1 : x - 1
+      const s = y + 1 === size ? 0 : y + 1
+      const n = y === 0 ? size - 1 : y - 1
+      this.visit(req, t, l, e, y, lx + 1, ly, false)
+      this.visit(req, t, l, w, y, lx - 1, ly, false)
+      this.visit(req, t, l, x, s, lx, ly + 1, false)
+      this.visit(req, t, l, x, n, lx, ly - 1, false)
+      this.visit(req, t, l, e, s, lx + 1, ly + 1, true)
+      this.visit(req, t, l, w, s, lx - 1, ly + 1, true)
+      this.visit(req, t, l, e, n, lx + 1, ly - 1, true)
+      this.visit(req, t, l, w, n, lx - 1, ly - 1, true)
     }
     return undefined
   }
 
-  /** Considers the step from tile `t` (window tile `l`) to (nx, ny), window tile (nlx, nly). */
+  /**
+   * Considers the step from tile `t` (window tile `l`) to (nx, ny), window tile (nlx, nly). A
+   * `diagonal` step costs `DIAGONAL_STEP` times as much, and only goes where both straight tiles
+   * beside it could be stepped onto too (`CONTEXT.md`: Step).
+   */
   private visit(
     req: Request,
     t: number,
@@ -309,6 +330,7 @@ class Search {
     ny: number,
     nlx: number,
     nly: number,
+    diagonal: boolean,
   ): void {
     const side = this.side
     if (nlx < 0 || nlx >= side || nly < 0 || nly >= side) {
@@ -321,12 +343,20 @@ class Search {
     }
     const ground = this.ground
     const nt = ny * ground.size + nx
-    const step = req.table![ground.at(nt)]!
+    const table = req.table!
+    let step = table[ground.at(nt)]!
     if (step === Infinity) return
     const nl = nly * side + nlx
     const stamp = this.stamp[nl]
     if (stamp === 2 * this.search + 1) return
     if (!ground.mayStep(req, t, nt)) return
+    if (diagonal) {
+      const a = t - (t % ground.size) + nx
+      const b = nt - nx + (t % ground.size)
+      if (table[ground.at(a)] === Infinity || table[ground.at(b)] === Infinity) return
+      if (!ground.mayStep(req, t, a) || !ground.mayStep(req, t, b)) return
+      step *= DIAGONAL_STEP
+    }
     const g = Math.fround(this.g[l]! + step)
     if (stamp === 2 * this.search && g >= this.g[nl]!) return
     this.stamp[nl] = 2 * this.search
@@ -355,8 +385,9 @@ interface Lane {
 /**
  * Finds paths across the map with A*, a little at a time (T4.1): `advance` works through the
  * waiting requests until its time budget for this tick runs out and carries on next tick, so a
- * path across the whole map never stalls the tick. Moves go to the four neighbouring tiles,
- * across the map's joins too. Tiles with a finished road (`setRoads`) cost a road's step, so
+ * path across the whole map never stalls the tick. Moves go to the eight tiles around, across
+ * the map's joins too; a diagonal one costs `DIAGONAL_STEP` times as much and never cuts a corner
+ * (`CONTEXT.md`: Step). Tiles with a finished road (`setRoads`) cost a road's step, so
  * paths prefer roads (`CONTEXT.md`: Road). Walls and gates (`setWalls`) block the way as
  * `mayStep` says, for the realm a request names (`CONTEXT.md`: Walls in combat).
  *
@@ -543,7 +574,8 @@ export class PathFinder {
   /**
    * Whether the goal, inside a ring of walls, can't be reached from the start: going back from
    * it, every way ends at walls or gates the one going can't pass. Gives up (false) once it is
-   * out of the ring, or past the most a ring can shut in.
+   * out of the ring, or past the most a ring can shut in. Going straight is enough: a diagonal
+   * step never cuts a corner, so it never gets out where straight ones can't.
    */
   private shutIn(req: Request, goal: number): boolean {
     const ground = this.ground

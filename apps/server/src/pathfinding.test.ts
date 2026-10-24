@@ -1,10 +1,12 @@
 import {
   PATH_DETOUR_LIMIT,
   PATH_DETOUR_SLACK,
+  DIAGONAL_STEP,
   Terrain,
+  besideStep,
   isPassableTerrain,
+  stepLength,
   terrainAt,
-  wrapDelta,
   type TerrainMap,
   type WallMap,
 } from '@csp/shared'
@@ -32,18 +34,21 @@ function draw(rows: string[]): TerrainMap {
 }
 
 /**
- * Checks a path step by step: neighbouring tiles only (across the joins too), all enterable,
- * ending at the goal.
+ * Checks a path step by step: each to one of the eight tiles around (across the joins too), all
+ * enterable, never cutting a corner past land that can't be entered, ending at the goal.
  */
 function checkPath(map: TerrainMap, from: Point, to: Point, path: Point[], costs: TerrainCosts) {
   let [x, y] = from
   let cost = 0
   for (const [nx, ny] of path) {
-    expect(Math.abs(wrapDelta(x, nx, map.size)) + Math.abs(wrapDelta(y, ny, map.size))).toBe(1)
+    const length = stepLength(map.size, x, y, nx, ny)
+    expect(length).toBeGreaterThan(0)
+    for (const side of besideStep(map.size, x, y, nx, ny))
+      expect(costs[map.tiles[side]!]).toBeLessThan(Infinity)
     const t = terrainAt(map, nx, ny)
     expect(isPassableTerrain(t)).toBe(true)
     expect(costs[t]).toBeLessThan(Infinity)
-    cost += costs[t]!
+    cost += costs[t]! * length
     ;[x, y] = [nx, ny]
   }
   expect([x, y]).toEqual([...to])
@@ -221,6 +226,130 @@ describe('PathFinder settling requests before any search', () => {
   })
 })
 
+describe('PathFinder stepping diagonally', () => {
+  it('goes diagonally across open plains, each diagonal step costing √2', () => {
+    const { map } = blank(20)
+    const finder = new PathFinder(map)
+    const r = finder.findPath([2, 2], [7, 7])
+    expect(r).toMatchObject({
+      status: 'found',
+      path: [
+        [3, 3],
+        [4, 4],
+        [5, 5],
+        [6, 6],
+        [7, 7],
+      ],
+    })
+    expect(r.status === 'found' && r.cost).toBeCloseTo(5 * DIAGONAL_STEP, 4)
+    // Slanting: two diagonal steps and three straight ones.
+    const slant = finder.findPath([2, 2], [7, 4])
+    expect(slant.status === 'found' && slant.path.length).toBe(5)
+    expect(slant.status === 'found' && slant.cost).toBeCloseTo(3 + 2 * DIAGONAL_STEP, 4)
+    expect(
+      slant.status === 'found' && checkPath(map, [2, 2], [7, 4], slant.path, WALKING_COSTS),
+    ).toBeCloseTo(3 + 2 * DIAGONAL_STEP, 4)
+  })
+
+  it('goes diagonally across a join', () => {
+    const { map } = blank(20)
+    expect(new PathFinder(map).findPath([0, 0], [19, 19])).toMatchObject({
+      status: 'found',
+      path: [[19, 19]],
+    })
+  })
+
+  it('never cuts a corner past a wall, a closed gate, or a lake', () => {
+    const { map, paint } = blank(20)
+    const at = (x: number, y: number) => y * 20 + x
+    const gate = (closed: boolean) => ({
+      kind: 'gate' as const,
+      realmId: null,
+      realms: [],
+      closed,
+      shutTo: [],
+    })
+    const finder = new PathFinder(map)
+    // From (4, 4) to (5, 5); the straight tiles beside the step are (5, 4) and (4, 5).
+    const way = () => finder.findPath([4, 4], [5, 5])
+    expect(way()).toMatchObject({ path: [[5, 5]] })
+    finder.setWalls(wallsOn(20, [at(5, 4)]))
+    expect(way()).toMatchObject({
+      status: 'found',
+      path: [
+        [4, 5],
+        [5, 5],
+      ],
+      cost: 2,
+    })
+    finder.setWalls({ size: 20, tiles: new Map([[at(4, 5), gate(true)]]), inside: new Set() })
+    expect(way()).toMatchObject({
+      status: 'found',
+      path: [
+        [5, 4],
+        [5, 5],
+      ],
+      cost: 2,
+    })
+    // An open gate is in nobody's way.
+    finder.setWalls({ size: 20, tiles: new Map([[at(4, 5), gate(false)]]), inside: new Set() })
+    expect(way()).toMatchObject({ path: [[5, 5]] })
+    finder.setWalls(undefined)
+    paint(5, 4, Terrain.Lake)
+    expect(way()).toMatchObject({
+      status: 'found',
+      path: [
+        [4, 5],
+        [5, 5],
+      ],
+      cost: 2,
+    })
+  })
+
+  it('keeps a carriage from cutting a corner past a mountain, which a walker may', () => {
+    const { map, paint } = blank(20)
+    paint(5, 4, Terrain.Mountain)
+    const finder = new PathFinder(map)
+    expect(finder.findPath([4, 4], [5, 5])).toMatchObject({ path: [[5, 5]] })
+    expect(finder.findPath([4, 4], [5, 5], CARRIAGE_COSTS)).toMatchObject({
+      status: 'found',
+      path: [
+        [4, 5],
+        [5, 5],
+      ],
+    })
+  })
+
+  it('a diagonal line of walls keeps everyone out like a straight one', () => {
+    // A diamond of walls round (10, 10), each touching the next only at a corner.
+    const { map } = blank(21)
+    const ring: number[] = []
+    for (let y = 0; y < 21; y++)
+      for (let x = 0; x < 21; x++)
+        if (Math.abs(x - 10) + Math.abs(y - 10) === 4) ring.push(y * 21 + x)
+    const finder = new PathFinder(map)
+    finder.setWalls(wallsOn(21, ring))
+    expect(finder.findPath([0, 0], [10, 10]).status).toBe('unreachable')
+    expect(finder.findPath([10, 10], [0, 0]).status).toBe('unreachable')
+    expect(finder.findPath([10, 10], [12, 11]).status).toBe('found')
+  })
+
+  it('an attacker goes diagonally into contact', () => {
+    const { map } = blank(20)
+    const r = new PathFinder(map).findPath([2, 2], [8, 8], WALKING_COSTS, { near: true })
+    expect(r).toMatchObject({
+      status: 'found',
+      path: [
+        [3, 3],
+        [4, 4],
+        [5, 5],
+        [6, 6],
+        [7, 7],
+      ],
+    })
+  })
+})
+
 describe('PathFinder lanes', () => {
   it('finds a short path while a long search is under way', () => {
     // Forest everywhere: dear ground, so a long search goes through a great many tiles.
@@ -244,8 +373,10 @@ describe('PathFinder lanes', () => {
     const r = finder.findPath([98, 100], [102, 100])
     expect(r.status).toBe('found')
     if (r.status !== 'found') return
-    expect(checkPath(map, [98, 100], [102, 100], r.path, WALKING_COSTS)).toBeCloseTo(r.cost)
-    expect(r.cost).toBe(4 + 2 * 41)
+    expect(checkPath(map, [98, 100], [102, 100], r.path, WALKING_COSTS)).toBeCloseTo(r.cost, 4)
+    // 41 rows up past the lake's end and back down, slanting where that helps.
+    expect(r.cost).toBeGreaterThan(2 * 41)
+    expect(r.cost).toBeLessThan(4 + 2 * 41)
   })
 
   it('gives the same paths as one lane for the whole map', () => {
@@ -298,7 +429,8 @@ describe('PathFinder across the full map', () => {
     const r = finder.result('across')
     expect(r?.status).toBe('found')
     if (r?.status !== 'found') return
-    expect(r.path.length).toBeGreaterThan(1300)
+    // Half the map along each direction, mostly diagonally.
+    expect(r.path.length).toBeGreaterThan(700)
     // The finder sums costs in 32-bit floats: close, not exact, over a path this long.
     expect(checkPath(map, west, east, r.path, WALKING_COSTS)).toBeCloseTo(r.cost, 1)
   })
