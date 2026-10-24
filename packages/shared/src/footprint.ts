@@ -94,11 +94,18 @@ export function nearFootprint(
 export function footprintsNear(a: Placed, b: Placed, reach: number, size = MAP_SIZE): boolean {
   const sa = FOOTPRINT[a.kind]
   const sb = FOOTPRINT[b.kind]
-  const along = (from: number, to: number) => {
-    const d = wrapDelta(from, to, size)
-    return d < 0 ? Math.max(0, -d - (sb - 1)) : Math.max(0, d - (sa - 1))
-  }
-  return along(a.x, b.x) <= reach && along(a.y, b.y) <= reach
+  return (
+    footprintGap(a.x, b.x, sa, sb, size) <= reach && footprintGap(a.y, b.y, sa, sb, size) <= reach
+  )
+}
+
+/**
+ * The steps between footprints of sides `sa` (from `from`) and `sb` (from `to`) along one
+ * direction (`footprintsNear`); not a closure there, as city membership asks it very often.
+ */
+function footprintGap(from: number, to: number, sa: number, sb: number, size: number): number {
+  const d = wrapDelta(from, to, size)
+  return d < 0 ? Math.max(0, -d - (sb - 1)) : Math.max(0, d - (sa - 1))
 }
 
 /** The tile in the middle of a footprint, rounded to the north-west: where to aim at it. */

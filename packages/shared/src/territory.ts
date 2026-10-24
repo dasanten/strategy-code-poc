@@ -129,37 +129,41 @@ export function controlSources(world: WorldState, size: number): ControlSource[]
  * tie between Organizations leaves the tile to nobody. `size` is the map's.
  */
 export function computeTerritory(world: WorldState, size: number): Territory {
-  const best = new Map<string, { owner: string | null; control: number }>()
+  // By tile index (y * size + x): a city reaches thousands of tiles, too many for "x,y" keys.
+  const best = new Map<number, { owner: string | null; control: number }>()
   for (const s of controlSources(world, size)) {
     // A source with several tiles projects from the nearest of them.
-    const reached = new Map<string, number>()
-    for (const [key, d] of nearestWithin(s.tiles, s.reach, size)) {
+    nearestWithin(s.tiles, s.reach, size, (i, d) => {
       const c = controlAt(s, d)
-      if (c > 0) reached.set(key, c)
-    }
-    for (const [key, c] of reached) {
-      const here = best.get(key)
-      if (!here || c > here.control) best.set(key, { owner: s.owner, control: c })
-      else if (c === here.control && here.owner !== s.owner) here.owner = null
-    }
+      if (c <= 0) return
+      const here = best.get(i)
+      if (!here) best.set(i, { owner: s.owner, control: c })
+      else if (c > here.control) {
+        here.owner = s.owner
+        here.control = c
+      } else if (c === here.control && here.owner !== s.owner) here.owner = null
+    })
   }
   const owners = new Map<string, string>()
-  for (const [key, { owner }] of best) if (owner !== null) owners.set(key, owner)
+  for (const [i, { owner }] of best) {
+    if (owner !== null) owners.set(`${i % size},${Math.floor(i / size)}`, owner)
+  }
   return { tick: world.tick, owners }
 }
 
 /**
- * Every tile within `reach` of the nearest of `tiles` (straight line, the short way round), with
- * that distance, by "x,y" key: an exact distance transform over the box round the tiles, so a
- * source of many tiles costs about its box rather than its tiles times its reach.
+ * Hands `reached` every tile within `reach` of the nearest of `tiles` (straight line, the short way
+ * round), by index (y * size + x), with that distance, each tile once: an exact distance transform
+ * over the box round the tiles, so a source of many tiles costs about its box rather than its
+ * tiles times its reach.
  */
 function nearestWithin(
   tiles: readonly { x: number; y: number }[],
   reach: number,
   size: number,
-): Map<string, number> {
-  const out = new Map<string, number>()
-  if (tiles.length === 0) return out
+  reached: (i: number, d: number) => void,
+): void {
+  if (tiles.length === 0) return
   // Tiles as steps from the first, the short way round, and the box round them plus the reach.
   const first = tiles[0]!
   const at = tiles.map((t) => [wrapDelta(first.x, t.x, size), wrapDelta(first.y, t.y, size)])
@@ -186,10 +190,9 @@ function nearestWithin(
     for (let x = 0; x < w; x++) {
       const dist = Math.sqrt(d[x]!)
       if (dist <= reach)
-        out.set(`${wrap(first.x + x0 + x, size)},${wrap(first.y + y0 + y, size)}`, dist)
+        reached(wrap(first.y + y0 + y, size) * size + wrap(first.x + x0 + x, size), dist)
     }
   }
-  return out
 }
 
 /** The 1D squared distance transform of the first `n` values of `f` (0 where a source is). */
