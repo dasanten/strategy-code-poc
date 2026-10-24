@@ -99,11 +99,17 @@ export function cityMembership(
   // Claims waiting to be settled: a building a city's chain reaches, and how far its hall is. The
   // nearest is settled first, then the older city's, then the one made first (`ClaimHeap`).
   const claims = new ClaimHeap()
+  // Per city, the buildings it has claimed: a claim made again is the same but later, so it never
+  // settles first, and a dense city (walls) would otherwise make many of each.
+  const claimed = new Map<string, Set<Building>>()
   const claim = (from: Building, cityId: string) => {
     const hall = halls.get(cityId)!
+    const mine = claimed.get(cityId) ?? new Set<Building>()
+    claimed.set(cityId, mine)
     for (const b of near(from)) {
-      if (!members.has(b.id))
-        claims.push({ b, cityId, d: wrapDistance(size, hall, b), age: idNumber(cityId), seq: 0 })
+      if (members.has(b.id) || mine.has(b)) continue
+      mine.add(b)
+      claims.push({ b, cityId, d: wrapDistance(size, hall, b), age: idNumber(cityId), seq: 0 })
     }
   }
   for (const [cityId, hall] of halls) members.set(hall.id, cityId)

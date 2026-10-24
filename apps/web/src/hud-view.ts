@@ -30,6 +30,25 @@ export function isWide(id: DrawerId): boolean {
   return DRAWERS.some((d) => d.id === id && 'wide' in d && d.wide)
 }
 
+/** The least map, in pixels, the open drawer and card must leave between them to show a place. */
+export const MIN_OPEN_MAP = 160
+
+/**
+ * Where to show a place on the map while an open drawer covers `left` pixels of it and the
+ * selection card `right`: in the map left between them; with the drawer closed when they leave
+ * too little; on the whole screen when even the card alone does.
+ */
+export function showBeside(
+  mapWidth: number,
+  left: number,
+  right: number,
+): { left: number; right: number; closeDrawer: boolean } {
+  if (mapWidth - left - right >= MIN_OPEN_MAP) return { left, right, closeDrawer: false }
+  const closeDrawer = left > 0
+  if (mapWidth - right >= MIN_OPEN_MAP) return { left: 0, right, closeDrawer }
+  return { left: 0, right: 0, closeDrawer }
+}
+
 /** The goods the top bar shows for the home city, in this order. */
 export const KEY_GOODS = ['food', 'wood', 'stone', 'coins'] as const satisfies readonly Good[]
 export type KeyGood = (typeof KEY_GOODS)[number]

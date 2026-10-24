@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   CARRIAGE_SPEED,
+  DIAGONAL_STEP,
   MAX_HEALTH,
   MAX_HUNGER,
   TERRAIN_SPEED,
@@ -301,7 +302,11 @@ describe('pathfinding with roads', () => {
   it('prefers a road to plains of the same length', () => {
     const finder = new PathFinder(map)
     const before = finder.findPath([1, 5], [9, 5], WALKING_COSTS)
-    expect(before).toMatchObject({ status: 'found', cost: 16 })
+    // Round the mountains, cutting the two corners diagonally: 12 straight steps and 2 diagonal.
+    const round = 12 + 2 * DIAGONAL_STEP
+    expect(before.status).toBe('found')
+    if (before.status !== 'found') return
+    expect(before.cost).toBeCloseTo(round, 4)
 
     const world = createWorld(map)
     layRoad(world)
@@ -309,14 +314,15 @@ describe('pathfinding with roads', () => {
     const byRoad = finder.findPath([1, 5], [9, 5], WALKING_COSTS)
     expect(byRoad).toMatchObject({ status: 'found' })
     if (byRoad.status !== 'found') return
-    // Along the road: 4 up, 8 across, 4 down, all at road speed.
-    expect(byRoad.path).toHaveLength(16)
+    // Along the road: 3 up, a diagonal, 6 across, a diagonal, 3 down, all at road speed.
+    expect(byRoad.path).toHaveLength(14)
     expect(byRoad.path.every(([x, y]) => x === 1 || x === 9 || y === 1)).toBe(true)
-    expect(byRoad.cost).toBeCloseTo(16 / TERRAIN_SPEED[Terrain.Road])
+    expect(byRoad.cost).toBeCloseTo(round / TERRAIN_SPEED[Terrain.Road], 4)
 
     // Torn down, the road is forgotten.
     finder.setRoads([])
-    expect(finder.findPath([1, 5], [9, 5], WALKING_COSTS)).toMatchObject({ cost: 16 })
+    const after = finder.findPath([1, 5], [9, 5], WALKING_COSTS)
+    expect(after.status === 'found' && after.cost).toBeCloseTo(round, 4)
   })
 
   it('sends walkers along the road', () => {

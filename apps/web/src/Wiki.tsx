@@ -57,6 +57,7 @@ import {
   HUNGER_DAYS,
   HUNGER_ENDURANCE_EFFECT,
   HUNGER_ENDURANCE_LIMIT,
+  DIAGONAL_STEP,
   ENDURANCE_TERRAIN_EFFECT,
   LIFESPAN_MAX,
   LIFESPAN_MIN,
@@ -132,6 +133,10 @@ import {
   type CrimeKind,
   type Good,
   type Stock,
+  DEFAULT_SCRIPTS,
+  SCRIPT_VIEWS,
+  type ScriptType,
+  type ScriptViewName,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 import { GOOD_LABELS } from './Residents.js'
@@ -169,6 +174,8 @@ import {
   wikiResident,
   type PricedGood,
 } from './wiki-view.js'
+import { SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
 export const WIKI_TOPICS = [
@@ -183,7 +190,10 @@ export const WIKI_TOPICS = [
   { id: 'standing', title: 'Standing & reactions' },
   { id: 'combat', title: 'Combat & walls' },
   { id: 'territory', title: 'Territory' },
+  { id: 'language', title: 'Script language' },
+  { id: 'api', title: 'Game API' },
   { id: 'scripts', title: 'Scripting budgets' },
+  { id: 'examples', title: 'Example scripts' },
 ] as const
 
 type TopicId = (typeof WIKI_TOPICS)[number]['id']
@@ -205,6 +215,88 @@ function goods(stock: Stock): string {
   const entries = (Object.entries(stock) as [Good, number][]).filter(([, n]) => n > 0)
   if (!entries.length) return 'nothing'
   return entries.map(([g, n]) => `${num(n)} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')
+}
+
+/** Plain words with `backticks` around code, as the scripting topics write them. */
+function withCode(text: string): ReactNode[] {
+  return text.split('`').map((part, i) => (i % 2 === 1 ? <code key={i}>{part}</code> : part))
+}
+
+/** A script value's kind, a script view linking to where the Game API lists its fields. */
+function typeNode(type: ScriptType): ReactNode {
+  if (typeof type === 'string') return type
+  if ('list' in type) return <>list of {typeNode(type.list)}</>
+  return <a href={`#view-${type.view}`}>{type.view}</a>
+}
+
+/** How an API name is written: `me`, `walkTo(x, y)`. */
+const callOf = (n: ApiName) => {
+  const b = (n.resident ?? n.army)!
+  return b.is === 'value' ? b.name : `${b.name}(${b.params.join(', ')})`
+}
+
+/** An API name's description, both where a resident's and an army's differ, and its mark. */
+function apiDescription(n: ApiName): ReactNode {
+  const r = n.resident
+  const a = n.army
+  const text =
+    r && a && r.description !== a.description ? (
+      <>
+        Resident: {withCode(r.description)} Army: {withCode(a.description)}
+      </>
+    ) : (
+      withCode((r ?? a)!.description)
+    )
+  return n.mark ? (
+    <>
+      <em>{n.mark}.</em> {text}
+    </>
+  ) : (
+    text
+  )
+}
+
+/** A table of the Game API's names of one kind: values, queries or actions. */
+function ApiTable({ is }: { is: ApiName['is'] }) {
+  const names = apiNames(false).filter((n) => n.is === is)
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>{is === 'value' ? 'Name' : 'Call'}</th>
+          {is !== 'value' && <th>Cost</th>}
+          <th>{is === 'value' ? 'Holds' : 'Answers'}</th>
+          <th>What it does</th>
+        </tr>
+      </thead>
+      <tbody>
+        {names.map((n) => {
+          const b = (n.resident ?? n.army)!
+          // `me` holds a resident in a resident's script, an army in an army's.
+          const holds =
+            n.resident && n.army && n.is === 'value' && n.name === 'me' ? (
+              <>
+                {typeNode(n.resident.returns)} or {typeNode(n.army.returns)}
+              </>
+            ) : is === 'action' ? (
+              'null, or why not'
+            ) : (
+              typeNode(b.returns)
+            )
+          return (
+            <tr key={n.name}>
+              <td>
+                <code>{callOf(n)}</code>
+              </td>
+              {is !== 'value' && <td>+{num(b.cost)}</td>}
+              <td>{holds}</td>
+              <td>{apiDescription(n)}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
 }
 
 const kindName = (kind: BuildingKind) => BUILDING_NAMES[kind]
@@ -289,6 +381,13 @@ export function Wiki() {
           An unloaded average resident walks a plains tile in {duration(WALK_TICKS_PER_TILE)}.
           Terrain changes how fast they walk and how much food they burn; lakes and sea can't be
           entered. A road is as fast whatever lies beneath it.
+        </p>
+        <p>
+          Residents and carriages step onto any of the eight tiles around, diagonals too. A diagonal
+          step is {num(DIAGONAL_STEP, 2)} times as far, so it takes that much longer on the same
+          ground. It can't squeeze between two corners: both straight tiles beside it must be ones
+          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage)
+          mountain. Two walls touching at a corner close the way like a straight stretch.
         </p>
         <table>
           <thead>
@@ -844,6 +943,80 @@ export function Wiki() {
         </table>
       </Section>
 
+      <Section id="language">
+        <p>
+          Scripts are written in the game's own small language. It reads much like JavaScript, with
+          less of it.
+        </p>
+        {SCRIPT_LANGUAGE.map((rule) => (
+          <div key={rule.title}>
+            <h3>{rule.title}</h3>
+            <p>{withCode(rule.text)}</p>
+            {rule.example && (
+              <pre>
+                <code>{rule.example}</code>
+              </pre>
+            )}
+          </div>
+        ))}
+      </Section>
+
+      <Section id="api">
+        <p>
+          What a script gets from the game. Values are read like names; queries and actions are
+          called. Every call costs one step, and its cost here on top. Queries answer from what you
+          see and have explored, nothing more. An action asks for the order of its name for{' '}
+          <code>me</code>, checked exactly as one from the map, and answers <code>null</code> when
+          asked for, or why not. A script runs as a resident's or as an army's: names marked
+          resident only or army only are only there for one of them, and a default script runs as a
+          resident's.
+        </p>
+        <h3>Values</h3>
+        <ApiTable is="value" />
+        <h3>Queries</h3>
+        <ApiTable is="query" />
+        <h3>Actions</h3>
+        <ApiTable is="action" />
+        <h3>Script views</h3>
+        <p>
+          What a script gets of each kind of thing. Every field listed is always there; one you
+          aren't allowed to see, or that doesn't apply, is <code>null</code>, as its last column
+          says. A script sees no other fields.
+        </p>
+        {(
+          Object.entries(SCRIPT_VIEWS) as [ScriptViewName, (typeof SCRIPT_VIEWS)[ScriptViewName]][]
+        ).map(([name, view]) => (
+          <div key={name} id={`view-${name}`} className="wiki-section">
+            <h4>
+              <code>{name}</code>
+            </h4>
+            <p>{withCode(view.description)}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Holds</th>
+                  <th>What it is</th>
+                  <th>null</th>
+                </tr>
+              </thead>
+              <tbody>
+                {view.fields.map((f) => (
+                  <tr key={f.name}>
+                    <td>
+                      <code>{f.name}</code>
+                    </td>
+                    <td>{typeNode(f.type)}</td>
+                    <td>{withCode(f.description)}</td>
+                    <td>{f.nullWhen ? withCode(f.nullWhen) : 'never'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </Section>
+
       <Section id="scripts">
         <p>
           Scripts run once a tick (a real second) for each resident or army running them. Each
@@ -857,6 +1030,22 @@ export function Wiki() {
           <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
           <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
         </ul>
+      </Section>
+
+      <Section id="examples">
+        <p>
+          The game's default scripts, as they are now: what residents run for a task you give them
+          on the map. Each Player has their own copy to edit in the script editor; here they are to
+          read.
+        </p>
+        {Object.entries(DEFAULT_SCRIPTS).map(([task, s]) => (
+          <div key={task}>
+            <h3>{s.name}</h3>
+            <pre>
+              <code>{s.source}</code>
+            </pre>
+          </div>
+        ))}
       </Section>
     </main>
   )

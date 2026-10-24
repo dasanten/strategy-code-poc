@@ -68,6 +68,9 @@ import {
   isPassableTerrain,
   buildingAt,
   isAt,
+  besideStep,
+  stepLength,
+  tileIndex,
 } from '@csp/shared'
 import { tallyGoods } from './goods-made.js'
 import { refillSource } from './survival.js'
@@ -862,19 +865,21 @@ export const territorySound: Invariant = {
       }
       return control
     }
+    // Made once, not per tile: a territory holds hundreds of thousands of tiles.
+    const fail = (key: string, owner: string, message: string) =>
+      out.push({ invariant: this.name, message: `tile (${key}) ${message}`, entityIds: [owner] })
     let i = 0
     for (const [key, owner] of computeTerritory(world, size).owners) {
-      const fail = (message: string) =>
-        out.push({ invariant: this.name, message: `tile (${key}) ${message}`, entityIds: [owner] })
-      if (!organizations.has(owner)) fail(`belongs to ${owner}, which is no Organization`)
+      if (!organizations.has(owner))
+        fail(key, owner, `belongs to ${owner}, which is no Organization`)
       if (i++ % TERRITORY_CHECK_STRIDE !== 0) continue
       const [x, y] = key.split(',').map(Number) as [number, number]
       const control = controlAtTile(x, y)
       const own = control.get(owner) ?? 0
-      if (own <= 0) fail(`belongs to ${owner}, which projects no control there`)
+      if (own <= 0) fail(key, owner, `belongs to ${owner}, which projects no control there`)
       for (const [other, c] of control) {
         if (other !== owner && c >= own)
-          fail(`belongs to ${owner}, but ${other} is as strong there`)
+          fail(key, owner, `belongs to ${owner}, but ${other} is as strong there`)
       }
     }
     return out
@@ -1363,6 +1368,44 @@ export const climbOrdersSound: Invariant = {
 }
 
 /**
+ * Every step left on a moving order's path (`CONTEXT.md`: Step), from the resident's tile on, goes
+ * onto one of the eight tiles around the one before, onto land they can enter, and a diagonal one
+ * never cuts a corner past land they can't (Lake, Sea, or Mountain for a carriage). So every step
+ * taken is one too. Walls and gates are left out: they may change under a path found earlier, and
+ * the step is checked against them when it is taken (`Walking.resolve`).
+ */
+export const pathsAreSteps: Invariant = {
+  name: 'paths-are-steps',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const { size } = terrain
+    for (const r of world.residents) {
+      const o = r.order
+      if (!o || !('path' in o) || !o.path) continue
+      const driving = o.kind === 'drive' || o.kind === 'haul'
+      const enterable = (t: number) =>
+        driving ? carriageCanEnter(terrain.tiles[t]!) : isPassableTerrain(terrain.tiles[t]!)
+      let [x, y] = [r.x, r.y]
+      const bad = o.path.findIndex(([nx, ny]) => {
+        const ok =
+          stepLength(size, x, y, nx, ny) > 0 &&
+          enterable(tileIndex(size, nx, ny)) &&
+          besideStep(size, x, y, nx, ny).every(enterable)
+        ;[x, y] = [nx, ny]
+        return !ok
+      })
+      if (bad >= 0)
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} has a path whose step ${bad} is no step they can take`,
+          entityIds: [r.id],
+        })
+    }
+    return out
+  },
+}
+
+/**
  * Road orders along a line are sound (`CONTEXT.md`: Road): they have tiles left, at most
  * `ROAD_LINE_MAX_TILES`, each next to the one before; and after a tick one building on a site
  * stands on that road site, on the order's first tile (`resolveBuilding` moves the order on from
@@ -1526,6 +1569,7 @@ export const worldInvariants: Invariant[] = [
   buyOffOrdersDone,
   hqRingsSound,
   roadLineOrdersSound,
+  pathsAreSteps,
   gameDefaultCarriers,
   gameDefaultFetchers,
 ]

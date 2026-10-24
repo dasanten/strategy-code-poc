@@ -39,6 +39,12 @@ The shared language of the game. Domain terms only — no implementation details
   work) on any passable land except Mountain, and it may share a tile with a building, so roads
   can lead through gates. On a road residents and carriages move at road speed whatever the
   terrain beneath, and eat as on Plains. Nobody owns a road; anyone can walk it or tear it down.
+- **Step:** a move onto one of the eight tiles around, straight or diagonal. A diagonal step is
+  √2 (about 1.41) times as far as a straight one, so it takes that much longer on the same
+  ground. A diagonal step can't squeeze between two corners: it is only possible when both
+  straight tiles beside it could be stepped onto as well, so no wall, gate in the way, Lake, Sea
+  or (for a carriage) Mountain may stand on either. Two wall tiles touching at a corner close
+  the way like a straight stretch.
 - No rivers and no water vehicles (for now), so all land is joined: any tile can be reached on
   foot from any other, if only the long way round.
 
@@ -626,6 +632,11 @@ The shared language of the game. Domain terms only — no implementation details
   counts. Default scripts count like any other. NPC cities have no realm budget, only the one
   for each resident. A script sees only what its Player sees: their sight, explored terrain and
   what they last saw (Last seen), told apart from what is in sight now.
+- **Script view:** what a script gets of each kind of thing (a resident, a building, a city, …):
+  a fixed set of fields, the same for every Player and listed in the Wiki. A field the Player
+  isn't allowed to see is always there and `null`, never missing. A script sees no field beyond
+  these. The game may add fields at any time; renaming or removing one tells each Player whose
+  scripts read it in their realm log, naming the field and the scripts.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

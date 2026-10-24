@@ -222,8 +222,17 @@ class Parser {
     for (;;) {
       const { line, column } = expression
       if (this.matchPunctuator('.')) {
+        const { line: propertyLine, column: propertyColumn } = this.peek()
         const property = this.propertyName('a property name after "."')
-        expression = { kind: 'Member', object: expression, property, line, column }
+        expression = {
+          kind: 'Member',
+          object: expression,
+          property,
+          propertyLine,
+          propertyColumn,
+          line,
+          column,
+        }
       } else if (this.matchPunctuator('[')) {
         const index = this.expression()
         this.expectPunctuator(']', 'to close "["')

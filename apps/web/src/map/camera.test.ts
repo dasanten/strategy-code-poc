@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_SCALE,
+  centreBeside,
   chunkToScreen,
   minScale,
   panBy,
@@ -20,6 +21,22 @@ describe('camera', () => {
     expect(screenToTile(cam, view, size, 400, 300)).toEqual([100, 200])
     expect(screenToTile(cam, view, size, 410, 280)).toEqual([101, 198])
     expect(tileToScreen(cam, view, size, 101, 198)).toEqual([410, 280])
+  })
+
+  it('centres a tile in the part of the screen left uncovered', () => {
+    const cam = centreBeside(100, 200, { left: 0, right: 0 }, 10, size)
+    expect(tileToScreen(cam, view, size, 100.5, 200.5)).toEqual([400, 300])
+    // A drawer covers 400 px on the left: the tile shows in the middle of the 400 px beside it.
+    const beside = centreBeside(100, 200, { left: 400, right: 0 }, 10, size)
+    expect(beside.scale).toBe(10)
+    expect(tileToScreen(beside, view, size, 100.5, 200.5)).toEqual([600, 300])
+    // And a card covers 200 px on the right: the middle of 400..600.
+    const between = centreBeside(100, 200, { left: 400, right: 200 }, 10, size)
+    expect(tileToScreen(between, view, size, 100.5, 200.5)).toEqual([500, 300])
+    // Across the west join the camera wraps onto the map.
+    const west = centreBeside(0, 200, { left: 400, right: 0 }, 10, size)
+    expect(west.x).toBeGreaterThan(size - 20)
+    expect(tileToScreen(west, view, size, 0.5, 200.5)).toEqual([600, 300])
   })
 
   it('shows tiles across a join at their nearest copy', () => {

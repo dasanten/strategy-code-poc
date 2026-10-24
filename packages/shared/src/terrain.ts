@@ -38,6 +38,30 @@ export function wrapDelta(a: number, b: number, size: number): number {
   return d > size / 2 ? d - size : d
 }
 
+/** How far a diagonal step is next to a straight one (`CONTEXT.md`: Step). */
+export const DIAGONAL_STEP = Math.SQRT2
+
+/**
+ * How far the step from (ax, ay) to (bx, by) is, the short way round (`CONTEXT.md`: Step): 1
+ * straight, `DIAGONAL_STEP` diagonal, and 0 when (bx, by) isn't one of the eight tiles around.
+ */
+export function stepLength(size: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = Math.abs(wrapDelta(ax, bx, size))
+  const dy = Math.abs(wrapDelta(ay, by, size))
+  if (dx > 1 || dy > 1 || dx + dy === 0) return 0
+  return dx + dy === 2 ? DIAGONAL_STEP : 1
+}
+
+/**
+ * The two straight tiles beside the diagonal step from (ax, ay) to (bx, by), as tile indices:
+ * the step can't squeeze between two corners, so both must be steppable too (`CONTEXT.md`: Step).
+ * None for a straight step.
+ */
+export function besideStep(size: number, ax: number, ay: number, bx: number, by: number): number[] {
+  if (stepLength(size, ax, ay, bx, by) !== DIAGONAL_STEP) return []
+  return [tileIndex(size, bx, ay), tileIndex(size, ax, by)]
+}
+
 /** Straight-line distance between two tiles, the short way round. */
 export function wrapDistance(
   size: number,
@@ -66,6 +90,11 @@ export function isPassableTerrain(t: number): boolean {
     t === Terrain.Mountain ||
     t === Terrain.Road
   )
+}
+
+/** A road goes on any passable land but Mountain (`CONTEXT.md`: Road). */
+export function roadMayGoOn(t: number): boolean {
+  return isPassableTerrain(t) && t !== Terrain.Mountain
 }
 
 /**

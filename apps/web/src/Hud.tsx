@@ -244,6 +244,18 @@ export function Drawer({
   )
 }
 
+/**
+ * How many pixels of the map the open drawer covers from the left and the selection card from
+ * the right, 0 for each that isn't showing. The map fills the window, so screen edges measure it.
+ */
+export function mapCovered(): { left: number; right: number } {
+  const card = document.querySelector('.game-selection')?.getBoundingClientRect()
+  return {
+    left: document.querySelector('.hud-drawer:not([hidden])')?.getBoundingClientRect().right ?? 0,
+    right: card ? window.innerWidth - card.left : 0,
+  }
+}
+
 /** Closes the open drawer on Escape, unless the Player is typing somewhere. */
 export function useEscapeCloses(open: OpenDrawer, close: () => void) {
   useEffect(() => {

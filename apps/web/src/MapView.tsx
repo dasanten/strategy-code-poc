@@ -19,6 +19,7 @@ import {
 import {
   CLOSE_SCALE,
   zoomTier,
+  centreBeside,
   chunkToScreen,
   clampScale,
   panBy,
@@ -28,6 +29,7 @@ import {
   visibleTiles,
   zoomAt,
   type Camera,
+  type Covered,
   type Size,
 } from './map/camera.js'
 import { ChunkStore } from './map/chunks.js'
@@ -152,9 +154,10 @@ export function MapView({
   onTerrainLoaded?: (terrainAt: (x: number, y: number) => number | undefined) => void
   /**
    * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
-   * at (the zoom in place if none); a new object each time.
+   * at (the zoom in place if none); a new object each time. `cover` is how much of the map the
+   * open drawer and the selection card cover, to centre the tile between them.
    */
-  focus?: { x: number; y: number; scale?: number }
+  focus?: { x: number; y: number; scale?: number; cover?: Covered }
   /** Where terrain chunks load from; the Player's explored terrain by default. */
   terrainPath?: (cx: number, cy: number) => string
   /** Where the view starts, instead of the home city at the starting zoom. */
@@ -191,7 +194,7 @@ export function MapView({
   const controlsRef = useRef<{
     zoom(factor: number): void
     centre(): void
-    goTo(x: number, y: number, scale?: number): void
+    goTo(x: number, y: number, scale?: number, cover?: Covered): void
   } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
@@ -206,7 +209,7 @@ export function MapView({
   }, [mode])
 
   useEffect(() => {
-    if (focus) controlsRef.current?.goTo(focus.x, focus.y, focus.scale)
+    if (focus) controlsRef.current?.goTo(focus.x, focus.y, focus.scale, focus.cover)
   }, [focus])
 
   // The Region map changes once a game hour, and where explored terrain grows.
@@ -602,12 +605,16 @@ export function MapView({
         setCam(zoomAt(cam, view, mapSize, factor, view.width / 2, view.height / 2))
       },
       centre: () => setCam({ ...cam, ...homeCentre(worldRef.current) }),
-      goTo: (x, y, scale) =>
-        setCam({
-          x: x + 0.5,
-          y: y + 0.5,
-          scale: scale === undefined ? cam.scale : clampScale(scale, mapSize, size()),
-        }),
+      goTo: (x, y, scale, cover = { left: 0, right: 0 }) =>
+        setCam(
+          centreBeside(
+            x,
+            y,
+            cover,
+            scale === undefined ? cam.scale : clampScale(scale, mapSize, size()),
+            mapSize,
+          ),
+        ),
     }
 
     void app.init({ resizeTo: host, background: VOID_COLOR, antialias: true }).then(() => {
@@ -910,16 +917,22 @@ function drawStructures(
       tile * (1 - 2 * inset),
     ] as const
   }
+  // A fill or stroke with nothing drawn since the last one paints the last one's shapes again
+  // (Pixi), so each below only runs when it has shapes of its own.
   // Each city's area, faintly, from the buildings in sight (`CONTEXT.md`: City area).
   const onScreen = ([sx, sy]: readonly number[]) =>
     sx! > -tile && sy! > -tile && sx! < view.width && sy! < view.height
   for (const c of cities) {
+    let any = false
     for (const key of cityAreaTiles(world, c, size)) {
       const [x, y] = key.split(',').map(Number) as [number, number]
       const b = box(x, y)
-      if (onScreen(b)) under.rect(...b)
+      if (onScreen(b)) {
+        under.rect(...b)
+        any = true
+      }
     }
-    under.fill({ color: CITY_AREA_COLOR, alpha: 0.18 * fade })
+    if (any) under.fill({ color: CITY_AREA_COLOR, alpha: 0.18 * fade })
   }
   // Roads under the buildings, as a wide light band through the middle of the tile joined to the
   // roads next to it (`CONTEXT.md`: Road, ADR 0008); a road site, and the step onto it, are faint.
@@ -932,12 +945,17 @@ function drawStructures(
     sx! > -tile && sy! > -tile && sx! < view.width + tile && sy! < view.height + tile
   for (const site of [false, true]) {
     const style = { color: ROAD_COLOR, alpha: (site ? 0.4 : 1) * fade }
+    let dots = false
     for (const r of roads.values()) {
       const c = centre(cam, view, size, r)
-      if (!!r.site === site && inSight(c)) under.circle(c[0], c[1], w / 2)
+      if (!!r.site === site && inSight(c)) {
+        under.circle(c[0], c[1], w / 2)
+        dots = true
+      }
     }
-    under.fill(style)
+    if (dots) under.fill(style)
     // Each join once, from the road to its right or below; faint if either end is a site.
+    let joins = false
     for (const r of roads.values()) {
       const [sx, sy] = centre(cam, view, size, r)
       if (!inSight([sx, sy])) continue
@@ -948,10 +966,11 @@ function drawStructures(
         const next = roadAt(r.x + dx, r.y + dy)
         if (next && !!(r.site || next.site) === site) {
           under.moveTo(sx, sy).lineTo(sx + dx * tile, sy + dy * tile)
+          joins = true
         }
       }
     }
-    under.stroke({ ...style, width: w })
+    if (joins) under.stroke({ ...style, width: w })
   }
 
   const cityById = new Map(cities.map((c) => [c.id, c]))
@@ -985,10 +1004,10 @@ function drawStructures(
   const stroke = (width: number, color: number, alpha: number, segments: number[][]) => {
     const dots = segments.filter(([x0, y0, x1, y1]) => x0 === x1 && y0 === y1)
     for (const [x, y] of dots) under.rect(x! - width / 2, y! - width / 2, width, width)
-    under.fill({ color, alpha })
-    for (const [x0, y0, x1, y1] of segments)
-      if (x0 !== x1 || y0 !== y1) under.moveTo(x0!, y0!).lineTo(x1!, y1!)
-    under.stroke({ width, color, alpha, cap: 'square' })
+    if (dots.length > 0) under.fill({ color, alpha })
+    const joins = segments.filter(([x0, y0, x1, y1]) => x0 !== x1 || y0 !== y1)
+    for (const [x0, y0, x1, y1] of joins) under.moveTo(x0!, y0!).lineTo(x1!, y1!)
+    if (joins.length > 0) under.stroke({ width, color, alpha, cap: 'square' })
   }
   for (const [key, segments] of lines)
     stroke(edge, 0x0e1419, Number(key.split(',')[1]) * 0.85, segments)
