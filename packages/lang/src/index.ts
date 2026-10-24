@@ -4,7 +4,7 @@ import { ScriptSyntaxError } from './lexer.js'
 import { parse } from './parser.js'
 
 export type * from './ast.js'
-export { ScriptSyntaxError, tokenize, type Token } from './lexer.js'
+export { KEYWORDS, type Keyword, ScriptSyntaxError, tokenize, type Token } from './lexer.js'
 export { MAX_NESTING, parse } from './parser.js'
 export {
   MAX_EVALUATION_DEPTH,
