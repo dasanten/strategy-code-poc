@@ -15,7 +15,7 @@ function shape(node: unknown): unknown {
   if (node && typeof node === 'object') {
     return Object.fromEntries(
       Object.entries(node)
-        .filter(([key]) => key !== 'line' && key !== 'column')
+        .filter(([key]) => !['line', 'column', 'propertyLine', 'propertyColumn'].includes(key))
         .map(([key, value]) => [key, shape(value)]),
     )
   }

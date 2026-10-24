@@ -96,6 +96,18 @@ Backups go to the `world-backups` volume before every start and daily, 14 days k
 back, deploy the previous image tag (`IMAGE_TAG=<tag> docker compose up -d`) and, if a migration
 already ran, stop the server and copy the `-start` backup over `/data/world.db`.
 
+Before scripts see exactly their script views (ADR 0011), list the fields Players' active scripts
+read that the views don't declare, with each script and Player. It only reads, so it is safe while
+the server runs; the image must be one with the command (Epic 24 released):
+
+```sh
+docker compose exec server node dist/cli/check-fields.js
+```
+
+Locally: `pnpm --filter @csp/server check:fields` (reads `DB_PATH`, `data/world.db` by default).
+It finds reads from values the checker is sure of (`me`, a query's result, a `for … of` over one,
+a `let` holding one); a read through `memory` or a function's parameters isn't found.
+
 ## Status
 
 - Accounts, the tick loop, persistence, per-Player sync and deploy work end to end.

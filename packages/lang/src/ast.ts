@@ -171,6 +171,9 @@ export interface MemberExpression extends Position {
   kind: 'Member'
   object: Expression
   property: string
+  /** Where the property name starts, so a check can point at it. */
+  propertyLine: number
+  propertyColumn: number
 }
 
 /** `object[index]` */
