@@ -169,6 +169,7 @@ import {
   wikiResident,
   type PricedGood,
 } from './wiki-view.js'
+import { SCRIPT_LANGUAGE } from './wiki-scripting.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
 export const WIKI_TOPICS = [
@@ -183,6 +184,7 @@ export const WIKI_TOPICS = [
   { id: 'standing', title: 'Standing & reactions' },
   { id: 'combat', title: 'Combat & walls' },
   { id: 'territory', title: 'Territory' },
+  { id: 'language', title: 'Script language' },
   { id: 'scripts', title: 'Scripting budgets' },
 ] as const
 
@@ -205,6 +207,11 @@ function goods(stock: Stock): string {
   const entries = (Object.entries(stock) as [Good, number][]).filter(([, n]) => n > 0)
   if (!entries.length) return 'nothing'
   return entries.map(([g, n]) => `${num(n)} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')
+}
+
+/** Plain words with `backticks` around code, as the scripting topics write them. */
+function withCode(text: string): ReactNode[] {
+  return text.split('`').map((part, i) => (i % 2 === 1 ? <code key={i}>{part}</code> : part))
 }
 
 const kindName = (kind: BuildingKind) => BUILDING_NAMES[kind]
@@ -842,6 +849,24 @@ export function Wiki() {
             ))}
           </tbody>
         </table>
+      </Section>
+
+      <Section id="language">
+        <p>
+          Scripts are written in the game's own small language. It reads much like JavaScript, with
+          less of it.
+        </p>
+        {SCRIPT_LANGUAGE.map((rule) => (
+          <div key={rule.title}>
+            <h3>{rule.title}</h3>
+            <p>{withCode(rule.text)}</p>
+            {rule.example && (
+              <pre>
+                <code>{rule.example}</code>
+              </pre>
+            )}
+          </div>
+        ))}
       </Section>
 
       <Section id="scripts">
