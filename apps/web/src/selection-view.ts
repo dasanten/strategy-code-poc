@@ -17,6 +17,7 @@ import {
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
+  buildProblem,
   canWork,
   nodeCorner,
   stockWeight,
@@ -78,6 +79,7 @@ export type ActionId =
   | 'haul'
   | 'build'
   | 'roadTo'
+  | 'wallTo'
   | 'work'
   | 'tearDown'
   | 'goods'
@@ -100,6 +102,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   haul: 'H',
   build: 'B',
   roadTo: 'R',
+  wallTo: 'Q',
   work: 'E',
   tearDown: 'T',
   goods: 'G',
@@ -139,7 +142,6 @@ export interface ResidentHere {
   busy: boolean
   /** They belong to a city, so they can pair. */
   inCity: boolean
-  carrying: boolean
   carriage?: Carriage
   pile?: Pile
   storage?: Building
@@ -152,7 +154,7 @@ export interface ResidentHere {
   /** Walls and gates of other realms' cities, or of none, in sight. */
   wallsInSight: number
   /** What the map is waiting for a tile for. */
-  picking: false | 'walk' | 'drive' | 'haul' | 'road'
+  picking: false | 'walk' | 'drive' | 'haul' | 'road' | 'wall'
   /**
    * For one of the Player's own residents who isn't their Leader: why the Leader can't hand the
    * realm over to them now (`CONTEXT.md`: Leader handover), undefined when they can. Absent for
@@ -207,10 +209,11 @@ export function residentActions(h: ResidentHere): CardAction[] {
     }),
   )
   add(row('roadTo', '', { ...picks('road', 'Build road to'), ...child }))
+  add(row('wallTo', '', { ...picks('wall', 'Build wall to'), ...child }))
   const torn = [h.building, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
   if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
-  const goodsHere = h.pile || h.storage || site || h.carriage
-  if (h.carrying || goodsHere) add(row('goods', 'Goods…', { opens: true }))
+  // Always there, so the Player sees the carry capacity even with nothing to move.
+  add(row('goods', 'Goods…', { opens: true }))
   if (h.adult && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
   if (h.wallsInSight > 0) add(row('walls', 'Break or climb a wall…', { opens: true }))
@@ -411,6 +414,28 @@ export function nodeFit(
     }
   }
   return nodeCorner({ ...seen, nodes }, terrain, node)
+}
+
+/**
+ * Why a building of `kind` can't be laid out from (x, y), its footprint running east and south, as
+ * far as the Player knows (`buildProblem`, `CONTEXT.md`: Where buildings go): the buildings and
+ * cities they see, the nodes and terrain they have explored. The server checks again when the
+ * order arrives.
+ */
+export function buildHereProblem(
+  kind: BuildingKind,
+  x: number,
+  y: number,
+  seen: { buildings: Building[]; cities: City[] },
+  nodeAt: (x: number, y: number) => KnownNode | undefined,
+  terrain: TerrainLookup,
+): string | undefined {
+  const nodes: KnownNode[] = []
+  for (const [tx, ty] of footprintTiles({ kind, x, y }, terrain.size)) {
+    const n = nodeAt(tx, ty)
+    if (n) nodes.push(n)
+  }
+  return buildProblem({ ...seen, nodes }, x, y, kind, terrain)
 }
 
 /** A node's kind in words: "forest", "iron ore". */

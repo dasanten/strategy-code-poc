@@ -250,7 +250,7 @@ describe('build order', () => {
       return a.type === 'rejected' ? a.reason : 'ack'
     }
     expect(reject(buildOrder('lumberCamp'), stranger)).toBe('not one of your residents')
-    expect(reject(buildOrder('storage'))).toBe('that can’t be built')
+    expect(reject(buildOrder('warehouse'))).toBe('that can’t be built')
     expect(reject(buildOrder('quarry'))).toBe(
       'a quarry goes with one tile on a fitting resource node',
     )

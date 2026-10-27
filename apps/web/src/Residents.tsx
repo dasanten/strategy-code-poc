@@ -1,7 +1,9 @@
 import {
   BUILD_MATERIALS,
   BUILDING_PURPOSE,
+  LINE_BUILDING,
   ROAD_LINE_MAX_TILES,
+  isLineOrder,
   BUILD_WORK,
   BUILDABLE,
   BATCHES_PER_DAY,
@@ -10,18 +12,18 @@ import {
   CARRYING_TICKS,
   GOODS,
   HAUL_KEEP_FOOD,
-  NODE_WORKPLACE,
+  buildMenu,
   MAX_HEALTH,
   MAX_HUNGER,
   MAX_WORKERS,
   NODE_GOOD,
-  PROCESSING,
   RECIPES,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
   STAT_NAMES,
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
+  TICKS_PER_GAME_HOUR,
   TICKS_PER_GAME_YEAR,
   TRAINED_CAP_SHARE,
   ageInYears,
@@ -57,7 +59,7 @@ import {
   type SeenResident,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import type { ResidentGroup } from './residents-view.js'
+import { carryLine, type CardSections, type ResidentGroup } from './residents-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -119,11 +121,21 @@ function meterClass(share: number): string {
 
 const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
 
+/** Work in ticks as a span of game time: "2 game days", "1.5 game hours". */
+const workSpan = (ticks: number) => {
+  const [n, unit] =
+    ticks >= TICKS_PER_GAME_DAY
+      ? [ticks / TICKS_PER_GAME_DAY, 'game day']
+      : [ticks / TICKS_PER_GAME_HOUR, 'game hour']
+  const rounded = Math.round(n * 10) / 10
+  return `${rounded} ${unit}${rounded === 1 ? '' : 's'}`
+}
+
 /**
  * What the map is waiting for a tile for: to walk or drive there, a haul route's other stop, or
  * the far end of a road along a line.
  */
-export type Picking = false | 'walk' | 'drive' | 'haul' | 'road'
+export type Picking = false | 'walk' | 'drive' | 'haul' | 'road' | 'wall'
 
 /** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
 export interface HaulSetup {
@@ -228,12 +240,13 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
     return o.side === 'buy' ? 'Buying at a warehouse' : 'Selling at a warehouse'
   if (o?.kind === 'attack') return o.path ? 'Going after their target' : 'Fighting'
   if (o?.kind === 'climb') return `Climbing a wall · ${pct(o.progress)}`
-  if (o?.kind === 'roadLine') {
+  if (isLineOrder(o)) {
     const [x, y] = o.tiles[0]!
-    const left = `${o.tiles.length} road tile${o.tiles.length === 1 ? '' : 's'} to go`
+    const what = LINE_BUILDING[o.kind]
+    const left = `${o.tiles.length} ${what} tile${o.tiles.length === 1 ? '' : 's'} to go`
     return o.phase === 'walking'
-      ? `Walking to lay road at ${x}, ${y} · ${left}`
-      : `Building road at ${x}, ${y} · ${left}`
+      ? `Walking to lay ${what} at ${x}, ${y} · ${left}`
+      : `Building ${what} at ${x}, ${y} · ${left}`
   }
   return 'Idle'
 }
@@ -306,7 +319,9 @@ export function ResidentsList({
                       style={{ width: pct(r.hunger / MAX_HUNGER) }}
                     />
                   </span>
-                  <span className="mono">{kg(stockWeight(r.carried))}</span>
+                  <span className="mono">
+                    {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
+                  </span>
                 </button>
               ))}
             </div>
@@ -338,6 +353,7 @@ export function ResidentCard({
   road,
   node,
   onBuild,
+  buildProblem,
   workers,
   holders,
   realmId,
@@ -354,6 +370,7 @@ export function ResidentCard({
   onDriveTo,
   onHaulTo,
   onRoadTo,
+  onWallTo,
   onStop,
   scripts,
   onRunScript,
@@ -364,6 +381,8 @@ export function ResidentCard({
   rename,
   onRename,
   onClose,
+  sections,
+  onSections,
 }: {
   resident: Resident
   leaderId: string
@@ -381,6 +400,8 @@ export function ResidentCard({
   onHaulTo: (setup: HaulSetup) => void
   /** Starts (or cancels) picking the far end of a road to build along a line from here. */
   onRoadTo: () => void
+  /** Starts (or cancels) picking the far end of a wall to build along a line from here. */
+  onWallTo: () => void
   /** Orders the resident to stop what they are doing. */
   onStop: () => void
   /** The Player's script library, to pick a script to run. */
@@ -407,6 +428,8 @@ export function ResidentCard({
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
   onBuild: (kind: BuildingKind) => void
+  /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
+  buildProblem?: (kind: BuildingKind) => string | undefined
   /** Residents in sight working the building on the resident's tile. */
   workers: number
   /** Realms whose residents in sight work it: who holds it (`CONTEXT.md`: Holding a workplace). */
@@ -449,9 +472,11 @@ export function ResidentCard({
   onRename: (name: string, realmName?: string) => void
   /** Closes the card. */
   onClose: () => void
+  /** The open sections, kept by the caller so they stay open from one selected unit to the next. */
+  sections: CardSections<ActionId>
+  onSections: (sections: CardSections<ActionId>) => void
 }) {
-  // The panel an action opened; the card is keyed by resident, so it starts closed for each.
-  const [open, setOpen] = useState<ActionId>()
+  const setPanel = (panel: ActionId | undefined) => onSections({ ...sections, panel })
   const age = Math.floor(ageInYears(r, tick))
   const skills = (Object.keys(SKILL_LABELS) as SkillName[]).filter((s) => (r.skills[s] ?? 0) > 0)
   const carried = goodsIn(r.carried)
@@ -471,7 +496,6 @@ export function ResidentCard({
     adult: !child,
     busy: !!(r.order || r.script),
     inCity: r.cityId !== null,
-    carrying: carried.length > 0,
     carriage,
     pile,
     storage,
@@ -484,12 +508,13 @@ export function ResidentCard({
     makeLeader,
     renamable: !!rename,
   })
-  const shown = actions.some((a) => a.id === open) ? open : undefined
+  const shown = actions.some((a) => a.id === sections.panel) ? sections.panel : undefined
   const act = (a: CardAction) => {
-    if (a.opens) return setOpen((now) => (now === a.id ? undefined : a.id))
+    if (a.opens) return setPanel(shown === a.id ? undefined : a.id)
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
     if (a.id === 'roadTo') onRoadTo()
+    if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
   }
   return (
@@ -553,6 +578,7 @@ export function ResidentCard({
                 tick={tick}
                 building={building}
                 node={node}
+                buildProblem={buildProblem}
                 onBuild={onBuild}
               />
               <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
@@ -570,7 +596,7 @@ export function ResidentCard({
                 <div className="panel-head">
                   <h3>Carrying</h3>
                   <span className="mono small">
-                    {kg(stockWeight(r.carried))} / {kg(carryCapacity(r, tick))}
+                    {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
                   </span>
                 </div>
                 {carried.length === 0 && (
@@ -697,13 +723,13 @@ export function ResidentCard({
                   className="primary"
                   disabled={!!makeLeader.problem}
                   onClick={() => {
-                    setOpen(undefined)
+                    setPanel(undefined)
                     onMakeLeader()
                   }}
                 >
                   Make {r.name} Leader
                 </button>
-                <button type="button" onClick={() => setOpen(undefined)}>
+                <button type="button" onClick={() => setPanel(undefined)}>
                   Cancel
                 </button>
               </div>
@@ -716,7 +742,7 @@ export function ResidentCard({
               resident={r}
               needsRealmName={rename.needsRealmName}
               onRename={(name, realmName) => {
-                setOpen(undefined)
+                setPanel(undefined)
                 onRename(name, realmName)
               }}
             />
@@ -724,8 +750,16 @@ export function ResidentCard({
         </div>
       )}
 
-      <details className="sel-details">
-        <summary>Stats and skills</summary>
+      <details className="sel-details" open={sections.stats}>
+        <summary
+          onClick={(e) => {
+            // Opened and closed only through the kept sections, never by the browser alone.
+            e.preventDefault()
+            onSections({ ...sections, stats: !sections.stats })
+          }}
+        >
+          Stats and skills
+        </summary>
         <section className="inspector-block" aria-label="Stats">
           <div className="panel-head">
             <h3>Stats</h3>
@@ -772,6 +806,7 @@ const PICKING_KEYS: Record<Exclude<Picking, false>, string> = {
   drive: ACTION_KEYS.drive,
   haul: 'Pick the other stop',
   road: ACTION_KEYS.roadTo,
+  wall: ACTION_KEYS.wallTo,
 }
 
 /** What picking a tile does, said while the map waits for it. */
@@ -779,7 +814,8 @@ const PICKING_HINTS: Record<Exclude<Picking, false>, string> = {
   walk: 'Walks there.',
   drive: 'Drives the carriage there.',
   haul: 'The other stop of the haul route.',
-  road: `Builds road from here to there, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the stone carried; without more, the resident waits on the next site until someone delivers it.`,
+  road: `Builds road from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the stone carried; without more, the resident waits on the next site until someone delivers it.`,
+  wall: `Builds wall from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the wood carried, past tiles with a wall or gate; without more, the resident waits on the next site until someone delivers it.`,
 }
 
 /**
@@ -866,20 +902,23 @@ function HaulBlock({
 
 /**
  * Building on the resident's tile (`CONTEXT.md`: Building): on a resource node with nothing on it,
- * build its workplace; on any other empty tile, a stable (on Plains only);
- * on a construction site, see what it still needs and help build it.
+ * build its workplace; on any other empty tile, whatever goes off a node (`buildMenu`), saying why
+ * a kind can't go here; on a construction site, see what it still needs and help build it.
  */
 function BuildBlock({
   resident,
   tick,
   building,
   node,
+  buildProblem = () => undefined,
   onBuild,
 }: {
   resident: Resident
   tick: number
   building: Building | undefined
   node: KnownNode | undefined
+  /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
+  buildProblem?: (kind: BuildingKind) => string | undefined
   onBuild: (kind: BuildingKind) => void
 }) {
   const adult = canWork(resident, tick)
@@ -922,11 +961,9 @@ function BuildBlock({
     )
   }
   if (!building) {
-    // On a node its workplace; anywhere else a farm or a stable (the server allows them on Plains
-    // only), a house (in a city's area), a smelter, a mint or a smithy (not on Mountain).
-    const kinds: BuildingKind[] = node
-      ? [NODE_WORKPLACE[node.kind]]
-      : ['farm', 'house', 'stable', ...PROCESSING]
+    // On a node its workplace; anywhere else every kind that goes off a node. One that can't go
+    // here says why rather than being left out.
+    const kinds = buildMenu(node)
     return (
       <section className="inspector-block" aria-label="Build">
         <div className="panel-head">
@@ -937,7 +974,7 @@ function BuildBlock({
         </div>
         {kinds.map((kind) => {
           const materials = goodsIn(BUILD_MATERIALS[kind])
-          const days = (BUILD_WORK[kind] ?? 0) / TICKS_PER_GAME_DAY
+          const problem = buildProblem(kind)
           return (
             <div key={kind}>
               <p className="muted small">
@@ -947,18 +984,19 @@ function BuildBlock({
                   : materials
                       .map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`)
                       .join(', ')}{' '}
-                and about {days} game days of one resident’s work.
+                and about {workSpan(BUILD_WORK[kind] ?? 0)} of one resident’s work.
               </p>
               <div className="order-buttons">
                 <button
                   type="button"
                   className="primary"
-                  disabled={!adult}
+                  disabled={!adult || problem !== undefined}
                   onClick={() => onBuild(kind)}
                 >
                   Build {BUILDING_NAMES[kind].toLowerCase()}
                 </button>
               </div>
+              {problem && <p className="muted small">Not here: {problem}.</p>}
             </div>
           )
         })}
@@ -996,7 +1034,6 @@ function RoadBlock({
   }
   if (road) return null
   const materials = goodsIn(BUILD_MATERIALS.road)
-  const days = (BUILD_WORK.road ?? 0) / TICKS_PER_GAME_DAY
   return (
     <section className="inspector-block" aria-label="Road">
       <div className="panel-head">
@@ -1005,7 +1042,7 @@ function RoadBlock({
       <p className="muted small">
         {BUILDING_PURPOSE.road} Needs{' '}
         {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
-        {days} game days of one resident’s work.
+        {workSpan(BUILD_WORK.road ?? 0)} of one resident’s work.
       </p>
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>

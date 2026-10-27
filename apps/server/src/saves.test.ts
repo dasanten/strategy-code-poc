@@ -128,7 +128,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(40)
+    expect(WORLD_FORMAT_VERSION).toBe(41)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -142,6 +142,21 @@ describe('world saves', () => {
     const migrated = migrateWorld(old, 39, { terrain: smallTerrain() })
     expect(migrated.lastSeen).toEqual({})
     expect(migrated.buildings).toEqual(world.buildings)
+  })
+
+  it('keeps road orders along a line as they are (migration 40 → 41)', () => {
+    const { world } = worldWithCity()
+    const r = world.residents[0]!
+    r.order = {
+      kind: 'roadLine',
+      tiles: [[r.x, r.y]],
+      phase: 'walking',
+      path: null,
+      progress: 0,
+      siteId: null,
+    }
+    const migrated = migrateWorld(structuredClone(world), 40, { terrain: smallTerrain() })
+    expect(migrated).toEqual(world)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

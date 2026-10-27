@@ -1,6 +1,6 @@
 import type { ContractView, Diplomacy } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { groupResidents, type ResidentGroup } from './residents-view.js'
+import { carryLine, groupResidents, type ResidentGroup } from './residents-view.js'
 
 const r = (id: string, cityId: string | null) => ({ id, cityId })
 const cities = [
@@ -70,5 +70,13 @@ describe('Residents drawer groups', () => {
 
   it('takes a resident of a city that is not the Player’s as homeless', () => {
     expect(shape(groupResidents([r('a', 'x')], options))).toEqual([['Homeless', ['a']]])
+  })
+})
+
+describe('Carry line', () => {
+  it('reads carried weight over carry capacity', () => {
+    expect(carryLine(12, 30)).toBe('12 / 30 kg')
+    expect(carryLine(0, 28)).toBe('0 / 28 kg')
+    expect(carryLine(1.25, 30.04)).toBe('1.3 / 30 kg')
   })
 })
