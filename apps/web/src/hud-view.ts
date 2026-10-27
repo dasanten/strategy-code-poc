@@ -69,3 +69,17 @@ export function keyGoods(
   }
   return totals
 }
+
+/** How wide, in pixels, the Player can drag a drawer (the wide script drawer keeps its own). */
+export const DRAWER_WIDTH = { min: 280, max: 640, initial: 380 } as const
+
+/** A drawer width the Player dragged to or the browser remembered, kept within the limits. */
+export function drawerWidth(wanted: number): number {
+  if (!Number.isFinite(wanted)) return DRAWER_WIDTH.initial
+  return Math.round(Math.min(DRAWER_WIDTH.max, Math.max(DRAWER_WIDTH.min, wanted)))
+}
+
+/** The width the browser remembered, or the initial one when it has none (or nonsense). */
+export function rememberedDrawerWidth(stored: string | null): number {
+  return stored === null ? DRAWER_WIDTH.initial : drawerWidth(Number.parseFloat(stored))
+}

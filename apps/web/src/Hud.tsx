@@ -1,9 +1,12 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { formatGameTime } from '@csp/shared'
 import {
   DRAWERS,
+  DRAWER_WIDTH,
   KEY_GOODS,
+  drawerWidth,
   isWide,
+  rememberedDrawerWidth,
   type DrawerId,
   type KeyGood,
   type OpenDrawer,
@@ -241,6 +244,90 @@ export function Drawer({
       </div>
       {children}
     </section>
+  )
+}
+
+/** Where the browser remembers how wide the Player dragged the drawers. */
+const WIDTH_KEY = 'csp.drawerWidth'
+
+function rememberedWidth(): number {
+  try {
+    return rememberedDrawerWidth(localStorage.getItem(WIDTH_KEY))
+  } catch {
+    return DRAWER_WIDTH.initial
+  }
+}
+
+function rememberWidth(width: number) {
+  try {
+    localStorage.setItem(WIDTH_KEY, String(width))
+  } catch {
+    // Without storage it just isn't remembered.
+  }
+}
+
+/** How far one arrow key press moves the drawer's edge. */
+const KEY_STEP = 16
+
+/**
+ * The drag handle on the open drawer's right edge: it sets every (not wide) drawer's width, as
+ * `--drawer-w` on the page, within `DRAWER_WIDTH`. The width is remembered in the browser; a
+ * double click goes back to the initial one. It keeps its own state, so a drag re-renders only it.
+ */
+export function DrawerEdge({ open }: { open: OpenDrawer }) {
+  const [width, setWidth] = useState(rememberedWidth)
+  const dragging = useRef(false)
+
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty('--drawer-w', `${width}px`)
+  }, [width])
+
+  if (!open || isWide(open)) return null
+  const settle = (to: number) => {
+    setWidth(to)
+    rememberWidth(to)
+  }
+  // The rail fixes the drawer's left edge; the pointer is where its right edge goes.
+  const toPointer = (x: number) =>
+    drawerWidth(
+      x - (document.querySelector('.hud-drawer:not([hidden])')?.getBoundingClientRect().left ?? 0),
+    )
+  return (
+    <div
+      className="hud-drawer-edge"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Drawer width"
+      aria-valuemin={DRAWER_WIDTH.min}
+      aria-valuemax={DRAWER_WIDTH.max}
+      aria-valuenow={width}
+      tabIndex={0}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        e.preventDefault()
+        e.currentTarget.setPointerCapture(e.pointerId)
+        dragging.current = true
+      }}
+      onPointerMove={(e) => {
+        if (dragging.current) setWidth(toPointer(e.clientX))
+      }}
+      onPointerUp={(e) => {
+        if (!dragging.current) return
+        dragging.current = false
+        settle(toPointer(e.clientX))
+      }}
+      onPointerCancel={() => {
+        dragging.current = false
+        rememberWidth(width)
+      }}
+      onDoubleClick={() => settle(DRAWER_WIDTH.initial)}
+      onKeyDown={(e) => {
+        const step = e.key === 'ArrowLeft' ? -KEY_STEP : e.key === 'ArrowRight' ? KEY_STEP : 0
+        if (!step) return
+        e.preventDefault()
+        settle(drawerWidth(width + step))
+      }}
+    />
   )
 }
 
