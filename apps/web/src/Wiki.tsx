@@ -174,11 +174,13 @@ import {
   wikiResident,
   type PricedGood,
 } from './wiki-view.js'
+import { GROUP_SLOTS } from './saved-groups.js'
 import { SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
 export const WIKI_TOPICS = [
+  { id: 'controls', title: 'Controls' },
   { id: 'time', title: 'Time & map' },
   { id: 'terrain', title: 'Terrain & walking' },
   { id: 'residents', title: 'Residents & stats' },
@@ -360,6 +362,48 @@ export function Wiki() {
           </ol>
         </nav>
       </header>
+
+      <Section id="controls">
+        <p>
+          Click one of your residents on the map to pick them and open their card. Each action on
+          the card shows its letter key; press it to run the action. Escape drops what is picked.
+        </p>
+        <p>
+          To pick several at once, drag a box around them with Shift held (or after the Box select
+          button), or Shift-click residents to add them or take them out.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Keys</th>
+              <th>What they do</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <kbd>Ctrl</kbd>+<kbd>{GROUP_SLOTS[0]}</kbd>–<kbd>{GROUP_SLOTS.at(-1)}</kbd>
+              </td>
+              <td>
+                Save the picked residents as that number's group (with nobody picked, forget it)
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <kbd>{GROUP_SLOTS[0]}</kbd>–<kbd>{GROUP_SLOTS.at(-1)}</kbd>
+              </td>
+              <td>Pick that group again; dead residents and ones no longer yours drop out of it</td>
+            </tr>
+            <tr>
+              <td>
+                <kbd>{GROUP_SLOTS[0]}</kbd>–<kbd>{GROUP_SLOTS.at(-1)}</kbd> twice
+              </td>
+              <td>Pick the group and centre the map on it</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>Groups are kept in this browser, for each realm; another browser starts without them.</p>
+      </Section>
 
       <Section id="time">
         <p>

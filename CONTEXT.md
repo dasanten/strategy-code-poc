@@ -641,6 +641,11 @@ The shared language of the game. Domain terms only — no implementation details
   isn't allowed to see is always there and `null`, never missing. A script sees no field beyond
   these. The game may add fields at any time; renaming or removing one tells each Player whose
   scripts read it in their realm log, naming the field and the scripts.
+- **Group:** several of the Player's residents picked on the map at once (box-drag or
+  Shift-click), so an order goes to each. Not an Army: nothing ties them together in the world.
+  Ctrl+1–9 saves the picked residents as that number's group and 1–9 picks them again (pressed
+  twice, it also centres the map on them); saved groups are kept per browser, not in the world.
+  Dead residents and ones no longer the Player's drop out of a group when it is picked again.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

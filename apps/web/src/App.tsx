@@ -38,6 +38,7 @@ import {
 import type { Covered } from './map/camera.js'
 import { groupResidents, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
+import { useSavedGroups } from './saved-groups.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { isWikiPath, pageFor } from './pages.js'
@@ -155,6 +156,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setArmyPick(undefined)
     setOrderError(undefined)
   }
+  // Ctrl+1–9 saves the picked residents as a group, 1–9 picks it again (`CONTEXT.md`: Group).
+  useSavedGroups(
+    world?.home.realmId,
+    group.map((r) => r.id),
+    own,
+    select,
+    showOnMap,
+  )
   // The city picked on the map or opened in the Cities drawer.
   const [openCityId, setOpenCityId] = useState<string>()
 
