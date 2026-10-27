@@ -76,10 +76,15 @@ export function carriagePulledBy<K extends Pick<Carriage, 'horseId'>>(
 /**
  * The horse that pulls a carriage once it is driven (`CONTEXT.md`: Carriage): the one hitched to
  * it, or else a horse of the carriage's realm (or NPC city) on its tile that pulls no other carriage, which is
- * hitched when the carriage first moves. Undefined when there is none.
+ * hitched when the carriage first moves. A horse somebody rides is never hitched (`CONTEXT.md`:
+ * Riding), as far as `residents` tell. Undefined when there is none.
  */
 export function horseFor<H extends CarriageHorse>(
-  world: { horses: readonly H[]; carriages: readonly CarriagePlace[] },
+  world: {
+    horses: readonly H[]
+    carriages: readonly CarriagePlace[]
+    residents?: readonly Pick<Resident, 'riding'>[]
+  },
   carriage: CarriagePlace,
 ): H | undefined {
   if (carriage.horseId) return world.horses.find((h) => h.id === carriage.horseId)
@@ -89,7 +94,8 @@ export function horseFor<H extends CarriageHorse>(
       h.y === carriage.y &&
       h.realmId === carriage.realmId &&
       h.cityId === carriage.cityId &&
-      !carriagePulledBy(world, h),
+      !carriagePulledBy(world, h) &&
+      !world.residents?.some((r) => r.riding === h.id),
   )
 }
 
@@ -115,8 +121,8 @@ export function haulStopSpot(world: WorldState, x: number, y: number): GoodsSpot
 
 /**
  * Why a resident can't drive a carriage now, or undefined when they can (`CONTEXT.md`:
- * Carriage): they must be grown up and on its tile, it must have a horse to pull it, and nobody
- * else may be driving it.
+ * Carriage): they must be grown up, on foot (`CONTEXT.md`: Riding) and on its tile, it must have
+ * a horse to pull it, and nobody else may be driving it.
  */
 export function driveProblem(
   world: WorldState,
@@ -124,6 +130,7 @@ export function driveProblem(
   carriage: Carriage,
 ): string | undefined {
   if (!canWork(resident, world.tick)) return 'children can’t drive'
+  if (resident.riding !== undefined) return 'dismount first to drive'
   if (carriage.x !== resident.x || carriage.y !== resident.y) {
     return 'that carriage is not on the resident’s tile'
   }

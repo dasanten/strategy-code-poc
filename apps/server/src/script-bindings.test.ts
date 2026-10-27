@@ -257,6 +257,8 @@ describe('script bindings', () => {
       { kind: 'haul', carriageId: 'c9', x: 20, y: 10, goods: ['wood'], keepFood: HAUL_KEEP_FOOD },
     ],
     ['stop()', { kind: 'stop' }],
+    ['mount("h9")', { kind: 'mount', horseId: 'h9' }],
+    ['dismount()', { kind: 'dismount' }],
     [
       'pickUp({ kind: "ground" }, { food: 2 })',
       { kind: 'pickUp', spot: { kind: 'ground' }, goods: { food: 2 } },

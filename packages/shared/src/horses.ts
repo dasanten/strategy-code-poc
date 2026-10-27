@@ -1,5 +1,5 @@
 import { HORSE_REACH, STABLE_BREED_DAYS, STABLE_CAPACITY } from './balance.js'
-import { carriagePulledBy } from './carriages.js'
+import { carriagePulledBy, drivenCarriageId } from './carriages.js'
 import { covers, isAt } from './footprint.js'
 import { pileAt } from './goods.js'
 import { wrap } from './terrain.js'
@@ -7,6 +7,7 @@ import {
   TICKS_PER_GAME_DAY,
   type Building,
   type Horse,
+  type Resident,
   type Stock,
   type WorldState,
 } from './world.js'
@@ -61,5 +62,58 @@ export function breedingPair(world: WorldState, stable: Building): [Horse, Horse
     const b = fed.find((h) => h !== a && h.realmId === a.realmId && h.cityId === a.cityId)
     if (b) return [a, b]
   }
+  return undefined
+}
+
+/** The horse a resident rides (`CONTEXT.md`: Riding), if they ride one. */
+export function horseRidden<H extends Pick<Horse, 'id'>>(
+  world: { horses: readonly H[] },
+  resident: Pick<Resident, 'riding'>,
+): H | undefined {
+  return resident.riding === undefined
+    ? undefined
+    : world.horses.find((h) => h.id === resident.riding)
+}
+
+/** The resident riding a horse, if anyone is. */
+export function riderOf<R extends Pick<Resident, 'riding'>>(
+  world: { residents: readonly R[] },
+  horse: Pick<Horse, 'id'>,
+): R | undefined {
+  return world.residents.find((r) => r.riding === horse.id)
+}
+
+/**
+ * Whether a horse is the resident's to ride: one of their realm, or for a resident of an NPC city
+ * one of that city.
+ */
+export function horseOfResident(
+  horse: Pick<Horse, 'realmId' | 'cityId'>,
+  resident: Pick<Resident, 'owner' | 'cityId'>,
+): boolean {
+  if (resident.owner !== null) return horse.realmId === resident.owner
+  return horse.realmId === null && resident.cityId !== null && horse.cityId === resident.cityId
+}
+
+/**
+ * Why a resident can't mount a horse now, or undefined when they can (`CONTEXT.md`: Riding): the
+ * horse must be of their realm and on their tile, pull no carriage, and nobody may ride it; the
+ * resident must ride no other horse and drive no carriage.
+ */
+export function mountProblem(
+  world: WorldState,
+  resident: Resident,
+  horse: Horse | undefined,
+): string | undefined {
+  if (!horse) return 'no such horse'
+  if (resident.riding === horse.id) return 'already riding that horse'
+  if (resident.riding !== undefined) return 'already riding another horse'
+  if (!horseOfResident(horse, resident)) return 'not a horse of your realm'
+  if (horse.x !== resident.x || horse.y !== resident.y) {
+    return 'that horse is not on the resident’s tile'
+  }
+  if (carriagePulledBy(world, horse)) return 'that horse is hitched to a carriage'
+  if (riderOf(world, horse)) return 'someone else rides that horse'
+  if (drivenCarriageId(resident) !== undefined) return 'a driver can’t ride'
   return undefined
 }

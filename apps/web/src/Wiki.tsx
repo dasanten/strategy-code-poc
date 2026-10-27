@@ -54,6 +54,8 @@ import {
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HORSE_HUNGRY_SHARE,
+  HUNGRY_HORSE_PACE,
   HORSE_ENDURANCE_EFFECT,
   HORSE_ENDURANCE_LIMIT,
   HORSE_SPEED_EFFECT,
@@ -721,6 +723,16 @@ export function Wiki() {
             ))}
           </tbody>
         </table>
+        <h3>Riding</h3>
+        <p>
+          A resident on a tile with a free horse of their realm can mount it, and dismount anywhere;
+          the horse stays where they get off. A rider goes wherever they walk at the speed the horse
+          would pull a carriage there (the carriage column above), and never into mountains or up
+          onto walls. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
+          at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
+          Driving makes riding faster. A rider carries no more than on foot, and can't drive a
+          carriage; a ridden horse is never hitched.
+        </p>
         <h3>Deliveries and transfers</h3>
         <p>
           A Trade Org caravan brings what you buy to your city's storage, at most{' '}

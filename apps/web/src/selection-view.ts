@@ -77,6 +77,7 @@ export type Selection = { kind: 'resident'; id: string } | { kind: 'tile'; x: nu
 export type ActionId =
   | 'walk'
   | 'stop'
+  | 'ride'
   | 'drive'
   | 'haul'
   | 'build'
@@ -100,6 +101,7 @@ export type ActionId =
 export const ACTION_KEYS: Record<ActionId, string> = {
   walk: 'W',
   stop: 'S',
+  ride: 'M',
   drive: 'D',
   haul: 'H',
   build: 'B',
@@ -165,6 +167,10 @@ export interface ResidentHere {
   makeLeader?: { problem: string | undefined }
   /** One of the Player's own residents, whom they can rename (`CONTEXT.md`: Renaming a resident). */
   renamable?: boolean
+  /** They ride a horse, and can dismount (`CONTEXT.md`: Riding). */
+  riding?: boolean
+  /** A horse of their realm on their tile that pulls no carriage and nobody rides, to mount. */
+  horseToRide?: boolean
 }
 
 /**
@@ -193,8 +199,12 @@ export function residentActions(h: ResidentHere): CardAction[] {
   const add = (a: CardAction) => actions.push(a)
   add(row('walk', '', picks('walk', 'Walk to')))
   if (h.busy) add(row('stop', 'Stop'))
+  if (h.riding) add(row('ride', 'Dismount'))
+  else if (h.horseToRide) add(row('ride', 'Mount horse'))
   if (h.carriage) {
-    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...child }))
+    // A rider doesn't drive (`CONTEXT.md`: Riding).
+    const riding = h.riding ? { disabled: true as const, reason: 'dismount first to drive' } : {}
+    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...child, ...riding }))
     add(row('haul', h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…', { opens: true }))
   }
   if (isWorkable(h.building, h.node)) {
