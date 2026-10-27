@@ -147,7 +147,7 @@ export function AdminMap({
             start={start}
             onView={onView}
             focus={focus}
-            selectedId={inspecting?.kind === 'resident' ? inspecting.id : undefined}
+            selectedIds={inspecting?.kind === 'resident' ? [inspecting.id] : undefined}
             selectedCityId={inspecting?.kind === 'city' ? inspecting.id : undefined}
             onSelectTile={(x, y) => inspect(pickOnTile(view, x, y) ?? null)}
             onSelectCity={(id) => inspect({ kind: 'city', id })}

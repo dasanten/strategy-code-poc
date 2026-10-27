@@ -80,3 +80,24 @@ export interface CardSections<A extends string = string> {
   panel?: A
   stats: boolean
 }
+
+/** How many residents a group card lists before saying how many more there are. */
+export const GROUP_LIST_MAX = 8
+
+/**
+ * The group card's head and list, for several residents picked at once: how many, their names
+ * (the first few, then how many more), and the residents it lists one per row.
+ */
+export function groupCard<R extends Pick<Resident, 'name'>>(
+  residents: readonly R[],
+): { title: string; names: string; rows: R[]; more: number } {
+  const names = residents.slice(0, 3).map((r) => r.name)
+  const rest = residents.length - names.length
+  const last = rest > 0 ? `${rest} more` : names.pop()
+  return {
+    title: `${residents.length} residents`,
+    names: names.length > 0 ? `${names.join(', ')} and ${last}` : (last ?? ''),
+    rows: residents.slice(0, GROUP_LIST_MAX),
+    more: Math.max(0, residents.length - GROUP_LIST_MAX),
+  }
+}
