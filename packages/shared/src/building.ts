@@ -267,7 +267,8 @@ export function buildProblem(
     if (nodes.length > 0 || !all((t) => t !== Terrain.Mountain))
       return `a ${kind} goes off any resource node, and not on Mountain`
     const inCity = (t: [number, number]) => citiesAt(world, t[0], t[1], size).length > 0
-    if (IN_CITY_AREA.includes(kind) && !tiles.every(inCity)) return `a ${kind} goes in a city’s area`
+    if (IN_CITY_AREA.includes(kind) && !tiles.every(inCity))
+      return `a ${kind} goes in a city’s area`
   } else if (nodes.length !== 1 || NODE_WORKPLACE[nodes[0]!.kind] !== kind)
     return `a ${kind} goes with one tile on a fitting resource node`
   if (tiles.some(([tx, ty]) => buildingAt(world, tx, ty, size)))
