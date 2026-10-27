@@ -18,6 +18,7 @@ import { ExploredTerrain } from './explored.js'
 import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
 import { Walking } from './walking.js'
+import { setScriptParamOrder } from './script-params.js'
 import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import {
   ScriptRunner,
@@ -86,6 +87,7 @@ const orders = new OrderQueue(
     ...orderKinds,
     runScript: runScriptOrder(scriptHost),
     armyRunScript: armyRunScriptOrder(scriptHost),
+    setScriptParam: setScriptParamOrder(scriptHost),
     task: taskOrder({ defaultScript: (userId, task) => defaultScriptId(db, userId, task) }),
   },
   terrain,

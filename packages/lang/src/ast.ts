@@ -8,8 +8,23 @@ export interface Position {
 
 export interface Program {
   kind: 'Program'
+  /** The script's `param` lines, from its top. */
+  params: ParamDeclaration[]
   body: Statement[]
 }
+
+/**
+ * `param name: type`: a value the Player picks for whoever runs the script, read as
+ * `params.name`.
+ */
+export interface ParamDeclaration extends Position {
+  name: string
+  type: ParamType
+}
+
+/** What a `param` can hold. */
+export const PARAM_TYPES = ['building', 'storage'] as const
+export type ParamType = (typeof PARAM_TYPES)[number]
 
 export type Statement =
   | LetStatement

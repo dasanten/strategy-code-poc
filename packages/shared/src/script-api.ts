@@ -74,6 +74,11 @@ const SHARED: readonly ScriptBinding[] = [
     'any',
     'An object kept between ticks for whoever runs it; whatever is set on it stays.',
   ),
+  value(
+    'params',
+    'any',
+    'The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; null while none is picked.',
+  ),
   value('tick', 'number', 'The world tick this run is for.'),
   value('mapSize', 'number', 'Tiles along each side of the map; its opposite sides join.'),
   value(
@@ -167,6 +172,30 @@ const SHARED: readonly ScriptBinding[] = [
     description: 'Tiles between two things with `x` and `y`, the short way round the map.',
   },
 ]
+
+/**
+ * What a script's `param` line can hold (`CONTEXT.md`: Script parameter): `param name: type`
+ * at the top of a script, read as `params.name`, picked per resident on their card. The same
+ * types as `PARAM_TYPES` in `@csp/lang`.
+ */
+export const SCRIPT_PARAM_TYPES = ['building', 'storage'] as const
+export type ScriptParamType = (typeof SCRIPT_PARAM_TYPES)[number]
+
+export function isScriptParamType(value: unknown): value is ScriptParamType {
+  return (SCRIPT_PARAM_TYPES as readonly unknown[]).includes(value)
+}
+
+/** What each param type accepts, for the Wiki and the editor. */
+export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
+  building: 'One of my realm’s buildings or construction sites.',
+  storage: 'One of my realm’s storages or stables, or one of its carriages.',
+}
+
+/** A script's `param` line. */
+export interface ScriptParam {
+  name: string
+  type: ScriptParamType
+}
 
 /** The game API of a resident's script. */
 export const SCRIPT_API: readonly ScriptBinding[] = [

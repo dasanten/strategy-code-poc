@@ -619,6 +619,18 @@ The shared language of the game. Domain terms only — no implementation details
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again.
+- **Script parameter:** a value the Player picks for whoever runs a script, declared by a
+  `param name: type` line at the top of the script and read there as `params.name`; a `param`
+  line anywhere else is a syntax error. A `building` param holds one of the realm's own buildings
+  or construction sites; a `storage` param one of its storages, stables or carriages. The values
+  are kept for each resident and each script: giving the task again keeps them, a param removed
+  from the script is dropped, a new one starts unset. Unset, or once the one picked is gone (or no
+  longer the realm's), it reads `null`. The resident card shows one field for each param of the
+  script the resident runs, picked on the map and cleared with a button; picking one doesn't end
+  the script. The Work default declares `storage` (where the output goes) and the Build default
+  `source` (where materials come from, a carriage too), each falling back to the nearest storage
+  while unset; a source picked that holds none of what the site lacks is left alone, and they
+  just build.
 - **Store:** a built-in order a script can hand over to: the resident walks to a storage,
   stable or carriage of their own (by default the nearest storage of their realm), puts down the
   chosen goods there (Food only beyond their own food, unless asked for exact units) and, at a

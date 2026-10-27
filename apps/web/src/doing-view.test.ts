@@ -9,6 +9,7 @@ const summary = (id: number, task: ScriptSummary['task']): ScriptSummary => ({
   latestVersion: 1,
   task,
   followsDefault: true,
+  params: [],
 })
 const scripts = [
   summary(1, 'work'),

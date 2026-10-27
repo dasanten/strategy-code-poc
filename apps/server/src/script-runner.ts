@@ -45,6 +45,7 @@ import {
   type ScriptContext,
 } from './script-bindings.js'
 import type { RunnableScript } from './scripts.js'
+import { paramValues, scriptParamsSound } from './script-params.js'
 import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
 
@@ -368,7 +369,7 @@ export class ScriptRunner {
     }
     this.programs = used
     if (check) {
-      out.push(...runningScriptsSound(world))
+      out.push(...runningScriptsSound(world), ...scriptParamsSound(world))
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
@@ -418,12 +419,17 @@ export class ScriptRunner {
     used.set(running.scriptId, parsed)
 
     const memory = structuredClone(running.memory) as ScriptObject
+    // A resident's picked param values; an army's params are never picked.
+    const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
+    const declared = parsed.program.params
+    const params = resident ? paramValues(world, resident, running.scriptId, declared) : declared
     const { globals, requests } = bindScript({
       world,
       terrain: this.terrain,
       sender,
       ...r.bind,
       memory,
+      params,
       seen,
       sees,
       explored: (x, y) => this.host.explored(realm.userId, x, y),
@@ -629,6 +635,8 @@ function runCityScripts(
       sees,
       explored: () => true,
       kinds,
+      // Nobody picks values for an NPC city: its defaults fall back on their own.
+      params: program.params,
     })
     run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)

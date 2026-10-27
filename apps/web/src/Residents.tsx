@@ -58,7 +58,7 @@ import {
   type Stock,
   type SeenResident,
 } from '@csp/shared'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { carryLine, type CardSections, type ResidentGroup } from './residents-view.js'
 import { doingLine } from './doing-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
@@ -393,6 +393,7 @@ export function ResidentCard({
   onClose,
   sections,
   onSections,
+  scriptParams,
 }: {
   resident: Resident
   leaderId: string
@@ -487,6 +488,8 @@ export function ResidentCard({
   /** The open sections, kept by the caller so they stay open from one selected unit to the next. */
   sections: CardSections<ActionId>
   onSections: (sections: CardSections<ActionId>) => void
+  /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
+  scriptParams?: ReactNode
 }) {
   const setPanel = (panel: ActionId | undefined) => onSections({ ...sections, panel })
   const age = Math.floor(ageInYears(r, tick))
@@ -557,6 +560,7 @@ export function ResidentCard({
       {r.script && (
         <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
       )}
+      {r.script && scriptParams}
       <ActionRows actions={actions} open={shown} onAction={act} />
       <p className="muted small" role="status">
         {orderError

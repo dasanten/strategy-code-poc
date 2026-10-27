@@ -33,6 +33,7 @@ import {
   type ResourceNode,
   type RunningScript,
   type ScriptBinding,
+  type ScriptParamType,
   type SeenEntity,
   type TerrainMap,
   type WorldState,
@@ -42,6 +43,7 @@ import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
 import { sightOf } from './sight.js'
 import { lastSeenOutOfSight } from './last-seen.js'
+import { paramTarget } from './script-params.js'
 import { realmOf } from './starting-city.js'
 
 /**
@@ -77,6 +79,11 @@ export interface ScriptContext {
   explored: (x: number, y: number) => boolean
   /** The order kinds actions go through; the game's own by default. */
   kinds?: Record<string, OrderKind>
+  /**
+   * The script's `param` lines with the id picked for each (`paramValues`); `params` holds
+   * nothing without it.
+   */
+  params?: readonly { name: string; type: ScriptParamType; id?: string }[]
 }
 
 export interface ScriptBindings {
@@ -154,7 +161,8 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   }
   const asSeen = (r: Resident) => {
     const { script, ...rest } = r
-    return toValue({ ...rest, script: { scriptId: script!.scriptId, memory: script!.memory } })
+    const running = { scriptId: script!.scriptId, memory: script!.memory }
+    return toValue({ ...rest, scriptParams: undefined, script: running })
   }
   let nodes: Value[] | undefined
   const exploredNodes = (): Value => {
@@ -266,7 +274,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = SCRIPT_API
     forMe = { residentId: resident.id }
     // The script's own state is `memory`, not part of `me`.
-    me = toValue({ ...resident, script: undefined, age: ageInYears(resident, world.tick) })
+    me = toValue({
+      ...resident,
+      script: undefined,
+      scriptParams: undefined,
+      age: ageInYears(resident, world.tick),
+    })
     actions = residentActions(request, resident)
     actions.doing = ([text]) => {
       const doing = doingText(text)
@@ -305,9 +318,17 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
   }
 
+  // Each param as what it names while that is still the side's and fits its type; else null.
+  const params = Object.create(null) as ScriptObject
+  for (const p of context.params ?? []) {
+    const target = p.id === undefined ? undefined : paramTarget(world, side, p.type, p.id)
+    params[p.name] = toValue(target?.is === 'building' ? target.building : target?.carriage)
+  }
+
   const values: Record<string, Value> = {
     me,
     memory: context.memory,
+    params: Object.freeze(params),
     tick: world.tick,
     mapSize: terrain.size,
     random: tickRandom(world),

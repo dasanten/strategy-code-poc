@@ -180,9 +180,9 @@ describe('script views', () => {
       mapSize: 'mapSize',
       random: 'random',
     }
-    // Every name in the API but `memory` and the actions.
+    // Every name in the API but `memory`, `params` (the script's own) and the actions.
     expect(Object.keys(calls).sort()).toEqual(
-      SCRIPT_API.filter((b) => b.is !== 'action' && b.name !== 'memory')
+      SCRIPT_API.filter((b) => b.is !== 'action' && b.name !== 'memory' && b.name !== 'params')
         .map((b) => b.name)
         .sort(),
     )
