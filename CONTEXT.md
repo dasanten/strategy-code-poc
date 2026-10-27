@@ -648,6 +648,11 @@ The shared language of the game. Domain terms only — no implementation details
   Until the Player edits it, their version follows the game's default as the game improves it;
   once edited it stays theirs, and they are told when the game's default has changed since.
   Default scripts can't be renamed or deleted. NPC cities always run the game's defaults.
+- **Doing:** the line on a resident's card and in the resident list that says what they are
+  doing, shown to the owning Player only. It is derived from their task and current order
+  ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
+  run is named on a small line of its own. A script can say it itself with `doing(text)`: short
+  text, kept in its memory, that shows instead until the script says something else or stops.
 - **Memory:** the small store a running script or order keeps between ticks. Roles are just
   something a script keeps there. A script can read, never change, the memory of its own
   Player's residents and armies, so residents doing the same task can agree on who does what;

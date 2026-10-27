@@ -17,6 +17,9 @@ import {
   warehousePrices,
   type Army,
   type Building,
+  type BuildingKind,
+  type RunningScript,
+  type SeenScript,
   type Carriage,
   type Placed,
   type Caravan,
@@ -255,6 +258,28 @@ function seenCarriage(insight: Insight, k: Carriage): SeenCarriage {
 }
 
 /**
+ * What a Player sees of the script a resident runs (`SeenScript`): which one, and for the owning
+ * Player (`own`) what goes into the resident's Doing line (`CONTEXT.md`: Doing): the task, the
+ * kind of building the task is about, as its memory names it (`TaskMemory`), and the text the
+ * script gave `doing()`.
+ */
+export function seenScript(world: WorldState, script: RunningScript, own: boolean): SeenScript {
+  if (!own) return { scriptId: script.scriptId }
+  const { memory } = script
+  const id = memory.workplaceId ?? memory.buildingId
+  const building =
+    typeof memory.building === 'string' && Object.hasOwn(FOOTPRINT, memory.building)
+      ? (memory.building as BuildingKind)
+      : world.buildings.find((b) => typeof id === 'string' && b.id === id)?.kind
+  return {
+    scriptId: script.scriptId,
+    ...(script.task ? { task: script.task } : {}),
+    ...(building ? { building } : {}),
+    ...(typeof memory.doing === 'string' && memory.doing ? { doing: memory.doing } : {}),
+  }
+}
+
+/**
  * What a realm's Player sees (`CONTEXT.md`: Sight): everything within sight range of any of
  * their residents or their alliance's, their own things included. A city counts as seen when
  * any of it is. What is inside, and how residents and horses fare, only as `CONTEXT.md` says
@@ -283,7 +308,14 @@ export function entitiesInSight(
     const shown: SeenEntity = {
       is: 'resident',
       ...rest,
-      ...(script ? { script: { scriptId: script.scriptId, ...(params ? { params } : {}) } } : {}),
+      ...(script
+        ? {
+            script: {
+              ...seenScript(world, script, r.owner === realmId),
+              ...(params ? { params } : {}),
+            },
+          }
+        : {}),
     }
     if (!insight.fares(r)) {
       delete shown.hunger

@@ -374,6 +374,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               diplomacy: world.diplomacy,
             })}
             leaderId={world.home.leaderId}
+            scripts={scripts}
+            buildings={world.buildings}
             tick={world.tick}
             selectedId={selectedId}
             onSelect={(id) => {
@@ -585,6 +587,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }}
             onStop={stop}
             scripts={scripts}
+            buildings={world.buildings}
             onRunScript={runScript}
             onEditScript={(id) => {
               setScriptToOpen({ id, at: Date.now() })

@@ -79,6 +79,7 @@ import {
   PRICE_REFERENCE_FLOORS,
   PROTECTION_DEFENCE,
   ROAD_LINE_MAX_TILES,
+  DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_MAX_CALL_DEPTH,
@@ -974,9 +975,13 @@ export function Wiki() {
           called. Every call costs one step, and its cost here on top. Queries answer from what you
           see and have explored, nothing more. An action asks for the order of its name for{' '}
           <code>me</code>, checked exactly as one from the map, and answers <code>null</code> when
-          asked for, or why not. A script runs as a resident's or as an army's: names marked
-          resident only or army only are only there for one of them, and a default script runs as a
-          resident's.
+          asked for, or why not. <code>doing</code> is the one action that asks for no order: its
+          text, at most {num(DOING_MAX_LENGTH)} characters, is what the resident card and list say
+          the resident is doing, until the script says something else; only you see it. Without it
+          they show what the task and its current order have the resident doing, such as “Building a
+          house: fetching 10 wood from the storage”. A script runs as a resident's or as an army's:
+          names marked resident only or army only are only there for one of them, and a default
+          script runs as a resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />

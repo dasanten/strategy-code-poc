@@ -139,20 +139,31 @@ export interface RunningScript {
 }
 
 /**
+ * What a Player sees of the script a resident runs: which one, but not its memory. The owning
+ * Player also sees what goes into their Doing line (`CONTEXT.md`: Doing): the `task` when it
+ * runs a task's default script without one of the Player's, the kind of `building` its task is
+ * about (from its memory, as `TaskMemory` holds it), and the text it last gave `doing()`.
+ */
+export interface SeenScript {
+  scriptId: number
+  task?: Task
+  building?: BuildingKind
+  doing?: string
+  /**
+   * The values picked for its params, by name (`Resident.scriptParams`); only for the realm
+   * running it.
+   */
+  params?: { [name: string]: string }
+}
+
+/**
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
  * memory, which stays on the server. Their hunger and health only for their own realm and its
  * allies (`CONTEXT.md`: Seeing how someone fares). Their script parameter values only for the
  * realm that runs their script, and only those of the script they run.
  */
 export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health' | 'scriptParams'> &
-  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: SeenRunningScript }
-
-/** Which script a resident runs, as Players see it; `params` only for the realm running it. */
-export interface SeenRunningScript {
-  scriptId: number
-  /** The values picked for its params, by name (`Resident.scriptParams`). */
-  params?: { [name: string]: string }
-}
+  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: SeenScript }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order

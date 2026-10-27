@@ -60,6 +60,7 @@ import {
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { carryLine, type CardSections, type ResidentGroup } from './residents-view.js'
+import { doingLine } from './doing-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -165,13 +166,10 @@ export function familyLine(r: Resident, residents: Resident[], tick: number): st
   return `Paired with ${name}`
 }
 
-/** What a resident is doing, from their order and the script they run, named if it is known. */
-function doing(r: Resident, scripts: ScriptSummary[] = []): string {
-  const now = r.carrying && !r.order ? 'Carrying a child' : orderDoing(r)
-  if (!r.script) return now
-  const { scriptId } = r.script
-  const name = scripts.find((s) => s.id === scriptId)?.name ?? 'Running a script'
-  return now === 'Idle' ? name : `${name} · ${now}`
+/** The name of the script a resident runs, for the small line under their Doing line. */
+function scriptName(r: Resident, scripts: readonly ScriptSummary[]): string | undefined {
+  if (!r.script) return undefined
+  return scripts.find((s) => s.id === r.script!.scriptId)?.name ?? 'a script'
 }
 
 /**
@@ -262,12 +260,18 @@ export function ResidentsList({
   groups,
   leaderId,
   tick,
+  scripts = [],
+  buildings = [],
   selectedId,
   onSelect,
 }: {
   groups: ResidentGroup<Resident>[]
   leaderId: string
   tick: number
+  /** The Player's script library, to name the script each runs and the task it is for. */
+  scripts?: ScriptSummary[]
+  /** The buildings in sight, to name where residents store or fetch goods. */
+  buildings?: Building[]
   selectedId: string | undefined
   onSelect: (id: string) => void
 }) {
@@ -314,7 +318,10 @@ export function ResidentsList({
                     {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
                   </span>
                   <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
-                  <span className="doing">{doing(r)}</span>
+                  <span className="doing" title={doingLine(r, { scripts, buildings })}>
+                    {doingLine(r, { scripts, buildings })}
+                    {r.script && <small className="muted">{scriptName(r, scripts)}</small>}
+                  </span>
                   <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
                     <span
                       className={meterClass(r.hunger / MAX_HUNGER)}
@@ -375,6 +382,7 @@ export function ResidentCard({
   onWallTo,
   onStop,
   scripts,
+  buildings = [],
   onRunScript,
   onEditScript,
   makeLeader,
@@ -409,6 +417,8 @@ export function ResidentCard({
   onStop: () => void
   /** The Player's script library, to pick a script to run. */
   scripts: ScriptSummary[]
+  /** The buildings in sight, to name where the resident stores or fetches goods. */
+  buildings?: Building[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
   onRunScript: (scriptId: number) => void
   /** Opens a script in the library, such as the one the resident's task runs. */
@@ -529,7 +539,7 @@ export function ResidentCard({
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
         `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}`,
-        <strong key="doing">{doing(r, scripts)}</strong>,
+        <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
         ...(family ? [family] : []),
       ]}
       onClose={onClose}
