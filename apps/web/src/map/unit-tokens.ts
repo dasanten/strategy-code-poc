@@ -24,6 +24,7 @@ import {
   armyBanners,
   entityRelationship,
   residentGroups,
+  unitRadius,
   type Known,
   type ResidentGroup,
 } from './units.js'
@@ -123,7 +124,7 @@ export function drawUnits(
       tokens,
       UNIT_ART.horse,
       ...p,
-      Math.max(4.5, tile * 0.24),
+      unitRadius('horse', tile),
       entityRelationship(h, viewer, known),
     )
   }
@@ -136,7 +137,7 @@ export function drawUnits(
       tokens,
       caravan ? UNIT_ART.caravan : UNIT_ART.carriage,
       ...p,
-      Math.max(5.5, tile * 0.36),
+      unitRadius('carriage', tile),
       entityRelationship(k, viewer, known),
     )
   }
@@ -146,13 +147,13 @@ export function drawUnits(
   const place = (x: number, y: number, full: number) => {
     const aside = built.has(`${x},${y}`) || carted.has(`${x},${y}`)
     const [sx, sy] = at(x, y, aside ? 0.3 : 0, aside ? 0.3 : 0)
-    return { x: sx, y: sy, r: aside ? Math.max(5, tile * 0.28) : full }
+    return { x: sx, y: sy, r: aside ? unitRadius('aside', tile) : full }
   }
 
   const banners = armyBanners(world.armies, world.residents)
   const armyById = new Map(world.armies.map((a) => [a.id, a]))
   for (const b of banners) {
-    const spot = place(b.x, b.y, Math.max(6, tile * 0.4))
+    const spot = place(b.x, b.y, unitRadius('army', tile))
     if (!near([spot.x, spot.y])) continue
     const army = armyById.get(b.armyId)!
     drawUnit(tokens, UNIT_ART.army, spot.x, spot.y, spot.r, entityRelationship(army, viewer, known))
@@ -180,7 +181,7 @@ export function drawUnits(
       })
       continue
     }
-    const spot = place(g.x, g.y, Math.max(5.5, tile * 0.36))
+    const spot = place(g.x, g.y, unitRadius('residents', tile))
     if (!near([spot.x, spot.y])) continue
     drawUnit(tokens, g.leader ? UNIT_ART.leader : UNIT_ART.person, spot.x, spot.y, spot.r, g.rel)
     if (g.ids.length > 1) badge(`×${g.ids.length}`, spot.x, spot.y, spot.r)
@@ -211,7 +212,7 @@ function drawFigures(
   },
 ) {
   const { figures, more } = tileFigures(g.ids, of.relOf, of.leaders)
-  const r = tile * 0.2
+  const r = unitRadius('figure', tile)
   for (const f of figures) {
     const [x, y] = at(f.dx, f.dy)
     const rel = of.relOf(f.id)

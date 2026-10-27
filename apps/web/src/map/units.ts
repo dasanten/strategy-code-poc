@@ -131,3 +131,29 @@ export function armyBanners(
   }
   return banners
 }
+
+/** The kinds of unit token, each with its own size (ADR 0008). */
+export type UnitToken = 'horse' | 'carriage' | 'army' | 'residents' | 'aside' | 'figure'
+
+/**
+ * A token's radius as a fraction of a tile, before `UNIT_GROWTH`: `aside` is people beside a
+ * building or cart on their tile, `figure` a single resident up close.
+ */
+const UNIT_SIZE: Record<UnitToken, number> = {
+  horse: 0.24,
+  carriage: 0.36,
+  army: 0.4,
+  residents: 0.36,
+  aside: 0.28,
+  figure: 0.2,
+}
+
+/** How much bigger unit tokens are drawn than they first were, so they are easy to spot and click. */
+export const UNIT_GROWTH = 1.5
+
+/** The smallest a unit token's radius gets when zoomed out, in screen pixels. */
+export const MIN_UNIT_RADIUS = 8
+
+/** A unit token's radius in screen pixels at `tile` pixels per tile. */
+export const unitRadius = (kind: UnitToken, tile: number): number =>
+  Math.max(MIN_UNIT_RADIUS, tile * UNIT_SIZE[kind] * UNIT_GROWTH)

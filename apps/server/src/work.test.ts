@@ -176,6 +176,10 @@ describe('farm work', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
+  it('makes 2 Food a game day for a worker of average Strength and no skill, half the old pace', () => {
+    expect(farmOutput(setup().r, 0) * TICKS_PER_GAME_DAY).toBeCloseTo(2)
+  })
+
   it('makes more with Strength and Farming skill', () => {
     const { r } = setup()
     const base = farmOutput(r, 0)
@@ -195,12 +199,12 @@ describe('farm work', () => {
     order(world, queue)
     order(world, queue, 'w2')
     run(world, 1000)
-    // Two workers make 4 units in that time: the one who had none takes meals from the pile
+    // Two workers make 2 units in that time: the one who had none takes meals from the pile
     // until no longer low, the rest stays there; a resident who doesn't work there gets none.
     expect(r.carried.food).toBe(5)
     expect(other.carried.food).toBe(HOME_FOOD_LOW)
     expect(idle.carried.food ?? 0).toBe(0)
-    expect(pileAt(world, 3, 3)?.goods.food).toBe(4 - HOME_FOOD_LOW)
+    expect(pileAt(world, 3, 3)?.goods.food).toBe(2 - HOME_FOOD_LOW)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 

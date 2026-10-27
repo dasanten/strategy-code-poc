@@ -26,7 +26,15 @@ import { StandingPanel } from './Standing.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { keyGoods, showBeside, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
-import { CentredDialog, Drawer, ToolRail, TopBar, mapCovered, useEscapeCloses } from './Hud.js'
+import {
+  CentredDialog,
+  Drawer,
+  DrawerEdge,
+  ToolRail,
+  TopBar,
+  mapCovered,
+  useEscapeCloses,
+} from './Hud.js'
 import type { Covered } from './map/camera.js'
 import { groupResidents } from './residents-view.js'
 import { Founding } from './Founding.js'
@@ -442,6 +450,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onShowPlace={(p) => showOnMap(p.x, p.y)}
           />,
         )}
+      <DrawerEdge open={openDrawer} />
       {world && selectedTile && (
         <div className="game-selection">
           <TileCard
