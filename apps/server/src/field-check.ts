@@ -1,5 +1,5 @@
 import { and, asc, eq, isNotNull } from 'drizzle-orm'
-import { checkNames } from '@csp/lang'
+import { checkNames, PARAMS_SHAPE } from '@csp/lang'
 import { scriptCheckEnv } from '@csp/shared'
 import { schema, type Db } from './db/index.js'
 
@@ -48,7 +48,8 @@ export function undeclaredFieldReads(db: Db): UndeclaredRead[] {
   const envs = [false, true].map((defaultScript) => scriptCheckEnv({ defaultScript }))
   return rows.flatMap((r) =>
     checkNames(r.source, envs[r.task === null ? 0 : 1]!)
-      .reads.filter((read) => !read.declared)
+      // A script's own params are no field of the game's.
+      .reads.filter((read) => !read.declared && read.shape !== PARAMS_SHAPE)
       .map((read) => ({
         view: read.shape,
         field: read.field,

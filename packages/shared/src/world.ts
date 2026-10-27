@@ -63,6 +63,12 @@ export interface Resident {
    * when they run none.
    */
   script?: RunningScript
+  /**
+   * The values the Player picked for this resident's script parameters (`CONTEXT.md`: Script
+   * parameter): by script id, then by param name, the id of the building or carriage picked.
+   * Kept when the script ends, so giving the task again keeps them. Absent while none is picked.
+   */
+  scriptParams?: ScriptParamValues
   /** The resident's pair (`CONTEXT.md`: Pairing), if they are paired. Not an order. */
   pair?: Pair
   /** The child the resident is carrying (`CONTEXT.md`: Carrying), if any. */
@@ -104,6 +110,11 @@ export interface ScriptMemory {
   [key: string]: MemoryValue
 }
 
+/** A resident's picked script parameter values: script id → param name → building or carriage id. */
+export interface ScriptParamValues {
+  [scriptId: string]: { [name: string]: string }
+}
+
 /**
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
  */
@@ -130,10 +141,18 @@ export interface RunningScript {
 /**
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
  * memory, which stays on the server. Their hunger and health only for their own realm and its
- * allies (`CONTEXT.md`: Seeing how someone fares).
+ * allies (`CONTEXT.md`: Seeing how someone fares). Their script parameter values only for the
+ * realm that runs their script, and only those of the script they run.
  */
-export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health'> &
-  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: Pick<RunningScript, 'scriptId'> }
+export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health' | 'scriptParams'> &
+  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: SeenRunningScript }
+
+/** Which script a resident runs, as Players see it; `params` only for the realm running it. */
+export interface SeenRunningScript {
+  scriptId: number
+  /** The values picked for its params, by name (`Resident.scriptParams`). */
+  params?: { [name: string]: string }
+}
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order

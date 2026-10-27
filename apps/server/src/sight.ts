@@ -275,12 +275,15 @@ export function entitiesInSight(
   const out: SeenEntity[] = []
   for (const r of world.residents) {
     if (!inSight(r)) continue
-    // Which script a resident runs is seen; its memory stays on the server.
-    const { script, ...rest } = r
+    // Which script a resident runs is seen; its memory stays on the server, and the values of
+    // its params are shown only to the realm running it.
+    const { script, scriptParams, ...rest } = r
+    const params =
+      script && commanderOf(world, r) === realmId ? scriptParams?.[script.scriptId] : undefined
     const shown: SeenEntity = {
       is: 'resident',
       ...rest,
-      ...(script ? { script: { scriptId: script.scriptId } } : {}),
+      ...(script ? { script: { scriptId: script.scriptId, ...(params ? { params } : {}) } } : {}),
     }
     if (!insight.fares(r)) {
       delete shown.hunger

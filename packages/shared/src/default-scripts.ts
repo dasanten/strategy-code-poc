@@ -53,9 +53,11 @@ export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
   work: {
     name: 'Work',
     source: `// Work (default): work the workplace memory.workplaceId; once its pile holds
-// a full load, one of us, picked at random, stores it in the nearest storage
-// of my realm and comes back. At a smithy, memory.makes says what to make.
-// Meals come from the workplace's pile on their own, without an order.
+// a full load, one of us, picked at random, stores it in params.storage, or
+// the nearest storage of my realm while none is picked, and comes back. At a
+// smithy, memory.makes says what to make. Meals come from the workplace's
+// pile on their own, without an order.
+param storage: storage // where the output goes
 let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
 
 // Where the workplace is, kept for when it is out of sight.
@@ -101,8 +103,12 @@ for (good of outputOf(place)) {
   }
 }
 if (!full) { return }
-let stores = storages(place) // nearest first
-if (stores.length == 0) { return } // none in reach: the pile grows
+let to = params.storage
+if (to == null) {
+  let stores = storages(place) // nearest first
+  if (stores.length == 0) { return } // none in reach: the pile grows
+  to = stores[0]
+}
 let workers = []
 for (r of withMemory("workplaceId", place.id)) {
   if (r.script.memory.carry != null) { return } // one carries at a time
@@ -113,7 +119,7 @@ let i = 0
 while ((i + 1) / workers.length <= random) { i = i + 1 }
 if (workers[i].id != me.id) { return }
 pickUp({kind: "ground"}, load)
-memory.carry = {storageId: stores[0].id, goods: goods}
+memory.carry = {storageId: to.id, goods: goods}
 `,
   },
   build: {
@@ -121,8 +127,10 @@ memory.carry = {storageId: stores[0].id, goods: goods}
     source: `// Build (default): build a memory.building with the north-west tile of its
 // footprint at memory.at, laying out the site or joining the one there.
 // While the site lacks materials, one of us building it, picked at random,
-// fetches a load of what is missing from the nearest storage of my realm
-// that holds it and brings it back. With none in storage we just build.
+// fetches a load of what is missing from params.source, or the nearest
+// storage of my realm that holds it while none is picked, and brings it
+// back. With none there we just build.
+param source: storage // where materials come from; a carriage too
 if (memory.done || memory.stuck) { return }
 if (me.order != null && me.order.kind != "build") { return } // on my way
 
@@ -184,8 +192,21 @@ let missing = materialsNeeded(site)
 if (missing.length == 0) { return }
 let goods = []
 for (m of missing) { goods[goods.length] = m.good }
-let stores = storages(site, goods) // nearest first, holding some
-if (stores.length == 0) { return } // none in storage: we just build
+let from = params.source
+if (from == null) {
+  let stores = storages(site, goods) // nearest first, holding some
+  if (stores.length == 0) { return } // none in storage: we just build
+  from = stores[0]
+} else {
+  // The one picked: only while it holds some of what is missing.
+  let held = from.stock
+  if (held == null) { held = from.load }
+  let some = false
+  for (g of goods) {
+    if (held != null && held[g] != null && held[g] > 0) { some = true }
+  }
+  if (!some) { return }
+}
 let builders = []
 for (r of withMemory("siteId", site.id)) {
   if (r.script.memory.fetch != null) { return } // one fetches at a time
@@ -198,8 +219,8 @@ while ((i + 1) / builders.length <= random) { i = i + 1 }
 if (builders[i].id != me.id) { return }
 let load = {}
 for (m of missing) { load[m.good] = m.units }
-if (fetch(load, stores[0].id) == null) {
-  memory.fetch = {storageId: stores[0].id, goods: load}
+if (fetch(load, from.id) == null) {
+  memory.fetch = {storageId: from.id, goods: load}
 }
 `,
   },

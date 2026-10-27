@@ -6,7 +6,7 @@ import { leaveTradeOrg } from './caravans.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 42
+export const WORLD_FORMAT_VERSION = 43
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -49,6 +49,10 @@ export const migrations: Record<number, MigrationStep> = {
   // Store and fetch orders (`CONTEXT.md`: Store, Fetch) and how a resident's last one ended
   // (`orderEnded`). Older residents hold neither, so the step leaves them as they are.
   41: (state) => state,
+  // Script parameters (`CONTEXT.md`: Script parameter): the values picked for a resident's
+  // (`Resident.scriptParams`). Older residents have none picked, so their params read null and
+  // the defaults fall back to the nearest place; the step leaves them as they are.
+  42: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

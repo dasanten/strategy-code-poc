@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import {
+  PARAM_DESCRIPTIONS,
+  SCRIPT_PARAM_TYPES,
   ADULT_AGE,
   AGILITY_LIMIT,
   AGILITY_SPEED_EFFECT,
@@ -192,6 +194,7 @@ export const WIKI_TOPICS = [
   { id: 'territory', title: 'Territory' },
   { id: 'language', title: 'Script language' },
   { id: 'api', title: 'Game API' },
+  { id: 'params', title: 'Script parameters' },
   { id: 'scripts', title: 'Scripting budgets' },
   { id: 'examples', title: 'Example scripts' },
 ] as const
@@ -1019,6 +1022,57 @@ export function Wiki() {
             </table>
           </div>
         ))}
+      </Section>
+
+      <Section id="params">
+        <p>
+          A script can ask for values you pick for whoever runs it, such as which storage the output
+          goes to. Each is a <code>param</code> line at the very top of the script, read further
+          down as <code>params.name</code>. A <code>param</code> line anywhere else is a syntax
+          error.
+        </p>
+        <pre>
+          <code>{`param storage: storage
+if (params.storage != null) { store(["wood"], params.storage) }`}</code>
+        </pre>
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Holds</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SCRIPT_PARAM_TYPES.map((t) => (
+              <tr key={t}>
+                <td>
+                  <code>{t}</code>
+                </td>
+                <td>{PARAM_DESCRIPTIONS[t]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <ul>
+          <li>
+            A resident's card shows one field for each param of the script they run: pick it on the
+            map, or clear it. Picking doesn't stop the script.
+          </li>
+          <li>
+            The values are kept for each resident and each script. Giving the task again keeps them;
+            a param removed from the script is dropped, and a new one starts unset.
+          </li>
+          <li>
+            A param reads <code>null</code> while none is picked, and once the one picked is gone or
+            no longer yours.
+          </li>
+          <li>
+            The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
+            <code>source</code>: where materials come from, a carriage too. Unset, each uses the
+            nearest storage; a source picked that holds none of what the site lacks is left alone,
+            and they just build.
+          </li>
+        </ul>
       </Section>
 
       <Section id="scripts">

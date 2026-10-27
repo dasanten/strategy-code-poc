@@ -30,9 +30,15 @@ describe('the Wiki’s Game API and example scripts', () => {
   const html = renderToStaticMarkup(createElement(Wiki))
   const between = (from: string, to: string) => html.slice(html.indexOf(from), html.indexOf(to))
 
-  it('reads in order: language, game API, budgets, examples', () => {
+  it('reads in order: language, game API, params, budgets, examples', () => {
     const ids = WIKI_TOPICS.map((t) => t.id)
-    expect(ids.slice(ids.indexOf('language'))).toEqual(['language', 'api', 'scripts', 'examples'])
+    expect(ids.slice(ids.indexOf('language'))).toEqual([
+      'language',
+      'api',
+      'params',
+      'scripts',
+      'examples',
+    ])
   })
 
   it('lists every binding of both APIs with its cost, and marks one-API names', () => {

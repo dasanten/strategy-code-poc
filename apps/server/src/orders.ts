@@ -129,8 +129,9 @@ export class OrderQueue {
     for (const { sender, order } of batch) {
       // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
       // script). Pairing, the Leader handover and renaming change nobody's order, so they leave
-      // scripts running too.
-      if (!['runScript', 'pair', 'handOver', 'rename', 'renameCity'].includes(order.kind)) {
+      // scripts running too, as does picking a param value (`CONTEXT.md`: Script parameter).
+      const keeps = ['runScript', 'pair', 'handOver', 'rename', 'renameCity', 'setScriptParam']
+      if (!keeps.includes(order.kind)) {
         const r = world.residents.find((x) => x.id === order.residentId)
         if (r) delete r.script
         // How their last store or fetch ended is kept until their next order.
