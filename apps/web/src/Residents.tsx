@@ -10,18 +10,18 @@ import {
   CARRYING_TICKS,
   GOODS,
   HAUL_KEEP_FOOD,
-  NODE_WORKPLACE,
+  buildMenu,
   MAX_HEALTH,
   MAX_HUNGER,
   MAX_WORKERS,
   NODE_GOOD,
-  PROCESSING,
   RECIPES,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
   STAT_NAMES,
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
+  TICKS_PER_GAME_HOUR,
   TICKS_PER_GAME_YEAR,
   TRAINED_CAP_SHARE,
   ageInYears,
@@ -118,6 +118,16 @@ function meterClass(share: number): string {
 }
 
 const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
+
+/** Work in ticks as a span of game time: "2 game days", "1.5 game hours". */
+const workSpan = (ticks: number) => {
+  const [n, unit] =
+    ticks >= TICKS_PER_GAME_DAY
+      ? [ticks / TICKS_PER_GAME_DAY, 'game day']
+      : [ticks / TICKS_PER_GAME_HOUR, 'game hour']
+  const rounded = Math.round(n * 10) / 10
+  return `${rounded} ${unit}${rounded === 1 ? '' : 's'}`
+}
 
 /**
  * What the map is waiting for a tile for: to walk or drive there, a haul route's other stop, or
@@ -340,6 +350,7 @@ export function ResidentCard({
   road,
   node,
   onBuild,
+  buildProblem,
   workers,
   holders,
   realmId,
@@ -411,6 +422,8 @@ export function ResidentCard({
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
   onBuild: (kind: BuildingKind) => void
+  /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
+  buildProblem?: (kind: BuildingKind) => string | undefined
   /** Residents in sight working the building on the resident's tile. */
   workers: number
   /** Realms whose residents in sight work it: who holds it (`CONTEXT.md`: Holding a workplace). */
@@ -558,6 +571,7 @@ export function ResidentCard({
                 tick={tick}
                 building={building}
                 node={node}
+                buildProblem={buildProblem}
                 onBuild={onBuild}
               />
               <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
@@ -879,20 +893,23 @@ function HaulBlock({
 
 /**
  * Building on the resident's tile (`CONTEXT.md`: Building): on a resource node with nothing on it,
- * build its workplace; on any other empty tile, a stable (on Plains only);
- * on a construction site, see what it still needs and help build it.
+ * build its workplace; on any other empty tile, whatever goes off a node (`buildMenu`), saying why
+ * a kind can't go here; on a construction site, see what it still needs and help build it.
  */
 function BuildBlock({
   resident,
   tick,
   building,
   node,
+  buildProblem = () => undefined,
   onBuild,
 }: {
   resident: Resident
   tick: number
   building: Building | undefined
   node: KnownNode | undefined
+  /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
+  buildProblem?: (kind: BuildingKind) => string | undefined
   onBuild: (kind: BuildingKind) => void
 }) {
   const adult = canWork(resident, tick)
@@ -935,11 +952,9 @@ function BuildBlock({
     )
   }
   if (!building) {
-    // On a node its workplace; anywhere else a farm or a stable (the server allows them on Plains
-    // only), a house (in a city's area), a smelter, a mint or a smithy (not on Mountain).
-    const kinds: BuildingKind[] = node
-      ? [NODE_WORKPLACE[node.kind]]
-      : ['farm', 'house', 'stable', ...PROCESSING]
+    // On a node its workplace; anywhere else every kind that goes off a node. One that can't go
+    // here says why rather than being left out.
+    const kinds = buildMenu(node)
     return (
       <section className="inspector-block" aria-label="Build">
         <div className="panel-head">
@@ -950,7 +965,7 @@ function BuildBlock({
         </div>
         {kinds.map((kind) => {
           const materials = goodsIn(BUILD_MATERIALS[kind])
-          const days = (BUILD_WORK[kind] ?? 0) / TICKS_PER_GAME_DAY
+          const problem = buildProblem(kind)
           return (
             <div key={kind}>
               <p className="muted small">
@@ -960,18 +975,19 @@ function BuildBlock({
                   : materials
                       .map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`)
                       .join(', ')}{' '}
-                and about {days} game days of one resident’s work.
+                and about {workSpan(BUILD_WORK[kind] ?? 0)} of one resident’s work.
               </p>
               <div className="order-buttons">
                 <button
                   type="button"
                   className="primary"
-                  disabled={!adult}
+                  disabled={!adult || problem !== undefined}
                   onClick={() => onBuild(kind)}
                 >
                   Build {BUILDING_NAMES[kind].toLowerCase()}
                 </button>
               </div>
+              {problem && <p className="muted small">Not here: {problem}.</p>}
             </div>
           )
         })}
@@ -1009,7 +1025,6 @@ function RoadBlock({
   }
   if (road) return null
   const materials = goodsIn(BUILD_MATERIALS.road)
-  const days = (BUILD_WORK.road ?? 0) / TICKS_PER_GAME_DAY
   return (
     <section className="inspector-block" aria-label="Road">
       <div className="panel-head">
@@ -1018,7 +1033,7 @@ function RoadBlock({
       <p className="muted small">
         {BUILDING_PURPOSE.road} Needs{' '}
         {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
-        {days} game days of one resident’s work.
+        {workSpan(BUILD_WORK.road ?? 0)} of one resident’s work.
       </p>
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>

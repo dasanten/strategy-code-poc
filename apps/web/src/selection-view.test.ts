@@ -16,6 +16,7 @@ import {
   Terrain,
   UNEXPLORED,
   WORK_OUTPUT_PER_DAY,
+  buildMenu,
   ticksForAge,
   footprintTiles,
   type Building,
@@ -31,6 +32,7 @@ import {
 import { BUILDING_NAMES } from './map/palette.js'
 import {
   actionForKey,
+  buildHereProblem,
   describeTile,
   makeLeaderProblem,
   nodeFit,
@@ -645,6 +647,50 @@ describe('where a node’s workplace fits on what the Player knows', () => {
         lookup(() => UNEXPLORED),
       ),
     ).toBeUndefined()
+  })
+})
+
+describe('what the build menu offers off a node, and why a kind can’t go here', () => {
+  const SIZE = 64
+  const plains = { size: SIZE, at: () => Terrain.Plains }
+  const hall = building({ id: 'hall', kind: 'townHall', cityId: 'c1', x: 20, y: 20 })
+  const seen = {
+    buildings: [hall],
+    cities: [{ id: 'c1', name: 'Ashford', realmId: 'me', townHallId: 'hall' }] as City[],
+  }
+  const noNodes = () => undefined
+
+  it('lists town hall, storage, wall and gate with everything else that goes off a node', () => {
+    const menu = buildMenu(undefined)
+    expect(menu).toEqual(expect.arrayContaining(['townHall', 'house', 'storage', 'wall', 'gate']))
+    expect(menu).toEqual(expect.arrayContaining(['farm', 'stable', 'smelter', 'mint', 'smithy']))
+    expect(menu).not.toContain('road')
+    expect(buildMenu({ kind: 'forest' })).toEqual(['lumberCamp'])
+  })
+
+  it('says a storage goes in a city’s area, and lets it go there', () => {
+    expect(buildHereProblem('storage', 23, 20, seen, noNodes, plains)).toBeUndefined()
+    expect(buildHereProblem('storage', 50, 50, seen, noNodes, plains)).toBe(
+      'a storage goes in a city’s area',
+    )
+    // Walls and gates go anywhere off Mountain and nodes.
+    expect(buildHereProblem('wall', 50, 50, seen, noNodes, plains)).toBeUndefined()
+    expect(buildHereProblem('gate', 50, 50, seen, noNodes, plains)).toBeUndefined()
+  })
+
+  it('says why on taken tiles, nodes and Mountain', () => {
+    expect(buildHereProblem('wall', 21, 21, seen, noNodes, plains)).toBe(
+      'there is already a building there',
+    )
+    const forestAt = (x: number, y: number) =>
+      x === 51 && y === 51 ? { kind: 'forest' as const, x, y } : undefined
+    expect(buildHereProblem('townHall', 50, 50, seen, forestAt, plains)).toBe(
+      'a townHall goes off any resource node, and not on Mountain',
+    )
+    const mountain = { size: SIZE, at: () => Terrain.Mountain }
+    expect(buildHereProblem('gate', 50, 50, seen, noNodes, mountain)).toBe(
+      'a gate goes off any resource node, and not on Mountain',
+    )
   })
 })
 

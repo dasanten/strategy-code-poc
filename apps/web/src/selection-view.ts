@@ -17,6 +17,7 @@ import {
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
+  buildProblem,
   canWork,
   nodeCorner,
   stockWeight,
@@ -410,6 +411,28 @@ export function nodeFit(
     }
   }
   return nodeCorner({ ...seen, nodes }, terrain, node)
+}
+
+/**
+ * Why a building of `kind` can't be laid out from (x, y), its footprint running east and south, as
+ * far as the Player knows (`buildProblem`, `CONTEXT.md`: Where buildings go): the buildings and
+ * cities they see, the nodes and terrain they have explored. The server checks again when the
+ * order arrives.
+ */
+export function buildHereProblem(
+  kind: BuildingKind,
+  x: number,
+  y: number,
+  seen: { buildings: Building[]; cities: City[] },
+  nodeAt: (x: number, y: number) => KnownNode | undefined,
+  terrain: TerrainLookup,
+): string | undefined {
+  const nodes: KnownNode[] = []
+  for (const [tx, ty] of footprintTiles({ kind, x, y }, terrain.size)) {
+    const n = nodeAt(tx, ty)
+    if (n) nodes.push(n)
+  }
+  return buildProblem({ ...seen, nodes }, x, y, kind, terrain)
 }
 
 /** A node's kind in words: "forest", "iron ore". */
