@@ -268,3 +268,49 @@ describe('town halls (`CONTEXT.md`: Town hall)', () => {
     ])
   })
 })
+
+describe('storages (`CONTEXT.md`: Storage)', () => {
+  it('can be laid out in a city’s area and not outside it', () => {
+    const { world, r } = setup()
+    addCity(world, { id: 'c1', realmId: 'r1', x: 40, y: 40 })
+    const q = new OrderQueue(undefined, terrain)
+    const order = { kind: 'build', residentId: r.id, building: 'storage' }
+    // Its footprint would reach a tile past the city's area.
+    Object.assign(r, { x: 42 + CITY_AREA_MARGIN, y: 40 })
+    expect(q.receive(world, me, 'q', order)).toMatchObject({
+      type: 'rejected',
+      reason: 'a storage goes in a city’s area',
+    })
+    Object.assign(r, { x: 43, y: 40 })
+    expect(q.receive(world, me, 'q', order)).toMatchObject({ type: 'ack' })
+    q.applyAll(world)
+    stepWorld(world, terrain)
+    expect(world.buildings.find((b) => b.kind === 'storage')).toMatchObject({
+      x: 43,
+      y: 40,
+      cityId: null,
+      site: { delivered: {}, work: expect.any(Number) },
+    })
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('once finished belongs to the city and holds goods', () => {
+    const { world, r } = setup()
+    addCity(world, { id: 'c1', realmId: 'r1', x: 40, y: 40 })
+    Object.assign(r, { x: 43, y: 40 })
+    const storage = nearlyBuilt(world, r, 'storage')
+    stepWorld(world, terrain)
+    expect(storage.site).toBeUndefined()
+    expect(storage.cityId).toBe('c1')
+
+    r.carried = { wood: 5 }
+    const q = new OrderQueue(undefined, terrain)
+    const spot = { kind: 'storage', storageId: storage.id }
+    q.receive(world, me, 'd', { kind: 'drop', residentId: r.id, spot, goods: { wood: 5 } })
+    q.applyAll(world)
+    stepWorld(world, terrain)
+    expect(storage.stock).toEqual({ wood: 5 })
+    expect(r.carried.wood ?? 0).toBe(0)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+})

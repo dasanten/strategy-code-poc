@@ -1058,6 +1058,8 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   road: { stone: 1 },
   /** A house (`CONTEXT.md`: House): timber for four residents' room. */
   house: { wood: 20 },
+  /** A storage (`CONTEXT.md`: Storage): a timber store on a stone floor, a little more than a house. */
+  storage: { wood: 30, stone: 10 },
   /** A farm is fields on Plains: work, but no materials, so a city can always feed itself. */
   farm: {},
 }
@@ -1067,7 +1069,8 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
  * a mint 5, a smithy 5, a town hall 6. A tile of wooden wall takes a sixteenth of a game day, a
  * gate an eighth, a tile of road a sixteenth (a quarter of what a 40 m tile took), a house one
- * game day and a farm half of one. More or stronger workers finish it sooner (`buildWork`).
+ * game day, a storage two and a farm half of one. More or stronger workers finish it sooner
+ * (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -1082,6 +1085,7 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   gate: TICKS_PER_GAME_DAY / 8,
   road: TICKS_PER_GAME_DAY / 16,
   house: TICKS_PER_GAME_DAY,
+  storage: 2 * TICKS_PER_GAME_DAY,
   farm: TICKS_PER_GAME_DAY / 2,
 }
 
