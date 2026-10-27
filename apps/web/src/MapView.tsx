@@ -582,8 +582,9 @@ export function MapView({
       let best: { id: string; d: number } | undefined
       for (const r of residents) {
         if (r.owner !== home.realmId) continue
-        // Up close, the figure under the pointer; further out, the tile's token.
-        const spot = close ? drawnSpots.get(r.id) : undefined
+        // The figure or token they were drawn as, so the reach grows with it; up close only
+        // residents drawn as a figure (or behind a "+N" badge) can be clicked.
+        const spot = drawnSpots.get(r.id)
         if (close && !spot) continue
         const [rx, ry] = spot
           ? [spot.x, spot.y]
