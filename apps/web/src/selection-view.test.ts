@@ -76,7 +76,7 @@ const ids = (h: ResidentHere) => residentActions(h).map((a) => a.id)
 
 describe('the actions on a resident’s card', () => {
   it('offers walking, building, a road, pairing and scripts to an idle adult on open ground', () => {
-    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'pair', 'script'])
+    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'wallTo', 'pair', 'script'])
   })
 
   it('offers stop only while they have an order or run a script', () => {
@@ -135,10 +135,11 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ inCity: false }))).not.toContain('pair')
   })
 
-  it('keeps a child’s driving and road building in sight but turned off', () => {
+  it('keeps a child’s driving, road and wall building in sight but turned off', () => {
     const a = residentActions(here({ adult: false, carriage }))
     expect(a.find((x) => x.id === 'drive')?.disabled).toBe(true)
     expect(a.find((x) => x.id === 'roadTo')?.disabled).toBe(true)
+    expect(a.find((x) => x.id === 'wallTo')?.disabled).toBe(true)
     expect(a.find((x) => x.id === 'walk')?.disabled).toBeUndefined()
   })
 

@@ -12,7 +12,7 @@ import { climb } from './climbing.js'
 import { attack } from './combat.js'
 import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
-import { roadLine } from './road-line.js'
+import { roadLine, wallLine } from './road-line.js'
 import { contractOrders, pay } from './contracts.js'
 import { buyCity } from './buying.js'
 import { persuasionOrders } from './persuasion.js'
@@ -64,6 +64,7 @@ export const orderKinds: Record<string, OrderKind> = {
   climb,
   setGate,
   roadLine,
+  wallLine,
   pay,
   buyCity,
   buy,

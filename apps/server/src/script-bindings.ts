@@ -428,6 +428,11 @@ function residentActions(
         from: { x: resident.x, y: resident.y },
         to: { x: plain(x), y: plain(y) },
       }),
+    wallLine: ([x, y]) =>
+      request('wallLine', {
+        from: { x: resident.x, y: resident.y },
+        to: { x: plain(x), y: plain(y) },
+      }),
   }
 }
 
