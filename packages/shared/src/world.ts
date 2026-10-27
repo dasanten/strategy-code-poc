@@ -13,6 +13,13 @@ export const TICKS_PER_GAME_YEAR = 420 * TICKS_PER_GAME_DAY
 export const STAT_NAMES = ['strength', 'endurance', 'agility', 'intellect'] as const
 export type StatName = (typeof STAT_NAMES)[number]
 
+/** A horse's stats (`CONTEXT.md`: Horse stats). */
+export const HORSE_STAT_NAMES = ['speed', 'strength', 'endurance'] as const
+export type HorseStatName = (typeof HORSE_STAT_NAMES)[number]
+
+/** A horse's stats, whole numbers it is born with; nothing trains them. */
+export type HorseStats = Record<HorseStatName, number>
+
 /** A stat: what the resident was born with, plus what training added (capped by the base). */
 export interface Stat {
   base: number
@@ -1466,6 +1473,10 @@ export interface Horse {
   hunger: number
   /** 0 is dead; the most is `MAX_HEALTH`, as for residents. */
   health: number
+  /** Speed, Strength and Endurance (`CONTEXT.md`: Horse stats). */
+  stats: HorseStats
+  /** The tick it was born; its age is counted from it (`horseAgeInYears`). */
+  bornAt: number
 }
 
 /** A horse-drawn cart (`CONTEXT.md`: Carriage). */

@@ -1,4 +1,4 @@
-import { GOODS, STAT_NAMES, type SkillName } from './world.js'
+import { GOODS, HORSE_STAT_NAMES, STAT_NAMES, type SkillName } from './world.js'
 
 /**
  * Script views (`CONTEXT.md`: Script view; ADR 0011): what a script gets of each kind of thing,
@@ -47,6 +47,7 @@ export type ScriptViewName =
   | 'city'
   | 'hire'
   | 'horse'
+  | 'horseStats'
   | 'carriage'
   | 'pile'
   | 'node'
@@ -463,7 +464,13 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         '0 is dead; full is 100.',
         'for one of another realm that isn’t allied',
       ),
+      field('stats', view('horseStats'), 'Speed, strength and endurance.'),
+      field('bornAt', 'number', 'The tick it was born; may be before the world began.'),
     ],
+  },
+  horseStats: {
+    description: 'A horse’s stats, whole numbers it was born with.',
+    fields: HORSE_STAT_NAMES.map((s) => field(s, 'number', `Its ${s}.`)),
   },
   carriage: {
     description: 'A carriage, as the Player sees it.',

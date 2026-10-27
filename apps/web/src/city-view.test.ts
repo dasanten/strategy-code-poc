@@ -155,7 +155,7 @@ describe('trading at a warehouse in the inspector', () => {
   })
 
   it('previews what buying and selling would move at the warehouse’s prices', () => {
-    const preview = previewTrade(seen, 'w1', trader, undefined, 'iron', 2, 0)
+    const preview = previewTrade(seen, 'w1', trader, undefined, 'iron', 2, 0, [])
     const floor = WAREHOUSE_FLOOR.iron
     expect(preview.sell).toEqual({
       units: 2,
@@ -175,7 +175,7 @@ describe('trading at a warehouse in the inspector', () => {
       horseId: null,
       load: {},
     }
-    expect(previewTrade(seen, 'w1', trader, carriage, 'iron', 2, 0)).toEqual({
+    expect(previewTrade(seen, 'w1', trader, carriage, 'iron', 2, 0, [])).toEqual({
       buy: { units: 0, coins: 0 },
       sell: { units: 0, coins: 0 },
     })
@@ -273,7 +273,7 @@ describe('trading with an NPC city in the inspector', () => {
       stats: { strength: { base: 10, trained: 0 } },
     } as unknown as Resident
     const q = (good: 'food' | 'wood', units: number) =>
-      previewNpcTrade([food, wood], storage, trader, undefined, good, units, 0)
+      previewNpcTrade([food, wood], storage, trader, undefined, good, units, 0, [])
     expect(q('food', 50).buy).toEqual({ units: 10, coins: 30 })
     expect(q('food', 50).sell.units).toBe(0)
     // It lacks 20 wood, but has only 12 coins: 3 wood at 4 coins.

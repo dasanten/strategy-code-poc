@@ -1,4 +1,5 @@
 import {
+  AVERAGE_HORSE_STATS,
   MAX_HEALTH,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_PER_PAID_WEEK,
@@ -401,6 +402,8 @@ describe('contracts when a Leader dies', () => {
       y: 40,
       hunger: MAX_HUNGER,
       health: MAX_HEALTH,
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: 0,
     })
     world.carriages.push({
       id: 'k2',

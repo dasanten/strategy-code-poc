@@ -1,4 +1,5 @@
 import {
+  AVERAGE_HORSE_STATS,
   BUILD_MATERIALS,
   BUILD_WORK,
   CARRIAGE_SPEED,
@@ -229,6 +230,8 @@ describe('moving on a road', () => {
         y: 2,
         hunger: MAX_HUNGER,
         health: MAX_HEALTH,
+        stats: { ...AVERAGE_HORSE_STATS },
+        bornAt: 0,
       })
       world.carriages.push({
         id: 'k1',

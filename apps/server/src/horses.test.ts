@@ -1,7 +1,17 @@
 import {
+  AVERAGE_HORSE_STATS,
   BUILD_MATERIALS,
   BUILD_WORK,
   HORSE_FOOD_PER_DAY,
+  HORSE_START_AGE_MAX,
+  HORSE_START_AGE_MIN,
+  HORSE_STAT_AVERAGE,
+  HORSE_STAT_MAX,
+  HORSE_STAT_MIN,
+  HORSE_STAT_NAMES,
+  TICKS_PER_GAME_YEAR,
+  horseAgeInYears,
+  horseFoodFactor,
   HUNGER_DAYS,
   MAX_HEALTH,
   MAX_HUNGER,
@@ -19,8 +29,8 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { eventsFor } from './events.js'
-import { stepHorses } from './horses.js'
-import { checkInvariants } from './invariants.js'
+import { newHorse, stepHorses } from './horses.js'
+import { checkInvariants, horseStatsSound } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { worldWithCity } from './test-terrain.js'
@@ -56,7 +66,17 @@ function setup(food = 0) {
 }
 
 function horse(world: WorldState, id: string, x: number, y: number, realmId: string | null = 'r1') {
-  const h: Horse = { id, realmId, cityId: null, x, y, hunger: MAX_HUNGER, health: MAX_HEALTH }
+  const h: Horse = {
+    id,
+    realmId,
+    cityId: null,
+    x,
+    y,
+    hunger: MAX_HUNGER,
+    health: MAX_HEALTH,
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
+  }
   world.horses.push(h)
   return h
 }
@@ -72,6 +92,61 @@ function run(world: WorldState, days: number) {
 }
 
 describe('horse hunger', () => {
+  it('feeds a horse of higher Endurance less, of lower Endurance more (`CONTEXT.md`: Horse stats)', () => {
+    const eaten = (endurance: number) => {
+      const { world, stable } = setup()
+      const h = horse(world, 'h1', stable.x, stable.y)
+      h.stats.endurance = endurance
+      stable.stock = { food: 100 }
+      run(world, 20)
+      return 100 - (stable.stock.food ?? 0)
+    }
+    const average = eaten(HORSE_STAT_AVERAGE)
+    const tough = eaten(HORSE_STAT_MAX)
+    const weak = eaten(HORSE_STAT_MIN)
+    expect(tough).toBeLessThan(average)
+    expect(weak).toBeGreaterThan(average)
+    const factor = horseFoodFactor({ stats: { ...AVERAGE_HORSE_STATS, endurance: HORSE_STAT_MAX } })
+    expect(Math.abs(tough - 20 * HORSE_FOOD_PER_DAY * factor)).toBeLessThanOrEqual(1)
+  })
+
+  it('draws a new horse’s stats and age in their ranges', () => {
+    const tick = 3 * TICKS_PER_GAME_YEAR
+    for (let seed = 0; seed < 50; seed++) {
+      const h = newHorse(mulberry32(seed), {
+        id: 'h',
+        realmId: null,
+        cityId: null,
+        x: 0,
+        y: 0,
+        tick,
+      })
+      for (const s of HORSE_STAT_NAMES) {
+        expect(Number.isInteger(h.stats[s])).toBe(true)
+        expect(h.stats[s]).toBeGreaterThanOrEqual(HORSE_STAT_MIN)
+        expect(h.stats[s]).toBeLessThanOrEqual(HORSE_STAT_MAX)
+      }
+      const age = horseAgeInYears(h, tick)
+      expect(age).toBeGreaterThanOrEqual(HORSE_START_AGE_MIN)
+      expect(age).toBeLessThanOrEqual(HORSE_START_AGE_MAX)
+      expect(h).toMatchObject({ hunger: MAX_HUNGER, health: MAX_HEALTH })
+    }
+  })
+
+  it('catches a horse without sound stats or born in the future', () => {
+    const { world } = setup()
+    const h = horse(world, 'h1', 1, 1)
+    expect(horseStatsSound.check(world, terrain)).toEqual([])
+    h.stats.speed = 0
+    h.stats.strength = 2.5
+    h.bornAt = world.tick + 1
+    const found = horseStatsSound.check(world, terrain).map((v) => v.message)
+    expect(found).toEqual([
+      'horse h1 has speed 0, strength 2.5',
+      `horse h1 was born at tick ${world.tick + 1}, after tick ${world.tick}`,
+    ])
+  })
+
   it('feeds a horse in a stable from the stable’s storage, HORSE_FOOD_PER_DAY a game day', () => {
     const { world, stable } = setup(100)
     const h = horse(world, 'h1', 8, 8)

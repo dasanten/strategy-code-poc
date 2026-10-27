@@ -6,6 +6,8 @@ import {
   type BuildingKind,
   type CrimeKind,
   type Good,
+  type Horse,
+  type HorseStats,
   type Protection,
   type ResourceKind,
   type Resident,
@@ -222,6 +224,73 @@ export const STABLE_CAPACITY = 6
  * two fed horses or without room does not count.
  */
 export const STABLE_BREED_DAYS = 10
+
+/**
+ * A new horse's stats are whole numbers drawn from this range (`CONTEXT.md`: Horse stats), like a
+ * resident's base stats.
+ */
+export const HORSE_STAT_MIN = 5
+export const HORSE_STAT_MAX = 15
+
+/** The stat at which a horse is average: it pulls, holds and eats as the plain numbers say. */
+export const HORSE_STAT_AVERAGE = 10
+
+/** An average horse's stats: the middle of the range, what horses from before stats got. */
+export const AVERAGE_HORSE_STATS: Readonly<HorseStats> = {
+  speed: HORSE_STAT_AVERAGE,
+  strength: HORSE_STAT_AVERAGE,
+  endurance: HORSE_STAT_AVERAGE,
+}
+
+/** A new horse is this many game years old, drawn in the range; foals start at 0. */
+export const HORSE_START_AGE_MIN = 3
+export const HORSE_START_AGE_MAX = 8
+
+/** How much faster a horse pulls its carriage for each point of Speed above average (slower below). */
+export const HORSE_SPEED_EFFECT = 0.04
+
+/** The furthest Speed moves a horse's pace, either way, as a share of it. */
+export const HORSE_SPEED_LIMIT = 0.5
+
+/** How much more a carriage holds for each point of its horse's Strength above average (less below). */
+export const HORSE_STRENGTH_EFFECT = 0.04
+
+/** The furthest Strength moves what a carriage holds, either way, as a share of `CARRIAGE_CAPACITY`. */
+export const HORSE_STRENGTH_LIMIT = 0.5
+
+/** How much less Food a horse needs for each point of Endurance above average (more below). */
+export const HORSE_ENDURANCE_EFFECT = 0.03
+
+/** The furthest Endurance moves the Food a horse needs, either way. */
+export const HORSE_ENDURANCE_LIMIT = 0.3
+
+/** How far a horse stat is from average, as a share, at most `limit` either way. */
+function horseStatShare(stat: number, effect: number, limit: number): number {
+  return Math.max(-limit, Math.min(limit, (stat - HORSE_STAT_AVERAGE) * effect))
+}
+
+/** How much faster than an average horse a horse goes, from its Speed (`CONTEXT.md`: Horse stats). */
+export function horseSpeedFactor(horse: Pick<Horse, 'stats'>): number {
+  return 1 + horseStatShare(horse.stats.speed, HORSE_SPEED_EFFECT, HORSE_SPEED_LIMIT)
+}
+
+/** How much more than usual a carriage pulled by the horse holds, from its Strength. */
+export function horseStrengthFactor(horse: Pick<Horse, 'stats'>): number {
+  return 1 + horseStatShare(horse.stats.strength, HORSE_STRENGTH_EFFECT, HORSE_STRENGTH_LIMIT)
+}
+
+/**
+ * How much of `HORSE_FOOD_PER_DAY` a horse needs, from its Endurance, as `hungerFactor` is for a
+ * resident.
+ */
+export function horseFoodFactor(horse: Pick<Horse, 'stats'>): number {
+  return 1 - horseStatShare(horse.stats.endurance, HORSE_ENDURANCE_EFFECT, HORSE_ENDURANCE_LIMIT)
+}
+
+/** A horse's age in game years at the given tick; unlike a resident, a foal ages at the usual pace. */
+export function horseAgeInYears(horse: Pick<Horse, 'bornAt'>, tick: number): number {
+  return (tick - horse.bornAt) / TICKS_PER_GAME_YEAR
+}
 
 /**
  * Starting cities lie at least this many tiles apart (about 2.5 hours' walk on plains), when the
@@ -843,17 +912,29 @@ export function carriageCanEnter(terrain: number): boolean {
 }
 
 /**
- * How many tiles per tick a carriage driven by `driver` goes onto a tile of the given terrain
- * (`CONTEXT.md`: Carriage): the terrain's `CARRIAGE_SPEED`, up to `DRIVING_SKILL_LIMIT` faster
- * with Driving skill. The horse sets the pace, so the driver's Agility does not count. Zero for
- * terrain a carriage cannot enter.
+ * How many tiles per tick a carriage driven by `driver` and pulled by `horse` goes onto a tile of
+ * the given terrain (`CONTEXT.md`: Carriage, Horse stats): the terrain's `CARRIAGE_SPEED`, scaled
+ * by the horse's Speed, and up to `DRIVING_SKILL_LIMIT` faster with Driving skill. The horse sets
+ * the pace, so the driver's Agility does not count. Zero for terrain a carriage cannot enter.
  */
-export function driveSpeed(driver: Resident, terrain: number): number {
+export function driveSpeed(driver: Resident, horse: Pick<Horse, 'stats'>, terrain: number): number {
   const base = (CARRIAGE_SPEED as Partial<Record<number, number>>)[terrain] ?? 0
   const skilled =
     1 + Math.min(DRIVING_SKILL_LIMIT, (driver.skills.driving ?? 0) * DRIVING_SKILL_EFFECT)
-  return (base * skilled) / WALK_TICKS_PER_TILE
+  return (base * horseSpeedFactor(horse) * skilled) / WALK_TICKS_PER_TILE
 }
+
+/**
+ * Most weight a carriage pulled by `horse` holds, in kg (`CONTEXT.md`: Horse stats):
+ * `CARRIAGE_CAPACITY`, scaled by the horse's Strength. A carriage with no horse holds
+ * `CARRIAGE_CAPACITY`.
+ */
+export function carriageCapacityWith(horse: Pick<Horse, 'stats'> | undefined): number {
+  return horse ? CARRIAGE_CAPACITY * horseStrengthFactor(horse) : CARRIAGE_CAPACITY
+}
+
+/** The most any carriage can hold, behind the strongest horse. */
+export const CARRIAGE_MAX_CAPACITY = CARRIAGE_CAPACITY * (1 + HORSE_STRENGTH_LIMIT)
 
 /**
  * Driving skill a driver learns from one tick of driving (`CONTEXT.md`: Skill, learned by doing),

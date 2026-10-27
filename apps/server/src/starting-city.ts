@@ -2,8 +2,6 @@ import {
   CITY_AREA_MARGIN,
   CITY_MIN_DISTANCE,
   HOUSING_ROOM,
-  MAX_HEALTH,
-  MAX_HUNGER,
   NPC_CITY_MIN_DISTANCE,
   START_CARRIED_FOOD,
   START_CITY_SIZE,
@@ -30,6 +28,7 @@ import {
 } from '@csp/shared'
 import { CITY_NAMES, updateCityMembership } from './cities.js'
 import { recordEvent } from './events.js'
+import { newHorse } from './horses.js'
 import { mulberry32, newResident, residentName } from './residents.js'
 import { welcomeFormerPlayer } from './standing.js'
 import { Ground } from './placing.js'
@@ -327,16 +326,12 @@ export function foundStartingCity(
   world.buildings.push(...buildings)
   updateCityMembership(world, terrain.size)
   world.residents.push(...residents)
+  const horseRand = mulberry32(world.seed * 7919 + userId + 1)
   for (let i = 0; i < START_HORSES; i++) {
-    world.horses.push({
-      id: newId(world, 'horse'),
-      realmId,
-      cityId: null,
-      x: sx,
-      y: sy,
-      hunger: MAX_HUNGER,
-      health: MAX_HEALTH,
-    })
+    const id = newId(world, 'horse')
+    world.horses.push(
+      newHorse(horseRand, { id, realmId, cityId: null, x: sx, y: sy, tick: world.tick }),
+    )
   }
   // The carriage stands at the stable, with one of the horses hitched to it.
   world.carriages.push({

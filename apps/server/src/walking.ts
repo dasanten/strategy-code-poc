@@ -253,7 +253,16 @@ export class Walking {
       if (waiting.has(r.id)) continue
       const ground = groundAt(this.terrain, roads, next[0], next[1])
       if (!onFoot(o)) {
-        o.progress += driveSpeed(r, ground)
+        // The horse sets the pace (`CONTEXT.md`: Horse stats). Without one the step goes at
+        // once, so resolving it ends the order.
+        const carriage = world.carriages.find((k) => k.id === o.carriageId)
+        const horse = carriage && horseFor(world, carriage)
+        if (!horse) {
+          const to = { x: next[0], y: next[1] }
+          steps.push({ kind: 'step', residentId: r.id, to, carriageId: o.carriageId })
+          continue
+        }
+        o.progress += driveSpeed(r, horse, ground)
         r.skills.driving = (r.skills.driving ?? 0) + drivingLearned(r, world.tick)
       } else {
         o.progress += walkSpeed(r, ground, world.tick)
