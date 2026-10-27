@@ -140,7 +140,6 @@ export interface ResidentHere {
   busy: boolean
   /** They belong to a city, so they can pair. */
   inCity: boolean
-  carrying: boolean
   carriage?: Carriage
   pile?: Pile
   storage?: Building
@@ -210,8 +209,8 @@ export function residentActions(h: ResidentHere): CardAction[] {
   add(row('roadTo', '', { ...picks('road', 'Build road to'), ...child }))
   const torn = [h.building, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
   if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
-  const goodsHere = h.pile || h.storage || site || h.carriage
-  if (h.carrying || goodsHere) add(row('goods', 'Goods…', { opens: true }))
+  // Always there, so the Player sees the carry capacity even with nothing to move.
+  add(row('goods', 'Goods…', { opens: true }))
   if (h.adult && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
   if (h.wallsInSight > 0) add(row('walls', 'Break or climb a wall…', { opens: true }))

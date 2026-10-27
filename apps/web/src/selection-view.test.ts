@@ -66,7 +66,6 @@ const here = (more: Partial<ResidentHere> = {}): ResidentHere => ({
   adult: true,
   busy: false,
   inCity: true,
-  carrying: false,
   othersInSight: 0,
   wallsInSight: 0,
   picking: false,
@@ -76,7 +75,7 @@ const ids = (h: ResidentHere) => residentActions(h).map((a) => a.id)
 
 describe('the actions on a resident’s card', () => {
   it('offers walking, building, a road, pairing and scripts to an idle adult on open ground', () => {
-    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'pair', 'script'])
+    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'goods', 'pair', 'script'])
   })
 
   it('offers stop only while they have an order or run a script', () => {
@@ -111,13 +110,9 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ building: building({ kind: 'warehouse' }) }))).not.toContain('tearDown')
   })
 
-  it('offers goods while they carry some or there are goods or a site on their tile', () => {
-    expect(ids(here())).not.toContain('goods')
-    expect(ids(here({ carrying: true }))).toContain('goods')
+  it('offers goods even with an empty inventory and nothing on their tile', () => {
+    expect(ids(here())).toContain('goods')
     expect(ids(here({ pile }))).toContain('goods')
-    expect(ids(here({ storage: building({ kind: 'storage' }) }))).toContain('goods')
-    const site = building({ kind: 'house', site: { work: 0, delivered: {} } })
-    expect(ids(here({ building: site }))).toContain('goods')
   })
 
   it('offers attacking only with someone of another realm in sight', () => {
@@ -150,7 +145,6 @@ describe('the actions on a resident’s card', () => {
   it('gives every shown action its own key', () => {
     const all = here({
       busy: true,
-      carrying: true,
       carriage,
       pile,
       building: building({ kind: 'farm' }),
