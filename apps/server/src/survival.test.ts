@@ -54,6 +54,20 @@ function averageEndurance(world: WorldState) {
 }
 
 describe('stepSurvival', () => {
+  it('has a resident of average Endurance eat half a unit of Food a game day, half the old pace', () => {
+    const { world } = worldWithCity()
+    averageEndurance(world)
+    const [r] = world.residents as [Resident]
+    world.residents = [r]
+    r.carried = { food: 12 }
+    expect(live(world, 20)).toEqual([])
+    // 20 game days at 0.5 a day; eaten in whole units, so within one.
+    expect(Math.abs(12 - (r.carried.food ?? 0) - 10)).toBeLessThanOrEqual(1)
+    // A fed resident's meter stays above a third: a unit fills two thirds of it.
+    expect(r.hunger).toBeGreaterThan(0)
+    expect(r.health).toBe(MAX_HEALTH)
+  })
+
   it('feeds residents from what they carry: everyone lives and the food goes down by what they eat', () => {
     const { world } = worldWithCity()
     averageEndurance(world)
@@ -102,7 +116,8 @@ describe('stepSurvival', () => {
     averageEndurance(world)
     const r = world.residents[1]!
     r.carried = { food: 3 }
-    live(world, 2.1) // two meals: one a game day, each when the meter has room for it
+    // Two meals: a unit lasts 1 / FOOD_PER_DAY game days, eaten when the meter has room for it.
+    live(world, 2 / FOOD_PER_DAY + 0.1)
     expect(r.carried.food).toBe(1)
   })
 
@@ -169,8 +184,8 @@ describe('stepSurvival', () => {
     }
     stock(tough, 15)
     stock(frail, 5)
-    live(tough, 10)
-    live(frail, 10)
+    live(tough, 20)
+    live(frail, 20)
     const left = (world: WorldState) => world.residents.reduce((n, r) => n + r.carried.food!, 0)
     expect(left(tough)).toBeGreaterThan(left(frail) + 20)
   })
