@@ -89,6 +89,7 @@ import type { MapWorld } from './map/map-world.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
+import { roadJoins } from './map/roads.js'
 
 /** Starting zoom, in screen pixels per tile. */
 const START_SCALE = 12
@@ -954,15 +955,12 @@ function drawStructures(
       }
     }
     if (dots) under.fill(style)
-    // Each join once, from the road to its right or below; faint if either end is a site.
+    // Each join once, straight or corner to corner (`roadJoins`); faint if either end is a site.
     let joins = false
     for (const r of roads.values()) {
       const [sx, sy] = centre(cam, view, size, r)
       if (!inSight([sx, sy])) continue
-      for (const [dx, dy] of [
-        [1, 0],
-        [0, 1],
-      ] as const) {
+      for (const [dx, dy] of roadJoins(r.x, r.y, (x, y) => !!roadAt(x, y))) {
         const next = roadAt(r.x + dx, r.y + dy)
         if (next && !!(r.site || next.site) === site) {
           under.moveTo(sx, sy).lineTo(sx + dx * tile, sy + dy * tile)
