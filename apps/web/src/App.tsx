@@ -223,6 +223,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'task', task: 'tearDown', residentId: selected.id, buildingId }
     setOrderError(await sendOrder(order))
   }
+  /**
+   * Gives the picked resident the Feed the stable task for the stable they stand in: they run the
+   * Player's Feed the stable (default) script (`CONTEXT.md`: Feeding the stable).
+   */
+  async function feedStable(stableId: string) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'feedStable', residentId: selected.id, stableId }
+    setOrderError(await sendOrder(order))
+  }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
   async function runScript(scriptId: number) {
@@ -623,6 +632,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             holders={heldBy(world.residents, buildingHere)}
             realmId={world.home.realmId}
             onWork={work}
+            onFeedStable={feedStable}
             onTearDown={tearDown}
             residents={own}
             onPair={pair}
