@@ -437,7 +437,7 @@ export function runTransfer(
     const { goods, onto } = caravan.holding
     caravan.holding = null
     const [good, wanted] = (Object.entries(goods) as [Good, number][])[0]!
-    const fits = onto === 'carriage' ? unitsThatFitCarriage(carriage, good) : Infinity
+    const fits = onto === 'carriage' ? unitsThatFitCarriage(world, carriage, good) : Infinity
     const units = Math.min(wanted, driver.carried[good] ?? 0, fits)
     if (units > 0) {
       driver.order = {
@@ -454,7 +454,7 @@ export function runTransfer(
   }
   const stock = b.stock ?? {}
   const hands = (g: Good) => unitsThatFit(driver, g, world.tick)
-  const fits = (g: Good) => unitsThatFitCarriage(carriage, g)
+  const fits = (g: Good) => unitsThatFitCarriage(world, carriage, g)
   const take = (from: GoodsSpot, good: Good, units: number, onto: 'carriage' | 'stop') => {
     driver.order = { kind: 'pickUp', from, goods: { [good]: units } }
     caravan.holding = { goods: { [good]: units }, onto }

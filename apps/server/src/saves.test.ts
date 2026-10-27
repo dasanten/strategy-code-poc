@@ -6,7 +6,13 @@ import { sql } from 'drizzle-orm'
 import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
 import { gzipSync } from 'node:zlib'
-import { type TerrainMap } from '@csp/shared'
+import {
+  AVERAGE_HORSE_STATS,
+  HORSE_START_AGE_MAX,
+  HORSE_START_AGE_MIN,
+  horseAgeInYears,
+  type TerrainMap,
+} from '@csp/shared'
 import { createAdmin } from './auth.js'
 import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
@@ -128,7 +134,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(41)
+    expect(WORLD_FORMAT_VERSION).toBe(42)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -155,8 +161,36 @@ describe('world saves', () => {
       progress: 0,
       siteId: null,
     }
-    const migrated = migrateWorld(structuredClone(world), 40, { terrain: smallTerrain() })
+    const migrated = migrateWorld(
+      structuredClone(world),
+      40,
+      { terrain: smallTerrain() },
+      migrations,
+      41,
+    )
     expect(migrated).toEqual(world)
+  })
+
+  it('gives horses from before stats average stats and a plausible age (migration 41 → 42)', () => {
+    const { world, terrain: land } = worldWithCity()
+    expect(world.horses.length).toBeGreaterThan(0)
+    // A format 41 horse: no stats, no birth tick.
+    const old = structuredClone(world) as unknown as { horses: Record<string, unknown>[] }
+    for (const h of old.horses) {
+      delete h.stats
+      delete h.bornAt
+    }
+    const migrated = migrateWorld(old, 41, { terrain: land })
+    for (const h of migrated.horses) {
+      expect(h.stats).toEqual(AVERAGE_HORSE_STATS)
+      const age = horseAgeInYears(h, migrated.tick)
+      expect(age).toBeGreaterThanOrEqual(HORSE_START_AGE_MIN)
+      expect(age).toBeLessThanOrEqual(HORSE_START_AGE_MAX)
+    }
+    expect(migrated.horses.map(({ id, x, y }) => ({ id, x, y }))).toEqual(
+      world.horses.map(({ id, x, y }) => ({ id, x, y })),
+    )
+    expect(checkInvariants(migrated, land)).toEqual([])
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

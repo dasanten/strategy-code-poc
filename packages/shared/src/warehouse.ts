@@ -1,7 +1,6 @@
 import { commandsCarriage } from './alliance.js'
 import {
   BUY_SHARE,
-  CARRIAGE_CAPACITY,
   DELIVERY_FEE_BASE,
   DELIVERY_FEE_PER_KG_TILE,
   DELIVERY_LOAD,
@@ -174,9 +173,9 @@ export function handsOf(resident: Resident, tick: number): TradeHolder {
   }
 }
 
-/** A carriage as a trade holder: its load and the room left on it (`CARRIAGE_CAPACITY`). */
-export function loadOf(carriage: Carriage): TradeHolder {
-  return { stock: carriage.load, room: CARRIAGE_CAPACITY - stockWeight(carriage.load) }
+/** A carriage as a trade holder: its load and the room left on it (`carriageCapacity`). */
+export function loadOf(carriage: Carriage, capacity: number): TradeHolder {
+  return { stock: carriage.load, room: capacity - stockWeight(carriage.load) }
 }
 
 /** What a trade moves: `units` of the good one way, `coins` the other. */

@@ -1,5 +1,6 @@
 import { parse, run } from '@csp/lang'
 import {
+  AVERAGE_HORSE_STATS,
   DEFAULT_SCRIPTS,
   MAX_HEALTH,
   MAX_HUNGER,
@@ -370,6 +371,8 @@ function withCarriage(world: WorldState) {
     y: 3,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
   })
   const k1 = { id: 'k1', realmId: 'r1', cityId: null, x: 3, y: 3, horseId: null, load: {} }
   world.carriages.push(k1)

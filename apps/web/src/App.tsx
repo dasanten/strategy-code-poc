@@ -422,6 +422,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             realms={world.diplomacy.realmsInSight}
             carriages={world.carriages}
+            horses={world.horses}
             tick={world.tick}
             mapSize={world.map.size}
             onSetGate={async (gateId, open) =>

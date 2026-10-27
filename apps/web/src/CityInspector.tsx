@@ -16,6 +16,7 @@ import {
   type TradeSide,
   type SeenResident,
   type SeenCarriage,
+  type SeenHorse,
 } from '@csp/shared'
 import {
   buildingCount,
@@ -59,6 +60,7 @@ export function CityInspector({
   realmId,
   realms,
   carriages,
+  horses,
   tick,
   mapSize,
   onSetGate,
@@ -78,6 +80,7 @@ export function CityInspector({
   realmId: string
   realms: RealmLabel[]
   carriages: SeenCarriage[]
+  horses: SeenHorse[]
   tick: number
   /** Tiles along each side of the map, for delivery fees. */
   mapSize: number
@@ -142,6 +145,7 @@ export function CityInspector({
                         good,
                         units,
                         tick,
+                        horses,
                       )
                     }
                     previewDelivery={(resident, carriage, good, units, city) =>
@@ -201,6 +205,7 @@ export function CityInspector({
                         good,
                         units,
                         tick,
+                        horses,
                       )
                     }
                     previewDelivery={() => ({ buy: noDelivery, sell: noDelivery })}

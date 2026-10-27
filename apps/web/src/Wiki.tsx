@@ -15,6 +15,7 @@ import {
   CARAVAN_ESCORTS_MAX,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
+  CARRIAGE_MAX_CAPACITY,
   CARRY_BASE,
   CARRY_PER_STRENGTH,
   CARRYING_DAYS,
@@ -53,6 +54,17 @@ import {
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HORSE_ENDURANCE_EFFECT,
+  HORSE_ENDURANCE_LIMIT,
+  HORSE_SPEED_EFFECT,
+  HORSE_SPEED_LIMIT,
+  HORSE_START_AGE_MAX,
+  HORSE_START_AGE_MIN,
+  HORSE_STAT_AVERAGE,
+  HORSE_STAT_MAX,
+  HORSE_STAT_MIN,
+  HORSE_STRENGTH_EFFECT,
+  HORSE_STRENGTH_LIMIT,
   HOUSING_ROOM,
   HUNGER_DAYS,
   HUNGER_ENDURANCE_EFFECT,
@@ -171,6 +183,7 @@ import {
   signed,
   residentsPerFarmer,
   transport,
+  horseRow,
   wikiResident,
   type PricedGood,
 } from './wiki-view.js'
@@ -616,10 +629,10 @@ export function Wiki() {
         <p>
           A resident carries {num(CARRY_BASE)} kg plus {num(CARRY_PER_STRENGTH)} kg for each point
           of Strength: {num(AVERAGE_CARRY)} kg at average, {num(carryCapacity(strong, 0))} kg with
-          Strength {num(strong.stats.strength.base)}. A carriage carries {num(CARRIAGE_CAPACITY)}{' '}
-          kg; each point of its driver's Driving skill makes it {pct(DRIVING_SKILL_EFFECT)} faster,
-          at most {pct(DRIVING_SKILL_LIMIT)}, learned at {num(DRIVING_SKILL_PER_DAY)} a game day of
-          driving. Carriages can't enter mountains.
+          Strength {num(strong.stats.strength.base)}. A carriage behind an average horse carries{' '}
+          {num(CARRIAGE_CAPACITY)} kg; each point of its driver's Driving skill makes it{' '}
+          {pct(DRIVING_SKILL_EFFECT)} faster, at most {pct(DRIVING_SKILL_LIMIT)}, learned at{' '}
+          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages can't enter mountains.
         </p>
         <table>
           <thead>
@@ -670,11 +683,44 @@ export function Wiki() {
           wall or gate already; a diagonal wall line closes the way like a straight one.
         </p>
         <p>
-          Horses eat {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the carriage's load
-          or food on the ground next to them. Two fed horses at a stable breed a foal every{' '}
-          {days(STABLE_BREED_DAYS)}, up to {num(STABLE_CAPACITY)} horses a stable. A haul route
-          keeps {num(HAUL_KEEP_FOOD)} Food on board for its horse.
+          An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
+          carriage's load or food on the ground next to them. Two fed horses at a stable breed a
+          foal every {days(STABLE_BREED_DAYS)}, up to {num(STABLE_CAPACITY)} horses a stable. A haul
+          route keeps {num(HAUL_KEEP_FOOD)} Food on board for its horse.
         </p>
+        <h3>Horse stats</h3>
+        <p>
+          Every horse has Speed, Strength and Endurance, and an age. A new horse's stats are whole
+          numbers from {num(HORSE_STAT_MIN)} to {num(HORSE_STAT_MAX)}, and it is{' '}
+          {num(HORSE_START_AGE_MIN)} to {num(HORSE_START_AGE_MAX)} game years old; a horse's stats
+          never change. Away from the average of {num(HORSE_STAT_AVERAGE)}, each point of Speed
+          makes its carriage {pct(HORSE_SPEED_EFFECT)} faster (slower below), at most{' '}
+          {pct(HORSE_SPEED_LIMIT)}; each point of Strength lets its carriage hold{' '}
+          {pct(HORSE_STRENGTH_EFFECT)} more (less below), at most {pct(HORSE_STRENGTH_LIMIT)}, so up
+          to {num(CARRIAGE_MAX_CAPACITY)} kg; each point of Endurance means{' '}
+          {pct(HORSE_ENDURANCE_EFFECT)} less Food (more below), at most {pct(HORSE_ENDURANCE_LIMIT)}
+          .
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Stat</th>
+              <th>Carriage on plains, tiles a game hour</th>
+              <th>Carriage holds, kg</th>
+              <th>Food a game day</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[HORSE_STAT_MIN, HORSE_STAT_AVERAGE, HORSE_STAT_MAX].map((v) => (
+              <tr key={v}>
+                <td>{num(v)}</td>
+                <td>{num(horseRow(v).plainsTiles, 1)}</td>
+                <td>{num(horseRow(v).capacity, 0)}</td>
+                <td>{num(horseRow(v).food, 2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
         <h3>Deliveries and transfers</h3>
         <p>
           A Trade Org caravan brings what you buy to your city's storage, at most{' '}

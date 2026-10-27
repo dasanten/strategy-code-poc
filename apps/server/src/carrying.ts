@@ -243,7 +243,7 @@ function put(world: WorldState, r: Resident, a: CarryAction, size: number): void
     a.spot.kind === 'site' ? materialsNeeded(siteAt(world, r.x, r.y, a.spot.siteId)!) : undefined
   const carriage = a.spot.kind === 'carriage' ? carriageOf(world, a.spot) : undefined
   for (const [good, wanted] of Object.entries(a.goods) as [Good, number][]) {
-    const fits = carriage ? unitsThatFitCarriage(carriage, good) : Infinity
+    const fits = carriage ? unitsThatFitCarriage(world, carriage, good) : Infinity
     const units = Math.min(wanted, r.carried[good] ?? 0, room ? (room[good] ?? 0) : fits)
     move(r.carried, target, good, units)
   }

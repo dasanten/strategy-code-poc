@@ -1,4 +1,5 @@
 import {
+  AVERAGE_HORSE_STATS,
   CARRIAGE_CAPACITY,
   MAX_HEALTH,
   MAX_HUNGER,
@@ -54,6 +55,8 @@ function setup(map: TerrainMap = open) {
     y: 2,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
   }
   world.horses.push(horse)
   const carriage: Carriage = {

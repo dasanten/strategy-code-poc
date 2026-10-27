@@ -1,4 +1,11 @@
-import type { TerrainMap, WorldState } from '@csp/shared'
+import {
+  AVERAGE_HORSE_STATS,
+  HORSE_START_AGE_MAX,
+  HORSE_START_AGE_MIN,
+  TICKS_PER_GAME_YEAR,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
 
 /**
@@ -6,7 +13,7 @@ import { leaveTradeOrg } from './caravans.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 41
+export const WORLD_FORMAT_VERSION = 42
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -46,6 +53,17 @@ export const migrations: Record<number, MigrationStep> = {
   // Walls can be built along a line (`CONTEXT.md`: Wall / Gate), a new order kind. Orders from
   // before are all road lines, which keep their shape, so the step leaves them as they are.
   40: (state) => state,
+  // Horses get stats and an age (`CONTEXT.md`: Horse stats). Those from before are average in
+  // every stat, and as old as the middle of a new horse's age range.
+  41: (state) => {
+    const world = structuredClone(state) as WorldState
+    const age = (HORSE_START_AGE_MIN + HORSE_START_AGE_MAX) / 2
+    for (const h of world.horses) {
+      h.stats = { ...AVERAGE_HORSE_STATS }
+      h.bornAt = world.tick - Math.round(age * TICKS_PER_GAME_YEAR)
+    }
+    return world
+  },
 }
 
 export class WorldFormatError extends Error {}

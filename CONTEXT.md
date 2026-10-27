@@ -568,6 +568,12 @@ The shared language of the game. Domain terms only — no implementation details
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
   hunger meter costs health, and a horse without food dies after about 5 game days. Bred at a
   stable, or bought from the Trade Organization.
+- **Horse stats:** every horse has Speed, Strength and Endurance, and an age. Speed is how fast
+  it pulls its carriage (and later carries a rider); Strength is how much the carriage it pulls
+  can hold; Endurance is how much Food it needs, as a resident's Endurance is for them. New
+  horses (in a starting city, at the Trade Organization, in an NPC city) get stats drawn in a
+  range. A horse's stats never change; they show with its age, health and hunger on the tile card
+  and in the stable.
 - **Horses have no inventory:** a horse eats only what is in reach. At a stable it eats from the
   stable's storage; pulling a carriage, from the carriage's load; anywhere, from Food lying on the
   ground on its tile or right next to it, so Players can feed a horse by putting food down by it.

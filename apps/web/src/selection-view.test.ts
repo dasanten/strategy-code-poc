@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CARRIAGE_CAPACITY,
   FOOTPRINT,
   MAP_SIZE,
   MAX_HEALTH,
@@ -418,6 +419,8 @@ describe('horses on the tile card', () => {
     y: 5,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    stats: { speed: 12, strength: 8, endurance: 10 },
+    bornAt: 0,
     ...h,
   })
   /** As sight sends a stranger's horse: without its hunger and health. */
@@ -431,19 +434,23 @@ describe('horses on the tile card', () => {
 
   it('tells how the own carriage’s horse fares and how long the Food on board feeds it', () => {
     const fed = tile({ carriages: [{ ...carriage, load: { food: 6 } }], horses: [horse()] })
-    expect(horseLine(fed.lines)).toBe('Horse: fed, healthy · Food on board for 8 game days')
+    expect(horseLine(fed.lines)).toBe(
+      'Horse: Speed 12, Strength 8, Endurance 10 · fed, healthy · Food on board for 8 game days',
+    )
     const hungry = tile({
       carriages: [carriage],
       horses: [horse({ hunger: 10, health: MAX_HEALTH - 5 })],
     })
-    expect(horseLine(hungry.lines)).toBe('Horse: hungry, hurt · no Food on board')
+    expect(horseLine(hungry.lines)).toBe(
+      'Horse: Speed 12, Strength 8, Endurance 10 · hungry, hurt · no Food on board',
+    )
     const starving = tile({ carriages: [carriage], horses: [horse({ hunger: 0 })] })
-    expect(horseLine(starving.lines)).toContain('Horse: starving')
+    expect(horseLine(starving.lines)).toContain('· starving, healthy')
     // A hitched horse is not a loose one.
     expect(fed.lines.some((l) => l.includes('1 horse ('))).toBe(false)
   })
 
-  it('says only whether a stranger’s carriage has a horse', () => {
+  it('says only whether a stranger’s carriage has a horse, and its horse’s stats', () => {
     const { id, x, y } = carriage
     const theirs = { id, x, y, realmId: 'r-other', cityId: null, loadLevel: 'empty' as const }
     const hitched = tile({
@@ -453,13 +460,37 @@ describe('horses on the tile card', () => {
     expect(hitched.lines.find((l) => l.startsWith('Carriage'))).toBe(
       'Carriage (another realm) · empty · horse hitched',
     )
-    expect(horseLine(hitched.lines)).toBeUndefined()
+    expect(horseLine(hitched.lines)).toBe('Horse: Speed 12, Strength 8, Endurance 10')
     const bare = tile({ carriages: [{ ...theirs, horseId: null }] })
     expect(bare.lines.find((l) => l.startsWith('Carriage'))).toBe(
       'Carriage (another realm) · empty · no horse',
     )
     const mine = tile({ carriages: [{ ...carriage, horseId: null }] })
     expect(mine.lines.find((l) => l.startsWith('Carriage'))).toContain('· no horse hitched')
+  })
+
+  it('shows each horse’s stats, age and how it fares, and how much its carriage holds', () => {
+    const at = 5 * TICKS_PER_GAME_YEAR + 100
+    const strong = horse({ stats: { speed: 9, strength: 15, endurance: 13 }, hunger: 10 })
+    const card = tile({ horses: [strong], tick: at })
+    expect(card.lines).toContain(
+      '· Speed 9, Strength 15, Endurance 13 · 5 years old · hungry, healthy',
+    )
+    const foal = horse({ bornAt: at - 3 * TICKS_PER_GAME_DAY })
+    expect(tile({ horses: [foal], tick: at }).lines).toContain(
+      '· Speed 12, Strength 8, Endurance 10 · 3 game days old · fed, healthy',
+    )
+    // A stranger's horse shows its stats and age, but not how it fares.
+    const theirs = unknown({ realmId: 'r-other', bornAt: at - TICKS_PER_GAME_YEAR })
+    expect(tile({ horses: [theirs], tick: at }).lines).toContain(
+      '· Speed 12, Strength 8, Endurance 10 · 1 year old',
+    )
+    // Strength 15 is 5 above average: the carriage it pulls holds a fifth more.
+    const k = { ...carriage, horseId: strong.id, load: { stone: 4 } }
+    const pulled = tile({ carriages: [k], horses: [strong], tick: at })
+    expect(pulled.lines.find((l) => l.startsWith('Carriage'))).toContain(
+      `/ ${CARRIAGE_CAPACITY * 1.2} kg`,
+    )
   })
 
   it('counts loose horses on a tile, how they fare only for the Player’s own, and is named after them', () => {

@@ -13,7 +13,9 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   CARRIAGE_CAPACITY,
+  CARRIAGE_MAX_CAPACITY,
   CRIME_MEMORY_DAYS,
+  HORSE_STAT_NAMES,
   TICKS_PER_GAME_DAY,
   carriageCanEnter,
   drivenCarriageId,
@@ -347,6 +349,37 @@ export const healthAndHungerInRange: Invariant = {
         message: `${t.what} ${t.id} has health ${t.health} and hunger ${t.hunger}`,
         entityIds: [t.id],
       }))
+  },
+}
+
+/**
+ * Every horse has its stats and an age (`CONTEXT.md`: Horse stats): each stat a whole number of
+ * at least 1, and a birth tick no later than now.
+ */
+export const horseStatsSound: Invariant = {
+  name: 'horse-stats-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const h of world.horses) {
+      const bad = HORSE_STAT_NAMES.filter(
+        (s) => !(Number.isInteger(h.stats?.[s]) && h.stats[s] >= 1),
+      )
+      if (bad.length > 0) {
+        out.push({
+          invariant: this.name,
+          message: `horse ${h.id} has ${bad.map((s) => `${s} ${h.stats?.[s]}`).join(', ')}`,
+          entityIds: [h.id],
+        })
+      }
+      if (!(Number.isFinite(h.bornAt) && h.bornAt <= world.tick)) {
+        out.push({
+          invariant: this.name,
+          message: `horse ${h.id} was born at tick ${h.bornAt}, after tick ${world.tick}`,
+          entityIds: [h.id],
+        })
+      }
+    }
+    return out
   },
 }
 
@@ -696,8 +729,9 @@ export const refilledWhenLow: Invariant = {
 
 /**
  * Carriages keep to the rules of `CONTEXT.md` (Carriage): never in the mountains, never loaded
- * past `CARRIAGE_CAPACITY`, and a hitched horse exists, stands with its carriage and pulls no
- * other one.
+ * past what the strongest horse lets one hold (`CARRIAGE_MAX_CAPACITY`: a carriage loaded behind
+ * a strong horse keeps its load when the horse dies), and a hitched horse exists, stands with its
+ * carriage and pulls no other one.
  */
 export const carriagesInPlace: Invariant = {
   name: 'carriages-in-place',
@@ -711,7 +745,9 @@ export const carriagesInPlace: Invariant = {
         fail(k.id, `stands where no carriage can go at (${k.x}, ${k.y})`)
       }
       const kg = stockWeight(k.load)
-      if (kg > CARRIAGE_CAPACITY + 1e-9) fail(k.id, `holds ${kg} kg of ${CARRIAGE_CAPACITY} kg`)
+      if (kg > CARRIAGE_MAX_CAPACITY + 1e-9) {
+        fail(k.id, `holds ${kg} kg, more than any carriage can (${CARRIAGE_MAX_CAPACITY} kg)`)
+      }
       if (k.horseId === null) continue
       const horse = world.horses.find((h) => h.id === k.horseId)
       if (!horse) fail(k.id, `is hitched to ${k.horseId}, which doesn't exist`)
@@ -1520,6 +1556,7 @@ export const worldInvariants: Invariant[] = [
   trainedWithinCap,
   skillsWithinCap,
   healthAndHungerInRange,
+  horseStatsSound,
   agesInRange,
   realmsHaveLeaders,
   leadersServeNoOne,
