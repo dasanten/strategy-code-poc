@@ -1548,6 +1548,12 @@ export const SCRIPT_REALM_STEP_BUDGET = 20000
 export const SCRIPT_MEMORY_MAX = 4000
 
 /**
+ * The longest text a script can give `doing()` for its resident's Doing line (`CONTEXT.md`:
+ * Doing), in characters after trimming; longer text is cut. One line of the resident card.
+ */
+export const DOING_MAX_LENGTH = 60
+
+/**
  * Ticks between two realm-log entries about the same resident's script going wrong (an error,
  * or running out of steps), so a script failing every tick doesn't flood the log. A minute.
  */
