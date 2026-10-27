@@ -40,6 +40,8 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
   mint: 'A mint turns gold ore into coins; not on Mountain.',
   smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain.',
   road: 'A road: residents walk and carriages drive faster on it, on any land but Mountain, and it can run through a gate. Nobody owns it.',
+  carriage:
+    'A carriage carries far more than any resident, pulled by a horse; built at a finished stable, on its tiles or right by them, and it belongs to the realm of whoever finishes it.',
 }
 
 /** Everything the ⓘ on a building's card says about its kind, numbers from the balance. */

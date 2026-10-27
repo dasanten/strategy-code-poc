@@ -13,6 +13,7 @@ import {
   type ScriptSummary,
   type Stock,
   isAt,
+  SHARES_A_TILE,
   covers,
   type SeenResident,
   UNEXPLORED,
@@ -261,8 +262,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A road may share its tile with a building (`CONTEXT.md`: Road); a building is wherever its
   // footprint is (`CONTEXT.md`: At a building).
   const buildingHere =
-    selected && world?.buildings.find((b) => b.kind !== 'road' && isAt(selected, b))
+    selected && world?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && isAt(selected, b))
   const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
+  const carriageSiteHere = onTile(world?.buildings.filter((b) => b.kind === 'carriage'))
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -495,12 +497,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             )}
             tick={world.tick}
             building={[...world.buildings, ...world.lastSeen.buildings].find(
-              (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
+              (b) => !SHARES_A_TILE.includes(b.kind) && covers(b, selectedTile.x, selectedTile.y),
             )}
             nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
             buildingNode={buildingNodeKind(
               world.buildings.find(
-                (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
+                (b) => !SHARES_A_TILE.includes(b.kind) && covers(b, selectedTile.x, selectedTile.y),
               ),
               nodeAt,
             )}
@@ -569,6 +571,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             building={buildingHere}
             road={roadHere}
+            carriageSite={carriageSiteHere}
             node={nodeAt?.(selected.x, selected.y)}
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
             onDrop={(spot, goods) => carry('drop', spot, goods)}

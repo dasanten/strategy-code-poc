@@ -22,6 +22,7 @@ export const BUILDING_ART: Record<BuildingKind, string> = {
   mint: 'mint.svg',
   smithy: 'smithy.svg',
   road: 'road.svg',
+  carriage: 'cart.svg',
 }
 
 /**
@@ -47,6 +48,8 @@ export const PAINTED_BUILDING_ART: Partial<Record<BuildingKind, number>> = {
   smelter: 9,
   mint: 10,
   smithy: 11,
+  /** Only ever a site, drawn as the 1×1 site cell (`PAINTED_SITE_ART`). */
+  carriage: 31,
 }
 
 /** A construction site's cell by its building's footprint, 1×1 to 4×4 (`CONTEXT.md`: Footprint). */

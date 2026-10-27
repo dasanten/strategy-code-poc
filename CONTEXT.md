@@ -577,7 +577,14 @@ The shared language of the game. Domain terms only — no implementation details
   Like a workplace, a stable has no owner: any horse standing in it eats from it.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
-  mountains.
+  mountains. Built at a stable (Building a carriage).
+- **Building a carriage:** a resident at a finished stable lays out a **carriage site** on their
+  tile of the stable, or on a tile right next to it, where a carriage can stand, off resource nodes
+  and other buildings; it shares the tile with the stable, one carriage site per tile. It is a
+  construction site like any other (materials, mostly wood and some iron, and work; fetching
+  materials, no owner, finished by anyone, torn down leaving all its materials). Once finished it
+  is gone, and an empty carriage of the realm of the resident who finished it stands on its tile,
+  with no horse hitched until it is first driven.
 - **Driving:** a grown-up resident on a carriage's tile drives it to another tile; the driver,
   the carriage and its horse move together. Driving teaches the Driving skill, and a more
   skilled driver goes faster. Players drive only their own carriages, with their own horses.
