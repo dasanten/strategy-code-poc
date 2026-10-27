@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { Building } from '@csp/shared'
 import {
   DRAWERS,
+  DRAWER_WIDTH,
   MIN_OPEN_MAP,
+  drawerWidth,
+  rememberedDrawerWidth,
   isWide,
   keyGoods,
   showBeside,
@@ -101,5 +104,26 @@ describe('key goods of the home city', () => {
 
   it('shows nothing when the realm has no home city', () => {
     expect(keyGoods([building({ stock: { food: 3 } })], null).food).toBe(0)
+  })
+})
+
+describe('drawer width', () => {
+  it('keeps a dragged width within the limits', () => {
+    expect(drawerWidth(DRAWER_WIDTH.min - 100)).toBe(DRAWER_WIDTH.min)
+    expect(drawerWidth(DRAWER_WIDTH.max + 100)).toBe(DRAWER_WIDTH.max)
+    expect(drawerWidth(450.6)).toBe(451)
+    expect(drawerWidth(Number.NaN)).toBe(DRAWER_WIDTH.initial)
+  })
+
+  it('starts at the initial width the limits allow', () => {
+    expect(DRAWER_WIDTH.initial).toBeGreaterThanOrEqual(DRAWER_WIDTH.min)
+    expect(DRAWER_WIDTH.initial).toBeLessThanOrEqual(DRAWER_WIDTH.max)
+  })
+
+  it('falls back to the initial width without a remembered one', () => {
+    expect(rememberedDrawerWidth(null)).toBe(DRAWER_WIDTH.initial)
+    expect(rememberedDrawerWidth('wide')).toBe(DRAWER_WIDTH.initial)
+    expect(rememberedDrawerWidth('500')).toBe(500)
+    expect(rememberedDrawerWidth('9999')).toBe(DRAWER_WIDTH.max)
   })
 })

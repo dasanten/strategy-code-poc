@@ -29,6 +29,7 @@ import { keyGoods, showBeside, toggleDrawer, type DrawerId, type OpenDrawer } fr
 import {
   CentredDialog,
   Drawer,
+  DrawerEdge,
   ToolRail,
   TopBar,
   mapCovered,
@@ -450,6 +451,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onShowPlace={(p) => showOnMap(p.x, p.y)}
           />,
         )}
+      <DrawerEdge open={openDrawer} />
       {world && selectedTile && (
         <div className="game-selection">
           <TileCard
