@@ -17,7 +17,13 @@ import {
 import { describe, expect, it } from 'vitest'
 import { ExploredTerrain } from './explored.js'
 import { stepAlliances } from './alliances.js'
-import { SightTracker, entitiesInSight, sentInsideUnseen, sentOutOfSight } from './sight.js'
+import {
+  SightTracker,
+  entitiesInSight,
+  seenScript,
+  sentInsideUnseen,
+  sentOutOfSight,
+} from './sight.js'
 import { foundStartingCity } from './starting-city.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { createWorld } from './world.js'
@@ -345,5 +351,31 @@ describe('loadLevel', () => {
     expect(loadLevel(food(CARRIAGE_CAPACITY / 2))).toBe('half')
     expect(loadLevel(food(CARRIAGE_CAPACITY * 0.9))).toBe('heavy')
     expect(loadLevel(food(CARRIAGE_CAPACITY))).toBe('full')
+  })
+})
+
+describe('seenScript', () => {
+  it('shows only the owning Player what goes into the Doing line', () => {
+    const { world } = worldWithCity()
+    const realm = world.realms[0]!
+    const farm = world.buildings.find((b) => b.kind === 'farm') ?? world.buildings[0]!
+    const [worker, builder, stranger] = world.residents
+    worker!.script = { scriptId: 3, memory: { workplaceId: farm.id, doing: 'Sowing' } }
+    builder!.script = {
+      scriptId: 0,
+      task: 'build',
+      memory: { building: 'house', at: { x: 1, y: 2 } },
+    }
+    stranger!.script = { scriptId: 4, memory: { building: 'nonsense', doing: 'Secret' } }
+    stranger!.owner = 'someone else'
+    const scripts = new Map(
+      entitiesInSight(world, terrain, realm.id).flatMap((e) =>
+        e.is === 'resident' && e.script ? [[e.id, e.script]] : [],
+      ),
+    )
+    expect(scripts.get(worker!.id)).toEqual({ scriptId: 3, building: farm.kind, doing: 'Sowing' })
+    expect(scripts.get(builder!.id)).toEqual({ scriptId: 0, task: 'build', building: 'house' })
+    expect(scripts.get(stranger!.id)).toEqual({ scriptId: 4 })
+    expect(seenScript(world, stranger!.script, true)).toEqual({ scriptId: 4, doing: 'Secret' })
   })
 })

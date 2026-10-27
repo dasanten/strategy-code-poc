@@ -13,6 +13,7 @@ import {
   SCRIPT_API,
   Terrain,
   DIAGONAL_STEP,
+  DOING_MAX_LENGTH,
   ageInYears,
   directivesFor,
   materialsNeeded,
@@ -85,9 +86,12 @@ export interface ScriptBindings {
   requests: OrderRequest[]
 }
 
-/** The order kinds a resident's script can request: one per action in `SCRIPT_API`. */
+/**
+ * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`,
+ * which asks for none.
+ */
 export const SCRIPT_ORDER_KINDS: readonly string[] = SCRIPT_API.filter(
-  (b) => b.is === 'action',
+  (b) => b.is === 'action' && b.name !== 'doing',
 ).map((b) => b.name)
 
 /** The army order each action of an army's script asks for (`ARMY_SCRIPT_API`). */
@@ -264,6 +268,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     // The script's own state is `memory`, not part of `me`.
     me = toValue({ ...resident, script: undefined, age: ageInYears(resident, world.tick) })
     actions = residentActions(request, resident)
+    actions.doing = ([text]) => {
+      const doing = doingText(text)
+      if (doing === null) delete context.memory.doing
+      else context.memory.doing = doing
+      return null
+    }
     queries.fits = ([good]) => {
       if (!(GOODS as readonly unknown[]).includes(good)) {
         throw new ScriptRuntimeError(`"fits" needs a good, not ${String(good)}`)
@@ -314,6 +324,16 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     globals[binding.name] = new NativeFunction(binding.name, call, binding.cost)
   }
   return { globals, requests }
+}
+
+/**
+ * What `doing(text)` keeps as `memory.doing` (`CONTEXT.md`: Doing): the text trimmed and cut to
+ * `DOING_MAX_LENGTH` characters, or null, as for empty text, to give the derived line back.
+ */
+export function doingText(text: Value | undefined): string | null {
+  if (text === undefined || text === null) return null
+  if (typeof text !== 'string') throw new ScriptRuntimeError('"doing" needs a text or null')
+  return text.trim().slice(0, DOING_MAX_LENGTH) || null
 }
 
 /** The `random` value of a tick: drawn from the world's seed, the same for every script. */
