@@ -318,7 +318,7 @@ export function ResidentsList({
                     {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
                   </span>
                   <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
-                  <span className="doing">
+                  <span className="doing" title={doingLine(r, { scripts, buildings })}>
                     {doingLine(r, { scripts, buildings })}
                     {r.script && <small className="muted">{scriptName(r, scripts)}</small>}
                   </span>
