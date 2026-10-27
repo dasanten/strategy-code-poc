@@ -13,6 +13,7 @@ export const FOOTPRINT: Record<BuildingKind, number> = {
   wall: 1,
   gate: 1,
   road: 1,
+  carriage: 1,
   house: 2,
   storage: 2,
   smelter: 2,

@@ -62,6 +62,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   mint: 'mint',
   smithy: 'smithy',
   road: 'road',
+  carriage: 'carriage site',
 }
 
 /** "3 houses", "1 storage". */
