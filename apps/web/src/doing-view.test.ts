@@ -51,6 +51,7 @@ const haul: ResidentOrder = {
   goods: ['wood'],
   returnGoods: [],
   keepFood: 2,
+  moving: null,
   stop: 'to',
   phase: 'driving',
   path: null,
