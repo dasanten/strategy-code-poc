@@ -161,7 +161,8 @@ function isBuilder(r: Resident): boolean {
     o?.kind === 'build' ||
     o?.kind === 'tearDown' ||
     (o?.kind === 'drop' && o.to.kind === 'site') ||
-    (o?.kind === 'pickUp' && o.from.kind === 'storage' && !('food' in o.goods))
+    (o?.kind === 'pickUp' && o.from.kind === 'storage' && !('food' in o.goods)) ||
+    (o?.kind === 'fetch' && !('food' in o.goods))
   )
 }
 
