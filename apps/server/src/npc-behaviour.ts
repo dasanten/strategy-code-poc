@@ -38,6 +38,8 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'walkTo',
   'pickUp',
   'drop',
+  'store',
+  'fetch',
   'workAt',
   'build',
   'tearDown',
@@ -117,8 +119,14 @@ function runCity(
     // Home at the storage with the load stored, a carrier is free for whatever the city needs
     // most (building, pairing), else back to work.
     const carry = r.script?.scriptId === 0 ? r.script.memory.carry : undefined
-    const stored = typeof carry === 'object' && carry !== null && !Array.isArray(carry)
-    if (stored && carry.step === 'back' && storage && isAt(r, storage, size)) {
+    const carrying = typeof carry === 'object' && carry !== null && !Array.isArray(carry)
+    if (
+      carrying &&
+      carry.stored === true &&
+      r.order?.kind !== 'store' &&
+      storage &&
+      isAt(r, storage, size)
+    ) {
       stopWork(r)
     }
     // Done with the Build default (built, or the site gone or out of reach), a builder is free.
