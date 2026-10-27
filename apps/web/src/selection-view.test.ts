@@ -436,7 +436,7 @@ describe('horses on the tile card', () => {
 
   it('tells how the own carriage’s horse fares and how long the Food on board feeds it', () => {
     const fed = tile({ carriages: [{ ...carriage, load: { food: 6 } }], horses: [horse()] })
-    expect(horseLine(fed.lines)).toBe('Horse: fed, healthy · Food on board for 4 game days')
+    expect(horseLine(fed.lines)).toBe('Horse: fed, healthy · Food on board for 8 game days')
     const hungry = tile({
       carriages: [carriage],
       horses: [horse({ hunger: 10, health: MAX_HEALTH - 5 })],

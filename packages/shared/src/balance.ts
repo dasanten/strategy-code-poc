@@ -177,11 +177,11 @@ export const HOUSING_ROOM: Partial<Record<BuildingKind, number>> = {
 /** Houses a starting city gets beyond what its residents need. */
 export const START_SPARE_HOUSES = 1
 
-/** Food in a starting city's storage, in kg: about twelve game days for its residents. */
+/** Food in a starting city's storage, in kg: about 25 game days for its residents. */
 export const START_FOOD = 100
 
 /**
- * Food each resident of a starting city carries, in units: two game days' meals, so they have
+ * Food each resident of a starting city carries, in units: four game days' meals, so they have
  * something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
  */
 export const START_CARRIED_FOOD = 2
@@ -190,7 +190,7 @@ export const START_CARRIED_FOOD = 2
 export const START_HORSES = 2
 
 /**
- * Food in a starting city's stable, in units: ten game days for its horses, time to start
+ * Food in a starting city's stable, in units: 20 game days for its horses, time to start
  * bringing it food from the farm.
  */
 export const START_STABLE_FOOD = 30
@@ -199,7 +199,7 @@ export const START_STABLE_FOOD = 30
  * Food a horse eats per game day, in units (`CONTEXT.md`: Horse). More than a resident; its
  * hunger meter otherwise runs like a resident's (`HUNGER_DAYS`, `STARVE_DAYS`, `HEAL_DAYS`).
  */
-export const HORSE_FOOD_PER_DAY = 1.5
+export const HORSE_FOOD_PER_DAY = 0.75
 
 /**
  * How far from its tile a horse reaches Food lying on the ground, in tiles either way
@@ -343,9 +343,9 @@ export const NPC_ADULTS_PER_PAIR = 6
 
 /**
  * Game days a partner carries a child before it is born (`CONTEXT.md`: Carrying), not working
- * meanwhile: 60 game days, 24 real hours.
+ * meanwhile: 10 game days, 4 real hours.
  */
-export const CARRYING_DAYS = 60
+export const CARRYING_DAYS = 10
 
 /** Ticks from the start of carrying until the child is born (`CARRYING_DAYS`). */
 export const CARRYING_TICKS = CARRYING_DAYS * TICKS_PER_GAME_DAY
@@ -409,7 +409,7 @@ export const TRADE_ORG_HQ = {
   houses: 9,
   /** Farms outside the outer ring, by its gates. */
   farms: 4,
-  /** Food in its storage, in units: about a week of what everyone eats. */
+  /** Food in its storage, in units: about two weeks of what everyone eats. */
   food: 225,
   /** Coins in its coin warehouse. */
   coins: 20_000,
@@ -449,7 +449,7 @@ export const TRADING_POST = {
   houses: 2,
   /** Farms outside the wall, by the gate. */
   farms: 1,
-  /** Food in its storage, in units: about two weeks of what everyone eats. */
+  /** Food in its storage, in units: about 25 game days of what everyone eats. */
   food: 75,
   /** Coins in its warehouse. */
   coins: 2_000,
@@ -533,7 +533,7 @@ export const CARAVAN_ESCORTS_MAX = 8
 
 /**
  * Extra Food a caravan keeps on board for each escort beyond `CARAVAN_ESCORTS`, in units: the
- * same ~16 game days of `FOOD_PER_DAY` as `CARAVAN_FOOD`.
+ * same ~32 game days of `FOOD_PER_DAY` as `CARAVAN_FOOD`.
  */
 export const CARAVAN_FOOD_PER_ESCORT = 16
 
@@ -545,8 +545,8 @@ export const CARAVAN_GUARD_RANGE = 16
 
 /**
  * Food a caravan keeps on board for its crew and its horse, in units, topped up at the storage
- * at each end of its route (`CONTEXT.md`: Caravan): a driver, two escorts and a horse eat 4.5 a
- * game day, so this lasts about 16 game days, the longest leg on a full-size map (~15).
+ * at each end of its route (`CONTEXT.md`: Caravan): a driver, two escorts and a horse eat 2.25 a
+ * game day, so this lasts about 32 game days, twice the longest leg on a full-size map (~15).
  */
 export const CARAVAN_FOOD = 72
 
@@ -645,32 +645,36 @@ export function carryCapacity(resident: Resident, tick: number): number {
 }
 
 /** Food a resident of average Endurance eats per game day, in units (`CONTEXT.md`: Hunger). */
-export const FOOD_PER_DAY = 1
+export const FOOD_PER_DAY = 0.5
 
 /**
- * A resident at home is running low on food when they carry fewer units than this: less than a
- * game day's meals (`CONTEXT.md`: Eating). They then take meals from their city's storage.
+ * A resident at home is running low on food when they carry fewer units than this: less than one
+ * meal, two game days' eating (`CONTEXT.md`: Eating). They then take meals from their city's storage.
  */
 export const HOME_FOOD_LOW = 1
 
 /**
- * A resident's own food (`CONTEXT.md`: Own food), in units: two game days of meals. Putting goods
+ * A resident's own food (`CONTEXT.md`: Own food), in units: four game days of meals. Putting goods
  * away leaves it in their hands unless the Player asks for an exact amount (`putAwayUnits`); NPC
  * residents always keep it, so nobody walks to the storage for the food they carry anyway.
  */
-export const OWN_FOOD = 2 * FOOD_PER_DAY
+export const OWN_FOOD = 4 * FOOD_PER_DAY
 
-/** Units of food in one meal, what a resident at home takes from storage at a time. */
+/**
+ * Units of food in one meal, what a resident at home takes from storage at a time: two game days'
+ * eating.
+ */
 export const MEAL_UNITS = 1
 
 /**
- * Game days a full hunger meter lasts without eating, at average Endurance. With `STARVE_DAYS`, a
+ * Game days a full hunger meter lasts without eating, at average Endurance. A unit of food fills
+ * two thirds of it, so a fed resident's meter never drops below a third. With `STARVE_DAYS`, a
  * resident dies about 5 game days (2 real hours) after their last meal.
  */
-export const HUNGER_DAYS = 2
+export const HUNGER_DAYS = 3
 
 /** Game days an empty hunger meter takes to cost a resident all their health. */
-export const STARVE_DAYS = 3
+export const STARVE_DAYS = 2
 
 /** Game days a fed resident takes to heal from no health back to full. */
 export const HEAL_DAYS = 3
@@ -1213,7 +1217,7 @@ export const BATCHES_PER_DAY: Partial<Record<BuildingKind, number>> = {
  * gold ore slowest.
  */
 export const WORK_OUTPUT_PER_DAY: Partial<Record<Good, number>> = {
-  food: 4,
+  food: 2,
   wood: 4,
   stone: 3,
   ironOre: 2,
