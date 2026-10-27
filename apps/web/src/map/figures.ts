@@ -60,10 +60,10 @@ export const FIGURES_PER_TILE = 4
  * the "+N" badge instead.
  */
 const SLOTS: readonly (readonly [number, number])[] = [
-  [0.26, 0.74],
-  [0.74, 0.74],
-  [0.26, 0.26],
-  [0.74, 0.26],
+  [0.22, 0.78],
+  [0.78, 0.78],
+  [0.22, 0.22],
+  [0.78, 0.22],
 ]
 
 /** One resident drawn as their own figure. */
