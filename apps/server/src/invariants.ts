@@ -1,5 +1,7 @@
 import {
   isWallOrGate,
+  carriagePulledBy,
+  horseOfResident,
   isLineOrder,
   LINE_BUILDING,
   wallStrength,
@@ -760,6 +762,46 @@ export const carriagesInPlace: Invariant = {
       const other = pulling.get(k.horseId)
       if (other) fail(k.id, `shares horse ${k.horseId} with ${other}`, [k.id, other, k.horseId])
       pulling.set(k.horseId, k.id)
+    }
+    return out
+  },
+}
+
+/**
+ * After a tick, a rider's horse exists, stands with them, is of their realm and pulls no carriage,
+ * and no horse has two riders (`CONTEXT.md`: Riding; `stepRiders` ends riding that can't go on).
+ */
+export const ridersOnHorses: Invariant = {
+  name: 'riders-on-horses',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (ids: string[], message: string) =>
+      out.push({ invariant: this.name, message, entityIds: ids })
+    const riders = new Map<string, string>()
+    for (const r of world.residents) {
+      if (r.riding === undefined) continue
+      const horse = world.horses.find((h) => h.id === r.riding)
+      if (!horse) {
+        fail([r.id], `resident ${r.id} rides ${r.riding}, which doesn't exist`)
+        continue
+      }
+      if (horse.x !== r.x || horse.y !== r.y) {
+        fail(
+          [r.id, horse.id],
+          `resident ${r.id} at (${r.x}, ${r.y}) rides horse ${horse.id} at (${horse.x}, ${horse.y})`,
+        )
+      }
+      if (!horseOfResident(horse, r)) {
+        fail([r.id, horse.id], `resident ${r.id} rides horse ${horse.id} of another realm`)
+      }
+      const carriage = carriagePulledBy(world, horse)
+      if (carriage) {
+        fail([horse.id, carriage.id], `horse ${horse.id} is ridden and hitched to ${carriage.id}`)
+      }
+      const other = riders.get(horse.id)
+      if (other)
+        fail([horse.id, r.id, other], `horse ${horse.id} has two riders, ${other} and ${r.id}`)
+      riders.set(horse.id, r.id)
     }
     return out
   },
@@ -1589,6 +1631,7 @@ export const worldInvariants: Invariant[] = [
   carryingDoesntWork,
   childrenDontWork,
   carriagesInPlace,
+  ridersOnHorses,
   driversOnCarriages,
   haulRoutesSound,
   alliancesSound,

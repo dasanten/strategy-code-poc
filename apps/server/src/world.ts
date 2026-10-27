@@ -25,6 +25,7 @@ import { requestWork, resolveWork } from './work.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestClimbing, resolveClimbing } from './climbing.js'
+import { stepRiders } from './riding.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
@@ -146,8 +147,9 @@ export interface StepResult {
  * whose delay ran out take effect; then residents at
  * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
  * realm (`stepCaptures`); admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
- * (`stepContracts`); standing drifts toward neutral (`stepStanding`); last, armies
- * lose members who are gone and give the rest their orders for the next tick. Without `walking`
+ * (`stepContracts`); standing drifts toward neutral (`stepStanding`); armies
+ * lose members who are gone and give the rest their orders for the next tick; last, riders who
+ * lost their horse get off it (`stepRiders`). Without `walking`
  * nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
@@ -198,6 +200,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
   stepLastSeen(world, terrain.size)
+  stepRiders(world)
   const actions =
     steps.length +
     strikes.length +

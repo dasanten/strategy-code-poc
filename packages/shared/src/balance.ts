@@ -924,6 +924,23 @@ export function driveSpeed(driver: Resident, horse: Pick<Horse, 'stats'>, terrai
   return (base * horseSpeedFactor(horse) * skilled) / WALK_TICKS_PER_TILE
 }
 
+/** How fast a hungry horse goes under its rider (`HORSE_HUNGRY_SHARE`), as a share of its pace. */
+export const HUNGRY_HORSE_PACE = 0.5
+
+/**
+ * How many tiles per tick a resident riding `horse` goes onto a tile of the given terrain
+ * (`CONTEXT.md`: Riding): as fast as the horse would pull a carriage there (`driveSpeed`), and
+ * only `HUNGRY_HORSE_PACE` of that while the horse is hungry. Zero where no carriage can go.
+ */
+export function rideSpeed(
+  rider: Resident,
+  horse: Pick<Horse, 'stats' | 'hunger'>,
+  terrain: number,
+): number {
+  const hungry = horse.hunger < HORSE_HUNGRY_SHARE * MAX_HUNGER
+  return driveSpeed(rider, horse, terrain) * (hungry ? HUNGRY_HORSE_PACE : 1)
+}
+
 /**
  * Most weight a carriage pulled by `horse` holds, in kg (`CONTEXT.md`: Horse stats):
  * `CARRIAGE_CAPACITY`, scaled by the horse's Strength. A carriage with no horse holds
