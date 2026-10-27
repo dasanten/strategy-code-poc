@@ -39,8 +39,8 @@ import {
 
 /**
  * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters,
- * mints and smithies, town halls, walls and gates (`CONTEXT.md`: Town hall, Wall / Gate), houses
- * and farms (`CONTEXT.md`: House, Farm), and roads (`CONTEXT.md`: Road).
+ * mints and smithies, town halls, storages, walls and gates (`CONTEXT.md`: Town hall, Storage,
+ * Wall / Gate), houses and farms (`CONTEXT.md`: House, Farm), and roads (`CONTEXT.md`: Road).
  */
 export const BUILDABLE: readonly BuildingKind[] = [
   'lumberCamp',
@@ -53,6 +53,7 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'mint',
   'smithy',
   'townHall',
+  'storage',
   'wall',
   'gate',
   'road',
@@ -89,12 +90,37 @@ export const OFF_NODES: readonly BuildingKind[] = [
   ...PROCESSING,
   'townHall',
   'house',
+  'storage',
   'wall',
   'gate',
 ]
 
 /** Buildable kinds that go on Plains, off any resource node: stables and farms. */
 export const ON_PLAINS: readonly BuildingKind[] = ['stable', 'farm']
+
+/**
+ * Buildable kinds that go only in a city's area, every tile of their footprint: houses and
+ * storages (`CONTEXT.md`: House, Storage).
+ */
+export const IN_CITY_AREA: readonly BuildingKind[] = ['house', 'storage']
+
+/**
+ * What a build menu offers off any resource node, in its order: every buildable kind but the
+ * nodes' workplaces and roads (which have their own), city buildings first.
+ */
+export const OFF_NODE_BUILDS: readonly BuildingKind[] = [
+  ...OFF_NODES.filter((k) => !PROCESSING.includes(k)),
+  ...ON_PLAINS,
+  ...PROCESSING,
+]
+
+/**
+ * What a build menu offers a resident on a tile: the workplace of the resource node there, or
+ * with none every kind that goes off a node (`OFF_NODE_BUILDS`).
+ */
+export function buildMenu(node: Pick<ResourceNode, 'kind'> | undefined): BuildingKind[] {
+  return node ? [NODE_WORKPLACE[node.kind]] : [...OFF_NODE_BUILDS]
+}
 
 /**
  * Kinds of building that keep goods in a storage of their own: storages, the Trade
@@ -192,7 +218,7 @@ export interface TerrainLookup {
   at: (x: number, y: number) => number
 }
 
-/** What `buildProblem` looks at: the buildings, the resource nodes, and the cities for a house. */
+/** What `buildProblem` looks at: the buildings, the resource nodes, and the cities (`IN_CITY_AREA`). */
 export type PlacingWorld = Pick<WorldState, 'buildings' | 'cities'> & {
   nodes: readonly Pick<ResourceNode, 'kind' | 'x' | 'y'>[]
 }
@@ -208,8 +234,8 @@ function lookupOf(terrain: TerrainMap | TerrainLookup): (x: number, y: number) =
  * (x, y) (`CONTEXT.md`: Where buildings go, Footprint), or undefined if it can: every tile of the
  * footprint passable and free of other buildings; workplaces with one tile on a resource node of
  * their kind, stables and farms wholly on Plains, smelters, mints, smithies, town halls, houses,
- * walls and gates off Mountain, a house only in a city's area (`CONTEXT.md`: House); only a
- * node's workplace covers a node. A road goes on any passable land but Mountain, node or not, and
+ * storages, walls and gates off Mountain, a house or storage only in a city's area (`CONTEXT.md`:
+ * House, Storage); only a node's workplace covers a node. A road goes on any passable land but Mountain, node or not, and
  * next to a building on its tile, but one road per tile (`CONTEXT.md`: Road). Without `terrain`
  * the terrain rules are not checked.
  */
@@ -240,8 +266,9 @@ export function buildProblem(
   } else if (OFF_NODES.includes(kind)) {
     if (nodes.length > 0 || !all((t) => t !== Terrain.Mountain))
       return `a ${kind} goes off any resource node, and not on Mountain`
-    if (kind === 'house' && tiles.some(([tx, ty]) => citiesAt(world, tx, ty, size).length === 0))
-      return 'a house goes in a city’s area'
+    const inCity = (t: [number, number]) => citiesAt(world, t[0], t[1], size).length > 0
+    if (IN_CITY_AREA.includes(kind) && !tiles.every(inCity))
+      return `a ${kind} goes in a city’s area`
   } else if (nodes.length !== 1 || NODE_WORKPLACE[nodes[0]!.kind] !== kind)
     return `a ${kind} goes with one tile on a fitting resource node`
   if (tiles.some(([tx, ty]) => buildingAt(world, tx, ty, size)))

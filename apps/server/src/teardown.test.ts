@@ -265,8 +265,8 @@ describe.each([
     r.bornAt = world.tick - ticksForAge(5)
     expect(reject(tearDownOrder())).toBe('children can’t tear down buildings')
     r.bornAt = world.tick - ticksForAge(30)
-    world.buildings.push({ id: 'b2', kind: 'storage', cityId: 'c1', x: 7, y: 7 })
-    expect(reject(tearDownOrder('b2'))).toBe('a storage can’t be torn down yet')
+    world.buildings.push({ id: 'b2', kind: 'warehouse', cityId: 'c1', x: 7, y: 7 })
+    expect(reject(tearDownOrder('b2'))).toBe('a warehouse can’t be torn down yet')
     expect(queue.size).toBe(0)
   })
 
@@ -312,9 +312,9 @@ describe('tear-down invariants', () => {
     expect(teardownsWithinNeeds.check(world, terrain)).toHaveLength(1)
     mine.teardown = 1
     expect(teardownsWithinNeeds.check(world, terrain)).toEqual([])
-    world.buildings.push({ id: 'h', kind: 'storage', cityId: 'c1', x: 1, y: 1, teardown: 0 })
+    world.buildings.push({ id: 'h', kind: 'warehouse', cityId: 'c1', x: 1, y: 1, teardown: 0 })
     expect(teardownsWithinNeeds.check(world, terrain).map((v) => v.message)).toContain(
-      'h is a storage being torn down',
+      'h is a warehouse being torn down',
     )
   })
 
