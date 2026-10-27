@@ -59,7 +59,7 @@ import {
   type SeenResident,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import type { ResidentGroup } from './residents-view.js'
+import { carryLine, type CardSections, type ResidentGroup } from './residents-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -319,7 +319,9 @@ export function ResidentsList({
                       style={{ width: pct(r.hunger / MAX_HUNGER) }}
                     />
                   </span>
-                  <span className="mono">{kg(stockWeight(r.carried))}</span>
+                  <span className="mono">
+                    {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
+                  </span>
                 </button>
               ))}
             </div>
@@ -379,6 +381,8 @@ export function ResidentCard({
   rename,
   onRename,
   onClose,
+  sections,
+  onSections,
 }: {
   resident: Resident
   leaderId: string
@@ -468,9 +472,11 @@ export function ResidentCard({
   onRename: (name: string, realmName?: string) => void
   /** Closes the card. */
   onClose: () => void
+  /** The open sections, kept by the caller so they stay open from one selected unit to the next. */
+  sections: CardSections<ActionId>
+  onSections: (sections: CardSections<ActionId>) => void
 }) {
-  // The panel an action opened; the card is keyed by resident, so it starts closed for each.
-  const [open, setOpen] = useState<ActionId>()
+  const setPanel = (panel: ActionId | undefined) => onSections({ ...sections, panel })
   const age = Math.floor(ageInYears(r, tick))
   const skills = (Object.keys(SKILL_LABELS) as SkillName[]).filter((s) => (r.skills[s] ?? 0) > 0)
   const carried = goodsIn(r.carried)
@@ -490,7 +496,6 @@ export function ResidentCard({
     adult: !child,
     busy: !!(r.order || r.script),
     inCity: r.cityId !== null,
-    carrying: carried.length > 0,
     carriage,
     pile,
     storage,
@@ -503,9 +508,9 @@ export function ResidentCard({
     makeLeader,
     renamable: !!rename,
   })
-  const shown = actions.some((a) => a.id === open) ? open : undefined
+  const shown = actions.some((a) => a.id === sections.panel) ? sections.panel : undefined
   const act = (a: CardAction) => {
-    if (a.opens) return setOpen((now) => (now === a.id ? undefined : a.id))
+    if (a.opens) return setPanel(shown === a.id ? undefined : a.id)
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
     if (a.id === 'roadTo') onRoadTo()
@@ -591,7 +596,7 @@ export function ResidentCard({
                 <div className="panel-head">
                   <h3>Carrying</h3>
                   <span className="mono small">
-                    {kg(stockWeight(r.carried))} / {kg(carryCapacity(r, tick))}
+                    {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
                   </span>
                 </div>
                 {carried.length === 0 && (
@@ -718,13 +723,13 @@ export function ResidentCard({
                   className="primary"
                   disabled={!!makeLeader.problem}
                   onClick={() => {
-                    setOpen(undefined)
+                    setPanel(undefined)
                     onMakeLeader()
                   }}
                 >
                   Make {r.name} Leader
                 </button>
-                <button type="button" onClick={() => setOpen(undefined)}>
+                <button type="button" onClick={() => setPanel(undefined)}>
                   Cancel
                 </button>
               </div>
@@ -737,7 +742,7 @@ export function ResidentCard({
               resident={r}
               needsRealmName={rename.needsRealmName}
               onRename={(name, realmName) => {
-                setOpen(undefined)
+                setPanel(undefined)
                 onRename(name, realmName)
               }}
             />
@@ -745,8 +750,16 @@ export function ResidentCard({
         </div>
       )}
 
-      <details className="sel-details">
-        <summary>Stats and skills</summary>
+      <details className="sel-details" open={sections.stats}>
+        <summary
+          onClick={(e) => {
+            // Opened and closed only through the kept sections, never by the browser alone.
+            e.preventDefault()
+            onSections({ ...sections, stats: !sections.stats })
+          }}
+        >
+          Stats and skills
+        </summary>
         <section className="inspector-block" aria-label="Stats">
           <div className="panel-head">
             <h3>Stats</h3>

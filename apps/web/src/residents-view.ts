@@ -61,3 +61,22 @@ export function groupResidents<R extends Pick<Resident, 'id' | 'cityId'>>(
   }
   return groups.filter((g) => g.residents.length > 0)
 }
+
+/**
+ * Carried weight over carry capacity (`CONTEXT.md`: Carry capacity), as the resident list and the
+ * Goods section show it: "12 / 30 kg", each to one decimal (coins weigh little).
+ */
+export function carryLine(carried: number, capacity: number): string {
+  const kg = (weight: number) => Math.round(weight * 10) / 10
+  return `${kg(carried)} / ${kg(capacity)} kg`
+}
+
+/**
+ * Which sections of the resident card are open: the panel an action opened (Goods, Build, …) and
+ * the Stats and skills. They stay open when the Player selects another unit, until closed; a unit
+ * without that action shows no panel.
+ */
+export interface CardSections<A extends string = string> {
+  panel?: A
+  stats: boolean
+}
