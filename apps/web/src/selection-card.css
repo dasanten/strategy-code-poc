@@ -163,3 +163,24 @@
 .sel-info-toggle:hover {
   color: var(--ui-text);
 }
+/* A group card's list: one row per selected resident, each picking just them. */
+.sel-group button {
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ui-muted);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sel-group button:hover {
+  background: var(--ui-raised);
+}
+.sel-group strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}

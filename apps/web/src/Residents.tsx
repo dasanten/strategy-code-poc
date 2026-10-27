@@ -59,7 +59,7 @@ import {
   type SeenResident,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { carryLine, type CardSections, type ResidentGroup } from './residents-view.js'
+import { carryLine, groupCard, type CardSections, type ResidentGroup } from './residents-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -329,6 +329,38 @@ export function ResidentsList({
         </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * The selection card for several of the Player's residents picked at once on the map: how many,
+ * their names, and a short list of what each is doing; click a row to pick just that one.
+ */
+export function GroupCard({
+  residents,
+  scripts,
+  onPick,
+  onClose,
+}: {
+  residents: Resident[]
+  scripts: ScriptSummary[]
+  onPick: (id: string) => void
+  onClose: () => void
+}) {
+  const card = groupCard(residents)
+  return (
+    <SelectionCard rel="own" title={card.title} lines={[card.names]} onClose={onClose}>
+      <ul className="sel-facts sel-group" aria-label="Selected residents">
+        {card.rows.map((r) => (
+          <li key={r.id}>
+            <button type="button" onClick={() => onPick(r.id)}>
+              <strong>{r.name}</strong> · {doing(r, scripts)}
+            </button>
+          </li>
+        ))}
+        {card.more > 0 && <li>and {card.more} more</li>}
+      </ul>
+    </SelectionCard>
   )
 }
 

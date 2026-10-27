@@ -46,6 +46,7 @@ import { RealmLog } from './RealmLog.js'
 import { realmEnded } from './realm-log.js'
 import {
   GOOD_LABELS,
+  GroupCard,
   ResidentCard,
   ResidentsList,
   type HaulSetup,
@@ -89,7 +90,8 @@ function Pages() {
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
   const { world, founding, status, sendOrder, found } = useWorld(onLoggedOut)
-  const [selectedId, setSelectedId] = useState<string | undefined>()
+  // The residents picked on the map or in the list: one shows their card, several a group card.
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
@@ -108,7 +110,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         (r): r is Resident => commandsSeen(world.diplomacy, world.home.realmId, r) && faresKnown(r),
       )
     : []
-  const selected = own.find((r) => r.id === selectedId)
+  const group = selectedIds.flatMap((id) => own.filter((r) => r.id === id))
+  const selected = group.length === 1 ? group[0] : undefined
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
@@ -122,6 +125,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
+  // With no drawer open, Escape drops the selection.
+  const anySelected = selectedIds.length > 0
+  useEffect(() => {
+    if (openDrawer || !anySelected) return
+    const onKey = (e: KeyboardEvent) => {
+      const typing =
+        e.target instanceof Element && e.target.closest('input, textarea, select, .cm-editor')
+      if (e.key !== 'Escape' || typing) return
+      setSelectedIds([])
+      setPicking(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [openDrawer, anySelected])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
@@ -130,6 +147,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setFocus({ ...toShow, cover: shown })
   }, [toShow, closeDrawer])
   const showOnMap = (x: number, y: number) => setToShow({ x, y })
+  /** Picks residents on the map: one shows their card, several a group card. */
+  const select = (ids: string[]) => {
+    setSelectedIds(ids)
+    setSelectedTile(undefined)
+    setPicking(false)
+    setArmyPick(undefined)
+    setOrderError(undefined)
+  }
   // The city picked on the map or opened in the Cities drawer.
   const [openCityId, setOpenCityId] = useState<string>()
 
@@ -287,15 +312,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         {world ? (
           <MapView
             world={world}
-            selectedId={selectedId}
-            onSelect={(id) => {
-              setSelectedId(id)
-              setSelectedTile(undefined)
-              setPicking(false)
-              setArmyPick(undefined)
-              setOrderError(undefined)
-            }}
+            selectedIds={selectedIds}
+            onSelect={(id) => select([id])}
+            onSelectMany={select}
             onSelectTile={(x, y) => {
+              // A click on the ground drops a group; one resident stays picked to send there.
+              if (group.length > 1) setSelectedIds([])
               const size = world.map.size
               setSelectedTile({ x: ((x % size) + size) % size, y: ((y % size) + size) % size })
               setPicking(false)
@@ -343,9 +365,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             })}
             leaderId={world.home.leaderId}
             tick={world.tick}
-            selectedId={selectedId}
+            selectedId={selected?.id}
             onSelect={(id) => {
-              setSelectedId(id)
+              setSelectedIds([id])
               setSelectedTile(undefined)
               const r = own.find((x) => x.id === id)
               if (r) showOnMap(Math.floor(r.x), Math.floor(r.y))
@@ -632,9 +654,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             sections={cardSections}
             onSections={setCardSections}
             onClose={() => {
-              setSelectedId(undefined)
+              setSelectedIds([])
               setPicking(false)
             }}
+          />
+        </div>
+      )}
+      {world && group.length > 1 && !selectedTile && (
+        <div className="game-selection">
+          <GroupCard
+            residents={group}
+            scripts={scripts}
+            onPick={(id) => select([id])}
+            onClose={() => setSelectedIds([])}
           />
         </div>
       )}
