@@ -10,6 +10,8 @@ import {
   constructionAt,
   constructionLearned,
   isAt,
+  isLineOrder,
+  LINE_BUILDING,
   materialsNeeded,
   workNeeded,
   type BuildOrder,
@@ -18,7 +20,7 @@ import {
   type OrderRequest,
   type Resident,
   type ResidentOrder,
-  type RoadLineOrder,
+  type LineOrder,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -73,11 +75,15 @@ export const build: OrderKind = {
 export function buildingPart(
   o: ResidentOrder | null,
 ):
-  | { order: BuildOrder | RoadLineOrder; building: BuildingKind; at: { x: number; y: number } }
+  | { order: BuildOrder | LineOrder; building: BuildingKind; at: { x: number; y: number } }
   | undefined {
   if (o?.kind === 'build') return { order: o, building: o.building, at: o.at }
-  if (o?.kind === 'roadLine' && o.phase === 'building') {
-    return { order: o, building: 'road', at: { x: o.tiles[0]![0], y: o.tiles[0]![1] } }
+  if (isLineOrder(o) && o.phase === 'building') {
+    return {
+      order: o,
+      building: LINE_BUILDING[o.kind],
+      at: { x: o.tiles[0]![0], y: o.tiles[0]![1] },
+    }
   }
   return undefined
 }
@@ -88,7 +94,7 @@ export function buildingPart(
  */
 export function nextTile(r: Resident): void {
   const o = r.order
-  if (o?.kind !== 'roadLine' || o.tiles.length <= 1) {
+  if (!isLineOrder(o) || o.tiles.length <= 1) {
     r.order = null
     return
   }

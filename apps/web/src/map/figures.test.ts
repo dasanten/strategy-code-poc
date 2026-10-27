@@ -84,8 +84,8 @@ describe('tileFigures', () => {
     const { figures, more } = tileFigures(['o1', 'o2', 'npc', 'ally'], relOf)
     expect(more).toBeUndefined()
     expect(figures).toHaveLength(FIGURES_PER_TILE)
-    expect(figures[0]).toMatchObject({ dx: 0.26, dy: 0.74 })
-    expect(figures[1]).toMatchObject({ dx: 0.74, dy: 0.74 })
+    expect(figures[0]).toMatchObject({ dx: 0.22, dy: 0.78 })
+    expect(figures[1]).toMatchObject({ dx: 0.78, dy: 0.78 })
     // Every figure stands inside the tile, each in a place of its own.
     const places = new Set(figures.map((f) => `${f.dx},${f.dy}`))
     expect(places.size).toBe(4)
@@ -102,7 +102,7 @@ describe('tileFigures', () => {
     const { figures, more } = tileFigures(ids, relOf)
     expect(figures).toHaveLength(3)
     expect(figures.map((f) => f.id)).toEqual(['me', 'me2', 'ally'])
-    expect(more).toEqual({ ids: ['o1', 'o2', 'npc'], dx: 0.74, dy: 0.26 })
+    expect(more).toEqual({ ids: ['o1', 'o2', 'npc'], dx: 0.78, dy: 0.22 })
     // Everyone is either drawn or counted, once.
     expect([...figures.map((f) => f.id), ...more!.ids].sort()).toEqual([...ids].sort())
   })

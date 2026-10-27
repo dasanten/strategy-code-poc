@@ -16,6 +16,7 @@ import {
   Terrain,
   UNEXPLORED,
   WORK_OUTPUT_PER_DAY,
+  buildMenu,
   ticksForAge,
   footprintTiles,
   type Building,
@@ -31,6 +32,7 @@ import {
 import { BUILDING_NAMES } from './map/palette.js'
 import {
   actionForKey,
+  buildHereProblem,
   describeTile,
   makeLeaderProblem,
   nodeFit,
@@ -64,7 +66,6 @@ const here = (more: Partial<ResidentHere> = {}): ResidentHere => ({
   adult: true,
   busy: false,
   inCity: true,
-  carrying: false,
   othersInSight: 0,
   wallsInSight: 0,
   picking: false,
@@ -73,8 +74,8 @@ const here = (more: Partial<ResidentHere> = {}): ResidentHere => ({
 const ids = (h: ResidentHere) => residentActions(h).map((a) => a.id)
 
 describe('the actions on a resident’s card', () => {
-  it('offers walking, building, a road, pairing and scripts to an idle adult on open ground', () => {
-    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'pair', 'script'])
+  it('offers walking, building, a road, a wall, goods, pairing and scripts to an idle adult on open ground', () => {
+    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'wallTo', 'goods', 'pair', 'script'])
   })
 
   it('offers stop only while they have an order or run a script', () => {
@@ -109,13 +110,9 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ building: building({ kind: 'warehouse' }) }))).not.toContain('tearDown')
   })
 
-  it('offers goods while they carry some or there are goods or a site on their tile', () => {
-    expect(ids(here())).not.toContain('goods')
-    expect(ids(here({ carrying: true }))).toContain('goods')
+  it('offers goods even with an empty inventory and nothing on their tile', () => {
+    expect(ids(here())).toContain('goods')
     expect(ids(here({ pile }))).toContain('goods')
-    expect(ids(here({ storage: building({ kind: 'storage' }) }))).toContain('goods')
-    const site = building({ kind: 'house', site: { work: 0, delivered: {} } })
-    expect(ids(here({ building: site }))).toContain('goods')
   })
 
   it('offers attacking only with someone of another realm in sight', () => {
@@ -133,10 +130,11 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ inCity: false }))).not.toContain('pair')
   })
 
-  it('keeps a child’s driving and road building in sight but turned off', () => {
+  it('keeps a child’s driving, road and wall building in sight but turned off', () => {
     const a = residentActions(here({ adult: false, carriage }))
     expect(a.find((x) => x.id === 'drive')?.disabled).toBe(true)
     expect(a.find((x) => x.id === 'roadTo')?.disabled).toBe(true)
+    expect(a.find((x) => x.id === 'wallTo')?.disabled).toBe(true)
     expect(a.find((x) => x.id === 'walk')?.disabled).toBeUndefined()
   })
 
@@ -148,7 +146,6 @@ describe('the actions on a resident’s card', () => {
   it('gives every shown action its own key', () => {
     const all = here({
       busy: true,
-      carrying: true,
       carriage,
       pile,
       building: building({ kind: 'farm' }),
@@ -434,7 +431,7 @@ describe('horses on the tile card', () => {
 
   it('tells how the own carriage’s horse fares and how long the Food on board feeds it', () => {
     const fed = tile({ carriages: [{ ...carriage, load: { food: 6 } }], horses: [horse()] })
-    expect(horseLine(fed.lines)).toBe('Horse: fed, healthy · Food on board for 4 game days')
+    expect(horseLine(fed.lines)).toBe('Horse: fed, healthy · Food on board for 8 game days')
     const hungry = tile({
       carriages: [carriage],
       horses: [horse({ hunger: 10, health: MAX_HEALTH - 5 })],
@@ -651,6 +648,50 @@ describe('where a node’s workplace fits on what the Player knows', () => {
         lookup(() => UNEXPLORED),
       ),
     ).toBeUndefined()
+  })
+})
+
+describe('what the build menu offers off a node, and why a kind can’t go here', () => {
+  const SIZE = 64
+  const plains = { size: SIZE, at: () => Terrain.Plains }
+  const hall = building({ id: 'hall', kind: 'townHall', cityId: 'c1', x: 20, y: 20 })
+  const seen = {
+    buildings: [hall],
+    cities: [{ id: 'c1', name: 'Ashford', realmId: 'me', townHallId: 'hall' }] as City[],
+  }
+  const noNodes = () => undefined
+
+  it('lists town hall, storage, wall and gate with everything else that goes off a node', () => {
+    const menu = buildMenu(undefined)
+    expect(menu).toEqual(expect.arrayContaining(['townHall', 'house', 'storage', 'wall', 'gate']))
+    expect(menu).toEqual(expect.arrayContaining(['farm', 'stable', 'smelter', 'mint', 'smithy']))
+    expect(menu).not.toContain('road')
+    expect(buildMenu({ kind: 'forest' })).toEqual(['lumberCamp'])
+  })
+
+  it('says a storage goes in a city’s area, and lets it go there', () => {
+    expect(buildHereProblem('storage', 23, 20, seen, noNodes, plains)).toBeUndefined()
+    expect(buildHereProblem('storage', 50, 50, seen, noNodes, plains)).toBe(
+      'a storage goes in a city’s area',
+    )
+    // Walls and gates go anywhere off Mountain and nodes.
+    expect(buildHereProblem('wall', 50, 50, seen, noNodes, plains)).toBeUndefined()
+    expect(buildHereProblem('gate', 50, 50, seen, noNodes, plains)).toBeUndefined()
+  })
+
+  it('says why on taken tiles, nodes and Mountain', () => {
+    expect(buildHereProblem('wall', 21, 21, seen, noNodes, plains)).toBe(
+      'there is already a building there',
+    )
+    const forestAt = (x: number, y: number) =>
+      x === 51 && y === 51 ? { kind: 'forest' as const, x, y } : undefined
+    expect(buildHereProblem('townHall', 50, 50, seen, forestAt, plains)).toBe(
+      'a townHall goes off any resource node, and not on Mountain',
+    )
+    const mountain = { size: SIZE, at: () => Terrain.Mountain }
+    expect(buildHereProblem('gate', 50, 50, seen, noNodes, mountain)).toBe(
+      'a gate goes off any resource node, and not on Mountain',
+    )
   })
 })
 

@@ -41,6 +41,7 @@ export const CARRYING_BLOCKS: ReadonlySet<ResidentOrder['kind']> = new Set([
   'workAt',
   'build',
   'roadLine',
+  'wallLine',
   'tearDown',
   'haul',
 ])

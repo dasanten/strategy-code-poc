@@ -39,6 +39,8 @@ The shared language of the game. Domain terms only — no implementation details
   work) on any passable land except Mountain, and it may share a tile with a building, so roads
   can lead through gates. On a road residents and carriages move at road speed whatever the
   terrain beneath, and eat as on Plains. Nobody owns a road; anyone can walk it or tear it down.
+  A resident can build road along a line from their tile to another, one tile after another; the
+  line runs straight or diagonal, each tile a Step on from the one before.
 - **Step:** a move onto one of the eight tiles around, straight or diagonal. A diagonal step is
   √2 (about 1.41) times as far as a straight one, so it takes that much longer on the same
   ground. A diagonal step can't squeeze between two corners: it is only possible when both
@@ -267,7 +269,9 @@ The shared language of the game. Domain terms only — no implementation details
   tearing down shrinks it.
 - **Wall / Gate:** buildings of one tile each, built on any passable tile except Mountain, in
   any shape: a closed ring, an inner ring or a single stretch. Nothing forces a closed ring.
-  Walls count as city buildings, so they grow the area like houses do.
+  Walls count as city buildings, so they grow the area like houses do. A wall can be built along
+  a line like a road, skipping tiles that have a wall or gate; a diagonal line closes the way,
+  since two wall tiles touching at a corner do (see Step).
 - **House:** a building in a city's area where a few residents live. A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
   (a palace, a castle) may add room the same way.
@@ -530,7 +534,7 @@ The shared language of the game. Domain terms only — no implementation details
   way, besides integrating, that residents come into being. Once a game year has passed since
   they paired, and their city has free housing and a food surplus, one partner, chosen at random,
   starts **Carrying** the child; the other keeps working as before.
-- **Carrying:** a partner carrying a child can't work for 60 game days (24 real hours); then the
+- **Carrying:** a partner carrying a child can't work for 10 game days (4 real hours); then the
   child is born and the pair ends. For another child the Player pairs them again (NPC cities do
   it on their own).
 - **Child:** a resident born to a pair. Each base stat is the parents' average plus a small
@@ -547,7 +551,7 @@ The shared language of the game. Domain terms only — no implementation details
   back.
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
-- **Own food:** the Food a resident keeps on them for their own meals, about two game days of
+- **Own food:** the Food a resident keeps on them for their own meals, about four game days of
   eating. Putting goods away (storing, dropping, loading, delivering) leaves it in their hands
   unless the Player asks for an exact amount; NPC residents always keep it.
 - **Refilling at home:** a resident in their own city's area who is running low on food takes a

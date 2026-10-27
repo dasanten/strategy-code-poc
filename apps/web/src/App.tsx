@@ -29,13 +29,14 @@ import { keyGoods, showBeside, toggleDrawer, type DrawerId, type OpenDrawer } fr
 import {
   CentredDialog,
   Drawer,
+  DrawerEdge,
   ToolRail,
   TopBar,
   mapCovered,
   useEscapeCloses,
 } from './Hud.js'
 import type { Covered } from './map/camera.js'
-import { groupResidents } from './residents-view.js'
+import { groupResidents, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
@@ -52,7 +53,13 @@ import {
 } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
 import { buildingNodeKind } from './building-info-view.js'
-import { describeTile, makeLeaderProblem, nodeFit } from './selection-view.js'
+import {
+  buildHereProblem,
+  describeTile,
+  makeLeaderProblem,
+  nodeFit,
+  type ActionId,
+} from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
@@ -86,6 +93,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
+  // The resident card's open sections, kept here so they stay open as the Player picks others.
+  const [cardSections, setCardSections] = useState<CardSections<ActionId>>({ stats: false })
   const [picking, setPicking] = useState<Picking>(false)
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
@@ -127,8 +136,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
    * carriage on their tile there, or, while picking a haul route's other stop, to haul between
-   * their tile and that one, or, while picking a road's far end, to build road along the line
-   * from their tile to that one (ADR 0002: the server checks it).
+   * their tile and that one, or, while picking a road's or wall's far end, to build it along the
+   * line from their tile to that one (ADR 0002: the server checks it).
    */
   async function goTo(x: number, y: number) {
     const mode = picking
@@ -151,11 +160,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setOrderError(await sendOrder({ ...order, x, y, ...haulSetup }))
       return
     }
-    if (mode === 'road') {
+    if (mode === 'road' || mode === 'wall') {
+      const kind = mode === 'road' ? 'roadLine' : 'wallLine'
       const from = { x: selected.x, y: selected.y }
-      setOrderError(
-        await sendOrder({ kind: 'roadLine', residentId: selected.id, from, to: { x, y } }),
-      )
+      setOrderError(await sendOrder({ kind, residentId: selected.id, from, to: { x, y } }))
       return
     }
     setOrderError(await sendOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
@@ -450,6 +458,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onShowPlace={(p) => showOnMap(p.x, p.y)}
           />,
         )}
+      <DrawerEdge open={openDrawer} />
       {world && selectedTile && (
         <div className="game-selection">
           <TileCard
@@ -537,6 +546,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             carriage={onTile(world.carriages.filter(loadKnown))}
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
             onRoadTo={() => setPicking((p) => (p === 'road' ? false : 'road'))}
+            onWallTo={() => setPicking((p) => (p === 'wall' ? false : 'wall'))}
             onHaulTo={(setup) => {
               setHaulSetup(setup)
               setPicking((p) => (p === 'haul' ? false : 'haul'))
@@ -563,6 +573,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
             onDrop={(spot, goods) => carry('drop', spot, goods)}
             onBuild={build}
+            buildProblem={(kind) =>
+              buildHereProblem(
+                kind,
+                selected.x,
+                selected.y,
+                world,
+                (x, y) => nodeAt?.(x, y),
+                // Terrain not loaded counts as unexplored: nothing is laid out there.
+                { size: world.map.size, at: (x, y) => terrainAt?.(x, y) ?? UNEXPLORED },
+              )
+            }
             workers={workersHere(world.residents, buildingHere)}
             holders={heldBy(world.residents, buildingHere)}
             realmId={world.home.realmId}
@@ -608,6 +629,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 : undefined
             }
             onRename={rename}
+            sections={cardSections}
+            onSections={setCardSections}
             onClose={() => {
               setSelectedId(undefined)
               setPicking(false)

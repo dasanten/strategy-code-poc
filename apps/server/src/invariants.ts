@@ -1,5 +1,7 @@
 import {
   isWallOrGate,
+  isLineOrder,
+  LINE_BUILDING,
   wallStrength,
   ALLIANCE_LEAVE_DELAY,
   ALLIANCE_RECALL_DELAY,
@@ -1157,7 +1159,16 @@ export const carryingDoesntWork: Invariant = {
 }
 
 /** Orders only a grown resident can hold (`CONTEXT.md`: Child); pairing is checked with pairs. */
-const ADULT_ORDERS = new Set(['build', 'roadLine', 'tearDown', 'workAt', 'drive', 'pickUp', 'drop'])
+const ADULT_ORDERS = new Set([
+  'build',
+  'roadLine',
+  'wallLine',
+  'tearDown',
+  'workAt',
+  'drive',
+  'pickUp',
+  'drop',
+])
 
 /** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
 export const childrenDontWork: Invariant = {
@@ -1435,18 +1446,20 @@ export const pathsAreSteps: Invariant = {
 }
 
 /**
- * Road orders along a line are sound (`CONTEXT.md`: Road): they have tiles left, at most
- * `ROAD_LINE_MAX_TILES`, each next to the one before; and after a tick one building on a site
- * stands on that road site, on the order's first tile (`resolveBuilding` moves the order on from
- * a finished one and ends it on a vanished one).
+ * Orders along a line are sound (`CONTEXT.md`: Road, Wall / Gate): they have tiles left, at most
+ * `ROAD_LINE_MAX_TILES`, each one step on from the one before, straight or diagonal (`CONTEXT.md`:
+ * Step); and after a tick one building on a site stands on a site of what the order builds
+ * (`LINE_BUILDING`), on the order's first tile (`resolveBuilding` moves the order on from a
+ * finished one and ends it on a vanished one).
  */
-export const roadLineOrdersSound: Invariant = {
-  name: 'road-line-orders-sound',
+export const lineOrdersSound: Invariant = {
+  name: 'line-orders-sound',
   check(world, terrain) {
     const out: InvariantViolation[] = []
     for (const r of world.residents) {
       const o = r.order
-      if (o?.kind !== 'roadLine') continue
+      if (!isLineOrder(o)) continue
+      const building = LINE_BUILDING[o.kind]
       const fail = (problem: string) =>
         out.push({
           invariant: this.name,
@@ -1455,23 +1468,28 @@ export const roadLineOrdersSound: Invariant = {
         })
       const first = o.tiles[0]
       if (!first || o.tiles.length > ROAD_LINE_MAX_TILES) {
-        fail(`has a road order with ${o.tiles.length} tiles`)
+        fail(`has a ${building} order with ${o.tiles.length} tiles`)
         continue
       }
       const size = terrain.size
       const apart = o.tiles.findIndex(
         ([x, y], i) =>
           i > 0 &&
-          Math.abs(wrapDelta(o.tiles[i - 1]![0], x, size)) +
-            Math.abs(wrapDelta(o.tiles[i - 1]![1], y, size)) !==
-            1,
+          Math.max(
+            Math.abs(wrapDelta(o.tiles[i - 1]![0], x, size)),
+            Math.abs(wrapDelta(o.tiles[i - 1]![1], y, size)),
+          ) !== 1,
       )
-      if (apart > 0) fail(`has a road order whose tile ${apart} is not next to the one before`)
+      if (apart > 0) {
+        fail(`has a ${building} order whose tile ${apart} is not a step on from the one before`)
+      }
       if (o.phase !== 'building' || o.siteId === null) continue
       const site = world.buildings.find((b) => b.id === o.siteId)
-      const onIt = site?.site && site.kind === 'road' && site.x === r.x && site.y === r.y
+      const onIt = site?.site && site.kind === building && site.x === r.x && site.y === r.y
       if (!onIt || r.x !== first[0] || r.y !== first[1]) {
-        fail(`builds ${o.siteId}, which is not the road site on their tile and the order’s next`)
+        fail(
+          `builds ${o.siteId}, which is not the ${building} site on their tile and the order’s next`,
+        )
       }
     }
     return out
@@ -1598,7 +1616,7 @@ export const worldInvariants: Invariant[] = [
   buyOffsSound,
   buyOffOrdersDone,
   hqRingsSound,
-  roadLineOrdersSound,
+  lineOrdersSound,
   pathsAreSteps,
   gameDefaultCarriers,
   gameDefaultFetchers,

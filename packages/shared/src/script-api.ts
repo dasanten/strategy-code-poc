@@ -276,7 +276,12 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'roadLine',
     ['x', 'y'],
-    'Build road on each tile of the line from my tile to (x, y), one after another, with the stone I carry.',
+    'Build road on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the stone I carry.',
+  ),
+  action(
+    'wallLine',
+    ['x', 'y'],
+    'Build wall on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped.',
   ),
 ]
 

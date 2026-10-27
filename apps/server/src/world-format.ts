@@ -6,7 +6,7 @@ import { leaveTradeOrg } from './caravans.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 41
+export const WORLD_FORMAT_VERSION = 42
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -43,9 +43,12 @@ export const migrations: Record<number, MigrationStep> = {
   // Last seen (`CONTEXT.md`): every Player starts with an empty memory. It is not filled from
   // explored terrain, which would hand them buildings and prices they never saw.
   39: (state) => ({ ...(state as object), lastSeen: {} }),
+  // Walls can be built along a line (`CONTEXT.md`: Wall / Gate), a new order kind. Orders from
+  // before are all road lines, which keep their shape, so the step leaves them as they are.
+  40: (state) => state,
   // Store and fetch orders (`CONTEXT.md`: Store, Fetch) and how a resident's last one ended
   // (`orderEnded`). Older residents hold neither, so the step leaves them as they are.
-  40: (state) => state,
+  41: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

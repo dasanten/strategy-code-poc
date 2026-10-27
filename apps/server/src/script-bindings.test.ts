@@ -309,6 +309,7 @@ describe('script bindings', () => {
     ['renameCity("c1", "Ironhold")', { kind: 'renameCity', cityId: 'c1', name: 'Ironhold' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],
+    ['wallLine(12, 12)', { kind: 'wallLine', from: { x: 10, y: 10 }, to: { x: 12, y: 12 } }],
   ]
 
   it.each(actions)('request %s exactly as the UI order would be', (call, order) => {

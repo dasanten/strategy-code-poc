@@ -214,7 +214,7 @@ describe('carrying', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('has the child CARRYING_DAYS after carrying starts, and ends the pair', () => {
+  it('has the child CARRYING_DAYS (10 game days) after carrying starts, and ends the pair', () => {
     const { world, terrain, queue, residents } = setup()
     const [a, b] = residents as [Resident, Resident]
     pairUp(world, queue, a, b)
@@ -224,6 +224,7 @@ describe('carrying', () => {
     expect(days(world, CARRYING_DAYS_ - 1)).toEqual([])
     const [child] = days(world, 1)
     expect(child!.bornAt - start).toBe(CARRYING_TICKS)
+    expect(child!.bornAt - start).toBe(10 * TICKS_PER_GAME_DAY)
     expect(child).toMatchObject({ x: carrier.x, y: carrier.y, cityId: carrier.cityId })
     expect([a.pair, b.pair, a.carrying, b.carrying]).toEqual([
       undefined,

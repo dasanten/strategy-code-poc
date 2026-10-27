@@ -47,6 +47,6 @@ describe('buildingInfo', () => {
   })
 
   it('gives a kind with no materials an empty cost', () => {
-    expect(buildingInfo('storage').materials).toEqual({})
+    expect(buildingInfo('warehouse').materials).toEqual({})
   })
 })

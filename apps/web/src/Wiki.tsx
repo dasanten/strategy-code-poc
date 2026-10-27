@@ -606,7 +606,9 @@ export function Wiki() {
         <p>
           A city building (town hall, house, storage, wall, gate) belongs to a city when it stands
           within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
-          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them.
+          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house or a storage
+          goes only in a city's area; a town hall, wall or gate goes anywhere off Mountain and off
+          resource nodes, and a new town hall founds a city.
         </p>
       </Section>
 
@@ -663,7 +665,9 @@ export function Wiki() {
         <p>
           A road tile takes {goods(BUILD_MATERIALS.road ?? {})} and{' '}
           {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work;
-          one road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles.
+          one road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along a line that runs
+          straight or diagonal. A wall can be built along a line the same way, past tiles with a
+          wall or gate already; a diagonal wall line closes the way like a straight one.
         </p>
         <p>
           Horses eat {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the carriage's load
