@@ -23,6 +23,7 @@ import { buildingOrganization, carriageOrganization, commitCrime } from './crime
 import { collectsFrom } from './deliveries.js'
 import { collectsTransferFrom } from './transfers.js'
 import { orderedResident } from './order-sender.js'
+import { carriedForOrder } from './storing.js'
 import type { OrderKind, OrderSender } from './orders.js'
 import { dropGoods } from './survival.js'
 
@@ -168,7 +169,8 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * Resolves take and put actions (ADR 0002), one after another, so two residents never take the
  * same goods. A take gets what is still at the spot on the resident's own tile, whole units that
  * fit their carry capacity; a put puts down what they still carry. A spot that is gone means
- * nothing happens. Either way the order is done. Taking from another Organization's storage or
+ * nothing happens. Either way the order is done; a store or fetch order goes on or ends
+ * (`carriedForOrder`). Taking from another Organization's storage or
  * carriage is theft (`CONTEXT.md`: Crime), on a map of `size` tiles, and taking from a caravan's
  * carriage robs it (`robCaravan`).
  */
@@ -180,6 +182,7 @@ export function resolveCarrying(world: WorldState, actions: CarryAction[], size 
     if (a.kind === 'take') take(world, r, a, size, robbed)
     else put(world, r, a, size)
     if (r.order?.kind === 'pickUp' || r.order?.kind === 'drop') r.order = null
+    else carriedForOrder(world, r)
   }
 }
 

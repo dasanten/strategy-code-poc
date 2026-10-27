@@ -214,6 +214,8 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
+  if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
+  if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
   if (o?.kind === 'build') {
     const what = BUILDING_NAMES[o.building].toLowerCase()
