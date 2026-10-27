@@ -379,6 +379,10 @@ function residentActions(
     stop: () => request('stop', {}),
     pickUp: ([spot, goods]) => request('pickUp', { spot: plain(spot), goods: plain(goods) }),
     drop: ([spot, goods]) => request('drop', { spot: plain(spot), goods: plain(goods) }),
+    store: ([goods, to]) =>
+      request('store', { goods: plain(goods), ...(to == null ? {} : { to: placeId(to) }) }),
+    fetch: ([goods, from]) =>
+      request('fetch', { goods: plain(goods), ...(from == null ? {} : { from: placeId(from) }) }),
     build: ([building]) => request('build', { building: plain(building) }),
     tearDown: ([buildingId]) => request('tearDown', { buildingId: plain(buildingId) }),
     workAt: ([makes]) => request('workAt', makes == null ? {} : { makes: plain(makes) }),
@@ -521,6 +525,12 @@ function plain(value: Value | undefined): unknown {
   const out: Record<string, unknown> = {}
   for (const [key, item] of Object.entries(value)) out[key] = plain(item)
   return out
+}
+
+/** A place for `store` and `fetch`: its id, or the id of a thing a script holds, like a building. */
+function placeId(value: Value): unknown {
+  const v = value as Record<string, Value>
+  return typeof v === 'object' && !Array.isArray(v) && 'id' in v ? plain(v.id) : plain(value)
 }
 
 function tile(x: Value | undefined, y: Value | undefined, name: string): { x: number; y: number } {

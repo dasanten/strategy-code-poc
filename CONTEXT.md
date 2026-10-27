@@ -615,6 +615,15 @@ The shared language of the game. Domain terms only — no implementation details
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again.
+- **Store:** a built-in order a script can hand over to: the resident walks to a storage,
+  stable or carriage of their own (by default the nearest storage of their realm), puts down the
+  chosen goods there (Food only beyond their own food, unless asked for exact units) and, at a
+  storage with Food, tops up their own food. Then it is done. It ends early when there is no way
+  there or the place is gone, and the script can read how it ended.
+- **Fetch:** a built-in order a script can hand over to: the resident walks to a storage, stable
+  or carriage of their own (by default the nearest storage or carriage of their realm holding the
+  goods) and takes the chosen goods there, as much as is there and fits. Then it is done; it ends
+  early like Store. Who stores or fetches, and when, stays in the script.
 - **Default script:** the script behind a task the UI can give (working a workplace, building,
   hauling, …). The game ships one per task; giving a resident that task from the UI runs it.
   Each Player has their own version of every default script in their library, one per task,

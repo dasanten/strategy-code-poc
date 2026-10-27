@@ -208,6 +208,16 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'Take goods from a spot on my tile: {kind: "ground"}, {kind: "storage", storageId}, {kind: "site", siteId} or {kind: "carriage", carriageId}; goods like {food: 3}.',
   ),
   action('drop', ['spot', 'goods'], 'Put carried goods down at a spot on my tile.'),
+  action(
+    'store',
+    ['goods', 'to?'],
+    'Walk to `to` (a storage, a stable or a carriage of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like ["wood"] for all I carry of them (Food beyond my own food). My order is "store" until done; then `me.orderEnded` says how it ended.',
+  ),
+  action(
+    'fetch',
+    ['goods', 'from?'],
+    'Walk to `from` (a storage, a stable or a carriage of mine; by default the nearest storage or carriage of my realm holding any of the goods) and take the goods there, as much as fits. Goods like {wood: 10}, or a list like ["wood"] for as much as there is. My order is "fetch" until done; then `me.orderEnded` says how it ended.',
+  ),
   action('build', ['building'], 'Lay out or join a construction site of that kind on my tile.'),
   action('tearDown', ['buildingId'], 'Tear down the building or site on my tile.'),
   action('workAt', ['makes?'], 'Work the workplace on my tile; at a smithy, say what to make.'),
