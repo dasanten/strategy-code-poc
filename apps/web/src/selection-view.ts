@@ -79,6 +79,7 @@ export type ActionId =
   | 'haul'
   | 'build'
   | 'roadTo'
+  | 'wallTo'
   | 'work'
   | 'tearDown'
   | 'goods'
@@ -101,6 +102,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   haul: 'H',
   build: 'B',
   roadTo: 'R',
+  wallTo: 'Q',
   work: 'E',
   tearDown: 'T',
   goods: 'G',
@@ -152,7 +154,7 @@ export interface ResidentHere {
   /** Walls and gates of other realms' cities, or of none, in sight. */
   wallsInSight: number
   /** What the map is waiting for a tile for. */
-  picking: false | 'walk' | 'drive' | 'haul' | 'road'
+  picking: false | 'walk' | 'drive' | 'haul' | 'road' | 'wall'
   /**
    * For one of the Player's own residents who isn't their Leader: why the Leader can't hand the
    * realm over to them now (`CONTEXT.md`: Leader handover), undefined when they can. Absent for
@@ -207,6 +209,7 @@ export function residentActions(h: ResidentHere): CardAction[] {
     }),
   )
   add(row('roadTo', '', { ...picks('road', 'Build road to'), ...child }))
+  add(row('wallTo', '', { ...picks('wall', 'Build wall to'), ...child }))
   const torn = [h.building, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
   if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
   // Always there, so the Player sees the carry capacity even with nothing to move.

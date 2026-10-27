@@ -301,21 +301,22 @@ export interface AttackOrder {
 }
 
 /**
- * Building a road along a line (`CONTEXT.md`: Road): the resident builds the road tiles of
- * `tiles` one after another. For each they walk to it (`path` and `progress` as for a walk
- * order), then lay out a road there or join the site already there, put in the materials they
- * carry that it needs, and work on it as for a build order (`siteId`) until it is finished. A
- * tile that already has a road, or can't take one, is skipped. The order ends after the last.
+ * Building a road or wall along a line (`CONTEXT.md`: Road, Wall / Gate): a `roadLine` order
+ * builds road and a `wallLine` order wall (`LINE_BUILDING`) on the tiles of `tiles`, one after
+ * another. For each the resident walks to it (`path` and `progress` as for a walk order), then
+ * lays out a site there or joins the one already there, puts in the materials they carry that it
+ * needs, and works on it as for a build order (`siteId`) until it is finished. A tile that already
+ * has one, or can't take one, is skipped. The order ends after the last.
  */
-export interface RoadLineOrder {
-  kind: 'roadLine'
+export interface LineOrder {
+  kind: 'roadLine' | 'wallLine'
   /** The tiles still to build, in order; the first is being walked to or built. Never empty. */
   tiles: [number, number][]
   phase: 'walking' | 'building'
   /** While walking, the tiles still to walk; null while the path is being found. */
   path: [number, number][] | null
   progress: number
-  /** While building, the road site on the first tile; null until it is laid out or joined. */
+  /** While building, the site on the first tile; null until it is laid out or joined. */
   siteId: string | null
 }
 
@@ -343,7 +344,7 @@ export type ResidentOrder =
   | WorkOrder
   | AttackOrder
   | ClimbOrder
-  | RoadLineOrder
+  | LineOrder
   | PayOrder
   | BuyCityOrder
   | TradeOrder

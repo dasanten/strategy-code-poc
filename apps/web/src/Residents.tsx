@@ -1,7 +1,9 @@
 import {
   BUILD_MATERIALS,
   BUILDING_PURPOSE,
+  LINE_BUILDING,
   ROAD_LINE_MAX_TILES,
+  isLineOrder,
   BUILD_WORK,
   BUILDABLE,
   BATCHES_PER_DAY,
@@ -133,7 +135,7 @@ const workSpan = (ticks: number) => {
  * What the map is waiting for a tile for: to walk or drive there, a haul route's other stop, or
  * the far end of a road along a line.
  */
-export type Picking = false | 'walk' | 'drive' | 'haul' | 'road'
+export type Picking = false | 'walk' | 'drive' | 'haul' | 'road' | 'wall'
 
 /** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
 export interface HaulSetup {
@@ -238,12 +240,13 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
     return o.side === 'buy' ? 'Buying at a warehouse' : 'Selling at a warehouse'
   if (o?.kind === 'attack') return o.path ? 'Going after their target' : 'Fighting'
   if (o?.kind === 'climb') return `Climbing a wall · ${pct(o.progress)}`
-  if (o?.kind === 'roadLine') {
+  if (isLineOrder(o)) {
     const [x, y] = o.tiles[0]!
-    const left = `${o.tiles.length} road tile${o.tiles.length === 1 ? '' : 's'} to go`
+    const what = LINE_BUILDING[o.kind]
+    const left = `${o.tiles.length} ${what} tile${o.tiles.length === 1 ? '' : 's'} to go`
     return o.phase === 'walking'
-      ? `Walking to lay road at ${x}, ${y} · ${left}`
-      : `Building road at ${x}, ${y} · ${left}`
+      ? `Walking to lay ${what} at ${x}, ${y} · ${left}`
+      : `Building ${what} at ${x}, ${y} · ${left}`
   }
   return 'Idle'
 }
@@ -367,6 +370,7 @@ export function ResidentCard({
   onDriveTo,
   onHaulTo,
   onRoadTo,
+  onWallTo,
   onStop,
   scripts,
   onRunScript,
@@ -396,6 +400,8 @@ export function ResidentCard({
   onHaulTo: (setup: HaulSetup) => void
   /** Starts (or cancels) picking the far end of a road to build along a line from here. */
   onRoadTo: () => void
+  /** Starts (or cancels) picking the far end of a wall to build along a line from here. */
+  onWallTo: () => void
   /** Orders the resident to stop what they are doing. */
   onStop: () => void
   /** The Player's script library, to pick a script to run. */
@@ -508,6 +514,7 @@ export function ResidentCard({
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
     if (a.id === 'roadTo') onRoadTo()
+    if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
   }
   return (
@@ -799,6 +806,7 @@ const PICKING_KEYS: Record<Exclude<Picking, false>, string> = {
   drive: ACTION_KEYS.drive,
   haul: 'Pick the other stop',
   road: ACTION_KEYS.roadTo,
+  wall: ACTION_KEYS.wallTo,
 }
 
 /** What picking a tile does, said while the map waits for it. */
@@ -806,7 +814,8 @@ const PICKING_HINTS: Record<Exclude<Picking, false>, string> = {
   walk: 'Walks there.',
   drive: 'Drives the carriage there.',
   haul: 'The other stop of the haul route.',
-  road: `Builds road from here to there, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the stone carried; without more, the resident waits on the next site until someone delivers it.`,
+  road: `Builds road from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the stone carried; without more, the resident waits on the next site until someone delivers it.`,
+  wall: `Builds wall from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the wood carried, past tiles with a wall or gate; without more, the resident waits on the next site until someone delivers it.`,
 }
 
 /**

@@ -665,7 +665,9 @@ export function Wiki() {
         <p>
           A road tile takes {goods(BUILD_MATERIALS.road ?? {})} and{' '}
           {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work;
-          one road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles.
+          one road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along a line that runs
+          straight or diagonal. A wall can be built along a line the same way, past tiles with a
+          wall or gate already; a diagonal wall line closes the way like a straight one.
         </p>
         <p>
           Horses eat {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the carriage's load

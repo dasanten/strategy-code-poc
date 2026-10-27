@@ -17,13 +17,14 @@ import {
   roadTiles,
   walkSpeed,
   besideStep,
+  isLineOrder,
   stepLength,
   type AttackOrder,
   type DriveOrder,
   type HaulOrder,
   type OrderRequest,
   type Resident,
-  type RoadLineOrder,
+  type LineOrder,
   type TerrainMap,
   type WalkOrder,
   type WallMap,
@@ -81,12 +82,12 @@ export const walkTo: OrderKind = {
  * A walk-to or drive order, a haul route driving to its next stop, an attack order going after
  * its target, or a road order walking to its next tile: all go along a path.
  */
-type MoveOrder = WalkOrder | DriveOrder | HaulOrder | AttackOrder | RoadLineOrder
+type MoveOrder = WalkOrder | DriveOrder | HaulOrder | AttackOrder | LineOrder
 
 function moveOrder(r: Resident): MoveOrder | undefined {
   const o = r.order
   if (o?.kind === 'haul') return o.phase === 'driving' ? o : undefined
-  if (o?.kind === 'roadLine') return o.phase === 'walking' ? o : undefined
+  if (isLineOrder(o)) return o.phase === 'walking' ? o : undefined
   return o?.kind === 'walkTo' || o?.kind === 'drive' || o?.kind === 'attack' ? o : undefined
 }
 
@@ -97,7 +98,7 @@ function moveOrder(r: Resident): MoveOrder | undefined {
 function targetOf(world: WorldState, o: MoveOrder): { x: number; y: number } | undefined {
   if (o.kind === 'haul') return o[o.stop]
   if (o.kind === 'attack') return attackTarget(world, o.targetId)
-  if (o.kind === 'roadLine') return { x: o.tiles[0]![0], y: o.tiles[0]![1] }
+  if (isLineOrder(o)) return { x: o.tiles[0]![0], y: o.tiles[0]![1] }
   return o.target
 }
 
@@ -108,8 +109,8 @@ function searchKey(world: WorldState, o: MoveOrder): string {
 }
 
 /** On foot, rather than driving a carriage. */
-function onFoot(o: MoveOrder): o is WalkOrder | AttackOrder | RoadLineOrder {
-  return o.kind === 'walkTo' || o.kind === 'attack' || o.kind === 'roadLine'
+function onFoot(o: MoveOrder): o is WalkOrder | AttackOrder | LineOrder {
+  return o.kind === 'walkTo' || o.kind === 'attack' || isLineOrder(o)
 }
 
 /**
@@ -170,7 +171,7 @@ function arrive(r: Resident, o: MoveOrder): void {
     o.progress = 0
     return
   }
-  if (o.kind === 'roadLine') {
+  if (isLineOrder(o)) {
     o.phase = 'building'
     o.path = null
     o.progress = 0

@@ -136,8 +136,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
    * carriage on their tile there, or, while picking a haul route's other stop, to haul between
-   * their tile and that one, or, while picking a road's far end, to build road along the line
-   * from their tile to that one (ADR 0002: the server checks it).
+   * their tile and that one, or, while picking a road's or wall's far end, to build it along the
+   * line from their tile to that one (ADR 0002: the server checks it).
    */
   async function goTo(x: number, y: number) {
     const mode = picking
@@ -160,11 +160,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setOrderError(await sendOrder({ ...order, x, y, ...haulSetup }))
       return
     }
-    if (mode === 'road') {
+    if (mode === 'road' || mode === 'wall') {
+      const kind = mode === 'road' ? 'roadLine' : 'wallLine'
       const from = { x: selected.x, y: selected.y }
-      setOrderError(
-        await sendOrder({ kind: 'roadLine', residentId: selected.id, from, to: { x, y } }),
-      )
+      setOrderError(await sendOrder({ kind, residentId: selected.id, from, to: { x, y } }))
       return
     }
     setOrderError(await sendOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
@@ -547,6 +546,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             carriage={onTile(world.carriages.filter(loadKnown))}
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
             onRoadTo={() => setPicking((p) => (p === 'road' ? false : 'road'))}
+            onWallTo={() => setPicking((p) => (p === 'wall' ? false : 'wall'))}
             onHaulTo={(setup) => {
               setHaulSetup(setup)
               setPicking((p) => (p === 'haul' ? false : 'haul'))

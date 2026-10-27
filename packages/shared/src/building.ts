@@ -17,8 +17,10 @@ import {
   type Building,
   type BuildingKind,
   type Good,
+  type LineOrder,
   type Pile,
   type Resident,
+  type ResidentOrder,
   type ResourceKind,
   type ResourceNode,
   type Stock,
@@ -484,9 +486,10 @@ export function tearDownProblem(
 }
 
 /**
- * The tiles of a road along a straight line from `from` to `to`, both ends included, the short
- * way round on a map `size` across. Each tile is next to the one before, never diagonally, as
- * residents walk, so the road joins up; each step goes the way that keeps closest to the line.
+ * The tiles of a road or wall along a straight line from `from` to `to`, both ends included, the
+ * short way round on a map `size` across (`CONTEXT.md`: Road, Wall / Gate). Each tile is one step
+ * on from the one before, straight or diagonal (`CONTEXT.md`: Step), the tile closest to the line,
+ * so a line from (0, 0) to (5, 5) runs diagonally over 6 tiles.
  */
 export function roadLine(
   from: { x: number; y: number },
@@ -495,16 +498,24 @@ export function roadLine(
 ): [number, number][] {
   const dx = wrapDelta(from.x, to.x, size)
   const dy = wrapDelta(from.y, to.y, size)
-  const nx = Math.abs(dx)
-  const ny = Math.abs(dy)
+  const steps = Math.max(Math.abs(dx), Math.abs(dy))
+  // Step i goes i/steps of the way along `d`, rounded to the nearest tile, halves up.
+  const along = (i: number, d: number) =>
+    Math.sign(d) * Math.floor((2 * i * Math.abs(d) + steps) / (2 * steps))
   const out: [number, number][] = [[wrap(from.x, size), wrap(from.y, size)]]
-  let x = 0
-  let y = 0
-  while (x < nx || y < ny) {
-    // Along x when the line crosses the next x half-step before the next y half-step.
-    if (y >= ny || (x < nx && (2 * x + 1) * ny < (2 * y + 1) * nx)) x++
-    else y++
-    out.push([wrap(from.x + Math.sign(dx) * x, size), wrap(from.y + Math.sign(dy) * y, size)])
+  for (let i = 1; i <= steps; i++) {
+    out.push([wrap(from.x + along(i, dx), size), wrap(from.y + along(i, dy), size)])
   }
   return out
+}
+
+/** What a line order builds on each of its tiles (`CONTEXT.md`: Road, Wall / Gate). */
+export const LINE_BUILDING: Record<LineOrder['kind'], 'road' | 'wall'> = {
+  roadLine: 'road',
+  wallLine: 'wall',
+}
+
+/** Whether an order is one along a line, a road line or a wall line. */
+export function isLineOrder(o: ResidentOrder | null | undefined): o is LineOrder {
+  return o?.kind === 'roadLine' || o?.kind === 'wallLine'
 }
