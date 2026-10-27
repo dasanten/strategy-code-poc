@@ -272,6 +272,7 @@ describe('script bindings', () => {
     ['build("house")', { kind: 'build', building: 'house' }],
     ['build("castle")', { kind: 'build', building: 'castle' }],
     ['tearDown("p1")', { kind: 'tearDown', buildingId: 'p1' }],
+    ['breed("st", ["h1", "h2"])', { kind: 'breed', stableId: 'st', horseIds: ['h1', 'h2'] }],
     ['workAt()', { kind: 'workAt' }],
     ['workAt("sword")', { kind: 'workAt', makes: 'sword' }],
     ['pair("b1")', { kind: 'pair', partnerId: 'b1' }],

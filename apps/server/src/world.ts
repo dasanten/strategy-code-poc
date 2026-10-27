@@ -13,6 +13,7 @@ import { placeResourceNodes } from './node-gen.js'
 import { requestBuilding, resolveBuilding } from './building.js'
 import { stepHorses } from './horses.js'
 import { requestTearingDown, resolveTearingDown } from './teardown.js'
+import { requestBreeding, resolveBreeding } from './breeding.js'
 import { requestCarrying, resolveCarrying } from './carrying.js'
 import { requestHauling } from './hauling.js'
 import { requestRoadMaterials } from './road-line.js'
@@ -139,9 +140,9 @@ export interface StepResult {
 
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
- * horses, and stables breed foals; food spoils at the end of each game day and Trade Org warehouses top up to their stock floor; caravans, NPC cities, the Trade Org army and its punishments give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
+ * horses; food spoils at the end of each game day and Trade Org warehouses top up to their stock floor; caravans, NPC cities, the Trade Org army and its punishments give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
  * putting down goods, haul routes' and road orders' included, then paying for mercenary contracts, then buying NPC cities, then trading at Trade Org warehouses, then laying out and working on construction sites, then tearing down, then
- * working workplaces, then pairs having children), and the world resolves them together. As the next tick begins, residents
+ * working workplaces, then residents breeding horses, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; then residents at
  * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
@@ -184,6 +185,8 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveTearingDown(world, teardowns, terrain)
   const work = requestWork(world)
   resolveWork(world, work)
+  const breeding = requestBreeding(world)
+  resolveBreeding(world, breeding, terrain.size)
   const births = requestBirths(world)
   resolveBirths(world, births)
   world.tick++
@@ -206,6 +209,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
     builds.length +
     teardowns.length +
     work.length +
+    breeding.length +
     births.length +
     payments +
     purchases +

@@ -13,7 +13,7 @@ import { leaveTradeOrg } from './caravans.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 42
+export const WORLD_FORMAT_VERSION = 43
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -62,6 +62,13 @@ export const migrations: Record<number, MigrationStep> = {
       h.stats = { ...AVERAGE_HORSE_STATS }
       h.bornAt = world.tick - Math.round(age * TICKS_PER_GAME_YEAR)
     }
+    return world
+  },
+  // Breeding is a resident's order (`CONTEXT.md`: Breeding): stables no longer breed on their
+  // own, so the progress they kept goes. Nobody tends their horses yet; the foal starts over.
+  42: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const b of world.buildings) delete (b as { breeding?: number }).breeding
     return world
   },
 }

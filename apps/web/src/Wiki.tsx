@@ -99,6 +99,8 @@ import {
   SIGHT_RANGE,
   STABLE_BREED_DAYS,
   STABLE_CAPACITY,
+  FOAL_STAT_SPREAD,
+  BREED_FOOD,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
   STANDING_PER_PAID_WEEK,
@@ -684,9 +686,20 @@ export function Wiki() {
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
-          carriage's load or food on the ground next to them. Two fed horses at a stable breed a
-          foal every {days(STABLE_BREED_DAYS)}, up to {num(STABLE_CAPACITY)} horses a stable. A haul
-          route keeps {num(HAUL_KEEP_FOOD)} Food on board for its horse.
+          carriage's load or food on the ground next to them. A stable holds up to{' '}
+          {num(STABLE_CAPACITY)} horses. A haul route keeps {num(HAUL_KEEP_FOOD)} Food on board for
+          its horse.
+        </p>
+        <h3>Breeding</h3>
+        <p>
+          Horses don't breed on their own. A grown resident standing at a finished stable is given
+          Breed horses and picks two fed horses of their realm in it; they tend them for{' '}
+          {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
+          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. Breeding stops,
+          and starts over from nothing, when the resident leaves or is given another order, when a
+          horse leaves or dies, or when the stable has no room left for the foal. The Breed horses
+          default first takes {num(BREED_FOOD)} Food from the stable for the resident's meals, if
+          they carry less. NPC cities have one of their residents breed their horses the same way.
         </p>
         <h3>Horse stats</h3>
         <p>

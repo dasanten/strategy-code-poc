@@ -382,6 +382,8 @@ function residentActions(
     build: ([building]) => request('build', { building: plain(building) }),
     tearDown: ([buildingId]) => request('tearDown', { buildingId: plain(buildingId) }),
     workAt: ([makes]) => request('workAt', makes == null ? {} : { makes: plain(makes) }),
+    breed: ([stableId, horseIds]) =>
+      request('breed', { stableId: plain(stableId), horseIds: plain(horseIds) }),
     pair: ([partnerId]) => request('pair', { partnerId: plain(partnerId) }),
     attack: ([targetId]) => request('attack', { targetId: plain(targetId) }),
     climb: ([wallId]) => request('climb', { wallId: plain(wallId) }),

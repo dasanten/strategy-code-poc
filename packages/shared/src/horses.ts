@@ -5,15 +5,17 @@ import { pileAt } from './goods.js'
 import { wrap } from './terrain.js'
 import {
   TICKS_PER_GAME_DAY,
+  type BreedOrder,
   type Building,
   type Horse,
+  type Resident,
   type Stock,
   type WorldState,
 } from './world.js'
 
 /** World queries about horses and stables (ADR 0002: the game API orders and scripts share). */
 
-/** Ticks of breeding a stable needs for one foal (`STABLE_BREED_DAYS`). */
+/** Ticks a resident tends two horses at a stable before their foal is born (`STABLE_BREED_DAYS`). */
 export const STABLE_BREED_TICKS = STABLE_BREED_DAYS * TICKS_PER_GAME_DAY
 
 /** The finished stable whose footprint covers a tile, if there is one. */
@@ -49,17 +51,76 @@ export function horseFood(world: WorldState, horse: Horse, mapSize: number): Sto
   return out
 }
 
+/** Whose horses a resident may breed (`CONTEXT.md`: Breeding): a realm's, or an NPC city's. */
+export type HorseOwner = { realmId: string } | { cityId: string }
+
+/** Whether a horse belongs to the realm or NPC city. */
+export function ownsHorse(owner: HorseOwner, h: Pick<Horse, 'realmId' | 'cityId'>): boolean {
+  return 'realmId' in owner
+    ? h.realmId === owner.realmId
+    : h.realmId === null && h.cityId === owner.cityId
+}
+
+/** The horses standing in a stable, hitched or not. */
+export function horsesIn<H extends { x: number; y: number }>(
+  horses: readonly H[],
+  stable: Building,
+): H[] {
+  return horses.filter((h) => isAt(h, stable))
+}
+
+/** The residents breeding at a stable (`BreedOrder`). */
+export function breedersAt<R extends Pick<Resident, 'order'>>(
+  residents: readonly R[],
+  stable: Building,
+): R[] {
+  return residents.filter((r) => r.order?.kind === 'breed' && r.order.stableId === stable.id)
+}
+
 /**
- * Two fed horses of one realm (or NPC city) at a stable, who can breed a foal there (`CONTEXT.md`: Stable), or
- * undefined when there are none or the stable has no room for another horse.
+ * Two fed horses of the owner's in a finished stable with room for a foal, which a resident there
+ * can breed (`CONTEXT.md`: Breeding), or undefined when there are none.
  */
-export function breedingPair(world: WorldState, stable: Building): [Horse, Horse] | undefined {
-  const here = world.horses.filter((h) => isAt(h, stable))
-  if (stable.site || stable.kind !== 'stable' || here.length >= STABLE_CAPACITY) return undefined
-  const fed = here.filter((h) => h.hunger > 0)
-  for (const a of fed) {
-    const b = fed.find((h) => h !== a && h.realmId === a.realmId && h.cityId === a.cityId)
-    if (b) return [a, b]
-  }
+export function breedingPair(
+  world: Pick<WorldState, 'horses' | 'residents'>,
+  stable: Building,
+  owner: HorseOwner,
+): [Horse, Horse] | undefined {
+  const fed = horsesIn(world.horses, stable).filter((h) => ownsHorse(owner, h) && h.hunger > 0)
+  const pair = fed.slice(0, 2)
+  if (pair.length < 2) return undefined
+  return breedProblem(world, stable, owner, undefined, [pair[0]!.id, pair[1]!.id])
+    ? undefined
+    : [pair[0]!, pair[1]!]
+}
+
+/**
+ * Why a resident standing at the stable can't breed the two horses (`CONTEXT.md`: Breeding),
+ * undefined when they can: the stable must be finished, the horses two fed ones of the owner's
+ * standing in it, and the stable must have room for a foal. Horses another resident already
+ * breeds can't be bred twice. `breeder` is the resident who would, left out of that check.
+ */
+export function breedProblem(
+  world: Pick<WorldState, 'horses' | 'residents'>,
+  stable: Building,
+  owner: HorseOwner,
+  breeder: Pick<Resident, 'id'> | undefined,
+  horseIds: unknown,
+): string | undefined {
+  if (stable.kind !== 'stable') return 'not a stable'
+  if (stable.site) return 'the stable isn’t finished'
+  if (!Array.isArray(horseIds) || horseIds.length !== 2 || horseIds[0] === horseIds[1])
+    return 'pick two horses'
+  const horses = horseIds.map((id) => world.horses.find((h) => h.id === id))
+  if (horses.some((h) => !h || !isAt(h, stable))) return 'both horses must stand in the stable'
+  if (horses.some((h) => !ownsHorse(owner, h!))) return 'not horses of your realm'
+  if (horses.some((h) => h!.hunger <= 0)) return 'a hungry horse can’t breed'
+  if (horsesIn(world.horses, stable).length >= STABLE_CAPACITY)
+    return 'the stable has no room for a foal'
+  const taken = breedersAt(world.residents, stable).some(
+    (r) =>
+      r.id !== breeder?.id && (r.order as BreedOrder).horseIds.some((id) => horseIds.includes(id)),
+  )
+  if (taken) return 'those horses are already being bred'
   return undefined
 }

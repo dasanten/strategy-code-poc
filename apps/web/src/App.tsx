@@ -203,6 +203,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'task', task: 'tearDown', residentId: selected.id, buildingId }
     setOrderError(await sendOrder(order))
   }
+  /**
+   * Gives the picked resident the Breed horses task for two horses in the stable on their tile:
+   * they run the Player's Breed horses (default) script.
+   */
+  async function breed(stableId: string, horseIds: [string, string]) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'breed', residentId: selected.id, stableId, horseIds }
+    setOrderError(await sendOrder(order))
+  }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
   async function runScript(scriptId: number) {
@@ -590,6 +599,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             onWork={work}
             onTearDown={tearDown}
+            horses={world.horses}
+            onBreed={breed}
             residents={own}
             onPair={pair}
             others={world.residents.filter((r) => !own.some((o) => o.id === r.id))}

@@ -384,24 +384,44 @@ export const horseStatsSound: Invariant = {
 }
 
 /**
- * Stables breed only while they make sense (`CONTEXT.md`: Stable): breeding progress is kept
- * only on stables, and stays between 0 and one foal's worth (`STABLE_BREED_TICKS`); a stable
- * reaching it has had its foal.
+ * Breeding goes on only while it makes sense (`CONTEXT.md`: Breeding): after a tick, a resident
+ * with a breed order stands where they started it, at the finished stable, with two different
+ * horses standing in it that no one else breeds, and their progress stays below one foal's worth
+ * (`STABLE_BREED_TICKS`); reaching it, the foal was born and the order ended.
  */
-export const stablesBreedInRange: Invariant = {
-  name: 'stables-breed-in-range',
+export const breedOrdersSound: Invariant = {
+  name: 'breed-orders-sound',
   check(world) {
-    return world.buildings
-      .filter(
-        (b) =>
-          b.breeding !== undefined &&
-          !(b.kind === 'stable' && b.breeding >= 0 && b.breeding < STABLE_BREED_TICKS),
-      )
-      .map((b) => ({
-        invariant: this.name,
-        message: `${b.kind} ${b.id} has breeding ${b.breeding} of ${STABLE_BREED_TICKS}`,
-        entityIds: [b.id],
-      }))
+    const out: InvariantViolation[] = []
+    const bred = new Map<string, string>()
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'breed') continue
+      const fail = (message: string, ids: string[] = []) =>
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${message}`,
+          entityIds: [r.id, ...ids],
+        })
+      const stable = world.buildings.find((b) => b.id === o.stableId)
+      if (!stable || stable.kind !== 'stable' || stable.site || !isAt(r, stable))
+        fail(`breeds at ${o.stableId}, which isn’t a finished stable they stand at`, [o.stableId])
+      if (r.x !== o.at.x || r.y !== o.at.y)
+        fail(`breeds from ${o.at.x}, ${o.at.y} but stands elsewhere`)
+      if (!(Number.isInteger(o.progress) && o.progress >= 0 && o.progress < STABLE_BREED_TICKS))
+        fail(`has breeding progress ${o.progress} of ${STABLE_BREED_TICKS}`)
+      if (o.horseIds[0] === o.horseIds[1]) fail(`breeds horse ${o.horseIds[0]} with itself`)
+      for (const id of o.horseIds) {
+        const h = world.horses.find((x) => x.id === id)
+        if (!h || !stable || !isAt(h, stable))
+          fail(`breeds horse ${id}, which isn’t in the stable`, [id])
+        const other = bred.get(id)
+        if (other !== undefined && other !== r.id)
+          fail(`breeds horse ${id}, which ${other} breeds too`, [id, other])
+        bred.set(id, r.id)
+      }
+    }
+    return out
   },
 }
 
@@ -1172,6 +1192,7 @@ const ADULT_ORDERS = new Set([
   'wallLine',
   'tearDown',
   'workAt',
+  'breed',
   'drive',
   'pickUp',
   'drop',
@@ -1566,7 +1587,7 @@ export const worldInvariants: Invariant[] = [
   citiesFromBuildings,
   carriedWithinCapacity,
   goodsInPlace,
-  stablesBreedInRange,
+  breedOrdersSound,
   goodsInWholeUnits,
   carryOrdersDone,
   sitesWithinNeeds,

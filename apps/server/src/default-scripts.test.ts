@@ -86,6 +86,7 @@ describe('a Player’s default scripts', () => {
   it('are in their library from the start, one per task, following the game’s default', () => {
     const list = listScripts(db, mara)
     expect(list.map((s) => [s.name, s.task, s.followsDefault])).toEqual([
+      ['Breed horses (default)', 'breed', true],
       ['Build (default)', 'build', true],
       ['Haul (default)', 'haul', true],
       ['Tear down (default)', 'tearDown', true],
@@ -521,6 +522,26 @@ describe('the step budget', () => {
       keepFood: 4,
     }
     const tearDown = { buildingId: 'farm' }
+    const breeding = { stableId: 'st', horseIds: ['h1', 'h2'] }
+    /** A stable of Mara's where the farm was, with two of her horses and Food in it. */
+    const stabled = (world: WorldState) => {
+      world.buildings = [
+        { id: 'st', kind: 'stable', cityId: 'c1', x: 3, y: 3, stock: { food: 50 } },
+      ]
+      for (const id of ['h1', 'h2']) {
+        world.horses.push({
+          id,
+          realmId: 'r1',
+          cityId: null,
+          x: 3,
+          y: 3,
+          hunger: MAX_HUNGER,
+          health: MAX_HEALTH,
+          stats: { ...AVERAGE_HORSE_STATS },
+          bornAt: 0,
+        })
+      }
+    }
     const stable = { building: 'stable', at: { x: 3, y: 3 }, siteId: 'site' }
     /** Mara's residents all building a stable's site where the farm was, lacking its Wood. */
     const building = (world: WorldState) => {
@@ -637,6 +658,28 @@ describe('the step budget', () => {
         },
         { memory: tearDown, prepare: (world) => void (world.buildings = []) },
         { memory: { ...tearDown, done: true }, prepare: (world) => void (world.buildings = []) },
+      ],
+      breed: [
+        // Taking Food along, breeding, away from the stable, breeding, turned down, and done.
+        { memory: breeding, prepare: stabled },
+        {
+          memory: { ...breeding, fed: true },
+          prepare: (world) => {
+            stabled(world)
+            world.residents[0]!.x = 20
+          },
+        },
+        {
+          memory: { ...breeding, fed: true, started: true },
+          prepare: (world) => {
+            stabled(world)
+            const at = { x: 3, y: 3 }
+            const order = { kind: 'breed' as const, stableId: 'st', at, progress: 5 }
+            world.residents[0]!.order = { ...order, horseIds: ['h1', 'h2'] }
+          },
+        },
+        { memory: { ...breeding, fed: true }, prepare: () => {} },
+        { memory: { ...breeding, done: true }, prepare: stabled },
       ],
     }
     for (const task of TASKS) {

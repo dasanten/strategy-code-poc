@@ -339,6 +339,20 @@ export interface ClimbOrder {
   progress: number
 }
 
+/**
+ * Breeding (`CONTEXT.md`: Breeding): the resident, standing at the finished stable `stableId` on
+ * `at`, tends the two horses `horseIds` standing in it. `progress` counts the ticks tended, up to
+ * `STABLE_BREED_TICKS`; then a foal is born there and the order is done. It ends, its progress
+ * lost, when the resident or a horse leaves, a horse dies or the stable has no room left.
+ */
+export interface BreedOrder {
+  kind: 'breed'
+  stableId: string
+  horseIds: [string, string]
+  at: { x: number; y: number }
+  progress: number
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -349,6 +363,7 @@ export type ResidentOrder =
   | BuildOrder
   | TearDownOrder
   | WorkOrder
+  | BreedOrder
   | AttackOrder
   | ClimbOrder
   | LineOrder
@@ -1425,11 +1440,6 @@ export interface Building {
   y: number
   /** Goods kept here; storages, warehouses and stables only. */
   stock?: Stock
-  /**
-   * A stable's progress toward its next foal, in ticks of breeding (`STABLE_BREED_DAYS`); there
-   * once it has started.
-   */
-  breeding?: number
   /** There while the building is still a construction site. */
   site?: ConstructionSite
   /** Work put into tearing it down so far, once someone has started (`teardownWork`). */

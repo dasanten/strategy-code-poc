@@ -9,11 +9,9 @@ import {
   HUNGER_DAYS,
   MAX_HEALTH,
   MAX_HUNGER,
-  STABLE_BREED_TICKS,
   STARVE_DAYS,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
-  breedingPair,
   horseFood,
   horseFoodFactor,
   type Horse,
@@ -22,8 +20,6 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
-import { hash, mulberry32 } from './residents.js'
-import { newId } from './starting-city.js'
 
 /** How far one unit of food fills a horse's hunger meter: a full meter holds `HUNGER_DAYS` of food. */
 const FILL_PER_FOOD = MAX_HUNGER / (HUNGER_DAYS * HORSE_FOOD_PER_DAY)
@@ -67,10 +63,8 @@ export function newHorse(
  * One tick of horses (`CONTEXT.md`: Horse, Horses have no inventory, Stable). Their hunger meter
  * runs down like a resident's; a horse eats a unit of food when there is room for it, from what is
  * in reach (`horseFood`). An empty meter costs health, a meter with anything in it slowly gives
- * health back, and a horse with no health left dies, which goes in its Player's realm log. Then
- * every stable with two fed horses of one realm and room for another breeds toward a foal; after
- * `STABLE_BREED_DAYS` of that a foal of their realm is born in the stable. Returns the horses
- * that died.
+ * health back, and a horse with no health left dies, which goes in its Player's realm log.
+ * Foals come only from a resident breeding them (`resolveBreeding`). Returns the horses that died.
  */
 export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
   const drain = MAX_HUNGER / (HUNGER_DAYS * TICKS_PER_GAME_DAY)
@@ -102,28 +96,6 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
     // A carriage whose horse died stands where it is, with nothing to pull it.
     for (const k of world.carriages) if (died.some((h) => h.id === k.horseId)) k.horseId = null
     for (const h of died) recordEvent(world, h.realmId, { kind: 'horseDied', horseId: h.id })
-  }
-
-  for (const stable of world.buildings) {
-    const pair = stable.kind === 'stable' ? breedingPair(world, stable) : undefined
-    if (!pair) continue
-    stable.breeding = (stable.breeding ?? 0) + 1
-    if (stable.breeding < STABLE_BREED_TICKS) continue
-    stable.breeding = 0
-    const id = newId(world, 'horse')
-    const foal: Horse = {
-      id,
-      realmId: pair[0].realmId,
-      cityId: pair[0].cityId,
-      x: stable.x,
-      y: stable.y,
-      hunger: MAX_HUNGER,
-      health: MAX_HEALTH,
-      stats: drawHorseStats(mulberry32(hash(`${world.seed}:foal:${id}`))),
-      bornAt: world.tick,
-    }
-    world.horses.push(foal)
-    recordEvent(world, foal.realmId, { kind: 'foaled', horseId: foal.id, stableId: stable.id })
   }
   return died
 }
