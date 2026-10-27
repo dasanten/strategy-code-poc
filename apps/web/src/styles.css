@@ -792,7 +792,7 @@ label > select {
 }
 .residents-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) 26px minmax(0, 1.5fr) 48px 58px;
+  grid-template-columns: minmax(0, 1.3fr) 26px minmax(0, 1.5fr) 48px 76px;
   gap: 8px;
   align-items: center;
   min-height: 34px;

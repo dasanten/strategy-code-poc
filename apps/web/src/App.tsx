@@ -26,16 +26,9 @@ import { StandingPanel } from './Standing.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { keyGoods, showBeside, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
-import {
-  CentredDialog,
-  Drawer,
-  ToolRail,
-  TopBar,
-  mapCovered,
-  useEscapeCloses,
-} from './Hud.js'
+import { CentredDialog, Drawer, ToolRail, TopBar, mapCovered, useEscapeCloses } from './Hud.js'
 import type { Covered } from './map/camera.js'
-import { groupResidents } from './residents-view.js'
+import { groupResidents, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
@@ -52,7 +45,7 @@ import {
 } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
 import { buildingNodeKind } from './building-info-view.js'
-import { describeTile, makeLeaderProblem, nodeFit } from './selection-view.js'
+import { describeTile, makeLeaderProblem, nodeFit, type ActionId } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
@@ -86,6 +79,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
+  // The resident card's open sections, kept here so they stay open as the Player picks others.
+  const [cardSections, setCardSections] = useState<CardSections<ActionId>>({ stats: false })
   const [picking, setPicking] = useState<Picking>(false)
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
@@ -608,6 +603,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 : undefined
             }
             onRename={rename}
+            sections={cardSections}
+            onSections={setCardSections}
             onClose={() => {
               setSelectedId(undefined)
               setPicking(false)
