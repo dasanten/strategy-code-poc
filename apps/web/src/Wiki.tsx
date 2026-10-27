@@ -606,7 +606,9 @@ export function Wiki() {
         <p>
           A city building (town hall, house, storage, wall, gate) belongs to a city when it stands
           within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
-          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them.
+          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house or a storage
+          goes only in a city's area; a town hall, wall or gate goes anywhere off Mountain and off
+          resource nodes, and a new town hall founds a city.
         </p>
       </Section>
 

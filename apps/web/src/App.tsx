@@ -52,7 +52,7 @@ import {
 } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
 import { buildingNodeKind } from './building-info-view.js'
-import { describeTile, makeLeaderProblem, nodeFit } from './selection-view.js'
+import { buildHereProblem, describeTile, makeLeaderProblem, nodeFit } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
@@ -563,6 +563,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
             onDrop={(spot, goods) => carry('drop', spot, goods)}
             onBuild={build}
+            buildProblem={(kind) =>
+              buildHereProblem(
+                kind,
+                selected.x,
+                selected.y,
+                world,
+                (x, y) => nodeAt?.(x, y),
+                // Terrain not loaded counts as unexplored: nothing is laid out there.
+                { size: world.map.size, at: (x, y) => terrainAt?.(x, y) ?? UNEXPLORED },
+              )
+            }
             workers={workersHere(world.residents, buildingHere)}
             holders={heldBy(world.residents, buildingHere)}
             realmId={world.home.realmId}
