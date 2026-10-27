@@ -74,7 +74,7 @@ const here = (more: Partial<ResidentHere> = {}): ResidentHere => ({
 const ids = (h: ResidentHere) => residentActions(h).map((a) => a.id)
 
 describe('the actions on a resident’s card', () => {
-  it('offers walking, building, a road, pairing and scripts to an idle adult on open ground', () => {
+  it('offers walking, building, a road, a wall, goods, pairing and scripts to an idle adult on open ground', () => {
     expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'wallTo', 'goods', 'pair', 'script'])
   })
 
