@@ -61,6 +61,7 @@ import {
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { carryLine, groupCard, type CardSections, type ResidentGroup } from './residents-view.js'
 import { doingLine } from './doing-view.js'
+import { groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -349,16 +350,44 @@ export function GroupCard({
   residents,
   scripts,
   buildings,
+  picking,
+  onPicking,
+  buildAt,
+  onOrder,
+  report,
+  orderError,
   onPick,
   onClose,
 }: {
   residents: Resident[]
   scripts: ScriptSummary[]
   buildings: Building[]
+  /** The map is waiting for a tile for the group's walk-to, work or build order. */
+  picking: GroupPicking
+  /** Starts (or cancels) picking a tile for the group. */
+  onPicking: (picking: GroupPicking) => void
+  /** The tile picked to build on: the site there to join, or the kinds that may go there. */
+  buildAt: GroupBuildTile | undefined
+  /** Gives each resident of the group the order (`CONTEXT.md`: Group). */
+  onOrder: (order: GroupOrder) => void
+  /** What the last group order did: how many it went to, and who was skipped and why. */
+  report: { sent: number; of: number; skipped: Skipped[] } | undefined
+  /** Why the last group order couldn't go out at all, such as no workplace on the tile. */
+  orderError: string | undefined
   onPick: (id: string) => void
   onClose: () => void
 }) {
   const card = groupCard(residents)
+  const [panel, setPanel] = useState<'fetch' | 'script'>()
+  const [good, setGood] = useState<Good>('food')
+  const toggle = (p: Exclude<GroupPicking, false>) => {
+    setPanel(undefined)
+    onPicking(picking === p ? false : p)
+  }
+  const open = (p: 'fetch' | 'script') => {
+    onPicking(false)
+    setPanel(panel === p ? undefined : p)
+  }
   return (
     <SelectionCard rel="own" title={card.title} lines={[card.names]} onClose={onClose}>
       <ul className="sel-facts sel-group" aria-label="Selected residents">
@@ -371,8 +400,148 @@ export function GroupCard({
         ))}
         {card.more > 0 && <li>and {card.more} more</li>}
       </ul>
+      <div className="order-buttons" aria-label="Group orders">
+        <button type="button" aria-pressed={picking === 'walk'} onClick={() => toggle('walk')}>
+          Walk to
+        </button>
+        <button type="button" aria-pressed={picking === 'work'} onClick={() => toggle('work')}>
+          Work
+        </button>
+        <button type="button" aria-pressed={picking === 'build'} onClick={() => toggle('build')}>
+          Build
+        </button>
+        <button type="button" onClick={() => onOrder({ kind: 'store' })}>
+          Store
+        </button>
+        <button type="button" aria-pressed={panel === 'fetch'} onClick={() => open('fetch')}>
+          Fetch
+        </button>
+        <button type="button" aria-pressed={panel === 'script'} onClick={() => open('script')}>
+          Run script
+        </button>
+        <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
+          Stop
+        </button>
+      </div>
+      <p className="muted small" role="status">
+        {orderError
+          ? `Order turned down: ${orderError}`
+          : picking
+            ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
+            : 'Right-click the map to walk them there.'}
+      </p>
+      {report && (
+        <div className="small" aria-label="Last group order">
+          <p>{groupSentLine(report.sent, report.of)}</p>
+          {report.skipped.length > 0 && (
+            <ul className="sel-facts">
+              {report.skipped.map((s) => (
+                <li key={s.id}>
+                  Skipped <strong>{s.name}</strong>: {s.why}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {buildAt && !picking && (
+        <section className="inspector-block" aria-label="Build">
+          <div className="panel-head">
+            <h3>Build</h3>
+            <span className="small muted">
+              at {buildAt.x}, {buildAt.y}
+            </span>
+          </div>
+          {buildAt.site ? (
+            <div className="order-buttons">
+              <button
+                type="button"
+                className="primary"
+                onClick={() =>
+                  onOrder({
+                    kind: 'build',
+                    building: buildAt.site!.kind,
+                    at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                  })
+                }
+              >
+                All help build the {BUILDING_NAMES[buildAt.site.kind].toLowerCase()}
+              </button>
+            </div>
+          ) : (
+            buildAt.kinds.map(({ kind, problem }) => (
+              <div key={kind}>
+                <div className="order-buttons">
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={problem !== undefined}
+                    onClick={() => onOrder({ kind: 'build', building: kind, at: buildAt })}
+                  >
+                    Build {BUILDING_NAMES[kind].toLowerCase()}
+                  </button>
+                </div>
+                {problem && <p className="muted small">Not here: {problem}.</p>}
+              </div>
+            ))
+          )}
+          <p className="muted small">
+            Each walks there; the first lays out the site and the others join it.
+          </p>
+        </section>
+      )}
+      {panel === 'fetch' && (
+        <section className="inspector-block" aria-label="Fetch">
+          <div className="order-buttons">
+            <select
+              aria-label="Good to fetch"
+              value={good}
+              onChange={(e) => setGood(e.target.value as Good)}
+            >
+              {GOODS.map((g) => (
+                <option key={g} value={g}>
+                  {GOOD_LABELS[g]}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={() => onOrder({ kind: 'fetch', good })}>
+              Fetch
+            </button>
+          </div>
+          <p className="muted small">
+            Each fetches as much as fits from the nearest storage or carriage holding it.
+          </p>
+        </section>
+      )}
+      {panel === 'script' && (
+        <section className="inspector-block" aria-label="Run script">
+          <RunScript
+            script={undefined}
+            scripts={scripts}
+            onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
+          />
+        </section>
+      )}
     </SelectionCard>
   )
+}
+
+/** What the map waits for while a group order is being given. */
+export type GroupPicking = false | 'walk' | 'work' | 'build'
+
+/** The tile a group is to build on, with the site there or the kinds that may go there. */
+export interface GroupBuildTile {
+  x: number
+  y: number
+  site: Building | undefined
+  kinds: { kind: BuildingKind; problem: string | undefined }[]
+}
+
+/** What picking a tile does for a group, said while the map waits for it. */
+const GROUP_PICKING_HINTS: Record<Exclude<GroupPicking, false>, string> = {
+  walk: 'They spread over free tiles around it, nearest first.',
+  work: 'Those standing at the workplace there work it.',
+  build: 'Where to build, or a site to join.',
 }
 
 /**
