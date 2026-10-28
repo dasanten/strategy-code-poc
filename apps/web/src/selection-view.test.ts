@@ -106,6 +106,13 @@ describe('the actions on a resident’s card', () => {
     expect(build?.label).toBe('Help build the farm…')
   })
 
+  it('offers feeding a finished stable on their tile', () => {
+    expect(ids(here({ building: building({ kind: 'stable' }) }))).toContain('feedStable')
+    const site = building({ kind: 'stable', site: { work: 0, delivered: {} } })
+    expect(ids(here({ building: site }))).not.toContain('feedStable')
+    expect(ids(here({ building: building({ kind: 'storage' }) }))).not.toContain('feedStable')
+  })
+
   it('offers tearing down what was built on their tile, but not a warehouse', () => {
     expect(ids(here({ building: building({ kind: 'farm' }) }))).toContain('tearDown')
     expect(ids(here({ road: building({ kind: 'road' }) }))).toContain('tearDown')

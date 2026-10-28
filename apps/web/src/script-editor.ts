@@ -1,7 +1,16 @@
 import type { StreamParser, StringStream } from '@codemirror/language'
-import { KEYWORDS, checkNames, tokenize, type Diagnostic, type Token } from '@csp/lang'
+import {
+  KEYWORDS,
+  PARAMS_SHAPE,
+  checkNames,
+  scriptParams,
+  tokenize,
+  type Diagnostic,
+  type Token,
+} from '@csp/lang'
 import {
   ARMY_SCRIPT_API,
+  PARAM_DESCRIPTIONS,
   RESIDENT_OR_ARMY,
   SCRIPT_API,
   SCRIPT_VIEWS,
@@ -495,11 +504,34 @@ function fieldInfo(f: ScriptField): string {
   return lines.join('\n')
 }
 
+/** The lines at the top of a script up to the first that is no `param` line, blank or comment. */
+function paramLines(source: string): string {
+  const lines = source.split('\n')
+  const end = lines.findIndex((l) => !/^\s*(param\b.*|\/\/.*)?$/.test(l))
+  return (end === -1 ? lines : lines.slice(0, end)).join('\n')
+}
+
 /**
  * The fields a view offers, each with its info; for `me` where it may be a resident or an army,
  * both views' fields, each marked where it is only one's.
  */
-function viewFields(shape: string): { field: ScriptField; mark: string | null; info: string }[] {
+function viewFields(
+  shape: string,
+  source: string,
+): { field: ScriptField; mark: string | null; info: string }[] {
+  if (shape === PARAMS_SHAPE) {
+    // `params`: the script's own `param` lines, from its top alone, as the rest may not parse
+    // while the Player types.
+    return scriptParams(paramLines(source)).map((p) => {
+      const field: ScriptField = {
+        name: p.name,
+        type: p.type === 'building' ? { view: 'building' } : 'any',
+        description: PARAM_DESCRIPTIONS[p.type],
+        nullWhen: 'while none is picked, or the one picked is gone or no longer of my realm',
+      }
+      return { field, mark: null, info: fieldInfo(field) }
+    })
+  }
   if (shape !== RESIDENT_OR_ARMY) {
     const view = SCRIPT_VIEWS[shape as ScriptViewName]
     return view ? view.fields.map((field) => ({ field, mark: null, info: fieldInfo(field) })) : []
@@ -536,7 +568,7 @@ export function fieldCompletions(
   const shape = viewBefore(source, dot, to, options.defaultScript)
   if (shape === null) return null
   const prefix = source.slice(dot, to).toLowerCase()
-  return viewFields(shape)
+  return viewFields(shape, source)
     .filter(({ field }) => field.name.toLowerCase().startsWith(prefix))
     .map(({ field, mark, info }) => ({
       label: field.name,
@@ -561,6 +593,6 @@ export function fieldHover(
   const found =
     shape === null
       ? undefined
-      : viewFields(shape).find((f) => f.field.name === source.slice(from, to))
+      : viewFields(shape, source).find((f) => f.field.name === source.slice(from, to))
   return found ? { from, to, text: found.info } : null
 }

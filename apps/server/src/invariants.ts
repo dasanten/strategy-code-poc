@@ -106,6 +106,7 @@ import { hqRingsSound } from './hq-growth.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
+import { readWanted } from './storing.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -564,6 +565,34 @@ export const carryOrdersDone: Invariant = {
         message: `resident ${r.id} still holds a ${r.order!.kind} order after the tick`,
         entityIds: [r.id],
       }))
+  },
+}
+
+/**
+ * Store and fetch orders (`CONTEXT.md`: Store, Fetch) ask for known goods in whole units or as
+ * many as there are, and put or take within the tick they reach their place, so after a tick none
+ * is still putting or taking. How one ended never lies in the future.
+ */
+export const storeFetchOrdersSound: Invariant = {
+  name: 'store-fetch-orders-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (id: string, message: string) =>
+      out.push({ invariant: this.name, message: `resident ${id} ${message}`, entityIds: [id] })
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind === 'store' || o?.kind === 'fetch') {
+        if (!readWanted(o.goods))
+          fail(r.id, `${o.kind}s malformed goods ${JSON.stringify(o.goods)}`)
+        if (o.phase === 'putting' || o.phase === 'taking') {
+          fail(r.id, `is still ${o.phase} for a ${o.kind} order after the tick`)
+        }
+      }
+      if (r.orderEnded && r.orderEnded.tick > world.tick) {
+        fail(r.id, `has a ${r.orderEnded.kind} order that ended at tick ${r.orderEnded.tick}`)
+      }
+    }
+    return out
   },
 }
 
@@ -1644,6 +1673,7 @@ export const worldInvariants: Invariant[] = [
   breedOrdersSound,
   goodsInWholeUnits,
   carryOrdersDone,
+  storeFetchOrdersSound,
   sitesWithinNeeds,
   buildOrdersOnSites,
   workOrdersOnWorkplaces,

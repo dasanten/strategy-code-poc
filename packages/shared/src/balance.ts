@@ -216,6 +216,13 @@ export const HORSE_REACH = 1
  */
 export const HORSE_HUNGRY_SHARE = 0.25
 
+/**
+ * Game days of Food for the horses standing in it that the Feed the stable task keeps in a stable
+ * (`CONTEXT.md`: Feeding the stable): `HORSE_FOOD_PER_DAY` for each, this many days. Below it the
+ * resident fetches more. Written into the default's source, where a Player can change it.
+ */
+export const STABLE_FEED_DAYS = 10
+
 /** Most horses a stable has room for; no foal is bred there once that many stand in it. */
 export const STABLE_CAPACITY = 6
 
@@ -1663,6 +1670,12 @@ export const SCRIPT_REALM_STEP_BUDGET = 20000
  * Memory). Enough for a role, a few tiles and ids; a run that leaves more keeps the old memory.
  */
 export const SCRIPT_MEMORY_MAX = 4000
+
+/**
+ * The longest text a script can give `doing()` for its resident's Doing line (`CONTEXT.md`:
+ * Doing), in characters after trimming; longer text is cut. One line of the resident card.
+ */
+export const DOING_MAX_LENGTH = 60
 
 /**
  * Ticks between two realm-log entries about the same resident's script going wrong (an error,

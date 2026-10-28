@@ -1,15 +1,18 @@
 // The recursive-descent parser: turns tokens into a syntax tree (ADR 0001, version 1).
 // Semicolons between statements are optional.
 
-import type {
-  AssignTarget,
-  BinaryOperator,
-  BlockStatement,
-  Expression,
-  IfStatement,
-  ObjectProperty,
-  Program,
-  Statement,
+import {
+  PARAM_TYPES,
+  type AssignTarget,
+  type BinaryOperator,
+  type BlockStatement,
+  type Expression,
+  type IfStatement,
+  type ObjectProperty,
+  type ParamDeclaration,
+  type ParamType,
+  type Program,
+  type Statement,
 } from './ast.js'
 import { type Keyword, type Punctuator, ScriptSyntaxError, type Token, tokenize } from './lexer.js'
 
@@ -39,9 +42,51 @@ class Parser {
   constructor(private readonly tokens: Token[]) {}
 
   program(): Program {
+    const params: ParamDeclaration[] = []
+    while (this.isParam()) {
+      const token = this.peek(1)
+      const param = this.param()
+      if (params.some((p) => p.name === param.name)) {
+        throw this.error(token, `The param "${param.name}" appears twice`)
+      }
+      params.push(param)
+    }
     const body: Statement[] = []
     while (this.peek().type !== 'end') body.push(this.statement())
-    return { kind: 'Program', body }
+    return { kind: 'Program', params, body }
+  }
+
+  /**
+   * Whether a `param name: type` line starts here. `param` is no keyword: `param x :` can't
+   * start anything else, so `param` stays free as a name.
+   */
+  private isParam(): boolean {
+    const [word, name, colon] = [this.peek(), this.peek(1), this.peek(2)]
+    return (
+      word.type === 'identifier' &&
+      word.value === 'param' &&
+      name.type === 'identifier' &&
+      colon.type === 'punctuator' &&
+      colon.value === ':'
+    )
+  }
+
+  private param(): ParamDeclaration {
+    const start = this.advance()
+    const name = this.expectIdentifier('a name after "param"')
+    this.expectPunctuator(':', `after the param "${name}"`)
+    const token = this.peek()
+    const type = token.type === 'identifier' ? token.value : ''
+    if (!(PARAM_TYPES as readonly string[]).includes(type)) {
+      const types = PARAM_TYPES.map((t) => `"${t}"`).join(' or ')
+      throw this.error(
+        token,
+        `Expected ${types} after "param ${name}:" but found ${describe(token)}`,
+      )
+    }
+    this.advance()
+    this.matchPunctuator(';')
+    return { name, type: type as ParamType, ...at(start) }
   }
 
   // --- statements ---
@@ -49,6 +94,7 @@ class Parser {
   private statement(): Statement {
     return this.nested(() => {
       const token = this.peek()
+      if (this.isParam()) throw this.error(token, '"param" lines go at the top of the script')
       let statement: Statement
       if (this.isKeyword('let')) statement = this.letStatement()
       else if (this.isKeyword('if')) statement = this.ifStatement()

@@ -1,4 +1,9 @@
-import { ARMY_SCRIPT_API, SCRIPT_API, type ScriptBinding } from './script-api.js'
+import {
+  ARMY_SCRIPT_API,
+  SCRIPT_API,
+  type ScriptBinding,
+  type ScriptParamType,
+} from './script-api.js'
 import { SCRIPT_VIEWS, type ScriptType, type ScriptViewName } from './script-views.js'
 
 /**
@@ -15,6 +20,8 @@ export interface ScriptCheckEnv {
   globals: Record<string, { type: CheckedScriptType; params?: readonly string[] }>
   shapes: Record<string, Record<string, CheckedScriptType>>
   describeShape: (shape: string) => string
+  /** What `params.name` holds for each param type (`SCRIPT_PARAM_TYPES`). */
+  paramTypes: Partial<Record<ScriptParamType, CheckedScriptType>>
 }
 
 /** The shape of `me` where it may be a resident or an army. */
@@ -98,5 +105,7 @@ export function scriptCheckEnv(options: { defaultScript: boolean }): ScriptCheck
     globals,
     shapes,
     describeShape: (shape) => NOUNS[shape] ?? `a ${shape as ScriptViewName}`,
+    // A storage param may hold a carriage as well, so only a building one is certain.
+    paramTypes: { building: { shape: 'building' } },
   }
 }

@@ -1,5 +1,5 @@
 import { and, asc, eq, isNotNull, max, sql } from 'drizzle-orm'
-import { checkScript } from '@csp/lang'
+import { checkScript, scriptParams } from '@csp/lang'
 import {
   DEFAULT_SCRIPTS,
   SCRIPT_MAX_LENGTH,
@@ -193,7 +193,16 @@ export function listScripts(db: Db, userId: number): ScriptSummary[] {
     .groupBy(scripts.id)
     .orderBy(sql`lower(${scripts.name})`)
     .all()
-    .map((s) => ({ ...s, task: isTask(s.task) ? s.task : null }))
+    .map((s) => ({
+      ...s,
+      task: isTask(s.task) ? s.task : null,
+      params: paramsOf(sourceOf(db, s.id, s.activeVersion)),
+    }))
+}
+
+/** The `param` lines of an active version's source (`CONTEXT.md`: Script parameter). */
+function paramsOf(source: string | undefined): ScriptSummary['params'] {
+  return source === undefined ? [] : scriptParams(source)
 }
 
 /** One of the Player's scripts with its whole history. */
@@ -219,6 +228,7 @@ export function getScript(db: Db, userId: number, id: number): ScriptDetail {
     latestVersion: versions.at(-1)?.version ?? 0,
     task,
     followsDefault: script.followsDefault,
+    params: paramsOf(versions.find((v) => v.version === script.activeVersion)?.source),
     versions,
     ...(task === null
       ? {}

@@ -7,10 +7,11 @@
  * into `memory`, as `TaskMemory` lists. Defaults use the step budget like any script; a test
  * keeps each at most a quarter of `SCRIPT_STEP_BUDGET`.
  */
-import { BREED_FOOD, OWN_FOOD, WORK_FOOD_KEPT } from './balance.js'
+import { BREED_FOOD, HORSE_FOOD_PER_DAY, STABLE_FEED_DAYS, WORK_FOOD_KEPT } from './balance.js'
+import { FOOTPRINT } from './footprint.js'
 
 /** The tasks that run a default script. */
-export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed'] as const
+export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable'] as const
 export type Task = (typeof TASKS)[number]
 
 /** What giving a task from the UI writes into the script's memory. */
@@ -39,6 +40,8 @@ export interface TaskMemory {
   tearDown: { buildingId: string }
   /** Breed horses: the stable, and the two horses in it to breed. */
   breed: { stableId: string; horseIds: string[] }
+  /** Feed the stable: the stable the resident stood in when given it. */
+  feedStable: { stableId: string }
 }
 
 export interface DefaultScript {
@@ -54,90 +57,37 @@ export interface DefaultScript {
 export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
   work: {
     name: 'Work',
-    source: `// Work (default): work the workplace memory.workplaceId, and carry what it
-// makes to the nearest storage of my realm once its pile holds a full load.
-// At a smithy, memory.makes says what to make. Meals come from the
-// workplace's pile on their own, without an order.
-let ownFood = ${OWN_FOOD} // Food I keep on me for my own meals
+    source: `// Work (default): work the workplace memory.workplaceId; once its pile holds
+// a full load, one of us, picked at random, stores it in params.storage, or
+// the nearest storage of my realm while none is picked, and comes back. At a
+// smithy, memory.makes says what to make. Meals come from the workplace's
+// pile on their own, without an order.
+param storage: storage // where the output goes
 let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
 
 // Where the workplace is, kept for when it is out of sight.
 let place = building(memory.workplaceId)
 if (place != null) { memory.at = {x: place.x, y: place.y} }
 if (memory.at == null || memory.stuck) { return }
+if (me.order != null && me.order.kind != "workAt") { return } // on my way
 
-fn at(spot) { return me.x == spot.x && me.y == spot.y }
-fn walking() { return me.order != null && me.order.kind == "walkTo" }
-fn units(stock, good) {
-  if (stock == null || stock[good] == null) { return 0 }
-  return stock[good]
-}
-
-// Carrying: to the storage, store the load, refill if low, back to work.
+// With a load picked up: store it (keeping my own food), then back to work.
 let carry = memory.carry
-fn next(step) {
-  carry.step = step
-  carry.walked = false
+if (carry != null && !carry.stored) {
+  carry.stored = true
+  if (store(carry.goods, carry.storageId) == null) { return }
 }
-// Walks to a spot; true once there. A way that can't be walked is lost.
-fn goTo(spot) {
-  if (at(spot)) { return true }
-  if (!walking()) {
-    if (carry.walked) { carry.lost = true }
-    else {
-      walkTo(spot.x, spot.y)
-      carry.walked = true
-    }
+if (me.x != memory.at.x || me.y != memory.at.y) {
+  if (carry != null && carry.walked) { memory.stuck = true } // no way back
+  else {
+    walkTo(memory.at.x, memory.at.y)
+    if (carry != null) { carry.walked = true }
   }
-  return false
-}
-if (carry != null) {
-  let storage = building(carry.storageId)
-  if (carry.step == "store" && (storage == null || carry.lost)) {
-    carry.lost = false
-    next("back")
-  }
-  if (carry.step == "store") {
-    if (!goTo(storage)) { return }
-    let load = {}
-    let any = false
-    for (good of carry.goods) {
-      let n = units(me.carried, good)
-      if (good == "food") { n = n - ownFood }
-      if (n > 0) {
-        load[good] = n
-        any = true
-      }
-    }
-    if (any) { drop({kind: "storage", storageId: storage.id}, load) }
-    next("refill")
-    return
-  }
-  if (carry.step == "refill") {
-    let have = units(me.carried, "food")
-    if (storage != null && at(storage) && have < ownFood && units(storage.stock, "food") > 0) {
-      pickUp({kind: "storage", storageId: storage.id}, {food: ownFood - have})
-    }
-    next("back")
-    return
-  }
-  if (!goTo(memory.at)) {
-    if (carry.lost) {
-      memory.carry = null
-      memory.stuck = true
-    }
-    return
-  }
-  memory.carry = null
-}
-
-// Working.
-if (!at(memory.at)) {
-  if (!walking()) { walkTo(memory.at.x, memory.at.y) }
   return
 }
+if (carry != null) { memory.carry = null }
 if (place == null) { return } // gone
-if (me.order == null || me.order.kind != "workAt") {
+if (me.order == null) {
   workAt(memory.makes)
   return
 }
@@ -148,18 +98,22 @@ let load = {}
 let goods = []
 let full = false
 for (good of outputOf(place)) {
-  let n = units(pile, good)
+  let n = 0
+  if (pile != null && pile[good] != null) { n = pile[good] }
   if (good == "food") { n = n - keepFood }
   if (n > 0) {
     load[good] = n
     goods[goods.length] = good
-    let room = fits(good)
-    if (room > 0 && n >= room) { full = true }
+    if (fits(good) > 0 && n >= fits(good)) { full = true }
   }
 }
 if (!full) { return }
-let stores = storages(place) // nearest first
-if (stores.length == 0) { return } // none in reach: the pile grows
+let to = params.storage
+if (to == null) {
+  let stores = storages(place) // nearest first
+  if (stores.length == 0) { return } // none in reach: the pile grows
+  to = stores[0]
+}
 let workers = []
 for (r of withMemory("workplaceId", place.id)) {
   if (r.script.memory.carry != null) { return } // one carries at a time
@@ -170,7 +124,7 @@ let i = 0
 while ((i + 1) / workers.length <= random) { i = i + 1 }
 if (workers[i].id != me.id) { return }
 pickUp({kind: "ground"}, load)
-memory.carry = {storageId: stores[0].id, goods: goods, step: "store", walked: false}
+memory.carry = {storageId: to.id, goods: goods}
 `,
   },
   build: {
@@ -178,17 +132,13 @@ memory.carry = {storageId: stores[0].id, goods: goods, step: "store", walked: fa
     source: `// Build (default): build a memory.building with the north-west tile of its
 // footprint at memory.at, laying out the site or joining the one there.
 // While the site lacks materials, one of us building it, picked at random,
-// fetches a load of what is missing from the nearest storage of my realm
-// that holds it, delivers it and comes back to build. With none in storage
-// we just build.
+// fetches a load of what is missing from params.source, or the nearest
+// storage of my realm that holds it while none is picked, and brings it
+// back. With none there we just build.
+param source: storage // where materials come from; a carriage too
 if (memory.done || memory.stuck) { return }
+if (me.order != null && me.order.kind != "build") { return } // on my way
 
-fn at(spot) { return me.x == spot.x && me.y == spot.y }
-fn walking() { return me.order != null && me.order.kind == "walkTo" }
-fn units(stock, good) {
-  if (stock == null || stock[good] == null) { return 0 }
-  return stock[good]
-}
 // What someone carries of what the site lacks; null if nothing.
 fn carriedOf(r, missing) {
   let load = null
@@ -204,61 +154,27 @@ fn carriedOf(r, missing) {
 }
 
 // The site, once laid out. Finished or gone, building is done.
+let at = me.x == memory.at.x && me.y == memory.at.y
 let site = null
 if (memory.siteId != null) {
   site = building(memory.siteId)
-  if (at(memory.at) && (site == null || site.site == null)) {
+  if (at && (site == null || site.site == null)) {
     memory.done = true
     return
   }
 }
 
-// Fetching: to the storage, pick up the load, back to the site.
-let fetch = memory.fetch
-fn next(step) {
-  fetch.step = step
-  fetch.walked = false
-}
-// Walks to a spot; true once there. A way that can't be walked is lost.
-fn goTo(spot) {
-  if (at(spot)) { return true }
-  if (!walking()) {
-    if (fetch.walked) { fetch.lost = true }
-    else {
-      walkTo(spot.x, spot.y)
-      fetch.walked = true
-    }
+// Not there yet, or back from fetching: walk to the site.
+let away = memory.fetch
+if (!at) {
+  if (away != null && away.walked) { memory.stuck = true } // no way back
+  else {
+    walkTo(memory.at.x, memory.at.y)
+    if (away != null) { away.walked = true }
   }
-  return false
-}
-if (fetch != null) {
-  if (fetch.step == "pickUp") {
-    let storage = building(fetch.storageId)
-    if (storage == null || fetch.lost) {
-      fetch.lost = false
-      next("back")
-    } else {
-      if (!goTo(storage)) { return }
-      pickUp({kind: "storage", storageId: storage.id}, fetch.goods)
-      next("back")
-      return
-    }
-  }
-  if (!goTo(memory.at)) {
-    if (fetch.lost) {
-      memory.fetch = null
-      memory.stuck = true
-    }
-    return
-  }
-  memory.fetch = null
-}
-
-// Building.
-if (!at(memory.at)) {
-  if (!walking()) { walkTo(memory.at.x, memory.at.y) }
   return
 }
+if (away != null) { memory.fetch = null }
 if (site != null) {
   // What I carry of what it lacks goes in first.
   let mine = carriedOf(me, materialsNeeded(site))
@@ -267,7 +183,7 @@ if (site != null) {
     return
   }
 }
-if (me.order == null || me.order.kind != "build") {
+if (me.order == null) {
   // Turned down, such as with the tile taken, build says why: done.
   if (build(memory.building) != null) { memory.done = true }
   return
@@ -281,8 +197,21 @@ let missing = materialsNeeded(site)
 if (missing.length == 0) { return }
 let goods = []
 for (m of missing) { goods[goods.length] = m.good }
-let stores = storages(site, goods) // nearest first, holding some
-if (stores.length == 0) { return } // none in storage: we just build
+let from = params.source
+if (from == null) {
+  let stores = storages(site, goods) // nearest first, holding some
+  if (stores.length == 0) { return } // none in storage: we just build
+  from = stores[0]
+} else {
+  // The one picked: only while it holds some of what is missing.
+  let held = from.stock
+  if (held == null) { held = from.load }
+  let some = false
+  for (g of goods) {
+    if (held != null && held[g] != null && held[g] > 0) { some = true }
+  }
+  if (!some) { return }
+}
 let builders = []
 for (r of withMemory("siteId", site.id)) {
   if (r.script.memory.fetch != null) { return } // one fetches at a time
@@ -293,14 +222,11 @@ if (builders.length == 0) { return }
 let i = 0
 while ((i + 1) / builders.length <= random) { i = i + 1 }
 if (builders[i].id != me.id) { return }
-let from = stores[0]
 let load = {}
-for (m of missing) {
-  let n = units(from.stock, m.good)
-  if (n > m.units) { n = m.units }
-  if (n > 0) { load[m.good] = n }
+for (m of missing) { load[m.good] = m.units }
+if (fetch(load, from.id) == null) {
+  memory.fetch = {storageId: from.id, goods: load}
 }
-memory.fetch = {storageId: from.id, goods: load, step: "pickUp", walked: false}
 `,
   },
   haul: {
@@ -364,6 +290,76 @@ if (problem == "not standing at that stable" && stable != null && memory.walked 
   return
 }
 memory.done = true
+`,
+  },
+  feedStable: {
+    name: 'Feed the stable',
+    source: `// Feed the stable (default): keep Food for ${STABLE_FEED_DAYS} game days for the
+// horses standing in params.stable, or in memory.stableId while none is
+// picked. Below that I fetch what is missing from params.source, or the
+// nearest storage of my realm with Food while none is picked, and store it
+// in the stable; otherwise I wait there.
+param stable: storage // the stable to feed
+param source: storage // where the Food comes from; a carriage too
+let days = ${STABLE_FEED_DAYS} // game days of Food to keep
+let perHorse = ${HORSE_FOOD_PER_DAY} // Food a horse eats a game day
+let side = ${FOOTPRINT.stable} // tiles along each side of a stable
+
+let stable = params.stable
+if (stable == null) { stable = building(memory.stableId) }
+if (stable == null) { return } // gone or out of sight
+if (me.order != null) { return } // on my way
+
+// Back with Food: what I fetched goes into the stable; my own food stays.
+let fetched = memory.fetched
+if (fetched != null) {
+  memory.fetched = null
+  let got = 0
+  if (me.carried.food != null) { got = me.carried.food - fetched.before }
+  got = got - got % 1
+  if (got > 0 && store({food: got}, stable.id) == null) { return }
+}
+
+// Whether something with x and y stands on the stable's footprint.
+fn inStable(t) {
+  let dx = (t.x - stable.x + mapSize) % mapSize
+  let dy = (t.y - stable.y + mapSize) % mapSize
+  return dx < side && dy < side
+}
+
+// Below the Food to keep for the horses in it now: fetch what is missing.
+let horsesIn = 0
+for (h of horses()) {
+  if (inStable(h)) { horsesIn = horsesIn + 1 }
+}
+let held = 0
+if (stable.stock != null && stable.stock.food != null) { held = stable.stock.food }
+let need = horsesIn * days * perHorse - held
+if (need > 0) {
+  let from = params.source
+  if (from == null) {
+    let stores = storages(stable, ["food"]) // nearest first, holding some
+    if (stores.length > 0) { from = stores[0] }
+  }
+  let has = null
+  if (from != null) {
+    has = from.stock
+    if (has == null) { has = from.load }
+  }
+  if (from != null && from.id != stable.id && has != null && has.food != null && has.food >= 1) {
+    let units = need - need % 1
+    if (units < need) { units = units + 1 }
+    let before = 0
+    if (me.carried.food != null) { before = me.carried.food }
+    if (fetch({food: units}, from.id) == null) {
+      memory.fetched = {before: before}
+      return
+    }
+  }
+}
+
+// Enough, or none to fetch: wait at the stable.
+if (!inStable(me)) { walkTo(stable.x, stable.y) }
 `,
   },
 }

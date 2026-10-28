@@ -13,6 +13,7 @@ import {
   type GoodsSpot,
   type KnownNode,
   type Resident,
+  type ScriptParam,
   type ScriptSummary,
   type Stock,
   isAt,
@@ -65,8 +66,16 @@ import {
   type ActionId,
 } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
+import { ScriptParamFields } from './ScriptParams.js'
+import { paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
+
+/** What the resident card's script param fields need of the world (`script-params-view`). */
+function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): ParamWorld {
+  const { buildings, carriages, cities } = world
+  return { buildings, carriages, cities, realmId: world.home.realmId, size: world.map.size }
+}
 
 export function App() {
   // The Wiki needs no account, so it shows without asking who is logged in.
@@ -104,6 +113,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [orderError, setOrderError] = useState<string | undefined>()
   const [armyPick, setArmyPick] = useState<ArmyPick>()
   const [armyError, setArmyError] = useState<string | undefined>()
+  // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
+  // Script parameter).
+  const [paramPick, setParamPick] = useState<ScriptParam>()
   // The residents the Player gives orders to: their own, less those handed over to their alliance's
   // army or rented out, and, as its alliance leader, the ones handed over (`CONTEXT.md`: Alliance
   // army) and the mercenaries they hired (`CONTEXT.md`: Mercenary contract).
@@ -146,6 +158,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function goTo(x: number, y: number) {
     const mode = picking
     setPicking(false)
+    if (paramPick) {
+      setParamPick(undefined)
+      if (!world) return
+      const picked = paramPickAt(paramWorld(world), paramPick.type, { x, y })
+      if (typeof picked === 'string') setOrderError(picked)
+      else await setScriptParam(paramPick.name, picked.id)
+      return
+    }
     if (armyPick) {
       setArmyPick(undefined)
       setArmyError(await sendOrder({ kind: armyPick.kind, armyId: armyPick.armyId, x, y }))
@@ -216,11 +236,30 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'task', task: 'breed', residentId: selected.id, stableId, horseIds }
     setOrderError(await sendOrder(order))
   }
+  /**
+   * Gives the picked resident the Feed the stable task for the stable they stand in: they run the
+   * Player's Feed the stable (default) script (`CONTEXT.md`: Feeding the stable).
+   */
+  async function feedStable(stableId: string) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'feedStable', residentId: selected.id, stableId }
+    setOrderError(await sendOrder(order))
+  }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
   async function runScript(scriptId: number) {
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'runScript', residentId: selected.id, scriptId }))
+  }
+  /**
+   * Picks, or clears with null, the value of a param of the script the picked resident runs
+   * (`CONTEXT.md`: Script parameter). It leaves the script running.
+   */
+  async function setScriptParam(name: string, targetId: string | null) {
+    if (!selected?.script) return
+    const { scriptId } = selected.script
+    const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, targetId }
+    setOrderError(await sendOrder(order))
   }
   async function stop() {
     if (!selected) return
@@ -315,6 +354,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setSelectedTile(undefined)
               setPicking(false)
               setArmyPick(undefined)
+              setParamPick(undefined)
               setOrderError(undefined)
             }}
             onSelectTile={(x, y) => {
@@ -322,6 +362,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setSelectedTile({ x: ((x % size) + size) % size, y: ((y % size) + size) % size })
               setPicking(false)
               setArmyPick(undefined)
+              setParamPick(undefined)
               setOrderError(undefined)
             }}
             selectedCityId={openCityId}
@@ -329,7 +370,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOpenCityId(id)
               setOpenDrawer('cities')
             }}
-            picking={picking !== false || armyPick !== undefined}
+            picking={picking !== false || armyPick !== undefined || paramPick !== undefined}
             onPickTile={goTo}
             onNodesLoaded={onNodesLoaded}
             onTerrainLoaded={onTerrainLoaded}
@@ -364,6 +405,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               diplomacy: world.diplomacy,
             })}
             leaderId={world.home.leaderId}
+            scripts={scripts}
+            buildings={world.buildings}
             tick={world.tick}
             selectedId={selectedId}
             onSelect={(id) => {
@@ -583,6 +626,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             )}
             onRide={ride}
             scripts={scripts}
+            buildings={world.buildings}
             onRunScript={runScript}
             onEditScript={(id) => {
               setScriptToOpen({ id, at: Date.now() })
@@ -619,6 +663,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             holders={heldBy(world.residents, buildingHere)}
             realmId={world.home.realmId}
             onWork={work}
+            onFeedStable={feedStable}
             onTearDown={tearDown}
             horses={world.horses}
             onBreed={breed}
@@ -664,9 +709,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onRename={rename}
             sections={cardSections}
             onSections={setCardSections}
+            scriptParams={
+              selected.script && (
+                <ScriptParamFields
+                  params={scripts.find((s) => s.id === selected.script!.scriptId)?.params ?? []}
+                  // As seen: the values picked for the script they run come with it.
+                  values={world.residents.find((r) => r.id === selected.id)?.script?.params ?? {}}
+                  label={(id) => paramValueLabel(paramWorld(world), id)}
+                  picking={paramPick?.name}
+                  onPick={(p) => {
+                    setPicking(false)
+                    setParamPick((now) => (now?.name === p.name ? undefined : p))
+                  }}
+                  onClear={(name) => void setScriptParam(name, null)}
+                />
+              )
+            }
             onClose={() => {
               setSelectedId(undefined)
               setPicking(false)
+              setParamPick(undefined)
             }}
           />
         </div>

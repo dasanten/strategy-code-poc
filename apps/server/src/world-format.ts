@@ -13,7 +13,7 @@ import { leaveTradeOrg } from './caravans.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 44
+export const WORLD_FORMAT_VERSION = 46
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -53,9 +53,16 @@ export const migrations: Record<number, MigrationStep> = {
   // Walls can be built along a line (`CONTEXT.md`: Wall / Gate), a new order kind. Orders from
   // before are all road lines, which keep their shape, so the step leaves them as they are.
   40: (state) => state,
+  // Store and fetch orders (`CONTEXT.md`: Store, Fetch) and how a resident's last one ended
+  // (`orderEnded`). Older residents hold neither, so the step leaves them as they are.
+  41: (state) => state,
+  // Script parameters (`CONTEXT.md`: Script parameter): the values picked for a resident's
+  // (`Resident.scriptParams`). Older residents have none picked, so their params read null and
+  // the defaults fall back to the nearest place; the step leaves them as they are.
+  42: (state) => state,
   // Horses get stats and an age (`CONTEXT.md`: Horse stats). Those from before are average in
   // every stat, and as old as the middle of a new horse's age range.
-  41: (state) => {
+  43: (state) => {
     const world = structuredClone(state) as WorldState
     const age = (HORSE_START_AGE_MIN + HORSE_START_AGE_MAX) / 2
     for (const h of world.horses) {
@@ -66,14 +73,14 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Breeding is a resident's order (`CONTEXT.md`: Breeding): stables no longer breed on their
   // own, so the progress they kept goes. Nobody tends their horses yet; the foal starts over.
-  42: (state) => {
+  44: (state) => {
     const world = structuredClone(state) as WorldState
     for (const b of world.buildings) delete (b as { breeding?: number }).breeding
     return world
   },
   // Residents can ride horses (`CONTEXT.md`: Riding), a new `riding` field. Nobody rode before,
   // so the step leaves the world as it is.
-  43: (state) => state,
+  45: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

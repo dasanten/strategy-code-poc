@@ -869,6 +869,13 @@ button.residents-row.selected:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The script they run, under their Doing line. */
+.residents-row .doing small {
+  display: block;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .meter {
   display: block;
   height: 6px;

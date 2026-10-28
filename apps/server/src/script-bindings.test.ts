@@ -1,5 +1,6 @@
 import { parse, run, type ScriptObject, type Value } from '@csp/lang'
 import {
+  DOING_MAX_LENGTH,
   HAUL_KEEP_FOOD,
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
@@ -271,6 +272,10 @@ describe('script bindings', () => {
       'drop({ kind: "ground" }, { food: 1 })',
       { kind: 'drop', spot: { kind: 'ground' }, goods: { food: 1 } },
     ],
+    ['store(["wood"])', { kind: 'store', goods: ['wood'] }],
+    ['store({ food: 1 }, "s9")', { kind: 'store', goods: { food: 1 }, to: 's9' }],
+    ['fetch({ food: 2 })', { kind: 'fetch', goods: { food: 2 } }],
+    ['fetch(["wood"], { id: "k9" })', { kind: 'fetch', goods: ['wood'], from: 'k9' }],
     ['build("house")', { kind: 'build', building: 'house' }],
     ['build("castle")', { kind: 'build', building: 'castle' }],
     ['tearDown("p1")', { kind: 'tearDown', buildingId: 'p1' }],
@@ -435,5 +440,38 @@ describe('walkTime', () => {
     about(time(60, 50), 10)
     about(time(60, 60), 10 * DIAGONAL_STEP)
     about(time(54, 40), 6 + 4 * DIAGONAL_STEP)
+  })
+})
+
+describe('doing()', () => {
+  it('keeps the Doing line in memory, trimmed and capped, and asks for no order', () => {
+    const { world, explored } = setup()
+    const memory: ScriptObject = { role: 'feeder' }
+    const long = 'x'.repeat(DOING_MAX_LENGTH + 20)
+    const { result, requests } = runAs(
+      world,
+      explored,
+      `memory.said = doing("  Feeding the stable: waiting  ")`,
+      memory,
+    )
+    expect(result.status).toBe('done')
+    expect(requests).toEqual([])
+    expect(memory).toEqual({ role: 'feeder', said: null, doing: 'Feeding the stable: waiting' })
+    runAs(world, explored, `doing("${long}")`, memory)
+    expect(memory.doing).toBe('x'.repeat(DOING_MAX_LENGTH))
+    // Null, or empty text, gives the derived line back.
+    runAs(world, explored, 'doing(null)', memory)
+    expect(memory).toEqual({ role: 'feeder', said: null })
+    runAs(world, explored, 'doing("x")', memory)
+    runAs(world, explored, 'doing(" ")', memory)
+    expect(memory.doing).toBeUndefined()
+  })
+
+  it('needs a text or null', () => {
+    const { world, explored } = setup()
+    const memory: ScriptObject = {}
+    const { result } = runAs(world, explored, 'doing(3)', memory)
+    expect(result.status).toBe('error')
+    expect(memory.doing).toBeUndefined()
   })
 })

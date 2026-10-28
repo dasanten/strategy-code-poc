@@ -45,6 +45,8 @@ function moving(r: Pick<Resident, 'order' | 'x' | 'y'>): boolean {
       return o.phase === 'driving'
     case 'roadLine':
     case 'wallLine':
+    case 'store':
+    case 'fetch':
       return o.phase === 'walking'
     case 'climb':
       return true
