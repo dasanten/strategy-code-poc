@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import {
+  carriagePulledBy,
   holdersOf,
+  horseOfResident,
+  riderOf,
   KEEPS_GOODS,
   isWallOrGate,
   type Account,
@@ -249,6 +252,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function attack(targetId: string) {
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'attack', residentId: selected.id, targetId }))
+  }
+  /** Orders the picked resident to mount a horse on their tile, or with none to dismount. */
+  async function ride(horseId?: string) {
+    if (!selected) return
+    const order = horseId
+      ? { kind: 'mount', residentId: selected.id, horseId }
+      : { kind: 'dismount', residentId: selected.id }
+    setOrderError(await sendOrder(order))
   }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
@@ -562,6 +573,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPicking((p) => (p === 'haul' ? false : 'haul'))
             }}
             onStop={stop}
+            horseToRide={onTile(
+              world.horses.filter(
+                (h) =>
+                  horseOfResident(h, selected) && !carriagePulledBy(world, h) && !riderOf(world, h),
+              ),
+            )}
+            onRide={ride}
             scripts={scripts}
             onRunScript={runScript}
             onEditScript={(id) => {

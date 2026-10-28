@@ -569,7 +569,7 @@ The shared language of the game. Domain terms only — no implementation details
   hunger meter costs health, and a horse without food dies after about 5 game days. Bred by a
   resident at a stable, or bought from the Trade Organization.
 - **Horse stats:** every horse has Speed, Strength and Endurance, and an age. Speed is how fast
-  it pulls its carriage (and later carries a rider); Strength is how much the carriage it pulls
+  it pulls its carriage or carries a rider (`Riding`); Strength is how much the carriage it pulls
   can hold; Endurance is how much Food it needs, as a resident's Endurance is for them. New
   horses (in a starting city, at the Trade Organization, in an NPC city) get stats drawn in a
   range. A horse's stats never change; they show with its age, health and hunger on the tile card
@@ -597,6 +597,15 @@ The shared language of the game. Domain terms only — no implementation details
 - **Hitched horse:** the one horse that pulls a carriage. A horse of the carriage's realm standing
   with it is hitched when the carriage is first driven, and stays hitched (for now). A carriage
   whose horse dies stands where it is until another horse is hitched.
+- **Riding:** a resident on a tile with a horse of their realm that pulls no carriage and nobody
+  rides mounts it, and dismounts anywhere; the horse stays on that tile. Riding is not an order:
+  the rider goes on with what they do, and their walking goes at the horse's pace, as fast as it
+  would pull a carriage there (fast on plains and roads, slower in forest and hills, never into
+  mountains or onto walls), slower while the horse is hungry. Gates and walls stop a rider as
+  anyone. The rider carries what they could on foot; the horse eats Food in reach as usual.
+  Riding teaches Driving, and Driving makes riding faster. A horse has at most one rider and is
+  never hitched while ridden; a rider doesn't drive. A rider whose horse dies, or who leaves it
+  behind (climbing a wall), is on foot again.
 - **Loading a carriage:** residents on a carriage's tile put goods on it and take goods off it
   like at a storage, up to what the carriage holds.
 - **Haul route:** an order (as a script could do it) for a resident to drive a carriage between

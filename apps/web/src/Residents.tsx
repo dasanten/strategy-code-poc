@@ -388,6 +388,8 @@ export function ResidentCard({
   onRoadTo,
   onWallTo,
   onStop,
+  horseToRide,
+  onRide,
   scripts,
   onRunScript,
   onEditScript,
@@ -420,6 +422,13 @@ export function ResidentCard({
   onWallTo: () => void
   /** Orders the resident to stop what they are doing. */
   onStop: () => void
+  /**
+   * A horse of the realm on the resident's tile that pulls no carriage and nobody rides, if one is
+   * in sight (`CONTEXT.md`: Riding).
+   */
+  horseToRide: { id: string } | undefined
+  /** Orders the resident to mount that horse, or with none to dismount. */
+  onRide: (horseId?: string) => void
   /** The Player's script library, to pick a script to run. */
   scripts: ScriptSummary[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
@@ -527,6 +536,8 @@ export function ResidentCard({
     picking,
     makeLeader,
     renamable: !!rename,
+    riding: r.riding !== undefined,
+    horseToRide: !!horseToRide,
   })
   const shown = actions.some((a) => a.id === sections.panel) ? sections.panel : undefined
   const act = (a: CardAction) => {
@@ -536,6 +547,7 @@ export function ResidentCard({
     if (a.id === 'roadTo') onRoadTo()
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
+    if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
   }
   return (
     <SelectionCard
@@ -543,7 +555,7 @@ export function ResidentCard({
       title={r.name}
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
-        `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}`,
+        `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}${r.riding ? ' · on horseback' : ''}`,
         <strong key="doing">{doing(r, scripts)}</strong>,
         ...(family ? [family] : []),
       ]}

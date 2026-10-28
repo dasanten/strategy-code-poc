@@ -72,6 +72,11 @@ export interface Resident {
   pair?: Pair
   /** The child the resident is carrying (`CONTEXT.md`: Carrying), if any. */
   carrying?: Carrying
+  /**
+   * The horse the resident rides (`CONTEXT.md`: Riding), if they ride one. Not an order: they go
+   * on with whatever they do, at the horse's pace.
+   */
+  riding?: string
 }
 
 /**

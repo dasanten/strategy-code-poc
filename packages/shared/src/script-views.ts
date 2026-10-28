@@ -210,6 +210,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('order', view('residentOrder'), 'What they were ordered to do.', 'when idle'),
       field('pair', view('pair'), 'Their pair, to have a child.', 'unless they are paired'),
       field('carrying', view('carrying'), 'The child they carry.', 'unless they carry one'),
+      field('riding', 'string', 'The id of the horse they ride.', 'unless they ride one'),
       field(
         'script',
         view('runningScript'),

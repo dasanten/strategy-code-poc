@@ -156,6 +156,18 @@ describe('the actions on a resident’s card', () => {
     expect(walk).toMatchObject({ active: true, label: 'Pick a tile…' })
   })
 
+  it('offers mounting with a free horse on their tile, and dismounting while they ride', () => {
+    expect(ids(here())).not.toContain('ride')
+    const mount = residentActions(here({ horseToRide: true })).find((a) => a.id === 'ride')
+    expect(mount?.label).toBe('Mount horse')
+    const off = residentActions(here({ riding: true, horseToRide: true })).filter(
+      (a) => a.id === 'ride',
+    )
+    expect(off.map((a) => a.label)).toEqual(['Dismount'])
+    const drive = residentActions(here({ riding: true, carriage })).find((a) => a.id === 'drive')
+    expect(drive).toMatchObject({ disabled: true, reason: 'dismount first to drive' })
+  })
+
   it('gives every shown action its own key', () => {
     const all = here({
       busy: true,
@@ -167,6 +179,7 @@ describe('the actions on a resident’s card', () => {
       wallsInSight: 1,
       makeLeader: { problem: undefined },
       renamable: true,
+      horseToRide: true,
     })
     const keys = residentActions(all).map((a) => a.key)
     expect(new Set(keys).size).toBe(keys.length)

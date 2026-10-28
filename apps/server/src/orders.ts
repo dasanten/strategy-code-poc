@@ -10,6 +10,7 @@ import { walkTo } from './walking.js'
 import { workAt } from './work.js'
 import { allianceOrders } from './alliances.js'
 import { climb } from './climbing.js'
+import { dismount, mount } from './riding.js'
 import { attack } from './combat.js'
 import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
@@ -64,6 +65,8 @@ export const orderKinds: Record<string, OrderKind> = {
   pair,
   attack,
   climb,
+  mount,
+  dismount,
   setGate,
   roadLine,
   wallLine,

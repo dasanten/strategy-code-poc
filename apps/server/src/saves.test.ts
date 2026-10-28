@@ -134,7 +134,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(43)
+    expect(WORLD_FORMAT_VERSION).toBe(44)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -202,6 +202,15 @@ describe('world saves', () => {
     const migrated = migrateWorld(old, 42, { terrain: land })
     expect(migrated.buildings.every((b) => !('breeding' in b))).toBe(true)
     expect(migrated.buildings).toEqual(world.buildings)
+    expect(checkInvariants(migrated, land)).toEqual([])
+  })
+
+  it('brings a format 43 world over with nobody riding (migration 43 → 44)', () => {
+    const { world, terrain: land } = worldWithCity()
+    expect(world.horses.length).toBeGreaterThan(0)
+    const migrated = migrateWorld(structuredClone(world), 43, { terrain: land }, migrations, 44)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents.every((r) => r.riding === undefined)).toBe(true)
     expect(checkInvariants(migrated, land)).toEqual([])
   })
 
