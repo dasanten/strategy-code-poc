@@ -258,6 +258,8 @@ describe('script bindings', () => {
       { kind: 'haul', carriageId: 'c9', x: 20, y: 10, goods: ['wood'], keepFood: HAUL_KEEP_FOOD },
     ],
     ['stop()', { kind: 'stop' }],
+    ['mount("h9")', { kind: 'mount', horseId: 'h9' }],
+    ['dismount()', { kind: 'dismount' }],
     [
       'pickUp({ kind: "ground" }, { food: 2 })',
       { kind: 'pickUp', spot: { kind: 'ground' }, goods: { food: 2 } },
@@ -277,6 +279,7 @@ describe('script bindings', () => {
     ['build("house")', { kind: 'build', building: 'house' }],
     ['build("castle")', { kind: 'build', building: 'castle' }],
     ['tearDown("p1")', { kind: 'tearDown', buildingId: 'p1' }],
+    ['breed("st", ["h1", "h2"])', { kind: 'breed', stableId: 'st', horseIds: ['h1', 'h2'] }],
     ['workAt()', { kind: 'workAt' }],
     ['workAt("sword")', { kind: 'workAt', makes: 'sword' }],
     ['pair("b1")', { kind: 'pair', partnerId: 'b1' }],

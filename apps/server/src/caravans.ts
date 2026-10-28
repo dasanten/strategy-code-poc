@@ -5,8 +5,6 @@ import {
   CARRIAGE_CAPACITY,
   GOODS,
   GOOD_WEIGHT,
-  MAX_HEALTH,
-  MAX_HUNGER,
   START_CARRIED_FOOD,
   WEAPONS,
   caravanEscortsWanted,
@@ -22,6 +20,7 @@ import {
   townHallOf,
   unitsThatFit,
   unitsThatFitCarriage,
+  carriageCapacity,
   wrapDistance,
   type Building,
   type Caravan,
@@ -40,6 +39,7 @@ import { organizationOf } from './crimes.js'
 import { deliveryRobbed, releaseDelivery, runDelivery, takeOnDelivery } from './deliveries.js'
 import { releaseTransfer, runTransfer, takeOnTransfer, transferRobbed } from './transfers.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
+import { newHorse } from './horses.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
 import { hqLayout, tradeOrgHq } from './trade-org.js'
@@ -139,15 +139,10 @@ export function placeCaravans(world: WorldState): Caravan[] {
     if (served.has(post.id)) continue
     const rand = mulberry32(hash(`${world.seed}:caravan:${post.id}`))
     const horseId = newId(world, 'horse')
-    world.horses.push({
-      id: horseId,
-      realmId: null,
-      cityId: hq.id,
-      x,
-      y,
-      hunger: MAX_HUNGER,
-      health: MAX_HEALTH,
-    })
+    const horseRand = mulberry32(hash(`${world.seed}:caravan-horse:${post.id}`))
+    world.horses.push(
+      newHorse(horseRand, { id: horseId, realmId: null, cityId: hq.id, x, y, tick: world.tick }),
+    )
     const carriageId = newId(world, 'carriage')
     world.carriages.push({ id: carriageId, realmId: null, cityId: hq.id, x, y, horseId, load: {} })
     const crew = Array.from({ length: 1 + CARAVAN_ESCORTS }, () => {
@@ -189,10 +184,11 @@ export function caravanCrew(world: WorldState): Set<string> {
 
 /**
  * What evens out two warehouses' stock: of each good (`CARRIED`), half of what `here` holds more
- * than `there`, as much of it as fits on the carriage, in the order of `GOODS`.
+ * than `there`, as much of it as fits on the carriage (`capacity`, by its horse's Strength), in
+ * the order of `GOODS`.
  */
-export function evenOut(here: Stock, there: Stock, carriage: Carriage): Stock {
-  let room = CARRIAGE_CAPACITY - stockWeight(carriage.load)
+export function evenOut(here: Stock, there: Stock, carriage: Carriage, capacity: number): Stock {
+  let room = capacity - stockWeight(carriage.load)
   const out: Stock = {}
   for (const g of CARRIED) {
     const more = Math.floor(((here[g] ?? 0) - (there[g] ?? 0)) / 2)
@@ -406,7 +402,7 @@ function runCaravan(
       caravanFoodFor(caravan.escortIds.length) - (carriage.load.food ?? 0),
       stock.food ?? 0,
       hands('food'),
-      unitsThatFitCarriage(carriage, 'food'),
+      unitsThatFitCarriage(world, carriage, 'food'),
     )
     if (food > 0) take(caravan, driver, here, { food }, 'carriage')
     else caravan.stop = 'warehouse'
@@ -422,10 +418,17 @@ function runCaravan(
     const other = routeEnd(world, caravan, caravan.heading === 'hq' ? 'post' : 'hq').warehouse
     const spare: Stock = { ...stock }
     for (const g of CARRIED) spare[g] = (stock[g] ?? 0) - owedBy(world, stop.id, g)
-    caravan.toLoad = other ? evenOut(spare, other.stock ?? {}, carriage) : {}
+    caravan.toLoad = other
+      ? evenOut(spare, other.stock ?? {}, carriage, carriageCapacity(world, carriage))
+      : {}
   }
   for (const [g, wanted] of Object.entries(caravan.toLoad) as [Good, number][]) {
-    const units = Math.min(wanted, stock[g] ?? 0, hands(g), unitsThatFitCarriage(carriage, g))
+    const units = Math.min(
+      wanted,
+      stock[g] ?? 0,
+      hands(g),
+      unitsThatFitCarriage(world, carriage, g),
+    )
     if (units <= 0) {
       delete caravan.toLoad[g]
       continue
@@ -593,7 +596,8 @@ export const caravansSound: Invariant = {
       if (o?.kind === 'drive' && o.carriageId !== c.carriageId) {
         fail(c, `has its driver driving ${o.carriageId}`, [c.driverId])
       }
-      if (c.toLoad && stockWeight(c.toLoad) > CARRIAGE_CAPACITY + 1e-9) {
+      const holds = k ? carriageCapacity(world, k) : CARRIAGE_CAPACITY
+      if (c.toLoad && stockWeight(c.toLoad) > holds + 1e-9) {
         fail(c, `means to load ${stockWeight(c.toLoad)} kg, more than a carriage holds`)
       }
     }

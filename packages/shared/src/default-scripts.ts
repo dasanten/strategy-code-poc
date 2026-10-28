@@ -7,11 +7,11 @@
  * into `memory`, as `TaskMemory` lists. Defaults use the step budget like any script; a test
  * keeps each at most a quarter of `SCRIPT_STEP_BUDGET`.
  */
-import { HORSE_FOOD_PER_DAY, STABLE_FEED_DAYS, WORK_FOOD_KEPT } from './balance.js'
+import { BREED_FOOD, HORSE_FOOD_PER_DAY, STABLE_FEED_DAYS, WORK_FOOD_KEPT } from './balance.js'
 import { FOOTPRINT } from './footprint.js'
 
 /** The tasks that run a default script. */
-export const TASKS = ['work', 'build', 'haul', 'tearDown', 'feedStable'] as const
+export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable'] as const
 export type Task = (typeof TASKS)[number]
 
 /** What giving a task from the UI writes into the script's memory. */
@@ -38,6 +38,8 @@ export interface TaskMemory {
   }
   /** Tear down: the building or construction site on the resident's tile. */
   tearDown: { buildingId: string }
+  /** Breed horses: the stable, and the two horses in it to breed. */
+  breed: { stableId: string; horseIds: string[] }
   /** Feed the stable: the stable the resident stood in when given it. */
   feedStable: { stableId: string }
 }
@@ -250,6 +252,44 @@ if (memory.done != true && (me.order == null || me.order.kind != "tearDown")) {
     memory.done = true
   }
 }
+`,
+  },
+  breed: {
+    name: 'Breed horses',
+    source: `// Breed horses (default): at stable memory.stableId, tend the two horses
+// memory.horseIds until their foal is born; then stand idle. Away from the
+// stable, walk there first. Before starting, take Food for the days of
+// tending from the stable, if it has some.
+let needFood = ${BREED_FOOD} // Food I take along for my meals while tending
+if (memory.done == true) { return }
+if (me.order != null && me.order.kind == "breed") {
+  memory.started = true
+  return
+}
+if (memory.started == true) {
+  // The foal was born, or the breeding stopped: done.
+  memory.done = true
+  return
+}
+if (me.order != null && (me.order.kind == "walkTo" || me.order.kind == "pickUp")) { return }
+let food = 0
+if (me.carried.food != null) { food = me.carried.food }
+if (memory.fed != true && food < needFood) {
+  let spot = {kind: "storage", storageId: memory.stableId}
+  if (pickUp(spot, {food: needFood - food}) == null) {
+    memory.fed = true
+    return
+  }
+}
+let problem = breed(memory.stableId, memory.horseIds)
+if (problem == null) { return }
+let stable = building(memory.stableId)
+if (problem == "not standing at that stable" && stable != null && memory.walked != true) {
+  memory.walked = true
+  walkTo(stable.x, stable.y)
+  return
+}
+memory.done = true
 `,
   },
   feedStable: {

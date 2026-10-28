@@ -181,8 +181,22 @@ interface BuildTaskRequest extends OrderRequest {
   at?: { x: number; y: number }
 }
 
+/** Breed horses: the breed order's input, at the stable the resident stands at. */
+interface BreedTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'breed'
+  residentId: string
+  stableId: string
+  horseIds: [string, string]
+}
+
 type TaskRequest =
-  WorkTaskRequest | BuildTaskRequest | HaulTaskRequest | TearDownTaskRequest | FeedStableTaskRequest
+  | WorkTaskRequest
+  | BuildTaskRequest
+  | HaulTaskRequest
+  | TearDownTaskRequest
+  | BreedTaskRequest
+  | FeedStableTaskRequest
 
 /** The built-in order a task's request is checked as, for the resident. */
 function asOrder(o: Partial<TaskRequest>): OrderRequest {
@@ -193,6 +207,8 @@ function asOrder(o: Partial<TaskRequest>): OrderRequest {
     return { kind: 'haul', residentId, carriageId, x, y, goods, returnGoods, keepFood }
   }
   if (o.task === 'tearDown') return { kind: 'tearDown', residentId, buildingId: o.buildingId }
+  if (o.task === 'breed')
+    return { kind: 'breed', residentId, stableId: o.stableId, horseIds: o.horseIds }
   if (o.task === 'build') return { kind: 'build', residentId, building: o.building }
   return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
 }
@@ -225,6 +241,13 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
       const memory: TaskMemory['tearDown'] = { buildingId: order.buildingId }
       return { ...memory }
     }
+    case 'breed': {
+      const memory: TaskMemory['breed'] = {
+        stableId: order.stableId,
+        horseIds: [...order.horseIds],
+      }
+      return { ...memory }
+    }
     case 'feedStable': {
       const memory: TaskMemory['feedStable'] = { stableId: order.stableId }
       return { ...memory }
@@ -238,8 +261,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * target (`TaskMemory`). It ends whatever the resident was doing. Each task is checked as the
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
  * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
- * the tear-down order. Feed the stable starts no order of its own: the resident stands in the
- * stable and is grown up.
+ * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
+ * own: the resident stands in the stable and is grown up.
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {

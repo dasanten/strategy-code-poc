@@ -346,11 +346,14 @@ describe('seeing inside (`CONTEXT.md`: Seeing inside a storage, Seeing how someo
 describe('loadLevel', () => {
   it('names how heavily a carriage is loaded by weight against its capacity', () => {
     const food = (kg: number) => ({ food: kg / GOOD_WEIGHT.food })
-    expect(loadLevel({})).toBe('empty')
-    expect(loadLevel(food(CARRIAGE_CAPACITY * CARRIAGE_LIGHT_LOAD))).toBe('light')
-    expect(loadLevel(food(CARRIAGE_CAPACITY / 2))).toBe('half')
-    expect(loadLevel(food(CARRIAGE_CAPACITY * 0.9))).toBe('heavy')
-    expect(loadLevel(food(CARRIAGE_CAPACITY))).toBe('full')
+    const level = (kg: number) => loadLevel(food(kg), CARRIAGE_CAPACITY)
+    expect(level(0)).toBe('empty')
+    expect(level(CARRIAGE_CAPACITY * CARRIAGE_LIGHT_LOAD)).toBe('light')
+    expect(level(CARRIAGE_CAPACITY / 2)).toBe('half')
+    expect(level(CARRIAGE_CAPACITY * 0.9)).toBe('heavy')
+    expect(level(CARRIAGE_CAPACITY)).toBe('full')
+    // Behind a stronger horse the same load leaves room.
+    expect(loadLevel(food(CARRIAGE_CAPACITY), CARRIAGE_CAPACITY * 1.2)).toBe('heavy')
   })
 })
 

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import {
+  carriagePulledBy,
   holdersOf,
+  horseOfResident,
+  riderOf,
   KEEPS_GOODS,
   isWallOrGate,
   type Account,
@@ -225,6 +228,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await sendOrder(order))
   }
   /**
+   * Gives the picked resident the Breed horses task for two horses in the stable on their tile:
+   * they run the Player's Breed horses (default) script.
+   */
+  async function breed(stableId: string, horseIds: [string, string]) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'breed', residentId: selected.id, stableId, horseIds }
+    setOrderError(await sendOrder(order))
+  }
+  /**
    * Gives the picked resident the Feed the stable task for the stable they stand in: they run the
    * Player's Feed the stable (default) script (`CONTEXT.md`: Feeding the stable).
    */
@@ -280,6 +292,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function attack(targetId: string) {
     if (!selected) return
     setOrderError(await sendOrder({ kind: 'attack', residentId: selected.id, targetId }))
+  }
+  /** Orders the picked resident to mount a horse on their tile, or with none to dismount. */
+  async function ride(horseId?: string) {
+    if (!selected) return
+    const order = horseId
+      ? { kind: 'mount', residentId: selected.id, horseId }
+      : { kind: 'dismount', residentId: selected.id }
+    setOrderError(await sendOrder(order))
   }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
@@ -467,6 +487,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             realms={world.diplomacy.realmsInSight}
             carriages={world.carriages}
+            horses={world.horses}
             tick={world.tick}
             mapSize={world.map.size}
             onSetGate={async (gateId, open) =>
@@ -597,6 +618,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPicking((p) => (p === 'haul' ? false : 'haul'))
             }}
             onStop={stop}
+            horseToRide={onTile(
+              world.horses.filter(
+                (h) =>
+                  horseOfResident(h, selected) && !carriagePulledBy(world, h) && !riderOf(world, h),
+              ),
+            )}
+            onRide={ride}
             scripts={scripts}
             buildings={world.buildings}
             onRunScript={runScript}
@@ -637,6 +665,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onWork={work}
             onFeedStable={feedStable}
             onTearDown={tearDown}
+            horses={world.horses}
+            onBreed={breed}
             residents={own}
             onPair={pair}
             others={world.residents.filter((r) => !own.some((o) => o.id === r.id))}

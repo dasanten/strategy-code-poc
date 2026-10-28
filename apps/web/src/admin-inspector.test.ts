@@ -282,7 +282,17 @@ describe('the admin inspector', () => {
       tick: 1,
       org: npc,
       is: 'horse',
-      horse: { id: 'h', realmId: null, cityId: 'n1', x: 1, y: 1, hunger: 40, health: 90 },
+      horse: {
+        id: 'h',
+        realmId: null,
+        cityId: 'n1',
+        x: 1,
+        y: 1,
+        hunger: 40,
+        health: 90,
+        stats: { speed: 12, strength: 8, endurance: 10 },
+        bornAt: 0,
+      },
     })
     expect(row(horse, 'Health')?.text).toBe('90 / 100')
   })

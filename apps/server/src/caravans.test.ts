@@ -105,11 +105,16 @@ describe('evening out', () => {
   it('takes half of what this warehouse has more than the other, never Food or coins', () => {
     const here = { wood: 300, stone: 40, iron: 11, coins: 900, food: 50 }
     const there = { wood: 100, stone: 60, iron: 0 }
-    expect(evenOut(here, there, carriage())).toEqual({ wood: 100, iron: 5 })
+    expect(evenOut(here, there, carriage(), CARRIAGE_CAPACITY)).toEqual({ wood: 100, iron: 5 })
   })
 
   it('takes no more than fits on the carriage', () => {
-    const plan = evenOut({ stone: 2000, wood: 2000 }, {}, carriage({ food: CARAVAN_FOOD }))
+    const plan = evenOut(
+      { stone: 2000, wood: 2000 },
+      {},
+      carriage({ food: CARAVAN_FOOD }),
+      CARRIAGE_CAPACITY,
+    )
     expect(stockWeight(plan) + CARAVAN_FOOD).toBeLessThanOrEqual(CARRIAGE_CAPACITY)
     expect(stockWeight(plan) + CARAVAN_FOOD).toBeGreaterThan(CARRIAGE_CAPACITY - 10)
   })

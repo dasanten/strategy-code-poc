@@ -52,6 +52,7 @@ const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   build: 'build',
   haul: 'haul',
   tearDown: 'tearDown',
+  breed: 'breed',
   feedStable: undefined,
 }
 

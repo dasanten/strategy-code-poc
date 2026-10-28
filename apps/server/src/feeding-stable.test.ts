@@ -1,4 +1,5 @@
 import {
+  AVERAGE_HORSE_STATS,
   HORSE_FOOD_PER_DAY,
   MAX_HEALTH,
   MAX_HUNGER,
@@ -60,6 +61,8 @@ function setup(food: number) {
       y: 11,
       hunger: MAX_HUNGER,
       health: MAX_HEALTH,
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: 0,
     })
   }
   const w1 = newResident(mulberry32(1), {
@@ -146,6 +149,8 @@ describe('feeding the stable', () => {
       y: 15,
       hunger: MAX_HUNGER,
       health: MAX_HEALTH,
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: 0,
     })
     give(world, queue)
     w1.scriptParams = { [w1.script!.scriptId]: { source: 'far', stable: 's2' } }

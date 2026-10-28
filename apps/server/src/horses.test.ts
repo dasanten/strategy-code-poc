@@ -1,12 +1,21 @@
 import {
+  AVERAGE_HORSE_STATS,
   BUILD_MATERIALS,
   BUILD_WORK,
   HORSE_FOOD_PER_DAY,
+  HORSE_START_AGE_MAX,
+  HORSE_START_AGE_MIN,
+  HORSE_STAT_AVERAGE,
+  HORSE_STAT_MAX,
+  HORSE_STAT_MIN,
+  HORSE_STAT_NAMES,
+  TICKS_PER_GAME_YEAR,
+  horseAgeInYears,
+  horseFoodFactor,
   HUNGER_DAYS,
   MAX_HEALTH,
   MAX_HUNGER,
   STABLE_BREED_TICKS,
-  STABLE_CAPACITY,
   STARVE_DAYS,
   TICKS_PER_GAME_DAY,
   Terrain,
@@ -19,8 +28,8 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { eventsFor } from './events.js'
-import { stepHorses } from './horses.js'
-import { checkInvariants } from './invariants.js'
+import { newHorse, stepHorses } from './horses.js'
+import { checkInvariants, horseStatsSound } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { worldWithCity } from './test-terrain.js'
@@ -56,7 +65,17 @@ function setup(food = 0) {
 }
 
 function horse(world: WorldState, id: string, x: number, y: number, realmId: string | null = 'r1') {
-  const h: Horse = { id, realmId, cityId: null, x, y, hunger: MAX_HUNGER, health: MAX_HEALTH }
+  const h: Horse = {
+    id,
+    realmId,
+    cityId: null,
+    x,
+    y,
+    hunger: MAX_HUNGER,
+    health: MAX_HEALTH,
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
+  }
   world.horses.push(h)
   return h
 }
@@ -72,6 +91,61 @@ function run(world: WorldState, days: number) {
 }
 
 describe('horse hunger', () => {
+  it('feeds a horse of higher Endurance less, of lower Endurance more (`CONTEXT.md`: Horse stats)', () => {
+    const eaten = (endurance: number) => {
+      const { world, stable } = setup()
+      const h = horse(world, 'h1', stable.x, stable.y)
+      h.stats.endurance = endurance
+      stable.stock = { food: 100 }
+      run(world, 20)
+      return 100 - (stable.stock.food ?? 0)
+    }
+    const average = eaten(HORSE_STAT_AVERAGE)
+    const tough = eaten(HORSE_STAT_MAX)
+    const weak = eaten(HORSE_STAT_MIN)
+    expect(tough).toBeLessThan(average)
+    expect(weak).toBeGreaterThan(average)
+    const factor = horseFoodFactor({ stats: { ...AVERAGE_HORSE_STATS, endurance: HORSE_STAT_MAX } })
+    expect(Math.abs(tough - 20 * HORSE_FOOD_PER_DAY * factor)).toBeLessThanOrEqual(1)
+  })
+
+  it('draws a new horse’s stats and age in their ranges', () => {
+    const tick = 3 * TICKS_PER_GAME_YEAR
+    for (let seed = 0; seed < 50; seed++) {
+      const h = newHorse(mulberry32(seed), {
+        id: 'h',
+        realmId: null,
+        cityId: null,
+        x: 0,
+        y: 0,
+        tick,
+      })
+      for (const s of HORSE_STAT_NAMES) {
+        expect(Number.isInteger(h.stats[s])).toBe(true)
+        expect(h.stats[s]).toBeGreaterThanOrEqual(HORSE_STAT_MIN)
+        expect(h.stats[s]).toBeLessThanOrEqual(HORSE_STAT_MAX)
+      }
+      const age = horseAgeInYears(h, tick)
+      expect(age).toBeGreaterThanOrEqual(HORSE_START_AGE_MIN)
+      expect(age).toBeLessThanOrEqual(HORSE_START_AGE_MAX)
+      expect(h).toMatchObject({ hunger: MAX_HUNGER, health: MAX_HEALTH })
+    }
+  })
+
+  it('catches a horse without sound stats or born in the future', () => {
+    const { world } = setup()
+    const h = horse(world, 'h1', 1, 1)
+    expect(horseStatsSound.check(world, terrain)).toEqual([])
+    h.stats.speed = 0
+    h.stats.strength = 2.5
+    h.bornAt = world.tick + 1
+    const found = horseStatsSound.check(world, terrain).map((v) => v.message)
+    expect(found).toEqual([
+      'horse h1 has speed 0, strength 2.5',
+      `horse h1 was born at tick ${world.tick + 1}, after tick ${world.tick}`,
+    ])
+  })
+
   it('feeds a horse in a stable from the stable’s storage, HORSE_FOOD_PER_DAY a game day', () => {
     const { world, stable } = setup(100)
     const h = horse(world, 'h1', 8, 8)
@@ -153,58 +227,6 @@ describe('horse hunger', () => {
   })
 })
 
-describe('stable breeding', () => {
-  it('breeds a foal of their realm from two fed horses after STABLE_BREED_DAYS', () => {
-    const { world, stable } = setup(100_000)
-    horse(world, 'h1', 8, 8)
-    horse(world, 'h2', 8, 8)
-    for (let t = 0; t < STABLE_BREED_TICKS - 1; t++) stepHorses(world, terrain)
-    expect(world.horses).toHaveLength(2)
-    stepHorses(world, terrain)
-    expect(world.horses).toHaveLength(3)
-    const foal = world.horses[2]!
-    expect(foal).toMatchObject({ realmId: 'r1', x: 8, y: 8, hunger: MAX_HUNGER })
-    expect(stable.breeding).toBe(0)
-    expect(eventsFor(world, 7)).toEqual([
-      expect.objectContaining({ kind: 'foaled', horseId: foal.id, stableId: 's1' }),
-    ])
-  })
-
-  it('needs two fed horses of one realm, in a finished stable with room', () => {
-    const lone = setup(1000)
-    horse(lone.world, 'h1', 8, 8)
-    // A horse next to the stable is not in it.
-    horse(lone.world, 'h2', 8, 11)
-    stepHorses(lone.world, terrain)
-    expect(lone.stable.breeding).toBeUndefined()
-
-    const mixed = setup(1000)
-    horse(mixed.world, 'h1', 8, 8)
-    horse(mixed.world, 'h2', 8, 8, 'r2')
-    stepHorses(mixed.world, terrain)
-    expect(mixed.stable.breeding).toBeUndefined()
-
-    const hungry = setup()
-    horse(hungry.world, 'h1', 8, 8).hunger = 0
-    horse(hungry.world, 'h2', 8, 8)
-    stepHorses(hungry.world, terrain)
-    expect(hungry.stable.breeding).toBeUndefined()
-
-    const site = setup(1000)
-    site.stable.site = { delivered: {}, work: 0 }
-    horse(site.world, 'h1', 8, 8)
-    horse(site.world, 'h2', 8, 8)
-    stepHorses(site.world, terrain)
-    expect(site.stable.breeding).toBeUndefined()
-
-    const full = setup(100_000)
-    for (let i = 0; i < STABLE_CAPACITY; i++) horse(full.world, `h${i}`, 8, 8)
-    full.stable.breeding = STABLE_BREED_TICKS - 1
-    stepHorses(full.world, terrain)
-    expect(full.world.horses).toHaveLength(STABLE_CAPACITY)
-  })
-})
-
 describe('stables in the world', () => {
   it('go on Plains off any resource node, and a build order checks the land', () => {
     const { world, w1 } = setup()
@@ -274,29 +296,25 @@ describe('stables in the world', () => {
     ])
   })
 
-  it('keep a starting city’s horses fed and breeding, with every invariant holding', () => {
+  it('keep a starting city’s horses fed, and breed no foal without a resident', () => {
     const { world, terrain: land } = worldWithCity()
     const stable = world.buildings.find((b) => b.kind === 'stable')!
     stable.stock = { food: 1000 }
     for (const r of world.residents) r.carried = { food: 1000 }
-    for (let t = 0; t < 2 * TICKS_PER_GAME_DAY; t++) stepWorld(world, land)
+    for (let t = 0; t < STABLE_BREED_TICKS + TICKS_PER_GAME_DAY; t++) stepWorld(world, land)
     expect(world.horses).toHaveLength(2)
-    expect(stable.breeding).toBe(2 * TICKS_PER_GAME_DAY)
+    expect(world.horses.every((h) => h.hunger > 0)).toBe(true)
     expect(checkInvariants(world, land)).toEqual([])
   })
 })
 
 describe('horse and stable invariants', () => {
-  it('report a horse out of range and breeding off a stable or past a foal', () => {
-    const { world, stable } = setup()
+  it('report a horse out of range', () => {
+    const { world } = setup()
     const h = horse(world, 'h1', 8, 8)
     h.health = MAX_HEALTH + 1
-    stable.breeding = STABLE_BREED_TICKS
-    world.buildings.push({ id: 'b2', kind: 'mine', cityId: null, x: 9, y: 9, breeding: 1 })
     const found = checkInvariants(world, terrain).map((v) => [v.invariant, v.entityIds[0]])
     expect(found).toContainEqual(['health-and-hunger-in-range', 'h1'])
-    expect(found).toContainEqual(['stables-breed-in-range', 's1'])
-    expect(found).toContainEqual(['stables-breed-in-range', 'b2'])
   })
 
   it('report a stable off Plains and goods only in storages and stables', () => {

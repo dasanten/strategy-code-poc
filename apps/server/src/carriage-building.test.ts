@@ -1,4 +1,5 @@
 import {
+  AVERAGE_HORSE_STATS,
   BUILD_MATERIALS,
   BUILD_WORK,
   DEFAULT_SCRIPTS,
@@ -156,6 +157,8 @@ describe('building a carriage', () => {
       y: 5,
       hunger: MAX_HUNGER,
       health: 100,
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: world.tick,
     })
     order(world, queue, build())
     const s = site(world)!

@@ -1,6 +1,7 @@
 import type { Account, OrderRequest, ServerMessage, TerrainMap, WorldState } from '@csp/shared'
 import { build } from './building.js'
 import { tearDown } from './teardown.js'
+import { breed } from './breeding.js'
 import { drop, pickUp } from './carrying.js'
 import { fetch, store } from './storing.js'
 import { drive } from './driving.js'
@@ -10,6 +11,7 @@ import { walkTo } from './walking.js'
 import { workAt } from './work.js'
 import { allianceOrders } from './alliances.js'
 import { climb } from './climbing.js'
+import { dismount, mount } from './riding.js'
 import { attack } from './combat.js'
 import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
@@ -62,9 +64,12 @@ export const orderKinds: Record<string, OrderKind> = {
   build,
   tearDown,
   workAt,
+  breed,
   pair,
   attack,
   climb,
+  mount,
+  dismount,
   setGate,
   roadLine,
   wallLine,

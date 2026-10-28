@@ -1,4 +1,5 @@
 import {
+  AVERAGE_HORSE_STATS,
   DELIVERY_FEE_BASE,
   DELIVERY_LOAD,
   GOOD_WEIGHT,
@@ -52,6 +53,8 @@ function setup() {
   foundTradeOrgHq(world, terrain, 128, 128, rand)
   foundTradingPost(world, terrain, 320, 320, undefined, rand)
   const [caravan] = placeCaravans(world)
+  // An average horse, so the caravan's loads are what the delivery numbers below expect.
+  for (const h of world.horses) h.stats = { ...AVERAGE_HORSE_STATS }
   const realm = foundStartingCity(world, terrain, mara.userId)
   const city = world.cities.find((c) => c.realmId === realm.id)!
   const storage = deliveryStorage(world, city.id)!

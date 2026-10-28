@@ -1,4 +1,5 @@
 import {
+  AVERAGE_HORSE_STATS,
   HAUL_KEEP_FOOD,
   Terrain,
   TICKS_PER_GAME_DAY,
@@ -60,6 +61,8 @@ const MORNING_ORE = 30
  */
 function scenario() {
   const { world, terrain } = worldWithCity()
+  // An average horse, so the carriage holds the `CARRIAGE_CAPACITY` the loads below are sized for.
+  for (const h of world.horses) h.stats = { ...AVERAGE_HORSE_STATS }
   const me = { userId: 1, account: { name: 'Mara', isAdmin: false } }
   const realm = world.realms[0]!
   const storage = world.buildings.find((b) => b.kind === 'storage')!

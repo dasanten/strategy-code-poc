@@ -2,6 +2,7 @@ import {
   BUILD_WORK,
   CARRIAGE_CAPACITY,
   GOODS,
+  HORSE_STAT_NAMES,
   MAX_HEALTH,
   MAX_HUNGER,
   STAT_NAMES,
@@ -20,6 +21,7 @@ import type { JumpEntry, JumpKind } from './admin-jump.js'
 import { buildingCount } from './city-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { GOOD_LABELS, orderDoing } from './Residents.js'
+import { horseAgeText } from './selection-view.js'
 
 /*
  * The admin map's read-only inspector (`CONTEXT.md`: admin map): what is clicked on the map,
@@ -241,6 +243,11 @@ export function inspectorCard(ins: AdminInspection): InspectorCard {
       return card({
         title: 'Horse',
         rows: [
+          ...HORSE_STAT_NAMES.map((s) => ({
+            label: s[0]!.toUpperCase() + s.slice(1),
+            text: String(ins.horse.stats[s]),
+          })),
+          { label: 'Age', text: horseAgeText(ins.horse, ins.tick) },
           { label: 'Health', text: meter(ins.horse.health, MAX_HEALTH) },
           { label: 'Hunger', text: `${meter(ins.horse.hunger, MAX_HUNGER)} fed` },
           tile(ins.horse),
