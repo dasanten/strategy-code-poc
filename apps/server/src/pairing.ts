@@ -2,7 +2,7 @@ import {
   CARRYING_A_CHILD,
   CARRYING_TICKS,
   commands,
-  TICKS_PER_GAME_YEAR,
+  PAIRING_WAIT_TICKS,
   canWork,
   freeHousing,
   hasFoodSurplus,
@@ -18,8 +18,8 @@ import { baseStats, hash, mulberry32, newChild } from './residents.js'
 import { newId, realmOf } from './starting-city.js'
 
 /**
- * An action a pair requests (`CONTEXT.md`: Pairing, Carrying): once a game year has passed since
- * they paired, that one of them starts carrying a child; once a partner has carried for
+ * An action a pair requests (`CONTEXT.md`: Pairing, Carrying): once `PAIRING_WAIT_DAYS` have passed
+ * since they paired, that one of them starts carrying a child; once a partner has carried for
  * `CARRYING_DAYS`, that the child is born. The world checks and resolves it at the end of the
  * tick.
  */
@@ -88,7 +88,7 @@ function pairedWith(r: Resident, partner: Resident): boolean {
 /**
  * Ends pairs that no longer hold (the partner gone, paired with someone else, or no longer of the
  * same city), stops what carrying residents can't do, then requests a carry for every pair whose
- * game year has passed with no child on the way, and a birth for every resident who has carried
+ * `PAIRING_WAIT_DAYS` have passed with no child on the way, and a birth for every resident who has carried
  * for `CARRYING_DAYS`.
  */
 export function requestBirths(world: WorldState): BirthAction[] {
@@ -112,7 +112,7 @@ export function requestBirths(world: WorldState): BirthAction[] {
     }
     const p = r.pair
     if (!p || r.id > p.partnerId || byId.get(p.partnerId)?.carrying) continue
-    if (world.tick - p.since >= TICKS_PER_GAME_YEAR)
+    if (world.tick - p.since >= PAIRING_WAIT_TICKS)
       actions.push({ kind: 'carry', parentIds: [r.id, p.partnerId] })
   }
   return actions

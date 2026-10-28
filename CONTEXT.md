@@ -277,7 +277,18 @@ The shared language of the game. Domain terms only — no implementation details
   (a palace, a castle) may add room the same way.
 - **Food surplus:** a city has one when its storage holds more Food than all its residents eat
   in a set number of game days. Food that residents carry doesn't count.
-- **Storage:** a building in a city's area where its goods are kept.
+- **Storage:** a building where goods are kept. In a city's area it is that city's storage and goes
+  with the city.
+- **Outpost storage:** a storage that is part of no city. It belongs to the realm whose residents
+  finished it, like a town hall does, and counts as a storage of that realm everywhere (Store,
+  Fetch, Carrying the output, Fetching materials, carriage stops). It founds no city and has no
+  city area; once a city grows to include it, it is that city's storage. Its stock is guarded like
+  a workplace: while an armed resident of its realm is at it and none of anyone else's, nobody
+  else can take from it; unguarded, anyone at it can, and for another organization that is theft.
+  Tearing it down against its realm is a crime too.
+- **Refilling at an outpost storage:** a resident of its realm within a short distance of an
+  outpost storage who is running low on food takes a meal from it, as at home, without an order.
+  A stocked outpost storage next to a remote workplace keeps its workers fed.
 - **At home:** a resident standing in the area of a city of their own realm; for a resident of an
   NPC city, in the area of that city.
 - **NPC city:** a city run by the game. Self-managed cities are NPC cities. On its own it works
@@ -530,9 +541,9 @@ The shared language of the game. Domain terms only — no implementation details
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
-  its own in NPC cities). Each pair has one child at most, so at most one per game year. The only
-  way, besides integrating, that residents come into being. Once a game year has passed since
-  they paired, and their city has free housing and a food surplus, one partner, chosen at random,
+  its own in NPC cities). Each pair has one child at most. The only way, besides integrating,
+  that residents come into being. Once 10 game days have passed since they paired, and their city
+  has free housing and a food surplus, one partner, chosen at random,
   starts **Carrying** the child; the other keeps working as before.
 - **Carrying:** a partner carrying a child can't work for 10 game days (4 real hours); then the
   child is born and the pair ends. For another child the Player pairs them again (NPC cities do
@@ -562,12 +573,25 @@ The shared language of the game. Domain terms only — no implementation details
   them or a delivery.
 - **Refilling from a carriage:** a resident of an army running low on food takes a meal from a
   carriage of their own realm on or next to their tile, like refilling at home.
+- **Getting food:** in the Work, Build and Tear down defaults, a resident whose `foodAt` param is
+  set and who carries less Food than that many units stops, walks to their `storage` (Work) or
+  `source` (Build, Tear down) param, or else the nearest storage of their realm with Food, takes
+  Food there up to `foodTake` units on them, and goes back. Whenever they are at a storage anyway
+  (carrying the output, fetching materials), their own food is topped up to `foodTake` instead of
+  the usual own food. Unset, they don't go on their own and rely on refilling. NPC cities run the
+  defaults with both unset.
 
 ## Transport
 
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
   hunger meter costs health, and a horse without food dies after about 5 game days. Bred by a
   resident at a stable, or bought from the Trade Organization.
+- **Horse grant:** a one-time gift, given once when it ships: every Player realm with a living
+  Leader and no horse at all (in a stable, hitched or ridden) gets two new horses with stats drawn
+  as in a starting city. They appear in the realm's finished stable nearest the Leader's city;
+  with no stable, on free tiles next to the storage of the Leader's city (or the realm's oldest
+  city; with no city, next to the Leader), each with a few days of Food on the ground by it. The
+  realm log says where they arrived. Realms that still have a horse get none.
 - **Horse stats:** every horse has Speed, Strength and Endurance, and an age. Speed is how fast
   it pulls its carriage or carries a rider (`Riding`); Strength is how much the carriage it pulls
   can hold; Endurance is how much Food it needs, as a resident's Endurance is for them. New
@@ -659,7 +683,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Script parameter:** a value the Player picks for whoever runs a script, declared by a
   `param name: type` line at the top of the script and read there as `params.name`; a `param`
   line anywhere else is a syntax error. A `building` param holds one of the realm's own buildings
-  or construction sites; a `storage` param one of its storages, stables or carriages. The values
+  or construction sites; a `storage` param one of its storages, stables or carriages; a `number`
+  param a whole number of zero or more, typed into a number field. The values
   are kept for each resident and each script: giving the task again keeps them, a param removed
   from the script is dropped, a new one starts unset. Unset, or once the one picked is gone (or no
   longer the realm's), it reads `null`. The resident card shows one field for each param of the
@@ -667,7 +692,8 @@ The shared language of the game. Domain terms only — no implementation details
   the script. The Work default declares `storage` (where the output goes) and the Build default
   `source` (where materials come from, a carriage too), each falling back to the nearest storage
   while unset; a source picked that holds none of what the site lacks is left alone, and they
-  just build.
+  just build. Work, Build and Tear down also declare the `number` params `foodAt` and `foodTake`
+  (Getting food).
 - **Store:** a built-in order a script can hand over to: the resident walks to a storage,
   stable or carriage of their own (by default the nearest storage of their realm), puts down the
   chosen goods there (Food only beyond their own food, unless asked for exact units) and, at a
@@ -732,3 +758,12 @@ The shared language of the game. Domain terms only — no implementation details
 - **Tick:** one step of the world, one per second.
 - **Realm log:** what happened in a Player's realm (residents going hungry, deaths, Food
   spoiling), shown only to that Player, also what happened while they were offline.
+- **Resident card:** what the UI shows for a picked resident (and, laid out the same, a group or
+  an army): a header that always shows (name, Doing, hunger and health, what they carry) and one
+  open tab under it: Orders, Queue, Stats or Script. Orders are grouped by kind (Move, Work &
+  build, Goods, Scripts), and orders they can't take right now are left out.
+- **Picking a target:** an order that needs a tile or building (walk to, store at, build here)
+  shrinks the card to its header and shows "Tap where …" with Cancel until the Player picks one
+  on the map; then the card comes back as it was. On a phone every card is a bottom sheet (peek,
+  half, full), one finger pans, pinch zooms, a tap picks, a long-press does what right-click does,
+  and a Select toggle makes a drag pick a group.
