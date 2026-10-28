@@ -396,8 +396,13 @@ export function Wiki() {
           the card shows its letter key; press it to run the action. Escape drops what is picked.
         </p>
         <p>
-          To pick several at once, drag a box around them with Shift held (or after the Box select
-          button), or Shift-click residents to add them or take them out.
+          To pick several at once, drag a box around them with Shift held (or after the Select
+          button on the map), or Shift-click residents to add them or take them out.
+        </p>
+        <p>
+          On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
+          long-press does what right-click does. Turn on Select to make a one-finger drag box a
+          group instead of panning.
         </p>
         <table>
           <thead>
