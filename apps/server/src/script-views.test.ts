@@ -27,7 +27,7 @@ const terrain: TerrainMap = { size: SIZE, tiles: new Uint8Array(SIZE * SIZE).fil
 const sender = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /**
- * Realm r1 (Player 7): a1 running a script, paired with a2, who is in army ar1; city c1 with its
+ * Realm r1 (Player 7): a1 running a script as a looping queue's step, paired with a2, who is in army ar1; city c1 with its
  * town hall, a stocked storage and a construction site; a horse and a carriage. Realm r2
  * (Player 8): b1 next to a1, and city c2 in sight. An NPC city c3 in sight; a pile, a node, an
  * admin directive, and a building and a city Player 7 last saw, out of sight now.
@@ -67,6 +67,14 @@ function setup() {
   const a2 = resident(world, 'a2', 'r1', 'c1', 10, 11)
   resident(world, 'b1', 'r2', 'c2', 9, 10)
   a1.script = { scriptId: 1, memory: { role: 'gatherer' } }
+  a1.queue = {
+    realmId: 'r1',
+    steps: [{ id: 1, order: { kind: 'runScript', scriptId: 1 }, minutes: 30 }],
+    current: 0,
+    startedAt: 40,
+    loop: true,
+    nextStepId: 2,
+  }
   a1.pair = { partnerId: 'a2', since: 3 }
   a2.pair = { partnerId: 'a1', since: 3 }
   world.armies.push({ id: 'ar1', name: 'Vanguard', realmId: 'r1', memberIds: ['a2'], order: null })
@@ -201,6 +209,20 @@ describe('script views', () => {
     }
     expect(out.materialsNeeded).not.toEqual([])
     expect(ids('storages')).toEqual(['s1'])
+    // A queue shows where it is, not its steps.
+    const queue = {
+      step: 1,
+      steps: 1,
+      loop: true,
+      kind: 'runScript',
+      scriptId: 1,
+      minutes: 30,
+      startedAt: 40,
+    }
+    expect((out.me as { queue: unknown }).queue).toEqual(queue)
+    expect(
+      (out.residents as { id: string; queue?: unknown }[]).find((r) => r.id === 'a1')!.queue,
+    ).toEqual(queue)
 
     const problems = Object.keys(calls).flatMap((name) =>
       scriptValueProblems(out[name], returnsOf(SCRIPT_API, name), name),

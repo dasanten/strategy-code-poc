@@ -1,5 +1,5 @@
 import type { Task } from './default-scripts.js'
-import type { Remembered } from './protocol.js'
+import type { OrderRequest, Remembered } from './protocol.js'
 import { Terrain } from './terrain.js'
 
 export const TICK_MS = 1000
@@ -76,6 +76,12 @@ export interface Resident {
    * Kept when the script ends, so giving the task again keeps them. Absent while none is picked.
    */
   scriptParams?: ScriptParamValues
+  /**
+   * The queue the resident works through (`CONTEXT.md`: Queue), when they were given one. Its
+   * current step sets `order` or `script` as if it had been given on its own; any order that
+   * isn't a step of it ends it. Absent when they have none.
+   */
+  queue?: Queue
   /** The resident's pair (`CONTEXT.md`: Pairing), if they are paired. Not an order. */
   pair?: Pair
   /** The child the resident is carrying (`CONTEXT.md`: Carrying), if any. */
@@ -85,6 +91,35 @@ export interface Resident {
    * on with whatever they do, at the horse's pace.
    */
   riding?: string
+}
+
+/**
+ * A queue (`CONTEXT.md`: Queue): steps done one after another, as plain data (ADR 0002).
+ * `current` is the step being done, always one of `steps`; `startedAt` the tick it started, null
+ * until it has. With `loop` the first step follows the last; without, the queue ends after it.
+ */
+export interface Queue {
+  /** The realm whose Player gave it; it ends once that realm no longer commands the resident. */
+  realmId: string
+  /** Never empty, and never a queue among them. */
+  steps: QueueStep[]
+  current: number
+  startedAt: number | null
+  loop: boolean
+  /** The id the next step added gets, so ids in the queue are never reused. */
+  nextStepId: number
+}
+
+/**
+ * One step of a queue: an order request as the UI or a script gives it (one-off actions, tasks,
+ * the Player's own scripts), without whom it is for. It ends when done, or once `minutes` game
+ * minutes have passed since it started, if set.
+ */
+export interface QueueStep {
+  /** Tells the steps apart while the list is edited; unique in the queue. */
+  id: number
+  order: OrderRequest
+  minutes?: number
 }
 
 /**
@@ -1328,6 +1363,20 @@ export type RealmEventWhat =
   | ({ kind: 'scriptOutOfSteps'; name: string; scriptId: number; realm: boolean } & ScriptRunBy)
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
+  /**
+   * Step `step` (counted from 1) of the resident `name`'s queue (`CONTEXT.md`: Queue), an order
+   * of kind `order`, was skipped: it couldn't start or ended in a failure, for `reason`.
+   * `queueEnded` when none of the queue's steps could start, so the queue ended.
+   */
+  | {
+      kind: 'queueStepSkipped'
+      residentId: string
+      name: string
+      step: number
+      order: string
+      reason: string
+      queueEnded?: true
+    }
   /**
    * A mercenary contract (`CONTEXT.md`: Mercenary contract) with the realm `other` (by its
    * realm name) changed: `offered` to this realm, `started` once accepted, `paid` for `weeks`

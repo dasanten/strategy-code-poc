@@ -650,7 +650,9 @@ The shared language of the game. Domain terms only — no implementation details
   **Running a script** is an order for a resident or an army: the script runs once a tick for
   each of them, with its own memory, and can request only what that resident or army could. Any
   other order ends it. A script can hand over to a built-in order for a while and take control
-  back. A saved change is picked up on the next tick: each save is a new version, and the
+  back. A script ends itself by calling `end()`: the resident stands idle, and in a queue its next
+  step starts; the Build, Tear down and Breed horses defaults do once the site is finished, the building is
+  gone or the foal is born. A saved change is picked up on the next tick: each save is a new version, and the
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again.
@@ -702,6 +704,29 @@ The shared language of the game. Domain terms only — no implementation details
   isn't allowed to see is always there and `null`, never missing. A script sees no field beyond
   these. The game may add fields at any time; renaming or removing one tells each Player whose
   scripts read it in their realm log, naming the field and the scripts.
+- **Group:** several of the Player's residents picked on the map at once (box-drag or
+  Shift-click), so an order goes to each. Not an Army: nothing ties them together in the world.
+  Ctrl+1–9 saves the picked residents as that number's group and 1–9 picks them again (pressed
+  twice, it also centres the map on them); saved groups are kept per browser, not in the world.
+  Dead residents and ones no longer the Player's drop out of a group when it is picked again.
+  **One command for a group:** the group card gives each the same order request as their own card
+  would (walk to, work, build, store, fetch, run a script, stop); nothing new is kept in the
+  world. A walk-to spreads them over distinct free tiles around the target, the nearest of them
+  to the nearest tile. Work and Build make each join the workplace or site: Build walks them
+  there, the first lays out the site and the others join it; Work is tile-bound, so it goes only
+  to those standing at the workplace. Those who can't take it (children, a partner carrying a
+  child, too far for a tile-bound order) are skipped, and the card says who and why.
+- **Queue:** an order holding a list of steps for a resident and which step they are on. A step
+  is any order the Player could give them on its own: a one-off action (walk to, pick up, drop,
+  Store, Fetch, …), a task, or one of their scripts with its params. A step ends when it's done
+  (a walk arrives, a script calls `end()`), or once its duration in game minutes is up, if the Player gave
+  it one; a task that never ends on its own (work, haul, feed the stable) needs a duration unless it's the last
+  step. With **loop**, the first step follows the last; without, the queue ends after it. Steps
+  can be added, removed and reordered while it runs: the current step keeps going unless removed,
+  and then the step in its place starts. A step that can't start or ends in a failure is skipped
+  and noted in the realm log; when none of them can start, the queue ends. Any order that isn't a
+  step ends it. Scripts see a resident's queue (which step, and what it is) but can't start or
+  change one; their `order` and `script` stay the current step's own.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

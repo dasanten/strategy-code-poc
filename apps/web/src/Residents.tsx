@@ -51,6 +51,8 @@ import {
   type GoodsSpot,
   type KnownNode,
   type Pile,
+  type Queue,
+  type QueueStepRequest,
   type Resident,
   type ScriptSummary,
   type SkillName,
@@ -65,8 +67,19 @@ import {
   horsesIn,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { carryLine, type CardSections, type ResidentGroup } from './residents-view.js'
+import { carryLine, groupCard, type CardSections, type ResidentGroup } from './residents-view.js'
 import { doingLine } from './doing-view.js'
+import {
+  dropStep,
+  moveStep,
+  queueRows,
+  realMinutes,
+  removeStep,
+  stepsOf,
+  timeStep,
+  type QueueRow,
+} from './queue-view.js'
+import { groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
@@ -213,6 +226,138 @@ function TaskScript({
   )
 }
 
+/**
+ * The resident's queue (`CONTEXT.md`: Queue): its steps in order, the current one with its Doing
+ * line. Steps are reordered by dragging or the arrows, removed, given a duration or none, and the
+ * queue looped; each change is an edit-queue order.
+ */
+function QueueBlock({
+  queue: q,
+  doing,
+  scripts,
+  buildings,
+  onEdit,
+}: {
+  queue: Queue
+  doing: string
+  scripts: ScriptSummary[]
+  buildings: Building[]
+  onEdit: (steps: QueueStepRequest[], loop?: boolean) => void
+}) {
+  const [dragged, setDragged] = useState<number>()
+  const rows = queueRows(q, { scripts, buildings })
+  return (
+    <section className="inspector-block" aria-label="Queue">
+      <div className="panel-head">
+        <h3>Queue</h3>
+        <label className="small queue-loop">
+          <input
+            type="checkbox"
+            checked={q.loop}
+            onChange={(e) => onEdit(stepsOf(q), e.target.checked)}
+          />{' '}
+          Loop
+        </label>
+      </div>
+      <ol className="queue-steps">
+        {rows.map((row, i) => (
+          <li
+            key={row.id}
+            className={`queue-step${row.current ? ' current' : ''}`}
+            aria-current={row.current ? 'step' : undefined}
+            draggable
+            onDragStart={() => setDragged(row.id)}
+            onDragEnd={() => setDragged(undefined)}
+            onDragOver={(e) => dragged !== undefined && e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragged !== undefined && dragged !== row.id) onEdit(dropStep(q, dragged, row.id))
+              setDragged(undefined)
+            }}
+          >
+            <div className="queue-step-head">
+              <span className="small">
+                {i + 1}. {row.label}
+              </span>
+              <span className="buttons">
+                <button
+                  type="button"
+                  aria-label="Move up"
+                  disabled={i === 0}
+                  onClick={() => onEdit(moveStep(q, row.id, -1))}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label="Move down"
+                  disabled={i === rows.length - 1}
+                  onClick={() => onEdit(moveStep(q, row.id, 1))}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  aria-label="Remove"
+                  onClick={() => onEdit(removeStep(q, row.id))}
+                >
+                  ✕
+                </button>
+              </span>
+            </div>
+            {row.current && <span className="small muted">{doing}</span>}
+            <StepMinutes row={row} onSet={(minutes) => onEdit(timeStep(q, row.id, minutes))} />
+          </li>
+        ))}
+      </ol>
+      <p className="muted small">
+        Drag a step or use the arrows to reorder. Working and hauling never end on their own, so
+        they need a duration unless they are last.
+      </p>
+    </section>
+  )
+}
+
+/** A step's duration in game minutes, with real time beside; set on Enter or leaving the field. */
+function StepMinutes({
+  row,
+  onSet,
+}: {
+  row: QueueRow
+  onSet: (minutes: number | undefined) => void
+}) {
+  const [text, setText] = useState(row.minutes === undefined ? '' : String(row.minutes))
+  useEffect(() => setText(row.minutes === undefined ? '' : String(row.minutes)), [row.minutes])
+  const typed = Math.floor(Number(text))
+  const commit = () => {
+    const minutes = text.trim() === '' || !(typed > 0) ? undefined : typed
+    if (minutes !== row.minutes) onSet(minutes)
+  }
+  return (
+    <label className="small queue-step-minutes">
+      Duration{' '}
+      <input
+        type="number"
+        min={1}
+        step={1}
+        placeholder="none"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && commit()}
+        style={{ width: '5em' }}
+      />{' '}
+      game min
+      {typed > 0 && <span className="muted"> · {realMinutes(typed)} real</span>}
+      {row.minutes !== undefined && (
+        <button type="button" onClick={() => onSet(undefined)}>
+          Clear
+        </button>
+      )}
+    </label>
+  )
+}
+
 /** What a resident's built-in order has them doing. */
 export function orderDoing(r: Pick<Resident, 'order'>): string {
   const o = r.order
@@ -356,6 +501,208 @@ export function ResidentsList({
 }
 
 /**
+ * The selection card for several of the Player's residents picked at once on the map: how many,
+ * their names, and a short list of what each is doing; click a row to pick just that one.
+ */
+export function GroupCard({
+  residents,
+  scripts,
+  buildings,
+  picking,
+  onPicking,
+  buildAt,
+  onOrder,
+  report,
+  orderError,
+  onPick,
+  onClose,
+}: {
+  residents: Resident[]
+  scripts: ScriptSummary[]
+  buildings: Building[]
+  /** The map is waiting for a tile for the group's walk-to, work or build order. */
+  picking: GroupPicking
+  /** Starts (or cancels) picking a tile for the group. */
+  onPicking: (picking: GroupPicking) => void
+  /** The tile picked to build on: the site there to join, or the kinds that may go there. */
+  buildAt: GroupBuildTile | undefined
+  /** Gives each resident of the group the order (`CONTEXT.md`: Group). */
+  onOrder: (order: GroupOrder) => void
+  /** What the last group order did: how many it went to, and who was skipped and why. */
+  report: { sent: number; of: number; skipped: Skipped[] } | undefined
+  /** Why the last group order couldn't go out at all, such as no workplace on the tile. */
+  orderError: string | undefined
+  onPick: (id: string) => void
+  onClose: () => void
+}) {
+  const card = groupCard(residents)
+  const [panel, setPanel] = useState<'fetch' | 'script'>()
+  const [good, setGood] = useState<Good>('food')
+  const toggle = (p: Exclude<GroupPicking, false>) => {
+    setPanel(undefined)
+    onPicking(picking === p ? false : p)
+  }
+  const open = (p: 'fetch' | 'script') => {
+    onPicking(false)
+    setPanel(panel === p ? undefined : p)
+  }
+  return (
+    <SelectionCard rel="own" title={card.title} lines={[card.names]} onClose={onClose}>
+      <ul className="sel-facts sel-group" aria-label="Selected residents">
+        {card.rows.map((r) => (
+          <li key={r.id}>
+            <button type="button" onClick={() => onPick(r.id)}>
+              <strong>{r.name}</strong> · {doingLine(r, { scripts, buildings })}
+            </button>
+          </li>
+        ))}
+        {card.more > 0 && <li>and {card.more} more</li>}
+      </ul>
+      <div className="order-buttons" aria-label="Group orders">
+        <button type="button" aria-pressed={picking === 'walk'} onClick={() => toggle('walk')}>
+          Walk to
+        </button>
+        <button type="button" aria-pressed={picking === 'work'} onClick={() => toggle('work')}>
+          Work
+        </button>
+        <button type="button" aria-pressed={picking === 'build'} onClick={() => toggle('build')}>
+          Build
+        </button>
+        <button type="button" onClick={() => onOrder({ kind: 'store' })}>
+          Store
+        </button>
+        <button type="button" aria-pressed={panel === 'fetch'} onClick={() => open('fetch')}>
+          Fetch
+        </button>
+        <button type="button" aria-pressed={panel === 'script'} onClick={() => open('script')}>
+          Run script
+        </button>
+        <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
+          Stop
+        </button>
+      </div>
+      <p className="muted small" role="status">
+        {orderError
+          ? `Order turned down: ${orderError}`
+          : picking
+            ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
+            : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
+      </p>
+      {report && (
+        <div className="small" aria-label="Last group order">
+          <p>{groupSentLine(report.sent, report.of)}</p>
+          {report.skipped.length > 0 && (
+            <ul className="sel-facts">
+              {report.skipped.map((s) => (
+                <li key={s.id}>
+                  Skipped <strong>{s.name}</strong>: {s.why}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {buildAt && !picking && (
+        <section className="inspector-block" aria-label="Build">
+          <div className="panel-head">
+            <h3>Build</h3>
+            <span className="small muted">
+              at {buildAt.x}, {buildAt.y}
+            </span>
+          </div>
+          {buildAt.site ? (
+            <div className="order-buttons">
+              <button
+                type="button"
+                className="primary"
+                onClick={() =>
+                  onOrder({
+                    kind: 'build',
+                    building: buildAt.site!.kind,
+                    at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                  })
+                }
+              >
+                All help build the {BUILDING_NAMES[buildAt.site.kind].toLowerCase()}
+              </button>
+            </div>
+          ) : (
+            buildAt.kinds.map(({ kind, problem }) => (
+              <div key={kind}>
+                <div className="order-buttons">
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={problem !== undefined}
+                    onClick={() => onOrder({ kind: 'build', building: kind, at: buildAt })}
+                  >
+                    Build {BUILDING_NAMES[kind].toLowerCase()}
+                  </button>
+                </div>
+                {problem && <p className="muted small">Not here: {problem}.</p>}
+              </div>
+            ))
+          )}
+          <p className="muted small">
+            Each walks there; the first lays out the site and the others join it.
+          </p>
+        </section>
+      )}
+      {panel === 'fetch' && (
+        <section className="inspector-block" aria-label="Fetch">
+          <div className="order-buttons">
+            <select
+              aria-label="Good to fetch"
+              value={good}
+              onChange={(e) => setGood(e.target.value as Good)}
+            >
+              {GOODS.map((g) => (
+                <option key={g} value={g}>
+                  {GOOD_LABELS[g]}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={() => onOrder({ kind: 'fetch', good })}>
+              Fetch
+            </button>
+          </div>
+          <p className="muted small">
+            Each fetches as much as fits from the nearest storage or carriage holding it.
+          </p>
+        </section>
+      )}
+      {panel === 'script' && (
+        <section className="inspector-block" aria-label="Run script">
+          <RunScript
+            script={undefined}
+            scripts={scripts}
+            onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
+          />
+        </section>
+      )}
+    </SelectionCard>
+  )
+}
+
+/** What the map waits for while a group order is being given. */
+export type GroupPicking = false | 'walk' | 'work' | 'build'
+
+/** The tile a group is to build on, with the site there or the kinds that may go there. */
+export interface GroupBuildTile {
+  x: number
+  y: number
+  site: Building | undefined
+  kinds: { kind: BuildingKind; problem: string | undefined }[]
+}
+
+/** What picking a tile does for a group, said while the map waits for it. */
+const GROUP_PICKING_HINTS: Record<Exclude<GroupPicking, false>, string> = {
+  walk: 'They spread over free tiles around it, nearest first.',
+  work: 'Those standing at the workplace there work it.',
+  build: 'Where to build, or a site to join.',
+}
+
+/**
  * The selection card for one of the Player's residents (ADR 0008; `CONTEXT.md`: Resident, Stats,
  * Skill): who they are and what they do, then the actions that fit them and their tile as rows
  * with keys. An action that needs more (goods, a partner, a target, a script) opens its panel.
@@ -414,6 +761,8 @@ export function ResidentCard({
   sections,
   onSections,
   scriptParams,
+  onStore,
+  onEditQueue,
 }: {
   resident: Resident
   leaderId: string
@@ -525,6 +874,10 @@ export function ResidentCard({
   onSections: (sections: CardSections<ActionId>) => void
   /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
   scriptParams?: ReactNode
+  /** Orders the resident to store what they carry at the nearest storage (`STORE_ALL`). */
+  onStore?: () => void
+  /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
+  onEditQueue?: (steps: QueueStepRequest[], loop?: boolean) => void
 }) {
   const setPanel = (panel: ActionId | undefined) => onSections({ ...sections, panel })
   const age = Math.floor(ageInYears(r, tick))
@@ -603,13 +956,22 @@ export function ResidentCard({
         <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
       )}
       {r.script && scriptParams}
+      {r.queue && onEditQueue && (
+        <QueueBlock
+          queue={r.queue}
+          doing={doingLine(r, { scripts, buildings })}
+          scripts={scripts}
+          buildings={buildings}
+          onEdit={onEditQueue}
+        />
+      )}
       <ActionRows actions={actions} open={shown} onAction={act} />
       <p className="muted small" role="status">
         {orderError
           ? `Order turned down: ${orderError}`
           : picking
             ? `${PICKING_HINTS[picking]} Tap a tile on the map, or press ${PICKING_KEYS[picking]} again to cancel.`
-            : 'Right-click the map to walk there.'}
+            : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
       </p>
 
       {shown && (
@@ -687,6 +1049,16 @@ export function ResidentCard({
                     Nothing. Residents eat only what they carry; at home they take meals from
                     storage.
                   </p>
+                )}
+                {onStore && carried.length > 0 && (
+                  <div className="order-buttons">
+                    <button type="button" disabled={child} onClick={onStore}>
+                      Store all
+                    </button>
+                    <span className="muted small">
+                      at the nearest storage, keeping their own Food
+                    </span>
+                  </div>
                 )}
                 {carried.map(([good, units]) => (
                   <GoodsRow
@@ -1240,8 +1612,9 @@ function WorkBlock({
   const batches = BATCHES_PER_DAY[building.kind] ?? 0
   const o = resident.order
   // Working by the task's script; one working by a bare order (as the starting residents do) can
-  // still be given the task.
-  const working = o?.kind === 'workAt' && o.buildingId === building.id && !!resident.script
+  // still be given the task, and so can one working as a queue step, to queue it again.
+  const working =
+    o?.kind === 'workAt' && o.buildingId === building.id && !!resident.script && !resident.queue
   const blocked = !canWork(resident, tick) || (!working && workers >= max)
   return (
     <section className="inspector-block" aria-label="Work">

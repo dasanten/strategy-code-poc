@@ -469,7 +469,7 @@ export class ScriptRunner {
     const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
     const declared = parsed.program.params
     const params = resident ? paramValues(world, resident, running.scriptId, declared) : declared
-    const { globals, requests } = bindScript({
+    const bound = bindScript({
       world,
       terrain: this.terrain,
       sender,
@@ -481,6 +481,7 @@ export class ScriptRunner {
       explored: (x, y) => this.host.explored(realm.userId, x, y),
       kinds: this.kinds,
     })
+    const { globals, requests } = bound
     const result = run(parsed.program, { globals, steps, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
     if (violations) {
       const sound = 'armyId' in r.bind ? armyScriptRequestsSound : scriptRequestsSound
@@ -501,6 +502,10 @@ export class ScriptRunner {
     }
     // What it requested counts, even when it stopped with an error or out of steps.
     for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
+    if (bound.ended()) {
+      endScript(world, r.id)
+      return result.steps
+    }
 
     const kept = keepMemory(memory)
     if (typeof kept === 'string') {
@@ -522,6 +527,17 @@ export class ScriptRunner {
     }
     return result.steps
   }
+}
+
+/**
+ * A resident's script called `end()` (`CONTEXT.md`: Running a script): it ends and they stand
+ * idle; in a queue, its next step starts.
+ */
+function endScript(world: WorldState, residentId: string): void {
+  const r = world.residents.find((x) => x.id === residentId)
+  if (!r) return
+  delete r.script
+  r.order = null
 }
 
 const scriptError = (
@@ -671,7 +687,7 @@ function runCityScripts(
     let program = gamePrograms.get(source)
     if (!program) gamePrograms.set(source, (program = parse(source)))
     const memory = structuredClone(running.memory) as ScriptObject
-    const { globals, requests } = bindScript({
+    const bound = bindScript({
       world,
       terrain,
       sender,
@@ -684,8 +700,13 @@ function runCityScripts(
       // Nobody picks values for an NPC city: its defaults fall back on their own.
       params: program.params,
     })
+    const { globals, requests } = bound
     run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
+    if (bound.ended()) {
+      endScript(world, r.id)
+      continue
+    }
     const kept = keepMemory(memory)
     if (typeof kept !== 'string' && r.script === running) running.memory = kept
   }

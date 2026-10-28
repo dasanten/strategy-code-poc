@@ -265,7 +265,8 @@ describe('the Breed horses task', () => {
     }
     expect(world.horses).toHaveLength(3)
     expect(w1.order).toBeNull()
-    expect(w1.script?.memory.done).toBe(true)
+    // Done, the script ended itself: the breeder stands idle.
+    expect(w1.script).toBeUndefined()
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 

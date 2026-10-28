@@ -132,9 +132,10 @@ function runCity(
     ) {
       stopWork(r)
     }
-    // Done with the Build default (built, or the site gone or out of reach), a builder is free.
+    // Stuck in the Build default (the site out of reach), a builder is free; built or gone, the
+    // script ended itself.
     const built = r.script?.scriptId === 0 && r.script.task === 'build' ? r.script.memory : null
-    if (built && (built.done === true || built.stuck === true)) stopWork(r)
+    if (built && built.stuck === true) stopWork(r)
     // Done breeding (a foal born, or the breeding stopped), a breeder is free too.
     const bred = r.script?.scriptId === 0 && r.script.task === 'breed' ? r.script.memory : null
     if (bred && bred.done === true) stopWork(r)

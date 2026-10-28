@@ -107,6 +107,7 @@ import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
+import { queuesSound } from './queues.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -1733,6 +1734,7 @@ export const worldInvariants: Invariant[] = [
   pathsAreSteps,
   gameDefaultCarriers,
   gameDefaultFetchers,
+  queuesSound,
 ]
 
 export function checkInvariants(
