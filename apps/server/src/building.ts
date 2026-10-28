@@ -131,12 +131,27 @@ function ownWorkplace(world: WorldState, r: Resident, kind: BuildingKind, id: st
 /**
  * Makes a construction site the building once it has all its materials and work
  * (`CONTEXT.md`: Construction site), whether the last of them was work or a delivery; `r` is the
- * resident who put it in. A finished town hall founds a city of their realm. Returns whether it
- * was finished; the caller brings city membership up to date (`updateCityMembership`).
+ * resident who put it in. A finished town hall founds a city of their realm. A finished carriage
+ * site is gone, and in its place stands an empty, unhitched carriage of their realm, or of their
+ * NPC city if they belong to no realm (`CONTEXT.md`: Carriage). Returns whether it was finished;
+ * the caller brings city membership up to date (`updateCityMembership`).
  */
 export function finishSite(world: WorldState, site: Building, r: Resident): boolean {
   if (!site.site || workNeeded(site) > 0 || Object.keys(materialsNeeded(site)).length > 0) {
     return false
+  }
+  if (site.kind === 'carriage') {
+    world.buildings = world.buildings.filter((b) => b !== site)
+    world.carriages.push({
+      id: newId(world, 'carriage'),
+      realmId: r.owner,
+      cityId: r.owner === null ? r.cityId : null,
+      x: site.x,
+      y: site.y,
+      horseId: null,
+      load: {},
+    })
+    return true
   }
   delete site.site
   if (site.kind === 'townHall') foundCity(world, site, r.owner)

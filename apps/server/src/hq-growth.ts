@@ -1,4 +1,5 @@
 import {
+  SHARES_A_TILE,
   TRADE_ORG_ARMY,
   TRADE_ORG_HQ,
   buildProblem,
@@ -68,7 +69,7 @@ export function hqRingTiles(hall: Building, k: number, size: number): RingTile[]
 function buildingsByTile(world: WorldState): Map<string, Building> {
   const out = new Map<string, Building>()
   for (const b of world.buildings) {
-    if (b.kind === 'road') continue
+    if (SHARES_A_TILE.includes(b.kind)) continue
     for (const [x, y] of footprintTiles(b)) {
       const key = `${x},${y}`
       if (!out.has(key)) out.set(key, b)

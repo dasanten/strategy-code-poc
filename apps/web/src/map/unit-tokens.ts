@@ -1,11 +1,12 @@
-import type {
-  Army,
-  Building,
-  SeenCaravan,
-  SeenCarriage,
-  SeenCity,
-  SeenHorse,
-  SeenResident,
+import {
+  SHARES_A_TILE,
+  type Army,
+  type Building,
+  type SeenCaravan,
+  type SeenCarriage,
+  type SeenCity,
+  type SeenHorse,
+  type SeenResident,
 } from '@csp/shared'
 import { caravanParts } from '../caravans.js'
 import { ACTIVITY_ART, BASE_ART, PAINTED_UNIT_ART, UNIT_ART, paintedCell } from './art.js'
@@ -99,7 +100,7 @@ export function drawUnits(
     caravan: new Set([...parts.carriages, ...parts.crew]),
   }
   const key = (e: { x: number; y: number }) => `${e.x},${e.y}`
-  const built = new Set(world.buildings.filter((b) => b.kind !== 'road').map(key))
+  const built = new Set(world.buildings.filter((b) => !SHARES_A_TILE.includes(b.kind)).map(key))
   const carted = new Set(world.carriages.map(key))
   const peopled = new Set(world.residents.map(key))
   const at = (x: number, y: number, dx = 0, dy = 0) =>

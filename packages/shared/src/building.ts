@@ -7,6 +7,7 @@ import {
   TEARDOWN_WORK_SHARE,
   WORKPLACE_MAX_WORKERS,
   canWork,
+  carriageCanEnter,
   type Recipe,
 } from './balance.js'
 import { citiesAt } from './city.js'
@@ -42,7 +43,8 @@ import {
 /**
  * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters,
  * mints and smithies, town halls, storages, walls and gates (`CONTEXT.md`: Town hall, Storage,
- * Wall / Gate), houses and farms (`CONTEXT.md`: House, Farm), and roads (`CONTEXT.md`: Road).
+ * Wall / Gate), houses and farms (`CONTEXT.md`: House, Farm), roads (`CONTEXT.md`: Road), and
+ * carriages, whose site becomes a carriage (`CONTEXT.md`: Carriage).
  */
 export const BUILDABLE: readonly BuildingKind[] = [
   'lumberCamp',
@@ -59,7 +61,14 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'wall',
   'gate',
   'road',
+  'carriage',
 ]
+
+/**
+ * Kinds that share a tile with a building rather than taking it (`CONTEXT.md`: Road, Carriage):
+ * roads and carriage sites, one of each per tile at most.
+ */
+export const SHARES_A_TILE: readonly BuildingKind[] = ['road', 'carriage']
 
 /** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
 export const PROCESSING = Object.keys(RECIPES) as readonly BuildingKind[]
@@ -132,7 +141,8 @@ export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'warehouse', 'st
 
 /**
  * The building or construction site whose footprint covers a tile, if there is one (one per
- * tile). A road is not one of them: it may share the tile with a building (`roadAt`).
+ * tile). A road or carriage site is not one of them: it may share the tile with a building
+ * (`roadAt`, `carriageSiteAt`).
  */
 export function buildingAt(
   world: Pick<WorldState, 'buildings'>,
@@ -140,7 +150,7 @@ export function buildingAt(
   y: number,
   size = MAP_SIZE,
 ): Building | undefined {
-  return world.buildings.find((b) => b.kind !== 'road' && covers(b, x, y, size))
+  return world.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && covers(b, x, y, size))
 }
 
 /**
@@ -171,14 +181,49 @@ export function roadAt(
   return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'road')
 }
 
-/** What of `kind` stands on a tile, finished or not: its road for a road, else its building. */
+/** The carriage site on a tile, if there is one (`CONTEXT.md`: Carriage). */
+export function carriageSiteAt(
+  world: Pick<WorldState, 'buildings'>,
+  x: number,
+  y: number,
+): Building | undefined {
+  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'carriage')
+}
+
+/**
+ * What of `kind` stands on a tile, finished or not: its road for a road, its carriage site for a
+ * carriage, else its building.
+ */
 export function constructionAt(
   world: WorldState,
   x: number,
   y: number,
   kind: BuildingKind,
 ): Building | undefined {
-  return kind === 'road' ? roadAt(world, x, y) : buildingAt(world, x, y)
+  if (kind === 'road') return roadAt(world, x, y)
+  if (kind === 'carriage') return carriageSiteAt(world, x, y)
+  return buildingAt(world, x, y)
+}
+
+/**
+ * The finished stable a carriage site on (x, y) is built at (`CONTEXT.md`: Carriage): one whose
+ * footprint covers the tile or lies right next to it, the one covering it first.
+ */
+export function stableFor(
+  world: Pick<WorldState, 'buildings'>,
+  x: number,
+  y: number,
+  size = MAP_SIZE,
+): Building | undefined {
+  const here = buildingAt(world, x, y, size)
+  if (here?.kind === 'stable' && !here.site) return here
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const b = buildingAt(world, wrap(x + dx, size), wrap(y + dy, size), size)
+      if (b?.kind === 'stable' && !b.site) return b
+    }
+  }
+  return undefined
 }
 
 /**
@@ -238,7 +283,9 @@ function lookupOf(terrain: TerrainMap | TerrainLookup): (x: number, y: number) =
  * their kind, stables and farms wholly on Plains, smelters, mints, smithies, town halls, houses,
  * storages, walls and gates off Mountain, a house or storage only in a city's area (`CONTEXT.md`:
  * House, Storage); only a node's workplace covers a node. A road goes on any passable land but Mountain, node or not, and
- * next to a building on its tile, but one road per tile (`CONTEXT.md`: Road). Without `terrain`
+ * next to a building on its tile, but one road per tile (`CONTEXT.md`: Road). A carriage site
+ * goes on a tile of a finished stable or right next to one, where a carriage can stand, off any
+ * resource node and any other building, one per tile (`CONTEXT.md`: Carriage). Without `terrain`
  * the terrain rules are not checked.
  */
 export function buildProblem(
@@ -257,6 +304,17 @@ export function buildProblem(
     return undefined
   }
   const size = terrain?.size ?? MAP_SIZE
+  if (kind === 'carriage') {
+    const t = at?.(x, y)
+    if (t !== undefined && !carriageCanEnter(t)) return 'a carriage can’t stand on this land'
+    if (world.nodes.some((n) => n.x === x && n.y === y))
+      return 'a carriage goes off any resource node'
+    if (!stableFor(world, x, y, size)) return 'a carriage is built at a finished stable'
+    const here = buildingAt(world, x, y, size)
+    if (here && here.kind !== 'stable') return 'there is already a building there'
+    if (carriageSiteAt(world, x, y)) return 'there is already a carriage site on this tile'
+    return undefined
+  }
   const placed = { kind, x, y }
   const tiles = footprintTiles(placed, size)
   const nodes = world.nodes.filter((n) => covers(placed, n.x, n.y, size))
