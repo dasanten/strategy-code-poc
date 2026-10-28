@@ -29,7 +29,9 @@ export function SelectionCard({
   title,
   badge,
   lines,
+  head,
   onClose,
+  collapsed = false,
   children,
 }: {
   rel: Relationship | undefined
@@ -38,7 +40,11 @@ export function SelectionCard({
   title: string
   badge?: string
   lines: ReactNode[]
+  /** More of the header under the title, such as a resident's health and hunger. */
+  head?: ReactNode
   onClose: () => void
+  /** Shrunk to its header while the map waits for a target (ADR 0012: pick mode). */
+  collapsed?: boolean
   children: ReactNode
 }) {
   const colour = rel
@@ -80,8 +86,35 @@ export function SelectionCard({
           ✕
         </button>
       </div>
-      {children}
+      {head}
+      {!collapsed && children}
     </aside>
+  )
+}
+
+/**
+ * The banner over the map while an order waits for its target (ADR 0012; `CONTEXT.md`: Picking a
+ * target): what to pick, and Cancel, which Escape does too.
+ */
+export function PickBanner({
+  prompt,
+  hint,
+  onCancel,
+}: {
+  prompt: string
+  hint?: string
+  onCancel: () => void
+}) {
+  return (
+    <div className="pick-banner" role="status">
+      <div className="pick-banner-text">
+        <strong>{prompt}</strong>
+        {hint && <span className="small">{hint}</span>}
+      </div>
+      <button type="button" onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
   )
 }
 

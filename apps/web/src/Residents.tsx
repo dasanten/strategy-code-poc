@@ -2,7 +2,6 @@ import {
   BUILD_MATERIALS,
   BUILDING_PURPOSE,
   LINE_BUILDING,
-  ROAD_LINE_MAX_TILES,
   isLineOrder,
   BUILD_WORK,
   BUILDABLE,
@@ -92,7 +91,6 @@ import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
 import { ActionRows, SelectionCard, useActionKeys } from './SelectionCard.js'
 import {
-  ACTION_KEYS,
   horseDetail,
   groupOrders,
   residentActions,
@@ -525,6 +523,7 @@ export function GroupCard({
   orderError,
   onPick,
   onClose,
+  collapsed = false,
 }: {
   residents: Resident[]
   scripts: ScriptSummary[]
@@ -543,6 +542,8 @@ export function GroupCard({
   orderError: string | undefined
   onPick: (id: string) => void
   onClose: () => void
+  /** Shrunk to its head while the map waits for a target (ADR 0012: pick mode). */
+  collapsed?: boolean
 }) {
   const card = groupCard(residents)
   const [panel, setPanel] = useState<'fetch' | 'script'>()
@@ -556,7 +557,13 @@ export function GroupCard({
     setPanel(panel === p ? undefined : p)
   }
   return (
-    <SelectionCard rel="own" title={card.title} lines={[card.names]} onClose={onClose}>
+    <SelectionCard
+      rel="own"
+      title={card.title}
+      lines={[card.names]}
+      onClose={onClose}
+      collapsed={collapsed}
+    >
       <ul className="sel-facts sel-group" aria-label="Selected residents">
         {card.rows.map((r) => (
           <li key={r.id}>
@@ -774,6 +781,7 @@ export function ResidentCard({
   scriptParams,
   onStore,
   onEditQueue,
+  collapsed = false,
 }: {
   resident: Resident
   leaderId: string
@@ -889,6 +897,8 @@ export function ResidentCard({
   onStore?: () => void
   /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
   onEditQueue?: (steps: QueueStepRequest[], loop?: boolean) => void
+  /** Shrunk to its header while the map waits for a target (ADR 0012: pick mode). */
+  collapsed?: boolean
 }) {
   const setPanel = (panel: ActionId | undefined) => onSections({ ...sections, panel })
   const age = Math.floor(ageInYears(r, tick))
@@ -955,21 +965,23 @@ export function ResidentCard({
         <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
         `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
       ]}
+      head={
+        <div className="vitals">
+          <Meter
+            label="Health"
+            value={`${Math.round(r.health)} / ${MAX_HEALTH}`}
+            share={r.health / MAX_HEALTH}
+          />
+          <Meter
+            label="Hunger"
+            value={r.hunger / MAX_HUNGER < 0.25 ? 'hungry' : `${pct(r.hunger / MAX_HUNGER)} fed`}
+            share={r.hunger / MAX_HUNGER}
+          />
+        </div>
+      }
       onClose={onClose}
+      collapsed={collapsed}
     >
-      <div className="vitals">
-        <Meter
-          label="Health"
-          value={`${Math.round(r.health)} / ${MAX_HEALTH}`}
-          share={r.health / MAX_HEALTH}
-        />
-        <Meter
-          label="Hunger"
-          value={r.hunger / MAX_HUNGER < 0.25 ? 'hungry' : `${pct(r.hunger / MAX_HUNGER)} fed`}
-          share={r.hunger / MAX_HUNGER}
-        />
-      </div>
-
       <div className="tabs sel-tabs" role="tablist" aria-label="Card">
         {CARD_TABS.map((t) => (
           <button
@@ -1307,35 +1319,15 @@ export function ResidentCard({
           </section>
         </>
       )}
-      {(orderError || picking || tab === 'orders') && (
+      {(orderError || tab === 'orders') && (
         <p className="muted small" role="status">
           {orderError
             ? `Order turned down: ${orderError}`
-            : picking
-              ? `${PICKING_HINTS[picking]} Tap a tile on the map, or press ${PICKING_KEYS[picking]} again to cancel.`
-              : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
+            : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
         </p>
       )}
     </SelectionCard>
   )
-}
-
-/** The key that started picking a tile, to name in the hint for cancelling. */
-const PICKING_KEYS: Record<Exclude<Picking, false>, string> = {
-  walk: ACTION_KEYS.walk,
-  drive: ACTION_KEYS.drive,
-  haul: 'Pick the other stop',
-  road: ACTION_KEYS.roadTo,
-  wall: ACTION_KEYS.wallTo,
-}
-
-/** What picking a tile does, said while the map waits for it. */
-const PICKING_HINTS: Record<Exclude<Picking, false>, string> = {
-  walk: 'Walks there.',
-  drive: 'Drives the carriage there.',
-  haul: 'The other stop of the haul route.',
-  road: `Builds road from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the stone carried; without more, the resident waits on the next site until someone delivers it.`,
-  wall: `Builds wall from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the wood carried, past tiles with a wall or gate; without more, the resident waits on the next site until someone delivers it.`,
 }
 
 /**

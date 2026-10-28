@@ -66,7 +66,8 @@ import {
   type HaulSetup,
   type Picking,
 } from './Residents.js'
-import { TileCard } from './SelectionCard.js'
+import { PickBanner, TileCard } from './SelectionCard.js'
+import { pickHint, pickPrompt, pickTarget, useTouchScreen } from './pick-mode.js'
 import { buildingNodeKind } from './building-info-view.js'
 import {
   buildHereProblem,
@@ -158,20 +159,42 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
-  // With no drawer open, Escape drops the selection.
+  // What the map waits for while an order that needs a target is given (ADR 0012: pick mode).
+  const touch = useTouchScreen()
+  const pick = pickTarget({
+    picking,
+    groupPicking,
+    isGroup: group.length > 1,
+    armyPick,
+    paramPick,
+  })
+  /** Leaves pick mode without giving the order; the card comes back as it was. */
+  const cancelPick = useCallback(() => {
+    setPicking(false)
+    setGroupPicking(false)
+    setArmyPick(undefined)
+    setParamPick(undefined)
+  }, [])
+  // Escape leaves pick mode first; with no drawer open, it then drops the selection.
   const anySelected = selectedIds.length > 0
+  const picked = pick !== undefined
   useEffect(() => {
-    if (openDrawer || !anySelected) return
+    if (!picked && (openDrawer || !anySelected)) return
     const onKey = (e: KeyboardEvent) => {
       const typing =
         e.target instanceof Element && e.target.closest('input, textarea, select, .cm-editor')
       if (e.key !== 'Escape' || typing) return
+      if (picked) {
+        // Ahead of the drawer's own Escape, which would close it too.
+        e.stopImmediatePropagation()
+        return cancelPick()
+      }
       setSelectedIds([])
       setPicking(false)
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [openDrawer, anySelected])
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [openDrawer, anySelected, picked, cancelPick])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
@@ -656,6 +679,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />,
         )}
       <DrawerEdge open={openDrawer} />
+      {pick && (
+        <PickBanner prompt={pickPrompt(pick, touch)} hint={pickHint(pick)} onCancel={cancelPick} />
+      )}
       {world && selectedTile && (
         <div className="game-selection">
           <TileCard
@@ -870,6 +896,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPicking(false)
               setParamPick(undefined)
             }}
+            collapsed={pick !== undefined && pick.kind !== 'army'}
           />
         </div>
       )}
@@ -909,6 +936,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             orderError={groupError}
             onPick={(id) => select([id])}
             onClose={() => select([])}
+            collapsed={pick?.kind === 'group'}
           />
         </div>
       )}
