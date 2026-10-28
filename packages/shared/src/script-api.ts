@@ -267,8 +267,8 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('drop', ['spot', 'goods'], 'Put carried goods down at a spot on my tile.'),
   action(
     'store',
-    ['goods', 'to?'],
-    'Walk to `to` (a storage, a stable or a carriage of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like ["wood"] for all I carry of them (Food beyond my own food). My order is "store" until done; then `me.orderEnded` says how it ended.',
+    ['goods', 'to?', 'ownFood?'],
+    'Walk to `to` (a storage, a stable or a carriage of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like ["wood"] for all I carry of them (Food beyond my own food). `ownFood`, units of Food, is the own food to keep and top up to instead of the usual. My order is "store" until done; then `me.orderEnded` says how it ended.',
   ),
   action(
     'fetch',

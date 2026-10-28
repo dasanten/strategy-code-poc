@@ -79,13 +79,8 @@ import {
   timeStep,
   type QueueRow,
 } from './queue-view.js'
-import {
-  groupNumberParams,
-  groupSentLine,
-  type GroupOrder,
-  type Skipped,
-} from './group-orders.js'
-import { NumberField } from './ScriptParams.js'
+import { groupNumberParams, groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
+import { NumberField, foodParamsHint } from './ScriptParams.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
@@ -545,6 +540,7 @@ export function GroupCard({
   const [panel, setPanel] = useState<'fetch' | 'script' | 'params'>()
   const [good, setGood] = useState<Good>('food')
   const numberParams = groupNumberParams(residents, scripts)
+  const foodHint = foodParamsHint(numberParams.map((p) => p.name))
   const toggle = (p: Exclude<GroupPicking, false>) => {
     setPanel(undefined)
     onPicking(picking === p ? false : p)
@@ -703,9 +699,7 @@ export function GroupCard({
                 <NumberField
                   name={name}
                   value={undefined}
-                  onSet={(v) =>
-                    onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
-                  }
+                  onSet={(v) => onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })}
                 />
                 <span className="buttons">
                   <button
@@ -721,6 +715,7 @@ export function GroupCard({
           <p className="muted small">
             Sets it for each one running a script with it. Type a number and press Enter.
           </p>
+          {foodHint && <p className="muted small">{foodHint}</p>}
         </section>
       )}
     </SelectionCard>

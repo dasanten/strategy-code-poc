@@ -606,6 +606,14 @@ export function Wiki() {
           storage when they run low.
         </p>
         <p>
+          Far from home, a resident working can go and get food on their own: set{' '}
+          <code>foodAt</code> and <code>foodTake</code> on their card, in units of Food. Below{' '}
+          <code>foodAt</code> on them, they walk to their storage (or the nearest one of your realm
+          with Food), take Food up to <code>foodTake</code> and go back. Whenever they are at a
+          storage anyway, their own food is topped up to <code>foodTake</code> instead of{' '}
+          {num(OWN_FOOD)}. Unset, they don't go on their own.
+        </p>
+        <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
           health in {days(STARVE_DAYS)}, so a resident without food dies{' '}
           {days(HUNGER_DAYS + STARVE_DAYS)} after their last meal. Fed again, they heal from nothing
@@ -628,6 +636,13 @@ export function Wiki() {
           Workers make goods in proportion to their Strength, plus {pct(WORK_SKILL_EFFECT)} for each
           point of the workplace's skill. Output lands in the workplace's pile; one worker at a time
           carries a full load to the nearest storage of their realm.
+        </p>
+        <p>
+          With <code>foodAt</code> set, a worker who carries less Food than that leaves work for
+          their <code>storage</code>, or the nearest storage of your realm with Food, takes Food up
+          to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes back. With no Food
+          anywhere they work on. With <code>foodTake</code> set, carrying a load tops their food up
+          to it too.
         </p>
         <table>
           <thead>
@@ -1297,7 +1312,9 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
             <code>source</code>: where materials come from, a carriage too. Unset, each uses the
             nearest storage; a source picked that holds none of what the site lacks is left alone,
-            and they just build.
+            and they just build. The Work default also has the <code>number</code> params{' '}
+            <code>foodAt</code> and <code>foodTake</code> for getting food, in units of Food (a
+            resident eats about {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>

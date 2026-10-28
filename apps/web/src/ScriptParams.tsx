@@ -1,5 +1,15 @@
 import type { ScriptParam, ScriptParamType, ScriptParamValue } from '@csp/shared'
 import { useRef } from 'react'
+import { foodEatenPerDay, num } from './wiki-view.js'
+
+/**
+ * The hint under number fields counting Food, like the defaults' `foodAt` and `foodTake`
+ * (`CONTEXT.md`: Getting food): how much a resident eats a game day. None without such a param.
+ */
+export function foodParamsHint(names: readonly string[]): string | undefined {
+  if (!names.some((n) => /food/i.test(n))) return undefined
+  return `Food is counted in units: a resident eats about ${num(foodEatenPerDay())} a game day.`
+}
 
 /** What the map picks for a param of each type a pick is for. */
 const PICK_HINTS: Record<Exclude<ScriptParamType, 'number'>, string> = {
@@ -39,6 +49,7 @@ export function ScriptParamFields({
 }) {
   if (params.length === 0) return null
   const pickingType = params.find((p) => p.name === picking)?.type
+  const foodHint = foodParamsHint(params.filter((p) => p.type === 'number').map((p) => p.name))
   return (
     <div className="script-params" aria-label="Script parameters">
       {params.map((p) => {
@@ -84,6 +95,7 @@ export function ScriptParamFields({
           </div>
         )
       })}
+      {foodHint && <p className="muted small">{foodHint}</p>}
       {picking !== undefined && pickingType !== undefined && pickingType !== 'number' && (
         <p className="muted small" role="status">
           Tap {PICK_HINTS[pickingType]} on the map for {picking}.

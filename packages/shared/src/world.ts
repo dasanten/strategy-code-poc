@@ -285,6 +285,11 @@ export interface StoreOrder {
   goods: GoodsWanted
   to: GoodsPlace
   phase: 'walking' | 'putting' | 'refilling'
+  /**
+   * The Food the resident keeps on them and tops up to at a storage with Food, in units; absent
+   * for `OWN_FOOD` (`CONTEXT.md`: Getting food).
+   */
+  ownFood?: number
   /** While walking, the tiles still to walk; null while the path is being found. */
   path: [number, number][] | null
   progress: number

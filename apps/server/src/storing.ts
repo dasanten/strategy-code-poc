@@ -35,6 +35,8 @@ interface StoringRequest extends OrderRequest {
   goods: unknown
   to?: unknown
   from?: unknown
+  /** Store: the Food to keep on them and top up to, in units; `OWN_FOOD` when absent. */
+  ownFood?: unknown
 }
 
 /**
@@ -109,12 +111,15 @@ function atPlace(world: WorldState, r: Resident, place: GoodsPlace): boolean {
   return b !== undefined && covers(b, r.x, r.y)
 }
 
-/** The units of each good a store order puts: those asked for, or all carried but own food. */
-function toStore(r: Resident, goods: GoodsWanted): Stock {
+/**
+ * The units of each good a store order puts: those asked for, or all carried but own food
+ * (`ownFood` units).
+ */
+function toStore(r: Resident, goods: GoodsWanted, ownFood = OWN_FOOD): Stock {
   const out: Stock = {}
   for (const [good, units] of Object.entries(goods) as [Good, number | null][]) {
     const carried = r.carried[good] ?? 0
-    const n = units === null ? putAwayUnits(good, carried) : Math.min(units, carried)
+    const n = units === null ? putAwayUnits(good, carried, ownFood) : Math.min(units, carried)
     if (n > 0) out[good] = n
   }
   return out
@@ -217,25 +222,43 @@ function start<O extends StoreOrder | FetchOrder>(
   return { ...order, phase, path: null, progress: 0 } as O
 }
 
+/** A store order's `ownFood`: absent, or units of zero or more; null when it is neither. */
+function readOwnFood(ownFood: unknown): number | undefined | null {
+  if (ownFood === undefined || ownFood === null) return undefined
+  return typeof ownFood === 'number' && Number.isFinite(ownFood) && ownFood >= 0 ? ownFood : null
+}
+
 /**
  * The store order (`CONTEXT.md`: Store): one of the Player's residents walks to `to` (by default
  * the nearest storage of their realm), puts down the goods there and, at a storage with Food, tops
- * up their own food to `OWN_FOOD`.
+ * up their own food to `ownFood` units, `OWN_FOOD` unless asked (Getting food).
  */
 export const store: OrderKind = {
   validate(world, sender, order, terrain) {
     const c = check(world, sender, order)
     if (typeof c === 'string') return c
-    if (Object.keys(toStore(c.r, c.goods)).length === 0) return 'not carrying any of those goods'
+    const ownFood = readOwnFood(c.o.ownFood)
+    if (ownFood === null) return 'ownFood must be units of Food, zero or more'
+    if (Object.keys(toStore(c.r, c.goods, ownFood)).length === 0) {
+      return 'not carrying any of those goods'
+    }
     const to = storePlace(world, sender, c.r, c.o.to, terrain?.size ?? MAP_SIZE)
     return typeof to === 'string' ? to : undefined
   },
   apply(world, sender, order, terrain) {
     const c = check(world, sender, order)
     if (typeof c === 'string') return
+    const ownFood = readOwnFood(c.o.ownFood)
+    if (ownFood === null) return
     const to = storePlace(world, sender, c.r, c.o.to, terrain?.size ?? MAP_SIZE)
     if (typeof to === 'string') return
-    c.r.order = start<StoreOrder>(world, c.r, to, { kind: 'store', goods: c.goods, to }, 'putting')
+    c.r.order = start<StoreOrder>(
+      world,
+      c.r,
+      to,
+      { kind: 'store', goods: c.goods, to, ...(ownFood === undefined ? {} : { ownFood }) },
+      'putting',
+    )
   },
 }
 
@@ -314,8 +337,8 @@ export function requestStoring(world: WorldState): CarryAction[] {
         goods[good] = units ?? Number.MAX_SAFE_INTEGER
       }
       action('take', goods)
-    } else if (o.phase === 'putting') action('put', toStore(r, o.goods))
-    else action('take', { food: Math.max(0, OWN_FOOD - (r.carried.food ?? 0)) })
+    } else if (o.phase === 'putting') action('put', toStore(r, o.goods, o.ownFood))
+    else action('take', { food: Math.max(0, (o.ownFood ?? OWN_FOOD) - (r.carried.food ?? 0)) })
   }
   return actions
 }
@@ -331,7 +354,7 @@ export function carriedForOrder(world: WorldState, r: Resident): void {
     const isStorage = world.buildings.some(
       (b) => o.to.kind === 'storage' && b.id === o.to.storageId && b.kind === 'storage',
     )
-    if (isStorage && food > 0 && (r.carried.food ?? 0) < OWN_FOOD) {
+    if (isStorage && food > 0 && (r.carried.food ?? 0) < (o.ownFood ?? OWN_FOOD)) {
       o.phase = 'refilling'
       return
     }
