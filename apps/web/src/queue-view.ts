@@ -26,7 +26,11 @@ import { realTimeOf } from './wiki-view.js'
  */
 
 /** What appending needs of a resident: where they stand, what they do and their queue. */
-export type Queued = Pick<Resident, 'id' | 'x' | 'y' | 'order' | 'script' | 'queue'>
+export type Queued = Pick<Resident, 'id' | 'x' | 'y'> &
+  Partial<Pick<Resident, 'order' | 'script' | 'queue'>>
+
+/** A tile, where an order acts. */
+type Tile = { x: number; y: number }
 
 /** Ticks in a game minute. */
 const TICKS_PER_GAME_MINUTE = TICKS_PER_GAME_HOUR / 60
@@ -39,12 +43,17 @@ export const STORE_ALL: OrderRequest = { kind: 'store', goods: [...GOODS] }
  * when they have none, an `editQueue` order keeping every step they have. Undefined when the order
  * can't be a queue step (stop, attack, …), so it is given as it is.
  *
- * A walk they are on (not one of a script's) becomes the queue's first step. An order acting on the resident's tile (work,
- * build, pick up, …) is put after a walk to that tile, unless the step before already walks
- * there, so it still finds them there when its turn comes, and on every round of a loop. A step
+ * A walk they are on (not one of a script's) becomes the queue's first step. An order acting on
+ * a tile (work, build, pick up, …) is put after a walk to it, unless the step before already
+ * walks there, so it still finds them there when its turn comes, and on every round of a loop.
+ * That tile is `at`, by default the one they stand on, as their card gives such orders. A step
  * that never ends on its own gets `QUEUE_DEFAULT_STEP_MINUTES` once another follows it.
  */
-export function appendRequest(r: Queued, order: OrderRequest): OrderRequest | undefined {
+export function appendRequest(
+  r: Queued,
+  order: OrderRequest,
+  at: Tile = { x: r.x, y: r.y },
+): OrderRequest | undefined {
   if (!QUEUE_STEP_KINDS.includes(order.kind)) return undefined
   const before: QueueStepRequest[] = r.queue
     ? stepsOf(r.queue)
@@ -52,7 +61,7 @@ export function appendRequest(r: Queued, order: OrderRequest): OrderRequest | un
       ? [{ order: { kind: 'walkTo', ...r.order.target } }]
       : []
   const added: QueueStepRequest[] = []
-  const here = actsHere(order) ? { x: r.x, y: r.y } : undefined
+  const here = actsHere(order) ? { x: at.x, y: at.y } : undefined
   const last = before.at(-1)?.order
   if (here && !(last && walksTo(last, here))) added.push({ order: { kind: 'walkTo', ...here } })
   added.push({ order: withoutResident(order) })
@@ -63,16 +72,18 @@ export function appendRequest(r: Queued, order: OrderRequest): OrderRequest | un
 }
 
 /**
- * The orders appending to each of several residents' queues, `orderFor` giving each one's order:
- * those whose order can't be a step get it as it is.
+ * The orders appending to each of several residents' queues, `orderFor` giving each one's order
+ * and `atFor` the tile it acts on, if not where they stand: those whose order can't be a step get
+ * it as it is.
  */
-export function appendRequests(
-  residents: readonly Queued[],
-  orderFor: (r: Queued) => OrderRequest,
+export function appendRequests<R extends Queued>(
+  residents: readonly R[],
+  orderFor: (r: R) => OrderRequest,
+  atFor: (r: R) => Tile | undefined = () => undefined,
 ): OrderRequest[] {
   return residents.map((r) => {
     const order = orderFor(r)
-    return appendRequest(r, order) ?? order
+    return appendRequest(r, order, atFor(r)) ?? order
   })
 }
 

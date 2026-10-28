@@ -293,7 +293,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       if (world.buildings.some((b) => isWallOrGate(b) && covers(b, x, y, size))) return false
       return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
     }
-    const { requests, skipped } = groupRequests(order, group, { tick: world.tick, size, free })
+    // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue).
+    const queued = shift.current
+    const { requests, skipped } = groupRequests(order, group, {
+      tick: world.tick,
+      size,
+      free,
+      queued,
+    })
     if (order.kind === 'build') setGroupBuildAt(undefined)
     setGroupError(undefined)
     const answers = await Promise.all(requests.map((q) => sendOrder(q.order)))

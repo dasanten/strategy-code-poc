@@ -572,7 +572,7 @@ export function GroupCard({
           ? `Order turned down: ${orderError}`
           : picking
             ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
-            : 'Right-click the map to walk them there.'}
+            : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
       </p>
       {report && (
         <div className="small" aria-label="Last group order">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TICKS_PER_GAME_YEAR, type Stock } from '@csp/shared'
+import { GOODS, QUEUE_DEFAULT_STEP_MINUTES, TICKS_PER_GAME_YEAR, type Stock } from '@csp/shared'
 import { groupRequests, groupSentLine, spreadTiles, type GroupOrder } from './group-orders.js'
 
 const TICK = 100 * TICKS_PER_GAME_YEAR
@@ -127,5 +127,71 @@ describe('group orders', () => {
     expect(groupSentLine(5, 5)).toBe('Sent to all 5.')
     expect(groupSentLine(3, 5)).toBe('Sent to 3 of 5.')
     expect(groupSentLine(0, 5)).toBe('Nobody could take that order.')
+  })
+})
+
+describe('group orders with Shift held', () => {
+  const queue = (
+    order: GroupOrder,
+    rs: ReturnType<typeof resident>[],
+    free: (x: number, y: number) => boolean = everywhere,
+  ) => groupRequests(order, rs, { tick: TICK, size: SIZE, free, queued: true })
+  const farm = { id: 'farm', kind: 'farm' as const, x: 10, y: 10 }
+
+  it("appends to each one's queue, or starts one", () => {
+    const working = resident('b', 6, 6, {
+      queue: {
+        realmId: 'r1',
+        steps: [{ id: 3, order: { kind: 'task', task: 'work', workplaceId: 'farm' } }],
+        current: 0,
+        startedAt: 0,
+        loop: true,
+        nextStepId: 4,
+      },
+    })
+    const { requests } = queue({ kind: 'walkTo', x: 20, y: 20 }, [resident('a', 0, 0), working])
+    const byId = Object.fromEntries(requests.map((q) => [q.residentId, q.order]))
+    expect(byId.a).toMatchObject({
+      kind: 'queue',
+      residentId: 'a',
+      steps: [{ order: { kind: 'walkTo' } }],
+    })
+    expect(byId.a!.steps).toHaveLength(1)
+    // Their work keeps its id and gets a duration, now that a step follows it.
+    expect(byId.b).toMatchObject({
+      kind: 'editQueue',
+      residentId: 'b',
+      steps: [{ id: 3, minutes: QUEUE_DEFAULT_STEP_MINUTES }, { order: { kind: 'walkTo' } }],
+    })
+    // Each still gets their own tile around the target.
+    const walks = requests.map((q) => (q.order.steps as { order: object }[]).at(-1)!.order)
+    expect(new Set(walks.map((w) => JSON.stringify(w))).size).toBe(2)
+  })
+
+  it('queues work after a walk to the workplace, even for those away from it', () => {
+    const rs = [resident('a', 10, 10), resident('b', 30, 30), child('c', 10, 10)]
+    const { requests, skipped } = queue({ kind: 'work', workplace: farm, name: 'farm' }, rs)
+    expect(requests.map((q) => [q.residentId, q.order.steps])).toEqual(
+      ['a', 'b'].map((id) => [
+        id,
+        [
+          { order: { kind: 'walkTo', x: 10, y: 10 } },
+          { order: { kind: 'task', task: 'work', workplaceId: 'farm' } },
+        ],
+      ]),
+    )
+    expect(skipped).toEqual([{ id: 'c', name: 'C', why: 'a child' }])
+  })
+
+  it('queues storing everything, even for those carrying nothing yet', () => {
+    const { requests, skipped } = queue({ kind: 'store' }, [resident('a', 0, 0)])
+    expect(skipped).toEqual([])
+    expect(requests[0]!.order.steps).toEqual([{ order: { kind: 'store', goods: [...GOODS] } }])
+  })
+
+  it('gives stop as it is: it is no step', () => {
+    expect(queue({ kind: 'stop' }, [resident('a', 0, 0)]).requests).toEqual([
+      { residentId: 'a', order: { kind: 'stop', residentId: 'a' } },
+    ])
   })
 })
