@@ -79,7 +79,13 @@ import {
   timeStep,
   type QueueRow,
 } from './queue-view.js'
-import { groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
+import {
+  groupNumberParams,
+  groupSentLine,
+  type GroupOrder,
+  type Skipped,
+} from './group-orders.js'
+import { NumberField } from './ScriptParams.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
@@ -536,13 +542,14 @@ export function GroupCard({
   onClose: () => void
 }) {
   const card = groupCard(residents)
-  const [panel, setPanel] = useState<'fetch' | 'script'>()
+  const [panel, setPanel] = useState<'fetch' | 'script' | 'params'>()
   const [good, setGood] = useState<Good>('food')
+  const numberParams = groupNumberParams(residents, scripts)
   const toggle = (p: Exclude<GroupPicking, false>) => {
     setPanel(undefined)
     onPicking(picking === p ? false : p)
   }
-  const open = (p: 'fetch' | 'script') => {
+  const open = (p: 'fetch' | 'script' | 'params') => {
     onPicking(false)
     setPanel(panel === p ? undefined : p)
   }
@@ -577,6 +584,11 @@ export function GroupCard({
         <button type="button" aria-pressed={panel === 'script'} onClick={() => open('script')}>
           Run script
         </button>
+        {numberParams.length > 0 && (
+          <button type="button" aria-pressed={panel === 'params'} onClick={() => open('params')}>
+            Script params
+          </button>
+        )}
         <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
           Stop
         </button>
@@ -678,6 +690,37 @@ export function GroupCard({
             scripts={scripts}
             onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
           />
+        </section>
+      )}
+      {panel === 'params' && numberParams.length > 0 && (
+        <section className="inspector-block" aria-label="Script params">
+          <div className="script-params">
+            {numberParams.map(({ name, scriptIds }) => (
+              <div key={name} className="goods-row">
+                <span className="small">
+                  <strong>{name}</strong> <span className="muted">(number)</span>
+                </span>
+                <NumberField
+                  name={name}
+                  value={undefined}
+                  onSet={(v) =>
+                    onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
+                  }
+                />
+                <span className="buttons">
+                  <button
+                    type="button"
+                    onClick={() => onOrder({ kind: 'setNumber', name, value: null, scriptIds })}
+                  >
+                    Clear
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="muted small">
+            Sets it for each one running a script with it. Type a number and press Enter.
+          </p>
         </section>
       )}
     </SelectionCard>

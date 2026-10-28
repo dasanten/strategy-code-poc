@@ -38,6 +38,7 @@ import {
   type RunningScript,
   type ScriptBinding,
   type ScriptParamType,
+  type ScriptParamValue,
   type SeenEntity,
   type TerrainMap,
   type WorldState,
@@ -84,10 +85,10 @@ export interface ScriptContext {
   /** The order kinds actions go through; the game's own by default. */
   kinds?: Record<string, OrderKind>
   /**
-   * The script's `param` lines with the id picked for each (`paramValues`); `params` holds
-   * nothing without it.
+   * The script's `param` lines with the id or number picked for each (`paramValues`); `params`
+   * holds nothing without it.
    */
-  params?: readonly { name: string; type: ScriptParamType; id?: string }[]
+  params?: readonly { name: string; type: ScriptParamType; value?: ScriptParamValue }[]
 }
 
 export interface ScriptBindings {
@@ -331,10 +332,16 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
   }
 
-  // Each param as what it names while that is still the side's and fits its type; else null.
+  // Each param as what it names while that is still the side's and fits its type, or the
+  // number typed for a number param; else null.
   const params = Object.create(null) as ScriptObject
   for (const p of context.params ?? []) {
-    const target = p.id === undefined ? undefined : paramTarget(world, side, p.type, p.id)
+    if (p.type === 'number') {
+      params[p.name] = typeof p.value === 'number' ? p.value : null
+      continue
+    }
+    const id = typeof p.value === 'string' ? p.value : undefined
+    const target = id === undefined ? undefined : paramTarget(world, side, p.type, id)
     params[p.name] = toValue(target?.is === 'building' ? target.building : target?.carriage)
   }
 

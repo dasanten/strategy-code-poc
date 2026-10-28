@@ -1277,7 +1277,12 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         <ul>
           <li>
             A resident's card shows one field for each param of the script they run: pick it on the
-            map, or clear it. Picking doesn't stop the script.
+            map, or clear it. A <code>number</code> param has a number field instead: type a whole
+            number of zero or more and press Enter. Neither stops the script.
+          </li>
+          <li>
+            A group's card sets a <code>number</code> param for each of them running a script with
+            it.
           </li>
           <li>
             The values are kept for each resident and each script. Giving the task again keeps them;
@@ -1285,7 +1290,8 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           </li>
           <li>
             A param reads <code>null</code> while none is picked, and once the one picked is gone or
-            no longer yours.
+            no longer yours. A <code>number</code> param reads the number typed, or{' '}
+            <code>null</code> while unset.
           </li>
           <li>
             The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
