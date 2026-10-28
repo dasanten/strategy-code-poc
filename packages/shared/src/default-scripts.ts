@@ -7,7 +7,13 @@
  * into `memory`, as `TaskMemory` lists. Defaults use the step budget like any script; a test
  * keeps each at most a quarter of `SCRIPT_STEP_BUDGET`.
  */
-import { BREED_FOOD, HORSE_FOOD_PER_DAY, STABLE_FEED_DAYS, WORK_FOOD_KEPT } from './balance.js'
+import {
+  BREED_FOOD,
+  HORSE_FOOD_PER_DAY,
+  OWN_FOOD,
+  STABLE_FEED_DAYS,
+  WORK_FOOD_KEPT,
+} from './balance.js'
 import { FOOTPRINT } from './footprint.js'
 
 /** The tasks that run a default script. */
@@ -61,9 +67,15 @@ export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
 // a full load, one of us, picked at random, stores it in params.storage, or
 // the nearest storage of my realm while none is picked, and comes back. At a
 // smithy, memory.makes says what to make. Meals come from the workplace's
-// pile on their own, without an order.
+// pile on their own, without an order. With params.foodAt set, below that
+// many units of Food on me I get Food up to params.foodTake (or my usual own
+// food) at params.storage, or the nearest storage of my realm with Food, and
+// come back; with foodTake set, storing a load tops my food up to it too.
 param storage: storage // where the output goes
+param foodAt: number // get Food below this many units on me
+param foodTake: number // units of Food to take along
 let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
+let ownFood = ${OWN_FOOD} // units of Food on me while foodTake is unset
 
 // Where the workplace is, kept for when it is out of sight.
 let place = building(memory.workplaceId)
@@ -75,18 +87,46 @@ if (me.order != null && me.order.kind != "workAt") { return } // on my way
 let carry = memory.carry
 if (carry != null && !carry.stored) {
   carry.stored = true
-  if (store(carry.goods, carry.storageId) == null) { return }
+  if (store(carry.goods, carry.storageId, params.foodTake) == null) { return }
 }
+let away = carry
+if (away == null) { away = memory.food } // back from getting food
 if (me.x != memory.at.x || me.y != memory.at.y) {
-  if (carry != null && carry.walked) { memory.stuck = true } // no way back
+  if (away != null && away.walked) { memory.stuck = true } // no way back
   else {
     walkTo(memory.at.x, memory.at.y)
-    if (carry != null) { carry.walked = true }
+    if (away != null) { away.walked = true }
   }
   return
 }
 if (carry != null) { memory.carry = null }
+if (memory.food != null) { memory.food = null }
 if (place == null) { return } // gone
+
+// Low on Food: get some, then back to work. With none anywhere, work on.
+let food = 0
+if (me.carried.food != null) { food = me.carried.food }
+if (params.foodAt != null && food < params.foodAt) {
+  let take = params.foodTake
+  if (take == null) { take = ownFood }
+  let units = take - food
+  units = units - units % 1
+  let from = params.storage
+  let has = null
+  if (from != null) {
+    has = from.stock
+    if (has == null) { has = from.load }
+  }
+  if (has == null || has.food == null || has.food < 1) {
+    from = null
+    let stores = storages(place, ["food"]) // nearest first, holding some
+    if (stores.length > 0) { from = stores[0] }
+  }
+  if (from != null && units >= 1 && fetch({food: units}, from.id) == null) {
+    memory.food = {walked: false}
+    return
+  }
+}
 if (me.order == null) {
   workAt(memory.makes)
   return

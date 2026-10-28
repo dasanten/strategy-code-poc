@@ -67,8 +67,9 @@ export function unitsThatFit(resident: Resident, good: Good, tick: number): numb
 
 /**
  * How many of a carried good a resident puts away (stores, drops, loads, delivers) unless asked
- * for an exact amount: all of it, but Food only beyond their own food (`CONTEXT.md`: Own food).
+ * for an exact amount: all of it, but Food only beyond their own food (`CONTEXT.md`: Own food),
+ * `ownFood` units: `OWN_FOOD` unless a store order asks to keep another amount.
  */
-export function putAwayUnits(good: Good, carried: number): number {
-  return good === 'food' ? Math.max(0, carried - OWN_FOOD) : carried
+export function putAwayUnits(good: Good, carried: number, ownFood = OWN_FOOD): number {
+  return good === 'food' ? Math.max(0, carried - ownFood) : carried
 }

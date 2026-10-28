@@ -445,8 +445,12 @@ function residentActions(
     stop: () => request('stop', {}),
     pickUp: ([spot, goods]) => request('pickUp', { spot: plain(spot), goods: plain(goods) }),
     drop: ([spot, goods]) => request('drop', { spot: plain(spot), goods: plain(goods) }),
-    store: ([goods, to]) =>
-      request('store', { goods: plain(goods), ...(to == null ? {} : { to: placeId(to) }) }),
+    store: ([goods, to, ownFood]) =>
+      request('store', {
+        goods: plain(goods),
+        ...(to == null ? {} : { to: placeId(to) }),
+        ...(ownFood == null ? {} : { ownFood: plain(ownFood) }),
+      }),
     fetch: ([goods, from]) =>
       request('fetch', { goods: plain(goods), ...(from == null ? {} : { from: placeId(from) }) }),
     build: ([building]) => request('build', { building: plain(building) }),
