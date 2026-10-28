@@ -203,6 +203,15 @@ export const START_STABLE_FOOD = 30
  */
 export const HORSE_FOOD_PER_DAY = 0.75
 
+/** Horses the one-time Horse grant gives each realm without any (`CONTEXT.md`: Horse grant). */
+export const HORSE_GRANT_HORSES = 2
+
+/**
+ * Food laid on the ground by each granted horse that has no stable to stand in (`CONTEXT.md`:
+ * Horse grant), in units: five game days of an average horse's meals, time to fetch it more.
+ */
+export const HORSE_GRANT_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
+
 /**
  * How far from its tile a horse reaches Food lying on the ground, in tiles either way
  * (`CONTEXT.md`: Horses have no inventory, "on its tile or right next to it"): its own tile and
