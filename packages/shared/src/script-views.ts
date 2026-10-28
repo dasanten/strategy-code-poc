@@ -36,6 +36,7 @@ export type ScriptViewName =
   | 'skills'
   | 'goods'
   | 'residentOrder'
+  | 'orderEnded'
   | 'armyOrder'
   | 'tile'
   | 'pair'
@@ -212,6 +213,12 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('lifespan', 'number', 'The age in game years at which they die of old age.'),
       field('carried', view('goods'), 'The goods they carry.'),
       field('order', view('residentOrder'), 'What they were ordered to do.', 'when idle'),
+      field(
+        'orderEnded',
+        view('orderEnded'),
+        'How their last store or fetch order ended.',
+        'until one ended, and after their next store or fetch order or an order from the UI',
+      ),
       field('pair', view('pair'), 'Their pair, to have a child.', 'unless they are paired'),
       field('carrying', view('carrying'), 'The child they carry.', 'unless they carry one'),
       field(
@@ -265,7 +272,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "build", "tearDown", "workAt", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
       ),
       field('target', view('tile'), 'Where a walk or drive goes.', 'for other orders'),
       field(
@@ -305,19 +312,19 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'from',
         'any',
-        'Where goods are picked up from (a spot), or a haul’s first stop (a tile).',
+        'Where goods are picked up from (a spot), fetched from (a spot: a storage or carriage), or a haul’s first stop (a tile).',
         'for other orders',
       ),
       field(
         'to',
         'any',
-        'Where goods are dropped (a spot), or a haul’s second stop (a tile).',
+        'Where goods are dropped (a spot), stored (a spot: a storage or carriage), or a haul’s second stop (a tile).',
         'for other orders',
       ),
       field(
         'goods',
         'any',
-        'The goods picked up or dropped, like {food: 3}, or the goods a haul takes to its second stop, as a list.',
+        'The goods picked up, dropped, stored or fetched, like {food: 3} (null units for a store or fetch of as many as there are), or the goods a haul takes to its second stop, as a list.',
         'for other orders',
       ),
       field('returnGoods', listOf('string'), 'The goods a haul brings back.', 'for other orders'),
@@ -336,7 +343,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'phase',
         'string',
-        'A haul’s "loading" or "driving", a road line’s "walking" or "building".',
+        'A haul’s "loading" or "driving", a road line’s "walking" or "building", a store’s "walking", "putting" or "refilling", a fetch’s "walking" or "taking".',
         'for other orders',
       ),
       field(
@@ -376,6 +383,19 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     fields: [
       field('x', 'number', 'From west to east.'),
       field('y', 'number', 'From north to south.'),
+    ],
+  },
+  orderEnded: {
+    description: 'How a resident’s last store or fetch order ended.',
+    fields: [
+      field('kind', 'string', 'The order: "store" or "fetch".'),
+      field('tick', 'number', 'The tick it ended.'),
+      field(
+        'reason',
+        'string',
+        'Why it ended before it was done: "no way", "the storage is gone" or "the carriage is gone".',
+        'when it was done',
+      ),
     ],
   },
   pair: {

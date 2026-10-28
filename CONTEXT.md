@@ -575,6 +575,12 @@ The shared language of the game. Domain terms only — no implementation details
   residents fill and empty like any storage. Two fed horses of one realm at a stable breed a foal
   every so often, while the stable has room for another horse. No residents need to work there.
   Like a workplace, a stable has no owner: any horse standing in it eats from it.
+- **Feeding the stable:** a task (default script "Feed the stable") given to a grown-up resident
+  standing in a stable, from their card. They keep Food in the stable for about 10 game days for
+  the horses standing in it: below that they fetch what is missing from a storage and store it in
+  the stable; otherwise they wait there. Its params: `stable`, the stable to feed (by default the
+  one they were given it in), and `source`, where the Food comes from (by default the nearest
+  storage of their realm with Food). With no Food to fetch they wait.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
   mountains. Built at a stable (Building a carriage).
@@ -626,6 +632,27 @@ The shared language of the game. Domain terms only — no implementation details
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again.
+- **Script parameter:** a value the Player picks for whoever runs a script, declared by a
+  `param name: type` line at the top of the script and read there as `params.name`; a `param`
+  line anywhere else is a syntax error. A `building` param holds one of the realm's own buildings
+  or construction sites; a `storage` param one of its storages, stables or carriages. The values
+  are kept for each resident and each script: giving the task again keeps them, a param removed
+  from the script is dropped, a new one starts unset. Unset, or once the one picked is gone (or no
+  longer the realm's), it reads `null`. The resident card shows one field for each param of the
+  script the resident runs, picked on the map and cleared with a button; picking one doesn't end
+  the script. The Work default declares `storage` (where the output goes) and the Build default
+  `source` (where materials come from, a carriage too), each falling back to the nearest storage
+  while unset; a source picked that holds none of what the site lacks is left alone, and they
+  just build.
+- **Store:** a built-in order a script can hand over to: the resident walks to a storage,
+  stable or carriage of their own (by default the nearest storage of their realm), puts down the
+  chosen goods there (Food only beyond their own food, unless asked for exact units) and, at a
+  storage with Food, tops up their own food. Then it is done. It ends early when there is no way
+  there or the place is gone, and the script can read how it ended.
+- **Fetch:** a built-in order a script can hand over to: the resident walks to a storage, stable
+  or carriage of their own (by default the nearest storage or carriage of their realm holding the
+  goods) and takes the chosen goods there, as much as is there and fits. Then it is done; it ends
+  early like Store. Who stores or fetches, and when, stays in the script.
 - **Default script:** the script behind a task the UI can give (working a workplace, building,
   hauling, …). The game ships one per task; giving a resident that task from the UI runs it.
   Each Player has their own version of every default script in their library, one per task,
@@ -634,6 +661,11 @@ The shared language of the game. Domain terms only — no implementation details
   Until the Player edits it, their version follows the game's default as the game improves it;
   once edited it stays theirs, and they are told when the game's default has changed since.
   Default scripts can't be renamed or deleted. NPC cities always run the game's defaults.
+- **Doing:** the line on a resident's card and in the resident list that says what they are
+  doing, shown to the owning Player only. It is derived from their task and current order
+  ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
+  run is named on a small line of its own. A script can say it itself with `doing(text)`: short
+  text, kept in its memory, that shows instead until the script says something else or stops.
 - **Memory:** the small store a running script or order keeps between ticks. Roles are just
   something a script keeps there. A script can read, never change, the memory of its own
   Player's residents and armies, so residents doing the same task can agree on who does what;

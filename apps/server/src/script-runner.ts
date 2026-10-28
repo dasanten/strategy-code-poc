@@ -9,8 +9,11 @@ import {
 import {
   buildAtProblem,
   buildingAt,
+  canWork,
   DEFAULT_SCRIPTS,
   commanderOf,
+  MAP_SIZE,
+  stableAt,
   commands,
   isTask,
   type Good,
@@ -45,6 +48,7 @@ import {
   type ScriptContext,
 } from './script-bindings.js'
 import type { RunnableScript } from './scripts.js'
+import { paramValues, scriptParamsSound } from './script-params.js'
 import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
 
@@ -157,6 +161,14 @@ interface TearDownTaskRequest extends OrderRequest {
   buildingId: string
 }
 
+/** Feed the stable: the stable the resident stands in (`CONTEXT.md`: Feeding the stable). */
+interface FeedStableTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'feedStable'
+  residentId: string
+  stableId: string
+}
+
 interface BuildTaskRequest extends OrderRequest {
   kind: 'task'
   task: 'build'
@@ -169,7 +181,8 @@ interface BuildTaskRequest extends OrderRequest {
   at?: { x: number; y: number }
 }
 
-type TaskRequest = WorkTaskRequest | BuildTaskRequest | HaulTaskRequest | TearDownTaskRequest
+type TaskRequest =
+  WorkTaskRequest | BuildTaskRequest | HaulTaskRequest | TearDownTaskRequest | FeedStableTaskRequest
 
 /** The built-in order a task's request is checked as, for the resident. */
 function asOrder(o: Partial<TaskRequest>): OrderRequest {
@@ -212,6 +225,10 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
       const memory: TaskMemory['tearDown'] = { buildingId: order.buildingId }
       return { ...memory }
     }
+    case 'feedStable': {
+      const memory: TaskMemory['feedStable'] = { stableId: order.stableId }
+      return { ...memory }
+    }
   }
 }
 
@@ -221,7 +238,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * target (`TaskMemory`). It ends whatever the resident was doing. Each task is checked as the
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
  * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
- * the tear-down order.
+ * the tear-down order. Feed the stable starts no order of its own: the resident stands in the
+ * stable and is grown up.
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
@@ -235,6 +253,12 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
         const workplaceId = (o as Partial<WorkTaskRequest>).workplaceId
         if (typeof workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== workplaceId)
           return 'not standing on that workplace'
+      }
+      if (o.task === 'feedStable') {
+        // No order of its own: they store and fetch, which children can't.
+        const size = terrain?.size ?? MAP_SIZE
+        if (stableAt(world, r.x, r.y, size)?.id !== o.stableId) return 'not standing in that stable'
+        return canWork(r, world.tick) ? undefined : 'children can’t store or fetch goods'
       }
       if (o.task === 'build' && o.at !== undefined) {
         // Somewhere else: checked as the build order there, once they have walked to it.
@@ -368,7 +392,7 @@ export class ScriptRunner {
     }
     this.programs = used
     if (check) {
-      out.push(...runningScriptsSound(world))
+      out.push(...runningScriptsSound(world), ...scriptParamsSound(world))
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
@@ -418,12 +442,17 @@ export class ScriptRunner {
     used.set(running.scriptId, parsed)
 
     const memory = structuredClone(running.memory) as ScriptObject
+    // A resident's picked param values; an army's params are never picked.
+    const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
+    const declared = parsed.program.params
+    const params = resident ? paramValues(world, resident, running.scriptId, declared) : declared
     const { globals, requests } = bindScript({
       world,
       terrain: this.terrain,
       sender,
       ...r.bind,
       memory,
+      params,
       seen,
       sees,
       explored: (x, y) => this.host.explored(realm.userId, x, y),
@@ -629,6 +658,8 @@ function runCityScripts(
       sees,
       explored: () => true,
       kinds,
+      // Nobody picks values for an NPC city: its defaults fall back on their own.
+      params: program.params,
     })
     run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)

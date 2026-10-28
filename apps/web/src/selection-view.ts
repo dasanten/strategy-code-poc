@@ -82,6 +82,7 @@ export type ActionId =
   | 'roadTo'
   | 'wallTo'
   | 'work'
+  | 'feedStable'
   | 'tearDown'
   | 'goods'
   | 'pair'
@@ -105,6 +106,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   roadTo: 'R',
   wallTo: 'Q',
   work: 'E',
+  feedStable: 'F',
   tearDown: 'T',
   goods: 'G',
   pair: 'P',
@@ -204,6 +206,10 @@ export function residentActions(h: ResidentHere): CardAction[] {
         opens: true,
       }),
     )
+  }
+  // A finished stable: keep Food in it for its horses (`CONTEXT.md`: Feeding the stable).
+  if (h.building?.kind === 'stable' && !h.building.site) {
+    add(row('feedStable', 'Feed the stable', child))
   }
   const site = h.building?.site
     ? h.building

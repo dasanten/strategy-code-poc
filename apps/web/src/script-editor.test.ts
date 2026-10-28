@@ -330,6 +330,22 @@ describe('field completions', () => {
     expect(fieldLabels('me.stats.strength.|', true)).toEqual(['base', 'trained'])
   })
 
+  it('offer the script’s own params after `params.`, and a building param’s fields', () => {
+    const top = 'param storage: storage\nparam home: building\n'
+    expect(fieldLabels(`${top}params.|`)).toEqual(['storage', 'home'])
+    expect(fieldLabels(`${top}if (params.h|`)).toEqual(['home'])
+    expect(fieldLabels(`${top}params.home.ki|`)).toEqual(['kind'])
+    expect(fieldLabels(`${top}params.storage.|`)).toBeNull()
+    expect(fieldLabels('params.|')).toEqual([])
+    expect(scriptWarnings(`${top}let a = params.storage\nlet b = params.other`, true)).toEqual([
+      {
+        message: 'No param "other": declare it with a "param" line at the top',
+        line: 4,
+        column: 16,
+      },
+    ])
+  })
+
   it('offer nothing for a value it isn’t sure of', () => {
     expect(fieldLabels('memory.|')).toBeNull()
     expect(fieldLabels('fn f(p) { return p.| }')).toBeNull()

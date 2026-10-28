@@ -58,8 +58,9 @@ import {
   type Stock,
   type SeenResident,
 } from '@csp/shared'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { carryLine, type CardSections, type ResidentGroup } from './residents-view.js'
+import { doingLine } from './doing-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -165,13 +166,10 @@ export function familyLine(r: Resident, residents: Resident[], tick: number): st
   return `Paired with ${name}`
 }
 
-/** What a resident is doing, from their order and the script they run, named if it is known. */
-function doing(r: Resident, scripts: ScriptSummary[] = []): string {
-  const now = r.carrying && !r.order ? 'Carrying a child' : orderDoing(r)
-  if (!r.script) return now
-  const { scriptId } = r.script
-  const name = scripts.find((s) => s.id === scriptId)?.name ?? 'Running a script'
-  return now === 'Idle' ? name : `${name} · ${now}`
+/** The name of the script a resident runs, for the small line under their Doing line. */
+function scriptName(r: Resident, scripts: readonly ScriptSummary[]): string | undefined {
+  if (!r.script) return undefined
+  return scripts.find((s) => s.id === r.script!.scriptId)?.name ?? 'a script'
 }
 
 /**
@@ -226,6 +224,8 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
+  if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
+  if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
   if (o?.kind === 'build') {
     const what = BUILDING_NAMES[o.building].toLowerCase()
@@ -260,12 +260,18 @@ export function ResidentsList({
   groups,
   leaderId,
   tick,
+  scripts = [],
+  buildings = [],
   selectedId,
   onSelect,
 }: {
   groups: ResidentGroup<Resident>[]
   leaderId: string
   tick: number
+  /** The Player's script library, to name the script each runs and the task it is for. */
+  scripts?: ScriptSummary[]
+  /** The buildings in sight, to name where residents store or fetch goods. */
+  buildings?: Building[]
   selectedId: string | undefined
   onSelect: (id: string) => void
 }) {
@@ -312,7 +318,10 @@ export function ResidentsList({
                     {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
                   </span>
                   <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
-                  <span className="doing">{doing(r)}</span>
+                  <span className="doing" title={doingLine(r, { scripts, buildings })}>
+                    {doingLine(r, { scripts, buildings })}
+                    {r.script && <small className="muted">{scriptName(r, scripts)}</small>}
+                  </span>
                   <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
                     <span
                       className={meterClass(r.hunger / MAX_HUNGER)}
@@ -359,6 +368,7 @@ export function ResidentCard({
   holders,
   realmId,
   onWork,
+  onFeedStable,
   onTearDown,
   residents,
   onPair,
@@ -374,6 +384,7 @@ export function ResidentCard({
   onWallTo,
   onStop,
   scripts,
+  buildings = [],
   onRunScript,
   onEditScript,
   makeLeader,
@@ -384,6 +395,7 @@ export function ResidentCard({
   onClose,
   sections,
   onSections,
+  scriptParams,
 }: {
   resident: Resident
   leaderId: string
@@ -407,6 +419,8 @@ export function ResidentCard({
   onStop: () => void
   /** The Player's script library, to pick a script to run. */
   scripts: ScriptSummary[]
+  /** The buildings in sight, to name where the resident stores or fetches goods. */
+  buildings?: Building[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
   onRunScript: (scriptId: number) => void
   /** Opens a script in the library, such as the one the resident's task runs. */
@@ -441,6 +455,8 @@ export function ResidentCard({
   realmId: string
   /** Orders the resident to work the workplace on their tile, making `makes` at a smithy. */
   onWork: (makes?: Good) => void
+  /** Gives the resident the Feed the stable task for the stable they stand in. */
+  onFeedStable: (stableId: string) => void
   /** Orders the resident to tear down the building or site on their tile. */
   onTearDown: (buildingId: string) => void
   /** The Player's residents in sight, to pick a partner from. */
@@ -478,6 +494,8 @@ export function ResidentCard({
   /** The open sections, kept by the caller so they stay open from one selected unit to the next. */
   sections: CardSections<ActionId>
   onSections: (sections: CardSections<ActionId>) => void
+  /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
+  scriptParams?: ReactNode
 }) {
   const setPanel = (panel: ActionId | undefined) => onSections({ ...sections, panel })
   const age = Math.floor(ageInYears(r, tick))
@@ -522,6 +540,7 @@ export function ResidentCard({
     if (a.id === 'roadTo') onRoadTo()
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
+    if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
   return (
     <SelectionCard
@@ -530,7 +549,7 @@ export function ResidentCard({
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
         `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}`,
-        <strong key="doing">{doing(r, scripts)}</strong>,
+        <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
         ...(family ? [family] : []),
       ]}
       onClose={onClose}
@@ -551,6 +570,7 @@ export function ResidentCard({
       {r.script && (
         <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
       )}
+      {r.script && scriptParams}
       <ActionRows actions={actions} open={shown} onAction={act} />
       <p className="muted small" role="status">
         {orderError

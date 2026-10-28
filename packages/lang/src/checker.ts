@@ -3,7 +3,7 @@
 // warnings, never errors: wherever it isn't sure, it stays quiet. It knows nothing of the game:
 // the names a script gets and the shapes of their values are passed in.
 
-import type { BlockStatement, Expression, Program, Statement } from './ast.js'
+import type { BlockStatement, Expression, ParamType, Program, Statement } from './ast.js'
 import type { Diagnostic } from './index.js'
 
 /** What the checker knows of a value: nothing, a list of something, or an object of a shape. */
@@ -23,7 +23,12 @@ export interface CheckEnv {
   shapes: Readonly<Record<string, Readonly<Record<string, CheckedType>>>>
   /** How a shape is named in a warning, like "a resident"; `a <name>` without it. */
   describeShape?: (shape: string) => string
+  /** What `params.name` holds for a `param` of each type; unknown without it. */
+  paramTypes?: Readonly<Partial<Record<ParamType, CheckedType>>>
 }
+
+/** The shape of `params`: the script's own `param` lines. */
+export const PARAMS_SHAPE = '$params'
 
 /** A field read from an object whose shape the checker was sure of. */
 export interface FieldRead {
@@ -202,6 +207,10 @@ class Checker {
         if (!fields) return UNKNOWN
         const declared = Object.hasOwn(fields, e.property)
         this.reads.push({ shape: object.shape, field: e.property, declared, ...at })
+        if (!declared && object.shape === PARAMS_SHAPE) {
+          this.warn(`No param "${e.property}": declare it with a "param" line at the top`, at)
+          return UNKNOWN
+        }
         if (!declared) {
           this.warn(`"${e.property}" is not a field of ${this.describe(object.shape)}`, at)
           return UNKNOWN
@@ -248,7 +257,16 @@ class Checker {
 
 /** Checks a parsed script against the names and shapes a script gets. */
 export function checkProgram(program: Program, env: CheckEnv): CheckResult {
-  const checker = new Checker(env, program)
+  // `params` holds the script's own `param` lines, whatever the game passes for it.
+  const params = Object.fromEntries(
+    program.params.map((p) => [p.name, env.paramTypes?.[p.type] ?? UNKNOWN]),
+  )
+  const withParams: CheckEnv = {
+    ...env,
+    globals: { ...env.globals, params: { type: { shape: PARAMS_SHAPE } } },
+    shapes: { ...env.shapes, [PARAMS_SHAPE]: params },
+  }
+  const checker = new Checker(withParams, program)
   checker.block(program.body, new Scope(null))
   return { warnings: checker.warnings, reads: checker.reads }
 }

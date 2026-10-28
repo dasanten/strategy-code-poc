@@ -25,6 +25,8 @@ import {
   type OrderRequest,
   type Resident,
   type LineOrder,
+  type StoreOrder,
+  type FetchOrder,
   type TerrainMap,
   type WalkOrder,
   type WallMap,
@@ -36,6 +38,7 @@ import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { waitingForArmy } from './armies.js'
 import { waitingForEscort } from './caravans.js'
 import { attackTarget } from './combat.js'
+import { endOrder, placeOf, placeTile } from './storing.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
 export const PATH_BUDGET_MS = 50
@@ -82,12 +85,14 @@ export const walkTo: OrderKind = {
  * A walk-to or drive order, a haul route driving to its next stop, an attack order going after
  * its target, or a road order walking to its next tile: all go along a path.
  */
-type MoveOrder = WalkOrder | DriveOrder | HaulOrder | AttackOrder | LineOrder
+type MoveOrder =
+  WalkOrder | DriveOrder | HaulOrder | AttackOrder | LineOrder | StoreOrder | FetchOrder
 
 function moveOrder(r: Resident): MoveOrder | undefined {
   const o = r.order
   if (o?.kind === 'haul') return o.phase === 'driving' ? o : undefined
   if (isLineOrder(o)) return o.phase === 'walking' ? o : undefined
+  if (o?.kind === 'store' || o?.kind === 'fetch') return o.phase === 'walking' ? o : undefined
   return o?.kind === 'walkTo' || o?.kind === 'drive' || o?.kind === 'attack' ? o : undefined
 }
 
@@ -99,6 +104,7 @@ function targetOf(world: WorldState, o: MoveOrder): { x: number; y: number } | u
   if (o.kind === 'haul') return o[o.stop]
   if (o.kind === 'attack') return attackTarget(world, o.targetId)
   if (isLineOrder(o)) return { x: o.tiles[0]![0], y: o.tiles[0]![1] }
+  if (o.kind === 'store' || o.kind === 'fetch') return placeTile(world, placeOf(o))
   return o.target
 }
 
@@ -109,8 +115,10 @@ function searchKey(world: WorldState, o: MoveOrder): string {
 }
 
 /** On foot, rather than driving a carriage. */
-function onFoot(o: MoveOrder): o is WalkOrder | AttackOrder | LineOrder {
-  return o.kind === 'walkTo' || o.kind === 'attack' || isLineOrder(o)
+function onFoot(
+  o: MoveOrder,
+): o is WalkOrder | AttackOrder | LineOrder | StoreOrder | FetchOrder {
+  return o.kind !== 'drive' && o.kind !== 'haul'
 }
 
 /**
@@ -177,6 +185,12 @@ function arrive(r: Resident, o: MoveOrder): void {
     o.progress = 0
     return
   }
+  if (o.kind === 'store' || o.kind === 'fetch') {
+    o.phase = o.kind === 'store' ? 'putting' : 'taking'
+    o.path = null
+    o.progress = 0
+    return
+  }
   // A supply wagon's drive lasts as long as its army (`followHolds`).
   if (o.kind === 'drive' && o.army !== undefined) {
     o.path = null
@@ -236,6 +250,12 @@ export class Walking {
     for (const r of world.residents) {
       const o = moveOrder(r)
       if (o?.kind === 'attack' && attackHolds(world, r, o, this.terrain.size)) holding.add(r.id)
+      // A store or fetch order whose carriage moved on since its path was found finds a new one.
+      if ((o?.kind === 'store' || o?.kind === 'fetch') && o.path) {
+        const to = targetOf(world, o)
+        const end = o.path.at(-1)
+        if (to && end && (end[0] !== to.x || end[1] !== to.y)) o.path = null
+      }
     }
     const waiting = waitingForArmy(world, holding)
     // And caravans with their escort (`CONTEXT.md`: Caravan).
@@ -299,7 +319,7 @@ export class Walking {
       const o = r && moveOrder(r)
       if (!o || o.path || searchKey(world, o) !== key) continue
       if (result.status === 'found') o.path = result.path.map(([x, y]) => [x, y])
-      else r.order = null
+      else endOrder(world, r, 'no way')
     }
   }
 
