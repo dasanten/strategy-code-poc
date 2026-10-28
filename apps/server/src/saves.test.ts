@@ -134,7 +134,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(48)
+    expect(WORLD_FORMAT_VERSION).toBe(49)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -158,11 +158,11 @@ describe('world saves', () => {
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
-  it('migrates a format 47 world: its Players are still to be told of the switch to script views (migration 47 → 48)', () => {
+  it('migrates a format 48 world: its Players are still to be told of the switch to script views (migration 48 → 49)', () => {
     const { world, terrain } = worldWithCity()
     const old: Partial<typeof world> = { ...world }
     delete old.scriptViewChanges
-    const migrated = migrateWorld(old, 47, { terrain })
+    const migrated = migrateWorld(old, 48, { terrain })
     expect(migrated).toEqual({ ...world, scriptViewChanges: 0 })
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })

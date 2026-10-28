@@ -8,7 +8,8 @@ the next one and works it into a PR (`.claude/commands/next-ticket.md`).
 survive → produce → transport → grow → trade → fight → alliances → scripts → roads. Exception:
 the UI redesign (Epic 17, ADR 0008), then the livelier pace and default scripts (Epic 18, ADR
 0009), go ahead of the remaining gameplay epics. The admin map (Epic 19) runs in parallel with
-Epic 18, ahead of Bandits.
+Epic 18, ahead of Bandits. Agreed with Daniel on 2026-10-28: Quick wins 2 (Epic 30), Food pickup
+(31), Outpost storage (32) and UI overhaul and mobile (33), in that order, go ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -42,6 +43,10 @@ I sleep.
 | 22  | [Wiki](https://github.com/dasanten/strategy-code-poc/issues/276)                                | ticketed                |
 | 23  | [Names](https://github.com/dasanten/strategy-code-poc/issues/288)                               | ticketed                |
 | 25  | [Quick wins](https://github.com/dasanten/strategy-code-poc/issues/320)                          | ticketed                |
+| 30  | [Quick wins 2](https://github.com/dasanten/strategy-code-poc/issues/375)                        | ticketed                |
+| 31  | [Food pickup](https://github.com/dasanten/strategy-code-poc/issues/376)                         | ticketed                |
+| 32  | [Outpost storage](https://github.com/dasanten/strategy-code-poc/issues/377)                     | ticketed                |
+| 33  | [UI overhaul and mobile](https://github.com/dasanten/strategy-code-poc/issues/378)              | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
