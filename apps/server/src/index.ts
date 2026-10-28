@@ -14,10 +14,12 @@ import {
 } from './monitoring.js'
 import { openDb, schema } from './db/index.js'
 import { OrderQueue, orderKinds } from './orders.js'
+import { QueueRunner } from './queues.js'
 import { ExploredTerrain } from './explored.js'
 import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
 import { Walking } from './walking.js'
+import { setScriptParamOrder } from './script-params.js'
 import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import {
   ScriptRunner,
@@ -81,15 +83,15 @@ const scriptHost: ScriptHost = {
   explored: (userId, x, y) => explored.isExplored({ id: userId }, x, y),
   defaultScript: (userId, task) => defaultScriptId(db, userId, task),
 }
-const orders = new OrderQueue(
-  {
-    ...orderKinds,
-    runScript: runScriptOrder(scriptHost),
-    armyRunScript: armyRunScriptOrder(scriptHost),
-    task: taskOrder({ defaultScript: (userId, task) => defaultScriptId(db, userId, task) }),
-  },
-  terrain,
-)
+const kinds = {
+  ...orderKinds,
+  runScript: runScriptOrder(scriptHost),
+  armyRunScript: armyRunScriptOrder(scriptHost),
+  setScriptParam: setScriptParamOrder(scriptHost),
+  task: taskOrder({ defaultScript: (userId, task) => defaultScriptId(db, userId, task) }),
+}
+const orders = new OrderQueue(kinds, terrain)
+const queues = new QueueRunner(scriptHost, kinds, terrain)
 const scripts = new ScriptRunner(terrain, scriptHost)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
@@ -113,6 +115,7 @@ const loop = setInterval(() => {
   runTick(world, terrain, {
     reporter,
     orders,
+    queues,
     scripts,
     walking,
     invariantSampleRate: config.invariantSampleRate,

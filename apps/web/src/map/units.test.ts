@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { armyBanners, entityRelationship, residentGroups, type Known } from './units.js'
+import {
+  armyBanners,
+  entityRelationship,
+  MIN_UNIT_RADIUS,
+  residentGroups,
+  unitRadius,
+  type Known,
+} from './units.js'
+import { FAR_SCALE, MAX_SCALE } from './camera.js'
 import type { Relationship } from './tokens.js'
 
 const viewer = { realmId: 'r1', allies: new Set(['r2']) }
@@ -135,5 +143,29 @@ describe('armyBanners', () => {
       ],
     )
     expect(banners).toEqual([{ armyId: 'a1', x: 4, y: 3, soldiers: 4, under: ['s2', 's3', 's4'] }])
+  })
+})
+
+describe('unitRadius', () => {
+  // The radii before tokens grew (T25.7), at the closest zoom.
+  const before = {
+    horse: 0.24,
+    carriage: 0.36,
+    army: 0.4,
+    residents: 0.36,
+    aside: 0.28,
+    figure: 0.2,
+  }
+
+  it('draws every token 1.5× its old size up close', () => {
+    for (const [kind, size] of Object.entries(before))
+      expect(unitRadius(kind as keyof typeof before, MAX_SCALE)).toBeCloseTo(MAX_SCALE * size * 1.5)
+  })
+
+  it('never draws a token smaller than the minimum when zoomed out', () => {
+    for (const kind of Object.keys(before) as (keyof typeof before)[]) {
+      expect(unitRadius(kind, FAR_SCALE)).toBe(MIN_UNIT_RADIUS)
+      expect(unitRadius(kind, 1)).toBe(MIN_UNIT_RADIUS)
+    }
   })
 })

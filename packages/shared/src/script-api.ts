@@ -1,4 +1,9 @@
-import { SCRIPT_ACTION_COST, SCRIPT_LIST_QUERY_COST, SCRIPT_TILE_QUERY_COST } from './balance.js'
+import {
+  DOING_MAX_LENGTH,
+  SCRIPT_ACTION_COST,
+  SCRIPT_LIST_QUERY_COST,
+  SCRIPT_TILE_QUERY_COST,
+} from './balance.js'
 import type { ScriptType, ScriptViewName } from './script-views.js'
 
 /**
@@ -13,7 +18,8 @@ import type { ScriptType, ScriptViewName } from './script-views.js'
  * - A **query** answers from what the Player sees and has explored, nothing more.
  * - An **action** asks for the order of the same name for `me`, checked exactly as a UI order
  *   is. It answers `null` when requested, or why not as a string; a script can request nothing
- *   an order couldn't.
+ *   an order couldn't. `doing` and `end` ask for no order: `doing` keeps the resident's Doing
+ *   line in `memory` (`CONTEXT.md`: Doing), `end` ends the script once this run is over.
  *
  * `cost` is the steps one call costs on top of the 1 every evaluated node costs. `returns` is
  * what a value holds or a call answers, in terms of the script views (ADR 0011).
@@ -67,6 +73,11 @@ const SHARED: readonly ScriptBinding[] = [
     'memory',
     'any',
     'An object kept between ticks for whoever runs it; whatever is set on it stays.',
+  ),
+  value(
+    'params',
+    'any',
+    'The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; null while none is picked.',
   ),
   value('tick', 'number', 'The world tick this run is for.'),
   value('mapSize', 'number', 'Tiles along each side of the map; its opposite sides join.'),
@@ -162,6 +173,30 @@ const SHARED: readonly ScriptBinding[] = [
   },
 ]
 
+/**
+ * What a script's `param` line can hold (`CONTEXT.md`: Script parameter): `param name: type`
+ * at the top of a script, read as `params.name`, picked per resident on their card. The same
+ * types as `PARAM_TYPES` in `@csp/lang`.
+ */
+export const SCRIPT_PARAM_TYPES = ['building', 'storage'] as const
+export type ScriptParamType = (typeof SCRIPT_PARAM_TYPES)[number]
+
+export function isScriptParamType(value: unknown): value is ScriptParamType {
+  return (SCRIPT_PARAM_TYPES as readonly unknown[]).includes(value)
+}
+
+/** What each param type accepts, for the Wiki and the editor. */
+export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
+  building: 'One of my realm’s buildings or construction sites.',
+  storage: 'One of my realm’s storages or stables, or one of its carriages.',
+}
+
+/** A script's `param` line. */
+export interface ScriptParam {
+  name: string
+  type: ScriptParamType
+}
+
 /** The game API of a resident's script. */
 export const SCRIPT_API: readonly ScriptBinding[] = [
   value(
@@ -197,20 +232,51 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('walkTo', ['x', 'y'], 'Walk to a tile.'),
   action('drive', ['carriageId', 'x', 'y'], 'Drive the carriage on my tile to a tile.'),
   action(
+    'mount',
+    ['horseId'],
+    'Get on a horse of my realm on my tile that pulls no carriage, and ride it.',
+  ),
+  action('dismount', [], 'Get off the horse I ride; it stays on my tile.'),
+  action(
     'haul',
     ['carriageId', 'x', 'y', 'goods', 'returnGoods?', 'keepFood?'],
     'Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.',
   ),
   action('stop', [], 'Stop what I was ordered to do and stand idle.'),
   action(
+    'end',
+    [],
+    'End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. It asks for no order.',
+  ),
+  action(
+    'doing',
+    ['text'],
+    `Say what I’m doing, for my Player’s Doing line: the text (cut to ${DOING_MAX_LENGTH} characters) shows instead of the one the game derives from my task and order, until I call it again; null gives the derived one back. Kept as \`memory.doing\`; it asks for no order.`,
+  ),
+  action(
     'pickUp',
     ['spot', 'goods'],
     'Take goods from a spot on my tile: {kind: "ground"}, {kind: "storage", storageId}, {kind: "site", siteId} or {kind: "carriage", carriageId}; goods like {food: 3}.',
   ),
   action('drop', ['spot', 'goods'], 'Put carried goods down at a spot on my tile.'),
+  action(
+    'store',
+    ['goods', 'to?'],
+    'Walk to `to` (a storage, a stable or a carriage of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like ["wood"] for all I carry of them (Food beyond my own food). My order is "store" until done; then `me.orderEnded` says how it ended.',
+  ),
+  action(
+    'fetch',
+    ['goods', 'from?'],
+    'Walk to `from` (a storage, a stable or a carriage of mine; by default the nearest storage or carriage of my realm holding any of the goods) and take the goods there, as much as fits. Goods like {wood: 10}, or a list like ["wood"] for as much as there is. My order is "fetch" until done; then `me.orderEnded` says how it ended.',
+  ),
   action('build', ['building'], 'Lay out or join a construction site of that kind on my tile.'),
   action('tearDown', ['buildingId'], 'Tear down the building or site on my tile.'),
   action('workAt', ['makes?'], 'Work the workplace on my tile; at a smithy, say what to make.'),
+  action(
+    'breed',
+    ['stableId', 'horseIds'],
+    'At the stable I stand at, tend two fed horses of mine in it, like ["h1", "h2"], until their foal is born.',
+  ),
   action('pair', ['partnerId'], 'Pair with an adult of my city to have children.'),
   action(
     'attack',
@@ -266,7 +332,12 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'roadLine',
     ['x', 'y'],
-    'Build road on each tile of the line from my tile to (x, y), one after another, with the stone I carry.',
+    'Build road on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the stone I carry.',
+  ),
+  action(
+    'wallLine',
+    ['x', 'y'],
+    'Build wall on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped.',
   ),
 ]
 

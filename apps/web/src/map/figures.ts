@@ -1,4 +1,4 @@
-import { PROTECTION, WEAPONS, type Good, type Resident } from '@csp/shared'
+import { PROTECTION, WEAPONS, isLineOrder, type Good, type Resident } from '@csp/shared'
 import { isLeader, rankedAs, type Leaders, type Relationship, type Tone } from './tokens.js'
 
 /**
@@ -24,7 +24,8 @@ export function residentActivity(
     o?.kind === 'workAt' ||
     o?.kind === 'build' ||
     o?.kind === 'tearDown' ||
-    (o?.kind === 'roadLine' && o.phase === 'building')
+    o?.kind === 'breed' ||
+    (isLineOrder(o) && o.phase === 'building')
   )
     return 'working'
   const load = Object.entries(r.carried).some(([g, n]) => n! > 0 && !NOT_A_LOAD.has(g as Good))
@@ -43,6 +44,9 @@ function moving(r: Pick<Resident, 'order' | 'x' | 'y'>): boolean {
     case 'haul':
       return o.phase === 'driving'
     case 'roadLine':
+    case 'wallLine':
+    case 'store':
+    case 'fetch':
       return o.phase === 'walking'
     case 'climb':
       return true
@@ -60,10 +64,10 @@ export const FIGURES_PER_TILE = 4
  * the "+N" badge instead.
  */
 const SLOTS: readonly (readonly [number, number])[] = [
-  [0.26, 0.74],
-  [0.74, 0.74],
-  [0.26, 0.26],
-  [0.74, 0.26],
+  [0.22, 0.78],
+  [0.78, 0.78],
+  [0.22, 0.22],
+  [0.78, 0.22],
 ]
 
 /** One resident drawn as their own figure. */

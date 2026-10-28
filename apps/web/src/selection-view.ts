@@ -2,10 +2,13 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   BUILDABLE,
-  CARRIAGE_CAPACITY,
+  SHARES_A_TILE,
   GOODS,
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
+  carriageCapacity,
+  horseAgeInYears,
+  horseFoodFactor,
   MAX_HEALTH,
   MAX_HUNGER,
   MAX_WORKERS,
@@ -14,9 +17,11 @@ import {
   RECIPES,
   STABLE_BREED_TICKS,
   STABLE_CAPACITY,
+  breedersAt,
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
+  buildProblem,
   canWork,
   nodeCorner,
   stockWeight,
@@ -74,12 +79,16 @@ export type Selection = { kind: 'resident'; id: string } | { kind: 'tile'; x: nu
 export type ActionId =
   | 'walk'
   | 'stop'
+  | 'ride'
   | 'drive'
   | 'haul'
   | 'build'
   | 'roadTo'
+  | 'wallTo'
   | 'work'
+  | 'feedStable'
   | 'tearDown'
+  | 'breed'
   | 'goods'
   | 'pair'
   | 'attack'
@@ -96,12 +105,16 @@ export type ActionId =
 export const ACTION_KEYS: Record<ActionId, string> = {
   walk: 'W',
   stop: 'S',
+  ride: 'M',
   drive: 'D',
   haul: 'H',
   build: 'B',
   roadTo: 'R',
+  wallTo: 'Q',
   work: 'E',
+  feedStable: 'F',
   tearDown: 'T',
+  breed: 'F',
   goods: 'G',
   pair: 'P',
   attack: 'A',
@@ -139,20 +152,21 @@ export interface ResidentHere {
   busy: boolean
   /** They belong to a city, so they can pair. */
   inCity: boolean
-  carrying: boolean
   carriage?: Carriage
   pile?: Pile
   storage?: Building
   /** The building or construction site on their tile, not a road. */
   building?: Building
   road?: Building
+  /** The carriage site on their tile (`CONTEXT.md`: Carriage). */
+  carriageSite?: Building
   node?: KnownNode
   /** Residents of other realms, or of none, in sight. */
   othersInSight: number
   /** Walls and gates of other realms' cities, or of none, in sight. */
   wallsInSight: number
   /** What the map is waiting for a tile for. */
-  picking: false | 'walk' | 'drive' | 'haul' | 'road'
+  picking: false | 'walk' | 'drive' | 'haul' | 'road' | 'wall'
   /**
    * For one of the Player's own residents who isn't their Leader: why the Leader can't hand the
    * realm over to them now (`CONTEXT.md`: Leader handover), undefined when they can. Absent for
@@ -161,6 +175,10 @@ export interface ResidentHere {
   makeLeader?: { problem: string | undefined }
   /** One of the Player's own residents, whom they can rename (`CONTEXT.md`: Renaming a resident). */
   renamable?: boolean
+  /** They ride a horse, and can dismount (`CONTEXT.md`: Riding). */
+  riding?: boolean
+  /** A horse of their realm on their tile that pulls no carriage and nobody rides, to mount. */
+  horseToRide?: boolean
 }
 
 /**
@@ -189,8 +207,12 @@ export function residentActions(h: ResidentHere): CardAction[] {
   const add = (a: CardAction) => actions.push(a)
   add(row('walk', '', picks('walk', 'Walk to')))
   if (h.busy) add(row('stop', 'Stop'))
+  if (h.riding) add(row('ride', 'Dismount'))
+  else if (h.horseToRide) add(row('ride', 'Mount horse'))
   if (h.carriage) {
-    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...child }))
+    // A rider doesn't drive (`CONTEXT.md`: Riding).
+    const riding = h.riding ? { disabled: true as const, reason: 'dismount first to drive' } : {}
+    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...child, ...riding }))
     add(row('haul', h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…', { opens: true }))
   }
   if (isWorkable(h.building, h.node)) {
@@ -200,17 +222,26 @@ export function residentActions(h: ResidentHere): CardAction[] {
       }),
     )
   }
-  const site = h.building?.site ? h.building : h.road?.site ? h.road : undefined
+  // A finished stable: keep Food in it for its horses (`CONTEXT.md`: Feeding the stable).
+  if (h.building?.kind === 'stable' && !h.building.site) {
+    add(row('feedStable', 'Feed the stable', child))
+  }
+  const site = h.building?.site
+    ? h.building
+    : (h.carriageSite ?? (h.road?.site ? h.road : undefined))
   add(
     row('build', site ? `Help build the ${BUILDING_NAMES[site.kind].toLowerCase()}…` : 'Build…', {
       opens: true,
     }),
   )
   add(row('roadTo', '', { ...picks('road', 'Build road to'), ...child }))
-  const torn = [h.building, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
+  add(row('wallTo', '', { ...picks('wall', 'Build wall to'), ...child }))
+  const torn = [h.building, h.carriageSite, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
   if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
-  const goodsHere = h.pile || h.storage || site || h.carriage
-  if (h.carrying || goodsHere) add(row('goods', 'Goods…', { opens: true }))
+  if (h.building?.kind === 'stable' && !h.building.site)
+    add(row('breed', 'Breed horses…', { opens: true, ...child }))
+  // Always there, so the Player sees the carry capacity even with nothing to move.
+  add(row('goods', 'Goods…', { opens: true }))
   if (h.adult && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
   if (h.wallsInSight > 0) add(row('walls', 'Break or climb a wall…', { opens: true }))
@@ -413,6 +444,28 @@ export function nodeFit(
   return nodeCorner({ ...seen, nodes }, terrain, node)
 }
 
+/**
+ * Why a building of `kind` can't be laid out from (x, y), its footprint running east and south, as
+ * far as the Player knows (`buildProblem`, `CONTEXT.md`: Where buildings go): the buildings and
+ * cities they see, the nodes and terrain they have explored. The server checks again when the
+ * order arrives.
+ */
+export function buildHereProblem(
+  kind: BuildingKind,
+  x: number,
+  y: number,
+  seen: { buildings: Building[]; cities: City[] },
+  nodeAt: (x: number, y: number) => KnownNode | undefined,
+  terrain: TerrainLookup,
+): string | undefined {
+  const nodes: KnownNode[] = []
+  for (const [tx, ty] of footprintTiles({ kind, x, y }, terrain.size)) {
+    const n = nodeAt(tx, ty)
+    if (n) nodes.push(n)
+  }
+  return buildProblem({ ...seen, nodes }, x, y, kind, terrain)
+}
+
 /** A node's kind in words: "forest", "iron ore". */
 const nodeKindName = (node: KnownNode) => NODE_NAMES[node.kind].replace(/ node$/, '').toLowerCase()
 
@@ -463,20 +516,45 @@ function horseFares(h: Horse): { hunger: 'fed' | 'hungry' | 'starving'; health: 
   return { hunger, health: h.health < MAX_HEALTH ? 'hurt' : 'healthy' }
 }
 
+/** A horse's age in words: game days for a foal under a game year, whole game years after. */
+export function horseAgeText(h: SeenHorse, tick: number): string {
+  const years = Math.floor(horseAgeInYears(h, tick))
+  if (years >= 1) return `${years} ${years === 1 ? 'year' : 'years'} old`
+  const days = Math.max(0, Math.floor((tick - h.bornAt) / TICKS_PER_GAME_DAY))
+  return `${days} game ${days === 1 ? 'day' : 'days'} old`
+}
+
 /**
- * Lines for horses standing together, one per owner: "2 horses (yours) · 1 hungry". How they fare
- * only for those the Player knows it of (`CONTEXT.md`: Seeing how someone fares).
+ * A horse's stats and age, and how it fares where the Player knows it (`CONTEXT.md`: Horse stats,
+ * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
+ */
+export function horseDetail(h: SeenHorse, tick: number | undefined): string {
+  const { speed, strength, endurance } = h.stats
+  const parts = [`Speed ${speed}, Strength ${strength}, Endurance ${endurance}`]
+  if (tick !== undefined) parts.push(horseAgeText(h, tick))
+  if (horseFaresKnown(h)) {
+    const fares = horseFares(h)
+    parts.push(`${fares.hunger}, ${fares.health}`)
+  }
+  return parts.join(' · ')
+}
+
+/**
+ * Lines for horses standing together, one per owner: "2 horses (yours) · 1 hungry", then one for
+ * each of them (`horseDetail`). How they fare only for those the Player knows it of (`CONTEXT.md`:
+ * Seeing how someone fares).
  */
 function horseLines(
   horses: SeenHorse[],
   rel: (h: SeenHorse) => Relationship | undefined,
+  tick: number | undefined,
 ): string[] {
   const groups = new Map<string, SeenHorse[]>()
   for (const h of horses) {
     const key = `${h.realmId}/${h.cityId}`
     groups.set(key, [...(groups.get(key) ?? []), h])
   }
-  return [...groups.values()].map((group) => {
+  return [...groups.values()].flatMap((group) => {
     const r = rel(group[0]!)
     const owner = r ? RELATIONSHIP_NAMES[r].toLowerCase() : 'nobody’s'
     const parts = [`${group.length} ${group.length === 1 ? 'horse' : 'horses'} (${owner})`]
@@ -485,23 +563,19 @@ function horseLines(
     const hurt = known.filter((f) => f.health === 'hurt').length
     if (hungry > 0) parts.push(`${hungry} hungry`)
     if (hurt > 0) parts.push(`${hurt} hurt`)
-    return parts.join(' · ')
+    return [parts.join(' · '), ...group.map((h) => `· ${horseDetail(h, tick)}`)]
   })
 }
 
 /**
- * Game days until a stable's next foal while two fed horses of one owner stand in it with room
- * for another (`CONTEXT.md`: Stable, `breedingPair`), as far as the Player knows how they fare.
+ * Game days until the foal of each resident in sight breeding at a stable (`CONTEXT.md`:
+ * Breeding), soonest first.
  */
-function daysToFoal(stable: Building, inIt: SeenHorse[]): number | undefined {
-  if (inIt.length >= STABLE_CAPACITY) return undefined
-  const fed = inIt.filter((h) => horseFaresKnown(h) && h.hunger > 0)
-  const pair = fed.some((a) =>
-    fed.some((b) => b !== a && b.realmId === a.realmId && b.cityId === a.cityId),
-  )
-  if (!pair) return undefined
-  const left = STABLE_BREED_TICKS - (stable.breeding ?? 0)
-  return Math.max(1, Math.ceil(left / TICKS_PER_GAME_DAY))
+export function daysToFoals(stable: Building, residents: readonly SeenResident[]): number[] {
+  return breedersAt(residents, stable)
+    .map((r) => (r.order?.kind === 'breed' ? STABLE_BREED_TICKS - r.order.progress : 0))
+    .map((left) => Math.max(1, Math.ceil(left / TICKS_PER_GAME_DAY)))
+    .sort((a, b) => a - b)
 }
 
 /**
@@ -514,18 +588,19 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const here = <T extends { x: number; y: number }>(xs: T[]) =>
     xs.filter((v) => v.x === t.x && v.y === t.y)
   // A building shows on every tile of its footprint, with its one pile (`CONTEXT.md`: At a building).
-  const live = t.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+  const live = t.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && covers(b, t.x, t.y))
   const remembered = live
     ? undefined
-    : t.lastSeen?.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+    : t.lastSeen?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && covers(b, t.x, t.y))
   const building = live ?? remembered
   const road = here(t.buildings).find((b) => b.kind === 'road')
+  const carriageSite = here(t.buildings).find((b) => b.kind === 'carriage')
   const carriage = here(t.carriages)[0]
   const pileTile = live ?? t
   const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
   const cityOf = (b: Building) => t.cities.find((c) => c.id === b.cityId)
-  // Every horse in the stable on the tile, hitched or not, as it breeds and fills up
-  // (`breedingPair`); elsewhere the horses on the tile not pulling a carriage.
+  // Every horse in the stable on the tile, hitched or not, as it is bred and fills up
+  // (`breedProblem`); elsewhere the horses on the tile not pulling a carriage.
   const hitched = new Set(t.carriages.map((k) => k.horseId))
   // Who is in or at a building only remembered is not known.
   const stable = live?.kind === 'stable' && !live.site ? live : undefined
@@ -562,15 +637,17 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       if (max !== undefined && live) lines.push(`${t.workers(live)} / ${max} workers`)
       if (stable) {
         lines.push(
-          ...(horsesHere.length > 0 ? horseLines(horsesHere, horseRel) : ['No horses in it']),
+          ...(horsesHere.length > 0
+            ? horseLines(horsesHere, horseRel, t.tick)
+            : ['No horses in it']),
         )
         lines.push(`Room for ${Math.max(0, STABLE_CAPACITY - horsesHere.length)} more horses`)
       }
       const makes = live && makesLine(live, t, pile, goodLabels)
       if (makes) lines.push(makes)
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
-      const foal = stable && daysToFoal(stable, horsesHere)
-      if (foal) lines.push(`Next foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
+      for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
+        lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))
@@ -592,12 +669,24 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       }
     }
   }
+  if (carriageSite?.site) {
+    // A carriage site has no owner (`CONTEXT.md`: Construction site), even on a stable.
+    card ??= { title: 'Carriage site', what: 'building' }
+    const work = BUILD_WORK.carriage ?? 0
+    const done = work > 0 ? Math.floor((carriageSite.site.work / work) * 100) : 100
+    lines.push(
+      `Carriage site · ${done}% of the work done · delivered ${goodsText(carriageSite.site.delivered, goodLabels)}`,
+    )
+    lines.push(stillNeeded(carriageSite, goodLabels))
+    if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
+  }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
     card ??= { title: 'Carriage', rel, what: 'carriage' }
     // Its load only when the Player sees inside (`CONTEXT.md`: Seeing inside a storage).
+    const capacity = carriageCapacity(t, carriage)
     const load = carriage.load
-      ? `${Math.round(stockWeight(carriage.load))} / ${CARRIAGE_CAPACITY} kg`
+      ? `${Math.round(stockWeight(carriage.load))} / ${Math.round(capacity)} kg`
       : LOAD_LEVEL_NAMES[carriage.loadLevel]
     // How its horse fares only for the Player's own and allies' (`CONTEXT.md`: Seeing how someone fares).
     const horse = t.horses.find((h) => h.id === carriage.horseId)
@@ -613,16 +702,18 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     lines.push(
       `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${load}${horseText}`,
     )
-    if (fares) {
-      const food = carriage.load?.food ?? 0
-      const days = Math.floor(food / HORSE_FOOD_PER_DAY + 1e-9)
-      const feeds =
-        days <= 0
-          ? 'Food on board for less than a game day'
-          : `Food on board for ${days} game ${days === 1 ? 'day' : 'days'}`
-      lines.push(
-        `Horse: ${fares.hunger}, ${fares.health} · ${food > 0 ? feeds : 'no Food on board'}`,
-      )
+    if (horse) {
+      const parts = [`Horse: ${horseDetail(horse, t.tick)}`]
+      if (fares) {
+        const food = carriage.load?.food ?? 0
+        const days = Math.floor(food / (HORSE_FOOD_PER_DAY * horseFoodFactor(horse)) + 1e-9)
+        const feeds =
+          days <= 0
+            ? 'Food on board for less than a game day'
+            : `Food on board for ${days} game ${days === 1 ? 'day' : 'days'}`
+        parts.push(food > 0 ? feeds : 'no Food on board')
+      }
+      lines.push(parts.join(' · '))
     }
   }
   if (pile) {
@@ -660,7 +751,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       rel: horseRel(horsesHere[0]!),
       what: 'horses',
     }
-    lines.push(...horseLines(horsesHere, horseRel))
+    lines.push(...horseLines(horsesHere, horseRel, t.tick))
   }
   const terrain = terrainLine(t.terrain, road)
   if (road) {

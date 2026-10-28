@@ -5,6 +5,8 @@ import {
   OWN_FOOD,
   RECIPES,
   WORK_OUTPUT_PER_DAY,
+  breedersAt,
+  breedingPair,
   canWork,
   cityFoodUse,
   contractOf,
@@ -38,9 +40,12 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'walkTo',
   'pickUp',
   'drop',
+  'store',
+  'fetch',
   'workAt',
   'build',
   'tearDown',
+  'breed',
   'attack',
 ]
 
@@ -117,13 +122,23 @@ function runCity(
     // Home at the storage with the load stored, a carrier is free for whatever the city needs
     // most (building, pairing), else back to work.
     const carry = r.script?.scriptId === 0 ? r.script.memory.carry : undefined
-    const stored = typeof carry === 'object' && carry !== null && !Array.isArray(carry)
-    if (stored && carry.step === 'back' && storage && isAt(r, storage, size)) {
+    const carrying = typeof carry === 'object' && carry !== null && !Array.isArray(carry)
+    if (
+      carrying &&
+      carry.stored === true &&
+      r.order?.kind !== 'store' &&
+      storage &&
+      isAt(r, storage, size)
+    ) {
       stopWork(r)
     }
-    // Done with the Build default (built, or the site gone or out of reach), a builder is free.
+    // Stuck in the Build default (the site out of reach), a builder is free; built or gone, the
+    // script ended itself.
     const built = r.script?.scriptId === 0 && r.script.task === 'build' ? r.script.memory : null
-    if (built && (built.done === true || built.stuck === true)) stopWork(r)
+    if (built && built.stuck === true) stopWork(r)
+    // Done breeding (a foal born, or the breeding stopped), a breeder is free too.
+    const bred = r.script?.scriptId === 0 && r.script.task === 'breed' ? r.script.memory : null
+    if (bred && bred.done === true) stopWork(r)
   }
   const home = npcHome(world, city)
   const growth = terrain && home && cityGrowth(world, city, home, adults, terrain, short)
@@ -153,6 +168,7 @@ function runCity(
       continue
     }
     const soldier = isArmed(r)
+    if (!soldier && breedHorses(world, city, r)) continue
     if (!soldier && growth && growth.assign(r)) continue
     const place = !soldier && places.find((p) => room(world, p) > 0)
     if (place) {
@@ -161,6 +177,28 @@ function runCity(
     }
     if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
   }
+}
+
+/**
+ * Has one of the city's residents breed its horses (`CONTEXT.md`: Breeding, NPC city): at the
+ * first of its finished stables with two fed horses of the city in it, room for a foal and nobody
+ * breeding there yet, they run the game's Breed horses default for that pair, which walks them
+ * there. Whether they were given it.
+ */
+function breedHorses(world: WorldState, city: City, r: Resident): boolean {
+  for (const stable of world.buildings) {
+    if (stable.kind !== 'stable' || stable.site || stable.cityId !== city.id) continue
+    const tending = world.residents.some(
+      (x) => x.script?.task === 'breed' && x.script.memory.stableId === stable.id,
+    )
+    if (tending || breedersAt(world.residents, stable).length > 0) continue
+    const pair = breedingPair(world, stable, { cityId: city.id })
+    if (!pair) continue
+    const memory = { stableId: stable.id, horseIds: pair.map((h) => h.id) }
+    r.script = { scriptId: 0, task: 'breed', memory }
+    return true
+  }
+  return false
 }
 
 /**

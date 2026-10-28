@@ -89,6 +89,11 @@ import type { MapWorld } from './map/map-world.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
+import { roadJoins } from './map/roads.js'
+import { inBox, pickableAt, pickables, toggled, type Point } from './map/selection.js'
+
+/** No residents selected. */
+const NONE: readonly string[] = []
 
 /** Starting zoom, in screen pixels per tile. */
 const START_SCALE = 12
@@ -119,8 +124,9 @@ type MapMode = 'terrain' | 'region'
  */
 export function MapView({
   world,
-  selectedId,
+  selectedIds = NONE,
   onSelect,
+  onSelectMany,
   onSelectTile,
   selectedCityId,
   onSelectCity,
@@ -134,10 +140,16 @@ export function MapView({
   onView,
 }: {
   world: MapWorld
-  /** The resident shown with a ring, if any. */
-  selectedId?: string
+  /** The residents shown with a ring; the way ahead shows when there is just one. */
+  selectedIds?: readonly string[]
   /** Called with a resident of the Player's realm clicked on the map. */
   onSelect?: (id: string) => void
+  /**
+   * Called with several of the Player's residents picked at once: the ones boxed by a drag with
+   * Shift held (or in box mode), or the selection with one Shift-clicked added or taken out.
+   * Without it the map selects one at a time.
+   */
+  onSelectMany?: (ids: string[]) => void
   /** Called with a tile clicked where there is no resident of the Player's realm. */
   onSelectTile?: (x: number, y: number) => void
   /** The city whose emblem shows with a ring in the far tier, if any. */
@@ -167,9 +179,11 @@ export function MapView({
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef(world)
-  const selectedRef = useRef(selectedId)
+  const selectedRef = useRef(selectedIds)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const onSelectManyRef = useRef(onSelectMany)
+  onSelectManyRef.current = onSelectMany
   const onSelectTileRef = useRef(onSelectTile)
   onSelectTileRef.current = onSelectTile
   const selectedCityRef = useRef(selectedCityId)
@@ -200,6 +214,10 @@ export function MapView({
   const [scale, setScale] = useState(START_SCALE)
   const [mode, setMode] = useState<MapMode>('terrain')
   const modeRef = useRef(mode)
+  // Box mode: a drag boxes residents instead of panning, for pointers with no Shift key.
+  const [boxMode, setBoxMode] = useState(false)
+  const boxModeRef = useRef(boxMode)
+  boxModeRef.current = boxMode
   const mapSize = world.map.size
   const admin = world.admin !== undefined
 
@@ -221,9 +239,9 @@ export function MapView({
 
   // What is in sight changes every tick; the scene reads the latest through the ref.
   useEffect(() => {
-    selectedRef.current = selectedId
+    selectedRef.current = selectedIds
     redrawRef.current()
-  }, [selectedId])
+  }, [selectedIds])
 
   useEffect(() => {
     selectedCityRef.current = selectedCityId
@@ -256,6 +274,8 @@ export function MapView({
     const labels = new LabelLayer()
     // Where each resident's token was drawn last frame; up close each has its own figure.
     let drawnSpots = new Map<string, Spot>()
+    // The box being dragged to select residents, from where it started to the pointer.
+    let box: { from: Point; to: Point } | undefined
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
     let cam: Camera = startRef.current ?? { ...homeCentre(worldRef.current), scale: START_SCALE }
     let disposed = false
@@ -399,6 +419,13 @@ export function MapView({
       labels.end()
       tokens.end()
       badges.end()
+      if (box) {
+        const { from, to } = box
+        const [x, y] = [Math.min(from.x, to.x), Math.min(from.y, to.y)]
+        g.rect(x, y, Math.abs(to.x - from.x), Math.abs(to.y - from.y))
+          .fill({ color: LEADER_COLOR, alpha: 0.12 })
+          .stroke({ width: 1.5, color: LEADER_COLOR })
+      }
     }
 
     /** Far out: an emblem with a name per city, armies and caravans as small markers. */
@@ -466,12 +493,18 @@ export function MapView({
       const world = worldRef.current
       const spots = drawUnits(tokens, badges, cam, view, world, viewerOf(world), leadersOf(world))
       drawnSpots = spots
-      const selected = worldRef.current.residents.find((u) => u.id === selectedRef.current)
-      const spot = selected && spots.get(selected.id)
-      if (selected && spot) {
-        g.circle(spot.x, spot.y, spot.r * 1.3).stroke({ width: 2.5, color: LEADER_COLOR })
-        drawPath(g, cam, view, mapSize, selected)
+      // A ring round each selected resident; the way ahead only when there is just one.
+      const ids = selectedRef.current
+      let rings = false
+      for (const id of ids) {
+        const spot = spots.get(id)
+        if (!spot) continue
+        g.circle(spot.x, spot.y, spot.r * 1.3)
+        rings = true
       }
+      if (rings) g.stroke({ width: 2.5, color: LEADER_COLOR })
+      const selected = ids.length === 1 ? world.residents.find((u) => u.id === ids[0]) : undefined
+      if (selected && spots.has(selected.id)) drawPath(g, cam, view, mapSize, selected)
     }
 
     function setCam(next: Camera) {
@@ -506,7 +539,8 @@ export function MapView({
       })
     }
 
-    // Pointer input: one pointer pans, two pinch-zoom; works for mouse, pen and touch alike.
+    // Pointer input: one pointer pans, two pinch-zoom; works for mouse, pen and touch alike. With
+    // Shift held, or in box mode, one pointer drags a box to select residents instead of panning.
     const pointers = new Map<number, { x: number; y: number }>()
     let pressedAt = { x: 0, y: 0 }
     let dragged = 0
@@ -524,6 +558,13 @@ export function MapView({
       pointers.set(e.pointerId, local(e))
       pressedAt = local(e)
       dragged = 0
+      const boxes =
+        onSelectManyRef.current !== undefined &&
+        (e.shiftKey || boxModeRef.current) &&
+        e.button === 0 &&
+        !pickingRef.current &&
+        zoomTier(cam.scale) !== 'far'
+      box = pointers.size === 1 && boxes ? { from: pressedAt, to: pressedAt } : undefined
     }
     const onMove = (e: PointerEvent) => {
       const p = local(e)
@@ -532,7 +573,12 @@ export function MapView({
       const prev = pointers.get(e.pointerId)
       if (!prev) return hoverAt(p.x, p.y)
       dragged = Math.max(dragged, Math.hypot(p.x - pressedAt.x, p.y - pressedAt.y))
-      if (pointers.size === 1) {
+      // A second finger turns a box drag back into a pinch.
+      if (box && pointers.size > 1) box = undefined
+      if (box) {
+        box = { ...box, to: p }
+        redraw()
+      } else if (pointers.size === 1) {
         setCam(panBy(cam, mapSize, p.x - prev.x, p.y - prev.y))
       } else if (pointers.size === 2) {
         const other = [...pointers].find(([id]) => id !== e.pointerId)![1]
@@ -547,6 +593,16 @@ export function MapView({
     }
     const onUp = (e: PointerEvent) => {
       const wasPressed = pointers.delete(e.pointerId)
+      // A box dragged far enough selects the own residents in it, replacing the selection.
+      const boxed = box
+      box = undefined
+      if (boxed && wasPressed && dragged >= 6) {
+        redraw()
+        if (e.type === 'pointerup') {
+          onSelectManyRef.current?.(inBox(ownOnScreen(), boxed.from, boxed.to))
+        }
+        return
+      }
       // A press that hardly moved is a click: while picking it picks the tile, otherwise it
       // picks the own resident under it, or else the tile. A right-click always picks the tile.
       if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && dragged < 6) {
@@ -568,30 +624,24 @@ export function MapView({
           if (city) onSelectCityRef.current?.(city.id)
           return
         }
-        const id = residentAt(p.x, p.y)
-        if (id) onSelectRef.current?.(id)
+        const id = pickableAt(ownOnScreen(), p.x, p.y)
+        const many = onSelectManyRef.current
+        // Shift-click adds an own resident to the selection or takes them out, and does nothing
+        // elsewhere. A plain click elsewhere picks the tile, which drops a group.
+        if (e.shiftKey && many) {
+          if (id) many(toggled(selectedRef.current, id))
+        } else if (id) onSelectRef.current?.(id)
         else onSelectTileRef.current?.(tx, ty)
       }
     }
 
-    function residentAt(sx: number, sy: number): string | undefined {
+    /** The Player's residents where they show on screen, to click or box. */
+    function ownOnScreen() {
       const view = size()
       const { home, residents } = worldRef.current
+      const place = (x: number, y: number) => tileToScreen(cam, view, mapSize, x, y)
       const close = zoomTier(cam.scale) === 'close'
-      let best: { id: string; d: number } | undefined
-      for (const r of residents) {
-        if (r.owner !== home.realmId) continue
-        // Up close, the figure under the pointer; further out, the tile's token.
-        const spot = close ? drawnSpots.get(r.id) : undefined
-        if (close && !spot) continue
-        const [rx, ry] = spot
-          ? [spot.x, spot.y]
-          : tileToScreen(cam, view, mapSize, r.x + 0.5, r.y + 0.5)
-        const reach = spot ? Math.max(8, spot.r * 1.4) : Math.max(10, cam.scale * 0.6)
-        const d = Math.hypot(rx - sx, ry - sy)
-        if (d <= reach && (!best || d < best.d)) best = { id: r.id, d }
-      }
-      return best?.id
+      return pickables(residents, home.realmId, drawnSpots, place, cam.scale, close)
     }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -703,6 +753,19 @@ export function MapView({
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
               <circle cx="9" cy="9" r="5" />
               <path d="M9 1v3M9 14v3M1 9h3M14 9h3" />
+            </svg>
+          </button>
+        )}
+        {onSelectMany && (
+          <button
+            type="button"
+            aria-label="Box select"
+            aria-pressed={boxMode}
+            title="Box select: drag to select residents (or hold Shift)"
+            onClick={() => setBoxMode(!boxMode)}
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
+              <path d="M2 2h3M8 2h2M13 2h3v3M16 8v2M16 13v3h-3M10 16H8M5 16H2v-3M2 10V8M2 5V2" />
             </svg>
           </button>
         )}
@@ -954,15 +1017,12 @@ function drawStructures(
       }
     }
     if (dots) under.fill(style)
-    // Each join once, from the road to its right or below; faint if either end is a site.
+    // Each join once, straight or corner to corner (`roadJoins`); faint if either end is a site.
     let joins = false
     for (const r of roads.values()) {
       const [sx, sy] = centre(cam, view, size, r)
       if (!inSight([sx, sy])) continue
-      for (const [dx, dy] of [
-        [1, 0],
-        [0, 1],
-      ] as const) {
+      for (const [dx, dy] of roadJoins(r.x, r.y, (x, y) => !!roadAt(x, y))) {
         const next = roadAt(r.x + dx, r.y + dy)
         if (next && !!(r.site || next.site) === site) {
           under.moveTo(sx, sy).lineTo(sx + dx * tile, sy + dy * tile)

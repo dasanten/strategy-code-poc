@@ -163,3 +163,70 @@
 .sel-info-toggle:hover {
   color: var(--ui-text);
 }
+/* A group card's list: one row per selected resident, each picking just them. */
+.sel-group button {
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ui-muted);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sel-group button:hover {
+  background: var(--ui-raised);
+}
+.sel-group strong {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+/* The resident's queue: its steps in order, the current one marked. */
+.queue-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.queue-step {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--ui-line);
+  border-left-width: 3px;
+  border-radius: 6px;
+  cursor: grab;
+}
+.queue-step.current {
+  border-left-color: var(--ui-live);
+  background: var(--ui-raised);
+}
+.queue-step-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.queue-step-head .buttons {
+  display: flex;
+  gap: 4px;
+}
+.queue-step-head button {
+  min-width: 32px;
+  min-height: 32px;
+}
+.queue-step-minutes,
+.queue-loop {
+  flex-direction: row;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 import {
+  AVERAGE_HORSE_STATS,
   ADMIN_MAP_INFO_PATH,
   ADMIN_PLACES_PATH,
   ADMIN_TERRITORY_PATH,
@@ -93,6 +94,8 @@ function setup(): WorldState {
     y: 40,
     hunger: 100,
     health: 100,
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
   })
   world.carriages.push({
     id: 'k1',

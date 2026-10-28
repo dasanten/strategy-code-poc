@@ -5,6 +5,8 @@ import {
   transferTiles,
   handsOf,
   loadOf,
+  carriageCapacity,
+  type CarriageHorse,
   quoteDelivery,
   quotePickUp,
   quoteTrade,
@@ -62,6 +64,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   mint: 'mint',
   smithy: 'smithy',
   road: 'road',
+  carriage: 'carriage site',
 }
 
 /** "3 houses", "1 storage". */
@@ -184,8 +187,8 @@ export function tradersAt(
 
 /**
  * What buying and selling up to `units` of a good would move for one of the Player's residents,
- * from their hands or `carriage` (`quoteTrade`), from what the Player sees. The server decides;
- * this is the preview.
+ * from their hands or `carriage` (`quoteTrade`, room by its horse among `horses`), from what
+ * the Player sees. The server decides; this is the preview.
  */
 export function previewTrade(
   seen: { cities: City[]; buildings: Building[] },
@@ -195,11 +198,14 @@ export function previewTrade(
   good: PricedGood,
   units: number,
   tick: number,
+  horses: readonly CarriageHorse[],
 ): { buy: TradeQuote; sell: TradeQuote } {
   const warehouse = seen.buildings.find((b) => b.id === warehouseId)
   const none = { units: 0, coins: 0 }
   if (!warehouse || !(units > 0)) return { buy: none, sell: none }
-  const holder = carriage ? loadOf(carriage) : handsOf(resident, tick)
+  const holder = carriage
+    ? loadOf(carriage, carriageCapacity({ horses, carriages: [carriage] }, carriage))
+    : handsOf(resident, tick)
   return {
     buy: quoteTrade(seen, warehouse, holder, 'buy', good, units),
     sell: quoteTrade(seen, warehouse, holder, 'sell', good, units),
@@ -319,11 +325,14 @@ export function previewNpcTrade(
   good: PricedGood,
   units: number,
   tick: number,
+  horses: readonly CarriageHorse[],
 ): { buy: TradeQuote; sell: TradeQuote } {
   const line = prices.find((p) => p.good === good)
   const none = { units: 0, coins: 0 }
   if (!line || !(units > 0)) return { buy: none, sell: none }
-  const holder = carriage ? loadOf(carriage) : handsOf(resident, tick)
+  const holder = carriage
+    ? loadOf(carriage, carriageCapacity({ horses, carriages: [carriage] }, carriage))
+    : handsOf(resident, tick)
   // How many units fit when each adds `per` kg to the holder.
   const fits = (per: number) => (per > 0 ? (holder.room + 1e-9) / per : Infinity)
   const perBuy = GOOD_WEIGHT[good] - line.sell * GOOD_WEIGHT.coins

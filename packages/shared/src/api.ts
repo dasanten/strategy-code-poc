@@ -1,5 +1,6 @@
 /** HTTP API shapes shared by server and client (ADR 0005). */
 import type { Task } from './default-scripts.js'
+import type { ScriptParam } from './script-api.js'
 import type { AdminDirectiveView } from './directive.js'
 
 export interface Account {
@@ -63,6 +64,8 @@ export interface ScriptSummary {
   task: Task | null
   /** A default script the Player hasn't edited, which follows the game's default. */
   followsDefault: boolean
+  /** The active version's `param` lines (`CONTEXT.md`: Script parameter); none while there is none. */
+  params: ScriptParam[]
 }
 
 /** One saved version of a script, with the syntax errors it has (at most one). */

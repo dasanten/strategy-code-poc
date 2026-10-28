@@ -1,4 +1,5 @@
 import {
+  AVERAGE_HORSE_STATS,
   FOOD_PER_DAY,
   HOME_FOOD_LOW,
   HUNGER_DAYS,
@@ -59,6 +60,8 @@ function setup() {
     y: 5,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
   }
   world.horses.push(horse)
   const carriage: Carriage = {

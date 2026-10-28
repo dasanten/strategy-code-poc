@@ -34,13 +34,15 @@ interface PairRequest extends OrderRequest {
 }
 
 /**
- * Orders a carrying resident can't hold (`CONTEXT.md`: Carrying): working, building, tearing down
- * and hauling. Walking, eating and handling goods go on.
+ * Orders a carrying resident can't hold (`CONTEXT.md`: Carrying): working, building, tearing down,
+ * breeding horses and hauling. Walking, eating and handling goods go on.
  */
 export const CARRYING_BLOCKS: ReadonlySet<ResidentOrder['kind']> = new Set([
   'workAt',
+  'breed',
   'build',
   'roadLine',
+  'wallLine',
   'tearDown',
   'haul',
 ])

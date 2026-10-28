@@ -6,6 +6,8 @@ import {
   type BuildingKind,
   type CrimeKind,
   type Good,
+  type Horse,
+  type HorseStats,
   type Protection,
   type ResourceKind,
   type Resident,
@@ -177,20 +179,20 @@ export const HOUSING_ROOM: Partial<Record<BuildingKind, number>> = {
 /** Houses a starting city gets beyond what its residents need. */
 export const START_SPARE_HOUSES = 1
 
-/** Food in a starting city's storage, in kg: about twelve game days for its residents. */
+/** Food in a starting city's storage, in kg: about 25 game days for its residents. */
 export const START_FOOD = 100
 
 /**
- * Food each resident of a starting city carries, in units: two game days' meals, so they have
+ * Food each resident of a starting city carries, in units: four game days' meals, so they have
  * something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
  */
 export const START_CARRIED_FOOD = 2
 
-/** Horses in a starting city's stable: two, so they can breed (`CONTEXT.md`: Starting city). */
+/** Horses in a starting city's stable: two, so a resident can breed them (`CONTEXT.md`: Starting city). */
 export const START_HORSES = 2
 
 /**
- * Food in a starting city's stable, in units: ten game days for its horses, time to start
+ * Food in a starting city's stable, in units: 20 game days for its horses, time to start
  * bringing it food from the farm.
  */
 export const START_STABLE_FOOD = 30
@@ -199,7 +201,7 @@ export const START_STABLE_FOOD = 30
  * Food a horse eats per game day, in units (`CONTEXT.md`: Horse). More than a resident; its
  * hunger meter otherwise runs like a resident's (`HUNGER_DAYS`, `STARVE_DAYS`, `HEAL_DAYS`).
  */
-export const HORSE_FOOD_PER_DAY = 1.5
+export const HORSE_FOOD_PER_DAY = 0.75
 
 /**
  * How far from its tile a horse reaches Food lying on the ground, in tiles either way
@@ -214,14 +216,94 @@ export const HORSE_REACH = 1
  */
 export const HORSE_HUNGRY_SHARE = 0.25
 
-/** Most horses a stable has room for; it breeds no foal once that many stand in it. */
+/**
+ * Game days of Food for the horses standing in it that the Feed the stable task keeps in a stable
+ * (`CONTEXT.md`: Feeding the stable): `HORSE_FOOD_PER_DAY` for each, this many days. Below it the
+ * resident fetches more. Written into the default's source, where a Player can change it.
+ */
+export const STABLE_FEED_DAYS = 10
+
+/** Most horses a stable has room for; no foal is bred there once that many stand in it. */
 export const STABLE_CAPACITY = 6
 
 /**
- * Game days two fed horses at a stable take to breed a foal (`CONTEXT.md`: Stable). Time without
- * two fed horses or without room does not count.
+ * Game days a resident tends two fed horses at a stable before a foal is born (`CONTEXT.md`:
+ * Breeding). Breeding that stops before then starts over.
  */
 export const STABLE_BREED_DAYS = 10
+
+/**
+ * How far each of a foal's stats may land from its parents' average, either way (`CONTEXT.md`:
+ * Breeding), as `CHILD_STAT_SPREAD` does for a resident's children.
+ */
+export const FOAL_STAT_SPREAD = 1
+
+/**
+ * A new horse's stats are whole numbers drawn from this range (`CONTEXT.md`: Horse stats), like a
+ * resident's base stats.
+ */
+export const HORSE_STAT_MIN = 5
+export const HORSE_STAT_MAX = 15
+
+/** The stat at which a horse is average: it pulls, holds and eats as the plain numbers say. */
+export const HORSE_STAT_AVERAGE = 10
+
+/** An average horse's stats: the middle of the range, what horses from before stats got. */
+export const AVERAGE_HORSE_STATS: Readonly<HorseStats> = {
+  speed: HORSE_STAT_AVERAGE,
+  strength: HORSE_STAT_AVERAGE,
+  endurance: HORSE_STAT_AVERAGE,
+}
+
+/** A new horse is this many game years old, drawn in the range; foals start at 0. */
+export const HORSE_START_AGE_MIN = 3
+export const HORSE_START_AGE_MAX = 8
+
+/** How much faster a horse pulls its carriage for each point of Speed above average (slower below). */
+export const HORSE_SPEED_EFFECT = 0.04
+
+/** The furthest Speed moves a horse's pace, either way, as a share of it. */
+export const HORSE_SPEED_LIMIT = 0.5
+
+/** How much more a carriage holds for each point of its horse's Strength above average (less below). */
+export const HORSE_STRENGTH_EFFECT = 0.04
+
+/** The furthest Strength moves what a carriage holds, either way, as a share of `CARRIAGE_CAPACITY`. */
+export const HORSE_STRENGTH_LIMIT = 0.5
+
+/** How much less Food a horse needs for each point of Endurance above average (more below). */
+export const HORSE_ENDURANCE_EFFECT = 0.03
+
+/** The furthest Endurance moves the Food a horse needs, either way. */
+export const HORSE_ENDURANCE_LIMIT = 0.3
+
+/** How far a horse stat is from average, as a share, at most `limit` either way. */
+function horseStatShare(stat: number, effect: number, limit: number): number {
+  return Math.max(-limit, Math.min(limit, (stat - HORSE_STAT_AVERAGE) * effect))
+}
+
+/** How much faster than an average horse a horse goes, from its Speed (`CONTEXT.md`: Horse stats). */
+export function horseSpeedFactor(horse: Pick<Horse, 'stats'>): number {
+  return 1 + horseStatShare(horse.stats.speed, HORSE_SPEED_EFFECT, HORSE_SPEED_LIMIT)
+}
+
+/** How much more than usual a carriage pulled by the horse holds, from its Strength. */
+export function horseStrengthFactor(horse: Pick<Horse, 'stats'>): number {
+  return 1 + horseStatShare(horse.stats.strength, HORSE_STRENGTH_EFFECT, HORSE_STRENGTH_LIMIT)
+}
+
+/**
+ * How much of `HORSE_FOOD_PER_DAY` a horse needs, from its Endurance, as `hungerFactor` is for a
+ * resident.
+ */
+export function horseFoodFactor(horse: Pick<Horse, 'stats'>): number {
+  return 1 - horseStatShare(horse.stats.endurance, HORSE_ENDURANCE_EFFECT, HORSE_ENDURANCE_LIMIT)
+}
+
+/** A horse's age in game years at the given tick; unlike a resident, a foal ages at the usual pace. */
+export function horseAgeInYears(horse: Pick<Horse, 'bornAt'>, tick: number): number {
+  return (tick - horse.bornAt) / TICKS_PER_GAME_YEAR
+}
 
 /**
  * Starting cities lie at least this many tiles apart (about 2.5 hours' walk on plains), when the
@@ -343,9 +425,9 @@ export const NPC_ADULTS_PER_PAIR = 6
 
 /**
  * Game days a partner carries a child before it is born (`CONTEXT.md`: Carrying), not working
- * meanwhile: 60 game days, 24 real hours.
+ * meanwhile: 10 game days, 4 real hours.
  */
-export const CARRYING_DAYS = 60
+export const CARRYING_DAYS = 10
 
 /** Ticks from the start of carrying until the child is born (`CARRYING_DAYS`). */
 export const CARRYING_TICKS = CARRYING_DAYS * TICKS_PER_GAME_DAY
@@ -409,7 +491,7 @@ export const TRADE_ORG_HQ = {
   houses: 9,
   /** Farms outside the outer ring, by its gates. */
   farms: 4,
-  /** Food in its storage, in units: about a week of what everyone eats. */
+  /** Food in its storage, in units: about two weeks of what everyone eats. */
   food: 225,
   /** Coins in its coin warehouse. */
   coins: 20_000,
@@ -449,7 +531,7 @@ export const TRADING_POST = {
   houses: 2,
   /** Farms outside the wall, by the gate. */
   farms: 1,
-  /** Food in its storage, in units: about two weeks of what everyone eats. */
+  /** Food in its storage, in units: about 25 game days of what everyone eats. */
   food: 75,
   /** Coins in its warehouse. */
   coins: 2_000,
@@ -533,7 +615,7 @@ export const CARAVAN_ESCORTS_MAX = 8
 
 /**
  * Extra Food a caravan keeps on board for each escort beyond `CARAVAN_ESCORTS`, in units: the
- * same ~16 game days of `FOOD_PER_DAY` as `CARAVAN_FOOD`.
+ * same ~32 game days of `FOOD_PER_DAY` as `CARAVAN_FOOD`.
  */
 export const CARAVAN_FOOD_PER_ESCORT = 16
 
@@ -545,8 +627,8 @@ export const CARAVAN_GUARD_RANGE = 16
 
 /**
  * Food a caravan keeps on board for its crew and its horse, in units, topped up at the storage
- * at each end of its route (`CONTEXT.md`: Caravan): a driver, two escorts and a horse eat 4.5 a
- * game day, so this lasts about 16 game days, the longest leg on a full-size map (~15).
+ * at each end of its route (`CONTEXT.md`: Caravan): a driver, two escorts and a horse eat 2.25 a
+ * game day, so this lasts about 32 game days, twice the longest leg on a full-size map (~15).
  */
 export const CARAVAN_FOOD = 72
 
@@ -645,32 +727,43 @@ export function carryCapacity(resident: Resident, tick: number): number {
 }
 
 /** Food a resident of average Endurance eats per game day, in units (`CONTEXT.md`: Hunger). */
-export const FOOD_PER_DAY = 1
+export const FOOD_PER_DAY = 0.5
 
 /**
- * A resident at home is running low on food when they carry fewer units than this: less than a
- * game day's meals (`CONTEXT.md`: Eating). They then take meals from their city's storage.
+ * A resident at home is running low on food when they carry fewer units than this: less than one
+ * meal, two game days' eating (`CONTEXT.md`: Eating). They then take meals from their city's storage.
  */
 export const HOME_FOOD_LOW = 1
 
 /**
- * A resident's own food (`CONTEXT.md`: Own food), in units: two game days of meals. Putting goods
+ * A resident's own food (`CONTEXT.md`: Own food), in units: four game days of meals. Putting goods
  * away leaves it in their hands unless the Player asks for an exact amount (`putAwayUnits`); NPC
  * residents always keep it, so nobody walks to the storage for the food they carry anyway.
  */
-export const OWN_FOOD = 2 * FOOD_PER_DAY
+export const OWN_FOOD = 4 * FOOD_PER_DAY
 
-/** Units of food in one meal, what a resident at home takes from storage at a time. */
+/**
+ * Food a resident running the Breed horses default takes from the stable before they start, if
+ * they carry less (`CONTEXT.md`: Breeding): their meals for the `STABLE_BREED_DAYS` of tending,
+ * away from home.
+ */
+export const BREED_FOOD = STABLE_BREED_DAYS * FOOD_PER_DAY
+
+/**
+ * Units of food in one meal, what a resident at home takes from storage at a time: two game days'
+ * eating.
+ */
 export const MEAL_UNITS = 1
 
 /**
- * Game days a full hunger meter lasts without eating, at average Endurance. With `STARVE_DAYS`, a
+ * Game days a full hunger meter lasts without eating, at average Endurance. A unit of food fills
+ * two thirds of it, so a fed resident's meter never drops below a third. With `STARVE_DAYS`, a
  * resident dies about 5 game days (2 real hours) after their last meal.
  */
-export const HUNGER_DAYS = 2
+export const HUNGER_DAYS = 3
 
 /** Game days an empty hunger meter takes to cost a resident all their health. */
-export const STARVE_DAYS = 3
+export const STARVE_DAYS = 2
 
 /** Game days a fed resident takes to heal from no health back to full. */
 export const HEAL_DAYS = 3
@@ -839,17 +932,46 @@ export function carriageCanEnter(terrain: number): boolean {
 }
 
 /**
- * How many tiles per tick a carriage driven by `driver` goes onto a tile of the given terrain
- * (`CONTEXT.md`: Carriage): the terrain's `CARRIAGE_SPEED`, up to `DRIVING_SKILL_LIMIT` faster
- * with Driving skill. The horse sets the pace, so the driver's Agility does not count. Zero for
- * terrain a carriage cannot enter.
+ * How many tiles per tick a carriage driven by `driver` and pulled by `horse` goes onto a tile of
+ * the given terrain (`CONTEXT.md`: Carriage, Horse stats): the terrain's `CARRIAGE_SPEED`, scaled
+ * by the horse's Speed, and up to `DRIVING_SKILL_LIMIT` faster with Driving skill. The horse sets
+ * the pace, so the driver's Agility does not count. Zero for terrain a carriage cannot enter.
  */
-export function driveSpeed(driver: Resident, terrain: number): number {
+export function driveSpeed(driver: Resident, horse: Pick<Horse, 'stats'>, terrain: number): number {
   const base = (CARRIAGE_SPEED as Partial<Record<number, number>>)[terrain] ?? 0
   const skilled =
     1 + Math.min(DRIVING_SKILL_LIMIT, (driver.skills.driving ?? 0) * DRIVING_SKILL_EFFECT)
-  return (base * skilled) / WALK_TICKS_PER_TILE
+  return (base * horseSpeedFactor(horse) * skilled) / WALK_TICKS_PER_TILE
 }
+
+/** How fast a hungry horse goes under its rider (`HORSE_HUNGRY_SHARE`), as a share of its pace. */
+export const HUNGRY_HORSE_PACE = 0.5
+
+/**
+ * How many tiles per tick a resident riding `horse` goes onto a tile of the given terrain
+ * (`CONTEXT.md`: Riding): as fast as the horse would pull a carriage there (`driveSpeed`), and
+ * only `HUNGRY_HORSE_PACE` of that while the horse is hungry. Zero where no carriage can go.
+ */
+export function rideSpeed(
+  rider: Resident,
+  horse: Pick<Horse, 'stats' | 'hunger'>,
+  terrain: number,
+): number {
+  const hungry = horse.hunger < HORSE_HUNGRY_SHARE * MAX_HUNGER
+  return driveSpeed(rider, horse, terrain) * (hungry ? HUNGRY_HORSE_PACE : 1)
+}
+
+/**
+ * Most weight a carriage pulled by `horse` holds, in kg (`CONTEXT.md`: Horse stats):
+ * `CARRIAGE_CAPACITY`, scaled by the horse's Strength. A carriage with no horse holds
+ * `CARRIAGE_CAPACITY`.
+ */
+export function carriageCapacityWith(horse: Pick<Horse, 'stats'> | undefined): number {
+  return horse ? CARRIAGE_CAPACITY * horseStrengthFactor(horse) : CARRIAGE_CAPACITY
+}
+
+/** The most any carriage can hold, behind the strongest horse. */
+export const CARRIAGE_MAX_CAPACITY = CARRIAGE_CAPACITY * (1 + HORSE_STRENGTH_LIMIT)
 
 /**
  * Driving skill a driver learns from one tick of driving (`CONTEXT.md`: Skill, learned by doing),
@@ -1058,8 +1180,15 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   road: { stone: 1 },
   /** A house (`CONTEXT.md`: House): timber for four residents' room. */
   house: { wood: 20 },
+  /** A storage (`CONTEXT.md`: Storage): a timber store on a stone floor, a little more than a house. */
+  storage: { wood: 30, stone: 10 },
   /** A farm is fields on Plains: work, but no materials, so a city can always feed itself. */
   farm: {},
+  /**
+   * A carriage, built at a stable (`CONTEXT.md`: Carriage): a wooden cart with iron fittings, so a
+   * realm needs a smelter's iron for its second carriage.
+   */
+  carriage: { wood: 30, iron: 5 },
 }
 
 /**
@@ -1067,7 +1196,8 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
  * a mint 5, a smithy 5, a town hall 6. A tile of wooden wall takes a sixteenth of a game day, a
  * gate an eighth, a tile of road a sixteenth (a quarter of what a 40 m tile took), a house one
- * game day and a farm half of one. More or stronger workers finish it sooner (`buildWork`).
+ * game day, a storage two and a farm half of one; a carriage two. More or stronger workers
+ * finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -1082,7 +1212,9 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   gate: TICKS_PER_GAME_DAY / 8,
   road: TICKS_PER_GAME_DAY / 16,
   house: TICKS_PER_GAME_DAY,
+  storage: 2 * TICKS_PER_GAME_DAY,
   farm: TICKS_PER_GAME_DAY / 2,
+  carriage: 2 * TICKS_PER_GAME_DAY,
 }
 
 /**
@@ -1209,7 +1341,7 @@ export const BATCHES_PER_DAY: Partial<Record<BuildingKind, number>> = {
  * gold ore slowest.
  */
 export const WORK_OUTPUT_PER_DAY: Partial<Record<Good, number>> = {
-  food: 4,
+  food: 2,
   wood: 4,
   stone: 3,
   ironOre: 2,
@@ -1540,10 +1672,28 @@ export const SCRIPT_REALM_STEP_BUDGET = 20000
 export const SCRIPT_MEMORY_MAX = 4000
 
 /**
+ * The longest text a script can give `doing()` for its resident's Doing line (`CONTEXT.md`:
+ * Doing), in characters after trimming; longer text is cut. One line of the resident card.
+ */
+export const DOING_MAX_LENGTH = 60
+
+/**
  * Ticks between two realm-log entries about the same resident's script going wrong (an error,
  * or running out of steps), so a script failing every tick doesn't flood the log. A minute.
  */
 export const SCRIPT_LOG_INTERVAL = 60
+
+/** The most steps a queue holds (`CONTEXT.md`: Queue): plenty for a day's round. */
+export const QUEUE_MAX_STEPS = 20
+
+/** The most a queue step's order request may hold, in characters of its JSON. */
+export const QUEUE_STEP_MAX_CHARS = 1000
+
+/**
+ * The duration, in game minutes, the card gives a step that never ends on its own (work, haul)
+ * once another step is put after it without one: a game hour, a real minute.
+ */
+export const QUEUE_DEFAULT_STEP_MINUTES = 60
 
 /** The longest realm name a Player may give, in characters after trimming (`CONTEXT.md`: Realm name). */
 export const REALM_NAME_MAX_LENGTH = 30

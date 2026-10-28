@@ -1,4 +1,5 @@
 import {
+  AVERAGE_HORSE_STATS,
   TICKS_PER_GAME_DAY,
   Terrain,
   captorOf,
@@ -153,6 +154,8 @@ describe('capturing a city', () => {
       y: 21,
       hunger: 100,
       health: 100,
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: 0,
     })
     world.horses.push(horse('hN', 'npc'), horse('hO', 'npc2'))
     world.carriages.push({
@@ -195,6 +198,8 @@ describe('capturing a city', () => {
       y: 40,
       hunger: 100,
       health: 100,
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: 0,
     })
     world.horses.push({
       id: 'hB',
@@ -204,6 +209,8 @@ describe('capturing a city', () => {
       y: 40,
       hunger: 100,
       health: 100,
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: 0,
     })
     world.carriages.push({
       id: 'kA',

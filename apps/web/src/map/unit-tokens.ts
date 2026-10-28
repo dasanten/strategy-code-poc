@@ -1,11 +1,12 @@
-import type {
-  Army,
-  Building,
-  SeenCaravan,
-  SeenCarriage,
-  SeenCity,
-  SeenHorse,
-  SeenResident,
+import {
+  SHARES_A_TILE,
+  type Army,
+  type Building,
+  type SeenCaravan,
+  type SeenCarriage,
+  type SeenCity,
+  type SeenHorse,
+  type SeenResident,
 } from '@csp/shared'
 import { caravanParts } from '../caravans.js'
 import { ACTIVITY_ART, BASE_ART, PAINTED_UNIT_ART, UNIT_ART, paintedCell } from './art.js'
@@ -24,6 +25,7 @@ import {
   armyBanners,
   entityRelationship,
   residentGroups,
+  unitRadius,
   type Known,
   type ResidentGroup,
 } from './units.js'
@@ -74,10 +76,21 @@ function drawUnit(
 }
 
 /**
+ * The horse under a rider (`CONTEXT.md`: Riding): a small horse badge at the lower left of the
+ * resident's token, in their relationship colour.
+ */
+function drawMount(tokens: TokenLayer, x: number, y: number, r: number, rel: Tone | undefined) {
+  const [hx, hy] = [x - r * 0.85, y + r * 0.8]
+  tokens.place(BASE_ART.round, hx, hy, r * 1.05)
+  tokens.place(UNIT_ART.horse, hx, hy, r * 0.62, relationshipColor(rel))
+}
+
+/**
  * Residents, carriages, horses, Trade Org caravans and armies at middle zoom and closer
  * (ADR 0008): residents on one tile as one token with a count, coloured by the largest group,
  * or up close as single figures with their activity (`drawFigures`);
- * an army as a banner with its soldier count; carts and caravans; horses not hitched to a cart.
+ * an army as a banner with its soldier count; carts and caravans; horses not hitched to a cart,
+ * and a ridden one as a small horse by its rider.
  * Units on a tile with a building or a cart step aside to its corners so both show.
  * Tokens are coloured as `viewer` sees them; the `leaders` wear the crown.
  */
@@ -98,7 +111,7 @@ export function drawUnits(
     caravan: new Set([...parts.carriages, ...parts.crew]),
   }
   const key = (e: { x: number; y: number }) => `${e.x},${e.y}`
-  const built = new Set(world.buildings.filter((b) => b.kind !== 'road').map(key))
+  const built = new Set(world.buildings.filter((b) => !SHARES_A_TILE.includes(b.kind)).map(key))
   const carted = new Set(world.carriages.map(key))
   const peopled = new Set(world.residents.map(key))
   const at = (x: number, y: number, dx = 0, dy = 0) =>
@@ -112,10 +125,12 @@ export function drawUnits(
   const badge = (label: string, x: number, y: number, r: number) =>
     badges.place(label, x + r * 0.85, y - r * 0.85, badgeSize)
 
-  // Horses standing free; a hitched one moves with its cart and shows as the cart.
+  // Horses standing free; a hitched one moves with its cart and shows as the cart, a ridden one
+  // with its rider.
   const hitched = new Set(world.carriages.map((k) => k.horseId))
+  const ridden = new Set(world.residents.map((r) => r.riding))
   for (const h of world.horses) {
-    if (hitched.has(h.id)) continue
+    if (hitched.has(h.id) || ridden.has(h.id)) continue
     const busy = built.has(key(h)) || carted.has(key(h)) || peopled.has(key(h))
     const p = at(h.x, h.y, busy ? -0.28 : 0, busy ? -0.28 : 0)
     if (!near(p)) continue
@@ -123,7 +138,7 @@ export function drawUnits(
       tokens,
       UNIT_ART.horse,
       ...p,
-      Math.max(4.5, tile * 0.24),
+      unitRadius('horse', tile),
       entityRelationship(h, viewer, known),
     )
   }
@@ -136,7 +151,7 @@ export function drawUnits(
       tokens,
       caravan ? UNIT_ART.caravan : UNIT_ART.carriage,
       ...p,
-      Math.max(5.5, tile * 0.36),
+      unitRadius('carriage', tile),
       entityRelationship(k, viewer, known),
     )
   }
@@ -146,13 +161,13 @@ export function drawUnits(
   const place = (x: number, y: number, full: number) => {
     const aside = built.has(`${x},${y}`) || carted.has(`${x},${y}`)
     const [sx, sy] = at(x, y, aside ? 0.3 : 0, aside ? 0.3 : 0)
-    return { x: sx, y: sy, r: aside ? Math.max(5, tile * 0.28) : full }
+    return { x: sx, y: sy, r: aside ? unitRadius('aside', tile) : full }
   }
 
   const banners = armyBanners(world.armies, world.residents)
   const armyById = new Map(world.armies.map((a) => [a.id, a]))
   for (const b of banners) {
-    const spot = place(b.x, b.y, Math.max(6, tile * 0.4))
+    const spot = place(b.x, b.y, unitRadius('army', tile))
     if (!near([spot.x, spot.y])) continue
     const army = armyById.get(b.armyId)!
     drawUnit(tokens, UNIT_ART.army, spot.x, spot.y, spot.r, entityRelationship(army, viewer, known))
@@ -176,14 +191,18 @@ export function drawUnits(
         relOf: (id) => rels.get(id),
         leaders,
         activityOf: (id) => residentActivity(byId.get(id)!),
+        rides: (id) => byId.get(id)?.riding !== undefined,
         spots,
       })
       continue
     }
-    const spot = place(g.x, g.y, Math.max(5.5, tile * 0.36))
+    const spot = place(g.x, g.y, unitRadius('residents', tile))
     if (!near([spot.x, spot.y])) continue
     drawUnit(tokens, g.leader ? UNIT_ART.leader : UNIT_ART.person, spot.x, spot.y, spot.r, g.rel)
     if (g.ids.length > 1) badge(`×${g.ids.length}`, spot.x, spot.y, spot.r)
+    if (g.ids.some((id) => byId.get(id)?.riding !== undefined)) {
+      drawMount(tokens, spot.x, spot.y, spot.r, g.rel)
+    }
     for (const id of g.ids) spots.set(id, spot)
   }
   return spots
@@ -194,7 +213,8 @@ const ACTIVITY_SCALE = 22
 
 /**
  * The residents on one tile as single figures at close zoom (ADR 0008): up to four, each in its
- * own relationship colour with an activity icon at its lower right; with more, three and a "+N"
+ * own relationship colour with an activity icon at its lower right, and a rider's horse at its
+ * lower left; with more, three and a "+N"
  * badge. Residents left out are found at the badge.
  */
 function drawFigures(
@@ -207,11 +227,12 @@ function drawFigures(
     relOf: (id: string) => Tone | undefined
     leaders: Leaders
     activityOf: (id: string) => Activity | undefined
+    rides: (id: string) => boolean
     spots: Map<string, Spot>
   },
 ) {
   const { figures, more } = tileFigures(g.ids, of.relOf, of.leaders)
-  const r = tile * 0.2
+  const r = unitRadius('figure', tile)
   for (const f of figures) {
     const [x, y] = at(f.dx, f.dy)
     const rel = of.relOf(f.id)
@@ -224,6 +245,7 @@ function drawFigures(
       tokens.place(BASE_ART.round, ax, ay, r * 1.05)
       tokens.place(ACTIVITY_ART[activity], ax, ay, r * 0.62, relationshipColor(rel))
     }
+    if (of.rides(f.id)) drawMount(tokens, x, y, r, rel)
   }
   if (more) {
     const [x, y] = at(more.dx, more.dy)

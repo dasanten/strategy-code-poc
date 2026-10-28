@@ -56,9 +56,9 @@ describe('buildingInfoLines', () => {
   })
 
   it('gives a building nobody builds no cost line', () => {
-    expect(buildingInfoLines('storage', labels)).toEqual([
-      BUILDING_PURPOSE.storage,
-      `Footprint ${FOOTPRINT.storage} × ${FOOTPRINT.storage} tiles`,
+    expect(buildingInfoLines('warehouse', labels)).toEqual([
+      BUILDING_PURPOSE.warehouse,
+      `Footprint ${FOOTPRINT.warehouse} × ${FOOTPRINT.warehouse} tiles`,
     ])
   })
 

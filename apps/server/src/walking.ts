@@ -7,23 +7,29 @@ import {
   drivingLearned,
   groundAt,
   horseFor,
+  horseRidden,
   isPassableTerrain,
   mayStep,
   wallSide,
   strandedOnWall,
   tileIndex,
+  terrainAt,
   wallMap,
   wallsKey,
   roadTiles,
   walkSpeed,
+  rideSpeed,
   besideStep,
+  isLineOrder,
   stepLength,
   type AttackOrder,
   type DriveOrder,
   type HaulOrder,
   type OrderRequest,
   type Resident,
-  type RoadLineOrder,
+  type LineOrder,
+  type StoreOrder,
+  type FetchOrder,
   type TerrainMap,
   type WalkOrder,
   type WallMap,
@@ -35,19 +41,22 @@ import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { waitingForArmy } from './armies.js'
 import { waitingForEscort } from './caravans.js'
 import { attackTarget } from './combat.js'
+import { endOrder, placeOf, placeTile } from './storing.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
 export const PATH_BUDGET_MS = 50
 
 /**
- * An action a resident requests: step onto the next tile, on foot or, with `carriageId`, driving
- * that carriage there. The world checks and resolves it at the end of the tick.
+ * An action a resident requests: step onto the next tile, on foot, with `carriageId` driving that
+ * carriage there, or with `horseId` riding that horse there. The world checks and resolves it at
+ * the end of the tick.
  */
 export interface StepAction {
   kind: 'step'
   residentId: string
   to: { x: number; y: number }
   carriageId?: string
+  horseId?: string
 }
 
 /** The input of a walk-to order: which resident, and the tile to go to. */
@@ -63,11 +72,15 @@ interface WalkToRequest extends OrderRequest {
  * only sets the resident's order; the path is found and the steps are taken in later ticks.
  */
 export const walkTo: OrderKind = {
-  validate(world, sender: OrderSender, order: OrderRequest) {
+  validate(world, sender: OrderSender, order: OrderRequest, terrain) {
     const o = order as Partial<WalkToRequest>
     const r = orderedResident(world, sender, o.residentId)
     if (!r) return 'not one of your residents'
     if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the target must be a tile'
+    // A rider goes where a carriage could (`CONTEXT.md`: Riding).
+    if (r.riding !== undefined && terrain && !carriageCanEnter(terrainAt(terrain, o.x!, o.y!))) {
+      return 'a horse can’t go there'
+    }
     return undefined
   },
   apply(world, _sender, order) {
@@ -81,12 +94,14 @@ export const walkTo: OrderKind = {
  * A walk-to or drive order, a haul route driving to its next stop, an attack order going after
  * its target, or a road order walking to its next tile: all go along a path.
  */
-type MoveOrder = WalkOrder | DriveOrder | HaulOrder | AttackOrder | RoadLineOrder
+type MoveOrder =
+  WalkOrder | DriveOrder | HaulOrder | AttackOrder | LineOrder | StoreOrder | FetchOrder
 
 function moveOrder(r: Resident): MoveOrder | undefined {
   const o = r.order
   if (o?.kind === 'haul') return o.phase === 'driving' ? o : undefined
-  if (o?.kind === 'roadLine') return o.phase === 'walking' ? o : undefined
+  if (isLineOrder(o)) return o.phase === 'walking' ? o : undefined
+  if (o?.kind === 'store' || o?.kind === 'fetch') return o.phase === 'walking' ? o : undefined
   return o?.kind === 'walkTo' || o?.kind === 'drive' || o?.kind === 'attack' ? o : undefined
 }
 
@@ -97,19 +112,26 @@ function moveOrder(r: Resident): MoveOrder | undefined {
 function targetOf(world: WorldState, o: MoveOrder): { x: number; y: number } | undefined {
   if (o.kind === 'haul') return o[o.stop]
   if (o.kind === 'attack') return attackTarget(world, o.targetId)
-  if (o.kind === 'roadLine') return { x: o.tiles[0]![0], y: o.tiles[0]![1] }
+  if (isLineOrder(o)) return { x: o.tiles[0]![0], y: o.tiles[0]![1] }
+  if (o.kind === 'store' || o.kind === 'fetch') return placeTile(world, placeOf(o))
   return o.target
 }
 
-/** The search for a moving order's path, by kind and target. */
-function searchKey(world: WorldState, o: MoveOrder): string {
+/** The search for a moving order's path, by kind, target and whether the resident rides. */
+function searchKey(world: WorldState, r: Resident, o: MoveOrder): string {
   const to = targetOf(world, o)
-  return to ? `${o.kind}:${to.x},${to.y}` : `${o.kind}:gone`
+  const how = r.riding === undefined ? o.kind : `${o.kind}:riding`
+  return to ? `${how}:${to.x},${to.y}` : `${how}:gone`
 }
 
-/** On foot, rather than driving a carriage. */
-function onFoot(o: MoveOrder): o is WalkOrder | AttackOrder | RoadLineOrder {
-  return o.kind === 'walkTo' || o.kind === 'attack' || o.kind === 'roadLine'
+/** Not driving a carriage: walking, or riding a horse. */
+function onFoot(o: MoveOrder): o is WalkOrder | AttackOrder | LineOrder | StoreOrder | FetchOrder {
+  return o.kind !== 'drive' && o.kind !== 'haul'
+}
+
+/** Walking for real: not driving, and riding no horse (`CONTEXT.md`: Riding). */
+function walking(r: Resident, o: MoveOrder): boolean {
+  return onFoot(o) && r.riding === undefined
 }
 
 /**
@@ -170,8 +192,14 @@ function arrive(r: Resident, o: MoveOrder): void {
     o.progress = 0
     return
   }
-  if (o.kind === 'roadLine') {
+  if (isLineOrder(o)) {
     o.phase = 'building'
+    o.path = null
+    o.progress = 0
+    return
+  }
+  if (o.kind === 'store' || o.kind === 'fetch') {
+    o.phase = o.kind === 'store' ? 'putting' : 'taking'
     o.path = null
     o.progress = 0
     return
@@ -216,7 +244,8 @@ export class Walking {
 
   /**
    * Requests this tick's steps for every walking resident and every driver. A driver goes at
-   * their carriage's speed and learns Driving while they drive. On a finished road both go at
+   * their carriage's speed and learns Driving while they drive; so does a rider, at their horse's
+   * (`CONTEXT.md`: Riding). On a finished road all go at
    * road speed, whatever the terrain beneath (`CONTEXT.md`: Road), and paths prefer roads.
    */
   requestSteps(world: WorldState, budgetMs = PATH_BUDGET_MS): StepAction[] {
@@ -235,6 +264,12 @@ export class Walking {
     for (const r of world.residents) {
       const o = moveOrder(r)
       if (o?.kind === 'attack' && attackHolds(world, r, o, this.terrain.size)) holding.add(r.id)
+      // A store or fetch order whose carriage moved on since its path was found finds a new one.
+      if ((o?.kind === 'store' || o?.kind === 'fetch') && o.path) {
+        const to = targetOf(world, o)
+        const end = o.path.at(-1)
+        if (to && end && (end[0] !== to.x || end[1] !== to.y)) o.path = null
+      }
     }
     const waiting = waitingForArmy(world, holding)
     // And caravans with their escort (`CONTEXT.md`: Caravan).
@@ -251,8 +286,22 @@ export class Walking {
       // Keeping together with their army (`CONTEXT.md`: Army).
       if (waiting.has(r.id)) continue
       const ground = groundAt(this.terrain, roads, next[0], next[1])
+      const riding = onFoot(o) ? horseRidden(world, r) : undefined
       if (!onFoot(o)) {
-        o.progress += driveSpeed(r, ground)
+        // The horse sets the pace (`CONTEXT.md`: Horse stats). Without one the step goes at
+        // once, so resolving it ends the order.
+        const carriage = world.carriages.find((k) => k.id === o.carriageId)
+        const horse = carriage && horseFor(world, carriage)
+        if (!horse) {
+          const to = { x: next[0], y: next[1] }
+          steps.push({ kind: 'step', residentId: r.id, to, carriageId: o.carriageId })
+          continue
+        }
+        o.progress += driveSpeed(r, horse, ground)
+        r.skills.driving = (r.skills.driving ?? 0) + drivingLearned(r, world.tick)
+      } else if (riding) {
+        // The horse sets the pace, and riding trains Driving too (`CONTEXT.md`: Riding).
+        o.progress += rideSpeed(r, riding, ground)
         r.skills.driving = (r.skills.driving ?? 0) + drivingLearned(r, world.tick)
       } else {
         o.progress += walkSpeed(r, ground, world.tick)
@@ -262,7 +311,14 @@ export class Walking {
       if (o.progress < length) continue
       const to = { x: next[0], y: next[1] }
       const carriageId = onFoot(o) ? undefined : o.carriageId
-      steps.push({ kind: 'step', residentId: r.id, to, ...(carriageId ? { carriageId } : {}) })
+      const horseId = riding?.id
+      steps.push({
+        kind: 'step',
+        residentId: r.id,
+        to,
+        ...(carriageId ? { carriageId } : {}),
+        ...(horseId ? { horseId } : {}),
+      })
     }
     return steps
   }
@@ -278,13 +334,14 @@ export class Walking {
       const target = targetOf(world, o)
       if (!target) continue
       // A new order for a resident replaces any search for their old one.
-      const key = searchKey(world, o)
+      const key = searchKey(world, r, o)
       if (this.searching.get(r.id) !== key) {
-        const costs = onFoot(o) ? WALKING_COSTS : CARRIAGE_COSTS
+        // A rider keeps to where a carriage can go, and off the walls (`CONTEXT.md`: Riding).
+        const costs = walking(r, o) ? WALKING_COSTS : CARRIAGE_COSTS
         // An attacker only needs to come into contact, even with a defender up on a wall.
         // So does a carriage going after an army (`CONTEXT.md`: Supply line).
         const near = o.kind === 'attack' || armyDrivenTo(r) !== undefined
-        const options = { realmId: wallSide(r), onWalls: onFoot(o), near }
+        const options = { realmId: wallSide(r), onWalls: walking(r, o), near }
         this.finder.request(r.id, [r.x, r.y], [target.x, target.y], costs, options)
         this.searching.set(r.id, key)
       }
@@ -296,9 +353,9 @@ export class Walking {
       this.searching.delete(id)
       const r = world.residents.find((x) => x.id === id)
       const o = r && moveOrder(r)
-      if (!o || o.path || searchKey(world, o) !== key) continue
+      if (!o || o.path || searchKey(world, r, o) !== key) continue
       if (result.status === 'found') o.path = result.path.map(([x, y]) => [x, y])
-      else r.order = null
+      else endOrder(world, r, 'no way')
     }
   }
 
@@ -308,7 +365,8 @@ export class Walking {
    * (`mayStep`), and for a diagonal step both straight tiles beside it could be stepped onto too
    * (`CONTEXT.md`: Step). A driver's step also needs their carriage on their tile with a horse to
    * pull it, and tiles a carriage can enter; the carriage and its horse, hitched now if it
-   * wasn't, go along. Each step taken uses up its length in tiles of progress.
+   * wasn't, go along. A rider's step likewise needs their horse with them and a tile a carriage
+   * could enter, and the horse goes along. Each step taken uses up its length in tiles of progress.
    */
   resolve(world: WorldState, steps: StepAction[]): number {
     let taken = 0
@@ -327,7 +385,7 @@ export class Walking {
       const from = tileIndex(size, r.x, r.y)
       const to = tileIndex(size, step.to.x, step.to.y)
       const side = wallSide(r)
-      const onWalls = !step.carriageId
+      const onWalls = !step.carriageId && !step.horseId
       const stranded = strandedOnWall(walls, side, from)
       const enterable = (t: number) => {
         const g = groundAt(this.terrain, roads, t % size, Math.floor(t / size))
@@ -356,6 +414,21 @@ export class Walking {
         carriage.horseId = horse.id
         carriage.x = horse.x = step.to.x
         carriage.y = horse.y = step.to.y
+      }
+      if (step.horseId) {
+        // A rider who got off, or a path found on foot that leads where a horse can't go, finds
+        // a new way (`CONTEXT.md`: Riding).
+        const horse = r.riding === step.horseId ? horseRidden(world, r) : undefined
+        if (!horse || horse.x !== r.x || horse.y !== r.y || !carriageCanEnter(ground)) {
+          const o = moveOrder(r)
+          if (o) {
+            o.path = null
+            o.progress = 0
+          }
+          continue
+        }
+        horse.x = step.to.x
+        horse.y = step.to.y
       }
       r.x = step.to.x
       r.y = step.to.y

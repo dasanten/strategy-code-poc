@@ -9,8 +9,11 @@ import {
 import {
   buildAtProblem,
   buildingAt,
+  canWork,
   DEFAULT_SCRIPTS,
   commanderOf,
+  MAP_SIZE,
+  stableAt,
   commands,
   isTask,
   type Good,
@@ -45,6 +48,7 @@ import {
   type ScriptContext,
 } from './script-bindings.js'
 import type { RunnableScript } from './scripts.js'
+import { paramValues, scriptParamsSound } from './script-params.js'
 import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
 
@@ -157,6 +161,14 @@ interface TearDownTaskRequest extends OrderRequest {
   buildingId: string
 }
 
+/** Feed the stable: the stable the resident stands in (`CONTEXT.md`: Feeding the stable). */
+interface FeedStableTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'feedStable'
+  residentId: string
+  stableId: string
+}
+
 interface BuildTaskRequest extends OrderRequest {
   kind: 'task'
   task: 'build'
@@ -169,7 +181,22 @@ interface BuildTaskRequest extends OrderRequest {
   at?: { x: number; y: number }
 }
 
-type TaskRequest = WorkTaskRequest | BuildTaskRequest | HaulTaskRequest | TearDownTaskRequest
+/** Breed horses: the breed order's input, at the stable the resident stands at. */
+interface BreedTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'breed'
+  residentId: string
+  stableId: string
+  horseIds: [string, string]
+}
+
+type TaskRequest =
+  | WorkTaskRequest
+  | BuildTaskRequest
+  | HaulTaskRequest
+  | TearDownTaskRequest
+  | BreedTaskRequest
+  | FeedStableTaskRequest
 
 /** The built-in order a task's request is checked as, for the resident. */
 function asOrder(o: Partial<TaskRequest>): OrderRequest {
@@ -180,6 +207,8 @@ function asOrder(o: Partial<TaskRequest>): OrderRequest {
     return { kind: 'haul', residentId, carriageId, x, y, goods, returnGoods, keepFood }
   }
   if (o.task === 'tearDown') return { kind: 'tearDown', residentId, buildingId: o.buildingId }
+  if (o.task === 'breed')
+    return { kind: 'breed', residentId, stableId: o.stableId, horseIds: o.horseIds }
   if (o.task === 'build') return { kind: 'build', residentId, building: o.building }
   return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
 }
@@ -212,6 +241,17 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
       const memory: TaskMemory['tearDown'] = { buildingId: order.buildingId }
       return { ...memory }
     }
+    case 'breed': {
+      const memory: TaskMemory['breed'] = {
+        stableId: order.stableId,
+        horseIds: [...order.horseIds],
+      }
+      return { ...memory }
+    }
+    case 'feedStable': {
+      const memory: TaskMemory['feedStable'] = { stableId: order.stableId }
+      return { ...memory }
+    }
   }
 }
 
@@ -221,7 +261,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * target (`TaskMemory`). It ends whatever the resident was doing. Each task is checked as the
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
  * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
- * the tear-down order.
+ * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
+ * own: the resident stands in the stable and is grown up.
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
@@ -235,6 +276,12 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
         const workplaceId = (o as Partial<WorkTaskRequest>).workplaceId
         if (typeof workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== workplaceId)
           return 'not standing on that workplace'
+      }
+      if (o.task === 'feedStable') {
+        // No order of its own: they store and fetch, which children can't.
+        const size = terrain?.size ?? MAP_SIZE
+        if (stableAt(world, r.x, r.y, size)?.id !== o.stableId) return 'not standing in that stable'
+        return canWork(r, world.tick) ? undefined : 'children can’t store or fetch goods'
       }
       if (o.task === 'build' && o.at !== undefined) {
         // Somewhere else: checked as the build order there, once they have walked to it.
@@ -368,7 +415,7 @@ export class ScriptRunner {
     }
     this.programs = used
     if (check) {
-      out.push(...runningScriptsSound(world))
+      out.push(...runningScriptsSound(world), ...scriptParamsSound(world))
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
@@ -418,17 +465,23 @@ export class ScriptRunner {
     used.set(running.scriptId, parsed)
 
     const memory = structuredClone(running.memory) as ScriptObject
-    const { globals, requests } = bindScript({
+    // A resident's picked param values; an army's params are never picked.
+    const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
+    const declared = parsed.program.params
+    const params = resident ? paramValues(world, resident, running.scriptId, declared) : declared
+    const bound = bindScript({
       world,
       terrain: this.terrain,
       sender,
       ...r.bind,
       memory,
+      params,
       seen,
       sees,
       explored: (x, y) => this.host.explored(realm.userId, x, y),
       kinds: this.kinds,
     })
+    const { globals, requests } = bound
     const result = run(parsed.program, { globals, steps, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
     if (violations) {
       const sound = 'armyId' in r.bind ? armyScriptRequestsSound : scriptRequestsSound
@@ -449,6 +502,10 @@ export class ScriptRunner {
     }
     // What it requested counts, even when it stopped with an error or out of steps.
     for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
+    if (bound.ended()) {
+      endScript(world, r.id)
+      return result.steps
+    }
 
     const kept = keepMemory(memory)
     if (typeof kept === 'string') {
@@ -470,6 +527,17 @@ export class ScriptRunner {
     }
     return result.steps
   }
+}
+
+/**
+ * A resident's script called `end()` (`CONTEXT.md`: Running a script): it ends and they stand
+ * idle; in a queue, its next step starts.
+ */
+function endScript(world: WorldState, residentId: string): void {
+  const r = world.residents.find((x) => x.id === residentId)
+  if (!r) return
+  delete r.script
+  r.order = null
 }
 
 const scriptError = (
@@ -619,7 +687,7 @@ function runCityScripts(
     let program = gamePrograms.get(source)
     if (!program) gamePrograms.set(source, (program = parse(source)))
     const memory = structuredClone(running.memory) as ScriptObject
-    const { globals, requests } = bindScript({
+    const bound = bindScript({
       world,
       terrain,
       sender,
@@ -629,9 +697,16 @@ function runCityScripts(
       sees,
       explored: () => true,
       kinds,
+      // Nobody picks values for an NPC city: its defaults fall back on their own.
+      params: program.params,
     })
+    const { globals, requests } = bound
     run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
+    if (bound.ended()) {
+      endScript(world, r.id)
+      continue
+    }
     const kept = keepMemory(memory)
     if (typeof kept !== 'string' && r.script === running) running.memory = kept
   }

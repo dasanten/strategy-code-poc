@@ -183,7 +183,7 @@ button.hud-logout {
   left: var(--rail-w);
   bottom: 0;
   z-index: 2;
-  width: min(380px, calc(100vw - var(--rail-w)));
+  width: min(var(--drawer-w, 380px), calc(100vw - var(--rail-w)));
   box-sizing: border-box;
   padding: 12px 16px 16px;
   overflow: auto;
@@ -201,6 +201,23 @@ button.hud-logout {
 }
 .hud-drawer[hidden] {
   display: none;
+}
+/* The drag handle on the open drawer's right edge (`DrawerEdge`), over the drawer's border. */
+.hud-drawer-edge {
+  position: absolute;
+  top: var(--top-h);
+  bottom: 0;
+  left: calc(var(--rail-w) + min(var(--drawer-w, 380px), 100vw - var(--rail-w)) - 4px);
+  z-index: 3;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.hud-drawer-edge:hover,
+.hud-drawer-edge:focus-visible,
+.hud-drawer-edge:active {
+  outline: none;
+  background: linear-gradient(to right, transparent 3px, var(--rel-own) 3px 5px, transparent 5px);
 }
 .hud-drawer-head {
   display: flex;
@@ -255,6 +272,13 @@ button.hud-logout {
   margin-top: 18px;
 }
 @media (max-width: 640px) {
+  /* Phones keep the fixed width: no handle, the drawer covers what fits. */
+  .hud-drawer:not(.wide) {
+    width: min(380px, calc(100vw - var(--rail-w)));
+  }
+  .hud-drawer-edge {
+    display: none;
+  }
   .hud-goods,
   .hud-top .hud-muted,
   .hud-top .hud-sep {
@@ -792,7 +816,7 @@ label > select {
 }
 .residents-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) 26px minmax(0, 1.5fr) 48px 58px;
+  grid-template-columns: minmax(0, 1.3fr) 26px minmax(0, 1.5fr) 48px 76px;
   gap: 8px;
   align-items: center;
   min-height: 34px;
@@ -842,6 +866,13 @@ button.residents-row.selected:hover {
 .residents-row .doing {
   color: var(--ui-muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The script they run, under their Doing line. */
+.residents-row .doing small {
+  display: block;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
 }

@@ -159,6 +159,20 @@ describe('running scripts', () => {
     expect(a0.script?.memory).toEqual({ leg: 2 })
   })
 
+  it('ends when the script calls end(), and the resident stands idle', () => {
+    const { world, orders, runner } = setup()
+    const s = createScript(db, mara, {
+      name: 'one walk',
+      source: 'walkTo(13, 10)\nend()',
+    })
+    giveScript(world, orders, s.id, ['a0'])
+    const a0 = world.residents[0]!
+    runner.runAll(world, true)
+    expect(a0.script).toBeUndefined()
+    expect(a0.order).toBeNull()
+    expect(scriptEvents(world)).toEqual([])
+  })
+
   it('picks up a saved change on the next tick, and ends when the script is deleted', () => {
     const { world, orders, runner } = setup()
     const s = createScript(db, mara, { name: 'role', source: 'memory.role = "miner"' })

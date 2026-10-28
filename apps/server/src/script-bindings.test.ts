@@ -1,5 +1,6 @@
 import { parse, run, type ScriptObject, type Value } from '@csp/lang'
 import {
+  DOING_MAX_LENGTH,
   HAUL_KEEP_FOOD,
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
@@ -17,6 +18,7 @@ import { allianceOrders } from './alliances.js'
 import { armyOrders } from './armies.js'
 import { contractOrders } from './contracts.js'
 import { persuasionOrders } from './persuasion.js'
+import { queueOrders } from './queues.js'
 import { ExploredTerrain } from './explored.js'
 import { OrderQueue, orderKinds } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -92,13 +94,14 @@ describe('script bindings', () => {
     const { globals } = runAs(world, explored, '')
     expect(Object.keys(globals).sort()).toEqual(SCRIPT_API.map((b) => b.name).sort())
     // Alliance, army, contract and persuasion orders, the gate order and the transfer order are
-    // the realm's, not a resident's.
+    // the realm's, not a resident's; queues only the Player gives (`CONTEXT.md`: Queue).
     const residentOrders = Object.keys(orderKinds).filter(
       (k) =>
         !(k in allianceOrders) &&
         !(k in armyOrders) &&
         !(k in contractOrders) &&
         !(k in persuasionOrders) &&
+        !(k in queueOrders) &&
         k !== 'setGate' &&
         k !== 'transfer',
     )
@@ -257,6 +260,8 @@ describe('script bindings', () => {
       { kind: 'haul', carriageId: 'c9', x: 20, y: 10, goods: ['wood'], keepFood: HAUL_KEEP_FOOD },
     ],
     ['stop()', { kind: 'stop' }],
+    ['mount("h9")', { kind: 'mount', horseId: 'h9' }],
+    ['dismount()', { kind: 'dismount' }],
     [
       'pickUp({ kind: "ground" }, { food: 2 })',
       { kind: 'pickUp', spot: { kind: 'ground' }, goods: { food: 2 } },
@@ -269,9 +274,14 @@ describe('script bindings', () => {
       'drop({ kind: "ground" }, { food: 1 })',
       { kind: 'drop', spot: { kind: 'ground' }, goods: { food: 1 } },
     ],
+    ['store(["wood"])', { kind: 'store', goods: ['wood'] }],
+    ['store({ food: 1 }, "s9")', { kind: 'store', goods: { food: 1 }, to: 's9' }],
+    ['fetch({ food: 2 })', { kind: 'fetch', goods: { food: 2 } }],
+    ['fetch(["wood"], { id: "k9" })', { kind: 'fetch', goods: ['wood'], from: 'k9' }],
     ['build("house")', { kind: 'build', building: 'house' }],
     ['build("castle")', { kind: 'build', building: 'castle' }],
     ['tearDown("p1")', { kind: 'tearDown', buildingId: 'p1' }],
+    ['breed("st", ["h1", "h2"])', { kind: 'breed', stableId: 'st', horseIds: ['h1', 'h2'] }],
     ['workAt()', { kind: 'workAt' }],
     ['workAt("sword")', { kind: 'workAt', makes: 'sword' }],
     ['pair("b1")', { kind: 'pair', partnerId: 'b1' }],
@@ -305,6 +315,7 @@ describe('script bindings', () => {
     ['renameCity("c1", "Ironhold")', { kind: 'renameCity', cityId: 'c1', name: 'Ironhold' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],
+    ['wallLine(12, 12)', { kind: 'wallLine', from: { x: 10, y: 10 }, to: { x: 12, y: 12 } }],
   ]
 
   it.each(actions)('request %s exactly as the UI order would be', (call, order) => {
@@ -431,5 +442,38 @@ describe('walkTime', () => {
     about(time(60, 50), 10)
     about(time(60, 60), 10 * DIAGONAL_STEP)
     about(time(54, 40), 6 + 4 * DIAGONAL_STEP)
+  })
+})
+
+describe('doing()', () => {
+  it('keeps the Doing line in memory, trimmed and capped, and asks for no order', () => {
+    const { world, explored } = setup()
+    const memory: ScriptObject = { role: 'feeder' }
+    const long = 'x'.repeat(DOING_MAX_LENGTH + 20)
+    const { result, requests } = runAs(
+      world,
+      explored,
+      `memory.said = doing("  Feeding the stable: waiting  ")`,
+      memory,
+    )
+    expect(result.status).toBe('done')
+    expect(requests).toEqual([])
+    expect(memory).toEqual({ role: 'feeder', said: null, doing: 'Feeding the stable: waiting' })
+    runAs(world, explored, `doing("${long}")`, memory)
+    expect(memory.doing).toBe('x'.repeat(DOING_MAX_LENGTH))
+    // Null, or empty text, gives the derived line back.
+    runAs(world, explored, 'doing(null)', memory)
+    expect(memory).toEqual({ role: 'feeder', said: null })
+    runAs(world, explored, 'doing("x")', memory)
+    runAs(world, explored, 'doing(" ")', memory)
+    expect(memory.doing).toBeUndefined()
+  })
+
+  it('needs a text or null', () => {
+    const { world, explored } = setup()
+    const memory: ScriptObject = {}
+    const { result } = runAs(world, explored, 'doing(3)', memory)
+    expect(result.status).toBe('error')
+    expect(memory.doing).toBeUndefined()
   })
 })

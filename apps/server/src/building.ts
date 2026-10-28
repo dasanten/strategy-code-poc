@@ -10,6 +10,8 @@ import {
   constructionAt,
   constructionLearned,
   isAt,
+  isLineOrder,
+  LINE_BUILDING,
   materialsNeeded,
   workNeeded,
   type BuildOrder,
@@ -18,7 +20,7 @@ import {
   type OrderRequest,
   type Resident,
   type ResidentOrder,
-  type RoadLineOrder,
+  type LineOrder,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -73,11 +75,15 @@ export const build: OrderKind = {
 export function buildingPart(
   o: ResidentOrder | null,
 ):
-  | { order: BuildOrder | RoadLineOrder; building: BuildingKind; at: { x: number; y: number } }
+  | { order: BuildOrder | LineOrder; building: BuildingKind; at: { x: number; y: number } }
   | undefined {
   if (o?.kind === 'build') return { order: o, building: o.building, at: o.at }
-  if (o?.kind === 'roadLine' && o.phase === 'building') {
-    return { order: o, building: 'road', at: { x: o.tiles[0]![0], y: o.tiles[0]![1] } }
+  if (isLineOrder(o) && o.phase === 'building') {
+    return {
+      order: o,
+      building: LINE_BUILDING[o.kind],
+      at: { x: o.tiles[0]![0], y: o.tiles[0]![1] },
+    }
   }
   return undefined
 }
@@ -88,7 +94,7 @@ export function buildingPart(
  */
 export function nextTile(r: Resident): void {
   const o = r.order
-  if (o?.kind !== 'roadLine' || o.tiles.length <= 1) {
+  if (!isLineOrder(o) || o.tiles.length <= 1) {
     r.order = null
     return
   }
@@ -125,12 +131,27 @@ function ownWorkplace(world: WorldState, r: Resident, kind: BuildingKind, id: st
 /**
  * Makes a construction site the building once it has all its materials and work
  * (`CONTEXT.md`: Construction site), whether the last of them was work or a delivery; `r` is the
- * resident who put it in. A finished town hall founds a city of their realm. Returns whether it
- * was finished; the caller brings city membership up to date (`updateCityMembership`).
+ * resident who put it in. A finished town hall founds a city of their realm. A finished carriage
+ * site is gone, and in its place stands an empty, unhitched carriage of their realm, or of their
+ * NPC city if they belong to no realm (`CONTEXT.md`: Carriage). Returns whether it was finished;
+ * the caller brings city membership up to date (`updateCityMembership`).
  */
 export function finishSite(world: WorldState, site: Building, r: Resident): boolean {
   if (!site.site || workNeeded(site) > 0 || Object.keys(materialsNeeded(site)).length > 0) {
     return false
+  }
+  if (site.kind === 'carriage') {
+    world.buildings = world.buildings.filter((b) => b !== site)
+    world.carriages.push({
+      id: newId(world, 'carriage'),
+      realmId: r.owner,
+      cityId: r.owner === null ? r.cityId : null,
+      x: site.x,
+      y: site.y,
+      horseId: null,
+      load: {},
+    })
+    return true
   }
   delete site.site
   if (site.kind === 'townHall') foundCity(world, site, r.owner)

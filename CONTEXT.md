@@ -39,6 +39,8 @@ The shared language of the game. Domain terms only — no implementation details
   work) on any passable land except Mountain, and it may share a tile with a building, so roads
   can lead through gates. On a road residents and carriages move at road speed whatever the
   terrain beneath, and eat as on Plains. Nobody owns a road; anyone can walk it or tear it down.
+  A resident can build road along a line from their tile to another, one tile after another; the
+  line runs straight or diagonal, each tile a Step on from the one before.
 - **Step:** a move onto one of the eight tiles around, straight or diagonal. A diagonal step is
   √2 (about 1.41) times as far as a straight one, so it takes that much longer on the same
   ground. A diagonal step can't squeeze between two corners: it is only possible when both
@@ -267,7 +269,9 @@ The shared language of the game. Domain terms only — no implementation details
   tearing down shrinks it.
 - **Wall / Gate:** buildings of one tile each, built on any passable tile except Mountain, in
   any shape: a closed ring, an inner ring or a single stretch. Nothing forces a closed ring.
-  Walls count as city buildings, so they grow the area like houses do.
+  Walls count as city buildings, so they grow the area like houses do. A wall can be built along
+  a line like a road, skipping tiles that have a wall or gate; a diagonal line closes the way,
+  since two wall tiles touching at a corner do (see Step).
 - **House:** a building in a city's area where a few residents live. A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
   (a palace, a castle) may add room the same way.
@@ -530,7 +534,7 @@ The shared language of the game. Domain terms only — no implementation details
   way, besides integrating, that residents come into being. Once a game year has passed since
   they paired, and their city has free housing and a food surplus, one partner, chosen at random,
   starts **Carrying** the child; the other keeps working as before.
-- **Carrying:** a partner carrying a child can't work for 60 game days (24 real hours); then the
+- **Carrying:** a partner carrying a child can't work for 10 game days (4 real hours); then the
   child is born and the pair ends. For another child the Player pairs them again (NPC cities do
   it on their own).
 - **Child:** a resident born to a pair. Each base stat is the parents' average plus a small
@@ -547,7 +551,7 @@ The shared language of the game. Domain terms only — no implementation details
   back.
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
-- **Own food:** the Food a resident keeps on them for their own meals, about two game days of
+- **Own food:** the Food a resident keeps on them for their own meals, about four game days of
   eating. Putting goods away (storing, dropping, loading, delivering) leaves it in their hands
   unless the Player asks for an exact amount; NPC residents always keep it.
 - **Refilling at home:** a resident in their own city's area who is running low on food takes a
@@ -562,24 +566,59 @@ The shared language of the game. Domain terms only — no implementation details
 ## Transport
 
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
-  hunger meter costs health, and a horse without food dies after about 5 game days. Bred at a
-  stable, or bought from the Trade Organization.
+  hunger meter costs health, and a horse without food dies after about 5 game days. Bred by a
+  resident at a stable, or bought from the Trade Organization.
+- **Horse stats:** every horse has Speed, Strength and Endurance, and an age. Speed is how fast
+  it pulls its carriage or carries a rider (`Riding`); Strength is how much the carriage it pulls
+  can hold; Endurance is how much Food it needs, as a resident's Endurance is for them. New
+  horses (in a starting city, at the Trade Organization, in an NPC city) get stats drawn in a
+  range. A horse's stats never change; they show with its age, health and hunger on the tile card
+  and in the stable.
 - **Horses have no inventory:** a horse eats only what is in reach. At a stable it eats from the
   stable's storage; pulling a carriage, from the carriage's load; anywhere, from Food lying on the
   ground on its tile or right next to it, so Players can feed a horse by putting food down by it.
 - **Stable:** a building on Plains where horses are kept. It has a storage for their Food, which
-  residents fill and empty like any storage. Two fed horses of one realm at a stable breed a foal
-  every so often, while the stable has room for another horse. No residents need to work there.
-  Like a workplace, a stable has no owner: any horse standing in it eats from it.
+  residents fill and empty like any storage. Horses don't breed there on their own: a resident
+  breeds them (**Breeding**). Like a workplace, a stable has no owner: any horse standing in it
+  eats from it.
+- **Breeding:** an order (as a script could do it) for a grown resident at a finished stable: they
+  pick two fed horses of their realm standing in it and tend them for a while; then a foal of
+  their realm is born in the stable, with its parents' average stats plus a little noise. It
+  stops, and its progress is lost, when the resident leaves or is given another order, when a
+  horse leaves or dies, or when the stable has no room for another horse. Before starting, the
+  default takes Food for the resident's meals from the stable. NPC cities breed their horses the
+  same way, with one of their residents.
+- **Feeding the stable:** a task (default script "Feed the stable") given to a grown-up resident
+  standing in a stable, from their card. They keep Food in the stable for about 10 game days for
+  the horses standing in it: below that they fetch what is missing from a storage and store it in
+  the stable; otherwise they wait there. Its params: `stable`, the stable to feed (by default the
+  one they were given it in), and `source`, where the Food comes from (by default the nearest
+  storage of their realm with Food). With no Food to fetch they wait.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
-  mountains.
+  mountains. Built at a stable (Building a carriage).
+- **Building a carriage:** a resident at a finished stable lays out a **carriage site** on their
+  tile of the stable, or on a tile right next to it, where a carriage can stand, off resource nodes
+  and other buildings; it shares the tile with the stable, one carriage site per tile. It is a
+  construction site like any other (materials, mostly wood and some iron, and work; fetching
+  materials, no owner, finished by anyone, torn down leaving all its materials). Once finished it
+  is gone, and an empty carriage of the realm of the resident who finished it stands on its tile,
+  with no horse hitched until it is first driven.
 - **Driving:** a grown-up resident on a carriage's tile drives it to another tile; the driver,
   the carriage and its horse move together. Driving teaches the Driving skill, and a more
   skilled driver goes faster. Players drive only their own carriages, with their own horses.
 - **Hitched horse:** the one horse that pulls a carriage. A horse of the carriage's realm standing
   with it is hitched when the carriage is first driven, and stays hitched (for now). A carriage
   whose horse dies stands where it is until another horse is hitched.
+- **Riding:** a resident on a tile with a horse of their realm that pulls no carriage and nobody
+  rides mounts it, and dismounts anywhere; the horse stays on that tile. Riding is not an order:
+  the rider goes on with what they do, and their walking goes at the horse's pace, as fast as it
+  would pull a carriage there (fast on plains and roads, slower in forest and hills, never into
+  mountains or onto walls), slower while the horse is hungry. Gates and walls stop a rider as
+  anyone. The rider carries what they could on foot; the horse eats Food in reach as usual.
+  Riding teaches Driving, and Driving makes riding faster. A horse has at most one rider and is
+  never hitched while ridden; a rider doesn't drive. A rider whose horse dies, or who leaves it
+  behind (climbing a wall), is on foot again.
 - **Loading a carriage:** residents on a carriage's tile put goods on it and take goods off it
   like at a storage, up to what the carriage holds.
 - **Haul route:** an order (as a script could do it) for a resident to drive a carriage between
@@ -611,10 +650,33 @@ The shared language of the game. Domain terms only — no implementation details
   **Running a script** is an order for a resident or an army: the script runs once a tick for
   each of them, with its own memory, and can request only what that resident or army could. Any
   other order ends it. A script can hand over to a built-in order for a while and take control
-  back. A saved change is picked up on the next tick: each save is a new version, and the
+  back. A script ends itself by calling `end()`: the resident stands idle, and in a queue its next
+  step starts; the Build, Tear down and Breed horses defaults do once the site is finished, the building is
+  gone or the foal is born. A saved change is picked up on the next tick: each save is a new version, and the
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again.
+- **Script parameter:** a value the Player picks for whoever runs a script, declared by a
+  `param name: type` line at the top of the script and read there as `params.name`; a `param`
+  line anywhere else is a syntax error. A `building` param holds one of the realm's own buildings
+  or construction sites; a `storage` param one of its storages, stables or carriages. The values
+  are kept for each resident and each script: giving the task again keeps them, a param removed
+  from the script is dropped, a new one starts unset. Unset, or once the one picked is gone (or no
+  longer the realm's), it reads `null`. The resident card shows one field for each param of the
+  script the resident runs, picked on the map and cleared with a button; picking one doesn't end
+  the script. The Work default declares `storage` (where the output goes) and the Build default
+  `source` (where materials come from, a carriage too), each falling back to the nearest storage
+  while unset; a source picked that holds none of what the site lacks is left alone, and they
+  just build.
+- **Store:** a built-in order a script can hand over to: the resident walks to a storage,
+  stable or carriage of their own (by default the nearest storage of their realm), puts down the
+  chosen goods there (Food only beyond their own food, unless asked for exact units) and, at a
+  storage with Food, tops up their own food. Then it is done. It ends early when there is no way
+  there or the place is gone, and the script can read how it ended.
+- **Fetch:** a built-in order a script can hand over to: the resident walks to a storage, stable
+  or carriage of their own (by default the nearest storage or carriage of their realm holding the
+  goods) and takes the chosen goods there, as much as is there and fits. Then it is done; it ends
+  early like Store. Who stores or fetches, and when, stays in the script.
 - **Default script:** the script behind a task the UI can give (working a workplace, building,
   hauling, …). The game ships one per task; giving a resident that task from the UI runs it.
   Each Player has their own version of every default script in their library, one per task,
@@ -623,6 +685,11 @@ The shared language of the game. Domain terms only — no implementation details
   Until the Player edits it, their version follows the game's default as the game improves it;
   once edited it stays theirs, and they are told when the game's default has changed since.
   Default scripts can't be renamed or deleted. NPC cities always run the game's defaults.
+- **Doing:** the line on a resident's card and in the resident list that says what they are
+  doing, shown to the owning Player only. It is derived from their task and current order
+  ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
+  run is named on a small line of its own. A script can say it itself with `doing(text)`: short
+  text, kept in its memory, that shows instead until the script says something else or stops.
 - **Memory:** the small store a running script or order keeps between ticks. Roles are just
   something a script keeps there. A script can read, never change, the memory of its own
   Player's residents and armies, so residents doing the same task can agree on who does what;
@@ -637,6 +704,29 @@ The shared language of the game. Domain terms only — no implementation details
   isn't allowed to see is always there and `null`, never missing. A script sees no field beyond
   these. The game may add fields at any time; renaming or removing one tells each Player whose
   scripts read it in their realm log, naming the field and the scripts.
+- **Group:** several of the Player's residents picked on the map at once (box-drag or
+  Shift-click), so an order goes to each. Not an Army: nothing ties them together in the world.
+  Ctrl+1–9 saves the picked residents as that number's group and 1–9 picks them again (pressed
+  twice, it also centres the map on them); saved groups are kept per browser, not in the world.
+  Dead residents and ones no longer the Player's drop out of a group when it is picked again.
+  **One command for a group:** the group card gives each the same order request as their own card
+  would (walk to, work, build, store, fetch, run a script, stop); nothing new is kept in the
+  world. A walk-to spreads them over distinct free tiles around the target, the nearest of them
+  to the nearest tile. Work and Build make each join the workplace or site: Build walks them
+  there, the first lays out the site and the others join it; Work is tile-bound, so it goes only
+  to those standing at the workplace. Those who can't take it (children, a partner carrying a
+  child, too far for a tile-bound order) are skipped, and the card says who and why.
+- **Queue:** an order holding a list of steps for a resident and which step they are on. A step
+  is any order the Player could give them on its own: a one-off action (walk to, pick up, drop,
+  Store, Fetch, …), a task, or one of their scripts with its params. A step ends when it's done
+  (a walk arrives, a script calls `end()`), or once its duration in game minutes is up, if the Player gave
+  it one; a task that never ends on its own (work, haul, feed the stable) needs a duration unless it's the last
+  step. With **loop**, the first step follows the last; without, the queue ends after it. Steps
+  can be added, removed and reordered while it runs: the current step keeps going unless removed,
+  and then the step in its place starts. A step that can't start or ends in a failure is skipped
+  and noted in the realm log; when none of them can start, the queue ends. Any order that isn't a
+  step ends it. Scripts see a resident's queue (which step, and what it is) but can't start or
+  change one; their `order` and `script` stay the current step's own.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

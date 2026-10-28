@@ -13,10 +13,14 @@ import {
   carriageCommanderOf,
   cityOrganization,
   loadLevel,
+  carriageCapacity,
   tradeCoinWarehouse,
   warehousePrices,
   type Army,
   type Building,
+  type BuildingKind,
+  type RunningScript,
+  type SeenScript,
   type Carriage,
   type Placed,
   type Caravan,
@@ -247,11 +251,33 @@ function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBui
 }
 
 /** A carriage as the side sees it: how heavily it is loaded, its load only when it sees inside. */
-function seenCarriage(insight: Insight, k: Carriage): SeenCarriage {
-  const level = loadLevel(k.load)
+function seenCarriage(world: WorldState, insight: Insight, k: Carriage): SeenCarriage {
+  const level = loadLevel(k.load, carriageCapacity(world, k))
   if (insight.insideCarriage(k)) return { ...k, loadLevel: level }
   const { id, realmId, cityId, x, y, horseId } = k
   return { id, realmId, cityId, x, y, horseId, loadLevel: level }
+}
+
+/**
+ * What a Player sees of the script a resident runs (`SeenScript`): which one, and for the owning
+ * Player (`own`) what goes into the resident's Doing line (`CONTEXT.md`: Doing): the task, the
+ * kind of building the task is about, as its memory names it (`TaskMemory`), and the text the
+ * script gave `doing()`.
+ */
+export function seenScript(world: WorldState, script: RunningScript, own: boolean): SeenScript {
+  if (!own) return { scriptId: script.scriptId }
+  const { memory } = script
+  const id = memory.workplaceId ?? memory.buildingId
+  const building =
+    typeof memory.building === 'string' && Object.hasOwn(FOOTPRINT, memory.building)
+      ? (memory.building as BuildingKind)
+      : world.buildings.find((b) => typeof id === 'string' && b.id === id)?.kind
+  return {
+    scriptId: script.scriptId,
+    ...(script.task ? { task: script.task } : {}),
+    ...(building ? { building } : {}),
+    ...(typeof memory.doing === 'string' && memory.doing ? { doing: memory.doing } : {}),
+  }
 }
 
 /**
@@ -275,12 +301,23 @@ export function entitiesInSight(
   const out: SeenEntity[] = []
   for (const r of world.residents) {
     if (!inSight(r)) continue
-    // Which script a resident runs is seen; its memory stays on the server.
-    const { script, ...rest } = r
+    // Which script a resident runs is seen; its memory stays on the server, and the values of
+    // its params are shown only to the realm running it, as is the queue to the realm that gave it.
+    const { script, scriptParams, queue, ...rest } = r
+    const params =
+      script && commanderOf(world, r) === realmId ? scriptParams?.[script.scriptId] : undefined
     const shown: SeenEntity = {
       is: 'resident',
       ...rest,
-      ...(script ? { script: { scriptId: script.scriptId } } : {}),
+      ...(queue && queue.realmId === realmId ? { queue } : {}),
+      ...(script
+        ? {
+            script: {
+              ...seenScript(world, script, r.owner === realmId),
+              ...(params ? { params } : {}),
+            },
+          }
+        : {}),
     }
     if (!insight.fares(r)) {
       delete shown.hunger
@@ -299,7 +336,7 @@ export function entitiesInSight(
     out.push(shown)
   }
   for (const k of world.carriages) {
-    if (inSight(k)) out.push({ is: 'carriage', ...seenCarriage(insight, k) })
+    if (inSight(k)) out.push({ is: 'carriage', ...seenCarriage(world, insight, k) })
   }
   for (const p of world.piles) if (inSight(p)) out.push({ is: 'pile', ...p })
   // An army is seen through its members; the Player gets only their own.

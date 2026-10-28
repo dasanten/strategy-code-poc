@@ -198,7 +198,8 @@ function nextTransfer(
   const onCarriage: GoodsSpot = { kind: 'carriage', carriageId: carriage.id }
   const there = goodsAtSpot(world, r.x, r.y, spot) ?? {}
   const hands = (g: Good) => unitsThatFit(r, g, world.tick)
-  const loadable = (g: Good) => Math.min(there[g] ?? 0, hands(g), unitsThatFitCarriage(carriage, g))
+  const loadable = (g: Good) =>
+    Math.min(there[g] ?? 0, hands(g), unitsThatFitCarriage(world, carriage, g))
   const [unloading, loading] = o.stop === 'to' ? [o.goods, o.returnGoods] : [o.returnGoods, o.goods]
   for (const good of unloading) {
     const units = Math.min((load[good] ?? 0) - kept(o, good), hands(good))

@@ -1,5 +1,5 @@
 import type { Task } from './default-scripts.js'
-import type { Remembered } from './protocol.js'
+import type { OrderRequest, Remembered } from './protocol.js'
 import { Terrain } from './terrain.js'
 
 export const TICK_MS = 1000
@@ -12,6 +12,13 @@ export const TICKS_PER_GAME_YEAR = 420 * TICKS_PER_GAME_DAY
 /** A resident's stats (`CONTEXT.md`: Stats). */
 export const STAT_NAMES = ['strength', 'endurance', 'agility', 'intellect'] as const
 export type StatName = (typeof STAT_NAMES)[number]
+
+/** A horse's stats (`CONTEXT.md`: Horse stats). */
+export const HORSE_STAT_NAMES = ['speed', 'strength', 'endurance'] as const
+export type HorseStatName = (typeof HORSE_STAT_NAMES)[number]
+
+/** A horse's stats, whole numbers it is born with; nothing trains them. */
+export type HorseStats = Record<HorseStatName, number>
 
 /** A stat: what the resident was born with, plus what training added (capped by the base). */
 export interface Stat {
@@ -55,16 +62,64 @@ export interface Resident {
   carried: Stock
   /** What the resident was ordered to do, as plain data; null when idle (ADR 0002). */
   order: ResidentOrder | null
+  /** How their last store or fetch order ended (`OrderEnded`); absent when none did since. */
+  orderEnded?: OrderEnded
   /**
    * The script the resident runs, when they were given the run-script order (`CONTEXT.md`:
    * Running a script). Its actions set `order` like UI orders; any other order ends it. Absent
    * when they run none.
    */
   script?: RunningScript
+  /**
+   * The values the Player picked for this resident's script parameters (`CONTEXT.md`: Script
+   * parameter): by script id, then by param name, the id of the building or carriage picked.
+   * Kept when the script ends, so giving the task again keeps them. Absent while none is picked.
+   */
+  scriptParams?: ScriptParamValues
+  /**
+   * The queue the resident works through (`CONTEXT.md`: Queue), when they were given one. Its
+   * current step sets `order` or `script` as if it had been given on its own; any order that
+   * isn't a step of it ends it. Absent when they have none.
+   */
+  queue?: Queue
   /** The resident's pair (`CONTEXT.md`: Pairing), if they are paired. Not an order. */
   pair?: Pair
   /** The child the resident is carrying (`CONTEXT.md`: Carrying), if any. */
   carrying?: Carrying
+  /**
+   * The horse the resident rides (`CONTEXT.md`: Riding), if they ride one. Not an order: they go
+   * on with whatever they do, at the horse's pace.
+   */
+  riding?: string
+}
+
+/**
+ * A queue (`CONTEXT.md`: Queue): steps done one after another, as plain data (ADR 0002).
+ * `current` is the step being done, always one of `steps`; `startedAt` the tick it started, null
+ * until it has. With `loop` the first step follows the last; without, the queue ends after it.
+ */
+export interface Queue {
+  /** The realm whose Player gave it; it ends once that realm no longer commands the resident. */
+  realmId: string
+  /** Never empty, and never a queue among them. */
+  steps: QueueStep[]
+  current: number
+  startedAt: number | null
+  loop: boolean
+  /** The id the next step added gets, so ids in the queue are never reused. */
+  nextStepId: number
+}
+
+/**
+ * One step of a queue: an order request as the UI or a script gives it (one-off actions, tasks,
+ * the Player's own scripts), without whom it is for. It ends when done, or once `minutes` game
+ * minutes have passed since it started, if set.
+ */
+export interface QueueStep {
+  /** Tells the steps apart while the list is edited; unique in the queue. */
+  id: number
+  order: OrderRequest
+  minutes?: number
 }
 
 /**
@@ -102,6 +157,11 @@ export interface ScriptMemory {
   [key: string]: MemoryValue
 }
 
+/** A resident's picked script parameter values: script id → param name → building or carriage id. */
+export interface ScriptParamValues {
+  [scriptId: string]: { [name: string]: string }
+}
+
 /**
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
  */
@@ -126,12 +186,31 @@ export interface RunningScript {
 }
 
 /**
+ * What a Player sees of the script a resident runs: which one, but not its memory. The owning
+ * Player also sees what goes into their Doing line (`CONTEXT.md`: Doing): the `task` when it
+ * runs a task's default script without one of the Player's, the kind of `building` its task is
+ * about (from its memory, as `TaskMemory` holds it), and the text it last gave `doing()`.
+ */
+export interface SeenScript {
+  scriptId: number
+  task?: Task
+  building?: BuildingKind
+  doing?: string
+  /**
+   * The values picked for its params, by name (`Resident.scriptParams`); only for the realm
+   * running it.
+   */
+  params?: { [name: string]: string }
+}
+
+/**
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
  * memory, which stays on the server. Their hunger and health only for their own realm and its
- * allies (`CONTEXT.md`: Seeing how someone fares).
+ * allies (`CONTEXT.md`: Seeing how someone fares). Their script parameter values only for the
+ * realm that runs their script, and only those of the script they run.
  */
-export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health'> &
-  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: Pick<RunningScript, 'scriptId'> }
+export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health' | 'scriptParams'> &
+  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: SeenScript }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -177,6 +256,57 @@ export interface DropOrder {
   kind: 'drop'
   to: GoodsSpot
   goods: Stock
+}
+
+/**
+ * Where a store or fetch order takes goods to or from: a storage or a stable's storage, or a
+ * carriage (`CONTEXT.md`: Store, Fetch).
+ */
+export type GoodsPlace = Extract<GoodsSpot, { kind: 'storage' | 'carriage' }>
+
+/**
+ * The goods a store or fetch order moves: units of each good, or null for as many as there are
+ * (to store: all carried but own food; to fetch: as much as fits).
+ */
+export type GoodsWanted = Partial<Record<Good, number | null>>
+
+/**
+ * Storing (`CONTEXT.md`: Store): the resident walks to `to` (`path` and `progress` as for a walk
+ * order), puts the goods there and, at a storage with Food, tops up their own food. Done then.
+ */
+export interface StoreOrder {
+  kind: 'store'
+  goods: GoodsWanted
+  to: GoodsPlace
+  phase: 'walking' | 'putting' | 'refilling'
+  /** While walking, the tiles still to walk; null while the path is being found. */
+  path: [number, number][] | null
+  progress: number
+}
+
+/**
+ * Fetching (`CONTEXT.md`: Fetch): the resident walks to `from` (`path` and `progress` as for a
+ * walk order) and takes the goods there, as much as fits. Done then.
+ */
+export interface FetchOrder {
+  kind: 'fetch'
+  goods: GoodsWanted
+  from: GoodsPlace
+  phase: 'walking' | 'taking'
+  /** While walking, the tiles still to walk; null while the path is being found. */
+  path: [number, number][] | null
+  progress: number
+}
+
+/**
+ * How the resident's last store or fetch order ended, so a script can tell: `reason` is null when
+ * it was done, else why it ended early ("no way", "the storage is gone", "the carriage is gone"). Kept until their next
+ * store or fetch order, or until the Player orders them otherwise.
+ */
+export interface OrderEnded {
+  kind: 'store' | 'fetch'
+  tick: number
+  reason: string | null
 }
 
 /**
@@ -301,21 +431,22 @@ export interface AttackOrder {
 }
 
 /**
- * Building a road along a line (`CONTEXT.md`: Road): the resident builds the road tiles of
- * `tiles` one after another. For each they walk to it (`path` and `progress` as for a walk
- * order), then lay out a road there or join the site already there, put in the materials they
- * carry that it needs, and work on it as for a build order (`siteId`) until it is finished. A
- * tile that already has a road, or can't take one, is skipped. The order ends after the last.
+ * Building a road or wall along a line (`CONTEXT.md`: Road, Wall / Gate): a `roadLine` order
+ * builds road and a `wallLine` order wall (`LINE_BUILDING`) on the tiles of `tiles`, one after
+ * another. For each the resident walks to it (`path` and `progress` as for a walk order), then
+ * lays out a site there or joins the one already there, puts in the materials they carry that it
+ * needs, and works on it as for a build order (`siteId`) until it is finished. A tile that already
+ * has one, or can't take one, is skipped. The order ends after the last.
  */
-export interface RoadLineOrder {
-  kind: 'roadLine'
+export interface LineOrder {
+  kind: 'roadLine' | 'wallLine'
   /** The tiles still to build, in order; the first is being walked to or built. Never empty. */
   tiles: [number, number][]
   phase: 'walking' | 'building'
   /** While walking, the tiles still to walk; null while the path is being found. */
   path: [number, number][] | null
   progress: number
-  /** While building, the road site on the first tile; null until it is laid out or joined. */
+  /** While building, the site on the first tile; null until it is laid out or joined. */
   siteId: string | null
 }
 
@@ -331,6 +462,20 @@ export interface ClimbOrder {
   progress: number
 }
 
+/**
+ * Breeding (`CONTEXT.md`: Breeding): the resident, standing at the finished stable `stableId` on
+ * `at`, tends the two horses `horseIds` standing in it. `progress` counts the ticks tended, up to
+ * `STABLE_BREED_TICKS`; then a foal is born there and the order is done. It ends, its progress
+ * lost, when the resident or a horse leaves, a horse dies or the stable has no room left.
+ */
+export interface BreedOrder {
+  kind: 'breed'
+  stableId: string
+  horseIds: [string, string]
+  at: { x: number; y: number }
+  progress: number
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -338,12 +483,15 @@ export type ResidentOrder =
   | HaulOrder
   | PickUpOrder
   | DropOrder
+  | StoreOrder
+  | FetchOrder
   | BuildOrder
   | TearDownOrder
   | WorkOrder
+  | BreedOrder
   | AttackOrder
   | ClimbOrder
-  | RoadLineOrder
+  | LineOrder
   | PayOrder
   | BuyCityOrder
   | TradeOrder
@@ -1216,6 +1364,20 @@ export type RealmEventWhat =
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
   /**
+   * Step `step` (counted from 1) of the resident `name`'s queue (`CONTEXT.md`: Queue), an order
+   * of kind `order`, was skipped: it couldn't start or ended in a failure, for `reason`.
+   * `queueEnded` when none of the queue's steps could start, so the queue ended.
+   */
+  | {
+      kind: 'queueStepSkipped'
+      residentId: string
+      name: string
+      step: number
+      order: string
+      reason: string
+      queueEnded?: true
+    }
+  /**
    * A mercenary contract (`CONTEXT.md`: Mercenary contract) with the realm `other` (by its
    * realm name) changed: `offered` to this realm, `started` once accepted, `paid` for `weeks`
    * more game weeks, `ended` when its time was up, or `broken` when a week went unpaid; or
@@ -1398,11 +1560,17 @@ export type BuildingKind =
   | 'mint'
   | 'smithy'
   | 'road'
+  /**
+   * A carriage site (`CONTEXT.md`: Carriage): only ever a construction site, laid out at a
+   * stable; finished, it becomes a `Carriage` and is gone from the buildings.
+   */
+  | 'carriage'
 
 /**
  * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction
  * site, not yet the building. A road is built like a building but may share its tile with one
- * (`CONTEXT.md`: Road): a tile holds at most one road and one other building.
+ * (`CONTEXT.md`: Road), and so may a carriage site (`CONTEXT.md`: Carriage): a tile holds at most
+ * one road, one carriage site and one other building.
  */
 export interface Building {
   id: string
@@ -1417,11 +1585,6 @@ export interface Building {
   y: number
   /** Goods kept here; storages, warehouses and stables only. */
   stock?: Stock
-  /**
-   * A stable's progress toward its next foal, in ticks of breeding (`STABLE_BREED_DAYS`); there
-   * once it has started.
-   */
-  breeding?: number
   /** There while the building is still a construction site. */
   site?: ConstructionSite
   /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
@@ -1465,6 +1628,10 @@ export interface Horse {
   hunger: number
   /** 0 is dead; the most is `MAX_HEALTH`, as for residents. */
   health: number
+  /** Speed, Strength and Endurance (`CONTEXT.md`: Horse stats). */
+  stats: HorseStats
+  /** The tick it was born; its age is counted from it (`horseAgeInYears`). */
+  bornAt: number
 }
 
 /** A horse-drawn cart (`CONTEXT.md`: Carriage). */
