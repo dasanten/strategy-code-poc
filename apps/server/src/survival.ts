@@ -1,6 +1,10 @@
 import {
   FOOD_PER_DAY,
   HOME_FOOD_LOW,
+  OUTPOST_REFILL_REACH,
+  buildingRealm,
+  isOutpostStorage,
+  nearFootprint,
   MEAL_UNITS,
   HEAL_DAYS,
   HUNGER_DAYS,
@@ -297,6 +301,21 @@ function hirersStorage(world: WorldState, r: Resident, size: number): Building |
   )
 }
 
+/**
+ * For a resident of a realm, a finished outpost storage of their realm with Food within
+ * `OUTPOST_REFILL_REACH` tiles (`CONTEXT.md`: Refilling at an outpost storage). `size` is the map's.
+ */
+function outpostStorage(world: WorldState, r: Resident, size: number): Building | undefined {
+  if (r.owner === null) return undefined
+  return world.buildings.find(
+    (b) =>
+      isOutpostStorage(b) &&
+      (b.stock?.food ?? 0) > 0 &&
+      buildingRealm(world, b) === r.owner &&
+      nearFootprint(b, r, OUTPOST_REFILL_REACH, size),
+  )
+}
+
 /** Goods a resident may take a meal from, and how many units of Food of them they may take. */
 export interface RefillSource {
   stock: Stock
@@ -309,7 +328,8 @@ const whole = (stock: Stock | undefined): RefillSource | undefined =>
 
 /**
  * Where a resident running low on food takes a meal from, if anywhere (`CONTEXT.md`: Refilling):
- * at home, their city's storage (a mercenary of the Trade Org's, the HQ's); working at a
+ * at home, their city's storage (a mercenary of the Trade Org's, the HQ's); near an outpost storage
+ * of their realm, that storage; working at a
  * workplace, the Food in its pile, else on a carriage standing at it; in an army, a carriage of their realm on or next to their tile, but
  * not the Food a haul route keeps on board for the horse (`spareFood`); on a caravan's crew, its
  * carriage close by (`caravanFood`). Elsewhere nowhere. `size`
@@ -320,7 +340,8 @@ export function refillSource(
   r: Resident,
   size: number,
 ): RefillSource | undefined {
-  const home = homeStorage(world, r, size) ?? hirersStorage(world, r, size)
+  const home =
+    homeStorage(world, r, size) ?? hirersStorage(world, r, size) ?? outpostStorage(world, r, size)
   if (home) return whole(home.stock)
   const o = r.order
   const atWork = o?.kind === 'workAt' && r.x === o.at.x && r.y === o.at.y
@@ -343,8 +364,8 @@ export function refillSource(
 }
 
 /**
- * Refilling (`CONTEXT.md`: Refilling at home, Refilling at a workplace, Refilling from a
- * carriage): a resident who carries fewer than `HOME_FOOD_LOW` units of food takes meals
+ * Refilling (`CONTEXT.md`: Refilling at home, Refilling at an outpost storage, Refilling at a
+ * workplace, Refilling from a carriage): a resident who carries fewer than `HOME_FOOD_LOW` units of food takes meals
  * (`MEAL_UNITS` each) into their hands from their `refillSource`, without an order, until they no
  * longer run low, there is none left, or no more fits. Residents anywhere else get nothing. They
  * still eat only what they carry. `size` is the map's.
