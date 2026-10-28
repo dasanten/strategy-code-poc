@@ -1,4 +1,4 @@
-import type { City, Diplomacy, Resident } from '@csp/shared'
+import type { City, Diplomacy, Good, Resident, Stock } from '@csp/shared'
 
 /** One heading of the Residents drawer and the residents under it. */
 export interface ResidentGroup<R> {
@@ -72,13 +72,71 @@ export function carryLine(carried: number, capacity: number): string {
 }
 
 /**
- * Which sections of the resident card are open: the panel an action opened (Goods, Build, …) and
- * the Stats and skills. They stay open when the Player selects another unit, until closed; a unit
- * without that action shows no panel.
+ * The resident card's carried goods, short, for its header: "Carrying 4 Wood, 2 Food" with the
+ * most first, at most `max` kinds and then how many more, or "Carrying nothing".
+ */
+export function carriedShort(
+  carried: Stock | undefined,
+  labels: Record<Good, string>,
+  max = 3,
+): string {
+  const goods = (Object.entries(carried ?? {}) as [Good, number | undefined][])
+    .filter((e): e is [Good, number] => (e[1] ?? 0) > 0)
+    .sort((a, b) => b[1] - a[1])
+  if (goods.length === 0) return 'Carrying nothing'
+  const shown = goods.slice(0, max).map(([g, n]) => `${Math.floor(n)} ${labels[g]}`)
+  const more = goods.length - shown.length
+  return `Carrying ${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}`
+}
+
+/** The tabs under the resident card's header (ADR 0012), in the order they show. */
+export const CARD_TABS = ['orders', 'queue', 'stats', 'script'] as const
+export type CardTab = (typeof CARD_TABS)[number]
+
+/** Each tab's label. */
+export const CARD_TAB_LABELS: Record<CardTab, string> = {
+  orders: 'Orders',
+  queue: 'Queue',
+  stats: 'Stats',
+  script: 'Script',
+}
+
+/** Where the browser keeps the last open tab. */
+const TAB_KEY = 'csp.cardTab'
+
+/** The tab a card opens on: the one remembered in this browser, else Orders. */
+export function rememberedTab(
+  storage: () => Pick<Storage, 'getItem'> = () => localStorage,
+): CardTab {
+  try {
+    const tab = storage().getItem(TAB_KEY)
+    return CARD_TABS.find((t) => t === tab) ?? 'orders'
+  } catch {
+    // Storage can be off (a private window); the card then just opens on Orders.
+    return 'orders'
+  }
+}
+
+/** Remembers the open tab in this browser, if it lets us. */
+export function rememberTab(
+  tab: CardTab,
+  storage: () => Pick<Storage, 'setItem'> = () => localStorage,
+): void {
+  try {
+    storage().setItem(TAB_KEY, tab)
+  } catch {
+    // Not remembered, which only costs a click next time.
+  }
+}
+
+/**
+ * What the resident card shows: the open tab and the panel an order opened (Goods, Build, …).
+ * They stay as they are when the Player selects another unit; a unit without that order shows no
+ * panel.
  */
 export interface CardSections<A extends string = string> {
   panel?: A
-  stats: boolean
+  tab: CardTab
 }
 
 /** How many residents a group card lists before saying how many more there are. */

@@ -133,15 +133,24 @@
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.18);
 }
-.sel-details summary {
-  cursor: pointer;
+/* The resident card's tabs (ADR 0012): one open at a time under the header. */
+.sel-tabs button {
+  padding: 4px 6px;
   font-size: 0.8rem;
-  color: var(--ui-muted);
 }
-.sel-details[open] {
+/* One kind of order on the Orders tab, under a quiet heading. */
+.sel-order-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
+}
+.sel-order-group h3 {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
 }
 /* The ⓘ on a building's card: a quiet toggle that opens what the building is for. */
 .sel-info {

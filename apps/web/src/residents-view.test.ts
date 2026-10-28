@@ -2,11 +2,15 @@ import type { ContractView, Diplomacy } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
   GROUP_LIST_MAX,
+  carriedShort,
   carryLine,
   groupCard,
   groupResidents,
+  rememberTab,
+  rememberedTab,
   type ResidentGroup,
 } from './residents-view.js'
+import { GOOD_LABELS } from './Residents.js'
 
 const r = (id: string, cityId: string | null) => ({ id, cityId })
 const cities = [
@@ -105,5 +109,43 @@ describe('Group card', () => {
     expect(card.rows).toHaveLength(GROUP_LIST_MAX)
     expect(card.more).toBe(3)
     expect(groupCard(named('Ada', 'Bo')).more).toBe(0)
+  })
+})
+
+describe('Resident card header', () => {
+  it('says what they carry, the most first, a few kinds and then how many more', () => {
+    expect(carriedShort({}, GOOD_LABELS)).toBe('Carrying nothing')
+    expect(carriedShort({ wood: 4, food: 6 }, GOOD_LABELS)).toBe('Carrying 6 Food, 4 Wood')
+    expect(carriedShort({ wood: 4, food: 6, stone: 1, iron: 2, coins: 3 }, GOOD_LABELS)).toBe(
+      'Carrying 6 Food, 4 Wood, 3 Coins and 2 more',
+    )
+  })
+})
+
+describe('Resident card tab', () => {
+  const memory = () => {
+    const kept = new Map<string, string>()
+    return {
+      getItem: (k: string) => kept.get(k) ?? null,
+      setItem: (k: string, v: string) => void kept.set(k, v),
+    }
+  }
+
+  it('opens on Orders until another tab was opened in this browser', () => {
+    const storage = memory()
+    expect(rememberedTab(() => storage)).toBe('orders')
+    rememberTab('stats', () => storage)
+    expect(rememberedTab(() => storage)).toBe('stats')
+  })
+
+  it('opens on Orders when storage is off or holds something else', () => {
+    const off = () => {
+      throw new Error('storage is off')
+    }
+    expect(rememberedTab(off)).toBe('orders')
+    expect(() => rememberTab('queue', off)).not.toThrow()
+    const storage = memory()
+    storage.setItem('csp.cardTab', 'goods')
+    expect(rememberedTab(() => storage)).toBe('orders')
   })
 })
