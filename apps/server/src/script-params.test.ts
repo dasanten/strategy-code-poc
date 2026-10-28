@@ -136,6 +136,30 @@ describe('params in a script', () => {
     expect(w.scriptParams).toEqual({ [SCRIPT]: { store: 's1' } })
   })
 
+  it('read a number param as the whole number typed, null while unset', () => {
+    const { world, terrain, w } = farmWorld()
+    const source = 'param foodAt: number\nmemory.foodAt = params.foodAt'
+    const runner = new ScriptRunner(terrain, host({ value: source }))
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory.foodAt).toBeNull()
+
+    w.scriptParams = { [SCRIPT]: { foodAt: 4 } }
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory.foodAt).toBe(4)
+    w.scriptParams = { [SCRIPT]: { foodAt: 0 } }
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory.foodAt).toBe(0)
+  })
+
+  it('drop a value that no longer fits its param’s type', () => {
+    const { world, terrain, w } = farmWorld()
+    w.scriptParams = { [SCRIPT]: { home: 4, store: 'farm' } }
+    const source = 'param home: building\nparam store: number\nmemory.n = params.store'
+    new ScriptRunner(terrain, host({ value: source })).runAll(world)
+    expect(w.scriptParams).toBeUndefined()
+    expect(w.script!.memory.n).toBeNull()
+  })
+
   it('show only to the realm running the script, and only the running script’s', () => {
     const { world, terrain, w } = farmWorld()
     w.scriptParams = { [SCRIPT]: { store: 's1' }, 7: { other: 'farm' } }
@@ -202,6 +226,51 @@ describe('the set-script-param order', () => {
     expect(kind.validate(world, sender, order('home', 'farm', 9))).toBe('not the script they run')
     const tobin = { userId: 2, account: { name: 'Tobin', isAdmin: false } }
     expect(kind.validate(world, tobin, order('home', 'farm'))).toBe('not one of your residents')
+  })
+
+  describe('for a number param', () => {
+    const SOURCE = 'param home: building\nparam take: number'
+    const numbers = setScriptParamOrder({ script: () => ({ userId: MARA, source: SOURCE }) })
+    const typed = (name: string, value: unknown) => ({
+      kind: 'setScriptParam',
+      residentId: 'w1',
+      scriptId: SCRIPT,
+      name,
+      value,
+    })
+
+    it('keeps a whole number of zero or more, and clears it with null', () => {
+      const { world } = farmWorld()
+      for (const n of [0, 12]) expect(numbers.validate(world, sender, typed('take', n))).toBeUndefined()
+      numbers.apply(world, sender, typed('take', 12))
+      expect(world.residents[0]!.scriptParams).toEqual({ [SCRIPT]: { take: 12 } })
+      expect(scriptParamsSound(world)).toEqual([])
+      numbers.apply(world, sender, order('take', null))
+      expect(world.residents[0]!.scriptParams).toBeUndefined()
+    })
+
+    it('refuses a negative or fractional value, or anything else', () => {
+      const { world } = farmWorld()
+      for (const n of [-1, 1.5, '3', null, undefined, Number.NaN, Infinity]) {
+        expect(numbers.validate(world, sender, typed('take', n))).toBe(
+          'must be a whole number of zero or more',
+        )
+      }
+      expect(numbers.validate(world, sender, order('take', 'farm'))).toBe(
+        'must be a whole number of zero or more',
+      )
+      expect(numbers.validate(world, sender, typed('home', 3))).toBe('takes no number')
+    })
+  })
+
+  it('a number value is sound only as a whole number of zero or more', () => {
+    const { world, w } = farmWorld()
+    w.scriptParams = { [SCRIPT]: { take: -2 } }
+    expect(scriptParamsSound(world)).toHaveLength(1)
+    w.scriptParams = { [SCRIPT]: { take: 2.5 } }
+    expect(scriptParamsSound(world)).toHaveLength(1)
+    w.scriptParams = { [SCRIPT]: { take: 2, home: 'farm' } }
+    expect(scriptParamsSound(world)).toEqual([])
   })
 
   it('leaves the script running', () => {

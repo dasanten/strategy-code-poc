@@ -9,6 +9,9 @@ describe('param lines', () => {
       { name: 'site', type: 'building', line: 3, column: 1 },
     ])
     expect(program.body).toHaveLength(1)
+    expect(parse('param foodAt: number').params).toEqual([
+      { name: 'foodAt', type: 'number', line: 1, column: 1 },
+    ])
     expect(parse('let x = 1').params).toEqual([])
   })
 
@@ -21,7 +24,7 @@ describe('param lines', () => {
 
   it('need a known type and a name only once', () => {
     expect(checkScript('param a: horse')[0]?.message).toBe(
-      'Expected "building" or "storage" after "param a:" but found the name "horse"',
+      'Expected "building" or "storage" or "number" after "param a:" but found the name "horse"',
     )
     expect(checkScript('param a: building\nparam a: storage')[0]?.message).toBe(
       'The param "a" appears twice',

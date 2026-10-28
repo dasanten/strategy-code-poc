@@ -178,7 +178,7 @@ const SHARED: readonly ScriptBinding[] = [
  * at the top of a script, read as `params.name`, picked per resident on their card. The same
  * types as `PARAM_TYPES` in `@csp/lang`.
  */
-export const SCRIPT_PARAM_TYPES = ['building', 'storage'] as const
+export const SCRIPT_PARAM_TYPES = ['building', 'storage', 'number'] as const
 export type ScriptParamType = (typeof SCRIPT_PARAM_TYPES)[number]
 
 export function isScriptParamType(value: unknown): value is ScriptParamType {
@@ -189,6 +189,12 @@ export function isScriptParamType(value: unknown): value is ScriptParamType {
 export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
   building: 'One of my realm’s buildings or construction sites.',
   storage: 'One of my realm’s storages or stables, or one of its carriages.',
+  number: 'A whole number of zero or more, typed in.',
+}
+
+/** Whether a value fits a `number` param: a whole number of zero or more. */
+export function isParamNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
 /** A script's `param` line. */

@@ -134,7 +134,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(47)
+    expect(WORLD_FORMAT_VERSION).toBe(48)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -150,9 +150,19 @@ describe('world saves', () => {
     expect(migrated.buildings).toEqual(world.buildings)
   })
 
+  it('keeps a format 47 world as it is: picked param values stay ids (migration 47 → 48)', () => {
+    const { world, terrain } = worldWithCity()
+    const r = world.residents[0]!
+    r.script = { scriptId: 1, memory: {} }
+    r.scriptParams = { 1: { home: world.buildings[0]!.id } }
+    const migrated = migrateWorld(structuredClone(world), 47, { terrain })
+    expect(migrated).toEqual(world)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
   it('keeps a format 46 world as it is: no resident has a queue yet (migration 46 → 47)', () => {
     const { world, terrain } = worldWithCity()
-    const migrated = migrateWorld(structuredClone(world), 46, { terrain })
+    const migrated = migrateWorld(structuredClone(world), 46, { terrain }, migrations, 47)
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.queue === undefined)).toBe(true)
     expect(checkInvariants(migrated, terrain)).toEqual([])
