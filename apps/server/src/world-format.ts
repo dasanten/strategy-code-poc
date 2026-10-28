@@ -13,7 +13,7 @@ import { leaveTradeOrg } from './caravans.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 44
+export const WORLD_FORMAT_VERSION = 43
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -64,12 +64,9 @@ export const migrations: Record<number, MigrationStep> = {
     }
     return world
   },
-  // Taken by breeding as an order (T29.2, #344), which brings its own step here; until it lands
-  // the step leaves the world as it is.
-  42: (state) => state,
   // Residents can ride horses (`CONTEXT.md`: Riding), a new `riding` field. Nobody rode before,
   // so the step leaves the world as it is.
-  43: (state) => state,
+  42: (state) => state,
 }
 
 export class WorldFormatError extends Error {}
