@@ -555,6 +555,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             armies={world.armies}
             own={own}
             inSight={world.residents}
+            carriages={world.carriages}
             realmId={world.home.realmId}
             picking={armyPick}
             onPick={(pick) => {

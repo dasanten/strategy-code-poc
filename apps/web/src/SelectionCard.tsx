@@ -85,6 +85,35 @@ export function SelectionCard({
   )
 }
 
+/** The tabs under a card's header (ADR 0012): one open at a time. */
+export function CardTabs<T extends string>({
+  tabs,
+  labels,
+  tab,
+  onTab,
+}: {
+  tabs: readonly T[]
+  labels: Record<T, string>
+  tab: T
+  onTab: (tab: T) => void
+}) {
+  return (
+    <div className="tabs sel-tabs" role="tablist" aria-label="Card">
+      {tabs.map((t) => (
+        <button
+          type="button"
+          key={t}
+          role="tab"
+          aria-selected={tab === t}
+          onClick={() => onTab(t)}
+        >
+          {labels[t]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /** The card's actions as rows, each with its key; a row that opens a panel shows it pressed. */
 export function ActionRows({
   actions,
