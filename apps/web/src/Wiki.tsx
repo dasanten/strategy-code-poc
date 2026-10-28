@@ -88,6 +88,7 @@ import {
   NPC_CITY_WONT_SELL_STANDING,
   NPC_TRADE,
   OWN_FOOD,
+  OUTPOST_REFILL_REACH,
   PERSUADE_ASK_AGAIN_DAYS,
   PERSUADE_STANDING,
   PRICE_ELASTICITY,
@@ -603,7 +604,9 @@ export function Wiki() {
           a game day on plains; each point of Endurance above average needs{' '}
           {pct(HUNGER_ENDURANCE_EFFECT)} less (more below), at most {pct(HUNGER_ENDURANCE_LIMIT)}.
           They keep {num(OWN_FOOD)} Food of their own on them, and at home take a meal from the
-          storage when they run low.
+          storage when they run low. Within {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage
+          of their realm they take it from there the same way, so a stocked outpost storage next to
+          a far workplace keeps its workers fed.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -765,7 +768,8 @@ export function Wiki() {
           founds no city and has no area. A city that grows over it takes it in; a storage cut off
           from its city, or left when its town hall is torn down, stays an outpost storage of that
           city's realm. What it holds is seen only by its realm and its allies, and by anyone
-          standing at it.
+          standing at it. Residents of your realm within {num(OUTPOST_REFILL_REACH)} tiles of it
+          take a meal from it when they run low, as at home.
         </p>
       </Section>
 

@@ -2,6 +2,10 @@ import {
   AVERAGE_HORSE_STATS,
   BUILD_MATERIALS,
   BUILD_WORK,
+  FOOD_PER_DAY,
+  HOME_FOOD_LOW,
+  OUTPOST_REFILL_REACH,
+  TICKS_PER_GAME_DAY,
   CITY_BUILDING_REACH,
   DEFAULT_SCRIPTS,
   MAX_HEALTH,
@@ -17,13 +21,13 @@ import {
 import { describe, expect, it } from 'vitest'
 import { updateCityMembership } from './cities.js'
 import { buildingOrganization } from './crimes.js'
-import { checkInvariants, outpostStorageRealms } from './invariants.js'
+import { checkInvariants, outpostStorageRealms, refilledWhenLow } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { ScriptRunner, type ScriptHost } from './script-runner.js'
 import { addCity } from './test-terrain.js'
 import { Walking } from './walking.js'
-import { dropGoods } from './survival.js'
+import { dropGoods, stepRefill } from './survival.js'
 import { createWorld, stepWorld } from './world.js'
 
 /**
@@ -243,5 +247,45 @@ describe('an outpost storage', () => {
       [home.id],
       [gone.id],
     ])
+  })
+})
+
+describe('refilling at an outpost storage', () => {
+  it('keeps a miner next to a stocked one fed, far from home', () => {
+    const { world, w1, home } = setup()
+    world.residents = [w1]
+    world.realms = world.realms.filter((r) => r.id === 'r1')
+    const out = outpost(world, 100, 100)
+    out.stock = { food: 50 }
+    w1.x = out.x - 1
+    w1.y = out.y
+    // Own food alone lasts far less than this.
+    for (let t = 0; t < 20 * TICKS_PER_GAME_DAY; t++) {
+      stepWorld(world, terrain)
+      expect(refilledWhenLow.check(world, terrain)).toEqual([])
+    }
+    expect(world.residents).toEqual([w1])
+    expect(w1.health).toBe(MAX_HEALTH)
+    expect(out.stock.food).toBeLessThan(50 - 20 * FOOD_PER_DAY + 1)
+    expect(home.stock).toEqual({})
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('feeds only residents of its realm within reach', () => {
+    const { world } = setup()
+    world.residents = []
+    const out = outpost(world, 100, 100)
+    out.stock = { food: 50 }
+    const near = resident(world, 'near', 'r1', out.x - OUTPOST_REFILL_REACH, out.y)
+    const far = resident(world, 'far', 'r1', out.x - OUTPOST_REFILL_REACH - 1, out.y)
+    const stranger = resident(world, 'stranger', 'r2', out.x - 1, out.y)
+    for (const r of [near, far, stranger]) r.carried = {}
+    expect(refilledWhenLow.check(world, terrain).map((v) => v.entityIds)).toEqual([[near.id]])
+    stepRefill(world, terrain.size)
+    expect(near.carried.food).toBeGreaterThanOrEqual(HOME_FOOD_LOW)
+    expect(far.carried).toEqual({})
+    expect(stranger.carried).toEqual({})
+    expect(out.stock.food).toBe(50 - near.carried.food!)
+    expect(refilledWhenLow.check(world, terrain)).toEqual([])
   })
 })

@@ -789,10 +789,10 @@ export const workOrdersOnWorkplaces: Invariant = {
 }
 
 /**
- * After a tick, nobody at home, at their workplace or in an army by a carriage runs low on food
- * while the storage, pile or carriage they refill from still has some and a meal would fit
- * (`stepRefill`, `CONTEXT.md`: Refilling at home, Refilling at a workplace, Refilling from a
- * carriage).
+ * After a tick, nobody at home, near an outpost storage of their realm, at their workplace or in
+ * an army by a carriage runs low on food while the storage, pile or carriage they refill from
+ * still has some and a meal would fit (`stepRefill`, `CONTEXT.md`: Refilling at home, Refilling at
+ * an outpost storage, Refilling at a workplace, Refilling from a carriage).
  */
 export const refilledWhenLow: Invariant = {
   name: 'refilled-when-low',
