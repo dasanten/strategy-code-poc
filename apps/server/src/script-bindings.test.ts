@@ -18,6 +18,7 @@ import { allianceOrders } from './alliances.js'
 import { armyOrders } from './armies.js'
 import { contractOrders } from './contracts.js'
 import { persuasionOrders } from './persuasion.js'
+import { queueOrders } from './queues.js'
 import { ExploredTerrain } from './explored.js'
 import { OrderQueue, orderKinds } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -93,13 +94,14 @@ describe('script bindings', () => {
     const { globals } = runAs(world, explored, '')
     expect(Object.keys(globals).sort()).toEqual(SCRIPT_API.map((b) => b.name).sort())
     // Alliance, army, contract and persuasion orders, the gate order and the transfer order are
-    // the realm's, not a resident's.
+    // the realm's, not a resident's; queues only the Player gives (`CONTEXT.md`: Queue).
     const residentOrders = Object.keys(orderKinds).filter(
       (k) =>
         !(k in allianceOrders) &&
         !(k in armyOrders) &&
         !(k in contractOrders) &&
         !(k in persuasionOrders) &&
+        !(k in queueOrders) &&
         k !== 'setGate' &&
         k !== 'transfer',
     )

@@ -19,6 +19,7 @@ import {
   materialsNeeded,
   organizationLabel,
   pileAt,
+  queueView,
   terrainAt,
   unitsThatFit,
   walkSpeed,
@@ -29,6 +30,7 @@ import {
   type Good,
   type Building,
   type OrderRequest,
+  type Queue,
   type Resident,
   type ResourceNode,
   type RunningScript,
@@ -91,14 +93,16 @@ export interface ScriptBindings {
   globals: Record<string, Value>
   /** The order requests the script's actions asked for and that were accepted, in order. */
   requests: OrderRequest[]
+  /** Whether the script called `end()`: once its requests are applied, it ends. */
+  ended(): boolean
 }
 
 /**
- * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`,
- * which asks for none.
+ * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`
+ * and `end`, which ask for none.
  */
 export const SCRIPT_ORDER_KINDS: readonly string[] = SCRIPT_API.filter(
-  (b) => b.is === 'action' && b.name !== 'doing',
+  (b) => b.is === 'action' && b.name !== 'doing' && b.name !== 'end',
 ).map((b) => b.name)
 
 /** The army order each action of an army's script asks for (`ARMY_SCRIPT_API`). */
@@ -124,6 +128,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const { world, terrain, sender } = context
   const kinds = context.kinds ?? orderKinds
   const requests: OrderRequest[] = []
+  let ended = false
 
   let seen: readonly SeenEntity[] | undefined
   const untagged = ({ is: _, ...rest }: SeenEntity) => rest
@@ -132,7 +137,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     return seen
       .filter((e) => e.is === is)
       .map(untagged)
-      .map((rest) => toValue({ ...rest, ...add?.(rest.id) }))
+      .map((rest) => toValue(withQueueView({ ...rest, ...add?.(rest.id) })))
   }
   // Whose script it is: the Player's realm, or the NPC city running the game's defaults.
   const side = sender.npcCityId ?? realmOf(world, sender.userId)?.id
@@ -162,7 +167,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const asSeen = (r: Resident) => {
     const { script, ...rest } = r
     const running = { scriptId: script!.scriptId, memory: script!.memory }
-    return toValue({ ...rest, scriptParams: undefined, script: running })
+    return toValue(withQueueView({ ...rest, scriptParams: undefined, script: running }))
   }
   let nodes: Value[] | undefined
   const exploredNodes = (): Value => {
@@ -274,17 +279,23 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = SCRIPT_API
     forMe = { residentId: resident.id }
     // The script's own state is `memory`, not part of `me`.
-    me = toValue({
-      ...resident,
-      script: undefined,
-      scriptParams: undefined,
-      age: ageInYears(resident, world.tick),
-    })
+    me = toValue(
+      withQueueView({
+        ...resident,
+        script: undefined,
+        scriptParams: undefined,
+        age: ageInYears(resident, world.tick),
+      }),
+    )
     actions = residentActions(request, resident)
     actions.doing = ([text]) => {
       const doing = doingText(text)
       if (doing === null) delete context.memory.doing
       else context.memory.doing = doing
+      return null
+    }
+    actions.end = () => {
+      ended = true
       return null
     }
     queries.fits = ([good]) => {
@@ -344,7 +355,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     if (!call) throw new Error(`the script binding ${binding.name} is not implemented`)
     globals[binding.name] = new NativeFunction(binding.name, call, binding.cost)
   }
-  return { globals, requests }
+  return { globals, requests, ended: () => ended }
 }
 
 /**
@@ -544,6 +555,12 @@ function requestsSound(
  * A copy of plain world data as a script value, frozen so the script can't change it (`me` and
  * what queries answer are the world as seen, not the world itself).
  */
+/** A resident's queue as its script view shows it (`queueView`), not its steps. */
+function withQueueView(r: object): object {
+  const queue = (r as { queue?: Queue }).queue
+  return queue ? { ...r, queue: queueView(queue) } : r
+}
+
 function toValue(data: unknown): Value {
   if (data === null || data === undefined) return null
   if (typeof data === 'number' || typeof data === 'string' || typeof data === 'boolean') {

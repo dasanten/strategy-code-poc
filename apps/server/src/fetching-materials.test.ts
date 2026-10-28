@@ -137,7 +137,7 @@ describe('fetching materials', () => {
     run(world, terrain, 2)
     for (const r of world.residents) {
       expect(r.carried).toEqual({ food: OWN_FOOD })
-      expect(r.script?.memory.done).toBe(true)
+      expect(r.script).toBeUndefined() // built: Build ended itself
     }
     expect(checkInvariants(world, terrain)).toEqual([])
   })

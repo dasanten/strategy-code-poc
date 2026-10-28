@@ -131,7 +131,7 @@ memory.carry = {storageId: to.id, goods: goods}
 // storage of my realm that holds it while none is picked, and brings it
 // back. With none there we just build.
 param source: storage // where materials come from; a carriage too
-if (memory.done || memory.stuck) { return }
+if (memory.stuck) { return }
 if (me.order != null && me.order.kind != "build") { return } // on my way
 
 // What someone carries of what the site lacks; null if nothing.
@@ -154,7 +154,7 @@ let site = null
 if (memory.siteId != null) {
   site = building(memory.siteId)
   if (at && (site == null || site.site == null)) {
-    memory.done = true
+    end()
     return
   }
 }
@@ -180,7 +180,7 @@ if (site != null) {
 }
 if (me.order == null) {
   // Turned down, such as with the tile taken, build says why: done.
-  if (build(memory.building) != null) { memory.done = true }
+  if (build(memory.building) != null) { end() }
   return
 }
 if (me.order.siteId == null) { return } // laid out at the end of the tick
@@ -240,12 +240,10 @@ if (me.order == null || me.order.kind != "haul") {
   tearDown: {
     name: 'Tear down',
     source: `// Tear down (default): tear down memory.buildingId, the building or site
-// I stand on, until it is gone; then stand idle.
-if (memory.done != true && (me.order == null || me.order.kind != "tearDown")) {
+// I stand on, until it is gone; then end.
+if (me.order == null || me.order.kind != "tearDown") {
   // Turned down, such as with the building gone, tearDown says why: done.
-  if (tearDown(memory.buildingId) != null) {
-    memory.done = true
-  }
+  if (tearDown(memory.buildingId) != null) { end() }
 }
 `,
   },

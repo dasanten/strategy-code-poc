@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import {
   PARAM_DESCRIPTIONS,
+  QUEUE_MAX_STEPS,
   SCRIPT_PARAM_TYPES,
   ADULT_AGE,
   AGILITY_LIMIT,
@@ -184,6 +185,7 @@ import { apiNames, type ApiName } from './script-editor.js'
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
 export const WIKI_TOPICS = [
   { id: 'controls', title: 'Controls' },
+  { id: 'queues', title: 'Queues' },
   { id: 'time', title: 'Time & map' },
   { id: 'terrain', title: 'Terrain & walking' },
   { id: 'residents', title: 'Residents & stats' },
@@ -407,6 +409,33 @@ export function Wiki() {
           </tbody>
         </table>
         <p>Groups are kept in this browser, for each realm; another browser starts without them.</p>
+      </Section>
+
+      <Section id="queues">
+        <p>
+          A queue gives a resident a list of steps to do one after another, up to{' '}
+          {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
+          to, pick up, drop, store, fetch, drive, work, build, haul, tear down, build a road or wall
+          line, or run one of your scripts with its params.
+        </p>
+        <p>
+          A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
+          <code>end()</code>), or once its duration in game minutes is up, if you gave it one.
+          Working a workplace and hauling never end on their own, so such a step needs a duration
+          unless it is the last. With loop on, the first step follows the last; without, the queue
+          ends after it.
+        </p>
+        <p>
+          You can add, remove and reorder steps while the queue runs; the current step keeps going
+          unless you remove it, and then the step in its place starts. A step that can't start, or
+          ends in a failure (a store whose storage is gone), is skipped and noted in your realm log.
+          Any other order you give the resident ends the queue.
+        </p>
+        <p>
+          Your scripts see a resident's queue as <code>queue</code>: which step they are on and what
+          it is. Their <code>order</code> and <code>script</code> stay the current step's own.
+          Scripts can't start or change queues.
+        </p>
       </Section>
 
       <Section id="time">
@@ -1019,11 +1048,14 @@ export function Wiki() {
           called. Every call costs one step, and its cost here on top. Queries answer from what you
           see and have explored, nothing more. An action asks for the order of its name for{' '}
           <code>me</code>, checked exactly as one from the map, and answers <code>null</code> when
-          asked for, or why not. <code>doing</code> is the one action that asks for no order: its
-          text, at most {num(DOING_MAX_LENGTH)} characters, is what the resident card and list say
-          the resident is doing, until the script says something else; only you see it. Without it
-          they show what the task and its current order have the resident doing, such as “Building a
-          house: fetching 10 wood from the storage”. A script runs as a resident's or as an army's:
+          asked for, or why not. Two actions ask for no order. <code>doing</code>: its text, at most{' '}
+          {num(DOING_MAX_LENGTH)} characters, is what the resident card and list say the resident is
+          doing, until the script says something else; only you see it. Without it they show what
+          the task and its current order have the resident doing, such as “Building a house:
+          fetching 10 wood from the storage”. <code>end</code>: once this run is over the script
+          ends and the resident stands idle; in a queue, its next step starts. The Build and Tear
+          down defaults end once the site is finished or the building is gone; a script that never
+          calls it runs until another order ends it. A script runs as a resident's or as an army's:
           names marked resident only or army only are only there for one of them, and a default
           script runs as a resident's.
         </p>

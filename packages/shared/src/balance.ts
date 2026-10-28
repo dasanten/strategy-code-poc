@@ -1559,6 +1559,12 @@ export const DOING_MAX_LENGTH = 60
  */
 export const SCRIPT_LOG_INTERVAL = 60
 
+/** The most steps a queue holds (`CONTEXT.md`: Queue): plenty for a day's round. */
+export const QUEUE_MAX_STEPS = 20
+
+/** The most a queue step's order request may hold, in characters of its JSON. */
+export const QUEUE_STEP_MAX_CHARS = 1000
+
 /** The longest realm name a Player may give, in characters after trimming (`CONTEXT.md`: Realm name). */
 export const REALM_NAME_MAX_LENGTH = 30
 
