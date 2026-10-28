@@ -3,6 +3,7 @@ import {
   CARRYING_TICKS,
   CHILD_STAT_SPREAD,
   HOUSING_ROOM,
+  PAIRING_WAIT_TICKS,
   STAT_NAMES,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
@@ -62,6 +63,7 @@ function days(world: WorldState, n: number): Resident[] {
 }
 
 const DAYS_PER_YEAR = TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY
+const WAIT_DAYS = PAIRING_WAIT_TICKS / TICKS_PER_GAME_DAY
 const CARRYING_DAYS_ = CARRYING_TICKS / TICKS_PER_GAME_DAY
 
 /** Runs only pairing for `n` game years. */
@@ -192,11 +194,11 @@ describe('pairing order', () => {
 })
 
 describe('carrying', () => {
-  it('starts a game year after pairing: one partner carries and stops, the other works on', () => {
+  it('starts PAIRING_WAIT_DAYS (10 game days) after pairing: one partner carries and stops, the other works on', () => {
     const { world, terrain, queue, residents } = setup()
     const [a, b] = residents as [Resident, Resident]
     pairUp(world, queue, a, b)
-    expect(days(world, DAYS_PER_YEAR - 1)).toEqual([])
+    expect(days(world, WAIT_DAYS - 1)).toEqual([])
     expect(carrierOf(a, b)).toBeUndefined()
     days(world, 1)
     const carrier = carrierOf(a, b)!
@@ -218,7 +220,7 @@ describe('carrying', () => {
     const { world, terrain, queue, residents } = setup()
     const [a, b] = residents as [Resident, Resident]
     pairUp(world, queue, a, b)
-    days(world, DAYS_PER_YEAR)
+    days(world, WAIT_DAYS)
     const carrier = carrierOf(a, b)!
     const start = world.tick
     expect(days(world, CARRYING_DAYS_ - 1)).toEqual([])
@@ -244,13 +246,13 @@ describe('carrying', () => {
       world.seed = seed
       const [a, b] = residents as [Resident, Resident]
       pairUp(world, queue, a, b)
-      days(world, DAYS_PER_YEAR)
+      days(world, WAIT_DAYS)
       carriers.add(carrierOf(a, b) === a ? 'a' : 'b')
     }
     expect(carriers).toEqual(new Set(['a', 'b']))
   })
 
-  it('never brings two children in one game year, however soon the pair is paired again', () => {
+  it('waits PAIRING_WAIT_DAYS again between children, however soon the pair is paired again', () => {
     const { world, terrain, queue, residents } = setup()
     for (let i = 0; i < 3; i++) addHouse(world)
     const [a, b] = residents as [Resident, Resident]
@@ -265,7 +267,7 @@ describe('carrying', () => {
     expect(born.length).toBeGreaterThanOrEqual(3)
     const ticks = born.map((c) => c.bornAt)
     for (let i = 1; i < ticks.length; i++) {
-      expect(ticks[i]! - ticks[i - 1]!).toBe(TICKS_PER_GAME_YEAR + CARRYING_TICKS)
+      expect(ticks[i]! - ticks[i - 1]!).toBe(PAIRING_WAIT_TICKS + CARRYING_TICKS)
     }
     expect(checkInvariants(world, terrain)).toEqual([])
   })
@@ -274,7 +276,7 @@ describe('carrying', () => {
     const { world, queue, residents } = setup()
     const [a, b, c] = residents as [Resident, Resident, Resident]
     pairUp(world, queue, a, b)
-    days(world, DAYS_PER_YEAR)
+    days(world, WAIT_DAYS)
     const carrier = carrierOf(a, b)!
     const reason = (o: object) => {
       const answer = queue.receive(world, me, 'q', { residentId: carrier.id, ...o })
@@ -303,7 +305,7 @@ describe('carrying', () => {
     for (let i = 0; i < free + 1; i++) {
       pairUp(world, queue, a, b)
       pairUp(world, queue, c, d)
-      days(world, DAYS_PER_YEAR + CARRYING_DAYS_)
+      days(world, WAIT_DAYS + CARRYING_DAYS_)
       expect(cityResidents(world, city).length).toBeLessThanOrEqual(housingRoom(world, city))
     }
     expect(world.residents.length - residents.length).toBe(free)
@@ -312,9 +314,7 @@ describe('carrying', () => {
     addHouse(world)
     pairUp(world, queue, a, b)
     pairUp(world, queue, c, d)
-    expect(days(world, DAYS_PER_YEAR + CARRYING_DAYS_)).toHaveLength(
-      Math.min(2, HOUSING_ROOM.house!),
-    )
+    expect(days(world, WAIT_DAYS + CARRYING_DAYS_)).toHaveLength(Math.min(2, HOUSING_ROOM.house!))
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
@@ -338,7 +338,7 @@ describe('carrying', () => {
     b.stats.strength = { base: 6, trained: 3 }
     a.skills = { construction: 5 }
     pairUp(world, queue, a, b)
-    days(world, DAYS_PER_YEAR)
+    days(world, WAIT_DAYS)
     const carrier = carrierOf(a, b)!
     const [child] = days(world, CARRYING_DAYS_)
     expect(child).toMatchObject({
@@ -370,7 +370,7 @@ describe('carrying', () => {
     const { world, terrain, queue, residents } = setup()
     const [a, b] = residents as [Resident, Resident]
     pairUp(world, queue, a, b)
-    days(world, DAYS_PER_YEAR)
+    days(world, WAIT_DAYS)
     const carrier = carrierOf(a, b)!
     const other = carrier === a ? b : a
     die(world, other)
@@ -388,7 +388,7 @@ describe('carrying', () => {
       b.stats[s] = { base: 1, trained: 0 }
     }
     pairUp(world, queue, a, b)
-    for (const child of days(world, DAYS_PER_YEAR + CARRYING_DAYS_)) {
+    for (const child of days(world, WAIT_DAYS + CARRYING_DAYS_)) {
       for (const s of STAT_NAMES) expect(child.stats[s].base).toBeGreaterThanOrEqual(1)
     }
   })
@@ -398,7 +398,8 @@ describe('carrying', () => {
     const [a, b] = residents as [Resident, Resident]
     const farm = world.buildings.find((x) => x.kind === 'farm')!
     pairUp(world, queue, a, b)
-    // They paired a game year ago: carrying starts in the world's next tick.
+    // They paired a game year ago, long past the wait (as pairs from before it was shortened):
+    // carrying starts in the world's next tick.
     for (const r of [a, b]) r.pair!.since -= TICKS_PER_GAME_YEAR
     stepWorld(world, terrain)
     const carrier = carrierOf(a, b)!

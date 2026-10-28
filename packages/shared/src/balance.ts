@@ -442,6 +442,15 @@ export const CARRYING_DAYS = 10
 export const CARRYING_TICKS = CARRYING_DAYS * TICKS_PER_GAME_DAY
 
 /**
+ * Game days a pair waits after pairing before one partner starts carrying (`CONTEXT.md`: Pairing),
+ * if their city then has free housing and a food surplus: 10 game days, 4 real hours.
+ */
+export const PAIRING_WAIT_DAYS = 10
+
+/** Ticks from pairing until a partner can start carrying (`PAIRING_WAIT_DAYS`). */
+export const PAIRING_WAIT_TICKS = PAIRING_WAIT_DAYS * TICKS_PER_GAME_DAY
+
+/**
  * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
  * materials to the site, building or tearing down. The others keep working.
  */
