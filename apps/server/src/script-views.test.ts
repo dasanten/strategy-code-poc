@@ -28,7 +28,7 @@ const sender = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /**
  * Realm r1 (Player 7): a1 running a script as a looping queue's step, paired with a2, who is in army ar1; city c1 with its
- * town hall, a stocked storage and a construction site; a horse and a carriage. Realm r2
+ * town hall, a stocked storage and a construction site; an outpost storage; a horse and a carriage. Realm r2
  * (Player 8): b1 next to a1, and city c2 in sight. An NPC city c3 in sight; a pile, a node, an
  * admin directive, and a building and a city Player 7 last saw, out of sight now.
  */
@@ -62,6 +62,8 @@ function setup() {
   building({ id: 's2', kind: 'storage', cityId: 'c2', x: 8, y: 11, stock: { stone: 3 } })
   building({ id: 'h3', kind: 'townHall', cityId: 'c3', x: 14, y: 14 })
   building({ id: 's3', kind: 'storage', cityId: 'c3', x: 15, y: 14, stock: { food: 40 } })
+  // An outpost storage of r1 (`CONTEXT.md`: Outpost storage).
+  building({ id: 'os1', kind: 'storage', realmId: 'r1', x: 6, y: 8, stock: { food: 3 } })
 
   const a1 = resident(world, 'a1', 'r1', 'c1', 10, 10)
   const a2 = resident(world, 'a2', 'r1', 'c1', 10, 11)
@@ -208,7 +210,7 @@ describe('script views', () => {
       expect((out[name] as unknown[]).length, name).toBeGreaterThan(0)
     }
     expect(out.materialsNeeded).not.toEqual([])
-    expect(ids('storages')).toEqual(['s1'])
+    expect(ids('storages')).toEqual(['s1', 'os1'])
     // A queue shows where it is, not its steps.
     const queue = {
       step: 1,

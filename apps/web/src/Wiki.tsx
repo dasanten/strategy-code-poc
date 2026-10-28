@@ -753,9 +753,19 @@ export function Wiki() {
         <p>
           A city building (town hall, house, storage, wall, gate) belongs to a city when it stands
           within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
-          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house or a storage
-          goes only in a city's area; a town hall, wall or gate goes anywhere off Mountain and off
+          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house goes only in a
+          city's area; a town hall, storage, wall or gate goes anywhere off Mountain and off
           resource nodes, and a new town hall founds a city.
+        </p>
+        <p>
+          A storage in a city's area is that city's storage. One outside any city is an{' '}
+          <strong>outpost storage</strong>: it belongs to the realm whose residents finished it and
+          counts as a storage of your realm everywhere (Store, Fetch, carrying the output, fetching
+          materials, haul route stops, <code>storages()</code> and <code>storage</code> params). It
+          founds no city and has no area. A city that grows over it takes it in; a storage cut off
+          from its city, or left when its town hall is torn down, stays an outpost storage of that
+          city's realm. What it holds is seen only by its realm and its allies, and by anyone
+          standing at it.
         </p>
       </Section>
 

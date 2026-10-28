@@ -3,6 +3,7 @@ import {
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_PER_PAID_WEEK,
   SIGHT_RANGE,
+  buildingRealm,
   commands,
   handedOverTo,
   contractEndsAt,
@@ -51,7 +52,8 @@ function npcCity(world: WorldState, id: unknown) {
 }
 
 /**
- * The side whose storage it is: the realm of the city a finished storage belongs to, the city
+ * The side whose storage it is: the realm of the city a finished storage belongs to or of an
+ * outpost storage, the city
  * itself for an NPC city's, or `TRADE_ORG` for a finished warehouse of one of the Trade
  * Organization's cities.
  */
@@ -59,7 +61,7 @@ function storageRealm(world: WorldState, storageId: unknown): string | null {
   const b = world.buildings.find((x) => x.id === storageId)
   if (!b || b.site) return null
   const city = world.cities.find((c) => c.id === b.cityId)
-  if (b.kind === 'storage') return city && forSale(city) ? city.id : (city?.realmId ?? null)
+  if (b.kind === 'storage') return city && forSale(city) ? city.id : buildingRealm(world, b)
   return b.kind === 'warehouse' && city?.tradeOrg ? TRADE_ORG : null
 }
 
