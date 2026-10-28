@@ -64,9 +64,13 @@ export const migrations: Record<number, MigrationStep> = {
     }
     return world
   },
-  // Taken by breeding as an order (T29.2, #344), which brings its own step here; until it lands
-  // the step leaves the world as it is.
-  42: (state) => state,
+  // Breeding is a resident's order (`CONTEXT.md`: Breeding): stables no longer breed on their
+  // own, so the progress they kept goes. Nobody tends their horses yet; the foal starts over.
+  42: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const b of world.buildings) delete (b as { breeding?: number }).breeding
+    return world
+  },
   // Residents can ride horses (`CONTEXT.md`: Riding), a new `riding` field. Nobody rode before,
   // so the step leaves the world as it is.
   43: (state) => state,

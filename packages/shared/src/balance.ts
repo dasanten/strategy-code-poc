@@ -188,7 +188,7 @@ export const START_FOOD = 100
  */
 export const START_CARRIED_FOOD = 2
 
-/** Horses in a starting city's stable: two, so they can breed (`CONTEXT.md`: Starting city). */
+/** Horses in a starting city's stable: two, so a resident can breed them (`CONTEXT.md`: Starting city). */
 export const START_HORSES = 2
 
 /**
@@ -216,14 +216,20 @@ export const HORSE_REACH = 1
  */
 export const HORSE_HUNGRY_SHARE = 0.25
 
-/** Most horses a stable has room for; it breeds no foal once that many stand in it. */
+/** Most horses a stable has room for; no foal is bred there once that many stand in it. */
 export const STABLE_CAPACITY = 6
 
 /**
- * Game days two fed horses at a stable take to breed a foal (`CONTEXT.md`: Stable). Time without
- * two fed horses or without room does not count.
+ * Game days a resident tends two fed horses at a stable before a foal is born (`CONTEXT.md`:
+ * Breeding). Breeding that stops before then starts over.
  */
 export const STABLE_BREED_DAYS = 10
+
+/**
+ * How far each of a foal's stats may land from its parents' average, either way (`CONTEXT.md`:
+ * Breeding), as `CHILD_STAT_SPREAD` does for a resident's children.
+ */
+export const FOAL_STAT_SPREAD = 1
 
 /**
  * A new horse's stats are whole numbers drawn from this range (`CONTEXT.md`: Horse stats), like a
@@ -728,6 +734,13 @@ export const HOME_FOOD_LOW = 1
  * residents always keep it, so nobody walks to the storage for the food they carry anyway.
  */
 export const OWN_FOOD = 4 * FOOD_PER_DAY
+
+/**
+ * Food a resident running the Breed horses default takes from the stable before they start, if
+ * they carry less (`CONTEXT.md`: Breeding): their meals for the `STABLE_BREED_DAYS` of tending,
+ * away from home.
+ */
+export const BREED_FOOD = STABLE_BREED_DAYS * FOOD_PER_DAY
 
 /**
  * Units of food in one meal, what a resident at home takes from storage at a time: two game days'

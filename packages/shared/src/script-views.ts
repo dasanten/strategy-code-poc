@@ -102,12 +102,7 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
     'The goods kept here.',
     'for any building but a storage, warehouse or stable, and when the Player doesn’t see inside it',
   ),
-  field(
-    'breeding',
-    'number',
-    'A stable’s ticks of breeding toward its next foal.',
-    'until a stable starts breeding',
-  ),
+
   field(
     'site',
     view('site'),
@@ -267,19 +262,19 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "build", "tearDown", "workAt", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "build", "tearDown", "workAt", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
       ),
       field('target', view('tile'), 'Where a walk or drive goes.', 'for other orders'),
       field(
         'at',
         view('tile'),
-        'The tile a build, work, tear-down or climb is on.',
+        'The tile a build, work, tear-down, breeding or climb is on.',
         'for other orders',
       ),
       field(
         'progress',
         'number',
-        'How far into the next step or piece of work.',
+        'How far into the next step or piece of work; for breeding, the ticks tended so far.',
         'for orders that have none',
       ),
       field('buildingId', 'string', 'The building worked or torn down.', 'for other orders'),
@@ -302,6 +297,8 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'The carriage driven, hauled with or traded from.',
         'for other orders, and when none',
       ),
+      field('stableId', 'string', 'The stable horses are bred at.', 'for other orders'),
+      field('horseIds', listOf('string'), 'The two horses being bred.', 'for other orders'),
       field('targetId', 'string', 'Who is attacked.', 'for other orders'),
       field('wallId', 'string', 'The wall or gate climbed.', 'for other orders'),
       field(

@@ -1,6 +1,7 @@
 import type { Account, OrderRequest, ServerMessage, TerrainMap, WorldState } from '@csp/shared'
 import { build } from './building.js'
 import { tearDown } from './teardown.js'
+import { breed } from './breeding.js'
 import { drop, pickUp } from './carrying.js'
 import { drive } from './driving.js'
 import { haul, stop } from './hauling.js'
@@ -60,6 +61,7 @@ export const orderKinds: Record<string, OrderKind> = {
   build,
   tearDown,
   workAt,
+  breed,
   pair,
   attack,
   climb,

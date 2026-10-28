@@ -28,6 +28,7 @@ import {
   type Horse,
   type Pile,
   type Resident,
+  type SeenResident,
   type SeenHorse,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
@@ -109,6 +110,17 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ building: building({ kind: 'farm' }) }))).toContain('tearDown')
     expect(ids(here({ road: building({ kind: 'road' }) }))).toContain('tearDown')
     expect(ids(here({ building: building({ kind: 'warehouse' }) }))).not.toContain('tearDown')
+  })
+
+  it('offers breeding horses at a finished stable, turned off for a child', () => {
+    const stable = building({ kind: 'stable' })
+    expect(ids(here({ building: stable }))).toContain('breed')
+    expect(ids(here({ building: { ...stable, site: { work: 0, delivered: {} } } }))).not.toContain(
+      'breed',
+    )
+    expect(ids(here({ building: building({ kind: 'farm' }) }))).not.toContain('breed')
+    const child = residentActions(here({ adult: false, building: stable }))
+    expect(child.find((x) => x.id === 'breed')?.disabled).toBe(true)
   })
 
   it('offers goods even with an empty inventory and nothing on their tile', () => {
@@ -522,30 +534,41 @@ describe('horses on the tile card', () => {
     expect(tile({ horses: [horse({ x: 6 })] }).what).toBe('tile')
   })
 
-  it('shows a stable’s horses, room, Food and how long until the next foal while breeding', () => {
-    const stable = building({
-      kind: 'stable',
-      cityId: 'c-me',
-      stock: { food: 30 },
-      breeding: 3 * TICKS_PER_GAME_DAY,
-    })
-    // The carriage's hitched horse stands in the stable too, and breeds (`breedingPair`).
+  it('shows a stable’s horses, room, Food and how long until the foal while a resident breeds', () => {
+    const stable = building({ kind: 'stable', cityId: 'c-me', stock: { food: 30 } })
+    // The carriage's hitched horse stands in the stable too, and can be bred.
     const pair = [horse({ id: 'h1' }), horse({ id: 'h2', x: 6, y: 6 })]
-    const card = tile({ buildings: [stable], horses: pair, carriages: [carriage] })
+    const breeder = {
+      id: 'ana',
+      name: 'Ana',
+      x: 5,
+      y: 5,
+      order: {
+        kind: 'breed',
+        stableId: stable.id,
+        horseIds: ['h1', 'h2'],
+        at: { x: 5, y: 5 },
+        progress: 3 * TICKS_PER_GAME_DAY,
+      },
+    } as unknown as SeenResident
+    const card = tile({
+      buildings: [stable],
+      horses: pair,
+      carriages: [carriage],
+      residents: [breeder],
+    })
     expect(card.what).toBe('building')
     expect(card.lines).toEqual(
       expect.arrayContaining([
         '2 horses (yours)',
         `Room for ${STABLE_CAPACITY - 2} more horses`,
         'Holds 30 food',
-        `Next foal in about ${STABLE_BREED_DAYS - 3} game days`,
+        `Breeding: a foal in about ${STABLE_BREED_DAYS - 3} game days`,
       ]),
     )
-    // One horse, or a hungry pair, or a stranger's pair whose condition is unknown: no breeding.
-    const alone = tile({ buildings: [stable], horses: [horse()] })
-    expect(alone.lines.some((l) => l.startsWith('Next foal'))).toBe(false)
-    const starved = tile({ buildings: [stable], horses: pair.map((h) => ({ ...h, hunger: 0 })) })
-    expect(starved.lines.some((l) => l.startsWith('Next foal'))).toBe(false)
+    // Fed horses alone breed no foal.
+    const alone = tile({ buildings: [stable], horses: pair })
+    expect(alone.lines.some((l) => l.startsWith('Breeding'))).toBe(false)
     const empty = tile({ buildings: [{ ...stable, stock: {} }] })
     expect(empty.lines).toEqual(
       expect.arrayContaining(['No horses in it', `Room for ${STABLE_CAPACITY} more horses`]),
@@ -562,7 +585,7 @@ describe('horses on the tile card', () => {
       ],
     })
     expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
-    expect(card.lines.some((l) => l.startsWith('Next foal'))).toBe(false)
+    expect(card.lines.some((l) => l.startsWith('Breeding'))).toBe(false)
     expect(card.lines).toContain('2 horses (another realm)')
   })
 })

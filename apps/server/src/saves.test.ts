@@ -193,6 +193,18 @@ describe('world saves', () => {
     expect(checkInvariants(migrated, land)).toEqual([])
   })
 
+  it('drops the breeding progress stables kept (migration 42 → 43)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const stable = world.buildings.find((b) => b.kind === 'stable')!
+    // A format 42 stable, partway to a foal.
+    const old = structuredClone(world) as unknown as { buildings: Record<string, unknown>[] }
+    old.buildings.find((b) => b.id === stable.id)!.breeding = 40
+    const migrated = migrateWorld(old, 42, { terrain: land })
+    expect(migrated.buildings.every((b) => !('breeding' in b))).toBe(true)
+    expect(migrated.buildings).toEqual(world.buildings)
+    expect(checkInvariants(migrated, land)).toEqual([])
+  })
+
   it('brings a format 43 world over with nobody riding (migration 43 → 44)', () => {
     const { world, terrain: land } = worldWithCity()
     expect(world.horses.length).toBeGreaterThan(0)

@@ -24,6 +24,7 @@ export function residentActivity(
     o?.kind === 'workAt' ||
     o?.kind === 'build' ||
     o?.kind === 'tearDown' ||
+    o?.kind === 'breed' ||
     (isLineOrder(o) && o.phase === 'building')
   )
     return 'working'

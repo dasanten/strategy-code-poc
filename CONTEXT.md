@@ -566,8 +566,8 @@ The shared language of the game. Domain terms only — no implementation details
 ## Transport
 
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
-  hunger meter costs health, and a horse without food dies after about 5 game days. Bred at a
-  stable, or bought from the Trade Organization.
+  hunger meter costs health, and a horse without food dies after about 5 game days. Bred by a
+  resident at a stable, or bought from the Trade Organization.
 - **Horse stats:** every horse has Speed, Strength and Endurance, and an age. Speed is how fast
   it pulls its carriage or carries a rider (`Riding`); Strength is how much the carriage it pulls
   can hold; Endurance is how much Food it needs, as a resident's Endurance is for them. New
@@ -578,9 +578,16 @@ The shared language of the game. Domain terms only — no implementation details
   stable's storage; pulling a carriage, from the carriage's load; anywhere, from Food lying on the
   ground on its tile or right next to it, so Players can feed a horse by putting food down by it.
 - **Stable:** a building on Plains where horses are kept. It has a storage for their Food, which
-  residents fill and empty like any storage. Two fed horses of one realm at a stable breed a foal
-  every so often, while the stable has room for another horse. No residents need to work there.
-  Like a workplace, a stable has no owner: any horse standing in it eats from it.
+  residents fill and empty like any storage. Horses don't breed there on their own: a resident
+  breeds them (**Breeding**). Like a workplace, a stable has no owner: any horse standing in it
+  eats from it.
+- **Breeding:** an order (as a script could do it) for a grown resident at a finished stable: they
+  pick two fed horses of their realm standing in it and tend them for a while; then a foal of
+  their realm is born in the stable, with its parents' average stats plus a little noise. It
+  stops, and its progress is lost, when the resident leaves or is given another order, when a
+  horse leaves or dies, or when the stable has no room for another horse. Before starting, the
+  default takes Food for the resident's meals from the stable. NPC cities breed their horses the
+  same way, with one of their residents.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
   mountains.

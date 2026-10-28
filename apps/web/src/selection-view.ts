@@ -16,6 +16,7 @@ import {
   RECIPES,
   STABLE_BREED_TICKS,
   STABLE_CAPACITY,
+  breedersAt,
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
@@ -85,6 +86,7 @@ export type ActionId =
   | 'wallTo'
   | 'work'
   | 'tearDown'
+  | 'breed'
   | 'goods'
   | 'pair'
   | 'attack'
@@ -109,6 +111,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   wallTo: 'Q',
   work: 'E',
   tearDown: 'T',
+  breed: 'F',
   goods: 'G',
   pair: 'P',
   attack: 'A',
@@ -224,6 +227,8 @@ export function residentActions(h: ResidentHere): CardAction[] {
   add(row('wallTo', '', { ...picks('wall', 'Build wall to'), ...child }))
   const torn = [h.building, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
   if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
+  if (h.building?.kind === 'stable' && !h.building.site)
+    add(row('breed', 'Breed horses…', { opens: true, ...child }))
   // Always there, so the Player sees the carry capacity even with nothing to move.
   add(row('goods', 'Goods…', { opens: true }))
   if (h.adult && h.inCity) add(row('pair', 'Pair…', { opens: true }))
@@ -512,7 +517,7 @@ export function horseAgeText(h: SeenHorse, tick: number): string {
  * A horse's stats and age, and how it fares where the Player knows it (`CONTEXT.md`: Horse stats,
  * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
  */
-function horseDetail(h: SeenHorse, tick: number | undefined): string {
+export function horseDetail(h: SeenHorse, tick: number | undefined): string {
   const { speed, strength, endurance } = h.stats
   const parts = [`Speed ${speed}, Strength ${strength}, Endurance ${endurance}`]
   if (tick !== undefined) parts.push(horseAgeText(h, tick))
@@ -552,18 +557,14 @@ function horseLines(
 }
 
 /**
- * Game days until a stable's next foal while two fed horses of one owner stand in it with room
- * for another (`CONTEXT.md`: Stable, `breedingPair`), as far as the Player knows how they fare.
+ * Game days until the foal of each resident in sight breeding at a stable (`CONTEXT.md`:
+ * Breeding), soonest first.
  */
-function daysToFoal(stable: Building, inIt: SeenHorse[]): number | undefined {
-  if (inIt.length >= STABLE_CAPACITY) return undefined
-  const fed = inIt.filter((h) => horseFaresKnown(h) && h.hunger > 0)
-  const pair = fed.some((a) =>
-    fed.some((b) => b !== a && b.realmId === a.realmId && b.cityId === a.cityId),
-  )
-  if (!pair) return undefined
-  const left = STABLE_BREED_TICKS - (stable.breeding ?? 0)
-  return Math.max(1, Math.ceil(left / TICKS_PER_GAME_DAY))
+export function daysToFoals(stable: Building, residents: readonly SeenResident[]): number[] {
+  return breedersAt(residents, stable)
+    .map((r) => (r.order?.kind === 'breed' ? STABLE_BREED_TICKS - r.order.progress : 0))
+    .map((left) => Math.max(1, Math.ceil(left / TICKS_PER_GAME_DAY)))
+    .sort((a, b) => a - b)
 }
 
 /**
@@ -586,8 +587,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const pileTile = live ?? t
   const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
   const cityOf = (b: Building) => t.cities.find((c) => c.id === b.cityId)
-  // Every horse in the stable on the tile, hitched or not, as it breeds and fills up
-  // (`breedingPair`); elsewhere the horses on the tile not pulling a carriage.
+  // Every horse in the stable on the tile, hitched or not, as it is bred and fills up
+  // (`breedProblem`); elsewhere the horses on the tile not pulling a carriage.
   const hitched = new Set(t.carriages.map((k) => k.horseId))
   // Who is in or at a building only remembered is not known.
   const stable = live?.kind === 'stable' && !live.site ? live : undefined
@@ -633,8 +634,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       const makes = live && makesLine(live, t, pile, goodLabels)
       if (makes) lines.push(makes)
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
-      const foal = stable && daysToFoal(stable, horsesHere)
-      if (foal) lines.push(`Next foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
+      for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
+        lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))
