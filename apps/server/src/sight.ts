@@ -301,13 +301,14 @@ export function entitiesInSight(
   for (const r of world.residents) {
     if (!inSight(r)) continue
     // Which script a resident runs is seen; its memory stays on the server, and the values of
-    // its params are shown only to the realm running it.
-    const { script, scriptParams, ...rest } = r
+    // its params are shown only to the realm running it, as is the queue to the realm that gave it.
+    const { script, scriptParams, queue, ...rest } = r
     const params =
       script && commanderOf(world, r) === realmId ? scriptParams?.[script.scriptId] : undefined
     const shown: SeenEntity = {
       is: 'resident',
       ...rest,
+      ...(queue && queue.realmId === realmId ? { queue } : {}),
       ...(script
         ? {
             script: {

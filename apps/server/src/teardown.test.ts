@@ -160,7 +160,7 @@ describe.each([
       // With the building gone, Tear down (default) stands idle.
       run(world, 5)
       expect(r.order).toBeNull()
-      expect(r.script?.memory).toEqual({ buildingId: 'b1', done: true })
+      expect(r.script).toBeUndefined() // gone: Tear down ended itself
     }
   })
 

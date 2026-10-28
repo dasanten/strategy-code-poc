@@ -18,8 +18,8 @@ import type { ScriptType, ScriptViewName } from './script-views.js'
  * - A **query** answers from what the Player sees and has explored, nothing more.
  * - An **action** asks for the order of the same name for `me`, checked exactly as a UI order
  *   is. It answers `null` when requested, or why not as a string; a script can request nothing
- *   an order couldn't. `doing` is the one action that asks for no order: it keeps the
- *   resident's Doing line in `memory` (`CONTEXT.md`: Doing).
+ *   an order couldn't. `doing` and `end` ask for no order: `doing` keeps the resident's Doing
+ *   line in `memory` (`CONTEXT.md`: Doing), `end` ends the script once this run is over.
  *
  * `cost` is the steps one call costs on top of the 1 every evaluated node costs. `returns` is
  * what a value holds or a call answers, in terms of the script views (ADR 0011).
@@ -237,6 +237,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.',
   ),
   action('stop', [], 'Stop what I was ordered to do and stand idle.'),
+  action(
+    'end',
+    [],
+    'End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. It asks for no order.',
+  ),
   action(
     'doing',
     ['text'],
