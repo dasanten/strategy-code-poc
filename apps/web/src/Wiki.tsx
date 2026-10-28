@@ -23,6 +23,7 @@ import {
   CARRY_BASE,
   CARRY_PER_STRENGTH,
   CARRYING_DAYS,
+  PAIRING_WAIT_DAYS,
   CHILD_STAT_SPREAD,
   CHILD_YEAR_DAYS,
   CITY_AREA_MARGIN,
@@ -585,8 +586,8 @@ export function Wiki() {
           Intellect, twice as fast).
         </p>
         <p>
-          A pair has one child at a time: once a game year has passed since they paired, and their
-          city has free housing and a food surplus, one partner carries the child for{' '}
+          A pair has one child at a time: once {days(PAIRING_WAIT_DAYS)} have passed since they paired, and
+          their city has free housing and a food surplus, one partner carries the child for{' '}
           {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
           {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a child is grown after{' '}
           {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Stats
