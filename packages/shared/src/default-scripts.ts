@@ -7,10 +7,11 @@
  * into `memory`, as `TaskMemory` lists. Defaults use the step budget like any script; a test
  * keeps each at most a quarter of `SCRIPT_STEP_BUDGET`.
  */
-import { WORK_FOOD_KEPT } from './balance.js'
+import { BREED_FOOD, HORSE_FOOD_PER_DAY, STABLE_FEED_DAYS, WORK_FOOD_KEPT } from './balance.js'
+import { FOOTPRINT } from './footprint.js'
 
 /** The tasks that run a default script. */
-export const TASKS = ['work', 'build', 'haul', 'tearDown'] as const
+export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable'] as const
 export type Task = (typeof TASKS)[number]
 
 /** What giving a task from the UI writes into the script's memory. */
@@ -37,6 +38,10 @@ export interface TaskMemory {
   }
   /** Tear down: the building or construction site on the resident's tile. */
   tearDown: { buildingId: string }
+  /** Breed horses: the stable, and the two horses in it to breed. */
+  breed: { stableId: string; horseIds: string[] }
+  /** Feed the stable: the stable the resident stood in when given it. */
+  feedStable: { stableId: string }
 }
 
 export interface DefaultScript {
@@ -245,6 +250,113 @@ if (me.order == null || me.order.kind != "tearDown") {
   // Turned down, such as with the building gone, tearDown says why: done.
   if (tearDown(memory.buildingId) != null) { end() }
 }
+`,
+  },
+  breed: {
+    name: 'Breed horses',
+    source: `// Breed horses (default): at stable memory.stableId, tend the two horses
+// memory.horseIds until their foal is born; then stand idle. Away from the
+// stable, walk there first. Before starting, take Food for the days of
+// tending from the stable, if it has some.
+let needFood = ${BREED_FOOD} // Food I take along for my meals while tending
+if (memory.done == true) { end() }
+if (me.order != null && me.order.kind == "breed") {
+  memory.started = true
+  return
+}
+if (memory.started == true) {
+  // The foal was born, or the breeding stopped: done.
+  end()
+}
+if (me.order != null && (me.order.kind == "walkTo" || me.order.kind == "pickUp")) { return }
+let food = 0
+if (me.carried.food != null) { food = me.carried.food }
+if (memory.fed != true && food < needFood) {
+  let spot = {kind: "storage", storageId: memory.stableId}
+  if (pickUp(spot, {food: needFood - food}) == null) {
+    memory.fed = true
+    return
+  }
+}
+let problem = breed(memory.stableId, memory.horseIds)
+if (problem == null) { return }
+let stable = building(memory.stableId)
+if (problem == "not standing at that stable" && stable != null && memory.walked != true) {
+  memory.walked = true
+  walkTo(stable.x, stable.y)
+  return
+}
+end()
+`,
+  },
+  feedStable: {
+    name: 'Feed the stable',
+    source: `// Feed the stable (default): keep Food for ${STABLE_FEED_DAYS} game days for the
+// horses standing in params.stable, or in memory.stableId while none is
+// picked. Below that I fetch what is missing from params.source, or the
+// nearest storage of my realm with Food while none is picked, and store it
+// in the stable; otherwise I wait there.
+param stable: storage // the stable to feed
+param source: storage // where the Food comes from; a carriage too
+let days = ${STABLE_FEED_DAYS} // game days of Food to keep
+let perHorse = ${HORSE_FOOD_PER_DAY} // Food a horse eats a game day
+let side = ${FOOTPRINT.stable} // tiles along each side of a stable
+
+let stable = params.stable
+if (stable == null) { stable = building(memory.stableId) }
+if (stable == null) { return } // gone or out of sight
+if (me.order != null) { return } // on my way
+
+// Back with Food: what I fetched goes into the stable; my own food stays.
+let fetched = memory.fetched
+if (fetched != null) {
+  memory.fetched = null
+  let got = 0
+  if (me.carried.food != null) { got = me.carried.food - fetched.before }
+  got = got - got % 1
+  if (got > 0 && store({food: got}, stable.id) == null) { return }
+}
+
+// Whether something with x and y stands on the stable's footprint.
+fn inStable(t) {
+  let dx = (t.x - stable.x + mapSize) % mapSize
+  let dy = (t.y - stable.y + mapSize) % mapSize
+  return dx < side && dy < side
+}
+
+// Below the Food to keep for the horses in it now: fetch what is missing.
+let horsesIn = 0
+for (h of horses()) {
+  if (inStable(h)) { horsesIn = horsesIn + 1 }
+}
+let held = 0
+if (stable.stock != null && stable.stock.food != null) { held = stable.stock.food }
+let need = horsesIn * days * perHorse - held
+if (need > 0) {
+  let from = params.source
+  if (from == null) {
+    let stores = storages(stable, ["food"]) // nearest first, holding some
+    if (stores.length > 0) { from = stores[0] }
+  }
+  let has = null
+  if (from != null) {
+    has = from.stock
+    if (has == null) { has = from.load }
+  }
+  if (from != null && from.id != stable.id && has != null && has.food != null && has.food >= 1) {
+    let units = need - need % 1
+    if (units < need) { units = units + 1 }
+    let before = 0
+    if (me.carried.food != null) { before = me.carried.food }
+    if (fetch({food: units}, from.id) == null) {
+      memory.fetched = {before: before}
+      return
+    }
+  }
+}
+
+// Enough, or none to fetch: wait at the stable.
+if (!inStable(me)) { walkTo(stable.x, stable.y) }
 `,
   },
 }

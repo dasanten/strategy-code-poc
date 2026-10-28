@@ -19,6 +19,7 @@ import {
   CARAVAN_ESCORTS_MAX,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
+  CARRIAGE_MAX_CAPACITY,
   CARRY_BASE,
   CARRY_PER_STRENGTH,
   CARRYING_DAYS,
@@ -57,6 +58,19 @@ import {
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HORSE_HUNGRY_SHARE,
+  HUNGRY_HORSE_PACE,
+  HORSE_ENDURANCE_EFFECT,
+  HORSE_ENDURANCE_LIMIT,
+  HORSE_SPEED_EFFECT,
+  HORSE_SPEED_LIMIT,
+  HORSE_START_AGE_MAX,
+  HORSE_START_AGE_MIN,
+  HORSE_STAT_AVERAGE,
+  HORSE_STAT_MAX,
+  HORSE_STAT_MIN,
+  HORSE_STRENGTH_EFFECT,
+  HORSE_STRENGTH_LIMIT,
   HOUSING_ROOM,
   HUNGER_DAYS,
   HUNGER_ENDURANCE_EFFECT,
@@ -92,6 +106,9 @@ import {
   SIGHT_RANGE,
   STABLE_BREED_DAYS,
   STABLE_CAPACITY,
+  FOAL_STAT_SPREAD,
+  BREED_FOOD,
+  STABLE_FEED_DAYS,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
   STANDING_PER_PAID_WEEK,
@@ -155,6 +172,7 @@ import {
   blow,
   breakTicks,
   buildCosts,
+  carriageCost,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -176,6 +194,7 @@ import {
   signed,
   residentsPerFarmer,
   transport,
+  horseRow,
   wikiResident,
   type PricedGood,
 } from './wiki-view.js'
@@ -472,9 +491,9 @@ export function Wiki() {
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
           <code>end()</code>), or once its duration in game minutes is up, if you gave it one.
-          Working a workplace and hauling never end on their own, so such a step needs a duration
-          unless it is the last. With loop on, the first step follows the last; without, the queue
-          ends after it.
+          Working a workplace, hauling and feeding a stable never end on their own, so such a step
+          needs a duration unless it is the last. With loop on, the first step follows the last;
+          without, the queue ends after it.
         </p>
         <p>
           You can add, remove and reorder steps while the queue runs; the current step keeps going
@@ -744,10 +763,18 @@ export function Wiki() {
         <p>
           A resident carries {num(CARRY_BASE)} kg plus {num(CARRY_PER_STRENGTH)} kg for each point
           of Strength: {num(AVERAGE_CARRY)} kg at average, {num(carryCapacity(strong, 0))} kg with
-          Strength {num(strong.stats.strength.base)}. A carriage carries {num(CARRIAGE_CAPACITY)}{' '}
-          kg; each point of its driver's Driving skill makes it {pct(DRIVING_SKILL_EFFECT)} faster,
-          at most {pct(DRIVING_SKILL_LIMIT)}, learned at {num(DRIVING_SKILL_PER_DAY)} a game day of
-          driving. Carriages can't enter mountains.
+          Strength {num(strong.stats.strength.base)}. A carriage behind an average horse carries{' '}
+          {num(CARRIAGE_CAPACITY)} kg; each point of its driver's Driving skill makes it{' '}
+          {pct(DRIVING_SKILL_EFFECT)} faster, at most {pct(DRIVING_SKILL_LIMIT)}, learned at{' '}
+          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages can't enter mountains.
+        </p>
+        <p>
+          A carriage is built at a finished stable: a resident there lays out a carriage site on a
+          tile of the stable, or right next to it, that has no carriage site yet. It takes{' '}
+          {goods(carriageCost().materials)} and {duration(carriageCost().buildTicks)} of one
+          builder's work, fetched and built like any construction site, and whoever finishes it gets
+          an empty carriage of their realm, with no horse hitched until it is first driven. Torn
+          down before it is finished, it leaves all the materials delivered to it.
         </p>
         <table>
           <thead>
@@ -798,10 +825,72 @@ export function Wiki() {
           wall or gate already; a diagonal wall line closes the way like a straight one.
         </p>
         <p>
-          Horses eat {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the carriage's load
-          or food on the ground next to them. Two fed horses at a stable breed a foal every{' '}
-          {days(STABLE_BREED_DAYS)}, up to {num(STABLE_CAPACITY)} horses a stable. A haul route
-          keeps {num(HAUL_KEEP_FOOD)} Food on board for its horse.
+          An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
+          carriage's load or food on the ground next to them. A stable holds up to{' '}
+          {num(STABLE_CAPACITY)} horses. A haul route keeps {num(HAUL_KEEP_FOOD)} Food on board for
+          its horse.
+        </p>
+        <h3>Breeding</h3>
+        <p>
+          Horses don't breed on their own. A grown resident standing at a finished stable is given
+          Breed horses and picks two fed horses of their realm in it; they tend them for{' '}
+          {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
+          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. Breeding stops,
+          and starts over from nothing, when the resident leaves or is given another order, when a
+          horse leaves or dies, or when the stable has no room left for the foal. The Breed horses
+          default first takes {num(BREED_FOOD)} Food from the stable for the resident's meals, if
+          they carry less. NPC cities have one of their residents breed their horses the same way.
+        </p>
+        <h3>Horse stats</h3>
+        <p>
+          Every horse has Speed, Strength and Endurance, and an age. A new horse's stats are whole
+          numbers from {num(HORSE_STAT_MIN)} to {num(HORSE_STAT_MAX)}, and it is{' '}
+          {num(HORSE_START_AGE_MIN)} to {num(HORSE_START_AGE_MAX)} game years old; a horse's stats
+          never change. Away from the average of {num(HORSE_STAT_AVERAGE)}, each point of Speed
+          makes its carriage {pct(HORSE_SPEED_EFFECT)} faster (slower below), at most{' '}
+          {pct(HORSE_SPEED_LIMIT)}; each point of Strength lets its carriage hold{' '}
+          {pct(HORSE_STRENGTH_EFFECT)} more (less below), at most {pct(HORSE_STRENGTH_LIMIT)}, so up
+          to {num(CARRIAGE_MAX_CAPACITY)} kg; each point of Endurance means{' '}
+          {pct(HORSE_ENDURANCE_EFFECT)} less Food (more below), at most {pct(HORSE_ENDURANCE_LIMIT)}
+          .
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Stat</th>
+              <th>Carriage on plains, tiles a game hour</th>
+              <th>Carriage holds, kg</th>
+              <th>Food a game day</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[HORSE_STAT_MIN, HORSE_STAT_AVERAGE, HORSE_STAT_MAX].map((v) => (
+              <tr key={v}>
+                <td>{num(v)}</td>
+                <td>{num(horseRow(v).plainsTiles, 1)}</td>
+                <td>{num(horseRow(v).capacity, 0)}</td>
+                <td>{num(horseRow(v).food, 2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>Riding</h3>
+        <p>
+          A resident on a tile with a free horse of their realm can mount it, and dismount anywhere;
+          the horse stays where they get off. A rider goes wherever they walk at the speed the horse
+          would pull a carriage there (the carriage column above), and never into mountains or up
+          onto walls. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
+          at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
+          Driving makes riding faster. A rider carries no more than on foot, and can't drive a
+          carriage; a ridden horse is never hitched.
+        </p>
+        <p>
+          A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
+          {days(STABLE_FEED_DAYS)} for the horses in it ({num(HORSE_FOOD_PER_DAY)} a horse a day):
+          below that they fetch what is missing from the nearest storage of your realm with Food, or
+          from the one picked as <code>source</code> on their card, and store it in the stable;
+          otherwise they wait there. Picking another <code>stable</code> on the card has them feed
+          that one instead.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>

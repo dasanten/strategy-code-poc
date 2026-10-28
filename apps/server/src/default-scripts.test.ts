@@ -1,10 +1,12 @@
 import { parse, run } from '@csp/lang'
 import {
+  AVERAGE_HORSE_STATS,
   DEFAULT_SCRIPTS,
   MAX_HEALTH,
   MAX_HUNGER,
   SCRIPT_MAX_CALL_DEPTH,
   SCRIPT_STEP_BUDGET,
+  STABLE_CAPACITY,
   TASKS,
   Terrain,
   nodeCorner,
@@ -85,7 +87,9 @@ describe('a Player’s default scripts', () => {
   it('are in their library from the start, one per task, following the game’s default', () => {
     const list = listScripts(db, mara)
     expect(list.map((s) => [s.name, s.task, s.followsDefault])).toEqual([
+      ['Breed horses (default)', 'breed', true],
       ['Build (default)', 'build', true],
+      ['Feed the stable (default)', 'feedStable', true],
       ['Haul (default)', 'haul', true],
       ['Tear down (default)', 'tearDown', true],
       ['Work (default)', 'work', true],
@@ -370,6 +374,8 @@ function withCarriage(world: WorldState) {
     y: 3,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
   })
   const k1 = { id: 'k1', realmId: 'r1', cityId: null, x: 3, y: 3, horseId: null, load: {} }
   world.carriages.push(k1)
@@ -549,6 +555,52 @@ describe('the step budget', () => {
       keepFood: 4,
     }
     const tearDown = { buildingId: 'farm' }
+    const breeding = { stableId: 'st', horseIds: ['h1', 'h2'] }
+    /** A stable of Mara's where the farm was, with two of her horses and Food in it. */
+    const stabled = (world: WorldState) => {
+      world.buildings = [
+        { id: 'st', kind: 'stable', cityId: 'c1', x: 3, y: 3, stock: { food: 50 } },
+      ]
+      for (const id of ['h1', 'h2']) {
+        world.horses.push({
+          id,
+          realmId: 'r1',
+          cityId: null,
+          x: 3,
+          y: 3,
+          hunger: MAX_HUNGER,
+          health: MAX_HEALTH,
+          stats: { ...AVERAGE_HORSE_STATS },
+          bornAt: 0,
+        })
+      }
+    }
+    const feed = { stableId: 'stable' }
+    /** A finished stable where the farm was, holding `food`, with as many horses as fit. */
+    const feeding = (world: WorldState, food: number) => {
+      world.buildings = world.buildings.filter((b) => b.id !== 'farm')
+      world.buildings.push({
+        id: 'stable',
+        kind: 'stable',
+        cityId: 'c1',
+        x: 3,
+        y: 3,
+        stock: { food },
+      })
+      for (let i = 0; i < STABLE_CAPACITY; i++) {
+        const at = { x: 3 + (i % 3), y: 3 + Math.floor(i / 3) }
+        world.horses.push({
+          id: `h${i}`,
+          realmId: 'r1',
+          cityId: null,
+          ...at,
+          hunger: 100,
+          health: 100,
+          stats: { ...AVERAGE_HORSE_STATS },
+          bornAt: 0,
+        })
+      }
+    }
     const stable = { building: 'stable', at: { x: 3, y: 3 }, siteId: 'site' }
     /** Mara's residents all building a stable's site where the farm was, lacking its Wood. */
     const building = (world: WorldState) => {
@@ -665,6 +717,65 @@ describe('the step budget', () => {
         },
         { memory: tearDown, prepare: (world) => void (world.buildings = []) },
         { memory: { ...tearDown, done: true }, prepare: (world) => void (world.buildings = []) },
+      ],
+      breed: [
+        // Taking Food along, breeding, away from the stable, breeding, turned down, and done.
+        { memory: breeding, prepare: stabled },
+        {
+          memory: { ...breeding, fed: true },
+          prepare: (world) => {
+            stabled(world)
+            world.residents[0]!.x = 20
+          },
+        },
+        {
+          memory: { ...breeding, fed: true, started: true },
+          prepare: (world) => {
+            stabled(world)
+            const at = { x: 3, y: 3 }
+            const order = { kind: 'breed' as const, stableId: 'st', at, progress: 5 }
+            world.residents[0]!.order = { ...order, horseIds: ['h1', 'h2'] }
+          },
+        },
+        { memory: { ...breeding, fed: true }, prepare: () => {} },
+        { memory: { ...breeding, done: true }, prepare: stabled },
+      ],
+      feedStable: [
+        // A full stable short of Food: counting its horses, fetching from the nearest of many
+        // storages, the farthest holding Food.
+        {
+          memory: feed,
+          prepare: (world) => {
+            feeding(world, 0)
+            for (let i = 0; i < 10; i++) {
+              const stock = i === 9 ? { food: 100 } : { stone: 5 }
+              world.buildings.push({
+                id: `s${i}`,
+                kind: 'storage',
+                cityId: 'c1',
+                x: 5 + 2 * i,
+                y: 12,
+                stock,
+              })
+            }
+          },
+        },
+        // Back with Food: storing it.
+        {
+          memory: { ...feed, fetched: { before: 4 } },
+          prepare: (world) => {
+            feeding(world, 0)
+            world.residents[0]!.carried = { food: 30 }
+          },
+        },
+        // Enough, away from it: walking back.
+        {
+          memory: feed,
+          prepare: (world) => {
+            feeding(world, 100)
+            world.residents[0]!.x = 5
+          },
+        },
       ],
     }
     for (const task of TASKS) {

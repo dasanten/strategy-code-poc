@@ -1,5 +1,7 @@
 import {
   isWallOrGate,
+  carriagePulledBy,
+  horseOfResident,
   isLineOrder,
   LINE_BUILDING,
   wallStrength,
@@ -10,10 +12,13 @@ import {
   nameProblem,
   isAllianceCity,
   BUILDABLE,
+  SHARES_A_TILE,
   BUILD_MATERIALS,
   BUILD_WORK,
   CARRIAGE_CAPACITY,
+  CARRIAGE_MAX_CAPACITY,
   CRIME_MEMORY_DAYS,
+  HORSE_STAT_NAMES,
   TICKS_PER_GAME_DAY,
   carriageCanEnter,
   drivenCarriageId,
@@ -199,7 +204,9 @@ export const realmsHaveLeaders: Invariant = {
 /**
  * Buildings and construction sites (`CONTEXT.md`: Footprint, Where buildings go): no two
  * footprints overlap, and next to a building at most one road or road site per tile, on passable
- * land off Mountain and of no city (`CONTEXT.md`: Road); every footprint on passable land; farms
+ * land off Mountain and of no city (`CONTEXT.md`: Road), and at most one carriage site, always
+ * still a site, of no city, off nodes and other buildings but stables, where a carriage can stand
+ * (`CONTEXT.md`: Carriage); every footprint on passable land; farms
  * and stables wholly on Plains, mines, quarries and lumber camps with one tile on a resource node
  * of their kind and of no city; smelters, mints, town halls, walls and gates off nodes and off
  * Mountain, smelters and mints of no city; no node under any other building; a stable, farm,
@@ -221,7 +228,7 @@ export const buildingsInPlace: Invariant = {
       const nodes = footprint.flatMap(([x, y]) => nodesAt.get(`${x},${y}`) ?? [])
       for (const [x, y] of footprint) {
         const key = `${x},${y}`
-        const layer = b.kind === 'road' ? `road ${key}` : key
+        const layer = SHARES_A_TILE.includes(b.kind) ? `${b.kind} ${key}` : key
         const other = tiles.get(layer)
         if (other) fail(b.id, `overlaps ${other} on tile (${key})`)
         tiles.set(layer, b.id)
@@ -231,6 +238,15 @@ export const buildingsInPlace: Invariant = {
         if (terrains[0] === Terrain.Mountain) fail(b.id, 'is a road on Mountain')
         if (b.cityId !== null) fail(b.id, `is a road of city ${b.cityId}`)
         if (b.stock) fail(b.id, 'is a road with a stock')
+      } else if (b.kind === 'carriage') {
+        if (!b.site) fail(b.id, 'is a finished carriage site')
+        if (!carriageCanEnter(terrains[0]!))
+          fail(b.id, 'is a carriage site where no carriage can go')
+        if (nodes.length > 0) fail(b.id, 'is a carriage site on a resource node')
+        if (b.cityId !== null) fail(b.id, `is a carriage site of city ${b.cityId}`)
+        if (b.stock) fail(b.id, 'is a carriage site with a stock')
+        const under = buildingAt(world, b.x, b.y, size)
+        if (under && under.kind !== 'stable') fail(b.id, `is a carriage site on a ${under.kind}`)
       } else if (OFF_NODES.includes(b.kind)) {
         if (nodes.length > 0) fail(b.id, `is a ${b.kind} on a resource node`)
         if (terrains.includes(Terrain.Mountain)) fail(b.id, `is a ${b.kind} on Mountain`)
@@ -353,24 +369,75 @@ export const healthAndHungerInRange: Invariant = {
 }
 
 /**
- * Stables breed only while they make sense (`CONTEXT.md`: Stable): breeding progress is kept
- * only on stables, and stays between 0 and one foal's worth (`STABLE_BREED_TICKS`); a stable
- * reaching it has had its foal.
+ * Every horse has its stats and an age (`CONTEXT.md`: Horse stats): each stat a whole number of
+ * at least 1, and a birth tick no later than now.
  */
-export const stablesBreedInRange: Invariant = {
-  name: 'stables-breed-in-range',
+export const horseStatsSound: Invariant = {
+  name: 'horse-stats-sound',
   check(world) {
-    return world.buildings
-      .filter(
-        (b) =>
-          b.breeding !== undefined &&
-          !(b.kind === 'stable' && b.breeding >= 0 && b.breeding < STABLE_BREED_TICKS),
+    const out: InvariantViolation[] = []
+    for (const h of world.horses) {
+      const bad = HORSE_STAT_NAMES.filter(
+        (s) => !(Number.isInteger(h.stats?.[s]) && h.stats[s] >= 1),
       )
-      .map((b) => ({
-        invariant: this.name,
-        message: `${b.kind} ${b.id} has breeding ${b.breeding} of ${STABLE_BREED_TICKS}`,
-        entityIds: [b.id],
-      }))
+      if (bad.length > 0) {
+        out.push({
+          invariant: this.name,
+          message: `horse ${h.id} has ${bad.map((s) => `${s} ${h.stats?.[s]}`).join(', ')}`,
+          entityIds: [h.id],
+        })
+      }
+      if (!(Number.isFinite(h.bornAt) && h.bornAt <= world.tick)) {
+        out.push({
+          invariant: this.name,
+          message: `horse ${h.id} was born at tick ${h.bornAt}, after tick ${world.tick}`,
+          entityIds: [h.id],
+        })
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * Breeding goes on only while it makes sense (`CONTEXT.md`: Breeding): after a tick, a resident
+ * with a breed order stands where they started it, at the finished stable, with two different
+ * horses standing in it that no one else breeds, and their progress stays below one foal's worth
+ * (`STABLE_BREED_TICKS`); reaching it, the foal was born and the order ended.
+ */
+export const breedOrdersSound: Invariant = {
+  name: 'breed-orders-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const bred = new Map<string, string>()
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'breed') continue
+      const fail = (message: string, ids: string[] = []) =>
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${message}`,
+          entityIds: [r.id, ...ids],
+        })
+      const stable = world.buildings.find((b) => b.id === o.stableId)
+      if (!stable || stable.kind !== 'stable' || stable.site || !isAt(r, stable))
+        fail(`breeds at ${o.stableId}, which isn’t a finished stable they stand at`, [o.stableId])
+      if (r.x !== o.at.x || r.y !== o.at.y)
+        fail(`breeds from ${o.at.x}, ${o.at.y} but stands elsewhere`)
+      if (!(Number.isInteger(o.progress) && o.progress >= 0 && o.progress < STABLE_BREED_TICKS))
+        fail(`has breeding progress ${o.progress} of ${STABLE_BREED_TICKS}`)
+      if (o.horseIds[0] === o.horseIds[1]) fail(`breeds horse ${o.horseIds[0]} with itself`)
+      for (const id of o.horseIds) {
+        const h = world.horses.find((x) => x.id === id)
+        if (!h || !stable || !isAt(h, stable))
+          fail(`breeds horse ${id}, which isn’t in the stable`, [id])
+        const other = bred.get(id)
+        if (other !== undefined && other !== r.id)
+          fail(`breeds horse ${id}, which ${other} breeds too`, [id, other])
+        bred.set(id, r.id)
+      }
+    }
+    return out
   },
 }
 
@@ -726,8 +793,9 @@ export const refilledWhenLow: Invariant = {
 
 /**
  * Carriages keep to the rules of `CONTEXT.md` (Carriage): never in the mountains, never loaded
- * past `CARRIAGE_CAPACITY`, and a hitched horse exists, stands with its carriage and pulls no
- * other one.
+ * past what the strongest horse lets one hold (`CARRIAGE_MAX_CAPACITY`: a carriage loaded behind
+ * a strong horse keeps its load when the horse dies), and a hitched horse exists, stands with its
+ * carriage and pulls no other one.
  */
 export const carriagesInPlace: Invariant = {
   name: 'carriages-in-place',
@@ -741,7 +809,9 @@ export const carriagesInPlace: Invariant = {
         fail(k.id, `stands where no carriage can go at (${k.x}, ${k.y})`)
       }
       const kg = stockWeight(k.load)
-      if (kg > CARRIAGE_CAPACITY + 1e-9) fail(k.id, `holds ${kg} kg of ${CARRIAGE_CAPACITY} kg`)
+      if (kg > CARRIAGE_MAX_CAPACITY + 1e-9) {
+        fail(k.id, `holds ${kg} kg, more than any carriage can (${CARRIAGE_MAX_CAPACITY} kg)`)
+      }
       if (k.horseId === null) continue
       const horse = world.horses.find((h) => h.id === k.horseId)
       if (!horse) fail(k.id, `is hitched to ${k.horseId}, which doesn't exist`)
@@ -754,6 +824,46 @@ export const carriagesInPlace: Invariant = {
       const other = pulling.get(k.horseId)
       if (other) fail(k.id, `shares horse ${k.horseId} with ${other}`, [k.id, other, k.horseId])
       pulling.set(k.horseId, k.id)
+    }
+    return out
+  },
+}
+
+/**
+ * After a tick, a rider's horse exists, stands with them, is of their realm and pulls no carriage,
+ * and no horse has two riders (`CONTEXT.md`: Riding; `stepRiders` ends riding that can't go on).
+ */
+export const ridersOnHorses: Invariant = {
+  name: 'riders-on-horses',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (ids: string[], message: string) =>
+      out.push({ invariant: this.name, message, entityIds: ids })
+    const riders = new Map<string, string>()
+    for (const r of world.residents) {
+      if (r.riding === undefined) continue
+      const horse = world.horses.find((h) => h.id === r.riding)
+      if (!horse) {
+        fail([r.id], `resident ${r.id} rides ${r.riding}, which doesn't exist`)
+        continue
+      }
+      if (horse.x !== r.x || horse.y !== r.y) {
+        fail(
+          [r.id, horse.id],
+          `resident ${r.id} at (${r.x}, ${r.y}) rides horse ${horse.id} at (${horse.x}, ${horse.y})`,
+        )
+      }
+      if (!horseOfResident(horse, r)) {
+        fail([r.id, horse.id], `resident ${r.id} rides horse ${horse.id} of another realm`)
+      }
+      const carriage = carriagePulledBy(world, horse)
+      if (carriage) {
+        fail([horse.id, carriage.id], `horse ${horse.id} is ridden and hitched to ${carriage.id}`)
+      }
+      const other = riders.get(horse.id)
+      if (other)
+        fail([horse.id, r.id, other], `horse ${horse.id} has two riders, ${other} and ${r.id}`)
+      riders.set(horse.id, r.id)
     }
     return out
   },
@@ -1166,6 +1276,7 @@ const ADULT_ORDERS = new Set([
   'wallLine',
   'tearDown',
   'workAt',
+  'breed',
   'drive',
   'pickUp',
   'drop',
@@ -1550,6 +1661,7 @@ export const worldInvariants: Invariant[] = [
   trainedWithinCap,
   skillsWithinCap,
   healthAndHungerInRange,
+  horseStatsSound,
   agesInRange,
   realmsHaveLeaders,
   leadersServeNoOne,
@@ -1559,7 +1671,7 @@ export const worldInvariants: Invariant[] = [
   citiesFromBuildings,
   carriedWithinCapacity,
   goodsInPlace,
-  stablesBreedInRange,
+  breedOrdersSound,
   goodsInWholeUnits,
   carryOrdersDone,
   storeFetchOrdersSound,
@@ -1583,6 +1695,7 @@ export const worldInvariants: Invariant[] = [
   carryingDoesntWork,
   childrenDontWork,
   carriagesInPlace,
+  ridersOnHorses,
   driversOnCarriages,
   haulRoutesSound,
   alliancesSound,

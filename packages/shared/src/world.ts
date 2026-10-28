@@ -13,6 +13,13 @@ export const TICKS_PER_GAME_YEAR = 420 * TICKS_PER_GAME_DAY
 export const STAT_NAMES = ['strength', 'endurance', 'agility', 'intellect'] as const
 export type StatName = (typeof STAT_NAMES)[number]
 
+/** A horse's stats (`CONTEXT.md`: Horse stats). */
+export const HORSE_STAT_NAMES = ['speed', 'strength', 'endurance'] as const
+export type HorseStatName = (typeof HORSE_STAT_NAMES)[number]
+
+/** A horse's stats, whole numbers it is born with; nothing trains them. */
+export type HorseStats = Record<HorseStatName, number>
+
 /** A stat: what the resident was born with, plus what training added (capped by the base). */
 export interface Stat {
   base: number
@@ -79,6 +86,11 @@ export interface Resident {
   pair?: Pair
   /** The child the resident is carrying (`CONTEXT.md`: Carrying), if any. */
   carrying?: Carrying
+  /**
+   * The horse the resident rides (`CONTEXT.md`: Riding), if they ride one. Not an order: they go
+   * on with whatever they do, at the horse's pace.
+   */
+  riding?: string
 }
 
 /**
@@ -450,6 +462,20 @@ export interface ClimbOrder {
   progress: number
 }
 
+/**
+ * Breeding (`CONTEXT.md`: Breeding): the resident, standing at the finished stable `stableId` on
+ * `at`, tends the two horses `horseIds` standing in it. `progress` counts the ticks tended, up to
+ * `STABLE_BREED_TICKS`; then a foal is born there and the order is done. It ends, its progress
+ * lost, when the resident or a horse leaves, a horse dies or the stable has no room left.
+ */
+export interface BreedOrder {
+  kind: 'breed'
+  stableId: string
+  horseIds: [string, string]
+  at: { x: number; y: number }
+  progress: number
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -462,6 +488,7 @@ export type ResidentOrder =
   | BuildOrder
   | TearDownOrder
   | WorkOrder
+  | BreedOrder
   | AttackOrder
   | ClimbOrder
   | LineOrder
@@ -1533,11 +1560,17 @@ export type BuildingKind =
   | 'mint'
   | 'smithy'
   | 'road'
+  /**
+   * A carriage site (`CONTEXT.md`: Carriage): only ever a construction site, laid out at a
+   * stable; finished, it becomes a `Carriage` and is gone from the buildings.
+   */
+  | 'carriage'
 
 /**
  * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction
  * site, not yet the building. A road is built like a building but may share its tile with one
- * (`CONTEXT.md`: Road): a tile holds at most one road and one other building.
+ * (`CONTEXT.md`: Road), and so may a carriage site (`CONTEXT.md`: Carriage): a tile holds at most
+ * one road, one carriage site and one other building.
  */
 export interface Building {
   id: string
@@ -1552,11 +1585,6 @@ export interface Building {
   y: number
   /** Goods kept here; storages, warehouses and stables only. */
   stock?: Stock
-  /**
-   * A stable's progress toward its next foal, in ticks of breeding (`STABLE_BREED_DAYS`); there
-   * once it has started.
-   */
-  breeding?: number
   /** There while the building is still a construction site. */
   site?: ConstructionSite
   /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
@@ -1600,6 +1628,10 @@ export interface Horse {
   hunger: number
   /** 0 is dead; the most is `MAX_HEALTH`, as for residents. */
   health: number
+  /** Speed, Strength and Endurance (`CONTEXT.md`: Horse stats). */
+  stats: HorseStats
+  /** The tick it was born; its age is counted from it (`horseAgeInYears`). */
+  bornAt: number
 }
 
 /** A horse-drawn cart (`CONTEXT.md`: Carriage). */

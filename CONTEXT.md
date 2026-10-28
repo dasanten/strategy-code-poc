@@ -566,24 +566,59 @@ The shared language of the game. Domain terms only — no implementation details
 ## Transport
 
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
-  hunger meter costs health, and a horse without food dies after about 5 game days. Bred at a
-  stable, or bought from the Trade Organization.
+  hunger meter costs health, and a horse without food dies after about 5 game days. Bred by a
+  resident at a stable, or bought from the Trade Organization.
+- **Horse stats:** every horse has Speed, Strength and Endurance, and an age. Speed is how fast
+  it pulls its carriage or carries a rider (`Riding`); Strength is how much the carriage it pulls
+  can hold; Endurance is how much Food it needs, as a resident's Endurance is for them. New
+  horses (in a starting city, at the Trade Organization, in an NPC city) get stats drawn in a
+  range. A horse's stats never change; they show with its age, health and hunger on the tile card
+  and in the stable.
 - **Horses have no inventory:** a horse eats only what is in reach. At a stable it eats from the
   stable's storage; pulling a carriage, from the carriage's load; anywhere, from Food lying on the
   ground on its tile or right next to it, so Players can feed a horse by putting food down by it.
 - **Stable:** a building on Plains where horses are kept. It has a storage for their Food, which
-  residents fill and empty like any storage. Two fed horses of one realm at a stable breed a foal
-  every so often, while the stable has room for another horse. No residents need to work there.
-  Like a workplace, a stable has no owner: any horse standing in it eats from it.
+  residents fill and empty like any storage. Horses don't breed there on their own: a resident
+  breeds them (**Breeding**). Like a workplace, a stable has no owner: any horse standing in it
+  eats from it.
+- **Breeding:** an order (as a script could do it) for a grown resident at a finished stable: they
+  pick two fed horses of their realm standing in it and tend them for a while; then a foal of
+  their realm is born in the stable, with its parents' average stats plus a little noise. It
+  stops, and its progress is lost, when the resident leaves or is given another order, when a
+  horse leaves or dies, or when the stable has no room for another horse. Before starting, the
+  default takes Food for the resident's meals from the stable. NPC cities breed their horses the
+  same way, with one of their residents.
+- **Feeding the stable:** a task (default script "Feed the stable") given to a grown-up resident
+  standing in a stable, from their card. They keep Food in the stable for about 10 game days for
+  the horses standing in it: below that they fetch what is missing from a storage and store it in
+  the stable; otherwise they wait there. Its params: `stable`, the stable to feed (by default the
+  one they were given it in), and `source`, where the Food comes from (by default the nearest
+  storage of their realm with Food). With no Food to fetch they wait.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
-  mountains.
+  mountains. Built at a stable (Building a carriage).
+- **Building a carriage:** a resident at a finished stable lays out a **carriage site** on their
+  tile of the stable, or on a tile right next to it, where a carriage can stand, off resource nodes
+  and other buildings; it shares the tile with the stable, one carriage site per tile. It is a
+  construction site like any other (materials, mostly wood and some iron, and work; fetching
+  materials, no owner, finished by anyone, torn down leaving all its materials). Once finished it
+  is gone, and an empty carriage of the realm of the resident who finished it stands on its tile,
+  with no horse hitched until it is first driven.
 - **Driving:** a grown-up resident on a carriage's tile drives it to another tile; the driver,
   the carriage and its horse move together. Driving teaches the Driving skill, and a more
   skilled driver goes faster. Players drive only their own carriages, with their own horses.
 - **Hitched horse:** the one horse that pulls a carriage. A horse of the carriage's realm standing
   with it is hitched when the carriage is first driven, and stays hitched (for now). A carriage
   whose horse dies stands where it is until another horse is hitched.
+- **Riding:** a resident on a tile with a horse of their realm that pulls no carriage and nobody
+  rides mounts it, and dismounts anywhere; the horse stays on that tile. Riding is not an order:
+  the rider goes on with what they do, and their walking goes at the horse's pace, as fast as it
+  would pull a carriage there (fast on plains and roads, slower in forest and hills, never into
+  mountains or onto walls), slower while the horse is hungry. Gates and walls stop a rider as
+  anyone. The rider carries what they could on foot; the horse eats Food in reach as usual.
+  Riding teaches Driving, and Driving makes riding faster. A horse has at most one rider and is
+  never hitched while ridden; a rider doesn't drive. A rider whose horse dies, or who leaves it
+  behind (climbing a wall), is on foot again.
 - **Loading a carriage:** residents on a carriage's tile put goods on it and take goods off it
   like at a storage, up to what the carriage holds.
 - **Haul route:** an order (as a script could do it) for a resident to drive a carriage between
@@ -616,8 +651,8 @@ The shared language of the game. Domain terms only — no implementation details
   each of them, with its own memory, and can request only what that resident or army could. Any
   other order ends it. A script can hand over to a built-in order for a while and take control
   back. A script ends itself by calling `end()`: the resident stands idle, and in a queue its next
-  step starts; the Build and Tear down defaults do once the site is finished or the building is
-  gone. A saved change is picked up on the next tick: each save is a new version, and the
+  step starts; the Build, Tear down and Breed horses defaults do once the site is finished, the building is
+  gone or the foal is born. A saved change is picked up on the next tick: each save is a new version, and the
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again.
@@ -685,7 +720,7 @@ The shared language of the game. Domain terms only — no implementation details
   is any order the Player could give them on its own: a one-off action (walk to, pick up, drop,
   Store, Fetch, …), a task, or one of their scripts with its params. A step ends when it's done
   (a walk arrives, a script calls `end()`), or once its duration in game minutes is up, if the Player gave
-  it one; a task that never ends on its own (work, haul) needs a duration unless it's the last
+  it one; a task that never ends on its own (work, haul, feed the stable) needs a duration unless it's the last
   step. With **loop**, the first step follows the last; without, the queue ends after it. Steps
   can be added, removed and reordered while it runs: the current step keeps going unless removed,
   and then the step in its place starts. A step that can't start or ends in a failure is skipped

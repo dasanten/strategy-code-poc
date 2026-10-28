@@ -257,6 +257,13 @@ describe('queue order', () => {
       'step 1 never ends on its own: give it a duration or make it the last',
     )
     expect(reason({ steps: [walk(1, 1), { order: { kind: 'workAt' } }] })).toBeUndefined()
+    const feed = { kind: 'task', task: 'feedStable', stableId: 'b1' }
+    expect(reason({ steps: [{ order: feed }, walk(1, 1)] })).toBe(
+      'step 1 never ends on its own: give it a duration or make it the last',
+    )
+    expect(reason({ steps: [{ order: feed, minutes: 30 }, walk(1, 1)] }) ?? '').not.toMatch(
+      /never ends/,
+    )
     expect(reason({ steps: [{ ...walk(1, 1), minutes: 0 }] })).toBe(
       "step 1's duration must be a whole number of minutes",
     )

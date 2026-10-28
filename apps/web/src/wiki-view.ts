@@ -1,6 +1,7 @@
 import {
   ADULT_AGE,
   AGILITY_AVERAGE,
+  AVERAGE_HORSE_STATS,
   BUILD_MATERIALS,
   BUILD_WORK,
   BUILDABLE,
@@ -29,6 +30,9 @@ import {
   TICK_MS,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_HOUR,
+  HORSE_FOOD_PER_DAY,
+  carriageCapacityWith,
+  horseFoodFactor,
   Terrain,
   WALL_STRENGTH,
   WAREHOUSE_BASE_PRICE,
@@ -275,9 +279,13 @@ export interface BuildCost {
   returned: Stock
 }
 
+/**
+ * The building cost sheet: every kind that can be built but a carriage, which is no building once
+ * finished (`carriageCost`).
+ */
 export function buildCosts(): BuildCost[] {
   const pace = buildWork(AVERAGE, AT)
-  return BUILDABLE.map((kind) => {
+  return BUILDABLE.filter((kind) => kind !== 'carriage').map((kind) => {
     const materials = BUILD_MATERIALS[kind] ?? {}
     const work = BUILD_WORK[kind] ?? 0
     const returned: Stock = {}
@@ -296,6 +304,17 @@ export function buildCosts(): BuildCost[] {
   })
 }
 
+/**
+ * What a carriage takes to build at a stable (`CONTEXT.md`: Carriage): its materials and the
+ * ticks one average builder takes, alone.
+ */
+export function carriageCost(): { materials: Stock; buildTicks: number } {
+  return {
+    materials: BUILD_MATERIALS.carriage ?? {},
+    buildTicks: (BUILD_WORK.carriage ?? 0) / buildWork(AVERAGE, AT),
+  }
+}
+
 // ---------- Transport ----------
 
 export const TERRAIN_NAMES = ['Plains', 'Forest', 'Hills', 'Mountain', 'Road'] as const
@@ -312,10 +331,13 @@ export interface TransportRow {
 
 export const AVERAGE_CARRY = carryCapacity(AVERAGE, AT)
 
+/** A horse of average stats (`CONTEXT.md`: Horse stats), for the wiki's carriage numbers. */
+export const AVERAGE_HORSE = { stats: AVERAGE_HORSE_STATS }
+
 export function transport(): TransportRow[] {
   return TERRAIN_NAMES.map((terrain) => {
     const footTiles = walkSpeed(AVERAGE, Terrain[terrain], AT) * TICKS_PER_GAME_HOUR
-    const carriageTiles = driveSpeed(AVERAGE, Terrain[terrain]) * TICKS_PER_GAME_HOUR
+    const carriageTiles = driveSpeed(AVERAGE, AVERAGE_HORSE, Terrain[terrain]) * TICKS_PER_GAME_HOUR
     return {
       terrain,
       footTiles,
@@ -324,6 +346,20 @@ export function transport(): TransportRow[] {
       carriageKgTiles: carriageTiles * CARRIAGE_CAPACITY,
     }
   })
+}
+
+/**
+ * What a horse with every stat at `value` does (`CONTEXT.md`: Horse stats): tiles its carriage
+ * goes on plains in a game hour with an untrained driver, what the carriage holds, and the Food it
+ * eats a game day.
+ */
+export function horseRow(value: number): { plainsTiles: number; capacity: number; food: number } {
+  const horse = { stats: { speed: value, strength: value, endurance: value } }
+  return {
+    plainsTiles: driveSpeed(AVERAGE, horse, Terrain.Plains) * TICKS_PER_GAME_HOUR,
+    capacity: carriageCapacityWith(horse),
+    food: HORSE_FOOD_PER_DAY * horseFoodFactor(horse),
+  }
 }
 
 /** Example deliveries: kg over tiles, and what the delivery and a transfer of it cost. */

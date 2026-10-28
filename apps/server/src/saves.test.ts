@@ -6,7 +6,13 @@ import { sql } from 'drizzle-orm'
 import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
 import { gzipSync } from 'node:zlib'
-import { type TerrainMap } from '@csp/shared'
+import {
+  AVERAGE_HORSE_STATS,
+  HORSE_START_AGE_MAX,
+  HORSE_START_AGE_MIN,
+  horseAgeInYears,
+  type TerrainMap,
+} from '@csp/shared'
 import { createAdmin } from './auth.js'
 import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
@@ -128,7 +134,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(44)
+    expect(WORLD_FORMAT_VERSION).toBe(47)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -144,9 +150,9 @@ describe('world saves', () => {
     expect(migrated.buildings).toEqual(world.buildings)
   })
 
-  it('keeps a format 43 world as it is: no resident has a queue yet (migration 43 → 44)', () => {
+  it('keeps a format 46 world as it is: no resident has a queue yet (migration 46 → 47)', () => {
     const { world, terrain } = worldWithCity()
-    const migrated = migrateWorld(structuredClone(world), 43, { terrain })
+    const migrated = migrateWorld(structuredClone(world), 46, { terrain })
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.queue === undefined)).toBe(true)
     expect(checkInvariants(migrated, terrain)).toEqual([])
@@ -154,7 +160,7 @@ describe('world saves', () => {
 
   it('keeps a format 42 world as it is: no script param is picked yet (migration 42 → 43)', () => {
     const { world, terrain } = worldWithCity()
-    const migrated = migrateWorld(structuredClone(world), 42, { terrain })
+    const migrated = migrateWorld(structuredClone(world), 42, { terrain }, migrations, 43)
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.scriptParams === undefined)).toBe(true)
     expect(checkInvariants(migrated, terrain)).toEqual([])
@@ -162,7 +168,7 @@ describe('world saves', () => {
 
   it('keeps a format 41 world as it is: no resident stores or fetches yet (migration 41 → 42)', () => {
     const { world, terrain } = worldWithCity()
-    const migrated = migrateWorld(structuredClone(world), 41, { terrain })
+    const migrated = migrateWorld(structuredClone(world), 41, { terrain }, migrations, 42)
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.orderEnded === undefined)).toBe(true)
     expect(checkInvariants(migrated, terrain)).toEqual([])
@@ -179,8 +185,57 @@ describe('world saves', () => {
       progress: 0,
       siteId: null,
     }
-    const migrated = migrateWorld(structuredClone(world), 40, { terrain: smallTerrain() })
+    const migrated = migrateWorld(
+      structuredClone(world),
+      40,
+      { terrain: smallTerrain() },
+      migrations,
+      41,
+    )
     expect(migrated).toEqual(world)
+  })
+
+  it('gives horses from before stats average stats and a plausible age (migration 43 → 44)', () => {
+    const { world, terrain: land } = worldWithCity()
+    expect(world.horses.length).toBeGreaterThan(0)
+    // A format 43 horse: no stats, no birth tick.
+    const old = structuredClone(world) as unknown as { horses: Record<string, unknown>[] }
+    for (const h of old.horses) {
+      delete h.stats
+      delete h.bornAt
+    }
+    const migrated = migrateWorld(old, 43, { terrain: land })
+    for (const h of migrated.horses) {
+      expect(h.stats).toEqual(AVERAGE_HORSE_STATS)
+      const age = horseAgeInYears(h, migrated.tick)
+      expect(age).toBeGreaterThanOrEqual(HORSE_START_AGE_MIN)
+      expect(age).toBeLessThanOrEqual(HORSE_START_AGE_MAX)
+    }
+    expect(migrated.horses.map(({ id, x, y }) => ({ id, x, y }))).toEqual(
+      world.horses.map(({ id, x, y }) => ({ id, x, y })),
+    )
+    expect(checkInvariants(migrated, land)).toEqual([])
+  })
+
+  it('drops the breeding progress stables kept (migration 44 → 45)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const stable = world.buildings.find((b) => b.kind === 'stable')!
+    // A format 44 stable, partway to a foal.
+    const old = structuredClone(world) as unknown as { buildings: Record<string, unknown>[] }
+    old.buildings.find((b) => b.id === stable.id)!.breeding = 40
+    const migrated = migrateWorld(old, 44, { terrain: land })
+    expect(migrated.buildings.every((b) => !('breeding' in b))).toBe(true)
+    expect(migrated.buildings).toEqual(world.buildings)
+    expect(checkInvariants(migrated, land)).toEqual([])
+  })
+
+  it('brings a format 45 world over with nobody riding (migration 45 → 46)', () => {
+    const { world, terrain: land } = worldWithCity()
+    expect(world.horses.length).toBeGreaterThan(0)
+    const migrated = migrateWorld(structuredClone(world), 45, { terrain: land }, migrations, 46)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents.every((r) => r.riding === undefined)).toBe(true)
+    expect(checkInvariants(migrated, land)).toEqual([])
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

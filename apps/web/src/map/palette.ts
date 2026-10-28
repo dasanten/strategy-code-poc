@@ -77,6 +77,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   mint: 0xc9a227,
   smithy: 0x4a4e57,
   road: ROAD_COLOR,
+  carriage: 0xa0703f,
 }
 
 export const BUILDING_NAMES: Record<BuildingKind, string> = {
@@ -95,6 +96,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   mint: 'Mint',
   smithy: 'Smithy',
   road: 'Road',
+  carriage: 'Carriage',
 }
 /** A Trade Org caravan's carriage and crew (`CONTEXT.md`: Caravan). */
 export const CARAVAN_COLOR = RELATIONSHIP_COLORS.tradeOrg

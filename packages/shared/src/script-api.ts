@@ -232,6 +232,12 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('walkTo', ['x', 'y'], 'Walk to a tile.'),
   action('drive', ['carriageId', 'x', 'y'], 'Drive the carriage on my tile to a tile.'),
   action(
+    'mount',
+    ['horseId'],
+    'Get on a horse of my realm on my tile that pulls no carriage, and ride it.',
+  ),
+  action('dismount', [], 'Get off the horse I ride; it stays on my tile.'),
+  action(
     'haul',
     ['carriageId', 'x', 'y', 'goods', 'returnGoods?', 'keepFood?'],
     'Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.',
@@ -266,6 +272,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('build', ['building'], 'Lay out or join a construction site of that kind on my tile.'),
   action('tearDown', ['buildingId'], 'Tear down the building or site on my tile.'),
   action('workAt', ['makes?'], 'Work the workplace on my tile; at a smithy, say what to make.'),
+  action(
+    'breed',
+    ['stableId', 'horseIds'],
+    'At the stable I stand at, tend two fed horses of mine in it, like ["h1", "h2"], until their foal is born.',
+  ),
   action('pair', ['partnerId'], 'Pair with an adult of my city to have children.'),
   action(
     'attack',

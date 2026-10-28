@@ -1,5 +1,13 @@
 import {
+  AVERAGE_HORSE_STATS,
   CARRIAGE_CAPACITY,
+  CARRIAGE_MAX_CAPACITY,
+  HORSE_STAT_AVERAGE,
+  HORSE_STAT_MAX,
+  HORSE_STAT_MIN,
+  carriageCapacity,
+  horseSpeedFactor,
+  unitsThatFitCarriage,
   CARRIAGE_SPEED,
   MAX_HEALTH,
   MAX_HUNGER,
@@ -55,6 +63,8 @@ function setup(map: TerrainMap, x = 2, y = 2) {
     y,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
   }
   world.horses.push(horse)
   const carriage: Carriage = {
@@ -172,7 +182,7 @@ describe('driving a carriage', () => {
     drive(w1, 'k1', 6, 2)
     driveOut(world, open, w1)
     expect(w1.skills.driving).toBeGreaterThan(0)
-    const speed = driveSpeed(w1, Terrain.Plains)
+    const speed = driveSpeed(w1, world.horses[0]!, Terrain.Plains)
     expect(speed).toBeGreaterThan(CARRIAGE_SPEED[Terrain.Plains] / WALK_TICKS_PER_TILE)
   })
 
@@ -209,6 +219,52 @@ describe('driving a carriage', () => {
     driveOut(world, open, w1)
     expect([carriage.x, w1.x]).toEqual([2, 2])
     expect(w1.order).toBeNull()
+  })
+})
+
+describe('horse stats on the road (`CONTEXT.md`: Horse stats)', () => {
+  it('a faster horse pulls its carriage faster, a slower one slower', () => {
+    const ticks = (speed: number) => {
+      const { world, w1, horse } = setup(open)
+      horse.stats.speed = speed
+      drive(w1, 'k1', 10, 2)
+      return driveOut(world, open, w1)
+    }
+    const average = ticks(HORSE_STAT_AVERAGE)
+    const fast = ticks(HORSE_STAT_MAX)
+    const slow = ticks(HORSE_STAT_MIN)
+    expect(fast).toBeLessThan(average)
+    expect(slow).toBeGreaterThan(average)
+    // As fast as `horseSpeedFactor` says, give or take the last part step.
+    const factor = horseSpeedFactor({ stats: { ...AVERAGE_HORSE_STATS, speed: HORSE_STAT_MAX } })
+    expect(Math.abs(fast - average / factor)).toBeLessThan(WALK_TICKS_PER_TILE)
+  })
+
+  it('a stronger horse lets its carriage hold more, a weaker one less', () => {
+    const { world, w1, horse, carriage } = setup(open)
+    expect(carriageCapacity(world, carriage)).toBe(CARRIAGE_CAPACITY)
+    horse.stats.strength = HORSE_STAT_MAX
+    const strong = carriageCapacity(world, carriage)
+    expect(strong).toBeGreaterThan(CARRIAGE_CAPACITY)
+    expect(strong).toBeLessThanOrEqual(CARRIAGE_MAX_CAPACITY)
+    // Loading goes up to what the stronger horse lets it hold.
+    const q = new OrderQueue(undefined, open)
+    const spot = { kind: 'carriage', carriageId: 'k1' }
+    carriage.load = { stone: CARRIAGE_CAPACITY }
+    w1.carried = { stone: 10 }
+    q.receive(world, me, 'a', { kind: 'drop', residentId: 'w1', spot, goods: { stone: 10 } })
+    q.applyAll(world)
+    stepWorld(world, open)
+    expect(carriage.load.stone).toBe(CARRIAGE_CAPACITY + 10)
+    expect(checkInvariants(world, open)).toEqual([])
+    // Behind a weak horse it holds less, and takes nothing more once past that.
+    horse.stats.strength = HORSE_STAT_MIN
+    expect(carriageCapacity(world, carriage)).toBeLessThan(CARRIAGE_CAPACITY)
+    expect(unitsThatFitCarriage(world, carriage, 'stone')).toBe(0)
+    // Without a horse a carriage holds the plain amount.
+    expect(carriageCapacity({ horses: [], carriages: [] }, { ...carriage, horseId: null })).toBe(
+      CARRIAGE_CAPACITY,
+    )
   })
 })
 
@@ -263,7 +319,7 @@ describe('carriage invariants', () => {
     const { world, w1, horse, carriage } = setup(map, 2, 2)
     carriage.horseId = 'h1'
     expect(checkInvariants(world, map)).toEqual([])
-    carriage.load = { stone: CARRIAGE_CAPACITY + 1 }
+    carriage.load = { stone: CARRIAGE_MAX_CAPACITY + 1 }
     horse.x = 3
     drive(w1, 'k1', 5, 5)
     w1.x = 4

@@ -59,6 +59,12 @@ import {
   type StatName,
   type Stock,
   type SeenResident,
+  type SeenHorse,
+  FOAL_STAT_SPREAD,
+  STABLE_BREED_DAYS,
+  STABLE_BREED_TICKS,
+  breedProblem,
+  horsesIn,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { carryLine, groupCard, type CardSections, type ResidentGroup } from './residents-view.js'
@@ -75,8 +81,15 @@ import {
 } from './queue-view.js'
 import { groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
+import { horseFaresKnown } from './seen.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
-import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
+import {
+  ACTION_KEYS,
+  horseDetail,
+  residentActions,
+  type ActionId,
+  type CardAction,
+} from './selection-view.js'
 
 /** Good names as the UI shows them. */
 export const GOOD_LABELS: Record<Good, string> = {
@@ -372,6 +385,7 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
   if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
   if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
+  if (o?.kind === 'breed') return 'Breeding horses'
   if (o?.kind === 'build') {
     const what = BUILDING_NAMES[o.building].toLowerCase()
     return o.siteId === null ? `Laying out a ${what}` : `Building a ${what}`
@@ -707,6 +721,7 @@ export function ResidentCard({
   onDrop,
   building,
   road,
+  carriageSite,
   node,
   onBuild,
   buildProblem,
@@ -714,7 +729,10 @@ export function ResidentCard({
   holders,
   realmId,
   onWork,
+  onFeedStable,
   onTearDown,
+  horses,
+  onBreed,
   residents,
   onPair,
   others,
@@ -728,6 +746,8 @@ export function ResidentCard({
   onRoadTo,
   onWallTo,
   onStop,
+  horseToRide,
+  onRide,
   scripts,
   buildings = [],
   onRunScript,
@@ -764,6 +784,13 @@ export function ResidentCard({
   onWallTo: () => void
   /** Orders the resident to stop what they are doing. */
   onStop: () => void
+  /**
+   * A horse of the realm on the resident's tile that pulls no carriage and nobody rides, if one is
+   * in sight (`CONTEXT.md`: Riding).
+   */
+  horseToRide: { id: string } | undefined
+  /** Orders the resident to mount that horse, or with none to dismount. */
+  onRide: (horseId?: string) => void
   /** The Player's script library, to pick a script to run. */
   scripts: ScriptSummary[]
   /** The buildings in sight, to name where the resident stores or fetches goods. */
@@ -786,6 +813,8 @@ export function ResidentCard({
   building: Building | undefined
   /** The road or road site on the resident's tile, if one is in sight; it may share the tile. */
   road: Building | undefined
+  /** The carriage site on the resident's tile, if one is in sight; it may share a stable's tile. */
+  carriageSite: Building | undefined
   /** The resource node on the resident's tile, if the Player knows of one. */
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
@@ -800,8 +829,14 @@ export function ResidentCard({
   realmId: string
   /** Orders the resident to work the workplace on their tile, making `makes` at a smithy. */
   onWork: (makes?: Good) => void
+  /** Gives the resident the Feed the stable task for the stable they stand in. */
+  onFeedStable: (stableId: string) => void
   /** Orders the resident to tear down the building or site on their tile. */
   onTearDown: (buildingId: string) => void
+  /** Horses in sight, to pick two in the stable on the resident's tile to breed. */
+  horses: SeenHorse[]
+  /** Orders the resident to breed two horses at the stable on their tile. */
+  onBreed: (stableId: string, horseIds: [string, string]) => void
   /** The Player's residents in sight, to pick a partner from. */
   residents: Resident[]
   /** Orders the resident to pair with another of the Player's residents. */
@@ -860,6 +895,8 @@ export function ResidentCard({
   const roadSite = road?.site ? road : undefined
   const atRoadSite: GoodsSpot = { kind: 'site', siteId: roadSite?.id ?? '' }
   const roadNeeded = roadSite ? materialsNeeded(roadSite) : {}
+  const atCarriageSite: GoodsSpot = { kind: 'site', siteId: carriageSite?.id ?? '' }
+  const carriageNeeded = carriageSite ? materialsNeeded(carriageSite) : {}
   const actions = residentActions({
     adult: !child,
     busy: !!(r.order || r.script),
@@ -869,12 +906,15 @@ export function ResidentCard({
     storage,
     building,
     road,
+    carriageSite,
     node,
     othersInSight: others.length,
     wallsInSight: walls.length,
     picking,
     makeLeader,
     renamable: !!rename,
+    riding: r.riding !== undefined,
+    horseToRide: !!horseToRide,
   })
   const shown = actions.some((a) => a.id === sections.panel) ? sections.panel : undefined
   const act = (a: CardAction) => {
@@ -884,6 +924,8 @@ export function ResidentCard({
     if (a.id === 'roadTo') onRoadTo()
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
+    if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
+    if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
   return (
     <SelectionCard
@@ -891,7 +933,7 @@ export function ResidentCard({
       title={r.name}
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
-        `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}`,
+        `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}${r.riding ? ' · on horseback' : ''}`,
         <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
         ...(family ? [family] : []),
       ]}
@@ -959,14 +1001,39 @@ export function ResidentCard({
                 buildProblem={buildProblem}
                 onBuild={onBuild}
               />
+              <CarriageBlock
+                resident={r}
+                tick={tick}
+                building={building}
+                carriageSite={carriageSite}
+                buildProblem={buildProblem}
+                onBuild={onBuild}
+              />
               <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
             </>
           )}
           {shown === 'tearDown' && (
             <>
               <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
+              <TearDownBlock
+                resident={r}
+                tick={tick}
+                building={carriageSite}
+                onTearDown={onTearDown}
+              />
               <TearDownBlock resident={r} tick={tick} building={road} onTearDown={onTearDown} />
             </>
+          )}
+          {shown === 'breed' && building && (
+            <BreedBlock
+              resident={r}
+              tick={tick}
+              stable={building}
+              horses={horses}
+              residents={residents}
+              realmId={realmId}
+              onBreed={onBreed}
+            />
           )}
           {shown === 'goods' && (
             <>
@@ -1004,6 +1071,9 @@ export function ResidentCard({
                       { label: 'Drop', spot: ground },
                       ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
                       ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
+                      ...((carriageNeeded[good] ?? 0) > 0
+                        ? [{ label: 'Deliver to carriage site', spot: atCarriageSite }]
+                        : []),
                       ...((roadNeeded[good] ?? 0) > 0
                         ? [{ label: 'Deliver to road', spot: atRoadSite }]
                         : []),
@@ -1013,7 +1083,7 @@ export function ResidentCard({
                   />
                 ))}
               </section>
-              {(pile || storage || site || roadSite || carriage) && (
+              {(pile || storage || site || carriageSite || roadSite || carriage) && (
                 <section className="inspector-block" aria-label="On this tile">
                   <div className="panel-head">
                     <h3>Here</h3>
@@ -1040,6 +1110,15 @@ export function ResidentCard({
                       title="Delivered to the site"
                       stock={site.site!.delivered}
                       spot={atSite}
+                      onPickUp={onPickUp}
+                      disabled={child}
+                    />
+                  )}
+                  {carriageSite && (
+                    <TileGoods
+                      title="Delivered to the carriage site"
+                      stock={carriageSite.site!.delivered}
+                      spot={atCarriageSite}
                       onPickUp={onPickUp}
                       disabled={child}
                     />
@@ -1395,6 +1474,65 @@ function BuildBlock({
 }
 
 /**
+ * A carriage at the stable the resident stands at (`CONTEXT.md`: Carriage): on a tile with no
+ * carriage site, lay one out there; on a carriage site, see what it still needs and help build it.
+ */
+function CarriageBlock({
+  resident,
+  tick,
+  building,
+  carriageSite,
+  buildProblem = () => undefined,
+  onBuild,
+}: {
+  resident: Resident
+  tick: number
+  building: Building | undefined
+  carriageSite: Building | undefined
+  buildProblem?: (kind: BuildingKind) => string | undefined
+  onBuild: (kind: BuildingKind) => void
+}) {
+  if (carriageSite?.site) {
+    return (
+      <BuildBlock
+        resident={resident}
+        tick={tick}
+        building={carriageSite}
+        node={undefined}
+        onBuild={onBuild}
+      />
+    )
+  }
+  if (building?.kind !== 'stable' || building.site) return null
+  const materials = goodsIn(BUILD_MATERIALS.carriage)
+  const problem = buildProblem('carriage')
+  return (
+    <section className="inspector-block" aria-label="Carriage">
+      <div className="panel-head">
+        <h3>Carriage</h3>
+        <span className="small muted">at the stable</span>
+      </div>
+      <p className="muted small">
+        {BUILDING_PURPOSE.carriage} Needs{' '}
+        {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
+        {workSpan(BUILD_WORK.carriage ?? 0)} of one resident’s work.
+      </p>
+      <div className="order-buttons">
+        <button
+          type="button"
+          className="primary"
+          disabled={!canWork(resident, tick) || problem !== undefined}
+          onClick={() => onBuild('carriage')}
+        >
+          Build carriage
+        </button>
+      </div>
+      {problem && <p className="muted small">Not here: {problem}.</p>}
+    </section>
+  )
+}
+
+/**
  * A road on the resident's tile (`CONTEXT.md`: Road): with none, lay one out, next to any
  * building there; on a road site, see what it still needs and help build it.
  */
@@ -1590,6 +1728,86 @@ function TearDownBlock({
           {joined ? 'Tearing down…' : `Tear down ${what}`}
         </button>
       </div>
+    </section>
+  )
+}
+
+/**
+ * Breeding (`CONTEXT.md`: Breeding): pick two of the Player's horses in the stable on the
+ * resident's tile for them to breed, or see how far their breeding has come.
+ */
+function BreedBlock({
+  resident,
+  tick,
+  stable,
+  horses,
+  residents,
+  realmId,
+  onBreed,
+}: {
+  resident: Resident
+  tick: number
+  stable: Building
+  horses: SeenHorse[]
+  residents: Resident[]
+  realmId: string
+  onBreed: (stableId: string, horseIds: [string, string]) => void
+}) {
+  const [picked, setPicked] = useState<string[]>([])
+  const own = horsesIn(horses, stable).filter((h) => h.realmId === realmId)
+  const o = resident.order
+  const breeding = o?.kind === 'breed' && o.stableId === stable.id ? o : undefined
+  const pair = picked.length === 2 ? ([picked[0]!, picked[1]!] as [string, string]) : undefined
+  // The Player knows how their own horses fare (`CONTEXT.md`: Seeing how someone fares).
+  const seen = { horses: horses.filter(horseFaresKnown), residents }
+  const problem = !canWork(resident, tick)
+    ? 'children can’t breed horses'
+    : pair
+      ? breedProblem(seen, stable, { realmId }, resident, pair)
+      : 'pick two horses'
+  const toggle = (id: string) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id].slice(-2)))
+  return (
+    <section className="inspector-block" aria-label="Breed horses">
+      <div className="panel-head">
+        <h3>Breed horses</h3>
+        <span className="small muted">{own.length} of yours here</span>
+      </div>
+      {breeding && (
+        <Meter
+          label="Foal"
+          value={pct(breeding.progress / STABLE_BREED_TICKS)}
+          share={breeding.progress / STABLE_BREED_TICKS}
+        />
+      )}
+      <p className="muted small">
+        Tending two fed horses for {STABLE_BREED_DAYS} game days brings a foal with their average
+        stats, give or take {FOAL_STAT_SPREAD}. It stops, and starts over, if the resident or a
+        horse leaves.
+      </p>
+      {own.length === 0 && <p className="muted small">No horses of yours in this stable.</p>}
+      {own.map((h) => (
+        <label key={h.id} className="small" style={{ display: 'block' }}>
+          <input
+            type="checkbox"
+            checked={picked.includes(h.id)}
+            onChange={() => toggle(h.id)}
+            disabled={!!breeding}
+          />{' '}
+          {horseDetail(h, tick)}
+        </label>
+      ))}
+      <div className="order-buttons">
+        <button
+          type="button"
+          disabled={!!breeding || !pair || problem !== undefined}
+          title={problem}
+          onClick={() => pair && onBreed(stable.id, pair)}
+        >
+          {breeding ? 'Breeding…' : 'Breed these two'}
+        </button>
+      </div>
+      {!breeding && pair && problem && <p className="muted small">{problem}</p>}
     </section>
   )
 }

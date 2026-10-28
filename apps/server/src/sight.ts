@@ -13,6 +13,7 @@ import {
   carriageCommanderOf,
   cityOrganization,
   loadLevel,
+  carriageCapacity,
   tradeCoinWarehouse,
   warehousePrices,
   type Army,
@@ -250,8 +251,8 @@ function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBui
 }
 
 /** A carriage as the side sees it: how heavily it is loaded, its load only when it sees inside. */
-function seenCarriage(insight: Insight, k: Carriage): SeenCarriage {
-  const level = loadLevel(k.load)
+function seenCarriage(world: WorldState, insight: Insight, k: Carriage): SeenCarriage {
+  const level = loadLevel(k.load, carriageCapacity(world, k))
   if (insight.insideCarriage(k)) return { ...k, loadLevel: level }
   const { id, realmId, cityId, x, y, horseId } = k
   return { id, realmId, cityId, x, y, horseId, loadLevel: level }
@@ -335,7 +336,7 @@ export function entitiesInSight(
     out.push(shown)
   }
   for (const k of world.carriages) {
-    if (inSight(k)) out.push({ is: 'carriage', ...seenCarriage(insight, k) })
+    if (inSight(k)) out.push({ is: 'carriage', ...seenCarriage(world, insight, k) })
   }
   for (const p of world.piles) if (inSight(p)) out.push({ is: 'pile', ...p })
   // An army is seen through its members; the Player gets only their own.

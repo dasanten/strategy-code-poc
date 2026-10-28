@@ -9,8 +9,11 @@ import {
 import {
   buildAtProblem,
   buildingAt,
+  canWork,
   DEFAULT_SCRIPTS,
   commanderOf,
+  MAP_SIZE,
+  stableAt,
   commands,
   isTask,
   type Good,
@@ -158,6 +161,14 @@ interface TearDownTaskRequest extends OrderRequest {
   buildingId: string
 }
 
+/** Feed the stable: the stable the resident stands in (`CONTEXT.md`: Feeding the stable). */
+interface FeedStableTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'feedStable'
+  residentId: string
+  stableId: string
+}
+
 interface BuildTaskRequest extends OrderRequest {
   kind: 'task'
   task: 'build'
@@ -170,7 +181,22 @@ interface BuildTaskRequest extends OrderRequest {
   at?: { x: number; y: number }
 }
 
-type TaskRequest = WorkTaskRequest | BuildTaskRequest | HaulTaskRequest | TearDownTaskRequest
+/** Breed horses: the breed order's input, at the stable the resident stands at. */
+interface BreedTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'breed'
+  residentId: string
+  stableId: string
+  horseIds: [string, string]
+}
+
+type TaskRequest =
+  | WorkTaskRequest
+  | BuildTaskRequest
+  | HaulTaskRequest
+  | TearDownTaskRequest
+  | BreedTaskRequest
+  | FeedStableTaskRequest
 
 /** The built-in order a task's request is checked as, for the resident. */
 function asOrder(o: Partial<TaskRequest>): OrderRequest {
@@ -181,6 +207,8 @@ function asOrder(o: Partial<TaskRequest>): OrderRequest {
     return { kind: 'haul', residentId, carriageId, x, y, goods, returnGoods, keepFood }
   }
   if (o.task === 'tearDown') return { kind: 'tearDown', residentId, buildingId: o.buildingId }
+  if (o.task === 'breed')
+    return { kind: 'breed', residentId, stableId: o.stableId, horseIds: o.horseIds }
   if (o.task === 'build') return { kind: 'build', residentId, building: o.building }
   return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
 }
@@ -213,6 +241,17 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
       const memory: TaskMemory['tearDown'] = { buildingId: order.buildingId }
       return { ...memory }
     }
+    case 'breed': {
+      const memory: TaskMemory['breed'] = {
+        stableId: order.stableId,
+        horseIds: [...order.horseIds],
+      }
+      return { ...memory }
+    }
+    case 'feedStable': {
+      const memory: TaskMemory['feedStable'] = { stableId: order.stableId }
+      return { ...memory }
+    }
   }
 }
 
@@ -222,7 +261,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * target (`TaskMemory`). It ends whatever the resident was doing. Each task is checked as the
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
  * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
- * the tear-down order.
+ * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
+ * own: the resident stands in the stable and is grown up.
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
@@ -236,6 +276,12 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
         const workplaceId = (o as Partial<WorkTaskRequest>).workplaceId
         if (typeof workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== workplaceId)
           return 'not standing on that workplace'
+      }
+      if (o.task === 'feedStable') {
+        // No order of its own: they store and fetch, which children can't.
+        const size = terrain?.size ?? MAP_SIZE
+        if (stableAt(world, r.x, r.y, size)?.id !== o.stableId) return 'not standing in that stable'
+        return canWork(r, world.tick) ? undefined : 'children can’t store or fetch goods'
       }
       if (o.task === 'build' && o.at !== undefined) {
         // Somewhere else: checked as the build order there, once they have walked to it.

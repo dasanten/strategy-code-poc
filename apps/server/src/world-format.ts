@@ -1,4 +1,11 @@
-import type { TerrainMap, WorldState } from '@csp/shared'
+import {
+  AVERAGE_HORSE_STATS,
+  HORSE_START_AGE_MAX,
+  HORSE_START_AGE_MIN,
+  TICKS_PER_GAME_YEAR,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
 
 /**
@@ -6,7 +13,7 @@ import { leaveTradeOrg } from './caravans.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 44
+export const WORLD_FORMAT_VERSION = 47
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -53,9 +60,30 @@ export const migrations: Record<number, MigrationStep> = {
   // (`Resident.scriptParams`). Older residents have none picked, so their params read null and
   // the defaults fall back to the nearest place; the step leaves them as they are.
   42: (state) => state,
+  // Horses get stats and an age (`CONTEXT.md`: Horse stats). Those from before are average in
+  // every stat, and as old as the middle of a new horse's age range.
+  43: (state) => {
+    const world = structuredClone(state) as WorldState
+    const age = (HORSE_START_AGE_MIN + HORSE_START_AGE_MAX) / 2
+    for (const h of world.horses) {
+      h.stats = { ...AVERAGE_HORSE_STATS }
+      h.bornAt = world.tick - Math.round(age * TICKS_PER_GAME_YEAR)
+    }
+    return world
+  },
+  // Breeding is a resident's order (`CONTEXT.md`: Breeding): stables no longer breed on their
+  // own, so the progress they kept goes. Nobody tends their horses yet; the foal starts over.
+  44: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const b of world.buildings) delete (b as { breeding?: number }).breeding
+    return world
+  },
+  // Residents can ride horses (`CONTEXT.md`: Riding), a new `riding` field. Nobody rode before,
+  // so the step leaves the world as it is.
+  45: (state) => state,
   // Queues (`CONTEXT.md`: Queue): the steps a resident works through (`Resident.queue`). Older
   // residents work through none, so the step leaves them as they are.
-  43: (state) => state,
+  46: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

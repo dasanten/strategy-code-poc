@@ -33,10 +33,13 @@ export function runsScript(order: Pick<OrderRequest, 'kind'>): boolean {
   return order.kind === 'task' || order.kind === 'runScript'
 }
 
-/** A step that never ends on its own: working a workplace or a haul route. */
+/** A step that never ends on its own: working a workplace, a haul route, or feeding a stable. */
 export function neverEnds(order: OrderRequest): boolean {
   if (order.kind === 'workAt' || order.kind === 'haul') return true
-  return order.kind === 'task' && (order.task === 'work' || order.task === 'haul')
+  return (
+    order.kind === 'task' &&
+    (order.task === 'work' || order.task === 'haul' || order.task === 'feedStable')
+  )
 }
 
 /** A queue step as a request gives it: `id` names a step already in the queue being edited. */

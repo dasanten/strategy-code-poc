@@ -1,5 +1,6 @@
 import { parse, run, type ScriptObject } from '@csp/lang'
 import {
+  AVERAGE_HORSE_STATS,
   ARMY_SCRIPT_API,
   DEFAULT_SCRIPTS,
   SCRIPT_API,
@@ -85,6 +86,8 @@ function setup() {
     y: 12,
     hunger: 90,
     health: 100,
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
   })
   world.carriages.push({
     id: 'cr1',

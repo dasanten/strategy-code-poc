@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import {
+  carriagePulledBy,
   holdersOf,
+  horseOfResident,
+  riderOf,
   KEEPS_GOODS,
   MAX_WORKERS,
   buildMenu,
@@ -18,6 +21,7 @@ import {
   type ScriptSummary,
   type Stock,
   isAt,
+  SHARES_A_TILE,
   covers,
   type SeenResident,
   UNEXPLORED,
@@ -350,6 +354,24 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'task', task: 'tearDown', residentId: selected.id, buildingId }
     setOrderError(await giveOrder(order))
   }
+  /**
+   * Gives the picked resident the Breed horses task for two horses in the stable on their tile:
+   * they run the Player's Breed horses (default) script.
+   */
+  async function breed(stableId: string, horseIds: [string, string]) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'breed', residentId: selected.id, stableId, horseIds }
+    setOrderError(await sendOrder(order))
+  }
+  /**
+   * Gives the picked resident the Feed the stable task for the stable they stand in: they run the
+   * Player's Feed the stable (default) script (`CONTEXT.md`: Feeding the stable).
+   */
+  async function feedStable(stableId: string) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'feedStable', residentId: selected.id, stableId }
+    setOrderError(await sendOrder(order))
+  }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
   async function runScript(scriptId: number) {
@@ -398,6 +420,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'attack', residentId: selected.id, targetId }))
   }
+  /** Orders the picked resident to mount a horse on their tile, or with none to dismount. */
+  async function ride(horseId?: string) {
+    if (!selected) return
+    const order = horseId
+      ? { kind: 'mount', residentId: selected.id, horseId }
+      : { kind: 'dismount', residentId: selected.id }
+    setOrderError(await sendOrder(order))
+  }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
     if (!selected) return
@@ -418,8 +448,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A road may share its tile with a building (`CONTEXT.md`: Road); a building is wherever its
   // footprint is (`CONTEXT.md`: At a building).
   const buildingHere =
-    selected && world?.buildings.find((b) => b.kind !== 'road' && isAt(selected, b))
+    selected && world?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && isAt(selected, b))
   const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
+  const carriageSiteHere = onTile(world?.buildings.filter((b) => b.kind === 'carriage'))
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -584,6 +615,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             realms={world.diplomacy.realmsInSight}
             carriages={world.carriages}
+            horses={world.horses}
             tick={world.tick}
             mapSize={world.map.size}
             onSetGate={async (gateId, open) =>
@@ -657,12 +689,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             )}
             tick={world.tick}
             building={[...world.buildings, ...world.lastSeen.buildings].find(
-              (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
+              (b) => !SHARES_A_TILE.includes(b.kind) && covers(b, selectedTile.x, selectedTile.y),
             )}
             nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
             buildingNode={buildingNodeKind(
               world.buildings.find(
-                (b) => b.kind !== 'road' && covers(b, selectedTile.x, selectedTile.y),
+                (b) => !SHARES_A_TILE.includes(b.kind) && covers(b, selectedTile.x, selectedTile.y),
               ),
               nodeAt,
             )}
@@ -714,6 +746,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPicking((p) => (p === 'haul' ? false : 'haul'))
             }}
             onStop={stop}
+            horseToRide={onTile(
+              world.horses.filter(
+                (h) =>
+                  horseOfResident(h, selected) && !carriagePulledBy(world, h) && !riderOf(world, h),
+              ),
+            )}
+            onRide={ride}
             scripts={scripts}
             buildings={world.buildings}
             onRunScript={runScript}
@@ -732,6 +771,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             building={buildingHere}
             road={roadHere}
+            carriageSite={carriageSiteHere}
             node={nodeAt?.(selected.x, selected.y)}
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
             onDrop={(spot, goods) => carry('drop', spot, goods)}
@@ -751,7 +791,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             holders={heldBy(world.residents, buildingHere)}
             realmId={world.home.realmId}
             onWork={work}
+            onFeedStable={feedStable}
             onTearDown={tearDown}
+            horses={world.horses}
+            onBreed={breed}
             residents={own}
             onPair={pair}
             others={world.residents.filter((r) => !own.some((o) => o.id === r.id))}

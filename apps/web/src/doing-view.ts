@@ -39,19 +39,21 @@ export function doingLine(
   const o = r.order
   // The task's own order says no more than the task does, but where a haul route is and what a
   // smithy makes.
-  if (o?.kind === TASK_ORDER[task]) {
+  if (o && o.kind === TASK_ORDER[task]) {
     if (o.kind === 'haul') return orderDoing(r)
     return o.kind === 'workAt' && o.makes ? `${what}: ${lower(orderDoing(r))}` : what
   }
   return `${what}: ${o ? lower(step ?? orderDoing(r)) : 'waiting'}`
 }
 
-/** The order a task's default script gives for the task itself. */
-const TASK_ORDER: Record<Task, ResidentOrder['kind']> = {
+/** The order a task's default script gives for the task itself; Feed the stable has none. */
+const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   work: 'workAt',
   build: 'build',
   haul: 'haul',
   tearDown: 'tearDown',
+  breed: 'breed',
+  feedStable: undefined,
 }
 
 /**
@@ -68,6 +70,7 @@ function taskLine(task: Task, building: SeenScript['building']): string {
   if (task === 'work') return name ? `Working the ${name}` : 'Working'
   if (task === 'build') return name ? `Building ${article(name)} ${name}` : 'Building'
   if (task === 'tearDown') return name ? `Tearing down the ${name}` : 'Tearing down'
+  if (task === 'feedStable') return 'Feeding the stable'
   return 'Hauling'
 }
 

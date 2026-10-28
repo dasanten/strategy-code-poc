@@ -171,7 +171,7 @@ export function runDelivery(
     const { goods, onto } = caravan.holding
     caravan.holding = null
     const [good, wanted] = (Object.entries(goods) as [Good, number][])[0]!
-    const fits = onto === 'carriage' ? unitsThatFitCarriage(carriage, good) : Infinity
+    const fits = onto === 'carriage' ? unitsThatFitCarriage(world, carriage, good) : Infinity
     const units = Math.min(wanted, driver.carried[good] ?? 0, fits)
     if (units > 0) {
       const to = onto === 'carriage' ? onCarriage : here
@@ -197,7 +197,12 @@ export function runDelivery(
     case 'load': {
       if (job.kind === 'delivery') {
         const want = (d?.units ?? 0) - job.units
-        const units = Math.min(want, stock[g] ?? 0, hands(g), unitsThatFitCarriage(carriage, g))
+        const units = Math.min(
+          want,
+          stock[g] ?? 0,
+          hands(g),
+          unitsThatFitCarriage(world, carriage, g),
+        )
         if (units > 0) return take(here, g, units, 'carriage')
         // Nothing to load yet: it waits at the warehouse for its stock.
         if (job.units === 0 && want > 0 && (stock[g] ?? 0) === 0) return
@@ -218,7 +223,7 @@ export function runDelivery(
         need - job.coins,
         stock.coins ?? 0,
         hands('coins'),
-        unitsThatFitCarriage(carriage, 'coins'),
+        unitsThatFitCarriage(world, carriage, 'coins'),
       )
       if (units > 0) return take(here, 'coins', units, 'carriage')
       // With no coins to pay with, it waits at the coin warehouse for some.
@@ -241,7 +246,7 @@ export function runDelivery(
         const q = warehouse
           ? quotePickUp(world, warehouse, g, d!.units, stock[g] ?? 0, tiles(b), job.coins)
           : { units: 0 }
-        job.target = Math.min(q.units, unitsThatFitCarriage(carriage, g))
+        job.target = Math.min(q.units, unitsThatFitCarriage(world, carriage, g))
       }
       // What robbers took off the carriage was collected all the same.
       const collected = job.units + job.robbed
@@ -249,7 +254,7 @@ export function runDelivery(
         job.target - collected,
         stock[g] ?? 0,
         hands(g),
-        unitsThatFitCarriage(carriage, g),
+        unitsThatFitCarriage(world, carriage, g),
       )
       if (units > 0) return take(here, g, units, 'carriage')
       const q = warehouse
