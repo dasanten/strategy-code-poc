@@ -129,9 +129,10 @@ function runCity(
     ) {
       stopWork(r)
     }
-    // Done with the Build default (built, or the site gone or out of reach), a builder is free.
+    // Stuck in the Build default (the site out of reach), a builder is free; built or gone, the
+    // script ended itself.
     const built = r.script?.scriptId === 0 && r.script.task === 'build' ? r.script.memory : null
-    if (built && (built.done === true || built.stuck === true)) stopWork(r)
+    if (built && built.stuck === true) stopWork(r)
   }
   const home = npcHome(world, city)
   const growth = terrain && home && cityGrowth(world, city, home, adults, terrain, short)

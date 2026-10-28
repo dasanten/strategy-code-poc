@@ -342,6 +342,13 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         : { text: `${e.name}’s script ran out of steps this tick.`, tone: 'warn' }
     case 'scriptEnded':
       return { text: `${e.name} stopped running a script: it was deleted.`, tone: 'info' }
+    case 'queueStepSkipped': {
+      const ended = e.queueEnded ? ' None of its steps could start, so the queue ended.' : ''
+      return {
+        text: `${e.name} skipped step ${e.step} of their queue: ${e.reason}.${ended}`,
+        tone: 'warn',
+      }
+    }
     case 'contract': {
       const them = e.other === TRADE_ORG_NAME ? e.other : `the realm of ${e.other}`
       const n = e.residents === 1 ? '1 mercenary' : `${e.residents} mercenaries`

@@ -37,6 +37,7 @@ export type ScriptViewName =
   | 'goods'
   | 'residentOrder'
   | 'orderEnded'
+  | 'queue'
   | 'armyOrder'
   | 'tile'
   | 'pair'
@@ -219,6 +220,12 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'How their last store or fetch order ended.',
         'until one ended, and after their next store or fetch order or an order from the UI',
       ),
+      field(
+        'queue',
+        view('queue'),
+        'The queue they work through; `order` or `script` is its current step’s.',
+        'when they have none, and for a resident of another realm',
+      ),
       field('pair', view('pair'), 'Their pair, to have a child.', 'unless they are paired'),
       field('carrying', view('carrying'), 'The child they carry.', 'unless they carry one'),
       field(
@@ -264,6 +271,29 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
   goods: {
     description: 'Goods by kind, in units, like {food: 3, wood: 10}.',
     fields: GOODS.map((g) => field(g, 'number', `Units of ${g}.`, 'when there are none')),
+  },
+  queue: {
+    description:
+      'A resident’s queue: steps done one after another. The current step’s order or script is the resident’s `order` or `script`.',
+    fields: [
+      field('step', 'number', 'The current step, counted from 1.'),
+      field('steps', 'number', 'How many steps it holds.'),
+      field('loop', 'boolean', 'Whether the first step follows the last.'),
+      field(
+        'kind',
+        'string',
+        'The current step’s order: "walkTo", "store", "task", "runScript", ….',
+      ),
+      field('task', 'string', 'The task the current step gives.', 'unless it gives a task'),
+      field('scriptId', 'number', 'The script the current step runs.', 'unless it runs a script'),
+      field(
+        'minutes',
+        'number',
+        'The current step’s duration in game minutes.',
+        'when it has none',
+      ),
+      field('startedAt', 'number', 'The tick the current step started.', 'until it has'),
+    ],
   },
   residentOrder: {
     description:

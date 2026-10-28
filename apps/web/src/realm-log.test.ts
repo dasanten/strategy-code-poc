@@ -42,6 +42,25 @@ describe('realm log', () => {
     )
   })
 
+  it('describes a skipped queue step', () => {
+    const skipped = {
+      kind: 'queueStepSkipped',
+      residentId: 'r1',
+      name: 'Mara',
+      step: 2,
+      order: 'workAt',
+      reason: 'not standing on that workplace',
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent(skipped).text).toBe(
+      'Mara skipped step 2 of their queue: not standing on that workplace.',
+    )
+    expect(describeEvent({ ...skipped, queueEnded: true }).text).toBe(
+      'Mara skipped step 2 of their queue: not standing on that workplace. None of its steps could start, so the queue ended.',
+    )
+  })
+
   it('describes fights, flight and deaths in them', () => {
     const fight = { kind: 'fight', residentId: 'r1', name: 'Mara', otherId: 'r9', seq: 6 } as const
     expect(describeEvent({ ...fight, other: 'Tobin', attacker: true, ...at })).toEqual({

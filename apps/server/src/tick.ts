@@ -7,6 +7,7 @@ import {
   type InvariantViolation,
 } from './invariants.js'
 import type { OrderQueue } from './orders.js'
+import type { QueueRunner } from './queues.js'
 import type { ScriptRunner } from './script-runner.js'
 import type { Walking } from './walking.js'
 import { stepWorld } from './world.js'
@@ -36,6 +37,8 @@ export interface TickOptions {
   walking?: Walking
   /** Orders accepted since the last tick; applied before the world steps. */
   orders?: OrderQueue
+  /** Moves the residents' queues on once the orders are applied; without it no queue moves. */
+  queues?: QueueRunner
   /** Runs the residents' scripts after the orders are applied; without it no script runs. */
   scripts?: ScriptRunner
   now?: () => number
@@ -56,6 +59,7 @@ export function runTick(
   try {
     const start = now()
     opts.orders?.applyAll(world)
+    opts.queues?.runAll(world)
     const check = shouldCheckInvariants(opts.invariantSampleRate, opts.rand)
     const scriptViolations = opts.scripts?.runAll(world, check) ?? []
     const before = check ? tallyGoods(world) : undefined
