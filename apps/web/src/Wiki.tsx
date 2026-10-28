@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import {
   PARAM_DESCRIPTIONS,
+  QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_MAX_STEPS,
   SCRIPT_PARAM_TYPES,
   ADULT_AGE,
@@ -179,6 +180,7 @@ import {
   type PricedGood,
 } from './wiki-view.js'
 import { GROUP_SLOTS } from './saved-groups.js'
+import { realMinutes } from './queue-view.js'
 import { SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
@@ -445,6 +447,21 @@ export function Wiki() {
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
           to, pick up, drop, store, fetch, drive, work, build, haul, tear down, build a road or wall
           line, or run one of your scripts with its params.
+        </p>
+        <p>
+          Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
+          map, right-click included) to add it to the end of the resident's queue instead of
+          replacing what they do; on a resident without a queue it starts one, after the walk they
+          are on, if any. An order done on the resident's tile (work, build, pick up, drop, drive,
+          haul, tear down) is queued after a walk back to that tile, so it still finds them there
+          when its turn comes, every round of a loop. Work or haul followed by another step gets a
+          duration of {num(QUEUE_DEFAULT_STEP_MINUTES)} game minutes (
+          {realMinutes(QUEUE_DEFAULT_STEP_MINUTES)}), which you can change.
+        </p>
+        <p>
+          The resident's card lists the queue with the current step marked and what they are doing
+          in it. Drag a step or use its arrows to reorder it, remove it, type a duration in game
+          minutes (the real time shows beside it) or clear it, and switch loop on or off.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
