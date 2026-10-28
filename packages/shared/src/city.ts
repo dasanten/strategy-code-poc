@@ -9,6 +9,7 @@ import {
   HOUSING_ROOM,
   hungerFactor,
   isArmed,
+  MAP_SIZE,
   NPC_CITY_REFUSES_STANDING,
   NPC_CITY_WONT_SELL_STANDING,
   STANDING_RANGE,
@@ -242,6 +243,26 @@ export function buildingRealm(
 /** Whether a building is an outpost storage (`CONTEXT.md`: Outpost storage): one of no city. */
 export function isOutpostStorage(b: Building): boolean {
   return b.kind === 'storage' && !b.site && b.cityId === null
+}
+
+/**
+ * Whether an outpost storage's stock is guarded (`CONTEXT.md`: Outpost storage): an armed, living
+ * resident of its realm stands on or next to it, and nobody else's armed resident does. Only its
+ * realm's residents can take from it then. `size` is the map's.
+ */
+export function outpostStorageGuarded(
+  world: Pick<WorldState, 'residents'>,
+  b: Building,
+  size = MAP_SIZE,
+): boolean {
+  if (!isOutpostStorage(b) || !b.realmId) return false
+  let guarded = false
+  for (const r of world.residents) {
+    if (r.health <= 0 || !isArmed(r) || !nearFootprint(b, r, 1, size)) continue
+    if (r.owner !== b.realmId) return false
+    guarded = true
+  }
+  return guarded
 }
 
 /** A city's town hall, if it stands. */

@@ -771,6 +771,12 @@ export function Wiki() {
           standing at it. Residents of your realm within {num(OUTPOST_REFILL_REACH)} tiles of it
           take a meal from it when they run low, as at home.
         </p>
+        <p>
+          An outpost storage is guarded like a workplace: while an armed resident of its realm
+          stands on or next to it and nobody else's armed resident does, only its realm can take
+          from it. Unguarded, anyone at it can pick up from it; for another organization that is
+          theft, and tearing it down is a crime too (see Standing).
+        </p>
       </Section>
 
       <Section id="transport">
@@ -1028,7 +1034,8 @@ export function Wiki() {
           Standing runs from {signed(-STANDING_RANGE)} to {signed(STANDING_RANGE)}. A known crime
           lowers the victim's standing toward the culprit; standing drifts back toward neutral by{' '}
           {num(STANDING_DRIFT_PER_DAY)} a game day. A crime is remembered for{' '}
-          {days(CRIME_MEMORY_DAYS)} after the news stops spreading.
+          {days(CRIME_MEMORY_DAYS)} after the news stops spreading. Taking from or tearing down
+          another realm's outpost storage counts the same as its city storage.
         </p>
         <table>
           <thead>
