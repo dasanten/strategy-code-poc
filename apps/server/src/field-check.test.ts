@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openDb, schema, type Db, type OpenDb } from './db/index.js'
-import { describeUndeclaredReads, undeclaredFieldReads } from './field-check.js'
+import { SCRIPT_VIEW_CHANGES } from '@csp/shared'
+import { eventsFor } from './events.js'
+import {
+  describeUndeclaredReads,
+  noteScriptViewChanges,
+  undeclaredFieldReads,
+} from './field-check.js'
 import { createScript, ensureDefaultScripts, saveScript } from './scripts.js'
+import { createWorld } from './world.js'
+import { smallTerrain } from './test-terrain.js'
 
 let opened: OpenDb
 let db: Db
@@ -30,6 +38,7 @@ describe('the live-world check for undeclared fields', () => {
         field: 'secretPlan',
         scriptId: s.id,
         script: 'feeder',
+        userId: mara,
         player: 'Mara',
         line: 2,
         column: 9,
@@ -54,5 +63,46 @@ describe('the live-world check for undeclared fields', () => {
     expect(describeUndeclaredReads([])).toBe(
       'No active script reads a field the script views don’t declare.',
     )
+  })
+})
+
+describe('telling Players of a breaking change to the script views', () => {
+  const world = (told: number) => ({ ...createWorld(smallTerrain()), scriptViewChanges: told })
+
+  it('notes each dropped field in the realm log of each Player whose active scripts read it, naming the scripts', () => {
+    const mara = addUser('Mara')
+    const tobin = addUser('Tobin')
+    const a = createScript(db, mara, { name: 'feeder', source: 'let h = me.plan\n' })
+    const b = createScript(db, mara, { name: 'miner', source: 'me.plan + me.plan\n' })
+    createScript(db, tobin, { name: 'careful', source: 'me.hunger\n' })
+    const w = world(0)
+    // A Player without a realm is told too: the log is theirs, not their realm's.
+    expect(noteScriptViewChanges(db, w)).toBe(true)
+    expect(w.scriptViewChanges).toBe(SCRIPT_VIEW_CHANGES.length)
+    expect(eventsFor(w, mara)).toMatchObject([
+      {
+        kind: 'scriptFieldDropped',
+        field: 'me.plan',
+        scripts: [
+          { scriptId: a.id, name: 'feeder' },
+          { scriptId: b.id, name: 'miner' },
+        ],
+      },
+    ])
+    expect(eventsFor(w, tobin)).toEqual([])
+    // Once told, never again.
+    expect(noteScriptViewChanges(db, w)).toBe(false)
+    expect(eventsFor(w, mara)).toHaveLength(1)
+  })
+
+  it('notes only the fields a later change drops', () => {
+    const mara = addUser('Mara')
+    createScript(db, mara, { name: 'feeder', source: 'me.plan + me.scheme\n' })
+    const w = world(1)
+    const changes = [{ dropped: 'undeclared' as const }, { dropped: ['resident.scheme'] }]
+    expect(noteScriptViewChanges(db, w, changes)).toBe(true)
+    expect(eventsFor(w, mara).map((e) => e.kind === 'scriptFieldDropped' && e.field)).toEqual([
+      'me.scheme',
+    ])
   })
 })

@@ -138,9 +138,13 @@ function resident(
   return r
 }
 
-/** What each expression in `calls` answers in one run of a1's script, or ar1's with `army`. */
-function answers(calls: Record<string, string>, army = false) {
+/**
+ * What each expression in `calls` answers in one run of a1's script, or ar1's with `army`;
+ * `prepare` changes the world first.
+ */
+function answers(calls: Record<string, string>, army = false, prepare?: (w: WorldState) => void) {
   const { world, explored } = setup()
+  prepare?.(world)
   const memory: ScriptObject = {}
   const bindings = bindScript({
     world,
@@ -215,6 +219,7 @@ describe('script views', () => {
       steps: 1,
       loop: true,
       kind: 'runScript',
+      task: null,
       scriptId: 1,
       minutes: 30,
       startedAt: 40,
@@ -228,6 +233,58 @@ describe('script views', () => {
       scriptValueProblems(out[name], returnsOf(SCRIPT_API, name), name),
     )
     expect(problems).toEqual([])
+  })
+
+  it('hand a script exactly its view: an undeclared field reads null, declared ones as they are', () => {
+    let world: WorldState | undefined
+    const out = answers(
+      {
+        mine: 'me.secret',
+        params: 'me.scriptParams',
+        theirs: 'withMemory("role", "gatherer")[0].secret',
+        task: 'withMemory("role", "gatherer")[0].script.task',
+        building: 'building("s1").secret',
+        storage: 'storages()[0].secret',
+        node: 'nodes()[0].secret',
+        name: 'me.name',
+        strength: 'me.stats.strength.base',
+        food: 'building("s1").stock.food',
+        role: 'withMemory("role", "gatherer")[0].script.memory.role',
+      },
+      false,
+      (w) => {
+        world = w
+        const a1 = w.residents.find((r) => r.id === 'a1')!
+        // Fields of the server's own that no view declares.
+        Object.assign(a1, { secret: 'plans', scriptParams: { home: 's1' } })
+        a1.script!.task = 'farmer'
+        Object.assign(
+          w.buildings.find((b) => b.id === 's1')!,
+          { secret: 1 },
+        )
+        Object.assign(w.nodes[0]!, { secret: 1 })
+      },
+    )
+    for (const name of ['mine', 'params', 'theirs', 'task', 'building', 'storage', 'node']) {
+      expect(out[name] ?? null, name).toBeNull()
+    }
+    const a1 = world!.residents.find((r) => r.id === 'a1')!
+    expect(out).toMatchObject({
+      name: a1.name,
+      strength: a1.stats.strength.base,
+      food: 5,
+      role: 'gatherer',
+    })
+  })
+
+  it('find a field outside its view', () => {
+    expect(
+      scriptValueProblems(
+        { id: 'n1', kind: 'forest', x: 1, y: 2, secret: 3 },
+        { view: 'node' },
+        'n',
+      ),
+    ).toEqual(['n.secret is not in the node view'])
   })
 
   it('describe every field of an army’s `me`', () => {

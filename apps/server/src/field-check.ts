@@ -1,7 +1,8 @@
 import { and, asc, eq, isNotNull } from 'drizzle-orm'
 import { checkNames, PARAMS_SHAPE } from '@csp/lang'
-import { scriptCheckEnv } from '@csp/shared'
+import { RESIDENT_OR_ARMY, SCRIPT_VIEW_CHANGES, scriptCheckEnv, type WorldState } from '@csp/shared'
 import { schema, type Db } from './db/index.js'
+import { recordPlayerEvent } from './events.js'
 
 const { scripts, scriptVersions, users } = schema
 
@@ -12,6 +13,7 @@ export interface UndeclaredRead {
   field: string
   scriptId: number
   script: string
+  userId: number
   player: string
   line: number
   column: number
@@ -30,6 +32,7 @@ export function undeclaredFieldReads(db: Db): UndeclaredRead[] {
       scriptId: scripts.id,
       script: scripts.name,
       task: scripts.task,
+      userId: users.id,
       player: users.name,
       source: scriptVersions.source,
     })
@@ -55,11 +58,52 @@ export function undeclaredFieldReads(db: Db): UndeclaredRead[] {
         field: read.field,
         scriptId: r.scriptId,
         script: r.script,
+        userId: r.userId,
         player: r.player,
         line: read.line,
         column: read.column,
       })),
   )
+}
+
+/**
+ * Tells the Players of the breaking changes to the script views they weren't told of yet
+ * (`SCRIPT_VIEW_CHANGES`, ADR 0011): one realm-log note for each dropped field a Player's active
+ * scripts read, naming the field and the scripts. Run at start, as the views change only with a
+ * deploy. Whether it wrote down anything, so the world is worth saving.
+ */
+export function noteScriptViewChanges(
+  db: Db,
+  world: WorldState,
+  changes: typeof SCRIPT_VIEW_CHANGES = SCRIPT_VIEW_CHANGES,
+): boolean {
+  const pending = changes.slice(world.scriptViewChanges)
+  if (pending.length === 0) return false
+  world.scriptViewChanges = changes.length
+  // A Player's own script's `me` may be a resident's or an army's: the note calls it `me`.
+  const views = (r: UndeclaredRead) =>
+    r.view === RESIDENT_OR_ARMY ? ['resident', 'army'] : [r.view]
+  const dropped = (r: UndeclaredRead) =>
+    pending.some(
+      (c) =>
+        c.dropped === 'undeclared' || views(r).some((v) => c.dropped.includes(`${v}.${r.field}`)),
+    )
+  const notes = new Map<string, { userId: number; field: string; scripts: Map<number, string> }>()
+  for (const r of undeclaredFieldReads(db).filter(dropped)) {
+    const field = `${r.view === RESIDENT_OR_ARMY ? 'me' : r.view}.${r.field}`
+    const key = `${r.userId} ${field}`
+    const note = notes.get(key) ?? { userId: r.userId, field, scripts: new Map() }
+    note.scripts.set(r.scriptId, r.script)
+    notes.set(key, note)
+  }
+  for (const { userId, field, scripts } of notes.values()) {
+    recordPlayerEvent(world, userId, {
+      kind: 'scriptFieldDropped',
+      field,
+      scripts: [...scripts].map(([scriptId, name]) => ({ scriptId, name })),
+    })
+  }
+  return true
 }
 
 /** The check's report: one line per field read, grouped by view and field. */
