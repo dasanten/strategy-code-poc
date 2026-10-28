@@ -13,6 +13,7 @@ import {
   SCRIPT_API,
   Terrain,
   DIAGONAL_STEP,
+  DOING_MAX_LENGTH,
   ageInYears,
   directivesFor,
   materialsNeeded,
@@ -32,6 +33,7 @@ import {
   type ResourceNode,
   type RunningScript,
   type ScriptBinding,
+  type ScriptParamType,
   type SeenEntity,
   type TerrainMap,
   type WorldState,
@@ -41,6 +43,7 @@ import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
 import { sightOf } from './sight.js'
 import { lastSeenOutOfSight } from './last-seen.js'
+import { paramTarget } from './script-params.js'
 import { realmOf } from './starting-city.js'
 
 /**
@@ -76,6 +79,11 @@ export interface ScriptContext {
   explored: (x: number, y: number) => boolean
   /** The order kinds actions go through; the game's own by default. */
   kinds?: Record<string, OrderKind>
+  /**
+   * The script's `param` lines with the id picked for each (`paramValues`); `params` holds
+   * nothing without it.
+   */
+  params?: readonly { name: string; type: ScriptParamType; id?: string }[]
 }
 
 export interface ScriptBindings {
@@ -85,9 +93,12 @@ export interface ScriptBindings {
   requests: OrderRequest[]
 }
 
-/** The order kinds a resident's script can request: one per action in `SCRIPT_API`. */
+/**
+ * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`,
+ * which asks for none.
+ */
 export const SCRIPT_ORDER_KINDS: readonly string[] = SCRIPT_API.filter(
-  (b) => b.is === 'action',
+  (b) => b.is === 'action' && b.name !== 'doing',
 ).map((b) => b.name)
 
 /** The army order each action of an army's script asks for (`ARMY_SCRIPT_API`). */
@@ -150,7 +161,8 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   }
   const asSeen = (r: Resident) => {
     const { script, ...rest } = r
-    return toValue({ ...rest, script: { scriptId: script!.scriptId, memory: script!.memory } })
+    const running = { scriptId: script!.scriptId, memory: script!.memory }
+    return toValue({ ...rest, scriptParams: undefined, script: running })
   }
   let nodes: Value[] | undefined
   const exploredNodes = (): Value => {
@@ -262,8 +274,19 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = SCRIPT_API
     forMe = { residentId: resident.id }
     // The script's own state is `memory`, not part of `me`.
-    me = toValue({ ...resident, script: undefined, age: ageInYears(resident, world.tick) })
+    me = toValue({
+      ...resident,
+      script: undefined,
+      scriptParams: undefined,
+      age: ageInYears(resident, world.tick),
+    })
     actions = residentActions(request, resident)
+    actions.doing = ([text]) => {
+      const doing = doingText(text)
+      if (doing === null) delete context.memory.doing
+      else context.memory.doing = doing
+      return null
+    }
     queries.fits = ([good]) => {
       if (!(GOODS as readonly unknown[]).includes(good)) {
         throw new ScriptRuntimeError(`"fits" needs a good, not ${String(good)}`)
@@ -295,9 +318,17 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
   }
 
+  // Each param as what it names while that is still the side's and fits its type; else null.
+  const params = Object.create(null) as ScriptObject
+  for (const p of context.params ?? []) {
+    const target = p.id === undefined ? undefined : paramTarget(world, side, p.type, p.id)
+    params[p.name] = toValue(target?.is === 'building' ? target.building : target?.carriage)
+  }
+
   const values: Record<string, Value> = {
     me,
     memory: context.memory,
+    params: Object.freeze(params),
     tick: world.tick,
     mapSize: terrain.size,
     random: tickRandom(world),
@@ -314,6 +345,16 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     globals[binding.name] = new NativeFunction(binding.name, call, binding.cost)
   }
   return { globals, requests }
+}
+
+/**
+ * What `doing(text)` keeps as `memory.doing` (`CONTEXT.md`: Doing): the text trimmed and cut to
+ * `DOING_MAX_LENGTH` characters, or null, as for empty text, to give the derived line back.
+ */
+export function doingText(text: Value | undefined): string | null {
+  if (text === undefined || text === null) return null
+  if (typeof text !== 'string') throw new ScriptRuntimeError('"doing" needs a text or null')
+  return text.trim().slice(0, DOING_MAX_LENGTH) || null
 }
 
 /** The `random` value of a tick: drawn from the world's seed, the same for every script. */
@@ -379,6 +420,10 @@ function residentActions(
     stop: () => request('stop', {}),
     pickUp: ([spot, goods]) => request('pickUp', { spot: plain(spot), goods: plain(goods) }),
     drop: ([spot, goods]) => request('drop', { spot: plain(spot), goods: plain(goods) }),
+    store: ([goods, to]) =>
+      request('store', { goods: plain(goods), ...(to == null ? {} : { to: placeId(to) }) }),
+    fetch: ([goods, from]) =>
+      request('fetch', { goods: plain(goods), ...(from == null ? {} : { from: placeId(from) }) }),
     build: ([building]) => request('build', { building: plain(building) }),
     tearDown: ([buildingId]) => request('tearDown', { buildingId: plain(buildingId) }),
     workAt: ([makes]) => request('workAt', makes == null ? {} : { makes: plain(makes) }),
@@ -526,6 +571,12 @@ function plain(value: Value | undefined): unknown {
   const out: Record<string, unknown> = {}
   for (const [key, item] of Object.entries(value)) out[key] = plain(item)
   return out
+}
+
+/** A place for `store` and `fetch`: its id, or the id of a thing a script holds, like a building. */
+function placeId(value: Value): unknown {
+  const v = value as Record<string, Value>
+  return typeof v === 'object' && !Array.isArray(v) && 'id' in v ? plain(v.id) : plain(value)
 }
 
 function tile(x: Value | undefined, y: Value | undefined, name: string): { x: number; y: number } {

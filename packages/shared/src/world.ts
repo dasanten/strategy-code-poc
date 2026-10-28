@@ -55,12 +55,20 @@ export interface Resident {
   carried: Stock
   /** What the resident was ordered to do, as plain data; null when idle (ADR 0002). */
   order: ResidentOrder | null
+  /** How their last store or fetch order ended (`OrderEnded`); absent when none did since. */
+  orderEnded?: OrderEnded
   /**
    * The script the resident runs, when they were given the run-script order (`CONTEXT.md`:
    * Running a script). Its actions set `order` like UI orders; any other order ends it. Absent
    * when they run none.
    */
   script?: RunningScript
+  /**
+   * The values the Player picked for this resident's script parameters (`CONTEXT.md`: Script
+   * parameter): by script id, then by param name, the id of the building or carriage picked.
+   * Kept when the script ends, so giving the task again keeps them. Absent while none is picked.
+   */
+  scriptParams?: ScriptParamValues
   /** The resident's pair (`CONTEXT.md`: Pairing), if they are paired. Not an order. */
   pair?: Pair
   /** The child the resident is carrying (`CONTEXT.md`: Carrying), if any. */
@@ -102,6 +110,11 @@ export interface ScriptMemory {
   [key: string]: MemoryValue
 }
 
+/** A resident's picked script parameter values: script id → param name → building or carriage id. */
+export interface ScriptParamValues {
+  [scriptId: string]: { [name: string]: string }
+}
+
 /**
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
  */
@@ -126,12 +139,31 @@ export interface RunningScript {
 }
 
 /**
+ * What a Player sees of the script a resident runs: which one, but not its memory. The owning
+ * Player also sees what goes into their Doing line (`CONTEXT.md`: Doing): the `task` when it
+ * runs a task's default script without one of the Player's, the kind of `building` its task is
+ * about (from its memory, as `TaskMemory` holds it), and the text it last gave `doing()`.
+ */
+export interface SeenScript {
+  scriptId: number
+  task?: Task
+  building?: BuildingKind
+  doing?: string
+  /**
+   * The values picked for its params, by name (`Resident.scriptParams`); only for the realm
+   * running it.
+   */
+  params?: { [name: string]: string }
+}
+
+/**
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
  * memory, which stays on the server. Their hunger and health only for their own realm and its
- * allies (`CONTEXT.md`: Seeing how someone fares).
+ * allies (`CONTEXT.md`: Seeing how someone fares). Their script parameter values only for the
+ * realm that runs their script, and only those of the script they run.
  */
-export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health'> &
-  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: Pick<RunningScript, 'scriptId'> }
+export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health' | 'scriptParams'> &
+  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: SeenScript }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -177,6 +209,57 @@ export interface DropOrder {
   kind: 'drop'
   to: GoodsSpot
   goods: Stock
+}
+
+/**
+ * Where a store or fetch order takes goods to or from: a storage or a stable's storage, or a
+ * carriage (`CONTEXT.md`: Store, Fetch).
+ */
+export type GoodsPlace = Extract<GoodsSpot, { kind: 'storage' | 'carriage' }>
+
+/**
+ * The goods a store or fetch order moves: units of each good, or null for as many as there are
+ * (to store: all carried but own food; to fetch: as much as fits).
+ */
+export type GoodsWanted = Partial<Record<Good, number | null>>
+
+/**
+ * Storing (`CONTEXT.md`: Store): the resident walks to `to` (`path` and `progress` as for a walk
+ * order), puts the goods there and, at a storage with Food, tops up their own food. Done then.
+ */
+export interface StoreOrder {
+  kind: 'store'
+  goods: GoodsWanted
+  to: GoodsPlace
+  phase: 'walking' | 'putting' | 'refilling'
+  /** While walking, the tiles still to walk; null while the path is being found. */
+  path: [number, number][] | null
+  progress: number
+}
+
+/**
+ * Fetching (`CONTEXT.md`: Fetch): the resident walks to `from` (`path` and `progress` as for a
+ * walk order) and takes the goods there, as much as fits. Done then.
+ */
+export interface FetchOrder {
+  kind: 'fetch'
+  goods: GoodsWanted
+  from: GoodsPlace
+  phase: 'walking' | 'taking'
+  /** While walking, the tiles still to walk; null while the path is being found. */
+  path: [number, number][] | null
+  progress: number
+}
+
+/**
+ * How the resident's last store or fetch order ended, so a script can tell: `reason` is null when
+ * it was done, else why it ended early ("no way", "the storage is gone", "the carriage is gone"). Kept until their next
+ * store or fetch order, or until the Player orders them otherwise.
+ */
+export interface OrderEnded {
+  kind: 'store' | 'fetch'
+  tick: number
+  reason: string | null
 }
 
 /**
@@ -339,6 +422,8 @@ export type ResidentOrder =
   | HaulOrder
   | PickUpOrder
   | DropOrder
+  | StoreOrder
+  | FetchOrder
   | BuildOrder
   | TearDownOrder
   | WorkOrder

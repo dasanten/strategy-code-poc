@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import {
+  PARAM_DESCRIPTIONS,
+  SCRIPT_PARAM_TYPES,
   ADULT_AGE,
   AGILITY_LIMIT,
   AGILITY_SPEED_EFFECT,
@@ -77,6 +79,7 @@ import {
   PRICE_REFERENCE_FLOORS,
   PROTECTION_DEFENCE,
   ROAD_LINE_MAX_TILES,
+  DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_MAX_CALL_DEPTH,
@@ -194,6 +197,7 @@ export const WIKI_TOPICS = [
   { id: 'territory', title: 'Territory' },
   { id: 'language', title: 'Script language' },
   { id: 'api', title: 'Game API' },
+  { id: 'params', title: 'Script parameters' },
   { id: 'scripts', title: 'Scripting budgets' },
   { id: 'examples', title: 'Example scripts' },
 ] as const
@@ -1015,9 +1019,13 @@ export function Wiki() {
           called. Every call costs one step, and its cost here on top. Queries answer from what you
           see and have explored, nothing more. An action asks for the order of its name for{' '}
           <code>me</code>, checked exactly as one from the map, and answers <code>null</code> when
-          asked for, or why not. A script runs as a resident's or as an army's: names marked
-          resident only or army only are only there for one of them, and a default script runs as a
-          resident's.
+          asked for, or why not. <code>doing</code> is the one action that asks for no order: its
+          text, at most {num(DOING_MAX_LENGTH)} characters, is what the resident card and list say
+          the resident is doing, until the script says something else; only you see it. Without it
+          they show what the task and its current order have the resident doing, such as “Building a
+          house: fetching 10 wood from the storage”. A script runs as a resident's or as an army's:
+          names marked resident only or army only are only there for one of them, and a default
+          script runs as a resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />
@@ -1063,6 +1071,57 @@ export function Wiki() {
             </table>
           </div>
         ))}
+      </Section>
+
+      <Section id="params">
+        <p>
+          A script can ask for values you pick for whoever runs it, such as which storage the output
+          goes to. Each is a <code>param</code> line at the very top of the script, read further
+          down as <code>params.name</code>. A <code>param</code> line anywhere else is a syntax
+          error.
+        </p>
+        <pre>
+          <code>{`param storage: storage
+if (params.storage != null) { store(["wood"], params.storage) }`}</code>
+        </pre>
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Holds</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SCRIPT_PARAM_TYPES.map((t) => (
+              <tr key={t}>
+                <td>
+                  <code>{t}</code>
+                </td>
+                <td>{PARAM_DESCRIPTIONS[t]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <ul>
+          <li>
+            A resident's card shows one field for each param of the script they run: pick it on the
+            map, or clear it. Picking doesn't stop the script.
+          </li>
+          <li>
+            The values are kept for each resident and each script. Giving the task again keeps them;
+            a param removed from the script is dropped, and a new one starts unset.
+          </li>
+          <li>
+            A param reads <code>null</code> while none is picked, and once the one picked is gone or
+            no longer yours.
+          </li>
+          <li>
+            The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
+            <code>source</code>: where materials come from, a carriage too. Unset, each uses the
+            nearest storage; a source picked that holds none of what the site lacks is left alone,
+            and they just build.
+          </li>
+        </ul>
       </Section>
 
       <Section id="scripts">

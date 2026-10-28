@@ -1,5 +1,6 @@
 // The script language: lexer, parser and step-counting interpreter (ADR 0001).
 
+import type { ParamDeclaration } from './ast.js'
 import { checkProgram, type CheckEnv, type CheckResult } from './checker.js'
 import { ScriptSyntaxError } from './lexer.js'
 import { parse } from './parser.js'
@@ -11,8 +12,10 @@ export {
   type CheckedGlobal,
   type CheckedType,
   type FieldRead,
+  PARAMS_SHAPE,
 } from './checker.js'
 export type * from './ast.js'
+export { PARAM_TYPES } from './ast.js'
 export { KEYWORDS, type Keyword, ScriptSyntaxError, tokenize, type Token } from './lexer.js'
 export { MAX_NESTING, parse } from './parser.js'
 export {
@@ -52,6 +55,16 @@ export function checkNames(source: string, env: CheckEnv): CheckResult {
     throw error
   }
   return checkProgram(program, env)
+}
+
+/** A script's `param` lines; none for a script with a syntax error. */
+export function scriptParams(source: string): ParamDeclaration[] {
+  try {
+    return parse(source).params
+  } catch (error) {
+    if (error instanceof ScriptSyntaxError) return []
+    throw error
+  }
 }
 
 /** Checks a script for syntax errors. The parser stops at the first one, so there is at most one. */

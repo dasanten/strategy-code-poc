@@ -32,7 +32,7 @@ const VALID = 'let x = 1\n'
 const VALID_2 = 'let x = 2\n'
 // The Player's own scripts, not their default scripts (default-scripts.test.ts has those).
 const own = (s: { task: unknown }) => s.task === null
-const OWN = { task: null, followsDefault: false }
+const OWN = { task: null, followsDefault: false, params: [] }
 const BROKEN = 'let = \n'
 
 let opened: OpenDb
