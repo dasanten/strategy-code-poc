@@ -45,7 +45,7 @@ import {
   useEscapeCloses,
 } from './Hud.js'
 import type { Covered } from './map/camera.js'
-import { groupResidents, type CardSections } from './residents-view.js'
+import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
 import { appendRequest, editRequest, STORE_ALL, useShiftHeld } from './queue-view.js'
 import { useSavedGroups } from './saved-groups.js'
@@ -117,8 +117,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
-  // The resident card's open sections, kept here so they stay open as the Player picks others.
-  const [cardSections, setCardSections] = useState<CardSections<ActionId>>({ stats: false })
+  // The resident card's open tab and panel, kept here so they stay as the Player picks others;
+  // the tab is also remembered in this browser (ADR 0012).
+  const [cardSections, setCardSections] = useState<CardSections<ActionId>>(() => ({
+    tab: rememberedTab(),
+  }))
   const [picking, setPicking] = useState<Picking>(false)
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
@@ -836,7 +839,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             onRename={rename}
             sections={cardSections}
-            onSections={setCardSections}
+            onSections={(s) => {
+              rememberTab(s.tab)
+              setCardSections(s)
+            }}
             scriptParams={
               selected.script && (
                 <ScriptParamFields

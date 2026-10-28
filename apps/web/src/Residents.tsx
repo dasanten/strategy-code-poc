@@ -67,7 +67,15 @@ import {
   horsesIn,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { carryLine, groupCard, type CardSections, type ResidentGroup } from './residents-view.js'
+import {
+  CARD_TAB_LABELS,
+  CARD_TABS,
+  carriedShort,
+  carryLine,
+  groupCard,
+  type CardSections,
+  type ResidentGroup,
+} from './residents-view.js'
 import { doingLine } from './doing-view.js'
 import {
   dropStep,
@@ -82,10 +90,11 @@ import {
 import { groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
-import { ActionRows, SelectionCard } from './SelectionCard.js'
+import { ActionRows, SelectionCard, useActionKeys } from './SelectionCard.js'
 import {
   ACTION_KEYS,
   horseDetail,
+  groupOrders,
   residentActions,
   type ActionId,
   type CardAction,
@@ -703,9 +712,11 @@ const GROUP_PICKING_HINTS: Record<Exclude<GroupPicking, false>, string> = {
 }
 
 /**
- * The selection card for one of the Player's residents (ADR 0008; `CONTEXT.md`: Resident, Stats,
- * Skill): who they are and what they do, then the actions that fit them and their tile as rows
- * with keys. An action that needs more (goods, a partner, a target, a script) opens its panel.
+ * The selection card for one of the Player's residents (ADRs 0008, 0012; `CONTEXT.md`: Resident, Stats,
+ * Skill, Resident card): a header that always shows who they are, what they do, their
+ * health, hunger and what they carry, then one open tab. Orders lists the orders they can take
+ * now, grouped by kind, as rows with keys; one that needs more (goods, a partner, a target, a
+ * script) opens its panel. Queue, Stats and Script show the rest.
  */
 export function ResidentCard({
   resident: r,
@@ -869,7 +880,7 @@ export function ResidentCard({
   onRename: (name: string, realmName?: string) => void
   /** Closes the card. */
   onClose: () => void
-  /** The open sections, kept by the caller so they stay open from one selected unit to the next. */
+  /** The open tab and panel, kept by the caller so they stay from one selected unit to the next. */
   sections: CardSections<ActionId>
   onSections: (sections: CardSections<ActionId>) => void
   /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
@@ -915,10 +926,17 @@ export function ResidentCard({
     renamable: !!rename,
     riding: r.riding !== undefined,
     horseToRide: !!horseToRide,
+    carrying: !!r.carrying,
+    carries: carried.length > 0,
   })
+  const tab = sections.tab
   const shown = actions.some((a) => a.id === sections.panel) ? sections.panel : undefined
   const act = (a: CardAction) => {
-    if (a.opens) return setPanel(shown === a.id ? undefined : a.id)
+    // An order's key opens its panel from any tab, on the Orders tab.
+    if (a.opens) {
+      const open = tab === 'orders' && shown === a.id ? undefined : a.id
+      return onSections({ ...sections, tab: 'orders', panel: open })
+    }
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
     if (a.id === 'roadTo') onRoadTo()
@@ -927,15 +945,15 @@ export function ResidentCard({
     if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
+  useActionKeys(actions, act)
   return (
     <SelectionCard
       rel={r.owner === realmId ? 'own' : 'alliance'}
       title={r.name}
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
-        `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}${r.riding ? ' · on horseback' : ''}`,
         <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
-        ...(family ? [family] : []),
+        `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
       ]}
       onClose={onClose}
     >
@@ -952,29 +970,55 @@ export function ResidentCard({
         />
       </div>
 
-      {r.script && (
-        <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
-      )}
-      {r.script && scriptParams}
-      {r.queue && onEditQueue && (
-        <QueueBlock
-          queue={r.queue}
-          doing={doingLine(r, { scripts, buildings })}
-          scripts={scripts}
-          buildings={buildings}
-          onEdit={onEditQueue}
-        />
-      )}
-      <ActionRows actions={actions} open={shown} onAction={act} />
-      <p className="muted small" role="status">
-        {orderError
-          ? `Order turned down: ${orderError}`
-          : picking
-            ? `${PICKING_HINTS[picking]} Tap a tile on the map, or press ${PICKING_KEYS[picking]} again to cancel.`
-            : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
-      </p>
+      <div className="tabs sel-tabs" role="tablist" aria-label="Card">
+        {CARD_TABS.map((t) => (
+          <button
+            type="button"
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => onSections({ ...sections, tab: t })}
+          >
+            {CARD_TAB_LABELS[t]}
+          </button>
+        ))}
+      </div>
 
-      {shown && (
+      {tab === 'orders' &&
+        groupOrders(actions).map((g) => (
+          <div className="sel-order-group" key={g.group}>
+            <h3>{g.label}</h3>
+            <ActionRows
+              actions={g.actions}
+              open={shown}
+              onAction={act}
+              label={g.label}
+              keys={false}
+            />
+          </div>
+        ))}
+      {tab === 'queue' &&
+        (r.queue && onEditQueue ? (
+          <QueueBlock
+            queue={r.queue}
+            doing={doingLine(r, { scripts, buildings })}
+            scripts={scripts}
+            buildings={buildings}
+            onEdit={onEditQueue}
+          />
+        ) : (
+          <p className="muted small">Nothing queued. Hold Shift with any order to queue it.</p>
+        ))}
+      {tab === 'script' &&
+        (r.script ? (
+          <>
+            <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
+            {scriptParams}
+          </>
+        ) : (
+          <p className="muted small">Runs no script. Give them one with Run script under Orders.</p>
+        ))}
+      {tab === 'orders' && shown && (
         <div className="sel-panel">
           {shown === 'haul' && carriage && (
             <HaulBlock resident={r} tick={tick} picking={picking === 'haul'} onHaulTo={onHaulTo} />
@@ -1217,52 +1261,61 @@ export function ResidentCard({
         </div>
       )}
 
-      <details className="sel-details" open={sections.stats}>
-        <summary
-          onClick={(e) => {
-            // Opened and closed only through the kept sections, never by the browser alone.
-            e.preventDefault()
-            onSections({ ...sections, stats: !sections.stats })
-          }}
-        >
-          Stats and skills
-        </summary>
-        <section className="inspector-block" aria-label="Stats">
-          <div className="panel-head">
-            <h3>Stats</h3>
-            <span className="small muted">base + trained (cap)</span>
-          </div>
-          {STAT_NAMES.map((s) => {
-            const { base, trained } = r.stats[s]
-            const cap = trainedCap(base)
-            return (
-              <div className="stat" key={s}>
-                <span>{STAT_LABELS[s]}</span>
-                <span className="stat-bar" aria-hidden="true">
-                  <span className="base" style={{ width: pct(base / STAT_SCALE) }} />
-                  <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
-                  <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
+      {tab === 'stats' && (
+        <>
+          <ul className="sel-facts">
+            <li>
+              {child ? 'Child' : 'Adult'} · {age} years{cityName ? ` · ${cityName}` : ''}
+              {r.riding ? ' · on horseback' : ''}
+            </li>
+            {family && <li>{family}</li>}
+          </ul>
+          <section className="inspector-block" aria-label="Stats">
+            <div className="panel-head">
+              <h3>Stats</h3>
+              <span className="small muted">base + trained (cap)</span>
+            </div>
+            {STAT_NAMES.map((s) => {
+              const { base, trained } = r.stats[s]
+              const cap = trainedCap(base)
+              return (
+                <div className="stat" key={s}>
+                  <span>{STAT_LABELS[s]}</span>
+                  <span className="stat-bar" aria-hidden="true">
+                    <span className="base" style={{ width: pct(base / STAT_SCALE) }} />
+                    <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
+                    <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
+                  </span>
+                  <span className="mono right">
+                    {base} + {trained} ({cap})
+                  </span>
+                </div>
+              )
+            })}
+          </section>
+          <section className="inspector-block" aria-label="Skills">
+            <h3>Skills</h3>
+            <div className="chips">
+              {skills.length === 0 && <span className="chip">None yet</span>}
+              {skills.map((s) => (
+                <span className="chip" key={s}>
+                  {SKILL_LABELS[s]}{' '}
+                  <span className="mono accent">{Math.floor(r.skills[s]! * 10) / 10}</span>
                 </span>
-                <span className="mono right">
-                  {base} + {trained} ({cap})
-                </span>
-              </div>
-            )
-          })}
-        </section>
-        <section className="inspector-block" aria-label="Skills">
-          <h3>Skills</h3>
-          <div className="chips">
-            {skills.length === 0 && <span className="chip">None yet</span>}
-            {skills.map((s) => (
-              <span className="chip" key={s}>
-                {SKILL_LABELS[s]}{' '}
-                <span className="mono accent">{Math.floor(r.skills[s]! * 10) / 10}</span>
-              </span>
-            ))}
-          </div>
-        </section>
-      </details>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+      {(orderError || picking || tab === 'orders') && (
+        <p className="muted small" role="status">
+          {orderError
+            ? `Order turned down: ${orderError}`
+            : picking
+              ? `${PICKING_HINTS[picking]} Tap a tile on the map, or press ${PICKING_KEYS[picking]} again to cancel.`
+              : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
+        </p>
+      )}
     </SelectionCard>
   )
 }

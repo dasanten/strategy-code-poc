@@ -90,15 +90,20 @@ export function ActionRows({
   actions,
   open,
   onAction,
+  label = 'Actions',
+  keys = true,
 }: {
   actions: CardAction[]
   /** The action whose panel is open, if any. */
   open: string | undefined
   onAction: (a: CardAction) => void
+  label?: string
+  /** Whether the rows run on their keys; off where the card listens for all its actions itself. */
+  keys?: boolean
 }) {
-  useActionKeys(actions, onAction)
+  useActionKeys(keys ? actions : [], onAction)
   return (
-    <div className="sel-actions" role="group" aria-label="Actions">
+    <div className="sel-actions" role="group" aria-label={label}>
       {actions.map((a) => {
         const on = a.active || (a.opens && open === a.id)
         return (
@@ -129,7 +134,7 @@ export function ActionRows({
 }
 
 /** Runs an action on its key, unless the Player is typing somewhere or holds a modifier. */
-function useActionKeys(actions: CardAction[], onAction: (a: CardAction) => void) {
+export function useActionKeys(actions: CardAction[], onAction: (a: CardAction) => void) {
   const latest = useRef({ actions, onAction })
   latest.current = { actions, onAction }
   useEffect(() => {
