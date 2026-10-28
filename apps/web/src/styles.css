@@ -1087,12 +1087,15 @@ button.residents-row.selected:hover {
 .alliance-list li.invited {
   color: var(--ui-muted);
 }
-.alliance-list li.army > span {
-  display: block;
+/* An army in the drawer: a row to open it, or its card (ADR 0012) across the drawer. */
+.alliance-list li.army > .army-row {
+  flex: 1;
+  text-align: left;
   line-height: 1.5;
 }
-.alliance-list li.army .order-buttons {
-  flex-basis: 100%;
+.alliance-list li.army > .sel-card {
+  flex: 1;
+  min-width: 0;
 }
 .city-list {
   list-style: none;
