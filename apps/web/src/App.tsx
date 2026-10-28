@@ -2,6 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } fro
 import {
   holdersOf,
   KEEPS_GOODS,
+  MAX_WORKERS,
+  buildMenu,
+  isPassableTerrain,
   isWallOrGate,
   type Account,
   type Building,
@@ -42,6 +45,8 @@ import { groupResidents, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
 import { appendRequest, editRequest, STORE_ALL, useShiftHeld } from './queue-view.js'
 import { useSavedGroups } from './saved-groups.js'
+import { groupRequests, type GroupOrder, type Skipped } from './group-orders.js'
+import { BUILDING_NAMES } from './map/palette.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
 import { isWikiPath, pageFor } from './pages.js'
@@ -52,6 +57,7 @@ import {
   GOOD_LABELS,
   GroupCard,
   ResidentCard,
+  type GroupPicking,
   ResidentsList,
   type HaulSetup,
   type Picking,
@@ -117,6 +123,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
   // Script parameter).
   const [paramPick, setParamPick] = useState<ScriptParam>()
+  // A group order waiting for a tile, the tile picked to build on, and what the last one did.
+  const [groupPicking, setGroupPicking] = useState<GroupPicking>(false)
+  const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
+  const [groupReport, setGroupReport] = useState<{ sent: number; of: number; skipped: Skipped[] }>()
+  const [groupError, setGroupError] = useState<string>()
   // The residents the Player gives orders to: their own, less those handed over to their alliance's
   // army or rented out, and, as its alliance leader, the ones handed over (`CONTEXT.md`: Alliance
   // army) and the mercenaries they hired (`CONTEXT.md`: Mercenary contract).
@@ -170,6 +181,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setArmyPick(undefined)
     setParamPick(undefined)
     setOrderError(undefined)
+    setGroupPicking(false)
+    setGroupBuildAt(undefined)
+    setGroupReport(undefined)
+    setGroupError(undefined)
   }
   // Ctrl+1–9 saves the picked residents as a group, 1–9 picks it again (`CONTEXT.md`: Group).
   useSavedGroups(
@@ -213,6 +228,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setArmyError(await sendOrder({ kind: armyPick.kind, armyId: armyPick.armyId, x, y }))
       return
     }
+    if (group.length > 1) {
+      await groupTile(x, y)
+      return
+    }
     if (!selected) return
     const carriage = onTile(world?.carriages)
     if (mode === 'drive' && carriage) {
@@ -233,6 +252,61 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     setOrderError(await giveOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
+  }
+
+  /**
+   * A tile picked for the group (`CONTEXT.md`: Group): walking there (also by right-click),
+   * working the workplace there, or where to build.
+   */
+  async function groupTile(x: number, y: number) {
+    const mode = groupPicking
+    setGroupPicking(false)
+    if (!world) return
+    if (mode === 'build') {
+      setGroupBuildAt({ x, y })
+      return
+    }
+    setGroupBuildAt(undefined)
+    if (mode !== 'work') return sendGroup({ kind: 'walkTo', x, y })
+    const workplace = world.buildings.find(
+      (b) => b.kind !== 'road' && !b.site && covers(b, x, y) && MAX_WORKERS[b.kind] !== undefined,
+    )
+    setGroupReport(undefined)
+    if (!workplace) return setGroupError('no workplace there')
+    // What a smithy makes is picked for each worker on their own card.
+    if (workplace.kind === 'smithy') return setGroupError('pick what to make on each one’s card')
+    const name = BUILDING_NAMES[workplace.kind].toLowerCase()
+    await sendGroup({ kind: 'work', workplace, name })
+  }
+  /**
+   * Gives each resident of the group the same order request (ADR 0002), skipping those who
+   * can't take it, and says on the card who was skipped or turned down and why.
+   */
+  async function sendGroup(order: GroupOrder) {
+    if (!world) return
+    const size = world.map.size
+    const inGroup = new Set(group.map((r) => r.id))
+    // Free: explored land a resident can stand on, with no wall or gate and nobody else on it.
+    const free = (x: number, y: number) => {
+      const t = terrainAt?.(x, y)
+      if (t === undefined || !isPassableTerrain(t)) return false
+      if (world.buildings.some((b) => isWallOrGate(b) && covers(b, x, y, size))) return false
+      return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
+    }
+    const { requests, skipped } = groupRequests(order, group, { tick: world.tick, size, free })
+    if (order.kind === 'build') setGroupBuildAt(undefined)
+    setGroupError(undefined)
+    const answers = await Promise.all(requests.map((q) => sendOrder(q.order)))
+    const turnedDown = requests.flatMap((q, i) => {
+      const why = answers[i]
+      const r = group.find((g) => g.id === q.residentId)
+      return why && r ? [{ id: r.id, name: r.name, why }] : []
+    })
+    setGroupReport({
+      sent: requests.length - turnedDown.length,
+      of: group.length,
+      skipped: [...skipped, ...turnedDown],
+    })
   }
 
   /** Orders the picked resident to pick up or drop goods on their tile. */
@@ -381,7 +455,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOpenCityId(id)
               setOpenDrawer('cities')
             }}
-            picking={picking !== false || armyPick !== undefined || paramPick !== undefined}
+            picking={
+              picking !== false ||
+              armyPick !== undefined ||
+              paramPick !== undefined ||
+              (group.length > 1 && groupPicking !== false)
+            }
             onPickTile={goTo}
             onNodesLoaded={onNodesLoaded}
             onTerrainLoaded={onTerrainLoaded}
@@ -744,8 +823,36 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             residents={group}
             scripts={scripts}
             buildings={world.buildings}
+            picking={groupPicking}
+            onPicking={(p) => {
+              setGroupPicking(p)
+              setGroupBuildAt(undefined)
+            }}
+            buildAt={
+              groupBuildAt && {
+                ...groupBuildAt,
+                site: world.buildings.find(
+                  (b) => b.kind !== 'road' && b.site && covers(b, groupBuildAt.x, groupBuildAt.y),
+                ),
+                kinds: buildMenu(nodeAt?.(groupBuildAt.x, groupBuildAt.y)).map((kind) => ({
+                  kind,
+                  problem: buildHereProblem(
+                    kind,
+                    groupBuildAt.x,
+                    groupBuildAt.y,
+                    world,
+                    (x, y) => nodeAt?.(x, y),
+                    // Terrain not loaded counts as unexplored: nothing is laid out there.
+                    { size: world.map.size, at: (x, y) => terrainAt?.(x, y) ?? UNEXPLORED },
+                  ),
+                })),
+              }
+            }
+            onOrder={(order) => void sendGroup(order)}
+            report={groupReport}
+            orderError={groupError}
             onPick={(id) => select([id])}
-            onClose={() => setSelectedIds([])}
+            onClose={() => select([])}
           />
         </div>
       )}

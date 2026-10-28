@@ -411,6 +411,34 @@ export function Wiki() {
           </tbody>
         </table>
         <p>Groups are kept in this browser, for each realm; another browser starts without them.</p>
+        <p>
+          With several picked, the group card gives each of them the same order, just as their own
+          cards would: walk to, work, build, store, fetch, run a script or stop. Nothing ties them
+          together afterwards; each goes on alone.
+        </p>
+        <ul>
+          <li>
+            <strong>Walk to</strong> (or right-click the map): they spread over free tiles around
+            the one picked, the nearest of them to the nearest tile.
+          </li>
+          <li>
+            <strong>Work</strong>: pick a workplace; those standing at it work it. Walk them there
+            first.
+          </li>
+          <li>
+            <strong>Build</strong>: pick a tile and what to build there, or a construction site.
+            Each walks there; the first to arrive lays out the site and the others join it.
+          </li>
+          <li>
+            <strong>Store</strong> puts what each carries in the nearest storage (their own food
+            stays with them); <strong>Fetch</strong> takes a good from the nearest storage or
+            carriage holding it.
+          </li>
+        </ul>
+        <p>
+          Those who can't take an order are skipped, and the card says who and why: children don't
+          work, build, store or fetch; a partner carrying a child doesn't work or build.
+        </p>
       </Section>
 
       <Section id="queues">
