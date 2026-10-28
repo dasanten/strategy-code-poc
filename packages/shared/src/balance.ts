@@ -1565,6 +1565,12 @@ export const QUEUE_MAX_STEPS = 20
 /** The most a queue step's order request may hold, in characters of its JSON. */
 export const QUEUE_STEP_MAX_CHARS = 1000
 
+/**
+ * The duration, in game minutes, the card gives a step that never ends on its own (work, haul)
+ * once another step is put after it without one: a game hour, a real minute.
+ */
+export const QUEUE_DEFAULT_STEP_MINUTES = 60
+
 /** The longest realm name a Player may give, in characters after trimming (`CONTEXT.md`: Realm name). */
 export const REALM_NAME_MAX_LENGTH = 30
 

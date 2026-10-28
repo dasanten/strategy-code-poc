@@ -9,6 +9,7 @@ import {
   type Good,
   type GoodsSpot,
   type KnownNode,
+  type OrderRequest,
   type Resident,
   type ScriptParam,
   type ScriptSummary,
@@ -39,6 +40,7 @@ import {
 import type { Covered } from './map/camera.js'
 import { groupResidents, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
+import { appendRequest, editRequest, STORE_ALL, useShiftHeld } from './queue-view.js'
 import { useSavedGroups } from './saved-groups.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
@@ -177,6 +179,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     select,
     showOnMap,
   )
+  const shift = useShiftHeld()
+  /**
+   * Gives an order, or, with Shift held, appends a resident's order to their queue (`CONTEXT.md`:
+   * Queue). Orders that can't be queue steps are given as they are.
+   */
+  const giveOrder = (order: OrderRequest) => {
+    const r = shift.current ? own.find((x) => x.id === order.residentId) : undefined
+    return sendOrder((r && appendRequest(r, order)) ?? order)
+  }
   // The city picked on the map or opened in the Cities drawer.
   const [openCityId, setOpenCityId] = useState<string>()
 
@@ -206,28 +217,28 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const carriage = onTile(world?.carriages)
     if (mode === 'drive' && carriage) {
       const order = { kind: 'drive', residentId: selected.id, carriageId: carriage.id, x, y }
-      setOrderError(await sendOrder(order))
+      setOrderError(await giveOrder(order))
       return
     }
     if (mode === 'haul' && carriage && haulSetup) {
       // The Haul task: they run the Player's Haul (default) script (`CONTEXT.md`: Default script).
       const order = { kind: 'task', task: 'haul', residentId: selected.id, carriageId: carriage.id }
-      setOrderError(await sendOrder({ ...order, x, y, ...haulSetup }))
+      setOrderError(await giveOrder({ ...order, x, y, ...haulSetup }))
       return
     }
     if (mode === 'road' || mode === 'wall') {
       const kind = mode === 'road' ? 'roadLine' : 'wallLine'
       const from = { x: selected.x, y: selected.y }
-      setOrderError(await sendOrder({ kind, residentId: selected.id, from, to: { x, y } }))
+      setOrderError(await giveOrder({ kind, residentId: selected.id, from, to: { x, y } }))
       return
     }
-    setOrderError(await sendOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
+    setOrderError(await giveOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
   }
 
   /** Orders the picked resident to pick up or drop goods on their tile. */
   async function carry(kind: 'pickUp' | 'drop', spot: GoodsSpot, goods: Stock) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind, residentId: selected.id, spot, goods }))
+    setOrderError(await giveOrder({ kind, residentId: selected.id, spot, goods }))
   }
   /**
    * Gives the picked resident the Build task on their tile, laying out a site or joining the one
@@ -237,7 +248,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function build(building: BuildingKind) {
     if (!selected) return
     const order = { kind: 'task', task: 'build', residentId: selected.id, building }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order))
   }
   /**
    * Gives the picked resident the Work task at the workplace on their tile, making `makes` at a
@@ -247,7 +258,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     const workplaceId = buildingHere?.id
     const order = { kind: 'task', task: 'work', residentId: selected.id, workplaceId, makes }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order))
   }
   /**
    * Gives the picked resident the Tear down task for the building or site on their tile: they
@@ -256,13 +267,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function tearDown(buildingId: string) {
     if (!selected) return
     const order = { kind: 'task', task: 'tearDown', residentId: selected.id, buildingId }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order))
   }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
   async function runScript(scriptId: number) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'runScript', residentId: selected.id, scriptId }))
+    setOrderError(await giveOrder({ kind: 'runScript', residentId: selected.id, scriptId }))
   }
   /**
    * Picks, or clears with null, the value of a param of the script the picked resident runs
@@ -272,16 +283,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected?.script) return
     const { scriptId } = selected.script
     const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, targetId }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order))
   }
   async function stop() {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'stop', residentId: selected.id }))
+    setOrderError(await giveOrder({ kind: 'stop', residentId: selected.id }))
   }
   /** Orders the picked resident to pair with another resident of their city. */
   async function pair(partnerId: string) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'pair', residentId: selected.id, partnerId }))
+    setOrderError(await giveOrder({ kind: 'pair', residentId: selected.id, partnerId }))
   }
   /**
    * Orders the Player's Leader to hand the realm over to the picked resident (`CONTEXT.md`:
@@ -290,7 +301,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function makeLeader() {
     if (!selected || !world) return
     const order = { kind: 'handOver', residentId: world.home.leaderId, newLeaderId: selected.id }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order))
   }
   /**
    * Renames the picked resident (`CONTEXT.md`: Renaming a resident), with the realm name when it
@@ -299,17 +310,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function rename(name: string, realmName?: string) {
     if (!selected) return
     const order = { kind: 'rename', residentId: selected.id, targetId: selected.id, name }
-    setOrderError(await sendOrder(realmName === undefined ? order : { ...order, realmName }))
+    setOrderError(await giveOrder(realmName === undefined ? order : { ...order, realmName }))
   }
   /** Orders the picked resident to attack a resident of another realm. */
   async function attack(targetId: string) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'attack', residentId: selected.id, targetId }))
+    setOrderError(await giveOrder({ kind: 'attack', residentId: selected.id, targetId }))
   }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
     if (!selected) return
-    setOrderError(await sendOrder({ kind: 'climb', residentId: selected.id, wallId }))
+    setOrderError(await giveOrder({ kind: 'climb', residentId: selected.id, wallId }))
   }
   const [nodeAt, setNodeAt] = useState<(x: number, y: number) => KnownNode | undefined>()
   const onNodesLoaded = useCallback(
@@ -490,16 +501,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             tick={world.tick}
             mapSize={world.map.size}
             onSetGate={async (gateId, open) =>
-              setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
+              setOrderError(await giveOrder({ kind: 'setGate', gateId, open }))
             }
             onBuyCity={async (residentId, cityId) =>
-              setOrderError(await sendOrder({ kind: 'buyCity', residentId, cityId }))
+              setOrderError(await giveOrder({ kind: 'buyCity', residentId, cityId }))
             }
             onTrade={async ({ side, ...trade }) =>
-              setOrderError(await sendOrder({ kind: side, ...trade }))
+              setOrderError(await giveOrder({ kind: side, ...trade }))
             }
             onTransfer={async (transfer) =>
-              setOrderError(await sendOrder({ kind: 'transfer', ...transfer }))
+              setOrderError(await giveOrder({ kind: 'transfer', ...transfer }))
             }
             directives={world.diplomacy.directives}
             openId={openCityId}
@@ -575,16 +586,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onSendHere={async () => {
               if (!selected) return
               const order = { kind: 'walkTo', residentId: selected.id, ...selectedTile }
-              setOrderError(await sendOrder(order))
+              setOrderError(await giveOrder(order))
             }}
             onBuildHere={async (building, at) => {
               // The Build task, walking to where the node's workplace fits first (ADR 0002).
               if (!selected) return
               const order = { kind: 'task', task: 'build', residentId: selected.id, building, at }
-              setOrderError(await sendOrder(order))
+              setOrderError(await giveOrder(order))
             }}
             onSetGate={async (gateId, open) =>
-              setOrderError(await sendOrder({ kind: 'setGate', gateId, open }))
+              setOrderError(await giveOrder({ kind: 'setGate', gateId, open }))
             }
             onOpenCity={(id) => {
               setOpenCityId(id)
@@ -593,7 +604,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             // The same `renameCity` order a script's `renameCity` requests, asked by the Leader.
             onRenameCity={async (cityId, name) => {
               const order = { kind: 'renameCity', residentId: world.home.leaderId, cityId, name }
-              setOrderError(await sendOrder(order))
+              setOrderError(await giveOrder(order))
             }}
           />
         </div>
@@ -712,6 +723,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   onClear={(name) => void setScriptParam(name, null)}
                 />
               )
+            }
+            onStore={async () =>
+              setOrderError(await giveOrder({ ...STORE_ALL, residentId: selected.id }))
+            }
+            onEditQueue={async (steps, loop) =>
+              setOrderError(await sendOrder(editRequest(selected, steps, loop)))
             }
             onClose={() => {
               setSelectedIds([])

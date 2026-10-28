@@ -1,0 +1,293 @@
+import { useEffect, useRef } from 'react'
+import {
+  GOODS,
+  QUEUE_DEFAULT_STEP_MINUTES,
+  QUEUE_STEP_KINDS,
+  TICKS_PER_GAME_HOUR,
+  neverEnds,
+  type Building,
+  type BuildingKind,
+  type Good,
+  type OrderRequest,
+  type Queue,
+  type QueueStepRequest,
+  type Resident,
+  type ScriptSummary,
+} from '@csp/shared'
+import { BUILDING_NAMES } from './city-view.js'
+import { GOOD_LABELS } from './Residents.js'
+import { realTimeOf } from './wiki-view.js'
+
+/**
+ * Queues on the resident card (`CONTEXT.md`: Queue): holding Shift while giving an order appends
+ * it to the resident's queue instead of replacing what they do, and the card lists the queue to
+ * reorder, remove, time and loop its steps. Every change is a `queue` or `editQueue` order the
+ * server checks (ADR 0002).
+ */
+
+/** What appending needs of a resident: where they stand, what they do and their queue. */
+export type Queued = Pick<Resident, 'id' | 'x' | 'y' | 'order' | 'script' | 'queue'>
+
+/** Ticks in a game minute. */
+const TICKS_PER_GAME_MINUTE = TICKS_PER_GAME_HOUR / 60
+
+/** The Store order the card gives: everything carried, keeping their own Food. */
+export const STORE_ALL: OrderRequest = { kind: 'store', goods: [...GOODS] }
+
+/**
+ * The order that appends `order` to the resident's queue, or starts one with it: a `queue` order
+ * when they have none, an `editQueue` order keeping every step they have. Undefined when the order
+ * can't be a queue step (stop, attack, …), so it is given as it is.
+ *
+ * A walk they are on (not one of a script's) becomes the queue's first step. An order acting on the resident's tile (work,
+ * build, pick up, …) is put after a walk to that tile, unless the step before already walks
+ * there, so it still finds them there when its turn comes, and on every round of a loop. A step
+ * that never ends on its own gets `QUEUE_DEFAULT_STEP_MINUTES` once another follows it.
+ */
+export function appendRequest(r: Queued, order: OrderRequest): OrderRequest | undefined {
+  if (!QUEUE_STEP_KINDS.includes(order.kind)) return undefined
+  const before: QueueStepRequest[] = r.queue
+    ? stepsOf(r.queue)
+    : r.order?.kind === 'walkTo' && !r.script
+      ? [{ order: { kind: 'walkTo', ...r.order.target } }]
+      : []
+  const added: QueueStepRequest[] = []
+  const here = actsHere(order) ? { x: r.x, y: r.y } : undefined
+  const last = before.at(-1)?.order
+  if (here && !(last && walksTo(last, here))) added.push({ order: { kind: 'walkTo', ...here } })
+  added.push({ order: withoutResident(order) })
+  const steps = timed([...before, ...added])
+  return r.queue
+    ? { kind: 'editQueue', residentId: r.id, steps }
+    : { kind: 'queue', residentId: r.id, steps }
+}
+
+/**
+ * The orders appending to each of several residents' queues, `orderFor` giving each one's order:
+ * those whose order can't be a step get it as it is.
+ */
+export function appendRequests(
+  residents: readonly Queued[],
+  orderFor: (r: Queued) => OrderRequest,
+): OrderRequest[] {
+  return residents.map((r) => {
+    const order = orderFor(r)
+    return appendRequest(r, order) ?? order
+  })
+}
+
+/** The queue's steps as an edit-queue request keeps them: each by its id. */
+export function stepsOf(q: Queue): QueueStepRequest[] {
+  return q.steps.map((s) => ({
+    id: s.id,
+    order: s.order,
+    ...(s.minutes === undefined ? {} : { minutes: s.minutes }),
+  }))
+}
+
+/** The steps with every one that never ends on its own, and isn't last, given a duration. */
+function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
+  return steps.map((s, i) =>
+    s.minutes === undefined && neverEnds(s.order) && i < steps.length - 1
+      ? { ...s, minutes: QUEUE_DEFAULT_STEP_MINUTES }
+      : s,
+  )
+}
+
+/** Orders the card gives for the resident's own tile: they only start there. */
+function actsHere(order: OrderRequest): boolean {
+  if (order.kind === 'pickUp' || order.kind === 'drop' || order.kind === 'drive') return true
+  if (order.kind !== 'task') return false
+  // A Build task laid out somewhere else (`at`) walks there itself.
+  return order.task !== 'build' || order.at === undefined
+}
+
+function walksTo(order: OrderRequest, at: { x: number; y: number }): boolean {
+  return order.kind === 'walkTo' && order.x === at.x && order.y === at.y
+}
+
+function withoutResident(order: OrderRequest): OrderRequest {
+  const step = { ...order }
+  delete step.residentId
+  return step
+}
+
+/** The order editing the resident's queue to these steps. */
+export function editRequest(
+  r: Pick<Resident, 'id'>,
+  steps: QueueStepRequest[],
+  loop?: boolean,
+): OrderRequest {
+  return { kind: 'editQueue', residentId: r.id, steps, ...(loop === undefined ? {} : { loop }) }
+}
+
+/** The steps with one moved up (-1) or down (+1); a step that never ends gets a duration. */
+export function moveStep(q: Queue, id: number, by: -1 | 1): QueueStepRequest[] {
+  const steps = stepsOf(q)
+  const i = steps.findIndex((s) => s.id === id)
+  const j = i + by
+  if (i < 0 || j < 0 || j >= steps.length) return steps
+  ;[steps[i], steps[j]] = [steps[j]!, steps[i]!]
+  return timed(steps)
+}
+
+/** The steps with one dragged to the place of another. */
+export function dropStep(q: Queue, id: number, onto: number): QueueStepRequest[] {
+  const steps = stepsOf(q)
+  const from = steps.findIndex((s) => s.id === id)
+  const to = steps.findIndex((s) => s.id === onto)
+  if (from < 0 || to < 0) return steps
+  steps.splice(to, 0, ...steps.splice(from, 1))
+  return timed(steps)
+}
+
+/** The steps without one; with none left, the edit ends the queue. */
+export function removeStep(q: Queue, id: number): QueueStepRequest[] {
+  return stepsOf(q).filter((s) => s.id !== id)
+}
+
+/** The steps with one's duration set in game minutes, or cleared with undefined. */
+export function timeStep(q: Queue, id: number, minutes: number | undefined): QueueStepRequest[] {
+  return stepsOf(q).map((s) => {
+    if (s.id !== id) return s
+    const step = { ...s, minutes }
+    if (minutes === undefined) delete step.minutes
+    return step
+  })
+}
+
+/** One step as the card lists it. */
+export interface QueueRow {
+  id: number
+  /** "Work the farm", "Walk to 12, 6". */
+  label: string
+  /** The step being done. */
+  current: boolean
+  /** Its duration in game minutes, if it has one. */
+  minutes?: number
+  /** The duration in real time, "1 min". */
+  real?: string
+  /** It never ends on its own: work or haul. */
+  endless: boolean
+}
+
+/** What step labels name: the Player's scripts and the buildings in sight. */
+export interface StepNames {
+  scripts?: readonly Pick<ScriptSummary, 'id' | 'name'>[]
+  buildings?: readonly Pick<Building, 'id' | 'kind'>[]
+}
+
+/** The queue as the card lists it, step by step. */
+export function queueRows(q: Queue, names: StepNames = {}): QueueRow[] {
+  return q.steps.map((s, i) => ({
+    id: s.id,
+    label: stepLabel(s.order, names),
+    current: i === q.current,
+    ...(s.minutes === undefined ? {} : { minutes: s.minutes, real: realMinutes(s.minutes) }),
+    endless: neverEnds(s.order),
+  }))
+}
+
+/** A duration in game minutes as real time, "10 s", "1 min". */
+export const realMinutes = (minutes: number) => realTimeOf(minutes * TICKS_PER_GAME_MINUTE)
+
+/** What a queue step does, as the card lists it: "Work the farm", "Walk to 12, 6". */
+export function stepLabel(
+  order: OrderRequest,
+  { scripts = [], buildings = [] }: StepNames,
+): string {
+  const at = (p: unknown) => {
+    const { x, y } = p as { x: number; y: number }
+    return `${x}, ${y}`
+  }
+  const building = (id: unknown) => {
+    const kind = buildings.find((b) => b.id === id)?.kind
+    return kind ? `the ${BUILDING_NAMES[kind]}` : 'the building'
+  }
+  switch (order.kind) {
+    case 'walkTo':
+      return `Walk to ${at(order)}`
+    case 'drive':
+      return `Drive the carriage to ${at(order)}`
+    case 'pickUp':
+      return `Pick up ${goodsLine(order.goods)}`
+    case 'drop':
+      return `${dropVerb(order.spot)} ${goodsLine(order.goods)}`
+    case 'store':
+      return order.goods && !Array.isArray(order.goods)
+        ? `Store ${goodsLine(order.goods)}`
+        : 'Store what they carry'
+    case 'fetch':
+      return `Fetch ${goodsLine(order.goods)}`
+    case 'build':
+      return 'Build'
+    case 'tearDown':
+      return `Tear down ${building(order.buildingId)}`
+    case 'workAt':
+      return `Work ${building(order.buildingId)}`
+    case 'haul':
+      return 'Haul'
+    case 'roadLine':
+      return `Build a road to ${at(order.to)}`
+    case 'wallLine':
+      return `Build a wall to ${at(order.to)}`
+    case 'runScript': {
+      const script = scripts.find((s) => s.id === order.scriptId)
+      return `Run ${script?.name ?? 'a script'}`
+    }
+    case 'task':
+      if (order.task === 'work') return `Work ${building(order.workplaceId)}`
+      if (order.task === 'build') {
+        const name = BUILDING_NAMES[order.building as BuildingKind] ?? 'something'
+        return `Build ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`
+      }
+      if (order.task === 'tearDown') return `Tear down ${building(order.buildingId)}`
+      return `Haul to ${at(order)}`
+  }
+  return order.kind
+}
+
+function dropVerb(spot: unknown): string {
+  const kind = (spot as { kind?: string } | undefined)?.kind
+  if (kind === 'storage') return 'Store'
+  if (kind === 'site') return 'Deliver'
+  if (kind === 'carriage') return 'Load'
+  return 'Drop'
+}
+
+/** "5 wood and 2 iron", "wood": units where the order names them. */
+function goodsLine(goods: unknown): string {
+  const entries: [string, unknown][] = Array.isArray(goods)
+    ? goods.map((g) => [g as string, null])
+    : Object.entries((goods ?? {}) as Record<string, unknown>)
+  const parts = entries.map(([good, units]) => {
+    const name = (GOOD_LABELS[good as Good] ?? good).toLowerCase()
+    return typeof units === 'number' ? `${units} ${name}` : name
+  })
+  if (parts.length === 0) return 'goods'
+  return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`
+}
+
+/**
+ * Whether Shift is held, as of the last key or pointer event: read when an order is given, so a
+ * button, a key or a map pick with Shift held appends to the queue.
+ */
+export function useShiftHeld(): { readonly current: boolean } {
+  const held = useRef(false)
+  useEffect(() => {
+    const seen = (e: KeyboardEvent | PointerEvent | MouseEvent) => {
+      held.current = e.shiftKey
+    }
+    const lost = () => {
+      held.current = false
+    }
+    const events = ['keydown', 'keyup', 'pointerdown', 'pointerup', 'click'] as const
+    for (const name of events) window.addEventListener(name, seen, true)
+    window.addEventListener('blur', lost)
+    return () => {
+      for (const name of events) window.removeEventListener(name, seen, true)
+      window.removeEventListener('blur', lost)
+    }
+  }, [])
+  return held
+}

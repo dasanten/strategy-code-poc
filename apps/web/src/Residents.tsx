@@ -51,6 +51,8 @@ import {
   type GoodsSpot,
   type KnownNode,
   type Pile,
+  type Queue,
+  type QueueStepRequest,
   type Resident,
   type ScriptSummary,
   type SkillName,
@@ -61,6 +63,16 @@ import {
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { carryLine, groupCard, type CardSections, type ResidentGroup } from './residents-view.js'
 import { doingLine } from './doing-view.js'
+import {
+  dropStep,
+  moveStep,
+  queueRows,
+  realMinutes,
+  removeStep,
+  stepsOf,
+  timeStep,
+  type QueueRow,
+} from './queue-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { ActionRows, SelectionCard } from './SelectionCard.js'
 import { ACTION_KEYS, residentActions, type ActionId, type CardAction } from './selection-view.js'
@@ -197,6 +209,138 @@ function TaskScript({
         Edit
       </button>
     </div>
+  )
+}
+
+/**
+ * The resident's queue (`CONTEXT.md`: Queue): its steps in order, the current one with its Doing
+ * line. Steps are reordered by dragging or the arrows, removed, given a duration or none, and the
+ * queue looped; each change is an edit-queue order.
+ */
+function QueueBlock({
+  queue: q,
+  doing,
+  scripts,
+  buildings,
+  onEdit,
+}: {
+  queue: Queue
+  doing: string
+  scripts: ScriptSummary[]
+  buildings: Building[]
+  onEdit: (steps: QueueStepRequest[], loop?: boolean) => void
+}) {
+  const [dragged, setDragged] = useState<number>()
+  const rows = queueRows(q, { scripts, buildings })
+  return (
+    <section className="inspector-block" aria-label="Queue">
+      <div className="panel-head">
+        <h3>Queue</h3>
+        <label className="small queue-loop">
+          <input
+            type="checkbox"
+            checked={q.loop}
+            onChange={(e) => onEdit(stepsOf(q), e.target.checked)}
+          />{' '}
+          Loop
+        </label>
+      </div>
+      <ol className="queue-steps">
+        {rows.map((row, i) => (
+          <li
+            key={row.id}
+            className={`queue-step${row.current ? ' current' : ''}`}
+            aria-current={row.current ? 'step' : undefined}
+            draggable
+            onDragStart={() => setDragged(row.id)}
+            onDragEnd={() => setDragged(undefined)}
+            onDragOver={(e) => dragged !== undefined && e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragged !== undefined && dragged !== row.id) onEdit(dropStep(q, dragged, row.id))
+              setDragged(undefined)
+            }}
+          >
+            <div className="queue-step-head">
+              <span className="small">
+                {i + 1}. {row.label}
+              </span>
+              <span className="buttons">
+                <button
+                  type="button"
+                  aria-label="Move up"
+                  disabled={i === 0}
+                  onClick={() => onEdit(moveStep(q, row.id, -1))}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label="Move down"
+                  disabled={i === rows.length - 1}
+                  onClick={() => onEdit(moveStep(q, row.id, 1))}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  aria-label="Remove"
+                  onClick={() => onEdit(removeStep(q, row.id))}
+                >
+                  ✕
+                </button>
+              </span>
+            </div>
+            {row.current && <span className="small muted">{doing}</span>}
+            <StepMinutes row={row} onSet={(minutes) => onEdit(timeStep(q, row.id, minutes))} />
+          </li>
+        ))}
+      </ol>
+      <p className="muted small">
+        Drag a step or use the arrows to reorder. Working and hauling never end on their own, so
+        they need a duration unless they are last.
+      </p>
+    </section>
+  )
+}
+
+/** A step's duration in game minutes, with real time beside; set on Enter or leaving the field. */
+function StepMinutes({
+  row,
+  onSet,
+}: {
+  row: QueueRow
+  onSet: (minutes: number | undefined) => void
+}) {
+  const [text, setText] = useState(row.minutes === undefined ? '' : String(row.minutes))
+  useEffect(() => setText(row.minutes === undefined ? '' : String(row.minutes)), [row.minutes])
+  const typed = Math.floor(Number(text))
+  const commit = () => {
+    const minutes = text.trim() === '' || !(typed > 0) ? undefined : typed
+    if (minutes !== row.minutes) onSet(minutes)
+  }
+  return (
+    <label className="small queue-step-minutes">
+      Duration{' '}
+      <input
+        type="number"
+        min={1}
+        step={1}
+        placeholder="none"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && commit()}
+        style={{ width: '5em' }}
+      />{' '}
+      game min
+      {typed > 0 && <span className="muted"> · {realMinutes(typed)} real</span>}
+      {row.minutes !== undefined && (
+        <button type="button" onClick={() => onSet(undefined)}>
+          Clear
+        </button>
+      )}
+    </label>
   )
 }
 
@@ -428,6 +572,8 @@ export function ResidentCard({
   sections,
   onSections,
   scriptParams,
+  onStore,
+  onEditQueue,
 }: {
   resident: Resident
   leaderId: string
@@ -524,6 +670,10 @@ export function ResidentCard({
   onSections: (sections: CardSections<ActionId>) => void
   /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
   scriptParams?: ReactNode
+  /** Orders the resident to store what they carry at the nearest storage (`STORE_ALL`). */
+  onStore?: () => void
+  /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
+  onEditQueue?: (steps: QueueStepRequest[], loop?: boolean) => void
 }) {
   const setPanel = (panel: ActionId | undefined) => onSections({ ...sections, panel })
   const age = Math.floor(ageInYears(r, tick))
@@ -595,13 +745,22 @@ export function ResidentCard({
         <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
       )}
       {r.script && scriptParams}
+      {r.queue && onEditQueue && (
+        <QueueBlock
+          queue={r.queue}
+          doing={doingLine(r, { scripts, buildings })}
+          scripts={scripts}
+          buildings={buildings}
+          onEdit={onEditQueue}
+        />
+      )}
       <ActionRows actions={actions} open={shown} onAction={act} />
       <p className="muted small" role="status">
         {orderError
           ? `Order turned down: ${orderError}`
           : picking
             ? `${PICKING_HINTS[picking]} Tap a tile on the map, or press ${PICKING_KEYS[picking]} again to cancel.`
-            : 'Right-click the map to walk there.'}
+            : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
       </p>
 
       {shown && (
@@ -654,6 +813,16 @@ export function ResidentCard({
                     Nothing. Residents eat only what they carry; at home they take meals from
                     storage.
                   </p>
+                )}
+                {onStore && carried.length > 0 && (
+                  <div className="order-buttons">
+                    <button type="button" disabled={child} onClick={onStore}>
+                      Store all
+                    </button>
+                    <span className="muted small">
+                      at the nearest storage, keeping their own Food
+                    </span>
+                  </div>
                 )}
                 {carried.map(([good, units]) => (
                   <GoodsRow
@@ -1136,8 +1305,9 @@ function WorkBlock({
   const batches = BATCHES_PER_DAY[building.kind] ?? 0
   const o = resident.order
   // Working by the task's script; one working by a bare order (as the starting residents do) can
-  // still be given the task.
-  const working = o?.kind === 'workAt' && o.buildingId === building.id && !!resident.script
+  // still be given the task, and so can one working as a queue step, to queue it again.
+  const working =
+    o?.kind === 'workAt' && o.buildingId === building.id && !!resident.script && !resident.queue
   const blocked = !canWork(resident, tick) || (!working && workers >= max)
   return (
     <section className="inspector-block" aria-label="Work">
