@@ -9,6 +9,7 @@ import {
   OWN_FOOD,
   Terrain,
   buildingRealm,
+  outpostStorageGuarded,
   teardownWork,
   type Building,
   type TerrainMap,
@@ -16,12 +17,14 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { updateCityMembership } from './cities.js'
+import { resolveCarrying } from './carrying.js'
 import { buildingOrganization } from './crimes.js'
 import { checkInvariants, outpostStorageRealms } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { ScriptRunner, type ScriptHost } from './script-runner.js'
 import { addCity } from './test-terrain.js'
+import { resolveTearingDown } from './teardown.js'
 import { Walking } from './walking.js'
 import { dropGoods } from './survival.js'
 import { createWorld, stepWorld } from './world.js'
@@ -243,5 +246,94 @@ describe('an outpost storage', () => {
       [home.id],
       [gone.id],
     ])
+  })
+})
+
+describe('an outpost storage’s stock', () => {
+  /** r2's b1 on r1's outpost storage at (60, 60) holding 9 Food, asking for 3. */
+  function atOutpost() {
+    const { world } = setup()
+    const out = outpost(world, 60, 60)
+    out.stock = { food: 9 }
+    const b1 = world.residents.find((r) => r.id === 'b1')!
+    b1.x = 60
+    b1.y = 60
+    const take = {
+      kind: 'take' as const,
+      residentId: b1.id,
+      spot: { kind: 'storage' as const, storageId: out.id },
+      goods: { food: 3 },
+    }
+    return { world, out, b1, take }
+  }
+
+  it('can’t be taken by another realm while an armed resident of its realm guards it', () => {
+    const { world, out, b1, take } = atOutpost()
+    resident(world, 'g1', 'r1', 61, 60).carried.spear = 1
+    resolveCarrying(world, [take], SIZE)
+    expect(out.stock).toEqual({ food: 9 })
+    expect(b1.carried.food).toBe(OWN_FOOD)
+    expect(world.crimes).toEqual([])
+  })
+
+  it('is guarded only by armed residents, and not while someone else’s armed one is there', () => {
+    const { world, out, b1, take } = atOutpost()
+    const g1 = resident(world, 'g1', 'r1', 61, 60)
+    expect(outpostStorageGuarded(world, out, SIZE)).toBe(false)
+    g1.carried.spear = 1
+    expect(outpostStorageGuarded(world, out, SIZE)).toBe(true)
+    b1.carried.sword = 1
+    expect(outpostStorageGuarded(world, out, SIZE)).toBe(false)
+    resolveCarrying(world, [take], SIZE)
+    expect(out.stock).toEqual({ food: 6 })
+  })
+
+  it('can be taken from unguarded, and a witness makes it a known theft', () => {
+    const { world, out, b1, take } = atOutpost()
+    // An unarmed resident of r1 nearby sees it but doesn't guard it.
+    const w2 = resident(world, 'w2', 'r1', 62, 60)
+    resolveCarrying(world, [take], SIZE)
+    expect(out.stock).toEqual({ food: 6 })
+    expect(b1.carried.food).toBe(OWN_FOOD + 3)
+    expect(world.crimes).toHaveLength(1)
+    expect(world.crimes[0]).toMatchObject({
+      kind: 'theft',
+      victimOrg: 'r1',
+      goods: { food: 3 },
+      witnesses: [w2.id],
+    })
+    // The witness brings the news home: the theft is known to r1.
+    w2.x = 40
+    w2.y = 40
+    stepWorld(world, terrain)
+    expect(world.crimes[0]!.knownBy).toContain('r1')
+  })
+
+  it('stays its own realm’s to take from while guarded', () => {
+    const { world, out } = atOutpost()
+    resident(world, 'g1', 'r1', 61, 60).carried.spear = 1
+    const w2 = resident(world, 'w2', 'r1', 60, 60)
+    const take = {
+      kind: 'take' as const,
+      residentId: w2.id,
+      spot: { kind: 'storage' as const, storageId: out.id },
+      goods: { food: 2 },
+    }
+    resolveCarrying(world, [take], SIZE)
+    expect(out.stock).toEqual({ food: 7 })
+    expect(world.crimes).toEqual([])
+  })
+
+  it('torn down by another realm is a crime against its realm', () => {
+    const { world, out, b1 } = atOutpost()
+    out.teardown = teardownWork(out)
+    b1.order = { kind: 'tearDown', buildingId: out.id, at: { x: 60, y: 60 } }
+    resolveTearingDown(world, [{ residentId: b1.id }], terrain)
+    expect(world.buildings).not.toContain(out)
+    expect(world.crimes[0]).toMatchObject({
+      kind: 'tearDown',
+      building: 'storage',
+      victimOrg: 'r1',
+    })
   })
 })
