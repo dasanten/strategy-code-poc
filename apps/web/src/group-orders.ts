@@ -12,6 +12,7 @@ import {
   type Resident,
   type Stock,
 } from '@csp/shared'
+import { appendRequests } from './queue-view.js'
 
 /**
  * One command for a group (`CONTEXT.md`: Group): the orders the group card offers, each sent to
@@ -43,7 +44,7 @@ export interface GroupSend {
 const SPREAD_RADIUS = 8
 
 type GroupResident = Pick<Resident, 'id' | 'name' | 'x' | 'y' | 'bornAt' | 'carried'> &
-  Partial<Pick<Resident, 'carrying'>>
+  Partial<Pick<Resident, 'carrying' | 'order' | 'script' | 'queue'>>
 
 /** The goods carried, at least one unit of each. */
 const carriedGoods = (stock: Stock): Good[] => GOODS.filter((g) => (stock[g] ?? 0) > 0)
@@ -52,12 +53,20 @@ const carriedGoods = (stock: Stock): Good[] => GOODS.filter((g) => (stock[g] ?? 
  * Why a resident of the group can't take the order, if they can't (`CONTEXT.md`: Child,
  * Carrying): children don't work, build, store or fetch; a partner carrying a child doesn't work
  * or build; Work is tile-bound, so only those standing at the workplace take it. Walking, running
- * a script and stopping go to everyone.
+ * a script and stopping go to everyone. Queued (Shift held), Work also goes to those away from
+ * the workplace, who walk there first, and Store to those carrying nothing yet.
  */
-export function groupSkip(order: GroupOrder, r: GroupResident, tick: number, size: number) {
+export function groupSkip(
+  order: GroupOrder,
+  r: GroupResident,
+  tick: number,
+  size: number,
+  queued = false,
+) {
   const tasks = ['work', 'build', 'store', 'fetch']
   if (tasks.includes(order.kind) && !canWork(r as Resident, tick)) return 'a child'
   if ((order.kind === 'work' || order.kind === 'build') && r.carrying) return CARRYING_A_CHILD
+  if (queued) return undefined
   if (order.kind === 'work' && !isAt(r, order.workplace, size))
     return `too far: not at the ${order.name}`
   if (order.kind === 'store' && carriedGoods(r.carried).length === 0) return 'carries nothing'
@@ -102,16 +111,31 @@ function distance(r: { x: number; y: number }, t: { x: number; y: number }, size
  * who can take it (`groupSkip`). A walk-to spreads the group over distinct free tiles around the
  * target: the resident nearest it gets the nearest tile, and so on; with too few free tiles the
  * rest are skipped. Work and Build make each join the workplace or site.
+ *
+ * Queued (Shift held), each request is appended to the resident's queue instead (`CONTEXT.md`:
+ * Queue), as their own card appends it: Work after a walk to the workplace, Store of whatever
+ * they carry by then. Stop, which can't be a step, is given as it is.
  */
 export function groupRequests(
   order: GroupOrder,
   residents: readonly GroupResident[],
-  { tick, size, free }: { tick: number; size: number; free: (x: number, y: number) => boolean },
+  {
+    tick,
+    size,
+    free,
+    queued = false,
+  }: {
+    tick: number
+    size: number
+    free: (x: number, y: number) => boolean
+    /** Shift held: append to each one's queue. */
+    queued?: boolean
+  },
 ): GroupSend {
   const skipped: Skipped[] = []
   const going: GroupResident[] = []
   for (const r of residents) {
-    const why = groupSkip(order, r, tick, size)
+    const why = groupSkip(order, r, tick, size, queued)
     if (why) skipped.push({ id: r.id, name: r.name, why })
     else going.push(r)
   }
@@ -128,7 +152,7 @@ export function groupRequests(
       if (tile) send(r, { kind: 'walkTo', ...tile })
       else skipped.push({ id: r.id, name: r.name, why: 'no free tile near there' })
     })
-    return { requests, skipped }
+    return { requests: queued ? appended(requests, residents) : requests, skipped }
   }
   for (const r of going) {
     switch (order.kind) {
@@ -141,7 +165,7 @@ export function groupRequests(
         break
       case 'store':
         // Everything they carry to the nearest storage; their own food stays in their hands.
-        send(r, { kind: 'store', goods: carriedGoods(r.carried) })
+        send(r, { kind: 'store', goods: queued ? [...GOODS] : carriedGoods(r.carried) })
         break
       case 'fetch':
         send(r, { kind: 'fetch', goods: [order.good] })
@@ -154,7 +178,27 @@ export function groupRequests(
         break
     }
   }
-  return { requests, skipped }
+  if (!queued) return { requests, skipped }
+  const at = order.kind === 'work' ? order.workplace : undefined
+  return { requests: appended(requests, residents, at), skipped }
+}
+
+/** The requests appended to each one's queue (`appendRequests`), acting at `at` if given. */
+function appended(
+  requests: GroupSend['requests'],
+  residents: readonly GroupResident[],
+  at?: { x: number; y: number },
+): GroupSend['requests'] {
+  const going = requests.map((q) => ({
+    ...residents.find((r) => r.id === q.residentId)!,
+    request: q.order,
+  }))
+  const orders = appendRequests(
+    going,
+    (r) => r.request,
+    () => at && { x: at.x, y: at.y },
+  )
+  return requests.map((q, i) => ({ residentId: q.residentId, order: orders[i]! }))
 }
 
 /** The line the group card shows once an order went out: how many it went to. */

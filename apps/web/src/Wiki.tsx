@@ -439,6 +439,12 @@ export function Wiki() {
           Those who can't take an order are skipped, and the card says who and why: children don't
           work, build, store or fetch; a partner carrying a child doesn't work or build.
         </p>
+        <p>
+          Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
+          instead (see Queues). Work then also goes to those away from the workplace, who walk there
+          first, and Store to those who carry nothing yet. Stop still stops them all and ends their
+          queues.
+        </p>
       </Section>
 
       <Section id="queues">
