@@ -1306,6 +1306,19 @@ export type RealmEventWhat =
   | { kind: 'grownUp'; residentId: string; name: string }
   /** One of the realm's horses starved to death (`CONTEXT.md`: Horse). */
   | { kind: 'horseDied'; horseId: string }
+  /**
+   * The one-time Horse grant (`CONTEXT.md`: Horse grant) gave the realm `horseIds`: in its stable
+   * at (`x`, `y`), or, with no stable, on the ground next to the storage of `city` or next to the
+   * Leader, with Food by them.
+   */
+  | {
+      kind: 'horsesGranted'
+      horseIds: string[]
+      where: 'stable' | 'storage' | 'leader'
+      city?: string
+      x: number
+      y: number
+    }
   /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
   | { kind: 'foaled'; horseId: string; stableId: string }
   /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */

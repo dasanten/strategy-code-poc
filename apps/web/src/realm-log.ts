@@ -295,6 +295,18 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return { text: 'A horse starved to death.', tone: 'bad' }
     case 'foaled':
       return { text: 'A foal was born in a stable.', tone: 'info' }
+    case 'horsesGranted': {
+      const where = {
+        stable: `in your stable at ${e.city}`,
+        storage: `by the storage of ${e.city}, with Food on the ground by them`,
+        leader: 'next to your Leader, with Food on the ground by them',
+      }[e.where]
+      return {
+        text: `Your realm had no horses left and was given ${e.horseIds.length} new ones: they stand ${where}.`,
+        tone: 'info',
+        places: [{ name: e.city ?? 'your horses', x: e.x, y: e.y }],
+      }
+    }
     case 'allianceInvited':
       return { text: `You were invited to join the alliance ${e.name}.`, tone: 'info' }
     case 'allianceJoined': {
