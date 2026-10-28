@@ -17,8 +17,13 @@ import {
 export const STABLE_BREED_TICKS = STABLE_BREED_DAYS * TICKS_PER_GAME_DAY
 
 /** The finished stable whose footprint covers a tile, if there is one. */
-export function stableAt(world: WorldState, x: number, y: number): Building | undefined {
-  return world.buildings.find((b) => b.kind === 'stable' && !b.site && covers(b, x, y))
+export function stableAt(
+  world: WorldState,
+  x: number,
+  y: number,
+  size?: number,
+): Building | undefined {
+  return world.buildings.find((b) => b.kind === 'stable' && !b.site && covers(b, x, y, size))
 }
 
 /** The horses standing on a tile. */

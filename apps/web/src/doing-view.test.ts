@@ -16,6 +16,7 @@ const scripts = [
   summary(2, 'build'),
   summary(3, 'haul'),
   summary(4, 'tearDown'),
+  summary(6, 'feedStable'),
   summary(5, null),
 ]
 const buildings: Pick<Building, 'id' | 'kind'>[] = [
@@ -88,6 +89,18 @@ describe('doingLine', () => {
     )
     expect(line({ order: haul, script: { scriptId: 3 } })).toBe('Hauling wood to 4, 5')
     expect(line({ order: null, script: { scriptId: 3 } })).toBe('Hauling: waiting')
+    // Feed the stable has no order of its own: it waits, walks, fetches and stores.
+    const feeder = { scriptId: 6 }
+    expect(line({ order: null, script: feeder })).toBe('Feeding the stable: waiting')
+    expect(line({ order: { ...fetch, goods: { food: 12 } }, script: feeder })).toBe(
+      'Feeding the stable: fetching 12 food from the storage',
+    )
+    expect(
+      line({
+        order: { ...store, goods: { food: 12 }, to: { kind: 'storage', storageId: 'st1' } },
+        script: feeder,
+      }),
+    ).toBe('Feeding the stable: carrying 12 food to the stable')
   })
 
   it('takes the task from the server when the script is none of the Player’s', () => {

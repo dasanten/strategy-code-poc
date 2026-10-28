@@ -367,6 +367,7 @@ export function ResidentCard({
   holders,
   realmId,
   onWork,
+  onFeedStable,
   onTearDown,
   residents,
   onPair,
@@ -451,6 +452,8 @@ export function ResidentCard({
   realmId: string
   /** Orders the resident to work the workplace on their tile, making `makes` at a smithy. */
   onWork: (makes?: Good) => void
+  /** Gives the resident the Feed the stable task for the stable they stand in. */
+  onFeedStable: (stableId: string) => void
   /** Orders the resident to tear down the building or site on their tile. */
   onTearDown: (buildingId: string) => void
   /** The Player's residents in sight, to pick a partner from. */
@@ -531,6 +534,7 @@ export function ResidentCard({
     if (a.id === 'roadTo') onRoadTo()
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
+    if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
   return (
     <SelectionCard

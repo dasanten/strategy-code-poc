@@ -214,6 +214,13 @@ export const HORSE_REACH = 1
  */
 export const HORSE_HUNGRY_SHARE = 0.25
 
+/**
+ * Game days of Food for the horses standing in it that the Feed the stable task keeps in a stable
+ * (`CONTEXT.md`: Feeding the stable): `HORSE_FOOD_PER_DAY` for each, this many days. Below it the
+ * resident fetches more. Written into the default's source, where a Player can change it.
+ */
+export const STABLE_FEED_DAYS = 10
+
 /** Most horses a stable has room for; it breeds no foal once that many stand in it. */
 export const STABLE_CAPACITY = 6
 

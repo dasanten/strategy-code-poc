@@ -575,6 +575,12 @@ The shared language of the game. Domain terms only — no implementation details
   residents fill and empty like any storage. Two fed horses of one realm at a stable breed a foal
   every so often, while the stable has room for another horse. No residents need to work there.
   Like a workplace, a stable has no owner: any horse standing in it eats from it.
+- **Feeding the stable:** a task (default script "Feed the stable") given to a grown-up resident
+  standing in a stable, from their card. They keep Food in the stable for about 10 game days for
+  the horses standing in it: below that they fetch what is missing from a storage and store it in
+  the stable; otherwise they wait there. Its params: `stable`, the stable to feed (by default the
+  one they were given it in), and `source`, where the Food comes from (by default the nearest
+  storage of their realm with Food). With no Food to fetch they wait.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
   mountains.

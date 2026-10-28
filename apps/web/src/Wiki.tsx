@@ -90,6 +90,7 @@ import {
   SIGHT_RANGE,
   STABLE_BREED_DAYS,
   STABLE_CAPACITY,
+  STABLE_FEED_DAYS,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
   STANDING_PER_PAID_WEEK,
@@ -678,6 +679,14 @@ export function Wiki() {
           or food on the ground next to them. Two fed horses at a stable breed a foal every{' '}
           {days(STABLE_BREED_DAYS)}, up to {num(STABLE_CAPACITY)} horses a stable. A haul route
           keeps {num(HAUL_KEEP_FOOD)} Food on board for its horse.
+        </p>
+        <p>
+          A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
+          {days(STABLE_FEED_DAYS)} for the horses in it ({num(HORSE_FOOD_PER_DAY)} a horse a day):
+          below that they fetch what is missing from the nearest storage of your realm with Food,
+          or from the one picked as <code>source</code> on their card, and store it in the stable;
+          otherwise they wait there. Picking another <code>stable</code> on the card has them feed
+          that one instead.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
