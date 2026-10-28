@@ -365,6 +365,7 @@ export function ResidentCard({
   onDrop,
   building,
   road,
+  carriageSite,
   node,
   onBuild,
   buildProblem,
@@ -449,6 +450,8 @@ export function ResidentCard({
   building: Building | undefined
   /** The road or road site on the resident's tile, if one is in sight; it may share the tile. */
   road: Building | undefined
+  /** The carriage site on the resident's tile, if one is in sight; it may share a stable's tile. */
+  carriageSite: Building | undefined
   /** The resource node on the resident's tile, if the Player knows of one. */
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
@@ -521,6 +524,8 @@ export function ResidentCard({
   const roadSite = road?.site ? road : undefined
   const atRoadSite: GoodsSpot = { kind: 'site', siteId: roadSite?.id ?? '' }
   const roadNeeded = roadSite ? materialsNeeded(roadSite) : {}
+  const atCarriageSite: GoodsSpot = { kind: 'site', siteId: carriageSite?.id ?? '' }
+  const carriageNeeded = carriageSite ? materialsNeeded(carriageSite) : {}
   const actions = residentActions({
     adult: !child,
     busy: !!(r.order || r.script),
@@ -530,6 +535,7 @@ export function ResidentCard({
     storage,
     building,
     road,
+    carriageSite,
     node,
     othersInSight: others.length,
     wallsInSight: walls.length,
@@ -613,12 +619,26 @@ export function ResidentCard({
                 buildProblem={buildProblem}
                 onBuild={onBuild}
               />
+              <CarriageBlock
+                resident={r}
+                tick={tick}
+                building={building}
+                carriageSite={carriageSite}
+                buildProblem={buildProblem}
+                onBuild={onBuild}
+              />
               <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
             </>
           )}
           {shown === 'tearDown' && (
             <>
               <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
+              <TearDownBlock
+                resident={r}
+                tick={tick}
+                building={carriageSite}
+                onTearDown={onTearDown}
+              />
               <TearDownBlock resident={r} tick={tick} building={road} onTearDown={onTearDown} />
             </>
           )}
@@ -659,6 +679,9 @@ export function ResidentCard({
                       { label: 'Drop', spot: ground },
                       ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
                       ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
+                      ...((carriageNeeded[good] ?? 0) > 0
+                        ? [{ label: 'Deliver to carriage site', spot: atCarriageSite }]
+                        : []),
                       ...((roadNeeded[good] ?? 0) > 0
                         ? [{ label: 'Deliver to road', spot: atRoadSite }]
                         : []),
@@ -668,7 +691,7 @@ export function ResidentCard({
                   />
                 ))}
               </section>
-              {(pile || storage || site || roadSite || carriage) && (
+              {(pile || storage || site || carriageSite || roadSite || carriage) && (
                 <section className="inspector-block" aria-label="On this tile">
                   <div className="panel-head">
                     <h3>Here</h3>
@@ -695,6 +718,15 @@ export function ResidentCard({
                       title="Delivered to the site"
                       stock={site.site!.delivered}
                       spot={atSite}
+                      onPickUp={onPickUp}
+                      disabled={child}
+                    />
+                  )}
+                  {carriageSite && (
+                    <TileGoods
+                      title="Delivered to the carriage site"
+                      stock={carriageSite.site!.delivered}
+                      spot={atCarriageSite}
                       onPickUp={onPickUp}
                       disabled={child}
                     />
@@ -1047,6 +1079,65 @@ function BuildBlock({
     )
   }
   return null
+}
+
+/**
+ * A carriage at the stable the resident stands at (`CONTEXT.md`: Carriage): on a tile with no
+ * carriage site, lay one out there; on a carriage site, see what it still needs and help build it.
+ */
+function CarriageBlock({
+  resident,
+  tick,
+  building,
+  carriageSite,
+  buildProblem = () => undefined,
+  onBuild,
+}: {
+  resident: Resident
+  tick: number
+  building: Building | undefined
+  carriageSite: Building | undefined
+  buildProblem?: (kind: BuildingKind) => string | undefined
+  onBuild: (kind: BuildingKind) => void
+}) {
+  if (carriageSite?.site) {
+    return (
+      <BuildBlock
+        resident={resident}
+        tick={tick}
+        building={carriageSite}
+        node={undefined}
+        onBuild={onBuild}
+      />
+    )
+  }
+  if (building?.kind !== 'stable' || building.site) return null
+  const materials = goodsIn(BUILD_MATERIALS.carriage)
+  const problem = buildProblem('carriage')
+  return (
+    <section className="inspector-block" aria-label="Carriage">
+      <div className="panel-head">
+        <h3>Carriage</h3>
+        <span className="small muted">at the stable</span>
+      </div>
+      <p className="muted small">
+        {BUILDING_PURPOSE.carriage} Needs{' '}
+        {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
+        {workSpan(BUILD_WORK.carriage ?? 0)} of one resident’s work.
+      </p>
+      <div className="order-buttons">
+        <button
+          type="button"
+          className="primary"
+          disabled={!canWork(resident, tick) || problem !== undefined}
+          onClick={() => onBuild('carriage')}
+        >
+          Build carriage
+        </button>
+      </div>
+      {problem && <p className="muted small">Not here: {problem}.</p>}
+    </section>
+  )
 }
 
 /**

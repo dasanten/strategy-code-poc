@@ -12,6 +12,7 @@ import {
   nameProblem,
   isAllianceCity,
   BUILDABLE,
+  SHARES_A_TILE,
   BUILD_MATERIALS,
   BUILD_WORK,
   CARRIAGE_CAPACITY,
@@ -201,7 +202,9 @@ export const realmsHaveLeaders: Invariant = {
 /**
  * Buildings and construction sites (`CONTEXT.md`: Footprint, Where buildings go): no two
  * footprints overlap, and next to a building at most one road or road site per tile, on passable
- * land off Mountain and of no city (`CONTEXT.md`: Road); every footprint on passable land; farms
+ * land off Mountain and of no city (`CONTEXT.md`: Road), and at most one carriage site, always
+ * still a site, of no city, off nodes and other buildings but stables, where a carriage can stand
+ * (`CONTEXT.md`: Carriage); every footprint on passable land; farms
  * and stables wholly on Plains, mines, quarries and lumber camps with one tile on a resource node
  * of their kind and of no city; smelters, mints, town halls, walls and gates off nodes and off
  * Mountain, smelters and mints of no city; no node under any other building; a stable, farm,
@@ -223,7 +226,7 @@ export const buildingsInPlace: Invariant = {
       const nodes = footprint.flatMap(([x, y]) => nodesAt.get(`${x},${y}`) ?? [])
       for (const [x, y] of footprint) {
         const key = `${x},${y}`
-        const layer = b.kind === 'road' ? `road ${key}` : key
+        const layer = SHARES_A_TILE.includes(b.kind) ? `${b.kind} ${key}` : key
         const other = tiles.get(layer)
         if (other) fail(b.id, `overlaps ${other} on tile (${key})`)
         tiles.set(layer, b.id)
@@ -233,6 +236,15 @@ export const buildingsInPlace: Invariant = {
         if (terrains[0] === Terrain.Mountain) fail(b.id, 'is a road on Mountain')
         if (b.cityId !== null) fail(b.id, `is a road of city ${b.cityId}`)
         if (b.stock) fail(b.id, 'is a road with a stock')
+      } else if (b.kind === 'carriage') {
+        if (!b.site) fail(b.id, 'is a finished carriage site')
+        if (!carriageCanEnter(terrains[0]!))
+          fail(b.id, 'is a carriage site where no carriage can go')
+        if (nodes.length > 0) fail(b.id, 'is a carriage site on a resource node')
+        if (b.cityId !== null) fail(b.id, `is a carriage site of city ${b.cityId}`)
+        if (b.stock) fail(b.id, 'is a carriage site with a stock')
+        const under = buildingAt(world, b.x, b.y, size)
+        if (under && under.kind !== 'stable') fail(b.id, `is a carriage site on a ${under.kind}`)
       } else if (OFF_NODES.includes(b.kind)) {
         if (nodes.length > 0) fail(b.id, `is a ${b.kind} on a resource node`)
         if (terrains.includes(Terrain.Mountain)) fail(b.id, `is a ${b.kind} on Mountain`)

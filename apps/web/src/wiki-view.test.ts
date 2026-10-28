@@ -21,6 +21,7 @@ import {
 import {
   AVERAGE,
   buildCosts,
+  carriageCost,
   coinsPerMintWorkerDay,
   duration,
   goldMinersPerMintWorker,
@@ -76,6 +77,14 @@ describe('wiki figures', () => {
       expect(b.teardownTicks).toBeLessThan(b.buildTicks)
       expect(b.returned).toEqual(teardownReturns({ kind: b.kind } as Building))
     }
+  })
+
+  it('lists a carriage apart from the buildings, timed like them', () => {
+    expect(buildCosts().map((b) => b.kind)).not.toContain('carriage')
+    expect(carriageCost()).toEqual({
+      materials: BUILD_MATERIALS.carriage,
+      buildTicks: BUILD_WORK.carriage! / buildWork(AVERAGE, 0),
+    })
   })
 
   it('moves more goods by carriage on plains than on foot, and none into mountains', () => {

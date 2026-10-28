@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   BUILDABLE,
+  SHARES_A_TILE,
   GOODS,
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
@@ -155,6 +156,8 @@ export interface ResidentHere {
   /** The building or construction site on their tile, not a road. */
   building?: Building
   road?: Building
+  /** The carriage site on their tile (`CONTEXT.md`: Carriage). */
+  carriageSite?: Building
   node?: KnownNode
   /** Residents of other realms, or of none, in sight. */
   othersInSight: number
@@ -217,7 +220,9 @@ export function residentActions(h: ResidentHere): CardAction[] {
       }),
     )
   }
-  const site = h.building?.site ? h.building : h.road?.site ? h.road : undefined
+  const site = h.building?.site
+    ? h.building
+    : (h.carriageSite ?? (h.road?.site ? h.road : undefined))
   add(
     row('build', site ? `Help build the ${BUILDING_NAMES[site.kind].toLowerCase()}…` : 'Build…', {
       opens: true,
@@ -225,7 +230,7 @@ export function residentActions(h: ResidentHere): CardAction[] {
   )
   add(row('roadTo', '', { ...picks('road', 'Build road to'), ...child }))
   add(row('wallTo', '', { ...picks('wall', 'Build wall to'), ...child }))
-  const torn = [h.building, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
+  const torn = [h.building, h.carriageSite, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
   if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
   if (h.building?.kind === 'stable' && !h.building.site)
     add(row('breed', 'Breed horses…', { opens: true, ...child }))
@@ -577,12 +582,13 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const here = <T extends { x: number; y: number }>(xs: T[]) =>
     xs.filter((v) => v.x === t.x && v.y === t.y)
   // A building shows on every tile of its footprint, with its one pile (`CONTEXT.md`: At a building).
-  const live = t.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+  const live = t.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && covers(b, t.x, t.y))
   const remembered = live
     ? undefined
-    : t.lastSeen?.buildings.find((b) => b.kind !== 'road' && covers(b, t.x, t.y))
+    : t.lastSeen?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && covers(b, t.x, t.y))
   const building = live ?? remembered
   const road = here(t.buildings).find((b) => b.kind === 'road')
+  const carriageSite = here(t.buildings).find((b) => b.kind === 'carriage')
   const carriage = here(t.carriages)[0]
   const pileTile = live ?? t
   const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
@@ -656,6 +662,17 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         lines: lines.splice(0),
       }
     }
+  }
+  if (carriageSite?.site) {
+    // A carriage site has no owner (`CONTEXT.md`: Construction site), even on a stable.
+    card ??= { title: 'Carriage site', what: 'building' }
+    const work = BUILD_WORK.carriage ?? 0
+    const done = work > 0 ? Math.floor((carriageSite.site.work / work) * 100) : 100
+    lines.push(
+      `Carriage site · ${done}% of the work done · delivered ${goodsText(carriageSite.site.delivered, goodLabels)}`,
+    )
+    lines.push(stillNeeded(carriageSite, goodLabels))
+    if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
   }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)

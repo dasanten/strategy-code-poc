@@ -1426,11 +1426,17 @@ export type BuildingKind =
   | 'mint'
   | 'smithy'
   | 'road'
+  /**
+   * A carriage site (`CONTEXT.md`: Carriage): only ever a construction site, laid out at a
+   * stable; finished, it becomes a `Carriage` and is gone from the buildings.
+   */
+  | 'carriage'
 
 /**
  * A building takes one tile (`CONTEXT.md`: Tile). While it has a `site` it is a construction
  * site, not yet the building. A road is built like a building but may share its tile with one
- * (`CONTEXT.md`: Road): a tile holds at most one road and one other building.
+ * (`CONTEXT.md`: Road), and so may a carriage site (`CONTEXT.md`: Carriage): a tile holds at most
+ * one road, one carriage site and one other building.
  */
 export interface Building {
   id: string

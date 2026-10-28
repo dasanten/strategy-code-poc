@@ -279,9 +279,13 @@ export interface BuildCost {
   returned: Stock
 }
 
+/**
+ * The building cost sheet: every kind that can be built but a carriage, which is no building once
+ * finished (`carriageCost`).
+ */
 export function buildCosts(): BuildCost[] {
   const pace = buildWork(AVERAGE, AT)
-  return BUILDABLE.map((kind) => {
+  return BUILDABLE.filter((kind) => kind !== 'carriage').map((kind) => {
     const materials = BUILD_MATERIALS[kind] ?? {}
     const work = BUILD_WORK[kind] ?? 0
     const returned: Stock = {}
@@ -298,6 +302,17 @@ export function buildCosts(): BuildCost[] {
       returned,
     }
   })
+}
+
+/**
+ * What a carriage takes to build at a stable (`CONTEXT.md`: Carriage): its materials and the
+ * ticks one average builder takes, alone.
+ */
+export function carriageCost(): { materials: Stock; buildTicks: number } {
+  return {
+    materials: BUILD_MATERIALS.carriage ?? {},
+    buildTicks: (BUILD_WORK.carriage ?? 0) / buildWork(AVERAGE, AT),
+  }
 }
 
 // ---------- Transport ----------

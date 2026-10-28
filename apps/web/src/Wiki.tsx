@@ -166,6 +166,7 @@ import {
   blow,
   breakTicks,
   buildCosts,
+  carriageCost,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -637,6 +638,14 @@ export function Wiki() {
           {num(CARRIAGE_CAPACITY)} kg; each point of its driver's Driving skill makes it{' '}
           {pct(DRIVING_SKILL_EFFECT)} faster, at most {pct(DRIVING_SKILL_LIMIT)}, learned at{' '}
           {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages can't enter mountains.
+        </p>
+        <p>
+          A carriage is built at a finished stable: a resident there lays out a carriage site on a
+          tile of the stable, or right next to it, that has no carriage site yet. It takes{' '}
+          {goods(carriageCost().materials)} and {duration(carriageCost().buildTicks)} of one
+          builder's work, fetched and built like any construction site, and whoever finishes it gets
+          an empty carriage of their realm, with no horse hitched until it is first driven. Torn
+          down before it is finished, it leaves all the materials delivered to it.
         </p>
         <table>
           <thead>
