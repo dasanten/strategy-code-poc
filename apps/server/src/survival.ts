@@ -210,6 +210,8 @@ export function endRealm(world: WorldState, realm: Realm, size: number): void {
     k.realmId = null
     k.cityId = nearestCity(world, cities, k, size)?.id ?? null
   }
+  // An outpost storage has no city to go with, so it belongs to nobody.
+  for (const b of world.buildings) if (b.realmId === realm.id) delete b.realmId
   // What became of each city goes in the Player's log while the realm is still there to name them.
   recordEvent(world, realm.id, {
     kind: 'selfManaged',

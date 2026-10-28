@@ -328,6 +328,21 @@ describe('the card for a tile', () => {
     expect(card.lines).toContain(`1 / ${MAX_WORKERS.farm} workers`)
   })
 
+  it('names an outpost storage’s realm (`CONTEXT.md`: Outpost storage)', () => {
+    const mine = building({ kind: 'storage', realmId: 'me', stock: { food: 3 } })
+    expect(tile({ buildings: [mine] })).toMatchObject({ title: 'Outpost storage', rel: 'own' })
+    expect(tile({ buildings: [mine] }).lines).toEqual(
+      expect.arrayContaining(['Yours', 'Holds 3 food']),
+    )
+    // As sight sends another realm's: without what it holds.
+    const theirs = building({ kind: 'storage', realmId: 'r-other' })
+    const card = tile({ buildings: [theirs] })
+    expect(card).toMatchObject({ title: 'Outpost storage', rel: 'otherRealm' })
+    expect(card.lines).toContain('Another realm')
+    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
+    expect(tile({ buildings: [building({ kind: 'storage' })] }).lines).toContain('Nobody’s')
+  })
+
   it('says how far a construction site has come', () => {
     const site = building({ kind: 'house', site: { work: 0, delivered: { wood: 2 } } })
     const card = tile({ buildings: [site] })
@@ -743,11 +758,13 @@ describe('what the build menu offers off a node, and why a kind can’t go here'
     expect(buildMenu({ kind: 'forest' })).toEqual(['lumberCamp'])
   })
 
-  it('says a storage goes in a city’s area, and lets it go there', () => {
-    expect(buildHereProblem('storage', 23, 20, seen, noNodes, plains)).toBeUndefined()
-    expect(buildHereProblem('storage', 50, 50, seen, noNodes, plains)).toBe(
-      'a storage goes in a city’s area',
+  it('says a house goes in a city’s area, and lets a storage go outside one', () => {
+    expect(buildHereProblem('house', 23, 20, seen, noNodes, plains)).toBeUndefined()
+    expect(buildHereProblem('house', 50, 50, seen, noNodes, plains)).toBe(
+      'a house goes in a city’s area',
     )
+    // An outpost storage (`CONTEXT.md`: Outpost storage).
+    expect(buildHereProblem('storage', 50, 50, seen, noNodes, plains)).toBeUndefined()
     // Walls and gates go anywhere off Mountain and nodes.
     expect(buildHereProblem('wall', 50, 50, seen, noNodes, plains)).toBeUndefined()
     expect(buildHereProblem('gate', 50, 50, seen, noNodes, plains)).toBeUndefined()

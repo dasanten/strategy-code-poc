@@ -58,6 +58,7 @@ import {
   controlAt,
   controlSources,
   isCityBuilding,
+  isOutpostStorage,
   STAT_NAMES,
   terrainAt,
   carryCapacity,
@@ -300,6 +301,26 @@ export const citiesFromBuildings: Invariant = {
       if (b.cityId !== city) fail(b.id, `belongs to city ${b.cityId}, but stands in ${city}`)
     }
     return out
+  },
+}
+
+/**
+ * Only an outpost storage has a realm of its own (`CONTEXT.md`: Outpost storage): a finished
+ * storage of no city, of a realm that exists. One in a city goes with the city.
+ */
+export const outpostStorageRealms: Invariant = {
+  name: 'outpost-storage-realms',
+  check(world) {
+    const realms = new Set(world.realms.map((x) => x.id))
+    return world.buildings.flatMap((b) => {
+      if (b.realmId === undefined) return []
+      const why = !isOutpostStorage(b)
+        ? `is a ${b.site ? `${b.kind} site` : b.kind}${b.cityId ? ` of city ${b.cityId}` : ''} with realm ${b.realmId}`
+        : !realms.has(b.realmId)
+          ? `belongs to realm ${b.realmId}, which doesn't exist`
+          : undefined
+      return why ? [{ invariant: this.name, message: `${b.id} ${why}`, entityIds: [b.id] }] : []
+    })
   },
 }
 
@@ -1669,6 +1690,7 @@ export const worldInvariants: Invariant[] = [
   cityNamesWellFormed,
   buildingsInPlace,
   citiesFromBuildings,
+  outpostStorageRealms,
   carriedWithinCapacity,
   goodsInPlace,
   breedOrdersSound,

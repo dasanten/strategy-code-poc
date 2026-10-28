@@ -227,6 +227,23 @@ export function cityAreaTiles(
   return out
 }
 
+/**
+ * The realm a building belongs to: its city's realm, or an outpost storage's own (`CONTEXT.md`:
+ * Outpost storage); null for one of no realm, such as an NPC city's or a workplace on a node.
+ */
+export function buildingRealm(
+  world: { cities: readonly Pick<City, 'id' | 'realmId'>[] },
+  b: Pick<Building, 'cityId' | 'realmId'>,
+): string | null {
+  if (b.cityId !== null) return world.cities.find((c) => c.id === b.cityId)?.realmId ?? null
+  return b.realmId ?? null
+}
+
+/** Whether a building is an outpost storage (`CONTEXT.md`: Outpost storage): one of no city. */
+export function isOutpostStorage(b: Building): boolean {
+  return b.kind === 'storage' && !b.site && b.cityId === null
+}
+
 /** A city's town hall, if it stands. */
 export function townHallOf(world: Pick<WorldState, 'buildings'>, city: City): Building | undefined {
   return world.buildings.find((b) => b.id === city.townHallId)

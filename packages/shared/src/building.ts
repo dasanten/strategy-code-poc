@@ -110,10 +110,11 @@ export const OFF_NODES: readonly BuildingKind[] = [
 export const ON_PLAINS: readonly BuildingKind[] = ['stable', 'farm']
 
 /**
- * Buildable kinds that go only in a city's area, every tile of their footprint: houses and
- * storages (`CONTEXT.md`: House, Storage).
+ * Buildable kinds that go only in a city's area, every tile of their footprint: houses
+ * (`CONTEXT.md`: House). A storage goes anywhere, outside a city as an outpost storage
+ * (`CONTEXT.md`: Outpost storage).
  */
-export const IN_CITY_AREA: readonly BuildingKind[] = ['house', 'storage']
+export const IN_CITY_AREA: readonly BuildingKind[] = ['house']
 
 /**
  * What a build menu offers off any resource node, in its order: every buildable kind but the
@@ -281,8 +282,8 @@ function lookupOf(terrain: TerrainMap | TerrainLookup): (x: number, y: number) =
  * (x, y) (`CONTEXT.md`: Where buildings go, Footprint), or undefined if it can: every tile of the
  * footprint passable and free of other buildings; workplaces with one tile on a resource node of
  * their kind, stables and farms wholly on Plains, smelters, mints, smithies, town halls, houses,
- * storages, walls and gates off Mountain, a house or storage only in a city's area (`CONTEXT.md`:
- * House, Storage); only a node's workplace covers a node. A road goes on any passable land but Mountain, node or not, and
+ * storages, walls and gates off Mountain, a house only in a city’s area (`CONTEXT.md`:
+ * House); only a node’s workplace covers a node. A road goes on any passable land but Mountain, node or not, and
  * next to a building on its tile, but one road per tile (`CONTEXT.md`: Road). A carriage site
  * goes on a tile of a finished stable or right next to one, where a carriage can stand, off any
  * resource node and any other building, one per tile (`CONTEXT.md`: Carriage). Without `terrain`
