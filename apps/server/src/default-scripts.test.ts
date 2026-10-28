@@ -475,6 +475,37 @@ describe('Build a … here from a node’s card', () => {
   })
 })
 
+describe('Build for a group (`CONTEXT.md`: Group)', () => {
+  it('walks each to the same tile: the first lays out the site and the others join it', () => {
+    const world = farmWorld()
+    world.residents = world.residents.filter((r) => r.owner === 'r1')
+    world.residents[1]!.x = 12
+    world.residents[1]!.y = 12
+    const at = { x: 8, y: 12 }
+    const orders = queue()
+    for (const id of ['w1', 'w2']) {
+      const order = { kind: 'task', task: 'build', residentId: id, building: 'house', at }
+      expect(orders.receive(world, sender(), id, order)).toEqual({ type: 'ack', requestId: id })
+    }
+    orders.applyAll(world)
+    const runner = new ScriptRunner(terrain, host())
+    const walking = new Walking(terrain)
+    const joined = () =>
+      world.residents.every((r) => r.order?.kind === 'build' && r.order.siteId !== null)
+    for (let tick = 0; tick < 500 && !joined(); tick++) {
+      for (const r of world.residents) r.hunger = MAX_HUNGER
+      expect(runner.runAll(world, true)).toEqual([])
+      stepWorld(world, terrain, walking)
+    }
+    const sites = world.buildings.filter((b) => b.kind === 'house')
+    expect(sites).toHaveLength(1)
+    expect(sites[0]).toMatchObject({ ...at, site: expect.any(Object) })
+    for (const r of world.residents) {
+      expect(r.order).toMatchObject({ kind: 'build', siteId: sites[0]!.id })
+    }
+  })
+})
+
 describe('the step budget', () => {
   /** Mara's residents all at work on the farm by Work. */
   const working = (world: WorldState) => {

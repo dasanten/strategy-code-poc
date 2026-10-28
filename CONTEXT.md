@@ -674,6 +674,13 @@ The shared language of the game. Domain terms only — no implementation details
   Ctrl+1–9 saves the picked residents as that number's group and 1–9 picks them again (pressed
   twice, it also centres the map on them); saved groups are kept per browser, not in the world.
   Dead residents and ones no longer the Player's drop out of a group when it is picked again.
+  **One command for a group:** the group card gives each the same order request as their own card
+  would (walk to, work, build, store, fetch, run a script, stop); nothing new is kept in the
+  world. A walk-to spreads them over distinct free tiles around the target, the nearest of them
+  to the nearest tile. Work and Build make each join the workplace or site: Build walks them
+  there, the first lays out the site and the others join it; Work is tile-bound, so it goes only
+  to those standing at the workplace. Those who can't take it (children, a partner carrying a
+  child, too far for a tile-bound order) are skipped, and the card says who and why.
 - **Queue:** an order holding a list of steps for a resident and which step they are on. A step
   is any order the Player could give them on its own: a one-off action (walk to, pick up, drop,
   Store, Fetch, …), a task, or one of their scripts with its params. A step ends when it's done
