@@ -92,7 +92,8 @@ import {
   timeStep,
   type QueueRow,
 } from './queue-view.js'
-import { groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
+import { groupNumberParams, groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
+import { NumberField, foodParamsHint } from './ScriptParams.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
 import { ActionRows, CardTabs, SelectionCard, useActionKeys } from './SelectionCard.js'
@@ -557,6 +558,8 @@ export function GroupCard({
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
   const [fetching, setFetching] = useState(false)
   const [good, setGood] = useState<Good>('food')
+  const numberParams = groupNumberParams(residents, scripts)
+  const foodHint = foodParamsHint(numberParams.map((p) => p.name))
   const showTab = (t: GroupTab) => {
     setTab(t)
     rememberTabOf('group', t)
@@ -720,6 +723,38 @@ export function GroupCard({
               onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
             />
           </section>
+          {numberParams.length > 0 && (
+            <section className="inspector-block" aria-label="Script params">
+              <div className="script-params">
+                {numberParams.map(({ name, scriptIds }) => (
+                  <div key={name} className="goods-row">
+                    <span className="small">
+                      <strong>{name}</strong> <span className="muted">(number)</span>
+                    </span>
+                    <NumberField
+                      name={name}
+                      value={undefined}
+                      onSet={(v) =>
+                        onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
+                      }
+                    />
+                    <span className="buttons">
+                      <button
+                        type="button"
+                        onClick={() => onOrder({ kind: 'setNumber', name, value: null, scriptIds })}
+                      >
+                        Clear
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="muted small">
+                Sets it for each one running a script with it. Type a number and press Enter.
+              </p>
+              {foodHint && <p className="muted small">{foodHint}</p>}
+            </section>
+          )}
         </>
       )}
 

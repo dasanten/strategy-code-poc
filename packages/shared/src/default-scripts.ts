@@ -7,7 +7,13 @@
  * into `memory`, as `TaskMemory` lists. Defaults use the step budget like any script; a test
  * keeps each at most a quarter of `SCRIPT_STEP_BUDGET`.
  */
-import { BREED_FOOD, HORSE_FOOD_PER_DAY, STABLE_FEED_DAYS, WORK_FOOD_KEPT } from './balance.js'
+import {
+  BREED_FOOD,
+  HORSE_FOOD_PER_DAY,
+  OWN_FOOD,
+  STABLE_FEED_DAYS,
+  WORK_FOOD_KEPT,
+} from './balance.js'
 import { FOOTPRINT } from './footprint.js'
 
 /** The tasks that run a default script. */
@@ -51,6 +57,50 @@ export interface DefaultScript {
 }
 
 /**
+ * Getting food (`CONTEXT.md`: Getting food), shared by the Work, Build and Tear down defaults,
+ * which declare the number params `foodAt` and `foodTake` and `let ownFood`. `getFood(from,
+ * near)` fetches Food below `foodAt` units on me, up to `foodTake` (or `ownFood`), at `from`
+ * while it holds Food, else at the nearest storage of my realm with Food from `near`; true once
+ * I set off. `foodToTake()` is the Food that tops me up to `foodTake`, 0 while it is unset.
+ */
+const GET_FOOD = `// The Food that tops me up to params.foodTake, in whole units; 0 unset.
+fn foodToTake() {
+  if (params.foodTake == null) { return 0 }
+  let food = 0
+  if (me.carried.food != null) { food = me.carried.food }
+  let units = params.foodTake - food
+  if (units < 1) { return 0 }
+  return units - units % 1
+}
+
+// Below params.foodAt units of Food on me: fetch Food up to params.foodTake,
+// or my usual own food, at from while it holds Food, else at the nearest
+// storage of my realm with Food from near. True once I set off.
+fn getFood(from, near) {
+  if (params.foodAt == null) { return false }
+  let food = 0
+  if (me.carried.food != null) { food = me.carried.food }
+  if (food >= params.foodAt) { return false }
+  let take = params.foodTake
+  if (take == null) { take = ownFood }
+  let units = take - food
+  units = units - units % 1
+  if (units < 1) { return false }
+  let at = from
+  let has = null
+  if (at != null) {
+    has = at.stock
+    if (has == null) { has = at.load }
+  }
+  if (has == null || has.food == null || has.food < 1) {
+    at = null
+    let stores = storages(near, ["food"]) // nearest first, holding some
+    if (stores.length > 0) { at = stores[0] }
+  }
+  return at != null && fetch({food: units}, at.id) == null
+}`
+
+/**
  * The game's current default of each task. Changing a source here reaches every Player still
  * following it on the next start; those who edited theirs are told it changed.
  */
@@ -61,9 +111,15 @@ export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
 // a full load, one of us, picked at random, stores it in params.storage, or
 // the nearest storage of my realm while none is picked, and comes back. At a
 // smithy, memory.makes says what to make. Meals come from the workplace's
-// pile on their own, without an order.
+// pile on their own, without an order. With params.foodAt set, below that
+// many units of Food on me I get Food up to params.foodTake (or my usual own
+// food) at params.storage, or the nearest storage of my realm with Food, and
+// come back; with foodTake set, storing a load tops my food up to it too.
 param storage: storage // where the output goes
+param foodAt: number // get Food below this many units on me
+param foodTake: number // units of Food to take along
 let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
+let ownFood = ${OWN_FOOD} // units of Food on me while foodTake is unset
 
 // Where the workplace is, kept for when it is out of sight.
 let place = building(memory.workplaceId)
@@ -75,18 +131,28 @@ if (me.order != null && me.order.kind != "workAt") { return } // on my way
 let carry = memory.carry
 if (carry != null && !carry.stored) {
   carry.stored = true
-  if (store(carry.goods, carry.storageId) == null) { return }
+  if (store(carry.goods, carry.storageId, params.foodTake) == null) { return }
 }
+let away = carry
+if (away == null) { away = memory.food } // back from getting food
 if (me.x != memory.at.x || me.y != memory.at.y) {
-  if (carry != null && carry.walked) { memory.stuck = true } // no way back
+  if (away != null && away.walked) { memory.stuck = true } // no way back
   else {
     walkTo(memory.at.x, memory.at.y)
-    if (carry != null) { carry.walked = true }
+    if (away != null) { away.walked = true }
   }
   return
 }
 if (carry != null) { memory.carry = null }
+if (memory.food != null) { memory.food = null }
 if (place == null) { return } // gone
+
+// Low on Food: get some, then back to work. With none anywhere, work on.
+${GET_FOOD}
+if (getFood(params.storage, place)) {
+  memory.food = {walked: false}
+  return
+}
 if (me.order == null) {
   workAt(memory.makes)
   return
@@ -134,8 +200,14 @@ memory.carry = {storageId: to.id, goods: goods}
 // While the site lacks materials, one of us building it, picked at random,
 // fetches a load of what is missing from params.source, or the nearest
 // storage of my realm that holds it while none is picked, and brings it
-// back. With none there we just build.
+// back. With none there we just build. With params.foodAt set, below that
+// many units of Food on me I get Food up to params.foodTake (or my usual own
+// food) at params.source, or the nearest storage of my realm with Food, and
+// come back; with foodTake set, fetching materials tops my food up to it too.
 param source: storage // where materials come from; a carriage too
+param foodAt: number // get Food below this many units on me
+param foodTake: number // units of Food to take along
+let ownFood = ${OWN_FOOD} // units of Food on me while foodTake is unset
 if (memory.stuck) { return }
 if (me.order != null && me.order.kind != "build") { return } // on my way
 
@@ -164,8 +236,9 @@ if (memory.siteId != null) {
   }
 }
 
-// Not there yet, or back from fetching: walk to the site.
+// Not there yet, or back from fetching or getting food: walk to the site.
 let away = memory.fetch
+if (away == null) { away = memory.food }
 if (!at) {
   if (away != null && away.walked) { memory.stuck = true } // no way back
   else {
@@ -174,7 +247,8 @@ if (!at) {
   }
   return
 }
-if (away != null) { memory.fetch = null }
+if (memory.fetch != null) { memory.fetch = null }
+if (memory.food != null) { memory.food = null }
 if (site != null) {
   // What I carry of what it lacks goes in first.
   let mine = carriedOf(me, materialsNeeded(site))
@@ -182,6 +256,13 @@ if (site != null) {
     drop({kind: "site", siteId: site.id}, mine)
     return
   }
+}
+
+// Low on Food: get some, then back to the site. With none anywhere, build on.
+${GET_FOOD}
+if (getFood(params.source, me)) {
+  memory.food = {walked: false}
+  return
 }
 if (me.order == null) {
   // Turned down, such as with the tile taken, build says why: done.
@@ -222,7 +303,10 @@ if (builders.length == 0) { return }
 let i = 0
 while ((i + 1) / builders.length <= random) { i = i + 1 }
 if (builders[i].id != me.id) { return }
+// My own food first, topped up to params.foodTake; then what is missing.
 let load = {}
+let topUp = foodToTake()
+if (topUp > 0) { load.food = topUp }
 for (m of missing) { load[m.good] = m.units }
 if (fetch(load, from.id) == null) {
   memory.fetch = {storageId: from.id, goods: load}
@@ -245,7 +329,39 @@ if (me.order == null || me.order.kind != "haul") {
   tearDown: {
     name: 'Tear down',
     source: `// Tear down (default): tear down memory.buildingId, the building or site
-// I stand on, until it is gone; then end.
+// I stand on, until it is gone; then end. With params.foodAt set, below that
+// many units of Food on me I get Food up to params.foodTake (or my usual own
+// food) at params.source, or the nearest storage of my realm with Food, and
+// come back.
+param source: storage // where Food comes from; a carriage too
+param foodAt: number // get Food below this many units on me
+param foodTake: number // units of Food to take along
+let ownFood = ${OWN_FOOD} // units of Food on me while foodTake is unset
+if (memory.stuck) { return }
+
+// Getting food: on my way, then back to the tile I tear down from.
+let away = memory.food
+if (away != null) {
+  if (me.order != null && me.order.kind != "tearDown") { return } // on my way
+  if (me.x != away.x || me.y != away.y) {
+    if (away.walked) { memory.stuck = true } // no way back
+    else {
+      walkTo(away.x, away.y)
+      away.walked = true
+    }
+    return
+  }
+  memory.food = null
+}
+
+// Low on Food: get some, then back. With none anywhere, tear down on.
+${GET_FOOD}
+let x = me.x
+let y = me.y
+if (getFood(params.source, me)) {
+  memory.food = {walked: false, x: x, y: y}
+  return
+}
 if (me.order == null || me.order.kind != "tearDown") {
   // Turned down, such as with the building gone, tearDown says why: done.
   if (tearDown(memory.buildingId) != null) { end() }

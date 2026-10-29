@@ -598,9 +598,9 @@ export function Wiki() {
           Intellect, twice as fast).
         </p>
         <p>
-          A pair has one child at a time: once {days(PAIRING_WAIT_DAYS)} have passed since they paired, and
-          their city has free housing and a food surplus, one partner carries the child for{' '}
-          {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
+          A pair has one child at a time: once {days(PAIRING_WAIT_DAYS)} have passed since they
+          paired, and their city has free housing and a food surplus, one partner carries the child
+          for {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
           {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a child is grown after{' '}
           {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Stats
           decline from age {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below{' '}
@@ -619,6 +619,14 @@ export function Wiki() {
           storage when they run low. Within {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage
           of their realm they take it from there the same way, so a stocked outpost storage next to
           a far workplace keeps its workers fed.
+        </p>
+        <p>
+          Far from home, a resident working, building or tearing down can go and get food on their
+          own: set <code>foodAt</code> and <code>foodTake</code> on their card, in units of Food.
+          Below <code>foodAt</code> on them, they walk to their storage (or the nearest one of your
+          realm with Food), take Food up to <code>foodTake</code> and go back. Whenever they are at
+          a storage anyway, their own food is topped up to <code>foodTake</code> instead of{' '}
+          {num(OWN_FOOD)}. Unset, they don't go on their own.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -643,6 +651,13 @@ export function Wiki() {
           Workers make goods in proportion to their Strength, plus {pct(WORK_SKILL_EFFECT)} for each
           point of the workplace's skill. Output lands in the workplace's pile; one worker at a time
           carries a full load to the nearest storage of their realm.
+        </p>
+        <p>
+          With <code>foodAt</code> set, a worker who carries less Food than that leaves work for
+          their <code>storage</code>, or the nearest storage of your realm with Food, takes Food up
+          to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes back. With no Food
+          anywhere they work on. With <code>foodTake</code> set, carrying a load tops their food up
+          to it too.
         </p>
         <table>
           <thead>
@@ -771,6 +786,13 @@ export function Wiki() {
           the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house goes only in a
           city's area; a town hall, storage, wall or gate goes anywhere off Mountain and off
           resource nodes, and a new town hall founds a city.
+        </p>
+        <p>
+          With <code>foodAt</code> set, a resident building or tearing down who carries less Food
+          than that goes to their <code>source</code>, or the nearest storage of your realm with
+          Food, takes Food up to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes
+          back to the site. With no Food anywhere they work on. With <code>foodTake</code> set,
+          fetching materials tops their food up to it too, before the materials.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
@@ -1312,7 +1334,12 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         <ul>
           <li>
             A resident's card shows one field for each param of the script they run: pick it on the
-            map, or clear it. Picking doesn't stop the script.
+            map, or clear it. A <code>number</code> param has a number field instead: type a whole
+            number of zero or more and press Enter. Neither stops the script.
+          </li>
+          <li>
+            A group's card sets a <code>number</code> param for each of them running a script with
+            it.
           </li>
           <li>
             The values are kept for each resident and each script. Giving the task again keeps them;
@@ -1320,13 +1347,17 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           </li>
           <li>
             A param reads <code>null</code> while none is picked, and once the one picked is gone or
-            no longer yours.
+            no longer yours. A <code>number</code> param reads the number typed, or{' '}
+            <code>null</code> while unset.
           </li>
           <li>
             The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
             <code>source</code>: where materials come from, a carriage too. Unset, each uses the
             nearest storage; a source picked that holds none of what the site lacks is left alone,
-            and they just build.
+            and they just build. The Tear down default has <code>source</code>: where Food comes
+            from. The Work, Build and Tear down defaults also have the <code>number</code> params{' '}
+            <code>foodAt</code> and <code>foodTake</code> for getting food, in units of Food (a
+            resident eats about {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>

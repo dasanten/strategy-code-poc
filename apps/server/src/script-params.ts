@@ -1,6 +1,7 @@
 import { scriptParams } from '@csp/lang'
 import {
   commands,
+  isParamNumber,
   isScriptParamType,
   type Building,
   type Carriage,
@@ -8,6 +9,7 @@ import {
   type Resident,
   type ScriptParam,
   type ScriptParamType,
+  type ScriptParamValue,
   type WorldState,
 } from '@csp/shared'
 import { buildingOrganization, carriageOrganization } from './crimes.js'
@@ -34,7 +36,7 @@ const STORAGE_KINDS: readonly string[] = ['storage', 'stable']
 export function paramTarget(
   world: WorldState,
   side: string | undefined,
-  type: ScriptParamType,
+  type: Exclude<ScriptParamType, 'number'>,
   id: string,
 ): { is: 'building'; building: Building } | { is: 'carriage'; carriage: Carriage } | undefined {
   if (side === undefined) return undefined
@@ -51,28 +53,35 @@ export function paramTarget(
 
 /**
  * The values picked for a resident's script as the script reads them, by the script's `param`
- * lines: the id picked for each, or none. Picked values of a param the script no longer has,
- * and those naming something gone from the world, are dropped from the resident.
+ * lines: the id or number picked for each, or none. Picked values of a param the script no
+ * longer has, those that no longer fit its type, and ids naming something gone from the world
+ * are dropped from the resident.
  */
 export function paramValues(
   world: WorldState,
   r: Resident,
   scriptId: number,
   params: readonly ScriptParam[],
-): { name: string; type: ScriptParamType; id?: string }[] {
+): { name: string; type: ScriptParamType; value?: ScriptParamValue }[] {
   const picked = r.scriptParams?.[scriptId]
   if (picked) {
-    for (const [name, id] of Object.entries(picked)) {
-      const gone =
-        !world.buildings.some((b) => b.id === id) && !world.carriages.some((k) => k.id === id)
-      if (gone || !params.some((p) => p.name === name)) delete picked[name]
+    for (const [name, value] of Object.entries(picked)) {
+      const param = params.find((p) => p.name === name)
+      const fits =
+        param?.type === 'number'
+          ? isParamNumber(value)
+          : param !== undefined &&
+            typeof value === 'string' &&
+            (world.buildings.some((b) => b.id === value) ||
+              world.carriages.some((k) => k.id === value))
+      if (!fits) delete picked[name]
     }
     if (Object.keys(picked).length === 0) delete r.scriptParams![scriptId]
     if (Object.keys(r.scriptParams!).length === 0) delete r.scriptParams
   }
   return params.map((p) => {
-    const id = picked?.[p.name]
-    return id === undefined ? { ...p } : { ...p, id }
+    const value = picked?.[p.name]
+    return value === undefined ? { ...p } : { ...p, value }
   })
 }
 
@@ -81,15 +90,18 @@ interface SetScriptParamRequest extends OrderRequest {
   residentId: string
   scriptId: number
   name: string
-  /** The building or carriage picked; null clears it. */
-  targetId: string | null
+  /** The building or carriage picked; null clears it, for a `number` param too. */
+  targetId?: string | null
+  /** The whole number typed for a `number` param. */
+  value?: number
 }
 
 /**
  * The set-script-param order (`CONTEXT.md`: Script parameter): the Player picks, or clears with
  * a null `targetId`, the value of a `param` of the script one of their residents runs. Free and
  * instant, from anywhere. The script must be the one the resident runs and have the param; the
- * target must fit its type and be the Player's.
+ * target must fit its type and be the Player's, and a `number` param's `value` be a whole number
+ * of zero or more.
  */
 export function setScriptParamOrder(host: {
   script(scriptId: number): Pick<RunnableScript, 'userId' | 'source'> | undefined
@@ -105,7 +117,12 @@ export function setScriptParamOrder(host: {
       if (!script || script.userId !== sender.userId) return 'not the script they run'
       const param = scriptParams(script.source).find((p) => p.name === o.name)
       if (!param || !isScriptParamType(param.type)) return 'the script has no such param'
-      if (o.targetId === null) return undefined
+      if (o.targetId === null && o.value === undefined) return undefined
+      if (param.type === 'number')
+        return o.targetId === undefined && isParamNumber(o.value)
+          ? undefined
+          : 'must be a whole number of zero or more'
+      if (o.value !== undefined) return 'takes no number'
       if (typeof o.targetId !== 'string' || !paramTarget(world, realm.id, param.type, o.targetId))
         return param.type === 'storage'
           ? 'must be a storage, a stable or a carriage of yours'
@@ -113,7 +130,7 @@ export function setScriptParamOrder(host: {
       return undefined
     },
     apply(world, _sender, order) {
-      const { residentId, scriptId, name, targetId } = order as SetScriptParamRequest
+      const { residentId, scriptId, name, targetId, value } = order as SetScriptParamRequest
       const r = world.residents.find((x) => x.id === residentId)
       if (!r) return
       if (targetId === null) {
@@ -125,14 +142,14 @@ export function setScriptParamOrder(host: {
         return
       }
       r.scriptParams ??= {}
-      r.scriptParams[scriptId] = { ...r.scriptParams[scriptId], [name]: targetId }
+      r.scriptParams[scriptId] = { ...r.scriptParams[scriptId], [name]: value ?? targetId! }
     },
   }
 }
 
 /**
- * Invariant (ADR 0004): every resident's picked script param values are plain ids, kept by a
- * whole positive script id, with no empty group left behind.
+ * Invariant (ADR 0004): every resident's picked script param values are plain ids or whole
+ * numbers of zero or more, kept by a whole positive script id, with no empty group left behind.
  */
 export function scriptParamsSound(world: WorldState): InvariantViolation[] {
   const out: InvariantViolation[] = []
@@ -150,8 +167,8 @@ export function scriptParamsSound(world: WorldState): InvariantViolation[] {
       if (!/^[1-9]\d*$/.test(scriptId)) fail(`keeps params for script ${scriptId}`)
       const values = Object.values(picked)
       if (values.length === 0) fail(`keeps an empty group of params for script ${scriptId}`)
-      if (values.some((v) => typeof v !== 'string'))
-        fail(`keeps a param value of script ${scriptId} that is no id`)
+      if (values.some((v) => typeof v !== 'string' && !isParamNumber(v)))
+        fail(`keeps a param value of script ${scriptId} that is no id or whole number`)
     }
   }
   return out

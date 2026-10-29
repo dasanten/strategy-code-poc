@@ -410,12 +410,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   /**
    * Picks, or clears with null, the value of a param of the script the picked resident runs
-   * (`CONTEXT.md`: Script parameter). It leaves the script running.
+   * (`CONTEXT.md`: Script parameter): the building or carriage's id, or the number typed for a
+   * number param. It leaves the script running.
    */
-  async function setScriptParam(name: string, targetId: string | null) {
+  async function setScriptParam(name: string, picked: string | number | null) {
     if (!selected?.script) return
     const { scriptId } = selected.script
-    const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, targetId }
+    const value = typeof picked === 'number' ? { value: picked } : { targetId: picked }
+    const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, ...value }
     setOrderError(await giveOrder(order))
   }
   async function stop() {
@@ -897,6 +899,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                     setPicking(false)
                     setParamPick((now) => (now?.name === p.name ? undefined : p))
                   }}
+                  onNumber={(name, value) => void setScriptParam(name, value)}
                   onClear={(name) => void setScriptParam(name, null)}
                 />
               )

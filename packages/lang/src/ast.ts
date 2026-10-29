@@ -23,7 +23,7 @@ export interface ParamDeclaration extends Position {
 }
 
 /** What a `param` can hold. */
-export const PARAM_TYPES = ['building', 'storage'] as const
+export const PARAM_TYPES = ['building', 'storage', 'number'] as const
 export type ParamType = (typeof PARAM_TYPES)[number]
 
 export type Statement =
