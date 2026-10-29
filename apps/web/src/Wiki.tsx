@@ -953,6 +953,13 @@ export function Wiki() {
           <code>passengerIds</code>.
         </p>
         <p>
+          <strong>Refilling from a carriage:</strong> passengers eat the food they carry, and when
+          they run low take a meal from the carriage's Food (or another carriage of your realm on or
+          next to their tile), as at home, so a carriage with Food on board keeps them fed on a long
+          drive. The Food a haul route keeps for the horse stays on board. On a carriage without
+          Food they go hungry like anyone away from home.
+        </p>
+        <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
           {days(STABLE_FEED_DAYS)} for the horses in it ({num(HORSE_FOOD_PER_DAY)} a horse a day):
           below that they fetch what is missing from the nearest storage of your realm with Food, or
