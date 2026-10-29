@@ -68,6 +68,8 @@ interface Client {
   leaderId: string
   /** The realm name last sent, null while it has none, so a tick sends it once it is named. */
   realmName: string | null
+  /** Whether the Player could still claim their Horse offer when last sent (`CONTEXT.md`). */
+  horseOffer: boolean
 }
 
 /**
@@ -165,6 +167,7 @@ export function attachRealtime(
       regionTick: null,
       leaderId: realm.leaderId,
       realmName: realm.name ?? null,
+      horseOffer: !world.horseOffersClaimed.includes(user.id),
     }
     clients.set(socket, client)
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
@@ -200,6 +203,7 @@ export function attachRealtime(
       events,
       diplomacy,
       region: regionFor(client, []) ?? null,
+      horseOffer: client.horseOffer,
     })
   }
 
@@ -275,6 +279,8 @@ export function attachRealtime(
         const realmName = realm?.name ?? null
         const named = realmName !== null && realmName !== client.realmName
         if (named) client.realmName = realmName
+        const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
+        if (claimed) client.horseOffer = false
         const tick = {
           tick: world.tick,
           changed,
@@ -286,6 +292,7 @@ export function attachRealtime(
           ...(region ? { region } : {}),
           ...(newLeader ? { leaderId } : {}),
           ...(named ? { realmName } : {}),
+          ...(claimed ? { horseOffer: false as const } : {}),
         }
         send(socket, { type: 'tick', ...tick })
       }

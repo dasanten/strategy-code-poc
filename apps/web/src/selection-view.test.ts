@@ -40,6 +40,7 @@ import {
   nodeFit,
   groupOrders,
   residentActions,
+  riddenHorseLine,
   tileActions,
   type ResidentHere,
   type TileThings,
@@ -578,6 +579,18 @@ describe('horses on the tile card', () => {
     expect(mine.lines.find((l) => l.startsWith('Carriage'))).toContain('· no horse hitched')
   })
 
+  it('lists a rider’s horse on their card with its stats, age and how it fares', () => {
+    const at = 5 * TICKS_PER_GAME_YEAR + 100
+    const ridden = horse({ id: 'h2', hunger: 10, health: MAX_HEALTH - 5 })
+    const horses = [horse(), ridden]
+    expect(riddenHorseLine({ riding: 'h2' }, horses, at)).toBe(
+      'Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt',
+    )
+    expect(riddenHorseLine({}, horses, at)).toBeUndefined()
+    // A horse not in sight shows nothing.
+    expect(riddenHorseLine({ riding: 'h9' }, horses, at)).toBeUndefined()
+  })
+
   it('shows each horse’s stats, age and how it fares, and how much its carriage holds', () => {
     const at = 5 * TICKS_PER_GAME_YEAR + 100
     const strong = horse({ stats: { speed: 9, strength: 15, endurance: 13 }, hunger: 10 })
@@ -653,6 +666,19 @@ describe('horses on the tile card', () => {
     // Fed horses alone breed no foal.
     const alone = tile({ buildings: [stable], horses: pair })
     expect(alone.lines.some((l) => l.startsWith('Breeding'))).toBe(false)
+    // A breeding the stable keeps: paused while nobody tends the pair, with the two horses.
+    const kept = {
+      ...stable,
+      breedings: [{ horseIds: ['h1', 'h2'] as [string, string], progress: 4 * TICKS_PER_GAME_DAY }],
+    }
+    const paused = tile({ buildings: [kept], horses: pair })
+    const pct = Math.floor((4 / STABLE_BREED_DAYS) * 100)
+    const at = paused.lines.indexOf(`Breeding paused: ${pct}% of the way to a foal`)
+    expect(at).toBeGreaterThan(-1)
+    expect(paused.lines[at + 1]).toMatch(/^· Speed/)
+    expect(paused.lines[at + 2]).toMatch(/^· Speed/)
+    const tended = tile({ buildings: [kept], horses: pair, residents: [breeder] })
+    expect(tended.lines.some((l) => l.startsWith('Breeding paused'))).toBe(false)
     const empty = tile({ buildings: [{ ...stable, stock: {} }] })
     expect(empty.lines).toEqual(
       expect.arrayContaining(['No horses in it', `Room for ${STABLE_CAPACITY} more horses`]),
