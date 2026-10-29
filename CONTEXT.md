@@ -30,22 +30,24 @@ The shared language of the game. Domain terms only — no implementation details
   | Plains   | 100%       | 100% | Farmland                                 |
   | Forest   | ~70%       | 100% | Wood                                     |
   | Hills    | ~70%       | 130% | Stone, some ore                          |
-  | Mountain | ~35%       | 200% | Ore-rich; walkers only, no carriages     |
+  | Mountain | ~35%       | 200% | Ore-rich; no carriages except on a road  |
   | Lake     | impassable | —    | Small inland water                       |
   | Sea      | impassable | —    | A few large bodies of water              |
   | Road     | ~130%      | 100% | Built by Players on top of passable land |
 
 - **Road:** built on a tile like a building (laid out by a resident there, then materials and
-  work) on any passable land except Mountain, and it may share a tile with a building, so roads
-  can lead through gates. On a road residents and carriages move at road speed whatever the
-  terrain beneath, and eat as on Plains. Nobody owns a road; anyone can walk it or tear it down.
+  work) on any passable land, and it may share a tile with a building, so roads can lead through
+  gates. A road tile on Mountain takes the same materials but four times the work. On a road
+  residents and carriages move at road speed whatever the terrain beneath, and eat as on Plains;
+  a finished road on Mountain lets carriages and riders cross it like any road, so roads open
+  mountain passes. Nobody owns a road; anyone can walk it or tear it down.
   A resident can build road along a line from their tile to another, one tile after another; the
   line runs straight or diagonal, each tile a Step on from the one before.
 - **Step:** a move onto one of the eight tiles around, straight or diagonal. A diagonal step is
   √2 (about 1.41) times as far as a straight one, so it takes that much longer on the same
   ground. A diagonal step can't squeeze between two corners: it is only possible when both
   straight tiles beside it could be stepped onto as well, so no wall, gate in the way, Lake, Sea
-  or (for a carriage) Mountain may stand on either. Two wall tiles touching at a corner close
+  or (for a carriage) Mountain without a road may stand on either. Two wall tiles touching at a corner close
   the way like a straight stretch.
 - No rivers and no water vehicles (for now), so all land is joined: any tile can be reached on
   foot from any other, if only the long way round.
@@ -634,7 +636,7 @@ The shared language of the game. Domain terms only — no implementation details
   storage of their realm with Food). With no Food to fetch they wait.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
-  mountains. Built at a stable (Building a carriage).
+  mountains except on a road. Built at a stable (Building a carriage).
 - **Building a carriage:** a resident at a finished stable lays out a **carriage site** on their
   tile of the stable, or on a tile right next to it, where a carriage can stand, off resource nodes
   and other buildings; it shares the tile with the stable, one carriage site per tile. It is a
@@ -652,7 +654,7 @@ The shared language of the game. Domain terms only — no implementation details
   rides mounts it, and dismounts anywhere; the horse stays on that tile. Riding is not an order:
   the rider goes on with what they do, and their walking goes at the horse's pace, as fast as it
   would pull a carriage there (fast on plains and roads, slower in forest and hills, never into
-  mountains or onto walls), slower while the horse is hungry. Gates and walls stop a rider as
+  mountains off a road or onto walls), slower while the horse is hungry. Gates and walls stop a rider as
   anyone. The rider carries what they could on foot; the horse eats Food in reach as usual.
   Riding teaches Driving, and Driving makes riding faster. A horse has at most one rider and is
   never hitched while ridden; a rider doesn't drive. A rider whose horse dies, or who leaves it
