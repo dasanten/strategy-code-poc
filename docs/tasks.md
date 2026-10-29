@@ -78,8 +78,10 @@ its tickets or closes.
   with the epic branch. PR bodies say "Checked: `pnpm check` against …" with what it ran. Merging into a
   non-default branch doesn't close the ticket, so whoever merges closes its tickets by hand.
 - **Slow tests:** a test that takes more than about 20 s on an idle machine (a long simulation)
-  gets `{ tags: ['slow'] }` (on the `it`, or on its `describe`). `pnpm check` skips them, even
-  when affected, and says how many; `pnpm test` runs them, and CI runs `pnpm test`.
+  gets `{ tags: ['slow'] }` on its `it` or `describe`, with any timeout in the same object
+  (`{ tags: ['slow'], timeout: 120_000 }`: Vitest ignores a trailing timeout next to options).
+  `pnpm check` skips them, even when affected, and says how many; `pnpm test` runs them, and CI
+  runs `pnpm test`.
 - **Epic PR:** when an epic's last ticket is on its branch, one PR `epic/<n>-…` → `dev` with
   `Closes #<epic>` runs CI and is merged once green; whoever merges closes the epic by hand.
 - **Release:** when Daniel asks, one PR `dev` → `main` lists the epics and bugs it ships, runs CI
