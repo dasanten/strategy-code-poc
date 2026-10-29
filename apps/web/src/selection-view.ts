@@ -18,6 +18,7 @@ import {
   STABLE_BREED_TICKS,
   STABLE_CAPACITY,
   breedersAt,
+  keptBreeding,
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
@@ -612,6 +613,20 @@ export function horseDetail(h: SeenHorse, tick: number | undefined): string {
 }
 
 /**
+ * The line on a rider's card for the horse they ride (`CONTEXT.md`: Riding), as the tile card
+ * shows a horse: "Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
+ * Undefined for someone on foot.
+ */
+export function riddenHorseLine(
+  r: Pick<Resident, 'riding'>,
+  horses: readonly SeenHorse[],
+  tick: number | undefined,
+): string | undefined {
+  const horse = r.riding === undefined ? undefined : horses.find((h) => h.id === r.riding)
+  return horse && `Horse: ${horseDetail(horse, tick)}`
+}
+
+/**
  * Lines for horses standing together, one per owner: "2 horses (yours) · 1 hungry", then one for
  * each of them (`horseDetail`). How they fare only for those the Player knows it of (`CONTEXT.md`:
  * Seeing how someone fares).
@@ -648,6 +663,30 @@ export function daysToFoals(stable: Building, residents: readonly SeenResident[]
     .map((r) => (r.order?.kind === 'breed' ? STABLE_BREED_TICKS - r.order.progress : 0))
     .map((left) => Math.max(1, Math.ceil(left / TICKS_PER_GAME_DAY)))
     .sort((a, b) => a - b)
+}
+
+/**
+ * Lines for the breedings a stable keeps that nobody in sight is tending (`CONTEXT.md`:
+ * Breeding): how far along each is, then its two horses (`horseDetail`).
+ */
+export function pausedBreedingLines(
+  stable: Building,
+  residents: readonly SeenResident[],
+  horses: readonly SeenHorse[],
+  tick: number | undefined,
+): string[] {
+  const tended = breedersAt(residents, stable).flatMap((r) =>
+    r.order?.kind === 'breed' ? [keptBreeding(stable, r.order.horseIds)] : [],
+  )
+  return (stable.breedings ?? [])
+    .filter((k) => !tended.includes(k))
+    .flatMap((k) => {
+      const pair = k.horseIds.map((id) => horses.find((h) => h.id === id))
+      return [
+        `Breeding paused: ${Math.floor((k.progress / STABLE_BREED_TICKS) * 100)}% of the way to a foal`,
+        ...pair.flatMap((h) => (h ? [`· ${horseDetail(h, tick)}`] : [])),
+      ]
+    })
 }
 
 /**
@@ -722,6 +761,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
+      if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))

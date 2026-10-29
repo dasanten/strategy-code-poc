@@ -10,6 +10,7 @@ import {
   canWork,
   horsesIn,
   isAt,
+  keptBreeding,
   type Building,
   type Horse,
   type HorseOwner,
@@ -66,7 +67,10 @@ export const breed: OrderKind = {
     const r = world.residents.find((x) => x.id === residentId)
     if (!r) return
     const ids: [string, string] = [horseIds[0], horseIds[1]]
-    r.order = { kind: 'breed', stableId, horseIds: ids, at: { x: r.x, y: r.y }, progress: 0 }
+    // A pair the stable kept breeding progress for carries on where it stopped.
+    const stable = world.buildings.find((b) => b.id === stableId)
+    const progress = (stable && keptBreeding(stable, ids)?.progress) ?? 0
+    r.order = { kind: 'breed', stableId, horseIds: ids, at: { x: r.x, y: r.y }, progress }
   },
 }
 
@@ -77,7 +81,8 @@ export function requestBreeding(world: WorldState): BreedAction[] {
 
 /**
  * Whether a resident's breeding goes on (`CONTEXT.md`: Breeding): they still stand where they
- * started, at the finished stable, both horses are alive and in it, and it has room for a foal.
+ * started, at the finished stable, and both horses are alive and in it. While the stable has no
+ * room for a foal it goes on but pauses (`resolveBreeding`).
  */
 export function breedingGoesOn(world: WorldState, r: Resident, size?: number): boolean {
   const o = r.order
@@ -85,8 +90,23 @@ export function breedingGoesOn(world: WorldState, r: Resident, size?: number): b
   const stable = world.buildings.find((b) => b.id === o.stableId)
   if (!stable || stable.site || !isAt(r, stable, size)) return false
   const horses = o.horseIds.map((id) => world.horses.find((h) => h.id === id))
-  if (horses.some((h) => !h || !isAt(h, stable, size))) return false
-  return horsesIn(world.horses, stable).length < STABLE_CAPACITY
+  return horses.every((h) => h && isAt(h, stable, size))
+}
+
+/**
+ * Drops the breeding progress stables keep for pairs that broke up (`CONTEXT.md`: Breeding): one
+ * of the two died, left the stable, or no longer belongs to the other's owner.
+ */
+export function dropLostBreedings(world: WorldState, size?: number): void {
+  for (const stable of world.buildings) {
+    if (!stable.breedings) continue
+    stable.breedings = stable.breedings.filter((k) => {
+      const [a, b] = k.horseIds.map((id) => world.horses.find((h) => h.id === id))
+      if (!a || !b || !isAt(a, stable, size) || !isAt(b, stable, size)) return false
+      return a.realmId === b.realmId && a.cityId === b.cityId
+    })
+    if (stable.breedings.length === 0) delete stable.breedings
+  }
 }
 
 /**
@@ -103,13 +123,16 @@ export function foalStats(rand: () => number, a: HorseStats, b: HorseStats): Hor
 }
 
 /**
- * Resolves breeding (ADR 0002), one action after another. Breeding that no longer goes on
- * (`breedingGoesOn`) stops, and its progress is lost. Otherwise the resident tends the horses a
- * tick; after `STABLE_BREED_TICKS` a foal of their parents' owner is born in the stable, with
- * stats from both (`foalStats`), it goes in the realm log, and the order is done. Returns the
- * foals born.
+ * Resolves breeding (ADR 0002). First the stables drop the progress of pairs that broke up
+ * (`dropLostBreedings`); then, one action after another, breeding that no longer goes on
+ * (`breedingGoesOn`) stops, and the stable keeps the pair's progress. While the stable has no
+ * room for a foal it pauses. Otherwise the resident tends the horses a tick and the stable keeps
+ * how far the pair has come (`Building.breedings`); after `STABLE_BREED_TICKS` a foal of their
+ * parents' owner is born in the stable, with stats from both (`foalStats`), it goes in the realm
+ * log, and the order is done. Returns the foals born.
  */
 export function resolveBreeding(world: WorldState, actions: BreedAction[], size?: number): Horse[] {
+  dropLostBreedings(world, size)
   const foals: Horse[] = []
   for (const a of actions) {
     const r = world.residents.find((x) => x.id === a.residentId)
@@ -119,10 +142,19 @@ export function resolveBreeding(world: WorldState, actions: BreedAction[], size?
       r.order = null
       continue
     }
-    o.progress++
+    const stable = world.buildings.find((b) => b.id === o.stableId)!
+    let kept = keptBreeding(stable, o.horseIds)
+    o.progress = kept?.progress ?? 0
+    if (horsesIn(world.horses, stable).length >= STABLE_CAPACITY) continue
+    if (!kept) {
+      kept = { horseIds: [o.horseIds[0], o.horseIds[1]], progress: 0 }
+      ;(stable.breedings ??= []).push(kept)
+    }
+    o.progress = ++kept.progress
     if (o.progress < STABLE_BREED_TICKS) continue
     r.order = null
-    const stable = world.buildings.find((b) => b.id === o.stableId)!
+    stable.breedings = stable.breedings!.filter((k) => k !== kept)
+    if (stable.breedings.length === 0) delete stable.breedings
     const [mother, father] = o.horseIds.map((id) => world.horses.find((h) => h.id === id)!)
     const foal = newFoal(world, stable, mother!, father!)
     world.horses.push(foal)

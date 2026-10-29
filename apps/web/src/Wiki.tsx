@@ -59,6 +59,8 @@ import {
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HORSE_GRANT_FOOD,
+  HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
   HUNGRY_HORSE_PACE,
   HORSE_ENDURANCE_EFFECT,
@@ -408,9 +410,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -889,11 +891,15 @@ export function Wiki() {
           Horses don't breed on their own. A grown resident standing at a finished stable is given
           Breed horses and picks two fed horses of their realm in it; they tend them for{' '}
           {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
-          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. Breeding stops,
-          and starts over from nothing, when the resident leaves or is given another order, when a
-          horse leaves or dies, or when the stable has no room left for the foal. The Breed horses
-          default first takes {num(BREED_FOOD)} Food from the stable for the resident's meals, if
-          they carry less. NPC cities have one of their residents breed their horses the same way.
+          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. The progress
+          belongs to the two horses, and the stable keeps it: breeding pauses when the resident
+          leaves or is given another order, or while the stable has no room left for the foal, and
+          any grown resident who breeds there later carries on with that pair first, where it
+          stopped, if both are still fed. The stable's card shows a paused breeding and how far
+          along it is. The progress is lost only when one of the two leaves the stable or dies. The
+          Breed horses default first takes {num(BREED_FOOD)} Food from the stable for the resident's
+          meals, if they carry less. NPC cities have one of their residents breed their horses the
+          same way.
         </p>
         <h3>Horse stats</h3>
         <p>
@@ -936,7 +942,13 @@ export function Wiki() {
           onto walls. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
           at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
           Driving makes riding faster. A rider carries no more than on foot, and can't drive a
-          carriage; a ridden horse is never hitched.
+          carriage; a ridden horse is never hitched. On the map a rider sits on a horse token, and
+          up close their activity icon is a horseshoe while they ride somewhere.
+        </p>
+        <p>
+          A rider’s Doing line says <em>Riding to …</em> where it would say{' '}
+          <em>Walking to …</em>, and their card shows the horse they ride: its stats, age, health
+          and hunger, with <strong>Dismount</strong> under Orders.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
@@ -945,6 +957,16 @@ export function Wiki() {
           from the one picked as <code>source</code> on their card, and store it in the stable;
           otherwise they wait there. Picking another <code>stable</code> on the card has them feed
           that one instead.
+        </p>
+        <h3>Horse offer</h3>
+        <p>
+          Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, ever, whenever they
+          choose and whether or not they have horses: a notice at the top of the screen has a Claim
+          button until they do. The horses get new stats and ages and go in your finished stable
+          nearest your Leader's city; with no stable, they stand next to that city's storage (or
+          next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
+          realm log says where they are. Once claimed the offer is gone for good, also after your
+          Leader dies and you found a new realm; while you have no living Leader you can't claim it.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
