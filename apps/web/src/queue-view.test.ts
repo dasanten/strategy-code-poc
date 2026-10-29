@@ -13,6 +13,7 @@ import {
   queueRows,
   removeStep,
   STORE_ALL,
+  stepLabel,
   timeStep,
   type Queued,
 } from './queue-view.js'
@@ -165,5 +166,24 @@ describe('the queue list', () => {
       [2, undefined],
     ])
     expect(queueStepsProblem(moved)).toBeUndefined()
+  })
+})
+
+describe('step labels', () => {
+  const buildings = [
+    { id: 's1', kind: 'storage' as const },
+    { id: 'b1', kind: 'stable' as const },
+  ]
+  it('names the place a planned step acts on', () => {
+    expect(stepLabel({ ...STORE_ALL, to: 's1' }, { buildings })).toBe(
+      'Store what they carry at the storage',
+    )
+    expect(stepLabel({ kind: 'fetch', goods: { wood: 5 }, from: 's1' }, { buildings })).toBe(
+      'Fetch 5 wood from the storage',
+    )
+    expect(stepLabel({ kind: 'task', task: 'feedStable', stableId: 'b1' }, { buildings })).toBe(
+      'Feed the stable',
+    )
+    expect(stepLabel({ kind: 'mount', horseId: 'h1' }, {})).toBe('Mount a horse')
   })
 })

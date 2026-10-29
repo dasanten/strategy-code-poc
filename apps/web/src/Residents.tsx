@@ -866,6 +866,7 @@ export function ResidentCard({
   scriptParams,
   onStore,
   onEditQueue,
+  addStep,
   collapsed = false,
 }: {
   resident: Resident
@@ -982,6 +983,8 @@ export function ResidentCard({
   onStore?: () => void
   /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
   onEditQueue?: (steps: QueueStepRequest[], loop?: boolean) => void
+  /** The queue planner's Add step (`AddStep`), under the queue. */
+  addStep?: ReactNode
   /** Shrunk to its header while the map waits for a target (ADR 0012: pick mode). */
   collapsed?: boolean
 }) {
@@ -1104,8 +1107,11 @@ export function ResidentCard({
             onEdit={onEditQueue}
           />
         ) : (
-          <p className="muted small">Nothing queued. Hold Shift with any order to queue it.</p>
+          <p className="muted small">
+            Nothing queued. Hold Shift with any order to queue it, or plan steps with Add step.
+          </p>
         ))}
+      {tab === 'queue' && addStep}
       {tab === 'script' &&
         (r.script ? (
           <>

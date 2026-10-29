@@ -483,8 +483,20 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, work, build, haul, tear down, build a road or wall
-          line, or run one of your scripts with its params.
+          to, pick up, drop, store, fetch, drive, mount or dismount, work, build, haul, feed the
+          stable, breed horses, tear down, build a road or wall line, or run one of your scripts with
+          its params.
+        </p>
+        <p>
+          To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
+          lists every kind of step. One that acts on a place (work a workplace, build, store at or
+          fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
+          map, anywhere, not only where the resident stands now; one that needs more (which goods,
+          what to build, what a smithy makes, which script) asks for it on the card after. A step
+          that has to be done on its tile goes after a walk there, unless the step before already
+          walks there. It works on a resident with no queue too, and starts one. Adding a step only
+          checks that it could make sense (the place is there, and a carriage or horse is yours);
+          whether it can start is checked when its turn comes.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
