@@ -936,7 +936,8 @@ export function Wiki() {
           onto walls. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
           at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
           Driving makes riding faster. A rider carries no more than on foot, and can't drive a
-          carriage; a ridden horse is never hitched.
+          carriage; a ridden horse is never hitched. On the map a rider sits on a horse token, and
+          up close their activity icon is a horseshoe while they ride somewhere.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
