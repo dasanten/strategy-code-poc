@@ -76,16 +76,21 @@ export function pickHint(target: PickTarget): string | undefined {
 
 /** Whether the screen is mainly touched rather than pointed at with a mouse. */
 export function useTouchScreen(): boolean {
-  const query = '(pointer: coarse)'
-  const [touch, setTouch] = useState(() => window.matchMedia?.(query).matches ?? false)
+  return useMediaQuery('(pointer: coarse)')
+}
+
+/** Whether the screen matches a CSS media query, kept up to date as it changes. */
+export function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia?.(query).matches ?? false)
   useEffect(() => {
     const list = window.matchMedia?.(query)
     if (!list) return
-    const onChange = () => setTouch(list.matches)
+    const onChange = () => setMatches(list.matches)
+    onChange()
     list.addEventListener('change', onChange)
     return () => list.removeEventListener('change', onChange)
-  }, [])
-  return touch
+  }, [query])
+  return matches
 }
 
 /**

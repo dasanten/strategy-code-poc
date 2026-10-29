@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import {
   CITY_NAME_MAX_LENGTH,
   nameProblem,
@@ -16,6 +24,7 @@ import {
   type CardAction,
   type TileCard as TileCardData,
 } from './selection-view.js'
+import { SHEET_OPENS_AT, nextSheet, snapSheet, stepSheet, type SheetHeight } from './sheet-view.js'
 import './selection-card.css'
 
 /**
@@ -47,6 +56,7 @@ export function SelectionCard({
   collapsed?: boolean
   children: ReactNode
 }) {
+  const peek = useContext(SheetPeek)
   const colour = rel
     ? `var(--rel-${rel.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)})`
     : undefined
@@ -87,8 +97,106 @@ export function SelectionCard({
         </button>
       </div>
       {head}
-      {!collapsed && children}
+      {!collapsed && !peek && children}
     </aside>
+  )
+}
+
+/** Whether the card is in a bottom sheet dropped to its header, so only the header shows. */
+const SheetPeek = createContext(false)
+
+const SHEET_LABELS: Record<SheetHeight, string> = {
+  peek: 'header only',
+  half: 'half the screen',
+  full: 'full screen',
+}
+
+/** How far, in pixels, the handle moves before a press counts as a drag rather than a tap. */
+const DRAG_SLOP = 6
+
+/**
+ * Where the selection card sits over the map: docked top right on a desktop, a bottom sheet on a
+ * phone (ADR 0012). The sheet opens at half; dragging its handle moves it between peek (just the
+ * header), half and full, and a tap goes one height up. Pick mode drops it to peek, and it comes
+ * back to where it was once the target is picked.
+ */
+export function CardSheet({
+  phone,
+  pinnedPeek,
+  children,
+}: {
+  phone: boolean
+  /** Held at peek while the map waits for a target for this card. */
+  pinnedPeek: boolean
+  children: ReactNode
+}) {
+  const [height, setHeight] = useState<SheetHeight>(SHEET_OPENS_AT)
+  // The sheet's height in pixels while its handle is dragged.
+  const [dragged, setDragged] = useState<number>()
+  const press = useRef<{ y: number; from: number; moved: boolean }>(undefined)
+  const ref = useRef<HTMLDivElement>(null)
+  if (!phone) return <div className="game-selection">{children}</div>
+  const shown = pinnedPeek ? 'peek' : height
+  const screen = () => ref.current?.parentElement?.clientHeight ?? window.innerHeight
+  const settle = (to: SheetHeight) => {
+    setHeight(to)
+    setDragged(undefined)
+  }
+  return (
+    <div
+      ref={ref}
+      className={`game-selection sheet sheet-${dragged === undefined ? shown : 'dragged'}`}
+      style={dragged === undefined ? undefined : { height: dragged }}
+    >
+      <button
+        type="button"
+        className="sheet-handle"
+        aria-label={`Card height: ${SHEET_LABELS[shown]}. Drag or tap to change it.`}
+        disabled={pinnedPeek}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return
+          e.currentTarget.setPointerCapture(e.pointerId)
+          press.current = {
+            y: e.clientY,
+            from: ref.current?.getBoundingClientRect().height ?? 0,
+            moved: false,
+          }
+        }}
+        onPointerMove={(e) => {
+          const p = press.current
+          if (!p) return
+          const dy = e.clientY - p.y
+          if (!p.moved && Math.abs(dy) < DRAG_SLOP) return
+          p.moved = true
+          setDragged(Math.max(0, Math.min(screen(), p.from - dy)))
+        }}
+        onPointerUp={(e) => {
+          const p = press.current
+          if (!p?.moved) return
+          settle(snapSheet(p.from - (e.clientY - p.y), screen()))
+        }}
+        onPointerCancel={() => {
+          press.current = undefined
+          setDragged(undefined)
+        }}
+        onClick={() => {
+          // A drag ends in a click too; only a press that stayed put is a tap.
+          const moved = press.current?.moved
+          press.current = undefined
+          if (!moved) settle(nextSheet(shown))
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+          e.preventDefault()
+          settle(stepSheet(shown, e.key === 'ArrowUp'))
+        }}
+      >
+        <span aria-hidden="true" />
+      </button>
+      <SheetPeek.Provider value={dragged === undefined && shown === 'peek'}>
+        {children}
+      </SheetPeek.Provider>
+    </div>
   )
 }
 

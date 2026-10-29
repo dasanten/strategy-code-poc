@@ -39,6 +39,7 @@ import {
   CentredDialog,
   Drawer,
   DrawerEdge,
+  PhoneMenu,
   ToolRail,
   TopBar,
   mapCovered,
@@ -66,8 +67,9 @@ import {
   type HaulSetup,
   type Picking,
 } from './Residents.js'
-import { PickBanner, TileCard } from './SelectionCard.js'
-import { pickHint, pickPrompt, pickTarget, useTouchScreen } from './pick-mode.js'
+import { CardSheet, PickBanner, TileCard } from './SelectionCard.js'
+import { pickHint, pickPrompt, pickTarget, useMediaQuery, useTouchScreen } from './pick-mode.js'
+import { PHONE_QUERY } from './sheet-view.js'
 import { buildingNodeKind } from './building-info-view.js'
 import {
   buildHereProblem,
@@ -161,6 +163,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   useEscapeCloses(openDrawer, closeDrawer)
   // What the map waits for while an order that needs a target is given (ADR 0012: pick mode).
   const touch = useTouchScreen()
+  // Narrow or touch: cards are bottom sheets and the HUD folds into a menu button (ADR 0012).
+  const phone = useMediaQuery(PHONE_QUERY)
   const pick = pickTarget({
     picking,
     groupPicking,
@@ -496,7 +500,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   if (founding && !world) return <Founding leaderName={founding.leaderName} onFound={found} />
 
   return (
-    <div className="game">
+    <div className={phone ? 'game phone' : 'game'}>
       <section className="game-map">
         {world ? (
           <MapView
@@ -543,10 +547,21 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         leader={leader?.name}
         onLogout={logout}
       />
-      <ToolRail
-        open={openDrawer}
-        onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
-      />
+      {phone ? (
+        <PhoneMenu
+          open={openDrawer}
+          onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
+          goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
+          cityName={homeCity?.name}
+          leader={leader?.name}
+          onLogout={logout}
+        />
+      ) : (
+        <ToolRail
+          open={openDrawer}
+          onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
+        />
+      )}
       {world &&
         drawer(
           'residents',
@@ -684,7 +699,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <PickBanner prompt={pickPrompt(pick, touch)} hint={pickHint(pick)} onCancel={cancelPick} />
       )}
       {world && selectedTile && (
-        <div className="game-selection">
+        <CardSheet phone={phone} pinnedPeek={false}>
           <TileCard
             card={describeTile(
               {
@@ -755,10 +770,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOrderError(await giveOrder(order))
             }}
           />
-        </div>
+        </CardSheet>
       )}
       {world && selected && !selectedTile && (
-        <div className="game-selection">
+        <CardSheet phone={phone} pinnedPeek={pick !== undefined && pick.kind !== 'army'}>
           <ResidentCard
             key={selected.id}
             resident={selected}
@@ -899,10 +914,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }}
             collapsed={pick !== undefined && pick.kind !== 'army'}
           />
-        </div>
+        </CardSheet>
       )}
       {world && group.length > 1 && !selectedTile && (
-        <div className="game-selection">
+        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group'}>
           <GroupCard
             residents={group}
             scripts={scripts}
@@ -939,7 +954,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onClose={() => select([])}
             collapsed={pick?.kind === 'group'}
           />
-        </div>
+        </CardSheet>
       )}
       {world && realmEnded(world.events) && (
         <CentredDialog title="Your realm has ended">

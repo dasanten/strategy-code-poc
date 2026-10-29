@@ -41,12 +41,59 @@
 .pick-banner button {
   flex: none;
 }
-/* On a narrow screen the card sits at the top, so the banner goes to the bottom, near the thumb. */
-@media (max-width: 640px) {
-  .pick-banner {
-    top: auto;
-    bottom: 12px;
-  }
+.game.phone .pick-banner {
+  max-width: calc(100vw - 24px);
+}
+/* On a phone the card is a bottom sheet (ADR 0012, `CardSheet`): peek shows just its header,
+   half and full fixed heights; a drag sets the height inline until it settles. */
+.game-selection.sheet {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-height: calc(100% - var(--top-h));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 14px 14px 0 0;
+}
+.game-selection.sheet-half {
+  height: 50%;
+}
+.game-selection.sheet-full {
+  height: calc(100% - var(--top-h));
+}
+.sheet-handle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--ui-panel);
+  backdrop-filter: blur(10px);
+  cursor: ns-resize;
+  touch-action: none;
+}
+.sheet-handle:disabled {
+  cursor: default;
+}
+.sheet-handle span {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ui-line-strong);
+}
+.game-selection.sheet .sel-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border-top: 0;
+  border-radius: 0;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 .inspector.sel-card {
   gap: 12px;
