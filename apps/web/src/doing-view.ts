@@ -2,12 +2,14 @@ import type {
   Building,
   GoodsPlace,
   GoodsWanted,
+  Resident,
   ResidentOrder,
   ScriptSummary,
   SeenScript,
   Task,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
+import { selectedWay } from './map/way.js'
 import { GOOD_LABELS, orderDoing } from './Residents.js'
 
 /** What the Doing line is worked out from: the resident's order and the script they run. */
@@ -16,21 +18,31 @@ export interface DoingOf {
   /** Expecting a child, which shows while they have no order. */
   carrying?: unknown
   script?: SeenScript
+  /** The carriage they are aboard (`CONTEXT.md`: Passenger), which shows while they have no order. */
+  aboard?: string
 }
 
 /**
  * A resident's Doing line (`CONTEXT.md`: Doing): what the script last gave `doing()`, else what
  * their task and current order have them doing, "Building a house: fetching 10 wood from the
  * storage". The script's name is not part of it; the card and list show it on a line of its own.
+ * A passenger with no order is "Aboard a carriage", heading where its driver among `residents`
+ * drives it.
  */
 export function doingLine(
   r: DoingOf,
   {
     scripts = [],
     buildings = [],
-  }: { scripts?: readonly ScriptSummary[]; buildings?: readonly Pick<Building, 'id' | 'kind'>[] },
+    residents = [],
+  }: {
+    scripts?: readonly ScriptSummary[]
+    buildings?: readonly Pick<Building, 'id' | 'kind'>[]
+    residents?: readonly Pick<Resident, 'order'>[]
+  },
 ): string {
   if (r.script?.doing) return r.script.doing
+  if (r.aboard !== undefined && !r.order) return aboardLine(r, residents)
   if (r.carrying && !r.order) return 'Carrying a child'
   const task = r.script && taskOf(r.script, scripts)
   const step = stepLine(r.order, buildings)
@@ -44,6 +56,18 @@ export function doingLine(
     return o.kind === 'workAt' && o.makes ? `${what}: ${lower(orderDoing(r))}` : what
   }
   return `${what}: ${o ? lower(step ?? orderDoing(r)) : 'waiting'}`
+}
+
+/**
+ * A passenger's line (`CONTEXT.md`: Passenger): "Aboard a carriage", and "· heading to 4, 5"
+ * while its driver drives it there.
+ */
+function aboardLine(
+  r: Pick<DoingOf, 'aboard'>,
+  residents: readonly Pick<Resident, 'order'>[],
+): string {
+  const to = selectedWay({ order: null, aboard: r.aboard }, residents)?.target
+  return to ? `Aboard a carriage · heading to ${to.x}, ${to.y}` : 'Aboard a carriage'
 }
 
 /** The order a task's default script gives for the task itself; Feed the stable has none. */

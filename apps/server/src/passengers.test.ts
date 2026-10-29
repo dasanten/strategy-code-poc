@@ -1,9 +1,12 @@
 import {
   AVERAGE_HORSE_STATS,
   CARRIAGE_CAPACITY,
+  HUNGER_DAYS,
   MAX_HEALTH,
   MAX_HUNGER,
+  OWN_FOOD,
   PASSENGER_WEIGHT,
+  TICKS_PER_GAME_DAY,
   Terrain,
   carriageCapacity,
   unitsThatFitCarriage,
@@ -31,7 +34,7 @@ const me = { userId: 7, account: { name: 'Mara', isAdmin: false } }
 
 /**
  * A world on an open map with realm r1 (Player 7, Leader w1) and, at (2, 2), its residents w1
- * (the driver), p1 and p2, and carriage k1 with horse h1 of r1.
+ * (the driver), p1 and p2 with their own food, and carriage k1 with horse h1 of r1.
  */
 function setup() {
   const world = createWorld(open)
@@ -40,6 +43,7 @@ function setup() {
   const at = (id: string, seed: number) =>
     newResident(mulberry32(seed), { id, owner: 'r1', x: 2, y: 2, tick: 0 })
   const [w1, p1, p2] = [at('w1', 1), at('p1', 2), at('p2', 3)]
+  for (const r of [w1, p1, p2]) r.carried = { food: OWN_FOOD }
   world.residents.push(w1, p1, p2)
   const horse: Horse = {
     id: 'h1',
@@ -305,6 +309,48 @@ describe('passengers', () => {
         reason: 'that carriage is not on the resident’s tile',
       }),
     ])
+  })
+
+  describe('eat from the carriage (Refilling from a carriage)', () => {
+    /**
+     * Boards p1 with no Food of their own on a carriage holding `food`, then has w1 (well fed)
+     * drive it back and forth across the map for `HUNGER_DAYS + 1` game days, longer than a full
+     * hunger meter lasts.
+     */
+    function longDrive(food: number) {
+      const { world, w1, p1, carriage } = setup()
+      world.residents = world.residents.filter((r) => r.id !== 'p2')
+      board(world, 'p1')
+      p1.carried = {}
+      w1.carried = { food: 10 }
+      carriage.load = food > 0 ? { food } : {}
+      const walking = new Walking(open)
+      const ends = [20, 2]
+      for (let t = 0; t < (HUNGER_DAYS + 1) * TICKS_PER_GAME_DAY; t++) {
+        if (!w1.order) {
+          order(world, { kind: 'drive', residentId: 'w1', carriageId: 'k1', x: ends[0], y: 2 })
+          ends.reverse()
+        }
+        stepWorld(world, open, walking)
+        if (t % 240 === 0) expect(checkInvariants(world, open)).toEqual([])
+      }
+      expect(p1.aboard).toBe('k1')
+      expect(carriage.x).not.toBe(2)
+      return { p1, carriage }
+    }
+
+    it('keep a passenger with no Food fed over a long drive on a carriage with Food', () => {
+      const { p1, carriage } = longDrive(20)
+      expect(p1.hunger).toBeGreaterThan(MAX_HUNGER / 2)
+      expect(p1.health).toBe(MAX_HEALTH)
+      expect(carriage.load.food ?? 0).toBeLessThan(20)
+    })
+
+    it('leave passengers hungry on a carriage without Food', () => {
+      const { p1 } = longDrive(0)
+      expect(p1.hunger).toBe(0)
+      expect(p1.carried.food ?? 0).toBe(0)
+    })
   })
 
   it('keep the invariant: a passenger stands on their carriage', () => {

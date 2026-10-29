@@ -1,7 +1,10 @@
 import type { SeenResident } from '@csp/shared'
 import type { Spot } from './unit-tokens.js'
 
-/** One of the Player's residents where it shows on screen, and how far from it a click reaches. */
+/**
+ * One of the Player's residents where it shows on screen, and how far from it a click reaches: 0
+ * for one a click never picks, only a box.
+ */
 export interface Pickable {
   id: string
   x: number
@@ -19,9 +22,11 @@ export interface Point {
  * The residents of the Player's realm that can be clicked or boxed on the map: at the figure or
  * token they were drawn as last frame (`spots`), so the reach grows with it, or else at their
  * tile's centre (`place`). Up close only those drawn as a figure (or behind a "+N" badge) count.
+ * A passenger, inside their carriage, is only boxed: a click there opens the carriage's card,
+ * which lists them (`CONTEXT.md`: Passenger).
  */
 export function pickables(
-  residents: readonly Pick<SeenResident, 'id' | 'owner' | 'x' | 'y'>[],
+  residents: readonly Pick<SeenResident, 'id' | 'owner' | 'x' | 'y' | 'aboard'>[],
   realmId: string,
   spots: ReadonlyMap<string, Spot>,
   place: (x: number, y: number) => readonly [number, number],
@@ -34,12 +39,8 @@ export function pickables(
     const spot = spots.get(r.id)
     if (close && !spot) continue
     const [x, y] = spot ? [spot.x, spot.y] : place(r.x + 0.5, r.y + 0.5)
-    list.push({
-      id: r.id,
-      x,
-      y,
-      reach: spot ? Math.max(8, spot.r * 1.4) : Math.max(10, scale * 0.6),
-    })
+    const reach = spot ? Math.max(8, spot.r * 1.4) : Math.max(10, scale * 0.6)
+    list.push({ id: r.id, x, y, reach: r.aboard === undefined ? reach : 0 })
   }
   return list
 }
@@ -49,7 +50,7 @@ export function pickableAt(list: readonly Pickable[], sx: number, sy: number): s
   let best: { id: string; d: number } | undefined
   for (const p of list) {
     const d = Math.hypot(p.x - sx, p.y - sy)
-    if (d <= p.reach && (!best || d < best.d)) best = { id: p.id, d }
+    if (p.reach > 0 && d <= p.reach && (!best || d < best.d)) best = { id: p.id, d }
   }
   return best?.id
 }
