@@ -40,7 +40,8 @@ The shared language of the game. Domain terms only — no implementation details
   gates. A road tile on Mountain takes the same materials but four times the work. On a road
   residents and carriages move at road speed whatever the terrain beneath, and eat as on Plains;
   a finished road on Mountain lets carriages and riders cross it like any road, so roads open
-  mountain passes. Nobody owns a road; anyone can walk it or tear it down.
+  mountain passes. Nobody owns a road; anyone can walk it or tear it down, except a road tile on
+  Mountain while a carriage or a ridden horse stands on it, so nobody is stranded there.
   A resident can build road along a line from their tile to another, one tile after another; the
   line runs straight or diagonal, each tile a Step on from the one before.
 - **Step:** a move onto one of the eight tiles around, straight or diagonal. A diagonal step is
