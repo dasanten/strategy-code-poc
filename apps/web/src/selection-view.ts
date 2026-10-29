@@ -23,6 +23,7 @@ import {
   WORKPLACE_SKILL,
   buildProblem,
   canWork,
+  isOutpostStorage,
   nodeCorner,
   stockWeight,
   type BuildingKind,
@@ -613,10 +614,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   let buildHere: TileCard['buildHere']
   if (building) {
     const city = cityOf(building)
-    const rel = themeRelationship(cityRelationship(city, t.viewer))
+    // An outpost storage goes by its own realm (`CONTEXT.md`: Outpost storage).
+    const rel = realmRelationship(building.realmId ?? null, building.cityId, t.cities, t.viewer)
     const name = BUILDING_NAMES[building.kind]
+    const outpost = isOutpostStorage(building) ? `Outpost ${name.toLowerCase()}` : name
     card = {
-      title: building.site ? `${name} site` : city ? `${city.name} ${name.toLowerCase()}` : name,
+      title: building.site ? `${name} site` : city ? `${city.name} ${name.toLowerCase()}` : outpost,
       rel,
       what: 'building',
       gate:

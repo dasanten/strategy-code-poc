@@ -205,7 +205,8 @@ function insightOf(world: WorldState, size: number, side: string, observers: Spo
         .filter((w) => w.kind === 'warehouse' && at(w))
         .flatMap((w) => tradeCoinWarehouse(world, w)?.id ?? []),
     )).has(b.id)
-  const insideBuilding = (b: Building) => ours(null, b.cityId) || at(b) || coinWarehouseSeen(b)
+  const insideBuilding = (b: Building) =>
+    ours(b.realmId ?? null, b.cityId) || at(b) || coinWarehouseSeen(b)
   return {
     ours,
     insideBuilding,

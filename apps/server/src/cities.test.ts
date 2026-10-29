@@ -270,17 +270,22 @@ describe('town halls (`CONTEXT.md`: Town hall)', () => {
 })
 
 describe('storages (`CONTEXT.md`: Storage)', () => {
-  it('can be laid out in a city’s area and not outside it', () => {
+  it('can be laid out in a city’s area, and outside it as an outpost storage', () => {
     const { world, r } = setup()
     addCity(world, { id: 'c1', realmId: 'r1', x: 40, y: 40 })
     const q = new OrderQueue(undefined, terrain)
     const order = { kind: 'build', residentId: r.id, building: 'storage' }
-    // Its footprint would reach a tile past the city's area.
+    // Its footprint reaches a tile past the city's area (`CONTEXT.md`: Outpost storage).
     Object.assign(r, { x: 42 + CITY_AREA_MARGIN, y: 40 })
-    expect(q.receive(world, me, 'q', order)).toMatchObject({
+    expect(q.receive(world, me, 'q', order)).toMatchObject({ type: 'ack' })
+    const house = { kind: 'build', residentId: r.id, building: 'house' }
+    expect(q.receive(world, me, 'q', house)).toMatchObject({
       type: 'rejected',
-      reason: 'a storage goes in a city’s area',
+      reason: 'a house goes in a city’s area',
     })
+    q.applyAll(world)
+    world.buildings = world.buildings.filter((b) => !b.site)
+    r.order = null
     Object.assign(r, { x: 43, y: 40 })
     expect(q.receive(world, me, 'q', order)).toMatchObject({ type: 'ack' })
     q.applyAll(world)
