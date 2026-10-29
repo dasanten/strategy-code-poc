@@ -415,17 +415,23 @@ describe('PathFinder across the full map', () => {
     const finder = new PathFinder(map)
     const budgetMs = 20
     finder.request('across', west, east)
+    // A clock that moves on 1 ms each time it is read: the finder reads it once per batch of
+    // expansions, so how far it moves in one `advance` is how much work that step did, however
+    // fast or busy this machine is.
+    let t = 0
+    const now = () => t++
     let worst = 0
     let ticks = 0
     while (finder.pending > 0) {
-      const start = performance.now()
-      finder.advance(budgetMs)
-      worst = Math.max(worst, performance.now() - start)
+      const start = t
+      finder.advance(budgetMs, now)
+      worst = Math.max(worst, t - start)
       ticks++
       expect(ticks).toBeLessThan(100)
     }
-    // One batch of expansions may run past the deadline; it is small.
-    expect(worst).toBeLessThan(budgetMs + 15)
+    // It stops at its deadline: one batch per ms of budget, plus the readings that look for short
+    // requests waiting.
+    expect(worst).toBeLessThanOrEqual(budgetMs + 2)
     const r = finder.result('across')
     expect(r?.status).toBe('found')
     if (r?.status !== 'found') return
