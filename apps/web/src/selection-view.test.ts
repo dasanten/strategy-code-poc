@@ -14,6 +14,8 @@ import {
   BUILD_WORK,
   NODE_GOOD,
   NODE_WORKPLACE,
+  PASSENGER_WEIGHT,
+  stockWeight,
   Terrain,
   UNEXPLORED,
   WORK_OUTPUT_PER_DAY,
@@ -437,6 +439,39 @@ describe('the card for a tile', () => {
     expect(tile({ piles: [pile] }).lines).toContain('On the ground: 4 stone')
     const node = { kind: 'ironOre' as const, x: 5, y: 5 }
     expect(tile({ node })).toMatchObject({ what: 'node', title: 'Iron ore node' })
+  })
+
+  it('lists a carriage’s passengers under its load, and how much of it is people', () => {
+    const ana = { id: 'ana', name: 'Ana' } as SeenResident
+    const bo = { id: 'bo', name: 'Bo' } as SeenResident
+    const cid = { id: 'cid', name: 'Cid', owner: 'them', cityId: null, carried: {} } as Resident
+    const k = { ...carriage, passengerIds: ['ana', 'bo', 'cid'] }
+    const card = tile({ carriages: [k], residents: [ana, bo, cid], strangers: [cid] })
+    const people = 3 * PASSENGER_WEIGHT
+    const weight = Math.round(stockWeight(carriage.load) + people)
+    expect(card.lines[0]).toContain(`${weight} / ${CARRIAGE_CAPACITY} kg`)
+    expect(card.lines[1]).toBe(`Passengers: Ana, Bo, Cid · ${people} kg of it people`)
+    // Each a link to pick them, but the stranger.
+    expect(card.passengers).toEqual({
+      line: 1,
+      residents: [
+        { id: 'ana', name: 'Ana', pick: true },
+        { id: 'bo', name: 'Bo', pick: true },
+        { id: 'cid', name: 'Cid', pick: false },
+      ],
+      weight: `${people} kg of it people`,
+    })
+    // Under a building's card it follows the carriage's line there.
+    const under = tile({
+      buildings: [building({ kind: 'farm', cityId: 'c-me' })],
+      carriages: [k],
+      residents: [ana],
+    })
+    const at = under.lines.findIndex((l) => l.startsWith('Carriage'))
+    expect(under.passengers?.line).toBe(at + 1)
+    expect(under.lines[at + 1]).toBe(`Passengers: Ana · ${PASSENGER_WEIGHT} kg of it people`)
+    // None aboard: no line, no list.
+    expect(tile({ carriages: [carriage] }).passengers).toBeUndefined()
   })
 
   it('lists everything on the tile under the building it is named after', () => {

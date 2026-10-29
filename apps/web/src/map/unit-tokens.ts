@@ -89,7 +89,8 @@ function drawMount(tokens: TokenLayer, x: number, y: number, r: number, rel: Ton
  * Residents, carriages, horses, Trade Org caravans and armies at middle zoom and closer
  * (ADR 0008): residents on one tile as one token with a count, coloured by the largest group,
  * or up close as single figures with their activity (`drawFigures`);
- * an army as a banner with its soldier count; carts and caravans; horses not hitched to a cart,
+ * an army as a banner with its soldier count; carts and caravans, a cart's passengers inside it
+ * as a count; horses not hitched to a cart,
  * and a ridden one as a small horse by its rider.
  * Units on a tile with a building or a cart step aside to its corners so both show.
  * Tokens are coloured as `viewer` sees them; the `leaders` wear the crown.
@@ -143,20 +144,27 @@ export function drawUnits(
     )
   }
 
+  const spots = new Map<string, Spot>()
+  // Passengers ride inside their carriage (`CONTEXT.md`: Passenger): its badge counts them, and
+  // they are found at it.
+  const passengers = new Set(world.carriages.flatMap((k) => k.passengerIds ?? []))
   for (const k of world.carriages) {
     const p = at(k.x, k.y, built.has(key(k)) ? -0.28 : 0, built.has(key(k)) ? 0.28 : 0)
     if (!near(p)) continue
     const caravan = parts.carriages.has(k.id)
+    const r = unitRadius('carriage', tile)
     drawUnit(
       tokens,
       caravan ? UNIT_ART.caravan : UNIT_ART.carriage,
       ...p,
-      unitRadius('carriage', tile),
+      r,
       entityRelationship(k, viewer, known),
     )
+    const aboard = k.passengerIds ?? []
+    if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)
+    for (const id of aboard) spots.set(id, { x: p[0], y: p[1], r })
   }
 
-  const spots = new Map<string, Spot>()
   // People step to the lower right of a building or a cart on their tile.
   const place = (x: number, y: number, full: number) => {
     const aside = built.has(`${x},${y}`) || carted.has(`${x},${y}`)
@@ -180,7 +188,7 @@ export function drawUnits(
     world.residents,
     (id) => rels.get(id),
     leaders,
-    new Set(banners.flatMap((b) => b.under)),
+    new Set([...banners.flatMap((b) => b.under), ...passengers]),
   )
   const close = zoomTier(tile) === 'close'
   const byId = new Map(world.residents.map((r) => [r.id, r]))

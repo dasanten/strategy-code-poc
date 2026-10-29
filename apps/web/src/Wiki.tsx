@@ -949,8 +949,12 @@ export function Wiki() {
           don't walk on their own. <strong>Get off</strong> puts them on the carriage's tile, or a
           script's <code>getOff(x, y)</code> on a tile right next to it. Giving a passenger a walk,
           or an order that acts on a tile (work, build, goods, fight and so on), gets them off first
-          and then goes on. Scripts see a resident's <code>aboard</code> and a carriage's{' '}
-          <code>passengerIds</code>.
+          and then goes on. On the map passengers ride inside the carriage, which shows how many it
+          carries; clicking it opens its card, which lists them under its load with how much of its
+          weight is people and picks one when you click their name (a box drag takes them in too). A
+          passenger's Doing line says "Aboard a carriage" and where it is heading while it is
+          driven, and picking them shows the carriage's way ahead. Scripts see a resident's{' '}
+          <code>aboard</code> and a carriage's <code>passengerIds</code>.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}

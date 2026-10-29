@@ -1,4 +1,4 @@
-import type { SeenResident } from '@csp/shared'
+import { drivenCarriageId, type SeenResident } from '@csp/shared'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 
 /** A resident's way ahead: where it ends and the tiles along it (none once in contact). */
@@ -17,6 +17,19 @@ export function wayAhead(r: Pick<SeenResident, 'order'>): Way | undefined {
   const last = o?.kind === 'attack' ? o.path?.at(-1) : undefined
   if (o?.kind === 'attack' && last) return { target: { x: last[0], y: last[1] }, path: o.path }
   return undefined
+}
+
+/**
+ * The way ahead of a resident on the map: a passenger's is the carriage's they are aboard, the
+ * way its driver among `residents` drives it (`CONTEXT.md`: Passenger); anyone else's their own.
+ */
+export function selectedWay(
+  r: Pick<SeenResident, 'order' | 'aboard'>,
+  residents: readonly Pick<SeenResident, 'order'>[],
+): Way | undefined {
+  if (r.aboard === undefined) return wayAhead(r)
+  const driver = residents.find((d) => drivenCarriageId(d) === r.aboard)
+  return driver && wayAhead(driver)
 }
 
 /** Screen pixels round the view in which the way's line and target dot still show. */

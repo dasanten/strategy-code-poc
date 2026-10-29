@@ -101,7 +101,7 @@ export function horseFor<H extends CarriageHorse>(
 }
 
 /** The carriage a resident drives, by a drive order or on a haul route, if they drive one. */
-export function drivenCarriageId(resident: Resident): string | undefined {
+export function drivenCarriageId(resident: Pick<Resident, 'order'>): string | undefined {
   const o = resident.order
   return o?.kind === 'drive' || o?.kind === 'haul' ? o.carriageId : undefined
 }
