@@ -408,9 +408,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -1248,11 +1248,13 @@ export function Wiki() {
           doing, until the script says something else; only you see it. Without it they show what
           the task and its current order have the resident doing, such as “Building a house:
           fetching 10 wood from the storage”. <code>end</code>: once this run is over the script
-          ends and the resident stands idle; in a queue, its next step starts. The Build and Tear
-          down defaults end once the site is finished or the building is gone; a script that never
-          calls it runs until another order ends it. A script runs as a resident's or as an army's:
-          names marked resident only or army only are only there for one of them, and a default
-          script runs as a resident's.
+          ends and the resident stands idle; in a queue, its next step starts. Given a reason,{' '}
+          <code>end(reason)</code> also notes it in your realm log, like “Ana stopped Work: no
+          workplace on her tile”: short text, cut like <code>doing</code>’s, that only you see, for
+          every end. The Build and Tear down defaults end once the site is finished or the building
+          is gone; a script that never calls it runs until another order ends it. A script runs as a
+          resident's or as an army's: names marked resident only or army only are only there for one
+          of them, and a default script runs as a resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />

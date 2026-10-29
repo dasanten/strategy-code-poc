@@ -504,6 +504,18 @@ export class ScriptRunner {
     for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
     if (bound.ended()) {
       endScript(world, r.id)
+      // A reason is noted each time, not rate-limited: an end is no error.
+      const reason = bound.endReason()
+      if (reason !== null) {
+        recordEvent(world, realm.id, {
+          kind: 'scriptStopped',
+          ...r.by,
+          name: r.name,
+          scriptId: running.scriptId,
+          script: script.name,
+          reason,
+        })
+      }
       return result.steps
     }
 

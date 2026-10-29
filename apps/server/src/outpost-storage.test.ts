@@ -116,7 +116,12 @@ describe('an outpost storage', () => {
     }
     world.piles.push({ id: 'p', x: farm.x, y: farm.y, goods: { food: 100 } })
     const host: ScriptHost = {
-      script: () => ({ userId: 7, source: DEFAULT_SCRIPTS.work.source, followsDefault: true }),
+      script: () => ({
+        userId: 7,
+        name: DEFAULT_SCRIPTS.work.name,
+        source: DEFAULT_SCRIPTS.work.source,
+        followsDefault: true,
+      }),
       sender: (userId) => ({ userId, account: { name: 'Mara', isAdmin: false } }),
       explored: () => true,
     }

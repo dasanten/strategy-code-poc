@@ -1393,6 +1393,17 @@ export type RealmEventWhat =
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
   /**
+   * A resident's script ended itself with `end(reason)` (`CONTEXT.md`: Script): `script` is its
+   * name, `reason` the short text it gave. Not an error: one for each end, never rate-limited.
+   */
+  | ({
+      kind: 'scriptStopped'
+      name: string
+      scriptId: number
+      script: string
+      reason: string
+    } & ScriptRunBy)
+  /**
    * A field the Player's active scripts read was renamed or removed from its script view
    * (`CONTEXT.md`: Script view), as `view.field`; it reads `null` from now on. `scripts` are
    * those that read it, by name.
