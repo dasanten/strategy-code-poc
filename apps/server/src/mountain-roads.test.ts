@@ -235,40 +235,46 @@ describe('a rider on a mountain road', () => {
   })
 })
 
-describe('tearing down a mountain road (`CONTEXT.md`: Tearing down)', () => {
-  it('waits for the carriages and horses on it to leave', () => {
-    const { world, w1, horse, carriage } = setup(ridge, 4, 6)
+describe('tearing down a mountain road (`CONTEXT.md`: Road)', () => {
+  it('waits for the carriages and ridden horses on it to leave', () => {
+    const { world, w1, carriage } = setup(ridge, 4, 6)
+    const w2 = newResident(mulberry32(2), { id: 'w2', owner: 'r1', x: 4, y: 6, tick: 0 })
+    world.residents.push(w2)
     const b = road(world, 4, 6)
     const tearDown = () =>
       order(world, ridge, { kind: 'tearDown', residentId: 'w1', buildingId: b.id })
-    expect(tearDown()).toMatchObject({
-      reason: 'a carriage or horse on this mountain road would be stranded',
-    })
-    carriage.x = 4
+    const stranded = { reason: 'a carriage or rider on this mountain road would be stranded' }
+    expect(tearDown()).toMatchObject(stranded)
+    // A horse nobody rides doesn't hold it up; a ridden one does.
     carriage.y = 5
-    expect(tearDown()).toMatchObject({
-      reason: 'a carriage or horse on this mountain road would be stranded',
-    })
-    horse.y = 5
     expect(tearDown()).toMatchObject({ type: 'ack' })
+    w2.riding = 'h1'
+    expect(tearDown()).toMatchObject(stranded)
+    delete w2.riding
 
-    // Started with nobody there; a horse comes onto it before the work is done, and the work
-    // waits for it to leave.
+    // Started with nobody there; a rider gets on before the work is done, and the work waits
+    // for them to get off or leave.
     w1.order = { kind: 'tearDown', buildingId: b.id, at: { x: 4, y: 6 } }
     const walking = new Walking(ridge)
     stepWorld(world, ridge, walking)
     const done = b.teardown!
     expect(done).toBeGreaterThan(0)
-    horse.y = 6
+    w2.riding = 'h1'
     for (let t = 0; t < 100; t++) stepWorld(world, ridge, walking)
     expect(b.teardown).toBe(done)
     expect(world.buildings).toContain(b)
     expect(w1.order?.kind).toBe('tearDown')
     expect(checkInvariants(world, ridge)).toEqual([])
-    horse.y = 5
+    delete w2.riding
     for (let t = 0; t < 20000 && w1.order; t++) stepWorld(world, ridge, walking)
     expect(world.buildings).not.toContain(b)
     expect(teardownWork(b)).toBeGreaterThan(done)
+
+    // The horse left behind on bare Mountain can't be ridden there.
+    expect(order(world, ridge, { kind: 'mount', residentId: 'w2', horseId: 'h1' })).toMatchObject({
+      reason: 'a horse can’t be ridden on Mountain without a road',
+    })
+    expect(checkInvariants(world, ridge)).toEqual([])
 
     // A road on plains comes down whoever stands on it.
     const plains = road(world, 4, 5)

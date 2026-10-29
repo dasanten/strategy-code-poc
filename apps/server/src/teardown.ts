@@ -87,7 +87,7 @@ export function resolveTearingDown(
       r.order = null
       continue
     }
-    // A carriage or horse on the mountain road: the work waits for them to leave.
+    // A carriage or ridden horse on the mountain road: the work waits for them to leave.
     if (terrain && strandsOnMountain(world, b, terrain)) continue
     if (teardownLeft(b) > 0) {
       b.teardown = Math.min(teardownWork(b), (b.teardown ?? 0) + buildWork(r, world.tick))

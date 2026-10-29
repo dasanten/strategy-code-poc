@@ -753,8 +753,9 @@ export function Wiki() {
           {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
           more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
           leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a building's materials on the tile (all of an
-          unfinished site's). A road over a mountain can't be torn down while a carriage or horse
-          stands on it: the work waits until they leave.
+          unfinished site's). A road over a mountain can't be torn down while a carriage or a ridden
+          horse stands on it: the work waits until they leave. A horse left there unridden can't be
+          ridden off a road.
         </p>
         <table>
           <thead>
