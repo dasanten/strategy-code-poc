@@ -1,6 +1,7 @@
 import {
   DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
+  SCRIPT_HELPER_COST,
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_TILE_QUERY_COST,
 } from './balance.js'
@@ -15,7 +16,8 @@ import type { ScriptType, ScriptViewName } from './script-views.js'
  *
  * - A **value** is set before the run: `me` (the resident or army running the script),
  *   `memory`, `tick`, `mapSize`.
- * - A **query** answers from what the Player sees and has explored, nothing more.
+ * - A **query** answers from what the Player sees and has explored, nothing more. The helpers
+ *   `floor` and `pickRandom` are queries too, but work only on what they are given.
  * - An **action** asks for the order of the same name for `me`, checked exactly as a UI order
  *   is. It answers `null` when requested, or why not as a string; a script can request nothing
  *   an order couldn't. `doing` and `end` ask for no order: `doing` keeps the resident's Doing
@@ -170,6 +172,23 @@ const SHARED: readonly ScriptBinding[] = [
     returns: 'number',
     cost: SCRIPT_TILE_QUERY_COST,
     description: 'Tiles between two things with `x` and `y`, the short way round the map.',
+  },
+  {
+    name: 'floor',
+    is: 'query',
+    params: ['n'],
+    returns: 'number',
+    cost: SCRIPT_HELPER_COST,
+    description: 'The whole number at or below `n`: `floor(2.7)` is 2, `floor(-2.5)` is -3.',
+  },
+  {
+    name: 'pickRandom',
+    is: 'query',
+    params: ['list'],
+    returns: 'any',
+    cost: SCRIPT_HELPER_COST,
+    description:
+      'One item of a list, picked with `random`, so every script picking from the same list this tick picks the same; null for an empty list.',
   },
 ]
 

@@ -190,6 +190,8 @@ describe('script views', () => {
       materialsNeeded: 'materialsNeeded(building("site1"))',
       terrainAt: 'terrainAt(10, 10)',
       distance: 'distance(me, building("s1"))',
+      floor: 'floor(2.5)',
+      pickRandom: 'pickRandom(["food"])',
       fits: 'fits("food")',
       storages: 'storages()',
       walkTime: 'walkTime(me, building("s1"))',
