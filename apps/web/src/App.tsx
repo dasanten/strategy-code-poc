@@ -49,8 +49,18 @@ import {
 import type { Covered } from './map/camera.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
-import { appendRequest, editRequest, STORE_ALL, useShiftHeld } from './queue-view.js'
+import {
+  appendRequest,
+  appendToEach,
+  editRequest,
+  giveToAll,
+  planStep,
+  STORE_ALL,
+  useShiftHeld,
+  type QueuePlan,
+} from './queue-view.js'
 import { AddStep } from './AddStep.js'
+import { GroupPlanner } from './GroupPlanner.js'
 import {
   horsesIn,
   nextPick,
@@ -155,6 +165,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The step being planned with the queue planner's Add step (`CONTEXT.md`: Queue, Planning
   // ahead): the map picks its places, then the card asks for what more it needs.
   const [plan, setPlan] = useState<Plan>()
+  // The queue planned on the group card, held here until given to all (`CONTEXT.md`: Planning
+  // for a group); with none open, a step planned for a group goes onto each one's own queue.
+  const [groupPlan, setGroupPlan] = useState<QueuePlan>()
   // A group order waiting for a tile, the tile picked to build on, and what the last one did.
   const [groupPicking, setGroupPicking] = useState<GroupPicking>(false)
   // What the group order being picked needs besides the tile, and a line's first end.
@@ -242,6 +255,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setArmyPick(undefined)
     setParamPick(undefined)
     setPlan(undefined)
+    setGroupPlan(undefined)
     setOrderError(undefined)
     setGroupPicking(false)
     setGroupBuildAt(undefined)
@@ -290,7 +304,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setArmyError(await sendOrder({ kind: armyPick.kind, armyId: armyPick.armyId, x, y }))
       return
     }
-    if (plan && nextPick(plan) && group.length <= 1) {
+    if (plan && nextPick(plan)) {
       if (!world) return
       const next = pickInto(planWorld(world), plan, { x, y })
       if (nextPick(next) || planAsk(next)) setPlan(next)
@@ -329,6 +343,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    */
   async function startPlan(kind: PlanStepId) {
     setPicking(false)
+    setGroupPicking(false)
     setParamPick(undefined)
     const fresh: Plan = { kind, picked: [] }
     if (nextPick(fresh) || planAsk(fresh)) setPlan(fresh)
@@ -337,14 +352,45 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   /**
    * Appends the step planned to the picked resident's queue, or starts one with it, after a walk
    * to where it acts (`appendRequest`). The server checks that it could make sense; whether it can
-   * start is checked when its turn comes.
+   * start is checked when its turn comes. For a group it goes onto the plan open on the group card,
+   * or, with none open, onto each one's own queue (`CONTEXT.md`: Planning for a group).
    */
   async function addPlanned(planned: Plan, answer?: PlanAnswer) {
     setPlan(undefined)
-    const step = selected && planOrder(planned, answer)
-    if (!selected || !step) return
+    const step = planOrder(planned, answer)
+    if (!step) return
+    if (group.length > 1) {
+      if (groupPlan) setGroupPlan(planStep(groupPlan, step.order, step.at))
+      else await sendToGroup(appendToEach(group, step.order, step.at), [])
+      return
+    }
+    if (!selected) return
     const order = { ...step.order, residentId: selected.id }
     setOrderError(await sendOrder(appendRequest(selected, order, step.at) ?? order))
+  }
+  /** The queue planner's Add step, on the resident card and the group card. */
+  function addStep(w: NonNullable<typeof world>) {
+    return (
+      <AddStep
+        plan={plan}
+        onStart={(kind) => void startPlan(kind)}
+        onAnswer={(answer) => plan && void addPlanned(plan, answer)}
+        onCancel={() => setPlan(undefined)}
+        scripts={scripts}
+        buildKinds={
+          plan?.kind === 'build' && plan.picked[0]
+            ? buildMenu(nodeAt?.(plan.picked[0].x, plan.picked[0].y))
+            : []
+        }
+        horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
+      />
+    )
+  }
+  /** Give to all: each one's queue becomes a copy of the plan; then the plan closes. */
+  async function giveGroupPlan() {
+    if (!groupPlan) return
+    setGroupPlan(undefined)
+    await sendToGroup(giveToAll(groupPlan, group), [])
   }
 
   /**
@@ -474,11 +520,21 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       },
     })
     if (order.kind === 'build') setGroupBuildAt(undefined)
+    await sendToGroup(
+      requests.map((q) => q.order),
+      skipped,
+    )
+  }
+  /**
+   * Sends the group's requests, one per resident, and says on the card how many went out and who
+   * was skipped or turned down and why.
+   */
+  async function sendToGroup(requests: OrderRequest[], skipped: Skipped[]) {
     setGroupError(undefined)
-    const answers = await Promise.all(requests.map((q) => sendOrder(q.order)))
-    const turnedDown = requests.flatMap((q, i) => {
+    const answers = await Promise.all(requests.map((o) => sendOrder(o)))
+    const turnedDown = requests.flatMap((o, i) => {
       const why = answers[i]
-      const r = group.find((g) => g.id === q.residentId)
+      const r = group.find((g) => g.id === o.residentId)
       return why && r ? [{ id: r.id, name: r.name, why }] : []
     })
     setGroupReport({
@@ -1050,21 +1106,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onEditQueue={async (steps, loop) =>
               setOrderError(await sendOrder(editRequest(selected, steps, loop)))
             }
-            addStep={
-              <AddStep
-                plan={plan}
-                onStart={(kind) => void startPlan(kind)}
-                onAnswer={(answer) => plan && void addPlanned(plan, answer)}
-                onCancel={() => setPlan(undefined)}
-                scripts={scripts}
-                buildKinds={
-                  plan?.kind === 'build' && plan.picked[0]
-                    ? buildMenu(nodeAt?.(plan.picked[0].x, plan.picked[0].y))
-                    : []
-                }
-                horses={horsesIn(planWorld(world), world.horses, plan?.picked[0]?.id)}
-              />
-            }
+            addStep={addStep(world)}
             onClose={() => {
               setSelectedIds([])
               setPicking(false)
@@ -1076,7 +1118,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && group.length > 1 && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group'}>
+        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}>
           <GroupCard
             residents={group}
             scripts={scripts}
@@ -1116,7 +1158,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             orderError={groupError}
             onPick={(id) => select([id])}
             onClose={() => select([])}
-            collapsed={pick?.kind === 'group'}
+            planner={
+              <GroupPlanner
+                plan={groupPlan}
+                onPlan={setGroupPlan}
+                onGive={() => void giveGroupPlan()}
+                addStep={addStep(world)}
+                scripts={scripts}
+                buildings={world.buildings}
+              />
+            }
+            collapsed={pick?.kind === 'group' || pick?.kind === 'plan'}
           />
         </CardSheet>
       )}

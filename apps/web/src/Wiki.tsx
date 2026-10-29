@@ -499,6 +499,15 @@ export function Wiki() {
           place, who walk there first, and Store to those who carry nothing yet. Stop still stops
           them all and ends their queues.
         </p>
+        <p>
+          The group card's Queue tab has the same planner as a resident's card.{' '}
+          <strong>Add step</strong> adds the step to the end of each one's own queue.{' '}
+          <strong>Plan a queue for all</strong> opens a plan kept in this browser: add steps,
+          reorder them, give them durations and loop it, as on a resident's card, then{' '}
+          <strong>Give to all</strong> makes each one's queue a copy of it, ending what they do.
+          Everyone gets every step, even one they can't do; they skip it when its turn comes.
+          Afterwards each one's queue is their own, edited on their card.
+        </p>
       </Section>
 
       <Section id="queues">
@@ -506,8 +515,8 @@ export function Wiki() {
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
           to, pick up, drop, store, fetch, drive, mount or dismount, work, build, haul, feed the
-          stable, breed horses, tear down, build a road or wall line, or run one of your scripts with
-          its params.
+          stable, breed horses, tear down, build a road or wall line, or run one of your scripts
+          with its params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it

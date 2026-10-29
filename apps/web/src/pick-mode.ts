@@ -29,7 +29,7 @@ export function pickTarget(state: {
 }): PickTarget | undefined {
   if (state.paramPick) return { kind: 'param', param: state.paramPick }
   if (state.armyPick) return { kind: 'army', mode: state.armyPick.kind }
-  const planned = state.plan && !state.isGroup ? nextPick(state.plan) : undefined
+  const planned = state.plan && nextPick(state.plan)
   if (planned) {
     const error = state.plan!.error
     return { kind: 'plan', prompt: planned.prompt, ...(error ? { error } : {}) }
