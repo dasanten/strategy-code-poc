@@ -606,11 +606,11 @@ export function Wiki() {
           storage when they run low.
         </p>
         <p>
-          Far from home, a resident working can go and get food on their own: set{' '}
-          <code>foodAt</code> and <code>foodTake</code> on their card, in units of Food. Below{' '}
-          <code>foodAt</code> on them, they walk to their storage (or the nearest one of your realm
-          with Food), take Food up to <code>foodTake</code> and go back. Whenever they are at a
-          storage anyway, their own food is topped up to <code>foodTake</code> instead of{' '}
+          Far from home, a resident working, building or tearing down can go and get food on their
+          own: set <code>foodAt</code> and <code>foodTake</code> on their card, in units of Food.
+          Below <code>foodAt</code> on them, they walk to their storage (or the nearest one of your
+          realm with Food), take Food up to <code>foodTake</code> and go back. Whenever they are at
+          a storage anyway, their own food is topped up to <code>foodTake</code> instead of{' '}
           {num(OWN_FOOD)}. Unset, they don't go on their own.
         </p>
         <p>
@@ -771,6 +771,13 @@ export function Wiki() {
           the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house or a storage
           goes only in a city's area; a town hall, wall or gate goes anywhere off Mountain and off
           resource nodes, and a new town hall founds a city.
+        </p>
+        <p>
+          With <code>foodAt</code> set, a resident building or tearing down who carries less Food
+          than that goes to their <code>source</code>, or the nearest storage of your realm with
+          Food, takes Food up to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes
+          back to the site. With no Food anywhere they work on. With <code>foodTake</code> set,
+          fetching materials tops their food up to it too, before the materials.
         </p>
       </Section>
 
@@ -1312,7 +1319,8 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
             <code>source</code>: where materials come from, a carriage too. Unset, each uses the
             nearest storage; a source picked that holds none of what the site lacks is left alone,
-            and they just build. The Work default also has the <code>number</code> params{' '}
+            and they just build. The Tear down default has <code>source</code>: where Food comes
+            from. The Work, Build and Tear down defaults also have the <code>number</code> params{' '}
             <code>foodAt</code> and <code>foodTake</code> for getting food, in units of Food (a
             resident eats about {num(foodEatenPerDay())} a game day).
           </li>
