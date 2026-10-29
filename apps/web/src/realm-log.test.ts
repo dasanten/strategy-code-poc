@@ -40,6 +40,21 @@ describe('realm log', () => {
     expect(describeEvent({ kind: 'scriptEnded', ...who }).text).toBe(
       'Mara stopped running a script: it was deleted.',
     )
+    const dropped = { kind: 'scriptFieldDropped', field: 'resident.plan', seq: 9, ...at } as const
+    expect(describeEvent({ ...dropped, scripts: [{ scriptId: 3, name: 'feeder' }] }).text).toBe(
+      'Your script “feeder” reads resident.plan, which scripts no longer see: it is null from now on.',
+    )
+    expect(
+      describeEvent({
+        ...dropped,
+        scripts: [
+          { scriptId: 3, name: 'feeder' },
+          { scriptId: 4, name: 'miner' },
+        ],
+      }).text,
+    ).toBe(
+      'Your scripts “feeder”, “miner” read resident.plan, which scripts no longer see: it is null from now on.',
+    )
   })
 
   it('describes a skipped queue step', () => {

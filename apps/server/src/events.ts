@@ -12,10 +12,14 @@ import {
  */
 export function recordEvent(world: WorldState, realmId: string | null, what: RealmEventWhat): void {
   const realm = realmId === null ? undefined : world.realms.find((x) => x.id === realmId)
-  if (!realm) return
-  const event: RealmEvent = { ...what, seq: world.nextId++, tick: world.tick, userId: realm.userId }
+  if (realm) recordPlayerEvent(world, realm.userId, what)
+}
+
+/** Writes down something for a Player's log, whether they have a realm now or not. */
+export function recordPlayerEvent(world: WorldState, userId: number, what: RealmEventWhat): void {
+  const event: RealmEvent = { ...what, seq: world.nextId++, tick: world.tick, userId }
   world.events.push(event)
-  const mine = world.events.filter((e) => e.userId === realm.userId)
+  const mine = world.events.filter((e) => e.userId === userId)
   if (mine.length > REALM_LOG_LENGTH) {
     const drop = new Set(mine.slice(0, mine.length - REALM_LOG_LENGTH))
     world.events = world.events.filter((e) => !drop.has(e))

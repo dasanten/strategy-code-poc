@@ -560,6 +560,11 @@ export interface WorldState {
    * seen): what is in their sight now as of this tick, and what left it as they last saw it.
    */
   lastSeen: Record<number, Remembered[]>
+  /**
+   * How many of the breaking changes to the script views (`SCRIPT_VIEW_CHANGES`) the Players were
+   * told of in their realm logs; the server tells them of the rest at start.
+   */
+  scriptViewChanges: number
 }
 
 /**
@@ -1376,6 +1381,12 @@ export type RealmEventWhat =
   | ({ kind: 'scriptOutOfSteps'; name: string; scriptId: number; realm: boolean } & ScriptRunBy)
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
+  /**
+   * A field the Player's active scripts read was renamed or removed from its script view
+   * (`CONTEXT.md`: Script view), as `view.field`; it reads `null` from now on. `scripts` are
+   * those that read it, by name.
+   */
+  | { kind: 'scriptFieldDropped'; field: string; scripts: { scriptId: number; name: string }[] }
   /**
    * Step `step` (counted from 1) of the resident `name`'s queue (`CONTEXT.md`: Queue), an order
    * of kind `order`, was skipped: it couldn't start or ended in a failure, for `reason`.
