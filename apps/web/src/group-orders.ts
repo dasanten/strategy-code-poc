@@ -1,12 +1,14 @@
 import {
   CARRYING_A_CHILD,
   GOODS,
+  boarderProblem,
   canWork,
   isAt,
   wrap,
   wrapDelta,
   type Building,
   type BuildingKind,
+  type Carriage,
   type Good,
   type OrderRequest,
   type Resident,
@@ -27,6 +29,16 @@ export type GroupOrder =
   | { kind: 'fetch'; good: Good }
   | { kind: 'runScript'; scriptId: number }
   | { kind: 'stop' }
+  /**
+   * Boards the carriage (`CONTEXT.md`: Passenger): those on its tile, in the group's order, until
+   * its `seats` are taken.
+   */
+  | {
+      kind: 'board'
+      carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>
+      seats: number
+    }
+  | { kind: 'getOff' }
   /**
    * Sets a number param (`CONTEXT.md`: Script parameter), or clears it with null, for each one
    * running one of `scriptIds`, the scripts that declare it.
@@ -49,8 +61,11 @@ export interface GroupSend {
 /** How far from the target a group's walk-to looks for free tiles, in tiles each way. */
 const SPREAD_RADIUS = 8
 
-type GroupResident = Pick<Resident, 'id' | 'name' | 'x' | 'y' | 'bornAt' | 'carried'> &
-  Partial<Pick<Resident, 'carrying' | 'order' | 'script' | 'queue'>>
+type GroupResident = Pick<
+  Resident,
+  'id' | 'name' | 'x' | 'y' | 'bornAt' | 'carried' | 'owner' | 'cityId'
+> &
+  Partial<Pick<Resident, 'carrying' | 'order' | 'script' | 'queue' | 'aboard' | 'riding'>>
 
 /** The goods carried, at least one unit of each. */
 const carriedGoods = (stock: Stock): Good[] => GOODS.filter((g) => (stock[g] ?? 0) > 0)
@@ -59,9 +74,11 @@ const carriedGoods = (stock: Stock): Good[] => GOODS.filter((g) => (stock[g] ?? 
  * Why a resident of the group can't take the order, if they can't (`CONTEXT.md`: Child,
  * Carrying): children don't work, build, store or fetch; a partner carrying a child doesn't work
  * or build; Work is tile-bound, so only those standing at the workplace take it. Walking, running
- * a script and stopping go to everyone. Queued (Shift held), Work also goes to those away from
- * the workplace, who walk there first, and Store to those carrying nothing yet. A number param
- * goes to those running a script that has it.
+ * a script and stopping go to everyone. Board goes to those who could board the carriage, room
+ * aside (`boarderProblem`), Get off to those aboard one. Queued (Shift held), Work also goes to
+ * those away from the workplace, who walk there first, Store to those carrying nothing yet, and
+ * Board and Get off to everyone: whether they can is checked when the step's turn comes. A number
+ * param goes to those running a script that has it.
  */
 export function groupSkip(
   order: GroupOrder,
@@ -78,6 +95,11 @@ export function groupSkip(
   if (tasks.includes(order.kind) && !canWork(r as Resident, tick)) return 'a child'
   if ((order.kind === 'work' || order.kind === 'build') && r.carrying) return CARRYING_A_CHILD
   if (queued) return undefined
+  if (order.kind === 'board') {
+    const why = boarderProblem({ ...r, order: r.order ?? null }, order.carriage)
+    return why === 'that carriage is not on the resident’s tile' ? 'not there' : why
+  }
+  if (order.kind === 'getOff' && r.aboard === undefined) return 'not aboard'
   if (order.kind === 'work' && !isAt(r, order.workplace, size))
     return `too far: not at the ${order.name}`
   if (order.kind === 'store' && carriedGoods(r.carried).length === 0) return 'carries nothing'
@@ -121,7 +143,8 @@ function distance(r: { x: number; y: number }, t: { x: number; y: number }, size
  * The requests a group order sends (ADR 0002: orders only request actions), one per resident
  * who can take it (`groupSkip`). A walk-to spreads the group over distinct free tiles around the
  * target: the resident nearest it gets the nearest tile, and so on; with too few free tiles the
- * rest are skipped. Work and Build make each join the workplace or site.
+ * rest are skipped. Work and Build make each join the workplace or site. Board fills the
+ * carriage's seats in the group's order and skips the rest, the carriage being full.
  *
  * Queued (Shift held), each request is appended to the resident's queue instead (`CONTEXT.md`:
  * Queue), as their own card appends it: Work after a walk to the workplace, Store of whatever
@@ -165,8 +188,20 @@ export function groupRequests(
     })
     return { requests: queued ? appended(requests, residents) : requests, skipped }
   }
+  let seats = order.kind === 'board' ? order.seats : 0
   for (const r of going) {
     switch (order.kind) {
+      case 'board':
+        // Queued, whether a seat is left is checked when the step's turn comes.
+        if (!queued && seats-- <= 0) {
+          skipped.push({ id: r.id, name: r.name, why: 'the carriage is full' })
+          break
+        }
+        send(r, { kind: 'board', carriageId: order.carriage.id })
+        break
+      case 'getOff':
+        send(r, { kind: 'getOff' })
+        break
       case 'work':
         send(r, { kind: 'task', task: 'work', workplaceId: order.workplace.id })
         break
@@ -198,7 +233,8 @@ export function groupRequests(
   }
   // Setting a param is no step: it is given as it is, queued or not.
   if (!queued || order.kind === 'setNumber') return { requests, skipped }
-  const at = order.kind === 'work' ? order.workplace : undefined
+  const at =
+    order.kind === 'work' ? order.workplace : order.kind === 'board' ? order.carriage : undefined
   return { requests: appended(requests, residents, at), skipped }
 }
 

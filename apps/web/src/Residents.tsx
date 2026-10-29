@@ -524,6 +524,7 @@ export function GroupCard({
   residents,
   scripts,
   buildings,
+  carriages = [],
   picking,
   onPicking,
   buildAt,
@@ -537,6 +538,11 @@ export function GroupCard({
   residents: Resident[]
   scripts: ScriptSummary[]
   buildings: Building[]
+  /**
+   * The realm's carriages someone of the group stands on, with how many more passengers fit on
+   * each, to board (`CONTEXT.md`: Passenger).
+   */
+  carriages?: { carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>; seats: number }[]
   /** The map is waiting for a tile for the group's walk-to, work or build order. */
   picking: GroupPicking
   /** Starts (or cancels) picking a tile for the group. */
@@ -598,6 +604,21 @@ export function GroupCard({
               <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
                 Stop
               </button>
+              {carriages.map(({ carriage, seats }) => (
+                <button
+                  type="button"
+                  key={carriage.id}
+                  onClick={() => onOrder({ kind: 'board', carriage, seats })}
+                >
+                  Board carriage
+                  {carriages.length > 1 ? ` at ${carriage.x}, ${carriage.y}` : ''}
+                </button>
+              ))}
+              {residents.some((r) => r.aboard !== undefined) && (
+                <button type="button" onClick={() => onOrder({ kind: 'getOff' })}>
+                  Get off
+                </button>
+              )}
             </div>
           </div>
           <div className="sel-order-group">
