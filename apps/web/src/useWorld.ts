@@ -15,6 +15,7 @@ import {
   type SeenCaravan,
   type SeenEntity,
   type Remembered,
+  type ScriptMemory,
   type ServerMessage,
 } from '@csp/shared'
 import { api } from './api.js'
@@ -83,6 +84,12 @@ function byKind(entities: Iterable<SeenEntity>) {
   return out
 }
 
+/** Tells the server which scripts the Player watches now (`watchScript`). */
+function sendWatch(socket: WebSocket | null, watched: ReadonlyMap<string, number>) {
+  if (socket?.readyState !== WebSocket.OPEN) return
+  socket.send(JSON.stringify({ type: 'watch', ids: [...watched.keys()] }))
+}
+
 /**
  * Keeps the client's copy of what the Player sees in sync with the server (ADR 0006): the
  * welcome message brings everything in sight, the Player's Last seen and the realm log, every
@@ -96,6 +103,10 @@ export function useWorld(onLoggedOut: () => void) {
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const socketRef = useRef<WebSocket | null>(null)
   const answers = useRef(new Map<string, (rejected: string | undefined) => void>())
+  // The residents and armies whose Script tab is open, with how many cards show it, and the
+  // memory the server last sent of each one's script (`CONTEXT.md`: Debugging a script).
+  const watched = useRef(new Map<string, number>())
+  const [memories, setMemories] = useState<ReadonlyMap<string, ScriptMemory | null>>(new Map())
 
   useEffect(() => {
     let socket: WebSocket | null = null
@@ -138,6 +149,10 @@ export function useWorld(onLoggedOut: () => void) {
             ...byKind(entities.values()),
             lastSeen: lastSeenByKind(remembered.values()),
           })
+          if (watched.current.size > 0) sendWatch(socket, watched.current)
+        } else if (msg.type === 'scriptMemory') {
+          if (!watched.current.has(msg.id)) return
+          setMemories((m) => new Map(m).set(msg.id, msg.memory))
         } else if (msg.type === 'ack' || msg.type === 'rejected') {
           const answer = answers.current.get(msg.requestId)
           answers.current.delete(msg.requestId)
@@ -202,6 +217,27 @@ export function useWorld(onLoggedOut: () => void) {
   }, [onLoggedOut])
 
   /**
+   * Watches the script memory of a resident or army while its Script tab is open (`memories`);
+   * the function it returns stops watching it.
+   */
+  const watchScript = useCallback((id: string) => {
+    const count = watched.current.get(id) ?? 0
+    watched.current.set(id, count + 1)
+    if (count === 0) sendWatch(socketRef.current, watched.current)
+    return () => {
+      const left = (watched.current.get(id) ?? 1) - 1
+      if (left > 0) return void watched.current.set(id, left)
+      watched.current.delete(id)
+      sendWatch(socketRef.current, watched.current)
+      setMemories((m) => {
+        const next = new Map(m)
+        next.delete(id)
+        return next
+      })
+    }
+  }, [])
+
+  /**
    * Sends an order (ADR 0002). Resolves with the server's reason when it is rejected, or
    * undefined once it is accepted; it takes effect from the next tick.
    */
@@ -233,5 +269,5 @@ export function useWorld(onLoggedOut: () => void) {
     })
   }, [])
 
-  return { world, founding, status, sendOrder, found }
+  return { world, founding, status, sendOrder, found, memories, watchScript }
 }

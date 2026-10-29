@@ -864,6 +864,7 @@ export function ResidentCard({
   sections,
   onSections,
   scriptParams,
+  scriptMemory,
   onStore,
   onEditQueue,
   collapsed = false,
@@ -978,6 +979,8 @@ export function ResidentCard({
   onSections: (sections: CardSections<ActionId>) => void
   /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
   scriptParams?: ReactNode
+  /** The memory of the script they run (`ScriptMemoryTree`), for the Player running it. */
+  scriptMemory?: ReactNode
   /** Orders the resident to store what they carry at the nearest storage (`STORE_ALL`). */
   onStore?: () => void
   /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
@@ -1111,6 +1114,7 @@ export function ResidentCard({
           <>
             <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
             {scriptParams}
+            {scriptMemory}
           </>
         ) : (
           <p className="muted small">Runs no script. Give them one with Run script under Orders.</p>

@@ -1,8 +1,10 @@
 import type { Server } from 'node:http'
 import { WebSocket, WebSocketServer } from 'ws'
 import {
+  SCRIPT_WATCH_MAX,
   SESSION_COOKIE,
   WS_PATH,
+  commanderOf,
   diplomacyFor,
   foundingProblem,
   regionMapFor,
@@ -12,6 +14,7 @@ import {
   type Realm,
   type RegionMap,
   type Remembered,
+  type ScriptMemory,
   type SeenEntity,
   type ServerMessage,
   type TerrainMap,
@@ -51,10 +54,30 @@ function realmsSeen(entities: SeenEntity[]): string[] {
   })
 }
 
+/**
+ * The memory of the script a resident or army runs, for the realm running it (`CONTEXT.md`:
+ * Debugging a script): null when it runs none, or another realm runs it.
+ */
+export function scriptMemoryFor(
+  world: WorldState,
+  realmId: string,
+  id: string,
+): ScriptMemory | null {
+  const r = world.residents.find((r) => r.id === id)
+  if (r) return r.script && commanderOf(world, r) === realmId ? r.script.memory : null
+  const army = world.armies.find((a) => a.id === id)
+  return army?.script && army.realmId === realmId ? army.script.memory : null
+}
+
 interface Client {
   account: Account
   userId: number
   realmId: string
+  /**
+   * The residents and armies whose Script tab the Player has open, with the memory last sent for
+   * each as JSON, so a tick sends it only when it changed.
+   */
+  watching: Map<string, string>
   view: ClientView
   /** What has been sent of the Player's Last seen out of sight (`CONTEXT.md`: Last seen). */
   lastSeenView: ClientView<Remembered>
@@ -139,6 +162,17 @@ export function attachRealtime(
     return region
   }
 
+  /** Sends the client the memory of each script it watches that changed since it was last sent. */
+  function sendScriptMemory(socket: WebSocket, client: Client) {
+    for (const [id, last] of client.watching) {
+      const memory = scriptMemoryFor(world, client.realmId, id)
+      const json = JSON.stringify(memory)
+      if (json === last) continue
+      client.watching.set(id, json)
+      send(socket, { type: 'scriptMemory', id, memory })
+    }
+  }
+
   const wss = new WebSocketServer({
     server,
     path: WS_PATH,
@@ -158,6 +192,7 @@ export function attachRealtime(
       account: { name: user.name, isAdmin: user.isAdmin },
       userId: user.id,
       realmId: realm.id,
+      watching: new Map(),
       view: new ClientView(),
       lastSeenView: new ClientView<Remembered>(),
       lastEventSeq: 0,
@@ -237,6 +272,12 @@ export function attachRealtime(
         const sender = { userId: client.userId, account: client.account }
         send(socket, opts.orders.receive(world, sender, msg.requestId, msg.order))
       }
+      if (msg?.type === 'watch' && client && Array.isArray(msg.ids)) {
+        const ids = msg.ids.filter((id) => typeof id === 'string').slice(0, SCRIPT_WATCH_MAX)
+        // Newly watched ones go out now; those still watched only when they change.
+        client.watching = new Map(ids.map((id) => [id, client.watching.get(id) ?? '']))
+        sendScriptMemory(socket, client)
+      }
     })
     socket.on('close', () => clients.delete(socket))
   })
@@ -288,6 +329,7 @@ export function attachRealtime(
           ...(named ? { realmName } : {}),
         }
         send(socket, { type: 'tick', ...tick })
+        sendScriptMemory(socket, client)
       }
     },
     close() {

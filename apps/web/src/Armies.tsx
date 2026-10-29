@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import {
   ARMY_NAME_MAX_LENGTH,
   armyDrivenTo,
@@ -54,6 +54,7 @@ export function ArmiesPanel({
   pickError,
   scripts,
   sendOrder,
+  scriptMemory,
 }: {
   armies: Army[]
   /** The Player's residents. */
@@ -71,6 +72,8 @@ export function ArmiesPanel({
   /** The Player's script library. */
   scripts: ScriptSummary[]
   sendOrder: (order: OrderRequest) => Promise<string | undefined>
+  /** The memory of the script an army runs (`ScriptMemoryTree`), shown on its Script tab. */
+  scriptMemory?: (armyId: string) => ReactNode
 }) {
   const [name, setName] = useState('')
   const [chosen, setChosen] = useState<Set<string>>(new Set())
@@ -229,12 +232,15 @@ export function ArmiesPanel({
             </ul>
           ))}
         {tab === 'script' && (
-          <RunScript
-            script={a.script}
-            scripts={scripts}
-            label={`Script for ${a.name} to run`}
-            onRunScript={(scriptId) => order({ kind: 'armyRunScript', armyId: a.id, scriptId })}
-          />
+          <>
+            <RunScript
+              script={a.script}
+              scripts={scripts}
+              label={`Script for ${a.name} to run`}
+              onRunScript={(scriptId) => order({ kind: 'armyRunScript', armyId: a.id, scriptId })}
+            />
+            {a.script && scriptMemory?.(a.id)}
+          </>
         )}
       </SelectionCard>
     )
