@@ -151,6 +151,36 @@ describe('params in a script', () => {
     expect(w.script!.memory.foodAt).toBe(0)
   })
 
+  it('read a number param’s default while unset, the value set, and the default once cleared', () => {
+    const { world, terrain, w } = farmWorld()
+    const source = 'param foodAt: number = 3\nmemory.foodAt = params.foodAt'
+    const runner = new ScriptRunner(terrain, host({ value: source }))
+    const kind = setScriptParamOrder({ script: () => ({ userId: MARA, source }) })
+    const sender = { userId: MARA, account: { name: 'Mara', isAdmin: false } }
+    const set = (value: number | null) => ({
+      kind: 'setScriptParam',
+      residentId: 'w1',
+      scriptId: SCRIPT,
+      name: 'foodAt',
+      ...(value === null ? { targetId: null } : { value }),
+    })
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory.foodAt).toBe(3)
+
+    for (const value of [7, 0]) {
+      expect(kind.validate(world, sender, set(value))).toBeUndefined()
+      kind.apply(world, sender, set(value))
+      expect(runner.runAll(world, true)).toEqual([])
+      expect(w.script!.memory.foodAt).toBe(value)
+    }
+
+    expect(kind.validate(world, sender, set(null))).toBeUndefined()
+    kind.apply(world, sender, set(null))
+    expect(w.scriptParams).toBeUndefined()
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory.foodAt).toBe(3)
+  })
+
   it('drop a value that no longer fits its param’s type', () => {
     const { world, terrain, w } = farmWorld()
     w.scriptParams = { [SCRIPT]: { home: 4, store: 'farm' } }
@@ -241,7 +271,8 @@ describe('the set-script-param order', () => {
 
     it('keeps a whole number of zero or more, and clears it with null', () => {
       const { world } = farmWorld()
-      for (const n of [0, 12]) expect(numbers.validate(world, sender, typed('take', n))).toBeUndefined()
+      for (const n of [0, 12])
+        expect(numbers.validate(world, sender, typed('take', n))).toBeUndefined()
       numbers.apply(world, sender, typed('take', 12))
       expect(world.residents[0]!.scriptParams).toEqual({ [SCRIPT]: { take: 12 } })
       expect(scriptParamsSound(world)).toEqual([])

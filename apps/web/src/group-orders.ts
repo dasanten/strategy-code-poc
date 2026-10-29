@@ -222,22 +222,30 @@ function appended(
 
 /**
  * The number params the group card can set (`CONTEXT.md`: Script parameter): each one declared
- * by a script someone in the group runs, by name, with the scripts that declare it.
+ * by a script someone in the group runs, by name, with the scripts that declare it and its
+ * default when they all declare the same one.
  */
 export function groupNumberParams(
   residents: readonly { script?: { scriptId: number } }[],
   scripts: readonly Pick<ScriptSummary, 'id' | 'params'>[],
-): { name: string; scriptIds: number[] }[] {
+): { name: string; scriptIds: number[]; default?: number }[] {
   const running = new Set(residents.flatMap((r) => (r.script ? [r.script.scriptId] : [])))
-  const byName = new Map<string, number[]>()
+  const byName = new Map<string, { scriptIds: number[]; defaults: (number | undefined)[] }>()
   for (const s of scripts) {
     if (!running.has(s.id)) continue
     for (const p of s.params) {
       if (p.type !== 'number') continue
-      byName.set(p.name, [...(byName.get(p.name) ?? []), s.id])
+      const seen = byName.get(p.name) ?? { scriptIds: [], defaults: [] }
+      byName.set(p.name, {
+        scriptIds: [...seen.scriptIds, s.id],
+        defaults: [...seen.defaults, p.default],
+      })
     }
   }
-  return [...byName].map(([name, scriptIds]) => ({ name, scriptIds }))
+  return [...byName].map(([name, { scriptIds, defaults }]) => {
+    const shared = defaults.every((d) => d === defaults[0]) ? defaults[0] : undefined
+    return shared === undefined ? { name, scriptIds } : { name, scriptIds, default: shared }
+  })
 }
 
 /** The line the group card shows once an order went out: how many it went to. */

@@ -66,6 +66,7 @@ export function ScriptParamFields({
                 key={n ?? 'unset'}
                 name={p.name}
                 value={n}
+                fallback={p.default}
                 onSet={(v) => (v === undefined ? onClear(p.name) : onNumber(p.name, v))}
               />
               <span className="buttons">
@@ -106,16 +107,20 @@ export function ScriptParamFields({
 }
 
 /**
- * A number param's field: what is set, or empty while unset. What is typed goes out on Enter or
- * when the field loses focus, if it changed; emptied, it clears the param.
+ * A number param's field: what is set, or empty while unset, showing the param's default then.
+ * What is typed goes out on Enter or when the field loses focus, if it changed; emptied, it
+ * clears the param, back to its default.
  */
 export function NumberField({
   name,
   value,
+  fallback,
   onSet,
 }: {
   name: string
   value: number | undefined
+  /** The param's default (`param name: number = 3`), shown while unset. */
+  fallback?: number
   onSet: (value: number | undefined) => void
 }) {
   // What went out last, so Enter and then leaving the field don't send it twice.
@@ -134,7 +139,8 @@ export function NumberField({
       step={1}
       className="amount"
       aria-label={name}
-      placeholder="unset"
+      placeholder={fallback === undefined ? 'unset' : String(fallback)}
+      title={fallback === undefined ? undefined : `Default ${fallback}`}
       defaultValue={value ?? ''}
       onBlur={(e) => commit(e.currentTarget.value)}
       onKeyDown={(e) => {
