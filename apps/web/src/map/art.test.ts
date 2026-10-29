@@ -29,7 +29,7 @@ describe('map art registry', () => {
   })
 
   it("has art for every resident's activity", () => {
-    const activities: Activity[] = ['walking', 'carrying', 'working', 'fighting']
+    const activities: Activity[] = ['walking', 'riding', 'carrying', 'working', 'fighting']
     for (const a of activities) expect(isSvg(ACTIVITY_ART[a]), a).toBe(true)
   })
 

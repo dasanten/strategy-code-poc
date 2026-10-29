@@ -408,9 +408,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -936,7 +936,8 @@ export function Wiki() {
           onto walls. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
           at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
           Driving makes riding faster. A rider carries no more than on foot, and can't drive a
-          carriage; a ridden horse is never hitched.
+          carriage; a ridden horse is never hitched. On the map a rider sits on a horse token, and
+          up close their activity icon is a horseshoe while they ride somewhere.
         </p>
         <p>
           A rider’s Doing line says <em>Riding to …</em> where it would say{' '}
