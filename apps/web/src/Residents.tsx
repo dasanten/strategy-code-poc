@@ -254,27 +254,30 @@ function TaskScript({
 /**
  * The resident's queue (`CONTEXT.md`: Queue): its steps in order, the current one with its Doing
  * line. Steps are reordered by dragging or the arrows, removed, given a duration or none, and the
- * queue looped; each change is an edit-queue order.
+ * queue looped; each change is an edit-queue order. The group card lists its plan with it, then
+ * titled "Plan", with no current step.
  */
-function QueueBlock({
+export function QueueBlock({
   queue: q,
-  doing,
+  doing = '',
   scripts,
   buildings,
   onEdit,
+  title = 'Queue',
 }: {
-  queue: Queue
-  doing: string
+  queue: Pick<Queue, 'steps' | 'current' | 'loop'>
+  doing?: string
   scripts: ScriptSummary[]
   buildings: Building[]
   onEdit: (steps: QueueStepRequest[], loop?: boolean) => void
+  title?: string
 }) {
   const [dragged, setDragged] = useState<number>()
   const rows = queueRows(q, { scripts, buildings })
   return (
-    <section className="inspector-block" aria-label="Queue">
+    <section className="inspector-block" aria-label={title}>
       <div className="panel-head">
-        <h3>Queue</h3>
+        <h3>{title}</h3>
         <label className="small queue-loop">
           <input
             type="checkbox"
@@ -529,8 +532,8 @@ export function ResidentsList({
  * The selection card for several of the Player's residents picked at once on the map (ADR 0012;
  * `CONTEXT.md`: Group, Resident card): a header with how many and who, then one open tab. Orders
  * gives each of them the same order, grouped by kind as on a resident card (`GROUP_BUTTONS`), each
- * to those who can take it; Members lists what each is doing, a click
- * picking just that one; Script says what they run and gives them all one.
+ * to those who can take it; Queue plans a queue to give them all; Members lists what each is doing,
+ * a click picking just that one; Script says what they run and gives them all one.
  */
 export function GroupCard({
   residents,
@@ -547,11 +550,14 @@ export function GroupCard({
   orderError,
   onPick,
   onClose,
+  planner,
   collapsed = false,
 }: {
   residents: Resident[]
   scripts: ScriptSummary[]
   buildings: Building[]
+  /** The queue planner (`GroupPlanner`), on the Queue tab (`CONTEXT.md`: Planning for a group). */
+  planner?: ReactNode
   /** Horses in sight, to pick two in a stable where some of them stand to breed. */
   horses?: SeenHorse[]
   /** The Player's realm, whose horses they breed. */
@@ -792,6 +798,7 @@ export function GroupCard({
           </p>
         </section>
       )}
+      {tab === 'queue' && planner}
       {tab === 'members' && (
         <ul className="sel-facts sel-group" aria-label="Selected residents">
           {card.rows.map((r) => (
