@@ -550,8 +550,12 @@ The shared language of the game. Domain terms only — no implementation details
   it on their own).
 - **Child:** a resident born to a pair. Each base stat is the parents' average plus a small
   random amount. Born where a parent stands, into their city and realm. Grows up for a while
-  before it can work: until grown, a child can walk and eats what they take at home (Refilling at
-  home), but can't work, build, tear down, drive, pair, or pick up and put down goods.
+  before it can work: until grown, a child can walk, but can't work, build, tear down, drive,
+  pair, or pick up and put down goods other than Food. Food they may pick up, put down, Fetch
+  and Store like anyone, so they can carry their meals. In their own city's area, a child with
+  less than their own food on them tops up to it from the city's storage (Refilling at home,
+  but to their own food and not only when running low), so a child leaving the city has food
+  on them.
 - **Aging:** residents grow old; their stats decline late in life, and they die of old age at
   around 60 game years. Children age faster: each year of age up to 14 takes 10 game days
   (4 real hours), so a child is grown after about 140 game days (~56 real hours); from 14 on, a
@@ -571,15 +575,18 @@ The shared language of the game. Domain terms only — no implementation details
   takes a meal the same way from Food lying on the workplace's tile, or else from a carriage
   standing there. Anywhere else (travelling, building) there is no refill: they need food on
   them or a delivery.
-- **Refilling from a carriage:** a resident of an army running low on food takes a meal from a
-  carriage of their own realm on or next to their tile, like refilling at home.
+- **Refilling from a carriage:** a resident of an army, or a passenger, running low on food
+  takes a meal from a carriage of their own realm on or next to their tile, like refilling at
+  home.
 - **Getting food:** in the Work, Build and Tear down defaults, a resident whose `foodAt` param is
   set and who carries less Food than that many units stops, walks to their `storage` (Work) or
   `source` (Build, Tear down) param, or else the nearest storage of their realm with Food, takes
   Food there up to `foodTake` units on them, and goes back. Whenever they are at a storage anyway
   (carrying the output, fetching materials), their own food is topped up to `foodTake` instead of
-  the usual own food. Unset, they don't go on their own and rely on refilling. NPC cities run the
-  defaults with both unset.
+  the usual own food. The game's defaults give both params a default (about a day of Food for
+  `foodAt`, a few days for `foodTake`), so residents get food on their own unless the Player
+  changes them; `foodAt` set to 0 turns it off, and they rely on refilling. NPC cities run the
+  defaults with these defaults.
 
 ## Transport
 
@@ -592,6 +599,11 @@ The shared language of the game. Domain terms only — no implementation details
   with no stable, on free tiles next to the storage of the Leader's city (or the realm's oldest
   city; with no city, next to the Leader), each with a few days of Food on the ground by it. The
   realm log says where they arrived. Realms that still have a horse get none.
+- **Horse offer:** every Player may claim two new horses once, ever, when they choose, whether
+  or not they have horses. Until claimed, the HUD shows a notice with a Claim button; claiming
+  places them as the Horse grant does (stats, stable or storage, Food by them, realm log) and
+  the notice is gone for good, also across Leader deaths. A Player with no living Leader can't
+  claim until they have one again.
 - **Horse stats:** every horse has Speed, Strength and Endurance, and an age. Speed is how fast
   it pulls its carriage or carries a rider (`Riding`); Strength is how much the carriage it pulls
   can hold; Endurance is how much Food it needs, as a resident's Endurance is for them. New
@@ -608,10 +620,12 @@ The shared language of the game. Domain terms only — no implementation details
 - **Breeding:** an order (as a script could do it) for a grown resident at a finished stable: they
   pick two fed horses of their realm standing in it and tend them for a while; then a foal of
   their realm is born in the stable, with its parents' average stats plus a little noise. It
-  stops, and its progress is lost, when the resident leaves or is given another order, when a
-  horse leaves or dies, or when the stable has no room for another horse. Before starting, the
-  default takes Food for the resident's meals from the stable. NPC cities breed their horses the
-  same way, with one of their residents.
+  pauses when the resident leaves or is given another order, or while the stable has no room for
+  another horse. Like a construction site's work, the progress belongs to the two horses in that
+  stable, not to the resident: any grown resident who breeds there later carries on with that
+  pair first, where it stopped. The progress is lost only when one of the two leaves the stable
+  or dies. Before starting, the default takes Food for the resident's meals from the stable. NPC
+  cities breed their horses the same way, with one of their residents.
 - **Feeding the stable:** a task (default script "Feed the stable") given to a grown-up resident
   standing in a stable, from their card. They keep Food in the stable for about 10 game days for
   the horses standing in it: below that they fetch what is missing from a storage and store it in
@@ -642,9 +656,20 @@ The shared language of the game. Domain terms only — no implementation details
   anyone. The rider carries what they could on foot; the horse eats Food in reach as usual.
   Riding teaches Driving, and Driving makes riding faster. A horse has at most one rider and is
   never hitched while ridden; a rider doesn't drive. A rider whose horse dies, or who leaves it
-  behind (climbing a wall), is on foot again.
+  behind (climbing a wall), is on foot again. On the map a rider's token sits on a horse token,
+  so riders stand out from walkers; their Doing line says "Riding" where it would say
+  "Walking", and their card shows the horse they ride with its stats, age, health and hunger.
 - **Loading a carriage:** residents on a carriage's tile put goods on it and take goods off it
   like at a storage, up to what the carriage holds.
+- **Passenger:** a resident aboard a carriage of their realm, children too. Any carriage takes
+  passengers: each counts as a fixed weight against what it holds, so it carries goods, people
+  or a mix. A resident on the carriage's tile **boards** it (card, group card, queue step,
+  script); aboard, they move with the carriage and don't walk on their own, and **get off** on
+  its tile or right next to it. Giving a passenger a walk or an order that acts on a tile gets
+  them off first. Being aboard isn't an order, like Riding. The driver isn't a passenger.
+  Passengers eat their own food and, running low, take a meal from the carriage's Food
+  (Refilling from a carriage). A carriage whose horse dies stands still with its passengers
+  aboard until they get off.
 - **Haul route:** an order (as a script could do it) for a resident to drive a carriage between
   two stops again and again: they load the chosen goods at the first stop, drive them to the
   second, unload them, and come back for more, until stopped. Goods can go both ways: others
@@ -684,12 +709,16 @@ The shared language of the game. Domain terms only — no implementation details
   `param name: type` line at the top of the script and read there as `params.name`; a `param`
   line anywhere else is a syntax error. A `building` param holds one of the realm's own buildings
   or construction sites; a `storage` param one of its storages, stables or carriages; a `number`
-  param a whole number of zero or more, typed into a number field. The values
+  param a whole number of zero or more, typed into a number field. A `number` param may declare a
+  **default** (`param foodAt: number = 3`); `building` and `storage` params can't. The values
   are kept for each resident and each script: giving the task again keeps them, a param removed
   from the script is dropped, a new one starts unset. Unset, or once the one picked is gone (or no
-  longer the realm's), it reads `null`. The resident card shows one field for each param of the
-  script the resident runs, picked on the map and cleared with a button; picking one doesn't end
-  the script. The Work default declares `storage` (where the output goes) and the Build default
+  longer the realm's), it reads its default, or `null` without one; clearing a field goes back to
+  the default. **Before it starts:** giving a task or Run script whose script declares params
+  first shows those params, filled with the resident's kept values or the defaults; Start gives
+  the order with them. A script without params starts at once. The resident card shows one field
+  for each param of the script the resident runs, picked on the map and cleared with a button;
+  picking one doesn't end the script. The Work default declares `storage` (where the output goes) and the Build default
   `source` (where materials come from, a carriage too), each falling back to the nearest storage
   while unset; a source picked that holds none of what the site lacks is left alone, and they
   just build. Work, Build and Tear down also declare the `number` params `foodAt` and `foodTake`
@@ -740,8 +769,13 @@ The shared language of the game. Domain terms only — no implementation details
   world. A walk-to spreads them over distinct free tiles around the target, the nearest of them
   to the nearest tile. Work and Build make each join the workplace or site: Build walks them
   there, the first lays out the site and the others join it; Work is tile-bound, so it goes only
-  to those standing at the workplace. Those who can't take it (children, a partner carrying a
-  child, too far for a tile-bound order) are skipped, and the card says who and why.
+  to those standing at the workplace. Every order a resident card offers is on the group card
+  too (mount, feed the stable, breed, haul, Run script with its params, …). Those who can't take
+  it (children, a partner carrying a child, too far for a tile-bound order) are skipped, and the
+  card says who and why. **Planning for a group:** the group card has the same queue planner as
+  a resident card; "Give to all" sets a copy of the planned steps as each member's queue, and
+  appending (Shift, or Add step) adds the step to each member's own queue. Members' queues stay
+  their own afterwards.
 - **Queue:** an order holding a list of steps for a resident and which step they are on. A step
   is any order the Player could give them on its own: a one-off action (walk to, pick up, drop,
   Store, Fetch, …), a task, or one of their scripts with its params. A step ends when it's done
@@ -749,7 +783,11 @@ The shared language of the game. Domain terms only — no implementation details
   it one; a task that never ends on its own (work, haul, feed the stable) needs a duration unless it's the last
   step. With **loop**, the first step follows the last; without, the queue ends after it. Steps
   can be added, removed and reordered while it runs: the current step keeps going unless removed,
-  and then the step in its place starts. A step that can't start or ends in a failure is skipped
+  and then the step in its place starts. **Planning ahead:** a step may act somewhere else than
+  where the resident stands now: the planner's Add step offers every kind of step, and one that
+  acts on a place (work, build, fetch, store, pick up, feed the stable, breed, …) is picked on the
+  map, with a walk there put before it. Adding only checks that the step could make sense (the
+  place exists and is the realm's); whether it can start is checked when its turn comes. A step that can't start or ends in a failure is skipped
   and noted in the realm log; when none of them can start, the queue ends. Any order that isn't a
   step ends it. Scripts see a resident's queue (which step, and what it is) but can't start or
   change one; their `order` and `script` stay the current step's own.
