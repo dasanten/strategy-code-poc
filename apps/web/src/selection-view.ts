@@ -62,6 +62,7 @@ import {
   recipeFor,
   recipeGood,
   teardownWork,
+  workFactor,
   UNEXPLORED,
 } from '@csp/shared'
 import type { Relationship } from './theme.js'
@@ -829,7 +830,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   }
   const terrain = terrainLine(t.terrain, road)
   if (road) {
-    lines.push(road.site ? 'Road site' : terrain!)
+    lines.push(road.site ? roadSiteLine(road, t.terrain) : terrain!)
     if (road.teardown) lines.push(teardownLine(road))
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
@@ -842,6 +843,18 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     lines,
     ...(buildHere ? { buildHere } : {}),
   }
+}
+
+/**
+ * How far a road site has come (`CONTEXT.md`: Road), on `terrain` beneath it: "Road site · 25% of
+ * the work done", and on Mountain how many times the work it takes there (`workFactor`).
+ */
+function roadSiteLine(site: Building, terrain: number | undefined): string {
+  const work = BUILD_WORK.road ?? 0
+  const done = work > 0 ? Math.floor(((site.site?.work ?? 0) / work) * 100) : 100
+  const factor = workFactor('road', terrain)
+  const mountain = factor > 1 ? ` · ${factor}× the work on Mountain` : ''
+  return `Road site · ${done}% of the work done${mountain}`
 }
 
 /** The explored terrain's name, undefined while it is unknown. */
