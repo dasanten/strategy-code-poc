@@ -70,7 +70,7 @@ describe('drawUnits: riders (CONTEXT.md: Riding)', () => {
     }
   })
 
-  it("sits a rider on a horse token the size of theirs, beneath it, at every zoom", () => {
+  it('sits a rider on a horse token the size of theirs, beneath it, at every zoom', () => {
     for (const scale of [FAR_SCALE / 2, MIDDLE, CLOSE]) {
       const { placed, spots } = draw([resident('a', 'r1', { riding: 'h' })], scale)
       const [horse, ...others] = horses(placed)
