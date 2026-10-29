@@ -40,6 +40,7 @@ import {
   ageInYears,
   CARRYING_TICKS,
   canWork,
+  canHandle,
   MAX_HUNGER,
   STABLE_BREED_TICKS,
   KEEPS_GOODS,
@@ -1299,8 +1300,6 @@ const ADULT_ORDERS = new Set([
   'workAt',
   'breed',
   'drive',
-  'pickUp',
-  'drop',
 ])
 
 /** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
@@ -1312,6 +1311,33 @@ export const childrenDontWork: Invariant = {
       .map((r) => ({
         invariant: this.name,
         message: `resident ${r.id} holds a ${r.order!.kind} order as a child`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
+/** The order kinds that move goods into or out of a resident's hands (`CONTEXT.md`: Child). */
+const HANDLING_ORDERS = new Set(['pickUp', 'drop', 'store', 'fetch'])
+
+/**
+ * Children handle only Food (`CONTEXT.md`: Child): no child carries another good, or holds a
+ * pick-up, drop, store or fetch order for one.
+ */
+export const childrenCarryOnlyFood: Invariant = {
+  name: 'children-carry-only-food',
+  check(world) {
+    const goodsOf = (r: Resident) => {
+      const carried = Object.keys(r.carried).filter((g) => (r.carried[g as Good] ?? 0) > 0)
+      const o = r.order
+      const ordered =
+        o && HANDLING_ORDERS.has(o.kind) ? Object.keys((o as { goods: object }).goods) : []
+      return [...carried, ...ordered]
+    }
+    return world.residents
+      .filter((r) => !canHandle(r, world.tick, goodsOf(r)))
+      .map((r) => ({
+        invariant: this.name,
+        message: `child ${r.id} handles ${goodsOf(r).join(', ')}`,
         entityIds: [r.id],
       }))
   },
@@ -1716,6 +1742,7 @@ export const worldInvariants: Invariant[] = [
   pairsHoldTogether,
   carryingDoesntWork,
   childrenDontWork,
+  childrenCarryOnlyFood,
   carriagesInPlace,
   ridersOnHorses,
   driversOnCarriages,
