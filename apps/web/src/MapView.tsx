@@ -33,6 +33,7 @@ import {
   type Size,
 } from './map/camera.js'
 import { ChunkStore } from './map/chunks.js'
+import { wayAhead, wayInView } from './map/way.js'
 import { TerrainLayer } from './map/terrain-layer.js'
 import {
   holderAt,
@@ -506,7 +507,7 @@ export function MapView({
       }
       if (rings) g.stroke({ width: 2.5, color: LEADER_COLOR })
       const selected = ids.length === 1 ? world.residents.find((u) => u.id === ids[0]) : undefined
-      if (selected && spots.has(selected.id)) drawPath(g, cam, view, mapSize, selected)
+      if (selected) drawPath(g, cam, view, mapSize, selected)
     }
 
     function setCam(next: Camera) {
@@ -902,24 +903,11 @@ function RegionLegend({ region }: { region: RegionState | null }) {
   )
 }
 
-/** Where the selected resident is walking, driving or going after someone, and the way there. */
-function wayAhead(
-  r: SeenResident,
-): { target: { x: number; y: number }; path: [number, number][] | null } | undefined {
-  const o = r.order
-  if (o?.kind === 'walkTo' || o?.kind === 'drive') return o
-  if (o?.kind === 'haul' && o.phase === 'driving')
-    return { target: o.stop === 'from' ? o.from : o.to, path: o.path }
-  // Going after a resident: the way ends where they were when it was found; none once in contact.
-  const last = o?.kind === 'attack' ? o.path?.at(-1) : undefined
-  if (o?.kind === 'attack' && last) return { target: { x: last[0], y: last[1] }, path: o.path }
-  return undefined
-}
-
 /** The selected resident's way ahead, as a line to the target (design: Main Game Screen). */
 function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: SeenResident) {
   const way = wayAhead(r)
-  if (!way) return
+  // Drawn wherever the resident is, as long as some of the way shows (they may be off screen).
+  if (!way || !wayInView(cam, view, size, r, way)) return
   const [tx, ty] = tileToScreen(cam, view, size, way.target.x + 0.5, way.target.y + 0.5)
   if (way.path) {
     let [px, py] = tileToScreen(cam, view, size, r.x + 0.5, r.y + 0.5)
