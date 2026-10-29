@@ -606,10 +606,11 @@ export function Wiki() {
           {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Until
           grown, a child walks but doesn't work, build, tear down, drive or pair, and of all goods
           handles only Food: they pick it up, put it down, fetch and store it like anyone, so they
-          can carry their meals. Stats decline from age {num(DECLINE_AGE)} by{' '}
-          {pct(DECLINE_PER_YEAR)} a year, never below {pct(DECLINE_FLOOR)}; residents die of old age
-          between {num(LIFESPAN_MIN)} and {num(LIFESPAN_MAX)}. A house holds{' '}
-          {num(HOUSING_ROOM.house ?? 0)} residents; health runs up to {num(MAX_HEALTH)}.
+          can carry their meals. At home a child tops up to their own {num(OWN_FOOD)} Food from the
+          storage, so they leave the city with food on them. Stats decline from age{' '}
+          {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below {pct(DECLINE_FLOOR)};
+          residents die of old age between {num(LIFESPAN_MIN)} and {num(LIFESPAN_MAX)}. A house
+          holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs up to {num(MAX_HEALTH)}.
         </p>
       </Section>
 
@@ -619,9 +620,12 @@ export function Wiki() {
           a game day on plains; each point of Endurance above average needs{' '}
           {pct(HUNGER_ENDURANCE_EFFECT)} less (more below), at most {pct(HUNGER_ENDURANCE_LIMIT)}.
           They keep {num(OWN_FOOD)} Food of their own on them, and at home take a meal from the
-          storage when they run low. Within {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage
-          of their realm they take it from there the same way, so a stocked outpost storage next to
-          a far workplace keeps its workers fed.
+          storage when they run low. A child at home doesn't wait to run low: whenever they have
+          less than their own food, they take meals until they have it again, so a child leaving the
+          city has {days(OWN_FOOD / foodEatenPerDay())} of food on them. Within{' '}
+          {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage of their realm they take it from
+          there the same way, so a stocked outpost storage next to a far workplace keeps its workers
+          fed.
         </p>
         <p>
           Far from home, a resident working, building or tearing down can go and get food on their

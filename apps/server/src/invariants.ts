@@ -24,7 +24,6 @@ import {
   drivenCarriageId,
   GOOD_WEIGHT,
   MAX_WORKERS,
-  HOME_FOOD_LOW,
   MEAL_UNITS,
   unitsThatFit,
   NODE_WORKPLACE,
@@ -82,7 +81,7 @@ import {
   tileIndex,
 } from '@csp/shared'
 import { tallyGoods } from './goods-made.js'
-import { refillSource } from './survival.js'
+import { refillSource, refillTarget } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
@@ -791,9 +790,10 @@ export const workOrdersOnWorkplaces: Invariant = {
 
 /**
  * After a tick, nobody at home, near an outpost storage of their realm, at their workplace or in
- * an army by a carriage runs low on food while the storage, pile or carriage they refill from
- * still has some and a meal would fit (`stepRefill`, `CONTEXT.md`: Refilling at home, Refilling at
- * an outpost storage, Refilling at a workplace, Refilling from a carriage).
+ * an army by a carriage runs low on food (a child at home: has less than their own food) while the
+ * storage, pile or carriage they refill from still has some and a meal would fit (`stepRefill`,
+ * `refillTarget`, `CONTEXT.md`: Refilling at home, Refilling at an outpost storage, Refilling at a
+ * workplace, Refilling from a carriage, Child).
  */
 export const refilledWhenLow: Invariant = {
   name: 'refilled-when-low',
@@ -801,13 +801,13 @@ export const refilledWhenLow: Invariant = {
     return world.residents
       .filter(
         (r) =>
-          (r.carried.food ?? 0) < HOME_FOOD_LOW &&
+          (r.carried.food ?? 0) < refillTarget(world, r, terrain.size) &&
           (refillSource(world, r, terrain.size)?.food ?? 0) > 0 &&
           unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
       )
       .map((r) => ({
         invariant: this.name,
-        message: `resident ${r.id} runs low with ${r.carried.food ?? 0} food where there is more`,
+        message: `resident ${r.id} has only ${r.carried.food ?? 0} food where there is more`,
         entityIds: [r.id],
       }))
   },
