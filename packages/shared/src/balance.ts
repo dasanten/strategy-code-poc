@@ -130,6 +130,19 @@ export function canWork(resident: Resident, tick: number): boolean {
   return ageInYears(resident, tick) >= ADULT_AGE
 }
 
+/** The goods a child may pick up, put down, Fetch and Store: their meals (`CONTEXT.md`: Child). */
+export const CHILD_GOODS: readonly Good[] = ['food']
+
+/**
+ * Whether a resident may pick up, put down, Fetch or Store these goods: anyone grown up, a child
+ * only `CHILD_GOODS` (`CONTEXT.md`: Child).
+ */
+export function canHandle(resident: Resident, tick: number, goods: readonly string[]): boolean {
+  return (
+    canWork(resident, tick) || goods.every((g) => (CHILD_GOODS as readonly string[]).includes(g))
+  )
+}
+
 /** Stats start to decline at this age in game years (`CONTEXT.md`: Aging). */
 export const DECLINE_AGE = 45
 
