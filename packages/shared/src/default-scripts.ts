@@ -338,16 +338,15 @@ param foodAt: number // get Food below this many units on me
 param foodTake: number // units of Food to take along
 let ownFood = ${OWN_FOOD} // units of Food on me while foodTake is unset
 if (memory.stuck) { return }
-if (memory.at == null) { memory.at = {x: me.x, y: me.y} }
 
-// Getting food: on my way, then back to where I tear down.
+// Getting food: on my way, then back to the tile I tear down from.
 let away = memory.food
 if (away != null) {
   if (me.order != null && me.order.kind != "tearDown") { return } // on my way
-  if (me.x != memory.at.x || me.y != memory.at.y) {
+  if (me.x != away.x || me.y != away.y) {
     if (away.walked) { memory.stuck = true } // no way back
     else {
-      walkTo(memory.at.x, memory.at.y)
+      walkTo(away.x, away.y)
       away.walked = true
     }
     return
@@ -357,8 +356,10 @@ if (away != null) {
 
 // Low on Food: get some, then back. With none anywhere, tear down on.
 ${GET_FOOD}
+let x = me.x
+let y = me.y
 if (getFood(params.source, me)) {
-  memory.food = {walked: false}
+  memory.food = {walked: false, x: x, y: y}
   return
 }
 if (me.order == null || me.order.kind != "tearDown") {
