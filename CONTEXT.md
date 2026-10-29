@@ -632,7 +632,7 @@ The shared language of the game. Domain terms only — no implementation details
   standing in a stable, from their card. They keep Food in the stable for about 10 game days for
   the horses standing in it: below that they fetch what is missing from a storage and store it in
   the stable; otherwise they wait there. Its params: `stable`, the stable to feed (by default the
-  one they were given it in), and `source`, where the Food comes from (by default the nearest
+  one they stand in when it starts), and `source`, where the Food comes from (by default the nearest
   storage of their realm with Food). With no Food to fetch they wait.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
@@ -702,11 +702,14 @@ The shared language of the game. Domain terms only — no implementation details
   each of them, with its own memory, and can request only what that resident or army could. Any
   other order ends it. A script can hand over to a built-in order for a while and take control
   back. A script ends itself by calling `end()`: the resident stands idle, and in a queue its next
-  step starts; the Build, Tear down and Breed horses defaults do once the site is finished, the building is
+  step starts. `end(reason)` also notes the short reason in the realm log ("Ana stopped Work: no
+  workplace on her tile"). The defaults end that way when their target is missing or gone; the
+  Build, Tear down and Breed horses defaults also end once the site is finished, the building is
   gone or the foal is born. A saved change is picked up on the next tick: each save is a new version, and the
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
-  active again.
+  active again. **Deleting versions:** any version but the active one can be deleted for good,
+  one at a time or all those older than the active one at once; the others keep their numbers.
 - **Script parameter:** a value the Player picks for whoever runs a script, declared by a
   `param name: type` line at the top of the script and read there as `params.name`; a `param`
   line anywhere else is a syntax error. A `building` param holds one of the realm's own buildings
@@ -741,7 +744,20 @@ The shared language of the game. Domain terms only — no implementation details
   like any script. **Resetting** it makes the game's current default its newest version again.
   Until the Player edits it, their version follows the game's default as the game improves it;
   once edited it stays theirs, and they are told when the game's default has changed since.
-  Default scripts can't be renamed or deleted. NPC cities always run the game's defaults.
+  Default scripts can't be renamed or deleted. NPC cities always run the game's defaults. Each
+  default reads top-down: a short main block first saying what happens in order, then a named
+  `fn` for each step, with plain names and no tricks (the game API's `floor` and `pickRandom`
+  help there). Shared pieces such as Getting food are copied into each default that needs them.
+  **Started directly:** a default script's target is a param: Work's `workplace`, Tear down's
+  `building`, Feed the stable's and Breed horses' `stable` (Breed horses then picks the pair as
+  Breeding says, a paused pair first). Giving the task from the UI fills
+  it; unset, it is the one on the resident's tile when the script starts, kept until it ends. So
+  running the same script with Run script or as a queue step works like giving the task.
+  Build's is `site`, a construction site to join; laying out a new one (its kind and place)
+  stays the Build order's. Haul's is `carriage`; its route (where to, which goods) comes only
+  from the Haul order, so Haul started without one ends ("no route given"). The target param is
+  never kept: each start fills it (the task order, or what the Player picks before it starts) or
+  leaves it unset; the script's other params are kept as usual.
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
@@ -751,6 +767,15 @@ The shared language of the game. Domain terms only — no implementation details
   something a script keeps there. A script can read, never change, the memory of its own
   Player's residents and armies, so residents doing the same task can agree on who does what;
   other Players' memory stays hidden.
+- **Script log:** a resident's last lines of `log(text)` (short text, each with its game time),
+  shown to the owning Player only and never in the realm log; `end(reason)` adds its reason too.
+  Kept with the resident across scripts, so it still shows why the last one ended; once full,
+  the oldest line goes. The game's defaults log their decisions and turns (carrying a load off,
+  getting Food, fetching materials), never every tick.
+- **Debugging a script:** the Script tab of a resident card shows, for the script they run,
+  read-only and live: its memory and params, the script log, its last runtime error with the
+  line (a click opens that line in the Library), and the steps it used last tick against its
+  step budget.
 - **Step budget:** how much work a script may do each tick, for each resident or army and for a
   whole realm. Out of budget, the script stops for that tick; what it already requested still
   counts. Default scripts count like any other. NPC cities have no realm budget, only the one
