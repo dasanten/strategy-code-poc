@@ -23,6 +23,7 @@ import {
   CARRY_BASE,
   CARRY_PER_STRENGTH,
   CARRYING_DAYS,
+  PAIRING_WAIT_DAYS,
   CHILD_STAT_SPREAD,
   CHILD_YEAR_DAYS,
   CITY_AREA_MARGIN,
@@ -88,6 +89,7 @@ import {
   NPC_CITY_WONT_SELL_STANDING,
   NPC_TRADE,
   OWN_FOOD,
+  OUTPOST_REFILL_REACH,
   PERSUADE_ASK_AGAIN_DAYS,
   PERSUADE_STANDING,
   PRICE_ELASTICITY,
@@ -396,8 +398,19 @@ export function Wiki() {
           the card shows its letter key; press it to run the action. Escape drops what is picked.
         </p>
         <p>
-          To pick several at once, drag a box around them with Shift held (or after the Box select
-          button), or Shift-click residents to add them or take them out.
+          To pick several at once, drag a box around them with Shift held (or after the Select
+          button on the map), or Shift-click residents to add them or take them out.
+        </p>
+        <p>
+          On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
+          long-press does what right-click does. Turn on Select to make a one-finger drag box a
+          group instead of panning.
+        </p>
+        <p>
+          On a phone the card sits at the bottom of the screen. Drag its handle to show just its
+          header, half the screen or all of it; a tap on the handle goes one step up. While an
+          order waits for a target the card drops to its header. The menu button at the top left
+          opens the drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -585,9 +598,9 @@ export function Wiki() {
           Intellect, twice as fast).
         </p>
         <p>
-          A pair has one child at a time: once a game year has passed since they paired, and their
-          city has free housing and a food surplus, one partner carries the child for{' '}
-          {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
+          A pair has one child at a time: once {days(PAIRING_WAIT_DAYS)} have passed since they
+          paired, and their city has free housing and a food surplus, one partner carries the child
+          for {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
           {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a child is grown after{' '}
           {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Stats
           decline from age {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below{' '}
@@ -603,7 +616,17 @@ export function Wiki() {
           a game day on plains; each point of Endurance above average needs{' '}
           {pct(HUNGER_ENDURANCE_EFFECT)} less (more below), at most {pct(HUNGER_ENDURANCE_LIMIT)}.
           They keep {num(OWN_FOOD)} Food of their own on them, and at home take a meal from the
-          storage when they run low.
+          storage when they run low. Within {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage
+          of their realm they take it from there the same way, so a stocked outpost storage next to
+          a far workplace keeps its workers fed.
+        </p>
+        <p>
+          Far from home, a resident working, building or tearing down can go and get food on their
+          own: set <code>foodAt</code> and <code>foodTake</code> on their card, in units of Food.
+          Below <code>foodAt</code> on them, they walk to their storage (or the nearest one of your
+          realm with Food), take Food up to <code>foodTake</code> and go back. Whenever they are at
+          a storage anyway, their own food is topped up to <code>foodTake</code> instead of{' '}
+          {num(OWN_FOOD)}. Unset, they don't go on their own.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -628,6 +651,13 @@ export function Wiki() {
           Workers make goods in proportion to their Strength, plus {pct(WORK_SKILL_EFFECT)} for each
           point of the workplace's skill. Output lands in the workplace's pile; one worker at a time
           carries a full load to the nearest storage of their realm.
+        </p>
+        <p>
+          With <code>foodAt</code> set, a worker who carries less Food than that leaves work for
+          their <code>storage</code>, or the nearest storage of your realm with Food, takes Food up
+          to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes back. With no Food
+          anywhere they work on. With <code>foodTake</code> set, carrying a load tops their food up
+          to it too.
         </p>
         <table>
           <thead>
@@ -753,9 +783,33 @@ export function Wiki() {
         <p>
           A city building (town hall, house, storage, wall, gate) belongs to a city when it stands
           within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
-          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house or a storage
-          goes only in a city's area; a town hall, wall or gate goes anywhere off Mountain and off
+          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house goes only in a
+          city's area; a town hall, storage, wall or gate goes anywhere off Mountain and off
           resource nodes, and a new town hall founds a city.
+        </p>
+        <p>
+          With <code>foodAt</code> set, a resident building or tearing down who carries less Food
+          than that goes to their <code>source</code>, or the nearest storage of your realm with
+          Food, takes Food up to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes
+          back to the site. With no Food anywhere they work on. With <code>foodTake</code> set,
+          fetching materials tops their food up to it too, before the materials.
+        </p>
+        <p>
+          A storage in a city's area is that city's storage. One outside any city is an{' '}
+          <strong>outpost storage</strong>: it belongs to the realm whose residents finished it and
+          counts as a storage of your realm everywhere (Store, Fetch, carrying the output, fetching
+          materials, haul route stops, <code>storages()</code> and <code>storage</code> params). It
+          founds no city and has no area. A city that grows over it takes it in; a storage cut off
+          from its city, or left when its town hall is torn down, stays an outpost storage of that
+          city's realm. What it holds is seen only by its realm and its allies, and by anyone
+          standing at it. Residents of your realm within {num(OUTPOST_REFILL_REACH)} tiles of it
+          take a meal from it when they run low, as at home.
+        </p>
+        <p>
+          An outpost storage is guarded like a workplace: while an armed resident of its realm
+          stands on or next to it and nobody else's armed resident does, only its realm can take
+          from it. Unguarded, anyone at it can pick up from it; for another organization that is
+          theft, and tearing it down is a crime too (see Standing).
         </p>
       </Section>
 
@@ -1014,7 +1068,8 @@ export function Wiki() {
           Standing runs from {signed(-STANDING_RANGE)} to {signed(STANDING_RANGE)}. A known crime
           lowers the victim's standing toward the culprit; standing drifts back toward neutral by{' '}
           {num(STANDING_DRIFT_PER_DAY)} a game day. A crime is remembered for{' '}
-          {days(CRIME_MEMORY_DAYS)} after the news stops spreading.
+          {days(CRIME_MEMORY_DAYS)} after the news stops spreading. Taking from or tearing down
+          another realm's outpost storage counts the same as its city storage.
         </p>
         <table>
           <thead>
@@ -1209,7 +1264,9 @@ export function Wiki() {
         <p>
           What a script gets of each kind of thing. Every field listed is always there; one you
           aren't allowed to see, or that doesn't apply, is <code>null</code>, as its last column
-          says. A script sees no other fields.
+          says. A script sees no other fields. The game may add fields at any time; when one is
+          renamed or removed, each Player whose scripts read it is told in their realm log, with the
+          field and the scripts.
         </p>
         {(
           Object.entries(SCRIPT_VIEWS) as [ScriptViewName, (typeof SCRIPT_VIEWS)[ScriptViewName]][]
@@ -1277,7 +1334,12 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         <ul>
           <li>
             A resident's card shows one field for each param of the script they run: pick it on the
-            map, or clear it. Picking doesn't stop the script.
+            map, or clear it. A <code>number</code> param has a number field instead: type a whole
+            number of zero or more and press Enter. Neither stops the script.
+          </li>
+          <li>
+            A group's card sets a <code>number</code> param for each of them running a script with
+            it.
           </li>
           <li>
             The values are kept for each resident and each script. Giving the task again keeps them;
@@ -1285,13 +1347,17 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           </li>
           <li>
             A param reads <code>null</code> while none is picked, and once the one picked is gone or
-            no longer yours.
+            no longer yours. A <code>number</code> param reads the number typed, or{' '}
+            <code>null</code> while unset.
           </li>
           <li>
             The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
             <code>source</code>: where materials come from, a carriage too. Unset, each uses the
             nearest storage; a source picked that holds none of what the site lacks is left alone,
-            and they just build.
+            and they just build. The Tear down default has <code>source</code>: where Food comes
+            from. The Work, Build and Tear down defaults also have the <code>number</code> params{' '}
+            <code>foodAt</code> and <code>foodTake</code> for getting food, in units of Food (a
+            resident eats about {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>

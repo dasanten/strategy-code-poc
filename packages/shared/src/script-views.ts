@@ -96,6 +96,12 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
     'The city it belongs to.',
     'for a building of no city, such as a workplace on a node',
   ),
+  field(
+    'realmId',
+    'string',
+    'The realm an outpost storage, a storage of no city, belongs to.',
+    'for any other building, and for a storage of no city that belongs to no realm',
+  ),
   x,
   y,
   field(
@@ -557,14 +563,20 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('is', 'string', '"building" or "city".'),
       field('seenAt', 'number', 'The tick it was last in sight.'),
       id('building or city'),
-      ...BUILDING_FIELDS.filter((f) => f.name !== 'id').map((f) => ({
+      ...BUILDING_FIELDS.filter((f) => f.name !== 'id' && f.name !== 'realmId').map((f) => ({
         ...f,
         nullWhen: f.nullWhen ? `for a city, ${f.nullWhen}` : 'for a city',
       })),
-      ...CITY_FIELDS.filter((f) => f.name !== 'id').map((f) => ({
-        ...f,
-        nullWhen: f.nullWhen ? `for a building, ${f.nullWhen}` : 'for a building',
-      })),
+      ...CITY_FIELDS.filter((f) => f.name !== 'id').map((f) =>
+        f.name === 'realmId'
+          ? field(
+              'realmId',
+              'string',
+              'The realm a city, or an outpost storage (a storage of no city), belongs to.',
+              'for an NPC city, and for any other building',
+            )
+          : { ...f, nullWhen: f.nullWhen ? `for a building, ${f.nullWhen}` : 'for a building' },
+      ),
     ],
   },
   directive: {
@@ -613,6 +625,19 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
   },
 }
 
+/**
+ * The breaking changes to the script views so far (ADR 0011), oldest first: the fields each one
+ * renamed or removed, as `view.field`, or `'undeclared'` for every field the views don't declare.
+ * Only add to the end. The world counts how many its Players were told of
+ * (`WorldState.scriptViewChanges`); at start the server writes a realm-log note to each Player
+ * whose active scripts read a field of the rest.
+ */
+export const SCRIPT_VIEW_CHANGES: readonly { dropped: 'undeclared' | readonly string[] }[] = [
+  // The switch to script views: scripts no longer get the server's own objects, so every field
+  // they read and no view declares reads null.
+  { dropped: 'undeclared' },
+]
+
 /** A view's field by name, if it has one. */
 export function scriptViewField(name: ScriptViewName, fieldName: string): ScriptField | undefined {
   return SCRIPT_VIEWS[name].fields.find((f) => f.name === fieldName)
@@ -620,8 +645,10 @@ export function scriptViewField(name: ScriptViewName, fieldName: string): Script
 
 /**
  * Where a script value doesn't hold what its type declares: a field missing that is never null,
- * or a value of the wrong kind, each with its path (`residents[0].stats`). A missing field reads
- * as `null` in a script, so it counts as a hidden one. Empty for a value that fits.
+ * a value of the wrong kind, or a field its view doesn't declare, each with its path
+ * (`residents[0].stats`). A missing field reads as `null` in a script, so it counts as a hidden
+ * one. Empty for a value that fits. Invariant (ADR 0004, 0011): every value the server hands a
+ * script fits.
  */
 export function scriptValueProblems(value: unknown, type: ScriptType, path: string): string[] {
   if (value === null || value === undefined || type === 'any') return []
@@ -634,12 +661,19 @@ export function scriptValueProblems(value: unknown, type: ScriptType, path: stri
   }
   if (typeof value !== 'object' || Array.isArray(value)) return [`${path} is not a ${type.view}`]
   const record = value as Record<string, unknown>
-  return SCRIPT_VIEWS[type.view].fields.flatMap((f) => {
-    const at = `${path}.${f.name}`
-    const item = record[f.name]
-    if ((item === null || item === undefined) && f.nullWhen === undefined) {
-      return [`${at} is missing`]
-    }
-    return scriptValueProblems(item, f.type, at)
-  })
+  const fields = SCRIPT_VIEWS[type.view].fields
+  const outside = Object.keys(record)
+    .filter((name) => !fields.some((f) => f.name === name))
+    .map((name) => `${path}.${name} is not in the ${type.view} view`)
+  return [
+    ...outside,
+    ...fields.flatMap((f) => {
+      const at = `${path}.${f.name}`
+      const item = record[f.name]
+      if ((item === null || item === undefined) && f.nullWhen === undefined) {
+        return [`${at} is missing`]
+      }
+      return scriptValueProblems(item, f.type, at)
+    }),
+  ]
 }

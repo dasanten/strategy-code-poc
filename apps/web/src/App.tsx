@@ -39,13 +39,14 @@ import {
   CentredDialog,
   Drawer,
   DrawerEdge,
+  PhoneMenu,
   ToolRail,
   TopBar,
   mapCovered,
   useEscapeCloses,
 } from './Hud.js'
 import type { Covered } from './map/camera.js'
-import { groupResidents, type CardSections } from './residents-view.js'
+import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
 import { appendRequest, editRequest, STORE_ALL, useShiftHeld } from './queue-view.js'
 import { useSavedGroups } from './saved-groups.js'
@@ -66,7 +67,9 @@ import {
   type HaulSetup,
   type Picking,
 } from './Residents.js'
-import { TileCard } from './SelectionCard.js'
+import { CardSheet, PickBanner, TileCard } from './SelectionCard.js'
+import { pickHint, pickPrompt, pickTarget, useMediaQuery, useTouchScreen } from './pick-mode.js'
+import { PHONE_QUERY } from './sheet-view.js'
 import { buildingNodeKind } from './building-info-view.js'
 import {
   buildHereProblem,
@@ -117,8 +120,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
-  // The resident card's open sections, kept here so they stay open as the Player picks others.
-  const [cardSections, setCardSections] = useState<CardSections<ActionId>>({ stats: false })
+  // The resident card's open tab and panel, kept here so they stay as the Player picks others;
+  // the tab is also remembered in this browser (ADR 0012).
+  const [cardSections, setCardSections] = useState<CardSections<ActionId>>(() => ({
+    tab: rememberedTab(),
+  }))
   const [picking, setPicking] = useState<Picking>(false)
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
@@ -155,20 +161,44 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
-  // With no drawer open, Escape drops the selection.
+  // What the map waits for while an order that needs a target is given (ADR 0012: pick mode).
+  const touch = useTouchScreen()
+  // Narrow or touch: cards are bottom sheets and the HUD folds into a menu button (ADR 0012).
+  const phone = useMediaQuery(PHONE_QUERY)
+  const pick = pickTarget({
+    picking,
+    groupPicking,
+    isGroup: group.length > 1,
+    armyPick,
+    paramPick,
+  })
+  /** Leaves pick mode without giving the order; the card comes back as it was. */
+  const cancelPick = useCallback(() => {
+    setPicking(false)
+    setGroupPicking(false)
+    setArmyPick(undefined)
+    setParamPick(undefined)
+  }, [])
+  // Escape leaves pick mode first; with no drawer open, it then drops the selection.
   const anySelected = selectedIds.length > 0
+  const picked = pick !== undefined
   useEffect(() => {
-    if (openDrawer || !anySelected) return
+    if (!picked && (openDrawer || !anySelected)) return
     const onKey = (e: KeyboardEvent) => {
       const typing =
         e.target instanceof Element && e.target.closest('input, textarea, select, .cm-editor')
       if (e.key !== 'Escape' || typing) return
+      if (picked) {
+        // Ahead of the drawer's own Escape, which would close it too.
+        e.stopImmediatePropagation()
+        return cancelPick()
+      }
       setSelectedIds([])
       setPicking(false)
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [openDrawer, anySelected])
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [openDrawer, anySelected, picked, cancelPick])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
@@ -380,12 +410,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   /**
    * Picks, or clears with null, the value of a param of the script the picked resident runs
-   * (`CONTEXT.md`: Script parameter). It leaves the script running.
+   * (`CONTEXT.md`: Script parameter): the building or carriage's id, or the number typed for a
+   * number param. It leaves the script running.
    */
-  async function setScriptParam(name: string, targetId: string | null) {
+  async function setScriptParam(name: string, picked: string | number | null) {
     if (!selected?.script) return
     const { scriptId } = selected.script
-    const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, targetId }
+    const value = typeof picked === 'number' ? { value: picked } : { targetId: picked }
+    const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, ...value }
     setOrderError(await giveOrder(order))
   }
   async function stop() {
@@ -470,7 +502,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   if (founding && !world) return <Founding leaderName={founding.leaderName} onFound={found} />
 
   return (
-    <div className="game">
+    <div className={phone ? 'game phone' : 'game'}>
       <section className="game-map">
         {world ? (
           <MapView
@@ -517,10 +549,21 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         leader={leader?.name}
         onLogout={logout}
       />
-      <ToolRail
-        open={openDrawer}
-        onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
-      />
+      {phone ? (
+        <PhoneMenu
+          open={openDrawer}
+          onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
+          goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
+          cityName={homeCity?.name}
+          leader={leader?.name}
+          onLogout={logout}
+        />
+      ) : (
+        <ToolRail
+          open={openDrawer}
+          onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
+        />
+      )}
       {world &&
         drawer(
           'residents',
@@ -552,6 +595,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             armies={world.armies}
             own={own}
             inSight={world.residents}
+            carriages={world.carriages}
             realmId={world.home.realmId}
             picking={armyPick}
             onPick={(pick) => {
@@ -653,8 +697,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />,
         )}
       <DrawerEdge open={openDrawer} />
+      {pick && (
+        <PickBanner prompt={pickPrompt(pick, touch)} hint={pickHint(pick)} onCancel={cancelPick} />
+      )}
       {world && selectedTile && (
-        <div className="game-selection">
+        <CardSheet phone={phone} pinnedPeek={false}>
           <TileCard
             card={describeTile(
               {
@@ -725,10 +772,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOrderError(await giveOrder(order))
             }}
           />
-        </div>
+        </CardSheet>
       )}
       {world && selected && !selectedTile && (
-        <div className="game-selection">
+        <CardSheet phone={phone} pinnedPeek={pick !== undefined && pick.kind !== 'army'}>
           <ResidentCard
             key={selected.id}
             resident={selected}
@@ -836,7 +883,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             onRename={rename}
             sections={cardSections}
-            onSections={setCardSections}
+            onSections={(s) => {
+              rememberTab(s.tab)
+              setCardSections(s)
+            }}
             scriptParams={
               selected.script && (
                 <ScriptParamFields
@@ -849,6 +899,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                     setPicking(false)
                     setParamPick((now) => (now?.name === p.name ? undefined : p))
                   }}
+                  onNumber={(name, value) => void setScriptParam(name, value)}
                   onClear={(name) => void setScriptParam(name, null)}
                 />
               )
@@ -864,11 +915,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPicking(false)
               setParamPick(undefined)
             }}
+            collapsed={pick !== undefined && pick.kind !== 'army'}
           />
-        </div>
+        </CardSheet>
       )}
       {world && group.length > 1 && !selectedTile && (
-        <div className="game-selection">
+        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group'}>
           <GroupCard
             residents={group}
             scripts={scripts}
@@ -903,8 +955,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             orderError={groupError}
             onPick={(id) => select([id])}
             onClose={() => select([])}
+            collapsed={pick?.kind === 'group'}
           />
-        </div>
+        </CardSheet>
       )}
       {world && realmEnded(world.events) && (
         <CentredDialog title="Your realm has ended">

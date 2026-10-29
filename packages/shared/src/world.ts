@@ -157,10 +157,16 @@ export interface ScriptMemory {
   [key: string]: MemoryValue
 }
 
-/** A resident's picked script parameter values: script id → param name → building or carriage id. */
+/**
+ * A resident's picked script parameter values: script id → param name → building or carriage
+ * id, or the whole number typed for a `number` param.
+ */
 export interface ScriptParamValues {
-  [scriptId: string]: { [name: string]: string }
+  [scriptId: string]: { [name: string]: ScriptParamValue }
 }
+
+/** A picked script parameter value: a building or carriage id, or a whole number of zero or more. */
+export type ScriptParamValue = string | number
 
 /**
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
@@ -200,7 +206,7 @@ export interface SeenScript {
    * The values picked for its params, by name (`Resident.scriptParams`); only for the realm
    * running it.
    */
-  params?: { [name: string]: string }
+  params?: { [name: string]: ScriptParamValue }
 }
 
 /**
@@ -279,6 +285,11 @@ export interface StoreOrder {
   goods: GoodsWanted
   to: GoodsPlace
   phase: 'walking' | 'putting' | 'refilling'
+  /**
+   * The Food the resident keeps on them and tops up to at a storage with Food, in units; absent
+   * for `OWN_FOOD` (`CONTEXT.md`: Getting food).
+   */
+  ownFood?: number
   /** While walking, the tiles still to walk; null while the path is being found. */
   path: [number, number][] | null
   progress: number
@@ -560,6 +571,11 @@ export interface WorldState {
    * seen): what is in their sight now as of this tick, and what left it as they last saw it.
    */
   lastSeen: Record<number, Remembered[]>
+  /**
+   * How many of the breaking changes to the script views (`SCRIPT_VIEW_CHANGES`) the Players were
+   * told of in their realm logs; the server tells them of the rest at start.
+   */
+  scriptViewChanges: number
 }
 
 /**
@@ -1306,6 +1322,19 @@ export type RealmEventWhat =
   | { kind: 'grownUp'; residentId: string; name: string }
   /** One of the realm's horses starved to death (`CONTEXT.md`: Horse). */
   | { kind: 'horseDied'; horseId: string }
+  /**
+   * The one-time Horse grant (`CONTEXT.md`: Horse grant) gave the realm `horseIds`: in its stable
+   * at (`x`, `y`), or, with no stable, on the ground next to the storage of `city` or next to the
+   * Leader, with Food by them.
+   */
+  | {
+      kind: 'horsesGranted'
+      horseIds: string[]
+      where: 'stable' | 'storage' | 'leader'
+      city?: string
+      x: number
+      y: number
+    }
   /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
   | { kind: 'foaled'; horseId: string; stableId: string }
   /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */
@@ -1363,6 +1392,12 @@ export type RealmEventWhat =
   | ({ kind: 'scriptOutOfSteps'; name: string; scriptId: number; realm: boolean } & ScriptRunBy)
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
+  /**
+   * A field the Player's active scripts read was renamed or removed from its script view
+   * (`CONTEXT.md`: Script view), as `view.field`; it reads `null` from now on. `scripts` are
+   * those that read it, by name.
+   */
+  | { kind: 'scriptFieldDropped'; field: string; scripts: { scriptId: number; name: string }[] }
   /**
    * Step `step` (counted from 1) of the resident `name`'s queue (`CONTEXT.md`: Queue), an order
    * of kind `order`, was skipped: it couldn't start or ended in a failure, for `reason`.
@@ -1581,6 +1616,11 @@ export interface Building {
    * keeps the city it was laid out for, until that city is gone.
    */
   cityId: string | null
+  /**
+   * The realm an outpost storage belongs to (`CONTEXT.md`: Outpost storage): finished storages
+   * of no city only, and only those a realm has. A city that takes it in drops it.
+   */
+  realmId?: string
   x: number
   y: number
   /** Goods kept here; storages, warehouses and stables only. */

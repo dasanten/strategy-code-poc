@@ -203,6 +203,15 @@ export const START_STABLE_FOOD = 30
  */
 export const HORSE_FOOD_PER_DAY = 0.75
 
+/** Horses the one-time Horse grant gives each realm without any (`CONTEXT.md`: Horse grant). */
+export const HORSE_GRANT_HORSES = 2
+
+/**
+ * Food laid on the ground by each granted horse that has no stable to stand in (`CONTEXT.md`:
+ * Horse grant), in units: five game days of an average horse's meals, time to fetch it more.
+ */
+export const HORSE_GRANT_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
+
 /**
  * How far from its tile a horse reaches Food lying on the ground, in tiles either way
  * (`CONTEXT.md`: Horses have no inventory, "on its tile or right next to it"): its own tile and
@@ -431,6 +440,15 @@ export const CARRYING_DAYS = 10
 
 /** Ticks from the start of carrying until the child is born (`CARRYING_DAYS`). */
 export const CARRYING_TICKS = CARRYING_DAYS * TICKS_PER_GAME_DAY
+
+/**
+ * Game days a pair waits after pairing before one partner starts carrying (`CONTEXT.md`: Pairing),
+ * if their city then has free housing and a food surplus: 10 game days, 4 real hours.
+ */
+export const PAIRING_WAIT_DAYS = 10
+
+/** Ticks from pairing until a partner can start carrying (`PAIRING_WAIT_DAYS`). */
+export const PAIRING_WAIT_TICKS = PAIRING_WAIT_DAYS * TICKS_PER_GAME_DAY
 
 /**
  * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
@@ -734,6 +752,13 @@ export const FOOD_PER_DAY = 0.5
  * meal, two game days' eating (`CONTEXT.md`: Eating). They then take meals from their city's storage.
  */
 export const HOME_FOOD_LOW = 1
+
+/**
+ * How many tiles from an outpost storage's footprint, along each direction, a resident of its
+ * realm still takes a meal from it when running low (`CONTEXT.md`: Refilling at an outpost
+ * storage): enough for the workers of a mine or farm built right beside it.
+ */
+export const OUTPOST_REFILL_REACH = 3
 
 /**
  * A resident's own food (`CONTEXT.md`: Own food), in units: four game days of meals. Putting goods

@@ -1,4 +1,11 @@
-import { isAt, type Building, type Carriage, type City, type ScriptParamType } from '@csp/shared'
+import {
+  buildingRealm,
+  isAt,
+  type Building,
+  type Carriage,
+  type City,
+  type ScriptParamType,
+} from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 
 /**
@@ -20,8 +27,7 @@ export interface ParamWorld {
 /** The buildings a storage param may name besides carriages: those a store or fetch goes to. */
 const STORAGE_KINDS: readonly string[] = ['storage', 'stable']
 
-const ownBuilding = (w: ParamWorld, b: Building) =>
-  w.cities.some((c) => c.id === b.cityId && c.realmId === w.realmId)
+const ownBuilding = (w: ParamWorld, b: Building) => buildingRealm(w, b) === w.realmId
 
 /** Whether a building fits a param of `type`: the realm's own, finished for a storage param. */
 function buildingFits(w: ParamWorld, type: ScriptParamType, b: Building): boolean {

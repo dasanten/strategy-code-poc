@@ -10,6 +10,91 @@
   overflow: auto;
   border-radius: 10px;
 }
+/* Pick mode (ADR 0012): a banner at the top of the map says what to pick, with Cancel. */
+.pick-banner {
+  position: absolute;
+  top: calc(var(--top-h) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: max-content;
+  max-width: min(520px, calc(100vw - var(--rail-w) - 24px));
+  padding: 8px 8px 8px 14px;
+  background: var(--ui-panel);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 10px;
+  color: var(--ui-text);
+  font-family: var(--font-ui);
+}
+.pick-banner-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.pick-banner-text .small {
+  color: var(--ui-muted);
+}
+.pick-banner button {
+  flex: none;
+}
+.game.phone .pick-banner {
+  max-width: calc(100vw - 24px);
+}
+/* On a phone the card is a bottom sheet (ADR 0012, `CardSheet`): peek shows just its header,
+   half and full fixed heights; a drag sets the height inline until it settles. */
+.game-selection.sheet {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-height: calc(100% - var(--top-h));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 14px 14px 0 0;
+}
+.game-selection.sheet-half {
+  height: 50%;
+}
+.game-selection.sheet-full {
+  height: calc(100% - var(--top-h));
+}
+.sheet-handle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--ui-panel);
+  backdrop-filter: blur(10px);
+  cursor: ns-resize;
+  touch-action: none;
+}
+.sheet-handle:disabled {
+  cursor: default;
+}
+.sheet-handle span {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ui-line-strong);
+}
+.game-selection.sheet .sel-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border-top: 0;
+  border-radius: 0;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
 .inspector.sel-card {
   gap: 12px;
   padding: 14px 14px 12px;
@@ -133,15 +218,24 @@
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.18);
 }
-.sel-details summary {
-  cursor: pointer;
+/* The resident card's tabs (ADR 0012): one open at a time under the header. */
+.sel-tabs button {
+  padding: 4px 6px;
   font-size: 0.8rem;
-  color: var(--ui-muted);
 }
-.sel-details[open] {
+/* One kind of order on the Orders tab, under a quiet heading. */
+.sel-order-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
+}
+.sel-order-group h3 {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
 }
 /* The ⓘ on a building's card: a quiet toggle that opens what the building is for. */
 .sel-info {

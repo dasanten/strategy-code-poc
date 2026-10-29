@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GOODS, QUEUE_DEFAULT_STEP_MINUTES, TICKS_PER_GAME_YEAR, type Stock } from '@csp/shared'
-import { groupRequests, groupSentLine, spreadTiles, type GroupOrder } from './group-orders.js'
+import {
+  groupNumberParams,
+  groupRequests,
+  groupSentLine,
+  spreadTiles,
+  type GroupOrder,
+} from './group-orders.js'
 
 const TICK = 100 * TICKS_PER_GAME_YEAR
 const SIZE = 64
@@ -121,6 +127,45 @@ describe('group orders', () => {
     ])
     expect(send({ kind: 'stop' }, rs).requests).toHaveLength(2)
     expect(send({ kind: 'walkTo', x: 5, y: 5 }, rs).requests).toHaveLength(2)
+  })
+
+  it('sets a number param for each running a script that has it, queued or not', () => {
+    const rs = [
+      resident('a', 0, 0, { script: { scriptId: 3 } }),
+      resident('b', 0, 0, { script: { scriptId: 4 } }),
+      resident('c', 0, 0),
+    ]
+    const order: GroupOrder = { kind: 'setNumber', name: 'foodAt', value: 4, scriptIds: [3] }
+    const { requests, skipped } = send(order, rs)
+    expect(requests.map((q) => q.order)).toEqual([
+      { kind: 'setScriptParam', scriptId: 3, name: 'foodAt', value: 4, residentId: 'a' },
+    ])
+    expect(skipped.map((s) => [s.id, s.why])).toEqual([
+      ['b', 'runs no script with foodAt'],
+      ['c', 'runs no script with foodAt'],
+    ])
+    const queued = groupRequests(order, rs, { tick: TICK, size: SIZE, free: everywhere, queued: true })
+    expect(queued.requests).toEqual(requests)
+    const clear = send({ ...order, value: null }, rs).requests.map((q) => q.order)
+    expect(clear).toEqual([
+      { kind: 'setScriptParam', scriptId: 3, name: 'foodAt', targetId: null, residentId: 'a' },
+    ])
+  })
+
+  it('offers the number params of the scripts the group runs', () => {
+    const scripts = [
+      { id: 3, params: [{ name: 'foodAt', type: 'number' as const }] },
+      {
+        id: 4,
+        params: [
+          { name: 'foodAt', type: 'number' as const },
+          { name: 'storage', type: 'storage' as const },
+        ],
+      },
+      { id: 5, params: [{ name: 'other', type: 'number' as const }] },
+    ]
+    const rs = [{ script: { scriptId: 3 } }, { script: { scriptId: 4 } }, {}]
+    expect(groupNumberParams(rs, scripts)).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
   })
 
   it('says how many the order went to', () => {
