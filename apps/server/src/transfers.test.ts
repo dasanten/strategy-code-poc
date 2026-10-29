@@ -2,9 +2,7 @@ import {
   DELIVERY_LOAD,
   GOOD_WEIGHT,
   TRANSFER_FEE_FACTOR,
-  Terrain,
   deliveryFee,
-  deliveryStorage,
   nearestWarehouse,
   owedBy,
   quoteTransfer,
@@ -12,147 +10,13 @@ import {
   transferLoad,
   transferTiles,
   wrapDistance,
-  type Caravan,
-  type Good,
-  type RealmEvent,
-  type Stock,
-  type TerrainMap,
-  type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { placeCaravans, routeEnd } from './caravans.js'
-import { resolveCarrying } from './carrying.js'
 import { checkInvariants } from './invariants.js'
-import { OrderQueue } from './orders.js'
-import { mulberry32, newResident } from './residents.js'
-import { foundStartingCity } from './starting-city.js'
 import { changeStanding } from './standing.js'
-import { foundTradeOrgHq } from './trade-org.js'
-import { foundTradingPost } from './trading-posts.js'
 import { collectsTransferFrom, transfersSound } from './transfers.js'
-import { Walking } from './walking.js'
-import { createWorld, stepWorld } from './world.js'
-
-const mara = { userId: 7, account: { name: 'Mara', isAdmin: false } }
-const ivo = { userId: 8, account: { name: 'Ivo', isAdmin: false } }
-
-/** An open map of Plains, `size` tiles along each side. */
-const plains = (size: number): TerrainMap => ({
-  size,
-  tiles: new Uint8Array(size * size).fill(Terrain.Plains),
-})
-
-/**
- * The Trade Org HQ, a trading post with its caravan, Mara's and Ivo's starting cities, and Mara's
- * resident p1 standing on the post's warehouse with 1,000 coins.
- */
-function setup() {
-  const terrain = plains(512)
-  const world = createWorld(terrain)
-  const rand = mulberry32(5)
-  foundTradeOrgHq(world, terrain, 128, 128, rand)
-  foundTradingPost(world, terrain, 320, 320, undefined, rand)
-  const [caravan] = placeCaravans(world)
-  const realm = foundStartingCity(world, terrain, mara.userId)
-  const other = foundStartingCity(world, terrain, ivo.userId)
-  const city = world.cities.find((c) => c.realmId === realm.id)!
-  const toCity = world.cities.find((c) => c.realmId === other.id)!
-  const storage = deliveryStorage(world, city.id)!
-  const toStorage = deliveryStorage(world, toCity.id)!
-  // Coins for the fees of transfers picked up there.
-  storage.stock!.coins = 2_000
-  const warehouse = routeEnd(world, caravan!, 'post').warehouse!
-  const p1 = newResident(mulberry32(11), {
-    id: 'p1',
-    owner: realm.id,
-    cityId: city.id,
-    x: warehouse.x,
-    y: warehouse.y,
-    tick: 0,
-  })
-  p1.bornAt = -20 * 24 * 3600
-  p1.carried = { coins: 1_000 }
-  world.residents.push(p1)
-  const queue = new OrderQueue(undefined, terrain)
-  return {
-    world,
-    terrain,
-    caravan: caravan!,
-    realm,
-    other,
-    city,
-    toCity,
-    storage,
-    toStorage,
-    warehouse,
-    p1,
-    queue,
-  }
-}
-
-/** Sends an order from Mara (for p1, when it is a resident's), applies it and answers. */
-function order(world: WorldState, queue: OrderQueue, o: Record<string, unknown>) {
-  const answer = queue.receive(world, mara, 'q', { residentId: 'p1', ...o })
-  queue.applyAll(world)
-  return answer.type === 'ack' ? 'ack' : (answer as { reason: string }).reason
-}
-
-/** Every unit of a good in the world: in buildings, on carriages, carried and on the ground. */
-function total(world: WorldState, good: Good): number {
-  const stocks = [
-    ...world.buildings.map((b) => b.stock ?? {}),
-    ...world.carriages.map((k) => k.load),
-    ...world.residents.map((r) => r.carried),
-    ...world.piles.map((p) => p.goods),
-  ]
-  return stocks.reduce((n, s) => n + (s[good] ?? 0), 0)
-}
-
-/**
- * Steps the world at least once and then until `done`, at most `ticks` times, checking every
- * invariant now and then.
- */
-function runUntil(world: WorldState, terrain: TerrainMap, done: () => boolean, ticks = 20_000) {
-  const walking = new Walking(terrain)
-  for (let t = 0; t < ticks && (t === 0 || !done()); t++) {
-    stepWorld(world, terrain, walking)
-    if (t % 500 === 0) expect(checkInvariants(world, terrain)).toEqual([])
-  }
-  expect(done()).toBe(true)
-  expect(checkInvariants(world, terrain)).toEqual([])
-}
-
-const eventsOf = <K extends RealmEvent['kind']>(world: WorldState, kind: K, userId?: number) =>
-  world.events.filter(
-    (e): e is Extract<RealmEvent, { kind: K }> =>
-      e.kind === kind && (userId === undefined || e.userId === userId),
-  )
-
-/** The caravan carrying out a transfer, if any. */
-const carrier = (world: WorldState): Caravan | undefined =>
-  world.caravans.find((c) => c.transfer !== null)
-
-/** Has a new resident of Mara's realm, standing at the caravan's carriage, take `goods` off it. */
-function rob(world: WorldState, terrain: TerrainMap, caravan: Caravan, goods: Stock) {
-  const carriage = world.carriages.find((k) => k.id === caravan.carriageId)!
-  const realmId = world.realms[0]!.id
-  const cityId = world.cities.find((c) => c.realmId === realmId)!.id
-  const thief = newResident(mulberry32(17), {
-    id: 'thief',
-    owner: realmId,
-    cityId,
-    x: 0,
-    y: 0,
-    tick: 0,
-  })
-  thief.bornAt = -20 * 24 * 3600
-  thief.x = carriage.x
-  thief.y = carriage.y
-  world.residents.push(thief)
-  const spot = { kind: 'carriage' as const, carriageId: carriage.id }
-  resolveCarrying(world, [{ kind: 'take', residentId: 'thief', spot, goods }], terrain.size)
-  return thief
-}
+import { stepWorld } from './world.js'
+import { mara, ivo, setup, order, total, runUntil, eventsOf, carrier } from './transfers.fixture.js'
 
 describe('transfer fees and quotes', () => {
   it('cost a multiple of a delivery’s fee over the caravan’s whole way', () => {
@@ -346,122 +210,6 @@ describe('caravans carrying out transfers', () => {
         expect.objectContaining({ why: 'nothing' }),
       ])
       runUntil(world, terrain, () => carrier(world) === undefined, 10_000)
-    },
-  )
-
-  it(
-    'turn back from a recipient behind closed gates, the warehouse keeping it for the next caravan',
-    { tags: ['slow'], timeout: 120_000 },
-    () => {
-      const { world, terrain, queue, city, toCity, storage } = setup()
-      storage.stock!.iron = 40
-      for (const b of world.buildings)
-        if (b.kind === 'gate' && b.cityId === toCity.id) b.closed = true
-      order(world, queue, {
-        kind: 'transfer',
-        fromCityId: city.id,
-        toCityId: toCity.id,
-        good: 'iron',
-        units: 12,
-      })
-      const warehouseId = world.transfers[0]!.warehouseId
-      runUntil(world, terrain, () => eventsOf(world, 'transferStuck').length > 0)
-      expect(eventsOf(world, 'transferStuck')).toEqual([
-        expect.objectContaining({ why: 'turnedBack', units: 12, cityId: toCity.id }),
-      ])
-      expect(world.transfers).toEqual([
-        expect.objectContaining({ fromCityId: null, caravanId: null, units: 12 }),
-      ])
-      runUntil(world, terrain, () => carrier(world) === undefined, 10_000)
-      expect(owedBy(world, warehouseId, 'iron')).toBe(12)
-      expect(storage.stock!.iron).toBe(28)
-    },
-  )
-
-  it(
-    'bring coins handed in at a warehouse to the recipient’s storage',
-    { tags: ['slow'], timeout: 120_000 },
-    () => {
-      const { world, terrain, queue, toCity, toStorage } = setup()
-      const before = toStorage.stock!.coins ?? 0
-      order(world, queue, { kind: 'handIn', good: 'coins', units: 300, toCityId: toCity.id })
-      runUntil(world, terrain, () => world.transfers.length === 0)
-      expect(toStorage.stock!.coins).toBe(before + 300)
-      expect(eventsOf(world, 'transferred', ivo.userId)).toEqual([
-        expect.objectContaining({ good: 'coins', units: 300 }),
-      ])
-    },
-  )
-
-  it(
-    'bring a transfer back to the sender when the recipient’s city is no longer theirs',
-    { tags: ['slow'], timeout: 120_000 },
-    () => {
-      const { world, terrain, queue, city, toCity, storage, toStorage } = setup()
-      storage.stock!.iron = 40
-      order(world, queue, {
-        kind: 'transfer',
-        fromCityId: city.id,
-        toCityId: toCity.id,
-        good: 'iron',
-        units: 25,
-      })
-      runUntil(world, terrain, () => carrier(world)?.transfer?.step === 'deliver')
-      const toIron = toStorage.stock!.iron ?? 0
-      // The recipient's realm is another than the city's now, as when the city was taken.
-      world.realms.push({ id: 'realm3', userId: 9, leaderId: 'q1' })
-      world.residents.push(
-        newResident(mulberry32(3), { id: 'q1', owner: 'realm3', x: 5, y: 5, tick: 0 }),
-      )
-      world.transfers[0]!.toRealmId = 'realm3'
-      runUntil(world, terrain, () => world.transfers.length === 0)
-      expect(eventsOf(world, 'transferStuck')).toEqual([
-        expect.objectContaining({ why: 'cancelled' }),
-      ])
-      expect(eventsOf(world, 'transferred', mara.userId)).toEqual([
-        expect.objectContaining({ back: true, units: 25, cityId: city.id }),
-      ])
-      // The goods are back, the fee is not.
-      expect(storage.stock!.iron).toBe(40)
-      expect(toStorage.stock!.iron ?? 0).toBe(toIron)
-      expect(world.transfers).toEqual([])
-    },
-  )
-
-  it(
-    'send again what robbers took of a transfer, and all of it arrives',
-    { tags: ['slow'], timeout: 120_000 },
-    () => {
-      const { world, terrain, queue, city, toCity, storage, toStorage } = setup()
-      storage.stock!.iron = 40
-      const before = toStorage.stock!.iron ?? 0
-      order(world, queue, {
-        kind: 'transfer',
-        fromCityId: city.id,
-        toCityId: toCity.id,
-        good: 'iron',
-        units: 25,
-      })
-      runUntil(world, terrain, () => {
-        const job = carrier(world)?.transfer
-        return job?.step === 'deliver' && job.units === 25
-      })
-      const caravan = carrier(world)!
-      const thief = rob(world, terrain, caravan, { iron: 10 })
-      expect(thief.carried.iron).toBe(10)
-      expect(caravan.transfer).toMatchObject({ units: 15, robbed: 10 })
-      runUntil(world, terrain, () => eventsOf(world, 'transferStuck').length > 0)
-      expect(eventsOf(world, 'transferStuck')).toEqual([
-        expect.objectContaining({ why: 'robbed', units: 10 }),
-      ])
-      expect(world.transfers).toEqual([
-        expect.objectContaining({ units: 10, fromCityId: null, caravanId: null }),
-      ])
-      runUntil(world, terrain, () => world.transfers.length === 0)
-      expect(toStorage.stock!.iron).toBe(before + 25)
-      expect(eventsOf(world, 'transferred', ivo.userId).map((e) => e.units)).toEqual([15, 10])
-      // The sender paid once.
-      expect(storage.stock!.iron).toBe(15)
     },
   )
 })
