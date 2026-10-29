@@ -1333,6 +1333,13 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         </table>
         <ul>
           <li>
+            Before it starts: giving a task or Run script whose script has params first shows them,
+            filled with the values the resident keeps or the defaults. Change what you like and
+            press Start; Cancel gives nothing. A script without params starts at once. For a group
+            the form shows once, and each of them gets the same values. With Shift held the step
+            added to the queue keeps the values.
+          </li>
+          <li>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
             number of zero or more and press Enter. Neither stops the script.

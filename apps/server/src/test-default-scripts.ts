@@ -21,7 +21,10 @@ export function defaultScripts(terrain: TerrainMap, senders: OrderSender[]) {
   }
   const kinds: Record<string, OrderKind> = {
     ...orderKinds,
-    task: taskOrder({ defaultScript: (userId, task) => userId * 100 + TASKS.indexOf(task) + 1 }),
+    task: taskOrder({
+      defaultScript: (userId, task) => userId * 100 + TASKS.indexOf(task) + 1,
+      script: host.script,
+    }),
   }
   const runner = new ScriptRunner(terrain, host)
   return {

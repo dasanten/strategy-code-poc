@@ -11,6 +11,7 @@ import {
   type OrderRequest,
   type Resident,
   type ScriptSummary,
+  type StartParamValues,
   type Stock,
 } from '@csp/shared'
 import { appendRequests } from './queue-view.js'
@@ -21,17 +22,25 @@ import { appendRequests } from './queue-view.js'
  */
 export type GroupOrder =
   | { kind: 'walkTo'; x: number; y: number }
-  | { kind: 'work'; workplace: Pick<Building, 'id' | 'kind' | 'x' | 'y'>; name: string }
-  | { kind: 'build'; building: BuildingKind; at: { x: number; y: number } }
+  | ({ kind: 'work'; workplace: Pick<Building, 'id' | 'kind' | 'x' | 'y'>; name: string } & Starts)
+  | ({ kind: 'build'; building: BuildingKind; at: { x: number; y: number } } & Starts)
   | { kind: 'store' }
   | { kind: 'fetch'; good: Good }
-  | { kind: 'runScript'; scriptId: number }
+  | ({ kind: 'runScript'; scriptId: number } & Starts)
   | { kind: 'stop' }
   /**
    * Sets a number param (`CONTEXT.md`: Script parameter), or clears it with null, for each one
    * running one of `scriptIds`, the scripts that declare it.
    */
   | { kind: 'setNumber'; name: string; value: number | null; scriptIds: readonly number[] }
+
+/**
+ * A group order that starts a script: the values for its params, the same for each of them
+ * (`CONTEXT.md`: Script parameter, Before it starts).
+ */
+interface Starts {
+  params?: StartParamValues
+}
 
 /** A resident the order wasn't sent to, or that the server turned down, and why. */
 export interface Skipped {
@@ -151,6 +160,7 @@ export function groupRequests(
     else going.push(r)
   }
   const requests: GroupSend['requests'] = []
+  const params = 'params' in order && order.params ? { params: order.params } : {}
   const send = (r: GroupResident, o: OrderRequest) =>
     requests.push({ residentId: r.id, order: { ...o, residentId: r.id } })
   if (order.kind === 'walkTo') {
@@ -168,11 +178,11 @@ export function groupRequests(
   for (const r of going) {
     switch (order.kind) {
       case 'work':
-        send(r, { kind: 'task', task: 'work', workplaceId: order.workplace.id })
+        send(r, { kind: 'task', task: 'work', workplaceId: order.workplace.id, ...params })
         break
       case 'build':
         // The Build task walks there first and joins the site once one of them has laid it out.
-        send(r, { kind: 'task', task: 'build', building: order.building, at: order.at })
+        send(r, { kind: 'task', task: 'build', building: order.building, at: order.at, ...params })
         break
       case 'store':
         // Everything they carry to the nearest storage; their own food stays in their hands.
@@ -182,7 +192,7 @@ export function groupRequests(
         send(r, { kind: 'fetch', goods: [order.good] })
         break
       case 'runScript':
-        send(r, { kind: 'runScript', scriptId: order.scriptId })
+        send(r, { kind: 'runScript', scriptId: order.scriptId, ...params })
         break
       case 'stop':
         send(r, { kind: 'stop' })
