@@ -262,6 +262,9 @@ describe('script bindings', () => {
     ['stop()', { kind: 'stop' }],
     ['mount("h9")', { kind: 'mount', horseId: 'h9' }],
     ['dismount()', { kind: 'dismount' }],
+    ['board("k9")', { kind: 'board', carriageId: 'k9' }],
+    ['getOff()', { kind: 'getOff' }],
+    ['getOff(3, 4)', { kind: 'getOff', x: 3, y: 4 }],
     [
       'pickUp({ kind: "ground" }, { food: 2 })',
       { kind: 'pickUp', spot: { kind: 'ground' }, goods: { food: 2 } },

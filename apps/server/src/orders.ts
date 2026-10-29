@@ -12,6 +12,7 @@ import { workAt } from './work.js'
 import { allianceOrders } from './alliances.js'
 import { climb } from './climbing.js'
 import { dismount, mount } from './riding.js'
+import { GETS_OFF_FIRST, board, getOff, getsOffFirst } from './passengers.js'
 import { attack } from './combat.js'
 import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
@@ -52,44 +53,51 @@ export interface OrderKind {
   apply(world: WorldState, sender: OrderSender, order: OrderRequest, terrain?: TerrainMap): void
 }
 
-/** The order kinds that exist. */
-export const orderKinds: Record<string, OrderKind> = {
-  walkTo,
-  drive,
-  haul,
-  stop,
-  pickUp,
-  drop,
-  store,
-  fetch,
-  build,
-  tearDown,
-  workAt,
-  breed,
-  pair,
-  attack,
-  climb,
-  mount,
-  dismount,
-  setGate,
-  roadLine,
-  wallLine,
-  pay,
-  buyCity,
-  buy,
-  sell,
-  handIn: handInOrder,
-  transfer,
-  buyOff,
-  handOver,
-  rename,
-  renameCity,
-  ...allianceOrders,
-  ...armyOrders,
-  ...contractOrders,
-  ...persuasionOrders,
-  ...queueOrders,
-}
+/**
+ * The order kinds that exist. Those that act on a tile get a passenger off their carriage first
+ * (`CONTEXT.md`: Passenger, `GETS_OFF_FIRST`).
+ */
+export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
+  Object.entries({
+    walkTo,
+    drive,
+    haul,
+    stop,
+    pickUp,
+    drop,
+    store,
+    fetch,
+    build,
+    tearDown,
+    workAt,
+    breed,
+    pair,
+    attack,
+    climb,
+    mount,
+    dismount,
+    board,
+    getOff,
+    setGate,
+    roadLine,
+    wallLine,
+    pay,
+    buyCity,
+    buy,
+    sell,
+    handIn: handInOrder,
+    transfer,
+    buyOff,
+    handOver,
+    rename,
+    renameCity,
+    ...allianceOrders,
+    ...armyOrders,
+    ...contractOrders,
+    ...persuasionOrders,
+    ...queueOrders,
+  }).map(([name, kind]) => [name, GETS_OFF_FIRST.includes(name) ? getsOffFirst(kind) : kind]),
+)
 
 interface Pending {
   sender: OrderSender

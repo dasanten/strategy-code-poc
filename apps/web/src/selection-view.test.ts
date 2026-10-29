@@ -215,6 +215,19 @@ describe('the actions on a resident’s card', () => {
     expect(drive).toMatchObject({ disabled: true, reason: 'dismount first to drive' })
   })
 
+  it('offers boarding a carriage of the realm on their tile, children too, and getting off aboard', () => {
+    expect(ids(here())).not.toContain('board')
+    const board = (h: Parameters<typeof here>[0]) =>
+      residentActions(here(h)).filter((a) => a.id === 'board')
+    expect(board({ carriageToBoard: true, adult: false })).toEqual([
+      expect.objectContaining({ label: 'Board carriage', key: 'K' }),
+    ])
+    expect(board({ carriageToBoard: true, riding: true })).toEqual([
+      expect.objectContaining({ disabled: true, reason: 'dismount first to board' }),
+    ])
+    expect(board({ aboard: true, carriageToBoard: true }).map((a) => a.label)).toEqual(['Get off'])
+  })
+
   it('gives every shown action its own key', () => {
     const all = here({
       busy: true,
@@ -227,6 +240,7 @@ describe('the actions on a resident’s card', () => {
       makeLeader: { problem: undefined },
       renamable: true,
       horseToRide: true,
+      carriageToBoard: true,
     })
     const keys = residentActions(all).map((a) => a.key)
     expect(new Set(keys).size).toBe(keys.length)
