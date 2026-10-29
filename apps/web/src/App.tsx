@@ -78,8 +78,9 @@ import {
   nodeFit,
   type ActionId,
 } from './selection-view.js'
-import { ScriptLibrary } from './ScriptLibrary.js'
+import { ScriptLibrary, type ScriptToOpen } from './ScriptLibrary.js'
 import { ScriptMemoryTree } from './ScriptMemory.js'
+import { ScriptRunInfo } from './ScriptRun.js'
 import { ScriptParamFields } from './ScriptParams.js'
 import { paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
 import { faresKnown, loadKnown } from './seen.js'
@@ -115,7 +116,8 @@ function Pages() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, founding, status, sendOrder, found, memories, watchScript } = useWorld(onLoggedOut)
+  const { world, founding, status, sendOrder, found, memories, runs, watchScript } =
+    useWorld(onLoggedOut)
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
@@ -153,7 +155,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
   // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
-  const [scriptToOpen, setScriptToOpen] = useState<{ id: number; at: number }>()
+  const [scriptToOpen, setScriptToOpen] = useState<ScriptToOpen>()
   // A place to show on the map, such as one from the realm log or a resident picked in the list:
   // asked for, then centred between the open drawer and the selection card once they are drawn.
   const [toShow, setToShow] = useState<{ x: number; y: number }>()
@@ -162,6 +164,25 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
+  /** Opens a script in the library, at a version and line when given. */
+  const openScript = (id: number, where?: Omit<ScriptToOpen, 'id' | 'at'>) => {
+    setScriptToOpen({ id, at: Date.now(), ...where })
+    setOpenDrawer('scripts')
+  }
+  /**
+   * The Script tab's live view of the script a resident or army runs (`CONTEXT.md`: Debugging a
+   * script): how it last ran, and its memory.
+   */
+  const scriptDebug = (id: string, scriptId: number) => (
+    <>
+      <ScriptRunInfo
+        run={runs.get(id)}
+        tick={world?.tick ?? 0}
+        onOpenError={({ version, line, column }) => openScript(scriptId, { version, line, column })}
+      />
+      <ScriptMemoryTree id={id} memory={memories.get(id)} watch={watchScript} />
+    </>
+  )
   // What the map waits for while an order that needs a target is given (ADR 0012: pick mode).
   const touch = useTouchScreen()
   // Narrow or touch: cards are bottom sheets and the HUD folds into a menu button (ADR 0012).
@@ -607,9 +628,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             pickError={armyError}
             scripts={scripts}
             sendOrder={sendOrder}
-            scriptMemory={(id) => (
-              <ScriptMemoryTree id={id} memory={memories.get(id)} watch={watchScript} />
-            )}
+            scriptMemory={(id) =>
+              scriptDebug(id, world.armies.find((a) => a.id === id)?.script?.scriptId ?? 0)
+            }
           />,
         )}
       {world &&
@@ -807,10 +828,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             scripts={scripts}
             buildings={world.buildings}
             onRunScript={runScript}
-            onEditScript={(id) => {
-              setScriptToOpen({ id, at: Date.now() })
-              setOpenDrawer('scripts')
-            }}
+            onEditScript={(id) => openScript(id)}
             orderError={orderError}
             pile={world.piles.find(
               (p) => p.x === (buildingHere ?? selected).x && p.y === (buildingHere ?? selected).y,
@@ -908,15 +926,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 />
               )
             }
-            scriptMemory={
-              selected.script && (
-                <ScriptMemoryTree
-                  id={selected.id}
-                  memory={memories.get(selected.id)}
-                  watch={watchScript}
-                />
-              )
-            }
+            scriptMemory={selected.script && scriptDebug(selected.id, selected.script.scriptId)}
             onStore={async () =>
               setOrderError(await giveOrder({ ...STORE_ALL, residentId: selected.id }))
             }

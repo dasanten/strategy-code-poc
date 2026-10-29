@@ -49,7 +49,10 @@ export function lastSeenText(seenAt: number, tick: number): string {
   const year = then.year === gameTime(tick).year ? '' : `year ${then.year}, `
   const hh = String(then.hour).padStart(2, '0')
   const mm = String(then.minute).padStart(2, '0')
-  const ago = tick - seenAt
-  const when = ago < TICKS_PER_GAME_HOUR / 60 ? 'just now' : `${span(ago)} ago`
-  return `Last seen: ${year}day ${then.day}, ${hh}:${mm} (${when})`
+  return `Last seen: ${year}day ${then.day}, ${hh}:${mm} (${agoText(tick - seenAt)})`
+}
+
+/** How long ago, in game time: "just now" within a game minute, else "3 days ago". */
+export function agoText(ticks: number): string {
+  return ticks < TICKS_PER_GAME_HOUR / 60 ? 'just now' : `${span(ticks)} ago`
 }

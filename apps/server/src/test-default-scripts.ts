@@ -14,7 +14,7 @@ export function defaultScripts(terrain: TerrainMap, senders: OrderSender[]) {
       const task = TASKS[(id % 100) - 1]
       if (!task) return undefined
       const userId = Math.floor(id / 100)
-      return { userId, source: DEFAULT_SCRIPTS[task].source, followsDefault: true }
+      return { userId, version: 1, source: DEFAULT_SCRIPTS[task].source, followsDefault: true }
     },
     sender: (userId: number) => senders.find((s) => s.userId === userId),
     explored: () => true,

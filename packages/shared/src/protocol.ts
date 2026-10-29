@@ -11,6 +11,7 @@ import type {
   Horse,
   Pile,
   RealmEvent,
+  RunningScript,
   ScriptMemory,
   SeenArmy,
   SeenCaravan,
@@ -170,6 +171,11 @@ export type ServerMessage =
    * theirs.
    */
   | { type: 'scriptMemory'; id: string; memory: ScriptMemory | null }
+  /**
+   * How the script run by a watched resident or army last ran (`CONTEXT.md`: Debugging a
+   * script): its last runtime error and the steps it used, sent like `scriptMemory`.
+   */
+  | { type: 'scriptRun'; id: string; run: ScriptRunSeen | null }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }
 
@@ -187,6 +193,9 @@ export type ClientMessage =
    * `SCRIPT_WATCH_MAX` of them.
    */
   | { type: 'watch'; ids: string[] }
+
+/** What the Player running a script sees of how it last ran (`RunningScript`). */
+export type ScriptRunSeen = Pick<RunningScript, 'lastError' | 'lastRun'>
 
 /** The most residents and armies one client may watch the script memory of at once. */
 export const SCRIPT_WATCH_MAX = 4

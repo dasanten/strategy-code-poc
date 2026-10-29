@@ -77,7 +77,12 @@ function storage(world: WorldState, id: string, x: number, y: number, stock: Sto
 }
 
 const hostOf = (task: Task): ScriptHost => ({
-  script: () => ({ userId: 1, source: DEFAULT_SCRIPTS[task].source, followsDefault: true }),
+  script: () => ({
+    userId: 1,
+    version: 1,
+    source: DEFAULT_SCRIPTS[task].source,
+    followsDefault: true,
+  }),
   sender: (userId) => ({ userId, account: { name: 'Mara', isAdmin: false } }),
   explored: () => true,
 })

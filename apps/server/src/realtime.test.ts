@@ -4,6 +4,7 @@ import { WebSocket } from 'ws'
 import {
   REALM_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
+  SCRIPT_STEP_BUDGET,
   SESSION_COOKIE,
   WS_PATH,
   chunksAcross,
@@ -408,6 +409,44 @@ describe('realtime', () => {
     world.armies.push({ ...army, order: null, script: { scriptId: 1, memory: { k: 1 } } })
     expect(scriptMemoryFor(world, realm.id, army.id)).toEqual({ k: 1 })
     expect(scriptMemoryFor(world, realmOf(world, other.id)!.id, army.id)).toBeNull()
+  })
+
+  it('sends how a watched script last ran, its error and steps, to the Player running it only', async () => {
+    const { url, token, db, userId, world, realtime } = await start()
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const daniel = connect(url, token)
+    const mara = connect(url, createSession(db, other.id))
+    await daniel.next('welcome')
+    await mara.next('welcome')
+    const realm = realmOf(world, userId)!
+    const worker = world.residents.find((r) => r.owner === realm.id)!
+    const lastError = { message: 'null has no field x', line: 3, column: 9, tick: 0, version: 2 }
+    worker.script = { scriptId: 1, memory: {}, lastError, lastRun: { steps: 312 } }
+    const watch = JSON.stringify({ type: 'watch', ids: [worker.id] })
+
+    daniel.socket.send(watch)
+    expect(await daniel.next('scriptRun')).toEqual({
+      type: 'scriptRun',
+      id: worker.id,
+      run: { lastError, lastRun: { steps: 312 } },
+    })
+    mara.socket.send(watch)
+    expect(await mara.next('scriptRun')).toEqual({ type: 'scriptRun', id: worker.id, run: null })
+
+    // A tick it changed in sends it again; one it didn't sends nothing.
+    worker.script.lastRun = { steps: SCRIPT_STEP_BUDGET, outOfSteps: 'own' }
+    realtime.broadcastTick()
+    expect(await daniel.next('scriptRun')).toMatchObject({
+      run: { lastError, lastRun: { steps: SCRIPT_STEP_BUDGET, outOfSteps: 'own' } },
+    })
+    realtime.broadcastTick()
+    daniel.socket.send(JSON.stringify({ type: 'order', requestId: 's', order: { kind: 'fly' } }))
+    await daniel.next('rejected')
+    expect(daniel.messages.filter((m) => m.type === 'scriptRun')).toEqual([])
   })
 
   it('tells a Player how their Leader died and what became of their cities, then starts them afresh', async () => {
