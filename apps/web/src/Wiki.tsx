@@ -408,9 +408,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -546,8 +546,9 @@ export function Wiki() {
           Residents and carriages step onto any of the eight tiles around, diagonals too. A diagonal
           step is {num(DIAGONAL_STEP, 2)} times as far, so it takes that much longer on the same
           ground. It can't squeeze between two corners: both straight tiles beside it must be ones
-          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage)
-          mountain. Two walls touching at a corner close the way like a straight stretch.
+          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage or
+          rider) mountain without a finished road. Two walls touching at a corner close the way like
+          a straight stretch.
         </p>
         <table>
           <thead>
@@ -752,7 +753,8 @@ export function Wiki() {
           {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
           more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
           leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a building's materials on the tile (all of an
-          unfinished site's).
+          unfinished site's). A road over a mountain can't be torn down while a carriage or horse
+          stands on it: the work waits until they leave.
         </p>
         <table>
           <thead>
@@ -865,7 +867,13 @@ export function Wiki() {
                 <td>{t.terrain}</td>
                 <td>{num(t.footTiles, 1)}</td>
                 <td>{num(t.footKgTiles, 0)}</td>
-                <td>{t.carriageTiles ? num(t.carriageTiles, 1) : 'can’t enter'}</td>
+                <td>
+                  {t.carriageTiles
+                    ? num(t.carriageTiles, 1)
+                    : t.terrain === 'Mountain'
+                      ? 'only on a road'
+                      : 'can’t enter'}
+                </td>
                 <td>{t.carriageTiles ? num(t.carriageKgTiles, 0) : '—'}</td>
               </tr>
             ))}
@@ -932,11 +940,11 @@ export function Wiki() {
         <p>
           A resident on a tile with a free horse of their realm can mount it, and dismount anywhere;
           the horse stays where they get off. A rider goes wherever they walk at the speed the horse
-          would pull a carriage there (the carriage column above), and never into mountains or up
-          onto walls. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
-          at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
-          Driving makes riding faster. A rider carries no more than on foot, and can't drive a
-          carriage; a ridden horse is never hitched.
+          would pull a carriage there (the carriage column above), never up onto walls, and into
+          mountains only along a finished road, like a carriage. A horse with less than{' '}
+          {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes at {pct(HUNGRY_HORSE_PACE)} of its
+          pace. Riding trains Driving like driving does, and Driving makes riding faster. A rider
+          carries no more than on foot, and can't drive a carriage; a ridden horse is never hitched.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}

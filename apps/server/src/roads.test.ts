@@ -344,7 +344,7 @@ describe('pathfinding with roads', () => {
 })
 
 describe('road invariants', () => {
-  it('catch a road on Mountain, of a city, and two roads on one tile', () => {
+  it('catch a road of a city and two roads on one tile, not a road on Mountain', () => {
     const map = draw(['^...', '....', '....', '....'])
     const world = createWorld(map)
     road(world, 0, 0, 'a')
@@ -352,7 +352,7 @@ describe('road invariants', () => {
     road(world, 2, 2, 'c')
     road(world, 2, 2, 'd')
     const messages = buildingsInPlace.check(world, map).map((v) => v.message)
-    expect(messages).toContain('a is a road on Mountain')
+    expect(messages.filter((m) => m.startsWith('a '))).toEqual([])
     expect(messages).toContain('b is a road of city c9')
     expect(messages).toContainEqual(expect.stringMatching(/^d overlaps .+ on tile .2,2.$/))
   })

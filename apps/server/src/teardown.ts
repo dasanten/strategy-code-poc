@@ -4,6 +4,7 @@ import {
   buildWork,
   canWork,
   constructionLearned,
+  strandsOnMountain,
   tearDownProblem,
   teardownLeft,
   teardownReturns,
@@ -39,7 +40,7 @@ interface TearDownRequest extends OrderRequest {
  * in later ticks.
  */
 export const tearDown: OrderKind = {
-  validate(world, sender, order) {
+  validate(world, sender, order, terrain) {
     const o = order as Partial<TearDownRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
@@ -47,7 +48,7 @@ export const tearDown: OrderKind = {
     if (!canWork(r, world.tick)) return 'children can’t tear down buildings'
     if (r.carrying) return CARRYING_A_CHILD
     if (typeof o.buildingId !== 'string') return 'which building?'
-    return tearDownProblem(world, r.x, r.y, o.buildingId)
+    return tearDownProblem(world, r.x, r.y, o.buildingId, terrain)
   },
   apply(world, _sender, order) {
     const { residentId, buildingId } = order as TearDownRequest
@@ -86,6 +87,8 @@ export function resolveTearingDown(
       r.order = null
       continue
     }
+    // A carriage or horse on the mountain road: the work waits for them to leave.
+    if (terrain && strandsOnMountain(world, b, terrain)) continue
     if (teardownLeft(b) > 0) {
       b.teardown = Math.min(teardownWork(b), (b.teardown ?? 0) + buildWork(r, world.tick))
       r.skills.construction = (r.skills.construction ?? 0) + constructionLearned(r, world.tick)

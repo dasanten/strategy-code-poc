@@ -362,7 +362,7 @@ export interface TearDownOrder {
 /**
  * Driving a carriage to a tile (`CONTEXT.md`: Carriage): the resident drives the carriage
  * `carriageId` from their tile, and the carriage, its horse and the driver move together. The
- * path and `progress` work as for walking, at the carriage's speeds and never into mountains.
+ * path and `progress` work as for walking, at the carriage's speeds, into mountains only on a road.
  */
 export interface DriveOrder {
   kind: 'drive'
