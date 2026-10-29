@@ -408,9 +408,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -445,8 +445,9 @@ export function Wiki() {
         <p>Groups are kept in this browser, for each realm; another browser starts without them.</p>
         <p>
           With several picked, the group card gives each of them the same order, just as their own
-          cards would: walk to, work, build, store, fetch, run a script or stop. Nothing ties them
-          together afterwards; each goes on alone.
+          cards would. Every order a resident's card has is on it, but pairing, making Leader and
+          renaming, which are about one resident. Nothing ties them together afterwards; each goes
+          on alone.
         </p>
         <ul>
           <li>
@@ -463,19 +464,40 @@ export function Wiki() {
           </li>
           <li>
             <strong>Store</strong> puts what each carries in the nearest storage (their own food
-            stays with them); <strong>Fetch</strong> takes a good from the nearest storage or
-            carriage holding it.
+            stays with them), <strong>Store at</strong> in the storage, stable or carriage picked;{' '}
+            <strong>Fetch</strong> takes a good from the nearest storage or carriage holding it, or
+            from the one picked. <strong>Drop all</strong> puts down everything each carries.
+          </li>
+          <li>
+            <strong>Mount horses</strong>: each takes a different free horse of yours on their tile.{' '}
+            <strong>Drive carriages</strong> and <strong>Haul route</strong> go to each standing on
+            a carriage, one driver for each carriage.
+          </li>
+          <li>
+            <strong>Feed the stable</strong>: each standing in a stable feeds it.{' '}
+            <strong>Breed horses</strong>: pick two horses in a stable where some of them stand; one
+            of them there who isn't breeding yet tends the pair. Pick two more for the next.
+          </li>
+          <li>
+            <strong>Build road</strong> and <strong>Build wall</strong>: pick where the line starts
+            and ends; they all build along it. <strong>Tear down</strong>: pick a building; those
+            standing at it tear it down.
+          </li>
+          <li>
+            <strong>Attack</strong>: pick a resident of another realm, or a wall or gate, for them
+            all to attack. <strong>Climb a wall</strong>: those next to the one picked climb over.
           </li>
         </ul>
         <p>
           Those who can't take an order are skipped, and the card says who and why: children don't
-          work, build, store or fetch; a partner carrying a child doesn't work or build.
+          work, build, handle goods or drive; a partner carrying a child doesn't work, build, tear
+          down, breed or haul; orders bound to a place go only to those standing there.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
-          instead (see Queues). Work then also goes to those away from the workplace, who walk there
-          first, and Store to those who carry nothing yet. Stop still stops them all and ends their
-          queues.
+          instead (see Queues). Work, Tear down and Breed horses then also go to those away from the
+          place, who walk there first, and Store to those who carry nothing yet. Stop still stops
+          them all and ends their queues.
         </p>
       </Section>
 

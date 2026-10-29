@@ -28,6 +28,7 @@ import {
   ageInYears,
   bestWeapon,
   canWork,
+  isAt,
   wrapDelta,
   wrapDistance,
   wallStrength,
@@ -92,7 +93,15 @@ import {
   timeStep,
   type QueueRow,
 } from './queue-view.js'
-import { groupNumberParams, groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
+import {
+  GROUP_BUTTONS,
+  groupNumberParams,
+  groupSentLine,
+  type GroupButton,
+  type GroupOrder,
+  type Skipped,
+} from './group-orders.js'
+import { GROUP_HINTS } from './pick-mode.js'
 import { NumberField, foodParamsHint } from './ScriptParams.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
@@ -101,8 +110,10 @@ import {
   horseDetail,
   groupOrders,
   residentActions,
+  ORDER_GROUP_LABELS,
   type ActionId,
   type CardAction,
+  type OrderGroup,
 } from './selection-view.js'
 
 /** Good names as the UI shows them. */
@@ -517,13 +528,17 @@ export function ResidentsList({
 /**
  * The selection card for several of the Player's residents picked at once on the map (ADR 0012;
  * `CONTEXT.md`: Group, Resident card): a header with how many and who, then one open tab. Orders
- * gives each of them the same order, grouped by kind; Members lists what each is doing, a click
+ * gives each of them the same order, grouped by kind as on a resident card (`GROUP_BUTTONS`), each
+ * to those who can take it; Members lists what each is doing, a click
  * picking just that one; Script says what they run and gives them all one.
  */
 export function GroupCard({
   residents,
   scripts,
   buildings,
+  horses = [],
+  realmId,
+  tick,
   picking,
   onPicking,
   buildAt,
@@ -537,10 +552,15 @@ export function GroupCard({
   residents: Resident[]
   scripts: ScriptSummary[]
   buildings: Building[]
-  /** The map is waiting for a tile for the group's walk-to, work or build order. */
+  /** Horses in sight, to pick two in a stable where some of them stand to breed. */
+  horses?: SeenHorse[]
+  /** The Player's realm, whose horses they breed. */
+  realmId?: string
+  tick?: number
+  /** The map is waiting for a tile for one of the group's orders. */
   picking: GroupPicking
-  /** Starts (or cancels) picking a tile for the group. */
-  onPicking: (picking: GroupPicking) => void
+  /** Starts (or cancels) picking a tile for the group, with what the order needs besides. */
+  onPicking: (picking: GroupPicking, with_?: GroupPickWith) => void
   /** The tile picked to build on: the site there to join, or the kinds that may go there. */
   buildAt: GroupBuildTile | undefined
   /** Gives each resident of the group the order (`CONTEXT.md`: Group). */
@@ -556,7 +576,8 @@ export function GroupCard({
 }) {
   const card = groupCard(residents)
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
-  const [fetching, setFetching] = useState(false)
+  // The order whose panel is open under the buttons: what it needs before it goes out.
+  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed'>()
   const [good, setGood] = useState<Good>('food')
   const numberParams = groupNumberParams(residents, scripts)
   const foodHint = foodParamsHint(numberParams.map((p) => p.name))
@@ -564,14 +585,74 @@ export function GroupCard({
     setTab(t)
     rememberTabOf('group', t)
   }
-  const toggle = (p: Exclude<GroupPicking, false>) => {
-    setFetching(false)
-    onPicking(picking === p ? false : p)
+  // A line's far end is still the line's button.
+  const picked = picking === 'roadTo' ? 'roadFrom' : picking === 'wallTo' ? 'wallFrom' : picking
+  const toggle = (p: Exclude<GroupPicking, false>, with_?: GroupPickWith) => {
+    if (!with_) setPanel(undefined)
+    onPicking(picked === p ? false : p, with_)
   }
-  const pickButton = (p: Exclude<GroupPicking, false>, label: string) => (
-    <button type="button" aria-pressed={picking === p} onClick={() => toggle(p)}>
-      {label}
-    </button>
+  // The buttons that start picking a tile on the map, and what for.
+  const picks: Partial<Record<GroupButton, Exclude<GroupPicking, false>>> = {
+    walk: 'walk',
+    drive: 'drive',
+    work: 'work',
+    build: 'build',
+    roadTo: 'roadFrom',
+    wallTo: 'wallFrom',
+    tearDown: 'tearDown',
+    storeAt: 'storeAt',
+    attack: 'attack',
+    climb: 'climb',
+  }
+  // The orders that go out as they are.
+  const at_once: Partial<Record<GroupButton, GroupOrder>> = {
+    stop: { kind: 'stop' },
+    mount: { kind: 'mount' },
+    dismount: { kind: 'dismount' },
+    feedStable: { kind: 'feedStable' },
+    store: { kind: 'store' },
+    drop: { kind: 'drop' },
+  }
+  const orderButton = (id: GroupButton, label: string) => {
+    const p = picks[id]
+    if (p) {
+      return (
+        <button type="button" key={id} aria-pressed={picked === p} onClick={() => toggle(p)}>
+          {label}
+        </button>
+      )
+    }
+    const order = at_once[id]
+    if (order)
+      return (
+        <button type="button" key={id} onClick={() => onOrder(order)}>
+          {label}
+        </button>
+      )
+    if (id === 'script')
+      return (
+        <button type="button" key={id} onClick={() => showTab('script')}>
+          {label}
+        </button>
+      )
+    const opens = id as 'haul' | 'fetch' | 'breed'
+    return (
+      <button
+        type="button"
+        key={id}
+        aria-pressed={panel === opens}
+        onClick={() => {
+          onPicking(false)
+          setPanel(panel === opens ? undefined : opens)
+        }}
+      >
+        {label}
+      </button>
+    )
+  }
+  // The finished stables some of them stand in, to breed horses in.
+  const stables = buildings.filter(
+    (b) => b.kind === 'stable' && !b.site && residents.some((r) => isAt(r, b)),
   )
   const idle = residents.filter((r) => !r.order && !r.script).length
   return (
@@ -589,44 +670,20 @@ export function GroupCard({
     >
       <CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
 
-      {tab === 'orders' && (
-        <>
-          <div className="sel-order-group">
-            <h3>Move</h3>
-            <div className="order-buttons" aria-label="Move">
-              {pickButton('walk', 'Walk to')}
-              <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
-                Stop
-              </button>
+      {tab === 'orders' &&
+        (Object.keys(ORDER_GROUP_LABELS) as OrderGroup[]).map((g) => {
+          const buttons = GROUP_BUTTONS.filter((b) => b.group === g)
+          if (buttons.length === 0) return null
+          const label = ORDER_GROUP_LABELS[g]
+          return (
+            <div className="sel-order-group" key={g}>
+              <h3>{label}</h3>
+              <div className="order-buttons" aria-label={label}>
+                {buttons.map((b) => orderButton(b.id, b.label))}
+              </div>
             </div>
-          </div>
-          <div className="sel-order-group">
-            <h3>Work &amp; build</h3>
-            <div className="order-buttons" aria-label="Work & build">
-              {pickButton('work', 'Work')}
-              {pickButton('build', 'Build')}
-            </div>
-          </div>
-          <div className="sel-order-group">
-            <h3>Goods</h3>
-            <div className="order-buttons" aria-label="Goods">
-              <button type="button" onClick={() => onOrder({ kind: 'store' })}>
-                Store
-              </button>
-              <button
-                type="button"
-                aria-pressed={fetching}
-                onClick={() => {
-                  onPicking(false)
-                  setFetching(!fetching)
-                }}
-              >
-                Fetch
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+          )
+        })}
       {tab === 'orders' && buildAt && !picking && (
         <section className="inspector-block" aria-label="Build">
           <div className="panel-head">
@@ -673,7 +730,7 @@ export function GroupCard({
           </p>
         </section>
       )}
-      {tab === 'orders' && fetching && (
+      {tab === 'orders' && panel === 'fetch' && (
         <section className="inspector-block" aria-label="Fetch">
           <div className="order-buttons">
             <select
@@ -690,9 +747,48 @@ export function GroupCard({
             <button type="button" onClick={() => onOrder({ kind: 'fetch', good })}>
               Fetch
             </button>
+            <button
+              type="button"
+              aria-pressed={picking === 'fetchFrom'}
+              onClick={() => toggle('fetchFrom', { good })}
+            >
+              Fetch from…
+            </button>
           </div>
           <p className="muted small">
-            Each fetches as much as fits from the nearest storage or carriage holding it.
+            Each fetches as much as fits from the nearest storage or carriage holding it, or from
+            the storage, stable or carriage picked on the map.
+          </p>
+        </section>
+      )}
+      {tab === 'orders' && panel === 'haul' && (
+        <HaulBlock
+          adult
+          onRoute={false}
+          picking={picking === 'haul'}
+          onHaulTo={(haul) => toggle('haul', { haul })}
+        />
+      )}
+      {tab === 'orders' && panel === 'breed' && (
+        <section className="inspector-block" aria-label="Breed horses">
+          <div className="panel-head">
+            <h3>Breed horses</h3>
+          </div>
+          {stables.length === 0 && (
+            <p className="muted small">None of them stands in a finished stable.</p>
+          )}
+          {stables.map((s) => (
+            <GroupBreed
+              key={s.id}
+              stable={s}
+              horses={horsesIn(horses, s).filter((h) => h.realmId === realmId)}
+              tick={tick ?? 0}
+              onBreed={(horseIds) => onOrder({ kind: 'breed', stable: s, horseIds })}
+            />
+          ))}
+          <p className="muted small">
+            One of them standing there who isn’t breeding yet tends the two; pick two more for the
+            next one.
           </p>
         </section>
       )}
@@ -786,7 +882,28 @@ export function GroupCard({
 }
 
 /** What the map waits for while a group order is being given. */
-export type GroupPicking = false | 'walk' | 'work' | 'build'
+export type GroupPicking =
+  | false
+  | 'walk'
+  | 'work'
+  | 'build'
+  | 'drive'
+  | 'haul'
+  | 'roadFrom'
+  | 'roadTo'
+  | 'wallFrom'
+  | 'wallTo'
+  | 'tearDown'
+  | 'storeAt'
+  | 'fetchFrom'
+  | 'attack'
+  | 'climb'
+
+/** What a group order picked on the map needs besides the tile: a haul route's goods, a good. */
+export interface GroupPickWith {
+  haul?: HaulSetup
+  good?: Good
+}
 
 /** The tile a group is to build on, with the site there or the kinds that may go there. */
 export interface GroupBuildTile {
@@ -798,8 +915,7 @@ export interface GroupBuildTile {
 
 /** What picking a tile does for a group, said while the map waits for it. */
 const GROUP_PICKING_HINTS: Record<Exclude<GroupPicking, false>, string> = {
-  walk: 'They spread over free tiles around it, nearest first.',
-  work: 'Those standing at the workplace there work it.',
+  ...GROUP_HINTS,
   build: 'Where to build, or a site to join.',
 }
 
@@ -1118,7 +1234,12 @@ export function ResidentCard({
       {tab === 'orders' && shown && (
         <div className="sel-panel">
           {shown === 'haul' && carriage && (
-            <HaulBlock resident={r} tick={tick} picking={picking === 'haul'} onHaulTo={onHaulTo} />
+            <HaulBlock
+              adult={!child}
+              onRoute={r.order?.kind === 'haul'}
+              picking={picking === 'haul'}
+              onHaulTo={onHaulTo}
+            />
           )}
           {shown === 'work' && (
             <WorkBlock
@@ -1421,13 +1542,15 @@ export function ResidentCard({
  * for the horse, then the other stop on the map.
  */
 function HaulBlock({
-  resident,
-  tick,
+  adult,
+  onRoute,
   picking,
   onHaulTo,
 }: {
-  resident: Resident
-  tick: number
+  /** Grown up, so they can drive (`CONTEXT.md`: Child). */
+  adult: boolean
+  /** Already hauling on a route. */
+  onRoute: boolean
   /** The map is waiting for the route's other stop. */
   picking: boolean
   onHaulTo: (setup: HaulSetup) => void
@@ -1441,12 +1564,11 @@ function HaulBlock({
     set((now) => (now.includes(g) ? now.filter((x) => x !== g) : [...now, g]))
     other((now) => now.filter((x) => x !== g))
   }
-  const o = resident.order
   return (
     <section className="inspector-block" aria-label="Haul route">
       <div className="panel-head">
         <h3>Haul route</h3>
-        {o?.kind === 'haul' && <span className="small muted">on a route</span>}
+        {onRoute && <span className="small muted">on a route</span>}
       </div>
       {([false, true] as const).map((back) => (
         <div key={String(back)}>
@@ -1481,7 +1603,7 @@ function HaulBlock({
           type="button"
           className={picking ? 'primary' : ''}
           aria-pressed={picking}
-          disabled={!canWork(resident, tick) || goods.length === 0}
+          disabled={!adult || goods.length === 0}
           onClick={() => onHaulTo({ goods, returnGoods, keepFood })}
         >
           {picking ? 'Pick a tile…' : 'Pick the other stop'}
@@ -1939,6 +2061,54 @@ function BreedBlock({
       </div>
       {!breeding && pair && problem && <p className="muted small">{problem}</p>}
     </section>
+  )
+}
+
+/**
+ * Breeding for a group (`CONTEXT.md`: Breeding, Group): pick two of the Player's horses in a
+ * stable some of them stand in; one of them there tends the pair.
+ */
+function GroupBreed({
+  stable,
+  horses,
+  tick,
+  onBreed,
+}: {
+  stable: Building
+  /** The Player's horses in the stable. */
+  horses: SeenHorse[]
+  tick: number
+  onBreed: (horseIds: [string, string]) => void
+}) {
+  const [picked, setPicked] = useState<string[]>([])
+  const pair = picked.length === 2 ? ([picked[0]!, picked[1]!] as [string, string]) : undefined
+  const toggle = (id: string) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id].slice(-2)))
+  return (
+    <div aria-label={`Stable at ${stable.x}, ${stable.y}`}>
+      <span className="small muted">
+        Stable at {stable.x}, {stable.y} · {horses.length} of yours
+      </span>
+      {horses.map((h) => (
+        <label key={h.id} className="small" style={{ display: 'block' }}>
+          <input type="checkbox" checked={picked.includes(h.id)} onChange={() => toggle(h.id)} />{' '}
+          {horseDetail(h, tick)}
+        </label>
+      ))}
+      <div className="order-buttons">
+        <button
+          type="button"
+          disabled={!pair}
+          onClick={() => {
+            if (!pair) return
+            setPicked([])
+            onBreed(pair)
+          }}
+        >
+          Breed these two
+        </button>
+      </div>
+    </div>
   )
 }
 
