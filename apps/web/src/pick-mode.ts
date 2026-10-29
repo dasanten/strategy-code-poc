@@ -51,6 +51,17 @@ const GROUP_PROMPTS: Record<Exclude<GroupPicking, false>, string> = {
   walk: 'where they walk',
   work: 'the workplace they work',
   build: 'where to build, or a site to join',
+  drive: 'where they drive the carriages',
+  haul: 'where the haul route’s other stop is',
+  roadFrom: 'where the road starts',
+  roadTo: 'where the road ends',
+  wallFrom: 'where the wall starts',
+  wallTo: 'where the wall ends',
+  tearDown: 'the building they tear down',
+  storeAt: 'the storage, stable or carriage they store at',
+  fetchFrom: 'the storage, stable or carriage they fetch from',
+  attack: 'whom they attack, or the wall or gate they break',
+  climb: 'the wall or gate they climb',
 }
 
 const ARMY_PROMPTS: Record<ArmyPick['kind'], string> = {
@@ -72,10 +83,21 @@ const RESIDENT_HINTS: Partial<Record<Exclude<Picking, false>, string>> = {
 }
 
 /** What picking a tile does for a group, said under the banner. */
-const GROUP_HINTS: Record<Exclude<GroupPicking, false>, string> = {
+export const GROUP_HINTS: Record<Exclude<GroupPicking, false>, string> = {
   walk: 'They spread over free tiles around it, nearest first.',
   work: 'Those standing at the workplace there work it.',
   build: 'Then pick what to build on their card.',
+  drive: 'Each standing on a carriage drives it there.',
+  haul: 'Each standing on a carriage hauls between there and their tile.',
+  roadFrom: 'Then where it ends; they all build along the line.',
+  roadTo: `They all build road along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles.`,
+  wallFrom: 'Then where it ends; they all build along the line.',
+  wallTo: `They all build wall along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles.`,
+  tearDown: 'Those standing at it tear it down.',
+  storeAt: 'Each takes there everything they carry, keeping their own Food.',
+  fetchFrom: 'Each fetches as much as fits of the good from there.',
+  attack: 'They all attack it.',
+  climb: 'Those standing next to it climb over.',
 }
 
 /** More on what picking does, for the banner's second line, where the prompt doesn't say it all. */
