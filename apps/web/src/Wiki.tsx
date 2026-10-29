@@ -97,6 +97,7 @@ import {
   PRICE_REFERENCE_FLOORS,
   PROTECTION_DEFENCE,
   ROAD_LINE_MAX_TILES,
+  MOUNTAIN_ROAD_WORK_FACTOR,
   DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
   SCRIPT_LIST_QUERY_COST,
@@ -153,6 +154,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   carryCapacity,
   walkSpeed,
+  workFactor,
   type BuildingKind,
   type CrimeKind,
   type Good,
@@ -408,9 +410,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -556,6 +558,7 @@ export function Wiki() {
               <th>Terrain</th>
               <th>Speed</th>
               <th>Food burnt</th>
+              <th>Road work</th>
             </tr>
           </thead>
           <tbody>
@@ -564,6 +567,7 @@ export function Wiki() {
                 <td>{t}</td>
                 <td>{pct(TERRAIN_SPEED[Terrain[t]])}</td>
                 <td>{pct(TERRAIN_FOOD[Terrain[t]])}</td>
+                <td>{t === 'Road' ? '—' : `× ${num(workFactor('road', Terrain[t]))}`}</td>
               </tr>
             ))}
           </tbody>
@@ -882,10 +886,13 @@ export function Wiki() {
         </table>
         <p>
           A road tile takes {goods(BUILD_MATERIALS.road ?? {})} and{' '}
-          {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work;
-          one road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along a line that runs
-          straight or diagonal. A wall can be built along a line the same way, past tiles with a
-          wall or gate already; a diagonal wall line closes the way like a straight one.
+          {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work.
+          It goes on any land a resident can walk, mountains too: there it takes the same materials
+          but {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work, to build and to tear down (the road
+          work column above). One road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along
+          a line that runs straight or diagonal. A wall can be built along a line the same way, past
+          tiles with a wall or gate already; a diagonal wall line closes the way like a straight
+          one.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the

@@ -1247,6 +1247,12 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
 }
 
 /**
+ * How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
+ * materials, but building goes at a quarter of the usual speed.
+ */
+export const MOUNTAIN_ROAD_WORK_FACTOR = 4
+
+/**
  * The most tiles one road order along a line may cover (`roadLine`): about a game week of one
  * resident's work, so a long road is a few orders rather than one that runs for months.
  */

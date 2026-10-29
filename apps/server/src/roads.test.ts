@@ -6,6 +6,7 @@ import {
   DIAGONAL_STEP,
   MAX_HEALTH,
   MAX_HUNGER,
+  MOUNTAIN_ROAD_WORK_FACTOR,
   TERRAIN_SPEED,
   Terrain,
   WALK_TICKS_PER_TILE,
@@ -85,7 +86,7 @@ const forest = draw(Array.from({ length: 16 }, () => 'f'.repeat(16)))
 describe('building a road', () => {
   const map = draw([
     '........',
-    '.fh^....',
+    '.fh^~...',
     '........',
     '........',
     '........',
@@ -94,7 +95,7 @@ describe('building a road', () => {
     '........',
   ])
 
-  it('lays out a site on passable land but Mountain, and finishes it from Stone and work', () => {
+  it('lays out a site on passable land, and finishes it from Stone and work', () => {
     const { world, r, queue } = setup(map, 1, 1)
     const build = { kind: 'build', residentId: 'w1', building: 'road' }
     expect(queue.receive(world, me, 'q1', build)).toEqual({ type: 'ack', requestId: 'q1' })
@@ -123,19 +124,76 @@ describe('building a road', () => {
     expect(r.order).toBeNull()
     expect(checkInvariants(world, map)).toEqual([])
 
-    // Hills take a road too; Mountain doesn't; one road per tile.
+    // Hills and Mountain take a road too; a Lake doesn't; one road per tile.
     r.x = 2
     expect(queue.receive(world, me, 'q4', build)).toEqual({ type: 'ack', requestId: 'q4' })
     r.x = 3
+    expect(queue.receive(world, me, 'q4m', build)).toEqual({ type: 'ack', requestId: 'q4m' })
+    r.x = 4
     expect(queue.receive(world, me, 'q5', build)).toMatchObject({
       type: 'rejected',
-      reason: 'a road goes on passable land, not on Mountain',
+      reason: 'a road goes on passable land',
     })
     r.x = 1
     expect(queue.receive(world, me, 'q6', build)).toMatchObject({
       type: 'rejected',
       reason: 'there is already a road on this tile',
     })
+  })
+
+  it('needs four times the work on Mountain, and the same Stone, as on Plains', () => {
+    // The same resident builds a road on Plains (1, 1) and on Mountain (3, 1), materials in.
+    const ticksToBuild = (x: number) => {
+      const { world, r, queue } = setup(map, x, 1)
+      r.carried = { ...BUILD_MATERIALS.road }
+      queue.receive(world, me, 'q1', { kind: 'build', residentId: 'w1', building: 'road' })
+      queue.applyAll(world)
+      run(world, map)
+      const site = roadAt(world, x, 1)!
+      queue.receive(world, me, 'q2', {
+        kind: 'drop',
+        residentId: 'w1',
+        spot: { kind: 'site', siteId: site.id },
+        goods: BUILD_MATERIALS.road!,
+      })
+      queue.applyAll(world)
+      run(world, map)
+      expect(site.site!.delivered).toEqual(BUILD_MATERIALS.road)
+      queue.receive(world, me, 'q3', { kind: 'build', residentId: 'w1', building: 'road' })
+      queue.applyAll(world)
+      let t = 2
+      while (site.site && t < 100 * BUILD_WORK.road!) {
+        run(world, map)
+        t++
+      }
+      expect(site.site).toBeUndefined()
+      expect(checkInvariants(world, map)).toEqual([])
+      return t
+    }
+    const plains = ticksToBuild(1)
+    const mountain = ticksToBuild(3)
+    // Construction learned along the way speeds both up a little, the longer build a little more.
+    expect(mountain / plains).toBeGreaterThan(MOUNTAIN_ROAD_WORK_FACTOR * 0.9)
+    expect(mountain / plains).toBeLessThanOrEqual(MOUNTAIN_ROAD_WORK_FACTOR * 1.05)
+  })
+
+  it('takes four times the work to tear down on Mountain', () => {
+    const ticksToTearDown = (x: number) => {
+      const { world, queue } = setup(map, x, 1)
+      const rd = road(world, x, 1)
+      queue.receive(world, me, 'q1', { kind: 'tearDown', residentId: 'w1', buildingId: rd.id })
+      queue.applyAll(world)
+      let t = 0
+      while (roadAt(world, x, 1) && t < 100 * BUILD_WORK.road!) {
+        run(world, map)
+        t++
+      }
+      expect(roadAt(world, x, 1)).toBeUndefined()
+      return t
+    }
+    const ratio = ticksToTearDown(3) / ticksToTearDown(1)
+    expect(ratio).toBeGreaterThan(MOUNTAIN_ROAD_WORK_FACTOR * 0.9)
+    expect(ratio).toBeLessThanOrEqual(MOUNTAIN_ROAD_WORK_FACTOR * 1.05)
   })
 
   it('shares a tile with a building, such as a gate, and a building can go on a road', () => {
@@ -344,7 +402,7 @@ describe('pathfinding with roads', () => {
 })
 
 describe('road invariants', () => {
-  it('catch a road of a city and two roads on one tile, not a road on Mountain', () => {
+  it('catch a road of a city and two roads on one tile, but not a road on Mountain', () => {
     const map = draw(['^...', '....', '....', '....'])
     const world = createWorld(map)
     road(world, 0, 0, 'a')

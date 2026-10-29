@@ -206,7 +206,7 @@ export const realmsHaveLeaders: Invariant = {
 /**
  * Buildings and construction sites (`CONTEXT.md`: Footprint, Where buildings go): no two
  * footprints overlap, and next to a building at most one road or road site per tile, on passable
- * land off Mountain and of no city (`CONTEXT.md`: Road), and at most one carriage site, always
+ * land and of no city (`CONTEXT.md`: Road), and at most one carriage site, always
  * still a site, of no city, off nodes and other buildings but stables, where a carriage can stand
  * (`CONTEXT.md`: Carriage); every footprint on passable land; farms
  * and stables wholly on Plains, mines, quarries and lumber camps with one tile on a resource node
