@@ -121,48 +121,52 @@ describe('evening out', () => {
 })
 
 describe('caravans on their route', () => {
-  it('carry stock from the HQ to the post and back, evening out, with the escort along', () => {
-    const { world, terrain, post, caravan } = route()
-    const walking = new Walking(terrain)
-    const postWarehouse = routeEnd(world, caravan, 'post').warehouse!
-    const hqWarehouse = routeEnd(world, caravan, 'hq').warehouse!
-    // Wood and coins stay above the stock floor, so the floor adds none of them on the way.
-    postWarehouse.stock = { coins: 2_000, wood: 30 }
-    hqWarehouse.stock = { wood: 300, iron: 100 }
-    const wood = total(world, 'wood')
-    const carriage = world.carriages.find((k) => k.id === caravan.carriageId)!
-    let reachedPost = false
-    let back = false
-    let farthest = 0
-    for (let t = 0; t < 12_000 && !back; t++) {
-      stepWorld(world, terrain, walking)
-      for (const id of caravan.escortIds) {
-        const r = world.residents.find((x) => x.id === id)!
-        if (caravan.stop === 'warehouse' || caravan.heading === 'post') {
-          farthest = Math.max(farthest, wrapDistance(terrain.size, r, carriage))
+  it(
+    'carry stock from the HQ to the post and back, evening out, with the escort along',
+    { tags: ['slow'], timeout: 180_000 },
+    () => {
+      const { world, terrain, post, caravan } = route()
+      const walking = new Walking(terrain)
+      const postWarehouse = routeEnd(world, caravan, 'post').warehouse!
+      const hqWarehouse = routeEnd(world, caravan, 'hq').warehouse!
+      // Wood and coins stay above the stock floor, so the floor adds none of them on the way.
+      postWarehouse.stock = { coins: 2_000, wood: 30 }
+      hqWarehouse.stock = { wood: 300, iron: 100 }
+      const wood = total(world, 'wood')
+      const carriage = world.carriages.find((k) => k.id === caravan.carriageId)!
+      let reachedPost = false
+      let back = false
+      let farthest = 0
+      for (let t = 0; t < 12_000 && !back; t++) {
+        stepWorld(world, terrain, walking)
+        for (const id of caravan.escortIds) {
+          const r = world.residents.find((x) => x.id === id)!
+          if (caravan.stop === 'warehouse' || caravan.heading === 'post') {
+            farthest = Math.max(farthest, wrapDistance(terrain.size, r, carriage))
+          }
         }
+        if (t % 500 === 0) expect(checkInvariants(world, terrain)).toEqual([])
+        if (caravan.heading === 'hq' && (postWarehouse.stock.wood ?? 0) > 30) reachedPost = true
+        back = reachedPost && caravan.heading === 'post' && caravan.stop === 'storage'
       }
-      if (t % 500 === 0) expect(checkInvariants(world, terrain)).toEqual([])
-      if (caravan.heading === 'hq' && (postWarehouse.stock.wood ?? 0) > 30) reachedPost = true
-      back = reachedPost && caravan.heading === 'post' && caravan.stop === 'storage'
-    }
-    expect(reachedPost).toBe(true)
-    expect(back).toBe(true)
-    // The post got about half the difference in wood and iron; nothing was made or lost.
-    expect(postWarehouse.stock.wood).toBeGreaterThan(100)
-    expect(postWarehouse.stock.iron).toBeGreaterThan(0)
-    expect(postWarehouse.stock.coins).toBe(2_000)
-    expect(total(world, 'wood')).toBe(wood)
-    // Moving its own stock between its warehouses is no theft.
-    expect(world.crimes).toEqual([])
-    // The escort walked along: never far from the carriage on the way.
-    expect(farthest).toBeLessThanOrEqual(CARAVAN_SPREAD + 2)
-    // The crew and horse ate from what the caravan carries; nobody starved.
-    const crew = [caravan.driverId, ...caravan.escortIds]
-    expect(crew.every((id) => world.residents.some((r) => r.id === id))).toBe(true)
-    expect(world.cities.some((c) => c.id === post.id)).toBe(true)
-    expect(checkInvariants(world, terrain)).toEqual([])
-  }, 180_000)
+      expect(reachedPost).toBe(true)
+      expect(back).toBe(true)
+      // The post got about half the difference in wood and iron; nothing was made or lost.
+      expect(postWarehouse.stock.wood).toBeGreaterThan(100)
+      expect(postWarehouse.stock.iron).toBeGreaterThan(0)
+      expect(postWarehouse.stock.coins).toBe(2_000)
+      expect(total(world, 'wood')).toBe(wood)
+      // Moving its own stock between its warehouses is no theft.
+      expect(world.crimes).toEqual([])
+      // The escort walked along: never far from the carriage on the way.
+      expect(farthest).toBeLessThanOrEqual(CARAVAN_SPREAD + 2)
+      // The crew and horse ate from what the caravan carries; nobody starved.
+      const crew = [caravan.driverId, ...caravan.escortIds]
+      expect(crew.every((id) => world.residents.some((r) => r.id === id))).toBe(true)
+      expect(world.cities.some((c) => c.id === post.id)).toBe(true)
+      expect(checkInvariants(world, terrain)).toEqual([])
+    },
+  )
 
   it('breaks up when its driver is gone, leaving the escort to the HQ', () => {
     const { world, terrain, caravan } = route()

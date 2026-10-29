@@ -131,71 +131,87 @@ describe('ordering a transfer', () => {
 })
 
 describe('caravans carrying out transfers', () => {
-  it('pick a transfer up at the sender’s city and bring it to the recipient’s', () => {
-    const { world, terrain, queue, city, toCity, storage, toStorage, realm, other } = setup()
-    storage.stock!.iron = 40
-    const coins = storage.stock!.coins ?? 0
-    const iron = total(world, 'iron')
-    const before = toStorage.stock!.iron ?? 0
-    order(world, queue, {
-      kind: 'transfer',
-      fromCityId: city.id,
-      toCityId: toCity.id,
-      good: 'iron',
-      units: 25,
-    })
-    const warehouse = world.buildings.find((b) => b.id === world.transfers[0]!.warehouseId)!
-    let collecting = false
-    runUntil(world, terrain, () => {
-      const c = carrier(world)
-      const driver = c && world.residents.find((r) => r.id === c.driverId)
-      collecting ||= !!driver && collectsTransferFrom(world, driver, storage.id)
-      return world.transfers.length === 0
-    })
-    expect(collecting).toBe(true)
-    const fee = transferFee(25, transferTiles(terrain.size, warehouse, storage, toStorage))
-    expect(toStorage.stock!.iron).toBe(before + 25)
-    expect(storage.stock!.iron).toBe(15)
-    expect(storage.stock!.coins ?? 0).toBe(coins - fee)
-    expect(total(world, 'iron')).toBe(iron)
-    const arrived = { good: 'iron', units: 25, fee, fromRealmId: realm.id, toRealmId: other.id }
-    // Both realms' logs show it.
-    expect(eventsOf(world, 'transferred', mara.userId)).toEqual([expect.objectContaining(arrived)])
-    expect(eventsOf(world, 'transferred', ivo.userId)).toEqual([expect.objectContaining(arrived)])
-    // Taking what it was given to carry, and putting it into someone's storage, is no crime.
-    expect(world.crimes).toEqual([])
-  }, 120_000)
+  it(
+    'pick a transfer up at the sender’s city and bring it to the recipient’s',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const { world, terrain, queue, city, toCity, storage, toStorage, realm, other } = setup()
+      storage.stock!.iron = 40
+      const coins = storage.stock!.coins ?? 0
+      const iron = total(world, 'iron')
+      const before = toStorage.stock!.iron ?? 0
+      order(world, queue, {
+        kind: 'transfer',
+        fromCityId: city.id,
+        toCityId: toCity.id,
+        good: 'iron',
+        units: 25,
+      })
+      const warehouse = world.buildings.find((b) => b.id === world.transfers[0]!.warehouseId)!
+      let collecting = false
+      runUntil(world, terrain, () => {
+        const c = carrier(world)
+        const driver = c && world.residents.find((r) => r.id === c.driverId)
+        collecting ||= !!driver && collectsTransferFrom(world, driver, storage.id)
+        return world.transfers.length === 0
+      })
+      expect(collecting).toBe(true)
+      const fee = transferFee(25, transferTiles(terrain.size, warehouse, storage, toStorage))
+      expect(toStorage.stock!.iron).toBe(before + 25)
+      expect(storage.stock!.iron).toBe(15)
+      expect(storage.stock!.coins ?? 0).toBe(coins - fee)
+      expect(total(world, 'iron')).toBe(iron)
+      const arrived = { good: 'iron', units: 25, fee, fromRealmId: realm.id, toRealmId: other.id }
+      // Both realms' logs show it.
+      expect(eventsOf(world, 'transferred', mara.userId)).toEqual([
+        expect.objectContaining(arrived),
+      ])
+      expect(eventsOf(world, 'transferred', ivo.userId)).toEqual([expect.objectContaining(arrived)])
+      // Taking what it was given to carry, and putting it into someone's storage, is no crime.
+      expect(world.crimes).toEqual([])
+    },
+  )
 
-  it('take what the sender’s storage holds, with a fee for what it takes', () => {
-    const { world, terrain, queue, city, toCity, storage, toStorage } = setup()
-    storage.stock!.iron = 6
-    const before = toStorage.stock!.iron ?? 0
-    order(world, queue, {
-      kind: 'transfer',
-      fromCityId: city.id,
-      toCityId: toCity.id,
-      good: 'iron',
-      units: 20,
-    })
-    runUntil(world, terrain, () => world.transfers.length === 0)
-    expect(toStorage.stock!.iron).toBe(before + 6)
-    expect(eventsOf(world, 'transferred')[0]).toMatchObject({ units: 6 })
-  }, 120_000)
+  it(
+    'take what the sender’s storage holds, with a fee for what it takes',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const { world, terrain, queue, city, toCity, storage, toStorage } = setup()
+      storage.stock!.iron = 6
+      const before = toStorage.stock!.iron ?? 0
+      order(world, queue, {
+        kind: 'transfer',
+        fromCityId: city.id,
+        toCityId: toCity.id,
+        good: 'iron',
+        units: 20,
+      })
+      runUntil(world, terrain, () => world.transfers.length === 0)
+      expect(toStorage.stock!.iron).toBe(before + 6)
+      expect(eventsOf(world, 'transferred')[0]).toMatchObject({ units: 6 })
+    },
+  )
 
-  it('drop a transfer the sender’s storage holds none of', () => {
-    const { world, terrain, queue, city, toCity, storage } = setup()
-    delete storage.stock!.iron
-    order(world, queue, {
-      kind: 'transfer',
-      fromCityId: city.id,
-      toCityId: toCity.id,
-      good: 'iron',
-      units: 5,
-    })
-    runUntil(world, terrain, () => world.transfers.length === 0)
-    expect(eventsOf(world, 'transferStuck')).toEqual([expect.objectContaining({ why: 'nothing' })])
-    runUntil(world, terrain, () => carrier(world) === undefined, 10_000)
-  }, 120_000)
+  it(
+    'drop a transfer the sender’s storage holds none of',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const { world, terrain, queue, city, toCity, storage } = setup()
+      delete storage.stock!.iron
+      order(world, queue, {
+        kind: 'transfer',
+        fromCityId: city.id,
+        toCityId: toCity.id,
+        good: 'iron',
+        units: 5,
+      })
+      runUntil(world, terrain, () => world.transfers.length === 0)
+      expect(eventsOf(world, 'transferStuck')).toEqual([
+        expect.objectContaining({ why: 'nothing' }),
+      ])
+      runUntil(world, terrain, () => carrier(world) === undefined, 10_000)
+    },
+  )
 })
 
 describe('transfers sound', () => {

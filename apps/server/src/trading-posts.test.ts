@@ -116,7 +116,7 @@ describe('a trading post', () => {
     expect(workplace).toMatchObject({ kind: NODE_WORKPLACE.stone, cityId: null, x: 70, y: 40 })
   })
 
-  it('left alone keeps its size and keeps itself fed', () => {
+  it('left alone keeps its size and keeps itself fed', { tags: ['slow'], timeout: 120_000 }, () => {
     const { world, terrain, city } = post()
     const walking = new Walking(terrain)
     const buildings = structuredClone(world.buildings.map(({ stock: _stock, ...b }) => b))
@@ -128,7 +128,7 @@ describe('a trading post', () => {
     expect(world.buildings.map(({ stock: _stock, ...b }) => b)).toEqual(buildings)
     expect(world.residents.map((r) => r.id)).toEqual(expect.arrayContaining(people))
     expect(storedFood(world, city)).toBeGreaterThan(0)
-  }, 120_000)
+  })
 })
 
 describe('placing trading posts', () => {

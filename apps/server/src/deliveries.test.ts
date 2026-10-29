@@ -116,48 +116,56 @@ describe('ordering a delivery', () => {
 })
 
 describe('caravans carrying out deliveries', () => {
-  it('bring a delivery from the trading post to the city’s storage', () => {
-    const { world, terrain, warehouse, storage, city, caravan, queue } = setup()
-    order(world, queue, { kind: 'buy', good: 'iron', units: 6, cityId: city.id })
-    const iron = total(world, 'iron')
-    const before = storage.stock!.iron ?? 0
-    runUntil(world, terrain, () => world.deliveries.length === 0)
-    expect(storage.stock!.iron).toBe(before + 6)
-    expect(eventsOf(world, 'delivered')).toEqual([
-      expect.objectContaining({ delivery: 'delivery', good: 'iron', units: 6, cityId: city.id }),
-    ])
-    // Then it goes back to its route, at the post's end.
-    runUntil(world, terrain, () => caravan.job === null, 5_000)
-    expect(owedBy(world, warehouse.id, 'iron')).toBe(0)
-    expect(total(world, 'iron')).toBe(iron)
-    // Bringing what was bought into someone's storage is no crime.
-    expect(world.crimes).toEqual([])
-  }, 120_000)
+  it(
+    'bring a delivery from the trading post to the city’s storage',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const { world, terrain, warehouse, storage, city, caravan, queue } = setup()
+      order(world, queue, { kind: 'buy', good: 'iron', units: 6, cityId: city.id })
+      const iron = total(world, 'iron')
+      const before = storage.stock!.iron ?? 0
+      runUntil(world, terrain, () => world.deliveries.length === 0)
+      expect(storage.stock!.iron).toBe(before + 6)
+      expect(eventsOf(world, 'delivered')).toEqual([
+        expect.objectContaining({ delivery: 'delivery', good: 'iron', units: 6, cityId: city.id }),
+      ])
+      // Then it goes back to its route, at the post's end.
+      runUntil(world, terrain, () => caravan.job === null, 5_000)
+      expect(owedBy(world, warehouse.id, 'iron')).toBe(0)
+      expect(total(world, 'iron')).toBe(iron)
+      // Bringing what was bought into someone's storage is no crime.
+      expect(world.crimes).toEqual([])
+    },
+  )
 
-  it('pick up goods sold from the city’s storage, pay there, and bring them to the warehouse', () => {
-    const { world, terrain, warehouse, storage, city, caravan, queue } = setup()
-    storage.stock!.stone = 40
-    const stone = warehouse.stock!.stone ?? 0
-    expect(order(world, queue, { kind: 'sell', good: 'stone', units: 30, cityId: city.id })).toBe(
-      'ack',
-    )
-    let collecting = false
-    runUntil(world, terrain, () => {
-      const driver = world.residents.find((r) => r.id === caravan.driverId)!
-      collecting ||= collectsFrom(world, driver, storage.id)
-      return world.deliveries.length === 0
-    })
-    expect(collecting).toBe(true)
-    const [done] = eventsOf(world, 'delivered')
-    expect(done).toMatchObject({ delivery: 'pickUp', good: 'stone', units: 30 })
-    expect(done!.coins).toBeGreaterThan(0)
-    expect(storage.stock!.stone).toBe(10)
-    expect(storage.stock!.coins).toBe(done!.coins)
-    // Taking what was sold to it is no theft.
-    expect(world.crimes).toEqual([])
-    runUntil(world, terrain, () => caravan.job === null, 10_000)
-    expect(warehouse.stock!.stone).toBeGreaterThanOrEqual(stone + 30 - 1)
-  }, 120_000)
+  it(
+    'pick up goods sold from the city’s storage, pay there, and bring them to the warehouse',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const { world, terrain, warehouse, storage, city, caravan, queue } = setup()
+      storage.stock!.stone = 40
+      const stone = warehouse.stock!.stone ?? 0
+      expect(order(world, queue, { kind: 'sell', good: 'stone', units: 30, cityId: city.id })).toBe(
+        'ack',
+      )
+      let collecting = false
+      runUntil(world, terrain, () => {
+        const driver = world.residents.find((r) => r.id === caravan.driverId)!
+        collecting ||= collectsFrom(world, driver, storage.id)
+        return world.deliveries.length === 0
+      })
+      expect(collecting).toBe(true)
+      const [done] = eventsOf(world, 'delivered')
+      expect(done).toMatchObject({ delivery: 'pickUp', good: 'stone', units: 30 })
+      expect(done!.coins).toBeGreaterThan(0)
+      expect(storage.stock!.stone).toBe(10)
+      expect(storage.stock!.coins).toBe(done!.coins)
+      // Taking what was sold to it is no theft.
+      expect(world.crimes).toEqual([])
+      runUntil(world, terrain, () => caravan.job === null, 10_000)
+      expect(warehouse.stock!.stone).toBeGreaterThanOrEqual(stone + 30 - 1)
+    },
+  )
 
   it('turn back from a city behind closed gates, and the delivery waits for the next caravan', () => {
     const { world, terrain, warehouse, city, caravan, queue } = setup()

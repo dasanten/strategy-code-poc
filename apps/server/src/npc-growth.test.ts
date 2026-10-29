@@ -38,25 +38,29 @@ import {
 } from './npc-growth.fixture.js'
 
 describe('NPC cities grow', () => {
-  it('tears the old wall down only after the new one is finished', () => {
-    const { world, terrain, city, home } = village()
-    const size = terrain.size
-    fillInside(world, terrain, home)
-    fillHouses(world, city, home)
-    storageOf(world, city).stock = { food: 400, wood: 600 }
-    const oldIds = new Set(ring(world, city, home, size, WALL).map((b) => b.id))
-    run(world, terrain, city, home, oldIds, 180 * TICKS_PER_GAME_DAY, () =>
-      world.buildings.every((b) => !oldIds.has(b.id)),
-    )
-    expect(world.buildings.filter((b) => oldIds.has(b.id))).toEqual([])
-    // The gate stands in line with the old one, further out.
-    const gate = world.buildings.find((b) => b.kind === 'gate' && b.cityId === city.id)!
-    expect([gate.x - home.x, gate.y - home.y]).toEqual([0, WALL + NPC_WALL_STEP])
-    // The houses inside are still the city's, with the one it built on its edge.
-    expect(world.buildings.filter((b) => b.kind === 'house' && b.cityId === city.id)).toHaveLength(
-      NPC_VILLAGE.houses + 1,
-    )
-  }, 300_000)
+  it(
+    'tears the old wall down only after the new one is finished',
+    { tags: ['slow'], timeout: 300_000 },
+    () => {
+      const { world, terrain, city, home } = village()
+      const size = terrain.size
+      fillInside(world, terrain, home)
+      fillHouses(world, city, home)
+      storageOf(world, city).stock = { food: 400, wood: 600 }
+      const oldIds = new Set(ring(world, city, home, size, WALL).map((b) => b.id))
+      run(world, terrain, city, home, oldIds, 180 * TICKS_PER_GAME_DAY, () =>
+        world.buildings.every((b) => !oldIds.has(b.id)),
+      )
+      expect(world.buildings.filter((b) => oldIds.has(b.id))).toEqual([])
+      // The gate stands in line with the old one, further out.
+      const gate = world.buildings.find((b) => b.kind === 'gate' && b.cityId === city.id)!
+      expect([gate.x - home.x, gate.y - home.y]).toEqual([0, WALL + NPC_WALL_STEP])
+      // The houses inside are still the city's, with the one it built on its edge.
+      expect(
+        world.buildings.filter((b) => b.kind === 'house' && b.cityId === city.id),
+      ).toHaveLength(NPC_VILLAGE.houses + 1)
+    },
+  )
 
   it('pairs adults while it has a food surplus, and ends pairs when Food runs short', () => {
     const { world, terrain, city, home } = village()

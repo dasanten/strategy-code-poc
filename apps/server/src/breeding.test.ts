@@ -280,27 +280,31 @@ describe('the Breed horses task', () => {
 })
 
 describe('NPC cities', () => {
-  it('have one of their residents breed their horses through the default task', () => {
-    const { world, terrain: land } = worldWithCity()
-    const realm = world.realms[0]!
-    const stable = world.buildings.find((b) => b.kind === 'stable')!
-    stable.stock = { food: 10_000 }
-    for (const r of world.residents) r.carried = { food: 100 }
-    endRealm(world, realm, land.size)
-    const city = world.cities[0]!
-    expect(world.horses.every((h) => h.cityId === city.id && h.realmId === null)).toBe(true)
-    // One of them is idle, free for what the city needs.
-    const idle = world.residents.find((r) => r.id !== realm.leaderId)!
-    idle.order = null
-    delete idle.script
-    idle.carried = { food: OWN_FOOD }
-    const walking = new Walking(land)
-    stepWorld(world, land, walking)
-    expect(idle.script).toMatchObject({ task: 'breed', memory: { stableId: stable.id } })
-    expect(world.residents.filter((r) => r.script?.task === 'breed')).toHaveLength(1)
-    for (let t = 0; t < STABLE_BREED_TICKS + 500; t++) stepWorld(world, land, walking)
-    expect(world.horses.length).toBeGreaterThanOrEqual(3)
-    expect(world.horses[2]).toMatchObject({ cityId: city.id, realmId: null })
-    expect(checkInvariants(world, land)).toEqual([])
-  }, 120_000)
+  it(
+    'have one of their residents breed their horses through the default task',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const { world, terrain: land } = worldWithCity()
+      const realm = world.realms[0]!
+      const stable = world.buildings.find((b) => b.kind === 'stable')!
+      stable.stock = { food: 10_000 }
+      for (const r of world.residents) r.carried = { food: 100 }
+      endRealm(world, realm, land.size)
+      const city = world.cities[0]!
+      expect(world.horses.every((h) => h.cityId === city.id && h.realmId === null)).toBe(true)
+      // One of them is idle, free for what the city needs.
+      const idle = world.residents.find((r) => r.id !== realm.leaderId)!
+      idle.order = null
+      delete idle.script
+      idle.carried = { food: OWN_FOOD }
+      const walking = new Walking(land)
+      stepWorld(world, land, walking)
+      expect(idle.script).toMatchObject({ task: 'breed', memory: { stableId: stable.id } })
+      expect(world.residents.filter((r) => r.script?.task === 'breed')).toHaveLength(1)
+      for (let t = 0; t < STABLE_BREED_TICKS + 500; t++) stepWorld(world, land, walking)
+      expect(world.horses.length).toBeGreaterThanOrEqual(3)
+      expect(world.horses[2]).toMatchObject({ cityId: city.id, realmId: null })
+      expect(checkInvariants(world, land)).toEqual([])
+    },
+  )
 })
