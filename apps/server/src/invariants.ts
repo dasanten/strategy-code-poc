@@ -106,6 +106,7 @@ import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
+import { horseOffersOnce } from './horse-grant.js'
 import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
@@ -1688,6 +1689,7 @@ export const worldInvariants: Invariant[] = [
   leadersServeNoOne,
   residentNamesWellFormed,
   cityNamesWellFormed,
+  horseOffersOnce,
   buildingsInPlace,
   citiesFromBuildings,
   outpostStorageRealms,

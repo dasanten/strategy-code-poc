@@ -138,6 +138,8 @@ export type ServerMessage =
       diplomacy: Diplomacy
       /** The Region map over their explored terrain; null until territory is first worked out. */
       region: RegionMap | null
+      /** Whether the Player may still claim their Horse offer (`CONTEXT.md`: Horse offer). */
+      horseOffer: boolean
     }
   /**
    * Every tick: entities in sight that changed, ids that left sight, the Player's Last seen out
@@ -147,7 +149,8 @@ export type ServerMessage =
    * their alliance matters when those changed, and the Region map when territory was worked out
    * again (all of it) or their explored terrain grew (the grown chunks), and the realm's Leader
    * when the Player handed the realm to another (`CONTEXT.md`: Leader handover), and the
-   * realm name once the Player named it (`CONTEXT.md`: Realm name).
+   * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer: false` once
+   * they claimed their Horse offer (`CONTEXT.md`: Horse offer).
    */
   | {
       type: 'tick'
@@ -161,6 +164,7 @@ export type ServerMessage =
       region?: RegionMap
       leaderId?: string
       realmName?: string
+      horseOffer?: false
     }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }

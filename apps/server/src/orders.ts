@@ -24,6 +24,7 @@ import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
 import { handOver } from './leader.js'
 import { rename, renameCity } from './renaming.js'
+import { claimHorses } from './horse-grant.js'
 import { queueOrders } from './queues.js'
 
 /** Who sent an order: the Player's account and id. */
@@ -84,6 +85,7 @@ export const orderKinds: Record<string, OrderKind> = {
   handOver,
   rename,
   renameCity,
+  claimHorses,
   ...allianceOrders,
   ...armyOrders,
   ...contractOrders,

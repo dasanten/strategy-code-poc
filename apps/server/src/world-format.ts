@@ -14,7 +14,7 @@ import { grantHorses } from './horse-grant.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 51
+export const WORLD_FORMAT_VERSION = 52
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -104,6 +104,10 @@ export const migrations: Record<number, MigrationStep> = {
   // as well as an id (`ScriptParamValue`). Values from before are all ids, so the step leaves
   // them as they are.
   50: (state) => state,
+  // The Horse offer (`CONTEXT.md`: Horse offer) is kept with the Player (`horseOffersClaimed`).
+  // Nobody could claim it before, so every existing Player starts unclaimed, whether or not they
+  // have horses or got the Horse grant.
+  51: (state) => ({ ...(state as object), horseOffersClaimed: [] }),
 }
 
 export class WorldFormatError extends Error {}
