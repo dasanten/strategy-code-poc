@@ -286,6 +286,117 @@ button.hud-logout {
   }
 }
 
+/* ---------- Phones (ADR 0012): narrow or touch screens (`PHONE_QUERY`) ---------- */
+/* The rail folds into the menu button and the top bar keeps only the realm, clock and status. */
+.game.phone {
+  --rail-w: 0px;
+  --top-h: 44px;
+}
+.game.phone .hud-top {
+  gap: 10px;
+  padding-left: 54px;
+  overflow: hidden;
+}
+.game.phone .hud-top b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.game.phone .hud-top .hud-goods,
+.game.phone .hud-top .hud-leader,
+.game.phone .hud-top .hud-wiki,
+.game.phone .hud-top .hud-logout,
+.game.phone .hud-top .hud-sep,
+.game.phone .hud-top .hud-muted,
+.game.phone .hud-drawer-edge {
+  display: none;
+}
+/* Drawers open full-screen under the top bar. */
+.game.phone .hud-drawer,
+.game.phone .hud-drawer.wide {
+  left: 0;
+  width: 100%;
+  border-right: 0;
+}
+.hud-menu-button {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  z-index: 6;
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+.hud-menu-button[aria-expanded='true'] {
+  background: var(--ui-raised-hover);
+}
+.hud-menu-button svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.hud-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+}
+.hud-menu {
+  position: absolute;
+  top: var(--top-h);
+  left: 0;
+  z-index: 6;
+  width: min(280px, 100vw);
+  max-height: calc(100% - var(--top-h));
+  box-sizing: border-box;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: var(--ui-panel);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--ui-line);
+  border-left: 0;
+  border-radius: 0 0 10px 0;
+}
+.hud-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+.hud-menu > button.on {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+}
+.hud-menu-goods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 10px 10px 4px;
+  border-top: 1px solid var(--ui-line);
+  margin-top: 6px;
+}
+.hud-menu .hud-leader {
+  padding: 6px 10px;
+}
+.hud-menu-links {
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px 2px;
+}
+
 /* ---------- Admin page ---------- */
 .layout header {
   display: flex;
@@ -1087,12 +1198,15 @@ button.residents-row.selected:hover {
 .alliance-list li.invited {
   color: var(--ui-muted);
 }
-.alliance-list li.army > span {
-  display: block;
+/* An army in the drawer: a row to open it, or its card (ADR 0012) across the drawer. */
+.alliance-list li.army > .army-row {
+  flex: 1;
+  text-align: left;
   line-height: 1.5;
 }
-.alliance-list li.army .order-buttons {
-  flex-basis: 100%;
+.alliance-list li.army > .sel-card {
+  flex: 1;
+  min-width: 0;
 }
 .city-list {
   list-style: none;

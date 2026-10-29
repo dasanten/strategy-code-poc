@@ -180,6 +180,10 @@ export interface ResidentHere {
   riding?: boolean
   /** A horse of their realm on their tile that pulls no carriage and nobody rides, to mount. */
   horseToRide?: boolean
+  /** They carry a child (`CONTEXT.md`: Carrying), so they can't work, build, tear down, haul or pair. */
+  carrying?: boolean
+  /** They carry goods, so there is something to drop or store. */
+  carries?: boolean
 }
 
 /**
@@ -193,7 +197,12 @@ export function isWorkable(building: Building | undefined, node: KnownNode | und
   return !!good || (RECIPES[building.kind] ?? []).length > 0
 }
 
-/** The actions a resident's card offers, in the order it shows them. */
+/**
+ * The actions a resident's card offers, in the order it shows them. Orders they can't take right
+ * now are left out (ADR 0012): a child's work, building, goods and pairing (`CONTEXT.md`: Child),
+ * the work, building, hauling and pairing of someone carrying a child (`CONTEXT.md`: Carrying),
+ * and Goods with nothing carried and nothing on their tile to pick up.
+ */
 export function residentActions(h: ResidentHere): CardAction[] {
   const row = (id: ActionId, label: string, more: Partial<CardAction> = {}): CardAction => ({
     id,
@@ -201,22 +210,26 @@ export function residentActions(h: ResidentHere): CardAction[] {
     key: ACTION_KEYS[id],
     ...more,
   })
-  const child = h.adult ? {} : { disabled: true as const }
   const picks = (mode: ResidentHere['picking'], label: string) =>
     h.picking === mode ? { label: 'Pick a tile…', active: true as const } : { label }
+  // Working, building, tearing down, hauling and pairing (`CONTEXT.md`: Child, Carrying).
+  const works = h.adult && !h.carrying
   const actions: CardAction[] = []
   const add = (a: CardAction) => actions.push(a)
   add(row('walk', '', picks('walk', 'Walk to')))
   if (h.busy) add(row('stop', 'Stop'))
   if (h.riding) add(row('ride', 'Dismount'))
   else if (h.horseToRide) add(row('ride', 'Mount horse'))
-  if (h.carriage) {
+  if (h.carriage && h.adult) {
     // A rider doesn't drive (`CONTEXT.md`: Riding).
     const riding = h.riding ? { disabled: true as const, reason: 'dismount first to drive' } : {}
-    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...child, ...riding }))
-    add(row('haul', h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…', { opens: true }))
+    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...riding }))
+    if (!h.carrying) {
+      const label = h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…'
+      add(row('haul', label, { opens: true }))
+    }
   }
-  if (isWorkable(h.building, h.node)) {
+  if (works && isWorkable(h.building, h.node)) {
     add(
       row('work', `Work at the ${BUILDING_NAMES[h.building!.kind].toLowerCase()}…`, {
         opens: true,
@@ -224,26 +237,27 @@ export function residentActions(h: ResidentHere): CardAction[] {
     )
   }
   // A finished stable: keep Food in it for its horses (`CONTEXT.md`: Feeding the stable).
-  if (h.building?.kind === 'stable' && !h.building.site) {
-    add(row('feedStable', 'Feed the stable', child))
+  if (h.adult && h.building?.kind === 'stable' && !h.building.site) {
+    add(row('feedStable', 'Feed the stable'))
   }
-  const site = h.building?.site
-    ? h.building
-    : (h.carriageSite ?? (h.road?.site ? h.road : undefined))
-  add(
-    row('build', site ? `Help build the ${BUILDING_NAMES[site.kind].toLowerCase()}…` : 'Build…', {
-      opens: true,
-    }),
-  )
-  add(row('roadTo', '', { ...picks('road', 'Build road to'), ...child }))
-  add(row('wallTo', '', { ...picks('wall', 'Build wall to'), ...child }))
-  const torn = [h.building, h.carriageSite, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
-  if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
-  if (h.building?.kind === 'stable' && !h.building.site)
-    add(row('breed', 'Breed horses…', { opens: true, ...child }))
-  // Always there, so the Player sees the carry capacity even with nothing to move.
-  add(row('goods', 'Goods…', { opens: true }))
-  if (h.adult && h.inCity) add(row('pair', 'Pair…', { opens: true }))
+  if (works) {
+    const site = h.building?.site
+      ? h.building
+      : (h.carriageSite ?? (h.road?.site ? h.road : undefined))
+    add(
+      row('build', site ? `Help build the ${BUILDING_NAMES[site.kind].toLowerCase()}…` : 'Build…', {
+        opens: true,
+      }),
+    )
+    add(row('roadTo', '', picks('road', 'Build road to')))
+    add(row('wallTo', '', picks('wall', 'Build wall to')))
+    const torn = [h.building, h.carriageSite, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
+    if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
+    if (h.building?.kind === 'stable' && !h.building.site)
+      add(row('breed', 'Breed horses…', { opens: true }))
+  }
+  if (h.adult && (h.carries || goodsOnTile(h))) add(row('goods', 'Goods…', { opens: true }))
+  if (works && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
   if (h.wallsInSight > 0) add(row('walls', 'Break or climb a wall…', { opens: true }))
   add(row('script', 'Run script…', { opens: true }))
@@ -258,6 +272,63 @@ export function residentActions(h: ResidentHere): CardAction[] {
   }
   if (h.renamable) add(row('rename', 'Rename…', { opens: true }))
   return actions
+}
+
+/** Whether there are goods on a resident's tile to pick up: on the ground, stored, at a site or on a carriage. */
+function goodsOnTile(h: ResidentHere): boolean {
+  const some = (stock: Stock | undefined) =>
+    !!stock && Object.values(stock).some((n) => (n ?? 0) > 0)
+  return (
+    some(h.pile?.goods) ||
+    some(h.storage?.stock) ||
+    some(h.building?.site?.delivered) ||
+    some(h.carriageSite?.site?.delivered) ||
+    some(h.road?.site?.delivered) ||
+    some(h.carriage?.load)
+  )
+}
+
+/** The kinds the Orders tab groups a resident's orders under (ADR 0012). */
+export type OrderGroup = 'move' | 'work' | 'goods' | 'scripts' | 'other'
+
+/** Each kind's heading on the Orders tab, in the order they show. */
+export const ORDER_GROUP_LABELS: Record<OrderGroup, string> = {
+  move: 'Move',
+  work: 'Work & build',
+  goods: 'Goods',
+  scripts: 'Scripts',
+  other: 'Other',
+}
+
+/** Which kind each action is grouped under; an action not listed goes under Other. */
+const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
+  walk: 'move',
+  stop: 'move',
+  ride: 'move',
+  drive: 'move',
+  haul: 'move',
+  work: 'work',
+  feedStable: 'work',
+  build: 'work',
+  roadTo: 'work',
+  wallTo: 'work',
+  tearDown: 'work',
+  breed: 'work',
+  goods: 'goods',
+  script: 'scripts',
+}
+
+/** A resident's actions by kind for the Orders tab, in the kinds' order, empty kinds left out. */
+export function groupOrders(
+  actions: CardAction[],
+): { group: OrderGroup; label: string; actions: CardAction[] }[] {
+  return (Object.keys(ORDER_GROUP_LABELS) as OrderGroup[])
+    .map((group) => ({
+      group,
+      label: ORDER_GROUP_LABELS[group],
+      actions: actions.filter((a) => (ORDER_GROUP[a.id] ?? 'other') === group),
+    }))
+    .filter((g) => g.actions.length > 0)
 }
 
 /** What the Player knows that the handover check needs: their diplomacy and what is in sight. */

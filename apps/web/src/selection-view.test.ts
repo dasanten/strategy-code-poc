@@ -38,6 +38,7 @@ import {
   describeTile,
   makeLeaderProblem,
   nodeFit,
+  groupOrders,
   residentActions,
   tileActions,
   type ResidentHere,
@@ -76,8 +77,8 @@ const here = (more: Partial<ResidentHere> = {}): ResidentHere => ({
 const ids = (h: ResidentHere) => residentActions(h).map((a) => a.id)
 
 describe('the actions on a resident’s card', () => {
-  it('offers walking, building, a road, a wall, goods, pairing and scripts to an idle adult on open ground', () => {
-    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'wallTo', 'goods', 'pair', 'script'])
+  it('offers walking, building, a road, a wall, pairing and scripts to an idle adult on open ground', () => {
+    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'wallTo', 'pair', 'script'])
   })
 
   it('offers stop only while they have an order or run a script', () => {
@@ -119,20 +120,23 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ building: building({ kind: 'warehouse' }) }))).not.toContain('tearDown')
   })
 
-  it('offers breeding horses at a finished stable, turned off for a child', () => {
+  it('offers breeding horses at a finished stable', () => {
     const stable = building({ kind: 'stable' })
     expect(ids(here({ building: stable }))).toContain('breed')
     expect(ids(here({ building: { ...stable, site: { work: 0, delivered: {} } } }))).not.toContain(
       'breed',
     )
     expect(ids(here({ building: building({ kind: 'farm' }) }))).not.toContain('breed')
-    const child = residentActions(here({ adult: false, building: stable }))
-    expect(child.find((x) => x.id === 'breed')?.disabled).toBe(true)
   })
 
-  it('offers goods even with an empty inventory and nothing on their tile', () => {
-    expect(ids(here())).toContain('goods')
+  it('offers goods only with something carried or something on their tile to pick up', () => {
+    expect(ids(here())).not.toContain('goods')
+    expect(ids(here({ carries: true }))).toContain('goods')
     expect(ids(here({ pile }))).toContain('goods')
+    expect(ids(here({ pile: { ...pile, goods: {} } }))).not.toContain('goods')
+    expect(ids(here({ storage: building({ kind: 'storage', stock: { food: 2 } }) }))).toContain(
+      'goods',
+    )
   })
 
   it('offers attacking only with someone of another realm in sight', () => {
@@ -150,12 +154,48 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ inCity: false }))).not.toContain('pair')
   })
 
-  it('keeps a child’s driving, road and wall building in sight but turned off', () => {
-    const a = residentActions(here({ adult: false, carriage }))
-    expect(a.find((x) => x.id === 'drive')?.disabled).toBe(true)
-    expect(a.find((x) => x.id === 'roadTo')?.disabled).toBe(true)
-    expect(a.find((x) => x.id === 'wallTo')?.disabled).toBe(true)
-    expect(a.find((x) => x.id === 'walk')?.disabled).toBeUndefined()
+  it('shows a child only the orders they can take: walking, riding, scripts, attacking', () => {
+    const stable = building({ kind: 'stable' })
+    const child = here({
+      adult: false,
+      carriage,
+      pile,
+      carries: true,
+      building: stable,
+      horseToRide: true,
+      othersInSight: 1,
+      renamable: true,
+    })
+    expect(ids(child)).toEqual(['walk', 'ride', 'attack', 'script', 'rename'])
+    expect(residentActions(child).some((a) => a.disabled)).toBe(false)
+  })
+
+  it('hides work, building, hauling and pairing from someone carrying a child', () => {
+    const carrying = here({
+      carrying: true,
+      carriage,
+      carries: true,
+      building: building({ kind: 'farm' }),
+    })
+    expect(ids(carrying)).toEqual(['walk', 'drive', 'goods', 'script'])
+  })
+
+  it('shows a grown resident every order that fits their tile', () => {
+    const stable = building({ kind: 'stable' })
+    expect(ids(here({ carriage, carries: true, building: stable }))).toEqual([
+      'walk',
+      'drive',
+      'haul',
+      'feedStable',
+      'build',
+      'roadTo',
+      'wallTo',
+      'tearDown',
+      'breed',
+      'goods',
+      'pair',
+      'script',
+    ])
   })
 
   it('shows which action the map is picking a tile for', () => {
@@ -294,11 +334,33 @@ describe('whether a resident can be made Leader', () => {
 
 describe('keys', () => {
   it('run the action with that key, in either case, unless it is turned off', () => {
-    const a = residentActions(here({ adult: false, carriage }))
+    const a = residentActions(here({ riding: true, carriage }))
     expect(actionForKey(a, 'w')?.id).toBe('walk')
     expect(actionForKey(a, 'W')?.id).toBe('walk')
     expect(actionForKey(a, 'd')).toBeUndefined()
     expect(actionForKey(a, 'z')).toBeUndefined()
+  })
+})
+
+describe('the Orders tab', () => {
+  it('groups the orders by kind: Move, Work & build, Goods, Scripts, then the rest', () => {
+    const a = residentActions(
+      here({ busy: true, carriage, carries: true, othersInSight: 1, renamable: true }),
+    )
+    expect(groupOrders(a).map((g) => [g.label, g.actions.map((x) => x.id)])).toEqual([
+      ['Move', ['walk', 'stop', 'drive', 'haul']],
+      ['Work & build', ['build', 'roadTo', 'wallTo']],
+      ['Goods', ['goods']],
+      ['Scripts', ['script']],
+      ['Other', ['pair', 'attack', 'rename']],
+    ])
+  })
+
+  it('leaves out kinds with no order a child can take', () => {
+    expect(groupOrders(residentActions(here({ adult: false }))).map((g) => g.label)).toEqual([
+      'Move',
+      'Scripts',
+    ])
   })
 })
 

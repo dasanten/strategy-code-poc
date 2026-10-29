@@ -91,6 +91,7 @@ import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
 import { roadJoins } from './map/roads.js'
 import { inBox, pickableAt, pickables, toggled, type Point } from './map/selection.js'
+import { LONG_PRESS_MS, TAP_SLOP, longPresses, pressKind } from './map/gestures.js'
 
 /** No residents selected. */
 const NONE: readonly string[] = []
@@ -118,7 +119,8 @@ type MapMode = 'terrain' | 'region'
  * chunk with its terrain marks (`map/terrain-layer.ts`) and drawn only while on screen. Zoomed out
  * it draws only terrain; closer in it adds resource nodes and residents, and up close the tile
  * grid.
- * Drag or swipe to pan; wheel, pinch or the buttons to zoom.
+ * Drag or swipe to pan; wheel, pinch or the buttons to zoom. A long-press does what right-click
+ * does, and the Select button makes a drag box residents (T33.5).
  * The admin map (`world.admin`) draws the whole world the same way, coloured by Organization, with
  * its far tier from the terrain overview and territory only when toggled on.
  */
@@ -541,9 +543,34 @@ export function MapView({
 
     // Pointer input: one pointer pans, two pinch-zoom; works for mouse, pen and touch alike. With
     // Shift held, or in box mode, one pointer drags a box to select residents instead of panning.
+    // A touch or pen press held still is a long-press: it picks the tile, as right-click does.
     const pointers = new Map<number, { x: number; y: number }>()
     let pressedAt = { x: 0, y: 0 }
+    let pressedTime = 0
     let dragged = 0
+    // The most pointers down at once in this gesture: two or more make it a pinch, never a tap.
+    let fingers = 0
+    let longPressTimer: ReturnType<typeof setTimeout> | undefined
+    // A long-press already acted; the rest of the gesture does nothing more.
+    let longPressed = false
+    const press = () => ({ moved: dragged, heldMs: performance.now() - pressedTime, fingers })
+    const stopLongPress = () => {
+      clearTimeout(longPressTimer)
+      longPressTimer = undefined
+    }
+    const longPress = (at: Point) => {
+      stopLongPress()
+      longPressed = true
+      if (box) {
+        box = undefined
+        redraw()
+      }
+      const [tx, ty] = screenToTile(cam, size(), mapSize, at.x, at.y).map(Math.floor) as [
+        number,
+        number,
+      ]
+      onPickTileRef.current?.(tx, ty)
+    }
     const local = (e: PointerEvent | WheelEvent) => {
       const rect = app.canvas.getBoundingClientRect()
       return { x: e.clientX - rect.left, y: e.clientY - rect.top }
@@ -555,9 +582,22 @@ export function MapView({
       } catch {
         // dragging still works while over the canvas
       }
+      if (pointers.size === 0) {
+        fingers = 0
+        longPressed = false
+      }
       pointers.set(e.pointerId, local(e))
       pressedAt = local(e)
+      pressedTime = performance.now()
       dragged = 0
+      fingers = Math.max(fingers, pointers.size)
+      stopLongPress()
+      if (pointers.size === 1 && longPresses(e.pointerType)) {
+        const at = pressedAt
+        longPressTimer = setTimeout(() => {
+          if (pressKind(press(), true) === 'long-press') longPress(at)
+        }, LONG_PRESS_MS)
+      }
       const boxes =
         onSelectManyRef.current !== undefined &&
         (e.shiftKey || boxModeRef.current) &&
@@ -573,6 +613,7 @@ export function MapView({
       const prev = pointers.get(e.pointerId)
       if (!prev) return hoverAt(p.x, p.y)
       dragged = Math.max(dragged, Math.hypot(p.x - pressedAt.x, p.y - pressedAt.y))
+      if (dragged >= TAP_SLOP) stopLongPress()
       // A second finger turns a box drag back into a pinch.
       if (box && pointers.size > 1) box = undefined
       if (box) {
@@ -593,10 +634,12 @@ export function MapView({
     }
     const onUp = (e: PointerEvent) => {
       const wasPressed = pointers.delete(e.pointerId)
+      stopLongPress()
+      if (longPressed) return
       // A box dragged far enough selects the own residents in it, replacing the selection.
       const boxed = box
       box = undefined
-      if (boxed && wasPressed && dragged >= 6) {
+      if (boxed && wasPressed && dragged >= TAP_SLOP) {
         redraw()
         if (e.type === 'pointerup') {
           onSelectManyRef.current?.(inBox(ownOnScreen(), boxed.from, boxed.to))
@@ -605,7 +648,12 @@ export function MapView({
       }
       // A press that hardly moved is a click: while picking it picks the tile, otherwise it
       // picks the own resident under it, or else the tile. A right-click always picks the tile.
-      if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && dragged < 6) {
+      // A touch held still picks the tile when let go, should the long-press timer not have fired.
+      const kind = pressKind(press(), longPresses(e.pointerType))
+      if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && kind === 'long-press') {
+        return longPress(local(e))
+      }
+      if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && kind === 'tap') {
         const p = local(e)
         const [tx, ty] = screenToTile(cam, size(), mapSize, p.x, p.y).map(Math.floor) as [
           number,
@@ -709,6 +757,7 @@ export function MapView({
 
     return () => {
       disposed = true
+      stopLongPress()
       store.stop()
       cancelAnimationFrame(frame)
       redrawRef.current = () => {}
@@ -759,9 +808,9 @@ export function MapView({
         {onSelectMany && (
           <button
             type="button"
-            aria-label="Box select"
+            aria-label="Select"
             aria-pressed={boxMode}
-            title="Box select: drag to select residents (or hold Shift)"
+            title="Select: a drag boxes residents instead of panning (or hold Shift)"
             onClick={() => setBoxMode(!boxMode)}
           >
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">

@@ -215,6 +215,97 @@ export function ToolRail({
 }
 
 /**
+ * On a phone the tool rail and the top bar's goods, Leader, Wiki and Log out fold into one menu
+ * button at the top left (ADR 0012); picking a drawer from it opens that drawer full-screen.
+ */
+export function PhoneMenu({
+  open,
+  onToggle,
+  goods,
+  cityName,
+  leader,
+  onLogout,
+}: {
+  open: OpenDrawer
+  onToggle: (id: DrawerId) => void
+  goods?: Record<KeyGood, number>
+  cityName?: string
+  leader?: string
+  onLogout: () => void
+}) {
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    if (!shown) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShown(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [shown])
+  return (
+    <>
+      <button
+        type="button"
+        className="hud-menu-button"
+        aria-label="Menu"
+        aria-expanded={shown}
+        onClick={() => setShown((s) => !s)}
+      >
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24">
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      {shown && (
+        <>
+          <div className="hud-menu-backdrop" onClick={() => setShown(false)} />
+          <nav className="hud-menu" aria-label="Menu">
+            {DRAWERS.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                className={open === d.id ? 'on' : ''}
+                aria-pressed={open === d.id}
+                onClick={() => {
+                  onToggle(d.id)
+                  setShown(false)
+                }}
+              >
+                <Icon name={d.id} size={18} /> {d.label}
+              </button>
+            ))}
+            {goods && (
+              <div
+                className="hud-menu-goods"
+                aria-label={`Goods in ${cityName ?? 'your home city'}`}
+              >
+                {KEY_GOODS.map((g) => (
+                  <span key={g} className="hud-good" title={GOOD_LABELS[g]}>
+                    <Icon name={g} size={15} /> {Math.floor(goods[g])}
+                  </span>
+                ))}
+              </div>
+            )}
+            {leader && (
+              <span className="hud-leader" title="Your Leader">
+                <Icon name="crown" size={15} /> {leader}
+              </span>
+            )}
+            <div className="hud-menu-links">
+              <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener">
+                Wiki
+              </a>
+              <button type="button" className="hud-logout" onClick={onLogout}>
+                Log out
+              </button>
+            </div>
+          </nav>
+        </>
+      )}
+    </>
+  )
+}
+
+/**
  * A drawer sliding over the map. Every drawer stays mounted and only the open one shows, so a
  * panel keeps what the Player typed into it, and the script library its list, while closed.
  */
@@ -336,7 +427,8 @@ export function DrawerEdge({ open }: { open: OpenDrawer }) {
  * the right, 0 for each that isn't showing. The map fills the window, so screen edges measure it.
  */
 export function mapCovered(): { left: number; right: number } {
-  const card = document.querySelector('.game-selection')?.getBoundingClientRect()
+  // A bottom sheet covers the bottom of the map, not its right side.
+  const card = document.querySelector('.game-selection:not(.sheet)')?.getBoundingClientRect()
   return {
     left: document.querySelector('.hud-drawer:not([hidden])')?.getBoundingClientRect().right ?? 0,
     right: card ? window.innerWidth - card.left : 0,

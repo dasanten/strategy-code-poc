@@ -2,7 +2,6 @@ import {
   BUILD_MATERIALS,
   BUILDING_PURPOSE,
   LINE_BUILDING,
-  ROAD_LINE_MAX_TILES,
   isLineOrder,
   BUILD_WORK,
   BUILDABLE,
@@ -67,7 +66,21 @@ import {
   horsesIn,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { carryLine, groupCard, type CardSections, type ResidentGroup } from './residents-view.js'
+import {
+  CARD_TAB_LABELS,
+  CARD_TABS,
+  carriedShort,
+  carryLine,
+  GROUP_TABS,
+  groupCard,
+  rememberedTabOf,
+  rememberTabOf,
+  scriptsRun,
+  TAB_LABELS,
+  type GroupTab,
+  type CardSections,
+  type ResidentGroup,
+} from './residents-view.js'
 import { doingLine } from './doing-view.js'
 import {
   dropStep,
@@ -83,10 +96,10 @@ import { groupNumberParams, groupSentLine, type GroupOrder, type Skipped } from 
 import { NumberField, foodParamsHint } from './ScriptParams.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
-import { ActionRows, SelectionCard } from './SelectionCard.js'
+import { ActionRows, CardTabs, SelectionCard, useActionKeys } from './SelectionCard.js'
 import {
-  ACTION_KEYS,
   horseDetail,
+  groupOrders,
   residentActions,
   type ActionId,
   type CardAction,
@@ -502,8 +515,10 @@ export function ResidentsList({
 }
 
 /**
- * The selection card for several of the Player's residents picked at once on the map: how many,
- * their names, and a short list of what each is doing; click a row to pick just that one.
+ * The selection card for several of the Player's residents picked at once on the map (ADR 0012;
+ * `CONTEXT.md`: Group, Resident card): a header with how many and who, then one open tab. Orders
+ * gives each of them the same order, grouped by kind; Members lists what each is doing, a click
+ * picking just that one; Script says what they run and gives them all one.
  */
 export function GroupCard({
   residents,
@@ -517,6 +532,7 @@ export function GroupCard({
   orderError,
   onPick,
   onClose,
+  collapsed = false,
 }: {
   residents: Resident[]
   scripts: ScriptSummary[]
@@ -535,82 +551,83 @@ export function GroupCard({
   orderError: string | undefined
   onPick: (id: string) => void
   onClose: () => void
+  /** Shrunk to its head while the map waits for a target (ADR 0012: pick mode). */
+  collapsed?: boolean
 }) {
   const card = groupCard(residents)
-  const [panel, setPanel] = useState<'fetch' | 'script' | 'params'>()
+  const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
+  const [fetching, setFetching] = useState(false)
   const [good, setGood] = useState<Good>('food')
   const numberParams = groupNumberParams(residents, scripts)
   const foodHint = foodParamsHint(numberParams.map((p) => p.name))
+  const showTab = (t: GroupTab) => {
+    setTab(t)
+    rememberTabOf('group', t)
+  }
   const toggle = (p: Exclude<GroupPicking, false>) => {
-    setPanel(undefined)
+    setFetching(false)
     onPicking(picking === p ? false : p)
   }
-  const open = (p: 'fetch' | 'script' | 'params') => {
-    onPicking(false)
-    setPanel(panel === p ? undefined : p)
-  }
+  const pickButton = (p: Exclude<GroupPicking, false>, label: string) => (
+    <button type="button" aria-pressed={picking === p} onClick={() => toggle(p)}>
+      {label}
+    </button>
+  )
+  const idle = residents.filter((r) => !r.order && !r.script).length
   return (
-    <SelectionCard rel="own" title={card.title} lines={[card.names]} onClose={onClose}>
-      <ul className="sel-facts sel-group" aria-label="Selected residents">
-        {card.rows.map((r) => (
-          <li key={r.id}>
-            <button type="button" onClick={() => onPick(r.id)}>
-              <strong>{r.name}</strong> · {doingLine(r, { scripts, buildings })}
-            </button>
-          </li>
-        ))}
-        {card.more > 0 && <li>and {card.more} more</li>}
-      </ul>
-      <div className="order-buttons" aria-label="Group orders">
-        <button type="button" aria-pressed={picking === 'walk'} onClick={() => toggle('walk')}>
-          Walk to
-        </button>
-        <button type="button" aria-pressed={picking === 'work'} onClick={() => toggle('work')}>
-          Work
-        </button>
-        <button type="button" aria-pressed={picking === 'build'} onClick={() => toggle('build')}>
-          Build
-        </button>
-        <button type="button" onClick={() => onOrder({ kind: 'store' })}>
-          Store
-        </button>
-        <button type="button" aria-pressed={panel === 'fetch'} onClick={() => open('fetch')}>
-          Fetch
-        </button>
-        <button type="button" aria-pressed={panel === 'script'} onClick={() => open('script')}>
-          Run script
-        </button>
-        {numberParams.length > 0 && (
-          <button type="button" aria-pressed={panel === 'params'} onClick={() => open('params')}>
-            Script params
-          </button>
-        )}
-        <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
-          Stop
-        </button>
-      </div>
-      <p className="muted small" role="status">
-        {orderError
-          ? `Order turned down: ${orderError}`
-          : picking
-            ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
-            : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
-      </p>
-      {report && (
-        <div className="small" aria-label="Last group order">
-          <p>{groupSentLine(report.sent, report.of)}</p>
-          {report.skipped.length > 0 && (
-            <ul className="sel-facts">
-              {report.skipped.map((s) => (
-                <li key={s.id}>
-                  Skipped <strong>{s.name}</strong>: {s.why}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+    <SelectionCard
+      rel="own"
+      title={card.title}
+      lines={[
+        card.names,
+        <strong key="doing">
+          {idle === residents.length ? 'All idle' : `${residents.length - idle} busy, ${idle} idle`}
+        </strong>,
+      ]}
+      onClose={onClose}
+      collapsed={collapsed}
+    >
+      <CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
+
+      {tab === 'orders' && (
+        <>
+          <div className="sel-order-group">
+            <h3>Move</h3>
+            <div className="order-buttons" aria-label="Move">
+              {pickButton('walk', 'Walk to')}
+              <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
+                Stop
+              </button>
+            </div>
+          </div>
+          <div className="sel-order-group">
+            <h3>Work &amp; build</h3>
+            <div className="order-buttons" aria-label="Work & build">
+              {pickButton('work', 'Work')}
+              {pickButton('build', 'Build')}
+            </div>
+          </div>
+          <div className="sel-order-group">
+            <h3>Goods</h3>
+            <div className="order-buttons" aria-label="Goods">
+              <button type="button" onClick={() => onOrder({ kind: 'store' })}>
+                Store
+              </button>
+              <button
+                type="button"
+                aria-pressed={fetching}
+                onClick={() => {
+                  onPicking(false)
+                  setFetching(!fetching)
+                }}
+              >
+                Fetch
+              </button>
+            </div>
+          </div>
+        </>
       )}
-      {buildAt && !picking && (
+      {tab === 'orders' && buildAt && !picking && (
         <section className="inspector-block" aria-label="Build">
           <div className="panel-head">
             <h3>Build</h3>
@@ -656,7 +673,7 @@ export function GroupCard({
           </p>
         </section>
       )}
-      {panel === 'fetch' && (
+      {tab === 'orders' && fetching && (
         <section className="inspector-block" aria-label="Fetch">
           <div className="order-buttons">
             <select
@@ -679,44 +696,90 @@ export function GroupCard({
           </p>
         </section>
       )}
-      {panel === 'script' && (
-        <section className="inspector-block" aria-label="Run script">
-          <RunScript
-            script={undefined}
-            scripts={scripts}
-            onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
-          />
-        </section>
+      {tab === 'members' && (
+        <ul className="sel-facts sel-group" aria-label="Selected residents">
+          {card.rows.map((r) => (
+            <li key={r.id}>
+              <button type="button" onClick={() => onPick(r.id)}>
+                <strong>{r.name}</strong> · {doingLine(r, { scripts, buildings })}
+              </button>
+            </li>
+          ))}
+          {card.more > 0 && <li>and {card.more} more</li>}
+        </ul>
       )}
-      {panel === 'params' && numberParams.length > 0 && (
-        <section className="inspector-block" aria-label="Script params">
-          <div className="script-params">
-            {numberParams.map(({ name, scriptIds }) => (
-              <div key={name} className="goods-row">
-                <span className="small">
-                  <strong>{name}</strong> <span className="muted">(number)</span>
-                </span>
-                <NumberField
-                  name={name}
-                  value={undefined}
-                  onSet={(v) => onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })}
-                />
-                <span className="buttons">
-                  <button
-                    type="button"
-                    onClick={() => onOrder({ kind: 'setNumber', name, value: null, scriptIds })}
-                  >
-                    Clear
-                  </button>
-                </span>
-              </div>
+      {tab === 'script' && (
+        <>
+          <ul className="sel-facts" aria-label="Scripts they run">
+            {scriptsRun(residents.map((r) => scriptName(r, scripts))).map((l) => (
+              <li key={l}>{l}</li>
             ))}
-          </div>
-          <p className="muted small">
-            Sets it for each one running a script with it. Type a number and press Enter.
-          </p>
-          {foodHint && <p className="muted small">{foodHint}</p>}
-        </section>
+          </ul>
+          <section className="inspector-block" aria-label="Run script">
+            <RunScript
+              script={undefined}
+              scripts={scripts}
+              label="Script for all of them to run"
+              onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
+            />
+          </section>
+          {numberParams.length > 0 && (
+            <section className="inspector-block" aria-label="Script params">
+              <div className="script-params">
+                {numberParams.map(({ name, scriptIds }) => (
+                  <div key={name} className="goods-row">
+                    <span className="small">
+                      <strong>{name}</strong> <span className="muted">(number)</span>
+                    </span>
+                    <NumberField
+                      name={name}
+                      value={undefined}
+                      onSet={(v) =>
+                        onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
+                      }
+                    />
+                    <span className="buttons">
+                      <button
+                        type="button"
+                        onClick={() => onOrder({ kind: 'setNumber', name, value: null, scriptIds })}
+                      >
+                        Clear
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="muted small">
+                Sets it for each one running a script with it. Type a number and press Enter.
+              </p>
+              {foodHint && <p className="muted small">{foodHint}</p>}
+            </section>
+          )}
+        </>
+      )}
+
+      {(orderError || picking || tab === 'orders') && (
+        <p className="muted small" role="status">
+          {orderError
+            ? `Order turned down: ${orderError}`
+            : picking
+              ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
+              : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
+        </p>
+      )}
+      {report && (
+        <div className="small" aria-label="Last group order">
+          <p>{groupSentLine(report.sent, report.of)}</p>
+          {report.skipped.length > 0 && (
+            <ul className="sel-facts">
+              {report.skipped.map((s) => (
+                <li key={s.id}>
+                  Skipped <strong>{s.name}</strong>: {s.why}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </SelectionCard>
   )
@@ -741,9 +804,11 @@ const GROUP_PICKING_HINTS: Record<Exclude<GroupPicking, false>, string> = {
 }
 
 /**
- * The selection card for one of the Player's residents (ADR 0008; `CONTEXT.md`: Resident, Stats,
- * Skill): who they are and what they do, then the actions that fit them and their tile as rows
- * with keys. An action that needs more (goods, a partner, a target, a script) opens its panel.
+ * The selection card for one of the Player's residents (ADRs 0008, 0012; `CONTEXT.md`: Resident, Stats,
+ * Skill, Resident card): a header that always shows who they are, what they do, their
+ * health, hunger and what they carry, then one open tab. Orders lists the orders they can take
+ * now, grouped by kind, as rows with keys; one that needs more (goods, a partner, a target, a
+ * script) opens its panel. Queue, Stats and Script show the rest.
  */
 export function ResidentCard({
   resident: r,
@@ -801,6 +866,7 @@ export function ResidentCard({
   scriptParams,
   onStore,
   onEditQueue,
+  collapsed = false,
 }: {
   resident: Resident
   leaderId: string
@@ -907,7 +973,7 @@ export function ResidentCard({
   onRename: (name: string, realmName?: string) => void
   /** Closes the card. */
   onClose: () => void
-  /** The open sections, kept by the caller so they stay open from one selected unit to the next. */
+  /** The open tab and panel, kept by the caller so they stay from one selected unit to the next. */
   sections: CardSections<ActionId>
   onSections: (sections: CardSections<ActionId>) => void
   /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
@@ -916,6 +982,8 @@ export function ResidentCard({
   onStore?: () => void
   /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
   onEditQueue?: (steps: QueueStepRequest[], loop?: boolean) => void
+  /** Shrunk to its header while the map waits for a target (ADR 0012: pick mode). */
+  collapsed?: boolean
 }) {
   const setPanel = (panel: ActionId | undefined) => onSections({ ...sections, panel })
   const age = Math.floor(ageInYears(r, tick))
@@ -953,10 +1021,17 @@ export function ResidentCard({
     renamable: !!rename,
     riding: r.riding !== undefined,
     horseToRide: !!horseToRide,
+    carrying: !!r.carrying,
+    carries: carried.length > 0,
   })
+  const tab = sections.tab
   const shown = actions.some((a) => a.id === sections.panel) ? sections.panel : undefined
   const act = (a: CardAction) => {
-    if (a.opens) return setPanel(shown === a.id ? undefined : a.id)
+    // An order's key opens its panel from any tab, on the Orders tab.
+    if (a.opens) {
+      const open = tab === 'orders' && shown === a.id ? undefined : a.id
+      return onSections({ ...sections, tab: 'orders', panel: open })
+    }
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
     if (a.id === 'roadTo') onRoadTo()
@@ -965,54 +1040,82 @@ export function ResidentCard({
     if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
+  useActionKeys(actions, act)
   return (
     <SelectionCard
       rel={r.owner === realmId ? 'own' : 'alliance'}
       title={r.name}
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
-        `${child ? 'Child' : 'Adult'} · ${age} years${cityName ? ` · ${cityName}` : ''}${r.riding ? ' · on horseback' : ''}`,
         <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
-        ...(family ? [family] : []),
+        `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
       ]}
+      head={
+        <div className="vitals">
+          <Meter
+            label="Health"
+            value={`${Math.round(r.health)} / ${MAX_HEALTH}`}
+            share={r.health / MAX_HEALTH}
+          />
+          <Meter
+            label="Hunger"
+            value={r.hunger / MAX_HUNGER < 0.25 ? 'hungry' : `${pct(r.hunger / MAX_HUNGER)} fed`}
+            share={r.hunger / MAX_HUNGER}
+          />
+        </div>
+      }
       onClose={onClose}
+      collapsed={collapsed}
     >
-      <div className="vitals">
-        <Meter
-          label="Health"
-          value={`${Math.round(r.health)} / ${MAX_HEALTH}`}
-          share={r.health / MAX_HEALTH}
-        />
-        <Meter
-          label="Hunger"
-          value={r.hunger / MAX_HUNGER < 0.25 ? 'hungry' : `${pct(r.hunger / MAX_HUNGER)} fed`}
-          share={r.hunger / MAX_HUNGER}
-        />
+      <div className="tabs sel-tabs" role="tablist" aria-label="Card">
+        {CARD_TABS.map((t) => (
+          <button
+            type="button"
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => onSections({ ...sections, tab: t })}
+          >
+            {CARD_TAB_LABELS[t]}
+          </button>
+        ))}
       </div>
 
-      {r.script && (
-        <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
-      )}
-      {r.script && scriptParams}
-      {r.queue && onEditQueue && (
-        <QueueBlock
-          queue={r.queue}
-          doing={doingLine(r, { scripts, buildings })}
-          scripts={scripts}
-          buildings={buildings}
-          onEdit={onEditQueue}
-        />
-      )}
-      <ActionRows actions={actions} open={shown} onAction={act} />
-      <p className="muted small" role="status">
-        {orderError
-          ? `Order turned down: ${orderError}`
-          : picking
-            ? `${PICKING_HINTS[picking]} Tap a tile on the map, or press ${PICKING_KEYS[picking]} again to cancel.`
-            : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
-      </p>
-
-      {shown && (
+      {tab === 'orders' &&
+        groupOrders(actions).map((g) => (
+          <div className="sel-order-group" key={g.group}>
+            <h3>{g.label}</h3>
+            <ActionRows
+              actions={g.actions}
+              open={shown}
+              onAction={act}
+              label={g.label}
+              keys={false}
+            />
+          </div>
+        ))}
+      {tab === 'queue' &&
+        (r.queue && onEditQueue ? (
+          <QueueBlock
+            queue={r.queue}
+            doing={doingLine(r, { scripts, buildings })}
+            scripts={scripts}
+            buildings={buildings}
+            onEdit={onEditQueue}
+          />
+        ) : (
+          <p className="muted small">Nothing queued. Hold Shift with any order to queue it.</p>
+        ))}
+      {tab === 'script' &&
+        (r.script ? (
+          <>
+            <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
+            {scriptParams}
+          </>
+        ) : (
+          <p className="muted small">Runs no script. Give them one with Run script under Orders.</p>
+        ))}
+      {tab === 'orders' && shown && (
         <div className="sel-panel">
           {shown === 'haul' && carriage && (
             <HaulBlock resident={r} tick={tick} picking={picking === 'haul'} onHaulTo={onHaulTo} />
@@ -1255,72 +1358,61 @@ export function ResidentCard({
         </div>
       )}
 
-      <details className="sel-details" open={sections.stats}>
-        <summary
-          onClick={(e) => {
-            // Opened and closed only through the kept sections, never by the browser alone.
-            e.preventDefault()
-            onSections({ ...sections, stats: !sections.stats })
-          }}
-        >
-          Stats and skills
-        </summary>
-        <section className="inspector-block" aria-label="Stats">
-          <div className="panel-head">
-            <h3>Stats</h3>
-            <span className="small muted">base + trained (cap)</span>
-          </div>
-          {STAT_NAMES.map((s) => {
-            const { base, trained } = r.stats[s]
-            const cap = trainedCap(base)
-            return (
-              <div className="stat" key={s}>
-                <span>{STAT_LABELS[s]}</span>
-                <span className="stat-bar" aria-hidden="true">
-                  <span className="base" style={{ width: pct(base / STAT_SCALE) }} />
-                  <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
-                  <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
+      {tab === 'stats' && (
+        <>
+          <ul className="sel-facts">
+            <li>
+              {child ? 'Child' : 'Adult'} · {age} years{cityName ? ` · ${cityName}` : ''}
+              {r.riding ? ' · on horseback' : ''}
+            </li>
+            {family && <li>{family}</li>}
+          </ul>
+          <section className="inspector-block" aria-label="Stats">
+            <div className="panel-head">
+              <h3>Stats</h3>
+              <span className="small muted">base + trained (cap)</span>
+            </div>
+            {STAT_NAMES.map((s) => {
+              const { base, trained } = r.stats[s]
+              const cap = trainedCap(base)
+              return (
+                <div className="stat" key={s}>
+                  <span>{STAT_LABELS[s]}</span>
+                  <span className="stat-bar" aria-hidden="true">
+                    <span className="base" style={{ width: pct(base / STAT_SCALE) }} />
+                    <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
+                    <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
+                  </span>
+                  <span className="mono right">
+                    {base} + {trained} ({cap})
+                  </span>
+                </div>
+              )
+            })}
+          </section>
+          <section className="inspector-block" aria-label="Skills">
+            <h3>Skills</h3>
+            <div className="chips">
+              {skills.length === 0 && <span className="chip">None yet</span>}
+              {skills.map((s) => (
+                <span className="chip" key={s}>
+                  {SKILL_LABELS[s]}{' '}
+                  <span className="mono accent">{Math.floor(r.skills[s]! * 10) / 10}</span>
                 </span>
-                <span className="mono right">
-                  {base} + {trained} ({cap})
-                </span>
-              </div>
-            )
-          })}
-        </section>
-        <section className="inspector-block" aria-label="Skills">
-          <h3>Skills</h3>
-          <div className="chips">
-            {skills.length === 0 && <span className="chip">None yet</span>}
-            {skills.map((s) => (
-              <span className="chip" key={s}>
-                {SKILL_LABELS[s]}{' '}
-                <span className="mono accent">{Math.floor(r.skills[s]! * 10) / 10}</span>
-              </span>
-            ))}
-          </div>
-        </section>
-      </details>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+      {(orderError || tab === 'orders') && (
+        <p className="muted small" role="status">
+          {orderError
+            ? `Order turned down: ${orderError}`
+            : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
+        </p>
+      )}
     </SelectionCard>
   )
-}
-
-/** The key that started picking a tile, to name in the hint for cancelling. */
-const PICKING_KEYS: Record<Exclude<Picking, false>, string> = {
-  walk: ACTION_KEYS.walk,
-  drive: ACTION_KEYS.drive,
-  haul: 'Pick the other stop',
-  road: ACTION_KEYS.roadTo,
-  wall: ACTION_KEYS.wallTo,
-}
-
-/** What picking a tile does, said while the map waits for it. */
-const PICKING_HINTS: Record<Exclude<Picking, false>, string> = {
-  walk: 'Walks there.',
-  drive: 'Drives the carriage there.',
-  haul: 'The other stop of the haul route.',
-  road: `Builds road from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the stone carried; without more, the resident waits on the next site until someone delivers it.`,
-  wall: `Builds wall from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the wood carried, past tiles with a wall or gate; without more, the resident waits on the next site until someone delivers it.`,
 }
 
 /**
