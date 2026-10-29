@@ -67,6 +67,17 @@ describe('residentActivity', () => {
     ).toBe('walking')
     expect(residentActivity(resident(null))).toBeUndefined()
   })
+
+  it('reads riding from a rider on the way, even with a load, but not from one standing', () => {
+    const ride = (order: ResidentOrder | null, carried: Resident['carried'] = {}) =>
+      residentActivity({ ...resident(order, carried), riding: 'h' })
+    const walk: ResidentOrder = { kind: 'walkTo', target: { x: 9, y: 9 }, path: null, progress: 0 }
+    expect(ride(walk)).toBe('riding')
+    expect(ride(walk, { wood: 4 })).toBe('riding')
+    expect(ride(null)).toBeUndefined()
+    expect(ride(null, { wood: 4 })).toBe('carrying')
+    expect(ride({ kind: 'tearDown', buildingId: 'b', at: { x: 3, y: 4 } })).toBe('working')
+  })
 })
 
 describe('tileFigures', () => {
