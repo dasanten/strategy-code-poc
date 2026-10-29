@@ -11,6 +11,7 @@ import {
   HORSE_START_AGE_MAX,
   HORSE_START_AGE_MIN,
   horseAgeInYears,
+  horsesIn,
   type TerrainMap,
 } from '@csp/shared'
 import { createAdmin } from './auth.js'
@@ -134,7 +135,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(51)
+    expect(WORLD_FORMAT_VERSION).toBe(52)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -157,6 +158,26 @@ describe('world saves', () => {
     r.scriptParams = { 1: { home: world.buildings[0]!.id } }
     const migrated = migrateWorld(structuredClone(world), 50, { terrain }, migrations, 51)
     expect(migrated).toEqual(world)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps the progress of breedings under way, with their stable (migration 51 → 52)', () => {
+    const { world, terrain } = worldWithCity()
+    const stable = world.buildings.find((b) => b.kind === 'stable')!
+    const [a, b] = horsesIn(world.horses, stable)
+    const [breeder, idle] = world.residents
+    // A format 51 breeder, partway to a foal; the progress was the order's alone.
+    breeder!.x = stable.x
+    breeder!.y = stable.y
+    const at = { x: stable.x, y: stable.y }
+    const horseIds: [string, string] = [a!.id, b!.id]
+    breeder!.order = { kind: 'breed', stableId: stable.id, horseIds, at, progress: 40 }
+    idle!.order = null
+    const migrated = migrateWorld(structuredClone(world), 51, { terrain }, migrations, 52)
+    const kept = migrated.buildings.find((x) => x.id === stable.id)!.breedings
+    expect(kept).toEqual([{ horseIds, progress: 40 }])
+    expect(migrated.residents.find((r) => r.id === breeder!.id)!.order).toEqual(breeder!.order)
+    expect(migrated.buildings.filter((x) => x.breedings).length).toBe(1)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

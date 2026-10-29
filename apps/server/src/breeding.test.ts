@@ -8,6 +8,7 @@ import {
   STABLE_BREED_TICKS,
   STABLE_CAPACITY,
   Terrain,
+  breedingPair,
   type Building,
   type Horse,
   type HorseStats,
@@ -17,7 +18,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { foalStats } from './breeding.js'
 import { eventsFor } from './events.js'
-import { breedOrdersSound, checkInvariants } from './invariants.js'
+import { breedOrdersSound, checkInvariants, keptBreedingsSound } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { endRealm } from './survival.js'
@@ -120,37 +121,66 @@ describe('breeding horses', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('stops, and loses its progress, when the resident leaves', () => {
-    const { world, w1 } = setup()
+  it('pauses when the resident leaves, and carries on where it stopped when they come back', () => {
+    const { world, stable, w1 } = setup()
+    const half = STABLE_BREED_TICKS / 2
     order(world, breedH1H2)
-    steps(world, STABLE_BREED_TICKS / 2)
+    steps(world, half)
     w1.x = 2
     steps(world, 1)
     expect(w1.order).toBeNull()
+    // The stable keeps the pair's progress while nobody tends them.
+    expect(stable.breedings).toEqual([{ horseIds: ['h1', 'h2'], progress: half }])
+    steps(world, 20)
+    expect(stable.breedings).toEqual([{ horseIds: ['h1', 'h2'], progress: half }])
+    expect(checkInvariants(world, terrain)).toEqual([])
     w1.x = 9
-    order(world, breedH1H2)
-    steps(world, STABLE_BREED_TICKS / 2 + 1)
+    // Picked the other way round, it is the same pair.
+    expect(order(world, { ...breedH1H2, horseIds: ['h2', 'h1'] })).toBeUndefined()
+    expect(w1.order).toMatchObject({ kind: 'breed', progress: half })
+    steps(world, half - 1)
     expect(world.horses).toHaveLength(2)
-    expect(w1.order).toMatchObject({ kind: 'breed', progress: STABLE_BREED_TICKS / 2 + 1 })
+    expect(checkInvariants(world, terrain)).toEqual([])
+    steps(world, 1)
+    expect(world.horses).toHaveLength(3)
+    // Born, the foal takes the progress with it.
+    expect(stable.breedings).toBeUndefined()
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('stops when the resident is given another order', () => {
-    const { world, w1 } = setup()
+  it('pauses when the resident is given another order; another resident carries on with the pair', () => {
+    const { world, stable, w1 } = setup()
     order(world, breedH1H2)
     steps(world, 10)
     expect(order(world, { kind: 'walkTo', residentId: 'w1', x: 2, y: 2 })).toBeUndefined()
     expect(w1.order?.kind).toBe('walkTo')
     steps(world, STABLE_BREED_TICKS)
     expect(world.horses).toHaveLength(2)
+    expect(stable.breedings).toEqual([{ horseIds: ['h1', 'h2'], progress: 10 }])
+    const w2 = newResident(mulberry32(2), { id: 'w2', owner: 'r1', x: 8, y: 9, tick: 0 })
+    w2.carried = { food: 50 }
+    world.residents.push(w2)
+    expect(order(world, { ...breedH1H2, residentId: 'w2' })).toBeUndefined()
+    expect(w2.order).toMatchObject({ kind: 'breed', progress: 10 })
+    steps(world, STABLE_BREED_TICKS - 11)
+    expect(world.horses).toHaveLength(2)
+    steps(world, 1)
+    expect(world.horses).toHaveLength(3)
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('stops when a horse leaves or dies, or the stable has no room left', () => {
+  it('loses its progress when a horse leaves the stable or dies, tended or not', () => {
     const left = setup()
     order(left.world, breedH1H2)
     steps(left.world, 10)
     left.world.horses[1]!.x = 2
     steps(left.world, 1)
     expect(left.w1.order).toBeNull()
+    expect(left.stable.breedings).toBeUndefined()
+    // Back in the stable, the pair starts over.
+    left.world.horses[1]!.x = 10
+    order(left.world, breedH1H2)
+    expect(left.w1.order).toMatchObject({ progress: 0 })
 
     const died = setup()
     order(died.world, breedH1H2)
@@ -159,13 +189,33 @@ describe('breeding horses', () => {
     died.world.horses.pop()
     steps(died.world, 1)
     expect(died.w1.order).toBeNull()
+    expect(died.stable.breedings).toBeUndefined()
 
-    const full = setup()
-    order(full.world, breedH1H2)
-    steps(full.world, 10)
-    for (let i = 2; i < STABLE_CAPACITY; i++) horse(full.world, `x${i}`, 9, 9)
-    steps(full.world, 1)
-    expect(full.w1.order).toBeNull()
+    // Paused, the progress goes all the same when a horse leaves.
+    const paused = setup()
+    order(paused.world, breedH1H2)
+    steps(paused.world, 10)
+    paused.w1.x = 2
+    steps(paused.world, 1)
+    expect(paused.stable.breedings).toHaveLength(1)
+    paused.world.horses[0]!.x = 3
+    steps(paused.world, 1)
+    expect(paused.stable.breedings).toBeUndefined()
+    expect(checkInvariants(paused.world, terrain)).toEqual([])
+  })
+
+  it('pauses while the stable has no room left, and goes on once there is', () => {
+    const { world, stable, w1 } = setup()
+    order(world, breedH1H2)
+    steps(world, 10)
+    for (let i = 2; i < STABLE_CAPACITY; i++) horse(world, `x${i}`, 9, 9)
+    steps(world, 5)
+    expect(w1.order).toMatchObject({ kind: 'breed', progress: 10 })
+    expect(stable.breedings).toEqual([{ horseIds: ['h1', 'h2'], progress: 10 }])
+    expect(checkInvariants(world, terrain)).toEqual([])
+    world.horses.find((h) => h.id === 'x2')!.x = 2
+    steps(world, 1)
+    expect(w1.order).toMatchObject({ kind: 'breed', progress: 11 })
   })
 
   it('needs an adult at a finished stable, and two fed horses of the realm in it with room for a foal', () => {
@@ -224,6 +274,24 @@ describe('breeding horses', () => {
     }
   })
 
+  it('is reported when a stable keeps progress for horses not in it, of two owners or past a foal', () => {
+    const { world, stable } = setup()
+    horse(world, 'h3', 9, 9, AVERAGE_HORSE_STATS, 'r2')
+    stable.breedings = [
+      { horseIds: ['h1', 'h2'], progress: STABLE_BREED_TICKS },
+      { horseIds: ['h2', 'h1'], progress: 3 },
+      { horseIds: ['h1', 'gone'], progress: 3 },
+      { horseIds: ['h1', 'h3'], progress: 3 },
+    ]
+    const messages = keptBreedingsSound.check(world, terrain).map((v) => v.message)
+    expect(messages).toEqual([
+      expect.stringMatching(/progress \d+ of/),
+      expect.stringMatching(/twice/),
+      expect.stringMatching(/not both alive in it/),
+      expect.stringMatching(/different owners/),
+    ])
+  })
+
   it('is reported when it breeds a horse not in the stable, the same horse twice or past a foal', () => {
     const { world, w1 } = setup()
     w1.order = {
@@ -268,6 +336,39 @@ describe('the Breed horses task', () => {
     // Done, the script ended itself: the breeder stands idle.
     expect(w1.script).toBeUndefined()
     expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('carries on first with a pair whose breeding the stable kept, if both are still fed', () => {
+    const task = {
+      kind: 'task',
+      task: 'breed',
+      residentId: 'w1',
+      stableId: 's1',
+      horseIds: ['h1', 'h3'],
+    }
+    const { world, stable, w1 } = setup()
+    horse(world, 'h3', 9, 9)
+    stable.breedings = [{ horseIds: ['h1', 'h2'], progress: 100 }]
+    expect(breedingPair(world, stable, { realmId: 'r1' })?.map((h) => h.id)).toEqual(['h1', 'h2'])
+    const tasks = defaultScripts(terrain, [me])
+    expect(order(world, task, new OrderQueue(tasks.kinds, terrain))).toBeUndefined()
+    expect(w1.script).toMatchObject({ memory: { stableId: 's1', horseIds: ['h1', 'h2'] } })
+    for (let t = 0; t < 3; t++) {
+      expect(tasks.runAll(world)).toEqual([])
+      stepWorld(world, terrain)
+    }
+    expect(w1.order).toMatchObject({ kind: 'breed', horseIds: ['h1', 'h2'] })
+    expect(stable.breedings).toEqual([{ horseIds: ['h1', 'h2'], progress: w1.order!.progress }])
+    expect((w1.order as { progress: number }).progress).toBeGreaterThan(100)
+
+    // A hungry horse in the kept pair: the two picked instead.
+    const hungry = setup()
+    horse(hungry.world, 'h3', 9, 9)
+    hungry.stable.breedings = [{ horseIds: ['h1', 'h2'], progress: 100 }]
+    hungry.world.horses[1]!.hunger = 0
+    const kinds = defaultScripts(terrain, [me]).kinds
+    expect(order(hungry.world, task, new OrderQueue(kinds, terrain))).toBeUndefined()
+    expect(hungry.w1.script).toMatchObject({ memory: { horseIds: ['h1', 'h3'] } })
   })
 
   it('is turned down away from the stable or with horses that can’t breed', () => {

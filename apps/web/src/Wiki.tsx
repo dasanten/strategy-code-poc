@@ -408,9 +408,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -889,11 +889,15 @@ export function Wiki() {
           Horses don't breed on their own. A grown resident standing at a finished stable is given
           Breed horses and picks two fed horses of their realm in it; they tend them for{' '}
           {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
-          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. Breeding stops,
-          and starts over from nothing, when the resident leaves or is given another order, when a
-          horse leaves or dies, or when the stable has no room left for the foal. The Breed horses
-          default first takes {num(BREED_FOOD)} Food from the stable for the resident's meals, if
-          they carry less. NPC cities have one of their residents breed their horses the same way.
+          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. The progress
+          belongs to the two horses, and the stable keeps it: breeding pauses when the resident
+          leaves or is given another order, or while the stable has no room left for the foal, and
+          any grown resident who breeds there later carries on with that pair first, where it
+          stopped, if both are still fed. The stable's card shows a paused breeding and how far
+          along it is. The progress is lost only when one of the two leaves the stable or dies. The
+          Breed horses default first takes {num(BREED_FOOD)} Food from the stable for the resident's
+          meals, if they carry less. NPC cities have one of their residents breed their horses the
+          same way.
         </p>
         <h3>Horse stats</h3>
         <p>

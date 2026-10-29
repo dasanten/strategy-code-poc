@@ -18,6 +18,7 @@ import {
   STABLE_BREED_TICKS,
   STABLE_CAPACITY,
   breedersAt,
+  keptBreeding,
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
@@ -651,6 +652,30 @@ export function daysToFoals(stable: Building, residents: readonly SeenResident[]
 }
 
 /**
+ * Lines for the breedings a stable keeps that nobody in sight is tending (`CONTEXT.md`:
+ * Breeding): how far along each is, then its two horses (`horseDetail`).
+ */
+export function pausedBreedingLines(
+  stable: Building,
+  residents: readonly SeenResident[],
+  horses: readonly SeenHorse[],
+  tick: number | undefined,
+): string[] {
+  const tended = breedersAt(residents, stable).flatMap((r) =>
+    r.order?.kind === 'breed' ? [keptBreeding(stable, r.order.horseIds)] : [],
+  )
+  return (stable.breedings ?? [])
+    .filter((k) => !tended.includes(k))
+    .flatMap((k) => {
+      const pair = k.horseIds.map((id) => horses.find((h) => h.id === id))
+      return [
+        `Breeding paused: ${Math.floor((k.progress / STABLE_BREED_TICKS) * 100)}% of the way to a foal`,
+        ...pair.flatMap((h) => (h ? [`· ${horseDetail(h, tick)}`] : [])),
+      ]
+    })
+}
+
+/**
  * The card for a tile: named after the most important thing on it (a building or site, then a
  * carriage, goods on the ground, a resource node, strangers), with a line for everything there.
  * Where no building is in sight but the Player remembers one, the card is named after that, says
@@ -722,6 +747,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
+      if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))

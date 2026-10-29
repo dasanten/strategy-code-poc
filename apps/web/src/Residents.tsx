@@ -64,6 +64,8 @@ import {
   STABLE_BREED_TICKS,
   breedProblem,
   horsesIn,
+  keptBreeding,
+  keptPair,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
@@ -1864,7 +1866,8 @@ function TearDownBlock({
 
 /**
  * Breeding (`CONTEXT.md`: Breeding): pick two of the Player's horses in the stable on the
- * resident's tile for them to breed, or see how far their breeding has come.
+ * resident's tile for them to breed, or see how far their breeding has come. A pair whose
+ * breeding the stable kept comes first (`keptPair`): it is picked, with how far along it is.
  */
 function BreedBlock({
   resident,
@@ -1887,9 +1890,12 @@ function BreedBlock({
   const own = horsesIn(horses, stable).filter((h) => h.realmId === realmId)
   const o = resident.order
   const breeding = o?.kind === 'breed' && o.stableId === stable.id ? o : undefined
-  const pair = picked.length === 2 ? ([picked[0]!, picked[1]!] as [string, string]) : undefined
   // The Player knows how their own horses fare (`CONTEXT.md`: Seeing how someone fares).
   const seen = { horses: horses.filter(horseFaresKnown), residents }
+  const kept = breeding ? undefined : keptPair(seen, stable, { realmId }, resident)
+  const keptShare = kept ? keptBreeding(stable, kept)!.progress / STABLE_BREED_TICKS : 0
+  const chosen = kept ?? picked
+  const pair = chosen.length === 2 ? ([chosen[0]!, chosen[1]!] as [string, string]) : undefined
   const problem = !canWork(resident, tick)
     ? 'children can’t breed horses'
     : pair
@@ -1910,19 +1916,27 @@ function BreedBlock({
           share={breeding.progress / STABLE_BREED_TICKS}
         />
       )}
+      {kept && (
+        <>
+          <Meter label="Paused" value={pct(keptShare)} share={keptShare} />
+          <p className="muted small">
+            The stable kept this pair&apos;s breeding: they carry on with it first.
+          </p>
+        </>
+      )}
       <p className="muted small">
         Tending two fed horses for {STABLE_BREED_DAYS} game days brings a foal with their average
-        stats, give or take {FOAL_STAT_SPREAD}. It stops, and starts over, if the resident or a
-        horse leaves.
+        stats, give or take {FOAL_STAT_SPREAD}. If the resident leaves, the stable keeps how far the
+        two have come; it is lost if one of them leaves the stable or dies.
       </p>
       {own.length === 0 && <p className="muted small">No horses of yours in this stable.</p>}
       {own.map((h) => (
         <label key={h.id} className="small" style={{ display: 'block' }}>
           <input
             type="checkbox"
-            checked={picked.includes(h.id)}
+            checked={chosen.includes(h.id)}
             onChange={() => toggle(h.id)}
-            disabled={!!breeding}
+            disabled={!!breeding || !!kept}
           />{' '}
           {horseDetail(h, tick)}
         </label>
@@ -1934,7 +1948,7 @@ function BreedBlock({
           title={problem}
           onClick={() => pair && onBreed(stable.id, pair)}
         >
-          {breeding ? 'Breeding…' : 'Breed these two'}
+          {breeding ? 'Breeding…' : kept ? 'Carry on with these two' : 'Breed these two'}
         </button>
       </div>
       {!breeding && pair && problem && <p className="muted small">{problem}</p>}
