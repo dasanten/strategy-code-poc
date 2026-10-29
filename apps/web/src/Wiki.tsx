@@ -1375,6 +1375,11 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
           <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
         </ul>
+        <p>
+          To debug a script, open the Script tab of a resident or army running it: it shows the
+          script's memory and params as they are now, changing every tick. You can't change memory
+          there. Only you see the memory of your scripts; a large one is shown cut.
+        </p>
       </Section>
 
       <Section id="examples">

@@ -324,3 +324,15 @@
   align-items: center;
   gap: 4px;
 }
+/* A running script's memory on the Script tab: a quiet, read-only tree. */
+.memory-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.memory-name {
+  color: var(--ui-muted);
+}

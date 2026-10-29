@@ -20,7 +20,7 @@ import { OrderQueue } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { SightTracker } from './sight.js'
 import { dieAll } from './survival.js'
-import { attachRealtime } from './realtime.js'
+import { attachRealtime, scriptMemoryFor } from './realtime.js'
 import { TerritoryTracker } from './territory.js'
 import { cityTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
@@ -117,7 +117,7 @@ function connect(
     }
     throw new Error(`no ${type} message`)
   }
-  return { socket, next }
+  return { socket, next, messages }
 }
 
 describe('realtime', () => {
@@ -346,6 +346,70 @@ describe('realtime', () => {
       'hungry',
     ])
   })
+  it('sends the memory of a watched script to the Player running it, and to nobody else', async () => {
+    const { url, token, db, userId, world, realtime } = await start()
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const daniel = connect(url, token)
+    const mara = connect(url, createSession(db, other.id))
+    await daniel.next('welcome')
+    await mara.next('welcome')
+    const realm = realmOf(world, userId)!
+    const worker = world.residents.find((r) => r.owner === realm.id)!
+    worker.script = { scriptId: 1, memory: { n: 1, at: { x: 3, y: 4 } } }
+    const watch = { type: 'watch', ids: [worker.id] }
+
+    // Opening the Script tab brings the memory at once.
+    daniel.socket.send(JSON.stringify(watch))
+    expect(await daniel.next('scriptMemory')).toEqual({
+      type: 'scriptMemory',
+      id: worker.id,
+      memory: { n: 1, at: { x: 3, y: 4 } },
+    })
+    // Another Player watching the same resident learns nothing of it.
+    mara.socket.send(JSON.stringify(watch))
+    expect(await mara.next('scriptMemory')).toEqual({
+      type: 'scriptMemory',
+      id: worker.id,
+      memory: null,
+    })
+
+    // An answered order shows the server got to everything sent before it.
+    const settle = async (c: ReturnType<typeof connect>) => {
+      c.socket.send(JSON.stringify({ type: 'order', requestId: 's', order: { kind: 'fly' } }))
+      await c.next('rejected')
+    }
+    const memorySent = (c: ReturnType<typeof connect>) =>
+      c.messages.filter((m) => m.type === 'scriptMemory')
+
+    // Every tick it changed, it goes out again; unchanged, it doesn't.
+    worker.script.memory = { n: 2, at: { x: 3, y: 4 } }
+    realtime.broadcastTick()
+    expect(await daniel.next('scriptMemory')).toMatchObject({ memory: { n: 2 } })
+    realtime.broadcastTick()
+    await settle(daniel)
+    await settle(mara)
+    expect(memorySent(daniel)).toEqual([])
+    expect(memorySent(mara)).toEqual([])
+
+    // Closing the tab stops it.
+    daniel.socket.send(JSON.stringify({ type: 'watch', ids: [] }))
+    await settle(daniel)
+    worker.script.memory = { n: 3 }
+    realtime.broadcastTick()
+    await settle(daniel)
+    expect(memorySent(daniel)).toEqual([])
+
+    // An army's script the same way: only for its own realm.
+    const army = { id: 'army-1', name: 'Guard', realmId: realm.id, memberIds: [worker.id] }
+    world.armies.push({ ...army, order: null, script: { scriptId: 1, memory: { k: 1 } } })
+    expect(scriptMemoryFor(world, realm.id, army.id)).toEqual({ k: 1 })
+    expect(scriptMemoryFor(world, realmOf(world, other.id)!.id, army.id)).toBeNull()
+  })
+
   it('tells a Player how their Leader died and what became of their cities, then starts them afresh', async () => {
     const { url, token, userId, world, realtime, territory, violations } = await start()
     const first = connect(url, token)

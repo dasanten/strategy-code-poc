@@ -11,6 +11,7 @@ import type {
   Horse,
   Pile,
   RealmEvent,
+  ScriptMemory,
   SeenArmy,
   SeenCaravan,
   SeenResident,
@@ -162,6 +163,13 @@ export type ServerMessage =
       leaderId?: string
       realmName?: string
     }
+  /**
+   * The memory of the script run by a resident or army whose Script tab the Player has open
+   * (`CONTEXT.md`: Debugging a script): once when they start watching it, then whenever it
+   * changed after a tick. Only for the Player running the script; null while it runs none of
+   * theirs.
+   */
+  | { type: 'scriptMemory'; id: string; memory: ScriptMemory | null }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }
 
@@ -173,6 +181,15 @@ export type ClientMessage =
    * `foundingProblem`) or the welcome.
    */
   | { type: 'found'; requestId: string; realmName: string; leaderName: string }
+  /**
+   * The residents and armies whose cards show their Script tab now, replacing those before: the
+   * server sends their script's memory (`scriptMemory`) while they are watched, at most
+   * `SCRIPT_WATCH_MAX` of them.
+   */
+  | { type: 'watch'; ids: string[] }
+
+/** The most residents and armies one client may watch the script memory of at once. */
+export const SCRIPT_WATCH_MAX = 4
 
 export const WS_PATH = '/ws'
 export const SESSION_COOKIE = 'csp_session'

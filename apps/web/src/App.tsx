@@ -79,6 +79,7 @@ import {
   type ActionId,
 } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
+import { ScriptMemoryTree } from './ScriptMemory.js'
 import { ScriptParamFields } from './ScriptParams.js'
 import { paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
 import { faresKnown, loadKnown } from './seen.js'
@@ -114,7 +115,7 @@ function Pages() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, founding, status, sendOrder, found } = useWorld(onLoggedOut)
+  const { world, founding, status, sendOrder, found, memories, watchScript } = useWorld(onLoggedOut)
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
@@ -606,6 +607,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             pickError={armyError}
             scripts={scripts}
             sendOrder={sendOrder}
+            scriptMemory={(id) => (
+              <ScriptMemoryTree id={id} memory={memories.get(id)} watch={watchScript} />
+            )}
           />,
         )}
       {world &&
@@ -901,6 +905,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   }}
                   onNumber={(name, value) => void setScriptParam(name, value)}
                   onClear={(name) => void setScriptParam(name, null)}
+                />
+              )
+            }
+            scriptMemory={
+              selected.script && (
+                <ScriptMemoryTree
+                  id={selected.id}
+                  memory={memories.get(selected.id)}
+                  watch={watchScript}
                 />
               )
             }
