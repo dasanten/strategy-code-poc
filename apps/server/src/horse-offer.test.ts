@@ -1,7 +1,18 @@
+import { parse, run } from '@csp/lang'
 import { describe, expect, it } from 'vitest'
-import { HORSE_GRANT_FOOD, HORSE_GRANT_HORSES, isAt, pileAt, type WorldState } from '@csp/shared'
+import {
+  HORSE_GRANT_FOOD,
+  HORSE_GRANT_HORSES,
+  SCRIPT_API,
+  SCRIPT_MAX_CALL_DEPTH,
+  isAt,
+  pileAt,
+  type WorldState,
+} from '@csp/shared'
 import { checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
+import { bindScript } from './script-bindings.js'
+import { entitiesInSight } from './sight.js'
 import { foundStartingCity, realmOf } from './starting-city.js'
 import { dieAll } from './survival.js'
 import { worldWithPost } from './test-terrain.js'
@@ -122,5 +133,44 @@ describe('the Horse offer', () => {
     const { world, terrain } = setup()
     world.horseOffersClaimed = [1, 1]
     expect(checkInvariants(world, terrain).map((v) => v.invariant)).toEqual(['horse-offers-once'])
+  })
+})
+
+describe('the Horse offer from a script', () => {
+  it('is in the script API, claims as the order does and leaves the script running', () => {
+    expect(SCRIPT_API.some((b) => b.name === 'claimHorses' && b.is === 'action')).toBe(true)
+    const { world, terrain } = setup()
+    const realm = realmOf(world, 1)!
+    const r = world.residents.find((x) => x.owner === realm.id && x.id !== realm.leaderId)!
+    r.script = { scriptId: 1, memory: {} }
+    const memory: { answer?: unknown } = {}
+    const script = () => {
+      const { globals, requests } = bindScript({
+        world,
+        terrain,
+        sender: player,
+        residentId: r.id,
+        memory,
+        seen: () => entitiesInSight(world, terrain, realm.id),
+        explored: () => true,
+      })
+      run(parse('memory.answer = claimHorses()'), {
+        globals,
+        steps: 10_000,
+        maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      })
+      return requests
+    }
+    const requests = script()
+    expect(memory.answer).toBeNull()
+    expect(requests).toEqual([{ kind: 'claimHorses', residentId: r.id }])
+    const queue = new OrderQueue(undefined, terrain)
+    expect(queue.receive(world, player, 'q', requests[0]).type).toBe('ack')
+    queue.applyAll(world)
+    expect(world.horseOffersClaimed).toEqual([1])
+    expect(r.script).toBeDefined()
+
+    expect(script()).toEqual([])
+    expect(memory.answer).toBe('you have claimed your horses already')
   })
 })
