@@ -1028,6 +1028,7 @@ export function ResidentCard({
     riding: r.riding !== undefined,
     horseToRide: !!horseToRide,
     aboard: r.aboard !== undefined,
+    driving: r.order?.kind === 'drive' || r.order?.kind === 'haul',
     carriageToBoard: !!carriageToBoard,
     carrying: !!r.carrying,
     carries: carried.length > 0,

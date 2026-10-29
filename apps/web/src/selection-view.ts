@@ -182,6 +182,8 @@ export interface ResidentHere {
   riding?: boolean
   /** They are aboard a carriage, and can get off (`CONTEXT.md`: Passenger). */
   aboard?: boolean
+  /** They drive a carriage, so they can't board one (`CONTEXT.md`: Passenger). */
+  driving?: boolean
   /** A carriage of their realm on their tile, to board (`CONTEXT.md`: Passenger). */
   carriageToBoard?: boolean
   /** A horse of their realm on their tile that pulls no carriage and nobody rides, to mount. */
@@ -226,11 +228,13 @@ export function residentActions(h: ResidentHere): CardAction[] {
   if (h.busy) add(row('stop', 'Stop'))
   if (h.riding) add(row('ride', 'Dismount'))
   else if (h.horseToRide) add(row('ride', 'Mount horse'))
-  // Children ride along too; a rider gets off their horse first (`CONTEXT.md`: Passenger).
+  // Children ride along too; a rider gets off their horse first, and the driver stays the driver
+  // (`CONTEXT.md`: Passenger).
   if (h.aboard) add(row('board', 'Get off'))
   else if (h.carriageToBoard) {
-    const riding = h.riding ? { disabled: true as const, reason: 'dismount first to board' } : {}
-    add(row('board', 'Board carriage', riding))
+    const reason = h.driving ? 'the driver can’t board' : h.riding ? 'dismount first to board' : ''
+    const refused = reason ? { disabled: true as const, reason } : {}
+    add(row('board', 'Board carriage', refused))
   }
   if (h.carriage && h.adult) {
     // A rider doesn't drive (`CONTEXT.md`: Riding).
@@ -317,6 +321,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   walk: 'move',
   stop: 'move',
   ride: 'move',
+  board: 'move',
   drive: 'move',
   haul: 'move',
   work: 'work',

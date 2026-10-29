@@ -225,6 +225,9 @@ describe('the actions on a resident’s card', () => {
     expect(board({ carriageToBoard: true, riding: true })).toEqual([
       expect.objectContaining({ disabled: true, reason: 'dismount first to board' }),
     ])
+    expect(board({ carriageToBoard: true, driving: true })).toEqual([
+      expect.objectContaining({ disabled: true, reason: 'the driver can’t board' }),
+    ])
     expect(board({ aboard: true, carriageToBoard: true }).map((a) => a.label)).toEqual(['Get off'])
   })
 
