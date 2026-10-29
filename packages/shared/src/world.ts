@@ -1605,6 +1605,11 @@ export interface Building {
    * keeps the city it was laid out for, until that city is gone.
    */
   cityId: string | null
+  /**
+   * The realm an outpost storage belongs to (`CONTEXT.md`: Outpost storage): finished storages
+   * of no city only, and only those a realm has. A city that takes it in drops it.
+   */
+  realmId?: string
   x: number
   y: number
   /** Goods kept here; storages, warehouses and stables only. */

@@ -16,6 +16,7 @@ import {
   DIAGONAL_STEP,
   DOING_MAX_LENGTH,
   ageInYears,
+  buildingRealm,
   directivesFor,
   materialsNeeded,
   organizationLabel,
@@ -152,13 +153,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   let sees: ((at: { x: number; y: number }) => boolean) | undefined
   const inSight = (at: { x: number; y: number }) =>
     side !== undefined && (sees ??= context.sees ?? sightOf(world, terrain.size, side))(at)
-  // A building of one of the side's own cities, which it knows of in sight or not.
+  // A building of one of the side's own cities, or an outpost storage of its realm, which it
+  // knows of in sight or not.
   const ownBuilding = (b: Building) =>
     side !== undefined &&
-    b.cityId !== null &&
-    (sender.npcCityId !== undefined
-      ? b.cityId === side
-      : world.cities.some((c) => c.id === b.cityId && c.realmId === side))
+    (sender.npcCityId !== undefined ? b.cityId === side : buildingRealm(world, b) === side)
   // A script reads, never changes, the memory of its own Player's residents (`CONTEXT.md`:
   // Memory); other Players' stays hidden.
   let ownScripts: Map<string, RunningScript> | undefined

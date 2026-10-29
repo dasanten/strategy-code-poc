@@ -754,6 +754,13 @@ export const FOOD_PER_DAY = 0.5
 export const HOME_FOOD_LOW = 1
 
 /**
+ * How many tiles from an outpost storage's footprint, along each direction, a resident of its
+ * realm still takes a meal from it when running low (`CONTEXT.md`: Refilling at an outpost
+ * storage): enough for the workers of a mine or farm built right beside it.
+ */
+export const OUTPOST_REFILL_REACH = 3
+
+/**
  * A resident's own food (`CONTEXT.md`: Own food), in units: four game days of meals. Putting goods
  * away leaves it in their hands unless the Player asks for an exact amount (`putAwayUnits`); NPC
  * residents always keep it, so nobody walks to the storage for the food they carry anyway.

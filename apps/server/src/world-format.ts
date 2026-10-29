@@ -14,7 +14,7 @@ import { grantHorses } from './horse-grant.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 49
+export const WORLD_FORMAT_VERSION = 50
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -92,10 +92,14 @@ export const migrations: Record<number, MigrationStep> = {
     grantHorses(world, ctx.terrain)
     return world
   },
+  // Outpost storages belong to a realm (`CONTEXT.md`: Outpost storage, `Building.realmId`). A
+  // storage of no city from before has no record of the city it last belonged to, so it stays
+  // ownerless and the step leaves the world as it is.
+  48: (state) => state,
   // Scripts see exactly their script views (`CONTEXT.md`: Script view; ADR 0011), and a breaking
   // change to one goes in the realm log of each Player whose scripts read the field. None was
   // told of yet, so the server tells them of the switch to views itself at its next start.
-  48: (state) => ({ ...(state as object), scriptViewChanges: 0 }),
+  49: (state) => ({ ...(state as object), scriptViewChanges: 0 }),
 }
 
 export class WorldFormatError extends Error {}
