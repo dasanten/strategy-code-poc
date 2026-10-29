@@ -408,9 +408,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -469,7 +469,8 @@ export function Wiki() {
         </ul>
         <p>
           Those who can't take an order are skipped, and the card says who and why: children don't
-          work, build, store or fetch; a partner carrying a child doesn't work or build.
+          work or build, and store or fetch only Food; a partner carrying a child doesn't work or
+          build.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
@@ -602,11 +603,13 @@ export function Wiki() {
           paired, and their city has free housing and a food surplus, one partner carries the child
           for {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
           {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a child is grown after{' '}
-          {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Stats
-          decline from age {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below{' '}
-          {pct(DECLINE_FLOOR)}; residents die of old age between {num(LIFESPAN_MIN)} and{' '}
-          {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs
-          up to {num(MAX_HEALTH)}.
+          {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Until
+          grown, a child walks but doesn't work, build, tear down, drive or pair, and of all goods
+          handles only Food: they pick it up, put it down, fetch and store it like anyone, so they
+          can carry their meals. Stats decline from age {num(DECLINE_AGE)} by{' '}
+          {pct(DECLINE_PER_YEAR)} a year, never below {pct(DECLINE_FLOOR)}; residents die of old age
+          between {num(LIFESPAN_MIN)} and {num(LIFESPAN_MAX)}. A house holds{' '}
+          {num(HOUSING_ROOM.house ?? 0)} residents; health runs up to {num(MAX_HEALTH)}.
         </p>
       </Section>
 

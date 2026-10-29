@@ -48,7 +48,7 @@ import {
 import type { Covered } from './map/camera.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
-import { appendRequest, editRequest, STORE_ALL, useShiftHeld } from './queue-view.js'
+import { appendRequest, editRequest, storeAll, useShiftHeld } from './queue-view.js'
 import { useSavedGroups } from './saved-groups.js'
 import { groupRequests, type GroupOrder, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES } from './map/palette.js'
@@ -905,7 +905,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               )
             }
             onStore={async () =>
-              setOrderError(await giveOrder({ ...STORE_ALL, residentId: selected.id }))
+              setOrderError(
+                await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
+              )
             }
             onEditQueue={async (steps, loop) =>
               setOrderError(await sendOrder(editRequest(selected, steps, loop)))

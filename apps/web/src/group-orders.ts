@@ -1,6 +1,7 @@
 import {
   CARRYING_A_CHILD,
   GOODS,
+  canHandle,
   canWork,
   isAt,
   wrap,
@@ -13,7 +14,7 @@ import {
   type ScriptSummary,
   type Stock,
 } from '@csp/shared'
-import { appendRequests } from './queue-view.js'
+import { appendRequests, storeAll } from './queue-view.js'
 
 /**
  * One command for a group (`CONTEXT.md`: Group): the orders the group card offers, each sent to
@@ -57,8 +58,8 @@ const carriedGoods = (stock: Stock): Good[] => GOODS.filter((g) => (stock[g] ?? 
 
 /**
  * Why a resident of the group can't take the order, if they can't (`CONTEXT.md`: Child,
- * Carrying): children don't work, build, store or fetch; a partner carrying a child doesn't work
- * or build; Work is tile-bound, so only those standing at the workplace take it. Walking, running
+ * Carrying): children don't work or build, and fetch only Food; a partner carrying a child doesn't
+ * work or build; Work is tile-bound, so only those standing at the workplace take it. Walking, running
  * a script and stopping go to everyone. Queued (Shift held), Work also goes to those away from
  * the workplace, who walk there first, and Store to those carrying nothing yet. A number param
  * goes to those running a script that has it.
@@ -74,8 +75,9 @@ export function groupSkip(
     return r.script && order.scriptIds.includes(r.script.scriptId)
       ? undefined
       : `runs no script with ${order.name}`
-  const tasks = ['work', 'build', 'store', 'fetch']
+  const tasks = ['work', 'build']
   if (tasks.includes(order.kind) && !canWork(r as Resident, tick)) return 'a child'
+  if (order.kind === 'fetch' && !canHandle(r as Resident, tick, [order.good])) return 'a child'
   if ((order.kind === 'work' || order.kind === 'build') && r.carrying) return CARRYING_A_CHILD
   if (queued) return undefined
   if (order.kind === 'work' && !isAt(r, order.workplace, size))
@@ -176,7 +178,10 @@ export function groupRequests(
         break
       case 'store':
         // Everything they carry to the nearest storage; their own food stays in their hands.
-        send(r, { kind: 'store', goods: queued ? [...GOODS] : carriedGoods(r.carried) })
+        send(r, {
+          kind: 'store',
+          goods: queued ? storeAll(r, tick).goods : carriedGoods(r.carried),
+        })
         break
       case 'fetch':
         send(r, { kind: 'fetch', goods: [order.good] })
