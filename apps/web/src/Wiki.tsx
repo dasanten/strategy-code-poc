@@ -53,6 +53,8 @@ import {
   STARVE_DAYS,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
+  GET_FOOD_AT,
+  GET_FOOD_TAKE,
   FORMER_PLAYER_STANDING,
   GAME_DAYS_PER_YEAR,
   GOOD_WEIGHT,
@@ -621,12 +623,13 @@ export function Wiki() {
           a far workplace keeps its workers fed.
         </p>
         <p>
-          Far from home, a resident working, building or tearing down can go and get food on their
-          own: set <code>foodAt</code> and <code>foodTake</code> on their card, in units of Food.
-          Below <code>foodAt</code> on them, they walk to their storage (or the nearest one of your
-          realm with Food), take Food up to <code>foodTake</code> and go back. Whenever they are at
-          a storage anyway, their own food is topped up to <code>foodTake</code> instead of{' '}
-          {num(OWN_FOOD)}. Unset, they don't go on their own.
+          Far from home, a resident working, building or tearing down goes and gets food on their
+          own. Below <code>foodAt</code> units of Food on them ({num(GET_FOOD_AT)} unless you set
+          it on their card), they walk to their storage (or the nearest one of your realm with
+          Food), take Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and go
+          back. Whenever they are at a storage anyway, their own food is topped up to{' '}
+          <code>foodTake</code> instead of {num(OWN_FOOD)}. With <code>foodAt</code> set to 0 they
+          don't go on their own and rely on refilling.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -653,11 +656,11 @@ export function Wiki() {
           carries a full load to the nearest storage of their realm.
         </p>
         <p>
-          With <code>foodAt</code> set, a worker who carries less Food than that leaves work for
-          their <code>storage</code>, or the nearest storage of your realm with Food, takes Food up
-          to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes back. With no Food
-          anywhere they work on. With <code>foodTake</code> set, carrying a load tops their food up
-          to it too.
+          A worker who carries less Food than <code>foodAt</code> ({num(GET_FOOD_AT)} unless set)
+          leaves work for their <code>storage</code>, or the nearest storage of your realm with
+          Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes
+          back. With no Food anywhere they work on. Carrying a load tops their food up to{' '}
+          <code>foodTake</code> too. <code>foodAt</code> 0 turns this off.
         </p>
         <table>
           <thead>
@@ -788,11 +791,12 @@ export function Wiki() {
           resource nodes, and a new town hall founds a city.
         </p>
         <p>
-          With <code>foodAt</code> set, a resident building or tearing down who carries less Food
-          than that goes to their <code>source</code>, or the nearest storage of your realm with
-          Food, takes Food up to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes
-          back to the site. With no Food anywhere they work on. With <code>foodTake</code> set,
-          fetching materials tops their food up to it too, before the materials.
+          A resident building or tearing down who carries less Food than <code>foodAt</code>{' '}
+          ({num(GET_FOOD_AT)} unless set) goes to their <code>source</code>, or the nearest storage
+          of your realm with Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)}{' '}
+          unless set) and comes back to the site. With no Food anywhere they work on. Fetching
+          materials tops their food up to <code>foodTake</code> too, before the materials.{' '}
+          <code>foodAt</code> 0 turns this off.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
@@ -1365,8 +1369,9 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             nearest storage; a source picked that holds none of what the site lacks is left alone,
             and they just build. The Tear down default has <code>source</code>: where Food comes
             from. The Work, Build and Tear down defaults also have the <code>number</code> params{' '}
-            <code>foodAt</code> and <code>foodTake</code> for getting food, in units of Food (a
-            resident eats about {num(foodEatenPerDay())} a game day).
+            <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0 turns it off) and{' '}
+            <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food, in units of Food
+            (a resident eats about {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>

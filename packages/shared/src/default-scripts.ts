@@ -9,8 +9,9 @@
  */
 import {
   BREED_FOOD,
+  GET_FOOD_AT,
+  GET_FOOD_TAKE,
   HORSE_FOOD_PER_DAY,
-  OWN_FOOD,
   STABLE_FEED_DAYS,
   WORK_FOOD_KEPT,
 } from './balance.js'
@@ -58,14 +59,16 @@ export interface DefaultScript {
 
 /**
  * Getting food (`CONTEXT.md`: Getting food), shared by the Work, Build and Tear down defaults,
- * which declare the number params `foodAt` and `foodTake` and `let ownFood`. `getFood(from,
- * near)` fetches Food below `foodAt` units on me, up to `foodTake` (or `ownFood`), at `from`
+ * which declare the number params `foodAt` and `foodTake` with defaults (`FOOD_PARAMS`).
+ * `getFood(from, near)` fetches Food below `foodAt` units on me, up to `foodTake`, at `from`
  * while it holds Food, else at the nearest storage of my realm with Food from `near`; true once
- * I set off. `foodToTake()` is the Food that tops me up to `foodTake`, 0 while it is unset.
+ * I set off. `foodToTake()` is the Food that tops me up to `foodTake`.
  */
-const GET_FOOD = `// The Food that tops me up to params.foodTake, in whole units; 0 unset.
+const FOOD_PARAMS = `param foodAt: number = ${GET_FOOD_AT} // get Food below this many units on me; 0 never
+param foodTake: number = ${GET_FOOD_TAKE} // units of Food to take along`
+
+const GET_FOOD =`// The Food that tops me up to params.foodTake, in whole units.
 fn foodToTake() {
-  if (params.foodTake == null) { return 0 }
   let food = 0
   if (me.carried.food != null) { food = me.carried.food }
   let units = params.foodTake - food
@@ -73,17 +76,14 @@ fn foodToTake() {
   return units - units % 1
 }
 
-// Below params.foodAt units of Food on me: fetch Food up to params.foodTake,
-// or my usual own food, at from while it holds Food, else at the nearest
-// storage of my realm with Food from near. True once I set off.
+// Below params.foodAt units of Food on me: fetch Food up to params.foodTake
+// at from while it holds Food, else at the nearest storage of my realm with
+// Food from near. True once I set off.
 fn getFood(from, near) {
-  if (params.foodAt == null) { return false }
   let food = 0
   if (me.carried.food != null) { food = me.carried.food }
   if (food >= params.foodAt) { return false }
-  let take = params.foodTake
-  if (take == null) { take = ownFood }
-  let units = take - food
+  let units = params.foodTake - food
   units = units - units % 1
   if (units < 1) { return false }
   let at = from
@@ -111,15 +111,13 @@ export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
 // a full load, one of us, picked at random, stores it in params.storage, or
 // the nearest storage of my realm while none is picked, and comes back. At a
 // smithy, memory.makes says what to make. Meals come from the workplace's
-// pile on their own, without an order. With params.foodAt set, below that
-// many units of Food on me I get Food up to params.foodTake (or my usual own
-// food) at params.storage, or the nearest storage of my realm with Food, and
-// come back; with foodTake set, storing a load tops my food up to it too.
+// pile on their own, without an order. Below params.foodAt units of Food on
+// me I get Food up to params.foodTake at params.storage, or the nearest
+// storage of my realm with Food, and come back; storing a load tops my food
+// up to foodTake too. foodAt 0 turns getting food off.
 param storage: storage // where the output goes
-param foodAt: number // get Food below this many units on me
-param foodTake: number // units of Food to take along
+${FOOD_PARAMS}
 let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
-let ownFood = ${OWN_FOOD} // units of Food on me while foodTake is unset
 
 // Where the workplace is, kept for when it is out of sight.
 let place = building(memory.workplaceId)
@@ -200,14 +198,12 @@ memory.carry = {storageId: to.id, goods: goods}
 // While the site lacks materials, one of us building it, picked at random,
 // fetches a load of what is missing from params.source, or the nearest
 // storage of my realm that holds it while none is picked, and brings it
-// back. With none there we just build. With params.foodAt set, below that
-// many units of Food on me I get Food up to params.foodTake (or my usual own
-// food) at params.source, or the nearest storage of my realm with Food, and
-// come back; with foodTake set, fetching materials tops my food up to it too.
+// back. With none there we just build. Below params.foodAt units of Food on
+// me I get Food up to params.foodTake at params.source, or the nearest
+// storage of my realm with Food, and come back; fetching materials tops my
+// food up to foodTake too. foodAt 0 turns getting food off.
 param source: storage // where materials come from; a carriage too
-param foodAt: number // get Food below this many units on me
-param foodTake: number // units of Food to take along
-let ownFood = ${OWN_FOOD} // units of Food on me while foodTake is unset
+${FOOD_PARAMS}
 if (memory.stuck) { return }
 if (me.order != null && me.order.kind != "build") { return } // on my way
 
@@ -329,14 +325,11 @@ if (me.order == null || me.order.kind != "haul") {
   tearDown: {
     name: 'Tear down',
     source: `// Tear down (default): tear down memory.buildingId, the building or site
-// I stand on, until it is gone; then end. With params.foodAt set, below that
-// many units of Food on me I get Food up to params.foodTake (or my usual own
-// food) at params.source, or the nearest storage of my realm with Food, and
-// come back.
+// I stand on, until it is gone; then end. Below params.foodAt units of Food
+// on me I get Food up to params.foodTake at params.source, or the nearest
+// storage of my realm with Food, and come back. foodAt 0 turns it off.
 param source: storage // where Food comes from; a carriage too
-param foodAt: number // get Food below this many units on me
-param foodTake: number // units of Food to take along
-let ownFood = ${OWN_FOOD} // units of Food on me while foodTake is unset
+${FOOD_PARAMS}
 if (memory.stuck) { return }
 
 // Getting food: on my way, then back to the tile I tear down from.
