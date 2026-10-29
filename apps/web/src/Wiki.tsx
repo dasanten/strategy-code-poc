@@ -404,6 +404,12 @@ export function Wiki() {
           long-press does what right-click does. Turn on Select to make a one-finger drag box a
           group instead of panning.
         </p>
+        <p>
+          On a phone the card sits at the bottom of the screen. Drag its handle to show just its
+          header, half the screen or all of it; a tap on the handle goes one step up. While an
+          order waits for a target the card drops to its header. The menu button at the top left
+          opens the drawers, your goods, the wiki and Log out.
+        </p>
         <table>
           <thead>
             <tr>
