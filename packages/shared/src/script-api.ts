@@ -178,7 +178,7 @@ const SHARED: readonly ScriptBinding[] = [
  * at the top of a script, read as `params.name`, picked per resident on their card. The same
  * types as `PARAM_TYPES` in `@csp/lang`.
  */
-export const SCRIPT_PARAM_TYPES = ['building', 'storage'] as const
+export const SCRIPT_PARAM_TYPES = ['building', 'storage', 'number'] as const
 export type ScriptParamType = (typeof SCRIPT_PARAM_TYPES)[number]
 
 export function isScriptParamType(value: unknown): value is ScriptParamType {
@@ -189,6 +189,12 @@ export function isScriptParamType(value: unknown): value is ScriptParamType {
 export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
   building: 'One of my realm’s buildings or construction sites.',
   storage: 'One of my realm’s storages or stables, or one of its carriages.',
+  number: 'A whole number of zero or more, typed in.',
+}
+
+/** Whether a value fits a `number` param: a whole number of zero or more. */
+export function isParamNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
 /** A script's `param` line. */
@@ -261,8 +267,8 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('drop', ['spot', 'goods'], 'Put carried goods down at a spot on my tile.'),
   action(
     'store',
-    ['goods', 'to?'],
-    'Walk to `to` (a storage, a stable or a carriage of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like ["wood"] for all I carry of them (Food beyond my own food). My order is "store" until done; then `me.orderEnded` says how it ended.',
+    ['goods', 'to?', 'ownFood?'],
+    'Walk to `to` (a storage, a stable or a carriage of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like ["wood"] for all I carry of them (Food beyond my own food). `ownFood`, units of Food, is the own food to keep and top up to instead of the usual. My order is "store" until done; then `me.orderEnded` says how it ended.',
   ),
   action(
     'fetch',

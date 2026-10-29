@@ -157,10 +157,16 @@ export interface ScriptMemory {
   [key: string]: MemoryValue
 }
 
-/** A resident's picked script parameter values: script id → param name → building or carriage id. */
+/**
+ * A resident's picked script parameter values: script id → param name → building or carriage
+ * id, or the whole number typed for a `number` param.
+ */
 export interface ScriptParamValues {
-  [scriptId: string]: { [name: string]: string }
+  [scriptId: string]: { [name: string]: ScriptParamValue }
 }
+
+/** A picked script parameter value: a building or carriage id, or a whole number of zero or more. */
+export type ScriptParamValue = string | number
 
 /**
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
@@ -200,7 +206,7 @@ export interface SeenScript {
    * The values picked for its params, by name (`Resident.scriptParams`); only for the realm
    * running it.
    */
-  params?: { [name: string]: string }
+  params?: { [name: string]: ScriptParamValue }
 }
 
 /**
@@ -279,6 +285,11 @@ export interface StoreOrder {
   goods: GoodsWanted
   to: GoodsPlace
   phase: 'walking' | 'putting' | 'refilling'
+  /**
+   * The Food the resident keeps on them and tops up to at a storage with Food, in units; absent
+   * for `OWN_FOOD` (`CONTEXT.md`: Getting food).
+   */
+  ownFood?: number
   /** While walking, the tiles still to walk; null while the path is being found. */
   path: [number, number][] | null
   progress: number

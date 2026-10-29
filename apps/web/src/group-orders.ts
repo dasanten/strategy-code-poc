@@ -10,6 +10,7 @@ import {
   type Good,
   type OrderRequest,
   type Resident,
+  type ScriptSummary,
   type Stock,
 } from '@csp/shared'
 import { appendRequests } from './queue-view.js'
@@ -26,6 +27,11 @@ export type GroupOrder =
   | { kind: 'fetch'; good: Good }
   | { kind: 'runScript'; scriptId: number }
   | { kind: 'stop' }
+  /**
+   * Sets a number param (`CONTEXT.md`: Script parameter), or clears it with null, for each one
+   * running one of `scriptIds`, the scripts that declare it.
+   */
+  | { kind: 'setNumber'; name: string; value: number | null; scriptIds: readonly number[] }
 
 /** A resident the order wasn't sent to, or that the server turned down, and why. */
 export interface Skipped {
@@ -54,7 +60,8 @@ const carriedGoods = (stock: Stock): Good[] => GOODS.filter((g) => (stock[g] ?? 
  * Carrying): children don't work, build, store or fetch; a partner carrying a child doesn't work
  * or build; Work is tile-bound, so only those standing at the workplace take it. Walking, running
  * a script and stopping go to everyone. Queued (Shift held), Work also goes to those away from
- * the workplace, who walk there first, and Store to those carrying nothing yet.
+ * the workplace, who walk there first, and Store to those carrying nothing yet. A number param
+ * goes to those running a script that has it.
  */
 export function groupSkip(
   order: GroupOrder,
@@ -63,6 +70,10 @@ export function groupSkip(
   size: number,
   queued = false,
 ) {
+  if (order.kind === 'setNumber')
+    return r.script && order.scriptIds.includes(r.script.scriptId)
+      ? undefined
+      : `runs no script with ${order.name}`
   const tasks = ['work', 'build', 'store', 'fetch']
   if (tasks.includes(order.kind) && !canWork(r as Resident, tick)) return 'a child'
   if ((order.kind === 'work' || order.kind === 'build') && r.carrying) return CARRYING_A_CHILD
@@ -176,9 +187,17 @@ export function groupRequests(
       case 'stop':
         send(r, { kind: 'stop' })
         break
+      case 'setNumber': {
+        const { name, value } = order
+        const scriptId = r.script!.scriptId
+        const set = value === null ? { targetId: null } : { value }
+        send(r, { kind: 'setScriptParam', scriptId, name, ...set })
+        break
+      }
     }
   }
-  if (!queued) return { requests, skipped }
+  // Setting a param is no step: it is given as it is, queued or not.
+  if (!queued || order.kind === 'setNumber') return { requests, skipped }
   const at = order.kind === 'work' ? order.workplace : undefined
   return { requests: appended(requests, residents, at), skipped }
 }
@@ -199,6 +218,26 @@ function appended(
     () => at && { x: at.x, y: at.y },
   )
   return requests.map((q, i) => ({ residentId: q.residentId, order: orders[i]! }))
+}
+
+/**
+ * The number params the group card can set (`CONTEXT.md`: Script parameter): each one declared
+ * by a script someone in the group runs, by name, with the scripts that declare it.
+ */
+export function groupNumberParams(
+  residents: readonly { script?: { scriptId: number } }[],
+  scripts: readonly Pick<ScriptSummary, 'id' | 'params'>[],
+): { name: string; scriptIds: number[] }[] {
+  const running = new Set(residents.flatMap((r) => (r.script ? [r.script.scriptId] : [])))
+  const byName = new Map<string, number[]>()
+  for (const s of scripts) {
+    if (!running.has(s.id)) continue
+    for (const p of s.params) {
+      if (p.type !== 'number') continue
+      byName.set(p.name, [...(byName.get(p.name) ?? []), s.id])
+    }
+  }
+  return [...byName].map(([name, scriptIds]) => ({ name, scriptIds }))
 }
 
 /** The line the group card shows once an order went out: how many it went to. */
