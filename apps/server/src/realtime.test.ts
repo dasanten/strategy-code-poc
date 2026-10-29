@@ -404,6 +404,21 @@ describe('realtime', () => {
     expect(await next('tick')).not.toHaveProperty('leaderId')
   })
 
+  it('offers the Player their horses on connect, and says once when they are claimed (Horse offer)', async () => {
+    const { url, token, world, realtime, userId } = await start()
+    const { next } = connect(url, token)
+    expect(await next('welcome')).toMatchObject({ horseOffer: true })
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('horseOffer')
+    world.horseOffersClaimed.push(userId)
+    realtime.broadcastTick()
+    expect(await next('tick')).toMatchObject({ horseOffer: false })
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('horseOffer')
+    const again = connect(url, token)
+    expect(await again.next('welcome')).toMatchObject({ horseOffer: false })
+  })
+
   it('sends the Player their alliance matters on connect, and again only when they change', async () => {
     const { url, token, world, realtime, orders } = await start()
     const { socket, next } = connect(url, token)

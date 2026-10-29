@@ -578,6 +578,11 @@ export interface WorldState {
    * told of in their realm logs; the server tells them of the rest at start.
    */
   scriptViewChanges: number
+  /**
+   * The account ids of the Players who claimed their Horse offer (`CONTEXT.md`: Horse offer):
+   * kept with the Player, not the realm, so a claim outlives a Leader death.
+   */
+  horseOffersClaimed: number[]
 }
 
 /**
@@ -1331,6 +1336,18 @@ export type RealmEventWhat =
    */
   | {
       kind: 'horsesGranted'
+      horseIds: string[]
+      where: 'stable' | 'storage' | 'leader'
+      city?: string
+      x: number
+      y: number
+    }
+  /**
+   * The Player claimed their Horse offer (`CONTEXT.md`: Horse offer): `horseIds` arrived where the
+   * Horse grant puts them (see `horsesGranted`).
+   */
+  | {
+      kind: 'horsesClaimed'
       horseIds: string[]
       where: 'stable' | 'storage' | 'leader'
       city?: string
