@@ -8,6 +8,7 @@ import {
   type BreedOrder,
   type Building,
   type Horse,
+  type KeptBreeding,
   type Resident,
   type Stock,
   type WorldState,
@@ -82,15 +83,47 @@ export function breedersAt<R extends Pick<Resident, 'order'>>(
   return residents.filter((r) => r.order?.kind === 'breed' && r.order.stableId === stable.id)
 }
 
+/** The breeding progress the stable keeps for the two horses, in either order, if it keeps any. */
+export function keptBreeding(
+  stable: Pick<Building, 'breedings'>,
+  horseIds: readonly string[],
+): KeptBreeding | undefined {
+  return stable.breedings?.find(
+    (k) => horseIds.includes(k.horseIds[0]) && horseIds.includes(k.horseIds[1]),
+  )
+}
+
+/**
+ * The pair a resident breeding at the stable carries on with first (`CONTEXT.md`: Breeding): of
+ * the pairs it keeps progress for, the furthest along that they can breed (`breedProblem`), so
+ * both still fed and nobody else tending either; undefined when there is none.
+ */
+export function keptPair(
+  world: Pick<WorldState, 'horses' | 'residents'>,
+  stable: Building,
+  owner: HorseOwner,
+  breeder: Pick<Resident, 'id'> | undefined,
+): [string, string] | undefined {
+  const kept = [...(stable.breedings ?? [])].sort((a, b) => b.progress - a.progress)
+  const k = kept.find((x) => !breedProblem(world, stable, owner, breeder, x.horseIds))
+  return k && [k.horseIds[0], k.horseIds[1]]
+}
+
 /**
  * Two fed horses of the owner's in a finished stable with room for a foal, which a resident there
- * can breed (`CONTEXT.md`: Breeding), or undefined when there are none.
+ * can breed (`CONTEXT.md`: Breeding), or undefined when there are none. A pair whose breeding the
+ * stable keeps comes first (`keptPair`).
  */
 export function breedingPair(
   world: Pick<WorldState, 'horses' | 'residents'>,
   stable: Building,
   owner: HorseOwner,
 ): [Horse, Horse] | undefined {
+  const kept = keptPair(world, stable, owner, undefined)
+  if (kept) {
+    const [a, b] = kept.map((id) => world.horses.find((h) => h.id === id)!)
+    return [a!, b!]
+  }
   const fed = horsesIn(world.horses, stable).filter((h) => ownsHorse(owner, h) && h.hunger > 0)
   const pair = fed.slice(0, 2)
   if (pair.length < 2) return undefined

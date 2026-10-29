@@ -17,6 +17,7 @@ import {
   stableAt,
   commands,
   isTask,
+  keptPair,
   type Good,
   type Task,
   type TaskMemory,
@@ -254,6 +255,23 @@ function asOrder(o: Partial<TaskRequest>): OrderRequest {
   return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
 }
 
+/**
+ * The task as the resident takes it up: for Breed horses (`CONTEXT.md`: Breeding), a pair whose
+ * breeding the stable keeps comes first (`keptPair`), when the resident can breed it, in place of
+ * the two picked.
+ */
+function withKeptPair(
+  world: WorldState,
+  o: Partial<TaskRequest>,
+  realmId: string | undefined,
+): Partial<TaskRequest> {
+  if (o.task !== 'breed' || realmId === undefined) return o
+  const stable = world.buildings.find((b) => b.id === o.stableId)
+  const r = world.residents.find((x) => x.id === o.residentId)
+  const kept = stable && r && keptPair(world, stable, { realmId }, r)
+  return kept ? { ...o, horseIds: kept } : o
+}
+
 /** The memory a task's default script starts from (`TaskMemory`), for resident `r`. */
 function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemory {
   switch (order.task) {
@@ -318,7 +336,8 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       return paramsProblem({ script: host.script }, world, realm.id, scriptId, o.params)
     },
     apply(world, sender, order) {
-      const o = order as TaskRequest
+      const realmId = realmOf(world, sender.userId)?.id
+      const o = withKeptPair(world, order as TaskRequest, realmId) as TaskRequest
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!r) return
       r.order = null
@@ -358,7 +377,7 @@ function taskProblem(
       return 'the target must be a tile'
     return buildAtProblem(world, r!, o.building, at as { x: number; y: number }, terrain)
   }
-  const built = asOrder(o)
+  const built = asOrder(withKeptPair(world, o, realm.id))
   const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)
   // Working there by a bare work-at order, as the starting residents do, they can still be
   // given the task; already running it there, they can't.

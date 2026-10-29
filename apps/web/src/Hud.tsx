@@ -460,3 +460,39 @@ export function CentredDialog({ title, children }: { title: string; children: Re
     </div>
   )
 }
+
+/** A small number as a capitalised word, for a sentence's start; larger ones stay digits. */
+const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six']
+
+/**
+ * The Horse offer's notice under the top bar (`CONTEXT.md`: Horse offer): shown while the Player
+ * may claim it; `onClaim` sends the claim and answers with the server's refusal, if any.
+ */
+export function HorseOfferNotice({
+  horses,
+  onClaim,
+}: {
+  horses: number
+  onClaim: () => Promise<string | undefined>
+}) {
+  const [busy, setBusy] = useState(false)
+  const [refused, setRefused] = useState<string>()
+  async function claim() {
+    setBusy(true)
+    const reason = await onClaim()
+    setRefused(reason)
+    // On success the notice goes once the server says the offer is claimed, a tick later.
+    if (reason) setBusy(false)
+  }
+  return (
+    <aside className="hud-offer" role="status">
+      <span>
+        {NUMBER_WORDS[horses] ?? horses} horses are waiting for you
+        {refused && <span className="hud-offer-refused"> — {refused}</span>}
+      </span>
+      <button type="button" disabled={busy} onClick={() => void claim()}>
+        Claim
+      </button>
+    </aside>
+  )
+}

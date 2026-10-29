@@ -24,6 +24,7 @@ import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
 import { handOver } from './leader.js'
 import { rename, renameCity } from './renaming.js'
+import { claimHorses } from './horse-grant.js'
 import { queueOrders } from './queues.js'
 
 /** Who sent an order: the Player's account and id. */
@@ -84,6 +85,7 @@ export const orderKinds: Record<string, OrderKind> = {
   handOver,
   rename,
   renameCity,
+  claimHorses,
   ...allianceOrders,
   ...armyOrders,
   ...contractOrders,
@@ -135,8 +137,9 @@ export class OrderQueue {
     this.pending = []
     for (const { sender, order } of batch) {
       // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
-      // script). Pairing, the Leader handover and renaming change nobody's order, so they leave
-      // scripts running too, as does picking a param value (`CONTEXT.md`: Script parameter).
+      // script). Pairing, the Leader handover, renaming and claiming the Horse offer change
+      // nobody's order, so they leave scripts running too, as does picking a param value
+      // (`CONTEXT.md`: Script parameter).
       // Editing a queue keeps its current step going (`CONTEXT.md`: Queue).
       const keeps = [
         'runScript',
@@ -144,6 +147,7 @@ export class OrderQueue {
         'handOver',
         'rename',
         'renameCity',
+        'claimHorses',
         'setScriptParam',
         'editQueue',
       ]

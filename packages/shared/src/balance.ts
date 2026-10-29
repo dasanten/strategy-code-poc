@@ -237,7 +237,7 @@ export const STABLE_CAPACITY = 6
 
 /**
  * Game days a resident tends two fed horses at a stable before a foal is born (`CONTEXT.md`:
- * Breeding). Breeding that stops before then starts over.
+ * Breeding). Breeding that pauses before then carries on where it stopped.
  */
 export const STABLE_BREED_DAYS = 10
 

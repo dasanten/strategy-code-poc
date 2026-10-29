@@ -56,6 +56,8 @@ export interface ClientWorld {
   diplomacy: Diplomacy
   /** The Region map over the Player's explored terrain; null until the server has one. */
   region: RegionState | null
+  /** Whether the Player may still claim their Horse offer (`CONTEXT.md`: Horse offer). */
+  horseOffer: boolean
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -135,6 +137,7 @@ export function useWorld(onLoggedOut: () => void) {
             events: msg.events,
             diplomacy: msg.diplomacy,
             region: msg.region && applyRegionMap(null, msg.region, msg.map.size),
+            horseOffer: msg.horseOffer,
             ...byKind(entities.values()),
             lastSeen: lastSeenByKind(remembered.values()),
           })
@@ -173,6 +176,7 @@ export function useWorld(onLoggedOut: () => void) {
               events,
               diplomacy,
               region,
+              horseOffer: msg.horseOffer ?? w.horseOffer,
             }
           })
         }
