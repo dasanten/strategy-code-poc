@@ -6,6 +6,7 @@ import {
   GOODS,
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
+  PASSENGER_WEIGHT,
   carriageCapacity,
   horseAgeInYears,
   horseFoodFactor,
@@ -480,6 +481,16 @@ export interface TileCard {
    * and what they saw of it then, shown apart from the lines about what is there now.
    */
   lastSeen?: { when: string; lines: string[] }
+  /**
+   * The carriage's passengers (`CONTEXT.md`: Passenger), written out on `lines[line]`: each by
+   * name, a link that picks them when they are the Player's to command (`pick`), and what they
+   * weigh together of what it holds.
+   */
+  passengers?: {
+    line: number
+    residents: { id: string; name: string; pick: boolean }[]
+    weight: string
+  }
 }
 
 /** What the Player sees on a tile, for the tile card. */
@@ -700,6 +711,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const lines: string[] = []
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
+  let passengers: TileCard['passengers']
   if (building) {
     const city = cityOf(building)
     // An outpost storage goes by its own realm (`CONTEXT.md`: Outpost storage).
@@ -774,10 +786,17 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
     card ??= { title: 'Carriage', rel, what: 'carriage' }
-    // Its load only when the Player sees inside (`CONTEXT.md`: Seeing inside a storage).
+    // Its passengers, as many as are in sight (they are on its tile, `CONTEXT.md`: Passenger).
+    const aboard = (carriage.passengerIds ?? []).flatMap((id) => {
+      const r = t.residents?.find((x) => x.id === id)
+      return r ? [{ id, name: r.name, pick: !t.strangers.some((s) => s.id === id) }] : []
+    })
+    const people = aboard.length * PASSENGER_WEIGHT
+    // Its load only when the Player sees inside (`CONTEXT.md`: Seeing inside a storage), its
+    // passengers counted in.
     const capacity = carriageCapacity(t, carriage)
     const load = carriage.load
-      ? `${Math.round(stockWeight(carriage.load))} / ${Math.round(capacity)} kg`
+      ? `${Math.round(stockWeight(carriage.load) + people)} / ${Math.round(capacity)} kg`
       : LOAD_LEVEL_NAMES[carriage.loadLevel]
     // How its horse fares only for the Player's own and allies' (`CONTEXT.md`: Seeing how someone fares).
     const horse = t.horses.find((h) => h.id === carriage.horseId)
@@ -793,6 +812,11 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     lines.push(
       `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${load}${horseText}`,
     )
+    if (aboard.length > 0) {
+      const weight = `${Math.round(people)} kg of it people`
+      passengers = { line: lines.length, residents: aboard, weight }
+      lines.push(`Passengers: ${aboard.map((p) => p.name).join(', ')} · ${weight}`)
+    }
     if (horse) {
       const parts = [`Horse: ${horseDetail(horse, t.tick)}`]
       if (fares) {
@@ -858,6 +882,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     }),
     lines,
     ...(buildHere ? { buildHere } : {}),
+    ...(passengers ? { passengers } : {}),
   }
 }
 

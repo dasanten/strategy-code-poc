@@ -435,6 +435,7 @@ export function ResidentsList({
   tick,
   scripts = [],
   buildings = [],
+  inSight = [],
   selectedId,
   onSelect,
 }: {
@@ -445,6 +446,8 @@ export function ResidentsList({
   scripts?: ScriptSummary[]
   /** The buildings in sight, to name where residents store or fetch goods. */
   buildings?: Building[]
+  /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
+  inSight?: readonly SeenResident[]
   selectedId: string | undefined
   onSelect: (id: string) => void
 }) {
@@ -491,8 +494,11 @@ export function ResidentsList({
                     {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
                   </span>
                   <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
-                  <span className="doing" title={doingLine(r, { scripts, buildings })}>
-                    {doingLine(r, { scripts, buildings })}
+                  <span
+                    className="doing"
+                    title={doingLine(r, { scripts, buildings, residents: inSight })}
+                  >
+                    {doingLine(r, { scripts, buildings, residents: inSight })}
                     {r.script && <small className="muted">{scriptName(r, scripts)}</small>}
                   </span>
                   <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
@@ -524,6 +530,7 @@ export function GroupCard({
   residents,
   scripts,
   buildings,
+  inSight = [],
   picking,
   onPicking,
   buildAt,
@@ -537,6 +544,8 @@ export function GroupCard({
   residents: Resident[]
   scripts: ScriptSummary[]
   buildings: Building[]
+  /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
+  inSight?: readonly SeenResident[]
   /** The map is waiting for a tile for the group's walk-to, work or build order. */
   picking: GroupPicking
   /** Starts (or cancels) picking a tile for the group. */
@@ -701,7 +710,8 @@ export function GroupCard({
           {card.rows.map((r) => (
             <li key={r.id}>
               <button type="button" onClick={() => onPick(r.id)}>
-                <strong>{r.name}</strong> · {doingLine(r, { scripts, buildings })}
+                <strong>{r.name}</strong> ·{' '}
+                {doingLine(r, { scripts, buildings, residents: inSight })}
               </button>
             </li>
           ))}
@@ -1057,7 +1067,7 @@ export function ResidentCard({
       title={r.name}
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
-        <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
+        <strong key="doing">{doingLine(r, { scripts, buildings, residents })}</strong>,
         `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
       ]}
       head={
@@ -1108,7 +1118,7 @@ export function ResidentCard({
         (r.queue && onEditQueue ? (
           <QueueBlock
             queue={r.queue}
-            doing={doingLine(r, { scripts, buildings })}
+            doing={doingLine(r, { scripts, buildings, residents })}
             scripts={scripts}
             buildings={buildings}
             onEdit={onEditQueue}

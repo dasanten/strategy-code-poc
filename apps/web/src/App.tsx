@@ -590,6 +590,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             leaderId={world.home.leaderId}
             scripts={scripts}
             buildings={world.buildings}
+            inSight={world.residents}
             tick={world.tick}
             selectedId={selected?.id}
             onSelect={(id) => {
@@ -783,6 +784,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               const order = { kind: 'renameCity', residentId: world.home.leaderId, cityId, name }
               setOrderError(await giveOrder(order))
             }}
+            onSelectResident={(id) => select([id])}
           />
         </CardSheet>
       )}
@@ -939,6 +941,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             residents={group}
             scripts={scripts}
             buildings={world.buildings}
+            inSight={world.residents}
             picking={groupPicking}
             onPicking={(p) => {
               setGroupPicking(p)
