@@ -1253,7 +1253,9 @@ export function Wiki() {
         <p>
           What a script gets of each kind of thing. Every field listed is always there; one you
           aren't allowed to see, or that doesn't apply, is <code>null</code>, as its last column
-          says. A script sees no other fields.
+          says. A script sees no other fields. The game may add fields at any time; when one is
+          renamed or removed, each Player whose scripts read it is told in their realm log, with the
+          field and the scripts.
         </p>
         {(
           Object.entries(SCRIPT_VIEWS) as [ScriptViewName, (typeof SCRIPT_VIEWS)[ScriptViewName]][]

@@ -16,7 +16,7 @@ import {
 import { checkInvariants } from './invariants.js'
 import { grantHorses } from './horse-grant.js'
 import { worldWithPost } from './test-terrain.js'
-import { migrateWorld } from './world-format.js'
+import { migrateWorld, migrations } from './world-format.js'
 
 /** A world where Player 1's realm has lost every horse: none stabled, hitched or ridden. */
 function withoutHorses() {
@@ -107,7 +107,7 @@ describe('the Horse grant (migration 47 → 48)', () => {
     const before = structuredClone(world)
     expect(world.horses.some((h) => h.realmId !== null)).toBe(true)
     expect(world.cities.some((c) => c.realmId === null)).toBe(true)
-    const migrated = migrateWorld(structuredClone(world), 47, { terrain })
+    const migrated = migrateWorld(structuredClone(world), 47, { terrain }, migrations, 48)
     expect(migrated).toEqual(before)
   })
 

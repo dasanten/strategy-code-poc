@@ -195,10 +195,10 @@ describe('script bindings', () => {
       memory,
     )
     expect(memory.storage).toMatchObject({ id: 's2', kind: 'storage' })
-    expect(memory.storage).not.toHaveProperty('stock')
+    expect(memory.storage).toHaveProperty('stock', null)
     expect(memory.b1).toMatchObject({ id: 'b1' })
-    expect(memory.b1).not.toHaveProperty('hunger')
-    expect(memory.b1).not.toHaveProperty('health')
+    expect(memory.b1).toHaveProperty('hunger', null)
+    expect(memory.b1).toHaveProperty('health', null)
     expect(memory.me).toBeTypeOf('number')
   })
 
@@ -238,7 +238,7 @@ describe('script bindings', () => {
     ]
     const memory: ScriptObject = {}
     runAs(world, explored, 'memory.ls = lastSeen()', memory)
-    expect(memory.ls).toEqual([
+    expect(memory.ls).toMatchObject([
       { is: 'building', ...house, seenAt: 4 },
       { is: 'city', ...city, seenAt: 4 },
     ])
