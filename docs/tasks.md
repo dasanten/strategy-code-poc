@@ -73,8 +73,9 @@ its tickets or closes.
   Bugs branch from `dev` and go straight back to it.
 - **PRs:** one per ticket; tickets that can't ship apart share one. The body says
   `Closes #<ticket>` for each and `Part of #<epic>`. Ticket PRs get no CI: the ticket session runs
-  `pnpm lint`, `pnpm typecheck` and `pnpm test`, and before merging into the epic branch the
-  coordinating session runs them again on the PR merged with the epic branch. Merging into a
+  `pnpm check origin/epic/<n>-<slug>` (lint, typecheck and the tests the change affects, ADR 0013),
+  and before merging into the epic branch the coordinating session runs it again on the PR merged
+  with the epic branch. PR bodies say "Checked: `pnpm check` against …" with what it ran. Merging into a
   non-default branch doesn't close the ticket, so whoever merges closes its tickets by hand.
 - **Epic PR:** when an epic's last ticket is on its branch, one PR `epic/<n>-…` → `dev` with
   `Closes #<epic>` runs CI and is merged once green; whoever merges closes the epic by hand.
