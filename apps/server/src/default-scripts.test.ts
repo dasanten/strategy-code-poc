@@ -195,7 +195,10 @@ describe('a Player’s default scripts', () => {
   it('are flagged when one following the game’s default doesn’t run it (ADR 0004)', () => {
     const id = workId()
     db.insert(schema.scriptVersions).values({ scriptId: id, version: 2, source: 'let x = 1' }).run()
-    db.update(schema.scripts).set({ activeVersion: 2 }).where(eq(schema.scripts.id, id)).run()
+    db.update(schema.scripts)
+      .set({ activeVersion: 2, latestVersion: 2 })
+      .where(eq(schema.scripts.id, id))
+      .run()
     expect(checkScriptLibrary(db)).toEqual([
       expect.objectContaining({ invariant: 'default-scripts-follow' }),
     ])

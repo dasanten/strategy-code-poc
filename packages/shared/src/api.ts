@@ -40,6 +40,7 @@ export type ApiErrorCode =
   | 'rate-limited'
   | 'script-has-errors'
   | 'default-script'
+  | 'active-version'
 
 export interface ApiError {
   error: ApiErrorCode
