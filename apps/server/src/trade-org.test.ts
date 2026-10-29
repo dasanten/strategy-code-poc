@@ -169,21 +169,28 @@ describe('the Trade Org HQ', () => {
     }
   })
 
-  it('left alone keeps itself fed over seven game weeks', () => {
-    const { world, terrain, city } = hq()
-    const walking = new Walking(terrain)
-    const people = world.residents.map((r) => r.id)
-    for (let t = 0; t < 49 * TICKS_PER_GAME_DAY; t++) {
-      stepWorld(world, terrain, walking)
-      if (world.tick % TICKS_PER_GAME_DAY === 0) expect(checkInvariants(world, terrain)).toEqual([])
-    }
-    // Starting ages and lifespans leave nobody to die of old age in seven weeks.
-    expect(world.residents.map((r) => r.id)).toEqual(expect.arrayContaining(people))
-    expect(storedFood(world, city)).toBeGreaterThan(0)
-    // Its workplaces on the nodes were worked too.
-    const goods = world.buildings.find((b) => b.kind === 'storage' && b.cityId === city.id)!.stock!
-    expect(goods.wood ?? 0).toBeGreaterThan(0)
-  }, 600_000)
+  it(
+    'left alone keeps itself fed over seven game weeks',
+    { tags: ['slow'], timeout: 600_000 },
+    () => {
+      const { world, terrain, city } = hq()
+      const walking = new Walking(terrain)
+      const people = world.residents.map((r) => r.id)
+      for (let t = 0; t < 49 * TICKS_PER_GAME_DAY; t++) {
+        stepWorld(world, terrain, walking)
+        if (world.tick % TICKS_PER_GAME_DAY === 0)
+          expect(checkInvariants(world, terrain)).toEqual([])
+      }
+      // Starting ages and lifespans leave nobody to die of old age in seven weeks.
+      expect(world.residents.map((r) => r.id)).toEqual(expect.arrayContaining(people))
+      expect(storedFood(world, city)).toBeGreaterThan(0)
+      // Its workplaces on the nodes were worked too.
+      const goods = world.buildings.find(
+        (b) => b.kind === 'storage' && b.cityId === city.id,
+      )!.stock!
+      expect(goods.wood ?? 0).toBeGreaterThan(0)
+    },
+  )
 })
 
 describe('placing the Trade Org HQ', () => {

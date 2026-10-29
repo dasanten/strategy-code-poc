@@ -12,10 +12,11 @@ day). Daniel won't raise the billing limit, so we run CI far less often.
 
 - **One branch per epic:** `epic/<n>-<slug>`, cut from `main` when the epic's first ticket
   starts. Ticket PRs target the epic branch, not `main`.
-- **Local checks decide whether a ticket merges.** The ticket session runs `pnpm lint`,
-  `pnpm typecheck` and `pnpm test` before opening its PR. Before merging a ticket PR into the epic branch, the
-  coordinating session brings it up to date with the epic branch and runs the same three
-  commands on the merged result; it merges only when all pass.
+- **Local checks decide whether a ticket merges.** The ticket session runs the local checks
+  before opening its PR. Before merging a ticket PR into the epic branch, the coordinating
+  session brings it up to date with the epic branch and runs them again on the merged result; it
+  merges only when they pass. Since ADR 0013 the local checks are `pnpm check <epic branch>`:
+  lint, typecheck and only the tests the change affects.
 - **One PR per epic into `main`,** opened when the epic's last ticket has landed on the epic
   branch. It closes the epic, runs CI, and is merged once CI is green. `main` (and with it the
   live game) changes once per epic.

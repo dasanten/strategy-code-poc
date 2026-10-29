@@ -124,16 +124,32 @@ interface Binding {
 class Scope {
   private readonly bindings = new Map<string, Binding>()
 
-  constructor(readonly parent: Scope | null) {}
+  /**
+   * `constants` are declared constant here when first looked up, not all at once: a run reads
+   * only a few of its many globals.
+   */
+  constructor(
+    readonly parent: Scope | null,
+    private readonly constants?: Readonly<Record<string, Value>>,
+  ) {}
 
   declare(name: string, value: Value, constant = false): boolean {
-    if (this.bindings.has(name)) return false
+    if (this.bindings.has(name) || (this.constants && Object.hasOwn(this.constants, name))) {
+      return false
+    }
     this.bindings.set(name, { value, constant })
     return true
   }
 
   lookup(name: string): Binding | undefined {
-    return this.bindings.get(name) ?? this.parent?.lookup(name)
+    const own = this.bindings.get(name)
+    if (own) return own
+    if (this.constants && Object.hasOwn(this.constants, name)) {
+      const binding = { value: this.constants[name]!, constant: true }
+      this.bindings.set(name, binding)
+      return binding
+    }
+    return this.parent?.lookup(name)
   }
 }
 
@@ -148,10 +164,7 @@ class Interpreter {
   constructor(options: RunOptions) {
     this.budget = options.steps
     this.maxCallDepth = options.maxCallDepth
-    this.globals = new Scope(null)
-    for (const [name, value] of Object.entries(options.globals)) {
-      this.globals.declare(name, value, true)
-    }
+    this.globals = new Scope(null, options.globals)
   }
 
   program(program: Program): void {
@@ -169,23 +182,24 @@ class Interpreter {
     this.steps += cost
   }
 
-  /** Counts one step for `node` and evaluates it one level deeper. */
-  private enter<T>(node: Position, evaluate: () => T): T {
+  /**
+   * Counts one step for `node` and goes one level deeper; `leave` comes back up. `statement` and
+   * `expression` do this around every node, with no closure, since they run for every node.
+   */
+  private enter(node: Position): void {
     this.step(node)
     if (++this.depth > MAX_EVALUATION_DEPTH) {
       throw new Failure('The script nests too deeply', node)
     }
-    try {
-      return evaluate()
-    } catch (error) {
-      // The JavaScript stack ran out before our own cap: report it the same way.
-      if (error instanceof RangeError && /call stack/i.test(error.message)) {
-        throw new Failure('The script nests too deeply', node)
-      }
-      throw error
-    } finally {
-      this.depth--
+  }
+
+  /** What `enter`'s caller rethrows for an error at `node`. */
+  private nested(error: unknown, node: Position): unknown {
+    // The JavaScript stack ran out before our own cap: report it the same way.
+    if (error instanceof RangeError && /call stack/i.test(error.message)) {
+      return new Failure('The script nests too deeply', node)
     }
+    return error
   }
 
   // --- statements ---
@@ -206,108 +220,126 @@ class Interpreter {
   }
 
   private statement(node: Statement, scope: Scope): void {
-    this.enter(node, () => {
-      switch (node.kind) {
-        case 'Let': {
-          const value = node.init ? this.expression(node.init, scope) : null
-          if (!scope.declare(node.name, value)) {
-            throw new Failure(`"${node.name}" is already declared here`, node)
-          }
-          return
+    this.enter(node)
+    try {
+      this.statementIn(node, scope)
+    } catch (error) {
+      throw this.nested(error, node)
+    } finally {
+      this.depth--
+    }
+  }
+
+  private statementIn(node: Statement, scope: Scope): void {
+    switch (node.kind) {
+      case 'Let': {
+        const value = node.init ? this.expression(node.init, scope) : null
+        if (!scope.declare(node.name, value)) {
+          throw new Failure(`"${node.name}" is already declared here`, node)
         }
-        case 'If': {
-          if (truthy(this.expression(node.test, scope))) this.statement(node.then, scope)
-          else if (node.else) this.statement(node.else, scope)
-          return
-        }
-        case 'While': {
-          while (truthy(this.expression(node.test, scope))) this.statement(node.body, scope)
-          return
-        }
-        case 'ForOf': {
-          const list = this.expression(node.list, scope)
-          if (!Array.isArray(list)) {
-            throw new Failure(`"for" needs a list, not ${describe(list)}`, node.list)
-          }
-          // A copy, so changing the list inside the loop doesn't change what it walks over.
-          for (const item of [...list]) {
-            const inner = new Scope(scope)
-            inner.declare(node.name, item)
-            this.statement(node.body, inner)
-          }
-          return
-        }
-        case 'FunctionDeclaration':
-          return // Declared when its block starts.
-        case 'Return':
-          throw new Return(node.value ? this.expression(node.value, scope) : null)
-        case 'Block':
-          this.statements(node.body, new Scope(scope))
-          return
-        case 'ExpressionStatement':
-          this.expression(node.expression, scope)
-          return
+        return
       }
-    })
+      case 'If': {
+        if (truthy(this.expression(node.test, scope))) this.statement(node.then, scope)
+        else if (node.else) this.statement(node.else, scope)
+        return
+      }
+      case 'While': {
+        while (truthy(this.expression(node.test, scope))) this.statement(node.body, scope)
+        return
+      }
+      case 'ForOf': {
+        const list = this.expression(node.list, scope)
+        if (!Array.isArray(list)) {
+          throw new Failure(`"for" needs a list, not ${describe(list)}`, node.list)
+        }
+        // A copy, so changing the list inside the loop doesn't change what it walks over.
+        for (const item of [...list]) {
+          const inner = new Scope(scope)
+          inner.declare(node.name, item)
+          this.statement(node.body, inner)
+        }
+        return
+      }
+      case 'FunctionDeclaration':
+        return // Declared when its block starts.
+      case 'Return':
+        throw new Return(node.value ? this.expression(node.value, scope) : null)
+      case 'Block':
+        this.statements(node.body, new Scope(scope))
+        return
+      case 'ExpressionStatement':
+        this.expression(node.expression, scope)
+        return
+    }
   }
 
   // --- expressions ---
 
   private expression(node: Expression, scope: Scope): Value {
-    return this.enter(node, () => {
-      switch (node.kind) {
-        case 'Number':
-        case 'String':
-        case 'Boolean':
-          return node.value
-        case 'Null':
-          return null
-        case 'Identifier': {
-          const binding = scope.lookup(node.name)
-          if (!binding) throw new Failure(`"${node.name}" is not defined`, node)
-          return binding.value
-        }
-        case 'List':
-          return node.items.map((item) => this.expression(item, scope))
-        case 'Object': {
-          const object: ScriptObject = Object.create(null) as ScriptObject
-          for (const property of node.properties) {
-            setOwn(object, property.key, this.expression(property.value, scope))
-          }
-          return object
-        }
-        case 'FunctionExpression':
-          return new ScriptFunction('', node.params, node.body, scope)
-        case 'Unary': {
-          const operand = this.expression(node.operand, scope)
-          if (node.operator === '!') return !truthy(operand)
-          if (typeof operand !== 'number') {
-            throw new Failure(`"-" needs a number, not ${describe(operand)}`, node)
-          }
-          return -operand
-        }
-        case 'Binary':
-          return this.binary(node, scope)
-        case 'Logical': {
-          const left = this.expression(node.left, scope)
-          if (node.operator === '&&' ? !truthy(left) : truthy(left)) return left
-          return this.expression(node.right, scope)
-        }
-        case 'Assign':
-          return this.assign(node, scope)
-        case 'Member':
-          return this.read(this.expression(node.object, scope), node.property, node)
-        case 'Index': {
-          const object = this.expression(node.object, scope)
-          return this.read(object, this.expression(node.index, scope), node)
-        }
-        case 'Call': {
-          const callee = this.expression(node.callee, scope)
-          const args = node.args.map((arg) => this.expression(arg, scope))
-          return this.call(callee, args, node)
-        }
+    this.enter(node)
+    try {
+      return this.expressionIn(node, scope)
+    } catch (error) {
+      throw this.nested(error, node)
+    } finally {
+      this.depth--
+    }
+  }
+
+  private expressionIn(node: Expression, scope: Scope): Value {
+    switch (node.kind) {
+      case 'Number':
+      case 'String':
+      case 'Boolean':
+        return node.value
+      case 'Null':
+        return null
+      case 'Identifier': {
+        const binding = scope.lookup(node.name)
+        if (!binding) throw new Failure(`"${node.name}" is not defined`, node)
+        return binding.value
       }
-    })
+      case 'List':
+        return node.items.map((item) => this.expression(item, scope))
+      case 'Object': {
+        const object: ScriptObject = Object.create(null) as ScriptObject
+        for (const property of node.properties) {
+          setOwn(object, property.key, this.expression(property.value, scope))
+        }
+        return object
+      }
+      case 'FunctionExpression':
+        return new ScriptFunction('', node.params, node.body, scope)
+      case 'Unary': {
+        const operand = this.expression(node.operand, scope)
+        if (node.operator === '!') return !truthy(operand)
+        if (typeof operand !== 'number') {
+          throw new Failure(`"-" needs a number, not ${describe(operand)}`, node)
+        }
+        return -operand
+      }
+      case 'Binary':
+        return this.binary(node, scope)
+      case 'Logical': {
+        const left = this.expression(node.left, scope)
+        if (node.operator === '&&' ? !truthy(left) : truthy(left)) return left
+        return this.expression(node.right, scope)
+      }
+      case 'Assign':
+        return this.assign(node, scope)
+      case 'Member':
+        return this.read(this.expression(node.object, scope), node.property, node)
+      case 'Index': {
+        const object = this.expression(node.object, scope)
+        return this.read(object, this.expression(node.index, scope), node)
+      }
+      case 'Call': {
+        const callee = this.expression(node.callee, scope)
+        const args = node.args.map((arg) => this.expression(arg, scope))
+        return this.call(callee, args, node)
+      }
+    }
   }
 
   private binary(node: BinaryExpression, scope: Scope): Value {

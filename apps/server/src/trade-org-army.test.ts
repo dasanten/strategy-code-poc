@@ -98,22 +98,26 @@ function run(world: WorldState, walking: Walking, ticks: number, until?: () => b
 const at = (world: WorldState, id: string) => world.residents.find((r) => r.id === id)!
 
 describe('the Trade Org army', () => {
-  it('is built by the HQ from its own adults and its goods warehouse', () => {
-    const { world, hq, walking } = setup()
-    const goods = world.buildings.find((b) => b.cityId === hq.id && b.stock?.wood !== undefined)!
-    goods.stock!.spear = 20
-    run(
-      world,
-      walking,
-      8 * TICKS_PER_GAME_DAY,
-      () => hqSoldiers(world).length >= TRADE_ORG_ARMY.size,
-    )
-    expect(hqSoldiers(world)).toHaveLength(TRADE_ORG_ARMY.size)
-    // It keeps enough at work: none of its soldiers works, and the rest still do.
-    const unarmed = hqPeople(world, hq).filter((r) => !isArmed(r))
-    expect(unarmed.length).toBeGreaterThanOrEqual(TRADE_ORG_ARMY.workers)
-    for (const r of hqSoldiers(world)) expect(r.order?.kind).not.toBe('workAt')
-  }, 120_000)
+  it(
+    'is built by the HQ from its own adults and its goods warehouse',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const { world, hq, walking } = setup()
+      const goods = world.buildings.find((b) => b.cityId === hq.id && b.stock?.wood !== undefined)!
+      goods.stock!.spear = 20
+      run(
+        world,
+        walking,
+        8 * TICKS_PER_GAME_DAY,
+        () => hqSoldiers(world).length >= TRADE_ORG_ARMY.size,
+      )
+      expect(hqSoldiers(world)).toHaveLength(TRADE_ORG_ARMY.size)
+      // It keeps enough at work: none of its soldiers works, and the rest still do.
+      const unarmed = hqPeople(world, hq).filter((r) => !isArmed(r))
+      expect(unarmed.length).toBeGreaterThanOrEqual(TRADE_ORG_ARMY.workers)
+      for (const r of hqSoldiers(world)) expect(r.order?.kind).not.toBe('workAt')
+    },
+  )
 
   it('arms no more than it can while keeping its workers', () => {
     const { world, hq, walking } = setup()
