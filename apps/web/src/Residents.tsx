@@ -726,7 +726,7 @@ export function GroupCard({
           {numberParams.length > 0 && (
             <section className="inspector-block" aria-label="Script params">
               <div className="script-params">
-                {numberParams.map(({ name, scriptIds }) => (
+                {numberParams.map(({ name, scriptIds, default: fallback }) => (
                   <div key={name} className="goods-row">
                     <span className="small">
                       <strong>{name}</strong> <span className="muted">(number)</span>
@@ -734,6 +734,7 @@ export function GroupCard({
                     <NumberField
                       name={name}
                       value={undefined}
+                      fallback={fallback}
                       onSet={(v) =>
                         onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
                       }

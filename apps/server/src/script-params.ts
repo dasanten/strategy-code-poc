@@ -62,7 +62,7 @@ export function paramValues(
   r: Resident,
   scriptId: number,
   params: readonly ScriptParam[],
-): { name: string; type: ScriptParamType; value?: ScriptParamValue }[] {
+): (ScriptParam & { value?: ScriptParamValue })[] {
   const picked = r.scriptParams?.[scriptId]
   if (picked) {
     for (const [name, value] of Object.entries(picked)) {

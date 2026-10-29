@@ -125,3 +125,9 @@ let n = twice(add(1, 2))`,
     text: `Every step counts against the budget (${SCRIPT_STEP_BUDGET} for each resident’s or army’s script a tick; see Scripting budgets). A script that runs out stops where it is, as with an error: what it asked for still happens and \`memory\` is kept, and your realm log says so. Calls nest at most ${SCRIPT_MAX_CALL_DEPTH} deep, and \`memory\` holds at most ${SCRIPT_MEMORY_MAX} characters of JSON, or that tick’s changes to it are dropped.`,
   },
 ]
+
+/** The Script parameters topic's example of a `number` param with a default. */
+export const PARAM_DEFAULT_EXAMPLE = `param rounds: number = 5
+if (memory.done == null) { memory.done = 0 }
+memory.done = memory.done + 1
+if (memory.done >= params.rounds) { end() }`

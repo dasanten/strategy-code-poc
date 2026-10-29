@@ -144,7 +144,12 @@ describe('group orders', () => {
       ['b', 'runs no script with foodAt'],
       ['c', 'runs no script with foodAt'],
     ])
-    const queued = groupRequests(order, rs, { tick: TICK, size: SIZE, free: everywhere, queued: true })
+    const queued = groupRequests(order, rs, {
+      tick: TICK,
+      size: SIZE,
+      free: everywhere,
+      queued: true,
+    })
     expect(queued.requests).toEqual(requests)
     const clear = send({ ...order, value: null }, rs).requests.map((q) => q.order)
     expect(clear).toEqual([
@@ -166,6 +171,24 @@ describe('group orders', () => {
     ]
     const rs = [{ script: { scriptId: 3 } }, { script: { scriptId: 4 } }, {}]
     expect(groupNumberParams(rs, scripts)).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
+  })
+
+  it('shows a number param’s default only when every script declares the same one', () => {
+    const foodAt = (d?: number) => ({
+      name: 'foodAt',
+      type: 'number' as const,
+      ...(d === undefined ? {} : { default: d }),
+    })
+    const rs = [{ script: { scriptId: 3 } }, { script: { scriptId: 4 } }]
+    const with3 = (other?: number) => [
+      { id: 3, params: [foodAt(3)] },
+      { id: 4, params: [foodAt(other)] },
+    ]
+    expect(groupNumberParams(rs, with3(3))).toEqual([
+      { name: 'foodAt', scriptIds: [3, 4], default: 3 },
+    ])
+    expect(groupNumberParams(rs, with3(5))).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
+    expect(groupNumberParams(rs, with3())).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
   })
 
   it('says how many the order went to', () => {

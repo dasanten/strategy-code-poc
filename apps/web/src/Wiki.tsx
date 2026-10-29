@@ -202,7 +202,7 @@ import {
 } from './wiki-view.js'
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
-import { SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
@@ -408,9 +408,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -1349,6 +1349,15 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             A param reads <code>null</code> while none is picked, and once the one picked is gone or
             no longer yours. A <code>number</code> param reads the number typed, or{' '}
             <code>null</code> while unset.
+          </li>
+          <li>
+            A <code>number</code> param may have a default: <code>= n</code> after its type, a whole
+            number of zero or more. Unset, it reads the default; the number typed wins over it, and
+            clearing the field goes back to it. Its field shows the default while unset. A{' '}
+            <code>building</code> or <code>storage</code> param can't have one.
+            <pre>
+              <code>{PARAM_DEFAULT_EXAMPLE}</code>
+            </pre>
           </li>
           <li>
             The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
