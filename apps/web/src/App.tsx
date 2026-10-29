@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } fro
 import {
   carriagePulledBy,
   holdersOf,
+  carriageOfResident,
   horseOfResident,
   riderOf,
   KEEPS_GOODS,
@@ -460,6 +461,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       : { kind: 'dismount', residentId: selected.id }
     setOrderError(await sendOrder(order))
   }
+  /**
+   * Orders the picked resident to board a carriage on their tile, or with none to get off the one
+   * they are aboard, onto its tile (`CONTEXT.md`: Passenger).
+   */
+  async function boardCarriage(carriageId?: string) {
+    if (!selected) return
+    const order = carriageId
+      ? { kind: 'board', residentId: selected.id, carriageId }
+      : { kind: 'getOff', residentId: selected.id }
+    setOrderError(await sendOrder(order))
+  }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
     if (!selected) return
@@ -800,6 +812,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               ),
             )}
             onRide={ride}
+            carriageToBoard={onTile(world.carriages.filter((k) => carriageOfResident(k, selected)))}
+            onBoard={boardCarriage}
             scripts={scripts}
             buildings={world.buildings}
             onRunScript={runScript}

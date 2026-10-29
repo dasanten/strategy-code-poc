@@ -19,6 +19,7 @@ import {
   CARAVAN_ESCORTS_MAX,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
+  PASSENGER_WEIGHT,
   CARRIAGE_MAX_CAPACITY,
   CARRY_BASE,
   CARRY_PER_STRENGTH,
@@ -408,9 +409,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -937,6 +938,19 @@ export function Wiki() {
           at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
           Driving makes riding faster. A rider carries no more than on foot, and can't drive a
           carriage; a ridden horse is never hitched.
+        </p>
+        <h3>Passengers</h3>
+        <p>
+          A resident standing on a carriage of their realm can <strong>Board</strong> it from their
+          card, children too; a rider dismounts first, and the driver can't board. Each passenger
+          counts as {num(PASSENGER_WEIGHT)} kg against what the carriage holds, so it carries goods,
+          people or a mix: a full carriage takes nobody more, and no goods while people fill it.
+          Aboard, they stop what they were doing, ride along wherever the carriage is driven, and
+          don't walk on their own. <strong>Get off</strong> puts them on the carriage's tile, or a
+          script's <code>getOff(x, y)</code> on a tile right next to it. Giving a passenger a walk,
+          or an order that acts on a tile (work, build, goods, fight and so on), gets them off first
+          and then goes on. Scripts see a resident's <code>aboard</code> and a carriage's{' '}
+          <code>passengerIds</code>.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}

@@ -1,6 +1,8 @@
 import {
   isWallOrGate,
   carriagePulledBy,
+  carriageOfResident,
+  PASSENGER_WEIGHT,
   horseOfResident,
   isLineOrder,
   LINE_BUILDING,
@@ -891,6 +893,49 @@ export const ridersOnHorses: Invariant = {
 }
 
 /**
+ * After a tick, a passenger's carriage exists, is of their realm and stands on their tile, and
+ * they neither drive nor ride; a carriage's goods and passengers together never weigh more than
+ * the strongest horse lets one hold (`CONTEXT.md`: Passenger; `stepPassengers` gets off those who
+ * can't stay aboard, and a carriage keeps its passengers when its horse dies).
+ */
+export const passengersAboard: Invariant = {
+  name: 'passengers-aboard',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (ids: string[], message: string) =>
+      out.push({ invariant: this.name, message, entityIds: ids })
+    const aboard = new Map<string, number>()
+    for (const r of world.residents) {
+      if (r.aboard === undefined) continue
+      aboard.set(r.aboard, (aboard.get(r.aboard) ?? 0) + 1)
+      const k = world.carriages.find((c) => c.id === r.aboard)
+      if (!k) {
+        fail([r.id], `resident ${r.id} is aboard ${r.aboard}, which doesn't exist`)
+        continue
+      }
+      if (k.x !== r.x || k.y !== r.y) {
+        fail(
+          [r.id, k.id],
+          `resident ${r.id} at (${r.x}, ${r.y}) is aboard carriage ${k.id} at (${k.x}, ${k.y})`,
+        )
+      }
+      if (!carriageOfResident(k, r)) {
+        fail([r.id, k.id], `resident ${r.id} is aboard carriage ${k.id} of another realm`)
+      }
+      if (drivenCarriageId(r) !== undefined) fail([r.id, k.id], `resident ${r.id} drives aboard`)
+      if (r.riding !== undefined) fail([r.id, k.id], `resident ${r.id} rides aboard`)
+    }
+    for (const k of world.carriages) {
+      const kg = stockWeight(k.load) + (aboard.get(k.id) ?? 0) * PASSENGER_WEIGHT
+      if (kg > CARRIAGE_MAX_CAPACITY + 1e-9) {
+        fail([k.id], `carriage ${k.id} holds ${kg} kg of goods and passengers, more than any can`)
+      }
+    }
+    return out
+  },
+}
+
+/**
  * After a tick, a driver stands on the carriage they drive, which exists, and is grown up; no
  * carriage has two drivers (`CONTEXT.md`: Carriage, `Walking.resolve` moves them together).
  */
@@ -1718,6 +1763,7 @@ export const worldInvariants: Invariant[] = [
   childrenDontWork,
   carriagesInPlace,
   ridersOnHorses,
+  passengersAboard,
   driversOnCarriages,
   haulRoutesSound,
   alliancesSound,

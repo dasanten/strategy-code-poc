@@ -850,6 +850,8 @@ export function ResidentCard({
   onWallTo,
   onStop,
   horseToRide,
+  carriageToBoard,
+  onBoard,
   onRide,
   scripts,
   buildings = [],
@@ -893,6 +895,10 @@ export function ResidentCard({
    * in sight (`CONTEXT.md`: Riding).
    */
   horseToRide: { id: string } | undefined
+  /** A carriage of the realm on the resident's tile (`CONTEXT.md`: Passenger), to board. */
+  carriageToBoard: { id: string } | undefined
+  /** Orders the resident to board that carriage, or with none to get off the one they are on. */
+  onBoard: (carriageId?: string) => void
   /** Orders the resident to mount that horse, or with none to dismount. */
   onRide: (horseId?: string) => void
   /** The Player's script library, to pick a script to run. */
@@ -1021,6 +1027,9 @@ export function ResidentCard({
     renamable: !!rename,
     riding: r.riding !== undefined,
     horseToRide: !!horseToRide,
+    aboard: r.aboard !== undefined,
+    driving: r.order?.kind === 'drive' || r.order?.kind === 'haul',
+    carriageToBoard: !!carriageToBoard,
     carrying: !!r.carrying,
     carries: carried.length > 0,
   })
@@ -1038,6 +1047,7 @@ export function ResidentCard({
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
     if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
+    if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
   useActionKeys(actions, act)
@@ -1364,6 +1374,7 @@ export function ResidentCard({
             <li>
               {child ? 'Child' : 'Adult'} · {age} years{cityName ? ` · ${cityName}` : ''}
               {r.riding ? ' · on horseback' : ''}
+              {r.aboard ? ' · aboard a carriage' : ''}
             </li>
             {family && <li>{family}</li>}
           </ul>

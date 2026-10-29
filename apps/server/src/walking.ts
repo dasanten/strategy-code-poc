@@ -8,6 +8,7 @@ import {
   groundAt,
   horseFor,
   horseRidden,
+  passengersOf,
   isPassableTerrain,
   mayStep,
   wallSide,
@@ -365,8 +366,9 @@ export class Walking {
    * (`mayStep`), and for a diagonal step both straight tiles beside it could be stepped onto too
    * (`CONTEXT.md`: Step). A driver's step also needs their carriage on their tile with a horse to
    * pull it, and tiles a carriage can enter; the carriage and its horse, hitched now if it
-   * wasn't, go along. A rider's step likewise needs their horse with them and a tile a carriage
-   * could enter, and the horse goes along. Each step taken uses up its length in tiles of progress.
+   * wasn't, go along, and so do its passengers (`CONTEXT.md`: Passenger). A rider's step
+   * likewise needs their horse with them and a tile a carriage could enter, and the horse goes
+   * along. Each step taken uses up its length in tiles of progress.
    */
   resolve(world: WorldState, steps: StepAction[]): number {
     let taken = 0
@@ -414,6 +416,12 @@ export class Walking {
         carriage.horseId = horse.id
         carriage.x = horse.x = step.to.x
         carriage.y = horse.y = step.to.y
+        // Its passengers ride along (`CONTEXT.md`: Passenger).
+        for (const p of passengersOf(world, carriage)) {
+          if (p.x !== r.x || p.y !== r.y) continue
+          p.x = step.to.x
+          p.y = step.to.y
+        }
       }
       if (step.horseId) {
         // A rider who got off, or a path found on foot that leads where a horse can't go, finds
