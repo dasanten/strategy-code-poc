@@ -102,6 +102,8 @@ export interface ScriptBindings {
   requests: OrderRequest[]
   /** Whether the script called `end()`: once its requests are applied, it ends. */
   ended(): boolean
+  /** The reason it gave `end(reason)`, cut like `doing`'s text; null without one. */
+  endReason(): string | null
 }
 
 /**
@@ -136,6 +138,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const kinds = context.kinds ?? orderKinds
   const requests: OrderRequest[] = []
   let ended = false
+  let endReason: string | null = null
 
   let seen: readonly SeenEntity[] | undefined
   const untagged = ({ is: _, ...rest }: SeenEntity) => rest
@@ -284,7 +287,8 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       else context.memory.doing = doing
       return null
     }
-    actions.end = () => {
+    actions.end = ([reason]) => {
+      endReason = shortText(reason, 'end')
       ended = true
       return null
     }
@@ -358,7 +362,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         : (call as (args: Value[]) => Value)
     globals[binding.name] = new NativeFunction(binding.name, answer, binding.cost)
   }
-  return { globals, requests, ended: () => ended }
+  return { globals, requests, ended: () => ended, endReason: () => endReason }
 }
 
 /**
@@ -366,8 +370,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
  * `DOING_MAX_LENGTH` characters, or null, as for empty text, to give the derived line back.
  */
 export function doingText(text: Value | undefined): string | null {
+  return shortText(text, 'doing')
+}
+
+/** A short text a script gives `call`: trimmed and cut to `DOING_MAX_LENGTH`; empty is null. */
+function shortText(text: Value | undefined, call: string): string | null {
   if (text === undefined || text === null) return null
-  if (typeof text !== 'string') throw new ScriptRuntimeError('"doing" needs a text or null')
+  if (typeof text !== 'string') throw new ScriptRuntimeError(`"${call}" needs a text or null`)
   return text.trim().slice(0, DOING_MAX_LENGTH) || null
 }
 

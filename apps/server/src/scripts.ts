@@ -362,9 +362,13 @@ export function deleteScript(db: Db, userId: number, id: number): void {
   })
 }
 
-/** What the run-script order needs of a script: whose it is and its active version's source. */
+/**
+ * What the run-script order needs of a script: whose it is, its name for the realm log and its
+ * active version's source.
+ */
 export interface RunnableScript {
   userId: number
+  name: string
   source: string
   /** A default script its Player hasn't edited: running out of steps is the game's fault. */
   followsDefault: boolean
@@ -375,6 +379,7 @@ export function runnableScript(db: Db, scriptId: number): RunnableScript | undef
   return db
     .select({
       userId: scripts.userId,
+      name: scripts.name,
       source: scriptVersions.source,
       followsDefault: scripts.followsDefault,
     })

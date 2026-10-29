@@ -354,6 +354,8 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         : { text: `${e.name}’s script ran out of steps this tick.`, tone: 'warn' }
     case 'scriptEnded':
       return { text: `${e.name} stopped running a script: it was deleted.`, tone: 'info' }
+    case 'scriptStopped':
+      return { text: `${e.name} stopped ${e.script}: ${e.reason}`, tone: 'info' }
     case 'scriptFieldDropped': {
       const names = e.scripts.map((s) => `“${s.name}”`).join(', ')
       const scripts =
