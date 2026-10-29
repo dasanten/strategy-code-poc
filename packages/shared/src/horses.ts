@@ -1,8 +1,9 @@
 import { HORSE_REACH, STABLE_BREED_DAYS, STABLE_CAPACITY } from './balance.js'
 import { carriagePulledBy, drivenCarriageId } from './carriages.js'
 import { covers, isAt } from './footprint.js'
+import { carriageCanGoTo } from './building.js'
 import { pileAt } from './goods.js'
-import { wrap } from './terrain.js'
+import { wrap, type TerrainMap } from './terrain.js'
 import {
   TICKS_PER_GAME_DAY,
   type BreedOrder,
@@ -163,12 +164,14 @@ export function horseOfResident(
 /**
  * Why a resident can't mount a horse now, or undefined when they can (`CONTEXT.md`: Riding): the
  * horse must be of their realm and on their tile, pull no carriage, and nobody may ride it; the
- * resident must ride no other horse and drive no carriage.
+ * resident must ride no other horse and drive no carriage. A horse left on Mountain whose road was
+ * torn down can't be ridden there (`CONTEXT.md`: Road).
  */
 export function mountProblem(
   world: WorldState,
   resident: Resident,
   horse: Horse | undefined,
+  terrain?: TerrainMap,
 ): string | undefined {
   if (!horse) return 'no such horse'
   if (resident.riding === horse.id) return 'already riding that horse'
@@ -180,5 +183,7 @@ export function mountProblem(
   if (carriagePulledBy(world, horse)) return 'that horse is hitched to a carriage'
   if (riderOf(world, horse)) return 'someone else rides that horse'
   if (drivenCarriageId(resident) !== undefined) return 'a driver can’t ride'
+  if (terrain && !carriageCanGoTo(world, terrain, horse.x, horse.y))
+    return 'a horse can’t be ridden on Mountain without a road'
   return undefined
 }

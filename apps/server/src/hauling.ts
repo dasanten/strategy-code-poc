@@ -7,11 +7,10 @@ import {
   GOOD_WEIGHT,
   armySpot,
   inContact,
-  carriageCanEnter,
+  carriageCanGoTo,
   driveProblem,
   goodsAtSpot,
   haulStopSpot,
-  terrainAt,
   unitsThatFit,
   unitsThatFitCarriage,
   type Carriage,
@@ -75,7 +74,7 @@ export const haul: OrderKind = {
     } else {
       if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the other stop must be a tile'
       if (o.x === r.x && o.y === r.y) return 'the other stop must be another tile'
-      if (terrain && !carriageCanEnter(terrainAt(terrain, o.x!, o.y!))) {
+      if (terrain && !carriageCanGoTo(world, terrain, o.x!, o.y!)) {
         return 'a carriage can’t go there'
       }
     }

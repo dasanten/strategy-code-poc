@@ -167,13 +167,14 @@ describe('PathFinder settling requests before any search', () => {
       }
     const finder = new PathFinder(map)
     finder.request('island', [20, 20], [150, 150])
-    finder.request('cart', [20, 20], [50, 150], CARRIAGE_COSTS)
     oneTurn(finder)
     expect(finder.result('island')).toEqual({ status: 'unreachable' })
-    oneTurn(finder)
-    expect(finder.result('cart')).toEqual({ status: 'unreachable' })
     // On foot, over the mountains.
     expect(finder.findPath([20, 20], [50, 150]).status).toBe('found')
+    // A carriage needs a road over them (`CONTEXT.md`: Road), so it has to search.
+    expect(finder.findPath([20, 20], [50, 150], CARRIAGE_COSTS).status).toBe('unreachable')
+    finder.setRoads([200 * 140 + 50])
+    expect(finder.findPath([20, 20], [50, 150], CARRIAGE_COSTS)).toMatchObject({ status: 'found' })
   })
 
   it('an attacker needs only reachable land next to the goal', () => {

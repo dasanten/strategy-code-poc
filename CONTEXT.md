@@ -102,7 +102,9 @@ The shared language of the game. Domain terms only — no implementation details
   back to work; only one fetches at a time. With no storage holding them, they just build.
 - **Tearing down:** anyone with residents on the tile can tear down a building or construction
   site. It takes work, less than building; part of a building's materials (all of an unfinished
-  site's) are left on the tile as goods, and the tile is free again.
+  site's) are left on the tile as goods, and the tile is free again. A road on Mountain waits
+  while a carriage or ridden horse stands on it (Road). A horse left there unridden stays, and
+  can't be ridden on bare Mountain.
 - **Footprint:** the square of tiles a building or construction site covers, the same for every
   building of a kind: Wall, Gate and Road 1×1; House, Storage, Smelter, Mint, Smithy, Mine,
   Quarry and Lumber camp 2×2; Town hall, Warehouse and Stable 3×3; Farm 4×4. A site covers its

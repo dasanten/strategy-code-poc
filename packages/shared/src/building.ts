@@ -243,6 +243,20 @@ export function roadTiles(world: Pick<WorldState, 'buildings'>, size: number): S
   return out
 }
 
+/**
+ * Whether a carriage, or a rider, can go onto (x, y) (`CONTEXT.md`: Carriage, Riding): passable
+ * land, Mountain only where a finished road is.
+ */
+export function carriageCanGoTo(
+  world: Pick<WorldState, 'buildings'>,
+  map: TerrainMap,
+  x: number,
+  y: number,
+): boolean {
+  const road = roadAt(world, x, y)
+  return carriageCanEnter(road && !road.site ? Terrain.Road : terrainAt(map, x, y))
+}
+
 /** Materials a construction site still needs before it can become the building. */
 export function materialsNeeded(site: Building): Stock {
   const out: Stock = {}
@@ -557,18 +571,37 @@ export function teardownReturns(b: Building): Stock {
 }
 
 /**
+ * Whether tearing down `b` would leave a carriage or ridden horse on Mountain without a road
+ * (`CONTEXT.md`: Road): it is a finished road on Mountain with one standing on it.
+ */
+export function strandsOnMountain(
+  world: Pick<WorldState, 'carriages' | 'horses' | 'residents'>,
+  b: Building,
+  terrain: TerrainMap,
+): boolean {
+  if (b.kind !== 'road' || b.site || terrainAt(terrain, b.x, b.y) !== Terrain.Mountain) return false
+  const here = (k: { x: number; y: number }) => k.x === b.x && k.y === b.y
+  const ridden = (h: { id: string }) => world.residents.some((r) => r.riding === h.id)
+  return world.carriages.some(here) || world.horses.some((h) => here(h) && ridden(h))
+}
+
+/**
  * Why the building or site can't be torn down by a resident on (x, y), or undefined if it can:
- * they must stand at it. So far only what can be built can be torn down, and its sites.
+ * they must stand at it. So far only what can be built can be torn down, and its sites. A road on
+ * Mountain waits for carriages and ridden horses on it to leave (`strandsOnMountain`).
  */
 export function tearDownProblem(
   world: WorldState,
   x: number,
   y: number,
   buildingId: string,
+  terrain?: TerrainMap,
 ): string | undefined {
   const b = world.buildings.find((c) => c.id === buildingId)
   if (!b || !covers(b, x, y)) return 'the resident is not at that building'
   if (!BUILDABLE.includes(b.kind)) return `a ${b.kind} can’t be torn down yet`
+  if (terrain && strandsOnMountain(world, b, terrain))
+    return 'a carriage or rider on this mountain road would be stranded'
   return undefined
 }
 
