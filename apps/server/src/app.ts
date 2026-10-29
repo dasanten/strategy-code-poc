@@ -56,7 +56,9 @@ import type { Logger } from './log.js'
 import {
   activateVersion,
   createScript,
+  deleteOlderVersions,
   deleteScript,
+  deleteVersion,
   getScript,
   listScripts,
   renameScript,
@@ -104,6 +106,7 @@ const STATUS: Record<ApiError['error'], number> = {
   'rate-limited': 429,
   'script-has-errors': 422,
   'default-script': 409,
+  'active-version': 409,
 }
 
 function fail(reply: FastifyReply, code: ApiError['error'], message: string) {
@@ -225,6 +228,17 @@ export async function buildApp(opts: AppOptions) {
     )
     // Resetting a default script makes the game's current default its newest version.
     lib.post<ById>('/api/scripts/:id/reset', async (req) => resetScript(db, req.user!.id, id(req)))
+    // Deleting versions (`CONTEXT.md`: Script): one, or all older than the active one.
+    lib.delete<{ Params: { id: string; version: string } }>(
+      '/api/scripts/:id/versions/:version',
+      async (req) =>
+        deleteVersion(db, req.user!.id, Number(req.params.id), {
+          version: Number(req.params.version),
+        }),
+    )
+    lib.post<ById>('/api/scripts/:id/delete-older', async (req) =>
+      deleteOlderVersions(db, req.user!.id, id(req)),
+    )
     lib.delete<ById>('/api/scripts/:id', async (req, reply) => {
       deleteScript(db, req.user!.id, id(req))
       return reply.code(204).send()

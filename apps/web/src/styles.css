@@ -1384,6 +1384,16 @@ button.residents-row.selected:hover {
   display: flex;
   gap: 4px;
 }
+.script-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.script-history-head button {
+  padding: 2px 8px;
+  font-size: 11px;
+}
 .script-history-actions button {
   padding: 2px 8px;
   font-size: 11px;
