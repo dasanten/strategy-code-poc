@@ -49,6 +49,18 @@ import type { Covered } from './map/camera.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
 import { appendRequest, editRequest, STORE_ALL, useShiftHeld } from './queue-view.js'
+import { AddStep } from './AddStep.js'
+import {
+  horsesIn,
+  nextPick,
+  pickInto,
+  planAsk,
+  planOrder,
+  type Plan,
+  type PlanAnswer,
+  type PlanStepId,
+  type PlanWorld,
+} from './plan-step.js'
 import { useSavedGroups } from './saved-groups.js'
 import { groupRequests, type GroupOrder, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES } from './map/palette.js'
@@ -88,6 +100,11 @@ import { useWorld } from './useWorld.js'
 function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): ParamWorld {
   const { buildings, carriages, cities } = world
   return { buildings, carriages, cities, realmId: world.home.realmId, size: world.map.size }
+}
+
+/** What the queue planner's map picks need of the world (`plan-step`). */
+function planWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): PlanWorld {
+  return { ...paramWorld(world), horses: world.horses }
 }
 
 export function App() {
@@ -133,6 +150,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
   // Script parameter).
   const [paramPick, setParamPick] = useState<ScriptParam>()
+  // The step being planned with the queue planner's Add step (`CONTEXT.md`: Queue, Planning
+  // ahead): the map picks its places, then the card asks for what more it needs.
+  const [plan, setPlan] = useState<Plan>()
   // A group order waiting for a tile, the tile picked to build on, and what the last one did.
   const [groupPicking, setGroupPicking] = useState<GroupPicking>(false)
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
@@ -171,6 +191,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     isGroup: group.length > 1,
     armyPick,
     paramPick,
+    plan,
   })
   /** Leaves pick mode without giving the order; the card comes back as it was. */
   const cancelPick = useCallback(() => {
@@ -178,6 +199,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setGroupPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setPlan(undefined)
   }, [])
   // Escape leaves pick mode first; with no drawer open, it then drops the selection.
   const anySelected = selectedIds.length > 0
@@ -214,6 +236,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setPlan(undefined)
     setOrderError(undefined)
     setGroupPicking(false)
     setGroupBuildAt(undefined)
@@ -262,6 +285,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setArmyError(await sendOrder({ kind: armyPick.kind, armyId: armyPick.armyId, x, y }))
       return
     }
+    if (plan && nextPick(plan) && group.length <= 1) {
+      if (!world) return
+      const next = pickInto(planWorld(world), plan, { x, y })
+      if (nextPick(next) || planAsk(next)) setPlan(next)
+      else await addPlanned(next)
+      return
+    }
     if (group.length > 1) {
       await groupTile(x, y)
       return
@@ -286,6 +316,30 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     setOrderError(await giveOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
+  }
+
+  /**
+   * Starts planning a step with Add step (`CONTEXT.md`: Queue, Planning ahead): the map picks its
+   * places first; one that needs neither is added at once.
+   */
+  async function startPlan(kind: PlanStepId) {
+    setPicking(false)
+    setParamPick(undefined)
+    const fresh: Plan = { kind, picked: [] }
+    if (nextPick(fresh) || planAsk(fresh)) setPlan(fresh)
+    else await addPlanned(fresh)
+  }
+  /**
+   * Appends the step planned to the picked resident's queue, or starts one with it, after a walk
+   * to where it acts (`appendRequest`). The server checks that it could make sense; whether it can
+   * start is checked when its turn comes.
+   */
+  async function addPlanned(planned: Plan, answer?: PlanAnswer) {
+    setPlan(undefined)
+    const step = selected && planOrder(planned, answer)
+    if (!selected || !step) return
+    const order = { ...step.order, residentId: selected.id }
+    setOrderError(await sendOrder(appendRequest(selected, order, step.at) ?? order))
   }
 
   /**
@@ -518,6 +572,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPicking(false)
               setArmyPick(undefined)
               setParamPick(undefined)
+              setPlan(undefined)
               setOrderError(undefined)
             }}
             selectedCityId={openCityId}
@@ -529,6 +584,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               picking !== false ||
               armyPick !== undefined ||
               paramPick !== undefined ||
+              pick?.kind === 'plan' ||
               (group.length > 1 && groupPicking !== false)
             }
             onPickTile={goTo}
@@ -910,10 +966,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onEditQueue={async (steps, loop) =>
               setOrderError(await sendOrder(editRequest(selected, steps, loop)))
             }
+            addStep={
+              <AddStep
+                plan={plan}
+                onStart={(kind) => void startPlan(kind)}
+                onAnswer={(answer) => plan && void addPlanned(plan, answer)}
+                onCancel={() => setPlan(undefined)}
+                scripts={scripts}
+                buildKinds={
+                  plan?.kind === 'build' && plan.picked[0]
+                    ? buildMenu(nodeAt?.(plan.picked[0].x, plan.picked[0].y))
+                    : []
+                }
+                horses={horsesIn(planWorld(world), world.horses, plan?.picked[0]?.id)}
+              />
+            }
             onClose={() => {
               setSelectedIds([])
               setPicking(false)
               setParamPick(undefined)
+              setPlan(undefined)
             }}
             collapsed={pick !== undefined && pick.kind !== 'army'}
           />

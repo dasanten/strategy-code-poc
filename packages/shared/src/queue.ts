@@ -24,6 +24,8 @@ export const QUEUE_STEP_KINDS: readonly string[] = [
   'haul',
   'roadLine',
   'wallLine',
+  'mount',
+  'dismount',
   'task',
   'runScript',
 ]

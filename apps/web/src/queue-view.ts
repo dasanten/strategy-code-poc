@@ -105,9 +105,9 @@ function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
   )
 }
 
-/** Orders the card gives for the resident's own tile: they only start there. */
+/** Orders that act on the tile they are given for (by the card, their own): they only start there. */
 function actsHere(order: OrderRequest): boolean {
-  if (order.kind === 'pickUp' || order.kind === 'drop' || order.kind === 'drive') return true
+  if (['pickUp', 'drop', 'drive', 'mount'].includes(order.kind)) return true
   if (order.kind !== 'task') return false
   // A Build task laid out somewhere else (`at`) walks there itself.
   return order.task !== 'build' || order.at === undefined
@@ -215,6 +215,11 @@ export function stepLabel(
     const kind = buildings.find((b) => b.id === id)?.kind
     return kind ? `the ${BUILDING_NAMES[kind]}` : 'the building'
   }
+  // A storage or stable in sight a store or fetch names, if it names one; a carriage goes unnamed.
+  const named = (word: string, id: unknown) => {
+    const kind = buildings.find((b) => b.id === id)?.kind
+    return kind ? `${word} the ${BUILDING_NAMES[kind]}` : ''
+  }
   switch (order.kind) {
     case 'walkTo':
       return `Walk to ${at(order)}`
@@ -224,12 +229,15 @@ export function stepLabel(
       return `Pick up ${goodsLine(order.goods)}`
     case 'drop':
       return `${dropVerb(order.spot)} ${goodsLine(order.goods)}`
-    case 'store':
-      return order.goods && !Array.isArray(order.goods)
-        ? `Store ${goodsLine(order.goods)}`
-        : 'Store what they carry'
+    case 'store': {
+      const what =
+        order.goods && !Array.isArray(order.goods)
+          ? `Store ${goodsLine(order.goods)}`
+          : 'Store what they carry'
+      return `${what}${named(' at', order.to)}`
+    }
     case 'fetch':
-      return `Fetch ${goodsLine(order.goods)}`
+      return `Fetch ${goodsLine(order.goods)}${named(' from', order.from)}`
     case 'build':
       return 'Build'
     case 'tearDown':
@@ -240,6 +248,10 @@ export function stepLabel(
       return 'Haul'
     case 'roadLine':
       return `Build a road to ${at(order.to)}`
+    case 'mount':
+      return 'Mount a horse'
+    case 'dismount':
+      return 'Dismount'
     case 'wallLine':
       return `Build a wall to ${at(order.to)}`
     case 'runScript': {
@@ -253,6 +265,8 @@ export function stepLabel(
         return `Build ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`
       }
       if (order.task === 'tearDown') return `Tear down ${building(order.buildingId)}`
+      if (order.task === 'feedStable') return `Feed ${building(order.stableId)}`
+      if (order.task === 'breed') return `Breed horses at ${building(order.stableId)}`
       return `Haul to ${at(order)}`
   }
   return order.kind

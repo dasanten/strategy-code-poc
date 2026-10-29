@@ -9,6 +9,7 @@ import {
   type TerrainMap,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
+import { newHorse } from './horses.js'
 import { checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { QueueRunner, queuesSound } from './queues.js'
@@ -273,6 +274,114 @@ describe('queue order', () => {
     expect(
       s.give({ kind: 'queue', residentId: 'x1', steps: [walk(1, 1)] } as OrderRequest),
     ).toMatchObject({ type: 'rejected', reason: 'not one of your residents' })
+  })
+})
+
+describe('planning ahead', () => {
+  /** Setup, with a second farm f2 far off at (20, 20), and a carriage k2 of realm r2. */
+  function farOff() {
+    const s = setup()
+    s.world.buildings.push({ id: 'f2', kind: 'farm', cityId: null, x: 20, y: 20 })
+    s.world.carriages.push({
+      id: 'k2',
+      realmId: 'r2',
+      cityId: null,
+      x: 2,
+      y: 2,
+      horseId: null,
+      load: {},
+    } as (typeof s.world.carriages)[number])
+    const reason = (kind: 'queue' | 'editQueue', steps: object[]) => {
+      const answer = s.give({ kind, steps })
+      return answer.type === 'rejected' ? answer.reason : undefined
+    }
+    return { ...s, reason }
+  }
+  const workF2 = (minutes?: number) => ({
+    order: { kind: 'task', task: 'work', workplaceId: 'f2' },
+    ...(minutes === undefined ? {} : { minutes }),
+  })
+
+  it('walks to a workplace elsewhere, works it, then stores at a storage', () => {
+    const s = farOff()
+    expect(
+      s.reason('queue', [
+        walk(20, 20),
+        workF2(5),
+        { order: { kind: 'store', goods: ['wood'], to: 's1' } },
+      ]),
+    ).toBeUndefined()
+    const worked: string[] = []
+    for (let i = 0; i < 400 && (i === 0 || s.r.queue); i++) {
+      s.tick()
+      if (s.r.order?.kind === 'workAt') worked.push(`${s.r.x},${s.r.y}`)
+    }
+    expect(worked).toContain('20,20')
+    expect(s.s1.stock).toMatchObject({ wood: 5 })
+    expect(s.r.carried.wood ?? 0).toBe(0)
+    expect(skips(s.world.events)).toEqual([])
+  })
+
+  it('takes a step on another tile and skips it with a log line when it can’t start there', () => {
+    const s = farOff()
+    // Working f2 from (6, 6), with no walk there first.
+    expect(s.reason('queue', [workF2(5), walk(3, 3)])).toBeUndefined()
+    for (let i = 0; i < 100 && (i === 0 || s.r.queue); i++) s.tick()
+    expect(skips(s.world.events)).toEqual([
+      expect.objectContaining({ step: 1, order: 'task', reason: expect.any(String) }),
+    ])
+    expect(s.r).toMatchObject({ x: 3, y: 3 })
+  })
+
+  it('turns down a step whose place can’t make sense', () => {
+    const s = farOff()
+    const work = (workplaceId: string) => ({ order: { kind: 'task', task: 'work', workplaceId } })
+    expect(s.reason('queue', [work('nowhere')])).toBe('step 1: no such building')
+    expect(s.reason('queue', [walk(1, 1), walk(SIZE, 1)])).toBe('step 2: that tile is off the map')
+    const road = { kind: 'roadLine', from: { x: 1, y: 1 }, to: { x: 1, y: -1 } }
+    expect(s.reason('queue', [{ order: road }])).toBe('step 1: that tile is off the map')
+    expect(s.reason('queue', [{ order: { kind: 'store', goods: ['wood'], to: 'gone' } }])).toBe(
+      'step 1: no such storage',
+    )
+    expect(s.reason('queue', [{ order: { kind: 'fetch', goods: ['food'], from: 'k2' } }])).toBe(
+      'step 1: not a carriage of your realm',
+    )
+    const drive = { kind: 'drive', carriageId: 'k2', x: 3, y: 3 }
+    expect(s.reason('queue', [{ order: drive }])).toBe('step 1: not a carriage of your realm')
+    expect(s.reason('queue', [{ order: { kind: 'mount', horseId: 'h9' } }])).toBe(
+      'step 1: no such horse',
+    )
+  })
+
+  it('walks to a horse elsewhere and mounts it', () => {
+    const s = farOff()
+    s.world.horses.push(
+      newHorse(mulberry32(3), { id: 'h1', realmId: 'r1', cityId: null, x: 9, y: 6, tick: 0 }),
+    )
+    s.give({
+      kind: 'queue',
+      steps: [walk(9, 6), { order: { kind: 'mount', horseId: 'h1' } }, walk(9, 9)],
+    })
+    for (let i = 0; i < 100 && (i === 0 || s.r.queue); i++) s.tick()
+    expect(s.r).toMatchObject({ x: 9, y: 9, riding: 'h1' })
+    expect(skips(s.world.events)).toEqual([])
+  })
+
+  it('checks only the steps an edit adds', () => {
+    const s = farOff()
+    s.give({ kind: 'queue', steps: [walk(20, 6), workF2()] })
+    s.tick()
+    // f2 is torn down: the step stays, to be skipped when its turn comes.
+    s.world.buildings = s.world.buildings.filter((b) => b.id !== 'f2')
+    expect(
+      s.reason('editQueue', [
+        { id: 1, ...walk(20, 6) },
+        { id: 2, ...workF2() },
+      ]),
+    ).toBe(undefined)
+    expect(s.reason('editQueue', [{ id: 1, ...walk(20, 6) }, workF2()])).toBe(
+      'step 2: no such building',
+    )
   })
 })
 
