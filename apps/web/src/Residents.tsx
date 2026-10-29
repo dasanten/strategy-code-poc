@@ -71,7 +71,13 @@ import {
   CARD_TABS,
   carriedShort,
   carryLine,
+  GROUP_TABS,
   groupCard,
+  rememberedTabOf,
+  rememberTabOf,
+  scriptsRun,
+  TAB_LABELS,
+  type GroupTab,
   type CardSections,
   type ResidentGroup,
 } from './residents-view.js'
@@ -89,7 +95,7 @@ import {
 import { groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
-import { ActionRows, SelectionCard, useActionKeys } from './SelectionCard.js'
+import { ActionRows, CardTabs, SelectionCard, useActionKeys } from './SelectionCard.js'
 import {
   horseDetail,
   groupOrders,
@@ -508,8 +514,10 @@ export function ResidentsList({
 }
 
 /**
- * The selection card for several of the Player's residents picked at once on the map: how many,
- * their names, and a short list of what each is doing; click a row to pick just that one.
+ * The selection card for several of the Player's residents picked at once on the map (ADR 0012;
+ * `CONTEXT.md`: Group, Resident card): a header with how many and who, then one open tab. Orders
+ * gives each of them the same order, grouped by kind; Members lists what each is doing, a click
+ * picking just that one; Script says what they run and gives them all one.
  */
 export function GroupCard({
   residents,
@@ -546,79 +554,77 @@ export function GroupCard({
   collapsed?: boolean
 }) {
   const card = groupCard(residents)
-  const [panel, setPanel] = useState<'fetch' | 'script'>()
+  const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
+  const [fetching, setFetching] = useState(false)
   const [good, setGood] = useState<Good>('food')
+  const showTab = (t: GroupTab) => {
+    setTab(t)
+    rememberTabOf('group', t)
+  }
   const toggle = (p: Exclude<GroupPicking, false>) => {
-    setPanel(undefined)
+    setFetching(false)
     onPicking(picking === p ? false : p)
   }
-  const open = (p: 'fetch' | 'script') => {
-    onPicking(false)
-    setPanel(panel === p ? undefined : p)
-  }
+  const pickButton = (p: Exclude<GroupPicking, false>, label: string) => (
+    <button type="button" aria-pressed={picking === p} onClick={() => toggle(p)}>
+      {label}
+    </button>
+  )
+  const idle = residents.filter((r) => !r.order && !r.script).length
   return (
     <SelectionCard
       rel="own"
       title={card.title}
-      lines={[card.names]}
+      lines={[
+        card.names,
+        <strong key="doing">
+          {idle === residents.length ? 'All idle' : `${residents.length - idle} busy, ${idle} idle`}
+        </strong>,
+      ]}
       onClose={onClose}
       collapsed={collapsed}
     >
-      <ul className="sel-facts sel-group" aria-label="Selected residents">
-        {card.rows.map((r) => (
-          <li key={r.id}>
-            <button type="button" onClick={() => onPick(r.id)}>
-              <strong>{r.name}</strong> · {doingLine(r, { scripts, buildings })}
-            </button>
-          </li>
-        ))}
-        {card.more > 0 && <li>and {card.more} more</li>}
-      </ul>
-      <div className="order-buttons" aria-label="Group orders">
-        <button type="button" aria-pressed={picking === 'walk'} onClick={() => toggle('walk')}>
-          Walk to
-        </button>
-        <button type="button" aria-pressed={picking === 'work'} onClick={() => toggle('work')}>
-          Work
-        </button>
-        <button type="button" aria-pressed={picking === 'build'} onClick={() => toggle('build')}>
-          Build
-        </button>
-        <button type="button" onClick={() => onOrder({ kind: 'store' })}>
-          Store
-        </button>
-        <button type="button" aria-pressed={panel === 'fetch'} onClick={() => open('fetch')}>
-          Fetch
-        </button>
-        <button type="button" aria-pressed={panel === 'script'} onClick={() => open('script')}>
-          Run script
-        </button>
-        <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
-          Stop
-        </button>
-      </div>
-      <p className="muted small" role="status">
-        {orderError
-          ? `Order turned down: ${orderError}`
-          : picking
-            ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
-            : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
-      </p>
-      {report && (
-        <div className="small" aria-label="Last group order">
-          <p>{groupSentLine(report.sent, report.of)}</p>
-          {report.skipped.length > 0 && (
-            <ul className="sel-facts">
-              {report.skipped.map((s) => (
-                <li key={s.id}>
-                  Skipped <strong>{s.name}</strong>: {s.why}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
+
+      {tab === 'orders' && (
+        <>
+          <div className="sel-order-group">
+            <h3>Move</h3>
+            <div className="order-buttons" aria-label="Move">
+              {pickButton('walk', 'Walk to')}
+              <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
+                Stop
+              </button>
+            </div>
+          </div>
+          <div className="sel-order-group">
+            <h3>Work &amp; build</h3>
+            <div className="order-buttons" aria-label="Work & build">
+              {pickButton('work', 'Work')}
+              {pickButton('build', 'Build')}
+            </div>
+          </div>
+          <div className="sel-order-group">
+            <h3>Goods</h3>
+            <div className="order-buttons" aria-label="Goods">
+              <button type="button" onClick={() => onOrder({ kind: 'store' })}>
+                Store
+              </button>
+              <button
+                type="button"
+                aria-pressed={fetching}
+                onClick={() => {
+                  onPicking(false)
+                  setFetching(!fetching)
+                }}
+              >
+                Fetch
+              </button>
+            </div>
+          </div>
+        </>
       )}
-      {buildAt && !picking && (
+      {tab === 'orders' && buildAt && !picking && (
         <section className="inspector-block" aria-label="Build">
           <div className="panel-head">
             <h3>Build</h3>
@@ -664,7 +670,7 @@ export function GroupCard({
           </p>
         </section>
       )}
-      {panel === 'fetch' && (
+      {tab === 'orders' && fetching && (
         <section className="inspector-block" aria-label="Fetch">
           <div className="order-buttons">
             <select
@@ -687,14 +693,58 @@ export function GroupCard({
           </p>
         </section>
       )}
-      {panel === 'script' && (
-        <section className="inspector-block" aria-label="Run script">
-          <RunScript
-            script={undefined}
-            scripts={scripts}
-            onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
-          />
-        </section>
+      {tab === 'members' && (
+        <ul className="sel-facts sel-group" aria-label="Selected residents">
+          {card.rows.map((r) => (
+            <li key={r.id}>
+              <button type="button" onClick={() => onPick(r.id)}>
+                <strong>{r.name}</strong> · {doingLine(r, { scripts, buildings })}
+              </button>
+            </li>
+          ))}
+          {card.more > 0 && <li>and {card.more} more</li>}
+        </ul>
+      )}
+      {tab === 'script' && (
+        <>
+          <ul className="sel-facts" aria-label="Scripts they run">
+            {scriptsRun(residents.map((r) => scriptName(r, scripts))).map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+          <section className="inspector-block" aria-label="Run script">
+            <RunScript
+              script={undefined}
+              scripts={scripts}
+              label="Script for all of them to run"
+              onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
+            />
+          </section>
+        </>
+      )}
+
+      {(orderError || picking || tab === 'orders') && (
+        <p className="muted small" role="status">
+          {orderError
+            ? `Order turned down: ${orderError}`
+            : picking
+              ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
+              : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
+        </p>
+      )}
+      {report && (
+        <div className="small" aria-label="Last group order">
+          <p>{groupSentLine(report.sent, report.of)}</p>
+          {report.skipped.length > 0 && (
+            <ul className="sel-facts">
+              {report.skipped.map((s) => (
+                <li key={s.id}>
+                  Skipped <strong>{s.name}</strong>: {s.why}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </SelectionCard>
   )

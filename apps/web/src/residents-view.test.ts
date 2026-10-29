@@ -6,7 +6,13 @@ import {
   carryLine,
   groupCard,
   groupResidents,
+  ARMY_TABS,
+  GROUP_TABS,
   rememberTab,
+  rememberTabOf,
+  rememberedTabOf,
+  scriptsRun,
+  supplyLines,
   rememberedTab,
   type ResidentGroup,
 } from './residents-view.js'
@@ -147,5 +153,57 @@ describe('Resident card tab', () => {
     const storage = memory()
     storage.setItem('csp.cardTab', 'goods')
     expect(rememberedTab(() => storage)).toBe('orders')
+  })
+})
+
+describe('Group and army card tabs', () => {
+  const memory = () => {
+    const kept = new Map<string, string>()
+    return {
+      getItem: (k: string) => kept.get(k) ?? null,
+      setItem: (k: string, v: string) => void kept.set(k, v),
+    }
+  }
+
+  it('remembers each kind of card on its own', () => {
+    const storage = memory()
+    expect(rememberedTabOf('group', GROUP_TABS, () => storage)).toBe('orders')
+    rememberTabOf('group', 'members', () => storage)
+    rememberTabOf('army', 'supply', () => storage)
+    expect(rememberedTabOf('group', GROUP_TABS, () => storage)).toBe('members')
+    expect(rememberedTabOf('army', ARMY_TABS, () => storage)).toBe('supply')
+    expect(rememberedTab(() => storage)).toBe('orders')
+  })
+
+  it('opens on the first tab when the remembered one is not the card’s', () => {
+    const storage = memory()
+    rememberTabOf('group', 'supply', () => storage)
+    expect(rememberedTabOf('group', GROUP_TABS, () => storage)).toBe('orders')
+  })
+})
+
+describe('scriptsRun', () => {
+  it('counts the scripts, most run first, then those running none', () => {
+    expect(scriptsRun(['Fish', undefined, 'Chop', 'Chop', undefined])).toEqual([
+      '2 run Chop',
+      '1 runs Fish',
+      '2 run no script',
+    ])
+    expect(scriptsRun([undefined])).toEqual(['1 runs no script'])
+  })
+})
+
+describe('supplyLines', () => {
+  it('says who drives each supply wagon, how, and the Food to take', () => {
+    const food: Record<string, number> = { c1: 12.7, c2: 0 }
+    expect(
+      supplyLines(
+        [
+          { name: 'Ada', carriageId: 'c1', haul: false },
+          { name: 'Bo', carriageId: 'c2', haul: true },
+        ],
+        (id) => food[id]!,
+      ),
+    ).toEqual(['Ada · following · 12 Food to take', 'Bo · haul route · 0 Food to take'])
   })
 })
