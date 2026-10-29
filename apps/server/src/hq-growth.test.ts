@@ -162,19 +162,23 @@ describe('the HQ against the strongest Organization', () => {
     expect(tradeOrgArmyWanted(world)).toBe(Math.ceil(15 * TRADE_ORG_ARMY.strongestMultiple))
   })
 
-  it('trains more soldiers than its army’s size when a Player grows strong', () => {
-    const { world, hq, walking } = setup()
-    const goods = world.buildings.find((b) => b.cityId === hq.id && b.stock?.wood !== undefined)!
-    goods.stock!.spear = 40
-    armed(world, 'r1', 12, 80, 563)
-    const wanted = Math.ceil(12 * TRADE_ORG_ARMY.strongestMultiple)
-    expect(wanted).toBeGreaterThan(TRADE_ORG_ARMY.size)
-    run(world, walking, 10 * TICKS_PER_GAME_DAY, () => hqSoldiers(world).length >= wanted)
-    expect(hqSoldiers(world)).toHaveLength(wanted)
-    expect(hqPeople(world, hq).filter((r) => !isArmed(r)).length).toBeGreaterThanOrEqual(
-      TRADE_ORG_ARMY.workers,
-    )
-  }, 120_000)
+  it(
+    'trains more soldiers than its army’s size when a Player grows strong',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const { world, hq, walking } = setup()
+      const goods = world.buildings.find((b) => b.cityId === hq.id && b.stock?.wood !== undefined)!
+      goods.stock!.spear = 40
+      armed(world, 'r1', 12, 80, 563)
+      const wanted = Math.ceil(12 * TRADE_ORG_ARMY.strongestMultiple)
+      expect(wanted).toBeGreaterThan(TRADE_ORG_ARMY.size)
+      run(world, walking, 10 * TICKS_PER_GAME_DAY, () => hqSoldiers(world).length >= wanted)
+      expect(hqSoldiers(world)).toHaveLength(wanted)
+      expect(hqPeople(world, hq).filter((r) => !isArmed(r)).length).toBeGreaterThanOrEqual(
+        TRADE_ORG_ARMY.workers,
+      )
+    },
+  )
 })
 
 /**
@@ -246,49 +250,54 @@ describe('the HQ growing', () => {
     }
   }, 120_000)
 
-  it('grows a new outer ring once it has no room for houses, and houses beyond the old one', () => {
-    const { world, hq, walking } = weak()
-    const hall = townHallOf(world, hq)!
-    fillRoom(world, hq, 0)
-    // Out of room: it starts on a gate of the next ring, in line with the others.
-    const next = hqProject(world, hq, terrain)!
-    expect(next.building).toBe('gate')
-    expect(fromHall(next)).toBeGreaterThan(hqRingRadius(1) - 1.5)
-    expect(fromHall(next)).toBeLessThanOrEqual(hqRingRadius(1) + 0.5)
-    run(world, walking, 2 * TICKS_PER_GAME_DAY, () =>
-      world.buildings.some(
-        (b) => !b.site && b.kind === 'gate' && fromHall(b) > hqRingRadius(1) - 1.5,
-      ),
-    )
-    expect(hqRings(world, hall, terrain)).toEqual({ outermost: 0, building: 1 })
-    const ring = world.buildings.filter(
-      (b) => (b.kind === 'wall' || b.kind === 'gate') && fromHall(b) > TRADE_ORG_HQ.outerRadius + 1,
-    )
-    expect(ring.length).toBeGreaterThan(0)
-    // The old ring stays.
-    expect(
-      outerGates(world, hq).filter((g) => fromHall(g) <= TRADE_ORG_HQ.outerRadius + 0.5),
-    ).toHaveLength(TRADE_ORG_HQ.gates)
+  it(
+    'grows a new outer ring once it has no room for houses, and houses beyond the old one',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const { world, hq, walking } = weak()
+      const hall = townHallOf(world, hq)!
+      fillRoom(world, hq, 0)
+      // Out of room: it starts on a gate of the next ring, in line with the others.
+      const next = hqProject(world, hq, terrain)!
+      expect(next.building).toBe('gate')
+      expect(fromHall(next)).toBeGreaterThan(hqRingRadius(1) - 1.5)
+      expect(fromHall(next)).toBeLessThanOrEqual(hqRingRadius(1) + 0.5)
+      run(world, walking, 2 * TICKS_PER_GAME_DAY, () =>
+        world.buildings.some(
+          (b) => !b.site && b.kind === 'gate' && fromHall(b) > hqRingRadius(1) - 1.5,
+        ),
+      )
+      expect(hqRings(world, hall, terrain)).toEqual({ outermost: 0, building: 1 })
+      const ring = world.buildings.filter(
+        (b) =>
+          (b.kind === 'wall' || b.kind === 'gate') && fromHall(b) > TRADE_ORG_HQ.outerRadius + 1,
+      )
+      expect(ring.length).toBeGreaterThan(0)
+      // The old ring stays.
+      expect(
+        outerGates(world, hq).filter((g) => fromHall(g) <= TRADE_ORG_HQ.outerRadius + 0.5),
+      ).toHaveLength(TRADE_ORG_HQ.gates)
 
-    // Once the new ring is finished, its next houses go between the old ring and the new.
-    for (const t of hqRingTiles(hall, 1, terrain.size)) {
-      const b = world.buildings.find((x) => x.x === t.x && x.y === t.y)
-      if (b) delete b.site
-      else
-        world.buildings.push({
-          id: `ring-${t.x}-${t.y}`,
-          kind: t.kind,
-          cityId: hq.id,
-          x: t.x,
-          y: t.y,
-        })
-    }
-    expect(hqRings(world, hall, terrain)).toEqual({ outermost: 1, building: undefined })
-    const house = hqHouseTile(world, hall, terrain, 1)!
-    expect(fromHall(house)).toBeGreaterThan(TRADE_ORG_HQ.outerRadius + 0.5)
-    expect(fromHall(house)).toBeLessThan(hqRingRadius(1))
-    expect(hqRingsSound.check(world, terrain)).toEqual([])
-  }, 120_000)
+      // Once the new ring is finished, its next houses go between the old ring and the new.
+      for (const t of hqRingTiles(hall, 1, terrain.size)) {
+        const b = world.buildings.find((x) => x.x === t.x && x.y === t.y)
+        if (b) delete b.site
+        else
+          world.buildings.push({
+            id: `ring-${t.x}-${t.y}`,
+            kind: t.kind,
+            cityId: hq.id,
+            x: t.x,
+            y: t.y,
+          })
+      }
+      expect(hqRings(world, hall, terrain)).toEqual({ outermost: 1, building: undefined })
+      const house = hqHouseTile(world, hall, terrain, 1)!
+      expect(fromHall(house)).toBeGreaterThan(TRADE_ORG_HQ.outerRadius + 0.5)
+      expect(fromHall(house)).toBeLessThan(hqRingRadius(1))
+      expect(hqRingsSound.check(world, terrain)).toEqual([])
+    },
+  )
 
   it('does not grow while it can match the strongest Organization', () => {
     const { world, hq } = weak()

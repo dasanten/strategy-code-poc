@@ -55,7 +55,7 @@ function run(world: WorldState, terrain: TerrainMap, walking: Walking, ticks: nu
 }
 
 describe('NPC cities work and eat', () => {
-  it('a village left alone survives ten game weeks', () => {
+  it('a village left alone survives ten game weeks', { tags: ['slow'], timeout: 240_000 }, () => {
     const { world, terrain, city } = village()
     const walking = new Walking(terrain)
     // Everyone starts idle at home, so the city has to send them out to work.
@@ -67,7 +67,7 @@ describe('NPC cities work and eat', () => {
     expect(world.residents.map((r) => r.id)).toEqual(expect.arrayContaining(people))
     // Left in the storage, the starting food would have mostly spoiled by now.
     expect(storedFood(world, city)).toBeGreaterThan(NPC_VILLAGE.food)
-  }, 240_000)
+  })
 
   it('carries the farm’s output to the storage', () => {
     const { world, terrain, city } = village()
