@@ -6,6 +6,6 @@
     "types": ["node"]
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.fixture.ts"],
   "references": [{ "path": "../../packages/lang" }, { "path": "../../packages/shared" }]
 }

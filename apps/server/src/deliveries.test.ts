@@ -1,11 +1,8 @@
 import {
-  AVERAGE_HORSE_STATS,
   DELIVERY_FEE_BASE,
   DELIVERY_LOAD,
   GOOD_WEIGHT,
-  Terrain,
   deliveryFee,
-  deliveryStorage,
   owedBy,
   priceFor,
   quoteDelivery,
@@ -14,100 +11,13 @@ import {
   stockFloor,
   wrapDistance,
   type Building,
-  type Caravan,
-  type Stock,
-  type Good,
-  type RealmEvent,
-  type TerrainMap,
-  type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { placeCaravans, routeEnd, routeRobberiesSound } from './caravans.js'
-import { resolveCarrying } from './carrying.js'
 import { collectsFrom, deliveriesSound } from './deliveries.js'
 import { checkInvariants } from './invariants.js'
-import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
-import { foundStartingCity } from './starting-city.js'
-import { foundTradeOrgHq, tradeOrgHq } from './trade-org.js'
-import { foundTradingPost } from './trading-posts.js'
-import { Walking } from './walking.js'
-import { createWorld, stepWorld } from './world.js'
-
-const mara = { userId: 7, account: { name: 'Mara', isAdmin: false } }
-
-/** An open map of Plains, `size` tiles along each side. */
-const plains = (size: number): TerrainMap => ({
-  size,
-  tiles: new Uint8Array(size * size).fill(Terrain.Plains),
-})
-
-/**
- * The Trade Org HQ, a trading post with its caravan, Mara's starting city and her resident p1
- * standing on the post’s warehouse with 1,000 coins.
- */
-function setup() {
-  const terrain = plains(512)
-  const world = createWorld(terrain)
-  const rand = mulberry32(5)
-  foundTradeOrgHq(world, terrain, 128, 128, rand)
-  foundTradingPost(world, terrain, 320, 320, undefined, rand)
-  const [caravan] = placeCaravans(world)
-  // An average horse, so the caravan's loads are what the delivery numbers below expect.
-  for (const h of world.horses) h.stats = { ...AVERAGE_HORSE_STATS }
-  const realm = foundStartingCity(world, terrain, mara.userId)
-  const city = world.cities.find((c) => c.realmId === realm.id)!
-  const storage = deliveryStorage(world, city.id)!
-  const warehouse = routeEnd(world, caravan!, 'post').warehouse!
-  const p1 = newResident(mulberry32(11), {
-    id: 'p1',
-    owner: realm.id,
-    cityId: city.id,
-    x: warehouse.x,
-    y: warehouse.y,
-    tick: 0,
-  })
-  p1.bornAt = -20 * 24 * 3600
-  p1.carried = { coins: 1_000 }
-  world.residents.push(p1)
-  const queue = new OrderQueue(undefined, terrain)
-  return { world, terrain, caravan: caravan!, realm, city, storage, warehouse, p1, queue }
-}
-
-/** Sends an order from p1, applies it and answers whether it was taken. */
-function order(world: WorldState, queue: OrderQueue, o: Record<string, unknown>) {
-  const answer = queue.receive(world, mara, 'q', { residentId: 'p1', ...o })
-  queue.applyAll(world)
-  return answer.type === 'ack' ? 'ack' : (answer as { reason: string }).reason
-}
-
-/** Every unit of a good in the world: in buildings, on carriages, carried and on the ground. */
-function total(world: WorldState, good: Good): number {
-  const stocks = [
-    ...world.buildings.map((b) => b.stock ?? {}),
-    ...world.carriages.map((k) => k.load),
-    ...world.residents.map((r) => r.carried),
-    ...world.piles.map((p) => p.goods),
-  ]
-  return stocks.reduce((n, s) => n + (s[good] ?? 0), 0)
-}
-
-/**
- * Steps the world at least once and then until `done`, at most `ticks` times, checking every
- * invariant now and then.
- */
-function runUntil(world: WorldState, terrain: TerrainMap, done: () => boolean, ticks = 20_000) {
-  const walking = new Walking(terrain)
-  for (let t = 0; t < ticks && (t === 0 || !done()); t++) {
-    stepWorld(world, terrain, walking)
-    if (t % 500 === 0) expect(checkInvariants(world, terrain)).toEqual([])
-  }
-  expect(done()).toBe(true)
-  expect(checkInvariants(world, terrain)).toEqual([])
-}
-
-const eventsOf = <K extends RealmEvent['kind']>(world: WorldState, kind: K) =>
-  world.events.filter((e): e is Extract<RealmEvent, { kind: K }> => e.kind === kind)
+import { stepWorld } from './world.js'
+import { setup, order, total, runUntil, eventsOf } from './deliveries.fixture.js'
 
 describe('delivery fees and quotes', () => {
   const post = () => {
@@ -325,125 +235,5 @@ describe('deliveries sound', () => {
       robbed: 0,
     }
     expect(deliveriesSound.check(world, terrain)).toHaveLength(1)
-  })
-})
-
-/** Has a new resident of Mara's realm, standing at the caravan's carriage, take `goods` off it. */
-function rob(world: WorldState, terrain: TerrainMap, caravan: Caravan, goods: Stock, id = 'thief') {
-  const carriage = world.carriages.find((k) => k.id === caravan.carriageId)!
-  let thief = world.residents.find((r) => r.id === id)
-  if (!thief) {
-    const realmId = world.realms[0]!.id
-    const cityId = world.cities.find((c) => c.realmId === realmId)!.id
-    thief = newResident(mulberry32(17), { id, owner: realmId, cityId, x: 0, y: 0, tick: 0 })
-    thief.bornAt = -20 * 24 * 3600
-    world.residents.push(thief)
-  }
-  thief.x = carriage.x
-  thief.y = carriage.y
-  const spot = { kind: 'carriage' as const, carriageId: carriage.id }
-  resolveCarrying(world, [{ kind: 'take', residentId: id, spot, goods }], terrain.size)
-  return thief
-}
-
-describe('robbed caravans', () => {
-  it('send what was taken of a delivery again, and all of it arrives', () => {
-    const { world, terrain, warehouse, storage, city, caravan, queue } = setup()
-    order(world, queue, { kind: 'buy', good: 'iron', units: 6, cityId: city.id })
-    const before = storage.stock!.iron ?? 0
-    runUntil(world, terrain, () => caravan.job?.step === 'deliver')
-    const thief = rob(world, terrain, caravan, { iron: 4 })
-    expect(thief.carried.iron).toBe(4)
-    expect(caravan.job).toMatchObject({ units: 2, robbed: 4 })
-    // The warehouse keeps nothing for it until the caravan has delivered the rest.
-    expect(owedBy(world, warehouse.id, 'iron')).toBe(0)
-    runUntil(world, terrain, () => eventsOf(world, 'deliveryRobbed').length > 0)
-    expect(eventsOf(world, 'deliveryRobbed')).toEqual([
-      expect.objectContaining({ good: 'iron', units: 4, cityId: city.id }),
-    ])
-    expect(world.deliveries).toEqual([expect.objectContaining({ units: 4, caravanId: null })])
-    expect(storage.stock!.iron).toBe(before + 2)
-    runUntil(world, terrain, () => world.deliveries.length === 0)
-    expect(storage.stock!.iron).toBe(before + 6)
-    expect(eventsOf(world, 'delivered').map((e) => e.units)).toEqual([2, 4])
-    expect(world.routeRobberies).toEqual({ [caravan.postId]: 1 })
-    // Taking from the Trade Org's caravan is theft from it.
-    expect(world.crimes).toEqual([
-      expect.objectContaining({ kind: 'theft', victimOrg: tradeOrgHq(world)!.id }),
-    ])
-  }, 120_000)
-
-  it('send a delivery again that robbers took all of', () => {
-    const { world, terrain, storage, city, caravan, queue } = setup()
-    order(world, queue, { kind: 'buy', good: 'iron', units: 3, cityId: city.id })
-    const before = storage.stock!.iron ?? 0
-    runUntil(world, terrain, () => caravan.job?.step === 'deliver')
-    rob(world, terrain, caravan, { iron: 3 })
-    runUntil(world, terrain, () => world.deliveries.length === 0)
-    expect(storage.stock!.iron).toBe(before + 3)
-    expect(eventsOf(world, 'deliveryRobbed')).toEqual([expect.objectContaining({ units: 3 })])
-    expect(eventsOf(world, 'delivered').map((e) => e.units)).toEqual([3])
-  }, 120_000)
-
-  it('fetch coins taken from a pick-up again, so the seller is paid for all of it', () => {
-    const { world, terrain, storage, city, caravan, queue } = setup()
-    storage.stock!.stone = 40
-    order(world, queue, { kind: 'sell', good: 'stone', units: 30, cityId: city.id })
-    runUntil(world, terrain, () => caravan.job?.step === 'collect')
-    rob(world, terrain, caravan, { coins: caravan.job!.coins })
-    expect(caravan.job).toMatchObject({ step: 'load', coins: 0 })
-    runUntil(world, terrain, () => world.deliveries.length === 0)
-    const [done] = eventsOf(world, 'delivered')
-    expect(done).toMatchObject({ delivery: 'pickUp', units: 30 })
-    expect(done!.coins).toBeGreaterThan(0)
-    expect(storage.stock!.coins).toBe(done!.coins)
-  }, 120_000)
-
-  it('fetch coins taken while a pick-up pays, and pay the rest', () => {
-    const { world, terrain, storage, city, caravan, queue } = setup()
-    storage.stock!.stone = 40
-    order(world, queue, { kind: 'sell', good: 'stone', units: 30, cityId: city.id })
-    runUntil(world, terrain, () => caravan.job?.step === 'pay')
-    const toPay = caravan.job!.toPay
-    rob(world, terrain, caravan, { coins: caravan.job!.coins, stone: 5 })
-    expect(caravan.job).toMatchObject({ robbed: 5 })
-    runUntil(world, terrain, () => world.deliveries.length === 0)
-    const [done] = eventsOf(world, 'delivered')
-    expect(done).toMatchObject({ delivery: 'pickUp', units: 30, coins: toPay })
-    expect(storage.stock!.coins).toBe(toPay)
-  }, 120_000)
-
-  it('count robberies per route, once a tick, and none by the Trade Organization', () => {
-    const { world, terrain, caravan } = setup()
-    const carriage = world.carriages.find((k) => k.id === caravan.carriageId)!
-    carriage.load.iron = 10
-    rob(world, terrain, caravan, { iron: 1 }, 'thief1')
-    expect(world.routeRobberies).toEqual({ [caravan.postId]: 1 })
-    // Two robbers in one tick are one robbery.
-    const spot = { kind: 'carriage' as const, carriageId: carriage.id }
-    resolveCarrying(
-      world,
-      ['thief1', 'thief2'].map((id) => {
-        rob(world, terrain, caravan, {}, id)
-        return { kind: 'take' as const, residentId: id, spot, goods: { iron: 1 } }
-      }),
-      terrain.size,
-    )
-    expect(world.routeRobberies).toEqual({ [caravan.postId]: 2 })
-    // Its own driver unloading robs nothing.
-    const driver = world.residents.find((r) => r.id === caravan.driverId)!
-    driver.x = carriage.x
-    driver.y = carriage.y
-    resolveCarrying(world, [{ kind: 'take', residentId: driver.id, spot, goods: { iron: 1 } }])
-    expect(world.routeRobberies).toEqual({ [caravan.postId]: 2 })
-    expect(checkInvariants(world, terrain)).toEqual([])
-  })
-
-  it('flag robberies counted for no trading post, or not a whole number of times', () => {
-    const { world, terrain, caravan } = setup()
-    world.routeRobberies = { [caravan.postId]: 2 }
-    expect(routeRobberiesSound.check(world, terrain)).toEqual([])
-    world.routeRobberies = { [caravan.postId]: 0, nowhere: 1 }
-    expect(routeRobberiesSound.check(world, terrain)).toHaveLength(2)
   })
 })

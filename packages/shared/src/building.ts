@@ -151,7 +151,11 @@ export function buildingAt(
   y: number,
   size = MAP_SIZE,
 ): Building | undefined {
-  return world.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && covers(b, x, y, size))
+  // A plain loop, footprint first: scripts ask this for every pile they look at.
+  for (const b of world.buildings) {
+    if (covers(b, x, y, size) && !SHARES_A_TILE.includes(b.kind)) return b
+  }
+  return undefined
 }
 
 /**
