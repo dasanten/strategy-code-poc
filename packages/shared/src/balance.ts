@@ -768,6 +768,16 @@ export const OUTPOST_REFILL_REACH = 3
 export const OWN_FOOD = 4 * FOOD_PER_DAY
 
 /**
+ * The default of `foodAt` in the Work, Build and Tear down defaults (`CONTEXT.md`: Getting food),
+ * in whole units: about a day of Food, rounded up. No more than `HOME_FOOD_LOW`, so a resident at
+ * home refills before they would walk for Food.
+ */
+export const GET_FOOD_AT = Math.ceil(FOOD_PER_DAY)
+
+/** The default of `foodTake` in those defaults, in whole units: six game days of Food. */
+export const GET_FOOD_TAKE = Math.ceil(6 * FOOD_PER_DAY)
+
+/**
  * Food a resident running the Breed horses default takes from the stable before they start, if
  * they carry less (`CONTEXT.md`: Breeding): their meals for the `STABLE_BREED_DAYS` of tending,
  * away from home.

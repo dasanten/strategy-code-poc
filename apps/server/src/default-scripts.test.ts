@@ -525,6 +525,7 @@ describe('the step budget', () => {
   function steps(task: Task, { memory, prepare }: Case): number {
     const world = farmWorld()
     prepare(world)
+    const program = parse(DEFAULT_SCRIPTS[task].source)
     const { globals } = bindScript({
       world,
       terrain,
@@ -534,8 +535,10 @@ describe('the step budget', () => {
       memory: structuredClone(memory),
       seen: seenAll(world),
       explored: () => true,
+      // Nothing picked: every param reads its default.
+      params: program.params,
     })
-    const result = run(parse(DEFAULT_SCRIPTS[task].source), {
+    const result = run(program, {
       globals,
       steps: SCRIPT_STEP_BUDGET,
       maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
