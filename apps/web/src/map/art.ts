@@ -105,6 +105,7 @@ export const UNIT_ART = {
 /** The small icon by a resident's figure at close zoom: what they are doing (`figures.ts`). */
 export const ACTIVITY_ART: Record<Activity, string> = {
   walking: 'activity-walking.svg',
+  riding: 'activity-riding.svg',
   carrying: 'activity-carrying.svg',
   working: 'activity-working.svg',
   fighting: 'activity-fighting.svg',

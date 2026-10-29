@@ -24,6 +24,7 @@ import {
   SHARES_A_TILE,
   covers,
   type SeenResident,
+  HORSE_GRANT_HORSES,
   UNEXPLORED,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
@@ -39,6 +40,7 @@ import {
   CentredDialog,
   Drawer,
   DrawerEdge,
+  HorseOfferNotice,
   PhoneMenu,
   ToolRail,
   TopBar,
@@ -549,6 +551,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         leader={leader?.name}
         onLogout={logout}
       />
+      {world?.horseOffer && (
+        <HorseOfferNotice
+          horses={HORSE_GRANT_HORSES}
+          onClaim={() => sendOrder({ kind: 'claimHorses' })}
+        />
+      )}
       {phone ? (
         <PhoneMenu
           open={openDrawer}
