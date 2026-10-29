@@ -11,10 +11,12 @@ import {
   HAUL_KEEP_FOOD,
   RECIPES,
   SCRIPT_API,
+  SCRIPT_VIEWS,
   Terrain,
   DIAGONAL_STEP,
   DOING_MAX_LENGTH,
   ageInYears,
+  buildingRealm,
   directivesFor,
   materialsNeeded,
   organizationLabel,
@@ -38,6 +40,7 @@ import {
   type RunningScript,
   type ScriptBinding,
   type ScriptParamType,
+  type ScriptType,
   type SeenEntity,
   type TerrainMap,
   type WorldState,
@@ -55,7 +58,8 @@ import { realmOf } from './starting-city.js'
  * `SCRIPT_API` in `@csp/shared` lists the names and their step costs; this gives them their
  * meaning for one resident in one tick.
  *
- * Queries read only what the Player sees and has explored. Actions build the very order request
+ * Queries read only what the Player sees and has explored, and every value a script gets is built
+ * from its script view (ADR 0011), so it holds exactly the view's fields. Actions build the very order request
  * the UI sends for `me` and check it with the same order kind, so a script can request nothing
  * an order couldn't; accepted requests are collected for the caller to apply like UI orders.
  */
@@ -134,12 +138,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
 
   let seen: readonly SeenEntity[] | undefined
   const untagged = ({ is: _, ...rest }: SeenEntity) => rest
-  const seenOf = (is: SeenEntity['is'], add?: (id: string) => object | undefined): Value => {
+  const seenOf = (is: SeenEntity['is'], add?: (id: string) => object | undefined) => {
     seen ??= context.seen()
     return seen
       .filter((e) => e.is === is)
       .map(untagged)
-      .map((rest) => toValue(withQueueView({ ...rest, ...add?.(rest.id) })))
+      .map((rest) => withQueueView({ ...rest, ...add?.(rest.id) }))
   }
   // Whose script it is: the Player's realm, or the NPC city running the game's defaults.
   const side = sender.npcCityId ?? realmOf(world, sender.userId)?.id
@@ -149,13 +153,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   let sees: ((at: { x: number; y: number }) => boolean) | undefined
   const inSight = (at: { x: number; y: number }) =>
     side !== undefined && (sees ??= context.sees ?? sightOf(world, terrain.size, side))(at)
-  // A building of one of the side's own cities, which it knows of in sight or not.
+  // A building of one of the side's own cities, or an outpost storage of its realm, which it
+  // knows of in sight or not.
   const ownBuilding = (b: Building) =>
     side !== undefined &&
-    b.cityId !== null &&
-    (sender.npcCityId !== undefined
-      ? b.cityId === side
-      : world.cities.some((c) => c.id === b.cityId && c.realmId === side))
+    (sender.npcCityId !== undefined ? b.cityId === side : buildingRealm(world, b) === side)
   // A script reads, never changes, the memory of its own Player's residents (`CONTEXT.md`:
   // Memory); other Players' stays hidden.
   let ownScripts: Map<string, RunningScript> | undefined
@@ -169,17 +171,14 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const asSeen = (r: Resident) => {
     const { script, ...rest } = r
     const running = { scriptId: script!.scriptId, memory: script!.memory }
-    return toValue(withQueueView({ ...rest, scriptParams: undefined, script: running }))
+    return withQueueView({ ...rest, script: running })
   }
-  let nodes: Value[] | undefined
-  const exploredNodes = (): Value => {
-    nodes ??= world.nodes
-      .filter((n: ResourceNode) => context.explored(n.x, n.y))
-      .map((n) => toValue(n))
-    return nodes
-  }
+  let nodes: ResourceNode[] | undefined
+  const exploredNodes = () => (nodes ??= world.nodes.filter((n) => context.explored(n.x, n.y)))
 
-  const queries: Record<string, (args: Value[]) => Value> = {
+  // What each query answers, as the server's data; the script gets it built from the view the
+  // query returns (`viewValue`).
+  const queries: Record<string, (args: Value[]) => unknown> = {
     residents: () => seenOf('resident', ownMemory),
     buildings: () => seenOf('building'),
     cities: () => seenOf('city'),
@@ -189,11 +188,8 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     nodes: exploredNodes,
     // A Player's memory, apart from what is in sight (`CONTEXT.md`: Last seen); an NPC city has none.
     lastSeen: () =>
-      sender.npcCityId !== undefined
-        ? []
-        : lastSeenOutOfSight(world, sender.userId).map((e) => toValue(e)),
-    directives: () =>
-      directivesFor(world, (org) => organizationLabel(world, org)).map((d) => toValue(d)),
+      sender.npcCityId !== undefined ? [] : lastSeenOutOfSight(world, sender.userId),
+    directives: () => directivesFor(world, (org) => organizationLabel(world, org)),
     withMemory: ([key, value]) => {
       if (typeof key !== 'string') throw new ScriptRuntimeError('"withMemory" needs a key')
       const wanted = JSON.stringify(plain(value) ?? null)
@@ -206,16 +202,16 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     building: ([id]) => {
       const b = world.buildings.find((x) => x.id === id)
       if (!b) return null
-      if (ownBuilding(b)) return toValue(b)
+      if (ownBuilding(b)) return b
       // Another's as the Player sees it, its stock only when they see inside (`CONTEXT.md`:
       // Seeing inside a storage).
       seen ??= context.seen()
       const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
-      return shown ? toValue(untagged(shown)) : null
+      return shown ? untagged(shown) : null
     },
     pileAt: ([x, y]) => {
       const at = tile(x, y, 'pileAt')
-      return inSight(at) ? toValue(pileAt(world, at.x, at.y)?.goods) : null
+      return inSight(at) ? pileAt(world, at.x, at.y)?.goods : null
     },
     outputOf: ([building]) => {
       const id = (building as Record<string, Value> | null)?.id
@@ -225,14 +221,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       const goods = recipes
         ? [...new Set(recipes.flatMap((r) => Object.keys(r.output)))]
         : [workplaceGood(world, b)].filter((g) => g !== undefined)
-      return Object.freeze(goods) as Value[]
+      return goods
     },
     materialsNeeded: ([site]) => {
       const id = (site as Record<string, Value> | null)?.id
       const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
       if (!b?.site || !(ownBuilding(b) || inSight(b))) return []
-      const need = Object.entries(materialsNeeded(b)).map(([good, units]) => ({ good, units }))
-      return Object.freeze(need.map((m) => toValue(m))) as Value[]
+      return Object.entries(materialsNeeded(b)).map(([good, units]) => ({ good, units }))
     },
     terrainAt: ([x, y]) => {
       const at = tile(x, y, 'terrainAt')
@@ -254,7 +249,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   }
 
   let api: readonly ScriptBinding[]
-  let me: Value
+  let me: object
   let forMe: Record<string, string>
   let actions: Record<string, (args: Value[]) => Value>
   if (context.armyId !== undefined) {
@@ -266,8 +261,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       const r = world.residents.find((x) => x.id === id)
       return r ? [{ ...r, script: undefined, age: ageInYears(r, world.tick) }] : []
     })
-    // The army's own script state is `memory`, not part of `me`.
-    me = toValue({ ...army, script: undefined, members })
+    me = { ...army, members }
     actions = {
       walkTo: ([x, y]) => request('armyWalkTo', { x: plain(x), y: plain(y) }),
       guard: ([x, y]) => request('armyGuard', { x: plain(x), y: plain(y) }),
@@ -281,14 +275,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = SCRIPT_API
     forMe = { residentId: resident.id }
     // The script's own state is `memory`, not part of `me`.
-    me = toValue(
-      withQueueView({
-        ...resident,
-        script: undefined,
-        scriptParams: undefined,
-        age: ageInYears(resident, world.tick),
-      }),
-    )
+    me = withQueueView({ ...resident, script: undefined, age: ageInYears(resident, world.tick) })
     actions = residentActions(request, resident)
     actions.doing = ([text]) => {
       const doing = doingText(text)
@@ -327,7 +314,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         const by = new Map(storages.map((b) => [b, time(at, b)]))
         storages.sort((a, b) => by.get(a)! - by.get(b)!)
       }
-      return Object.freeze(storages.map((b) => toValue(b))) as Value[]
+      return storages
     }
   }
 
@@ -335,11 +322,14 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const params = Object.create(null) as ScriptObject
   for (const p of context.params ?? []) {
     const target = p.id === undefined ? undefined : paramTarget(world, side, p.type, p.id)
-    params[p.name] = toValue(target?.is === 'building' ? target.building : target?.carriage)
+    params[p.name] =
+      target?.is === 'building'
+        ? viewValue(target.building, { view: 'building' })
+        : viewValue(target?.carriage, { view: 'carriage' })
   }
 
   const values: Record<string, Value> = {
-    me,
+    me: viewValue(me, api.find((b) => b.name === 'me')!.returns),
     memory: context.memory,
     params: Object.freeze(params),
     tick: world.tick,
@@ -355,7 +345,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
     const call = (binding.is === 'query' ? queries : actions)[binding.name]
     if (!call) throw new Error(`the script binding ${binding.name} is not implemented`)
-    globals[binding.name] = new NativeFunction(binding.name, call, binding.cost)
+    const answer =
+      binding.is === 'query'
+        ? (args: Value[]) => viewValue(call(args), binding.returns)
+        : (call as (args: Value[]) => Value)
+    globals[binding.name] = new NativeFunction(binding.name, answer, binding.cost)
   }
   return { globals, requests, ended: () => ended }
 }
@@ -560,16 +554,35 @@ function requestsSound(
   return out
 }
 
-/**
- * A copy of plain world data as a script value, frozen so the script can't change it (`me` and
- * what queries answer are the world as seen, not the world itself).
- */
 /** A resident's queue as its script view shows it (`queueView`), not its steps. */
 function withQueueView(r: object): object {
   const queue = (r as { queue?: Queue }).queue
   return queue ? { ...r, queue: queueView(queue) } : r
 }
 
+/**
+ * Plain world data as a script value of `type`, built from its script view (ADR 0011): an object
+ * holds exactly its view's fields, each `null` that the data doesn't hold, so no other field of
+ * the server's reaches a script. A value of the wrong kind for its type is `null`. Frozen, so the
+ * script can't change it (`me` and what queries answer are the world as seen, not the world).
+ */
+export function viewValue(data: unknown, type: ScriptType): Value {
+  if (data === null || data === undefined) return null
+  if (type === 'any') return toValue(data)
+  if (typeof type === 'string') return typeof data === type ? (data as Value) : null
+  if ('list' in type) {
+    return Array.isArray(data)
+      ? (Object.freeze(data.map((d) => viewValue(d, type.list))) as Value[])
+      : null
+  }
+  if (typeof data !== 'object' || Array.isArray(data)) return null
+  const record = data as Record<string, unknown>
+  const out = Object.create(null) as ScriptObject
+  for (const f of SCRIPT_VIEWS[type.view].fields) out[f.name] = viewValue(record[f.name], f.type)
+  return Object.freeze(out)
+}
+
+/** A copy of plain data as a script value, frozen; for what a view leaves open (`any`). */
 function toValue(data: unknown): Value {
   if (data === null || data === undefined) return null
   if (typeof data === 'number' || typeof data === 'string' || typeof data === 'boolean') {

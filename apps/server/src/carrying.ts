@@ -4,6 +4,7 @@ import {
   canWork,
   goodsAtSpot,
   materialsNeeded,
+  outpostStorageGuarded,
   pileAt,
   siteAt,
   storageAt,
@@ -172,7 +173,7 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * nothing happens. Either way the order is done; a store or fetch order goes on or ends
  * (`carriedForOrder`). Taking from another Organization's storage or
  * carriage is theft (`CONTEXT.md`: Crime), on a map of `size` tiles, and taking from a caravan's
- * carriage robs it (`robCaravan`).
+ * carriage robs it (`robCaravan`). Nobody but its realm takes from a guarded outpost storage.
  */
 export function resolveCarrying(world: WorldState, actions: CarryAction[], size = MAP_SIZE): void {
   const robbed = new Set<string>()
@@ -195,7 +196,7 @@ function take(
 ): void {
   const source =
     a.spot.kind === 'ground' ? pileAt(world, r.x, r.y)?.goods : spotStock(world, r, a.spot)
-  if (!source) return
+  if (!source || guardedFrom(world, r, a.spot, size)) return
   const taken: Stock = {}
   for (const [good, wanted] of Object.entries(a.goods) as [Good, number][]) {
     const units = Math.min(wanted, source[good] ?? 0, unitsThatFit(r, good, world.tick))
@@ -215,6 +216,16 @@ function take(
   if (a.spot.kind === 'carriage' && Object.keys(taken).length > 0) {
     robCaravan(world, r, a.spot.carriageId, robbed)
   }
+}
+
+/**
+ * Whether a spot is an outpost storage guarded against `r` (`CONTEXT.md`: Outpost storage): it is
+ * guarded and `r` is not of its realm.
+ */
+function guardedFrom(world: WorldState, r: Resident, spot: GoodsSpot, size: number): boolean {
+  if (spot.kind !== 'storage') return false
+  const b = world.buildings.find((x) => x.id === spot.storageId)
+  return !!b && r.owner !== b.realmId && outpostStorageGuarded(world, b, size)
 }
 
 /**

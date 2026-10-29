@@ -34,6 +34,7 @@ import {
   runnableScript,
   syncDefaultScripts,
 } from './scripts.js'
+import { noteScriptViewChanges } from './field-check.js'
 import { generateTerrain } from './terrain-gen.js'
 import { TerritoryTracker } from './territory.js'
 import { runTick } from './tick.js'
@@ -98,6 +99,8 @@ const walking = new Walking(terrain)
 const reporter = createTickReporter(logger)
 // Players who haven't edited a default script run the game's current default from now on.
 syncDefaultScripts(db)
+// Players whose scripts read a field a script view dropped since the last start are told so.
+if (noteScriptViewChanges(db, world)) saveWorld(db, world)
 // The script library lives in the database, so its invariant is checked at start and daily.
 reporter.invariantViolations(world, checkScriptLibrary(db))
 const realtime = attachRealtime(app.server, {
