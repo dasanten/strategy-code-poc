@@ -46,7 +46,8 @@ Other scripts:
 ```sh
 pnpm build      # type-check and compile all packages, bundle the client
 pnpm start      # run the compiled server
-pnpm test       # Vitest
+pnpm test       # Vitest, the full suite
+pnpm check [base]  # lint, typecheck and the tests affected by changes against base (default origin/dev)
 pnpm lint       # ESLint
 pnpm format     # Prettier
 ```

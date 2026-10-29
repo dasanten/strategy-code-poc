@@ -37,13 +37,14 @@ branches from `origin/dev` instead (ADR 0010).
   through the game API, orders only request actions (ADR 0002).
 - If the next ticket cannot ship without this one (or the reverse), do both in this PR.
 - Tick the ticket's "Done when" boxes as they become true (edit the issue body).
-- Before committing: `pnpm lint`, `pnpm typecheck`, `pnpm test`.
+- Before committing: `pnpm check origin/epic/<n>-<slug>` (a `bug`: `origin/dev`). It runs lint,
+  typecheck and the tests the change affects (ADR 0013).
 
 ## 4. Pull request
 
-- Merge the latest epic branch into yours and run `pnpm lint`, `pnpm typecheck`, `pnpm test`
-  again: ticket PRs get no CI, so this run is what lets the PR merge. Say in the PR body that it
-  passed.
+- Merge the latest epic branch into yours and run `pnpm check origin/epic/<n>-<slug>` again:
+  ticket PRs get no CI, so this run is what lets the PR merge. Say in the PR body "Checked:
+  `pnpm check` against `<base>`", that it passed, and the test files it ran (its last line).
 - Push and open a ready-for-review PR (not a draft) against the epic branch (a `bug` against
   `dev`).
 - Title: what changed. Body: what and why, balance values chosen, anything to check, then one
