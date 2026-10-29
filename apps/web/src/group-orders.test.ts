@@ -251,6 +251,21 @@ describe('group orders with Shift held', () => {
     expect(skipped).toEqual([{ id: 'c', name: 'C', why: 'a child' }])
   })
 
+  it('gives each the params set before the script starts, a queued step keeping them', () => {
+    const params = { foodAt: 2, storage: null }
+    const rs = [resident('a', 10, 10), resident('b', 10, 10)]
+    const run = send({ kind: 'runScript', scriptId: 7, params }, rs)
+    expect(run.requests.map((q) => q.order)).toEqual([
+      { kind: 'runScript', scriptId: 7, params, residentId: 'a' },
+      { kind: 'runScript', scriptId: 7, params, residentId: 'b' },
+    ])
+    const { requests } = queue({ kind: 'work', workplace: farm, name: 'farm', params }, rs)
+    for (const q of requests)
+      expect(q.order.steps).toContainEqual({
+        order: { kind: 'task', task: 'work', workplaceId: 'farm', params },
+      })
+  })
+
   it('queues storing everything, even for those carrying nothing yet', () => {
     const { requests, skipped } = queue({ kind: 'store' }, [resident('a', 0, 0)])
     expect(skipped).toEqual([])

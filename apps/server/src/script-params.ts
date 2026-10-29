@@ -10,6 +10,7 @@ import {
   type ScriptParam,
   type ScriptParamType,
   type ScriptParamValue,
+  type StartParamValues,
   type WorldState,
 } from '@csp/shared'
 import { buildingOrganization, carriageOrganization } from './crimes.js'
@@ -85,6 +86,73 @@ export function paramValues(
   })
 }
 
+/** Why `value` can't be picked for `param` by the realm, if it can't: by the param's type. */
+function valueProblem(
+  world: WorldState,
+  realmId: string,
+  param: ScriptParam,
+  value: unknown,
+): string | undefined {
+  if (!isScriptParamType(param.type)) return 'the script has no such param'
+  if (param.type === 'number')
+    return isParamNumber(value) ? undefined : 'must be a whole number of zero or more'
+  if (typeof value !== 'string' || !paramTarget(world, realmId, param.type, value))
+    return param.type === 'storage'
+      ? 'must be a storage, a stable or a carriage of yours'
+      : 'must be a building or construction site of yours'
+  return undefined
+}
+
+/** Keeps `value` for the resident's param of the script, or with null clears it. */
+function keep(r: Resident, scriptId: number, name: string, value: ScriptParamValue | null): void {
+  if (value === null) {
+    const picked = r.scriptParams?.[scriptId]
+    if (!picked) return
+    delete picked[name]
+    if (Object.keys(picked).length === 0) delete r.scriptParams![scriptId]
+    if (Object.keys(r.scriptParams!).length === 0) delete r.scriptParams
+    return
+  }
+  r.scriptParams ??= {}
+  r.scriptParams[scriptId] = { ...r.scriptParams[scriptId], [name]: value }
+}
+
+/**
+ * Why the param values an order starting a script gives (`CONTEXT.md`: Script parameter, Before
+ * it starts) don't fit the script's `param` lines, if they don't: each must name one of them and
+ * fit its type, or be null.
+ */
+export function startParamsProblem(
+  world: WorldState,
+  realmId: string,
+  declared: readonly ScriptParam[],
+  params: unknown,
+): string | undefined {
+  if (params === undefined) return undefined
+  if (typeof params !== 'object' || params === null || Array.isArray(params))
+    return 'params must be values by name'
+  for (const [name, value] of Object.entries(params)) {
+    const param = declared.find((p) => p.name === name)
+    if (!param) return `${name}: the script has no such param`
+    if (value === null) continue
+    const problem = valueProblem(world, realmId, param, value)
+    if (problem) return `${name}: ${problem}`
+  }
+  return undefined
+}
+
+/**
+ * Sets the param values an order starting script `scriptId` gives, before its first tick: each
+ * one kept for the resident, null clearing it; those left out keep theirs.
+ */
+export function setStartParams(
+  r: Resident,
+  scriptId: number,
+  params: StartParamValues | undefined,
+): void {
+  for (const [name, value] of Object.entries(params ?? {})) keep(r, scriptId, name, value)
+}
+
 interface SetScriptParamRequest extends OrderRequest {
   kind: 'setScriptParam'
   residentId: string
@@ -119,30 +187,16 @@ export function setScriptParamOrder(host: {
       if (!param || !isScriptParamType(param.type)) return 'the script has no such param'
       if (o.targetId === null && o.value === undefined) return undefined
       if (param.type === 'number')
-        return o.targetId === undefined && isParamNumber(o.value)
-          ? undefined
+        return o.targetId === undefined
+          ? valueProblem(world, realm.id, param, o.value)
           : 'must be a whole number of zero or more'
       if (o.value !== undefined) return 'takes no number'
-      if (typeof o.targetId !== 'string' || !paramTarget(world, realm.id, param.type, o.targetId))
-        return param.type === 'storage'
-          ? 'must be a storage, a stable or a carriage of yours'
-          : 'must be a building or construction site of yours'
-      return undefined
+      return valueProblem(world, realm.id, param, o.targetId)
     },
     apply(world, _sender, order) {
       const { residentId, scriptId, name, targetId, value } = order as SetScriptParamRequest
       const r = world.residents.find((x) => x.id === residentId)
-      if (!r) return
-      if (targetId === null) {
-        const picked = r.scriptParams?.[scriptId]
-        if (!picked) return
-        delete picked[name]
-        if (Object.keys(picked).length === 0) delete r.scriptParams![scriptId]
-        if (Object.keys(r.scriptParams!).length === 0) delete r.scriptParams
-        return
-      }
-      r.scriptParams ??= {}
-      r.scriptParams[scriptId] = { ...r.scriptParams[scriptId], [name]: value ?? targetId! }
+      if (r) keep(r, scriptId, name, value ?? targetId!)
     },
   }
 }
