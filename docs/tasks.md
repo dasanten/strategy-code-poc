@@ -11,9 +11,9 @@ the UI redesign (Epic 17, ADR 0008), then the livelier pace and default scripts 
 Epic 18, ahead of Bandits. Agreed with Daniel on 2026-10-28: Quick wins 2 (Epic 30), Food pickup
 (31), Outpost storage (32) and UI overhaul and mobile (33), in that order, go ahead of Bandits.
 Agreed with Daniel on 2026-10-29: Faster checks (Epic 34, ADR 0013) first, since every other
-ticket waits on checks; then Riding and horses (35), Script params (36), Queue planner and
-groups (37), Children and food (38) and Passenger carriages (39), in that order, all ahead of
-Bandits. The tickets of 35–39 wait for Epic 34's T34.1 and T34.2.
+ticket waits on checks; then Riding and horses (35), Mountain roads (40), Script params (36),
+Queue planner and groups (37), Children and food (38) and Passenger carriages (39), in that
+order, all ahead of Bandits. The tickets of 35–40 wait for Epic 34's T34.1 and T34.2.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -57,6 +57,7 @@ I sleep.
 | 37  | [Queue planner and groups](https://github.com/dasanten/strategy-code-poc/issues/427)            | ticketed                |
 | 38  | [Children and food](https://github.com/dasanten/strategy-code-poc/issues/431)                   | ticketed                |
 | 39  | [Passenger carriages](https://github.com/dasanten/strategy-code-poc/issues/434)                 | ticketed                |
+| 40  | [Mountain roads](https://github.com/dasanten/strategy-code-poc/issues/442)                      | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
@@ -73,8 +74,9 @@ its tickets or closes.
   Bugs branch from `dev` and go straight back to it.
 - **PRs:** one per ticket; tickets that can't ship apart share one. The body says
   `Closes #<ticket>` for each and `Part of #<epic>`. Ticket PRs get no CI: the ticket session runs
-  `pnpm lint`, `pnpm typecheck` and `pnpm test`, and before merging into the epic branch the
-  coordinating session runs them again on the PR merged with the epic branch. Merging into a
+  `pnpm check origin/epic/<n>-<slug>` (lint, typecheck and the tests the change affects, ADR 0013),
+  and before merging into the epic branch the coordinating session runs it again on the PR merged
+  with the epic branch. PR bodies say "Checked: `pnpm check` against …" with what it ran. Merging into a
   non-default branch doesn't close the ticket, so whoever merges closes its tickets by hand.
 - **Epic PR:** when an epic's last ticket is on its branch, one PR `epic/<n>-…` → `dev` with
   `Closes #<epic>` runs CI and is merged once green; whoever merges closes the epic by hand.

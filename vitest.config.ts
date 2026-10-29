@@ -10,5 +10,14 @@ export default defineConfig({
     hookTimeout: 120_000,
     // Locally several sessions often check at once: each takes half the cores, not all of them.
     maxWorkers: process.env.CI ? undefined : '50%',
+    // `pnpm check` runs only the tests affected by a change (ADR 0013); a change to one of these
+    // runs them all.
+    forceRerunTriggers: [
+      '**/package.json',
+      '**/pnpm-lock.yaml',
+      '**/{vitest,vite}.config.*',
+      '**/tsconfig*.json',
+      '**/eslint.config.*',
+    ],
   },
 })

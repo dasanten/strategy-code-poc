@@ -22,4 +22,6 @@
 - Toolchain: the machine's default Node is too old. In bash run
   `eval "$(fnm env --shell bash)" && fnm use` first (from the repo root), and call pnpm as
   `corepack pnpm`. `gh` is at `C:\Program Files\GitHub CLI\gh.exe`.
-- Before finishing: `pnpm lint`, `pnpm typecheck`, `pnpm test`.
+- Before finishing: `pnpm check <base>` (ADR 0013), with `<base>` the branch the change goes into
+  (`origin/epic/<n>-<slug>`, or `origin/dev` for a bug). It runs lint, typecheck and only the
+  tests the change affects, and says what it ran. `pnpm test` is the full suite; CI runs it.
