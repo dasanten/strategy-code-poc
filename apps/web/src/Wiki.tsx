@@ -89,6 +89,7 @@ import {
   NPC_CITY_WONT_SELL_STANDING,
   NPC_TRADE,
   OWN_FOOD,
+  OUTPOST_REFILL_REACH,
   PERSUADE_ASK_AGAIN_DAYS,
   PERSUADE_STANDING,
   PRICE_ELASTICITY,
@@ -604,7 +605,9 @@ export function Wiki() {
           a game day on plains; each point of Endurance above average needs{' '}
           {pct(HUNGER_ENDURANCE_EFFECT)} less (more below), at most {pct(HUNGER_ENDURANCE_LIMIT)}.
           They keep {num(OWN_FOOD)} Food of their own on them, and at home take a meal from the
-          storage when they run low.
+          storage when they run low. Within {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage
+          of their realm they take it from there the same way, so a stocked outpost storage next to
+          a far workplace keeps its workers fed.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -754,9 +757,26 @@ export function Wiki() {
         <p>
           A city building (town hall, house, storage, wall, gate) belongs to a city when it stands
           within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
-          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house or a storage
-          goes only in a city's area; a town hall, wall or gate goes anywhere off Mountain and off
+          the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house goes only in a
+          city's area; a town hall, storage, wall or gate goes anywhere off Mountain and off
           resource nodes, and a new town hall founds a city.
+        </p>
+        <p>
+          A storage in a city's area is that city's storage. One outside any city is an{' '}
+          <strong>outpost storage</strong>: it belongs to the realm whose residents finished it and
+          counts as a storage of your realm everywhere (Store, Fetch, carrying the output, fetching
+          materials, haul route stops, <code>storages()</code> and <code>storage</code> params). It
+          founds no city and has no area. A city that grows over it takes it in; a storage cut off
+          from its city, or left when its town hall is torn down, stays an outpost storage of that
+          city's realm. What it holds is seen only by its realm and its allies, and by anyone
+          standing at it. Residents of your realm within {num(OUTPOST_REFILL_REACH)} tiles of it
+          take a meal from it when they run low, as at home.
+        </p>
+        <p>
+          An outpost storage is guarded like a workplace: while an armed resident of its realm
+          stands on or next to it and nobody else's armed resident does, only its realm can take
+          from it. Unguarded, anyone at it can pick up from it; for another organization that is
+          theft, and tearing it down is a crime too (see Standing).
         </p>
       </Section>
 
@@ -1015,7 +1035,8 @@ export function Wiki() {
           Standing runs from {signed(-STANDING_RANGE)} to {signed(STANDING_RANGE)}. A known crime
           lowers the victim's standing toward the culprit; standing drifts back toward neutral by{' '}
           {num(STANDING_DRIFT_PER_DAY)} a game day. A crime is remembered for{' '}
-          {days(CRIME_MEMORY_DAYS)} after the news stops spreading.
+          {days(CRIME_MEMORY_DAYS)} after the news stops spreading. Taking from or tearing down
+          another realm's outpost storage counts the same as its city storage.
         </p>
         <table>
           <thead>

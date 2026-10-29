@@ -134,7 +134,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(48)
+    expect(WORLD_FORMAT_VERSION).toBe(49)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -236,6 +236,16 @@ describe('world saves', () => {
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.riding === undefined)).toBe(true)
     expect(checkInvariants(migrated, land)).toEqual([])
+  })
+
+  it('leaves a storage of no city from before ownerless (migration 48 → 49)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const storage = world.buildings.find((b) => b.kind === 'storage')!
+    // A format 48 storage cut off from every city: which city it last belonged to is not kept.
+    storage.cityId = null
+    const migrated = migrateWorld(structuredClone(world), 48, { terrain: land }, migrations, 49)
+    expect(migrated).toEqual(world)
+    expect(migrated.buildings.every((b) => b.realmId === undefined)).toBe(true)
   })
 
   it('keeps the newest saves and one per hour for a week', async () => {

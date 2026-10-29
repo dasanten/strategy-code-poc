@@ -96,6 +96,12 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
     'The city it belongs to.',
     'for a building of no city, such as a workplace on a node',
   ),
+  field(
+    'realmId',
+    'string',
+    'The realm an outpost storage, a storage of no city, belongs to.',
+    'for any other building, and for a storage of no city that belongs to no realm',
+  ),
   x,
   y,
   field(
@@ -557,14 +563,20 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('is', 'string', '"building" or "city".'),
       field('seenAt', 'number', 'The tick it was last in sight.'),
       id('building or city'),
-      ...BUILDING_FIELDS.filter((f) => f.name !== 'id').map((f) => ({
+      ...BUILDING_FIELDS.filter((f) => f.name !== 'id' && f.name !== 'realmId').map((f) => ({
         ...f,
         nullWhen: f.nullWhen ? `for a city, ${f.nullWhen}` : 'for a city',
       })),
-      ...CITY_FIELDS.filter((f) => f.name !== 'id').map((f) => ({
-        ...f,
-        nullWhen: f.nullWhen ? `for a building, ${f.nullWhen}` : 'for a building',
-      })),
+      ...CITY_FIELDS.filter((f) => f.name !== 'id').map((f) =>
+        f.name === 'realmId'
+          ? field(
+              'realmId',
+              'string',
+              'The realm a city, or an outpost storage (a storage of no city), belongs to.',
+              'for an NPC city, and for any other building',
+            )
+          : { ...f, nullWhen: f.nullWhen ? `for a building, ${f.nullWhen}` : 'for a building' },
+      ),
     ],
   },
   directive: {
