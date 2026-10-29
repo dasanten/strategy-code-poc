@@ -132,6 +132,30 @@ describe('doingLine', () => {
     expect(line({ order: null, carrying: { since: 0 } })).toBe('Carrying a child')
   })
 
+  it('says Riding where a rider would walk (CONTEXT.md: Riding)', () => {
+    const riding = 'h1'
+    expect(line({ order: walk, riding })).toBe('Riding to 4, 5 · 1 tiles to go')
+    expect(line({ order: walk, riding, script: { scriptId: 5 } })).toBe(
+      'Riding to 4, 5 · 1 tiles to go',
+    )
+    expect(line({ order: walk, riding, script: { scriptId: 1, building: 'mine' } })).toBe(
+      'Working the mine: riding to 4, 5 · 1 tiles to go',
+    )
+    const road: ResidentOrder = {
+      kind: 'roadLine',
+      tiles: [[4, 5]],
+      phase: 'walking',
+      path: null,
+      progress: 0,
+      siteId: null,
+    }
+    expect(line({ order: road, riding })).toBe('Riding to lay road at 4, 5 · 1 road tile to go')
+    // Their own doing() still wins.
+    expect(line({ order: walk, riding, script: { scriptId: 5, doing: 'Scouting' } })).toBe(
+      'Scouting',
+    )
+  })
+
   it('shows what the script last gave doing() instead', () => {
     expect(
       line({

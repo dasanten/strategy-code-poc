@@ -939,6 +939,11 @@ export function Wiki() {
           carriage; a ridden horse is never hitched.
         </p>
         <p>
+          A rider’s Doing line says <em>Riding to …</em> where it would say{' '}
+          <em>Walking to …</em>, and their card shows the horse they ride: its stats, age, health
+          and hunger, with <strong>Dismount</strong> under Orders.
+        </p>
+        <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
           {days(STABLE_FEED_DAYS)} for the horses in it ({num(HORSE_FOOD_PER_DAY)} a horse a day):
           below that they fetch what is missing from the nearest storage of your realm with Food, or

@@ -101,6 +101,7 @@ import {
   horseDetail,
   groupOrders,
   residentActions,
+  riddenHorseLine,
   type ActionId,
   type CardAction,
 } from './selection-view.js'
@@ -372,12 +373,16 @@ function StepMinutes({
   )
 }
 
-/** What a resident's built-in order has them doing. */
-export function orderDoing(r: Pick<Resident, 'order'>): string {
+/**
+ * What a resident's built-in order has them doing. A rider rides where others walk (`CONTEXT.md`:
+ * Riding): "Riding to 4, 5 · 3 tiles to go".
+ */
+export function orderDoing(r: Pick<Resident, 'order' | 'riding'>): string {
   const o = r.order
+  const walking = r.riding === undefined ? 'Walking' : 'Riding'
   if (o?.kind === 'walkTo') {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
-    return `Walking to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
+    return `${walking} to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
   }
   if (o?.kind === 'drive') {
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
@@ -418,7 +423,7 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
     const what = LINE_BUILDING[o.kind]
     const left = `${o.tiles.length} ${what} tile${o.tiles.length === 1 ? '' : 's'} to go`
     return o.phase === 'walking'
-      ? `Walking to lay ${what} at ${x}, ${y} · ${left}`
+      ? `${walking} to lay ${what} at ${x}, ${y} · ${left}`
       : `Building ${what} at ${x}, ${y} · ${left}`
   }
   return 'Idle'
@@ -1041,6 +1046,7 @@ export function ResidentCard({
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
   useActionKeys(actions, act)
+  const ridden = riddenHorseLine(r, horses, tick)
   return (
     <SelectionCard
       rel={r.owner === realmId ? 'own' : 'alliance'}
@@ -1049,6 +1055,7 @@ export function ResidentCard({
       lines={[
         <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
         `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
+        ...(ridden ? [ridden] : []),
       ]}
       head={
         <div className="vitals">

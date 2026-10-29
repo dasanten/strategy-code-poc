@@ -40,6 +40,7 @@ import {
   nodeFit,
   groupOrders,
   residentActions,
+  riddenHorseLine,
   tileActions,
   type ResidentHere,
   type TileThings,
@@ -576,6 +577,18 @@ describe('horses on the tile card', () => {
     )
     const mine = tile({ carriages: [{ ...carriage, horseId: null }] })
     expect(mine.lines.find((l) => l.startsWith('Carriage'))).toContain('· no horse hitched')
+  })
+
+  it('lists a rider’s horse on their card with its stats, age and how it fares', () => {
+    const at = 5 * TICKS_PER_GAME_YEAR + 100
+    const ridden = horse({ id: 'h2', hunger: 10, health: MAX_HEALTH - 5 })
+    const horses = [horse(), ridden]
+    expect(riddenHorseLine({ riding: 'h2' }, horses, at)).toBe(
+      'Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt',
+    )
+    expect(riddenHorseLine({}, horses, at)).toBeUndefined()
+    // A horse not in sight shows nothing.
+    expect(riddenHorseLine({ riding: 'h9' }, horses, at)).toBeUndefined()
   })
 
   it('shows each horse’s stats, age and how it fares, and how much its carriage holds', () => {
