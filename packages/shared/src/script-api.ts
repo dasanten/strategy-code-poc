@@ -251,8 +251,8 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('stop', [], 'Stop what I was ordered to do and stand idle.'),
   action(
     'end',
-    [],
-    'End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. It asks for no order.',
+    ['reason?'],
+    `End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. With \`reason\`, short text (cut to ${DOING_MAX_LENGTH} characters), my Player’s realm log says why, like “Ana stopped Work: no workplace on her tile”. It asks for no order.`,
   ),
   action(
     'doing',

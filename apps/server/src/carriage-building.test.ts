@@ -231,7 +231,12 @@ describe('building a carriage', () => {
       b.script = { scriptId: 1, memory: { building: 'carriage', at: { x: 10, y: 5 } } }
     }
     const host: ScriptHost = {
-      script: () => ({ userId: 7, source: DEFAULT_SCRIPTS.build.source, followsDefault: true }),
+      script: () => ({
+        userId: 7,
+        name: DEFAULT_SCRIPTS.build.name,
+        source: DEFAULT_SCRIPTS.build.source,
+        followsDefault: true,
+      }),
       sender: (userId) => ({ userId, account: { name: 'Mara', isAdmin: false } }),
       explored: () => true,
     }
