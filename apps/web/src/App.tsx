@@ -79,6 +79,7 @@ import {
   type ActionId,
 } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
+import { ScriptLog } from './ScriptLog.js'
 import { ScriptMemoryTree } from './ScriptMemory.js'
 import { ScriptParamFields } from './ScriptParams.js'
 import { paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
@@ -115,7 +116,8 @@ function Pages() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, founding, status, sendOrder, found, memories, watchScript } = useWorld(onLoggedOut)
+  const { world, founding, status, sendOrder, found, memories, scriptLogs, watchScript } =
+    useWorld(onLoggedOut)
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
@@ -916,6 +918,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   watch={watchScript}
                 />
               )
+            }
+            scriptLog={
+              <ScriptLog id={selected.id} lines={scriptLogs.get(selected.id)} watch={watchScript} />
             }
             onStore={async () =>
               setOrderError(await giveOrder({ ...STORE_ALL, residentId: selected.id }))

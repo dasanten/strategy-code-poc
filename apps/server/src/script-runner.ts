@@ -47,6 +47,7 @@ import {
   scriptRequestsSound,
   type ScriptContext,
 } from './script-bindings.js'
+import { addToScriptLog } from './script-log.js'
 import type { RunnableScript } from './scripts.js'
 import { paramValues, scriptParamsSound } from './script-params.js'
 import { entitiesInSight, sightOf } from './sight.js'
@@ -502,10 +503,19 @@ export class ScriptRunner {
     }
     // What it requested counts, even when it stopped with an error or out of steps.
     for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
+    // So are its log lines, and the reason it ended with goes in the log after them. Only the
+    // owning Player reads the log, so a hirer's script, run by a resident they don't own, logs none.
+    const reason = bound.ended() ? bound.endReason() : null
+    if (resident?.owner === realm.id) {
+      addToScriptLog(
+        resident,
+        world.tick,
+        reason === null ? bound.logged : [...bound.logged, reason],
+      )
+    }
     if (bound.ended()) {
       endScript(world, r.id)
       // A reason is noted each time, not rate-limited: an end is no error.
-      const reason = bound.endReason()
       if (reason !== null) {
         recordEvent(world, realm.id, {
           kind: 'scriptStopped',
@@ -714,6 +724,7 @@ function runCityScripts(
     })
     const { globals, requests } = bound
     run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
     if (bound.ended()) {
       endScript(world, r.id)
