@@ -9,6 +9,7 @@ import {
   createTickReporter,
   flushSentry,
   initSentry,
+  reportClientError,
   setupFastifyErrorHandler,
   tagWorld,
 } from './monitoring.js'
@@ -115,6 +116,7 @@ const realtime = attachRealtime(app.server, {
   orders,
   territory,
   sightCheck: { reporter, sampleRate: config.invariantSampleRate },
+  onError: (error, userId) => reportClientError(logger, error, userId),
 })
 
 const loop = setInterval(() => {

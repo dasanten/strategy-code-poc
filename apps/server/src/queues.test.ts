@@ -157,6 +157,28 @@ describe('queue order', () => {
     expect(s.r).toMatchObject({ x: 6, y: 14 })
   })
 
+  it('skips a kept step whose kind is unknown or inherited from Object.prototype', () => {
+    // Such steps can't be given (`queueStepsProblem`), but a kept queue is checked again when
+    // its step's turn comes, and a lookup must not find `Object.prototype.constructor`.
+    const s = setup()
+    const kinds = ['constructor', 'toString', '__proto__', 'fly']
+    s.r.queue = {
+      realmId: 'r1',
+      steps: kinds.map((kind, i) => ({ id: i + 1, order: { kind } })),
+      current: 0,
+      startedAt: null,
+      loop: false,
+      nextStepId: kinds.length + 1,
+    }
+    expect(() => s.tick()).not.toThrow()
+    expect(s.r.queue).toBeUndefined()
+    expect(skips(s.world.events)).toEqual(
+      kinds.map((kind) =>
+        expect.objectContaining({ order: kind, reason: `unknown order: ${kind}` }),
+      ),
+    )
+  })
+
   it('skips a step that ends in a failure and notes it', () => {
     const s = setup()
     s.give({ kind: 'queue', steps: [{ order: { kind: 'store', goods: ['wood'] } }, walk(3, 3)] })
