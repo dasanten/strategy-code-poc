@@ -781,6 +781,13 @@ export function Wiki() {
           horse stands on it: the work waits until they leave. A horse left there unridden can't be
           ridden off a road.
         </p>
+        <p>
+          Tear down can be run directly too, with Run script or as a queue step: they tear down the
+          building or site in its <code>building</code> param, walking there first, or with none
+          picked the one they stand on when it starts. Giving Tear down on a building fills it; it
+          is never kept between starts. With no building there, Tear down ends and your realm log
+          says why.
+        </p>
         <table>
           <thead>
             <tr>
@@ -936,6 +943,14 @@ export function Wiki() {
           meals, if they carry less. NPC cities have one of their residents breed their horses the
           same way.
         </p>
+        <p>
+          Breed horses can be run directly too, with Run script or as a queue step: they breed in
+          the stable in its <code>stable</code> param, walking there first, or with none picked the
+          one they stand in when it starts. They pick the pair themselves, a paused pair in that
+          stable first, else two fed horses of your realm in it. Giving Breed horses in a stable
+          fills the param; it is never kept between starts. With no stable there, or no two fed
+          horses in it, Breed horses ends and your realm log says why.
+        </p>
         <h3>Horse stats</h3>
         <p>
           Every horse has Speed, Strength and Endurance, and an age. A new horse's stats are whole
@@ -991,8 +1006,11 @@ export function Wiki() {
           {days(STABLE_FEED_DAYS)} for the horses in it ({num(HORSE_FOOD_PER_DAY)} a horse a day):
           below that they fetch what is missing from the nearest storage of your realm with Food, or
           from the one picked as <code>source</code> on their card, and store it in the stable;
-          otherwise they wait there. Picking another <code>stable</code> on the card has them feed
-          that one instead.
+          otherwise they wait there. Feed the stable can be run directly too, with Run script or as
+          a queue step: they feed the stable in its <code>stable</code> param, or with none picked
+          the one they stand in when it starts. Giving Feed the stable in a stable fills it; it is
+          never kept between starts. With no stable there, or once theirs is gone, Feed the stable
+          ends and your realm log says why.
         </p>
         <h3>Horse offer</h3>
         <p>
@@ -1433,11 +1451,14 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             <code>storage</code>: where the output goes. The Build default has <code>source</code>:
             where materials come from, a carriage too. Unset, each uses the nearest storage; a
             source picked that holds none of what the site lacks is left alone, and they just build.
-            The Tear down default has <code>source</code>: where Food comes from. The Work, Build
-            and Tear down defaults also have the <code>number</code> params <code>foodAt</code>{' '}
-            (default {num(GET_FOOD_AT)}; 0 turns it off) and <code>foodTake</code> (default{' '}
-            {num(GET_FOOD_TAKE)}) for getting food, in units of Food (a resident eats about{' '}
-            {num(foodEatenPerDay())} a game day).
+            The Tear down default has <code>building</code>, the Breed horses and Feed the stable
+            defaults <code>stable</code>: like Work's <code>workplace</code>, the one they stand on
+            while none is picked, never kept between starts, filled by giving the task. Feed the
+            stable also has <code>source</code>: where the Food comes from. The Tear down default
+            has <code>source</code>: where Food comes from. The Work, Build and Tear down defaults
+            also have the <code>number</code> params <code>foodAt</code> (default {num(GET_FOOD_AT)}
+            ; 0 turns it off) and <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting
+            food, in units of Food (a resident eats about {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>
