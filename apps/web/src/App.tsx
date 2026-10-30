@@ -144,7 +144,8 @@ interface Starting {
 /** What the resident card's script param fields need of the world (`script-params-view`). */
 function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): ParamWorld {
   const { buildings, carriages, cities } = world
-  return { buildings, carriages, cities, realmId: world.home.realmId, size: world.map.size }
+  const [lastSeen, realmId] = [world.lastSeen.buildings, world.home.realmId]
+  return { buildings, lastSeen, carriages, cities, realmId, size: world.map.size }
 }
 
 /** What the queue planner's map picks need of the world (`plan-step`). */
@@ -1149,6 +1150,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onBoard={boardCarriage}
             scripts={scripts}
             buildings={world.buildings}
+            lastSeen={world.lastSeen.buildings}
             onRunScript={runScript}
             onEditScript={(id) => openScript(id)}
             orderError={orderError}

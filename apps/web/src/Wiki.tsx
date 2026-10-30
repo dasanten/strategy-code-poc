@@ -541,8 +541,10 @@ export function Wiki() {
           what to build, what a smithy makes, which script) asks for it on the card after. A step
           that has to be done on its tile goes after a walk there, unless the step before already
           walks there. It works on a resident with no queue too, and starts one. Adding a step only
-          checks that it could make sense (the place is there, and a carriage or horse is yours);
-          whether it can start is checked when its turn comes.
+          checks that it could make sense (the place is there as you last knew it, and a carriage or
+          horse is yours). A workplace or construction site can be anyone's, in sight or as last
+          seen, since a workplace has no owner: queue Work at a far mine and they walk there and
+          work it. Whether a step can start is checked when its turn comes.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -732,8 +734,9 @@ export function Wiki() {
           in its <code>workplace</code> param, or with none picked the one they stand on when it
           starts. Giving Work on a workplace fills it. It is never kept: each start works what it is
           given or where they stand, so a queue can walk them to a workplace and then run Work
-          there. With no workplace there, or once theirs is gone, Work ends and your realm log says
-          why.
+          there. The workplace can be anyone's you know, out of sight too: they walk to where you
+          last saw it. With no workplace there, once theirs is gone, or when they find it held by
+          another realm's workers with no room left, Work ends and your realm log says why.
         </p>
         <table>
           <thead>
@@ -1532,9 +1535,11 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             a param removed from the script is dropped, and a new one starts unset.
           </li>
           <li>
-            A param reads <code>null</code> while none is picked, and once the one picked is gone or
-            no longer yours. A <code>number</code> param reads the number typed, or{' '}
-            <code>null</code> while unset.
+            A <code>building</code> param can name a workplace or construction site of anyone's you
+            know, in sight or last seen; out of sight the card names it with "(last seen)" and the
+            script reads it as you last saw it. A param reads <code>null</code> while none is
+            picked, and once the one picked is gone or no longer one it may name. A{' '}
+            <code>number</code> param reads the number typed, or <code>null</code> while unset.
           </li>
           <li>
             A <code>number</code> param may have a default: <code>= n</code> after its type, a whole

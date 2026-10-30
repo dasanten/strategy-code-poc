@@ -255,7 +255,7 @@ describe('the set-script-param order', () => {
       'must be a storage, a stable or a carriage of yours',
     )
     expect(kind.validate(world, sender, order('home', 'theirs'))).toBe(
-      'must be a building or construction site of yours',
+      'must be a building of yours, or a workplace or construction site you know',
     )
     expect(kind.validate(world, sender, order('away', 'farm'))).toBe('the script has no such param')
     expect(kind.validate(world, sender, order('home', 'farm', 9))).toBe('not the script they run')

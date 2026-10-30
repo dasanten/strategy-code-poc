@@ -36,8 +36,13 @@ const site: Building = {
   y: 9,
   site: { delivered: {}, work: 0 },
 }
+/** Out of sight, as last seen: realm r2's mine, its house and a quarry site. */
+const theirMine: Building = { id: 'm2', kind: 'mine', cityId: 'c2', x: 44, y: 30 }
+const theirHouse: Building = { id: 'h2', kind: 'house', cityId: 'c2', x: 46, y: 30 }
+const farSite: Building = { ...site, id: 'q1', kind: 'quarry', x: 48, y: 30 }
 const w: PlanWorld = {
   buildings: [farm, storage, stable, theirs, site],
+  lastSeen: [theirMine, theirHouse, farSite],
   carriages: [{ id: 'k1', x: 3, y: 3, realmId: 'r1' }],
   horses: [
     { id: 'h1', x: 30, y: 4, realmId: 'r1' },
@@ -142,7 +147,9 @@ describe('Add step', () => {
   it('picks only what could make sense, and says why not', () => {
     expect(planned('work', [9, 9])).toMatchObject({ picked: [], error: 'no workplace there' })
     expect(planned('work', [9, 9], [20, 20]).picked).toHaveLength(1)
-    expect(planPickAt(w, 'building', { x: 40, y: 40 })).toBe('no building of yours there')
+    expect(planPickAt(w, 'building', { x: 40, y: 40 })).toBe(
+      'no building of yours, workplace or site there',
+    )
     // Anyone's storage takes goods; a carriage must be the realm's.
     expect(planPickAt(w, 'storage', { x: 40, y: 40 })).toMatchObject({ id: 's2' })
     expect(planPickAt(w, 'storage', { x: 3, y: 3 })).toMatchObject({ id: 'k1' })
@@ -151,6 +158,21 @@ describe('Add step', () => {
       spot: { kind: 'storage', storageId: 's1' },
     })
     expect(planPickAt(w, 'spot', { x: 1, y: 1 })).toMatchObject({ spot: { kind: 'ground' } })
+  })
+
+  it('picks a workplace or site anyone may work as last seen, whoever built it', () => {
+    expect(planOrder(planned('work', [44, 30]))).toEqual({
+      order: { kind: 'task', task: 'work', workplaceId: 'm2' },
+      at: { x: 44, y: 30 },
+    })
+    expect(planPickAt(w, 'building', { x: 44, y: 30 })).toMatchObject({ id: 'm2' })
+    expect(planPickAt(w, 'building', { x: 48, y: 30 })).toMatchObject({ id: 'q1' })
+    // Any other building must be the realm's own.
+    expect(planPickAt(w, 'building', { x: 46, y: 30 })).toBe(
+      'no building of yours, workplace or site there',
+    )
+    // A site to join is built as what it was last seen as.
+    expect(planOrder(planned('build', [48, 30]))?.order).toMatchObject({ building: 'quarry' })
   })
 
   it('asks for what more a step needs once its places are picked', () => {
