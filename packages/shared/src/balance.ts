@@ -1739,6 +1739,14 @@ export const SCRIPT_REALM_STEP_BUDGET = 20000
 export const SCRIPT_MEMORY_MAX = 4000
 
 /**
+ * The most a value a script passes to an action or `withMemory` may hold, in characters of its
+ * JSON: as much as its memory, so anything a script keeps it can also pass. Script values are
+ * shared by reference, so one built in a few steps can stand for far more than this; the check
+ * gives up as soon as it passes the limit and the call fails with a runtime error.
+ */
+export const SCRIPT_ACTION_VALUE_MAX = SCRIPT_MEMORY_MAX
+
+/**
  * The longest text a script can give `doing()` for its resident's Doing line (`CONTEXT.md`:
  * Doing), in characters after trimming; longer text is cut. One line of the resident card.
  */

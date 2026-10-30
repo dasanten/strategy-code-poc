@@ -1,12 +1,4 @@
-import {
-  NativeFunction,
-  ScriptFunction,
-  parse,
-  run,
-  scriptParams,
-  type Program,
-  type ScriptObject,
-} from '@csp/lang'
+import { parse, run, scriptParams, type Program, type ScriptObject } from '@csp/lang'
 import {
   buildAtProblem,
   buildingAt,
@@ -51,6 +43,7 @@ import {
   scriptRequestsSound,
   type ScriptContext,
 } from './script-bindings.js'
+import { plainValue } from './plain-value.js'
 import { addToScriptLog } from './script-log.js'
 import type { RunnableScript } from './scripts.js'
 import {
@@ -747,22 +740,16 @@ function logLimited(
  * memory from before the run stays.
  */
 export function keepMemory(memory: ScriptObject): ScriptMemory | string {
-  const hasFunction = (v: unknown): boolean =>
-    v instanceof NativeFunction ||
-    v instanceof ScriptFunction ||
-    (typeof v === 'object' && v !== null && Object.values(v).some(hasFunction))
-  let json: string
-  try {
-    if (hasFunction(memory)) return 'Memory can’t keep functions; this tick’s changes were dropped'
-    json = JSON.stringify(memory)
-  } catch {
-    // Something that holds itself, which can't be kept as plain data.
-    return 'Memory can’t keep something that holds itself; this tick’s changes were dropped'
+  const plain = plainValue(memory, SCRIPT_MEMORY_MAX)
+  if (plain.ok) return plain.value as ScriptMemory
+  switch (plain.why) {
+    case 'function':
+      return 'Memory can’t keep functions; this tick’s changes were dropped'
+    case 'cycle':
+      return 'Memory can’t keep something that holds itself; this tick’s changes were dropped'
+    case 'size':
+      return `Memory can keep at most ${SCRIPT_MEMORY_MAX} characters; this tick’s changes were dropped`
   }
-  if (json.length > SCRIPT_MEMORY_MAX) {
-    return `Memory can keep at most ${SCRIPT_MEMORY_MAX} characters; this tick’s changes were dropped`
-  }
-  return JSON.parse(json) as ScriptMemory
 }
 
 /**

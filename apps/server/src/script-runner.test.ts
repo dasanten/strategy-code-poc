@@ -11,6 +11,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { NativeFunction, type ScriptObject } from '@csp/lang'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openDb, schema, type Db, type OpenDb } from './db/index.js'
 import { OrderQueue, orderKinds } from './orders.js'
@@ -380,6 +381,23 @@ describe('running scripts', () => {
     const loop: Record<string, never> = {}
     ;(loop as Record<string, unknown>).self = loop
     expect(keepMemory(loop)).toMatch(/holds itself/)
+    expect(keepMemory({ list: [{ loop }] })).toMatch(/holds itself/)
+    expect(keepMemory({ f: new NativeFunction('f', () => null) })).toMatch(/functions/)
+  })
+
+  it('keeps shared references within the limit, as the plain data they stand for', () => {
+    const tile = { x: 1, y: 2 }
+    const kept = keepMemory({ a: tile, b: tile, list: [tile, tile] })
+    expect(kept).toEqual({ a: tile, b: tile, list: [tile, tile] })
+    expect((kept as ScriptObject).a).not.toBe(tile)
+  })
+
+  it('gives up on a doubly-shared value of 40 levels within 50 ms', () => {
+    let value: ScriptObject = { leaf: 'x' }
+    for (let level = 0; level < 40; level += 1) value = { a: value, b: value }
+    const started = performance.now()
+    expect(keepMemory(value)).toMatch(/at most/)
+    expect(performance.now() - started).toBeLessThan(50)
   })
 
   it('shows Players which script a resident runs, not its memory', () => {
