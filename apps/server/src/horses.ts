@@ -1,6 +1,7 @@
 import {
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HORSE_HUNGRY_SHARE,
   HORSE_START_AGE_MAX,
   HORSE_START_AGE_MIN,
   HORSE_STAT_MAX,
@@ -14,6 +15,7 @@ import {
   TICKS_PER_GAME_YEAR,
   horseFood,
   horseFoodFactor,
+  riderOf,
   type Horse,
   type HorseStats,
   type TerrainMap,
@@ -62,8 +64,10 @@ export function newHorse(
 /**
  * One tick of horses (`CONTEXT.md`: Horse, Horses have no inventory, Stable). Their hunger meter
  * runs down like a resident's; a horse eats a unit of food when there is room for it, from what is
- * in reach (`horseFood`). An empty meter costs health, a meter with anything in it slowly gives
- * health back, and a horse with no health left dies, which goes in its Player's realm log.
+ * in reach (`horseFood`), for a ridden horse also its rider's spare Food. A ridden horse going
+ * hungry, its rider with none to spare, goes in its Player's realm log once. An empty meter costs
+ * health, a meter with anything in it slowly gives health back, and a horse with no health left
+ * dies, which goes in its Player's realm log.
  * Foals come only from a resident breeding them (`resolveBreeding`). Returns the horses that died.
  */
 export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
@@ -73,7 +77,9 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
   const died: Horse[] = []
   let ate = false
 
+  const hungry = HORSE_HUNGRY_SHARE * MAX_HUNGER
   for (const h of world.horses) {
+    const wasFed = h.hunger >= hungry
     // Endurance sets how fast the meter runs down, so how much Food the horse needs.
     h.hunger = Math.max(0, h.hunger - drain * horseFoodFactor(h))
     if (h.hunger <= MAX_HUNGER - FILL_PER_FOOD) {
@@ -85,6 +91,16 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
         h.hunger = Math.min(MAX_HUNGER, h.hunger + FILL_PER_FOOD)
         ate = true
       }
+    }
+    // Going hungry with nothing in reach: a rider has no Food to spare for it (`CONTEXT.md`: Riding).
+    const rider = wasFed && h.hunger < hungry ? riderOf(world, h) : undefined
+    if (rider) {
+      recordEvent(world, h.realmId, {
+        kind: 'horseHungry',
+        horseId: h.id,
+        residentId: rider.id,
+        name: rider.name,
+      })
     }
     if (h.hunger <= 0) h.health = Math.max(0, h.health - starve)
     else h.health = Math.min(MAX_HEALTH, h.health + heal)

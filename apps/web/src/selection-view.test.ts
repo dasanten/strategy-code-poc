@@ -647,7 +647,7 @@ describe('horses on the tile card', () => {
     const ridden = horse({ id: 'h2', hunger: 10, health: MAX_HEALTH - 5 })
     const horses = [horse(), ridden]
     expect(riddenHorseLine({ riding: 'h2' }, horses, at)).toBe(
-      'Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt',
+      'Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt · eats from your spare Food',
     )
     expect(riddenHorseLine({}, horses, at)).toBeUndefined()
     // A horse not in sight shows nothing.

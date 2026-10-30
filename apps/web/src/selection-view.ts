@@ -648,8 +648,9 @@ export function horseDetail(h: SeenHorse, tick: number | undefined): string {
 
 /**
  * The line on a rider's card for the horse they ride (`CONTEXT.md`: Riding), as the tile card
- * shows a horse: "Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
- * Undefined for someone on foot.
+ * shows a horse, and that it eats from the rider's spare Food: "Horse: Speed 12, Strength 8,
+ * Endurance 10 · 5 years old · fed, healthy · eats from your spare Food". Undefined for someone
+ * on foot.
  */
 export function riddenHorseLine(
   r: Pick<Resident, 'riding'>,
@@ -657,7 +658,7 @@ export function riddenHorseLine(
   tick: number | undefined,
 ): string | undefined {
   const horse = r.riding === undefined ? undefined : horses.find((h) => h.id === r.riding)
-  return horse && `Horse: ${horseDetail(horse, tick)}`
+  return horse && `Horse: ${horseDetail(horse, tick)} · eats from your spare Food`
 }
 
 /**
