@@ -6,7 +6,7 @@ import {
   TERRAIN_SPEED,
   Terrain,
   WALL_ENCLOSES_MAX,
-  roadMayGoOn,
+  isPassableTerrain,
   tileIndex,
   wrap,
   wrapDelta,
@@ -27,7 +27,7 @@ export const WALKING_COSTS: TerrainCosts = costsFrom(TERRAIN_SPEED)
 
 /**
  * Costs for a carriage, from its speed on each terrain (`CONTEXT.md`: Carriage): cheap on plains,
- * dear in forest and hills, and mountains, lakes and sea can't be entered.
+ * dear in forest and hills; lakes, sea and mountains can't be entered, mountains except on a road.
  */
 export const CARRIAGE_COSTS: TerrainCosts = costsFrom(CARRIAGE_SPEED)
 
@@ -156,10 +156,10 @@ const regionCache = new WeakMap<Uint8Array, Map<Float64Array, Uint16Array>>()
 /**
  * Labels each tile with the stretch of land it lies in for a traveller with these costs: tiles
  * with the same label reach each other, walls and gates aside, tiles with different ones never.
- * 0 can't be entered. Roads don't join stretches, as they never go where the terrain beneath
- * can't be crossed by someone it carries (`roadMayGoOn`), and diagonal steps don't either, as
- * they never cut a corner. The terrain never changes, so the labels are worked out once per map
- * and set of costs.
+ * 0 can't be entered. Where these costs let a road be crossed, any passable land counts as
+ * entered, road or not yet: a road on Mountain joins a carriage's stretches, and roads come and
+ * go (`CONTEXT.md`: Road). Diagonal steps don't join stretches, as they never cut a corner. The
+ * terrain never changes, so the labels are worked out once per map and set of costs.
  */
 function regionsOf(ground: Ground, table: Float64Array): Uint16Array {
   let byTable = regionCache.get(ground.tiles)
@@ -171,7 +171,7 @@ function regionsOf(ground: Ground, table: Float64Array): Uint16Array {
   const road = table[Terrain.Road]! < Infinity
   const passable = (t: number) => {
     const terrain = tiles[t]!
-    return table[terrain]! < Infinity || (road && roadMayGoOn(terrain))
+    return table[terrain]! < Infinity || (road && isPassableTerrain(terrain))
   }
   const labels = new Uint16Array(n)
   const stack = new Int32Array(n)

@@ -53,12 +53,16 @@ import {
   STARVE_DAYS,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
+  GET_FOOD_AT,
+  GET_FOOD_TAKE,
   FORMER_PLAYER_STANDING,
   GAME_DAYS_PER_YEAR,
   GOOD_WEIGHT,
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HORSE_GRANT_FOOD,
+  HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
   HUNGRY_HORSE_PACE,
   HORSE_ENDURANCE_EFFECT,
@@ -97,6 +101,7 @@ import {
   PRICE_REFERENCE_FLOORS,
   PROTECTION_DEFENCE,
   ROAD_LINE_MAX_TILES,
+  MOUNTAIN_ROAD_WORK_FACTOR,
   DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
   SCRIPT_LIST_QUERY_COST,
@@ -154,6 +159,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   carryCapacity,
   walkSpeed,
+  workFactor,
   type BuildingKind,
   type CrimeKind,
   type Good,
@@ -203,7 +209,7 @@ import {
 } from './wiki-view.js'
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
-import { SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
@@ -446,8 +452,9 @@ export function Wiki() {
         <p>Groups are kept in this browser, for each realm; another browser starts without them.</p>
         <p>
           With several picked, the group card gives each of them the same order, just as their own
-          cards would: walk to, work, build, store, fetch, run a script or stop. Nothing ties them
-          together afterwards; each goes on alone.
+          cards would. Every order a resident's card has is on it, but pairing, making Leader and
+          renaming, which are about one resident. Nothing ties them together afterwards; each goes
+          on alone.
         </p>
         <ul>
           <li>
@@ -464,19 +471,50 @@ export function Wiki() {
           </li>
           <li>
             <strong>Store</strong> puts what each carries in the nearest storage (their own food
-            stays with them); <strong>Fetch</strong> takes a good from the nearest storage or
-            carriage holding it.
+            stays with them), <strong>Store at</strong> in the storage, stable or carriage picked;{' '}
+            <strong>Fetch</strong> takes a good from the nearest storage or carriage holding it, or
+            from the one picked. <strong>Drop all</strong> puts down everything each carries.
+          </li>
+          <li>
+            <strong>Mount horses</strong>: each takes a different free horse of yours on their tile.{' '}
+            <strong>Drive carriages</strong> and <strong>Haul route</strong> go to each standing on
+            a carriage, one driver for each carriage.
+          </li>
+          <li>
+            <strong>Feed the stable</strong>: each standing in a stable feeds it.{' '}
+            <strong>Breed horses</strong>: pick two horses in a stable where some of them stand; one
+            of them there who isn't breeding yet tends the pair. Pick two more for the next.
+          </li>
+          <li>
+            <strong>Build road</strong> and <strong>Build wall</strong>: pick where the line starts
+            and ends; they all build along it. <strong>Tear down</strong>: pick a building; those
+            standing at it tear it down.
+          </li>
+          <li>
+            <strong>Attack</strong>: pick a resident of another realm, or a wall or gate, for them
+            all to attack. <strong>Climb a wall</strong>: those next to the one picked climb over.
           </li>
         </ul>
         <p>
           Those who can't take an order are skipped, and the card says who and why: children don't
-          work, build, store or fetch; a partner carrying a child doesn't work or build.
+          work, build or drive, and store, fetch or put down only Food; a partner carrying a child
+          doesn't work, build, tear down, breed or haul; orders bound to a place go only to those
+          standing there.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
-          instead (see Queues). Work then also goes to those away from the workplace, who walk there
-          first, and Store to those who carry nothing yet. Stop still stops them all and ends their
-          queues.
+          instead (see Queues). Work, Tear down and Breed horses then also go to those away from the
+          place, who walk there first, and Store to those who carry nothing yet. Stop still stops
+          them all and ends their queues.
+        </p>
+        <p>
+          The group card's Queue tab has the same planner as a resident's card.{' '}
+          <strong>Add step</strong> adds the step to the end of each one's own queue.{' '}
+          <strong>Plan a queue for all</strong> opens a plan kept in this browser: add steps,
+          reorder them, give them durations and loop it, as on a resident's card, then{' '}
+          <strong>Give to all</strong> makes each one's queue a copy of it, ending what they do.
+          Everyone gets every step, even one they can't do; they skip it when its turn comes.
+          Afterwards each one's queue is their own, edited on their card.
         </p>
       </Section>
 
@@ -484,8 +522,20 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, work, build, haul, tear down, build a road or wall
-          line, or run one of your scripts with its params.
+          to, pick up, drop, store, fetch, drive, mount or dismount, work, build, haul, feed the
+          stable, breed horses, tear down, build a road or wall line, or run one of your scripts
+          with its params.
+        </p>
+        <p>
+          To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
+          lists every kind of step. One that acts on a place (work a workplace, build, store at or
+          fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
+          map, anywhere, not only where the resident stands now; one that needs more (which goods,
+          what to build, what a smithy makes, which script) asks for it on the card after. A step
+          that has to be done on its tile goes after a walk there, unless the step before already
+          walks there. It works on a resident with no queue too, and starts one. Adding a step only
+          checks that it could make sense (the place is there, and a carriage or horse is yours);
+          whether it can start is checked when its turn comes.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -547,8 +597,9 @@ export function Wiki() {
           Residents and carriages step onto any of the eight tiles around, diagonals too. A diagonal
           step is {num(DIAGONAL_STEP, 2)} times as far, so it takes that much longer on the same
           ground. It can't squeeze between two corners: both straight tiles beside it must be ones
-          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage)
-          mountain. Two walls touching at a corner close the way like a straight stretch.
+          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage or
+          rider) mountain without a finished road. Two walls touching at a corner close the way like
+          a straight stretch.
         </p>
         <table>
           <thead>
@@ -556,6 +607,7 @@ export function Wiki() {
               <th>Terrain</th>
               <th>Speed</th>
               <th>Food burnt</th>
+              <th>Road work</th>
             </tr>
           </thead>
           <tbody>
@@ -564,6 +616,7 @@ export function Wiki() {
                 <td>{t}</td>
                 <td>{pct(TERRAIN_SPEED[Terrain[t]])}</td>
                 <td>{pct(TERRAIN_FOOD[Terrain[t]])}</td>
+                <td>{t === 'Road' ? '—' : `× ${num(workFactor('road', Terrain[t]))}`}</td>
               </tr>
             ))}
           </tbody>
@@ -603,11 +656,14 @@ export function Wiki() {
           paired, and their city has free housing and a food surplus, one partner carries the child
           for {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
           {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a child is grown after{' '}
-          {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Stats
-          decline from age {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below{' '}
-          {pct(DECLINE_FLOOR)}; residents die of old age between {num(LIFESPAN_MIN)} and{' '}
-          {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs
-          up to {num(MAX_HEALTH)}.
+          {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Until
+          grown, a child walks but doesn't work, build, tear down, drive or pair, and of all goods
+          handles only Food: they pick it up, put it down, fetch and store it like anyone, so they
+          can carry their meals. At home a child tops up to their own {num(OWN_FOOD)} Food from the
+          storage, so they leave the city with food on them. Stats decline from age{' '}
+          {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below {pct(DECLINE_FLOOR)};
+          residents die of old age between {num(LIFESPAN_MIN)} and {num(LIFESPAN_MAX)}. A house
+          holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs up to {num(MAX_HEALTH)}.
         </p>
       </Section>
 
@@ -617,17 +673,21 @@ export function Wiki() {
           a game day on plains; each point of Endurance above average needs{' '}
           {pct(HUNGER_ENDURANCE_EFFECT)} less (more below), at most {pct(HUNGER_ENDURANCE_LIMIT)}.
           They keep {num(OWN_FOOD)} Food of their own on them, and at home take a meal from the
-          storage when they run low. Within {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage
-          of their realm they take it from there the same way, so a stocked outpost storage next to
-          a far workplace keeps its workers fed.
+          storage when they run low. A child at home doesn't wait to run low: whenever they have
+          less than their own food, they take meals until they have it again, so a child leaving the
+          city has {days(OWN_FOOD / foodEatenPerDay())} of food on them. Within{' '}
+          {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage of their realm they take it from
+          there the same way, so a stocked outpost storage next to a far workplace keeps its workers
+          fed.
         </p>
         <p>
-          Far from home, a resident working, building or tearing down can go and get food on their
-          own: set <code>foodAt</code> and <code>foodTake</code> on their card, in units of Food.
-          Below <code>foodAt</code> on them, they walk to their storage (or the nearest one of your
-          realm with Food), take Food up to <code>foodTake</code> and go back. Whenever they are at
-          a storage anyway, their own food is topped up to <code>foodTake</code> instead of{' '}
-          {num(OWN_FOOD)}. Unset, they don't go on their own.
+          Far from home, a resident working, building or tearing down goes and gets food on their
+          own. Below <code>foodAt</code> units of Food on them ({num(GET_FOOD_AT)} unless you set it
+          on their card), they walk to their storage (or the nearest one of your realm with Food),
+          take Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and go back.
+          Whenever they are at a storage anyway, their own food is topped up to{' '}
+          <code>foodTake</code> instead of {num(OWN_FOOD)}. With <code>foodAt</code> set to 0 they
+          don't go on their own and rely on refilling.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -654,11 +714,11 @@ export function Wiki() {
           carries a full load to the nearest storage of their realm.
         </p>
         <p>
-          With <code>foodAt</code> set, a worker who carries less Food than that leaves work for
-          their <code>storage</code>, or the nearest storage of your realm with Food, takes Food up
-          to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes back. With no Food
-          anywhere they work on. With <code>foodTake</code> set, carrying a load tops their food up
-          to it too.
+          A worker who carries less Food than <code>foodAt</code> ({num(GET_FOOD_AT)} unless set)
+          leaves work for their <code>storage</code>, or the nearest storage of your realm with
+          Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes
+          back. With no Food anywhere they work on. Carrying a load tops their food up to{' '}
+          <code>foodTake</code> too. <code>foodAt</code> 0 turns this off.
         </p>
         <table>
           <thead>
@@ -753,7 +813,9 @@ export function Wiki() {
           {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
           more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
           leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a building's materials on the tile (all of an
-          unfinished site's).
+          unfinished site's). A road over a mountain can't be torn down while a carriage or a ridden
+          horse stands on it: the work waits until they leave. A horse left there unridden can't be
+          ridden off a road.
         </p>
         <table>
           <thead>
@@ -789,11 +851,12 @@ export function Wiki() {
           resource nodes, and a new town hall founds a city.
         </p>
         <p>
-          With <code>foodAt</code> set, a resident building or tearing down who carries less Food
-          than that goes to their <code>source</code>, or the nearest storage of your realm with
-          Food, takes Food up to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes
-          back to the site. With no Food anywhere they work on. With <code>foodTake</code> set,
-          fetching materials tops their food up to it too, before the materials.
+          A resident building or tearing down who carries less Food than <code>foodAt</code> (
+          {num(GET_FOOD_AT)} unless set) goes to their <code>source</code>, or the nearest storage
+          of your realm with Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)}{' '}
+          unless set) and comes back to the site. With no Food anywhere they work on. Fetching
+          materials tops their food up to <code>foodTake</code> too, before the materials.{' '}
+          <code>foodAt</code> 0 turns this off.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
@@ -866,7 +929,13 @@ export function Wiki() {
                 <td>{t.terrain}</td>
                 <td>{num(t.footTiles, 1)}</td>
                 <td>{num(t.footKgTiles, 0)}</td>
-                <td>{t.carriageTiles ? num(t.carriageTiles, 1) : 'can’t enter'}</td>
+                <td>
+                  {t.carriageTiles
+                    ? num(t.carriageTiles, 1)
+                    : t.terrain === 'Mountain'
+                      ? 'only on a road'
+                      : 'can’t enter'}
+                </td>
                 <td>{t.carriageTiles ? num(t.carriageKgTiles, 0) : '—'}</td>
               </tr>
             ))}
@@ -874,10 +943,13 @@ export function Wiki() {
         </table>
         <p>
           A road tile takes {goods(BUILD_MATERIALS.road ?? {})} and{' '}
-          {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work;
-          one road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along a line that runs
-          straight or diagonal. A wall can be built along a line the same way, past tiles with a
-          wall or gate already; a diagonal wall line closes the way like a straight one.
+          {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work.
+          It goes on any land a resident can walk, mountains too: there it takes the same materials
+          but {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work, to build and to tear down (the road
+          work column above). One road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along
+          a line that runs straight or diagonal. A wall can be built along a line the same way, past
+          tiles with a wall or gate already; a diagonal wall line closes the way like a straight
+          one.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
@@ -890,11 +962,15 @@ export function Wiki() {
           Horses don't breed on their own. A grown resident standing at a finished stable is given
           Breed horses and picks two fed horses of their realm in it; they tend them for{' '}
           {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
-          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. Breeding stops,
-          and starts over from nothing, when the resident leaves or is given another order, when a
-          horse leaves or dies, or when the stable has no room left for the foal. The Breed horses
-          default first takes {num(BREED_FOOD)} Food from the stable for the resident's meals, if
-          they carry less. NPC cities have one of their residents breed their horses the same way.
+          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. The progress
+          belongs to the two horses, and the stable keeps it: breeding pauses when the resident
+          leaves or is given another order, or while the stable has no room left for the foal, and
+          any grown resident who breeds there later carries on with that pair first, where it
+          stopped, if both are still fed. The stable's card shows a paused breeding and how far
+          along it is. The progress is lost only when one of the two leaves the stable or dies. The
+          Breed horses default first takes {num(BREED_FOOD)} Food from the stable for the resident's
+          meals, if they carry less. NPC cities have one of their residents breed their horses the
+          same way.
         </p>
         <h3>Horse stats</h3>
         <p>
@@ -933,11 +1009,18 @@ export function Wiki() {
         <p>
           A resident on a tile with a free horse of their realm can mount it, and dismount anywhere;
           the horse stays where they get off. A rider goes wherever they walk at the speed the horse
-          would pull a carriage there (the carriage column above), and never into mountains or up
-          onto walls. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
-          at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
-          Driving makes riding faster. A rider carries no more than on foot, and can't drive a
-          carriage; a ridden horse is never hitched.
+          would pull a carriage there (the carriage column above), never up onto walls, and into
+          mountains only along a finished road, like a carriage. A horse with less than{' '}
+          {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes at {pct(HUNGRY_HORSE_PACE)} of its
+          pace. Riding trains Driving like driving does, and Driving makes riding faster. A rider
+          carries no more than on foot, and can't drive a carriage; a ridden horse is never hitched.
+          On the map a rider sits on a horse token, and up close their activity icon is a horseshoe
+          while they ride somewhere.
+        </p>
+        <p>
+          A rider’s Doing line says <em>Riding to …</em> where it would say <em>Walking to …</em>,
+          and their card shows the horse they ride: its stats, age, health and hunger, with{' '}
+          <strong>Dismount</strong> under Orders.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
@@ -946,6 +1029,16 @@ export function Wiki() {
           from the one picked as <code>source</code> on their card, and store it in the stable;
           otherwise they wait there. Picking another <code>stable</code> on the card has them feed
           that one instead.
+        </p>
+        <h3>Horse offer</h3>
+        <p>
+          Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, ever, whenever they
+          choose and whether or not they have horses: a notice at the top of the screen has a Claim
+          button until they do. The horses get new stats and ages and go in your finished stable
+          nearest your Leader's city; with no stable, they stand next to that city's storage (or
+          next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
+          realm log says where they are. Once claimed the offer is gone for good, also after your
+          Leader dies and you found a new realm; while you have no living Leader you can't claim it.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
@@ -1337,6 +1430,13 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         </table>
         <ul>
           <li>
+            Before it starts: giving a task or Run script whose script has params first shows them,
+            filled with the values the resident keeps or the defaults. Change what you like and
+            press Start; Cancel gives nothing. A script without params starts at once. For a group
+            the form shows once, and each of them gets the same values. With Shift held the step
+            added to the queue keeps the values.
+          </li>
+          <li>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
             number of zero or more and press Enter. Neither stops the script.
@@ -1355,13 +1455,23 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             <code>null</code> while unset.
           </li>
           <li>
+            A <code>number</code> param may have a default: <code>= n</code> after its type, a whole
+            number of zero or more. Unset, it reads the default; the number typed wins over it, and
+            clearing the field goes back to it. Its field shows the default while unset. A{' '}
+            <code>building</code> or <code>storage</code> param can't have one.
+            <pre>
+              <code>{PARAM_DEFAULT_EXAMPLE}</code>
+            </pre>
+          </li>
+          <li>
             The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
             <code>source</code>: where materials come from, a carriage too. Unset, each uses the
             nearest storage; a source picked that holds none of what the site lacks is left alone,
             and they just build. The Tear down default has <code>source</code>: where Food comes
             from. The Work, Build and Tear down defaults also have the <code>number</code> params{' '}
-            <code>foodAt</code> and <code>foodTake</code> for getting food, in units of Food (a
-            resident eats about {num(foodEatenPerDay())} a game day).
+            <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0 turns it off) and{' '}
+            <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food, in units of Food
+            (a resident eats about {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>

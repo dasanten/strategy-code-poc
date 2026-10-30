@@ -181,6 +181,15 @@ export interface ScriptLogLine {
 export type ScriptParamValue = string | number
 
 /**
+ * The param values an order starting a script gives (`CONTEXT.md`: Script parameter, Before it
+ * starts), by name: what is picked or typed for each, or null to clear it back to its default.
+ * A param left out keeps its value.
+ */
+export interface StartParamValues {
+  [name: string]: ScriptParamValue | null
+}
+
+/**
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
  */
 export interface RunningScript {
@@ -254,14 +263,15 @@ export interface SeenScript {
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
  * memory, which stays on the server, nor their script log, which the owning Player gets only on
  * the Script tab. Their hunger and health only for their own realm and its allies (`CONTEXT.md`:
- * Seeing how someone fares). Their script parameter values only for the realm that runs their
- * script, and only those of the script they run.
+ * Seeing how someone fares). Their script parameter values only for the realm that commands them:
+ * all they keep, so a script's params can be filled in before it starts (`CONTEXT.md`: Script
+ * parameter), and those of the script they run with it.
  */
 export type SeenResident = Omit<
   Resident,
   'script' | 'hunger' | 'health' | 'scriptParams' | 'scriptLog'
 > &
-  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: SeenScript }
+  Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & { script?: SeenScript }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -407,7 +417,7 @@ export interface TearDownOrder {
 /**
  * Driving a carriage to a tile (`CONTEXT.md`: Carriage): the resident drives the carriage
  * `carriageId` from their tile, and the carriage, its horse and the driver move together. The
- * path and `progress` work as for walking, at the carriage's speeds and never into mountains.
+ * path and `progress` work as for walking, at the carriage's speeds, into mountains only on a road.
  */
 export interface DriveOrder {
   kind: 'drive'
@@ -520,9 +530,11 @@ export interface ClimbOrder {
 
 /**
  * Breeding (`CONTEXT.md`: Breeding): the resident, standing at the finished stable `stableId` on
- * `at`, tends the two horses `horseIds` standing in it. `progress` counts the ticks tended, up to
- * `STABLE_BREED_TICKS`; then a foal is born there and the order is done. It ends, its progress
- * lost, when the resident or a horse leaves, a horse dies or the stable has no room left.
+ * `at`, tends the two horses `horseIds` standing in it. `progress` counts the ticks the pair has
+ * been tended, up to `STABLE_BREED_TICKS`; then a foal is born there and the order is done. The
+ * progress belongs to the pair, kept by the stable (`Building.breedings`); the order shows the
+ * same number. It ends when the resident or a horse leaves or a horse dies, and makes no progress
+ * while the stable has no room left.
  */
 export interface BreedOrder {
   kind: 'breed'
@@ -621,6 +633,11 @@ export interface WorldState {
    * told of in their realm logs; the server tells them of the rest at start.
    */
   scriptViewChanges: number
+  /**
+   * The account ids of the Players who claimed their Horse offer (`CONTEXT.md`: Horse offer):
+   * kept with the Player, not the realm, so a claim outlives a Leader death.
+   */
+  horseOffersClaimed: number[]
 }
 
 /**
@@ -1380,6 +1397,18 @@ export type RealmEventWhat =
       x: number
       y: number
     }
+  /**
+   * The Player claimed their Horse offer (`CONTEXT.md`: Horse offer): `horseIds` arrived where the
+   * Horse grant puts them (see `horsesGranted`).
+   */
+  | {
+      kind: 'horsesClaimed'
+      horseIds: string[]
+      where: 'stable' | 'storage' | 'leader'
+      city?: string
+      x: number
+      y: number
+    }
   /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
   | { kind: 'foaled'; horseId: string; stableId: string }
   /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */
@@ -1683,7 +1712,7 @@ export interface Building {
   stock?: Stock
   /** There while the building is still a construction site. */
   site?: ConstructionSite
-  /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
+  /** Work put into tearing it down so far, once someone has started (`teardownWork`, `siteWorkOf`). */
   teardown?: number
   /** A gate its city's realm has closed (`CONTEXT.md`: Walls in combat); gates only, open without it. */
   closed?: true
@@ -1692,6 +1721,19 @@ export interface Building {
    * finished walls and gates only. It falls at its `wallStrength`.
    */
   damage?: number
+  /**
+   * How far each pair of horses in it has been bred (`CONTEXT.md`: Breeding), once a resident has
+   * tended them; finished stables only. Kept while nobody tends them, lost when one of the two
+   * leaves the stable or dies, gone when their foal is born.
+   */
+  breedings?: KeptBreeding[]
+}
+
+/** The breeding progress a stable keeps for two horses in it (`Building.breedings`). */
+export interface KeptBreeding {
+  horseIds: [string, string]
+  /** Ticks the pair has been tended so far, from 1 to below `STABLE_BREED_TICKS`. */
+  progress: number
 }
 
 /**
@@ -1701,7 +1743,10 @@ export interface Building {
 export interface ConstructionSite {
   /** Materials delivered so far; never more of a good than the building needs. */
   delivered: Stock
-  /** Work put in so far, at most what the building needs (`BUILD_WORK`). */
+  /**
+   * Work put in so far, at most what the building needs (`BUILD_WORK`); on a road on Mountain a
+   * resident's work counts less (`siteWorkOf`).
+   */
   work: number
 }
 

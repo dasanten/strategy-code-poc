@@ -92,7 +92,12 @@ export interface ScriptContext {
    * The script's `param` lines with the id or number picked for each (`paramValues`); `params`
    * holds nothing without it.
    */
-  params?: readonly { name: string; type: ScriptParamType; value?: ScriptParamValue }[]
+  params?: readonly {
+    name: string
+    type: ScriptParamType
+    default?: number
+    value?: ScriptParamValue
+  }[]
 }
 
 export interface ScriptBindings {
@@ -332,11 +337,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   }
 
   // Each param as what it names while that is still the side's and fits its type, or the
-  // number typed for a number param; else null.
+  // number typed for a number param, or its default while none is; else null.
   const params = Object.create(null) as ScriptObject
   for (const p of context.params ?? []) {
     if (p.type === 'number') {
-      params[p.name] = typeof p.value === 'number' ? p.value : null
+      params[p.name] = typeof p.value === 'number' ? p.value : (p.default ?? null)
       continue
     }
     const id = typeof p.value === 'string' ? p.value : undefined
@@ -510,6 +515,7 @@ function residentActions(
       }),
     renameCity: ([cityId, name]) =>
       request('renameCity', { cityId: plain(cityId), name: plain(name) }),
+    claimHorses: () => request('claimHorses', {}),
     roadLine: ([x, y]) =>
       request('roadLine', {
         from: { x: resident.x, y: resident.y },
