@@ -18,11 +18,16 @@ const resident = (id: string, x: number, y: number, more: object = {}) => ({
   y,
   bornAt: TICK - 30 * TICKS_PER_GAME_YEAR,
   carried: {} as Stock,
+  owner: 'r1' as string | null,
+  cityId: null as string | null,
   ...more,
 })
 const child = (id: string, x: number, y: number) => resident(id, x, y, { bornAt: TICK })
 const carrying = (id: string, x: number, y: number) =>
   resident(id, x, y, { carrying: { partnerName: 'P', since: 0 } })
+
+/** Carriage k1 of realm r1 at (4, 4). */
+const k1 = { id: 'k1', x: 4, y: 4, realmId: 'r1', cityId: null }
 
 const everywhere = () => true
 const send = (
@@ -144,7 +149,12 @@ describe('group orders', () => {
       ['b', 'runs no script with foodAt'],
       ['c', 'runs no script with foodAt'],
     ])
-    const queued = groupRequests(order, rs, { tick: TICK, size: SIZE, free: everywhere, queued: true })
+    const queued = groupRequests(order, rs, {
+      tick: TICK,
+      size: SIZE,
+      free: everywhere,
+      queued: true,
+    })
     expect(queued.requests).toEqual(requests)
     const clear = send({ ...order, value: null }, rs).requests.map((q) => q.order)
     expect(clear).toEqual([
@@ -166,6 +176,38 @@ describe('group orders', () => {
     ]
     const rs = [{ script: { scriptId: 3 } }, { script: { scriptId: 4 } }, {}]
     expect(groupNumberParams(rs, scripts)).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
+  })
+
+  it('boards those on the carriage until it is full, and says who was skipped and why', () => {
+    const rs = [
+      resident('a', 4, 4),
+      resident('away', 5, 4),
+      child('b', 4, 4),
+      resident('aboard', 4, 4, { aboard: 'k1' }),
+      resident('driver', 4, 4, { order: { kind: 'drive', carriageId: 'k1' } }),
+      resident('c', 4, 4),
+      resident('d', 4, 4),
+    ]
+    const { requests, skipped } = send({ kind: 'board', carriage: k1, seats: 2 }, rs)
+    // Children ride along too.
+    expect(requests).toEqual([
+      { residentId: 'a', order: { kind: 'board', carriageId: 'k1', residentId: 'a' } },
+      { residentId: 'b', order: { kind: 'board', carriageId: 'k1', residentId: 'b' } },
+    ])
+    expect(skipped).toEqual([
+      { id: 'away', name: 'AWAY', why: 'not there' },
+      { id: 'aboard', name: 'ABOARD', why: 'already aboard that carriage' },
+      { id: 'driver', name: 'DRIVER', why: 'the driver can’t board' },
+      { id: 'c', name: 'C', why: 'the carriage is full' },
+      { id: 'd', name: 'D', why: 'the carriage is full' },
+    ])
+  })
+
+  it('gets those aboard off and skips the others', () => {
+    const rs = [resident('a', 4, 4, { aboard: 'k1' }), resident('b', 4, 4)]
+    const { requests, skipped } = send({ kind: 'getOff' }, rs)
+    expect(requests).toEqual([{ residentId: 'a', order: { kind: 'getOff', residentId: 'a' } }])
+    expect(skipped).toEqual([{ id: 'b', name: 'B', why: 'not aboard' }])
   })
 
   it('says how many the order went to', () => {
@@ -232,6 +274,21 @@ describe('group orders with Shift held', () => {
     const { requests, skipped } = queue({ kind: 'store' }, [resident('a', 0, 0)])
     expect(skipped).toEqual([])
     expect(requests[0]!.order.steps).toEqual([{ order: { kind: 'store', goods: [...GOODS] } }])
+  })
+
+  it('queues boarding after a walk to the carriage, and getting off, for everyone', () => {
+    const rs = [resident('a', 4, 4), resident('b', 30, 30)]
+    const board = queue({ kind: 'board', carriage: k1, seats: 0 }, rs)
+    expect(board.skipped).toEqual([])
+    expect(board.requests.map((q) => [q.residentId, q.order.steps])).toEqual(
+      ['a', 'b'].map((id) => [
+        id,
+        [{ order: { kind: 'walkTo', x: 4, y: 4 } }, { order: { kind: 'board', carriageId: 'k1' } }],
+      ]),
+    )
+    const getOff = queue({ kind: 'getOff' }, rs)
+    expect(getOff.skipped).toEqual([])
+    expect(getOff.requests[1]!.order.steps).toEqual([{ order: { kind: 'getOff' } }])
   })
 
   it('gives stop as it is: it is no step', () => {

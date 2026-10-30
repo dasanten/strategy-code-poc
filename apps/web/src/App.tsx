@@ -5,6 +5,7 @@ import {
   carriageOfResident,
   horseOfResident,
   riderOf,
+  seatsLeft,
   KEEPS_GOODS,
   MAX_WORKERS,
   buildMenu,
@@ -149,6 +150,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     : []
   const group = selectedIds.flatMap((id) => own.filter((r) => r.id === id))
   const selected = group.length === 1 ? group[0] : undefined
+  // The realm's carriages someone of the group stands on, to board with the seats left on each
+  // (`CONTEXT.md`: Passenger).
+  const groupCarriages = world
+    ? world.carriages.flatMap((k) =>
+        k.load && group.some((r) => r.x === k.x && r.y === k.y && carriageOfResident(k, r))
+          ? [
+              {
+                carriage: k,
+                seats: seatsLeft(world, { ...k, load: k.load }, k.passengerIds?.length ?? 0),
+              },
+            ]
+          : [],
+      )
+    : []
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
@@ -463,14 +478,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   /**
    * Orders the picked resident to board a carriage on their tile, or with none to get off the one
-   * they are aboard, onto its tile (`CONTEXT.md`: Passenger).
+   * they are aboard, onto its tile (`CONTEXT.md`: Passenger); with Shift held, appends it to their
+   * queue.
    */
   async function boardCarriage(carriageId?: string) {
     if (!selected) return
     const order = carriageId
       ? { kind: 'board', residentId: selected.id, carriageId }
       : { kind: 'getOff', residentId: selected.id }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order))
   }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
@@ -941,6 +957,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             residents={group}
             scripts={scripts}
             buildings={world.buildings}
+            carriages={groupCarriages}
             inSight={world.residents}
             picking={groupPicking}
             onPicking={(p) => {

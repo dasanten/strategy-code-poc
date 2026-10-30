@@ -107,7 +107,8 @@ function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
 
 /** Orders the card gives for the resident's own tile: they only start there. */
 function actsHere(order: OrderRequest): boolean {
-  if (order.kind === 'pickUp' || order.kind === 'drop' || order.kind === 'drive') return true
+  const here = ['pickUp', 'drop', 'drive', 'board']
+  if (here.includes(order.kind)) return true
   if (order.kind !== 'task') return false
   // A Build task laid out somewhere else (`at`) walks there itself.
   return order.task !== 'build' || order.at === undefined
@@ -220,6 +221,10 @@ export function stepLabel(
       return `Walk to ${at(order)}`
     case 'drive':
       return `Drive the carriage to ${at(order)}`
+    case 'board':
+      return 'Board the carriage'
+    case 'getOff':
+      return order.x === undefined ? 'Get off' : `Get off at ${at(order)}`
     case 'pickUp':
       return `Pick up ${goodsLine(order.goods)}`
     case 'drop':

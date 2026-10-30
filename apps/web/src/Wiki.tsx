@@ -467,10 +467,16 @@ export function Wiki() {
             stays with them); <strong>Fetch</strong> takes a good from the nearest storage or
             carriage holding it.
           </li>
+          <li>
+            <strong>Board carriage</strong> (shown while some of them stand on a carriage of your
+            realm) puts those on its tile aboard, in the group's order, until it is full;{' '}
+            <strong>Get off</strong> gets every passenger among them off. See Passengers.
+          </li>
         </ul>
         <p>
           Those who can't take an order are skipped, and the card says who and why: children don't
-          work, build, store or fetch; a partner carrying a child doesn't work or build.
+          work, build, store or fetch; a partner carrying a child doesn't work or build; Board skips
+          those not on the carriage's tile, the driver, riders and, once it is full, the rest.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
@@ -484,17 +490,17 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, work, build, haul, tear down, build a road or wall
-          line, or run one of your scripts with its params.
+          to, pick up, drop, store, fetch, drive, board or get off a carriage, work, build, haul,
+          tear down, build a road or wall line, or run one of your scripts with its params.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
           map, right-click included) to add it to the end of the resident's queue instead of
           replacing what they do; on a resident without a queue it starts one, after the walk they
           are on, if any. An order done on the resident's tile (work, build, pick up, drop, drive,
-          haul, tear down) is queued after a walk back to that tile, so it still finds them there
-          when its turn comes, every round of a loop. Work or haul followed by another step gets a
-          duration of {num(QUEUE_DEFAULT_STEP_MINUTES)} game minutes (
+          board, haul, tear down) is queued after a walk back to that tile, so it still finds them
+          there when its turn comes, every round of a loop. Work or haul followed by another step
+          gets a duration of {num(QUEUE_DEFAULT_STEP_MINUTES)} game minutes (
           {realMinutes(QUEUE_DEFAULT_STEP_MINUTES)}), which you can change.
         </p>
         <p>
@@ -962,6 +968,14 @@ export function Wiki() {
           next to their tile), as at home, so a carriage with Food on board keeps them fed on a long
           drive. The Food a haul route keeps for the horse stays on board. On a carriage without
           Food they go hungry like anyone away from home.
+        </p>
+        <p>
+          The group card boards everyone of the group standing on the carriage at once, until it is
+          full, and says who was skipped and why; its Get off gets them all off. Board and Get off
+          are queue steps too: Board ends once they are aboard and Get off once they are off, so put
+          a step that waits for the stop between them (a script that calls <code>end()</code> once
+          they are there), e.g. board, wait, get off, work. A Board step whose carriage has left
+          their tile by its turn is skipped.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}

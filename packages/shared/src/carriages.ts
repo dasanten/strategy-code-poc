@@ -217,6 +217,20 @@ export function boardProblem(
   carriage: Carriage | undefined,
 ): string | undefined {
   if (!carriage) return 'no such carriage'
+  const problem = boarderProblem(resident, carriage)
+  if (problem) return problem
+  if (carriageRoom(world, carriage) < PASSENGER_WEIGHT - 1e-9) return 'the carriage is full'
+  return undefined
+}
+
+/**
+ * Why a resident can't board a carriage, room aside (`boardProblem`): what the group card checks
+ * of each member before it hands out the seats left (`CONTEXT.md`: Group).
+ */
+export function boarderProblem(
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'order' | 'aboard' | 'riding'>,
+  carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>,
+): string | undefined {
   if (resident.aboard === carriage.id) return 'already aboard that carriage'
   if (resident.aboard !== undefined) return 'already aboard another carriage'
   if (!carriageOfResident(carriage, resident)) return 'not a carriage of your realm'
@@ -225,8 +239,21 @@ export function boardProblem(
   }
   if (drivenCarriageId(resident) !== undefined) return 'the driver can’t board'
   if (resident.riding !== undefined) return 'dismount first to board'
-  if (carriageRoom(world, carriage) < PASSENGER_WEIGHT - 1e-9) return 'the carriage is full'
   return undefined
+}
+
+/**
+ * How many more passengers fit on a carriage (`CONTEXT.md`: Passenger): its room for weight
+ * (what it holds less its goods and passengers) in whole `PASSENGER_WEIGHT`s.
+ */
+export function seatsLeft(
+  world: { horses: readonly CarriageHorse[]; carriages: readonly CarriagePlace[] },
+  carriage: CarriagePlace & { load: Stock },
+  passengers: number,
+): number {
+  const room =
+    carriageCapacity(world, carriage) - stockWeight(carriage.load) - passengers * PASSENGER_WEIGHT
+  return Math.max(0, Math.floor(room / PASSENGER_WEIGHT + 1e-9))
 }
 
 /**

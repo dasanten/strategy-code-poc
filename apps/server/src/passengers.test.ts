@@ -18,8 +18,10 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { checkInvariants } from './invariants.js'
-import { OrderQueue } from './orders.js'
+import { OrderQueue, orderKinds } from './orders.js'
+import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
+import { ScriptRunner, runScriptOrder } from './script-runner.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
@@ -234,6 +236,79 @@ describe('passengers', () => {
     world.carriages = []
     stepWorld(world, open)
     expect([p1.aboard, p2.aboard]).toEqual([undefined, undefined])
+  })
+
+  it('board and get off as queue steps, riding along while a step waits for the stop', () => {
+    const { world, w1, p1, p2, carriage } = setup()
+    // Script 1 waits until its resident is at (12, 5): the step that waits for arrival.
+    const host = {
+      script: (id: number) =>
+        id === 1
+          ? { userId: 7, source: 'if (me.x == 12 && me.y == 5) { end() }', followsDefault: false }
+          : undefined,
+      sender: (userId: number) => (userId === 7 ? me : undefined),
+      explored: () => true,
+    }
+    const kinds = { ...orderKinds, runScript: runScriptOrder(host) }
+    const orders = new OrderQueue(kinds, open)
+    const queues = new QueueRunner(host, kinds, open)
+    const scripts = new ScriptRunner(open, host)
+    const walking = new Walking(open)
+    const tick = () => {
+      orders.applyAll(world)
+      queues.runAll(world)
+      expect(scripts.runAll(world, true)).toEqual([])
+      stepWorld(world, open, walking)
+      expect(checkInvariants(world, open)).toEqual([])
+    }
+    const give = (o: object) => orders.receive(world, me, 'q', o as { kind: string })
+    // p1: board, wait for the stop, get off next to the carriage, walk on.
+    expect(
+      give({
+        kind: 'queue',
+        residentId: 'p1',
+        steps: [
+          { order: { kind: 'board', carriageId: 'k1' } },
+          { order: { kind: 'runScript', scriptId: 1 } },
+          { order: { kind: 'getOff', x: 13, y: 5 } },
+          { order: { kind: 'walkTo', x: 13, y: 8 } },
+        ],
+      }),
+    ).toMatchObject({ type: 'ack' })
+    // p2: board and get off at once, still at the start; then a board the carriage left behind.
+    give({
+      kind: 'queue',
+      residentId: 'p2',
+      steps: [
+        { order: { kind: 'board', carriageId: 'k1' } },
+        { order: { kind: 'getOff' } },
+        { order: { kind: 'walkTo', x: 2, y: 4 } },
+        { order: { kind: 'board', carriageId: 'k1' } },
+      ],
+    })
+    tick()
+    expect([p1.aboard, p2.aboard]).toEqual(['k1', 'k1'])
+    tick()
+    // Board ends once aboard: p1's wait starts, and p2 is off again.
+    expect(p1).toMatchObject({ aboard: 'k1', queue: { current: 1 } })
+    expect(p2).toMatchObject({ queue: { current: 1 } })
+    expect(p2.aboard).toBeUndefined()
+
+    give({ kind: 'drive', residentId: 'w1', carriageId: 'k1', x: 12, y: 5 })
+    for (let t = 0; t < 300 && (p1.queue || p2.queue || w1.order); t++) tick()
+    expect([carriage.x, carriage.y]).toEqual([12, 5])
+    expect([p1.x, p1.y, p1.aboard, p1.queue]).toEqual([13, 8, undefined, undefined])
+    expect([p2.x, p2.y, p2.aboard, p2.queue]).toEqual([2, 4, undefined, undefined])
+    // p2's last board found the carriage gone and was skipped; p1's plan skipped nothing.
+    const skips = world.events.filter((e) => e.kind === 'queueStepSkipped')
+    expect(skips).toEqual([
+      expect.objectContaining({
+        residentId: 'p2',
+        step: 4,
+        order: 'board',
+        reason: 'that carriage is not on the resident’s tile',
+      }),
+    ])
   })
 
   describe('eat from the carriage (Refilling from a carriage)', () => {
