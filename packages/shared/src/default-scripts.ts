@@ -29,6 +29,8 @@ export type Task = (typeof TASKS)[number]
  */
 export const TARGET_PARAMS: Partial<Readonly<Record<Task, string>>> = {
   work: 'workplace',
+  build: 'site',
+  haul: 'carriage',
   tearDown: 'building',
   breed: 'stable',
   feedStable: 'stable',
@@ -51,12 +53,15 @@ export interface TaskMemory {
   /**
    * Build: the kind of building, with the north-west tile of its footprint `at` the tile the
    * resident stood on when given it, or the one the task named: they walk there, then lay out the
-   * site there or join the one there.
+   * site there or join the one there. Joining one, the site goes in the param `site` too
+   * (`TARGET_PARAMS`); started without this memory, the default takes both from that site.
    */
   build: { building: string; at: { x: number; y: number } }
   /**
    * Haul: the carriage, the route's stops (`from` the tile the resident stood on when given it),
-   * the goods going to `to` and those coming back, and the Food kept on board for the horse.
+   * the goods going to `to` and those coming back, and the Food kept on board for the horse. The
+   * carriage goes in the param `carriage` too (`TARGET_PARAMS`), which the default reads; the
+   * route comes only from here, so the default started without it ends.
    */
   haul: {
     carriageId: string
@@ -277,7 +282,9 @@ memory.carry = {storageId: to.id, goods: goods}
   build: {
     name: 'Build',
     source: `// Build (default): build a memory.building with the north-west tile of its
-// footprint at memory.at, laying out the site or joining the one there.
+// footprint at memory.at, laying out the site or joining the one there, as
+// the Build order gives it. Without one I join params.site, or while none is
+// picked the construction site on my tile when I start; with none I end.
 // While the site lacks materials, one of us building it, picked at random,
 // fetches a load of what is missing from params.source, or the nearest
 // storage of my realm that holds it while none is picked, and brings it
@@ -285,8 +292,24 @@ memory.carry = {storageId: to.id, goods: goods}
 // me I get Food up to params.foodTake at params.source, or the nearest
 // storage of my realm with Food, and come back; fetching materials tops my
 // food up to foodTake too. foodAt 0 turns getting food off.
+param site: building // the construction site to join; none: the one I stand on
 param source: storage // where materials come from; a carriage too
 ${FOOD_PARAMS}
+
+// Which site I build: the Build order's, else the one picked, else the one I
+// started on.
+if (memory.building == null) {
+  let join = params.site
+  if (join == null) { join = buildingAt(me.x, me.y) }
+  if (join == null || join.site == null) {
+    if (params.site != null) { end("the " + params.site.kind + " is no construction site") }
+    else { end("no construction site on their tile") }
+    return
+  }
+  memory.building = join.kind
+  memory.at = {x: join.x, y: join.y}
+  memory.siteId = join.id
+}
 if (memory.stuck) { return }
 if (me.order != null && me.order.kind != "build") { return } // on my way
 
@@ -394,10 +417,35 @@ if (fetch(load, from.id) == null) {
   },
   haul: {
     name: 'Haul',
-    source: `// Haul (default): drive carriage memory.carriageId on a haul route between
-// memory.from and memory.to: memory.goods there, memory.returnGoods back,
-// memory.keepFood Food kept on board for the horse. The built-in haul order
-// loads, drives and unloads, again and again; this starts it at memory.from.
+    source: `// Haul (default): drive params.carriage, or while none is picked the carriage
+// on my tile when I start, on a haul route between memory.from and memory.to:
+// memory.goods there, memory.returnGoods back, memory.keepFood Food kept on
+// board for the horse. The route comes only from the Haul order; started
+// without one I end. The built-in haul order loads, drives and unloads, again
+// and again; this starts it at memory.from.
+param carriage: storage // the carriage to drive; none: the one I stand on
+if (memory.to == null) {
+  end("no route given")
+  return
+}
+
+// Which carriage I drive: the one picked, else the one I started on.
+if (params.carriage != null) {
+  if (params.carriage.kind != null) {
+    end("the " + params.carriage.kind + " is no carriage")
+    return
+  }
+  memory.carriageId = params.carriage.id
+}
+if (memory.carriageId == null) {
+  for (c of carriages()) {
+    if (c.x == me.x && c.y == me.y) { memory.carriageId = c.id }
+  }
+  if (memory.carriageId == null) {
+    end("no carriage on their tile")
+    return
+  }
+}
 if (me.order == null || me.order.kind != "haul") {
   if (me.x == memory.from.x && me.y == memory.from.y) {
     haul(memory.carriageId, memory.to.x, memory.to.y, memory.goods, memory.returnGoods, memory.keepFood)

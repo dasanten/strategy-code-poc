@@ -10,6 +10,7 @@ import {
 import {
   buildAtProblem,
   buildingAt,
+  constructionAt,
   canWork,
   DEFAULT_SCRIPTS,
   commanderOf,
@@ -349,7 +350,7 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       r.script = { scriptId, memory: taskMemory(o, r) }
       const source = host.script?.(scriptId)?.source
       const script = source === undefined ? undefined : { source, task: o.task }
-      const target = taskTarget(world, realmId, o)
+      const target = taskTarget(world, realmId, o, r)
       setStartParams(r, scriptId, withTargetParam(script, o.params, target))
     },
   }
@@ -357,13 +358,16 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
 
 /**
  * The task's target as its default's target param holds it (`TARGET_PARAMS`): Work's workplace,
- * Tear down's building, the stable of Breed horses and Feed the stable. Only one of the realm's
- * own, which a param can name; another's stays in the memory alone (`TaskMemory`).
+ * Tear down's building, the stable of Breed horses and Feed the stable, Haul's carriage, and for
+ * Build the unfinished site of its kind it joins at `at` (or the resident's tile); none while
+ * Build lays out a new one, which isn't there yet. Only one of the realm's own, which a param can
+ * name; another's stays in the memory alone (`TaskMemory`).
  */
 function taskTarget(
   world: WorldState,
   realmId: string | undefined,
   o: TaskRequest,
+  r: { x: number; y: number },
 ): string | undefined {
   const [id, type] =
     o.task === 'work'
@@ -372,9 +376,22 @@ function taskTarget(
         ? [o.buildingId, 'building' as const]
         : o.task === 'breed' || o.task === 'feedStable'
           ? [o.stableId, 'storage' as const]
-          : [undefined, undefined]
-  if (id === undefined || type === undefined) return undefined
+          : o.task === 'haul'
+            ? [o.carriageId, 'storage' as const]
+            : [buildSite(world, o, r), 'building' as const]
+  if (id === undefined) return undefined
   return paramTarget(world, realmId, type, id) ? id : undefined
+}
+
+/** The unfinished site a Build task joins at `at` (or the resident's tile), if one stands there. */
+function buildSite(
+  world: WorldState,
+  o: Extract<TaskRequest, { task: 'build' }>,
+  r: { x: number; y: number },
+): string | undefined {
+  const at = o.at ?? r
+  const site = constructionAt(world, at.x, at.y, o.building)
+  return site?.site && site.kind === o.building ? site.id : undefined
 }
 
 /** Why the resident can't be given the task on its target, if they can't (`taskOrder`). */
@@ -529,9 +546,9 @@ export class ScriptRunner {
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
-      const works = (r: Resident) =>
-        ran.has(r.id) && unedited(r) && this.host.script(r.script!.scriptId)?.task === 'work'
-      out.push(...workersHaveAWorkplace(world, works))
+      const taskOf = (r: Resident) =>
+        ran.has(r.id) && unedited(r) ? this.host.script(r.script!.scriptId)?.task : undefined
+      out.push(...defaultsHaveATarget(world, taskOf))
     }
     return out
   }
@@ -853,23 +870,53 @@ export function oneCarrierAtATime(
   }))
 }
 
+/** What a default script keeps in memory once it knows its target (`defaultsHaveATarget`). */
+const TARGET_KNOWN: Partial<
+  Record<Task, { invariant: string; memory: readonly string[]; without: string }>
+> = {
+  work: {
+    invariant: 'workers-have-a-workplace',
+    memory: ['workplaceId'],
+    without: 'Work without a workplace',
+  },
+  build: {
+    invariant: 'builders-have-a-site',
+    memory: ['building', 'at'],
+    without: 'Build without a site',
+  },
+  haul: {
+    invariant: 'haulers-have-a-route',
+    memory: ['to', 'carriageId'],
+    without: 'Haul without a route or carriage',
+  },
+}
+
 /**
  * Invariant (ADR 0004; `CONTEXT.md`: Default script, Started directly): a resident running the
- * Work default as the game ships it (`counts`) knows the workplace they work
- * (`memory.workplaceId`) once it has run: with none picked and none on their tile it ends, so
- * nobody runs Work for longer than a tick without a workplace.
+ * Work, Build or Haul default as the game ships it (`taskOf` names the task, for those that
+ * count) knows its target once it has run: Work its workplace (`memory.workplaceId`), Build the
+ * site's kind and place (`memory.building`, `memory.at`), Haul its route and carriage
+ * (`memory.to`, `memory.carriageId`). With none picked and none on their tile, or Haul with no
+ * route, it ends, so nobody runs one for longer than a tick without its target.
  */
-export function workersHaveAWorkplace(
+export function defaultsHaveATarget(
   world: WorldState,
-  counts: (r: Resident) => boolean,
+  taskOf: (r: Resident) => Task | undefined,
 ): InvariantViolation[] {
-  return world.residents
-    .filter((r) => r.script && typeof r.script.memory.workplaceId !== 'string' && counts(r))
-    .map((r) => ({
-      invariant: 'workers-have-a-workplace',
-      message: `${r.id} runs Work without a workplace`,
+  const out: InvariantViolation[] = []
+  for (const r of world.residents) {
+    if (!r.script) continue
+    const memory = r.script.memory
+    const task = taskOf(r)
+    const known = task && TARGET_KNOWN[task]
+    if (!known || known.memory.every((key) => memory[key] != null)) continue
+    out.push({
+      invariant: known.invariant,
+      message: `${r.id} runs ${known.without}`,
       entityIds: [r.id],
-    }))
+    })
+  }
+  return out
 }
 
 /**

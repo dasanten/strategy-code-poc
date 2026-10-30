@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { OrderQueue } from './orders.js'
 import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
-import { workersHaveAWorkplace } from './script-runner.js'
+import { defaultsHaveATarget } from './script-runner.js'
 import { defaultScripts } from './test-default-scripts.js'
 import { addCity } from './test-terrain.js'
 import { Walking } from './walking.js'
@@ -150,10 +150,10 @@ describe('workers-have-a-workplace invariant', () => {
     const [w1, w2] = world.residents
     w1!.script = { scriptId: WORK, memory: { workplaceId: 'f1' } }
     w2!.script = { scriptId: WORK, memory: {} }
-    expect(workersHaveAWorkplace(world, () => true)).toEqual([
+    expect(defaultsHaveATarget(world, () => 'work')).toEqual([
       expect.objectContaining({ invariant: 'workers-have-a-workplace', entityIds: ['w2'] }),
     ])
-    expect(workersHaveAWorkplace(world, (r) => r.id === 'w1')).toEqual([])
+    expect(defaultsHaveATarget(world, (r) => (r.id === 'w1' ? 'work' : undefined))).toEqual([])
   })
 
   it('is checked where a Player’s scripts run, once the Work default has run', () => {
