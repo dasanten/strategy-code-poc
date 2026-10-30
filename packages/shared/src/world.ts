@@ -480,9 +480,11 @@ export interface ClimbOrder {
 
 /**
  * Breeding (`CONTEXT.md`: Breeding): the resident, standing at the finished stable `stableId` on
- * `at`, tends the two horses `horseIds` standing in it. `progress` counts the ticks tended, up to
- * `STABLE_BREED_TICKS`; then a foal is born there and the order is done. It ends, its progress
- * lost, when the resident or a horse leaves, a horse dies or the stable has no room left.
+ * `at`, tends the two horses `horseIds` standing in it. `progress` counts the ticks the pair has
+ * been tended, up to `STABLE_BREED_TICKS`; then a foal is born there and the order is done. The
+ * progress belongs to the pair, kept by the stable (`Building.breedings`); the order shows the
+ * same number. It ends when the resident or a horse leaves or a horse dies, and makes no progress
+ * while the stable has no room left.
  */
 export interface BreedOrder {
   kind: 'breed'
@@ -581,6 +583,11 @@ export interface WorldState {
    * told of in their realm logs; the server tells them of the rest at start.
    */
   scriptViewChanges: number
+  /**
+   * The account ids of the Players who claimed their Horse offer (`CONTEXT.md`: Horse offer):
+   * kept with the Player, not the realm, so a claim outlives a Leader death.
+   */
+  horseOffersClaimed: number[]
 }
 
 /**
@@ -1340,6 +1347,18 @@ export type RealmEventWhat =
       x: number
       y: number
     }
+  /**
+   * The Player claimed their Horse offer (`CONTEXT.md`: Horse offer): `horseIds` arrived where the
+   * Horse grant puts them (see `horsesGranted`).
+   */
+  | {
+      kind: 'horsesClaimed'
+      horseIds: string[]
+      where: 'stable' | 'storage' | 'leader'
+      city?: string
+      x: number
+      y: number
+    }
   /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
   | { kind: 'foaled'; horseId: string; stableId: string }
   /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */
@@ -1641,6 +1660,19 @@ export interface Building {
    * finished walls and gates only. It falls at its `wallStrength`.
    */
   damage?: number
+  /**
+   * How far each pair of horses in it has been bred (`CONTEXT.md`: Breeding), once a resident has
+   * tended them; finished stables only. Kept while nobody tends them, lost when one of the two
+   * leaves the stable or dies, gone when their foal is born.
+   */
+  breedings?: KeptBreeding[]
+}
+
+/** The breeding progress a stable keeps for two horses in it (`Building.breedings`). */
+export interface KeptBreeding {
+  horseIds: [string, string]
+  /** Ticks the pair has been tended so far, from 1 to below `STABLE_BREED_TICKS`. */
+  progress: number
 }
 
 /**

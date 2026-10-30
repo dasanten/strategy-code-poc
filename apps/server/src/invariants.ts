@@ -78,6 +78,7 @@ import {
   isPassableTerrain,
   buildingAt,
   isAt,
+  keptBreeding,
   besideStep,
   stepLength,
   tileIndex,
@@ -108,6 +109,7 @@ import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
+import { horseOffersOnce } from './horse-grant.js'
 import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
@@ -449,6 +451,9 @@ export const breedOrdersSound: Invariant = {
         fail(`breeds from ${o.at.x}, ${o.at.y} but stands elsewhere`)
       if (!(Number.isInteger(o.progress) && o.progress >= 0 && o.progress < STABLE_BREED_TICKS))
         fail(`has breeding progress ${o.progress} of ${STABLE_BREED_TICKS}`)
+      const kept = stable && keptBreeding(stable, o.horseIds)
+      if (stable && o.progress !== (kept?.progress ?? 0))
+        fail(`has breeding progress ${o.progress}, the stable ${kept?.progress ?? 0}`, [stable.id])
       if (o.horseIds[0] === o.horseIds[1]) fail(`breeds horse ${o.horseIds[0]} with itself`)
       for (const id of o.horseIds) {
         const h = world.horses.find((x) => x.id === id)
@@ -458,6 +463,46 @@ export const breedOrdersSound: Invariant = {
         if (other !== undefined && other !== r.id)
           fail(`breeds horse ${id}, which ${other} breeds too`, [id, other])
         bred.set(id, r.id)
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * Breeding progress belongs to two horses in a stable (`CONTEXT.md`: Breeding): after a tick,
+ * every progress a stable keeps (`Building.breedings`) is that finished stable's, names two
+ * different living horses of one realm or NPC city standing in it, at most once per pair, and is
+ * below one foal's worth (`STABLE_BREED_TICKS`).
+ */
+export const keptBreedingsSound: Invariant = {
+  name: 'kept-breedings-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const b of world.buildings) {
+      if (!b.breedings) continue
+      const fail = (message: string, ids: string[] = []) =>
+        out.push({
+          invariant: this.name,
+          message: `building ${b.id} ${message}`,
+          entityIds: [b.id, ...ids],
+        })
+      if (b.kind !== 'stable' || b.site) fail('keeps breeding progress but isn’t a finished stable')
+      const pairs = new Set<string>()
+      for (const k of b.breedings) {
+        const [a, c] = k.horseIds
+        const pair = [a, c].sort().join('+')
+        if (a === c) fail(`keeps breeding progress for horse ${a} with itself`, [a])
+        if (pairs.has(pair)) fail(`keeps breeding progress for ${a} and ${c} twice`, [a, c])
+        pairs.add(pair)
+        const horses = k.horseIds.map((id) => world.horses.find((h) => h.id === id))
+        if (horses.some((h) => !h || !isAt(h, b)))
+          fail(`keeps breeding progress for ${a} and ${c}, not both alive in it`, [a, c])
+        const [h1, h2] = horses
+        if (h1 && h2 && (h1.realmId !== h2.realmId || h1.cityId !== h2.cityId))
+          fail(`keeps breeding progress for ${a} and ${c}, of different owners`, [a, c])
+        if (!(Number.isInteger(k.progress) && k.progress >= 1 && k.progress < STABLE_BREED_TICKS))
+          fail(`keeps breeding progress ${k.progress} of ${STABLE_BREED_TICKS} for ${a} and ${c}`)
       }
     }
     return out
@@ -1733,12 +1778,14 @@ export const worldInvariants: Invariant[] = [
   leadersServeNoOne,
   residentNamesWellFormed,
   cityNamesWellFormed,
+  horseOffersOnce,
   buildingsInPlace,
   citiesFromBuildings,
   outpostStorageRealms,
   carriedWithinCapacity,
   goodsInPlace,
   breedOrdersSound,
+  keptBreedingsSound,
   goodsInWholeUnits,
   carryOrdersDone,
   storeFetchOrdersSound,

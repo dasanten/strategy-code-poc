@@ -14,7 +14,7 @@ import { grantHorses } from './horse-grant.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 52
+export const WORLD_FORMAT_VERSION = 54
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -104,9 +104,30 @@ export const migrations: Record<number, MigrationStep> = {
   // as well as an id (`ScriptParamValue`). Values from before are all ids, so the step leaves
   // them as they are.
   50: (state) => state,
+  // Breeding progress belongs to the two horses in the stable (`CONTEXT.md`: Breeding,
+  // `Building.breedings`), no longer only to the breeder's order. A breeding under way keeps its
+  // progress: its stable now keeps it for the pair too.
+  51: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'breed' || o.progress < 1) continue
+      const stable = world.buildings.find((b) => b.id === o.stableId)
+      if (!stable) continue
+      ;(stable.breedings ??= []).push({
+        horseIds: [o.horseIds[0], o.horseIds[1]],
+        progress: o.progress,
+      })
+    }
+    return world
+  },
+  // The Horse offer (`CONTEXT.md`: Horse offer) is kept with the Player (`horseOffersClaimed`).
+  // Nobody could claim it before, so every existing Player starts unclaimed, whether or not they
+  // have horses or got the Horse grant.
+  52: (state) => ({ ...(state as object), horseOffersClaimed: [] }),
   // Residents ride carriages as passengers (`CONTEXT.md`: Passenger), a new `aboard` field.
   // Nobody was aboard before, so the step leaves the world as it is.
-  51: (state) => state,
+  53: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

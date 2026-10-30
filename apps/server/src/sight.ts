@@ -238,13 +238,16 @@ function shownLines<P extends { stock: number }>(lines: P[], inside: boolean): S
 }
 
 /**
- * A building as the side sees it: its stock only when it sees inside, and a Trade Org
- * warehouse's prices either way (`CONTEXT.md`: Seeing inside a storage, Warehouse prices).
+ * A building as the side sees it: its stock and the breeding progress a stable keeps only when it
+ * sees inside, and a Trade Org warehouse's prices either way (`CONTEXT.md`: Seeing inside a storage, Warehouse prices).
  */
 function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBuilding {
   const inside = insight.insideBuilding(b)
   const shown: SeenBuilding = { ...b }
-  if (!inside) delete shown.stock
+  if (!inside) {
+    delete shown.stock
+    delete shown.breedings
+  }
   if (b.kind === 'warehouse') {
     const prices = warehousePrices(world, b)
     if (prices.length > 0) shown.prices = shownLines(prices, inside)

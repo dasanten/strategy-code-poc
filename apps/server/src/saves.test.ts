@@ -11,6 +11,7 @@ import {
   HORSE_START_AGE_MAX,
   HORSE_START_AGE_MIN,
   horseAgeInYears,
+  horsesIn,
   type TerrainMap,
 } from '@csp/shared'
 import { createAdmin } from './auth.js'
@@ -134,7 +135,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(52)
+    expect(WORLD_FORMAT_VERSION).toBe(54)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -150,6 +151,16 @@ describe('world saves', () => {
     expect(migrated.buildings).toEqual(world.buildings)
   })
 
+  it('migrates a format 52 world: every Player starts with their Horse offer unclaimed (migration 52 → 53)', () => {
+    const { world, terrain } = worldWithPost()
+    expect(world.horses.some((h) => h.realmId === world.realms[0]!.id)).toBe(true)
+    const old: Partial<typeof world> = structuredClone(world)
+    delete old.horseOffersClaimed
+    const migrated = migrateWorld(old, 52, { terrain })
+    expect(migrated).toEqual({ ...world, horseOffersClaimed: [] })
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
   it('keeps a format 50 world as it is: picked param values stay ids (migration 50 → 51)', () => {
     const { world, terrain } = worldWithCity()
     const r = world.residents[0]!
@@ -160,12 +171,32 @@ describe('world saves', () => {
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
-  it('keeps a format 51 world as it is: nobody is aboard a carriage (migration 51 → 52)', () => {
+  it('keeps a format 53 world as it is: nobody is aboard a carriage (migration 53 → 54)', () => {
     const { world, terrain } = worldWithCity()
     expect(world.carriages.length).toBeGreaterThan(0)
-    const migrated = migrateWorld(structuredClone(world), 51, { terrain }, migrations, 52)
+    const migrated = migrateWorld(structuredClone(world), 53, { terrain }, migrations, 54)
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.aboard === undefined)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps the progress of breedings under way, with their stable (migration 51 → 52)', () => {
+    const { world, terrain } = worldWithCity()
+    const stable = world.buildings.find((b) => b.kind === 'stable')!
+    const [a, b] = horsesIn(world.horses, stable)
+    const [breeder, idle] = world.residents
+    // A format 51 breeder, partway to a foal; the progress was the order's alone.
+    breeder!.x = stable.x
+    breeder!.y = stable.y
+    const at = { x: stable.x, y: stable.y }
+    const horseIds: [string, string] = [a!.id, b!.id]
+    breeder!.order = { kind: 'breed', stableId: stable.id, horseIds, at, progress: 40 }
+    idle!.order = null
+    const migrated = migrateWorld(structuredClone(world), 51, { terrain }, migrations, 52)
+    const kept = migrated.buildings.find((x) => x.id === stable.id)!.breedings
+    expect(kept).toEqual([{ horseIds, progress: 40 }])
+    expect(migrated.residents.find((r) => r.id === breeder!.id)!.order).toEqual(breeder!.order)
+    expect(migrated.buildings.filter((x) => x.breedings).length).toBe(1)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

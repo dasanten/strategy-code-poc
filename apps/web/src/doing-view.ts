@@ -15,6 +15,8 @@ import { GOOD_LABELS, orderDoing } from './Residents.js'
 /** What the Doing line is worked out from: the resident's order and the script they run. */
 export interface DoingOf {
   order: ResidentOrder | null
+  /** The horse they ride: their walks say "Riding" (`CONTEXT.md`: Riding). */
+  riding?: string
   /** Expecting a child, which shows while they have no order. */
   carrying?: unknown
   script?: SeenScript

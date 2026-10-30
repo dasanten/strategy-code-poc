@@ -83,6 +83,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     lastSeen: {},
     // A new world's Players have nothing to be told of changes before it.
     scriptViewChanges: SCRIPT_VIEW_CHANGES.length,
+    horseOffersClaimed: [],
   }
 }
 
