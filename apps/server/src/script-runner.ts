@@ -56,6 +56,7 @@ import {
   scriptParamsSound,
   setStartParams,
   startParamsProblem,
+  withTargetParam,
 } from './script-params.js'
 import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
@@ -133,8 +134,9 @@ function paramsProblem(
 
 /**
  * The run-script order: one of the Player's residents runs one of the Player's scripts, from a
- * fresh memory, with the param values it gives set first (`CONTEXT.md`: Before it starts). It
- * ends whatever the resident was doing.
+ * fresh memory, with the param values it gives set first (`CONTEXT.md`: Before it starts); a
+ * default script's target param is cleared unless it gives one (`withTargetParam`). It ends
+ * whatever the resident was doing.
  */
 export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
   return {
@@ -154,7 +156,7 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
       if (!r) return
       r.order = null
       r.script = { scriptId, memory: {} }
-      setStartParams(r, scriptId, params)
+      setStartParams(r, scriptId, withTargetParam(host.script(scriptId), params))
     },
   }
 }
@@ -322,7 +324,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
  * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
  * own: the resident stands in the stable and is grown up. The param values it gives are checked
- * against the default script's and set first (`CONTEXT.md`: Before it starts).
+ * against the default script's and set first (`CONTEXT.md`: Before it starts), the task's target
+ * in the script's target param (`withTargetParam`): Work's `workplace`.
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
@@ -343,7 +346,10 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       r.order = null
       const scriptId = host.defaultScript(sender.userId, o.task)
       r.script = { scriptId, memory: taskMemory(o, r) }
-      setStartParams(r, scriptId, o.params)
+      const source = host.script?.(scriptId)?.source
+      const script = source === undefined ? undefined : { source, task: o.task }
+      const target = o.task === 'work' ? o.workplaceId : undefined
+      setStartParams(r, scriptId, withTargetParam(script, o.params, target))
     },
   }
 }
@@ -461,6 +467,8 @@ export class ScriptRunner {
       add(a.realmId, { holder: a, id: a.id, name: a.name, by, bind: by })
     }
     const used = new Map<number, { source: string; program: Program }>()
+    // Those whose script ran this tick, not skipped for the realm's budget.
+    const ran = new Set<string>()
     for (const realm of world.realms) {
       const running = byRealm.get(realm.id)
       const sender = this.host.sender(realm.userId)
@@ -478,6 +486,7 @@ export class ScriptRunner {
           logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, true))
           continue
         }
+        ran.add(r.id)
         const steps = Math.min(SCRIPT_STEP_BUDGET, left)
         left -= this.runOne(
           world,
@@ -497,6 +506,9 @@ export class ScriptRunner {
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
+      const works = (r: Resident) =>
+        ran.has(r.id) && unedited(r) && this.host.script(r.script!.scriptId)?.task === 'work'
+      out.push(...workersHaveAWorkplace(world, works))
     }
     return out
   }
@@ -816,6 +828,25 @@ export function oneCarrierAtATime(
     message: `${ids.length} residents carry ${place}'s output at once: ${ids.join(', ')}`,
     entityIds: [place, ...ids],
   }))
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Default script, Started directly): a resident running the
+ * Work default as the game ships it (`counts`) knows the workplace they work
+ * (`memory.workplaceId`) once it has run: with none picked and none on their tile it ends, so
+ * nobody runs Work for longer than a tick without a workplace.
+ */
+export function workersHaveAWorkplace(
+  world: WorldState,
+  counts: (r: Resident) => boolean,
+): InvariantViolation[] {
+  return world.residents
+    .filter((r) => r.script && typeof r.script.memory.workplaceId !== 'string' && counts(r))
+    .map((r) => ({
+      invariant: 'workers-have-a-workplace',
+      message: `${r.id} runs Work without a workplace`,
+      entityIds: [r.id],
+    }))
 }
 
 /**

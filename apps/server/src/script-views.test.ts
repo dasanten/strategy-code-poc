@@ -185,6 +185,7 @@ describe('script views', () => {
       directives: 'directives()',
       withMemory: 'withMemory("role", "gatherer")',
       building: 'building("s1")',
+      buildingAt: 'buildingAt(13, 10)',
       pileAt: 'pileAt(10, 10)',
       outputOf: 'outputOf(building("s1"))',
       materialsNeeded: 'materialsNeeded(building("site1"))',

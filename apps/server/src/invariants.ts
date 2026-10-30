@@ -109,7 +109,7 @@ import { hqRingsSound } from './hq-growth.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
-import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
+import { oneCarrierAtATime, oneFetcherAtATime, workersHaveAWorkplace } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
 
@@ -1754,6 +1754,17 @@ export const gameDefaultFetchers: Invariant = {
   check: (world) => oneFetcherAtATime(world, (r) => r.script?.scriptId === 0),
 }
 
+/**
+ * Nobody runs Work for longer than a tick without a workplace (`CONTEXT.md`: Default script,
+ * Started directly), among NPC cities' residents running the game's own Work default, whose
+ * city names it when it puts them to work; a Player's are checked where their scripts run.
+ */
+export const gameDefaultWorkers: Invariant = {
+  name: 'workers-have-a-workplace',
+  check: (world) =>
+    workersHaveAWorkplace(world, (r) => r.script?.scriptId === 0 && r.script.task === 'work'),
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -1837,6 +1848,7 @@ export const worldInvariants: Invariant[] = [
   pathsAreSteps,
   gameDefaultCarriers,
   gameDefaultFetchers,
+  gameDefaultWorkers,
   queuesSound,
 ]
 

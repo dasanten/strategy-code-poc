@@ -638,10 +638,10 @@ export function Wiki() {
         </p>
         <p>
           Far from home, a resident working, building or tearing down goes and gets food on their
-          own. Below <code>foodAt</code> units of Food on them ({num(GET_FOOD_AT)} unless you set
-          it on their card), they walk to their storage (or the nearest one of your realm with
-          Food), take Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and go
-          back. Whenever they are at a storage anyway, their own food is topped up to{' '}
+          own. Below <code>foodAt</code> units of Food on them ({num(GET_FOOD_AT)} unless you set it
+          on their card), they walk to their storage (or the nearest one of your realm with Food),
+          take Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and go back.
+          Whenever they are at a storage anyway, their own food is topped up to{' '}
           <code>foodTake</code> instead of {num(OWN_FOOD)}. With <code>foodAt</code> set to 0 they
           don't go on their own and rely on refilling.
         </p>
@@ -675,6 +675,14 @@ export function Wiki() {
           Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes
           back. With no Food anywhere they work on. Carrying a load tops their food up to{' '}
           <code>foodTake</code> too. <code>foodAt</code> 0 turns this off.
+        </p>
+        <p>
+          Work can be run directly too, with Run script or as a queue step: they work the workplace
+          in its <code>workplace</code> param, or with none picked the one they stand on when it
+          starts. Giving Work on a workplace fills it. It is never kept: each start works what it is
+          given or where they stand, so a queue can walk them to a workplace and then run Work
+          there. With no workplace there, or once theirs is gone, Work ends and your realm log says
+          why.
         </p>
         <table>
           <thead>
@@ -807,8 +815,8 @@ export function Wiki() {
           resource nodes, and a new town hall founds a city.
         </p>
         <p>
-          A resident building or tearing down who carries less Food than <code>foodAt</code>{' '}
-          ({num(GET_FOOD_AT)} unless set) goes to their <code>source</code>, or the nearest storage
+          A resident building or tearing down who carries less Food than <code>foodAt</code> (
+          {num(GET_FOOD_AT)} unless set) goes to their <code>source</code>, or the nearest storage
           of your realm with Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)}{' '}
           unless set) and comes back to the site. With no Food anywhere they work on. Fetching
           materials tops their food up to <code>foodTake</code> too, before the materials.{' '}
@@ -974,9 +982,9 @@ export function Wiki() {
           while they ride somewhere.
         </p>
         <p>
-          A rider’s Doing line says <em>Riding to …</em> where it would say{' '}
-          <em>Walking to …</em>, and their card shows the horse they ride: its stats, age, health
-          and hunger, with <strong>Dismount</strong> under Orders.
+          A rider’s Doing line says <em>Riding to …</em> where it would say <em>Walking to …</em>,
+          and their card shows the horse they ride: its stats, age, health and hunger, with{' '}
+          <strong>Dismount</strong> under Orders.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
@@ -1419,14 +1427,17 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             </pre>
           </li>
           <li>
-            The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
-            <code>source</code>: where materials come from, a carriage too. Unset, each uses the
-            nearest storage; a source picked that holds none of what the site lacks is left alone,
-            and they just build. The Tear down default has <code>source</code>: where Food comes
-            from. The Work, Build and Tear down defaults also have the <code>number</code> params{' '}
-            <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0 turns it off) and{' '}
-            <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food, in units of Food
-            (a resident eats about {num(foodEatenPerDay())} a game day).
+            The Work default has <code>workplace</code>: the workplace to work, the one they stand
+            on while none is picked; it is never kept between starts, so the form before it starts
+            shows it empty, and giving Work on a workplace fills it without asking. It also has{' '}
+            <code>storage</code>: where the output goes. The Build default has <code>source</code>:
+            where materials come from, a carriage too. Unset, each uses the nearest storage; a
+            source picked that holds none of what the site lacks is left alone, and they just build.
+            The Tear down default has <code>source</code>: where Food comes from. The Work, Build
+            and Tear down defaults also have the <code>number</code> params <code>foodAt</code>{' '}
+            (default {num(GET_FOOD_AT)}; 0 turns it off) and <code>foodTake</code> (default{' '}
+            {num(GET_FOOD_TAKE)}) for getting food, in units of Food (a resident eats about{' '}
+            {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>

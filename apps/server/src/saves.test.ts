@@ -135,7 +135,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(53)
+    expect(WORLD_FORMAT_VERSION).toBe(54)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -156,9 +156,27 @@ describe('world saves', () => {
     expect(world.horses.some((h) => h.realmId === world.realms[0]!.id)).toBe(true)
     const old: Partial<typeof world> = structuredClone(world)
     delete old.horseOffersClaimed
-    const migrated = migrateWorld(old, 52, { terrain })
+    const migrated = migrateWorld(old, 52, { terrain }, migrations, 53)
     expect(migrated).toEqual({ ...world, horseOffersClaimed: [] })
     expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('gives a running worker the workplace in their memory as the param workplace (migration 53 → 54)', () => {
+    const { world, terrain } = worldWithCity()
+    const [worker, npc, other] = world.residents
+    const farm = world.buildings[0]!
+    worker!.script = { scriptId: 7, memory: { workplaceId: farm.id, at: { x: 1, y: 2 } } }
+    worker!.scriptParams = { 7: { storage: 'storage-1' } }
+    // The game's own default, run by an NPC city, keeps its memory only.
+    npc!.script = { scriptId: 0, task: 'work', memory: { workplaceId: farm.id } }
+    // A workplace gone from the world is none to give.
+    other!.script = { scriptId: 8, memory: { workplaceId: 'gone' } }
+    const migrated = migrateWorld(structuredClone(world), 53, { terrain }, migrations, 54)
+    const [w, n, o] = migrated.residents
+    expect(w!.scriptParams).toEqual({ 7: { storage: 'storage-1', workplace: farm.id } })
+    expect(w!.script).toEqual(worker!.script)
+    expect(n!.scriptParams).toBeUndefined()
+    expect(o!.scriptParams).toBeUndefined()
   })
 
   it('keeps a format 50 world as it is: picked param values stay ids (migration 50 → 51)', () => {

@@ -128,6 +128,15 @@ const SHARED: readonly ScriptBinding[] = [
       'The building or construction site with that id, if the Player sees it or it is one of my realm’s cities’; else null.',
   },
   {
+    name: 'buildingAt',
+    is: 'query',
+    params: ['x', 'y'],
+    returns: { view: 'building' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The building or construction site on a tile, roads and carriage sites left out, as `building(id)` gives it; null where there is none or the Player doesn’t see it.',
+  },
+  {
     name: 'pileAt',
     is: 'query',
     params: ['x', 'y'],
