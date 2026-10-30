@@ -135,7 +135,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(58)
+    expect(WORLD_FORMAT_VERSION).toBe(60)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -255,7 +255,6 @@ describe('world saves', () => {
     expect(realmOf('farm')).toBe(realmId)
     expect(realmOf('far')).toBeUndefined()
     expect(realmOf('done')).toBeUndefined()
-    expect(WORLD_FORMAT_VERSION).toBe(58)
   })
 
   it('gives residents tearing down, breeding and feeding their target as its param (migration 55 → 56)', () => {
@@ -319,6 +318,23 @@ describe('world saves', () => {
     expect(kept).toEqual([{ horseIds, progress: 40 }])
     expect(migrated.residents.find((r) => r.id === breeder!.id)!.order).toEqual(breeder!.order)
     expect(migrated.buildings.filter((x) => x.breedings).length).toBe(1)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps a format 58 world as it is: scripts keep no error or steps yet (migration 58 → 59)', () => {
+    const { world, terrain } = worldWithCity()
+    world.residents[0]!.script = { scriptId: 1, memory: { n: 2 }, errorLoggedAt: 0 }
+    const migrated = migrateWorld(structuredClone(world), 58, { terrain }, migrations, 59)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents[0]!.script).not.toHaveProperty('lastError')
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps a format 59 world as it is: no resident has a script log yet (migration 59 → 60)', () => {
+    const { world, terrain } = worldWithCity()
+    const migrated = migrateWorld(structuredClone(world), 59, { terrain }, migrations, 60)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents.every((r) => r.scriptLog === undefined)).toBe(true)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

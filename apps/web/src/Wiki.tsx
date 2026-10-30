@@ -107,6 +107,7 @@ import {
   SCRIPT_ACTION_COST,
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_LOG_LINES,
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
@@ -885,9 +886,9 @@ export function Wiki() {
           Build can be run directly too, with Run script or as a queue step: they join the
           construction site in its <code>site</code> param, or with none picked the one they stand
           on when it starts. Laying out a new site (what and where) is only the Build order's.
-          Giving Build on a site your residents laid out fills <code>site</code>; it is never kept, so a
-          queue can walk them to a site and then run Build there. With no construction site there,
-          Build ends and your realm log says why.
+          Giving Build on a site your residents laid out fills <code>site</code>; it is never kept,
+          so a queue can walk them to a site and then run Build there. With no construction site
+          there, Build ends and your realm log says why.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
@@ -1416,18 +1417,19 @@ export function Wiki() {
           called. Every call costs one step, and its cost here on top. Queries answer from what you
           see and have explored, nothing more. An action asks for the order of its name for{' '}
           <code>me</code>, checked exactly as one from the map, and answers <code>null</code> when
-          asked for, or why not. Two actions ask for no order. <code>doing</code>: its text, at most{' '}
-          {num(DOING_MAX_LENGTH)} characters, is what the resident card and list say the resident is
-          doing, until the script says something else; only you see it. Without it they show what
-          the task and its current order have the resident doing, such as “Building a house:
-          fetching 10 wood from the storage”. <code>end</code>: once this run is over the script
-          ends and the resident stands idle; in a queue, its next step starts. Given a reason,{' '}
-          <code>end(reason)</code> also notes it in your realm log, like “Ana stopped Work: no
-          workplace on her tile”: short text, cut like <code>doing</code>’s, that only you see, for
-          every end. The Build and Tear down defaults end once the site is finished or the building
-          is gone; a script that never calls it runs until another order ends it. A script runs as a
-          resident's or as an army's: names marked resident only or army only are only there for one
-          of them, and a default script runs as a resident's.
+          asked for, or why not. Three actions ask for no order. <code>doing</code>: its text, at
+          most {num(DOING_MAX_LENGTH)} characters, is what the resident card and list say the
+          resident is doing, until the script says something else; only you see it. Without it they
+          show what the task and its current order have the resident doing, such as “Building a
+          house: fetching 10 wood from the storage”. <code>end</code>: once this run is over the
+          script ends and the resident stands idle; in a queue, its next step starts. Given a
+          reason, <code>end(reason)</code> also notes it in your realm log, like “Ana stopped Work:
+          no workplace on her tile”: short text, cut like <code>doing</code>’s, that only you see,
+          for every end. <code>log</code>: adds a short line, cut like <code>doing</code>’s, to the
+          resident's script log, with the game time. The Build and Tear down defaults end once the
+          site is finished or the building is gone; a script that never calls it runs until another
+          order ends it. A script runs as a resident's or as an army's: names marked resident only
+          or army only are only there for one of them, and a default script runs as a resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />
@@ -1575,6 +1577,27 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
           <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
         </ul>
+        <p>
+          To debug a script, open the Script tab of a resident or army running it: it shows the
+          script's memory and params as they are now, changing every tick. You can't change memory
+          there. Only you see the memory of your scripts; a large one is shown cut.
+        </p>
+        <p>
+          The Script tab also shows the steps the script used last tick out of its{' '}
+          {num(SCRIPT_STEP_BUDGET)}, marked when it ran out, and its last runtime error with the
+          line and how long ago. The error stays until the script ends or you save a new version;
+          click it to open that line in the Library. Errors still go into the realm log as well.
+        </p>
+        <p>
+          The Script tab of your resident also shows their script log, newest first: the lines their
+          scripts gave <code>log(text)</code> and the reasons they gave <code>end(reason)</code>,
+          each with its game time. A resident keeps their last {num(SCRIPT_LOG_LINES)} lines across
+          scripts, so it still shows why the last one ended after it did; once full, the oldest line
+          goes. Only you see it: it never goes in the realm log, to other Players or to scripts. The
+          game’s default scripts log their decisions and turns, never every tick, like “pile full:
+          carrying 10 stone to the storage at 12,6” or “low on Food (2): fetching 6 at the storage
+          at 12,6”.
+        </p>
       </Section>
 
       <Section id="examples">

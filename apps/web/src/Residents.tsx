@@ -1042,6 +1042,8 @@ export function ResidentCard({
   sections,
   onSections,
   scriptParams,
+  scriptMemory,
+  scriptLog,
   onStore,
   onEditQueue,
   addStep,
@@ -1163,6 +1165,10 @@ export function ResidentCard({
   onSections: (sections: CardSections<ActionId>) => void
   /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
   scriptParams?: ReactNode
+  /** The memory of the script they run (`ScriptMemoryTree`), for the Player running it. */
+  scriptMemory?: ReactNode
+  /** Their script log (`ScriptLog`), for the Player owning them, running a script or not. */
+  scriptLog?: ReactNode
   /** Orders the resident to store what they carry at the nearest storage (`STORE_ALL`). */
   onStore?: () => void
   /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
@@ -1308,9 +1314,16 @@ export function ResidentCard({
           <>
             <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
             {scriptParams}
+            {scriptMemory}
+            {scriptLog}
           </>
         ) : (
-          <p className="muted small">Runs no script. Give them one with Run script under Orders.</p>
+          <>
+            <p className="muted small">
+              Runs no script. Give them one with Run script under Orders.
+            </p>
+            {scriptLog}
+          </>
         ))}
       {tab === 'orders' && shown && (
         <div className="sel-panel">

@@ -51,6 +51,7 @@ import {
   scriptRequestsSound,
   type ScriptContext,
 } from './script-bindings.js'
+import { addToScriptLog } from './script-log.js'
 import type { RunnableScript } from './scripts.js'
 import {
   paramTarget,
@@ -523,6 +524,7 @@ export class ScriptRunner {
         // Its script may have ended this tick.
         if (!r.holder.script) continue
         if (left <= 0) {
+          r.holder.script.lastRun = { steps: 0, outOfSteps: 'realm' }
           logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, true))
           continue
         }
@@ -593,6 +595,8 @@ export class ScriptRunner {
       parsed = { source: script.source, program: parse(script.source) }
     }
     used.set(running.scriptId, parsed)
+    // An error belongs to the version that ran into it; another one running clears it.
+    if (running.lastError && running.lastError.version !== script.version) delete running.lastError
 
     const memory = structuredClone(running.memory) as ScriptObject
     // A resident's picked param values; an army's params are never picked.
@@ -632,10 +636,19 @@ export class ScriptRunner {
     }
     // What it requested counts, even when it stopped with an error or out of steps.
     for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
+    // So are its log lines, and the reason it ended with goes in the log after them. Only the
+    // owning Player reads the log, so a hirer's script, run by a resident they don't own, logs none.
+    const reason = bound.ended() ? bound.endReason() : null
+    if (resident?.owner === realm.id) {
+      addToScriptLog(
+        resident,
+        world.tick,
+        reason === null ? bound.logged : [...bound.logged, reason],
+      )
+    }
     if (bound.ended()) {
       endScript(world, r.id)
       // A reason is noted each time, not rate-limited: an end is no error.
-      const reason = bound.endReason()
       if (reason !== null) {
         recordEvent(world, realm.id, {
           kind: 'scriptStopped',
@@ -649,14 +662,9 @@ export class ScriptRunner {
       return result.steps
     }
 
-    const kept = keepMemory(memory)
-    if (typeof kept === 'string') {
-      logLimited(world, realm.id, r, 'errorLoggedAt', scriptError(r, running, kept))
-    } else {
-      running.memory = kept
-    }
-    if (result.status === 'error') {
-      const { message, line, column } = result
+    const failed = (message: string, line?: number, column?: number) => {
+      const where = line === undefined ? {} : { line, column }
+      running.lastError = { message, ...where, tick: world.tick, version: script.version }
       logLimited(
         world,
         realm.id,
@@ -664,8 +672,17 @@ export class ScriptRunner {
         'errorLoggedAt',
         scriptError(r, running, message, line, column),
       )
+    }
+    const kept = keepMemory(memory)
+    if (typeof kept === 'string') failed(kept)
+    else running.memory = kept
+    const realmCut = steps < SCRIPT_STEP_BUDGET
+    running.lastRun = { steps: result.steps }
+    if (result.status === 'error') {
+      failed(result.message, result.line, result.column)
     } else if (result.status === 'out-of-steps') {
-      logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, steps < SCRIPT_STEP_BUDGET))
+      running.lastRun.outOfSteps = realmCut ? 'realm' : 'own'
+      logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, realmCut))
     }
     return result.steps
   }
@@ -751,7 +768,8 @@ export function keepMemory(memory: ScriptObject): ScriptMemory | string {
 /**
  * Invariant (ADR 0004): every running script, a resident's or an army's, names a script (or a
  * task, for its default), keeps
- * plain memory within `SCRIPT_MEMORY_MAX` and has logged no trouble in the future.
+ * plain memory within `SCRIPT_MEMORY_MAX`, has logged no trouble and kept no error from the
+ * future, and used no more steps than its budget.
  */
 export function runningScriptsSound(world: WorldState): InvariantViolation[] {
   const out: InvariantViolation[] = []
@@ -779,6 +797,11 @@ export function runningScriptsSound(world: WorldState): InvariantViolation[] {
       if (at !== undefined && at > world.tick)
         fail(`logged script trouble at tick ${at}, after ${world.tick}`)
     }
+    if (s.lastError && s.lastError.tick > world.tick)
+      fail(`kept an error from tick ${s.lastError.tick}, after ${world.tick}`)
+    const used = s.lastRun?.steps
+    if (used !== undefined && !(Number.isInteger(used) && used >= 0 && used <= SCRIPT_STEP_BUDGET))
+      fail(`used ${used} steps, outside its budget of ${SCRIPT_STEP_BUDGET}`)
   }
   return out
 }
@@ -844,6 +867,7 @@ function runCityScripts(
     })
     const { globals, requests } = bound
     run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
     if (bound.ended()) {
       endScript(world, r.id)

@@ -67,7 +67,7 @@ function storage(world: WorldState, id: string, x: number, y: number, stock: Sto
 const host = (source: { value: string }): ScriptHost => ({
   script: (id) =>
     id === SCRIPT
-      ? { userId: MARA, name: 'Test', source: source.value, followsDefault: false }
+      ? { userId: MARA, name: 'Test', version: 1, source: source.value, followsDefault: false }
       : undefined,
   sender: (userId) => ({ userId, account: { name: 'Mara', isAdmin: false } }),
   explored: () => true,

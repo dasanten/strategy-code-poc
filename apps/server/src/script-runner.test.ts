@@ -1,5 +1,7 @@
 import {
+  DOING_MAX_LENGTH,
   SCRIPT_LOG_INTERVAL,
+  SCRIPT_LOG_LINES,
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
@@ -21,6 +23,7 @@ import {
   runningScriptsSound,
   type ScriptHost,
 } from './script-runner.js'
+import { scriptLogsSound } from './script-log.js'
 import { createScript, deleteScript, runnableScript, saveScript } from './scripts.js'
 import { entitiesInSight } from './sight.js'
 import { Walking } from './walking.js'
@@ -287,6 +290,74 @@ describe('running scripts', () => {
     expect(errors[1]?.tick).toBe(SCRIPT_LOG_INTERVAL)
   })
 
+  it('keeps its last error for the Script tab until another version runs or it ends', () => {
+    const { world, orders, runner } = setup()
+    // Fails on its second tick only.
+    const source =
+      'if (memory.n == null) { memory.n = 0 }\nmemory.n = memory.n + 1\nif (memory.n == 2) { null.x }'
+    const s = createScript(db, mara, { name: 'once', source })
+    giveScript(world, orders, s.id, ['a0'])
+    const a0 = world.residents[0]!
+    runner.runAll(world)
+    expect(a0.script?.lastError).toBeUndefined()
+    world.tick = 5
+    runner.runAll(world)
+    const lastError = {
+      message: 'Can\'t read "x" of null',
+      line: 3,
+      column: 22,
+      tick: 5,
+      version: 1,
+    }
+    expect(a0.script?.lastError).toEqual(lastError)
+    // Runs that go well after it leave it there.
+    world.tick = 6
+    runner.runAll(world, true)
+    expect(a0.script?.lastError).toEqual(lastError)
+    expect(runningScriptsSound(world)).toEqual([])
+
+    saveScript(db, mara, s.id, { source: `${source}\n` })
+    runner.runAll(world)
+    expect(a0.script?.lastError).toBeUndefined()
+    // The memory it couldn't keep is an error too, with no line.
+    a0.script!.lastError = { ...lastError, version: 2 }
+    saveScript(db, mara, s.id, { source: 'memory.f = fn() {}' })
+    runner.runAll(world)
+    expect(a0.script?.lastError).toEqual({
+      message: expect.stringMatching(/functions/),
+      tick: 6,
+      version: 3,
+    })
+  })
+
+  it('keeps the steps it used last tick, and whether it ran out of its own or the realm’s', () => {
+    const count = SCRIPT_REALM_STEP_BUDGET / SCRIPT_STEP_BUDGET + 1
+    const { world, orders, runner } = setup(count)
+    const light = createScript(db, mara, { name: 'light', source: 'memory.n = 1' })
+    const busy = createScript(db, mara, { name: 'busy', source: 'while (true) {}' })
+    giveScript(world, orders, light.id, ['a0'])
+    giveScript(
+      world,
+      orders,
+      busy.id,
+      world.residents.slice(1).map((r) => r.id),
+    )
+    runner.runAll(world, true)
+    const a0 = world.residents[0]!.script!.lastRun!
+    expect(a0.steps).toBeGreaterThan(0)
+    expect(a0.steps).toBeLessThan(SCRIPT_STEP_BUDGET)
+    expect(a0.outOfSteps).toBeUndefined()
+    const busyRuns = world.residents.slice(1).map((r) => r.script!.lastRun)
+    // The realm's budget runs out: one is cut short or skipped, the rest use their own up.
+    expect(busyRuns.filter((r) => r?.outOfSteps === 'own')).toHaveLength(count - 2)
+    expect(busyRuns.filter((r) => r?.outOfSteps === 'realm')).toEqual([
+      { steps: expect.any(Number), outOfSteps: 'realm' },
+    ])
+    for (const r of busyRuns.filter((r) => r?.outOfSteps === 'own'))
+      expect(r?.steps).toBe(SCRIPT_STEP_BUDGET)
+    expect(runningScriptsSound(world)).toEqual([])
+  })
+
   it('caps memory: a run that leaves too much keeps the memory from before', () => {
     const { world, orders, runner } = setup()
     const s = createScript(db, mara, {
@@ -328,6 +399,96 @@ describe('running scripts', () => {
     world.residents[0]!.owner = null
     runner.runAll(world)
     expect(world.residents[0]!.script).toBeUndefined()
+  })
+})
+
+describe('the script log', () => {
+  it('keeps what log() and end(reason) give, with the tick, across scripts', () => {
+    const { world, orders, runner } = setup()
+    const s = createScript(db, mara, { name: 'Work', source: 'log("  tick " + tick)' })
+    giveScript(world, orders, s.id, ['a0'])
+    const a0 = world.residents[0]!
+    expect(a0.scriptLog).toBeUndefined()
+    world.tick = 7
+    expect(runner.runAll(world, true)).toEqual([])
+    world.tick = 8
+    runner.runAll(world)
+    expect(a0.scriptLog).toEqual([
+      { tick: 7, text: 'tick 7' },
+      { tick: 8, text: 'tick 8' },
+    ])
+    // Lines logged before an error stay.
+    const source = 'log("before")\nlet x = null\nx.a'
+    const failing = createScript(db, mara, { name: 'Fail', source })
+    giveScript(world, orders, failing.id, ['a0'])
+    runner.runAll(world)
+    expect(a0.scriptLog?.at(-1)).toEqual({ tick: 8, text: 'before' })
+    // A new script starting keeps the log, and its end adds the reason after its own lines.
+    const ends = createScript(db, mara, { name: 'Ends', source: 'log("done")\nend("no work")' })
+    giveScript(world, orders, ends.id, ['a0'])
+    world.tick = 9
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(a0.script).toBeUndefined()
+    expect(a0.scriptLog?.map((l) => `${l.tick} ${l.text}`)).toEqual([
+      '7 tick 7',
+      '8 tick 8',
+      '8 before',
+      '9 done',
+      '9 no work',
+    ])
+  })
+
+  it('drops the oldest lines once full', () => {
+    const { world, orders, runner } = setup()
+    const s = createScript(db, mara, {
+      name: 'chatty',
+      source: 'let i = 0\nwhile (i < 3) {\n  log("line " + (tick * 3 + i))\n  i = i + 1\n}',
+    })
+    giveScript(world, orders, s.id, ['a0'])
+    for (let t = 0; t < SCRIPT_LOG_LINES; t++) {
+      world.tick = t
+      expect(runner.runAll(world, true)).toEqual([])
+    }
+    const log = world.residents[0]!.scriptLog!
+    expect(log).toHaveLength(SCRIPT_LOG_LINES)
+    const last = SCRIPT_LOG_LINES * 3 - 1
+    expect(log.at(-1)).toEqual({ tick: SCRIPT_LOG_LINES - 1, text: `line ${last}` })
+    expect(log[0]!.text).toBe(`line ${last - SCRIPT_LOG_LINES + 1}`)
+  })
+
+  it('goes with no resident Players see, and scripts can’t read it', () => {
+    const { world, orders, runner } = setup(2)
+    const s = createScript(db, mara, {
+      name: 'peek',
+      source: 'log("hidden line")\nmemory.me = me\nmemory.all = residents()',
+    })
+    giveScript(world, orders, s.id, ['a0', 'a1'])
+    runner.runAll(world)
+    runner.runAll(world)
+    expect(world.residents[0]!.scriptLog).toHaveLength(2)
+    expect(JSON.stringify(world.residents.map((r) => r.script?.memory))).not.toContain('hidden')
+    expect(JSON.stringify(entitiesInSight(world, terrain, 'r1'))).not.toContain('hidden')
+  })
+
+  it('is checked: at most its lines, short, in order and none from the future', () => {
+    const { world } = setup()
+    const a0 = world.residents[0]!
+    world.tick = 10
+    a0.scriptLog = [{ tick: 5, text: 'fine' }]
+    expect(scriptLogsSound.check(world, terrain)).toEqual([])
+    a0.scriptLog = [
+      { tick: 6, text: 'later' },
+      { tick: 5, text: '' },
+      { tick: 11, text: 'x'.repeat(DOING_MAX_LENGTH + 1) },
+    ]
+    expect(scriptLogsSound.check(world, terrain).map((v) => v.message)).toEqual([
+      "a0's script log has a line of 0",
+      "a0's script log goes back from tick 6 to 5",
+      `a0's script log has a line of ${DOING_MAX_LENGTH + 1}`,
+      "a0's script log has a line at tick 11, after 10",
+    ])
+    a0.scriptLog = Array.from({ length: SCRIPT_LOG_LINES + 1 }, () => ({ tick: 1, text: 'a' }))
+    expect(scriptLogsSound.check(world, terrain)).toHaveLength(1)
   })
 })
 

@@ -334,3 +334,38 @@
   align-items: center;
   gap: 4px;
 }
+/* A running script's memory on the Script tab: a quiet, read-only tree. */
+.memory-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.memory-name {
+  color: var(--ui-muted);
+}
+/* How a running script last ran: its steps, and its last error as a link to the line. */
+.script-steps {
+  margin: 0;
+  font-family: var(--font-mono);
+}
+.script-steps.out-of-steps {
+  color: var(--ui-warn);
+}
+.script-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border-left: 3px solid var(--ui-bad);
+}
+.script-error-message {
+  color: var(--ui-bad);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}

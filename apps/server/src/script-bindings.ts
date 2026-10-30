@@ -112,14 +112,16 @@ export interface ScriptBindings {
   ended(): boolean
   /** The reason it gave `end(reason)`, cut like `doing`'s text; null without one. */
   endReason(): string | null
+  /** The lines it gave `log(text)`, in order, cut like `doing`'s text (`CONTEXT.md`: Script log). */
+  logged: string[]
 }
 
 /**
- * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`
- * and `end`, which ask for none.
+ * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`,
+ * `log` and `end`, which ask for none.
  */
 export const SCRIPT_ORDER_KINDS: readonly string[] = SCRIPT_API.filter(
-  (b) => b.is === 'action' && b.name !== 'doing' && b.name !== 'end',
+  (b) => b.is === 'action' && !['doing', 'log', 'end'].includes(b.name),
 ).map((b) => b.name)
 
 /** The army order each action of an army's script asks for (`ARMY_SCRIPT_API`). */
@@ -147,6 +149,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const requests: OrderRequest[] = []
   let ended = false
   let endReason: string | null = null
+  const logged: string[] = []
 
   let seen: readonly SeenEntity[] | undefined
   const untagged = ({ is: _, ...rest }: SeenEntity) => rest
@@ -307,6 +310,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       ended = true
       return null
     }
+    actions.log = ([text]) => {
+      const line = shortText(text, 'log')
+      if (line !== null) logged.push(line)
+      return null
+    }
     queries.fits = ([good]) => {
       if (!(GOODS as readonly unknown[]).includes(good)) {
         throw new ScriptRuntimeError(`"fits" needs a good, not ${String(good)}`)
@@ -393,7 +401,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         : (call as (args: Value[]) => Value)
     globals[binding.name] = new NativeFunction(binding.name, answer, binding.cost)
   }
-  return { globals, requests, ended: () => ended, endReason: () => endReason }
+  return { globals, requests, ended: () => ended, endReason: () => endReason, logged }
 }
 
 /**

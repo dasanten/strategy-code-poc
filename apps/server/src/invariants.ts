@@ -114,6 +114,7 @@ import { horseOffersOnce } from './horse-grant.js'
 import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
+import { scriptLogsSound } from './script-log.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -1898,6 +1899,7 @@ export const worldInvariants: Invariant[] = [
   gameDefaultFetchers,
   gameDefaultTargets,
   queuesSound,
+  scriptLogsSound,
 ]
 
 export function checkInvariants(

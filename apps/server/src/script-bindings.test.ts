@@ -506,3 +506,25 @@ describe('end()', () => {
     expect(ended()).toBe(false)
   })
 })
+
+describe('log()', () => {
+  it('collects short lines, cut like doing’s text, and asks for no order', () => {
+    const { world, explored } = setup()
+    const long = 'x'.repeat(DOING_MAX_LENGTH + 20)
+    const { result, requests, logged } = runAs(
+      world,
+      explored,
+      `log("  one ")\nlog(null)\nlog(" ")\nlog("${long}")`,
+    )
+    expect(result.status).toBe('done')
+    expect(requests).toEqual([])
+    expect(logged).toEqual(['one', 'x'.repeat(DOING_MAX_LENGTH)])
+  })
+
+  it('needs a text', () => {
+    const { world, explored } = setup()
+    const { result, logged } = runAs(world, explored, 'log(3)')
+    expect(result.status).toBe('error')
+    expect(logged).toEqual([])
+  })
+})

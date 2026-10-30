@@ -369,6 +369,8 @@ export function deleteScript(db: Db, userId: number, id: number): void {
 export interface RunnableScript {
   userId: number
   name: string
+  /** The active version's number and source. */
+  version: number
   source: string
   /** A default script its Player hasn't edited: running out of steps is the game's fault. */
   followsDefault: boolean
@@ -382,6 +384,7 @@ export function runnableScript(db: Db, scriptId: number): RunnableScript | undef
     .select({
       userId: scripts.userId,
       name: scripts.name,
+      version: scriptVersions.version,
       source: scriptVersions.source,
       followsDefault: scripts.followsDefault,
       task: scripts.task,

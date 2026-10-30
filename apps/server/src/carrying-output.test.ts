@@ -72,6 +72,7 @@ const host = (defaultScript?: ScriptHost['defaultScript']): ScriptHost => ({
   script: () => ({
     userId: 1,
     name: DEFAULT_SCRIPTS.work.name,
+    version: 1,
     source: DEFAULT_SCRIPTS.work.source,
     followsDefault: true,
   }),
