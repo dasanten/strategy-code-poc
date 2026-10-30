@@ -21,10 +21,10 @@ import {
   HORSE_STAT_NAMES,
   TICKS_PER_GAME_DAY,
   carriageCanEnter,
+  carriageCanGoTo,
   drivenCarriageId,
   GOOD_WEIGHT,
   MAX_WORKERS,
-  HOME_FOOD_LOW,
   MEAL_UNITS,
   unitsThatFit,
   NODE_WORKPLACE,
@@ -41,6 +41,7 @@ import {
   ageInYears,
   CARRYING_TICKS,
   canWork,
+  canHandle,
   MAX_HUNGER,
   STABLE_BREED_TICKS,
   KEEPS_GOODS,
@@ -76,12 +77,13 @@ import {
   isPassableTerrain,
   buildingAt,
   isAt,
+  keptBreeding,
   besideStep,
   stepLength,
   tileIndex,
 } from '@csp/shared'
 import { tallyGoods } from './goods-made.js'
-import { refillSource } from './survival.js'
+import { refillSource, refillTarget } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
@@ -106,6 +108,7 @@ import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
+import { horseOffersOnce } from './horse-grant.js'
 import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
@@ -205,7 +208,7 @@ export const realmsHaveLeaders: Invariant = {
 /**
  * Buildings and construction sites (`CONTEXT.md`: Footprint, Where buildings go): no two
  * footprints overlap, and next to a building at most one road or road site per tile, on passable
- * land off Mountain and of no city (`CONTEXT.md`: Road), and at most one carriage site, always
+ * land and of no city (`CONTEXT.md`: Road), and at most one carriage site, always
  * still a site, of no city, off nodes and other buildings but stables, where a carriage can stand
  * (`CONTEXT.md`: Carriage); every footprint on passable land; farms
  * and stables wholly on Plains, mines, quarries and lumber camps with one tile on a resource node
@@ -236,7 +239,6 @@ export const buildingsInPlace: Invariant = {
       }
       if (!terrains.every(isPassableTerrain)) fail(b.id, `is a ${b.kind} on impassable land`)
       if (b.kind === 'road') {
-        if (terrains[0] === Terrain.Mountain) fail(b.id, 'is a road on Mountain')
         if (b.cityId !== null) fail(b.id, `is a road of city ${b.cityId}`)
         if (b.stock) fail(b.id, 'is a road with a stock')
       } else if (b.kind === 'carriage') {
@@ -447,6 +449,9 @@ export const breedOrdersSound: Invariant = {
         fail(`breeds from ${o.at.x}, ${o.at.y} but stands elsewhere`)
       if (!(Number.isInteger(o.progress) && o.progress >= 0 && o.progress < STABLE_BREED_TICKS))
         fail(`has breeding progress ${o.progress} of ${STABLE_BREED_TICKS}`)
+      const kept = stable && keptBreeding(stable, o.horseIds)
+      if (stable && o.progress !== (kept?.progress ?? 0))
+        fail(`has breeding progress ${o.progress}, the stable ${kept?.progress ?? 0}`, [stable.id])
       if (o.horseIds[0] === o.horseIds[1]) fail(`breeds horse ${o.horseIds[0]} with itself`)
       for (const id of o.horseIds) {
         const h = world.horses.find((x) => x.id === id)
@@ -456,6 +461,46 @@ export const breedOrdersSound: Invariant = {
         if (other !== undefined && other !== r.id)
           fail(`breeds horse ${id}, which ${other} breeds too`, [id, other])
         bred.set(id, r.id)
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * Breeding progress belongs to two horses in a stable (`CONTEXT.md`: Breeding): after a tick,
+ * every progress a stable keeps (`Building.breedings`) is that finished stable's, names two
+ * different living horses of one realm or NPC city standing in it, at most once per pair, and is
+ * below one foal's worth (`STABLE_BREED_TICKS`).
+ */
+export const keptBreedingsSound: Invariant = {
+  name: 'kept-breedings-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const b of world.buildings) {
+      if (!b.breedings) continue
+      const fail = (message: string, ids: string[] = []) =>
+        out.push({
+          invariant: this.name,
+          message: `building ${b.id} ${message}`,
+          entityIds: [b.id, ...ids],
+        })
+      if (b.kind !== 'stable' || b.site) fail('keeps breeding progress but isn’t a finished stable')
+      const pairs = new Set<string>()
+      for (const k of b.breedings) {
+        const [a, c] = k.horseIds
+        const pair = [a, c].sort().join('+')
+        if (a === c) fail(`keeps breeding progress for horse ${a} with itself`, [a])
+        if (pairs.has(pair)) fail(`keeps breeding progress for ${a} and ${c} twice`, [a, c])
+        pairs.add(pair)
+        const horses = k.horseIds.map((id) => world.horses.find((h) => h.id === id))
+        if (horses.some((h) => !h || !isAt(h, b)))
+          fail(`keeps breeding progress for ${a} and ${c}, not both alive in it`, [a, c])
+        const [h1, h2] = horses
+        if (h1 && h2 && (h1.realmId !== h2.realmId || h1.cityId !== h2.cityId))
+          fail(`keeps breeding progress for ${a} and ${c}, of different owners`, [a, c])
+        if (!(Number.isInteger(k.progress) && k.progress >= 1 && k.progress < STABLE_BREED_TICKS))
+          fail(`keeps breeding progress ${k.progress} of ${STABLE_BREED_TICKS} for ${a} and ${c}`)
       }
     }
     return out
@@ -790,9 +835,10 @@ export const workOrdersOnWorkplaces: Invariant = {
 
 /**
  * After a tick, nobody at home, near an outpost storage of their realm, at their workplace or in
- * an army by a carriage runs low on food while the storage, pile or carriage they refill from
- * still has some and a meal would fit (`stepRefill`, `CONTEXT.md`: Refilling at home, Refilling at
- * an outpost storage, Refilling at a workplace, Refilling from a carriage).
+ * an army by a carriage runs low on food (a child at home: has less than their own food) while the
+ * storage, pile or carriage they refill from still has some and a meal would fit (`stepRefill`,
+ * `refillTarget`, `CONTEXT.md`: Refilling at home, Refilling at an outpost storage, Refilling at a
+ * workplace, Refilling from a carriage, Child).
  */
 export const refilledWhenLow: Invariant = {
   name: 'refilled-when-low',
@@ -800,20 +846,20 @@ export const refilledWhenLow: Invariant = {
     return world.residents
       .filter(
         (r) =>
-          (r.carried.food ?? 0) < HOME_FOOD_LOW &&
+          (r.carried.food ?? 0) < refillTarget(world, r, terrain.size) &&
           (refillSource(world, r, terrain.size)?.food ?? 0) > 0 &&
           unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
       )
       .map((r) => ({
         invariant: this.name,
-        message: `resident ${r.id} runs low with ${r.carried.food ?? 0} food where there is more`,
+        message: `resident ${r.id} has only ${r.carried.food ?? 0} food where there is more`,
         entityIds: [r.id],
       }))
   },
 }
 
 /**
- * Carriages keep to the rules of `CONTEXT.md` (Carriage): never in the mountains, never loaded
+ * Carriages keep to the rules of `CONTEXT.md` (Carriage): on Mountain only on a finished road, never loaded
  * past what the strongest horse lets one hold (`CARRIAGE_MAX_CAPACITY`: a carriage loaded behind
  * a strong horse keeps its load when the horse dies), and a hitched horse exists, stands with its
  * carriage and pulls no other one.
@@ -826,7 +872,7 @@ export const carriagesInPlace: Invariant = {
       out.push({ invariant: this.name, message: `carriage ${id} ${message}`, entityIds: ids })
     const pulling = new Map<string, string>()
     for (const k of world.carriages) {
-      if (!carriageCanEnter(terrainAt(terrain, k.x, k.y))) {
+      if (!carriageCanGoTo(world, terrain, k.x, k.y)) {
         fail(k.id, `stands where no carriage can go at (${k.x}, ${k.y})`)
       }
       const kg = stockWeight(k.load)
@@ -853,10 +899,11 @@ export const carriagesInPlace: Invariant = {
 /**
  * After a tick, a rider's horse exists, stands with them, is of their realm and pulls no carriage,
  * and no horse has two riders (`CONTEXT.md`: Riding; `stepRiders` ends riding that can't go on).
+ * A ridden horse stands where a carriage could: on Mountain only on a finished road.
  */
 export const ridersOnHorses: Invariant = {
   name: 'riders-on-horses',
-  check(world) {
+  check(world, terrain) {
     const out: InvariantViolation[] = []
     const fail = (ids: string[], message: string) =>
       out.push({ invariant: this.name, message, entityIds: ids })
@@ -880,6 +927,12 @@ export const ridersOnHorses: Invariant = {
       const carriage = carriagePulledBy(world, horse)
       if (carriage) {
         fail([horse.id, carriage.id], `horse ${horse.id} is ridden and hitched to ${carriage.id}`)
+      }
+      if (!carriageCanGoTo(world, terrain, horse.x, horse.y)) {
+        fail(
+          [r.id, horse.id],
+          `horse ${horse.id} is ridden where no horse can go at (${horse.x}, ${horse.y})`,
+        )
       }
       const other = riders.get(horse.id)
       if (other)
@@ -944,8 +997,10 @@ export const haulRoutesSound: Invariant = {
       // An army stop is wherever the army is (`CONTEXT.md`: Supply line).
       const toArmy = o.toArmy !== undefined
       if (!toArmy && from.x === to.x && from.y === to.y) fail('hauls between one tile and itself')
+      // A stop on a road over Mountain may lose its road later; the route then finds no way.
       for (const s of toArmy ? [from] : [from, to]) {
-        if (!carriageCanEnter(terrainAt(terrain, s.x, s.y))) {
+        const t = terrainAt(terrain, s.x, s.y)
+        if (!carriageCanEnter(t) && t !== Terrain.Mountain) {
           fail(`hauls to (${s.x}, ${s.y}), where no carriage can go`)
         }
       }
@@ -1299,8 +1354,6 @@ const ADULT_ORDERS = new Set([
   'workAt',
   'breed',
   'drive',
-  'pickUp',
-  'drop',
 ])
 
 /** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
@@ -1312,6 +1365,33 @@ export const childrenDontWork: Invariant = {
       .map((r) => ({
         invariant: this.name,
         message: `resident ${r.id} holds a ${r.order!.kind} order as a child`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
+/** The order kinds that move goods into or out of a resident's hands (`CONTEXT.md`: Child). */
+const HANDLING_ORDERS = new Set(['pickUp', 'drop', 'store', 'fetch'])
+
+/**
+ * Children handle only Food (`CONTEXT.md`: Child): no child carries another good, or holds a
+ * pick-up, drop, store or fetch order for one.
+ */
+export const childrenCarryOnlyFood: Invariant = {
+  name: 'children-carry-only-food',
+  check(world) {
+    const goodsOf = (r: Resident) => {
+      const carried = Object.keys(r.carried).filter((g) => (r.carried[g as Good] ?? 0) > 0)
+      const o = r.order
+      const ordered =
+        o && HANDLING_ORDERS.has(o.kind) ? Object.keys((o as { goods: object }).goods) : []
+      return [...carried, ...ordered]
+    }
+    return world.residents
+      .filter((r) => !canHandle(r, world.tick, goodsOf(r)))
+      .map((r) => ({
+        invariant: this.name,
+        message: `child ${r.id} handles ${goodsOf(r).join(', ')}`,
         entityIds: [r.id],
       }))
   },
@@ -1543,9 +1623,9 @@ export const climbOrdersSound: Invariant = {
 /**
  * Every step left on a moving order's path (`CONTEXT.md`: Step), from the resident's tile on, goes
  * onto one of the eight tiles around the one before, onto land they can enter, and a diagonal one
- * never cuts a corner past land they can't (Lake, Sea, or Mountain for a carriage). So every step
- * taken is one too. Walls and gates are left out: they may change under a path found earlier, and
- * the step is checked against them when it is taken (`Walking.resolve`).
+ * never cuts a corner past land they can't (Lake, Sea). So every step taken is one too. Walls,
+ * gates and roads are left out: they may change under a path found earlier (a carriage's way over
+ * a mountain road too), and the step is checked against them when it is taken (`Walking.resolve`).
  */
 export const pathsAreSteps: Invariant = {
   name: 'paths-are-steps',
@@ -1555,9 +1635,7 @@ export const pathsAreSteps: Invariant = {
     for (const r of world.residents) {
       const o = r.order
       if (!o || !('path' in o) || !o.path) continue
-      const driving = o.kind === 'drive' || o.kind === 'haul'
-      const enterable = (t: number) =>
-        driving ? carriageCanEnter(terrain.tiles[t]!) : isPassableTerrain(terrain.tiles[t]!)
+      const enterable = (t: number) => isPassableTerrain(terrain.tiles[t]!)
       let [x, y] = [r.x, r.y]
       const bad = o.path.findIndex(([nx, ny]) => {
         const ok =
@@ -1688,12 +1766,14 @@ export const worldInvariants: Invariant[] = [
   leadersServeNoOne,
   residentNamesWellFormed,
   cityNamesWellFormed,
+  horseOffersOnce,
   buildingsInPlace,
   citiesFromBuildings,
   outpostStorageRealms,
   carriedWithinCapacity,
   goodsInPlace,
   breedOrdersSound,
+  keptBreedingsSound,
   goodsInWholeUnits,
   carryOrdersDone,
   storeFetchOrdersSound,
@@ -1716,6 +1796,7 @@ export const worldInvariants: Invariant[] = [
   pairsHoldTogether,
   carryingDoesntWork,
   childrenDontWork,
+  childrenCarryOnlyFood,
   carriagesInPlace,
   ridersOnHorses,
   driversOnCarriages,

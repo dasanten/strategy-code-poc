@@ -12,6 +12,8 @@ import {
   GOODS,
   HAUL_KEEP_FOOD,
   buildMenu,
+  buildingWork,
+  workFactor,
   MAX_HEALTH,
   MAX_HUNGER,
   MAX_WORKERS,
@@ -27,6 +29,7 @@ import {
   TRAINED_CAP_SHARE,
   ageInYears,
   bestWeapon,
+  canHandle,
   canWork,
   wrapDelta,
   wrapDistance,
@@ -64,6 +67,8 @@ import {
   STABLE_BREED_TICKS,
   breedProblem,
   horsesIn,
+  keptBreeding,
+  keptPair,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
@@ -101,6 +106,7 @@ import {
   horseDetail,
   groupOrders,
   residentActions,
+  riddenHorseLine,
   type ActionId,
   type CardAction,
 } from './selection-view.js'
@@ -372,12 +378,16 @@ function StepMinutes({
   )
 }
 
-/** What a resident's built-in order has them doing. */
-export function orderDoing(r: Pick<Resident, 'order'>): string {
+/**
+ * What a resident's built-in order has them doing. A rider rides where others walk (`CONTEXT.md`:
+ * Riding): "Riding to 4, 5 · 3 tiles to go".
+ */
+export function orderDoing(r: Pick<Resident, 'order' | 'riding'>): string {
   const o = r.order
+  const walking = r.riding === undefined ? 'Walking' : 'Riding'
   if (o?.kind === 'walkTo') {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
-    return `Walking to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
+    return `${walking} to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
   }
   if (o?.kind === 'drive') {
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
@@ -418,7 +428,7 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
     const what = LINE_BUILDING[o.kind]
     const left = `${o.tiles.length} ${what} tile${o.tiles.length === 1 ? '' : 's'} to go`
     return o.phase === 'walking'
-      ? `Walking to lay ${what} at ${x}, ${y} · ${left}`
+      ? `${walking} to lay ${what} at ${x}, ${y} · ${left}`
       : `Building ${what} at ${x}, ${y} · ${left}`
   }
   return 'Idle'
@@ -726,7 +736,7 @@ export function GroupCard({
           {numberParams.length > 0 && (
             <section className="inspector-block" aria-label="Script params">
               <div className="script-params">
-                {numberParams.map(({ name, scriptIds }) => (
+                {numberParams.map(({ name, scriptIds, default: fallback }) => (
                   <div key={name} className="goods-row">
                     <span className="small">
                       <strong>{name}</strong> <span className="muted">(number)</span>
@@ -734,6 +744,7 @@ export function GroupCard({
                     <NumberField
                       name={name}
                       value={undefined}
+                      fallback={fallback}
                       onSet={(v) =>
                         onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
                       }
@@ -824,6 +835,7 @@ export function ResidentCard({
   onDrop,
   building,
   road,
+  terrain,
   carriageSite,
   node,
   onBuild,
@@ -917,6 +929,8 @@ export function ResidentCard({
   building: Building | undefined
   /** The road or road site on the resident's tile, if one is in sight; it may share the tile. */
   road: Building | undefined
+  /** The explored terrain beneath the resident's tile, if known: a road on Mountain takes more work. */
+  terrain?: number
   /** The carriage site on the resident's tile, if one is in sight; it may share a stable's tile. */
   carriageSite: Building | undefined
   /** The resource node on the resident's tile, if the Player knows of one. */
@@ -989,8 +1003,9 @@ export function ResidentCard({
   const age = Math.floor(ageInYears(r, tick))
   const skills = (Object.keys(SKILL_LABELS) as SkillName[]).filter((s) => (r.skills[s] ?? 0) > 0)
   const carried = goodsIn(r.carried)
-  // Children can't pick up or put down goods (`CONTEXT.md`: Child).
   const child = !canWork(r, tick)
+  // Children pick up and put down only Food (`CONTEXT.md`: Child).
+  const refused = (good: Good) => !canHandle(r, tick, [good])
   const family = familyLine(r, residents, tick)
   const ground: GoodsSpot = { kind: 'ground' }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
@@ -1041,6 +1056,7 @@ export function ResidentCard({
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
   useActionKeys(actions, act)
+  const ridden = riddenHorseLine(r, horses, tick)
   return (
     <SelectionCard
       rel={r.owner === realmId ? 'own' : 'alliance'}
@@ -1049,6 +1065,7 @@ export function ResidentCard({
       lines={[
         <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
         `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
+        ...(ridden ? [ridden] : []),
       ]}
       head={
         <div className="vitals">
@@ -1150,7 +1167,7 @@ export function ResidentCard({
                 buildProblem={buildProblem}
                 onBuild={onBuild}
               />
-              <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
+              <RoadBlock resident={r} tick={tick} road={road} terrain={terrain} onBuild={onBuild} />
             </>
           )}
           {shown === 'tearDown' && (
@@ -1193,7 +1210,7 @@ export function ResidentCard({
                 )}
                 {onStore && carried.length > 0 && (
                   <div className="order-buttons">
-                    <button type="button" disabled={child} onClick={onStore}>
+                    <button type="button" onClick={onStore}>
                       Store all
                     </button>
                     <span className="muted small">
@@ -1207,7 +1224,7 @@ export function ResidentCard({
                     good={good}
                     units={units}
                     byDefault={putAwayUnits(good, units)}
-                    disabled={child}
+                    disabled={refused(good)}
                     actions={[
                       { label: 'Drop', spot: ground },
                       ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
@@ -1235,7 +1252,7 @@ export function ResidentCard({
                     stock={pile?.goods}
                     spot={ground}
                     onPickUp={onPickUp}
-                    disabled={child}
+                    refused={refused}
                   />
                   {storage && (
                     <TileGoods
@@ -1243,7 +1260,7 @@ export function ResidentCard({
                       stock={storage.stock}
                       spot={inStorage}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {site && (
@@ -1252,7 +1269,7 @@ export function ResidentCard({
                       stock={site.site!.delivered}
                       spot={atSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {carriageSite && (
@@ -1261,7 +1278,7 @@ export function ResidentCard({
                       stock={carriageSite.site!.delivered}
                       spot={atCarriageSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {roadSite && (
@@ -1270,7 +1287,7 @@ export function ResidentCard({
                       stock={roadSite.site!.delivered}
                       spot={atRoadSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {carriage && (
@@ -1279,7 +1296,7 @@ export function ResidentCard({
                       stock={carriage.load}
                       spot={onCarriage}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                 </section>
@@ -1507,6 +1524,7 @@ function BuildBlock({
   tick,
   building,
   node,
+  terrain,
   buildProblem = () => undefined,
   onBuild,
 }: {
@@ -1514,6 +1532,8 @@ function BuildBlock({
   tick: number
   building: Building | undefined
   node: KnownNode | undefined
+  /** The explored terrain beneath the site, if known (`buildingWork`). */
+  terrain?: number
   /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
   buildProblem?: (kind: BuildingKind) => string | undefined
   onBuild: (kind: BuildingKind) => void
@@ -1552,7 +1572,11 @@ function BuildBlock({
           </button>
         </div>
         <p className="muted small">
-          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done.
+          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
+          about {workSpan(buildingWork(building.kind, terrain))} of one resident’s work in all
+          {workFactor(building.kind, terrain) > 1 &&
+            `, on Mountain ${workFactor(building.kind, terrain)} times as much as elsewhere`}
+          .
         </p>
       </section>
     )
@@ -1670,11 +1694,14 @@ function RoadBlock({
   resident,
   tick,
   road,
+  terrain,
   onBuild,
 }: {
   resident: Resident
   tick: number
   road: Building | undefined
+  /** The explored terrain beneath the resident's tile, if known (`buildingWork`). */
+  terrain?: number
   onBuild: (kind: BuildingKind) => void
 }) {
   if (road?.site) {
@@ -1684,6 +1711,7 @@ function RoadBlock({
         tick={tick}
         building={road}
         node={undefined}
+        terrain={terrain}
         onBuild={onBuild}
       />
     )
@@ -1698,7 +1726,8 @@ function RoadBlock({
       <p className="muted small">
         {BUILDING_PURPOSE.road} Needs{' '}
         {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
-        {workSpan(BUILD_WORK.road ?? 0)} of one resident’s work.
+        {workSpan(buildingWork('road', terrain))} of one resident’s work
+        {workFactor('road', terrain) > 1 && ' here on Mountain'}.
       </p>
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
@@ -1864,7 +1893,8 @@ function TearDownBlock({
 
 /**
  * Breeding (`CONTEXT.md`: Breeding): pick two of the Player's horses in the stable on the
- * resident's tile for them to breed, or see how far their breeding has come.
+ * resident's tile for them to breed, or see how far their breeding has come. A pair whose
+ * breeding the stable kept comes first (`keptPair`): it is picked, with how far along it is.
  */
 function BreedBlock({
   resident,
@@ -1887,9 +1917,12 @@ function BreedBlock({
   const own = horsesIn(horses, stable).filter((h) => h.realmId === realmId)
   const o = resident.order
   const breeding = o?.kind === 'breed' && o.stableId === stable.id ? o : undefined
-  const pair = picked.length === 2 ? ([picked[0]!, picked[1]!] as [string, string]) : undefined
   // The Player knows how their own horses fare (`CONTEXT.md`: Seeing how someone fares).
   const seen = { horses: horses.filter(horseFaresKnown), residents }
+  const kept = breeding ? undefined : keptPair(seen, stable, { realmId }, resident)
+  const keptShare = kept ? keptBreeding(stable, kept)!.progress / STABLE_BREED_TICKS : 0
+  const chosen = kept ?? picked
+  const pair = chosen.length === 2 ? ([chosen[0]!, chosen[1]!] as [string, string]) : undefined
   const problem = !canWork(resident, tick)
     ? 'children can’t breed horses'
     : pair
@@ -1910,19 +1943,27 @@ function BreedBlock({
           share={breeding.progress / STABLE_BREED_TICKS}
         />
       )}
+      {kept && (
+        <>
+          <Meter label="Paused" value={pct(keptShare)} share={keptShare} />
+          <p className="muted small">
+            The stable kept this pair&apos;s breeding: they carry on with it first.
+          </p>
+        </>
+      )}
       <p className="muted small">
         Tending two fed horses for {STABLE_BREED_DAYS} game days brings a foal with their average
-        stats, give or take {FOAL_STAT_SPREAD}. It stops, and starts over, if the resident or a
-        horse leaves.
+        stats, give or take {FOAL_STAT_SPREAD}. If the resident leaves, the stable keeps how far the
+        two have come; it is lost if one of them leaves the stable or dies.
       </p>
       {own.length === 0 && <p className="muted small">No horses of yours in this stable.</p>}
       {own.map((h) => (
         <label key={h.id} className="small" style={{ display: 'block' }}>
           <input
             type="checkbox"
-            checked={picked.includes(h.id)}
+            checked={chosen.includes(h.id)}
             onChange={() => toggle(h.id)}
-            disabled={!!breeding}
+            disabled={!!breeding || !!kept}
           />{' '}
           {horseDetail(h, tick)}
         </label>
@@ -1934,7 +1975,7 @@ function BreedBlock({
           title={problem}
           onClick={() => pair && onBreed(stable.id, pair)}
         >
-          {breeding ? 'Breeding…' : 'Breed these two'}
+          {breeding ? 'Breeding…' : kept ? 'Carry on with these two' : 'Breed these two'}
         </button>
       </div>
       {!breeding && pair && problem && <p className="muted small">{problem}</p>}
@@ -2221,13 +2262,14 @@ function TileGoods({
   stock,
   spot,
   onPickUp,
-  disabled,
+  refused,
 }: {
   title: string
   stock: Stock | undefined
   spot: GoodsSpot
   onPickUp: (from: GoodsSpot, goods: Stock) => void
-  disabled: boolean
+  /** Whether the resident may not pick up this good, as a child anything but Food. */
+  refused: (good: Good) => boolean
 }) {
   const goods = goodsIn(stock)
   return (
@@ -2240,7 +2282,7 @@ function TileGoods({
           good={good}
           units={units}
           byDefault={units}
-          disabled={disabled}
+          disabled={refused(good)}
           actions={[{ label: 'Pick up', spot }]}
           onAct={onPickUp}
         />

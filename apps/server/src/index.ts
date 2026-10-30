@@ -89,7 +89,10 @@ const kinds = {
   runScript: runScriptOrder(scriptHost),
   armyRunScript: armyRunScriptOrder(scriptHost),
   setScriptParam: setScriptParamOrder(scriptHost),
-  task: taskOrder({ defaultScript: (userId, task) => defaultScriptId(db, userId, task) }),
+  task: taskOrder({
+    defaultScript: (userId, task) => defaultScriptId(db, userId, task),
+    script: (id) => runnableScript(db, id),
+  }),
 }
 const orders = new OrderQueue(kinds, terrain)
 const queues = new QueueRunner(scriptHost, kinds, terrain)

@@ -20,9 +20,13 @@ import { PathFinder } from './pathfinding.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-/** A square map drawn as text (sides join): . plains, ^ mountain. */
+/** A square map drawn as text (sides join): . plains, ^ mountain, ~ lake. */
 function draw(rows: string[]): TerrainMap {
-  const codes: Record<string, number> = { '.': Terrain.Plains, '^': Terrain.Mountain }
+  const codes: Record<string, number> = {
+    '.': Terrain.Plains,
+    '^': Terrain.Mountain,
+    '~': Terrain.Lake,
+  }
   return { size: rows.length, tiles: Uint8Array.from(rows.join('').split(''), (c) => codes[c]!) }
 }
 
@@ -188,8 +192,18 @@ describe('road order along a line', () => {
     expect(roadAt(world, 1, 1)?.site).toMatchObject({ delivered: {} })
   })
 
+  it('lays out and builds every tile of a line across Mountain', () => {
+    const map = draw(['..........', '..^^^.....', ...Array.from({ length: 8 }, () => '..........')])
+    const { world, r, queue } = setup(map, 1, 1, 5 * STONE)
+    expect(order(world, queue, { x: 1, y: 1 }, { x: 5, y: 1 })).toMatchObject({ type: 'ack' })
+    expect(r.order).toMatchObject({ tiles: [1, 2, 3, 4, 5].map((x) => [x, 1]) })
+    run(world, map, new Walking(map), 40_000, () => r.order === null)
+    expect(r.order).toBeNull()
+    for (const x of [1, 2, 3, 4, 5]) expect(finished(world, x, 1)).toBe(true)
+  })
+
   it('rejects lines it can’t build, and orders it can’t give', () => {
-    const map = draw(['..........', '...^......', ...Array.from({ length: 8 }, () => '..........')])
+    const map = draw(['..........', '...~......', ...Array.from({ length: 8 }, () => '..........')])
     const { world, queue } = setup(map)
     const rejected = (from: object, to: object, residentId = 'w1') =>
       order(world, queue, from as never, to as never, residentId)

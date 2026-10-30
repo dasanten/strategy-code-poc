@@ -1,5 +1,6 @@
 import {
   DEFAULT_SCRIPTS,
+  GET_FOOD_TAKE,
   MAX_HUNGER,
   OWN_FOOD,
   Terrain,
@@ -23,7 +24,7 @@ import { createWorld, stepWorld } from './world.js'
 /**
  * Carrying the output (`CONTEXT.md`: Carrying the output, Own food): the Work default carries a
  * workplace's output to the nearest storage of the realm once its pile holds a full load, one
- * worker at a time, each keeping their own food.
+ * worker at a time, each keeping their own food: `foodTake`, by default `GET_FOOD_TAKE`.
  */
 
 const SIZE = 32
@@ -143,9 +144,9 @@ describe('carrying the output', () => {
       if ((s.stock?.food ?? 0) > before) {
         trips++
         stored += (s.stock?.food ?? 0) - before
-        // The carrier put away only the load, their own food still in hand.
+        // The carrier put away only the load, their own food (foodTake) still in hand.
         const [carrier] = carriers(world)
-        expect(carrier!.carried.food).toBe(OWN_FOOD)
+        expect(carrier!.carried.food).toBe(GET_FOOD_TAKE)
       }
     }
     expect(trips).toBeGreaterThan(1)
@@ -169,6 +170,8 @@ describe('carrying the output', () => {
     world.residents = []
     const w = addWorker(world, 'w1', camp)
     w.carried = {}
+    // Not getting food on their own: only storing the load tops their food up.
+    w.scriptParams = { [WORK]: { foodAt: 0 } }
     const s = storage(world, 's1', at.x + 1, at.y, { food: 50 })
     world.piles.push({ id: 'p', ...at, goods: { wood: 100 } })
     const load = unitsThatFit(w, 'wood', world.tick)
@@ -183,8 +186,8 @@ describe('carrying the output', () => {
     }
     expect(went).toBe(true)
     expect(w.script?.memory.carry).toBeFalsy()
-    expect(w.carried).toEqual({ food: OWN_FOOD })
-    expect(s.stock).toEqual({ food: 50 - OWN_FOOD, wood: load })
+    expect(w.carried).toEqual({ food: GET_FOOD_TAKE })
+    expect(s.stock).toEqual({ food: 50 - GET_FOOD_TAKE, wood: load })
   })
 
   it('leaves the pile to grow with no finished storage of the realm', () => {

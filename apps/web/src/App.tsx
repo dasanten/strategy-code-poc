@@ -19,11 +19,13 @@ import {
   type Resident,
   type ScriptParam,
   type ScriptSummary,
+  type StartParamValues,
   type Stock,
   isAt,
   SHARES_A_TILE,
   covers,
   type SeenResident,
+  HORSE_GRANT_HORSES,
   UNEXPLORED,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
@@ -39,6 +41,7 @@ import {
   CentredDialog,
   Drawer,
   DrawerEdge,
+  HorseOfferNotice,
   PhoneMenu,
   ToolRail,
   TopBar,
@@ -48,7 +51,7 @@ import {
 import type { Covered } from './map/camera.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
-import { appendRequest, editRequest, STORE_ALL, useShiftHeld } from './queue-view.js'
+import { appendRequest, editRequest, storeAll, useShiftHeld } from './queue-view.js'
 import { useSavedGroups } from './saved-groups.js'
 import { groupRequests, type GroupOrder, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES } from './map/palette.js'
@@ -79,10 +82,31 @@ import {
   type ActionId,
 } from './selection-view.js'
 import { ScriptLibrary } from './ScriptLibrary.js'
-import { ScriptParamFields } from './ScriptParams.js'
+import { ScriptParamFields, StartParamsForm } from './ScriptParams.js'
+import {
+  groupStartValues,
+  startedScript,
+  startParamValues,
+  startValues,
+  startValuesValid,
+  type StartValues,
+} from './start-params.js'
 import { paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
+
+/**
+ * The form shown before a script with params starts (`CONTEXT.md`: Script parameter, Before it
+ * starts): the script, the values in the form, the param being picked on the map for it, why the
+ * last pick picked nothing, and what Start gives with the values.
+ */
+interface Starting {
+  script: ScriptSummary
+  values: StartValues
+  picking?: ScriptParam
+  error?: string
+  start: (params: StartParamValues) => Promise<void>
+}
 
 /** What the resident card's script param fields need of the world (`script-params-view`). */
 function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): ParamWorld {
@@ -133,6 +157,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
   // Script parameter).
   const [paramPick, setParamPick] = useState<ScriptParam>()
+  const [starting, setStarting] = useState<Starting>()
+  // The param whose value the map is waiting for: of the running script, or for the form.
+  const pickingParam = paramPick ?? starting?.picking
   // A group order waiting for a tile, the tile picked to build on, and what the last one did.
   const [groupPicking, setGroupPicking] = useState<GroupPicking>(false)
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
@@ -170,7 +197,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     groupPicking,
     isGroup: group.length > 1,
     armyPick,
-    paramPick,
+    paramPick: pickingParam,
   })
   /** Leaves pick mode without giving the order; the card comes back as it was. */
   const cancelPick = useCallback(() => {
@@ -178,12 +205,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setGroupPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setStarting((s) => s && { ...s, picking: undefined })
   }, [])
   // Escape leaves pick mode first; with no drawer open, it then drops the selection.
   const anySelected = selectedIds.length > 0
   const picked = pick !== undefined
+  const formOpen = starting !== undefined
   useEffect(() => {
-    if (!picked && (openDrawer || !anySelected)) return
+    if (!picked && !formOpen && (openDrawer || !anySelected)) return
     const onKey = (e: KeyboardEvent) => {
       const typing =
         e.target instanceof Element && e.target.closest('input, textarea, select, .cm-editor')
@@ -193,12 +222,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         e.stopImmediatePropagation()
         return cancelPick()
       }
+      // The form before a script starts is cancelled first.
+      if (formOpen) {
+        e.stopImmediatePropagation()
+        return setStarting(undefined)
+      }
       setSelectedIds([])
       setPicking(false)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [openDrawer, anySelected, picked, cancelPick])
+  }, [openDrawer, anySelected, picked, formOpen, cancelPick])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
@@ -214,6 +248,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setStarting(undefined)
     setOrderError(undefined)
     setGroupPicking(false)
     setGroupBuildAt(undefined)
@@ -230,12 +265,24 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   )
   const shift = useShiftHeld()
   /**
-   * Gives an order, or, with Shift held, appends a resident's order to their queue (`CONTEXT.md`:
-   * Queue). Orders that can't be queue steps are given as they are.
+   * Gives an order, or, `queued` (Shift held), appends a resident's order to their queue
+   * (`CONTEXT.md`: Queue). Orders that can't be queue steps are given as they are. An order
+   * starting a script that declares params first shows the form for them (`CONTEXT.md`: Before
+   * it starts), filled with the resident's kept values or the defaults; Start gives it with them.
    */
-  const giveOrder = (order: OrderRequest) => {
-    const r = shift.current ? own.find((x) => x.id === order.residentId) : undefined
-    return sendOrder((r && appendRequest(r, order)) ?? order)
+  const giveOrder = (order: OrderRequest, queued = shift.current): Promise<string | undefined> => {
+    const r = own.find((x) => x.id === order.residentId)
+    const script = order.params === undefined ? startedScript(order, scripts) : undefined
+    if (script && script.params.length > 0) {
+      setStarting({
+        script,
+        values: startValues(script.params, r?.scriptParams?.[script.id]),
+        start: async (params) => setOrderError(await giveOrder({ ...order, params }, queued)),
+      })
+      return Promise.resolve(undefined)
+    }
+    const queuedFor = queued ? r : undefined
+    return sendOrder((queuedFor && appendRequest(queuedFor, order)) ?? order)
   }
   // The city picked on the map or opened in the Cities drawer.
   const [openCityId, setOpenCityId] = useState<string>()
@@ -249,6 +296,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function goTo(x: number, y: number) {
     const mode = picking
     setPicking(false)
+    if (starting?.picking) {
+      // A value for the form before a script starts, which shows again.
+      const param = starting.picking
+      if (!world) return
+      const got = paramPickAt(paramWorld(world), param.type, { x, y })
+      setStarting({
+        ...starting,
+        picking: undefined,
+        ...(typeof got === 'string'
+          ? { error: got }
+          : { error: undefined, values: { ...starting.values, [param.name]: got.id } }),
+      })
+      return
+    }
     if (paramPick) {
       setParamPick(undefined)
       if (!world) return
@@ -314,10 +375,29 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   /**
    * Gives each resident of the group the same order request (ADR 0002), skipping those who
-   * can't take it, and says on the card who was skipped or turned down and why.
+   * can't take it, and says on the card who was skipped or turned down and why. One starting a
+   * script that declares params first shows the form for them, once for all (`CONTEXT.md`:
+   * Before it starts), filled with the values all of them keep or the defaults.
    */
-  async function sendGroup(order: GroupOrder) {
+  async function sendGroup(order: GroupOrder, queued = shift.current) {
     if (!world) return
+    const starts =
+      order.kind === 'runScript'
+        ? { kind: 'runScript', scriptId: order.scriptId }
+        : order.kind === 'work' || order.kind === 'build'
+          ? { kind: 'task', task: order.kind }
+          : undefined
+    const given = 'params' in order && order.params !== undefined
+    const script = starts && !given ? startedScript(starts, scripts) : undefined
+    if (script && script.params.length > 0) {
+      const kept = group.map((r) => r.scriptParams?.[script.id])
+      setStarting({
+        script,
+        values: groupStartValues(script.params, kept),
+        start: (params) => sendGroup({ ...order, params } as GroupOrder, queued),
+      })
+      return
+    }
     const size = world.map.size
     const inGroup = new Set(group.map((r) => r.id))
     // Free: explored land a resident can stand on, with no wall or gate and nobody else on it.
@@ -328,7 +408,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
     }
     // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue).
-    const queued = shift.current
     const { requests, skipped } = groupRequests(order, group, {
       tick: world.tick,
       size,
@@ -391,7 +470,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function breed(stableId: string, horseIds: [string, string]) {
     if (!selected) return
     const order = { kind: 'task', task: 'breed', residentId: selected.id, stableId, horseIds }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order, false))
   }
   /**
    * Gives the picked resident the Feed the stable task for the stable they stand in: they run the
@@ -400,7 +479,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function feedStable(stableId: string) {
     if (!selected) return
     const order = { kind: 'task', task: 'feedStable', residentId: selected.id, stableId }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order, false))
   }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
@@ -528,7 +607,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             picking={
               picking !== false ||
               armyPick !== undefined ||
-              paramPick !== undefined ||
+              pickingParam !== undefined ||
               (group.length > 1 && groupPicking !== false)
             }
             onPickTile={goTo}
@@ -549,6 +628,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         leader={leader?.name}
         onLogout={logout}
       />
+      {world?.horseOffer && (
+        <HorseOfferNotice
+          horses={HORSE_GRANT_HORSES}
+          onClaim={() => sendOrder({ kind: 'claimHorses' })}
+        />
+      )}
       {phone ? (
         <PhoneMenu
           open={openDrawer}
@@ -818,6 +903,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             building={buildingHere}
             road={roadHere}
+            terrain={terrainAt?.(selected.x, selected.y)}
             carriageSite={carriageSiteHere}
             node={nodeAt?.(selected.x, selected.y)}
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
@@ -905,7 +991,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               )
             }
             onStore={async () =>
-              setOrderError(await giveOrder({ ...STORE_ALL, residentId: selected.id }))
+              setOrderError(
+                await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
+              )
             }
             onEditQueue={async (steps, loop) =>
               setOrderError(await sendOrder(editRequest(selected, steps, loop)))
@@ -958,6 +1046,29 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             collapsed={pick?.kind === 'group'}
           />
         </CardSheet>
+      )}
+      {world && starting && !starting.picking && (
+        <StartParamsForm
+          script={starting.script.name}
+          params={starting.script.params}
+          values={starting.values}
+          label={(id) => paramValueLabel(paramWorld(world), id)}
+          canStart={startValuesValid(starting.script.params, starting.values)}
+          error={starting.error}
+          onPick={(p) => {
+            setPicking(false)
+            setGroupPicking(false)
+            setStarting({ ...starting, picking: p, error: undefined })
+          }}
+          onChange={(name, value) =>
+            setStarting({ ...starting, values: { ...starting.values, [name]: value } })
+          }
+          onStart={() => {
+            setStarting(undefined)
+            void starting.start(startParamValues(starting.script.params, starting.values))
+          }}
+          onCancel={() => setStarting(undefined)}
+        />
       )}
       {world && realmEnded(world.events) && (
         <CentredDialog title="Your realm has ended">

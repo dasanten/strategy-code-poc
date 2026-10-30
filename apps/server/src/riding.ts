@@ -40,7 +40,7 @@ function freshPath(r: Resident): void {
  * from the next tick at the horse's pace (`Walking`).
  */
 export const mount: OrderKind = {
-  validate(world, sender, order) {
+  validate(world, sender, order, terrain) {
     const o = order as Partial<MountRequest>
     const r = orderedResident(world, sender, o.residentId)
     if (!r) return 'not one of your residents'
@@ -48,14 +48,15 @@ export const mount: OrderKind = {
       world,
       r,
       world.horses.find((h) => h.id === o.horseId),
+      terrain,
     )
   },
-  apply(world, _sender, order) {
+  apply(world, _sender, order, terrain) {
     const { residentId, horseId } = order as MountRequest
     const r = world.residents.find((x) => x.id === residentId)
     const horse = world.horses.find((h) => h.id === horseId)
     // Two riders ordered onto one horse in the same tick: the first one rides it.
-    if (!r || mountProblem(world, r, horse)) return
+    if (!r || mountProblem(world, r, horse, terrain)) return
     r.riding = horseId
     freshPath(r)
   },
