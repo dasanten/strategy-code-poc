@@ -27,9 +27,13 @@ import { addCity } from './test-terrain.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
-/** A square map drawn as text (sides join): . plains, ^ mountain. */
+/** A square map drawn as text (sides join): . plains, ^ mountain, ~ lake. */
 function draw(rows: string[]): TerrainMap {
-  const codes: Record<string, number> = { '.': Terrain.Plains, '^': Terrain.Mountain }
+  const codes: Record<string, number> = {
+    '.': Terrain.Plains,
+    '^': Terrain.Mountain,
+    '~': Terrain.Lake,
+  }
   return { size: rows.length, tiles: Uint8Array.from(rows.join('').split(''), (c) => codes[c]!) }
 }
 
@@ -283,7 +287,7 @@ describe.each([
   })
 
   it('breaks the invariants when broken', () => {
-    const map = draw(Array.from({ length: 16 }, (_, y) => (y === 8 ? '^' : '.').repeat(16)))
+    const map = draw(Array.from({ length: 16 }, (_, y) => (y === 8 ? '~' : '.').repeat(16)))
     const { world, w1 } = setup(map)
     const w2 = newResident(mulberry32(2), { id: 'w2', owner: 'r1', x: 5, y: 5, tick: 0 })
     world.residents.push(w2)

@@ -155,7 +155,7 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ inCity: false }))).not.toContain('pair')
   })
 
-  it('shows a child only the orders they can take: walking, riding, scripts, attacking', () => {
+  it('shows a child only the orders they can take: walking, riding, goods, scripts, attacking', () => {
     const stable = building({ kind: 'stable' })
     const child = here({
       adult: false,
@@ -167,8 +167,19 @@ describe('the actions on a resident’s card', () => {
       othersInSight: 1,
       renamable: true,
     })
-    expect(ids(child)).toEqual(['walk', 'ride', 'attack', 'script', 'rename'])
+    expect(ids(child)).toEqual(['walk', 'ride', 'goods', 'attack', 'script', 'rename'])
     expect(residentActions(child).some((a) => a.disabled)).toBe(false)
+  })
+
+  it('offers a child Goods only with Food carried or on their tile', () => {
+    const child = (more: Partial<ResidentHere>) => ids(here({ adult: false, ...more }))
+    expect(child({ pile })).not.toContain('goods')
+    expect(child({ storage: building({ kind: 'storage', stock: { wood: 9 } }) })).not.toContain(
+      'goods',
+    )
+    expect(child({ storage: building({ kind: 'storage', stock: { food: 9 } }) })).toContain('goods')
+    expect(child({ pile: { ...pile, goods: { food: 1 } } })).toContain('goods')
+    expect(ids(here({ pile }))).toContain('goods')
   })
 
   it('hides work, building, hauling and pairing from someone carrying a child', () => {

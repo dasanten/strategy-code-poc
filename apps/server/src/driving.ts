@@ -1,9 +1,8 @@
 import {
-  carriageCanEnter,
+  carriageCanGoTo,
   commands,
   commandsCarriage,
   driveProblem,
-  terrainAt,
   type Army,
   type OrderRequest,
   type WorldState,
@@ -57,7 +56,7 @@ export const drive: OrderKind = {
       if (typeof army === 'string') return army
     } else {
       if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the target must be a tile'
-      if (terrain && !carriageCanEnter(terrainAt(terrain, o.x!, o.y!))) {
+      if (terrain && !carriageCanGoTo(world, terrain, o.x!, o.y!)) {
         return 'a carriage can’t go there'
       }
     }
