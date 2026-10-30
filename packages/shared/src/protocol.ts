@@ -215,4 +215,9 @@ export type ScriptRunSeen = Pick<RunningScript, 'lastError' | 'lastRun'>
 export const SCRIPT_WATCH_MAX = 4
 
 export const WS_PATH = '/ws'
+/**
+ * The close code the server ends a socket with that sent more messages than it may; the client
+ * shows it as "too many requests" and waits before connecting again.
+ */
+export const WS_CLOSE_TOO_MANY_REQUESTS = 4429
 export const SESSION_COOKIE = 'csp_session'

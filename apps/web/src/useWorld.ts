@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  WS_CLOSE_TOO_MANY_REQUESTS,
   WS_PATH,
   type SeenBuilding,
   type Army,
@@ -25,7 +26,11 @@ import { appendEvents } from './realm-log.js'
 import { applyRegionMap, type RegionState } from './map/region.js'
 import { lastSeenByKind, type LastSeen } from './last-seen.js'
 
-export type ConnectionStatus = 'connecting' | 'open' | 'closed'
+/** `throttled`: the server closed the socket for sending too much; it reconnects after a wait. */
+export type ConnectionStatus = 'connecting' | 'open' | 'closed' | 'throttled'
+
+/** How long the client waits to connect again after the server closed it for sending too much. */
+const THROTTLED_RETRY_MS = 10_000
 
 /** What the client knows of the world: the map, which chunks it may load and the entities in sight. */
 export interface ClientWorld {
@@ -209,9 +214,15 @@ export function useWorld(onLoggedOut: () => void) {
           })
         }
       }
-      socket.onclose = () => {
+      socket.onclose = (ev) => {
+        if (stopped) return setStatus('closed')
+        // The server closed it for sending too much: wait before trying again.
+        if (ev.code === WS_CLOSE_TOO_MANY_REQUESTS) {
+          setStatus('throttled')
+          retry = setTimeout(connect, THROTTLED_RETRY_MS)
+          return
+        }
         setStatus('closed')
-        if (stopped) return
         // A refused socket looks like any other close; ask the API whether we're still logged in.
         api.me().then(
           () => {

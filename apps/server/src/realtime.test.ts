@@ -6,6 +6,7 @@ import {
   RESIDENT_NAME_MAX_LENGTH,
   SCRIPT_STEP_BUDGET,
   SESSION_COOKIE,
+  WS_CLOSE_TOO_MANY_REQUESTS,
   WS_PATH,
   chunksAcross,
   realmName,
@@ -33,7 +34,9 @@ afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn()
 })
 
-async function start() {
+async function start(
+  opts: Pick<Parameters<typeof attachRealtime>[1], 'origins' | 'limits' | 'now'> = {},
+) {
   const opened = await openDb(':memory:')
   const app = await buildApp({
     db: opened.db,
@@ -60,6 +63,7 @@ async function start() {
     orders,
     territory,
     sightCheck: { reporter, sampleRate: 1 },
+    ...opts,
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
   cleanup.push(
@@ -92,8 +96,9 @@ function connect(
   url: string,
   token?: string,
   found: { realmName: string; leaderName?: string } | null = { realmName: 'Ironvale' },
+  headers: Record<string, string> = {},
 ) {
-  const headers = token ? { cookie: `${SESSION_COOKIE}=${token}` } : undefined
+  if (token) headers = { ...headers, cookie: `${SESSION_COOKIE}=${token}` }
   const socket = new WebSocket(url, { headers })
   const messages: ServerMessage[] = []
   socket.on('message', (raw) => {
@@ -118,17 +123,133 @@ function connect(
     }
     throw new Error(`no ${type} message`)
   }
-  return { socket, next, messages }
+  const refused = () =>
+    new Promise<number | undefined>((resolve) =>
+      socket.on('unexpected-response', (_req, res) => resolve(res.statusCode)),
+    )
+  const closed = () =>
+    new Promise<{ code: number; reason: string }>((resolve) =>
+      socket.on('close', (code, reason) => resolve({ code, reason: String(reason) })),
+    )
+  return { socket, next, messages, refused, closed }
 }
 
 describe('realtime', () => {
   it('refuses sockets without a session', async () => {
     const { url } = await start()
-    const { socket } = connect(url)
-    const status = await new Promise<number | undefined>((resolve) =>
-      socket.on('unexpected-response', (_req, res) => resolve(res.statusCode)),
-    )
-    expect(status).toBe(401)
+    expect(await connect(url).refused()).toBe(401)
+  })
+
+  it('refuses a socket from another origin, and takes the allowed ones and its own host', async () => {
+    const origins = { allowed: ['https://game.example.com'], allowMissing: false }
+    const { url, token, world } = await start({ origins })
+    const open = (origin?: string) =>
+      connect(url, token, { realmName: 'Ironvale' }, origin === undefined ? {} : { origin })
+    // Another site a Player has open, with their cookie: refused before the session is looked at.
+    expect(await open('https://evil.example.com').refused()).toBe(403)
+    // A browser always sends an Origin; without one it is let in only outside production.
+    expect(await open().refused()).toBe(403)
+    expect(world.realms).toEqual([])
+    // The game's own domain, as configured, and whatever host the request came in at.
+    expect(await open('https://game.example.com').next('welcome')).toMatchObject({ type: 'welcome' })
+    const own = `http://${new URL(url).host}`
+    expect(await open(own).next('welcome')).toMatchObject({ type: 'welcome' })
+    expect(await open('http://localhost:5173').refused()).toBe(403)
+  })
+
+  it('lets a socket without an Origin in where the policy allows it (development)', async () => {
+    const { url, token } = await start({ origins: { allowed: [], allowMissing: true } })
+    expect(await connect(url, token).next('welcome')).toMatchObject({ type: 'welcome' })
+  })
+
+  it('closes a socket that sends a frame over maxPayload, and stays up', async () => {
+    const { url, token } = await start({ limits: { maxPayloadBytes: 1024 } })
+    const first = connect(url, token)
+    await first.next('welcome')
+    first.socket.send(JSON.stringify({ type: 'watch', ids: ['x'.repeat(2000)] }))
+    expect((await first.closed()).code).toBe(1009)
+    // The server took no harm: the next connection plays on, and a frame within the cap is fine.
+    const second = connect(url, token)
+    await second.next('welcome')
+    second.socket.send(JSON.stringify({ type: 'order', requestId: 'r1', order: { kind: 'fly' } }))
+    expect(await second.next('rejected')).toMatchObject({ requestId: 'r1' })
+  })
+
+  it('closes a socket that floods it with messages, as "too many requests"', async () => {
+    let time = 0
+    const { url, token } = await start({
+      limits: { messageBurst: 4, messagesPerSecond: 1 },
+      now: () => time,
+    })
+    const { socket, next, closed } = connect(url, token)
+    await next('welcome')
+    const order = (id: string) =>
+      socket.send(JSON.stringify({ type: 'order', requestId: id, order: { kind: 'fly' } }))
+    // The burst goes through, each answered.
+    for (const id of ['a', 'b', 'c']) {
+      order(id)
+      expect(await next('rejected')).toMatchObject({ requestId: id })
+    }
+    // Half a second on, half a message is earned: not enough.
+    time = 500
+    order('d')
+    expect(await closed()).toEqual({ code: WS_CLOSE_TOO_MANY_REQUESTS, reason: 'Too many requests' })
+
+    // Given time, the allowance comes back.
+    time = 2500
+    const again = connect(url, token)
+    await again.next('welcome')
+    again.socket.send(JSON.stringify({ type: 'order', requestId: 'e', order: { kind: 'fly' } }))
+    expect(await again.next('rejected')).toMatchObject({ requestId: 'e' })
+  })
+
+  it('caps the sockets one account holds open, and frees a slot when one closes', async () => {
+    const { url, token, db, userId } = await start({ limits: { connectionsPerUser: 2 } })
+    const first = connect(url, token)
+    await first.next('welcome')
+    const second = connect(url, token)
+    await second.next('welcome')
+    expect(await connect(url, token).refused()).toBe(429)
+    // Another account is counted on its own.
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    await connect(url, createSession(db, other.id)).next('welcome')
+    first.socket.close()
+    await first.closed()
+    await connect(url, token).next('welcome')
+  })
+
+  it("caps a realm's orders waiting for the next tick, and takes more once it ran", async () => {
+    const { url, token, world, orders } = await start({ limits: { pendingOrdersPerRealm: 2 } })
+    const { socket, next } = connect(url, token)
+    await next('welcome')
+    // Renaming the Leader is valid any number of times, before and after a tick applied it.
+    const leaderId = world.realms[0]!.leaderId
+    const order = (id: string) =>
+      socket.send(
+        JSON.stringify({
+          type: 'order',
+          requestId: id,
+          order: { kind: 'rename', residentId: leaderId, targetId: leaderId, name: `Brann ${id}` },
+        }),
+      )
+    order('a')
+    expect(await next('ack')).toEqual({ type: 'ack', requestId: 'a' })
+    order('b')
+    expect(await next('ack')).toEqual({ type: 'ack', requestId: 'b' })
+    order('c')
+    expect(await next('rejected')).toEqual({
+      type: 'rejected',
+      requestId: 'c',
+      reason: 'too many orders waiting',
+    })
+    expect(orders.size).toBe(2)
+    orders.applyAll(world)
+    order('d')
+    expect(await next('ack')).toEqual({ type: 'ack', requestId: 'd' })
   })
 
   it('welcomes a logged-in Player, then sends only changes', async () => {

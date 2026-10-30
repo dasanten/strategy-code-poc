@@ -182,4 +182,9 @@ export class OrderQueue {
   get size(): number {
     return this.pending.length
   }
+
+  /** How many orders a Player has waiting for the next tick. */
+  pendingFor(userId: number): number {
+    return this.pending.filter((p) => p.sender.userId === userId).length
+  }
 }
