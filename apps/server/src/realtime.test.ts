@@ -4,6 +4,7 @@ import { WebSocket } from 'ws'
 import {
   REALM_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
+  SCRIPT_STEP_BUDGET,
   SESSION_COOKIE,
   WS_PATH,
   chunksAcross,
@@ -20,7 +21,7 @@ import { OrderQueue } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { SightTracker } from './sight.js'
 import { dieAll } from './survival.js'
-import { attachRealtime } from './realtime.js'
+import { attachRealtime, scriptMemoryFor } from './realtime.js'
 import { TerritoryTracker } from './territory.js'
 import { cityTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
@@ -117,7 +118,7 @@ function connect(
     }
     throw new Error(`no ${type} message`)
   }
-  return { socket, next }
+  return { socket, next, messages }
 }
 
 describe('realtime', () => {
@@ -346,6 +347,147 @@ describe('realtime', () => {
       'hungry',
     ])
   })
+  it('sends the memory of a watched script to the Player running it, and to nobody else', async () => {
+    const { url, token, db, userId, world, realtime } = await start()
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const daniel = connect(url, token)
+    const mara = connect(url, createSession(db, other.id))
+    await daniel.next('welcome')
+    await mara.next('welcome')
+    const realm = realmOf(world, userId)!
+    const worker = world.residents.find((r) => r.owner === realm.id)!
+    worker.script = { scriptId: 1, memory: { n: 1, at: { x: 3, y: 4 } } }
+    const watch = { type: 'watch', ids: [worker.id] }
+
+    // Opening the Script tab brings the memory at once.
+    daniel.socket.send(JSON.stringify(watch))
+    expect(await daniel.next('scriptMemory')).toEqual({
+      type: 'scriptMemory',
+      id: worker.id,
+      memory: { n: 1, at: { x: 3, y: 4 } },
+    })
+    // Another Player watching the same resident learns nothing of it.
+    mara.socket.send(JSON.stringify(watch))
+    expect(await mara.next('scriptMemory')).toEqual({
+      type: 'scriptMemory',
+      id: worker.id,
+      memory: null,
+    })
+
+    // An answered order shows the server got to everything sent before it.
+    const settle = async (c: ReturnType<typeof connect>) => {
+      c.socket.send(JSON.stringify({ type: 'order', requestId: 's', order: { kind: 'fly' } }))
+      await c.next('rejected')
+    }
+    const memorySent = (c: ReturnType<typeof connect>) =>
+      c.messages.filter((m) => m.type === 'scriptMemory')
+
+    // Every tick it changed, it goes out again; unchanged, it doesn't.
+    worker.script.memory = { n: 2, at: { x: 3, y: 4 } }
+    realtime.broadcastTick()
+    expect(await daniel.next('scriptMemory')).toMatchObject({ memory: { n: 2 } })
+    realtime.broadcastTick()
+    await settle(daniel)
+    await settle(mara)
+    expect(memorySent(daniel)).toEqual([])
+    expect(memorySent(mara)).toEqual([])
+
+    // Closing the tab stops it.
+    daniel.socket.send(JSON.stringify({ type: 'watch', ids: [] }))
+    await settle(daniel)
+    worker.script.memory = { n: 3 }
+    realtime.broadcastTick()
+    await settle(daniel)
+    expect(memorySent(daniel)).toEqual([])
+
+    // An army's script the same way: only for its own realm.
+    const army = { id: 'army-1', name: 'Guard', realmId: realm.id, memberIds: [worker.id] }
+    world.armies.push({ ...army, order: null, script: { scriptId: 1, memory: { k: 1 } } })
+    expect(scriptMemoryFor(world, realm.id, army.id)).toEqual({ k: 1 })
+    expect(scriptMemoryFor(world, realmOf(world, other.id)!.id, army.id)).toBeNull()
+  })
+
+  it('sends how a watched script last ran, its error and steps, to the Player running it only', async () => {
+    const { url, token, db, userId, world, realtime } = await start()
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const daniel = connect(url, token)
+    const mara = connect(url, createSession(db, other.id))
+    await daniel.next('welcome')
+    await mara.next('welcome')
+    const realm = realmOf(world, userId)!
+    const worker = world.residents.find((r) => r.owner === realm.id)!
+    const lastError = { message: 'null has no field x', line: 3, column: 9, tick: 0, version: 2 }
+    worker.script = { scriptId: 1, memory: {}, lastError, lastRun: { steps: 312 } }
+    const watch = JSON.stringify({ type: 'watch', ids: [worker.id] })
+
+    daniel.socket.send(watch)
+    expect(await daniel.next('scriptRun')).toEqual({
+      type: 'scriptRun',
+      id: worker.id,
+      run: { lastError, lastRun: { steps: 312 } },
+    })
+    mara.socket.send(watch)
+    expect(await mara.next('scriptRun')).toEqual({ type: 'scriptRun', id: worker.id, run: null })
+
+    // A tick it changed in sends it again; one it didn't sends nothing.
+    worker.script.lastRun = { steps: SCRIPT_STEP_BUDGET, outOfSteps: 'own' }
+    realtime.broadcastTick()
+    expect(await daniel.next('scriptRun')).toMatchObject({
+      run: { lastError, lastRun: { steps: SCRIPT_STEP_BUDGET, outOfSteps: 'own' } },
+    })
+    realtime.broadcastTick()
+    daniel.socket.send(JSON.stringify({ type: 'order', requestId: 's', order: { kind: 'fly' } }))
+    await daniel.next('rejected')
+    expect(daniel.messages.filter((m) => m.type === 'scriptRun')).toEqual([])
+  })
+
+  it('sends a watched resident’s script log to the Player owning them, and to nobody else', async () => {
+    const { url, token, db, userId, world, realtime } = await start()
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const daniel = connect(url, token)
+    const mara = connect(url, createSession(db, other.id))
+    await daniel.next('welcome')
+    await mara.next('welcome')
+    const realm = realmOf(world, userId)!
+    // No script running: the log stays to show why the last one ended.
+    const worker = world.residents.find((r) => r.owner === realm.id)!
+    worker.scriptLog = [{ tick: 3, text: 'no workplace here' }]
+    const watch = JSON.stringify({ type: 'watch', ids: [worker.id] })
+
+    daniel.socket.send(watch)
+    expect(await daniel.next('scriptLog')).toEqual({
+      type: 'scriptLog',
+      id: worker.id,
+      lines: [{ tick: 3, text: 'no workplace here' }],
+    })
+    mara.socket.send(watch)
+    expect(await mara.next('scriptLog')).toEqual({ type: 'scriptLog', id: worker.id, lines: null })
+
+    // A new line goes out after the tick, to the owner only; nothing in the tick itself.
+    worker.scriptLog.push({ tick: 4, text: 'tick' })
+    realtime.broadcastTick()
+    expect(await daniel.next('scriptLog')).toMatchObject({ lines: [{ tick: 3 }, { tick: 4 }] })
+    const ticks = await Promise.all([daniel.next('tick'), mara.next('tick')])
+    expect(JSON.stringify(ticks)).not.toContain('no workplace here')
+    daniel.socket.send(JSON.stringify({ type: 'order', requestId: 's', order: { kind: 'fly' } }))
+    await daniel.next('rejected')
+    mara.socket.send(JSON.stringify({ type: 'order', requestId: 's', order: { kind: 'fly' } }))
+    await mara.next('rejected')
+    expect(mara.messages.filter((m) => m.type === 'scriptLog')).toEqual([])
+  })
+
   it('tells a Player how their Leader died and what became of their cities, then starts them afresh', async () => {
     const { url, token, userId, world, realtime, territory, violations } = await start()
     const first = connect(url, token)
@@ -402,6 +544,21 @@ describe('realtime', () => {
     expect(await next('tick')).toMatchObject({ leaderId: heir.id })
     realtime.broadcastTick()
     expect(await next('tick')).not.toHaveProperty('leaderId')
+  })
+
+  it('offers the Player their horses on connect, and says once when they are claimed (Horse offer)', async () => {
+    const { url, token, world, realtime, userId } = await start()
+    const { next } = connect(url, token)
+    expect(await next('welcome')).toMatchObject({ horseOffer: true })
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('horseOffer')
+    world.horseOffersClaimed.push(userId)
+    realtime.broadcastTick()
+    expect(await next('tick')).toMatchObject({ horseOffer: false })
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('horseOffer')
+    const again = connect(url, token)
+    expect(await again.next('welcome')).toMatchObject({ horseOffer: false })
   })
 
   it('sends the Player their alliance matters on connect, and again only when they change', async () => {

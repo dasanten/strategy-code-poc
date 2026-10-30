@@ -10,6 +10,13 @@ the UI redesign (Epic 17, ADR 0008), then the livelier pace and default scripts 
 0009), go ahead of the remaining gameplay epics. The admin map (Epic 19) runs in parallel with
 Epic 18, ahead of Bandits. Agreed with Daniel on 2026-10-28: Quick wins 2 (Epic 30), Food pickup
 (31), Outpost storage (32) and UI overhaul and mobile (33), in that order, go ahead of Bandits.
+Agreed with Daniel on 2026-10-29: Faster checks (Epic 34, ADR 0013) first, since every other
+ticket waits on checks; then Riding and horses (35), Mountain roads (40), Script params (36),
+Queue planner and groups (37), Children and food (38) and Passenger carriages (39), in that
+order, all ahead of Bandits. The tickets of 35–40 wait for Epic 34's T34.1 and T34.2. Agreed
+later the same day: Scripts started directly (41, ADR 0014), Script debugging (42) and Script
+library tidy-up (43) come right after Script params (36). So: 35, 40, 36, 41, 42, 43, 37, 38,
+39, then Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -47,6 +54,16 @@ I sleep.
 | 31  | [Food pickup](https://github.com/dasanten/strategy-code-poc/issues/376)                         | ticketed                |
 | 32  | [Outpost storage](https://github.com/dasanten/strategy-code-poc/issues/377)                     | ticketed                |
 | 33  | [UI overhaul and mobile](https://github.com/dasanten/strategy-code-poc/issues/378)              | ticketed                |
+| 34  | [Faster checks](https://github.com/dasanten/strategy-code-poc/issues/414)                       | ticketed                |
+| 35  | [Riding and horses](https://github.com/dasanten/strategy-code-poc/issues/418)                   | ticketed                |
+| 36  | [Script params](https://github.com/dasanten/strategy-code-poc/issues/423)                       | ticketed                |
+| 37  | [Queue planner and groups](https://github.com/dasanten/strategy-code-poc/issues/427)            | ticketed                |
+| 38  | [Children and food](https://github.com/dasanten/strategy-code-poc/issues/431)                   | ticketed                |
+| 39  | [Passenger carriages](https://github.com/dasanten/strategy-code-poc/issues/434)                 | ticketed                |
+| 40  | [Mountain roads](https://github.com/dasanten/strategy-code-poc/issues/442)                      | ticketed                |
+| 41  | [Scripts started directly](https://github.com/dasanten/strategy-code-poc/issues/450)            | ticketed                |
+| 42  | [Script debugging](https://github.com/dasanten/strategy-code-poc/issues/451)                    | ticketed                |
+| 43  | [Script library tidy-up](https://github.com/dasanten/strategy-code-poc/issues/452)              | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
@@ -63,9 +80,15 @@ its tickets or closes.
   Bugs branch from `dev` and go straight back to it.
 - **PRs:** one per ticket; tickets that can't ship apart share one. The body says
   `Closes #<ticket>` for each and `Part of #<epic>`. Ticket PRs get no CI: the ticket session runs
-  `pnpm lint`, `pnpm typecheck` and `pnpm test`, and before merging into the epic branch the
-  coordinating session runs them again on the PR merged with the epic branch. Merging into a
+  `pnpm check origin/epic/<n>-<slug>` (lint, typecheck and the tests the change affects, ADR 0013),
+  and before merging into the epic branch the coordinating session runs it again on the PR merged
+  with the epic branch. PR bodies say "Checked: `pnpm check` against …" with what it ran. Merging into a
   non-default branch doesn't close the ticket, so whoever merges closes its tickets by hand.
+- **Slow tests:** a test that takes more than about 20 s on an idle machine (a long simulation)
+  gets `{ tags: ['slow'] }` on its `it` or `describe`, with any timeout in the same object
+  (`{ tags: ['slow'], timeout: 120_000 }`: Vitest ignores a trailing timeout next to options).
+  `pnpm check` skips them, even when affected, and says how many; `pnpm test` runs them, and CI
+  runs `pnpm test`.
 - **Epic PR:** when an epic's last ticket is on its branch, one PR `epic/<n>-…` → `dev` with
   `Closes #<epic>` runs CI and is merged once green; whoever merges closes the epic by hand.
 - **Release:** when Daniel asks, one PR `dev` → `main` lists the epics and bugs it ships, runs CI

@@ -10,6 +10,7 @@ import {
   diagnosticsText,
   hasUnsavedChanges,
   lineDiff,
+  olderVersions,
   savedMessage,
   scriptWarnings,
   versionStatus,
@@ -33,11 +34,27 @@ if (memory.role == null) { memory.role = "gatherer" }
 interface Opened {
   key: string
   source: string
+  /** Where to put the cursor, such as a runtime error's line. */
+  line?: number
+  column?: number
+}
+
+/**
+ * A script to open, such as the one a resident's task runs; a new `at` opens it again. With a
+ * `version` that version opens rather than the newest, and with a `line` the cursor goes there,
+ * as for a script's last runtime error (`CONTEXT.md`: Debugging a script).
+ */
+export interface ScriptToOpen {
+  id: number
+  at: number
+  version?: number
+  line?: number
+  column?: number
 }
 
 /**
  * The Player's script library (`CONTEXT.md`: Script): write and check scripts, save them as new
- * versions, browse a script's history and make an earlier version active again.
+ * versions, browse a script's history, make an earlier version active again and delete old ones.
  */
 export function ScriptLibrary({
   onScripts,
@@ -45,8 +62,8 @@ export function ScriptLibrary({
 }: {
   /** Hears the list each time it is loaded, so residents can be given a script to run. */
   onScripts?: (scripts: ScriptSummary[]) => void
-  /** A script to open, such as the one a resident's task runs; a new `at` opens it again. */
-  toOpen?: { id: number; at: number }
+  /** A script to open, such as the one a resident's task runs. */
+  toOpen?: ScriptToOpen
 } = {}) {
   const [scripts, setListed] = useState<ScriptSummary[]>([])
   const setScripts = useCallback(
@@ -85,21 +102,28 @@ export function ScriptLibrary({
     api.scripts().then(setScripts, (e: Error) => setError(e.message))
   }, [setScripts])
 
-  function show(detail: ScriptDetail, version = detail.versions.at(-1)) {
+  function show(
+    detail: ScriptDetail,
+    version = detail.versions.at(-1),
+    at?: Pick<Opened, 'line' | 'column'>,
+  ) {
     setScript(detail)
     setRename(undefined)
     const source = version?.source ?? ''
-    setOpened({ key: `${detail.id}-${version?.version ?? 0}-${Date.now()}`, source })
+    setOpened({ key: `${detail.id}-${version?.version ?? 0}-${Date.now()}`, source, ...at })
     setDraft(source)
   }
 
-  async function open(id: number) {
+  async function open({ id, version, line, column }: ScriptToOpen) {
     const detail = await act(() => api.script(id))
-    if (detail) show(detail)
+    if (!detail) return
+    // The version asked for, unless it is gone from the history: then the newest.
+    const asked = detail.versions.find((v) => v.version === version)
+    show(detail, asked, asked ? { line, column } : undefined)
   }
 
   useEffect(() => {
-    if (toOpen) void open(toOpen.id)
+    if (toOpen) void open(toOpen)
     // Only a new request opens a script, not a new `open`.
   }, [toOpen])
 
@@ -148,6 +172,30 @@ export function ScriptLibrary({
     setMessage(`Version ${version} is active now.`)
   }
 
+  /** Deletes one version for good (never the active one), once the Player confirms. */
+  async function deleteVersion(version: number) {
+    if (!script) return
+    if (!window.confirm(`Delete version ${version} of ${script.name} for good?`)) return
+    const detail = await act(() => api.deleteScriptVersion(script.id, version))
+    if (!detail) return
+    setScript(detail)
+    setMessage(`Deleted version ${version}.`)
+  }
+
+  /** Deletes every version older than the active one, once the Player confirms. */
+  async function deleteOlder() {
+    if (!script) return
+    const count = olderVersions(script).length
+    const ok = window.confirm(
+      `Delete the ${count} version${count === 1 ? '' : 's'} of ${script.name} older than the active version ${script.activeVersion} for good?`,
+    )
+    if (!ok) return
+    const detail = await act(() => api.deleteOlderScriptVersions(script.id))
+    if (!detail) return
+    setScript(detail)
+    setMessage(`Deleted the versions older than version ${detail.activeVersion}.`)
+  }
+
   async function submitRename(e: FormEvent) {
     e.preventDefault()
     if (!script || rename === undefined) return
@@ -192,7 +240,7 @@ export function ScriptLibrary({
                 type="button"
                 className={script?.id === s.id ? 'on' : ''}
                 aria-current={script?.id === s.id || undefined}
-                onClick={() => open(s.id)}
+                onClick={() => open({ id: s.id, at: Date.now() })}
               >
                 <span>{s.name}</span>
                 <small>
@@ -206,7 +254,14 @@ export function ScriptLibrary({
 
         {script && script.versions.length > 0 && (
           <>
-            <h3>History</h3>
+            <div className="script-history-head">
+              <h3>History</h3>
+              {olderVersions(script).length > 0 && (
+                <button type="button" onClick={deleteOlder}>
+                  Delete older versions
+                </button>
+              )}
+            </div>
             <ul className="script-history">
               {[...script.versions].reverse().map((v) => {
                 const status = versionStatus(script, v)
@@ -232,6 +287,11 @@ export function ScriptLibrary({
                       >
                         Make active
                       </button>
+                      {status !== 'active' && (
+                        <button type="button" onClick={() => deleteVersion(v.version)}>
+                          Delete
+                        </button>
+                      )}
                     </span>
                   </li>
                 )
@@ -321,6 +381,8 @@ export function ScriptLibrary({
         <ScriptEditor
           key={opened.key}
           initialSource={opened.source}
+          line={opened.line}
+          column={opened.column}
           defaultScript={script?.task != null}
           onChange={setDraft}
         />

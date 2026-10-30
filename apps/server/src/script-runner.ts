@@ -3,12 +3,14 @@ import {
   ScriptFunction,
   parse,
   run,
+  scriptParams,
   type Program,
   type ScriptObject,
 } from '@csp/lang'
 import {
   buildAtProblem,
   buildingAt,
+  constructionAt,
   canWork,
   DEFAULT_SCRIPTS,
   commanderOf,
@@ -16,6 +18,7 @@ import {
   stableAt,
   commands,
   isTask,
+  keptPair,
   type Good,
   type Task,
   type TaskMemory,
@@ -34,6 +37,7 @@ import {
   type ScriptMemory,
   type ScriptRunBy,
   type SeenEntity,
+  type StartParamValues,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -47,8 +51,16 @@ import {
   scriptRequestsSound,
   type ScriptContext,
 } from './script-bindings.js'
+import { addToScriptLog } from './script-log.js'
 import type { RunnableScript } from './scripts.js'
-import { paramValues, scriptParamsSound } from './script-params.js'
+import {
+  paramTarget,
+  paramValues,
+  scriptParamsSound,
+  setStartParams,
+  startParamsProblem,
+  withTargetParam,
+} from './script-params.js'
 import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
 
@@ -83,6 +95,8 @@ interface RunScriptRequest extends OrderRequest {
   kind: 'runScript'
   residentId: string
   scriptId: number
+  /** Values for the script's params, set before its first tick (`CONTEXT.md`: Before it starts). */
+  params?: StartParamValues
 }
 
 interface ArmyRunScriptRequest extends OrderRequest {
@@ -105,8 +119,27 @@ function badScript(
 }
 
 /**
+ * Why the param values an order starting script `scriptId` gives don't fit its `param` lines
+ * (`startParamsProblem`), if they don't; none given always fit.
+ */
+function paramsProblem(
+  host: { script(scriptId: number): Pick<RunnableScript, 'source'> | undefined },
+  world: WorldState,
+  realmId: string,
+  scriptId: number,
+  params: unknown,
+): string | undefined {
+  if (params === undefined) return undefined
+  const source = host.script(scriptId)?.source
+  if (source === undefined) return 'not one of your scripts with a version that can run'
+  return startParamsProblem(world, realmId, scriptParams(source), params)
+}
+
+/**
  * The run-script order: one of the Player's residents runs one of the Player's scripts, from a
- * fresh memory. It ends whatever the resident was doing.
+ * fresh memory, with the param values it gives set first (`CONTEXT.md`: Before it starts); a
+ * default script's target param is cleared unless it gives one (`withTargetParam`). It ends
+ * whatever the resident was doing.
  */
 export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
   return {
@@ -115,14 +148,18 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
       const realm = realmOf(world, sender.userId)
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
-      return badScript(host, sender, o.scriptId)
+      return (
+        badScript(host, sender, o.scriptId) ??
+        paramsProblem(host, world, realm.id, o.scriptId!, o.params)
+      )
     },
     apply(world, _sender, order) {
-      const { residentId, scriptId } = order as RunScriptRequest
+      const { residentId, scriptId, params } = order as RunScriptRequest
       const r = world.residents.find((x) => x.id === residentId)
       if (!r) return
       r.order = null
       r.script = { scriptId, memory: {} }
+      setStartParams(r, scriptId, withTargetParam(host.script(scriptId), params))
     },
   }
 }
@@ -131,6 +168,14 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
 export interface DefaultScriptHost {
   /** The id of the Player's version of the task's default script, made if they have none. */
   defaultScript(userId: number, task: Task): number
+  /** The script's active version, to check the param values a task gives against. */
+  script?(scriptId: number): Pick<RunnableScript, 'source'> | undefined
+}
+
+/** What every task order may carry besides its target. */
+interface TaskParams {
+  /** Values for the default script's params, set before its first tick (`CONTEXT.md`: Before it starts). */
+  params?: StartParamValues
 }
 
 interface WorkTaskRequest extends OrderRequest {
@@ -190,13 +235,15 @@ interface BreedTaskRequest extends OrderRequest {
   horseIds: [string, string]
 }
 
-type TaskRequest =
+type TaskRequest = (
   | WorkTaskRequest
   | BuildTaskRequest
   | HaulTaskRequest
   | TearDownTaskRequest
   | BreedTaskRequest
   | FeedStableTaskRequest
+) &
+  TaskParams
 
 /** The built-in order a task's request is checked as, for the resident. */
 function asOrder(o: Partial<TaskRequest>): OrderRequest {
@@ -211,6 +258,23 @@ function asOrder(o: Partial<TaskRequest>): OrderRequest {
     return { kind: 'breed', residentId, stableId: o.stableId, horseIds: o.horseIds }
   if (o.task === 'build') return { kind: 'build', residentId, building: o.building }
   return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
+}
+
+/**
+ * The task as the resident takes it up: for Breed horses (`CONTEXT.md`: Breeding), a pair whose
+ * breeding the stable keeps comes first (`keptPair`), when the resident can breed it, in place of
+ * the two picked.
+ */
+function withKeptPair(
+  world: WorldState,
+  o: Partial<TaskRequest>,
+  realmId: string | undefined,
+): Partial<TaskRequest> {
+  if (o.task !== 'breed' || realmId === undefined) return o
+  const stable = world.buildings.find((b) => b.id === o.stableId)
+  const r = world.residents.find((x) => x.id === o.residentId)
+  const kept = stable && r && keptPair(world, stable, { realmId }, r)
+  return kept ? { ...o, horseIds: kept } : o
 }
 
 /** The memory a task's default script starts from (`TaskMemory`), for resident `r`. */
@@ -262,49 +326,110 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
  * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
  * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
- * own: the resident stands in the stable and is grown up.
+ * own: the resident stands in the stable and is grown up. The param values it gives are checked
+ * against the default script's and set first (`CONTEXT.md`: Before it starts), the task's target
+ * in the script's target param (`withTargetParam`, `taskTarget`).
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
     validate(world, sender, order, terrain) {
       const o = order as Partial<TaskRequest>
-      if (!isTask(o.task)) return 'no such task'
-      const realm = realmOf(world, sender.userId)
-      const r = world.residents.find((x) => x.id === o.residentId)
-      if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
-      if (o.task === 'work') {
-        const workplaceId = (o as Partial<WorkTaskRequest>).workplaceId
-        if (typeof workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== workplaceId)
-          return 'not standing on that workplace'
-      }
-      if (o.task === 'feedStable') {
-        // No order of its own: they store and fetch, which children can't.
-        const size = terrain?.size ?? MAP_SIZE
-        if (stableAt(world, r.x, r.y, size)?.id !== o.stableId) return 'not standing in that stable'
-        return canWork(r, world.tick) ? undefined : 'children can’t store or fetch goods'
-      }
-      if (o.task === 'build' && o.at !== undefined) {
-        // Somewhere else: checked as the build order there, once they have walked to it.
-        const at = o.at as Partial<{ x: number; y: number }> | null
-        if (!at || !Number.isInteger(at.x) || !Number.isInteger(at.y))
-          return 'the target must be a tile'
-        return buildAtProblem(world, r!, o.building, at as { x: number; y: number }, terrain)
-      }
-      const built = asOrder(o)
-      const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)
-      // Working there by a bare work-at order, as the starting residents do, they can still be
-      // given the task; already running it there, they can't.
-      if (problem === 'already working here' && !r.script) return undefined
-      return problem
+      const problem = taskProblem(world, sender, o, terrain)
+      if (problem !== undefined || o.params === undefined) return problem
+      if (!host.script) return 'the task takes no params'
+      const realm = realmOf(world, sender.userId)!
+      const scriptId = host.defaultScript(sender.userId, o.task!)
+      return paramsProblem({ script: host.script }, world, realm.id, scriptId, o.params)
     },
     apply(world, sender, order) {
-      const o = order as TaskRequest
+      const realmId = realmOf(world, sender.userId)?.id
+      const o = withKeptPair(world, order as TaskRequest, realmId) as TaskRequest
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!r) return
       r.order = null
-      r.script = { scriptId: host.defaultScript(sender.userId, o.task), memory: taskMemory(o, r) }
+      const scriptId = host.defaultScript(sender.userId, o.task)
+      r.script = { scriptId, memory: taskMemory(o, r) }
+      const source = host.script?.(scriptId)?.source
+      const script = source === undefined ? undefined : { source, task: o.task }
+      const target = taskTarget(world, realmId, o, r)
+      setStartParams(r, scriptId, withTargetParam(script, o.params, target))
     },
   }
+}
+
+/**
+ * The task's target as its default's target param holds it (`TARGET_PARAMS`): Work's workplace,
+ * Tear down's building, the stable of Breed horses and Feed the stable, Haul's carriage, and for
+ * Build the unfinished site of its kind it joins at `at` (or the resident's tile); none while
+ * Build lays out a new one, which isn't there yet. Only one of the realm's own, which a param can
+ * name; another's stays in the memory alone (`TaskMemory`).
+ */
+function taskTarget(
+  world: WorldState,
+  realmId: string | undefined,
+  o: TaskRequest,
+  r: { x: number; y: number },
+): string | undefined {
+  const [id, type] =
+    o.task === 'work'
+      ? [o.workplaceId, 'building' as const]
+      : o.task === 'tearDown'
+        ? [o.buildingId, 'building' as const]
+        : o.task === 'breed' || o.task === 'feedStable'
+          ? [o.stableId, 'storage' as const]
+          : o.task === 'haul'
+            ? [o.carriageId, 'storage' as const]
+            : [buildSite(world, o, r), 'building' as const]
+  if (id === undefined) return undefined
+  return paramTarget(world, realmId, type, id) ? id : undefined
+}
+
+/** The unfinished site a Build task joins at `at` (or the resident's tile), if one stands there. */
+function buildSite(
+  world: WorldState,
+  o: Extract<TaskRequest, { task: 'build' }>,
+  r: { x: number; y: number },
+): string | undefined {
+  const at = o.at ?? r
+  const site = constructionAt(world, at.x, at.y, o.building)
+  return site?.site && site.kind === o.building ? site.id : undefined
+}
+
+/** Why the resident can't be given the task on its target, if they can't (`taskOrder`). */
+function taskProblem(
+  world: WorldState,
+  sender: OrderSender,
+  o: Partial<TaskRequest>,
+  terrain: TerrainMap | undefined,
+): string | undefined {
+  if (!isTask(o.task)) return 'no such task'
+  const realm = realmOf(world, sender.userId)
+  const r = world.residents.find((x) => x.id === o.residentId)
+  if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+  if (o.task === 'work') {
+    const workplaceId = (o as Partial<WorkTaskRequest>).workplaceId
+    if (typeof workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== workplaceId)
+      return 'not standing on that workplace'
+  }
+  if (o.task === 'feedStable') {
+    // No order of its own: they store and fetch, which children can't.
+    const size = terrain?.size ?? MAP_SIZE
+    if (stableAt(world, r.x, r.y, size)?.id !== o.stableId) return 'not standing in that stable'
+    return canWork(r, world.tick) ? undefined : 'children can’t store or fetch goods'
+  }
+  if (o.task === 'build' && o.at !== undefined) {
+    // Somewhere else: checked as the build order there, once they have walked to it.
+    const at = o.at as Partial<{ x: number; y: number }> | null
+    if (!at || !Number.isInteger(at.x) || !Number.isInteger(at.y))
+      return 'the target must be a tile'
+    return buildAtProblem(world, r!, o.building, at as { x: number; y: number }, terrain)
+  }
+  const built = asOrder(withKeptPair(world, o, realm.id))
+  const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)
+  // Working there by a bare work-at order, as the starting residents do, they can still be
+  // given the task; already running it there, they can't.
+  if (problem === 'already working here' && !r.script) return undefined
+  return problem
 }
 
 /**
@@ -383,6 +508,8 @@ export class ScriptRunner {
       add(a.realmId, { holder: a, id: a.id, name: a.name, by, bind: by })
     }
     const used = new Map<number, { source: string; program: Program }>()
+    // Those whose script ran this tick, not skipped for the realm's budget.
+    const ran = new Set<string>()
     for (const realm of world.realms) {
       const running = byRealm.get(realm.id)
       const sender = this.host.sender(realm.userId)
@@ -397,9 +524,11 @@ export class ScriptRunner {
         // Its script may have ended this tick.
         if (!r.holder.script) continue
         if (left <= 0) {
+          r.holder.script.lastRun = { steps: 0, outOfSteps: 'realm' }
           logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, true))
           continue
         }
+        ran.add(r.id)
         const steps = Math.min(SCRIPT_STEP_BUDGET, left)
         left -= this.runOne(
           world,
@@ -419,6 +548,9 @@ export class ScriptRunner {
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
+      const taskOf = (r: Resident) =>
+        ran.has(r.id) && unedited(r) ? this.host.script(r.script!.scriptId)?.task : undefined
+      out.push(...defaultsHaveATarget(world, taskOf))
     }
     return out
   }
@@ -463,6 +595,8 @@ export class ScriptRunner {
       parsed = { source: script.source, program: parse(script.source) }
     }
     used.set(running.scriptId, parsed)
+    // An error belongs to the version that ran into it; another one running clears it.
+    if (running.lastError && running.lastError.version !== script.version) delete running.lastError
 
     const memory = structuredClone(running.memory) as ScriptObject
     // A resident's picked param values; an army's params are never picked.
@@ -502,19 +636,35 @@ export class ScriptRunner {
     }
     // What it requested counts, even when it stopped with an error or out of steps.
     for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
+    // So are its log lines, and the reason it ended with goes in the log after them. Only the
+    // owning Player reads the log, so a hirer's script, run by a resident they don't own, logs none.
+    const reason = bound.ended() ? bound.endReason() : null
+    if (resident?.owner === realm.id) {
+      addToScriptLog(
+        resident,
+        world.tick,
+        reason === null ? bound.logged : [...bound.logged, reason],
+      )
+    }
     if (bound.ended()) {
       endScript(world, r.id)
+      // A reason is noted each time, not rate-limited: an end is no error.
+      if (reason !== null) {
+        recordEvent(world, realm.id, {
+          kind: 'scriptStopped',
+          ...r.by,
+          name: r.name,
+          scriptId: running.scriptId,
+          script: script.name,
+          reason,
+        })
+      }
       return result.steps
     }
 
-    const kept = keepMemory(memory)
-    if (typeof kept === 'string') {
-      logLimited(world, realm.id, r, 'errorLoggedAt', scriptError(r, running, kept))
-    } else {
-      running.memory = kept
-    }
-    if (result.status === 'error') {
-      const { message, line, column } = result
+    const failed = (message: string, line?: number, column?: number) => {
+      const where = line === undefined ? {} : { line, column }
+      running.lastError = { message, ...where, tick: world.tick, version: script.version }
       logLimited(
         world,
         realm.id,
@@ -522,8 +672,17 @@ export class ScriptRunner {
         'errorLoggedAt',
         scriptError(r, running, message, line, column),
       )
+    }
+    const kept = keepMemory(memory)
+    if (typeof kept === 'string') failed(kept)
+    else running.memory = kept
+    const realmCut = steps < SCRIPT_STEP_BUDGET
+    running.lastRun = { steps: result.steps }
+    if (result.status === 'error') {
+      failed(result.message, result.line, result.column)
     } else if (result.status === 'out-of-steps') {
-      logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, steps < SCRIPT_STEP_BUDGET))
+      running.lastRun.outOfSteps = realmCut ? 'realm' : 'own'
+      logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, realmCut))
     }
     return result.steps
   }
@@ -609,7 +768,8 @@ export function keepMemory(memory: ScriptObject): ScriptMemory | string {
 /**
  * Invariant (ADR 0004): every running script, a resident's or an army's, names a script (or a
  * task, for its default), keeps
- * plain memory within `SCRIPT_MEMORY_MAX` and has logged no trouble in the future.
+ * plain memory within `SCRIPT_MEMORY_MAX`, has logged no trouble and kept no error from the
+ * future, and used no more steps than its budget.
  */
 export function runningScriptsSound(world: WorldState): InvariantViolation[] {
   const out: InvariantViolation[] = []
@@ -637,6 +797,11 @@ export function runningScriptsSound(world: WorldState): InvariantViolation[] {
       if (at !== undefined && at > world.tick)
         fail(`logged script trouble at tick ${at}, after ${world.tick}`)
     }
+    if (s.lastError && s.lastError.tick > world.tick)
+      fail(`kept an error from tick ${s.lastError.tick}, after ${world.tick}`)
+    const used = s.lastRun?.steps
+    if (used !== undefined && !(Number.isInteger(used) && used >= 0 && used <= SCRIPT_STEP_BUDGET))
+      fail(`used ${used} steps, outside its budget of ${SCRIPT_STEP_BUDGET}`)
   }
   return out
 }
@@ -702,6 +867,7 @@ function runCityScripts(
     })
     const { globals, requests } = bound
     run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
     if (bound.ended()) {
       endScript(world, r.id)
@@ -726,6 +892,55 @@ export function oneCarrierAtATime(
     message: `${ids.length} residents carry ${place}'s output at once: ${ids.join(', ')}`,
     entityIds: [place, ...ids],
   }))
+}
+
+/** What a default script keeps in memory once it knows its target (`defaultsHaveATarget`). */
+const TARGET_KNOWN: Partial<
+  Record<Task, { invariant: string; memory: readonly string[]; without: string }>
+> = {
+  work: {
+    invariant: 'workers-have-a-workplace',
+    memory: ['workplaceId'],
+    without: 'Work without a workplace',
+  },
+  build: {
+    invariant: 'builders-have-a-site',
+    memory: ['building', 'at'],
+    without: 'Build without a site',
+  },
+  haul: {
+    invariant: 'haulers-have-a-route',
+    memory: ['to', 'carriageId'],
+    without: 'Haul without a route or carriage',
+  },
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Default script, Started directly): a resident running the
+ * Work, Build or Haul default as the game ships it (`taskOf` names the task, for those that
+ * count) knows its target once it has run: Work its workplace (`memory.workplaceId`), Build the
+ * site's kind and place (`memory.building`, `memory.at`), Haul its route and carriage
+ * (`memory.to`, `memory.carriageId`). With none picked and none on their tile, or Haul with no
+ * route, it ends, so nobody runs one for longer than a tick without its target.
+ */
+export function defaultsHaveATarget(
+  world: WorldState,
+  taskOf: (r: Resident) => Task | undefined,
+): InvariantViolation[] {
+  const out: InvariantViolation[] = []
+  for (const r of world.residents) {
+    if (!r.script) continue
+    const memory = r.script.memory
+    const task = taskOf(r)
+    const known = task && TARGET_KNOWN[task]
+    if (!known || known.memory.every((key) => memory[key] != null)) continue
+    out.push({
+      invariant: known.invariant,
+      message: `${r.id} runs ${known.without}`,
+      entityIds: [r.id],
+    })
+  }
+  return out
 }
 
 /**

@@ -2,6 +2,8 @@ import {
   FOOD_PER_DAY,
   HOME_FOOD_LOW,
   OUTPOST_REFILL_REACH,
+  OWN_FOOD,
+  canWork,
   buildingRealm,
   isOutpostStorage,
   nearFootprint,
@@ -330,7 +332,8 @@ const whole = (stock: Stock | undefined): RefillSource | undefined =>
  * Where a resident running low on food takes a meal from, if anywhere (`CONTEXT.md`: Refilling):
  * at home, their city's storage (a mercenary of the Trade Org's, the HQ's); near an outpost storage
  * of their realm, that storage; working at a
- * workplace, the Food in its pile, else on a carriage standing at it; in an army, a carriage of their realm on or next to their tile, but
+ * workplace, the Food in its pile, else on a carriage standing at it; in an army or aboard a
+ * carriage as a passenger, a carriage of their realm on or next to their tile, but
  * not the Food a haul route keeps on board for the horse (`spareFood`); on a caravan's crew, its
  * carriage close by (`caravanFood`). Elsewhere nowhere. `size`
  * is the map's.
@@ -354,7 +357,7 @@ export function refillSource(
   }
   const caravan = caravanFood(world, r, size)
   if (caravan) return whole(caravan)
-  if (r.owner === null || !armyOf(world, r.id)) return undefined
+  if (r.owner === null || (r.aboard === undefined && !armyOf(world, r.id))) return undefined
   for (const k of world.carriages) {
     if (k.realmId !== r.owner || !inContact(size, k, r)) continue
     const food = spareFood(world, k)
@@ -364,16 +367,27 @@ export function refillSource(
 }
 
 /**
+ * How much Food a resident refills up to where they stand (`CONTEXT.md`: Refilling at home,
+ * Child): a child in their own city's area, with Food in its storage, to their own food
+ * (`OWN_FOOD`), so they leave the city with food on them; everyone else, and a child anywhere
+ * else, until they no longer run low (`HOME_FOOD_LOW`). `size` is the map's.
+ */
+export function refillTarget(world: WorldState, r: Resident, size: number): number {
+  return !canWork(r, world.tick) && homeStorage(world, r, size) ? OWN_FOOD : HOME_FOOD_LOW
+}
+
+/**
  * Refilling (`CONTEXT.md`: Refilling at home, Refilling at an outpost storage, Refilling at a
- * workplace, Refilling from a carriage): a resident who carries fewer than `HOME_FOOD_LOW` units of food takes meals
- * (`MEAL_UNITS` each) into their hands from their `refillSource`, without an order, until they no
- * longer run low, there is none left, or no more fits. Residents anywhere else get nothing. They
- * still eat only what they carry. `size` is the map's.
+ * workplace, Refilling from a carriage): a resident who carries less food than their
+ * `refillTarget` takes meals (`MEAL_UNITS` each) into their hands from their `refillSource`,
+ * without an order, until they reach it, there is none left, or no more fits. Residents anywhere
+ * else get nothing. They still eat only what they carry. `size` is the map's.
  */
 export function stepRefill(world: WorldState, size: number): void {
   let fromPile = false
   for (const r of world.residents) {
-    while ((r.carried.food ?? 0) < HOME_FOOD_LOW) {
+    const target = refillTarget(world, r, size)
+    while ((r.carried.food ?? 0) < target) {
       const source = refillSource(world, r, size)
       const units = Math.min(MEAL_UNITS, source?.food ?? 0, unitsThatFit(r, 'food', world.tick))
       if (!source || units <= 0) break

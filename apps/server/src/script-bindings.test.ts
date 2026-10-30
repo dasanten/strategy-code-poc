@@ -22,7 +22,14 @@ import { queueOrders } from './queues.js'
 import { ExploredTerrain } from './explored.js'
 import { OrderQueue, orderKinds } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
-import { SCRIPT_ORDER_KINDS, bindScript, scriptRequestsSound, walkTime } from './script-bindings.js'
+import {
+  SCRIPT_ORDER_KINDS,
+  bindScript,
+  scriptHelpers,
+  scriptRequestsSound,
+  tickRandom,
+  walkTime,
+} from './script-bindings.js'
 import { entitiesInSight } from './sight.js'
 import { createWorld } from './world.js'
 
@@ -170,6 +177,46 @@ describe('script bindings', () => {
     expect(memory.d).toBe(16)
   })
 
+  it('floor a number to the whole number at or below it', () => {
+    const { world, explored } = setup()
+    const memory: ScriptObject = {}
+    runAs(
+      world,
+      explored,
+      'memory.f = [floor(3), floor(2.7), floor(0.2), floor(-2.5), floor(-4)]',
+      memory,
+    )
+    expect(memory.f).toEqual([3, 2, 0, -3, -4])
+    const { result } = runAs(world, explored, 'floor("3")')
+    expect(result.status).toBe('error')
+  })
+
+  it('pick a list item with the script’s random, null from an empty list', () => {
+    const { world, explored } = setup()
+    const random = tickRandom(world)
+    const memory: ScriptObject = {}
+    runAs(
+      world,
+      explored,
+      `
+      memory.none = pickRandom([])
+      memory.one = pickRandom([me])
+      memory.of4 = pickRandom(["a", "b", "c", "d"])
+      memory.same = pickRandom(["a", "b", "c", "d"]) == memory.of4
+      `,
+      memory,
+    )
+    expect(memory.none).toBeNull()
+    expect((memory.one as { id: string }).id).toBe('a1')
+    expect(memory.of4).toBe(['a', 'b', 'c', 'd'][Math.floor(random * 4)])
+    expect(memory.same).toBe(true)
+    // The ends of `random` stay inside the list.
+    expect(scriptHelpers(0).pickRandom!([['a', 'b', 'c']])).toBe('a')
+    expect(scriptHelpers(0.999).pickRandom!([['a', 'b', 'c']])).toBe('c')
+    const { result } = runAs(world, explored, 'pickRandom(3)')
+    expect(result.status).toBe('error')
+  })
+
   it('show what is inside and how others fare only as the Player sees it', () => {
     const { world, explored } = setup()
     // Realm r2's storage, in sight of a1 but with no one of r1's at it (`CONTEXT.md`: Seeing
@@ -262,6 +309,9 @@ describe('script bindings', () => {
     ['stop()', { kind: 'stop' }],
     ['mount("h9")', { kind: 'mount', horseId: 'h9' }],
     ['dismount()', { kind: 'dismount' }],
+    ['board("k9")', { kind: 'board', carriageId: 'k9' }],
+    ['getOff()', { kind: 'getOff' }],
+    ['getOff(3, 4)', { kind: 'getOff', x: 3, y: 4 }],
     [
       'pickUp({ kind: "ground" }, { food: 2 })',
       { kind: 'pickUp', spot: { kind: 'ground' }, goods: { food: 2 } },
@@ -313,6 +363,7 @@ describe('script bindings', () => {
       { kind: 'rename', targetId: 'b1', name: 'Mara', realmName: 'Ironvale' },
     ],
     ['renameCity("c1", "Ironhold")', { kind: 'renameCity', cityId: 'c1', name: 'Ironhold' }],
+    ['claimHorses()', { kind: 'claimHorses' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],
     ['wallLine(12, 12)', { kind: 'wallLine', from: { x: 10, y: 10 }, to: { x: 12, y: 12 } }],
@@ -475,5 +526,52 @@ describe('doing()', () => {
     const { result } = runAs(world, explored, 'doing(3)', memory)
     expect(result.status).toBe('error')
     expect(memory.doing).toBeUndefined()
+  })
+})
+
+describe('end()', () => {
+  it('ends with a reason, trimmed and cut like doing’s text, or with none', () => {
+    const { world, explored } = setup()
+    const ends = (source: string) => {
+      const { result, requests, ended, endReason } = runAs(world, explored, source)
+      expect(result.status).toBe('done')
+      expect(requests).toEqual([])
+      expect(ended()).toBe(true)
+      return endReason()
+    }
+    expect(ends('end("  no workplace here  ")')).toBe('no workplace here')
+    expect(ends(`end("${'x'.repeat(DOING_MAX_LENGTH + 20)}")`)).toBe('x'.repeat(DOING_MAX_LENGTH))
+    expect(ends('end()')).toBeNull()
+    expect(ends('end(null)')).toBeNull()
+    expect(ends('end(" ")')).toBeNull()
+  })
+
+  it('needs a text or nothing', () => {
+    const { world, explored } = setup()
+    const { result, ended } = runAs(world, explored, 'end(3)')
+    expect(result.status).toBe('error')
+    expect(ended()).toBe(false)
+  })
+})
+
+describe('log()', () => {
+  it('collects short lines, cut like doing’s text, and asks for no order', () => {
+    const { world, explored } = setup()
+    const long = 'x'.repeat(DOING_MAX_LENGTH + 20)
+    const { result, requests, logged } = runAs(
+      world,
+      explored,
+      `log("  one ")\nlog(null)\nlog(" ")\nlog("${long}")`,
+    )
+    expect(result.status).toBe('done')
+    expect(requests).toEqual([])
+    expect(logged).toEqual(['one', 'x'.repeat(DOING_MAX_LENGTH)])
+  })
+
+  it('needs a text', () => {
+    const { world, explored } = setup()
+    const { result, logged } = runAs(world, explored, 'log(3)')
+    expect(result.status).toBe('error')
+    expect(logged).toEqual([])
   })
 })

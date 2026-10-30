@@ -167,13 +167,14 @@ describe('PathFinder settling requests before any search', () => {
       }
     const finder = new PathFinder(map)
     finder.request('island', [20, 20], [150, 150])
-    finder.request('cart', [20, 20], [50, 150], CARRIAGE_COSTS)
     oneTurn(finder)
     expect(finder.result('island')).toEqual({ status: 'unreachable' })
-    oneTurn(finder)
-    expect(finder.result('cart')).toEqual({ status: 'unreachable' })
     // On foot, over the mountains.
     expect(finder.findPath([20, 20], [50, 150]).status).toBe('found')
+    // A carriage needs a road over them (`CONTEXT.md`: Road), so it has to search.
+    expect(finder.findPath([20, 20], [50, 150], CARRIAGE_COSTS).status).toBe('unreachable')
+    finder.setRoads([200 * 140 + 50])
+    expect(finder.findPath([20, 20], [50, 150], CARRIAGE_COSTS)).toMatchObject({ status: 'found' })
   })
 
   it('an attacker needs only reachable land next to the goal', () => {
@@ -415,17 +416,23 @@ describe('PathFinder across the full map', () => {
     const finder = new PathFinder(map)
     const budgetMs = 20
     finder.request('across', west, east)
+    // A clock that moves on 1 ms each time it is read: the finder reads it once per batch of
+    // expansions, so how far it moves in one `advance` is how much work that step did, however
+    // fast or busy this machine is.
+    let t = 0
+    const now = () => t++
     let worst = 0
     let ticks = 0
     while (finder.pending > 0) {
-      const start = performance.now()
-      finder.advance(budgetMs)
-      worst = Math.max(worst, performance.now() - start)
+      const start = t
+      finder.advance(budgetMs, now)
+      worst = Math.max(worst, t - start)
       ticks++
       expect(ticks).toBeLessThan(100)
     }
-    // One batch of expansions may run past the deadline; it is small.
-    expect(worst).toBeLessThan(budgetMs + 15)
+    // It stops at its deadline: one batch per ms of budget, plus the readings that look for short
+    // requests waiting.
+    expect(worst).toBeLessThanOrEqual(budgetMs + 2)
     const r = finder.result('across')
     expect(r?.status).toBe('found')
     if (r?.status !== 'found') return

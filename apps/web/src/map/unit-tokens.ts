@@ -76,21 +76,26 @@ function drawUnit(
 }
 
 /**
- * The horse under a rider (`CONTEXT.md`: Riding): a small horse badge at the lower left of the
- * resident's token, in their relationship colour.
+ * Where the horse under a rider is drawn (`CONTEXT.md`: Riding): a horse token the size of the
+ * rider's, behind it and out to its lower left, so the rider sits on it.
  */
-function drawMount(tokens: TokenLayer, x: number, y: number, r: number, rel: Tone | undefined) {
-  const [hx, hy] = [x - r * 0.85, y + r * 0.8]
-  tokens.place(BASE_ART.round, hx, hy, r * 1.05)
-  tokens.place(UNIT_ART.horse, hx, hy, r * 0.62, relationshipColor(rel))
+export function mountSpot(rider: Spot): Spot {
+  return { x: rider.x - rider.r * 0.8, y: rider.y + rider.r * 0.6, r: rider.r }
+}
+
+/** A rider's horse token, in the rider's relationship colour; drawn before the rider, so beneath. */
+function drawMount(tokens: TokenLayer, rider: Spot, rel: Tone | undefined) {
+  const { x, y, r } = mountSpot(rider)
+  drawUnit(tokens, UNIT_ART.horse, x, y, r, rel)
 }
 
 /**
  * Residents, carriages, horses, Trade Org caravans and armies at middle zoom and closer
  * (ADR 0008): residents on one tile as one token with a count, coloured by the largest group,
  * or up close as single figures with their activity (`drawFigures`);
- * an army as a banner with its soldier count; carts and caravans; horses not hitched to a cart,
- * and a ridden one as a small horse by its rider.
+ * an army as a banner with its soldier count; carts and caravans, a cart's passengers inside it
+ * as a count; horses not hitched to a cart,
+ * and a ridden one as a horse token under its rider (in a group token, under the group).
  * Units on a tile with a building or a cart step aside to its corners so both show.
  * Tokens are coloured as `viewer` sees them; the `leaders` wear the crown.
  */
@@ -143,20 +148,27 @@ export function drawUnits(
     )
   }
 
+  const spots = new Map<string, Spot>()
+  // Passengers ride inside their carriage (`CONTEXT.md`: Passenger): its badge counts them, and
+  // they are found at it.
+  const passengers = new Set(world.carriages.flatMap((k) => k.passengerIds ?? []))
   for (const k of world.carriages) {
     const p = at(k.x, k.y, built.has(key(k)) ? -0.28 : 0, built.has(key(k)) ? 0.28 : 0)
     if (!near(p)) continue
     const caravan = parts.carriages.has(k.id)
+    const r = unitRadius('carriage', tile)
     drawUnit(
       tokens,
       caravan ? UNIT_ART.caravan : UNIT_ART.carriage,
       ...p,
-      unitRadius('carriage', tile),
+      r,
       entityRelationship(k, viewer, known),
     )
+    const aboard = k.passengerIds ?? []
+    if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)
+    for (const id of aboard) spots.set(id, { x: p[0], y: p[1], r })
   }
 
-  const spots = new Map<string, Spot>()
   // People step to the lower right of a building or a cart on their tile.
   const place = (x: number, y: number, full: number) => {
     const aside = built.has(`${x},${y}`) || carted.has(`${x},${y}`)
@@ -180,7 +192,7 @@ export function drawUnits(
     world.residents,
     (id) => rels.get(id),
     leaders,
-    new Set(banners.flatMap((b) => b.under)),
+    new Set([...banners.flatMap((b) => b.under), ...passengers]),
   )
   const close = zoomTier(tile) === 'close'
   const byId = new Map(world.residents.map((r) => [r.id, r]))
@@ -198,11 +210,10 @@ export function drawUnits(
     }
     const spot = place(g.x, g.y, unitRadius('residents', tile))
     if (!near([spot.x, spot.y])) continue
+    const rider = g.ids.find((id) => byId.get(id)?.riding !== undefined)
+    if (rider !== undefined) drawMount(tokens, spot, rels.get(rider))
     drawUnit(tokens, g.leader ? UNIT_ART.leader : UNIT_ART.person, spot.x, spot.y, spot.r, g.rel)
     if (g.ids.length > 1) badge(`×${g.ids.length}`, spot.x, spot.y, spot.r)
-    if (g.ids.some((id) => byId.get(id)?.riding !== undefined)) {
-      drawMount(tokens, spot.x, spot.y, spot.r, g.rel)
-    }
     for (const id of g.ids) spots.set(id, spot)
   }
   return spots
@@ -213,9 +224,8 @@ const ACTIVITY_SCALE = 22
 
 /**
  * The residents on one tile as single figures at close zoom (ADR 0008): up to four, each in its
- * own relationship colour with an activity icon at its lower right, and a rider's horse at its
- * lower left; with more, three and a "+N"
- * badge. Residents left out are found at the badge.
+ * own relationship colour with an activity icon at its lower right, and a rider on their horse
+ * token; with more, three and a "+N" badge. Residents left out are found at the badge.
  */
 function drawFigures(
   tokens: TokenLayer,
@@ -237,6 +247,7 @@ function drawFigures(
     const [x, y] = at(f.dx, f.dy)
     const rel = of.relOf(f.id)
     const leader = isLeader(of.leaders, f.id)
+    if (of.rides(f.id)) drawMount(tokens, { x, y, r }, rel)
     drawUnit(tokens, leader ? UNIT_ART.leader : UNIT_ART.person, x, y, r, rel)
     of.spots.set(f.id, { x, y, r })
     const activity = of.activityOf(f.id)
@@ -245,7 +256,6 @@ function drawFigures(
       tokens.place(BASE_ART.round, ax, ay, r * 1.05)
       tokens.place(ACTIVITY_ART[activity], ax, ay, r * 0.62, relationshipColor(rel))
     }
-    if (of.rides(f.id)) drawMount(tokens, x, y, r, rel)
   }
   if (more) {
     const [x, y] = at(more.dx, more.dy)

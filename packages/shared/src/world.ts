@@ -77,6 +77,12 @@ export interface Resident {
    */
   scriptParams?: ScriptParamValues
   /**
+   * The resident's script log (`CONTEXT.md`: Script log): what their scripts gave `log()` and
+   * `end(reason)`, oldest first, at most `SCRIPT_LOG_LINES`. Kept across scripts; only the
+   * owning Player sees it. Absent while nothing was logged.
+   */
+  scriptLog?: ScriptLogLine[]
+  /**
    * The queue the resident works through (`CONTEXT.md`: Queue), when they were given one. Its
    * current step sets `order` or `script` as if it had been given on its own; any order that
    * isn't a step of it ends it. Absent when they have none.
@@ -91,6 +97,11 @@ export interface Resident {
    * on with whatever they do, at the horse's pace.
    */
   riding?: string
+  /**
+   * The carriage the resident rides on as a passenger (`CONTEXT.md`: Passenger), if they are
+   * aboard one. Not an order: they move with the carriage and don't walk on their own.
+   */
+  aboard?: string
 }
 
 /**
@@ -165,8 +176,23 @@ export interface ScriptParamValues {
   [scriptId: string]: { [name: string]: ScriptParamValue }
 }
 
+/** One line of a resident's script log: the tick it was logged and its short text. */
+export interface ScriptLogLine {
+  tick: number
+  text: string
+}
+
 /** A picked script parameter value: a building or carriage id, or a whole number of zero or more. */
 export type ScriptParamValue = string | number
+
+/**
+ * The param values an order starting a script gives (`CONTEXT.md`: Script parameter, Before it
+ * starts), by name: what is picked or typed for each, or null to clear it back to its default.
+ * A param left out keeps its value.
+ */
+export interface StartParamValues {
+  [name: string]: ScriptParamValue | null
+}
 
 /**
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
@@ -189,6 +215,35 @@ export interface RunningScript {
   errorLoggedAt?: number
   /** The tick its last out-of-steps warning went into the realm log. */
   budgetLoggedAt?: number
+  /**
+   * Its last runtime error (`CONTEXT.md`: Debugging a script), kept until the script ends or
+   * another version of it runs.
+   */
+  lastError?: ScriptRunError
+  /** The steps it used the last tick it ran, and whether it ran out (`CONTEXT.md`: Step budget). */
+  lastRun?: ScriptRunSteps
+}
+
+/** A script's last runtime error, as its Script tab shows it (`CONTEXT.md`: Debugging a script). */
+export interface ScriptRunError {
+  message: string
+  /** Where in the script, when the error is in the script itself. */
+  line?: number
+  column?: number
+  /** The tick it stopped with the error. */
+  tick: number
+  /** The version of the script that ran into it. */
+  version: number
+}
+
+/**
+ * The steps a script used the last tick it ran (`CONTEXT.md`: Step budget), out of
+ * `SCRIPT_STEP_BUDGET`. `outOfSteps` when it ran out: of its own budget, or of the realm's, which
+ * cut it short or skipped it.
+ */
+export interface ScriptRunSteps {
+  steps: number
+  outOfSteps?: 'own' | 'realm'
 }
 
 /**
@@ -211,12 +266,17 @@ export interface SeenScript {
 
 /**
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
- * memory, which stays on the server. Their hunger and health only for their own realm and its
- * allies (`CONTEXT.md`: Seeing how someone fares). Their script parameter values only for the
- * realm that runs their script, and only those of the script they run.
+ * memory, which stays on the server, nor their script log, which the owning Player gets only on
+ * the Script tab. Their hunger and health only for their own realm and its allies (`CONTEXT.md`:
+ * Seeing how someone fares). Their script parameter values only for the realm that commands them:
+ * all they keep, so a script's params can be filled in before it starts (`CONTEXT.md`: Script
+ * parameter), and those of the script they run with it.
  */
-export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health' | 'scriptParams'> &
-  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: SeenScript }
+export type SeenResident = Omit<
+  Resident,
+  'script' | 'hunger' | 'health' | 'scriptParams' | 'scriptLog'
+> &
+  Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & { script?: SeenScript }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -362,7 +422,7 @@ export interface TearDownOrder {
 /**
  * Driving a carriage to a tile (`CONTEXT.md`: Carriage): the resident drives the carriage
  * `carriageId` from their tile, and the carriage, its horse and the driver move together. The
- * path and `progress` work as for walking, at the carriage's speeds and never into mountains.
+ * path and `progress` work as for walking, at the carriage's speeds, into mountains only on a road.
  */
 export interface DriveOrder {
   kind: 'drive'
@@ -475,9 +535,11 @@ export interface ClimbOrder {
 
 /**
  * Breeding (`CONTEXT.md`: Breeding): the resident, standing at the finished stable `stableId` on
- * `at`, tends the two horses `horseIds` standing in it. `progress` counts the ticks tended, up to
- * `STABLE_BREED_TICKS`; then a foal is born there and the order is done. It ends, its progress
- * lost, when the resident or a horse leaves, a horse dies or the stable has no room left.
+ * `at`, tends the two horses `horseIds` standing in it. `progress` counts the ticks the pair has
+ * been tended, up to `STABLE_BREED_TICKS`; then a foal is born there and the order is done. The
+ * progress belongs to the pair, kept by the stable (`Building.breedings`); the order shows the
+ * same number. It ends when the resident or a horse leaves or a horse dies, and makes no progress
+ * while the stable has no room left.
  */
 export interface BreedOrder {
   kind: 'breed'
@@ -576,6 +638,11 @@ export interface WorldState {
    * told of in their realm logs; the server tells them of the rest at start.
    */
   scriptViewChanges: number
+  /**
+   * The account ids of the Players who claimed their Horse offer (`CONTEXT.md`: Horse offer):
+   * kept with the Player, not the realm, so a claim outlives a Leader death.
+   */
+  horseOffersClaimed: number[]
 }
 
 /**
@@ -1335,6 +1402,18 @@ export type RealmEventWhat =
       x: number
       y: number
     }
+  /**
+   * The Player claimed their Horse offer (`CONTEXT.md`: Horse offer): `horseIds` arrived where the
+   * Horse grant puts them (see `horsesGranted`).
+   */
+  | {
+      kind: 'horsesClaimed'
+      horseIds: string[]
+      where: 'stable' | 'storage' | 'leader'
+      city?: string
+      x: number
+      y: number
+    }
   /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
   | { kind: 'foaled'; horseId: string; stableId: string }
   /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */
@@ -1392,6 +1471,17 @@ export type RealmEventWhat =
   | ({ kind: 'scriptOutOfSteps'; name: string; scriptId: number; realm: boolean } & ScriptRunBy)
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
+  /**
+   * A resident's script ended itself with `end(reason)` (`CONTEXT.md`: Script): `script` is its
+   * name, `reason` the short text it gave. Not an error: one for each end, never rate-limited.
+   */
+  | ({
+      kind: 'scriptStopped'
+      name: string
+      scriptId: number
+      script: string
+      reason: string
+    } & ScriptRunBy)
   /**
    * A field the Player's active scripts read was renamed or removed from its script view
    * (`CONTEXT.md`: Script view), as `view.field`; it reads `null` from now on. `scripts` are
@@ -1618,7 +1708,9 @@ export interface Building {
   cityId: string | null
   /**
    * The realm an outpost storage belongs to (`CONTEXT.md`: Outpost storage): finished storages
-   * of no city only, and only those a realm has. A city that takes it in drops it.
+   * of no city only, and only those a realm has. A city that takes it in drops it. A
+   * construction site has the realm whose resident laid it out, until it is finished
+   * (`CONTEXT.md`: Construction site); one an NPC city's resident laid out has none.
    */
   realmId?: string
   x: number
@@ -1627,7 +1719,7 @@ export interface Building {
   stock?: Stock
   /** There while the building is still a construction site. */
   site?: ConstructionSite
-  /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
+  /** Work put into tearing it down so far, once someone has started (`teardownWork`, `siteWorkOf`). */
   teardown?: number
   /** A gate its city's realm has closed (`CONTEXT.md`: Walls in combat); gates only, open without it. */
   closed?: true
@@ -1636,6 +1728,19 @@ export interface Building {
    * finished walls and gates only. It falls at its `wallStrength`.
    */
   damage?: number
+  /**
+   * How far each pair of horses in it has been bred (`CONTEXT.md`: Breeding), once a resident has
+   * tended them; finished stables only. Kept while nobody tends them, lost when one of the two
+   * leaves the stable or dies, gone when their foal is born.
+   */
+  breedings?: KeptBreeding[]
+}
+
+/** The breeding progress a stable keeps for two horses in it (`Building.breedings`). */
+export interface KeptBreeding {
+  horseIds: [string, string]
+  /** Ticks the pair has been tended so far, from 1 to below `STABLE_BREED_TICKS`. */
+  progress: number
 }
 
 /**
@@ -1645,7 +1750,10 @@ export interface Building {
 export interface ConstructionSite {
   /** Materials delivered so far; never more of a good than the building needs. */
   delivered: Stock
-  /** Work put in so far, at most what the building needs (`BUILD_WORK`). */
+  /**
+   * Work put in so far, at most what the building needs (`BUILD_WORK`); on a road on Mountain a
+   * resident's work counts less (`siteWorkOf`).
+   */
   work: number
 }
 

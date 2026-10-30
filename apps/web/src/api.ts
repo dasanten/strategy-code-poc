@@ -104,5 +104,10 @@ export const api = {
     call<ScriptDetail>('POST', `/api/scripts/${id}/active`, { version }),
   // Resetting a default script makes the game's current default its newest version.
   resetScript: (id: number) => call<ScriptDetail>('POST', `/api/scripts/${id}/reset`),
+  // Deleting versions: any but the active one; the others keep their numbers.
+  deleteScriptVersion: (id: number, version: number) =>
+    call<ScriptDetail>('DELETE', `/api/scripts/${id}/versions/${version}`),
+  deleteOlderScriptVersions: (id: number) =>
+    call<ScriptDetail>('POST', `/api/scripts/${id}/delete-older`),
   deleteScript: (id: number) => call<void>('DELETE', `/api/scripts/${id}`),
 }

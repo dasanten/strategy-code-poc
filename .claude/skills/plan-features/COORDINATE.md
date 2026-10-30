@@ -26,7 +26,7 @@ For every workable ticket at once, without asking Daniel first:
 Check the PR itself, not just the note.
 
 1. **Ticket PR into the epic branch:** check it out, merge `origin/epic/<n>-<slug>` into it,
-   run `pnpm lint`, `pnpm typecheck` and `pnpm test`. Green: merge the PR, close its tickets
+   run `pnpm check origin/epic/<n>-<slug>` (lint, typecheck and the affected tests, ADR 0013). Green: merge the PR, close its tickets
    by hand and remove `in progress`. Red: send the failure to that session with `SendMessage`.
 2. **`WORLD_FORMAT_VERSION`:** several open PRs that bump it merge one at a time. After each,
    tell the next one which number to take.

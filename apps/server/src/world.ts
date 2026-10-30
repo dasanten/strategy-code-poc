@@ -29,6 +29,7 @@ import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestClimbing, resolveClimbing } from './climbing.js'
 import { stepRiders } from './riding.js'
+import { stepPassengers } from './passengers.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
@@ -82,6 +83,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     lastSeen: {},
     // A new world's Players have nothing to be told of changes before it.
     scriptViewChanges: SCRIPT_VIEW_CHANGES.length,
+    horseOffersClaimed: [],
   }
 }
 
@@ -154,7 +156,8 @@ export interface StepResult {
  * realm (`stepCaptures`); admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
  * (`stepContracts`); standing drifts toward neutral (`stepStanding`); armies
  * lose members who are gone and give the rest their orders for the next tick; last, riders who
- * lost their horse get off it (`stepRiders`). Without `walking`
+ * lost their horse get off it (`stepRiders`), and passengers who lost their carriage get off
+ * (`stepPassengers`). Without `walking`
  * nobody moves.
  */
 export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
@@ -209,6 +212,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepArmies(world, terrain.size)
   stepLastSeen(world, terrain.size)
   stepRiders(world)
+  stepPassengers(world)
   const actions =
     steps.length +
     strikes.length +

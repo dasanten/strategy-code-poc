@@ -12,6 +12,7 @@
     "dev": "pnpm --parallel --filter @csp/server --filter @csp/web dev",
     "start": "pnpm --filter @csp/server start",
     "test": "vitest run",
+    "check": "eslint . --cache --cache-location node_modules/.cache/eslint/ && pnpm typecheck && node scripts/check-tests.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

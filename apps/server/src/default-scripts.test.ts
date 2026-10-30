@@ -195,7 +195,10 @@ describe('a Player’s default scripts', () => {
   it('are flagged when one following the game’s default doesn’t run it (ADR 0004)', () => {
     const id = workId()
     db.insert(schema.scriptVersions).values({ scriptId: id, version: 2, source: 'let x = 1' }).run()
-    db.update(schema.scripts).set({ activeVersion: 2 }).where(eq(schema.scripts.id, id)).run()
+    db.update(schema.scripts)
+      .set({ activeVersion: 2, latestVersion: 2 })
+      .where(eq(schema.scripts.id, id))
+      .run()
     expect(checkScriptLibrary(db)).toEqual([
       expect.objectContaining({ invariant: 'default-scripts-follow' }),
     ])
@@ -525,6 +528,7 @@ describe('the step budget', () => {
   function steps(task: Task, { memory, prepare }: Case): number {
     const world = farmWorld()
     prepare(world)
+    const program = parse(DEFAULT_SCRIPTS[task].source)
     const { globals } = bindScript({
       world,
       terrain,
@@ -534,8 +538,10 @@ describe('the step budget', () => {
       memory: structuredClone(memory),
       seen: seenAll(world),
       explored: () => true,
+      // Nothing picked: every param reads its default.
+      params: program.params,
     })
-    const result = run(parse(DEFAULT_SCRIPTS[task].source), {
+    const result = run(program, {
       globals,
       steps: SCRIPT_STEP_BUDGET,
       maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
@@ -683,7 +689,7 @@ describe('the step budget', () => {
         },
         // Carrying: ordering the load stored.
         {
-          memory: { ...work, carry: { storageId: 's1', goods: ['food'] } },
+          memory: { ...work, carry: { storageId: 's1', goods: ['food'], load: { food: 24 } } },
           prepare: (world) => {
             world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 3, y: 3 })
             world.residents[0]!.carried = { food: 30 }
@@ -792,7 +798,7 @@ describe('the step budget', () => {
       world.residents[0]!.script = { scriptId: 1, memory: {} }
       const runner = new ScriptRunner(terrain, {
         ...host(),
-        script: () => ({ userId: mara, source: loop, followsDefault }),
+        script: () => ({ userId: mara, version: 1, source: loop, followsDefault }),
       })
       const violations = runner.runAll(world, true)
       expect(violations.map((v) => v.invariant)).toEqual(

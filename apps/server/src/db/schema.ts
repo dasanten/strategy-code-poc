@@ -43,7 +43,8 @@ export const inviteCodes = sqliteTable('invite_codes', {
 /**
  * A Player's named scripts (`CONTEXT.md`: Script). They belong to the account, not the realm, so
  * they outlast a Leader's death. `activeVersion` is the version that runs: always one without
- * syntax errors, or null while there is none.
+ * syntax errors, or null while there is none. `latestVersion` is the highest version number ever
+ * saved, kept when that version is deleted, so new saves keep counting up.
  *
  * A Player's version of a default script (`CONTEXT.md`: Default script) names its `task`, one
  * per task. While `followsDefault`, it takes each new game default as a new version; once the
@@ -59,6 +60,7 @@ export const scripts = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     activeVersion: integer('active_version'),
+    latestVersion: integer('latest_version').notNull().default(0),
     task: text('task'),
     followsDefault: integer('follows_default', { mode: 'boolean' }).notNull().default(false),
     editedFrom: text('edited_from'),

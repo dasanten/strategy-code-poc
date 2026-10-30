@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react'
 import {
+  CHILD_GOODS,
   GOODS,
   QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_STEP_KINDS,
   TICKS_PER_GAME_HOUR,
+  canWork,
   neverEnds,
   type Building,
   type BuildingKind,
@@ -36,7 +38,12 @@ type Tile = { x: number; y: number }
 const TICKS_PER_GAME_MINUTE = TICKS_PER_GAME_HOUR / 60
 
 /** The Store order the card gives: everything carried, keeping their own Food. */
-export const STORE_ALL: OrderRequest = { kind: 'store', goods: [...GOODS] }
+export const STORE_ALL = { kind: 'store', goods: [...GOODS] } satisfies OrderRequest
+
+/** `STORE_ALL` for this resident: a child stores only the goods children may (`CONTEXT.md`: Child). */
+export function storeAll(r: Pick<Resident, 'bornAt'>, tick: number): typeof STORE_ALL {
+  return canWork(r as Resident, tick) ? STORE_ALL : { kind: 'store', goods: [...CHILD_GOODS] }
+}
 
 /**
  * The order that appends `order` to the resident's queue, or starts one with it: a `queue` order
@@ -60,15 +67,23 @@ export function appendRequest(
     : r.order?.kind === 'walkTo' && !r.script
       ? [{ order: { kind: 'walkTo', ...r.order.target } }]
       : []
-  const added: QueueStepRequest[] = []
-  const here = actsHere(order) ? { x: at.x, y: at.y } : undefined
-  const last = before.at(-1)?.order
-  if (here && !(last && walksTo(last, here))) added.push({ order: { kind: 'walkTo', ...here } })
-  added.push({ order: withoutResident(order) })
-  const steps = timed([...before, ...added])
+  const steps = withStep(before, order, at)
   return r.queue
     ? { kind: 'editQueue', residentId: r.id, steps }
     : { kind: 'queue', residentId: r.id, steps }
+}
+
+/**
+ * The steps with `order` added last, after a walk to `at` when it acts on its tile and the step
+ * before doesn't already walk there; a step that never ends gets a duration once another follows.
+ */
+function withStep(before: QueueStepRequest[], order: OrderRequest, at: Tile | undefined) {
+  const added: QueueStepRequest[] = []
+  const here = at && actsHere(order) ? { x: at.x, y: at.y } : undefined
+  const last = before.at(-1)?.order
+  if (here && !(last && walksTo(last, here))) added.push({ order: { kind: 'walkTo', ...here } })
+  added.push({ order: withoutResident(order) })
+  return timed([...before, ...added])
 }
 
 /**
@@ -87,8 +102,73 @@ export function appendRequests<R extends Queued>(
   })
 }
 
+/**
+ * A step planned with Add step for a group with no plan open: added after each member's own steps
+ * (`appendRequests`), after a walk to `at` when it acts on that tile.
+ */
+export function appendToEach(
+  residents: readonly Queued[],
+  order: OrderRequest,
+  at?: Tile,
+): OrderRequest[] {
+  return appendRequests(
+    residents,
+    (r) => ({ ...order, residentId: r.id }),
+    () => at,
+  )
+}
+
+/**
+ * A queue planned on the group card (`CONTEXT.md`: Group, Planning for a group), held in this
+ * browser until it is given to all: steps with ids of the plan's own, none of them current.
+ */
+export type QueuePlan = Pick<Queue, 'steps' | 'current' | 'loop' | 'nextStepId'>
+
+/** A plan with no steps yet. */
+export const EMPTY_PLAN: QueuePlan = { steps: [], current: -1, loop: false, nextStepId: 1 }
+
+/** The plan with its steps as the planner edited them, and loop when given; new steps get ids. */
+export function editPlan(plan: QueuePlan, steps: QueueStepRequest[], loop?: boolean): QueuePlan {
+  let nextStepId = plan.nextStepId
+  return {
+    steps: steps.map((s) => ({
+      id: s.id ?? nextStepId++,
+      order: s.order,
+      ...(s.minutes === undefined ? {} : { minutes: s.minutes }),
+    })),
+    current: -1,
+    loop: loop ?? plan.loop,
+    nextStepId,
+  }
+}
+
+/**
+ * The plan with a step planned with Add step added last, after a walk to `at` when it acts on
+ * that tile, as a resident's own queue gets it (`appendRequest`).
+ */
+export function planStep(plan: QueuePlan, order: OrderRequest, at?: Tile): QueuePlan {
+  return editPlan(plan, withStep(stepsOf(plan), order, at))
+}
+
+/**
+ * Give to all: each member's queue becomes a copy of the plan, one `queue` request each, ending
+ * what they do. A member who can't do a step gets it anyway and skips it when its turn comes.
+ */
+export function giveToAll(plan: QueuePlan, residents: readonly Pick<Resident, 'id'>[]) {
+  const steps = stepsOf(plan).map(({ order, minutes }) => ({
+    order,
+    ...(minutes === undefined ? {} : { minutes }),
+  }))
+  return residents.map((r): OrderRequest => ({
+    kind: 'queue',
+    residentId: r.id,
+    steps,
+    loop: plan.loop,
+  }))
+}
+
 /** The queue's steps as an edit-queue request keeps them: each by its id. */
-export function stepsOf(q: Queue): QueueStepRequest[] {
+export function stepsOf(q: Pick<Queue, 'steps'>): QueueStepRequest[] {
   return q.steps.map((s) => ({
     id: s.id,
     order: s.order,
@@ -105,9 +185,9 @@ function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
   )
 }
 
-/** Orders the card gives for the resident's own tile: they only start there. */
+/** Orders that act on the tile they are given for (by the card, their own): they only start there. */
 function actsHere(order: OrderRequest): boolean {
-  if (order.kind === 'pickUp' || order.kind === 'drop' || order.kind === 'drive') return true
+  if (['pickUp', 'drop', 'drive', 'mount', 'board'].includes(order.kind)) return true
   if (order.kind !== 'task') return false
   // A Build task laid out somewhere else (`at`) walks there itself.
   return order.task !== 'build' || order.at === undefined
@@ -133,7 +213,7 @@ export function editRequest(
 }
 
 /** The steps with one moved up (-1) or down (+1); a step that never ends gets a duration. */
-export function moveStep(q: Queue, id: number, by: -1 | 1): QueueStepRequest[] {
+export function moveStep(q: Pick<Queue, 'steps'>, id: number, by: -1 | 1): QueueStepRequest[] {
   const steps = stepsOf(q)
   const i = steps.findIndex((s) => s.id === id)
   const j = i + by
@@ -143,7 +223,7 @@ export function moveStep(q: Queue, id: number, by: -1 | 1): QueueStepRequest[] {
 }
 
 /** The steps with one dragged to the place of another. */
-export function dropStep(q: Queue, id: number, onto: number): QueueStepRequest[] {
+export function dropStep(q: Pick<Queue, 'steps'>, id: number, onto: number): QueueStepRequest[] {
   const steps = stepsOf(q)
   const from = steps.findIndex((s) => s.id === id)
   const to = steps.findIndex((s) => s.id === onto)
@@ -153,12 +233,16 @@ export function dropStep(q: Queue, id: number, onto: number): QueueStepRequest[]
 }
 
 /** The steps without one; with none left, the edit ends the queue. */
-export function removeStep(q: Queue, id: number): QueueStepRequest[] {
+export function removeStep(q: Pick<Queue, 'steps'>, id: number): QueueStepRequest[] {
   return stepsOf(q).filter((s) => s.id !== id)
 }
 
 /** The steps with one's duration set in game minutes, or cleared with undefined. */
-export function timeStep(q: Queue, id: number, minutes: number | undefined): QueueStepRequest[] {
+export function timeStep(
+  q: Pick<Queue, 'steps'>,
+  id: number,
+  minutes: number | undefined,
+): QueueStepRequest[] {
   return stepsOf(q).map((s) => {
     if (s.id !== id) return s
     const step = { ...s, minutes }
@@ -189,7 +273,7 @@ export interface StepNames {
 }
 
 /** The queue as the card lists it, step by step. */
-export function queueRows(q: Queue, names: StepNames = {}): QueueRow[] {
+export function queueRows(q: Pick<Queue, 'steps' | 'current'>, names: StepNames = {}): QueueRow[] {
   return q.steps.map((s, i) => ({
     id: s.id,
     label: stepLabel(s.order, names),
@@ -215,21 +299,33 @@ export function stepLabel(
     const kind = buildings.find((b) => b.id === id)?.kind
     return kind ? `the ${BUILDING_NAMES[kind]}` : 'the building'
   }
+  // A storage or stable in sight a store or fetch names, if it names one; a carriage goes unnamed.
+  const named = (word: string, id: unknown) => {
+    const kind = buildings.find((b) => b.id === id)?.kind
+    return kind ? `${word} the ${BUILDING_NAMES[kind]}` : ''
+  }
   switch (order.kind) {
     case 'walkTo':
       return `Walk to ${at(order)}`
     case 'drive':
       return `Drive the carriage to ${at(order)}`
+    case 'board':
+      return 'Board the carriage'
+    case 'getOff':
+      return order.x === undefined ? 'Get off' : `Get off at ${at(order)}`
     case 'pickUp':
       return `Pick up ${goodsLine(order.goods)}`
     case 'drop':
       return `${dropVerb(order.spot)} ${goodsLine(order.goods)}`
-    case 'store':
-      return order.goods && !Array.isArray(order.goods)
-        ? `Store ${goodsLine(order.goods)}`
-        : 'Store what they carry'
+    case 'store': {
+      const what =
+        order.goods && !Array.isArray(order.goods)
+          ? `Store ${goodsLine(order.goods)}`
+          : 'Store what they carry'
+      return `${what}${named(' at', order.to)}`
+    }
     case 'fetch':
-      return `Fetch ${goodsLine(order.goods)}`
+      return `Fetch ${goodsLine(order.goods)}${named(' from', order.from)}`
     case 'build':
       return 'Build'
     case 'tearDown':
@@ -240,6 +336,10 @@ export function stepLabel(
       return 'Haul'
     case 'roadLine':
       return `Build a road to ${at(order.to)}`
+    case 'mount':
+      return 'Mount a horse'
+    case 'dismount':
+      return 'Dismount'
     case 'wallLine':
       return `Build a wall to ${at(order.to)}`
     case 'runScript': {
@@ -253,6 +353,8 @@ export function stepLabel(
         return `Build ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`
       }
       if (order.task === 'tearDown') return `Tear down ${building(order.buildingId)}`
+      if (order.task === 'feedStable') return `Feed ${building(order.stableId)}`
+      if (order.task === 'breed') return `Breed horses at ${building(order.stableId)}`
       return `Haul to ${at(order)}`
   }
   return order.kind

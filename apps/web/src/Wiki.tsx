@@ -19,6 +19,7 @@ import {
   CARAVAN_ESCORTS_MAX,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
+  PASSENGER_WEIGHT,
   CARRIAGE_MAX_CAPACITY,
   CARRY_BASE,
   CARRY_PER_STRENGTH,
@@ -53,12 +54,16 @@ import {
   STARVE_DAYS,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
+  GET_FOOD_AT,
+  GET_FOOD_TAKE,
   FORMER_PLAYER_STANDING,
   GAME_DAYS_PER_YEAR,
   GOOD_WEIGHT,
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HORSE_GRANT_FOOD,
+  HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
   HUNGRY_HORSE_PACE,
   HORSE_ENDURANCE_EFFECT,
@@ -97,10 +102,12 @@ import {
   PRICE_REFERENCE_FLOORS,
   PROTECTION_DEFENCE,
   ROAD_LINE_MAX_TILES,
+  MOUNTAIN_ROAD_WORK_FACTOR,
   DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_LOG_LINES,
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
@@ -153,6 +160,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   carryCapacity,
   walkSpeed,
+  workFactor,
   type BuildingKind,
   type CrimeKind,
   type Good,
@@ -202,7 +210,7 @@ import {
 } from './wiki-view.js'
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
-import { SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
@@ -408,9 +416,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -445,8 +453,9 @@ export function Wiki() {
         <p>Groups are kept in this browser, for each realm; another browser starts without them.</p>
         <p>
           With several picked, the group card gives each of them the same order, just as their own
-          cards would: walk to, work, build, store, fetch, run a script or stop. Nothing ties them
-          together afterwards; each goes on alone.
+          cards would. Every order a resident's card has is on it, but pairing, making Leader and
+          renaming, which are about one resident. Nothing ties them together afterwards; each goes
+          on alone.
         </p>
         <ul>
           <li>
@@ -463,19 +472,56 @@ export function Wiki() {
           </li>
           <li>
             <strong>Store</strong> puts what each carries in the nearest storage (their own food
-            stays with them); <strong>Fetch</strong> takes a good from the nearest storage or
-            carriage holding it.
+            stays with them), <strong>Store at</strong> in the storage, stable or carriage picked;{' '}
+            <strong>Fetch</strong> takes a good from the nearest storage or carriage holding it, or
+            from the one picked. <strong>Drop all</strong> puts down everything each carries.
+          </li>
+          <li>
+            <strong>Mount horses</strong>: each takes a different free horse of yours on their tile.{' '}
+            <strong>Drive carriages</strong> and <strong>Haul route</strong> go to each standing on
+            a carriage, one driver for each carriage.
+          </li>
+          <li>
+            <strong>Feed the stable</strong>: each standing in a stable feeds it.{' '}
+            <strong>Breed horses</strong>: pick two horses in a stable where some of them stand; one
+            of them there who isn't breeding yet tends the pair. Pick two more for the next.
+          </li>
+          <li>
+            <strong>Build road</strong> and <strong>Build wall</strong>: pick where the line starts
+            and ends; they all build along it. <strong>Tear down</strong>: pick a building; those
+            standing at it tear it down.
+          </li>
+          <li>
+            <strong>Attack</strong>: pick a resident of another realm, or a wall or gate, for them
+            all to attack. <strong>Climb a wall</strong>: those next to the one picked climb over.
+          </li>
+          <li>
+            <strong>Board carriage</strong> (one for each carriage of your realm some of them stand
+            on) puts those on its tile aboard, in the group's order, until it is full;{' '}
+            <strong>Get off</strong> gets every passenger among them off. See Passengers.
           </li>
         </ul>
         <p>
           Those who can't take an order are skipped, and the card says who and why: children don't
-          work, build, store or fetch; a partner carrying a child doesn't work or build.
+          work, build or drive, and store, fetch or put down only Food; a partner carrying a child
+          doesn't work, build, tear down, breed or haul; orders bound to a place go only to those
+          standing there; Board skips those not on the carriage's tile, the driver, riders and, once
+          it is full, the rest.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
-          instead (see Queues). Work then also goes to those away from the workplace, who walk there
-          first, and Store to those who carry nothing yet. Stop still stops them all and ends their
-          queues.
+          instead (see Queues). Work, Tear down and Breed horses then also go to those away from the
+          place, who walk there first, and Store to those who carry nothing yet. Stop still stops
+          them all and ends their queues.
+        </p>
+        <p>
+          The group card's Queue tab has the same planner as a resident's card.{' '}
+          <strong>Add step</strong> adds the step to the end of each one's own queue.{' '}
+          <strong>Plan a queue for all</strong> opens a plan kept in this browser: add steps,
+          reorder them, give them durations and loop it, as on a resident's card, then{' '}
+          <strong>Give to all</strong> makes each one's queue a copy of it, ending what they do.
+          Everyone gets every step, even one they can't do; they skip it when its turn comes.
+          Afterwards each one's queue is their own, edited on their card.
         </p>
       </Section>
 
@@ -483,17 +529,29 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, work, build, haul, tear down, build a road or wall
-          line, or run one of your scripts with its params.
+          to, pick up, drop, store, fetch, drive, mount or dismount, board or get off a carriage,
+          work, build, haul, feed the stable, breed horses, tear down, build a road or wall line, or
+          run one of your scripts with its params.
+        </p>
+        <p>
+          To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
+          lists every kind of step. One that acts on a place (work a workplace, build, store at or
+          fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
+          map, anywhere, not only where the resident stands now; one that needs more (which goods,
+          what to build, what a smithy makes, which script) asks for it on the card after. A step
+          that has to be done on its tile goes after a walk there, unless the step before already
+          walks there. It works on a resident with no queue too, and starts one. Adding a step only
+          checks that it could make sense (the place is there, and a carriage or horse is yours);
+          whether it can start is checked when its turn comes.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
           map, right-click included) to add it to the end of the resident's queue instead of
           replacing what they do; on a resident without a queue it starts one, after the walk they
           are on, if any. An order done on the resident's tile (work, build, pick up, drop, drive,
-          haul, tear down) is queued after a walk back to that tile, so it still finds them there
-          when its turn comes, every round of a loop. Work or haul followed by another step gets a
-          duration of {num(QUEUE_DEFAULT_STEP_MINUTES)} game minutes (
+          board, haul, tear down) is queued after a walk back to that tile, so it still finds them
+          there when its turn comes, every round of a loop. Work or haul followed by another step
+          gets a duration of {num(QUEUE_DEFAULT_STEP_MINUTES)} game minutes (
           {realMinutes(QUEUE_DEFAULT_STEP_MINUTES)}), which you can change.
         </p>
         <p>
@@ -546,8 +604,9 @@ export function Wiki() {
           Residents and carriages step onto any of the eight tiles around, diagonals too. A diagonal
           step is {num(DIAGONAL_STEP, 2)} times as far, so it takes that much longer on the same
           ground. It can't squeeze between two corners: both straight tiles beside it must be ones
-          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage)
-          mountain. Two walls touching at a corner close the way like a straight stretch.
+          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage or
+          rider) mountain without a finished road. Two walls touching at a corner close the way like
+          a straight stretch.
         </p>
         <table>
           <thead>
@@ -555,6 +614,7 @@ export function Wiki() {
               <th>Terrain</th>
               <th>Speed</th>
               <th>Food burnt</th>
+              <th>Road work</th>
             </tr>
           </thead>
           <tbody>
@@ -563,6 +623,7 @@ export function Wiki() {
                 <td>{t}</td>
                 <td>{pct(TERRAIN_SPEED[Terrain[t]])}</td>
                 <td>{pct(TERRAIN_FOOD[Terrain[t]])}</td>
+                <td>{t === 'Road' ? '—' : `× ${num(workFactor('road', Terrain[t]))}`}</td>
               </tr>
             ))}
           </tbody>
@@ -602,11 +663,14 @@ export function Wiki() {
           paired, and their city has free housing and a food surplus, one partner carries the child
           for {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
           {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a child is grown after{' '}
-          {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Stats
-          decline from age {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below{' '}
-          {pct(DECLINE_FLOOR)}; residents die of old age between {num(LIFESPAN_MIN)} and{' '}
-          {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs
-          up to {num(MAX_HEALTH)}.
+          {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Until
+          grown, a child walks but doesn't work, build, tear down, drive or pair, and of all goods
+          handles only Food: they pick it up, put it down, fetch and store it like anyone, so they
+          can carry their meals. At home a child tops up to their own {num(OWN_FOOD)} Food from the
+          storage, so they leave the city with food on them. Stats decline from age{' '}
+          {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below {pct(DECLINE_FLOOR)};
+          residents die of old age between {num(LIFESPAN_MIN)} and {num(LIFESPAN_MAX)}. A house
+          holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs up to {num(MAX_HEALTH)}.
         </p>
       </Section>
 
@@ -616,17 +680,21 @@ export function Wiki() {
           a game day on plains; each point of Endurance above average needs{' '}
           {pct(HUNGER_ENDURANCE_EFFECT)} less (more below), at most {pct(HUNGER_ENDURANCE_LIMIT)}.
           They keep {num(OWN_FOOD)} Food of their own on them, and at home take a meal from the
-          storage when they run low. Within {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage
-          of their realm they take it from there the same way, so a stocked outpost storage next to
-          a far workplace keeps its workers fed.
+          storage when they run low. A child at home doesn't wait to run low: whenever they have
+          less than their own food, they take meals until they have it again, so a child leaving the
+          city has {days(OWN_FOOD / foodEatenPerDay())} of food on them. Within{' '}
+          {num(OUTPOST_REFILL_REACH)} tiles of an outpost storage of their realm they take it from
+          there the same way, so a stocked outpost storage next to a far workplace keeps its workers
+          fed.
         </p>
         <p>
-          Far from home, a resident working, building or tearing down can go and get food on their
-          own: set <code>foodAt</code> and <code>foodTake</code> on their card, in units of Food.
-          Below <code>foodAt</code> on them, they walk to their storage (or the nearest one of your
-          realm with Food), take Food up to <code>foodTake</code> and go back. Whenever they are at
-          a storage anyway, their own food is topped up to <code>foodTake</code> instead of{' '}
-          {num(OWN_FOOD)}. Unset, they don't go on their own.
+          Far from home, a resident working, building or tearing down goes and gets food on their
+          own. Below <code>foodAt</code> units of Food on them ({num(GET_FOOD_AT)} unless you set it
+          on their card), they walk to their storage (or the nearest one of your realm with Food),
+          take Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and go back.
+          Whenever they are at a storage anyway, their own food is topped up to{' '}
+          <code>foodTake</code> instead of {num(OWN_FOOD)}. With <code>foodAt</code> set to 0 they
+          don't go on their own and rely on refilling.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -653,11 +721,19 @@ export function Wiki() {
           carries a full load to the nearest storage of their realm.
         </p>
         <p>
-          With <code>foodAt</code> set, a worker who carries less Food than that leaves work for
-          their <code>storage</code>, or the nearest storage of your realm with Food, takes Food up
-          to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes back. With no Food
-          anywhere they work on. With <code>foodTake</code> set, carrying a load tops their food up
-          to it too.
+          A worker who carries less Food than <code>foodAt</code> ({num(GET_FOOD_AT)} unless set)
+          leaves work for their <code>storage</code>, or the nearest storage of your realm with
+          Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes
+          back. With no Food anywhere they work on. Carrying a load tops their food up to{' '}
+          <code>foodTake</code> too. <code>foodAt</code> 0 turns this off.
+        </p>
+        <p>
+          Work can be run directly too, with Run script or as a queue step: they work the workplace
+          in its <code>workplace</code> param, or with none picked the one they stand on when it
+          starts. Giving Work on a workplace fills it. It is never kept: each start works what it is
+          given or where they stand, so a queue can walk them to a workplace and then run Work
+          there. With no workplace there, or once theirs is gone, Work ends and your realm log says
+          why.
         </p>
         <table>
           <thead>
@@ -747,12 +823,23 @@ export function Wiki() {
       <Section id="building">
         <p>
           A construction site becomes its building once its materials are there and builders have
-          put in its work. Building goes in proportion to Strength, plus{' '}
+          put in its work. Until then the site belongs to the realm whose resident laid it out, so
+          that realm's scripts and params can pick it; finished, the building belongs where its kind
+          does (a city's, or an outpost storage). Building goes in proportion to Strength, plus{' '}
           {pct(CONSTRUCTION_SKILL_EFFECT)} for each point of Construction (at most{' '}
           {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
           more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
           leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a building's materials on the tile (all of an
-          unfinished site's).
+          unfinished site's). A road over a mountain can't be torn down while a carriage or a ridden
+          horse stands on it: the work waits until they leave. A horse left there unridden can't be
+          ridden off a road.
+        </p>
+        <p>
+          Tear down can be run directly too, with Run script or as a queue step: they tear down the
+          building or site in its <code>building</code> param, walking there first, or with none
+          picked the one they stand on when it starts. Giving Tear down on a building fills it; it
+          is never kept between starts. With no building there, Tear down ends and your realm log
+          says why.
         </p>
         <table>
           <thead>
@@ -788,11 +875,20 @@ export function Wiki() {
           resource nodes, and a new town hall founds a city.
         </p>
         <p>
-          With <code>foodAt</code> set, a resident building or tearing down who carries less Food
-          than that goes to their <code>source</code>, or the nearest storage of your realm with
-          Food, takes Food up to <code>foodTake</code> (or {num(OWN_FOOD)} while unset) and comes
-          back to the site. With no Food anywhere they work on. With <code>foodTake</code> set,
-          fetching materials tops their food up to it too, before the materials.
+          A resident building or tearing down who carries less Food than <code>foodAt</code> (
+          {num(GET_FOOD_AT)} unless set) goes to their <code>source</code>, or the nearest storage
+          of your realm with Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)}{' '}
+          unless set) and comes back to the site. With no Food anywhere they work on. Fetching
+          materials tops their food up to <code>foodTake</code> too, before the materials.{' '}
+          <code>foodAt</code> 0 turns this off.
+        </p>
+        <p>
+          Build can be run directly too, with Run script or as a queue step: they join the
+          construction site in its <code>site</code> param, or with none picked the one they stand
+          on when it starts. Laying out a new site (what and where) is only the Build order's.
+          Giving Build on a site your residents laid out fills <code>site</code>; it is never kept,
+          so a queue can walk them to a site and then run Build there. With no construction site
+          there, Build ends and your realm log says why.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
@@ -865,7 +961,13 @@ export function Wiki() {
                 <td>{t.terrain}</td>
                 <td>{num(t.footTiles, 1)}</td>
                 <td>{num(t.footKgTiles, 0)}</td>
-                <td>{t.carriageTiles ? num(t.carriageTiles, 1) : 'can’t enter'}</td>
+                <td>
+                  {t.carriageTiles
+                    ? num(t.carriageTiles, 1)
+                    : t.terrain === 'Mountain'
+                      ? 'only on a road'
+                      : 'can’t enter'}
+                </td>
                 <td>{t.carriageTiles ? num(t.carriageKgTiles, 0) : '—'}</td>
               </tr>
             ))}
@@ -873,10 +975,13 @@ export function Wiki() {
         </table>
         <p>
           A road tile takes {goods(BUILD_MATERIALS.road ?? {})} and{' '}
-          {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work;
-          one road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along a line that runs
-          straight or diagonal. A wall can be built along a line the same way, past tiles with a
-          wall or gate already; a diagonal wall line closes the way like a straight one.
+          {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work.
+          It goes on any land a resident can walk, mountains too: there it takes the same materials
+          but {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work, to build and to tear down (the road
+          work column above). One road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along
+          a line that runs straight or diagonal. A wall can be built along a line the same way, past
+          tiles with a wall or gate already; a diagonal wall line closes the way like a straight
+          one.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
@@ -884,16 +989,33 @@ export function Wiki() {
           {num(STABLE_CAPACITY)} horses. A haul route keeps {num(HAUL_KEEP_FOOD)} Food on board for
           its horse.
         </p>
+        <p>
+          The route (where to, which goods) comes only from the Haul order, which also fills the
+          Haul default's <code>carriage</code> param. Run directly, with Run script or as a queue
+          step, Haul has no route: it ends at once and your realm log says “no route given”.
+        </p>
         <h3>Breeding</h3>
         <p>
           Horses don't breed on their own. A grown resident standing at a finished stable is given
           Breed horses and picks two fed horses of their realm in it; they tend them for{' '}
           {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
-          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. Breeding stops,
-          and starts over from nothing, when the resident leaves or is given another order, when a
-          horse leaves or dies, or when the stable has no room left for the foal. The Breed horses
-          default first takes {num(BREED_FOOD)} Food from the stable for the resident's meals, if
-          they carry less. NPC cities have one of their residents breed their horses the same way.
+          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. The progress
+          belongs to the two horses, and the stable keeps it: breeding pauses when the resident
+          leaves or is given another order, or while the stable has no room left for the foal, and
+          any grown resident who breeds there later carries on with that pair first, where it
+          stopped, if both are still fed. The stable's card shows a paused breeding and how far
+          along it is. The progress is lost only when one of the two leaves the stable or dies. The
+          Breed horses default first takes {num(BREED_FOOD)} Food from the stable for the resident's
+          meals, if they carry less. NPC cities have one of their residents breed their horses the
+          same way.
+        </p>
+        <p>
+          Breed horses can be run directly too, with Run script or as a queue step: they breed in
+          the stable in its <code>stable</code> param, walking there first, or with none picked the
+          one they stand in when it starts. They pick the pair themselves, a paused pair in that
+          stable first, else two fed horses of your realm in it. Giving Breed horses in a stable
+          fills the param; it is never kept between starts. With no stable there, or no two fed
+          horses in it, Breed horses ends and your realm log says why.
         </p>
         <h3>Horse stats</h3>
         <p>
@@ -932,19 +1054,71 @@ export function Wiki() {
         <p>
           A resident on a tile with a free horse of their realm can mount it, and dismount anywhere;
           the horse stays where they get off. A rider goes wherever they walk at the speed the horse
-          would pull a carriage there (the carriage column above), and never into mountains or up
-          onto walls. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
-          at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
-          Driving makes riding faster. A rider carries no more than on foot, and can't drive a
-          carriage; a ridden horse is never hitched.
+          would pull a carriage there (the carriage column above), never up onto walls, and into
+          mountains only along a finished road, like a carriage. A horse with less than{' '}
+          {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes at {pct(HUNGRY_HORSE_PACE)} of its
+          pace. Riding trains Driving like driving does, and Driving makes riding faster. A rider
+          carries no more than on foot, and can't drive a carriage; a ridden horse is never hitched.
+          On the map a rider sits on a horse token, and up close their activity icon is a horseshoe
+          while they ride somewhere.
+        </p>
+        <p>
+          A rider’s Doing line says <em>Riding to …</em> where it would say <em>Walking to …</em>,
+          and their card shows the horse they ride: its stats, age, health and hunger, with{' '}
+          <strong>Dismount</strong> under Orders.
+        </p>
+        <h3>Passengers</h3>
+        <p>
+          A resident standing on a carriage of their realm can <strong>Board</strong> it from their
+          card, children too; a rider dismounts first, and the driver can't board. Each passenger
+          counts as {num(PASSENGER_WEIGHT)} kg against what the carriage holds, so it carries goods,
+          people or a mix: a full carriage takes nobody more, and no goods while people fill it.
+          Aboard, they stop what they were doing, ride along wherever the carriage is driven, and
+          don't walk on their own. <strong>Get off</strong> puts them on the carriage's tile, or a
+          script's <code>getOff(x, y)</code> on a tile right next to it. Giving a passenger a walk,
+          or an order that acts on a tile (work, build, goods, fight and so on), gets them off first
+          and then goes on. On the map passengers ride inside the carriage, which shows how many it
+          carries; clicking it opens its card, which lists them under its load with how much of its
+          weight is people and picks one when you click their name (a box drag takes them in too). A
+          passenger's Doing line says "Aboard a carriage" and where it is heading while it is
+          driven, and picking them shows the carriage's way ahead. Scripts see a resident's{' '}
+          <code>aboard</code> and a carriage's <code>passengerIds</code>.
+        </p>
+        <p>
+          <strong>Refilling from a carriage:</strong> passengers eat the food they carry, and when
+          they run low take a meal from the carriage's Food (or another carriage of your realm on or
+          next to their tile), as at home, so a carriage with Food on board keeps them fed on a long
+          drive. The Food a haul route keeps for the horse stays on board. On a carriage without
+          Food they go hungry like anyone away from home.
+        </p>
+        <p>
+          The group card boards everyone of the group standing on the carriage at once, until it is
+          full, and says who was skipped and why; its Get off gets them all off. Board and Get off
+          are queue steps too: Board ends once they are aboard and Get off once they are off, so put
+          a step that waits for the stop between them (a script that calls <code>end()</code> once
+          they are there), e.g. board, wait, get off, work. A Board step whose carriage has left
+          their tile by its turn is skipped.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
           {days(STABLE_FEED_DAYS)} for the horses in it ({num(HORSE_FOOD_PER_DAY)} a horse a day):
           below that they fetch what is missing from the nearest storage of your realm with Food, or
           from the one picked as <code>source</code> on their card, and store it in the stable;
-          otherwise they wait there. Picking another <code>stable</code> on the card has them feed
-          that one instead.
+          otherwise they wait there. Feed the stable can be run directly too, with Run script or as
+          a queue step: they feed the stable in its <code>stable</code> param, or with none picked
+          the one they stand in when it starts. Giving Feed the stable in a stable fills it; it is
+          never kept between starts. With no stable there, or once theirs is gone, Feed the stable
+          ends and your realm log says why.
+        </p>
+        <h3>Horse offer</h3>
+        <p>
+          Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, ever, whenever they
+          choose and whether or not they have horses: a notice at the top of the screen has a Claim
+          button until they do. The horses get new stats and ages and go in your finished stable
+          nearest your Leader's city; with no stable, they stand next to that city's storage (or
+          next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
+          realm log says where they are. Once claimed the offer is gone for good, also after your
+          Leader dies and you found a new realm; while you have no living Leader you can't claim it.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
@@ -1241,18 +1415,23 @@ export function Wiki() {
         <p>
           What a script gets from the game. Values are read like names; queries and actions are
           called. Every call costs one step, and its cost here on top. Queries answer from what you
-          see and have explored, nothing more. An action asks for the order of its name for{' '}
-          <code>me</code>, checked exactly as one from the map, and answers <code>null</code> when
-          asked for, or why not. Two actions ask for no order. <code>doing</code>: its text, at most{' '}
-          {num(DOING_MAX_LENGTH)} characters, is what the resident card and list say the resident is
-          doing, until the script says something else; only you see it. Without it they show what
-          the task and its current order have the resident doing, such as “Building a house:
-          fetching 10 wood from the storage”. <code>end</code>: once this run is over the script
-          ends and the resident stands idle; in a queue, its next step starts. The Build and Tear
-          down defaults end once the site is finished or the building is gone; a script that never
-          calls it runs until another order ends it. A script runs as a resident's or as an army's:
-          names marked resident only or army only are only there for one of them, and a default
-          script runs as a resident's.
+          see and have explored, nothing more; the helpers <code>floor</code> and{' '}
+          <code>pickRandom</code> work only on what you give them. An action asks for the order of
+          its name for <code>me</code>, checked exactly as one from the map, and answers{' '}
+          <code>null</code> when asked for, or why not. Three actions ask for no order.{' '}
+          <code>doing</code>: its text, at most {num(DOING_MAX_LENGTH)} characters, is what the
+          resident card and list say the resident is doing, until the script says something else;
+          only you see it. Without it they show what the task and its current order have the
+          resident doing, such as “Building a house: fetching 10 wood from the storage”.{' '}
+          <code>end</code>: once this run is over the script ends and the resident stands idle; in a
+          queue, its next step starts. Given a reason, <code>end(reason)</code> also notes it in
+          your realm log, like “Ana stopped Work: no workplace on her tile”: short text, cut like{' '}
+          <code>doing</code>’s, that only you see, for every end. <code>log</code>: adds a short
+          line, cut like <code>doing</code>’s, to the resident's script log, with the game time. The
+          Build and Tear down defaults end once the site is finished or the building is gone; a
+          script that never calls it runs until another order ends it. A script runs as a resident's
+          or as an army's: names marked resident only or army only are only there for one of them,
+          and a default script runs as a resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />
@@ -1333,6 +1512,13 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         </table>
         <ul>
           <li>
+            Before it starts: giving a task or Run script whose script has params first shows them,
+            filled with the values the resident keeps or the defaults. Change what you like and
+            press Start; Cancel gives nothing. A script without params starts at once. For a group
+            the form shows once, and each of them gets the same values. With Shift held the step
+            added to the queue keeps the values.
+          </li>
+          <li>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
             number of zero or more and press Enter. Neither stops the script.
@@ -1351,13 +1537,31 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             <code>null</code> while unset.
           </li>
           <li>
-            The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
-            <code>source</code>: where materials come from, a carriage too. Unset, each uses the
-            nearest storage; a source picked that holds none of what the site lacks is left alone,
-            and they just build. The Tear down default has <code>source</code>: where Food comes
-            from. The Work, Build and Tear down defaults also have the <code>number</code> params{' '}
-            <code>foodAt</code> and <code>foodTake</code> for getting food, in units of Food (a
-            resident eats about {num(foodEatenPerDay())} a game day).
+            A <code>number</code> param may have a default: <code>= n</code> after its type, a whole
+            number of zero or more. Unset, it reads the default; the number typed wins over it, and
+            clearing the field goes back to it. Its field shows the default while unset. A{' '}
+            <code>building</code> or <code>storage</code> param can't have one.
+            <pre>
+              <code>{PARAM_DEFAULT_EXAMPLE}</code>
+            </pre>
+          </li>
+          <li>
+            The Work default has <code>workplace</code>: the workplace to work, the one they stand
+            on while none is picked; it is never kept between starts, so the form before it starts
+            shows it empty, and giving Work on a workplace fills it without asking. It also has{' '}
+            <code>storage</code>: where the output goes. The Build default has <code>site</code>:
+            the construction site to join; and <code>source</code>: where materials come from, a
+            carriage too. Unset, each uses the nearest storage; a source picked that holds none of
+            what the site lacks is left alone, and they just build. The Haul default has{' '}
+            <code>carriage</code>: the carriage to drive. The Tear down default has{' '}
+            <code>building</code>, the Breed horses and Feed the stable defaults <code>stable</code>
+            . Like Work's <code>workplace</code>, each of these is the one they stand on while none
+            is picked, never kept between starts, and filled by giving the task. Feed the stable
+            also has <code>source</code>: where the Food comes from. The Tear down default has{' '}
+            <code>source</code>: where Food comes from. The Work, Build and Tear down defaults also
+            have the <code>number</code> params <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0
+            turns it off) and <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food,
+            in units of Food (a resident eats about {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>
@@ -1375,6 +1579,27 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
           <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
         </ul>
+        <p>
+          To debug a script, open the Script tab of a resident or army running it: it shows the
+          script's memory and params as they are now, changing every tick. You can't change memory
+          there. Only you see the memory of your scripts; a large one is shown cut.
+        </p>
+        <p>
+          The Script tab also shows the steps the script used last tick out of its{' '}
+          {num(SCRIPT_STEP_BUDGET)}, marked when it ran out, and its last runtime error with the
+          line and how long ago. The error stays until the script ends or you save a new version;
+          click it to open that line in the Library. Errors still go into the realm log as well.
+        </p>
+        <p>
+          The Script tab of your resident also shows their script log, newest first: the lines their
+          scripts gave <code>log(text)</code> and the reasons they gave <code>end(reason)</code>,
+          each with its game time. A resident keeps their last {num(SCRIPT_LOG_LINES)} lines across
+          scripts, so it still shows why the last one ended after it did; once full, the oldest line
+          goes. Only you see it: it never goes in the realm log, to other Players or to scripts. The
+          game’s default scripts log their decisions and turns, never every tick, like “pile full:
+          carrying 10 stone to the storage at 12,6” or “low on Food (2): fetching 6 at the storage
+          at 12,6”.
+        </p>
       </Section>
 
       <Section id="examples">

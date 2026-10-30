@@ -1,8 +1,10 @@
 import type { Server } from 'node:http'
 import { WebSocket, WebSocketServer } from 'ws'
 import {
+  SCRIPT_WATCH_MAX,
   SESSION_COOKIE,
   WS_PATH,
+  commanderOf,
   diplomacyFor,
   foundingProblem,
   regionMapFor,
@@ -12,6 +14,9 @@ import {
   type Realm,
   type RegionMap,
   type Remembered,
+  type ScriptLogLine,
+  type ScriptMemory,
+  type ScriptRunSeen,
   type SeenEntity,
   type ServerMessage,
   type TerrainMap,
@@ -51,10 +56,60 @@ function realmsSeen(entities: SeenEntity[]): string[] {
   })
 }
 
+/** The script a resident or army runs for the realm, if any (`CONTEXT.md`: Debugging a script). */
+function runningScriptFor(world: WorldState, realmId: string, id: string) {
+  const r = world.residents.find((r) => r.id === id)
+  if (r) return (commanderOf(world, r) === realmId && r.script) || null
+  const army = world.armies.find((a) => a.id === id)
+  return (army?.realmId === realmId && army.script) || null
+}
+
+/**
+ * The memory of the script a resident or army runs, for the realm running it (`CONTEXT.md`:
+ * Debugging a script): null when it runs none, or another realm runs it.
+ */
+export function scriptMemoryFor(
+  world: WorldState,
+  realmId: string,
+  id: string,
+): ScriptMemory | null {
+  return runningScriptFor(world, realmId, id)?.memory ?? null
+}
+
+/**
+ * How the script a resident or army runs last ran, for the realm running it (`CONTEXT.md`:
+ * Debugging a script): its last runtime error and the steps it used; null as `scriptMemoryFor`.
+ */
+export function scriptRunFor(world: WorldState, realmId: string, id: string): ScriptRunSeen | null {
+  const running = runningScriptFor(world, realmId, id)
+  if (!running) return null
+  const { lastError, lastRun } = running
+  return { ...(lastError ? { lastError } : {}), ...(lastRun ? { lastRun } : {}) }
+}
+
+/**
+ * A resident's script log, for the realm owning them (`CONTEXT.md`: Script log): null for anyone
+ * else's resident, or an army.
+ */
+export function scriptLogFor(
+  world: WorldState,
+  realmId: string,
+  id: string,
+): ScriptLogLine[] | null {
+  const r = world.residents.find((r) => r.id === id)
+  return r?.owner === realmId ? (r.scriptLog ?? []) : null
+}
+
 interface Client {
   account: Account
   userId: number
   realmId: string
+  /**
+   * The residents and armies whose Script tab the Player has open, with what was last sent for
+   * each as JSON (its script's memory, how it last ran, and a resident's script log), so a tick
+   * sends each only when it changed.
+   */
+  watching: Map<string, { memory: string; run: string; log: string }>
   view: ClientView
   /** What has been sent of the Player's Last seen out of sight (`CONTEXT.md`: Last seen). */
   lastSeenView: ClientView<Remembered>
@@ -68,6 +123,8 @@ interface Client {
   leaderId: string
   /** The realm name last sent, null while it has none, so a tick sends it once it is named. */
   realmName: string | null
+  /** Whether the Player could still claim their Horse offer when last sent (`CONTEXT.md`). */
+  horseOffer: boolean
 }
 
 /**
@@ -139,6 +196,39 @@ export function attachRealtime(
     return region
   }
 
+  /**
+   * Sends the client the memory of each script it watches, and how it last ran, where they
+   * changed since they were last sent.
+   */
+  function sendScriptMemory(socket: WebSocket, client: Client) {
+    for (const [id, last] of client.watching) {
+      const memory = scriptMemoryFor(world, client.realmId, id)
+      const memoryJson = JSON.stringify(memory)
+      if (memoryJson !== last.memory) {
+        last.memory = memoryJson
+        send(socket, { type: 'scriptMemory', id, memory })
+      }
+      const run = scriptRunFor(world, client.realmId, id)
+      const runJson = JSON.stringify(run)
+      if (runJson !== last.run) {
+        last.run = runJson
+        send(socket, { type: 'scriptRun', id, run })
+      }
+    }
+  }
+
+  /** Sends the client the script log of each resident it watches that changed since last sent. */
+  function sendScriptLogs(socket: WebSocket, client: Client) {
+    for (const id of client.watching.keys()) {
+      const lines = scriptLogFor(world, client.realmId, id)
+      const json = JSON.stringify(lines)
+      const last = client.watching.get(id)!
+      if (json === last.log) continue
+      last.log = json
+      send(socket, { type: 'scriptLog', id, lines })
+    }
+  }
+
   const wss = new WebSocketServer({
     server,
     path: WS_PATH,
@@ -158,6 +248,7 @@ export function attachRealtime(
       account: { name: user.name, isAdmin: user.isAdmin },
       userId: user.id,
       realmId: realm.id,
+      watching: new Map(),
       view: new ClientView(),
       lastSeenView: new ClientView<Remembered>(),
       lastEventSeq: 0,
@@ -165,6 +256,7 @@ export function attachRealtime(
       regionTick: null,
       leaderId: realm.leaderId,
       realmName: realm.name ?? null,
+      horseOffer: !world.horseOffersClaimed.includes(user.id),
     }
     clients.set(socket, client)
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
@@ -200,6 +292,7 @@ export function attachRealtime(
       events,
       diplomacy,
       region: regionFor(client, []) ?? null,
+      horseOffer: client.horseOffer,
     })
   }
 
@@ -236,6 +329,15 @@ export function attachRealtime(
         if (!client) return send(socket, { type: 'rejected', requestId, reason: 'no realm yet' })
         const sender = { userId: client.userId, account: client.account }
         send(socket, opts.orders.receive(world, sender, msg.requestId, msg.order))
+      }
+      if (msg?.type === 'watch' && client && Array.isArray(msg.ids)) {
+        const ids = msg.ids.filter((id) => typeof id === 'string').slice(0, SCRIPT_WATCH_MAX)
+        // Newly watched ones go out now; those still watched only when they change.
+        client.watching = new Map(
+          ids.map((id) => [id, client.watching.get(id) ?? { memory: '', run: '', log: '' }]),
+        )
+        sendScriptMemory(socket, client)
+        sendScriptLogs(socket, client)
       }
     })
     socket.on('close', () => clients.delete(socket))
@@ -275,6 +377,8 @@ export function attachRealtime(
         const realmName = realm?.name ?? null
         const named = realmName !== null && realmName !== client.realmName
         if (named) client.realmName = realmName
+        const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
+        if (claimed) client.horseOffer = false
         const tick = {
           tick: world.tick,
           changed,
@@ -286,8 +390,11 @@ export function attachRealtime(
           ...(region ? { region } : {}),
           ...(newLeader ? { leaderId } : {}),
           ...(named ? { realmName } : {}),
+          ...(claimed ? { horseOffer: false as const } : {}),
         }
         send(socket, { type: 'tick', ...tick })
+        sendScriptMemory(socket, client)
+        sendScriptLogs(socket, client)
       }
     },
     close() {

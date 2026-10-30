@@ -295,14 +295,19 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return { text: 'A horse starved to death.', tone: 'bad' }
     case 'foaled':
       return { text: 'A foal was born in a stable.', tone: 'info' }
-    case 'horsesGranted': {
+    case 'horsesGranted':
+    case 'horsesClaimed': {
       const where = {
         stable: `in your stable at ${e.city}`,
         storage: `by the storage of ${e.city}, with Food on the ground by them`,
         leader: 'next to your Leader, with Food on the ground by them',
       }[e.where]
+      const what =
+        e.kind === 'horsesClaimed'
+          ? `You claimed ${e.horseIds.length} new horses`
+          : `Your realm had no horses left and was given ${e.horseIds.length} new ones`
       return {
-        text: `Your realm had no horses left and was given ${e.horseIds.length} new ones: they stand ${where}.`,
+        text: `${what}: they stand ${where}.`,
         tone: 'info',
         places: [{ name: e.city ?? 'your horses', x: e.x, y: e.y }],
       }
@@ -354,6 +359,8 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         : { text: `${e.name}’s script ran out of steps this tick.`, tone: 'warn' }
     case 'scriptEnded':
       return { text: `${e.name} stopped running a script: it was deleted.`, tone: 'info' }
+    case 'scriptStopped':
+      return { text: `${e.name} stopped ${e.script}: ${e.reason}`, tone: 'info' }
     case 'scriptFieldDropped': {
       const names = e.scripts.map((s) => `“${s.name}”`).join(', ')
       const scripts =

@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, max, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, isNotNull, lt, sql } from 'drizzle-orm'
 import { checkScript, scriptParams } from '@csp/lang'
 import {
   DEFAULT_SCRIPTS,
@@ -21,7 +21,8 @@ import type { InvariantViolation } from './invariants.js'
  *
  * The active version is the one that runs. Saving a version without syntax errors makes it
  * active, so a saved change is picked up on the next tick; a version with errors is kept in the
- * history but never becomes active.
+ * history but never becomes active. Any version but the active one can be deleted; the others
+ * keep their numbers.
  *
  * Each Player also has their own version of every default script (`CONTEXT.md`: Default script;
  * ADR 0009), made the first time their library is used. Until they edit it, it takes each new
@@ -79,22 +80,26 @@ function notDefault(row: { task: string | null }, what: string): void {
   }
 }
 
-function latestVersion(db: Db, scriptId: number): number {
-  const row = db
-    .select({ v: max(scriptVersions.version) })
-    .from(scriptVersions)
-    .where(eq(scriptVersions.scriptId, scriptId))
-    .get()
-  return row?.v ?? 0
-}
-
-/** Adds a version; it becomes active if it has no syntax errors. */
+/**
+ * Adds a version; it becomes active if it has no syntax errors. It is numbered after the highest
+ * version ever saved, so a deleted version's number is never used again.
+ */
 function addVersion(db: Db, scriptId: number, source: string): void {
-  const version = latestVersion(db, scriptId) + 1
+  const { latestVersion } = db
+    .select({ latestVersion: scripts.latestVersion })
+    .from(scripts)
+    .where(eq(scripts.id, scriptId))
+    .get()!
+  const version = latestVersion + 1
   db.insert(scriptVersions).values({ scriptId, version, source }).run()
-  if (checkScript(source).length === 0) {
-    db.update(scripts).set({ activeVersion: version }).where(eq(scripts.id, scriptId)).run()
-  }
+  db.update(scripts)
+    .set(
+      checkScript(source).length === 0
+        ? { latestVersion: version, activeVersion: version }
+        : { latestVersion: version },
+    )
+    .where(eq(scripts.id, scriptId))
+    .run()
 }
 
 function sourceOf(db: Db, scriptId: number, version: number | null): string | undefined {
@@ -183,14 +188,12 @@ export function listScripts(db: Db, userId: number): ScriptSummary[] {
       id: scripts.id,
       name: scripts.name,
       activeVersion: scripts.activeVersion,
-      latestVersion: sql<number>`coalesce(max(${scriptVersions.version}), 0)`,
+      latestVersion: scripts.latestVersion,
       task: scripts.task,
       followsDefault: scripts.followsDefault,
     })
     .from(scripts)
-    .leftJoin(scriptVersions, eq(scriptVersions.scriptId, scripts.id))
     .where(eq(scripts.userId, userId))
-    .groupBy(scripts.id)
     .orderBy(sql`lower(${scripts.name})`)
     .all()
     .map((s) => ({
@@ -225,7 +228,7 @@ export function getScript(db: Db, userId: number, id: number): ScriptDetail {
     id: script.id,
     name: script.name,
     activeVersion: script.activeVersion,
-    latestVersion: versions.at(-1)?.version ?? 0,
+    latestVersion: script.latestVersion,
     task,
     followsDefault: script.followsDefault,
     params: paramsOf(versions.find((v) => v.version === script.activeVersion)?.source),
@@ -354,6 +357,49 @@ export function resetScript(db: Db, userId: number, id: number): ScriptDetail {
   return getScript(db, userId, id)
 }
 
+/** The active version can't be deleted (`CONTEXT.md`: Script, Deleting versions). */
+function notActive(script: { activeVersion: number | null }, version: number): void {
+  if (version === script.activeVersion) {
+    throw new AuthError('active-version', 'The active version can’t be deleted.')
+  }
+}
+
+/**
+ * Deletes one version for good; any but the active one, of a default script too. The others keep
+ * their numbers and new saves keep counting up.
+ */
+export function deleteVersion(
+  db: Db,
+  userId: number,
+  id: number,
+  input: { version: unknown },
+): ScriptDetail {
+  db.transaction((tx) => {
+    const script = ownScript(tx as unknown as Db, userId, id)
+    const version = input.version
+    if (typeof version !== 'number') throw new AuthError('not-found', 'No such version.')
+    notActive(script, version)
+    const where = and(eq(scriptVersions.scriptId, id), eq(scriptVersions.version, version))
+    if (!tx.select({ id: scriptVersions.id }).from(scriptVersions).where(where).get()) {
+      throw new AuthError('not-found', 'No such version.')
+    }
+    tx.delete(scriptVersions).where(where).run()
+  })
+  return getScript(db, userId, id)
+}
+
+/** Deletes every version older than the active one; nothing while there is no active version. */
+export function deleteOlderVersions(db: Db, userId: number, id: number): ScriptDetail {
+  db.transaction((tx) => {
+    const { activeVersion } = ownScript(tx as unknown as Db, userId, id)
+    if (activeVersion === null) return
+    tx.delete(scriptVersions)
+      .where(and(eq(scriptVersions.scriptId, id), lt(scriptVersions.version, activeVersion)))
+      .run()
+  })
+  return getScript(db, userId, id)
+}
+
 /** Deletes a script with its whole history. */
 export function deleteScript(db: Db, userId: number, id: number): void {
   db.transaction((tx) => {
@@ -362,21 +408,32 @@ export function deleteScript(db: Db, userId: number, id: number): void {
   })
 }
 
-/** What the run-script order needs of a script: whose it is and its active version's source. */
+/**
+ * What the run-script order needs of a script: whose it is, its name for the realm log and its
+ * active version's source.
+ */
 export interface RunnableScript {
   userId: number
+  name: string
+  /** The active version's number and source. */
+  version: number
   source: string
   /** A default script its Player hasn't edited: running out of steps is the game's fault. */
   followsDefault: boolean
+  /** The task it is the default script of; absent for any other script. */
+  task?: Task
 }
 
 /** A script that can run: its Player and active version; undefined if it has none (or is gone). */
 export function runnableScript(db: Db, scriptId: number): RunnableScript | undefined {
-  return db
+  const row = db
     .select({
       userId: scripts.userId,
+      name: scripts.name,
+      version: scriptVersions.version,
       source: scriptVersions.source,
       followsDefault: scripts.followsDefault,
+      task: scripts.task,
     })
     .from(scripts)
     .innerJoin(
@@ -388,6 +445,9 @@ export function runnableScript(db: Db, scriptId: number): RunnableScript | undef
     )
     .where(eq(scripts.id, scriptId))
     .get()
+  if (!row) return undefined
+  const { task, ...rest } = row
+  return isTask(task) ? { ...rest, task } : rest
 }
 
 /** The source of the script's active version, or undefined if it has none (or is gone). */
@@ -408,7 +468,8 @@ export function activeSource(db: Db, scriptId: number): string | undefined {
 
 /**
  * The script library's invariants (ADR 0004): every active version exists and has no syntax
- * errors; every default script is for a task, and one its Player hasn't edited runs the game's
+ * errors; no version is numbered above its script's latest version, so new saves never reuse a
+ * number; every default script is for a task, and one its Player hasn't edited runs the game's
  * current default (checked after `syncDefaultScripts`).
  */
 export function checkScriptLibrary(db: Db): InvariantViolation[] {
@@ -445,6 +506,19 @@ export function checkScriptLibrary(db: Db): InvariantViolation[] {
         entityIds,
       })
     }
+  }
+  const ahead = db
+    .selectDistinct({ id: scripts.id, latestVersion: scripts.latestVersion })
+    .from(scripts)
+    .innerJoin(scriptVersions, eq(scriptVersions.scriptId, scripts.id))
+    .where(gt(scriptVersions.version, scripts.latestVersion))
+    .all()
+  for (const s of ahead) {
+    violations.push({
+      invariant: 'script-versions-counted',
+      message: `script ${s.id} has a version above its latest version ${s.latestVersion}`,
+      entityIds: [`script-${s.id}`],
+    })
   }
   const defaults = db
     .select({

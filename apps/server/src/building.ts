@@ -13,6 +13,8 @@ import {
   isLineOrder,
   LINE_BUILDING,
   materialsNeeded,
+  siteWorkOf,
+  terrainAt,
   workNeeded,
   type BuildOrder,
   type Building,
@@ -155,6 +157,8 @@ export function finishSite(world: WorldState, site: Building, r: Resident): bool
     return true
   }
   delete site.site
+  // Finished, it belongs where its kind of building does, no longer to the realm that laid it out.
+  delete site.realmId
   if (site.kind === 'townHall') foundCity(world, site, r.owner)
   // A storage no city takes in is the builder's realm's (`CONTEXT.md`: Outpost storage).
   if (site.kind === 'storage' && r.owner !== null) site.realmId = r.owner
@@ -178,7 +182,8 @@ export function requestBuilding(world: WorldState): BuildAction[] {
  * Laying out joins an unfinished site of the same kind they stand at, or else lays out a new one
  * with the north-west tile of its footprint on theirs, where the building may go, gathering the
  * goods lying on its footprint into its pile (`gatherPile`); otherwise the order ends. Work goes
- * into the site they stand at, up to what it needs, and teaches Construction. A site with all its materials and work becomes
+ * into the site they stand at, up to what it needs (slower on a road on Mountain,
+ * `siteWorkOf`), and teaches Construction. A site with all its materials and work becomes
  * the building, and everyone's build order for it is done. A finished town hall founds a city of
  * the realm whose resident finished it, and any finished city building may grow a city
  * (`updateCityMembership`). A road order along a line builds its tiles this way: where its tile
@@ -209,6 +214,8 @@ export function resolveBuilding(
           id,
           kind: part.building,
           cityId: laidOutFor(world, r, part.building),
+          // The realm whose resident lays it out, until it is finished (`CONTEXT.md`: Construction site).
+          ...(r.owner !== null && { realmId: r.owner }),
           x: r.x,
           y: r.y,
           site: { delivered: {}, work: 0 },
@@ -226,9 +233,10 @@ export function resolveBuilding(
       continue
     }
     if (workNeeded(site) > 0) {
+      const under = terrain && terrainAt(terrain, site.x, site.y)
       site.site.work = Math.min(
         BUILD_WORK[site.kind] ?? 0,
-        site.site.work + buildWork(r, world.tick),
+        site.site.work + siteWorkOf(buildWork(r, world.tick), site.kind, under),
       )
       r.skills.construction = (r.skills.construction ?? 0) + constructionLearned(r, world.tick)
     }

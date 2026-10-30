@@ -132,6 +132,30 @@ describe('doingLine', () => {
     expect(line({ order: null, carrying: { since: 0 } })).toBe('Carrying a child')
   })
 
+  it('says Riding where a rider would walk (CONTEXT.md: Riding)', () => {
+    const riding = 'h1'
+    expect(line({ order: walk, riding })).toBe('Riding to 4, 5 · 1 tiles to go')
+    expect(line({ order: walk, riding, script: { scriptId: 5 } })).toBe(
+      'Riding to 4, 5 · 1 tiles to go',
+    )
+    expect(line({ order: walk, riding, script: { scriptId: 1, building: 'mine' } })).toBe(
+      'Working the mine: riding to 4, 5 · 1 tiles to go',
+    )
+    const road: ResidentOrder = {
+      kind: 'roadLine',
+      tiles: [[4, 5]],
+      phase: 'walking',
+      path: null,
+      progress: 0,
+      siteId: null,
+    }
+    expect(line({ order: road, riding })).toBe('Riding to lay road at 4, 5 · 1 road tile to go')
+    // Their own doing() still wins.
+    expect(line({ order: walk, riding, script: { scriptId: 5, doing: 'Scouting' } })).toBe(
+      'Scouting',
+    )
+  })
+
   it('shows what the script last gave doing() instead', () => {
     expect(
       line({
@@ -140,5 +164,31 @@ describe('doingLine', () => {
       }),
     ).toBe('Feeding the stable: waiting')
     expect(line({ order: null, script: { scriptId: 5, doing: 'Guarding' } })).toBe('Guarding')
+  })
+
+  it('says a passenger is aboard, and where the carriage is heading while it is driven', () => {
+    const aboard = (residents: { order: ResidentOrder | null }[], more: Partial<DoingOf> = {}) =>
+      doingLine({ order: null, aboard: 'k1', ...more }, { scripts, buildings, residents })
+    expect(aboard([])).toBe('Aboard a carriage')
+    const drive: ResidentOrder = {
+      kind: 'drive',
+      carriageId: 'k1',
+      target: { x: 12, y: 30 },
+      path: null,
+      progress: 0,
+    }
+    expect(aboard([{ order: null }, { order: drive }])).toBe(
+      'Aboard a carriage · heading to 12, 30',
+    )
+    // Another carriage's driver says nothing about this one.
+    expect(aboard([{ order: { ...drive, carriageId: 'k2' } }])).toBe('Aboard a carriage')
+    // On a haul route: heading to the stop it drives to, and only aboard while it loads.
+    expect(aboard([{ order: haul }])).toBe('Aboard a carriage · heading to 4, 5')
+    expect(aboard([{ order: { ...haul, phase: 'loading' } }])).toBe('Aboard a carriage')
+    // Instead of Idle, waiting or expecting a child; a script's own doing() still wins.
+    expect(aboard([], { script: { scriptId: 5 } })).toBe('Aboard a carriage')
+    expect(aboard([], { script: { scriptId: 1, building: 'farm' } })).toBe('Aboard a carriage')
+    expect(aboard([], { carrying: { since: 0 } })).toBe('Aboard a carriage')
+    expect(aboard([], { script: { scriptId: 5, doing: 'Riding along' } })).toBe('Riding along')
   })
 })

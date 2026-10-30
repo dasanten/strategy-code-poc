@@ -90,8 +90,9 @@ export const scriptHighlighting: StreamParser<HighlightState> = {
 }
 
 /**
- * Where in the source a syntax error sits, as offsets: from its line and column (1-based) to the
- * end of the word there, or one character if there is none, kept inside the source.
+ * Where in the source a syntax error (or a runtime error) sits, as offsets: from its line and
+ * column (1-based) to the end of the word there, or one character if there is none, kept inside
+ * the source.
  */
 export function diagnosticRange(source: string, d: Diagnostic): { from: number; to: number } {
   const lines = source.split('\n')
@@ -157,6 +158,14 @@ export function canMakeActive(
   version: Pick<ScriptVersion, 'version' | 'errors'>,
 ): boolean {
   return versionStatus(script, version) === 'saved'
+}
+
+/** The versions older than the active one, which "Delete older versions" deletes at once. */
+export function olderVersions<V extends Pick<ScriptVersion, 'version'>>(
+  script: Pick<ScriptSummary, 'activeVersion'> & { versions: V[] },
+): V[] {
+  const active = script.activeVersion
+  return active === null ? [] : script.versions.filter((v) => v.version < active)
 }
 
 /** Whether the editor holds something that isn't saved yet as the script's newest version. */
@@ -526,8 +535,13 @@ function viewFields(
       const field: ScriptField = {
         name: p.name,
         type: p.type === 'building' ? { view: 'building' } : 'any',
-        description: PARAM_DESCRIPTIONS[p.type],
-        nullWhen: 'while none is picked, or the one picked is gone or no longer of my realm',
+        description:
+          p.default === undefined
+            ? PARAM_DESCRIPTIONS[p.type]
+            : `${PARAM_DESCRIPTIONS[p.type]} ${p.default} while none is set.`,
+        ...(p.default === undefined && {
+          nullWhen: 'while none is picked, or the one picked is gone or no longer of my realm',
+        }),
       }
       return { field, mark: null, info: fieldInfo(field) }
     })

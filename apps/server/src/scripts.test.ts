@@ -18,10 +18,13 @@ import {
   checkScriptLibrary,
   createScript,
   defaultScriptId,
+  deleteOlderVersions,
   deleteScript,
+  deleteVersion,
   getScript,
   listScripts,
   renameScript,
+  resetScript,
   saveScript,
 } from './scripts.js'
 import { foundStartingCity, realmOf } from './starting-city.js'
@@ -186,7 +189,108 @@ describe('active version', () => {
   })
 })
 
+describe('deleting versions', () => {
+  const numbers = (s: { versions: { version: number }[] }) => s.versions.map((v) => v.version)
+
+  it('deletes one version for good; the others keep their numbers', () => {
+    const mara = addUser('Mara')
+    const s = createScript(db, mara, { name: 'miners', source: VALID })
+    saveScript(db, mara, s.id, { source: VALID_2 })
+    saveScript(db, mara, s.id, { source: VALID })
+    const after = deleteVersion(db, mara, s.id, { version: 1 })
+    expect(numbers(after)).toEqual([2, 3])
+    expect(after).toMatchObject({ activeVersion: 3, latestVersion: 3 })
+    expect(() => deleteVersion(db, mara, s.id, { version: 1 })).toThrow(
+      expect.objectContaining({ code: 'not-found' }),
+    )
+    expect(checkScriptLibrary(db)).toEqual([])
+  })
+
+  it('keeps counting up after the newest version is deleted', () => {
+    const mara = addUser('Mara')
+    const s = createScript(db, mara, { name: 'miners', source: VALID })
+    saveScript(db, mara, s.id, { source: BROKEN })
+    expect(numbers(deleteVersion(db, mara, s.id, { version: 2 }))).toEqual([1])
+    expect(listScripts(db, mara).find((x) => x.id === s.id)?.latestVersion).toBe(2)
+    const saved = saveScript(db, mara, s.id, { source: VALID_2 })
+    expect(numbers(saved)).toEqual([1, 3])
+    expect(saved).toMatchObject({ activeVersion: 3, latestVersion: 3 })
+  })
+
+  it('refuses the active version', () => {
+    const mara = addUser('Mara')
+    const s = createScript(db, mara, { name: 'miners', source: VALID })
+    saveScript(db, mara, s.id, { source: VALID_2 })
+    activateVersion(db, mara, s.id, { version: 1 })
+    expect(() => deleteVersion(db, mara, s.id, { version: 1 })).toThrow(
+      expect.objectContaining({ code: 'active-version' }),
+    )
+    // A later version than the active one can go.
+    expect(numbers(deleteVersion(db, mara, s.id, { version: 2 }))).toEqual([1])
+    expect(activeSource(db, s.id)).toBe(VALID)
+  })
+
+  it('deletes every version older than the active one at once', () => {
+    const mara = addUser('Mara')
+    const s = createScript(db, mara, { name: 'miners', source: VALID })
+    saveScript(db, mara, s.id, { source: BROKEN })
+    saveScript(db, mara, s.id, { source: VALID_2 })
+    saveScript(db, mara, s.id, { source: BROKEN })
+    const after = deleteOlderVersions(db, mara, s.id)
+    expect(numbers(after)).toEqual([3, 4])
+    expect(after).toMatchObject({ activeVersion: 3, latestVersion: 4 })
+    expect(activeSource(db, s.id)).toBe(VALID_2)
+    expect(saveScript(db, mara, s.id, { source: VALID }).latestVersion).toBe(5)
+  })
+
+  it('deletes nothing at once while there is no active version', () => {
+    const mara = addUser('Mara')
+    const s = createScript(db, mara, { name: 'broken', source: BROKEN })
+    saveScript(db, mara, s.id, { source: BROKEN })
+    expect(numbers(deleteOlderVersions(db, mara, s.id))).toEqual([1, 2])
+    // With none active, any version can go.
+    expect(numbers(deleteVersion(db, mara, s.id, { version: 2 }))).toEqual([1])
+  })
+
+  it("deletes old versions of the Player's default script; Reset still adds the newest", () => {
+    const mara = addUser('Mara')
+    const work = defaultScriptId(db, mara, 'work')
+    saveScript(db, mara, work, { source: VALID })
+    saveScript(db, mara, work, { source: VALID_2 })
+    const after = deleteOlderVersions(db, mara, work)
+    expect(numbers(after)).toEqual([3])
+    expect(after.followsDefault).toBe(false)
+    const reset = resetScript(db, mara, work)
+    expect(numbers(reset)).toEqual([3, 4])
+    expect(reset).toMatchObject({ activeVersion: 4, followsDefault: true })
+    expect(checkScriptLibrary(db)).toEqual([])
+  })
+
+  it("keeps Players out of each other's versions", () => {
+    const mara = addUser('Mara')
+    const tobin = addUser('Tobin')
+    const s = createScript(db, mara, { name: 'miners', source: VALID })
+    saveScript(db, mara, s.id, { source: VALID_2 })
+    const notFound = expect.objectContaining({ code: 'not-found' })
+    expect(() => deleteVersion(db, tobin, s.id, { version: 1 })).toThrow(notFound)
+    expect(() => deleteOlderVersions(db, tobin, s.id)).toThrow(notFound)
+    expect(numbers(getScript(db, mara, s.id))).toEqual([1, 2])
+  })
+})
+
 describe('checkScriptLibrary', () => {
+  it('reports a version numbered above its latest version', () => {
+    const mara = addUser('Mara')
+    const a = createScript(db, mara, { name: 'a', source: VALID })
+    db.update(schema.scripts).set({ latestVersion: 0 }).where(eq(schema.scripts.id, a.id)).run()
+    expect(checkScriptLibrary(db)).toEqual([
+      expect.objectContaining({
+        invariant: 'script-versions-counted',
+        entityIds: [`script-${a.id}`],
+      }),
+    ])
+  })
+
   it('reports an active version with syntax errors or one that is missing', () => {
     const mara = addUser('Mara')
     const a = createScript(db, mara, { name: 'a', source: VALID })
@@ -301,6 +405,44 @@ describe('migration 0005', () => {
   })
 })
 
+describe('migration 0007', () => {
+  it("counts each script's versions up from its highest saved one", async () => {
+    const all = fileURLToPath(new URL('../drizzle', import.meta.url))
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'csp-migrate-'))
+    const old = path.join(dir, 'migrations')
+    const file = path.join(dir, 'game.db')
+    try {
+      // The migrations up to 0006, before the version counter.
+      fs.mkdirSync(path.join(old, 'meta'), { recursive: true })
+      const journal = JSON.parse(fs.readFileSync(path.join(all, 'meta/_journal.json'), 'utf8'))
+      journal.entries = journal.entries.filter((e: { idx: number }) => e.idx <= 6)
+      fs.writeFileSync(path.join(old, 'meta/_journal.json'), JSON.stringify(journal))
+      for (const e of journal.entries as { tag: string }[]) {
+        fs.copyFileSync(path.join(all, `${e.tag}.sql`), path.join(old, `${e.tag}.sql`))
+      }
+      const sqlite = new Database(file)
+      migrate(drizzle(sqlite), { migrationsFolder: old })
+      sqlite.exec(`
+        INSERT INTO users (id, name) VALUES (1, 'Mara');
+        INSERT INTO scripts (id, user_id, name, active_version) VALUES
+          (1, 1, 'miners', 2), (2, 1, 'empty', NULL);
+        INSERT INTO script_versions (script_id, version, source) VALUES
+          (1, 1, '${VALID}'), (1, 2, '${VALID_2}'), (1, 3, '${BROKEN}');
+      `)
+      sqlite.close()
+
+      const opened = await openDb(file)
+      expect(getScript(opened.db, 1, 1)).toMatchObject({ activeVersion: 2, latestVersion: 3 })
+      expect(getScript(opened.db, 1, 2).latestVersion).toBe(0)
+      expect(checkScriptLibrary(opened.db)).toEqual([])
+      expect(saveScript(opened.db, 1, 1, { source: VALID }).latestVersion).toBe(4)
+      opened.close()
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('script library API', () => {
   let app: Awaited<ReturnType<typeof buildApp>>
   beforeEach(async () => {
@@ -347,6 +489,27 @@ describe('script library API', () => {
     const reset = await call('POST', `/api/scripts/${work.id}/reset`)
     expect(reset.json()).toMatchObject({ followsDefault: true, latestVersion: 3 })
     expect((await call('GET', `/api/scripts/${id}`)).statusCode).toBe(404)
+  })
+
+  it('deletes versions over HTTP, refusing the active one', async () => {
+    const call = as(addUser('Mara'))
+    const id = (await call('POST', '/api/scripts', { name: 'miners', source: VALID })).json().id
+    await call('POST', `/api/scripts/${id}/versions`, { source: VALID_2 })
+    await call('POST', `/api/scripts/${id}/versions`, { source: VALID })
+
+    const refused = await call('DELETE', `/api/scripts/${id}/versions/3`)
+    expect(refused.statusCode).toBe(409)
+    expect(refused.json().error).toBe('active-version')
+    const one = await call('DELETE', `/api/scripts/${id}/versions/2`)
+    expect(one.statusCode).toBe(200)
+    expect(one.json().versions.map((v: { version: number }) => v.version)).toEqual([1, 3])
+    const older = await call('POST', `/api/scripts/${id}/delete-older`)
+    expect(older.json()).toMatchObject({ activeVersion: 3, latestVersion: 3 })
+    expect(older.json().versions.map((v: { version: number }) => v.version)).toEqual([3])
+    expect((await call('DELETE', `/api/scripts/${id}/versions/1`)).statusCode).toBe(404)
+
+    const tobin = as(addUser('Tobin'))
+    expect((await tobin('POST', `/api/scripts/${id}/delete-older`)).statusCode).toBe(404)
   })
 
   it('needs a login and hides other Players’ scripts', async () => {

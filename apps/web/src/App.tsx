@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import {
+  BUILDABLE,
   carriagePulledBy,
   holdersOf,
+  carriageOfResident,
   horseOfResident,
   riderOf,
+  seatsLeft,
   KEEPS_GOODS,
   MAX_WORKERS,
   buildMenu,
@@ -19,11 +22,14 @@ import {
   type Resident,
   type ScriptParam,
   type ScriptSummary,
+  type StartParamValues,
   type Stock,
   isAt,
   SHARES_A_TILE,
+  targetParam,
   covers,
   type SeenResident,
+  HORSE_GRANT_HORSES,
   UNEXPLORED,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
@@ -39,6 +45,7 @@ import {
   CentredDialog,
   Drawer,
   DrawerEdge,
+  HorseOfferNotice,
   PhoneMenu,
   ToolRail,
   TopBar,
@@ -48,9 +55,31 @@ import {
 import type { Covered } from './map/camera.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
-import { appendRequest, editRequest, STORE_ALL, useShiftHeld } from './queue-view.js'
+import {
+  appendRequest,
+  appendToEach,
+  editRequest,
+  giveToAll,
+  planStep,
+  storeAll,
+  useShiftHeld,
+  type QueuePlan,
+} from './queue-view.js'
+import { AddStep } from './AddStep.js'
+import { GroupPlanner } from './GroupPlanner.js'
+import {
+  horsesIn,
+  nextPick,
+  pickInto,
+  planAsk,
+  planOrder,
+  type Plan,
+  type PlanAnswer,
+  type PlanStepId,
+  type PlanWorld,
+} from './plan-step.js'
 import { useSavedGroups } from './saved-groups.js'
-import { groupRequests, type GroupOrder, type Skipped } from './group-orders.js'
+import { groupRequests, type GroupOrder, type Place, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
@@ -63,6 +92,7 @@ import {
   GroupCard,
   ResidentCard,
   type GroupPicking,
+  type GroupPickWith,
   ResidentsList,
   type HaulSetup,
   type Picking,
@@ -78,16 +108,48 @@ import {
   nodeFit,
   type ActionId,
 } from './selection-view.js'
-import { ScriptLibrary } from './ScriptLibrary.js'
-import { ScriptParamFields } from './ScriptParams.js'
+import { ScriptLibrary, type ScriptToOpen } from './ScriptLibrary.js'
+import { ScriptLog } from './ScriptLog.js'
+import { ScriptMemoryTree } from './ScriptMemory.js'
+import { ScriptRunInfo } from './ScriptRun.js'
+import { ScriptParamFields, StartParamsForm } from './ScriptParams.js'
+import {
+  groupStartValues,
+  startedScript,
+  startFormParams,
+  startParamValues,
+  startValues,
+  startValuesValid,
+  type StartValues,
+} from './start-params.js'
 import { paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
+
+/**
+ * The form shown before a script with params starts (`CONTEXT.md`: Script parameter, Before it
+ * starts): the script, the values in the form, the param being picked on the map for it, why the
+ * last pick picked nothing, and what Start gives with the values.
+ */
+interface Starting {
+  script: ScriptSummary
+  /** The params the form shows (`startFormParams`). */
+  params: ScriptParam[]
+  values: StartValues
+  picking?: ScriptParam
+  error?: string
+  start: (params: StartParamValues) => Promise<void>
+}
 
 /** What the resident card's script param fields need of the world (`script-params-view`). */
 function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): ParamWorld {
   const { buildings, carriages, cities } = world
   return { buildings, carriages, cities, realmId: world.home.realmId, size: world.map.size }
+}
+
+/** What the queue planner's map picks need of the world (`plan-step`). */
+function planWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): PlanWorld {
+  return { ...paramWorld(world), horses: world.horses }
 }
 
 export function App() {
@@ -114,7 +176,8 @@ function Pages() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, founding, status, sendOrder, found } = useWorld(onLoggedOut)
+  const { world, founding, status, sendOrder, found, memories, runs, scriptLogs, watchScript } =
+    useWorld(onLoggedOut)
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
@@ -133,8 +196,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
   // Script parameter).
   const [paramPick, setParamPick] = useState<ScriptParam>()
+  // The step being planned with the queue planner's Add step (`CONTEXT.md`: Queue, Planning
+  // ahead): the map picks its places, then the card asks for what more it needs.
+  const [plan, setPlan] = useState<Plan>()
+  // The queue planned on the group card, held here until given to all (`CONTEXT.md`: Planning
+  // for a group); with none open, a step planned for a group goes onto each one's own queue.
+  const [groupPlan, setGroupPlan] = useState<QueuePlan>()
+  const [starting, setStarting] = useState<Starting>()
+  // The param whose value the map is waiting for: of the running script, or for the form.
+  const pickingParam = paramPick ?? starting?.picking
   // A group order waiting for a tile, the tile picked to build on, and what the last one did.
   const [groupPicking, setGroupPicking] = useState<GroupPicking>(false)
+  // What the group order being picked needs besides the tile, and a line's first end.
+  const [groupPickWith, setGroupPickWith] = useState<GroupPickWith>({})
+  const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
   const [groupReport, setGroupReport] = useState<{ sent: number; of: number; skipped: Skipped[] }>()
   const [groupError, setGroupError] = useState<string>()
@@ -148,11 +223,25 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     : []
   const group = selectedIds.flatMap((id) => own.filter((r) => r.id === id))
   const selected = group.length === 1 ? group[0] : undefined
+  // The realm's carriages someone of the group stands on, to board with the seats left on each
+  // (`CONTEXT.md`: Passenger).
+  const groupCarriages = world
+    ? world.carriages.flatMap((k) =>
+        k.load && group.some((r) => r.x === k.x && r.y === k.y && carriageOfResident(k, r))
+          ? [
+              {
+                carriage: k,
+                seats: seatsLeft(world, { ...k, load: k.load }, k.passengerIds?.length ?? 0),
+              },
+            ]
+          : [],
+      )
+    : []
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
   // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
-  const [scriptToOpen, setScriptToOpen] = useState<{ id: number; at: number }>()
+  const [scriptToOpen, setScriptToOpen] = useState<ScriptToOpen>()
   // A place to show on the map, such as one from the realm log or a resident picked in the list:
   // asked for, then centred between the open drawer and the selection card once they are drawn.
   const [toShow, setToShow] = useState<{ x: number; y: number }>()
@@ -161,6 +250,25 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
+  /** Opens a script in the library, at a version and line when given. */
+  const openScript = (id: number, where?: Omit<ScriptToOpen, 'id' | 'at'>) => {
+    setScriptToOpen({ id, at: Date.now(), ...where })
+    setOpenDrawer('scripts')
+  }
+  /**
+   * The Script tab's live view of the script a resident or army runs (`CONTEXT.md`: Debugging a
+   * script): how it last ran, and its memory.
+   */
+  const scriptDebug = (id: string, scriptId: number) => (
+    <>
+      <ScriptRunInfo
+        run={runs.get(id)}
+        tick={world?.tick ?? 0}
+        onOpenError={({ version, line, column }) => openScript(scriptId, { version, line, column })}
+      />
+      <ScriptMemoryTree id={id} memory={memories.get(id)} watch={watchScript} />
+    </>
+  )
   // What the map waits for while an order that needs a target is given (ADR 0012: pick mode).
   const touch = useTouchScreen()
   // Narrow or touch: cards are bottom sheets and the HUD folds into a menu button (ADR 0012).
@@ -170,7 +278,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     groupPicking,
     isGroup: group.length > 1,
     armyPick,
-    paramPick,
+    paramPick: pickingParam,
+    plan,
   })
   /** Leaves pick mode without giving the order; the card comes back as it was. */
   const cancelPick = useCallback(() => {
@@ -178,12 +287,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setGroupPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setPlan(undefined)
+    setStarting((s) => s && { ...s, picking: undefined })
   }, [])
   // Escape leaves pick mode first; with no drawer open, it then drops the selection.
   const anySelected = selectedIds.length > 0
   const picked = pick !== undefined
+  const formOpen = starting !== undefined
   useEffect(() => {
-    if (!picked && (openDrawer || !anySelected)) return
+    if (!picked && !formOpen && (openDrawer || !anySelected)) return
     const onKey = (e: KeyboardEvent) => {
       const typing =
         e.target instanceof Element && e.target.closest('input, textarea, select, .cm-editor')
@@ -193,12 +305,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         e.stopImmediatePropagation()
         return cancelPick()
       }
+      // The form before a script starts is cancelled first.
+      if (formOpen) {
+        e.stopImmediatePropagation()
+        return setStarting(undefined)
+      }
       setSelectedIds([])
       setPicking(false)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [openDrawer, anySelected, picked, cancelPick])
+  }, [openDrawer, anySelected, picked, formOpen, cancelPick])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
@@ -214,6 +331,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setPlan(undefined)
+    setGroupPlan(undefined)
+    setStarting(undefined)
     setOrderError(undefined)
     setGroupPicking(false)
     setGroupBuildAt(undefined)
@@ -230,12 +350,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   )
   const shift = useShiftHeld()
   /**
-   * Gives an order, or, with Shift held, appends a resident's order to their queue (`CONTEXT.md`:
-   * Queue). Orders that can't be queue steps are given as they are.
+   * Gives an order, or, `queued` (Shift held), appends a resident's order to their queue
+   * (`CONTEXT.md`: Queue). Orders that can't be queue steps are given as they are. An order
+   * starting a script that declares params first shows the form for them (`CONTEXT.md`: Before
+   * it starts), filled with the resident's kept values or the defaults; Start gives it with them.
    */
-  const giveOrder = (order: OrderRequest) => {
-    const r = shift.current ? own.find((x) => x.id === order.residentId) : undefined
-    return sendOrder((r && appendRequest(r, order)) ?? order)
+  const giveOrder = (order: OrderRequest, queued = shift.current): Promise<string | undefined> => {
+    const r = own.find((x) => x.id === order.residentId)
+    const script = order.params === undefined ? startedScript(order, scripts) : undefined
+    const params = script ? startFormParams(order, script) : []
+    if (script && params.length > 0) {
+      setStarting({
+        script,
+        params,
+        values: startValues(params, r?.scriptParams?.[script.id], targetParam(script)),
+        start: async (params) => setOrderError(await giveOrder({ ...order, params }, queued)),
+      })
+      return Promise.resolve(undefined)
+    }
+    const queuedFor = queued ? r : undefined
+    return sendOrder((queuedFor && appendRequest(queuedFor, order)) ?? order)
   }
   // The city picked on the map or opened in the Cities drawer.
   const [openCityId, setOpenCityId] = useState<string>()
@@ -249,6 +383,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function goTo(x: number, y: number) {
     const mode = picking
     setPicking(false)
+    if (starting?.picking) {
+      // A value for the form before a script starts, which shows again.
+      const param = starting.picking
+      if (!world) return
+      const got = paramPickAt(paramWorld(world), param.type, { x, y })
+      setStarting({
+        ...starting,
+        picking: undefined,
+        ...(typeof got === 'string'
+          ? { error: got }
+          : { error: undefined, values: { ...starting.values, [param.name]: got.id } }),
+      })
+      return
+    }
     if (paramPick) {
       setParamPick(undefined)
       if (!world) return
@@ -260,6 +408,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (armyPick) {
       setArmyPick(undefined)
       setArmyError(await sendOrder({ kind: armyPick.kind, armyId: armyPick.armyId, x, y }))
+      return
+    }
+    if (plan && nextPick(plan)) {
+      if (!world) return
+      const next = pickInto(planWorld(world), plan, { x, y })
+      if (nextPick(next) || planAsk(next)) setPlan(next)
+      else await addPlanned(next)
       return
     }
     if (group.length > 1) {
@@ -289,8 +444,65 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
 
   /**
+   * Starts planning a step with Add step (`CONTEXT.md`: Queue, Planning ahead): the map picks its
+   * places first; one that needs neither is added at once.
+   */
+  async function startPlan(kind: PlanStepId) {
+    setPicking(false)
+    setGroupPicking(false)
+    setParamPick(undefined)
+    const fresh: Plan = { kind, picked: [] }
+    if (nextPick(fresh) || planAsk(fresh)) setPlan(fresh)
+    else await addPlanned(fresh)
+  }
+  /**
+   * Appends the step planned to the picked resident's queue, or starts one with it, after a walk
+   * to where it acts (`appendRequest`). The server checks that it could make sense; whether it can
+   * start is checked when its turn comes. For a group it goes onto the plan open on the group card,
+   * or, with none open, onto each one's own queue (`CONTEXT.md`: Planning for a group).
+   */
+  async function addPlanned(planned: Plan, answer?: PlanAnswer) {
+    setPlan(undefined)
+    const step = planOrder(planned, answer)
+    if (!step) return
+    if (group.length > 1) {
+      if (groupPlan) setGroupPlan(planStep(groupPlan, step.order, step.at))
+      else await sendToGroup(appendToEach(group, step.order, step.at), [])
+      return
+    }
+    if (!selected) return
+    const order = { ...step.order, residentId: selected.id }
+    setOrderError(await sendOrder(appendRequest(selected, order, step.at) ?? order))
+  }
+  /** The queue planner's Add step, on the resident card and the group card. */
+  function addStep(w: NonNullable<typeof world>) {
+    return (
+      <AddStep
+        plan={plan}
+        onStart={(kind) => void startPlan(kind)}
+        onAnswer={(answer) => plan && void addPlanned(plan, answer)}
+        onCancel={() => setPlan(undefined)}
+        scripts={scripts}
+        buildKinds={
+          plan?.kind === 'build' && plan.picked[0]
+            ? buildMenu(nodeAt?.(plan.picked[0].x, plan.picked[0].y))
+            : []
+        }
+        horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
+      />
+    )
+  }
+  /** Give to all: each one's queue becomes a copy of the plan; then the plan closes. */
+  async function giveGroupPlan() {
+    if (!groupPlan) return
+    setGroupPlan(undefined)
+    await sendToGroup(giveToAll(groupPlan, group), [])
+  }
+
+  /**
    * A tile picked for the group (`CONTEXT.md`: Group): walking there (also by right-click),
-   * working the workplace there, or where to build.
+   * working the workplace there, where to build, drive or haul to, a line's ends, the building to
+   * tear down, the place to store at or fetch from, whom to attack or the wall to climb.
    */
   async function groupTile(x: number, y: number) {
     const mode = groupPicking
@@ -300,24 +512,114 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setGroupBuildAt({ x, y })
       return
     }
+    if (mode === 'roadFrom' || mode === 'wallFrom') {
+      // Then the line's other end.
+      setGroupLineFrom({ x, y })
+      setGroupPicking(mode === 'roadFrom' ? 'roadTo' : 'wallTo')
+      return
+    }
     setGroupBuildAt(undefined)
-    if (mode !== 'work') return sendGroup({ kind: 'walkTo', x, y })
-    const workplace = world.buildings.find(
-      (b) => b.kind !== 'road' && !b.site && covers(b, x, y) && MAX_WORKERS[b.kind] !== undefined,
-    )
     setGroupReport(undefined)
-    if (!workplace) return setGroupError('no workplace there')
-    // What a smithy makes is picked for each worker on their own card.
-    if (workplace.kind === 'smithy') return setGroupError('pick what to make on each one’s card')
-    const name = BUILDING_NAMES[workplace.kind].toLowerCase()
-    await sendGroup({ kind: 'work', workplace, name })
+    const fail = (why: string) => setGroupError(why)
+    const name = (b: Building) => BUILDING_NAMES[b.kind].toLowerCase()
+    const realmId = world.home.realmId
+    // A storage, a stable or one of the realm's carriages, to store at or fetch from.
+    const place = (): Place | undefined => {
+      const b = world.buildings.find(
+        (s) => (s.kind === 'storage' || s.kind === 'stable') && !s.site && covers(s, x, y),
+      )
+      if (b) return { id: b.id, name: name(b) }
+      const k = world.carriages.find((c) => c.realmId === realmId && c.x === x && c.y === y)
+      return k && { id: k.id, name: 'carriage' }
+    }
+    // A wall or gate of another realm's city, or of none.
+    const foreignWall = world.buildings.find(
+      (b) =>
+        isWallOrGate(b) &&
+        covers(b, x, y) &&
+        world.cities.find((c) => c.id === b.cityId)?.realmId !== realmId,
+    )
+    switch (mode) {
+      case 'work': {
+        const workplace = world.buildings.find(
+          (b) =>
+            b.kind !== 'road' && !b.site && covers(b, x, y) && MAX_WORKERS[b.kind] !== undefined,
+        )
+        if (!workplace) return fail('no workplace there')
+        // What a smithy makes is picked for each worker on their own card.
+        if (workplace.kind === 'smithy') return fail('pick what to make on each one’s card')
+        return sendGroup({ kind: 'work', workplace, name: name(workplace) })
+      }
+      case 'drive':
+        return sendGroup({ kind: 'drive', x, y })
+      case 'haul':
+        if (!groupPickWith.haul) return
+        return sendGroup({ kind: 'haul', x, y, ...groupPickWith.haul })
+      case 'roadTo':
+      case 'wallTo':
+        if (!groupLineFrom) return
+        setGroupLineFrom(undefined)
+        return sendGroup({
+          kind: 'line',
+          line: mode === 'roadTo' ? 'roadLine' : 'wallLine',
+          from: groupLineFrom,
+          to: { x, y },
+        })
+      case 'tearDown': {
+        // A building before a road sharing its tile.
+        const there = world.buildings.filter((b) => BUILDABLE.includes(b.kind) && covers(b, x, y))
+        const building = there.find((b) => b.kind !== 'road') ?? there[0]
+        if (!building) return fail('nothing to tear down there')
+        return sendGroup({ kind: 'tearDown', building, name: name(building) })
+      }
+      case 'storeAt':
+      case 'fetchFrom': {
+        const at = place()
+        if (!at) return fail('no storage, stable or carriage of yours there')
+        if (mode === 'storeAt') return sendGroup({ kind: 'store', to: at })
+        return sendGroup({ kind: 'fetch', good: groupPickWith.good ?? 'food', from: at })
+      }
+      case 'attack': {
+        const target =
+          world.residents.find((r) => r.x === x && r.y === y && !own.some((o) => o.id === r.id)) ??
+          foreignWall
+        if (!target) return fail('nobody of another realm there, and no wall or gate')
+        return sendGroup({ kind: 'attack', targetId: target.id })
+      }
+      case 'climb':
+        if (!foreignWall) return fail('no wall or gate of another realm there')
+        return sendGroup({ kind: 'climb', wall: foreignWall })
+      default:
+        return sendGroup({ kind: 'walkTo', x, y })
+    }
   }
   /**
    * Gives each resident of the group the same order request (ADR 0002), skipping those who
-   * can't take it, and says on the card who was skipped or turned down and why.
+   * can't take it, and says on the card who was skipped or turned down and why. One starting a
+   * script that declares params first shows the form for them, once for all (`CONTEXT.md`:
+   * Before it starts), filled with the values all of them keep or the defaults.
    */
-  async function sendGroup(order: GroupOrder) {
+  async function sendGroup(order: GroupOrder, queued = shift.current) {
     if (!world) return
+    const starts =
+      order.kind === 'runScript'
+        ? { kind: 'runScript', scriptId: order.scriptId }
+        : order.kind === 'work' || order.kind === 'build'
+          ? { kind: 'task', task: order.kind }
+          : undefined
+    const given = 'params' in order && order.params !== undefined
+    const script = starts && !given ? startedScript(starts, scripts) : undefined
+    const params = script ? startFormParams(starts!, script) : []
+    if (script && params.length > 0) {
+      const kept = group.map((r) => r.scriptParams?.[script.id])
+      setStarting({
+        script,
+        params,
+        values: groupStartValues(params, kept, targetParam(script)),
+        start: (params) => sendGroup({ ...order, params } as GroupOrder, queued),
+      })
+      return
+    }
     const size = world.map.size
     const inGroup = new Set(group.map((r) => r.id))
     // Free: explored land a resident can stand on, with no wall or gate and nobody else on it.
@@ -328,19 +630,37 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
     }
     // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue).
-    const queued = shift.current
+    const realmId = world.home.realmId
     const { requests, skipped } = groupRequests(order, group, {
       tick: world.tick,
       size,
       free,
       queued,
+      seen: {
+        // Free horses of the realm, to mount (`CONTEXT.md`: Riding).
+        horses: world.horses.filter(
+          (h) => h.realmId === realmId && !carriagePulledBy(world, h) && !riderOf(world, h),
+        ),
+        carriages: world.carriages.filter((k) => k.realmId === realmId),
+        buildings: world.buildings,
+      },
     })
     if (order.kind === 'build') setGroupBuildAt(undefined)
+    await sendToGroup(
+      requests.map((q) => q.order),
+      skipped,
+    )
+  }
+  /**
+   * Sends the group's requests, one per resident, and says on the card how many went out and who
+   * was skipped or turned down and why.
+   */
+  async function sendToGroup(requests: OrderRequest[], skipped: Skipped[]) {
     setGroupError(undefined)
-    const answers = await Promise.all(requests.map((q) => sendOrder(q.order)))
-    const turnedDown = requests.flatMap((q, i) => {
+    const answers = await Promise.all(requests.map((o) => sendOrder(o)))
+    const turnedDown = requests.flatMap((o, i) => {
       const why = answers[i]
-      const r = group.find((g) => g.id === q.residentId)
+      const r = group.find((g) => g.id === o.residentId)
       return why && r ? [{ id: r.id, name: r.name, why }] : []
     })
     setGroupReport({
@@ -391,7 +711,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function breed(stableId: string, horseIds: [string, string]) {
     if (!selected) return
     const order = { kind: 'task', task: 'breed', residentId: selected.id, stableId, horseIds }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order, false))
   }
   /**
    * Gives the picked resident the Feed the stable task for the stable they stand in: they run the
@@ -400,7 +720,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function feedStable(stableId: string) {
     if (!selected) return
     const order = { kind: 'task', task: 'feedStable', residentId: selected.id, stableId }
-    setOrderError(await sendOrder(order))
+    setOrderError(await giveOrder(order, false))
   }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
@@ -460,6 +780,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       : { kind: 'dismount', residentId: selected.id }
     setOrderError(await sendOrder(order))
   }
+  /**
+   * Orders the picked resident to board a carriage on their tile, or with none to get off the one
+   * they are aboard, onto its tile (`CONTEXT.md`: Passenger); with Shift held, appends it to their
+   * queue.
+   */
+  async function boardCarriage(carriageId?: string) {
+    if (!selected) return
+    const order = carriageId
+      ? { kind: 'board', residentId: selected.id, carriageId }
+      : { kind: 'getOff', residentId: selected.id }
+    setOrderError(await giveOrder(order))
+  }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
     if (!selected) return
@@ -518,6 +850,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPicking(false)
               setArmyPick(undefined)
               setParamPick(undefined)
+              setPlan(undefined)
               setOrderError(undefined)
             }}
             selectedCityId={openCityId}
@@ -528,7 +861,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             picking={
               picking !== false ||
               armyPick !== undefined ||
-              paramPick !== undefined ||
+              pickingParam !== undefined ||
+              pick?.kind === 'plan' ||
               (group.length > 1 && groupPicking !== false)
             }
             onPickTile={goTo}
@@ -549,6 +883,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         leader={leader?.name}
         onLogout={logout}
       />
+      {world?.horseOffer && (
+        <HorseOfferNotice
+          horses={HORSE_GRANT_HORSES}
+          onClaim={() => sendOrder({ kind: 'claimHorses' })}
+        />
+      )}
       {phone ? (
         <PhoneMenu
           open={openDrawer}
@@ -578,6 +918,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             leaderId={world.home.leaderId}
             scripts={scripts}
             buildings={world.buildings}
+            inSight={world.residents}
             tick={world.tick}
             selectedId={selected?.id}
             onSelect={(id) => {
@@ -606,6 +947,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             pickError={armyError}
             scripts={scripts}
             sendOrder={sendOrder}
+            scriptMemory={(id) =>
+              scriptDebug(id, world.armies.find((a) => a.id === id)?.script?.scriptId ?? 0)
+            }
           />,
         )}
       {world &&
@@ -771,6 +1115,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               const order = { kind: 'renameCity', residentId: world.home.leaderId, cityId, name }
               setOrderError(await giveOrder(order))
             }}
+            onSelectResident={(id) => select([id])}
           />
         </CardSheet>
       )}
@@ -800,13 +1145,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               ),
             )}
             onRide={ride}
+            carriageToBoard={onTile(world.carriages.filter((k) => carriageOfResident(k, selected)))}
+            onBoard={boardCarriage}
             scripts={scripts}
             buildings={world.buildings}
             onRunScript={runScript}
-            onEditScript={(id) => {
-              setScriptToOpen({ id, at: Date.now() })
-              setOpenDrawer('scripts')
-            }}
+            onEditScript={(id) => openScript(id)}
             orderError={orderError}
             pile={world.piles.find(
               (p) => p.x === (buildingHere ?? selected).x && p.y === (buildingHere ?? selected).y,
@@ -818,6 +1162,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             building={buildingHere}
             road={roadHere}
+            terrain={terrainAt?.(selected.x, selected.y)}
             carriageSite={carriageSiteHere}
             node={nodeAt?.(selected.x, selected.y)}
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
@@ -904,30 +1249,45 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 />
               )
             }
+            scriptMemory={selected.script && scriptDebug(selected.id, selected.script.scriptId)}
+            scriptLog={
+              <ScriptLog id={selected.id} lines={scriptLogs.get(selected.id)} watch={watchScript} />
+            }
             onStore={async () =>
-              setOrderError(await giveOrder({ ...STORE_ALL, residentId: selected.id }))
+              setOrderError(
+                await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
+              )
             }
             onEditQueue={async (steps, loop) =>
               setOrderError(await sendOrder(editRequest(selected, steps, loop)))
             }
+            addStep={addStep(world)}
             onClose={() => {
               setSelectedIds([])
               setPicking(false)
               setParamPick(undefined)
+              setPlan(undefined)
             }}
             collapsed={pick !== undefined && pick.kind !== 'army'}
           />
         </CardSheet>
       )}
       {world && group.length > 1 && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group'}>
+        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}>
           <GroupCard
             residents={group}
             scripts={scripts}
             buildings={world.buildings}
+            carriages={groupCarriages}
+            inSight={world.residents}
+            horses={world.horses}
+            realmId={world.home.realmId}
+            tick={world.tick}
             picking={groupPicking}
-            onPicking={(p) => {
+            onPicking={(p, with_) => {
               setGroupPicking(p)
+              setGroupPickWith(with_ ?? {})
+              setGroupLineFrom(undefined)
               setGroupBuildAt(undefined)
             }}
             buildAt={
@@ -955,9 +1315,43 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             orderError={groupError}
             onPick={(id) => select([id])}
             onClose={() => select([])}
-            collapsed={pick?.kind === 'group'}
+            planner={
+              <GroupPlanner
+                plan={groupPlan}
+                onPlan={setGroupPlan}
+                onGive={() => void giveGroupPlan()}
+                addStep={addStep(world)}
+                scripts={scripts}
+                buildings={world.buildings}
+              />
+            }
+            collapsed={pick?.kind === 'group' || pick?.kind === 'plan'}
           />
         </CardSheet>
+      )}
+      {world && starting && !starting.picking && (
+        <StartParamsForm
+          script={starting.script.name}
+          params={starting.params}
+          target={targetParam(starting.script)}
+          values={starting.values}
+          label={(id) => paramValueLabel(paramWorld(world), id)}
+          canStart={startValuesValid(starting.params, starting.values)}
+          error={starting.error}
+          onPick={(p) => {
+            setPicking(false)
+            setGroupPicking(false)
+            setStarting({ ...starting, picking: p, error: undefined })
+          }}
+          onChange={(name, value) =>
+            setStarting({ ...starting, values: { ...starting.values, [name]: value } })
+          }
+          onStart={() => {
+            setStarting(undefined)
+            void starting.start(startParamValues(starting.params, starting.values))
+          }}
+          onCancel={() => setStarting(undefined)}
+        />
       )}
       {world && realmEnded(world.events) && (
         <CentredDialog title="Your realm has ended">

@@ -85,8 +85,31 @@ class Parser {
       )
     }
     this.advance()
+    const declared = this.isPunctuator('=') ? this.paramDefault(name, type) : undefined
     this.matchPunctuator(';')
-    return { name, type: type as ParamType, ...at(start) }
+    return {
+      name,
+      type: type as ParamType,
+      ...(declared === undefined ? {} : { default: declared }),
+      ...at(start),
+    }
+  }
+
+  /** The `= n` of a param line: only a `number` param has one, a whole number of zero or more. */
+  private paramDefault(name: string, type: string): number {
+    const equals = this.advance()
+    if (type !== 'number') {
+      throw this.error(equals, `A "${type}" param can't have a default, only a "number" param`)
+    }
+    const token = this.peek()
+    if (token.type !== 'number' || !Number.isSafeInteger(token.value)) {
+      throw this.error(
+        token,
+        `The default of "param ${name}" must be a whole number of zero or more but found ${describe(token)}`,
+      )
+    }
+    this.advance()
+    return token.value
   }
 
   // --- statements ---

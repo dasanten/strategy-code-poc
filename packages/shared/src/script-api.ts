@@ -1,7 +1,9 @@
 import {
   DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
+  SCRIPT_HELPER_COST,
   SCRIPT_LIST_QUERY_COST,
+  SCRIPT_LOG_LINES,
   SCRIPT_TILE_QUERY_COST,
 } from './balance.js'
 import type { ScriptType, ScriptViewName } from './script-views.js'
@@ -15,11 +17,13 @@ import type { ScriptType, ScriptViewName } from './script-views.js'
  *
  * - A **value** is set before the run: `me` (the resident or army running the script),
  *   `memory`, `tick`, `mapSize`.
- * - A **query** answers from what the Player sees and has explored, nothing more.
+ * - A **query** answers from what the Player sees and has explored, nothing more. The helpers
+ *   `floor` and `pickRandom` are queries too, but work only on what they are given.
  * - An **action** asks for the order of the same name for `me`, checked exactly as a UI order
  *   is. It answers `null` when requested, or why not as a string; a script can request nothing
- *   an order couldn't. `doing` and `end` ask for no order: `doing` keeps the resident's Doing
- *   line in `memory` (`CONTEXT.md`: Doing), `end` ends the script once this run is over.
+ *   an order couldn't. `doing`, `log` and `end` ask for no order: `doing` keeps the resident's
+ *   Doing line in `memory` (`CONTEXT.md`: Doing), `log` adds to their script log (Script log),
+ *   `end` ends the script once this run is over.
  *
  * `cost` is the steps one call costs on top of the 1 every evaluated node costs. `returns` is
  * what a value holds or a call answers, in terms of the script views (ADR 0011).
@@ -77,7 +81,7 @@ const SHARED: readonly ScriptBinding[] = [
   value(
     'params',
     'any',
-    'The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; null while none is picked.',
+    'The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; a `number` param’s default (`param name: number = 3`) while none is set, else null.',
   ),
   value('tick', 'number', 'The world tick this run is for.'),
   value('mapSize', 'number', 'Tiles along each side of the map; its opposite sides join.'),
@@ -128,6 +132,15 @@ const SHARED: readonly ScriptBinding[] = [
       'The building or construction site with that id, if the Player sees it or it is one of my realm’s cities’; else null.',
   },
   {
+    name: 'buildingAt',
+    is: 'query',
+    params: ['x', 'y'],
+    returns: { view: 'building' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The building or construction site on a tile, roads and carriage sites left out, as `building(id)` gives it; null where there is none or the Player doesn’t see it.',
+  },
+  {
     name: 'pileAt',
     is: 'query',
     params: ['x', 'y'],
@@ -171,6 +184,23 @@ const SHARED: readonly ScriptBinding[] = [
     cost: SCRIPT_TILE_QUERY_COST,
     description: 'Tiles between two things with `x` and `y`, the short way round the map.',
   },
+  {
+    name: 'floor',
+    is: 'query',
+    params: ['n'],
+    returns: 'number',
+    cost: SCRIPT_HELPER_COST,
+    description: 'The whole number at or below `n`: `floor(2.7)` is 2, `floor(-2.5)` is -3.',
+  },
+  {
+    name: 'pickRandom',
+    is: 'query',
+    params: ['list'],
+    returns: 'any',
+    cost: SCRIPT_HELPER_COST,
+    description:
+      'One item of a list, picked with `random`, so every script picking from the same list this tick picks the same; null for an empty list.',
+  },
 ]
 
 /**
@@ -189,7 +219,7 @@ export function isScriptParamType(value: unknown): value is ScriptParamType {
 export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
   building: 'One of my realm’s buildings or construction sites.',
   storage: 'One of my realm’s storages or stables, or one of its carriages.',
-  number: 'A whole number of zero or more, typed in.',
+  number: 'A whole number of zero or more, typed in; `= n` after the type gives it a default.',
 }
 
 /** Whether a value fits a `number` param: a whole number of zero or more. */
@@ -201,6 +231,8 @@ export function isParamNumber(value: unknown): value is number {
 export interface ScriptParam {
   name: string
   type: ScriptParamType
+  /** A `number` param's default (`param name: number = 3`), read while none is set. */
+  default?: number
 }
 
 /** The game API of a resident's script. */
@@ -218,6 +250,15 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     returns: 'number',
     cost: SCRIPT_TILE_QUERY_COST,
     description: 'How many units of a good still fit in my hands.',
+  },
+  {
+    name: 'breedingPair',
+    is: 'query',
+    params: ['stable'],
+    returns: { list: 'string' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The two horses of mine I would `breed` in a stable I see, as ids like ["h1", "h2"]: a pair whose breeding it keeps first, else two fed ones standing in it; null while there are none.',
   },
   list(
     'storages',
@@ -244,6 +285,16 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   ),
   action('dismount', [], 'Get off the horse I ride; it stays on my tile.'),
   action(
+    'board',
+    ['carriageId'],
+    'Get on a carriage of my realm on my tile as a passenger, and ride along with it.',
+  ),
+  action(
+    'getOff',
+    ['x?', 'y?'],
+    'Get off the carriage I am aboard, onto its tile or the tile x, y right next to it.',
+  ),
+  action(
     'haul',
     ['carriageId', 'x', 'y', 'goods', 'returnGoods?', 'keepFood?'],
     'Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.',
@@ -251,13 +302,18 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('stop', [], 'Stop what I was ordered to do and stand idle.'),
   action(
     'end',
-    [],
-    'End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. It asks for no order.',
+    ['reason?'],
+    `End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. With \`reason\`, short text (cut to ${DOING_MAX_LENGTH} characters), my Player’s realm log says why, like “Ana stopped Work: no workplace on her tile”. It asks for no order.`,
   ),
   action(
     'doing',
     ['text'],
     `Say what I’m doing, for my Player’s Doing line: the text (cut to ${DOING_MAX_LENGTH} characters) shows instead of the one the game derives from my task and order, until I call it again; null gives the derived one back. Kept as \`memory.doing\`; it asks for no order.`,
+  ),
+  action(
+    'log',
+    ['text'],
+    `Add a line to my script log, with the game time: short text (cut to ${DOING_MAX_LENGTH} characters) that my Player sees on my Script tab, and nobody else. I keep my last ${SCRIPT_LOG_LINES} lines across scripts; \`end(reason)\` adds its reason too. It asks for no order.`,
   ),
   action(
     'pickUp',
@@ -334,6 +390,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'renameCity',
     ['cityId', 'name'],
     'Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.',
+  ),
+  action(
+    'claimHorses',
+    [],
+    'Claim my Player’s Horse offer, once ever: two new horses for my realm, in its stable nearest the Leader’s city, or else by a storage or the Leader with Food by them. Free and at once; refused once claimed, or while my realm has no living Leader.',
   ),
   action(
     'roadLine',
