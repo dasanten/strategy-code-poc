@@ -4,6 +4,7 @@ import {
   HAUL_KEEP_FOOD,
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_VALUE_LIMITS,
   SIGHT_RANGE,
   TICKS_PER_GAME_YEAR,
   DIAGONAL_STEP,
@@ -91,6 +92,7 @@ function runAs(
     globals: bindings.globals,
     steps: 10_000,
     maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+    limits: SCRIPT_VALUE_LIMITS,
   })
   return { result, ...bindings, memory }
 }

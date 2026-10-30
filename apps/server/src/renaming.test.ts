@@ -5,6 +5,7 @@ import {
   RESIDENT_NAME_MAX_LENGTH,
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_VALUE_LIMITS,
   canWork,
   realmName,
   type OrderRequest,
@@ -174,7 +175,12 @@ describe('Renaming from a script', () => {
         seen: () => entitiesInSight(world, terrain, realm.id),
         explored: () => true,
       })
-      run(parse(source), { globals, steps: 10_000, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+      run(parse(source), {
+        globals,
+        steps: 10_000,
+        maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+        limits: SCRIPT_VALUE_LIMITS,
+      })
       return { memory: memory as { answer?: unknown }, requests }
     }
     const apply = (requests: OrderRequest[]) => {
@@ -357,7 +363,12 @@ describe('Renaming a city from a script', () => {
         seen: () => entitiesInSight(world, terrain, realm.id),
         explored: () => true,
       })
-      run(parse(source), { globals, steps: 10_000, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+      run(parse(source), {
+        globals,
+        steps: 10_000,
+        maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+        limits: SCRIPT_VALUE_LIMITS,
+      })
       return requests
     }
     const requests = script(`memory.answer = renameCity("${city.id}", "Ironhold")`)

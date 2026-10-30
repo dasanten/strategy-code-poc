@@ -107,6 +107,9 @@ import {
   SCRIPT_ACTION_COST,
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_MAX_LIST_LENGTH,
+  SCRIPT_MAX_OBJECT_KEYS,
+  SCRIPT_MAX_STRING_LENGTH,
   SCRIPT_LOG_LINES,
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
@@ -1578,6 +1581,12 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>All of a realm's scripts together: {num(SCRIPT_REALM_STEP_BUDGET)} steps a tick.</li>
           <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
           <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
+          <li>
+            One value a script builds is bounded: a string holds at most{' '}
+            {num(SCRIPT_MAX_STRING_LENGTH)} characters, a list {num(SCRIPT_MAX_LIST_LENGTH)} items
+            and an object {num(SCRIPT_MAX_OBJECT_KEYS)} keys. Past that the script stops with a
+            runtime error, like a call too deep.
+          </li>
         </ul>
         <p>
           To debug a script, open the Script tab of a resident or army running it: it shows the
