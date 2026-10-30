@@ -16,7 +16,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 57
+export const WORLD_FORMAT_VERSION = 58
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -127,11 +127,14 @@ export const migrations: Record<number, MigrationStep> = {
   // Nobody could claim it before, so every existing Player starts unclaimed, whether or not they
   // have horses or got the Horse grant.
   52: (state) => ({ ...(state as object), horseOffersClaimed: [] }),
+  // Residents ride carriages as passengers (`CONTEXT.md`: Passenger), a new `aboard` field.
+  // Nobody was aboard before, so the step leaves the world as it is.
+  53: (state) => state,
   // Work takes its workplace as the param `workplace` (`CONTEXT.md`: Default script, Started
   // directly; ADR 0014), no longer from memory. A resident working by a script of their Player's
   // gets the workplace its memory names as that param, so they work on; the memory keeps it too,
   // as Work still writes it there. A script with no such param drops it on its next run.
-  53: (state) => {
+  54: (state) => {
     const world = structuredClone(state) as WorldState
     for (const r of world.residents) {
       const s = r.script
@@ -148,7 +151,7 @@ export const migrations: Record<number, MigrationStep> = {
   // one by a script of their Player's gets the building or stable its memory names as that
   // param, when it is one of their realm's a param can name; the memory keeps it too, which the
   // defaults still read. A script with no such param drops it on its next run.
-  54: (state) => {
+  55: (state) => {
     const world = structuredClone(state) as WorldState
     for (const r of world.residents) {
       const s = r.script
@@ -169,7 +172,7 @@ export const migrations: Record<number, MigrationStep> = {
   // (`memory.carriageId`) its memory names as that param, where the param can hold it (one of
   // their realm's); the memory keeps them too, as both defaults still read them there. A script
   // with no such param drops it on its next run.
-  55: (state) => {
+  56: (state) => {
     const world = structuredClone(state) as WorldState
     for (const r of world.residents) {
       const s = r.script
@@ -193,7 +196,7 @@ export const migrations: Record<number, MigrationStep> = {
   // (`CONTEXT.md`: Construction site; `Building.realmId`). Who laid out a site already there
   // isn't known: each gets the realm of a resident building it, else of the city it stands in
   // (the one a farm or stable was laid out for, or whose area it is in), else none.
-  56: (state, { terrain }) => {
+  57: (state, { terrain }) => {
     const world = structuredClone(state) as WorldState
     for (const b of world.buildings) {
       if (!b.site) continue

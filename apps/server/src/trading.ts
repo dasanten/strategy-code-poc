@@ -10,7 +10,7 @@ import {
   deliveryStorage,
   handsOf,
   loadOf,
-  carriageCapacity,
+  goodsCapacity,
   npcCityRefuses,
   npcCityReserve,
   npcCityStock,
@@ -174,7 +174,7 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
       if (!isAt(carriage, warehouse)) continue
     }
     const holder = carriage
-      ? loadOf(carriage, carriageCapacity(world, carriage))
+      ? loadOf(carriage, goodsCapacity(world, carriage))
       : handsOf(r, world.tick)
     const parties = [holder.stock, (warehouse.stock ??= {}), (coinWarehouse.stock ??= {})]
     const before = total([...new Set(parties)])
@@ -257,7 +257,7 @@ function tradeWithCity(
     if (!isAt(carriage, storage)) return false
   }
   const holder = carriage
-    ? loadOf(carriage, carriageCapacity(world, carriage))
+    ? loadOf(carriage, goodsCapacity(world, carriage))
     : handsOf(r, world.tick)
   const parties = [holder.stock, (storage.stock ??= {})]
   const before = total(parties)

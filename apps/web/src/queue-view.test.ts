@@ -8,11 +8,17 @@ import { describe, expect, it } from 'vitest'
 import {
   appendRequest,
   appendRequests,
+  appendToEach,
   dropStep,
+  editPlan,
+  EMPTY_PLAN,
+  giveToAll,
+  planStep,
   moveStep,
   queueRows,
   removeStep,
   STORE_ALL,
+  stepLabel,
   timeStep,
   type Queued,
 } from './queue-view.js'
@@ -147,6 +153,21 @@ describe('the queue list', () => {
     expect(q.loop).toBe(true)
   })
 
+  it('lists boarding and getting off a carriage', () => {
+    // Board at the carriage, run along, get off: the Shift-queued passenger's plan.
+    const r = shiftQueue(idle, [
+      { kind: 'board', residentId: 'w1', carriageId: 'k1' },
+      { kind: 'getOff', residentId: 'w1' },
+      { kind: 'getOff', residentId: 'w1', x: 20, y: 7 },
+    ])
+    expect(queueRows(r.queue!).map((row) => row.label)).toEqual([
+      'Walk to 6, 6',
+      'Board the carriage',
+      'Get off',
+      'Get off at 20, 7',
+    ])
+  })
+
   it('reorders, removes and times steps by id', () => {
     expect(moveStep(q, 4, -1).map((s) => s.id)).toEqual([1, 2, 4, 3])
     expect(moveStep(q, 1, -1).map((s) => s.id)).toEqual([1, 2, 3, 4])
@@ -165,5 +186,88 @@ describe('the queue list', () => {
       [2, undefined],
     ])
     expect(queueStepsProblem(moved)).toBeUndefined()
+  })
+})
+
+describe('step labels', () => {
+  const buildings = [
+    { id: 's1', kind: 'storage' as const },
+    { id: 'b1', kind: 'stable' as const },
+  ]
+  it('names the place a planned step acts on', () => {
+    expect(stepLabel({ ...STORE_ALL, to: 's1' }, { buildings })).toBe(
+      'Store what they carry at the storage',
+    )
+    expect(stepLabel({ kind: 'fetch', goods: { wood: 5 }, from: 's1' }, { buildings })).toBe(
+      'Fetch 5 wood from the storage',
+    )
+    expect(stepLabel({ kind: 'task', task: 'feedStable', stableId: 'b1' }, { buildings })).toBe(
+      'Feed the stable',
+    )
+    expect(stepLabel({ kind: 'mount', horseId: 'h1' }, {})).toBe('Mount a horse')
+  })
+})
+
+describe('the group planner', () => {
+  // Walk to the far mine, work it, store at the outpost storage: the epic's plan.
+  const mine = { x: 30, y: 4 }
+  const workMine: OrderRequest = { kind: 'task', task: 'work', workplaceId: 'm1' }
+  const store: OrderRequest = { kind: 'store', goods: STORE_ALL.goods, to: 's9' }
+  const plan = planStep(planStep(EMPTY_PLAN, workMine, mine), store)
+  const members: Queued[] = [
+    idle,
+    { id: 'w2', x: 1, y: 1, order: null },
+    shiftQueue({ ...idle, id: 'w3' }, [{ kind: 'walkTo', residentId: 'w3', x: 2, y: 2 }]),
+  ]
+
+  it('plans a step acting on a place after a walk there, and times one that never ends', () => {
+    expect(plan.steps).toEqual([
+      { id: 1, order: { kind: 'walkTo', ...mine } },
+      { id: 2, order: workMine, minutes: QUEUE_DEFAULT_STEP_MINUTES },
+      { id: 3, order: store },
+    ])
+    expect(plan.current).toBe(-1)
+  })
+
+  it('edits the plan as the queue list does, keeping its ids', () => {
+    const looped = editPlan(plan, removeStep(plan, 3), true)
+    expect(looped.steps.map((s) => s.id)).toEqual([1, 2])
+    expect(looped.loop).toBe(true)
+    // A step added after a removal gets a fresh id.
+    expect(planStep(looped, store).steps.at(-1)!.id).toBe(4)
+  })
+
+  it('Give to all sends one queue request per member with the same steps', () => {
+    const requests = giveToAll({ ...plan, loop: true }, members)
+    expect(requests.map((o) => [o.kind, o.residentId])).toEqual([
+      ['queue', 'w1'],
+      ['queue', 'w2'],
+      ['queue', 'w3'],
+    ])
+    const steps = [
+      { order: { kind: 'walkTo', ...mine } },
+      { order: workMine, minutes: QUEUE_DEFAULT_STEP_MINUTES },
+      { order: store },
+    ]
+    for (const o of requests) {
+      expect(o.steps).toEqual(steps)
+      expect(o.loop).toBe(true)
+      expect(queueStepsProblem(o.steps)).toBeUndefined()
+    }
+  })
+
+  it('appending to a group adds the step after each member’s own steps', () => {
+    const requests = appendToEach(members, workMine, mine)
+    const walkMine = { order: { kind: 'walkTo', ...mine } }
+    const step = { order: workMine }
+    expect(requests).toEqual([
+      { kind: 'queue', residentId: 'w1', steps: [walkMine, step] },
+      { kind: 'queue', residentId: 'w2', steps: [walkMine, step] },
+      {
+        kind: 'editQueue',
+        residentId: 'w3',
+        steps: [{ id: 1, order: { kind: 'walkTo', x: 2, y: 2 } }, walkMine, step],
+      },
+    ])
   })
 })

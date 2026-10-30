@@ -69,11 +69,13 @@ export type SeenHorse = Omit<Horse, 'hunger' | 'health'> & Partial<Pick<Horse, '
 /**
  * A carriage as Players see it (`CONTEXT.md`: Seeing inside a storage): how heavily it is loaded,
  * and the load itself only for its own Organization, their allies and anyone with a resident on
- * its tile.
+ * its tile. `passengerIds` are the residents aboard it (`CONTEXT.md`: Passenger), always sent by
+ * the server.
  */
-export type SeenCarriage =
+export type SeenCarriage = (
   | (Carriage & { loadLevel?: LoadLevel })
   | (Omit<Carriage, 'load'> & { load?: undefined; loadLevel: LoadLevel })
+) & { passengerIds?: string[] }
 
 /**
  * Something a Player sees (`CONTEXT.md`: Sight), tagged with what it is. Ids are unique across
