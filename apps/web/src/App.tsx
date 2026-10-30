@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import {
+  BUILDABLE,
   carriagePulledBy,
   holdersOf,
   horseOfResident,
@@ -51,9 +52,31 @@ import {
 import type { Covered } from './map/camera.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { Founding } from './Founding.js'
-import { appendRequest, editRequest, storeAll, useShiftHeld } from './queue-view.js'
+import {
+  appendRequest,
+  appendToEach,
+  editRequest,
+  giveToAll,
+  planStep,
+  storeAll,
+  useShiftHeld,
+  type QueuePlan,
+} from './queue-view.js'
+import { AddStep } from './AddStep.js'
+import { GroupPlanner } from './GroupPlanner.js'
+import {
+  horsesIn,
+  nextPick,
+  pickInto,
+  planAsk,
+  planOrder,
+  type Plan,
+  type PlanAnswer,
+  type PlanStepId,
+  type PlanWorld,
+} from './plan-step.js'
 import { useSavedGroups } from './saved-groups.js'
-import { groupRequests, type GroupOrder, type Skipped } from './group-orders.js'
+import { groupRequests, type GroupOrder, type Place, type Skipped } from './group-orders.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
@@ -66,6 +89,7 @@ import {
   GroupCard,
   ResidentCard,
   type GroupPicking,
+  type GroupPickWith,
   ResidentsList,
   type HaulSetup,
   type Picking,
@@ -114,6 +138,11 @@ function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): P
   return { buildings, carriages, cities, realmId: world.home.realmId, size: world.map.size }
 }
 
+/** What the queue planner's map picks need of the world (`plan-step`). */
+function planWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): PlanWorld {
+  return { ...paramWorld(world), horses: world.horses }
+}
+
 export function App() {
   // The Wiki needs no account, so it shows without asking who is logged in.
   if (isWikiPath(window.location.pathname)) return <Wiki />
@@ -157,11 +186,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
   // Script parameter).
   const [paramPick, setParamPick] = useState<ScriptParam>()
+  // The step being planned with the queue planner's Add step (`CONTEXT.md`: Queue, Planning
+  // ahead): the map picks its places, then the card asks for what more it needs.
+  const [plan, setPlan] = useState<Plan>()
+  // The queue planned on the group card, held here until given to all (`CONTEXT.md`: Planning
+  // for a group); with none open, a step planned for a group goes onto each one's own queue.
+  const [groupPlan, setGroupPlan] = useState<QueuePlan>()
   const [starting, setStarting] = useState<Starting>()
   // The param whose value the map is waiting for: of the running script, or for the form.
   const pickingParam = paramPick ?? starting?.picking
   // A group order waiting for a tile, the tile picked to build on, and what the last one did.
   const [groupPicking, setGroupPicking] = useState<GroupPicking>(false)
+  // What the group order being picked needs besides the tile, and a line's first end.
+  const [groupPickWith, setGroupPickWith] = useState<GroupPickWith>({})
+  const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
   const [groupReport, setGroupReport] = useState<{ sent: number; of: number; skipped: Skipped[] }>()
   const [groupError, setGroupError] = useState<string>()
@@ -198,6 +236,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     isGroup: group.length > 1,
     armyPick,
     paramPick: pickingParam,
+    plan,
   })
   /** Leaves pick mode without giving the order; the card comes back as it was. */
   const cancelPick = useCallback(() => {
@@ -205,6 +244,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setGroupPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setPlan(undefined)
     setStarting((s) => s && { ...s, picking: undefined })
   }, [])
   // Escape leaves pick mode first; with no drawer open, it then drops the selection.
@@ -248,6 +288,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setPlan(undefined)
+    setGroupPlan(undefined)
     setStarting(undefined)
     setOrderError(undefined)
     setGroupPicking(false)
@@ -323,6 +365,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setArmyError(await sendOrder({ kind: armyPick.kind, armyId: armyPick.armyId, x, y }))
       return
     }
+    if (plan && nextPick(plan)) {
+      if (!world) return
+      const next = pickInto(planWorld(world), plan, { x, y })
+      if (nextPick(next) || planAsk(next)) setPlan(next)
+      else await addPlanned(next)
+      return
+    }
     if (group.length > 1) {
       await groupTile(x, y)
       return
@@ -350,8 +399,65 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
 
   /**
+   * Starts planning a step with Add step (`CONTEXT.md`: Queue, Planning ahead): the map picks its
+   * places first; one that needs neither is added at once.
+   */
+  async function startPlan(kind: PlanStepId) {
+    setPicking(false)
+    setGroupPicking(false)
+    setParamPick(undefined)
+    const fresh: Plan = { kind, picked: [] }
+    if (nextPick(fresh) || planAsk(fresh)) setPlan(fresh)
+    else await addPlanned(fresh)
+  }
+  /**
+   * Appends the step planned to the picked resident's queue, or starts one with it, after a walk
+   * to where it acts (`appendRequest`). The server checks that it could make sense; whether it can
+   * start is checked when its turn comes. For a group it goes onto the plan open on the group card,
+   * or, with none open, onto each one's own queue (`CONTEXT.md`: Planning for a group).
+   */
+  async function addPlanned(planned: Plan, answer?: PlanAnswer) {
+    setPlan(undefined)
+    const step = planOrder(planned, answer)
+    if (!step) return
+    if (group.length > 1) {
+      if (groupPlan) setGroupPlan(planStep(groupPlan, step.order, step.at))
+      else await sendToGroup(appendToEach(group, step.order, step.at), [])
+      return
+    }
+    if (!selected) return
+    const order = { ...step.order, residentId: selected.id }
+    setOrderError(await sendOrder(appendRequest(selected, order, step.at) ?? order))
+  }
+  /** The queue planner's Add step, on the resident card and the group card. */
+  function addStep(w: NonNullable<typeof world>) {
+    return (
+      <AddStep
+        plan={plan}
+        onStart={(kind) => void startPlan(kind)}
+        onAnswer={(answer) => plan && void addPlanned(plan, answer)}
+        onCancel={() => setPlan(undefined)}
+        scripts={scripts}
+        buildKinds={
+          plan?.kind === 'build' && plan.picked[0]
+            ? buildMenu(nodeAt?.(plan.picked[0].x, plan.picked[0].y))
+            : []
+        }
+        horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
+      />
+    )
+  }
+  /** Give to all: each one's queue becomes a copy of the plan; then the plan closes. */
+  async function giveGroupPlan() {
+    if (!groupPlan) return
+    setGroupPlan(undefined)
+    await sendToGroup(giveToAll(groupPlan, group), [])
+  }
+
+  /**
    * A tile picked for the group (`CONTEXT.md`: Group): walking there (also by right-click),
-   * working the workplace there, or where to build.
+   * working the workplace there, where to build, drive or haul to, a line's ends, the building to
+   * tear down, the place to store at or fetch from, whom to attack or the wall to climb.
    */
   async function groupTile(x: number, y: number) {
     const mode = groupPicking
@@ -361,17 +467,86 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setGroupBuildAt({ x, y })
       return
     }
+    if (mode === 'roadFrom' || mode === 'wallFrom') {
+      // Then the line's other end.
+      setGroupLineFrom({ x, y })
+      setGroupPicking(mode === 'roadFrom' ? 'roadTo' : 'wallTo')
+      return
+    }
     setGroupBuildAt(undefined)
-    if (mode !== 'work') return sendGroup({ kind: 'walkTo', x, y })
-    const workplace = world.buildings.find(
-      (b) => b.kind !== 'road' && !b.site && covers(b, x, y) && MAX_WORKERS[b.kind] !== undefined,
-    )
     setGroupReport(undefined)
-    if (!workplace) return setGroupError('no workplace there')
-    // What a smithy makes is picked for each worker on their own card.
-    if (workplace.kind === 'smithy') return setGroupError('pick what to make on each one’s card')
-    const name = BUILDING_NAMES[workplace.kind].toLowerCase()
-    await sendGroup({ kind: 'work', workplace, name })
+    const fail = (why: string) => setGroupError(why)
+    const name = (b: Building) => BUILDING_NAMES[b.kind].toLowerCase()
+    const realmId = world.home.realmId
+    // A storage, a stable or one of the realm's carriages, to store at or fetch from.
+    const place = (): Place | undefined => {
+      const b = world.buildings.find(
+        (s) => (s.kind === 'storage' || s.kind === 'stable') && !s.site && covers(s, x, y),
+      )
+      if (b) return { id: b.id, name: name(b) }
+      const k = world.carriages.find((c) => c.realmId === realmId && c.x === x && c.y === y)
+      return k && { id: k.id, name: 'carriage' }
+    }
+    // A wall or gate of another realm's city, or of none.
+    const foreignWall = world.buildings.find(
+      (b) =>
+        isWallOrGate(b) &&
+        covers(b, x, y) &&
+        world.cities.find((c) => c.id === b.cityId)?.realmId !== realmId,
+    )
+    switch (mode) {
+      case 'work': {
+        const workplace = world.buildings.find(
+          (b) =>
+            b.kind !== 'road' && !b.site && covers(b, x, y) && MAX_WORKERS[b.kind] !== undefined,
+        )
+        if (!workplace) return fail('no workplace there')
+        // What a smithy makes is picked for each worker on their own card.
+        if (workplace.kind === 'smithy') return fail('pick what to make on each one’s card')
+        return sendGroup({ kind: 'work', workplace, name: name(workplace) })
+      }
+      case 'drive':
+        return sendGroup({ kind: 'drive', x, y })
+      case 'haul':
+        if (!groupPickWith.haul) return
+        return sendGroup({ kind: 'haul', x, y, ...groupPickWith.haul })
+      case 'roadTo':
+      case 'wallTo':
+        if (!groupLineFrom) return
+        setGroupLineFrom(undefined)
+        return sendGroup({
+          kind: 'line',
+          line: mode === 'roadTo' ? 'roadLine' : 'wallLine',
+          from: groupLineFrom,
+          to: { x, y },
+        })
+      case 'tearDown': {
+        // A building before a road sharing its tile.
+        const there = world.buildings.filter((b) => BUILDABLE.includes(b.kind) && covers(b, x, y))
+        const building = there.find((b) => b.kind !== 'road') ?? there[0]
+        if (!building) return fail('nothing to tear down there')
+        return sendGroup({ kind: 'tearDown', building, name: name(building) })
+      }
+      case 'storeAt':
+      case 'fetchFrom': {
+        const at = place()
+        if (!at) return fail('no storage, stable or carriage of yours there')
+        if (mode === 'storeAt') return sendGroup({ kind: 'store', to: at })
+        return sendGroup({ kind: 'fetch', good: groupPickWith.good ?? 'food', from: at })
+      }
+      case 'attack': {
+        const target =
+          world.residents.find((r) => r.x === x && r.y === y && !own.some((o) => o.id === r.id)) ??
+          foreignWall
+        if (!target) return fail('nobody of another realm there, and no wall or gate')
+        return sendGroup({ kind: 'attack', targetId: target.id })
+      }
+      case 'climb':
+        if (!foreignWall) return fail('no wall or gate of another realm there')
+        return sendGroup({ kind: 'climb', wall: foreignWall })
+      default:
+        return sendGroup({ kind: 'walkTo', x, y })
+    }
   }
   /**
    * Gives each resident of the group the same order request (ADR 0002), skipping those who
@@ -408,18 +583,37 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
     }
     // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue).
+    const realmId = world.home.realmId
     const { requests, skipped } = groupRequests(order, group, {
       tick: world.tick,
       size,
       free,
       queued,
+      seen: {
+        // Free horses of the realm, to mount (`CONTEXT.md`: Riding).
+        horses: world.horses.filter(
+          (h) => h.realmId === realmId && !carriagePulledBy(world, h) && !riderOf(world, h),
+        ),
+        carriages: world.carriages.filter((k) => k.realmId === realmId),
+        buildings: world.buildings,
+      },
     })
     if (order.kind === 'build') setGroupBuildAt(undefined)
+    await sendToGroup(
+      requests.map((q) => q.order),
+      skipped,
+    )
+  }
+  /**
+   * Sends the group's requests, one per resident, and says on the card how many went out and who
+   * was skipped or turned down and why.
+   */
+  async function sendToGroup(requests: OrderRequest[], skipped: Skipped[]) {
     setGroupError(undefined)
-    const answers = await Promise.all(requests.map((q) => sendOrder(q.order)))
-    const turnedDown = requests.flatMap((q, i) => {
+    const answers = await Promise.all(requests.map((o) => sendOrder(o)))
+    const turnedDown = requests.flatMap((o, i) => {
       const why = answers[i]
-      const r = group.find((g) => g.id === q.residentId)
+      const r = group.find((g) => g.id === o.residentId)
       return why && r ? [{ id: r.id, name: r.name, why }] : []
     })
     setGroupReport({
@@ -597,6 +791,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPicking(false)
               setArmyPick(undefined)
               setParamPick(undefined)
+              setPlan(undefined)
               setOrderError(undefined)
             }}
             selectedCityId={openCityId}
@@ -608,6 +803,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               picking !== false ||
               armyPick !== undefined ||
               pickingParam !== undefined ||
+              pick?.kind === 'plan' ||
               (group.length > 1 && groupPicking !== false)
             }
             onPickTile={goTo}
@@ -998,24 +1194,31 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onEditQueue={async (steps, loop) =>
               setOrderError(await sendOrder(editRequest(selected, steps, loop)))
             }
+            addStep={addStep(world)}
             onClose={() => {
               setSelectedIds([])
               setPicking(false)
               setParamPick(undefined)
+              setPlan(undefined)
             }}
             collapsed={pick !== undefined && pick.kind !== 'army'}
           />
         </CardSheet>
       )}
       {world && group.length > 1 && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group'}>
+        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}>
           <GroupCard
             residents={group}
             scripts={scripts}
             buildings={world.buildings}
+            horses={world.horses}
+            realmId={world.home.realmId}
+            tick={world.tick}
             picking={groupPicking}
-            onPicking={(p) => {
+            onPicking={(p, with_) => {
               setGroupPicking(p)
+              setGroupPickWith(with_ ?? {})
+              setGroupLineFrom(undefined)
               setGroupBuildAt(undefined)
             }}
             buildAt={
@@ -1043,7 +1246,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             orderError={groupError}
             onPick={(id) => select([id])}
             onClose={() => select([])}
-            collapsed={pick?.kind === 'group'}
+            planner={
+              <GroupPlanner
+                plan={groupPlan}
+                onPlan={setGroupPlan}
+                onGive={() => void giveGroupPlan()}
+                addStep={addStep(world)}
+                scripts={scripts}
+                buildings={world.buildings}
+              />
+            }
+            collapsed={pick?.kind === 'group' || pick?.kind === 'plan'}
           />
         </CardSheet>
       )}

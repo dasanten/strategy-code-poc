@@ -451,8 +451,9 @@ export function Wiki() {
         <p>Groups are kept in this browser, for each realm; another browser starts without them.</p>
         <p>
           With several picked, the group card gives each of them the same order, just as their own
-          cards would: walk to, work, build, store, fetch, run a script or stop. Nothing ties them
-          together afterwards; each goes on alone.
+          cards would. Every order a resident's card has is on it, but pairing, making Leader and
+          renaming, which are about one resident. Nothing ties them together afterwards; each goes
+          on alone.
         </p>
         <ul>
           <li>
@@ -469,20 +470,50 @@ export function Wiki() {
           </li>
           <li>
             <strong>Store</strong> puts what each carries in the nearest storage (their own food
-            stays with them); <strong>Fetch</strong> takes a good from the nearest storage or
-            carriage holding it.
+            stays with them), <strong>Store at</strong> in the storage, stable or carriage picked;{' '}
+            <strong>Fetch</strong> takes a good from the nearest storage or carriage holding it, or
+            from the one picked. <strong>Drop all</strong> puts down everything each carries.
+          </li>
+          <li>
+            <strong>Mount horses</strong>: each takes a different free horse of yours on their tile.{' '}
+            <strong>Drive carriages</strong> and <strong>Haul route</strong> go to each standing on
+            a carriage, one driver for each carriage.
+          </li>
+          <li>
+            <strong>Feed the stable</strong>: each standing in a stable feeds it.{' '}
+            <strong>Breed horses</strong>: pick two horses in a stable where some of them stand; one
+            of them there who isn't breeding yet tends the pair. Pick two more for the next.
+          </li>
+          <li>
+            <strong>Build road</strong> and <strong>Build wall</strong>: pick where the line starts
+            and ends; they all build along it. <strong>Tear down</strong>: pick a building; those
+            standing at it tear it down.
+          </li>
+          <li>
+            <strong>Attack</strong>: pick a resident of another realm, or a wall or gate, for them
+            all to attack. <strong>Climb a wall</strong>: those next to the one picked climb over.
           </li>
         </ul>
         <p>
           Those who can't take an order are skipped, and the card says who and why: children don't
-          work or build, and store or fetch only Food; a partner carrying a child doesn't work or
-          build.
+          work, build or drive, and store, fetch or put down only Food; a partner carrying a child
+          doesn't work, build, tear down, breed or haul; orders bound to a place go only to those
+          standing there.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
-          instead (see Queues). Work then also goes to those away from the workplace, who walk there
-          first, and Store to those who carry nothing yet. Stop still stops them all and ends their
-          queues.
+          instead (see Queues). Work, Tear down and Breed horses then also go to those away from the
+          place, who walk there first, and Store to those who carry nothing yet. Stop still stops
+          them all and ends their queues.
+        </p>
+        <p>
+          The group card's Queue tab has the same planner as a resident's card.{' '}
+          <strong>Add step</strong> adds the step to the end of each one's own queue.{' '}
+          <strong>Plan a queue for all</strong> opens a plan kept in this browser: add steps,
+          reorder them, give them durations and loop it, as on a resident's card, then{' '}
+          <strong>Give to all</strong> makes each one's queue a copy of it, ending what they do.
+          Everyone gets every step, even one they can't do; they skip it when its turn comes.
+          Afterwards each one's queue is their own, edited on their card.
         </p>
       </Section>
 
@@ -490,8 +521,20 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, work, build, haul, tear down, build a road or wall
-          line, or run one of your scripts with its params.
+          to, pick up, drop, store, fetch, drive, mount or dismount, work, build, haul, feed the
+          stable, breed horses, tear down, build a road or wall line, or run one of your scripts
+          with its params.
+        </p>
+        <p>
+          To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
+          lists every kind of step. One that acts on a place (work a workplace, build, store at or
+          fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
+          map, anywhere, not only where the resident stands now; one that needs more (which goods,
+          what to build, what a smithy makes, which script) asks for it on the card after. A step
+          that has to be done on its tile goes after a walk there, unless the step before already
+          walks there. It works on a resident with no queue too, and starts one. Adding a step only
+          checks that it could make sense (the place is there, and a carriage or horse is yours);
+          whether it can start is checked when its turn comes.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -638,10 +681,10 @@ export function Wiki() {
         </p>
         <p>
           Far from home, a resident working, building or tearing down goes and gets food on their
-          own. Below <code>foodAt</code> units of Food on them ({num(GET_FOOD_AT)} unless you set
-          it on their card), they walk to their storage (or the nearest one of your realm with
-          Food), take Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and go
-          back. Whenever they are at a storage anyway, their own food is topped up to{' '}
+          own. Below <code>foodAt</code> units of Food on them ({num(GET_FOOD_AT)} unless you set it
+          on their card), they walk to their storage (or the nearest one of your realm with Food),
+          take Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and go back.
+          Whenever they are at a storage anyway, their own food is topped up to{' '}
           <code>foodTake</code> instead of {num(OWN_FOOD)}. With <code>foodAt</code> set to 0 they
           don't go on their own and rely on refilling.
         </p>
@@ -807,8 +850,8 @@ export function Wiki() {
           resource nodes, and a new town hall founds a city.
         </p>
         <p>
-          A resident building or tearing down who carries less Food than <code>foodAt</code>{' '}
-          ({num(GET_FOOD_AT)} unless set) goes to their <code>source</code>, or the nearest storage
+          A resident building or tearing down who carries less Food than <code>foodAt</code> (
+          {num(GET_FOOD_AT)} unless set) goes to their <code>source</code>, or the nearest storage
           of your realm with Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)}{' '}
           unless set) and comes back to the site. With no Food anywhere they work on. Fetching
           materials tops their food up to <code>foodTake</code> too, before the materials.{' '}
@@ -974,9 +1017,9 @@ export function Wiki() {
           while they ride somewhere.
         </p>
         <p>
-          A rider’s Doing line says <em>Riding to …</em> where it would say{' '}
-          <em>Walking to …</em>, and their card shows the horse they ride: its stats, age, health
-          and hunger, with <strong>Dismount</strong> under Orders.
+          A rider’s Doing line says <em>Riding to …</em> where it would say <em>Walking to …</em>,
+          and their card shows the horse they ride: its stats, age, health and hunger, with{' '}
+          <strong>Dismount</strong> under Orders.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
