@@ -1,5 +1,5 @@
 import type { Server } from 'node:http'
-import cookie from '@fastify/cookie'
+import { fastifyCookie } from '@fastify/cookie'
 import { WebSocket, WebSocketServer } from 'ws'
 import {
   SCRIPT_WATCH_MAX,
@@ -45,7 +45,7 @@ import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
  * ended the process (#512).
  */
 function sessionToken(header: string | undefined): string | undefined {
-  return header ? cookie.parse(header)[SESSION_COOKIE] : undefined
+  return header ? fastifyCookie.parse(header)[SESSION_COOKIE] : undefined
 }
 
 function send(socket: WebSocket, msg: ServerMessage) {
