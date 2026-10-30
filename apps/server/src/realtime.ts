@@ -3,6 +3,7 @@ import { WebSocket, WebSocketServer } from 'ws'
 import {
   SCRIPT_WATCH_MAX,
   SESSION_COOKIE,
+  WS_CLOSE_LOGGED_OUT,
   WS_PATH,
   commanderOf,
   diplomacyFor,
@@ -23,7 +24,7 @@ import {
   type Territory,
   type WorldState,
 } from '@csp/shared'
-import { getSessionUser, type SessionUser } from './auth.js'
+import { getSessionUser, hashToken, sessionAlive, type SessionUser } from './auth.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
 import type { OrderQueue } from './orders.js'
@@ -46,6 +47,18 @@ function readCookie(header: string | undefined, name: string): string | undefine
 
 function send(socket: WebSocket, msg: ServerMessage) {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
+}
+
+/**
+ * How often each client's session is checked again after the handshake, so a session that
+ * expired, or was deleted some other way than logout or a reset, ends its sockets within that.
+ */
+export const SESSION_RECHECK_MS = 60_000
+
+/** A connected socket's session: what it is closed by when the session ends. */
+interface Session {
+  tokenHash: string
+  userId: number
 }
 
 /** The realms whose residents are among the entities, and the cities among them. */
@@ -152,8 +165,27 @@ export function attachRealtime(
   },
 ) {
   const { world } = opts
-  const users = new WeakMap<object, SessionUser>()
+  const users = new WeakMap<object, { user: SessionUser; session: Session }>()
+  /** Every connected socket, whether or not its Player has a realm yet. */
+  const sessions = new Map<WebSocket, Session>()
   const clients = new Map<WebSocket, Client>()
+  let lastSessionCheck = Date.now()
+
+  /** Closes a socket because its session ended; the client shows the login screen. */
+  function endSession(socket: WebSocket) {
+    sessions.delete(socket)
+    clients.delete(socket)
+    socket.close(WS_CLOSE_LOGGED_OUT, 'logged out')
+  }
+
+  /** Closes the sockets whose session is gone or expired, at most once in `SESSION_RECHECK_MS`. */
+  function recheckSessions(now: number) {
+    if (now - lastSessionCheck < SESSION_RECHECK_MS) return
+    lastSessionCheck = now
+    for (const [socket, session] of sessions) {
+      if (!sessionAlive(opts.db, session.tokenHash, now)) endSession(socket)
+    }
+  }
 
   /** Reports entities about to go to a realm's Player outside their sight, on sampled ticks. */
   function checkSent(realmId: string, sent: SeenEntity[]) {
@@ -233,9 +265,10 @@ export function attachRealtime(
     server,
     path: WS_PATH,
     verifyClient: ({ req }, done) => {
-      const user = getSessionUser(opts.db, readCookie(req.headers.cookie, SESSION_COOKIE))
-      if (!user) return done(false, 401, 'Not logged in')
-      users.set(req, user)
+      const token = readCookie(req.headers.cookie, SESSION_COOKIE)
+      const user = getSessionUser(opts.db, token)
+      if (!user || !token) return done(false, 401, 'Not logged in')
+      users.set(req, { user, session: { tokenHash: hashToken(token), userId: user.id } })
       done(true)
     },
   })
@@ -297,7 +330,8 @@ export function attachRealtime(
   }
 
   wss.on('connection', (socket, req) => {
-    const user = users.get(req)!
+    const { user, session } = users.get(req)!
+    sessions.set(socket, session)
     const account = { name: user.name, isAdmin: user.isAdmin }
     // A Player without a realm (first login, or after a Leader death) names it and their Leader
     // before the realm and its starting city are founded (`CONTEXT.md`: Realm name).
@@ -340,18 +374,34 @@ export function attachRealtime(
         sendScriptLogs(socket, client)
       }
     })
-    socket.on('close', () => clients.delete(socket))
+    socket.on('close', () => {
+      sessions.delete(socket)
+      clients.delete(socket)
+    })
   })
 
   return {
+    /** Closes the sockets of one session: called when it is logged out. */
+    disconnectSession(tokenHash: string) {
+      for (const [socket, session] of sessions) {
+        if (session.tokenHash === tokenHash) endSession(socket)
+      }
+    },
+    /** Closes every socket of an account: called when a password reset ends all its sessions. */
+    disconnectUser(userId: number) {
+      for (const [socket, session] of sessions) {
+        if (session.userId === userId) endSession(socket)
+      }
+    },
     /**
      * Sends every client the changes in its sight since the last tick, and the chunks whose
      * explored terrain grew for its Player (`explored`, from `SightTracker.update`), and its
      * Player's new realm events, and their alliance matters when those changed, and the Region map
      * when territory was worked out again or their explored terrain grew: each Player gets only
-     * their own.
+     * their own. First, once a minute, the sockets whose session ended meanwhile are closed.
      */
-    broadcastTick(explored: Map<number, Set<number>> = new Map()) {
+    broadcastTick(explored: Map<number, Set<number>> = new Map(), now = Date.now()) {
+      recheckSessions(now)
       for (const [socket, client] of clients) {
         const inSight = entitiesInSight(world, opts.terrain, client.realmId)
         const { changed, gone } = client.view.diff(inSight)

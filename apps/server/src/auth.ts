@@ -30,6 +30,15 @@ export interface SessionUser extends Account {
   id: number
 }
 
+/**
+ * The open sockets of sessions (`attachRealtime`), closed when a session ends: one session's on
+ * logout, all of an account's on a password reset.
+ */
+export interface SessionSockets {
+  disconnectSession(tokenHash: string): void
+  disconnectUser(userId: number): void
+}
+
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16)
   const hash = await scryptAsync(password, salt, KEY_LENGTH)
@@ -119,7 +128,9 @@ export async function logIn(
   return toAccount(user)
 }
 
-const hashToken = (token: string) => createHash('sha256').update(token).digest('base64url')
+/** The hash a session token is stored and tracked by; the token itself is only in the cookie. */
+export const hashToken = (token: string) =>
+  createHash('sha256').update(token).digest('base64url')
 
 /** Starts a session and returns the token for the cookie. */
 export function createSession(db: Db, userId: number, now = Date.now()): string {
@@ -165,10 +176,21 @@ export function getSessionUser(
   return toAccount(row.user)
 }
 
-export function deleteSession(db: Db, token: string): void {
-  db.delete(schema.sessions)
-    .where(eq(schema.sessions.tokenHash, hashToken(token)))
-    .run()
+/** Whether the session with this token hash still exists and has not expired. */
+export function sessionAlive(db: Db, tokenHash: string, now = Date.now()): boolean {
+  const row = db
+    .select({ expiresAt: schema.sessions.expiresAt })
+    .from(schema.sessions)
+    .where(eq(schema.sessions.tokenHash, tokenHash))
+    .get()
+  return row !== undefined && row.expiresAt.getTime() > now
+}
+
+/** Ends a session (logout), closing its open sockets. */
+export function deleteSession(db: Db, token: string, sockets?: SessionSockets): void {
+  const tokenHash = hashToken(token)
+  db.delete(schema.sessions).where(eq(schema.sessions.tokenHash, tokenHash)).run()
+  sockets?.disconnectSession(tokenHash)
 }
 
 export function deleteExpiredSessions(db: Db, now = Date.now()): void {
@@ -186,8 +208,13 @@ export function createInviteCode(db: Db, createdBy: number | null): string {
   return code
 }
 
-/** Sets a new password and logs the account out everywhere. */
-export async function resetPassword(db: Db, name: unknown, password: unknown): Promise<void> {
+/** Sets a new password and logs the account out everywhere, closing its open sockets. */
+export async function resetPassword(
+  db: Db,
+  name: unknown,
+  password: unknown,
+  sockets?: SessionSockets,
+): Promise<void> {
   const pw = validatePassword(password)
   const user = typeof name === 'string' ? findUserByName(db, name) : undefined
   if (!user) throw new AuthError('not-found', 'No account with that name.')
@@ -196,6 +223,7 @@ export async function resetPassword(db: Db, name: unknown, password: unknown): P
     tx.update(schema.users).set({ passwordHash }).where(eq(schema.users.id, user.id)).run()
     tx.delete(schema.sessions).where(eq(schema.sessions.userId, user.id)).run()
   })
+  sockets?.disconnectUser(user.id)
 }
 
 /** Creates an admin account, or makes an existing account admin and sets its password. */
