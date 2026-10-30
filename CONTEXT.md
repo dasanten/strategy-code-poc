@@ -388,7 +388,8 @@ The shared language of the game. Domain terms only — no implementation details
   stop, so food keeps coming to wherever the army is. Cut the route and the army starves.
   At its army stop the carriage unloads nothing: it stays with the army, which refills from it,
   until the hauled goods are gone, then goes back for more. Nothing comes back from an army.
-  A supply wagon's driver, not being of the army, eats only what they carry.
+  A supply wagon's driver, not being of the army, refills from the carriage like anyone aboard
+  (Refilling from a carriage).
 - **Combat:** resolved between residents in contact (the same or a neighbouring tile). Attack
   from Strength, weapon and Combat skill; Agility dodges, armour and shields take off damage.
   Fighting teaches Combat. An armed resident who is hit fights back; an unarmed one flees home.
@@ -582,7 +583,7 @@ The shared language of the game. Domain terms only — no implementation details
   takes a meal the same way from Food lying on the workplace's tile, or else from a carriage
   standing there. Anywhere else (travelling, building) there is no refill: they need food on
   them or a delivery.
-- **Refilling from a carriage:** a resident of an army, or a passenger, running low on food
+- **Refilling from a carriage:** a resident of an army, a passenger, or the driver, running low on food
   takes a meal from a carriage of their own realm on or next to their tile, like refilling at
   home.
 - **Getting food:** in the Work, Build and Tear down defaults, a resident whose `foodAt` param is
@@ -620,6 +621,9 @@ The shared language of the game. Domain terms only — no implementation details
 - **Horses have no inventory:** a horse eats only what is in reach. At a stable it eats from the
   stable's storage; pulling a carriage, from the carriage's load; anywhere, from Food lying on the
   ground on its tile or right next to it, so Players can feed a horse by putting food down by it.
+  A ridden horse also eats from the Food its rider carries beyond the rider's own food, after
+  Food in reach on the ground: the rider never goes without for the horse, and the realm log says
+  when a ridden horse is hungry with nothing to spare.
 - **Stable:** a building on Plains where horses are kept. It has a storage for their Food, which
   residents fill and empty like any storage. Horses don't breed there on their own: a resident
   breeds them (**Breeding**). Like a workplace, a stable has no owner: any horse standing in it
@@ -653,7 +657,9 @@ The shared language of the game. Domain terms only — no implementation details
   the carriage and its horse move together. Driving teaches the Driving skill, and a more
   skilled driver goes faster. Players drive only their own carriages, with their own horses.
 - **Hitched horse:** the one horse that pulls a carriage. A horse of the carriage's realm standing
-  with it is hitched when the carriage is first driven, and stays hitched (for now). A carriage
+  with it is hitched when the carriage is first driven, and stays hitched until **unhitched**: a grown resident of the carriage's realm standing on its
+  tile unhitches it (an order, as a script could do it); the horse stands free on the tile, and
+  the carriage stands where it is until it is next driven. A carriage
   whose horse dies stands where it is until another horse is hitched.
 - **Riding:** a resident on a tile with a horse of their realm that pulls no carriage and nobody
   rides mounts it, and dismounts anywhere; the horse stays on that tile. Riding is not an order:
