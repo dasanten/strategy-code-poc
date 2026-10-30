@@ -886,9 +886,9 @@ export function Wiki() {
           Build can be run directly too, with Run script or as a queue step: they join the
           construction site in its <code>site</code> param, or with none picked the one they stand
           on when it starts. Laying out a new site (what and where) is only the Build order's.
-          Giving Build on a site your residents laid out fills <code>site</code>; it is never kept, so a
-          queue can walk them to a site and then run Build there. With no construction site there,
-          Build ends and your realm log says why.
+          Giving Build on a site your residents laid out fills <code>site</code>; it is never kept,
+          so a queue can walk them to a site and then run Build there. With no construction site
+          there, Build ends and your realm log says why.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
@@ -1593,7 +1593,10 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           scripts gave <code>log(text)</code> and the reasons they gave <code>end(reason)</code>,
           each with its game time. A resident keeps their last {num(SCRIPT_LOG_LINES)} lines across
           scripts, so it still shows why the last one ended after it did; once full, the oldest line
-          goes. Only you see it: it never goes in the realm log, to other Players or to scripts.
+          goes. Only you see it: it never goes in the realm log, to other Players or to scripts. The
+          game’s default scripts log their decisions and turns, never every tick, like “pile full:
+          carrying 10 stone to the storage at 12,6” or “low on Food (2): fetching 6 at the storage
+          at 12,6”.
         </p>
       </Section>
 

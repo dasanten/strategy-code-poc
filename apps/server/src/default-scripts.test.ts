@@ -686,7 +686,7 @@ describe('the step budget', () => {
         },
         // Carrying: ordering the load stored.
         {
-          memory: { ...work, carry: { storageId: 's1', goods: ['food'] } },
+          memory: { ...work, carry: { storageId: 's1', goods: ['food'], load: { food: 24 } } },
           prepare: (world) => {
             world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 3, y: 3 })
             world.residents[0]!.carried = { food: 30 }
