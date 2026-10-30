@@ -386,11 +386,18 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     mapSize: terrain.size,
     random: tickRandom(world),
   }
+  const helpers = scriptHelpers(values.random as number)
 
   const globals: Record<string, Value> = {}
   for (const binding of api) {
     if (binding.is === 'value') {
       globals[binding.name] = values[binding.name]!
+      continue
+    }
+    // A helper answers with what it was given, as it is, not through a script view.
+    const helper = helpers[binding.name]
+    if (helper) {
+      globals[binding.name] = new NativeFunction(binding.name, helper, binding.cost)
       continue
     }
     const call = (binding.is === 'query' ? queries : actions)[binding.name]
@@ -417,6 +424,23 @@ function shortText(text: Value | undefined, call: string): string | null {
   if (text === undefined || text === null) return null
   if (typeof text !== 'string') throw new ScriptRuntimeError(`"${call}" needs a text or null`)
   return text.trim().slice(0, DOING_MAX_LENGTH) || null
+}
+
+/**
+ * The helpers of the game API (`CONTEXT.md`: Default script), which work only on what they are
+ * given: `floor(n)`, and `pickRandom(list)`, the item at `random` of the way along the list.
+ */
+export function scriptHelpers(random: number): Record<string, (args: Value[]) => Value> {
+  return {
+    floor: ([n]) => {
+      if (typeof n !== 'number') throw new ScriptRuntimeError('"floor" needs a number')
+      return Math.floor(n)
+    },
+    pickRandom: ([items]) => {
+      if (!Array.isArray(items)) throw new ScriptRuntimeError('"pickRandom" needs a list')
+      return items.length === 0 ? null : items[Math.floor(random * items.length)]!
+    },
+  }
 }
 
 /** The `random` value of a tick: drawn from the world's seed, the same for every script. */

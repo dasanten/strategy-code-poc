@@ -1719,6 +1719,9 @@ export const SCRIPT_LIST_QUERY_COST = 20
 /** Extra steps for a small query about one tile or two things, such as `terrainAt` or `distance`. */
 export const SCRIPT_TILE_QUERY_COST = 1
 
+/** Extra steps for a helper that only works on what it is given: `floor`, `pickRandom`. */
+export const SCRIPT_HELPER_COST = 1
+
 /** Extra steps a script pays to request an action (`walkTo`, `pickUp`, …), accepted or not. */
 export const SCRIPT_ACTION_COST = 10
 

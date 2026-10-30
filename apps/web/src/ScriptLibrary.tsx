@@ -10,6 +10,7 @@ import {
   diagnosticsText,
   hasUnsavedChanges,
   lineDiff,
+  olderVersions,
   savedMessage,
   scriptWarnings,
   versionStatus,
@@ -53,7 +54,7 @@ export interface ScriptToOpen {
 
 /**
  * The Player's script library (`CONTEXT.md`: Script): write and check scripts, save them as new
- * versions, browse a script's history and make an earlier version active again.
+ * versions, browse a script's history, make an earlier version active again and delete old ones.
  */
 export function ScriptLibrary({
   onScripts,
@@ -171,6 +172,30 @@ export function ScriptLibrary({
     setMessage(`Version ${version} is active now.`)
   }
 
+  /** Deletes one version for good (never the active one), once the Player confirms. */
+  async function deleteVersion(version: number) {
+    if (!script) return
+    if (!window.confirm(`Delete version ${version} of ${script.name} for good?`)) return
+    const detail = await act(() => api.deleteScriptVersion(script.id, version))
+    if (!detail) return
+    setScript(detail)
+    setMessage(`Deleted version ${version}.`)
+  }
+
+  /** Deletes every version older than the active one, once the Player confirms. */
+  async function deleteOlder() {
+    if (!script) return
+    const count = olderVersions(script).length
+    const ok = window.confirm(
+      `Delete the ${count} version${count === 1 ? '' : 's'} of ${script.name} older than the active version ${script.activeVersion} for good?`,
+    )
+    if (!ok) return
+    const detail = await act(() => api.deleteOlderScriptVersions(script.id))
+    if (!detail) return
+    setScript(detail)
+    setMessage(`Deleted the versions older than version ${detail.activeVersion}.`)
+  }
+
   async function submitRename(e: FormEvent) {
     e.preventDefault()
     if (!script || rename === undefined) return
@@ -229,7 +254,14 @@ export function ScriptLibrary({
 
         {script && script.versions.length > 0 && (
           <>
-            <h3>History</h3>
+            <div className="script-history-head">
+              <h3>History</h3>
+              {olderVersions(script).length > 0 && (
+                <button type="button" onClick={deleteOlder}>
+                  Delete older versions
+                </button>
+              )}
+            </div>
             <ul className="script-history">
               {[...script.versions].reverse().map((v) => {
                 const status = versionStatus(script, v)
@@ -255,6 +287,11 @@ export function ScriptLibrary({
                       >
                         Make active
                       </button>
+                      {status !== 'active' && (
+                        <button type="button" onClick={() => deleteVersion(v.version)}>
+                          Delete
+                        </button>
+                      )}
                     </span>
                   </li>
                 )

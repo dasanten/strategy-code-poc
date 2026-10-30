@@ -15,6 +15,7 @@ import {
   lineDiff,
   nameCompletions,
   namesInScope,
+  olderVersions,
   savedMessage,
   scriptWarnings,
   scriptHighlighting,
@@ -131,6 +132,13 @@ describe('script history', () => {
     expect(canMakeActive(script, active)).toBe(false)
     expect(canMakeActive(script, broken)).toBe(false)
     expect(canMakeActive({ activeVersion: null }, ok)).toBe(true)
+  })
+
+  it('finds the versions older than the active one', () => {
+    const versions = [{ version: 1 }, { version: 4 }, { version: 6 }, { version: 7 }]
+    expect(olderVersions({ activeVersion: 6, versions })).toEqual([{ version: 1 }, { version: 4 }])
+    expect(olderVersions({ activeVersion: 1, versions })).toEqual([])
+    expect(olderVersions({ activeVersion: null, versions })).toEqual([])
   })
 
   it('says whether a save became the active version', () => {

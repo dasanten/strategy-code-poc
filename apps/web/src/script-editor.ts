@@ -160,6 +160,14 @@ export function canMakeActive(
   return versionStatus(script, version) === 'saved'
 }
 
+/** The versions older than the active one, which "Delete older versions" deletes at once. */
+export function olderVersions<V extends Pick<ScriptVersion, 'version'>>(
+  script: Pick<ScriptSummary, 'activeVersion'> & { versions: V[] },
+): V[] {
+  const active = script.activeVersion
+  return active === null ? [] : script.versions.filter((v) => v.version < active)
+}
+
 /** Whether the editor holds something that isn't saved yet as the script's newest version. */
 export function hasUnsavedChanges(
   versions: Pick<ScriptVersion, 'source'>[],
