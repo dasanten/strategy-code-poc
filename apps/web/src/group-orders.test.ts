@@ -386,6 +386,7 @@ describe('every resident order on the group card', () => {
     renamable: true,
     horseToRide: true,
     carries: true,
+    carriageToBoard: true,
   })
   const offered = [
     ...residentActions(everything(farm)),
