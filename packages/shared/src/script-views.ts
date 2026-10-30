@@ -232,6 +232,12 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('carrying', view('carrying'), 'The child they carry.', 'unless they carry one'),
       field('riding', 'string', 'The id of the horse they ride.', 'unless they ride one'),
       field(
+        'aboard',
+        'string',
+        'The id of the carriage they ride on as a passenger.',
+        'unless they are aboard one',
+      ),
+      field(
         'script',
         view('runningScript'),
         'The script they run.',
@@ -535,6 +541,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       x,
       y,
       field('horseId', 'string', 'The horse hitched to it.', 'when none is'),
+      field('passengerIds', listOf('string'), 'The residents aboard it as passengers.'),
       field('load', view('goods'), 'The goods on board.', 'unless the Player sees inside'),
       field(
         'loadLevel',

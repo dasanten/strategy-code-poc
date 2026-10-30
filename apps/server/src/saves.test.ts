@@ -135,7 +135,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(53)
+    expect(WORLD_FORMAT_VERSION).toBe(54)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -168,6 +168,15 @@ describe('world saves', () => {
     r.scriptParams = { 1: { home: world.buildings[0]!.id } }
     const migrated = migrateWorld(structuredClone(world), 50, { terrain }, migrations, 51)
     expect(migrated).toEqual(world)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps a format 53 world as it is: nobody is aboard a carriage (migration 53 → 54)', () => {
+    const { world, terrain } = worldWithCity()
+    expect(world.carriages.length).toBeGreaterThan(0)
+    const migrated = migrateWorld(structuredClone(world), 53, { terrain }, migrations, 54)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents.every((r) => r.aboard === undefined)).toBe(true)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

@@ -1,4 +1,5 @@
 import {
+  Fragment,
   createContext,
   useContext,
   useEffect,
@@ -335,6 +336,7 @@ export function TileCard({
   onSetGate,
   onOpenCity,
   onRenameCity,
+  onSelectResident,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -355,6 +357,8 @@ export function TileCard({
   onOpenCity: (cityId: string) => void
   /** Renames a city of the Player's realm (`CONTEXT.md`: Renaming a city). */
   onRenameCity: (cityId: string, name: string) => void
+  /** Picks one of the Player's residents, such as a carriage's passenger. */
+  onSelectResident: (id: string) => void
 }) {
   const actions = tileActions(card, actor, tick)
   const [open, setOpen] = useState<string | undefined>()
@@ -384,9 +388,28 @@ export function TileCard({
       )}
       {card.lines.length > (card.lastSeen ? 0 : 1) && (
         <ul className="sel-facts">
-          {card.lines.slice(card.lastSeen ? 0 : 1).map((l) => (
-            <li key={l}>{l}</li>
-          ))}
+          {card.lines.map((l, i) =>
+            i === 0 && !card.lastSeen ? null : i === card.passengers?.line ? (
+              <li key={l}>
+                Passengers:{' '}
+                {card.passengers.residents.map((p, j) => (
+                  <Fragment key={p.id}>
+                    {j > 0 && ', '}
+                    {p.pick ? (
+                      <button type="button" className="link" onClick={() => onSelectResident(p.id)}>
+                        {p.name}
+                      </button>
+                    ) : (
+                      p.name
+                    )}
+                  </Fragment>
+                ))}{' '}
+                · {card.passengers.weight}
+              </li>
+            ) : (
+              <li key={l}>{l}</li>
+            ),
+          )}
         </ul>
       )}
       {card.what === 'building' && building && (

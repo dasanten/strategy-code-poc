@@ -246,6 +246,16 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   ),
   action('dismount', [], 'Get off the horse I ride; it stays on my tile.'),
   action(
+    'board',
+    ['carriageId'],
+    'Get on a carriage of my realm on my tile as a passenger, and ride along with it.',
+  ),
+  action(
+    'getOff',
+    ['x?', 'y?'],
+    'Get off the carriage I am aboard, onto its tile or the tile x, y right next to it.',
+  ),
+  action(
     'haul',
     ['carriageId', 'x', 'y', 'goods', 'returnGoods?', 'keepFood?'],
     'Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.',

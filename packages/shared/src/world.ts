@@ -91,6 +91,11 @@ export interface Resident {
    * on with whatever they do, at the horse's pace.
    */
   riding?: string
+  /**
+   * The carriage the resident rides on as a passenger (`CONTEXT.md`: Passenger), if they are
+   * aboard one. Not an order: they move with the carriage and don't walk on their own.
+   */
+  aboard?: string
 }
 
 /**

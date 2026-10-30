@@ -14,6 +14,8 @@ import type { Queue } from './world.js'
 export const QUEUE_STEP_KINDS: readonly string[] = [
   'walkTo',
   'drive',
+  'board',
+  'getOff',
   'pickUp',
   'drop',
   'store',

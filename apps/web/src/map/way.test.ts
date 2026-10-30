@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import type { ResidentOrder } from '@csp/shared'
 import type { Camera } from './camera.js'
-import { wayAhead, wayInView, type Way } from './way.js'
+import { selectedWay, wayAhead, wayInView, type Way } from './way.js'
 
 const view = { width: 800, height: 600 }
 const size = 1440
@@ -12,6 +13,24 @@ describe('the selected resident’s way ahead', () => {
     const order = { kind: 'walkTo', target: { x: 5, y: 6 }, path: [[5, 6]], progress: 0 } as const
     expect(wayAhead({ order } as never)).toMatchObject({ target: { x: 5, y: 6 }, path: [[5, 6]] })
     expect(wayAhead({ order: null } as never)).toBeUndefined()
+  })
+
+  it('is the carriage’s for a passenger: the way its driver drives it', () => {
+    const order: ResidentOrder = {
+      kind: 'drive',
+      carriageId: 'k1',
+      target: { x: 9, y: 2 },
+      path: [[9, 2]],
+      progress: 0,
+    }
+    const driver = { order }
+    const passenger = { order: null, aboard: 'k1' }
+    expect(selectedWay(passenger, [driver])).toMatchObject({ target: { x: 9, y: 2 } })
+    // Standing still, or someone else's carriage driven: no way ahead.
+    expect(selectedWay(passenger, [])).toBeUndefined()
+    expect(selectedWay({ ...passenger, aboard: 'k2' }, [driver])).toBeUndefined()
+    // Anyone else's is their own.
+    expect(selectedWay({ order }, [])).toMatchObject({ target: { x: 9, y: 2 } })
   })
 
   it('is drawn while its resident is on screen', () => {

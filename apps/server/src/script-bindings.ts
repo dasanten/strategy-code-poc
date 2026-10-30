@@ -27,6 +27,7 @@ import {
   walkSpeed,
   rideSpeed,
   horseRidden,
+  passengersOf,
   workplaceGood,
   wrap,
   wrapDelta,
@@ -334,10 +335,17 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
     const id = typeof p.value === 'string' ? p.value : undefined
     const target = id === undefined ? undefined : paramTarget(world, side, p.type, id)
+    const carriage = target?.is === 'carriage' ? target.carriage : undefined
     params[p.name] =
       target?.is === 'building'
         ? viewValue(target.building, { view: 'building' })
-        : viewValue(target?.carriage, { view: 'carriage' })
+        : viewValue(
+            carriage && {
+              ...carriage,
+              passengerIds: passengersOf(world, carriage).map((r) => r.id),
+            },
+            { view: 'carriage' },
+          )
   }
 
   const values: Record<string, Value> = {
@@ -441,6 +449,9 @@ function residentActions(
       }),
     mount: ([horseId]) => request('mount', { horseId: plain(horseId) }),
     dismount: () => request('dismount', {}),
+    board: ([carriageId]) => request('board', { carriageId: plain(carriageId) }),
+    getOff: ([x, y]) =>
+      request('getOff', (x ?? y ?? null) === null ? {} : { x: plain(x), y: plain(y) }),
     stop: () => request('stop', {}),
     pickUp: ([spot, goods]) => request('pickUp', { spot: plain(spot), goods: plain(goods) }),
     drop: ([spot, goods]) => request('drop', { spot: plain(spot), goods: plain(goods) }),
