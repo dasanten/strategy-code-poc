@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react'
 import { ROAD_LINE_MAX_TILES, type ScriptParam } from '@csp/shared'
 import type { ArmyPick } from './Armies.js'
 import type { GroupPicking, Picking } from './Residents.js'
+import { nextPick, type Plan } from './plan-step.js'
 
 /**
  * What the map is waiting for while an order that needs a target is being given (ADR 0012;
- * `CONTEXT.md`: Picking a target): the picked resident's, the group's, an army's, or a value for
- * a param of the script the picked resident runs.
+ * `CONTEXT.md`: Picking a target): the picked resident's, the group's, an army's, a value for
+ * a param of the script the picked resident runs, or a place for a step planned with Add step.
  */
 export type PickTarget =
   | { kind: 'resident'; mode: Exclude<Picking, false> }
   | { kind: 'group'; mode: Exclude<GroupPicking, false> }
   | { kind: 'army'; mode: ArmyPick['kind'] }
   | { kind: 'param'; param: ScriptParam }
+  | { kind: 'plan'; prompt: string; error?: string }
 
 /** The target the map waits for, if any; one at a time, the param before the others. */
 export function pickTarget(state: {
@@ -22,9 +24,16 @@ export function pickTarget(state: {
   isGroup: boolean
   armyPick: ArmyPick | undefined
   paramPick: ScriptParam | undefined
+  /** The step being planned with Add step, if it still picks a place. */
+  plan?: Plan
 }): PickTarget | undefined {
   if (state.paramPick) return { kind: 'param', param: state.paramPick }
   if (state.armyPick) return { kind: 'army', mode: state.armyPick.kind }
+  const planned = state.plan && nextPick(state.plan)
+  if (planned) {
+    const error = state.plan!.error
+    return { kind: 'plan', prompt: planned.prompt, ...(error ? { error } : {}) }
+  }
   if (state.isGroup && state.groupPicking) return { kind: 'group', mode: state.groupPicking }
   if (!state.isGroup && state.picking) return { kind: 'resident', mode: state.picking }
   return undefined
@@ -42,6 +51,17 @@ const GROUP_PROMPTS: Record<Exclude<GroupPicking, false>, string> = {
   walk: 'where they walk',
   work: 'the workplace they work',
   build: 'where to build, or a site to join',
+  drive: 'where they drive the carriages',
+  haul: 'where the haul route’s other stop is',
+  roadFrom: 'where the road starts',
+  roadTo: 'where the road ends',
+  wallFrom: 'where the wall starts',
+  wallTo: 'where the wall ends',
+  tearDown: 'the building they tear down',
+  storeAt: 'the storage, stable or carriage they store at',
+  fetchFrom: 'the storage, stable or carriage they fetch from',
+  attack: 'whom they attack, or the wall or gate they break',
+  climb: 'the wall or gate they climb',
 }
 
 const ARMY_PROMPTS: Record<ArmyPick['kind'], string> = {
@@ -63,16 +83,28 @@ const RESIDENT_HINTS: Partial<Record<Exclude<Picking, false>, string>> = {
 }
 
 /** What picking a tile does for a group, said under the banner. */
-const GROUP_HINTS: Record<Exclude<GroupPicking, false>, string> = {
+export const GROUP_HINTS: Record<Exclude<GroupPicking, false>, string> = {
   walk: 'They spread over free tiles around it, nearest first.',
   work: 'Those standing at the workplace there work it.',
   build: 'Then pick what to build on their card.',
+  drive: 'Each standing on a carriage drives it there.',
+  haul: 'Each standing on a carriage hauls between there and their tile.',
+  roadFrom: 'Then where it ends; they all build along the line.',
+  roadTo: `They all build road along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles.`,
+  wallFrom: 'Then where it ends; they all build along the line.',
+  wallTo: `They all build wall along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles.`,
+  tearDown: 'Those standing at it tear it down.',
+  storeAt: 'Each takes there everything they carry, keeping their own Food.',
+  fetchFrom: 'Each fetches as much as fits of the good from there.',
+  attack: 'They all attack it.',
+  climb: 'Those standing next to it climb over.',
 }
 
 /** More on what picking does, for the banner's second line, where the prompt doesn't say it all. */
 export function pickHint(target: PickTarget): string | undefined {
   if (target.kind === 'resident') return RESIDENT_HINTS[target.mode]
   if (target.kind === 'group') return GROUP_HINTS[target.mode]
+  if (target.kind === 'plan') return target.error && `Nothing picked: ${target.error}.`
   return undefined
 }
 
@@ -104,5 +136,6 @@ export function pickPrompt(target: PickTarget, touch: boolean): string {
   if (target.kind === 'resident') return `${verb} ${RESIDENT_PROMPTS[target.mode]}`
   if (target.kind === 'group') return `${verb} ${GROUP_PROMPTS[target.mode]}`
   if (target.kind === 'army') return `${verb} ${ARMY_PROMPTS[target.mode]}`
+  if (target.kind === 'plan') return `${verb} ${target.prompt}`
   return `${verb} ${PARAM_PROMPTS[target.param.type]} for ${target.param.name}`
 }

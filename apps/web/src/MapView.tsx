@@ -33,7 +33,7 @@ import {
   type Size,
 } from './map/camera.js'
 import { ChunkStore } from './map/chunks.js'
-import { wayAhead, wayInView } from './map/way.js'
+import { selectedWay, wayInView } from './map/way.js'
 import { TerrainLayer } from './map/terrain-layer.js'
 import {
   holderAt,
@@ -507,7 +507,7 @@ export function MapView({
       }
       if (rings) g.stroke({ width: 2.5, color: LEADER_COLOR })
       const selected = ids.length === 1 ? world.residents.find((u) => u.id === ids[0]) : undefined
-      if (selected) drawPath(g, cam, view, mapSize, selected)
+      if (selected) drawPath(g, cam, view, mapSize, selected, world.residents)
     }
 
     function setCam(next: Camera) {
@@ -903,9 +903,19 @@ function RegionLegend({ region }: { region: RegionState | null }) {
   )
 }
 
-/** The selected resident's way ahead, as a line to the target (design: Main Game Screen). */
-function drawPath(g: Graphics, cam: Camera, view: Size, size: number, r: SeenResident) {
-  const way = wayAhead(r)
+/**
+ * The selected resident's way ahead, as a line to the target (design: Main Game Screen); a
+ * passenger's is the carriage's they are aboard (`selectedWay`).
+ */
+function drawPath(
+  g: Graphics,
+  cam: Camera,
+  view: Size,
+  size: number,
+  r: SeenResident,
+  residents: readonly SeenResident[],
+) {
+  const way = selectedWay(r, residents)
   // Drawn wherever the resident is, as long as some of the way shows (they may be off screen).
   if (!way || !wayInView(cam, view, size, r, way)) return
   const [tx, ty] = tileToScreen(cam, view, size, way.target.x + 0.5, way.target.y + 0.5)
