@@ -65,7 +65,9 @@ function storage(world: WorldState, id: string, x: number, y: number, stock: Sto
 /** A host whose script 1 is Mara's, with `source` as its active version. */
 const host = (source: { value: string }): ScriptHost => ({
   script: (id) =>
-    id === SCRIPT ? { userId: MARA, source: source.value, followsDefault: false } : undefined,
+    id === SCRIPT
+      ? { userId: MARA, version: 1, source: source.value, followsDefault: false }
+      : undefined,
   sender: (userId) => ({ userId, account: { name: 'Mara', isAdmin: false } }),
   explored: () => true,
 })
@@ -241,7 +243,8 @@ describe('the set-script-param order', () => {
 
     it('keeps a whole number of zero or more, and clears it with null', () => {
       const { world } = farmWorld()
-      for (const n of [0, 12]) expect(numbers.validate(world, sender, typed('take', n))).toBeUndefined()
+      for (const n of [0, 12])
+        expect(numbers.validate(world, sender, typed('take', n))).toBeUndefined()
       numbers.apply(world, sender, typed('take', 12))
       expect(world.residents[0]!.scriptParams).toEqual({ [SCRIPT]: { take: 12 } })
       expect(scriptParamsSound(world)).toEqual([])

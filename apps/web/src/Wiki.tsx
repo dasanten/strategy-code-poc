@@ -408,9 +408,9 @@ export function Wiki() {
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
-          header, half the screen or all of it; a tap on the handle goes one step up. While an
-          order waits for a target the card drops to its header. The menu button at the top left
-          opens the drawers, your goods, the wiki and Log out.
+          header, half the screen or all of it; a tap on the handle goes one step up. While an order
+          waits for a target the card drops to its header. The menu button at the top left opens the
+          drawers, your goods, the wiki and Log out.
         </p>
         <table>
           <thead>
@@ -1379,6 +1379,12 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           To debug a script, open the Script tab of a resident or army running it: it shows the
           script's memory and params as they are now, changing every tick. You can't change memory
           there. Only you see the memory of your scripts; a large one is shown cut.
+        </p>
+        <p>
+          The Script tab also shows the steps the script used last tick out of its{' '}
+          {num(SCRIPT_STEP_BUDGET)}, marked when it ran out, and its last runtime error with the
+          line and how long ago. The error stays until the script ends or you save a new version;
+          click it to open that line in the Library. Errors still go into the realm log as well.
         </p>
       </Section>
 

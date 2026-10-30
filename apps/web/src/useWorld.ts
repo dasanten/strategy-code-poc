@@ -16,6 +16,7 @@ import {
   type SeenEntity,
   type Remembered,
   type ScriptMemory,
+  type ScriptRunSeen,
   type ServerMessage,
 } from '@csp/shared'
 import { api } from './api.js'
@@ -104,9 +105,11 @@ export function useWorld(onLoggedOut: () => void) {
   const socketRef = useRef<WebSocket | null>(null)
   const answers = useRef(new Map<string, (rejected: string | undefined) => void>())
   // The residents and armies whose Script tab is open, with how many cards show it, and the
-  // memory the server last sent of each one's script (`CONTEXT.md`: Debugging a script).
+  // memory the server last sent of each one's script and how it last ran (`CONTEXT.md`:
+  // Debugging a script).
   const watched = useRef(new Map<string, number>())
   const [memories, setMemories] = useState<ReadonlyMap<string, ScriptMemory | null>>(new Map())
+  const [runs, setRuns] = useState<ReadonlyMap<string, ScriptRunSeen | null>>(new Map())
 
   useEffect(() => {
     let socket: WebSocket | null = null
@@ -153,6 +156,9 @@ export function useWorld(onLoggedOut: () => void) {
         } else if (msg.type === 'scriptMemory') {
           if (!watched.current.has(msg.id)) return
           setMemories((m) => new Map(m).set(msg.id, msg.memory))
+        } else if (msg.type === 'scriptRun') {
+          if (!watched.current.has(msg.id)) return
+          setRuns((m) => new Map(m).set(msg.id, msg.run))
         } else if (msg.type === 'ack' || msg.type === 'rejected') {
           const answer = answers.current.get(msg.requestId)
           answers.current.delete(msg.requestId)
@@ -234,6 +240,11 @@ export function useWorld(onLoggedOut: () => void) {
         next.delete(id)
         return next
       })
+      setRuns((m) => {
+        const next = new Map(m)
+        next.delete(id)
+        return next
+      })
     }
   }, [])
 
@@ -269,5 +280,5 @@ export function useWorld(onLoggedOut: () => void) {
     })
   }, [])
 
-  return { world, founding, status, sendOrder, found, memories, watchScript }
+  return { world, founding, status, sendOrder, found, memories, runs, watchScript }
 }
