@@ -90,14 +90,16 @@ function taskOf(script: SeenScript, scripts: readonly ScriptSummary[]): Task | u
   return script.task ?? scripts.find((s) => s.id === script.scriptId)?.task ?? undefined
 }
 
-/** "Working the farm", "Building a house", "Tearing down the mine". */
+/** "Working the farm", "Building a house", "Tearing down the mine", "Breeding horses". */
 function taskLine(task: Task, building: SeenScript['building']): string {
   const name = building && BUILDING_NAMES[building]
   if (task === 'work') return name ? `Working the ${name}` : 'Working'
   if (task === 'build') return name ? `Building ${article(name)} ${name}` : 'Building'
   if (task === 'tearDown') return name ? `Tearing down the ${name}` : 'Tearing down'
   if (task === 'feedStable') return 'Feeding the stable'
-  return 'Hauling'
+  if (task === 'breed') return 'Breeding horses'
+  if (task === 'haul') return 'Hauling'
+  return task satisfies never
 }
 
 /**
