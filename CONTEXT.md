@@ -391,7 +391,10 @@ The shared language of the game. Domain terms only — no implementation details
   A supply wagon's driver, not being of the army, eats only what they carry.
 - **Combat:** resolved between residents in contact (the same or a neighbouring tile). Attack
   from Strength, weapon and Combat skill; Agility dodges, armour and shields take off damage.
-  Fighting teaches Combat. An armed resident who is hit fights back; an unarmed one flees home.
+  Fighting teaches Combat. **Under attack:** a resident who is struck runs their Defence script
+  (Control): by default they fight back when armed and go home when not, and then go on with
+  what they were doing. Scripts see who last struck a resident and when (`struckBy`, `struckAt`),
+  as far as the Player may see how that resident fares.
   A city's soldiers fight attackers in its area on their own.
 - **Walls in combat:** nobody walks through a wall. The city's own realm and its allies can stand on its walls
   and defend far better there. A **gate** lets the city's realm and its allies through always, everyone else
@@ -763,6 +766,15 @@ The shared language of the game. Domain terms only — no implementation details
   from the Haul order, so Haul started without one ends ("no route given"). The target param is
   never kept: each start fills it (the task order, or what the Player picks before it starts) or
   leaves it unset; the script's other params are kept as usual.
+- **Defence script:** the script a resident runs when struck: the game's **Defend** default (armed,
+  attack the attacker until they are dead, gone or out of sight; unarmed, walk home to the town
+  hall; it ends once no blow has landed for a while) unless the Player picked one of their own
+  scripts for that resident, on the card's Script tab or the group card; cleared, it is Defend
+  again. Kept per resident like any script. Being struck interrupts what the resident was doing;
+  when the defence script calls `end()`, the interrupted script goes on with its memory, the
+  queue step continues, or the plain order resumes. A struck resident whose defence script is
+  already running isn't interrupted again; a Player order given meanwhile ends both. NPC
+  residents, and residents with no Player, run the game's Defend default.
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
