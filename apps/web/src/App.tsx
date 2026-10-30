@@ -826,6 +826,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             building={buildingHere}
             road={roadHere}
+            terrain={terrainAt?.(selected.x, selected.y)}
             carriageSite={carriageSiteHere}
             node={nodeAt?.(selected.x, selected.y)}
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}

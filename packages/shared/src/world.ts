@@ -362,7 +362,7 @@ export interface TearDownOrder {
 /**
  * Driving a carriage to a tile (`CONTEXT.md`: Carriage): the resident drives the carriage
  * `carriageId` from their tile, and the carriage, its horse and the driver move together. The
- * path and `progress` work as for walking, at the carriage's speeds and never into mountains.
+ * path and `progress` work as for walking, at the carriage's speeds, into mountains only on a road.
  */
 export interface DriveOrder {
   kind: 'drive'
@@ -1646,7 +1646,7 @@ export interface Building {
   stock?: Stock
   /** There while the building is still a construction site. */
   site?: ConstructionSite
-  /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
+  /** Work put into tearing it down so far, once someone has started (`teardownWork`, `siteWorkOf`). */
   teardown?: number
   /** A gate its city's realm has closed (`CONTEXT.md`: Walls in combat); gates only, open without it. */
   closed?: true
@@ -1677,7 +1677,10 @@ export interface KeptBreeding {
 export interface ConstructionSite {
   /** Materials delivered so far; never more of a good than the building needs. */
   delivered: Stock
-  /** Work put in so far, at most what the building needs (`BUILD_WORK`). */
+  /**
+   * Work put in so far, at most what the building needs (`BUILD_WORK`); on a road on Mountain a
+   * resident's work counts less (`siteWorkOf`).
+   */
   work: number
 }
 

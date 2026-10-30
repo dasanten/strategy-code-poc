@@ -21,6 +21,7 @@ import {
   HORSE_STAT_NAMES,
   TICKS_PER_GAME_DAY,
   carriageCanEnter,
+  carriageCanGoTo,
   drivenCarriageId,
   GOOD_WEIGHT,
   MAX_WORKERS,
@@ -207,7 +208,7 @@ export const realmsHaveLeaders: Invariant = {
 /**
  * Buildings and construction sites (`CONTEXT.md`: Footprint, Where buildings go): no two
  * footprints overlap, and next to a building at most one road or road site per tile, on passable
- * land off Mountain and of no city (`CONTEXT.md`: Road), and at most one carriage site, always
+ * land and of no city (`CONTEXT.md`: Road), and at most one carriage site, always
  * still a site, of no city, off nodes and other buildings but stables, where a carriage can stand
  * (`CONTEXT.md`: Carriage); every footprint on passable land; farms
  * and stables wholly on Plains, mines, quarries and lumber camps with one tile on a resource node
@@ -238,7 +239,6 @@ export const buildingsInPlace: Invariant = {
       }
       if (!terrains.every(isPassableTerrain)) fail(b.id, `is a ${b.kind} on impassable land`)
       if (b.kind === 'road') {
-        if (terrains[0] === Terrain.Mountain) fail(b.id, 'is a road on Mountain')
         if (b.cityId !== null) fail(b.id, `is a road of city ${b.cityId}`)
         if (b.stock) fail(b.id, 'is a road with a stock')
       } else if (b.kind === 'carriage') {
@@ -858,7 +858,7 @@ export const refilledWhenLow: Invariant = {
 }
 
 /**
- * Carriages keep to the rules of `CONTEXT.md` (Carriage): never in the mountains, never loaded
+ * Carriages keep to the rules of `CONTEXT.md` (Carriage): on Mountain only on a finished road, never loaded
  * past what the strongest horse lets one hold (`CARRIAGE_MAX_CAPACITY`: a carriage loaded behind
  * a strong horse keeps its load when the horse dies), and a hitched horse exists, stands with its
  * carriage and pulls no other one.
@@ -871,7 +871,7 @@ export const carriagesInPlace: Invariant = {
       out.push({ invariant: this.name, message: `carriage ${id} ${message}`, entityIds: ids })
     const pulling = new Map<string, string>()
     for (const k of world.carriages) {
-      if (!carriageCanEnter(terrainAt(terrain, k.x, k.y))) {
+      if (!carriageCanGoTo(world, terrain, k.x, k.y)) {
         fail(k.id, `stands where no carriage can go at (${k.x}, ${k.y})`)
       }
       const kg = stockWeight(k.load)
@@ -898,10 +898,11 @@ export const carriagesInPlace: Invariant = {
 /**
  * After a tick, a rider's horse exists, stands with them, is of their realm and pulls no carriage,
  * and no horse has two riders (`CONTEXT.md`: Riding; `stepRiders` ends riding that can't go on).
+ * A ridden horse stands where a carriage could: on Mountain only on a finished road.
  */
 export const ridersOnHorses: Invariant = {
   name: 'riders-on-horses',
-  check(world) {
+  check(world, terrain) {
     const out: InvariantViolation[] = []
     const fail = (ids: string[], message: string) =>
       out.push({ invariant: this.name, message, entityIds: ids })
@@ -925,6 +926,12 @@ export const ridersOnHorses: Invariant = {
       const carriage = carriagePulledBy(world, horse)
       if (carriage) {
         fail([horse.id, carriage.id], `horse ${horse.id} is ridden and hitched to ${carriage.id}`)
+      }
+      if (!carriageCanGoTo(world, terrain, horse.x, horse.y)) {
+        fail(
+          [r.id, horse.id],
+          `horse ${horse.id} is ridden where no horse can go at (${horse.x}, ${horse.y})`,
+        )
       }
       const other = riders.get(horse.id)
       if (other)
@@ -989,8 +996,10 @@ export const haulRoutesSound: Invariant = {
       // An army stop is wherever the army is (`CONTEXT.md`: Supply line).
       const toArmy = o.toArmy !== undefined
       if (!toArmy && from.x === to.x && from.y === to.y) fail('hauls between one tile and itself')
+      // A stop on a road over Mountain may lose its road later; the route then finds no way.
       for (const s of toArmy ? [from] : [from, to]) {
-        if (!carriageCanEnter(terrainAt(terrain, s.x, s.y))) {
+        const t = terrainAt(terrain, s.x, s.y)
+        if (!carriageCanEnter(t) && t !== Terrain.Mountain) {
           fail(`hauls to (${s.x}, ${s.y}), where no carriage can go`)
         }
       }
@@ -1588,9 +1597,9 @@ export const climbOrdersSound: Invariant = {
 /**
  * Every step left on a moving order's path (`CONTEXT.md`: Step), from the resident's tile on, goes
  * onto one of the eight tiles around the one before, onto land they can enter, and a diagonal one
- * never cuts a corner past land they can't (Lake, Sea, or Mountain for a carriage). So every step
- * taken is one too. Walls and gates are left out: they may change under a path found earlier, and
- * the step is checked against them when it is taken (`Walking.resolve`).
+ * never cuts a corner past land they can't (Lake, Sea). So every step taken is one too. Walls,
+ * gates and roads are left out: they may change under a path found earlier (a carriage's way over
+ * a mountain road too), and the step is checked against them when it is taken (`Walking.resolve`).
  */
 export const pathsAreSteps: Invariant = {
   name: 'paths-are-steps',
@@ -1600,9 +1609,7 @@ export const pathsAreSteps: Invariant = {
     for (const r of world.residents) {
       const o = r.order
       if (!o || !('path' in o) || !o.path) continue
-      const driving = o.kind === 'drive' || o.kind === 'haul'
-      const enterable = (t: number) =>
-        driving ? carriageCanEnter(terrain.tiles[t]!) : isPassableTerrain(terrain.tiles[t]!)
+      const enterable = (t: number) => isPassableTerrain(terrain.tiles[t]!)
       let [x, y] = [r.x, r.y]
       const bad = o.path.findIndex(([nx, ny]) => {
         const ok =

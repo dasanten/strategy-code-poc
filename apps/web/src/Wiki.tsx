@@ -99,6 +99,7 @@ import {
   PRICE_REFERENCE_FLOORS,
   PROTECTION_DEFENCE,
   ROAD_LINE_MAX_TILES,
+  MOUNTAIN_ROAD_WORK_FACTOR,
   DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
   SCRIPT_LIST_QUERY_COST,
@@ -155,6 +156,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   carryCapacity,
   walkSpeed,
+  workFactor,
   type BuildingKind,
   type CrimeKind,
   type Good,
@@ -548,8 +550,9 @@ export function Wiki() {
           Residents and carriages step onto any of the eight tiles around, diagonals too. A diagonal
           step is {num(DIAGONAL_STEP, 2)} times as far, so it takes that much longer on the same
           ground. It can't squeeze between two corners: both straight tiles beside it must be ones
-          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage)
-          mountain. Two walls touching at a corner close the way like a straight stretch.
+          they could step onto, with no wall, gate in the way, lake, sea, or (for a carriage or
+          rider) mountain without a finished road. Two walls touching at a corner close the way like
+          a straight stretch.
         </p>
         <table>
           <thead>
@@ -557,6 +560,7 @@ export function Wiki() {
               <th>Terrain</th>
               <th>Speed</th>
               <th>Food burnt</th>
+              <th>Road work</th>
             </tr>
           </thead>
           <tbody>
@@ -565,6 +569,7 @@ export function Wiki() {
                 <td>{t}</td>
                 <td>{pct(TERRAIN_SPEED[Terrain[t]])}</td>
                 <td>{pct(TERRAIN_FOOD[Terrain[t]])}</td>
+                <td>{t === 'Road' ? '—' : `× ${num(workFactor('road', Terrain[t]))}`}</td>
               </tr>
             ))}
           </tbody>
@@ -754,7 +759,9 @@ export function Wiki() {
           {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
           more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
           leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a building's materials on the tile (all of an
-          unfinished site's).
+          unfinished site's). A road over a mountain can't be torn down while a carriage or a ridden
+          horse stands on it: the work waits until they leave. A horse left there unridden can't be
+          ridden off a road.
         </p>
         <table>
           <thead>
@@ -867,7 +874,13 @@ export function Wiki() {
                 <td>{t.terrain}</td>
                 <td>{num(t.footTiles, 1)}</td>
                 <td>{num(t.footKgTiles, 0)}</td>
-                <td>{t.carriageTiles ? num(t.carriageTiles, 1) : 'can’t enter'}</td>
+                <td>
+                  {t.carriageTiles
+                    ? num(t.carriageTiles, 1)
+                    : t.terrain === 'Mountain'
+                      ? 'only on a road'
+                      : 'can’t enter'}
+                </td>
                 <td>{t.carriageTiles ? num(t.carriageKgTiles, 0) : '—'}</td>
               </tr>
             ))}
@@ -875,10 +888,13 @@ export function Wiki() {
         </table>
         <p>
           A road tile takes {goods(BUILD_MATERIALS.road ?? {})} and{' '}
-          {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work;
-          one road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along a line that runs
-          straight or diagonal. A wall can be built along a line the same way, past tiles with a
-          wall or gate already; a diagonal wall line closes the way like a straight one.
+          {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work.
+          It goes on any land a resident can walk, mountains too: there it takes the same materials
+          but {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work, to build and to tear down (the road
+          work column above). One road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along
+          a line that runs straight or diagonal. A wall can be built along a line the same way, past
+          tiles with a wall or gate already; a diagonal wall line closes the way like a straight
+          one.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
@@ -938,12 +954,13 @@ export function Wiki() {
         <p>
           A resident on a tile with a free horse of their realm can mount it, and dismount anywhere;
           the horse stays where they get off. A rider goes wherever they walk at the speed the horse
-          would pull a carriage there (the carriage column above), and never into mountains or up
-          onto walls. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
-          at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
-          Driving makes riding faster. A rider carries no more than on foot, and can't drive a
-          carriage; a ridden horse is never hitched. On the map a rider sits on a horse token, and
-          up close their activity icon is a horseshoe while they ride somewhere.
+          would pull a carriage there (the carriage column above), never up onto walls, and into
+          mountains only along a finished road, like a carriage. A horse with less than{' '}
+          {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes at {pct(HUNGRY_HORSE_PACE)} of its
+          pace. Riding trains Driving like driving does, and Driving makes riding faster. A rider
+          carries no more than on foot, and can't drive a carriage; a ridden horse is never hitched.
+          On the map a rider sits on a horse token, and up close their activity icon is a horseshoe
+          while they ride somewhere.
         </p>
         <p>
           A rider’s Doing line says <em>Riding to …</em> where it would say{' '}

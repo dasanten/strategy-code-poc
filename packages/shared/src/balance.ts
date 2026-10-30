@@ -932,7 +932,8 @@ export const HAUL_KEEP_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
  * Plains (`CONTEXT.md`: Carriage): twice as fast on Plains, a little slower than walking in Forest
- * and Hills, and faster still on a road. Mountains are missing: a carriage cannot enter them.
+ * and Hills, and faster still on a road. Mountains are missing: a carriage enters them only on a
+ * road (`Terrain.Road`).
  */
 export const CARRIAGE_SPEED = {
   [Terrain.Plains]: 2,
@@ -951,7 +952,10 @@ export const DRIVING_SKILL_LIMIT = 0.5
 /** Driving skill a driver of average Intellect gains per game day of driving. */
 export const DRIVING_SKILL_PER_DAY = 1
 
-/** Whether a carriage can enter a tile of the given terrain: passable land, but no mountains. */
+/**
+ * Whether a carriage can enter ground of the given kind (`groundAt`): passable land or a road, but
+ * no bare mountains (`carriageCanGoTo`).
+ */
 export function carriageCanEnter(terrain: number): boolean {
   return ((CARRIAGE_SPEED as Partial<Record<number, number>>)[terrain] ?? 0) > 0
 }
@@ -1241,6 +1245,12 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   farm: TICKS_PER_GAME_DAY / 2,
   carriage: 2 * TICKS_PER_GAME_DAY,
 }
+
+/**
+ * How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
+ * materials, but building goes at a quarter of the usual speed.
+ */
+export const MOUNTAIN_ROAD_WORK_FACTOR = 4
 
 /**
  * The most tiles one road order along a line may cover (`roadLine`): about a game week of one

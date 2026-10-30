@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   MAP_SIZE,
   BUILD_WORK,
+  MOUNTAIN_ROAD_WORK_FACTOR,
   RECIPES,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
@@ -30,7 +31,6 @@ import {
 import {
   Terrain,
   isPassableTerrain,
-  roadMayGoOn,
   terrainAt,
   tileIndex,
   wrap,
@@ -243,6 +243,20 @@ export function roadTiles(world: Pick<WorldState, 'buildings'>, size: number): S
   return out
 }
 
+/**
+ * Whether a carriage, or a rider, can go onto (x, y) (`CONTEXT.md`: Carriage, Riding): passable
+ * land, Mountain only where a finished road is.
+ */
+export function carriageCanGoTo(
+  world: Pick<WorldState, 'buildings'>,
+  map: TerrainMap,
+  x: number,
+  y: number,
+): boolean {
+  const road = roadAt(world, x, y)
+  return carriageCanEnter(road && !road.site ? Terrain.Road : terrainAt(map, x, y))
+}
+
 /** Materials a construction site still needs before it can become the building. */
 export function materialsNeeded(site: Building): Stock {
   const out: Stock = {}
@@ -256,7 +270,30 @@ export function materialsNeeded(site: Building): Stock {
   return out
 }
 
-/** Work a construction site still needs. */
+/**
+ * How many times its `BUILD_WORK` a building of `kind` takes, with `under` the terrain beneath its
+ * tile where known: `MOUNTAIN_ROAD_WORK_FACTOR` for a road on Mountain (`CONTEXT.md`: Road), 1
+ * otherwise. A resident's work on it, building or tearing down, counts that much less
+ * (`siteWorkOf`), so a site's work still runs up to `BUILD_WORK`.
+ */
+export function workFactor(kind: BuildingKind, under?: number): number {
+  return kind === 'road' && under === Terrain.Mountain ? MOUNTAIN_ROAD_WORK_FACTOR : 1
+}
+
+/**
+ * Work a building of `kind` takes in ticks of one unskilled resident of average Strength, with
+ * `under` the terrain beneath it (`workFactor`): what a Player is shown.
+ */
+export function buildingWork(kind: BuildingKind, under?: number): number {
+  return (BUILD_WORK[kind] ?? 0) * workFactor(kind, under)
+}
+
+/** How much `work` of a resident counts on a building of `kind` over `under` (`workFactor`). */
+export function siteWorkOf(work: number, kind: BuildingKind, under?: number): number {
+  return work / workFactor(kind, under)
+}
+
+/** Work a construction site still needs, out of its `BUILD_WORK` (`siteWorkOf`). */
 export function workNeeded(site: Building): number {
   return Math.max(0, (BUILD_WORK[site.kind] ?? 0) - (site.site?.work ?? 0))
 }
@@ -287,7 +324,7 @@ function lookupOf(terrain: TerrainMap | TerrainLookup): (x: number, y: number) =
  * footprint passable and free of other buildings; workplaces with one tile on a resource node of
  * their kind, stables and farms wholly on Plains, smelters, mints, smithies, town halls, houses,
  * storages, walls and gates off Mountain, a house only in a city’s area (`CONTEXT.md`:
- * House); only a node’s workplace covers a node. A road goes on any passable land but Mountain, node or not, and
+ * House); only a node’s workplace covers a node. A road goes on any passable land, Mountain too, node or not, and
  * next to a building on its tile, but one road per tile (`CONTEXT.md`: Road). A carriage site
  * goes on a tile of a finished stable or right next to one, where a carriage can stand, off any
  * resource node and any other building, one per tile (`CONTEXT.md`: Carriage). Without `terrain`
@@ -304,7 +341,7 @@ export function buildProblem(
   const at = terrain && lookupOf(terrain)
   if (kind === 'road') {
     const t = at?.(x, y)
-    if (t !== undefined && !roadMayGoOn(t)) return 'a road goes on passable land, not on Mountain'
+    if (t !== undefined && !isPassableTerrain(t)) return 'a road goes on passable land'
     if (roadAt(world, x, y)) return 'there is already a road on this tile'
     return undefined
   }
@@ -506,7 +543,8 @@ export function workProblem(
 
 /**
  * Work it takes to tear down a building or construction site (`CONTEXT.md`: Tearing down):
- * `TEARDOWN_WORK_SHARE` of the building's work, or of the work put into the site so far.
+ * `TEARDOWN_WORK_SHARE` of the building's work, or of the work put into the site so far. Like
+ * building, a resident's work on a road on Mountain counts less (`siteWorkOf`).
  */
 export function teardownWork(b: Building): number {
   const built = b.site ? b.site.work : (BUILD_WORK[b.kind] ?? 0)
@@ -533,18 +571,37 @@ export function teardownReturns(b: Building): Stock {
 }
 
 /**
+ * Whether tearing down `b` would leave a carriage or ridden horse on Mountain without a road
+ * (`CONTEXT.md`: Road): it is a finished road on Mountain with one standing on it.
+ */
+export function strandsOnMountain(
+  world: Pick<WorldState, 'carriages' | 'horses' | 'residents'>,
+  b: Building,
+  terrain: TerrainMap,
+): boolean {
+  if (b.kind !== 'road' || b.site || terrainAt(terrain, b.x, b.y) !== Terrain.Mountain) return false
+  const here = (k: { x: number; y: number }) => k.x === b.x && k.y === b.y
+  const ridden = (h: { id: string }) => world.residents.some((r) => r.riding === h.id)
+  return world.carriages.some(here) || world.horses.some((h) => here(h) && ridden(h))
+}
+
+/**
  * Why the building or site can't be torn down by a resident on (x, y), or undefined if it can:
- * they must stand at it. So far only what can be built can be torn down, and its sites.
+ * they must stand at it. So far only what can be built can be torn down, and its sites. A road on
+ * Mountain waits for carriages and ridden horses on it to leave (`strandsOnMountain`).
  */
 export function tearDownProblem(
   world: WorldState,
   x: number,
   y: number,
   buildingId: string,
+  terrain?: TerrainMap,
 ): string | undefined {
   const b = world.buildings.find((c) => c.id === buildingId)
   if (!b || !covers(b, x, y)) return 'the resident is not at that building'
   if (!BUILDABLE.includes(b.kind)) return `a ${b.kind} can’t be torn down yet`
+  if (terrain && strandsOnMountain(world, b, terrain))
+    return 'a carriage or rider on this mountain road would be stranded'
   return undefined
 }
 

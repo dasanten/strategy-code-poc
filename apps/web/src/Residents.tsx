@@ -12,6 +12,8 @@ import {
   GOODS,
   HAUL_KEEP_FOOD,
   buildMenu,
+  buildingWork,
+  workFactor,
   MAX_HEALTH,
   MAX_HUNGER,
   MAX_WORKERS,
@@ -831,6 +833,7 @@ export function ResidentCard({
   onDrop,
   building,
   road,
+  terrain,
   carriageSite,
   node,
   onBuild,
@@ -924,6 +927,8 @@ export function ResidentCard({
   building: Building | undefined
   /** The road or road site on the resident's tile, if one is in sight; it may share the tile. */
   road: Building | undefined
+  /** The explored terrain beneath the resident's tile, if known: a road on Mountain takes more work. */
+  terrain?: number
   /** The carriage site on the resident's tile, if one is in sight; it may share a stable's tile. */
   carriageSite: Building | undefined
   /** The resource node on the resident's tile, if the Player knows of one. */
@@ -1159,7 +1164,7 @@ export function ResidentCard({
                 buildProblem={buildProblem}
                 onBuild={onBuild}
               />
-              <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
+              <RoadBlock resident={r} tick={tick} road={road} terrain={terrain} onBuild={onBuild} />
             </>
           )}
           {shown === 'tearDown' && (
@@ -1516,6 +1521,7 @@ function BuildBlock({
   tick,
   building,
   node,
+  terrain,
   buildProblem = () => undefined,
   onBuild,
 }: {
@@ -1523,6 +1529,8 @@ function BuildBlock({
   tick: number
   building: Building | undefined
   node: KnownNode | undefined
+  /** The explored terrain beneath the site, if known (`buildingWork`). */
+  terrain?: number
   /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
   buildProblem?: (kind: BuildingKind) => string | undefined
   onBuild: (kind: BuildingKind) => void
@@ -1561,7 +1569,11 @@ function BuildBlock({
           </button>
         </div>
         <p className="muted small">
-          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done.
+          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
+          about {workSpan(buildingWork(building.kind, terrain))} of one resident’s work in all
+          {workFactor(building.kind, terrain) > 1 &&
+            `, on Mountain ${workFactor(building.kind, terrain)} times as much as elsewhere`}
+          .
         </p>
       </section>
     )
@@ -1679,11 +1691,14 @@ function RoadBlock({
   resident,
   tick,
   road,
+  terrain,
   onBuild,
 }: {
   resident: Resident
   tick: number
   road: Building | undefined
+  /** The explored terrain beneath the resident's tile, if known (`buildingWork`). */
+  terrain?: number
   onBuild: (kind: BuildingKind) => void
 }) {
   if (road?.site) {
@@ -1693,6 +1708,7 @@ function RoadBlock({
         tick={tick}
         building={road}
         node={undefined}
+        terrain={terrain}
         onBuild={onBuild}
       />
     )
@@ -1707,7 +1723,8 @@ function RoadBlock({
       <p className="muted small">
         {BUILDING_PURPOSE.road} Needs{' '}
         {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
-        {workSpan(BUILD_WORK.road ?? 0)} of one resident’s work.
+        {workSpan(buildingWork('road', terrain))} of one resident’s work
+        {workFactor('road', terrain) > 1 && ' here on Mountain'}.
       </p>
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
