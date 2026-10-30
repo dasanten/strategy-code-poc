@@ -3,6 +3,7 @@ import {
   HORSE_START_AGE_MAX,
   HORSE_START_AGE_MIN,
   TICKS_PER_GAME_YEAR,
+  inCityArea,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -15,7 +16,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 56
+export const WORLD_FORMAT_VERSION = 57
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -185,6 +186,25 @@ export const migrations: Record<number, MigrationStep> = {
       const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
       if (site) picked.site ??= siteId
       if (carriage) picked.carriage ??= carriageId
+    }
+    return world
+  },
+  // A construction site belongs to the realm whose resident laid it out, until it is finished
+  // (`CONTEXT.md`: Construction site; `Building.realmId`). Who laid out a site already there
+  // isn't known: each gets the realm of a resident building it, else of the city it stands in
+  // (the one a farm or stable was laid out for, or whose area it is in), else none.
+  56: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    for (const b of world.buildings) {
+      if (!b.site) continue
+      const builder = world.residents.find(
+        (r) => r.owner !== null && (r.order as { siteId?: unknown } | null)?.siteId === b.id,
+      )
+      const city =
+        world.cities.find((c) => c.id === b.cityId) ??
+        world.cities.find((c) => inCityArea(world, c, b.x, b.y, terrain.size))
+      const realm = builder?.owner ?? city?.realmId ?? null
+      if (realm !== null) b.realmId = realm
     }
     return world
   },

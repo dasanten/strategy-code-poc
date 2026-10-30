@@ -135,7 +135,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(56)
+    expect(WORLD_FORMAT_VERSION).toBe(57)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -222,6 +222,40 @@ describe('world saves', () => {
     expect(h!.scriptParams).toEqual({ 8: { carriage: 'k1' } })
     expect(n!.scriptParams).toBeUndefined()
     expect(o!.scriptParams).toBeUndefined()
+  })
+
+  it('gives each construction site the realm of a builder, else of its city (migration 56 → 57)', () => {
+    const { world, terrain } = worldWithCity()
+    const [builder, npc] = world.residents
+    const city = world.cities[0]!
+    const realmId = world.realms[0]!.id
+    expect(city.realmId).toBe(realmId)
+    world.realms.push({ id: 'r-other', userId: 99, leaderId: builder!.id })
+    builder!.owner = 'r-other'
+    npc!.owner = null
+    const site = () => ({ delivered: {}, work: 0 })
+    const hall = world.buildings.find((b) => b.id === city.townHallId)!
+    world.buildings.push(
+      // Built by a resident of another realm: theirs, though it stands in the city.
+      { id: 'built', kind: 'house', cityId: null, x: hall.x + 3, y: hall.y, site: site() },
+      // In the city's area with nobody of a realm building it: the city's realm's.
+      { id: 'near', kind: 'house', cityId: null, x: hall.x, y: hall.y + 3, site: site() },
+      // A farm site laid out for the city: the city's realm's.
+      { id: 'farm', kind: 'farm', cityId: city.id, x: 40, y: 40, site: site() },
+      // Far from every city, an NPC builder only: nobody's.
+      { id: 'far', kind: 'storage', cityId: null, x: 60, y: 10, site: site() },
+      { id: 'done', kind: 'house', cityId: null, x: 60, y: 30 },
+    )
+    builder!.order = { kind: 'build', building: 'house', at: { x: 0, y: 0 }, siteId: 'built' }
+    npc!.order = { kind: 'build', building: 'storage', at: { x: 60, y: 10 }, siteId: 'far' }
+    const migrated = migrateWorld(structuredClone(world), 56, { terrain }, migrations, 57)
+    const realmOf = (id: string) => migrated.buildings.find((b) => b.id === id)!.realmId
+    expect(realmOf('built')).toBe('r-other')
+    expect(realmOf('near')).toBe(realmId)
+    expect(realmOf('farm')).toBe(realmId)
+    expect(realmOf('far')).toBeUndefined()
+    expect(realmOf('done')).toBeUndefined()
+    expect(WORLD_FORMAT_VERSION).toBe(57)
   })
 
   it('gives residents tearing down, breeding and feeding their target as its param (migration 54 → 55)', () => {

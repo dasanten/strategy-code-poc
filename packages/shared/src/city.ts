@@ -230,12 +230,15 @@ export function cityAreaTiles(
 
 /**
  * The realm a building belongs to: its city's realm, or an outpost storage's own (`CONTEXT.md`:
- * Outpost storage); null for one of no realm, such as an NPC city's or a workplace on a node.
+ * Outpost storage); null for one of no realm, such as an NPC city's or a workplace on a node. A
+ * construction site laid out by a realm's resident is that realm's until it is finished
+ * (`CONTEXT.md`: Construction site).
  */
 export function buildingRealm(
   world: { cities: readonly Pick<City, 'id' | 'realmId'>[] },
-  b: Pick<Building, 'cityId' | 'realmId'>,
+  b: Pick<Building, 'cityId' | 'realmId' | 'site'>,
 ): string | null {
+  if (b.site && b.realmId !== undefined) return b.realmId
   if (b.cityId !== null) return world.cities.find((c) => c.id === b.cityId)?.realmId ?? null
   return b.realmId ?? null
 }

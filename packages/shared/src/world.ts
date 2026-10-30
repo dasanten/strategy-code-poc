@@ -1658,7 +1658,9 @@ export interface Building {
   cityId: string | null
   /**
    * The realm an outpost storage belongs to (`CONTEXT.md`: Outpost storage): finished storages
-   * of no city only, and only those a realm has. A city that takes it in drops it.
+   * of no city only, and only those a realm has. A city that takes it in drops it. A
+   * construction site has the realm whose resident laid it out, until it is finished
+   * (`CONTEXT.md`: Construction site); one an NPC city's resident laid out has none.
    */
   realmId?: string
   x: number

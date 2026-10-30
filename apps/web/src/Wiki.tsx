@@ -772,7 +772,9 @@ export function Wiki() {
       <Section id="building">
         <p>
           A construction site becomes its building once its materials are there and builders have
-          put in its work. Building goes in proportion to Strength, plus{' '}
+          put in its work. Until then the site belongs to the realm whose resident laid it out, so
+          that realm's scripts and params can pick it; finished, the building belongs where its kind
+          does (a city's, or an outpost storage). Building goes in proportion to Strength, plus{' '}
           {pct(CONSTRUCTION_SKILL_EFFECT)} for each point of Construction (at most{' '}
           {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
           more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
@@ -833,7 +835,7 @@ export function Wiki() {
           Build can be run directly too, with Run script or as a queue step: they join the
           construction site in its <code>site</code> param, or with none picked the one they stand
           on when it starts. Laying out a new site (what and where) is only the Build order's.
-          Giving Build on a site of your realm's fills <code>site</code>; it is never kept, so a
+          Giving Build on a site your residents laid out fills <code>site</code>; it is never kept, so a
           queue can walk them to a site and then run Build there. With no construction site there,
           Build ends and your realm log says why.
         </p>
