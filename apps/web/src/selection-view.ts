@@ -783,6 +783,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     } else {
       const max = MAX_WORKERS[building.kind]
       if (max !== undefined && live) lines.push(`${t.workers(live)} / ${max} workers`)
+      // A house's room (`CONTEXT.md`: House), and how its city is housed where the Player may know.
+      const room = HOUSING_ROOM[building.kind]
+      if (room !== undefined) {
+        const housed = live && city && (rel === 'own' || rel === 'alliance')
+        lines.push(
+          `Room for ${room} residents${housed ? ` · ${city.name}: ${housingLine(city.id, t)}` : ''}`,
+        )
+      }
       if (stable) {
         lines.push(
           ...(horsesHere.length > 0
@@ -1076,11 +1084,19 @@ function strangersLines(strangers: SeenResident[]): string[] {
  * An own or allied city's town hall: its residents, free housing (`CONTEXT.md`: House) and how
  * many game days the Food in its storages lasts them, from what the Player sees of it.
  */
+/** A city's residents in sight and its free housing (`CONTEXT.md`: House), as far as in sight. */
+function housingLine(cityId: string, t: TileThings): string {
+  const residents = (t.residents ?? []).filter((r) => r.cityId === cityId)
+  const room = t.buildings
+    .filter((b) => b.cityId === cityId && !b.site)
+    .reduce((n, b) => n + (HOUSING_ROOM[b.kind] ?? 0), 0)
+  return `${residents.length} residents · ${room - residents.length} free housing`
+}
+
 function townHallLines(cityId: string, t: TileThings): string[] {
   const residents = (t.residents ?? []).filter((r) => r.cityId === cityId)
   const mine = t.buildings.filter((b) => b.cityId === cityId && !b.site)
-  const room = mine.reduce((n, b) => n + (HOUSING_ROOM[b.kind] ?? 0), 0)
-  const lines = [`${residents.length} residents · ${room - residents.length} free housing`]
+  const lines = [housingLine(cityId, t)]
   const food = mine
     .filter((b) => b.kind === 'storage')
     .reduce((n, b) => n + (b.stock?.food ?? 0), 0)
