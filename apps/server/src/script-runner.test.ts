@@ -290,6 +290,74 @@ describe('running scripts', () => {
     expect(errors[1]?.tick).toBe(SCRIPT_LOG_INTERVAL)
   })
 
+  it('keeps its last error for the Script tab until another version runs or it ends', () => {
+    const { world, orders, runner } = setup()
+    // Fails on its second tick only.
+    const source =
+      'if (memory.n == null) { memory.n = 0 }\nmemory.n = memory.n + 1\nif (memory.n == 2) { null.x }'
+    const s = createScript(db, mara, { name: 'once', source })
+    giveScript(world, orders, s.id, ['a0'])
+    const a0 = world.residents[0]!
+    runner.runAll(world)
+    expect(a0.script?.lastError).toBeUndefined()
+    world.tick = 5
+    runner.runAll(world)
+    const lastError = {
+      message: 'Can\'t read "x" of null',
+      line: 3,
+      column: 22,
+      tick: 5,
+      version: 1,
+    }
+    expect(a0.script?.lastError).toEqual(lastError)
+    // Runs that go well after it leave it there.
+    world.tick = 6
+    runner.runAll(world, true)
+    expect(a0.script?.lastError).toEqual(lastError)
+    expect(runningScriptsSound(world)).toEqual([])
+
+    saveScript(db, mara, s.id, { source: `${source}\n` })
+    runner.runAll(world)
+    expect(a0.script?.lastError).toBeUndefined()
+    // The memory it couldn't keep is an error too, with no line.
+    a0.script!.lastError = { ...lastError, version: 2 }
+    saveScript(db, mara, s.id, { source: 'memory.f = fn() {}' })
+    runner.runAll(world)
+    expect(a0.script?.lastError).toEqual({
+      message: expect.stringMatching(/functions/),
+      tick: 6,
+      version: 3,
+    })
+  })
+
+  it('keeps the steps it used last tick, and whether it ran out of its own or the realm’s', () => {
+    const count = SCRIPT_REALM_STEP_BUDGET / SCRIPT_STEP_BUDGET + 1
+    const { world, orders, runner } = setup(count)
+    const light = createScript(db, mara, { name: 'light', source: 'memory.n = 1' })
+    const busy = createScript(db, mara, { name: 'busy', source: 'while (true) {}' })
+    giveScript(world, orders, light.id, ['a0'])
+    giveScript(
+      world,
+      orders,
+      busy.id,
+      world.residents.slice(1).map((r) => r.id),
+    )
+    runner.runAll(world, true)
+    const a0 = world.residents[0]!.script!.lastRun!
+    expect(a0.steps).toBeGreaterThan(0)
+    expect(a0.steps).toBeLessThan(SCRIPT_STEP_BUDGET)
+    expect(a0.outOfSteps).toBeUndefined()
+    const busyRuns = world.residents.slice(1).map((r) => r.script!.lastRun)
+    // The realm's budget runs out: one is cut short or skipped, the rest use their own up.
+    expect(busyRuns.filter((r) => r?.outOfSteps === 'own')).toHaveLength(count - 2)
+    expect(busyRuns.filter((r) => r?.outOfSteps === 'realm')).toEqual([
+      { steps: expect.any(Number), outOfSteps: 'realm' },
+    ])
+    for (const r of busyRuns.filter((r) => r?.outOfSteps === 'own'))
+      expect(r?.steps).toBe(SCRIPT_STEP_BUDGET)
+    expect(runningScriptsSound(world)).toEqual([])
+  })
+
   it('caps memory: a run that leaves too much keeps the memory from before', () => {
     const { world, orders, runner } = setup()
     const s = createScript(db, mara, {

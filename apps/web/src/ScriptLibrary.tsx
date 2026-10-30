@@ -33,6 +33,22 @@ if (memory.role == null) { memory.role = "gatherer" }
 interface Opened {
   key: string
   source: string
+  /** Where to put the cursor, such as a runtime error's line. */
+  line?: number
+  column?: number
+}
+
+/**
+ * A script to open, such as the one a resident's task runs; a new `at` opens it again. With a
+ * `version` that version opens rather than the newest, and with a `line` the cursor goes there,
+ * as for a script's last runtime error (`CONTEXT.md`: Debugging a script).
+ */
+export interface ScriptToOpen {
+  id: number
+  at: number
+  version?: number
+  line?: number
+  column?: number
 }
 
 /**
@@ -45,8 +61,8 @@ export function ScriptLibrary({
 }: {
   /** Hears the list each time it is loaded, so residents can be given a script to run. */
   onScripts?: (scripts: ScriptSummary[]) => void
-  /** A script to open, such as the one a resident's task runs; a new `at` opens it again. */
-  toOpen?: { id: number; at: number }
+  /** A script to open, such as the one a resident's task runs. */
+  toOpen?: ScriptToOpen
 } = {}) {
   const [scripts, setListed] = useState<ScriptSummary[]>([])
   const setScripts = useCallback(
@@ -85,21 +101,28 @@ export function ScriptLibrary({
     api.scripts().then(setScripts, (e: Error) => setError(e.message))
   }, [setScripts])
 
-  function show(detail: ScriptDetail, version = detail.versions.at(-1)) {
+  function show(
+    detail: ScriptDetail,
+    version = detail.versions.at(-1),
+    at?: Pick<Opened, 'line' | 'column'>,
+  ) {
     setScript(detail)
     setRename(undefined)
     const source = version?.source ?? ''
-    setOpened({ key: `${detail.id}-${version?.version ?? 0}-${Date.now()}`, source })
+    setOpened({ key: `${detail.id}-${version?.version ?? 0}-${Date.now()}`, source, ...at })
     setDraft(source)
   }
 
-  async function open(id: number) {
+  async function open({ id, version, line, column }: ScriptToOpen) {
     const detail = await act(() => api.script(id))
-    if (detail) show(detail)
+    if (!detail) return
+    // The version asked for, unless it is gone from the history: then the newest.
+    const asked = detail.versions.find((v) => v.version === version)
+    show(detail, asked, asked ? { line, column } : undefined)
   }
 
   useEffect(() => {
-    if (toOpen) void open(toOpen.id)
+    if (toOpen) void open(toOpen)
     // Only a new request opens a script, not a new `open`.
   }, [toOpen])
 
@@ -192,7 +215,7 @@ export function ScriptLibrary({
                 type="button"
                 className={script?.id === s.id ? 'on' : ''}
                 aria-current={script?.id === s.id || undefined}
-                onClick={() => open(s.id)}
+                onClick={() => open({ id: s.id, at: Date.now() })}
               >
                 <span>{s.name}</span>
                 <small>
@@ -321,6 +344,8 @@ export function ScriptLibrary({
         <ScriptEditor
           key={opened.key}
           initialSource={opened.source}
+          line={opened.line}
+          column={opened.column}
           defaultScript={script?.task != null}
           onChange={setDraft}
         />

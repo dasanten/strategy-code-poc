@@ -119,6 +119,7 @@ describe('an outpost storage', () => {
       script: () => ({
         userId: 7,
         name: DEFAULT_SCRIPTS.work.name,
+        version: 1,
         source: DEFAULT_SCRIPTS.work.source,
         followsDefault: true,
       }),

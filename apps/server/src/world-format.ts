@@ -14,7 +14,7 @@ import { grantHorses } from './horse-grant.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 52
+export const WORLD_FORMAT_VERSION = 53
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -104,9 +104,13 @@ export const migrations: Record<number, MigrationStep> = {
   // as well as an id (`ScriptParamValue`). Values from before are all ids, so the step leaves
   // them as they are.
   50: (state) => state,
+  // A running script keeps its last runtime error and the steps it used (`CONTEXT.md`:
+  // Debugging a script). Scripts from before have neither until they next run, so the step
+  // leaves them as they are.
+  51: (state) => state,
   // Script logs (`CONTEXT.md`: Script log, `Resident.scriptLog`). Nothing was logged before, so
   // every resident starts with none and the step leaves them as they are.
-  51: (state) => state,
+  52: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

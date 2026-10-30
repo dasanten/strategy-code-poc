@@ -234,6 +234,7 @@ describe('building a carriage', () => {
       script: () => ({
         userId: 7,
         name: DEFAULT_SCRIPTS.build.name,
+        version: 1,
         source: DEFAULT_SCRIPTS.build.source,
         followsDefault: true,
       }),

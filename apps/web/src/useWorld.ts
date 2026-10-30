@@ -17,6 +17,7 @@ import {
   type Remembered,
   type ScriptLogLine,
   type ScriptMemory,
+  type ScriptRunSeen,
   type ServerMessage,
 } from '@csp/shared'
 import { api } from './api.js'
@@ -105,10 +106,11 @@ export function useWorld(onLoggedOut: () => void) {
   const socketRef = useRef<WebSocket | null>(null)
   const answers = useRef(new Map<string, (rejected: string | undefined) => void>())
   // The residents and armies whose Script tab is open, with how many cards show it, and the
-  // memory the server last sent of each one's script (`CONTEXT.md`: Debugging a script), and of
-  // each resident's script log (Script log).
+  // memory the server last sent of each one's script and how it last ran (`CONTEXT.md`:
+  // Debugging a script), and of each resident's script log (Script log).
   const watched = useRef(new Map<string, number>())
   const [memories, setMemories] = useState<ReadonlyMap<string, ScriptMemory | null>>(new Map())
+  const [runs, setRuns] = useState<ReadonlyMap<string, ScriptRunSeen | null>>(new Map())
   const [scriptLogs, setScriptLogs] = useState<ReadonlyMap<string, ScriptLogLine[] | null>>(
     new Map(),
   )
@@ -158,6 +160,9 @@ export function useWorld(onLoggedOut: () => void) {
         } else if (msg.type === 'scriptMemory') {
           if (!watched.current.has(msg.id)) return
           setMemories((m) => new Map(m).set(msg.id, msg.memory))
+        } else if (msg.type === 'scriptRun') {
+          if (!watched.current.has(msg.id)) return
+          setRuns((m) => new Map(m).set(msg.id, msg.run))
         } else if (msg.type === 'scriptLog') {
           if (!watched.current.has(msg.id)) return
           setScriptLogs((m) => new Map(m).set(msg.id, msg.lines))
@@ -243,6 +248,7 @@ export function useWorld(onLoggedOut: () => void) {
         return next
       }
       setMemories(without)
+      setRuns(without)
       setScriptLogs(without)
     }
   }, [])
@@ -279,5 +285,5 @@ export function useWorld(onLoggedOut: () => void) {
     })
   }, [])
 
-  return { world, founding, status, sendOrder, found, memories, scriptLogs, watchScript }
+  return { world, founding, status, sendOrder, found, memories, runs, scriptLogs, watchScript }
 }

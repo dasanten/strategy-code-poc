@@ -201,6 +201,35 @@ export interface RunningScript {
   errorLoggedAt?: number
   /** The tick its last out-of-steps warning went into the realm log. */
   budgetLoggedAt?: number
+  /**
+   * Its last runtime error (`CONTEXT.md`: Debugging a script), kept until the script ends or
+   * another version of it runs.
+   */
+  lastError?: ScriptRunError
+  /** The steps it used the last tick it ran, and whether it ran out (`CONTEXT.md`: Step budget). */
+  lastRun?: ScriptRunSteps
+}
+
+/** A script's last runtime error, as its Script tab shows it (`CONTEXT.md`: Debugging a script). */
+export interface ScriptRunError {
+  message: string
+  /** Where in the script, when the error is in the script itself. */
+  line?: number
+  column?: number
+  /** The tick it stopped with the error. */
+  tick: number
+  /** The version of the script that ran into it. */
+  version: number
+}
+
+/**
+ * The steps a script used the last tick it ran (`CONTEXT.md`: Step budget), out of
+ * `SCRIPT_STEP_BUDGET`. `outOfSteps` when it ran out: of its own budget, or of the realm's, which
+ * cut it short or skipped it.
+ */
+export interface ScriptRunSteps {
+  steps: number
+  outOfSteps?: 'own' | 'realm'
 }
 
 /**

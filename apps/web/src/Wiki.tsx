@@ -1385,6 +1385,12 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           there. Only you see the memory of your scripts; a large one is shown cut.
         </p>
         <p>
+          The Script tab also shows the steps the script used last tick out of its{' '}
+          {num(SCRIPT_STEP_BUDGET)}, marked when it ran out, and its last runtime error with the
+          line and how long ago. The error stays until the script ends or you save a new version;
+          click it to open that line in the Library. Errors still go into the realm log as well.
+        </p>
+        <p>
           The Script tab of your resident also shows their script log, newest first: the lines their
           scripts gave <code>log(text)</code> and the reasons they gave <code>end(reason)</code>,
           each with its game time. A resident keeps their last {num(SCRIPT_LOG_LINES)} lines across

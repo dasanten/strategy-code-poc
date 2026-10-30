@@ -67,6 +67,7 @@ const host: ScriptHost = {
   script: () => ({
     userId: 1,
     name: DEFAULT_SCRIPTS.build.name,
+    version: 1,
     source: DEFAULT_SCRIPTS.build.source,
     followsDefault: true,
   }),

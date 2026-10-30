@@ -80,6 +80,7 @@ const hostOf = (task: Task): ScriptHost => ({
   script: () => ({
     userId: 1,
     name: DEFAULT_SCRIPTS[task].name,
+    version: 1,
     source: DEFAULT_SCRIPTS[task].source,
     followsDefault: true,
   }),

@@ -17,6 +17,7 @@ export function defaultScripts(terrain: TerrainMap, senders: OrderSender[]) {
       return {
         userId,
         name: DEFAULT_SCRIPTS[task].name,
+        version: 1,
         source: DEFAULT_SCRIPTS[task].source,
         followsDefault: true,
       }
