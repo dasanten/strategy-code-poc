@@ -1,5 +1,7 @@
 import {
   AVERAGE_HORSE_STATS,
+  BUILD_MATERIALS,
+  BUILD_WORK,
   MAX_HEALTH,
   MAX_HUNGER,
   OWN_FOOD,
@@ -10,9 +12,12 @@ import {
   type TerrainMap,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
+import { finishSite } from './building.js'
+import { outpostStorageRealms } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
+import { startParamsProblem } from './script-params.js'
 import { defaultsHaveATarget } from './script-runner.js'
 import { defaultScripts } from './test-default-scripts.js'
 import { addCity } from './test-terrain.js'
@@ -178,6 +183,71 @@ describe('Build started directly', () => {
     s.tick()
     expect(s.w1.script).toBeUndefined()
     expect(s.stopped()).toEqual(['the storage is no construction site'])
+  })
+})
+
+describe('a construction site is the realm’s that laid it out', () => {
+  const asBuilding = [{ name: 'target', type: 'building' as const }]
+
+  it('laid out by the realm’s resident, can be picked as site and as any building param', () => {
+    const s = setup()
+    s.give({ kind: 'task', task: 'build', building: 'house', at: { x: 9, y: 7 } }, 'w2')
+    for (let i = 0; i < 1000 && !s.building(s.w2); i++) s.tick()
+    const laid = s.world.buildings.find((b) => b.site && b.x === 9 && b.y === 7)!
+    // Of no city until finished, yet the realm's: its resident laid it out.
+    expect(laid).toMatchObject({ kind: 'house', cityId: null, realmId: 'r1' })
+    expect(startParamsProblem(s.world, 'r1', asBuilding, { target: laid.id })).toBeUndefined()
+    // Picked as Build's site, w1 walks over and joins it.
+    s.give({ kind: 'runScript', scriptId: BUILD, params: { site: laid.id } })
+    for (let i = 0; i < 100 && s.building(s.w1) !== laid.id; i++) s.tick()
+    expect(s.building(s.w1)).toBe(laid.id)
+  })
+
+  it('another realm’s site, or nobody’s, can’t be picked', () => {
+    const s = setup()
+    s.world.realms.push({ id: 'r2', userId: 8, leaderId: 'w2' })
+    const theirs: Building = {
+      id: 'ts',
+      kind: 'townHall',
+      cityId: null,
+      realmId: 'r2',
+      x: 24,
+      y: 2,
+      site: { delivered: {}, work: 0 },
+    }
+    s.world.buildings.push(theirs)
+    expect(startParamsProblem(s.world, 'r2', asBuilding, { target: 'ts' })).toBeUndefined()
+    for (const id of ['ts', 'hs'])
+      expect(startParamsProblem(s.world, 'r1', asBuilding, { target: id })).toBe(
+        'target: must be a building or construction site of yours',
+      )
+  })
+
+  it('giving Build on a house site of the realm’s fills site', () => {
+    const s = setup()
+    s.world.buildings.find((b) => b.id === 'hs')!.realmId = 'r1'
+    s.give({ kind: 'task', task: 'build', building: 'house', at: { x: 6, y: 6 } })
+    s.tick()
+    expect(s.w1.scriptParams?.[BUILD]).toEqual({ site: 'hs' })
+  })
+
+  it('finished, belongs where its kind does; a realm gone leaves none', () => {
+    const s = setup()
+    const done = (b: Building) => {
+      b.realmId = 'r1'
+      b.site = { delivered: { ...BUILD_MATERIALS[b.kind] }, work: BUILD_WORK[b.kind]! }
+      expect(finishSite(s.world, b, s.w2)).toBe(true)
+      return b
+    }
+    const hs = s.world.buildings.find((b) => b.id === 'hs')!
+    expect(done(hs).realmId).toBeUndefined()
+    // A storage out of every city is the builder's realm's outpost storage, as before.
+    const os: Building = { id: 'os', kind: 'storage', cityId: null, x: 26, y: 26 }
+    s.world.buildings.push(os)
+    expect(done(os).realmId).toBe('r1')
+    s.world.buildings.push({ id: 'gs', kind: 'house', cityId: null, realmId: 'r9', x: 2, y: 26 })
+    s.world.buildings.at(-1)!.site = { delivered: {}, work: 0 }
+    expect(outpostStorageRealms.check(s.world, terrain).map((v) => v.entityIds)).toEqual([['gs']])
   })
 })
 

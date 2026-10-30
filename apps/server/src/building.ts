@@ -157,6 +157,8 @@ export function finishSite(world: WorldState, site: Building, r: Resident): bool
     return true
   }
   delete site.site
+  // Finished, it belongs where its kind of building does, no longer to the realm that laid it out.
+  delete site.realmId
   if (site.kind === 'townHall') foundCity(world, site, r.owner)
   // A storage no city takes in is the builder's realm's (`CONTEXT.md`: Outpost storage).
   if (site.kind === 'storage' && r.owner !== null) site.realmId = r.owner
@@ -212,6 +214,8 @@ export function resolveBuilding(
           id,
           kind: part.building,
           cityId: laidOutFor(world, r, part.building),
+          // The realm whose resident lays it out, until it is finished (`CONTEXT.md`: Construction site).
+          ...(r.owner !== null && { realmId: r.owner }),
           x: r.x,
           y: r.y,
           site: { delivered: {}, work: 0 },

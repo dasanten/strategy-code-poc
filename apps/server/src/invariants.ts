@@ -307,8 +307,9 @@ export const citiesFromBuildings: Invariant = {
 }
 
 /**
- * Only an outpost storage has a realm of its own (`CONTEXT.md`: Outpost storage): a finished
- * storage of no city, of a realm that exists. One in a city goes with the city.
+ * Only an outpost storage (`CONTEXT.md`: Outpost storage), a finished storage of no city, or a
+ * construction site (the realm that laid it out, `CONTEXT.md`: Construction site) has a realm of
+ * its own, and only one that exists. A finished building in a city goes with the city.
  */
 export const outpostStorageRealms: Invariant = {
   name: 'outpost-storage-realms',
@@ -316,8 +317,8 @@ export const outpostStorageRealms: Invariant = {
     const realms = new Set(world.realms.map((x) => x.id))
     return world.buildings.flatMap((b) => {
       if (b.realmId === undefined) return []
-      const why = !isOutpostStorage(b)
-        ? `is a ${b.site ? `${b.kind} site` : b.kind}${b.cityId ? ` of city ${b.cityId}` : ''} with realm ${b.realmId}`
+      const why = !isOutpostStorage(b) && !b.site
+        ? `is a ${b.kind}${b.cityId ? ` of city ${b.cityId}` : ''} with realm ${b.realmId}`
         : !realms.has(b.realmId)
           ? `belongs to realm ${b.realmId}, which doesn't exist`
           : undefined
