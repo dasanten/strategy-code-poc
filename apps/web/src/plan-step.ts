@@ -50,6 +50,7 @@ export type PlanStepId =
   | 'dismount'
   | 'board'
   | 'getOff'
+  | 'unhitch'
   | 'runScript'
 
 /** One kind of step Add step offers. */
@@ -81,6 +82,11 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     picks: [{ pick: 'carriage', prompt: 'the carriage to board' }],
   },
   { id: 'getOff', label: 'Get off', picks: [] },
+  {
+    id: 'unhitch',
+    label: 'Unhitch a horse',
+    picks: [{ pick: 'carriage', prompt: 'the carriage to unhitch the horse from' }],
+  },
   { id: 'work', label: 'Work', picks: [{ pick: 'workplace', prompt: 'the workplace to work' }] },
   {
     id: 'build',
@@ -312,6 +318,8 @@ export function planOrder(
       return { order: { kind: 'board', carriageId: p.id }, at }
     case 'getOff':
       return { order: { kind: 'getOff' } }
+    case 'unhitch':
+      return { order: { kind: 'unhitch', carriageId: p.id }, at }
     case 'work': {
       const makes = a?.ask === 'makes' ? { makes: a.makes } : {}
       return { order: { kind: 'task', task: 'work', workplaceId: p.id, ...makes }, at }

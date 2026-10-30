@@ -207,6 +207,26 @@ export function carriageOfResident(
 }
 
 /**
+ * Why a resident can't unhitch a carriage's horse now, or undefined when they can (`CONTEXT.md`:
+ * Hitched horse): they must be grown up and of the carriage's realm, standing on its tile, and a
+ * horse must be hitched to it.
+ */
+export function unhitchProblem(
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'bornAt'>,
+  carriage: Pick<Carriage, 'x' | 'y' | 'realmId' | 'cityId' | 'horseId'> | undefined,
+  tick: number,
+): string | undefined {
+  if (!carriage) return 'no such carriage'
+  if (!canWork(resident, tick)) return 'children can’t unhitch'
+  if (!carriageOfResident(carriage, resident)) return 'not a carriage of your realm'
+  if (carriage.x !== resident.x || carriage.y !== resident.y) {
+    return 'that carriage is not on the resident’s tile'
+  }
+  if (!carriage.horseId) return 'no horse is hitched to that carriage'
+  return undefined
+}
+
+/**
  * Why a resident can't board a carriage now, or undefined when they can (`CONTEXT.md`:
  * Passenger): it must be of their realm and on their tile, with room for one more passenger;
  * they must be aboard no carriage, on foot (`CONTEXT.md`: Riding) and drive none.
