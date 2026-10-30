@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BUILD_WORK,
   FOOD_PER_DAY,
   HOUSING_ROOM,
+  MOUNTAIN_ROAD_WORK_FACTOR,
   TICKS_PER_GAME_YEAR,
   Terrain,
   UNEXPLORED,
@@ -73,7 +75,15 @@ describe('the terrain on a tile’s card', () => {
     expect(card.lines).not.toContain('Hills · speed ~70% · food 130%')
     const site = building({ kind: 'road', site: { work: 0, delivered: {} } })
     expect(linesOf({ terrain: Terrain.Hills, buildings: [site] })).toEqual(
-      expect.arrayContaining(['Road site', 'Hills · speed ~70% · food 130%']),
+      expect.arrayContaining(['Road site · 0% of the work done', 'Hills · speed ~70% · food 130%']),
+    )
+  })
+
+  it('says a road site on Mountain takes more work', () => {
+    const work = (BUILD_WORK.road ?? 0) / 2
+    const site = building({ kind: 'road', site: { work, delivered: {} } })
+    expect(linesOf({ terrain: Terrain.Mountain, buildings: [site] })).toContain(
+      `Road site · 50% of the work done · ${MOUNTAIN_ROAD_WORK_FACTOR}× the work on Mountain`,
     )
   })
 })

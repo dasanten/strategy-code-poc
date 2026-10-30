@@ -5,7 +5,7 @@ import { ARMY_SCRIPT_API, DEFAULT_SCRIPTS, SCRIPT_API, SCRIPT_VIEWS } from '@csp
 import { describe, expect, it } from 'vitest'
 import { scriptWarnings } from './script-editor.js'
 import { WIKI_TOPICS, Wiki } from './Wiki.js'
-import { SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 
 const examples = SCRIPT_LANGUAGE.filter((r) => r.example).map((r) => [r.title, r.example!])
 
@@ -23,6 +23,15 @@ describe('the Wiki’s Script language topic', () => {
     }
     // Code in a rule's text shows as code.
     expect(html).toContain('<code>return</code>')
+  })
+})
+
+describe('the Wiki’s Script parameters topic', () => {
+  it('shows a number param with a default, without syntax errors or warnings', () => {
+    expect(checkScript(PARAM_DEFAULT_EXAMPLE)).toEqual([])
+    expect(scriptWarnings(PARAM_DEFAULT_EXAMPLE, false)).toEqual([])
+    const html = renderToStaticMarkup(createElement(Wiki))
+    expect(html).toContain('param rounds: number = 5')
   })
 })
 

@@ -3,6 +3,7 @@ import {
   ScriptFunction,
   parse,
   run,
+  scriptParams,
   type Program,
   type ScriptObject,
 } from '@csp/lang'
@@ -16,6 +17,7 @@ import {
   stableAt,
   commands,
   isTask,
+  keptPair,
   type Good,
   type Task,
   type TaskMemory,
@@ -34,6 +36,7 @@ import {
   type ScriptMemory,
   type ScriptRunBy,
   type SeenEntity,
+  type StartParamValues,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -49,7 +52,12 @@ import {
 } from './script-bindings.js'
 import { addToScriptLog } from './script-log.js'
 import type { RunnableScript } from './scripts.js'
-import { paramValues, scriptParamsSound } from './script-params.js'
+import {
+  paramValues,
+  scriptParamsSound,
+  setStartParams,
+  startParamsProblem,
+} from './script-params.js'
 import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
 
@@ -84,6 +92,8 @@ interface RunScriptRequest extends OrderRequest {
   kind: 'runScript'
   residentId: string
   scriptId: number
+  /** Values for the script's params, set before its first tick (`CONTEXT.md`: Before it starts). */
+  params?: StartParamValues
 }
 
 interface ArmyRunScriptRequest extends OrderRequest {
@@ -106,8 +116,26 @@ function badScript(
 }
 
 /**
+ * Why the param values an order starting script `scriptId` gives don't fit its `param` lines
+ * (`startParamsProblem`), if they don't; none given always fit.
+ */
+function paramsProblem(
+  host: { script(scriptId: number): Pick<RunnableScript, 'source'> | undefined },
+  world: WorldState,
+  realmId: string,
+  scriptId: number,
+  params: unknown,
+): string | undefined {
+  if (params === undefined) return undefined
+  const source = host.script(scriptId)?.source
+  if (source === undefined) return 'not one of your scripts with a version that can run'
+  return startParamsProblem(world, realmId, scriptParams(source), params)
+}
+
+/**
  * The run-script order: one of the Player's residents runs one of the Player's scripts, from a
- * fresh memory. It ends whatever the resident was doing.
+ * fresh memory, with the param values it gives set first (`CONTEXT.md`: Before it starts). It
+ * ends whatever the resident was doing.
  */
 export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
   return {
@@ -116,14 +144,18 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
       const realm = realmOf(world, sender.userId)
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
-      return badScript(host, sender, o.scriptId)
+      return (
+        badScript(host, sender, o.scriptId) ??
+        paramsProblem(host, world, realm.id, o.scriptId!, o.params)
+      )
     },
     apply(world, _sender, order) {
-      const { residentId, scriptId } = order as RunScriptRequest
+      const { residentId, scriptId, params } = order as RunScriptRequest
       const r = world.residents.find((x) => x.id === residentId)
       if (!r) return
       r.order = null
       r.script = { scriptId, memory: {} }
+      setStartParams(r, scriptId, params)
     },
   }
 }
@@ -132,6 +164,14 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
 export interface DefaultScriptHost {
   /** The id of the Player's version of the task's default script, made if they have none. */
   defaultScript(userId: number, task: Task): number
+  /** The script's active version, to check the param values a task gives against. */
+  script?(scriptId: number): Pick<RunnableScript, 'source'> | undefined
+}
+
+/** What every task order may carry besides its target. */
+interface TaskParams {
+  /** Values for the default script's params, set before its first tick (`CONTEXT.md`: Before it starts). */
+  params?: StartParamValues
 }
 
 interface WorkTaskRequest extends OrderRequest {
@@ -191,13 +231,15 @@ interface BreedTaskRequest extends OrderRequest {
   horseIds: [string, string]
 }
 
-type TaskRequest =
+type TaskRequest = (
   | WorkTaskRequest
   | BuildTaskRequest
   | HaulTaskRequest
   | TearDownTaskRequest
   | BreedTaskRequest
   | FeedStableTaskRequest
+) &
+  TaskParams
 
 /** The built-in order a task's request is checked as, for the resident. */
 function asOrder(o: Partial<TaskRequest>): OrderRequest {
@@ -212,6 +254,23 @@ function asOrder(o: Partial<TaskRequest>): OrderRequest {
     return { kind: 'breed', residentId, stableId: o.stableId, horseIds: o.horseIds }
   if (o.task === 'build') return { kind: 'build', residentId, building: o.building }
   return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
+}
+
+/**
+ * The task as the resident takes it up: for Breed horses (`CONTEXT.md`: Breeding), a pair whose
+ * breeding the stable keeps comes first (`keptPair`), when the resident can breed it, in place of
+ * the two picked.
+ */
+function withKeptPair(
+  world: WorldState,
+  o: Partial<TaskRequest>,
+  realmId: string | undefined,
+): Partial<TaskRequest> {
+  if (o.task !== 'breed' || realmId === undefined) return o
+  const stable = world.buildings.find((b) => b.id === o.stableId)
+  const r = world.residents.find((x) => x.id === o.residentId)
+  const kept = stable && r && keptPair(world, stable, { realmId }, r)
+  return kept ? { ...o, horseIds: kept } : o
 }
 
 /** The memory a task's default script starts from (`TaskMemory`), for resident `r`. */
@@ -263,49 +322,68 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
  * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
  * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
- * own: the resident stands in the stable and is grown up.
+ * own: the resident stands in the stable and is grown up. The param values it gives are checked
+ * against the default script's and set first (`CONTEXT.md`: Before it starts).
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
     validate(world, sender, order, terrain) {
       const o = order as Partial<TaskRequest>
-      if (!isTask(o.task)) return 'no such task'
-      const realm = realmOf(world, sender.userId)
-      const r = world.residents.find((x) => x.id === o.residentId)
-      if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
-      if (o.task === 'work') {
-        const workplaceId = (o as Partial<WorkTaskRequest>).workplaceId
-        if (typeof workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== workplaceId)
-          return 'not standing on that workplace'
-      }
-      if (o.task === 'feedStable') {
-        // No order of its own: they store and fetch, which children can't.
-        const size = terrain?.size ?? MAP_SIZE
-        if (stableAt(world, r.x, r.y, size)?.id !== o.stableId) return 'not standing in that stable'
-        return canWork(r, world.tick) ? undefined : 'children can’t store or fetch goods'
-      }
-      if (o.task === 'build' && o.at !== undefined) {
-        // Somewhere else: checked as the build order there, once they have walked to it.
-        const at = o.at as Partial<{ x: number; y: number }> | null
-        if (!at || !Number.isInteger(at.x) || !Number.isInteger(at.y))
-          return 'the target must be a tile'
-        return buildAtProblem(world, r!, o.building, at as { x: number; y: number }, terrain)
-      }
-      const built = asOrder(o)
-      const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)
-      // Working there by a bare work-at order, as the starting residents do, they can still be
-      // given the task; already running it there, they can't.
-      if (problem === 'already working here' && !r.script) return undefined
-      return problem
+      const problem = taskProblem(world, sender, o, terrain)
+      if (problem !== undefined || o.params === undefined) return problem
+      if (!host.script) return 'the task takes no params'
+      const realm = realmOf(world, sender.userId)!
+      const scriptId = host.defaultScript(sender.userId, o.task!)
+      return paramsProblem({ script: host.script }, world, realm.id, scriptId, o.params)
     },
     apply(world, sender, order) {
-      const o = order as TaskRequest
+      const realmId = realmOf(world, sender.userId)?.id
+      const o = withKeptPair(world, order as TaskRequest, realmId) as TaskRequest
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!r) return
       r.order = null
-      r.script = { scriptId: host.defaultScript(sender.userId, o.task), memory: taskMemory(o, r) }
+      const scriptId = host.defaultScript(sender.userId, o.task)
+      r.script = { scriptId, memory: taskMemory(o, r) }
+      setStartParams(r, scriptId, o.params)
     },
   }
+}
+
+/** Why the resident can't be given the task on its target, if they can't (`taskOrder`). */
+function taskProblem(
+  world: WorldState,
+  sender: OrderSender,
+  o: Partial<TaskRequest>,
+  terrain: TerrainMap | undefined,
+): string | undefined {
+  if (!isTask(o.task)) return 'no such task'
+  const realm = realmOf(world, sender.userId)
+  const r = world.residents.find((x) => x.id === o.residentId)
+  if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+  if (o.task === 'work') {
+    const workplaceId = (o as Partial<WorkTaskRequest>).workplaceId
+    if (typeof workplaceId !== 'string' || buildingAt(world, r.x, r.y)?.id !== workplaceId)
+      return 'not standing on that workplace'
+  }
+  if (o.task === 'feedStable') {
+    // No order of its own: they store and fetch, which children can't.
+    const size = terrain?.size ?? MAP_SIZE
+    if (stableAt(world, r.x, r.y, size)?.id !== o.stableId) return 'not standing in that stable'
+    return canWork(r, world.tick) ? undefined : 'children can’t store or fetch goods'
+  }
+  if (o.task === 'build' && o.at !== undefined) {
+    // Somewhere else: checked as the build order there, once they have walked to it.
+    const at = o.at as Partial<{ x: number; y: number }> | null
+    if (!at || !Number.isInteger(at.x) || !Number.isInteger(at.y))
+      return 'the target must be a tile'
+    return buildAtProblem(world, r!, o.building, at as { x: number; y: number }, terrain)
+  }
+  const built = asOrder(withKeptPair(world, o, realm.id))
+  const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)
+  // Working there by a bare work-at order, as the starting residents do, they can still be
+  // given the task; already running it there, they can't.
+  if (problem === 'already working here' && !r.script) return undefined
+  return problem
 }
 
 /**

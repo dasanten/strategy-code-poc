@@ -527,8 +527,13 @@ function viewFields(
       const field: ScriptField = {
         name: p.name,
         type: p.type === 'building' ? { view: 'building' } : 'any',
-        description: PARAM_DESCRIPTIONS[p.type],
-        nullWhen: 'while none is picked, or the one picked is gone or no longer of my realm',
+        description:
+          p.default === undefined
+            ? PARAM_DESCRIPTIONS[p.type]
+            : `${PARAM_DESCRIPTIONS[p.type]} ${p.default} while none is set.`,
+        ...(p.default === undefined && {
+          nullWhen: 'while none is picked, or the one picked is gone or no longer of my realm',
+        }),
       }
       return { field, mark: null, info: fieldInfo(field) }
     })

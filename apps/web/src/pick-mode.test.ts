@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { pickPrompt, pickTarget } from './pick-mode.js'
+import type { Plan } from './plan-step.js'
 
 const none = {
   picking: false,
@@ -38,6 +39,16 @@ describe('pickTarget', () => {
       kind: 'army',
       mode: 'armyGuard',
     })
+  })
+
+  it('waits for a place of a step planned with Add step, for a resident or a group', () => {
+    const plan: Plan = { kind: 'work', picked: [] }
+    const target = { kind: 'plan', prompt: 'the workplace to work' }
+    expect(pickTarget({ ...none, plan })).toEqual(target)
+    expect(pickTarget({ ...none, plan, groupPicking: 'walk', isGroup: true })).toEqual(target)
+    // Once its places are picked, the card asks for the rest.
+    const picked: Plan = { kind: 'work', picked: [{ x: 1, y: 1, id: 'f1' }] }
+    expect(pickTarget({ ...none, plan: picked, isGroup: true })).toBeUndefined()
   })
 })
 

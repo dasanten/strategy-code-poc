@@ -1,7 +1,10 @@
 import {
   BUILD_MATERIALS,
   DEFAULT_SCRIPTS,
+  GET_FOOD_AT,
+  GET_FOOD_TAKE,
   MAX_HUNGER,
+  MEAL_UNITS,
   OWN_FOOD,
   Terrain,
   type Building,
@@ -22,9 +25,9 @@ import { createWorld, stepWorld } from './world.js'
 
 /**
  * Getting food (`CONTEXT.md`: Getting food, Own food): a resident running the Work, Build or
- * Tear down default with `foodAt` set goes to get Food below that many units on them, up to
- * `foodTake`, and comes back; with `foodTake` set, storing a load or fetching materials tops
- * their own food up to it too.
+ * Tear down default goes to get Food below `foodAt` units on them, up to `foodTake`, and comes
+ * back; storing a load or fetching materials tops their own food up to `foodTake` too. Both
+ * params have defaults, so they do it without any set; `foodAt` 0 turns it off.
  */
 
 const SIZE = 32
@@ -135,18 +138,25 @@ describe('getting food in the Work default', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('takes their usual own food while foodTake is unset', () => {
+  it('with no params set, fetches the default foodTake once below the default foodAt', () => {
     const { world, terrain, camp } = campWorld()
-    storage(world, 's1', camp.x + 6, camp.y, { food: 50 })
-    // Above the one unit below which a resident refills on their own at a storage.
-    const w = addWorker(world, camp, 1, { foodAt: OWN_FOOD })
+    const s = storage(world, 's1', camp.x + 6, camp.y, { food: 50 })
+    const w = addWorker(world, camp, GET_FOOD_AT)
+    expect(run(world, terrain, w, () => false, 20)).toBe(false)
+    expect(w.order).toMatchObject({ kind: 'workAt' })
+
+    w.carried.food = 0
     let fetched = false
-    run(world, terrain, w, () => {
-      fetched ||= (w.carried.food ?? 0) >= OWN_FOOD
+    const left = run(world, terrain, w, () => {
+      fetched ||= (w.carried.food ?? 0) >= GET_FOOD_TAKE
       return fetched && working(w, camp)
     })
+    expect(left).toBe(true)
     expect(working(w, camp)).toBe(true)
-    expect(w.carried.food).toBe(OWN_FOOD)
+    // They set off for foodTake; arriving with none, they also refill a meal at the storage.
+    expect(w.carried.food).toBe(GET_FOOD_TAKE + MEAL_UNITS)
+    expect(s.stock?.food).toBe(50 - GET_FOOD_TAKE - MEAL_UNITS)
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 
   it('goes to the picked storage while it holds Food, else the nearest with Food', () => {
@@ -178,10 +188,10 @@ describe('getting food in the Work default', () => {
     expect(w.script?.memory.food).toBeFalsy()
   })
 
-  it('stays at work unset, however little Food they carry', () => {
+  it('stays at work with foodAt 0, however little Food they carry', () => {
     const { world, terrain, camp } = campWorld()
     storage(world, 's1', camp.x + 6, camp.y, { food: 50 })
-    const w = addWorker(world, camp, 0)
+    const w = addWorker(world, camp, 0, { foodAt: 0 })
     const left = run(world, terrain, w, () => false, 20)
     expect(left).toBe(false)
     expect(w.order).toMatchObject({ kind: 'workAt' })
@@ -278,10 +288,10 @@ describe('getting food in the Build default', () => {
     expect(s.stock?.food).toBe(50 - (12 - OWN_FOOD))
   })
 
-  it('stays at the site unset, however little Food they carry', () => {
+  it('stays at the site with foodAt 0, however little Food they carry', () => {
     const { world, terrain } = campWorld()
     storage(world, 's1', HOUSE_AT.x + 6, HOUSE_AT.y, { food: 50 })
-    const b = addBuilder(world, HOUSE_AT, 0)
+    const b = addBuilder(world, HOUSE_AT, 0, { foodAt: 0 })
     const left = run(world, terrain, b, () => false, 20, 'build')
     expect(left).toBe(false)
     expect(b.order).toMatchObject({ kind: 'build' })
@@ -331,10 +341,10 @@ describe('getting food in the Tear down default', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('tears down unset without leaving, however little Food they carry', () => {
+  it('tears down with foodAt 0 without leaving, however little Food they carry', () => {
     const { world, terrain, camp } = campWorld()
     storage(world, 's1', camp.x + 6, camp.y, { food: 50 })
-    const r = addTearer(world, camp, 0)
+    const r = addTearer(world, camp, 0, { foodAt: 0 })
     const left = run(world, terrain, r, () => false, 20, 'tearDown')
     expect(left).toBe(false)
     expect(r.order).toMatchObject({ kind: 'tearDown', buildingId: camp.id })

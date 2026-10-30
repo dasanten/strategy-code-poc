@@ -237,13 +237,16 @@ function shownLines<P extends { stock: number }>(lines: P[], inside: boolean): S
 }
 
 /**
- * A building as the side sees it: its stock only when it sees inside, and a Trade Org
- * warehouse's prices either way (`CONTEXT.md`: Seeing inside a storage, Warehouse prices).
+ * A building as the side sees it: its stock and the breeding progress a stable keeps only when it
+ * sees inside, and a Trade Org warehouse's prices either way (`CONTEXT.md`: Seeing inside a storage, Warehouse prices).
  */
 function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBuilding {
   const inside = insight.insideBuilding(b)
   const shown: SeenBuilding = { ...b }
-  if (!inside) delete shown.stock
+  if (!inside) {
+    delete shown.stock
+    delete shown.breedings
+  }
   if (b.kind === 'warehouse') {
     const prices = warehousePrices(world, b)
     if (prices.length > 0) shown.prices = shownLines(prices, inside)
@@ -309,13 +312,15 @@ export function entitiesInSight(
   for (const r of world.residents) {
     if (!inSight(r)) continue
     // Which script a resident runs is seen; its memory stays on the server, and the values of
-    // its params are shown only to the realm running it, as is the queue to the realm that gave it.
+    // its params are shown only to the realm commanding them, all they keep (to fill in before a
+    // script starts), as is the queue to the realm that gave it.
     const { script, scriptParams, queue, ...rest } = withoutScriptLog(r)
-    const params =
-      script && commanderOf(world, r) === realmId ? scriptParams?.[script.scriptId] : undefined
+    const kept = commanderOf(world, r) === realmId ? scriptParams : undefined
+    const params = script ? kept?.[script.scriptId] : undefined
     const shown: SeenEntity = {
       is: 'resident',
       ...rest,
+      ...(kept ? { scriptParams: kept } : {}),
       ...(queue && queue.realmId === realmId ? { queue } : {}),
       ...(script
         ? {

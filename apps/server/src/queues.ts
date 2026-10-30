@@ -1,6 +1,7 @@
 import {
   commanderOf,
   commands,
+  MAP_SIZE,
   QUEUE_STEP_KINDS,
   queueStepsProblem,
   runsScript,
@@ -14,6 +15,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { leaveArmies } from './armies.js'
+import { carriageOrganization } from './crimes.js'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import type { OrderKind, OrderSender } from './orders.js'
@@ -25,6 +27,10 @@ import { realmOf } from './starting-city.js'
  * after the orders are applied and before scripts run, `QueueRunner` starts the current step by
  * applying its request as if it had been given on its own, and moves on once it is done or its
  * duration is up. Any order that isn't a step ends the queue (`OrderQueue`).
+ *
+ * A step may act somewhere else than where the resident stands (Planning ahead): adding it only
+ * checks that the places it names could make sense (`stepPlaceProblem`); whether it can start is
+ * checked when its turn comes.
  */
 
 /** Ticks in a game minute. */
@@ -59,6 +65,71 @@ function keptStep(id: number, s: QueueStepRequest): QueueStep {
   }
 }
 
+/** A tile as an order names it, `{ x, y }`, rather than a place by its id. */
+function isTile(p: unknown): p is { x: unknown; y: unknown } {
+  return typeof p === 'object' && p !== null && 'x' in p && 'y' in p
+}
+
+/**
+ * Why a step can't make sense wherever the resident stands when its turn comes (`CONTEXT.md`:
+ * Queue, Planning ahead): a tile it names is off the map, a building, carriage or horse it names
+ * isn't there, or a carriage or horse it names isn't the realm's. Everything else, such as
+ * standing on the right tile or carrying the goods, is checked when the step starts.
+ */
+export function stepPlaceProblem(
+  world: WorldState,
+  realmId: string,
+  order: OrderRequest,
+  size = MAP_SIZE,
+): string | undefined {
+  const onMap = (p: { x: unknown; y: unknown }) =>
+    [p.x, p.y].every((n) => typeof n !== 'number' || (Number.isInteger(n) && n >= 0 && n < size))
+  const tiles = [order, order.at, order.from, order.to].filter(isTile)
+  if (!tiles.every(onMap)) return 'that tile is off the map'
+  const spot = (order.spot ?? {}) as Record<string, unknown>
+  // A store's `to` or a fetch's `from` names a storage or stable, anyone's, or a carriage.
+  const places = [order.to, order.from]
+    .filter((p) => p !== undefined && p !== null && !isTile(p))
+    .map((p) => (typeof p === 'object' ? (p as { id?: unknown }).id : p))
+  const buildingIds = [order.workplaceId, order.buildingId, order.stableId, order.wallId]
+  for (const id of [...buildingIds, spot.storageId, spot.siteId]) {
+    if (typeof id === 'string' && !world.buildings.some((b) => b.id === id))
+      return 'no such building'
+  }
+  for (const id of [order.carriageId, spot.carriageId, ...places]) {
+    if (typeof id !== 'string') continue
+    const k = world.carriages.find((x) => x.id === id)
+    const isPlace = places.includes(id)
+    if (!k && isPlace && world.buildings.some((b) => b.id === id)) continue
+    if (!k) return isPlace ? 'no such storage' : 'no such carriage'
+    if (carriageOrganization(k) !== realmId) return 'not a carriage of your realm'
+  }
+  const horseIds = Array.isArray(order.horseIds) ? (order.horseIds as unknown[]) : []
+  for (const id of [order.horseId, ...horseIds]) {
+    if (typeof id !== 'string') continue
+    const horse = world.horses.find((h) => h.id === id)
+    if (!horse) return 'no such horse'
+    if (horse.realmId !== realmId) return 'not a horse of your realm'
+  }
+  return undefined
+}
+
+/** Why one of the steps `checked` picks can't make sense (`stepPlaceProblem`). */
+function placesProblem(
+  world: WorldState,
+  realmId: string,
+  steps: QueueStepRequest[],
+  checked: (s: QueueStepRequest) => boolean,
+  terrain?: TerrainMap,
+): string | undefined {
+  for (const [i, s] of steps.entries()) {
+    if (!checked(s)) continue
+    const problem = stepPlaceProblem(world, realmId, s.order, terrain?.size)
+    if (problem) return `step ${i + 1}: ${problem}`
+  }
+  return undefined
+}
+
 /** The resident the sender's queue order names, if they command them. */
 function queuedResident(world: WorldState, sender: OrderSender, residentId: unknown) {
   const realm = realmOf(world, sender.userId)
@@ -71,12 +142,16 @@ function queuedResident(world: WorldState, sender: OrderSender, residentId: unkn
  * whatever they were doing.
  */
 export const queue: OrderKind = {
-  validate(world, sender, order) {
+  validate(world, sender, order, terrain) {
     const o = order as Partial<QueueRequest>
-    if (!queuedResident(world, sender, o.residentId)) return 'not one of your residents'
+    const found = queuedResident(world, sender, o.residentId)
+    if (!found) return 'not one of your residents'
     if (Array.isArray(o.steps) && o.steps.length === 0) return 'a queue needs a step'
     if (o.loop !== undefined && typeof o.loop !== 'boolean') return 'loop must be true or false'
-    return queueStepsProblem(o.steps)
+    return (
+      queueStepsProblem(o.steps) ??
+      placesProblem(world, found.realm.id, o.steps!, () => true, terrain)
+    )
   },
   apply(world, sender, order) {
     const o = order as QueueRequest
@@ -104,7 +179,7 @@ export const queue: OrderKind = {
  * first one when the queue loops; otherwise the queue ends and the resident stops.
  */
 export const editQueue: OrderKind = {
-  validate(world, sender, order) {
+  validate(world, sender, order, terrain) {
     const o = order as Partial<EditQueueRequest>
     const found = queuedResident(world, sender, o.residentId)
     if (!found) return 'not one of your residents'
@@ -116,7 +191,9 @@ export const editQueue: OrderKind = {
     const ids = o.steps!.flatMap((s) => (s.id === undefined ? [] : [s.id]))
     if (new Set(ids).size !== ids.length) return 'a step is in the list twice'
     if (!ids.every((id) => q.steps.some((s) => s.id === id))) return 'no such step in the queue'
-    return undefined
+    // Only the steps added are checked: one already there whose place is gone since is skipped
+    // when its turn comes, and can still be edited until then.
+    return placesProblem(world, found.realm.id, o.steps!, (s) => s.id === undefined, terrain)
   },
   apply(world, sender, order) {
     const o = order as EditQueueRequest

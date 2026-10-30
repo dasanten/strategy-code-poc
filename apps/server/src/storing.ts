@@ -2,7 +2,7 @@ import {
   GOODS,
   MAP_SIZE,
   OWN_FOOD,
-  canWork,
+  canHandle,
   covers,
   putAwayUnits,
   wrapDistance,
@@ -203,9 +203,9 @@ function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   const o = order as Partial<StoringRequest>
   const r = orderedResident(world, sender, o.residentId)
   if (!r) return 'not one of your residents'
-  if (!canWork(r, world.tick)) return 'children can’t store or fetch goods'
   const goods = readWanted(o.goods)
   if (!goods) return 'goods must be a list of goods, or whole units of known goods'
+  if (!canHandle(r, world.tick, Object.keys(goods))) return 'children can’t store or fetch goods'
   return { r, goods, o }
 }
 

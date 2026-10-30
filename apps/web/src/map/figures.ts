@@ -5,18 +5,19 @@ import { isLeader, rankedAs, type Leaders, type Relationship, type Tone } from '
  * What a resident is doing, as the small icon by their figure at close zoom (ADR 0008). A resident
  * standing about has none.
  */
-export type Activity = 'fighting' | 'working' | 'carrying' | 'walking'
+export type Activity = 'fighting' | 'working' | 'riding' | 'carrying' | 'walking'
 
 /** What a resident holds that is not a load: their food and the gear they fight with. */
 const NOT_A_LOAD: ReadonlySet<Good> = new Set<Good>(['food', ...WEAPONS, ...PROTECTION])
 
 /**
  * A resident's activity from their order and what they hold: attacking is fighting; working a
- * workplace, building, tearing down or laying a road is working; otherwise holding goods beyond
- * their food and gear is carrying, and being on the way somewhere is walking.
+ * workplace, building, tearing down or laying a road is working; otherwise a rider on the way
+ * somewhere is riding (`CONTEXT.md`: Riding), holding goods beyond their food and gear is
+ * carrying, and being on the way somewhere is walking.
  */
 export function residentActivity(
-  r: Pick<Resident, 'order' | 'carried' | 'x' | 'y'>,
+  r: Pick<Resident, 'order' | 'carried' | 'x' | 'y' | 'riding'>,
 ): Activity | undefined {
   const o = r.order
   if (o?.kind === 'attack') return 'fighting'
@@ -28,6 +29,7 @@ export function residentActivity(
     (isLineOrder(o) && o.phase === 'building')
   )
     return 'working'
+  if (r.riding !== undefined && moving(r)) return 'riding'
   const load = Object.entries(r.carried).some(([g, n]) => n! > 0 && !NOT_A_LOAD.has(g as Good))
   if (load) return 'carrying'
   if (moving(r)) return 'walking'

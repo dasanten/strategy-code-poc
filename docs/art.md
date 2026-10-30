@@ -152,7 +152,7 @@ seamless and tileable at 128 px: Plains, Forest, Hills, Mountain, Lake, Sea, and
 
 ### Kept as SVG
 
-The activity icons (walking, carrying, working, fighting) and the token bases (hex, ring, round,
+The activity icons (walking, riding, carrying, working, fighting) and the token bases (hex, ring, round,
 diamond): tiny UI markers that read better as line art.
 
 **Minimum:** about 58 images (15 buildings, 12 wall and road pieces, 1 extra gate, 4 construction

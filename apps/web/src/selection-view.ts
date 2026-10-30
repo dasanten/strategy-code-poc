@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   BUILDABLE,
+  CHILD_GOODS,
   SHARES_A_TILE,
   GOODS,
   HORSE_FOOD_PER_DAY,
@@ -18,6 +19,7 @@ import {
   STABLE_BREED_TICKS,
   STABLE_CAPACITY,
   breedersAt,
+  keptBreeding,
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
@@ -62,6 +64,7 @@ import {
   recipeFor,
   recipeGood,
   teardownWork,
+  workFactor,
   UNEXPLORED,
 } from '@csp/shared'
 import type { Relationship } from './theme.js'
@@ -147,7 +150,7 @@ export interface CardAction {
 
 /** What a resident's card needs to know about them and their tile. */
 export interface ResidentHere {
-  /** A child can't build, work, carry goods, drive or pair (`CONTEXT.md`: Child). */
+  /** A child can't build, work, drive or pair, and handles only Food (`CONTEXT.md`: Child). */
   adult: boolean
   /** They have an order or run a script, so there is something to stop. */
   busy: boolean
@@ -199,9 +202,9 @@ export function isWorkable(building: Building | undefined, node: KnownNode | und
 
 /**
  * The actions a resident's card offers, in the order it shows them. Orders they can't take right
- * now are left out (ADR 0012): a child's work, building, goods and pairing (`CONTEXT.md`: Child),
- * the work, building, hauling and pairing of someone carrying a child (`CONTEXT.md`: Carrying),
- * and Goods with nothing carried and nothing on their tile to pick up.
+ * now are left out (ADR 0012): a child's work, building and pairing (`CONTEXT.md`: Child), the
+ * work, building, hauling and pairing of someone carrying a child (`CONTEXT.md`: Carrying), and
+ * Goods with nothing carried and nothing on their tile to pick up (for a child: no Food).
  */
 export function residentActions(h: ResidentHere): CardAction[] {
   const row = (id: ActionId, label: string, more: Partial<CardAction> = {}): CardAction => ({
@@ -256,7 +259,9 @@ export function residentActions(h: ResidentHere): CardAction[] {
     if (h.building?.kind === 'stable' && !h.building.site)
       add(row('breed', 'Breed horses…', { opens: true }))
   }
-  if (h.adult && (h.carries || goodsOnTile(h))) add(row('goods', 'Goods…', { opens: true }))
+  if (h.carries || goodsOnTile(h, h.adult ? GOODS : CHILD_GOODS)) {
+    add(row('goods', 'Goods…', { opens: true }))
+  }
   if (works && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
   if (h.wallsInSight > 0) add(row('walls', 'Break or climb a wall…', { opens: true }))
@@ -274,10 +279,12 @@ export function residentActions(h: ResidentHere): CardAction[] {
   return actions
 }
 
-/** Whether there are goods on a resident's tile to pick up: on the ground, stored, at a site or on a carriage. */
-function goodsOnTile(h: ResidentHere): boolean {
-  const some = (stock: Stock | undefined) =>
-    !!stock && Object.values(stock).some((n) => (n ?? 0) > 0)
+/**
+ * Whether there are some of `goods` on a resident's tile to pick up: on the ground, stored, at a
+ * site or on a carriage.
+ */
+function goodsOnTile(h: ResidentHere, goods: readonly Good[]): boolean {
+  const some = (stock: Stock | undefined) => !!stock && goods.some((g) => (stock[g] ?? 0) > 0)
   return (
     some(h.pile?.goods) ||
     some(h.storage?.stock) ||
@@ -612,6 +619,20 @@ export function horseDetail(h: SeenHorse, tick: number | undefined): string {
 }
 
 /**
+ * The line on a rider's card for the horse they ride (`CONTEXT.md`: Riding), as the tile card
+ * shows a horse: "Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
+ * Undefined for someone on foot.
+ */
+export function riddenHorseLine(
+  r: Pick<Resident, 'riding'>,
+  horses: readonly SeenHorse[],
+  tick: number | undefined,
+): string | undefined {
+  const horse = r.riding === undefined ? undefined : horses.find((h) => h.id === r.riding)
+  return horse && `Horse: ${horseDetail(horse, tick)}`
+}
+
+/**
  * Lines for horses standing together, one per owner: "2 horses (yours) · 1 hungry", then one for
  * each of them (`horseDetail`). How they fare only for those the Player knows it of (`CONTEXT.md`:
  * Seeing how someone fares).
@@ -648,6 +669,30 @@ export function daysToFoals(stable: Building, residents: readonly SeenResident[]
     .map((r) => (r.order?.kind === 'breed' ? STABLE_BREED_TICKS - r.order.progress : 0))
     .map((left) => Math.max(1, Math.ceil(left / TICKS_PER_GAME_DAY)))
     .sort((a, b) => a - b)
+}
+
+/**
+ * Lines for the breedings a stable keeps that nobody in sight is tending (`CONTEXT.md`:
+ * Breeding): how far along each is, then its two horses (`horseDetail`).
+ */
+export function pausedBreedingLines(
+  stable: Building,
+  residents: readonly SeenResident[],
+  horses: readonly SeenHorse[],
+  tick: number | undefined,
+): string[] {
+  const tended = breedersAt(residents, stable).flatMap((r) =>
+    r.order?.kind === 'breed' ? [keptBreeding(stable, r.order.horseIds)] : [],
+  )
+  return (stable.breedings ?? [])
+    .filter((k) => !tended.includes(k))
+    .flatMap((k) => {
+      const pair = k.horseIds.map((id) => horses.find((h) => h.id === id))
+      return [
+        `Breeding paused: ${Math.floor((k.progress / STABLE_BREED_TICKS) * 100)}% of the way to a foal`,
+        ...pair.flatMap((h) => (h ? [`· ${horseDetail(h, tick)}`] : [])),
+      ]
+    })
 }
 
 /**
@@ -722,6 +767,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
+      if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))
@@ -829,7 +875,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   }
   const terrain = terrainLine(t.terrain, road)
   if (road) {
-    lines.push(road.site ? 'Road site' : terrain!)
+    lines.push(road.site ? roadSiteLine(road, t.terrain) : terrain!)
     if (road.teardown) lines.push(teardownLine(road))
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
@@ -842,6 +888,18 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     lines,
     ...(buildHere ? { buildHere } : {}),
   }
+}
+
+/**
+ * How far a road site has come (`CONTEXT.md`: Road), on `terrain` beneath it: "Road site · 25% of
+ * the work done", and on Mountain how many times the work it takes there (`workFactor`).
+ */
+function roadSiteLine(site: Building, terrain: number | undefined): string {
+  const work = BUILD_WORK.road ?? 0
+  const done = work > 0 ? Math.floor(((site.site?.work ?? 0) / work) * 100) : 100
+  const factor = workFactor('road', terrain)
+  const mountain = factor > 1 ? ` · ${factor}× the work on Mountain` : ''
+  return `Road site · ${done}% of the work done${mountain}`
 }
 
 /** The explored terrain's name, undefined while it is unknown. */

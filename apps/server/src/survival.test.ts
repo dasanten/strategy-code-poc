@@ -2,6 +2,9 @@ import {
   FOOD_PER_DAY,
   HOME_FOOD_LOW,
   HUNGER_DAYS,
+  MEAL_UNITS,
+  OWN_FOOD,
+  ticksForAge,
   STARVE_DAYS,
   START_FOOD,
   carryCapacity,
@@ -322,5 +325,61 @@ describe('stepRefill', () => {
     expect(refilledWhenLow.check(world, terrain)).toHaveLength(8)
     stepRefill(world, terrain.size)
     expect(refilledWhenLow.check(world, terrain)).toEqual([])
+  })
+
+  /** Makes a resident a child of five. */
+  const makeChild = (world: WorldState, r: Resident) => {
+    r.bornAt = world.tick - Math.ceil(ticksForAge(5))
+  }
+
+  it('tops a child at home up to their own food, not just a meal', () => {
+    const { world, storage } = atHome()
+    const [, child, grown] = world.residents as [Resident, Resident, Resident]
+    makeChild(world, child)
+    child.carried = { food: HOME_FOOD_LOW }
+    stepRefill(world, terrain.size)
+    expect(child.carried.food).toBeGreaterThanOrEqual(OWN_FOOD)
+    expect(child.carried.food).toBeLessThan(OWN_FOOD + MEAL_UNITS)
+    expect(grown.carried.food).toBe(HOME_FOOD_LOW)
+    expect(storage.stock!.food).toBe(
+      START_FOOD - (world.residents.length - 1) * HOME_FOOD_LOW - (child.carried.food! - 1),
+    )
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('tops a child up only from their city’s storage, and nothing when it has no Food', () => {
+    const { world, storage, city } = atHome()
+    const [, away, home] = world.residents as [Resident, Resident, Resident]
+    makeChild(world, away)
+    makeChild(world, home)
+    Object.assign(away, { ...awayFrom(world, city) })
+    storage.stock = {}
+    stepRefill(world, terrain.size)
+    expect(away.carried).toEqual({})
+    expect(home.carried).toEqual({})
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('is caught by the invariant when a child at home has only a meal', () => {
+    const { world } = atHome()
+    const child = world.residents[1]!
+    makeChild(world, child)
+    for (const r of world.residents) r.carried = { food: HOME_FOOD_LOW }
+    expect(refilledWhenLow.check(world, terrain).map((v) => v.entityIds)).toEqual([[child.id]])
+  })
+
+  it('sends a child out of the city with days of food: they don’t starve on a 2-day trip', () => {
+    const { world, city } = atHome()
+    averageEndurance(world)
+    const child = world.residents[1]!
+    makeChild(world, child)
+    stepWorld(world, terrain)
+    expect(child.carried.food).toBeGreaterThanOrEqual(OWN_FOOD)
+    Object.assign(child, { ...awayFrom(world, city) })
+    for (let t = 0; t < 2 * TICKS_PER_GAME_DAY; t++) stepWorld(world, terrain)
+    expect(world.residents).toContain(child)
+    expect(child.health).toBe(MAX_HEALTH)
+    expect(child.carried.food).toBeGreaterThan(0)
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 })
