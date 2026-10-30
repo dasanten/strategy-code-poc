@@ -192,6 +192,7 @@ describe('script views', () => {
       terrainAt: 'terrainAt(10, 10)',
       distance: 'distance(me, building("s1"))',
       fits: 'fits("food")',
+      breedingPair: 'breedingPair(building("s1"))',
       storages: 'storages()',
       walkTime: 'walkTime(me, building("s1"))',
       tick: 'tick',

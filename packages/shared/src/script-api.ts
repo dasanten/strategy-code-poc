@@ -230,6 +230,15 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     cost: SCRIPT_TILE_QUERY_COST,
     description: 'How many units of a good still fit in my hands.',
   },
+  {
+    name: 'breedingPair',
+    is: 'query',
+    params: ['stable'],
+    returns: { list: 'string' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The two horses of mine I would `breed` in a stable I see, as ids like ["h1", "h2"]: a pair whose breeding it keeps first, else two fed ones standing in it; null while there are none.',
+  },
   list(
     'storages',
     'building',

@@ -16,6 +16,7 @@ import {
   DIAGONAL_STEP,
   DOING_MAX_LENGTH,
   ageInYears,
+  breedingPair,
   buildingAt,
   buildingRealm,
   directivesFor,
@@ -310,6 +311,15 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         throw new ScriptRuntimeError(`"fits" needs a good, not ${String(good)}`)
       }
       return unitsThatFit(resident, good as Good, world.tick)
+    }
+    queries.breedingPair = ([stable]) => {
+      const id = (stable as Record<string, Value> | null)?.id
+      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      if (!b || b.kind !== 'stable' || side === undefined || !(ownBuilding(b) || inSight(b)))
+        return null
+      const owner = sender.npcCityId !== undefined ? { cityId: side } : { realmId: side }
+      const pair = breedingPair(world, b, owner, resident)
+      return pair ? pair.map((h) => h.id) : null
     }
     const time = (a: { x: number; y: number }, b: { x: number; y: number }) =>
       walkTime(world, terrain, context.explored, resident, a, b)

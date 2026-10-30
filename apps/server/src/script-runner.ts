@@ -52,6 +52,7 @@ import {
 } from './script-bindings.js'
 import type { RunnableScript } from './scripts.js'
 import {
+  paramTarget,
   paramValues,
   scriptParamsSound,
   setStartParams,
@@ -325,7 +326,7 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
  * own: the resident stands in the stable and is grown up. The param values it gives are checked
  * against the default script's and set first (`CONTEXT.md`: Before it starts), the task's target
- * in the script's target param (`withTargetParam`): Work's `workplace`.
+ * in the script's target param (`withTargetParam`, `taskTarget`).
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
@@ -348,10 +349,32 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       r.script = { scriptId, memory: taskMemory(o, r) }
       const source = host.script?.(scriptId)?.source
       const script = source === undefined ? undefined : { source, task: o.task }
-      const target = o.task === 'work' ? o.workplaceId : undefined
+      const target = taskTarget(world, realmId, o)
       setStartParams(r, scriptId, withTargetParam(script, o.params, target))
     },
   }
+}
+
+/**
+ * The task's target as its default's target param holds it (`TARGET_PARAMS`): Work's workplace,
+ * Tear down's building, the stable of Breed horses and Feed the stable. Only one of the realm's
+ * own, which a param can name; another's stays in the memory alone (`TaskMemory`).
+ */
+function taskTarget(
+  world: WorldState,
+  realmId: string | undefined,
+  o: TaskRequest,
+): string | undefined {
+  const [id, type] =
+    o.task === 'work'
+      ? [o.workplaceId, 'building' as const]
+      : o.task === 'tearDown'
+        ? [o.buildingId, 'building' as const]
+        : o.task === 'breed' || o.task === 'feedStable'
+          ? [o.stableId, 'storage' as const]
+          : [undefined, undefined]
+  if (id === undefined || type === undefined) return undefined
+  return paramTarget(world, realmId, type, id) ? id : undefined
 }
 
 /** Why the resident can't be given the task on its target, if they can't (`taskOrder`). */

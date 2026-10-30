@@ -8,13 +8,14 @@ import {
 } from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
 import { grantHorses } from './horse-grant.js'
+import { paramTarget } from './script-params.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 54
+export const WORLD_FORMAT_VERSION = 55
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -138,6 +139,26 @@ export const migrations: Record<number, MigrationStep> = {
       if (!world.buildings.some((b) => b.id === id)) continue
       const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
       picked.workplace ??= id
+    }
+    return world
+  },
+  // Tear down, Breed horses and Feed the stable take their target as a param too: `building`,
+  // and `stable` for both (`CONTEXT.md`: Default script, Started directly). A resident running
+  // one by a script of their Player's gets the building or stable its memory names as that
+  // param, when it is one of their realm's a param can name; the memory keeps it too, which the
+  // defaults still read. A script with no such param drops it on its next run.
+  54: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const r of world.residents) {
+      const s = r.script
+      if (!s || s.scriptId <= 0 || r.owner === null) continue
+      const give = (name: string, type: 'building' | 'storage', id: unknown) => {
+        if (typeof id !== 'string' || !paramTarget(world, r.owner!, type, id)) return
+        const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
+        picked[name] ??= id
+      }
+      give('building', 'building', s.memory.buildingId)
+      give('stable', 'storage', s.memory.stableId)
     }
     return world
   },
