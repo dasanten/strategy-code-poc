@@ -26,6 +26,7 @@ import {
   type Stock,
   isAt,
   SHARES_A_TILE,
+  targetParam,
   covers,
   type SeenResident,
   HORSE_GRANT_HORSES,
@@ -112,6 +113,7 @@ import { ScriptParamFields, StartParamsForm } from './ScriptParams.js'
 import {
   groupStartValues,
   startedScript,
+  startFormParams,
   startParamValues,
   startValues,
   startValuesValid,
@@ -128,6 +130,8 @@ import { useWorld } from './useWorld.js'
  */
 interface Starting {
   script: ScriptSummary
+  /** The params the form shows (`startFormParams`). */
+  params: ScriptParam[]
   values: StartValues
   picking?: ScriptParam
   error?: string
@@ -331,10 +335,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const giveOrder = (order: OrderRequest, queued = shift.current): Promise<string | undefined> => {
     const r = own.find((x) => x.id === order.residentId)
     const script = order.params === undefined ? startedScript(order, scripts) : undefined
-    if (script && script.params.length > 0) {
+    const params = script ? startFormParams(order, script) : []
+    if (script && params.length > 0) {
       setStarting({
         script,
-        values: startValues(script.params, r?.scriptParams?.[script.id]),
+        params,
+        values: startValues(params, r?.scriptParams?.[script.id], targetParam(script)),
         start: async (params) => setOrderError(await giveOrder({ ...order, params }, queued)),
       })
       return Promise.resolve(undefined)
@@ -580,11 +586,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           : undefined
     const given = 'params' in order && order.params !== undefined
     const script = starts && !given ? startedScript(starts, scripts) : undefined
-    if (script && script.params.length > 0) {
+    const params = script ? startFormParams(starts!, script) : []
+    if (script && params.length > 0) {
       const kept = group.map((r) => r.scriptParams?.[script.id])
       setStarting({
         script,
-        values: groupStartValues(script.params, kept),
+        params,
+        values: groupStartValues(params, kept, targetParam(script)),
         start: (params) => sendGroup({ ...order, params } as GroupOrder, queued),
       })
       return
@@ -1297,10 +1305,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       {world && starting && !starting.picking && (
         <StartParamsForm
           script={starting.script.name}
-          params={starting.script.params}
+          params={starting.params}
+          target={targetParam(starting.script)}
           values={starting.values}
           label={(id) => paramValueLabel(paramWorld(world), id)}
-          canStart={startValuesValid(starting.script.params, starting.values)}
+          canStart={startValuesValid(starting.params, starting.values)}
           error={starting.error}
           onPick={(p) => {
             setPicking(false)
@@ -1312,7 +1321,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           }
           onStart={() => {
             setStarting(undefined)
-            void starting.start(startParamValues(starting.script.params, starting.values))
+            void starting.start(startParamValues(starting.params, starting.values))
           }}
           onCancel={() => setStarting(undefined)}
         />

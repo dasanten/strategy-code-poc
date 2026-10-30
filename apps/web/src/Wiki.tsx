@@ -726,6 +726,14 @@ export function Wiki() {
           back. With no Food anywhere they work on. Carrying a load tops their food up to{' '}
           <code>foodTake</code> too. <code>foodAt</code> 0 turns this off.
         </p>
+        <p>
+          Work can be run directly too, with Run script or as a queue step: they work the workplace
+          in its <code>workplace</code> param, or with none picked the one they stand on when it
+          starts. Giving Work on a workplace fills it. It is never kept: each start works what it is
+          given or where they stand, so a queue can walk them to a workplace and then run Work
+          there. With no workplace there, or once theirs is gone, Work ends and your realm log says
+          why.
+        </p>
         <table>
           <thead>
             <tr>
@@ -814,7 +822,9 @@ export function Wiki() {
       <Section id="building">
         <p>
           A construction site becomes its building once its materials are there and builders have
-          put in its work. Building goes in proportion to Strength, plus{' '}
+          put in its work. Until then the site belongs to the realm whose resident laid it out, so
+          that realm's scripts and params can pick it; finished, the building belongs where its kind
+          does (a city's, or an outpost storage). Building goes in proportion to Strength, plus{' '}
           {pct(CONSTRUCTION_SKILL_EFFECT)} for each point of Construction (at most{' '}
           {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
           more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
@@ -822,6 +832,13 @@ export function Wiki() {
           unfinished site's). A road over a mountain can't be torn down while a carriage or a ridden
           horse stands on it: the work waits until they leave. A horse left there unridden can't be
           ridden off a road.
+        </p>
+        <p>
+          Tear down can be run directly too, with Run script or as a queue step: they tear down the
+          building or site in its <code>building</code> param, walking there first, or with none
+          picked the one they stand on when it starts. Giving Tear down on a building fills it; it
+          is never kept between starts. With no building there, Tear down ends and your realm log
+          says why.
         </p>
         <table>
           <thead>
@@ -863,6 +880,14 @@ export function Wiki() {
           unless set) and comes back to the site. With no Food anywhere they work on. Fetching
           materials tops their food up to <code>foodTake</code> too, before the materials.{' '}
           <code>foodAt</code> 0 turns this off.
+        </p>
+        <p>
+          Build can be run directly too, with Run script or as a queue step: they join the
+          construction site in its <code>site</code> param, or with none picked the one they stand
+          on when it starts. Laying out a new site (what and where) is only the Build order's.
+          Giving Build on a site your residents laid out fills <code>site</code>; it is never kept, so a
+          queue can walk them to a site and then run Build there. With no construction site there,
+          Build ends and your realm log says why.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
@@ -963,6 +988,11 @@ export function Wiki() {
           {num(STABLE_CAPACITY)} horses. A haul route keeps {num(HAUL_KEEP_FOOD)} Food on board for
           its horse.
         </p>
+        <p>
+          The route (where to, which goods) comes only from the Haul order, which also fills the
+          Haul default's <code>carriage</code> param. Run directly, with Run script or as a queue
+          step, Haul has no route: it ends at once and your realm log says “no route given”.
+        </p>
         <h3>Breeding</h3>
         <p>
           Horses don't breed on their own. A grown resident standing at a finished stable is given
@@ -977,6 +1007,14 @@ export function Wiki() {
           Breed horses default first takes {num(BREED_FOOD)} Food from the stable for the resident's
           meals, if they carry less. NPC cities have one of their residents breed their horses the
           same way.
+        </p>
+        <p>
+          Breed horses can be run directly too, with Run script or as a queue step: they breed in
+          the stable in its <code>stable</code> param, walking there first, or with none picked the
+          one they stand in when it starts. They pick the pair themselves, a paused pair in that
+          stable first, else two fed horses of your realm in it. Giving Breed horses in a stable
+          fills the param; it is never kept between starts. With no stable there, or no two fed
+          horses in it, Breed horses ends and your realm log says why.
         </p>
         <h3>Horse stats</h3>
         <p>
@@ -1065,8 +1103,11 @@ export function Wiki() {
           {days(STABLE_FEED_DAYS)} for the horses in it ({num(HORSE_FOOD_PER_DAY)} a horse a day):
           below that they fetch what is missing from the nearest storage of your realm with Food, or
           from the one picked as <code>source</code> on their card, and store it in the stable;
-          otherwise they wait there. Picking another <code>stable</code> on the card has them feed
-          that one instead.
+          otherwise they wait there. Feed the stable can be run directly too, with Run script or as
+          a queue step: they feed the stable in its <code>stable</code> param, or with none picked
+          the one they stand in when it starts. Giving Feed the stable in a stable fills it; it is
+          never kept between starts. With no stable there, or once theirs is gone, Feed the stable
+          ends and your realm log says why.
         </p>
         <h3>Horse offer</h3>
         <p>
@@ -1380,11 +1421,13 @@ export function Wiki() {
           doing, until the script says something else; only you see it. Without it they show what
           the task and its current order have the resident doing, such as “Building a house:
           fetching 10 wood from the storage”. <code>end</code>: once this run is over the script
-          ends and the resident stands idle; in a queue, its next step starts. The Build and Tear
-          down defaults end once the site is finished or the building is gone; a script that never
-          calls it runs until another order ends it. A script runs as a resident's or as an army's:
-          names marked resident only or army only are only there for one of them, and a default
-          script runs as a resident's.
+          ends and the resident stands idle; in a queue, its next step starts. Given a reason,{' '}
+          <code>end(reason)</code> also notes it in your realm log, like “Ana stopped Work: no
+          workplace on her tile”: short text, cut like <code>doing</code>’s, that only you see, for
+          every end. The Build and Tear down defaults end once the site is finished or the building
+          is gone; a script that never calls it runs until another order ends it. A script runs as a
+          resident's or as an army's: names marked resident only or army only are only there for one
+          of them, and a default script runs as a resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />
@@ -1499,14 +1542,22 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             </pre>
           </li>
           <li>
-            The Work default has <code>storage</code>: where the output goes. The Build default has{' '}
-            <code>source</code>: where materials come from, a carriage too. Unset, each uses the
-            nearest storage; a source picked that holds none of what the site lacks is left alone,
-            and they just build. The Tear down default has <code>source</code>: where Food comes
-            from. The Work, Build and Tear down defaults also have the <code>number</code> params{' '}
-            <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0 turns it off) and{' '}
-            <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food, in units of Food
-            (a resident eats about {num(foodEatenPerDay())} a game day).
+            The Work default has <code>workplace</code>: the workplace to work, the one they stand
+            on while none is picked; it is never kept between starts, so the form before it starts
+            shows it empty, and giving Work on a workplace fills it without asking. It also has{' '}
+            <code>storage</code>: where the output goes. The Build default has <code>site</code>:
+            the construction site to join; and <code>source</code>: where materials come from, a
+            carriage too. Unset, each uses the nearest storage; a source picked that holds none of
+            what the site lacks is left alone, and they just build. The Haul default has{' '}
+            <code>carriage</code>: the carriage to drive. The Tear down default has{' '}
+            <code>building</code>, the Breed horses and Feed the stable defaults <code>stable</code>
+            . Like Work's <code>workplace</code>, each of these is the one they stand on while none
+            is picked, never kept between starts, and filled by giving the task. Feed the stable
+            also has <code>source</code>: where the Food comes from. The Tear down default has{' '}
+            <code>source</code>: where Food comes from. The Work, Build and Tear down defaults also
+            have the <code>number</code> params <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0
+            turns it off) and <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food,
+            in units of Food (a resident eats about {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>

@@ -16,6 +16,8 @@ import {
   DIAGONAL_STEP,
   DOING_MAX_LENGTH,
   ageInYears,
+  breedingPair,
+  buildingAt,
   buildingRealm,
   directivesFor,
   materialsNeeded,
@@ -108,6 +110,8 @@ export interface ScriptBindings {
   requests: OrderRequest[]
   /** Whether the script called `end()`: once its requests are applied, it ends. */
   ended(): boolean
+  /** The reason it gave `end(reason)`, cut like `doing`'s text; null without one. */
+  endReason(): string | null
 }
 
 /**
@@ -142,6 +146,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const kinds = context.kinds ?? orderKinds
   const requests: OrderRequest[] = []
   let ended = false
+  let endReason: string | null = null
 
   let seen: readonly SeenEntity[] | undefined
   const untagged = ({ is: _, ...rest }: SeenEntity) => rest
@@ -180,6 +185,14 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const running = { scriptId: script!.scriptId, memory: script!.memory }
     return withQueueView({ ...rest, script: running })
   }
+  // A building as `building(id)` gives it: one of the side's own as it is, another's as the
+  // Player sees it, its stock only when they see inside (`CONTEXT.md`: Seeing inside a storage).
+  const asSeenBuilding = (b: Building) => {
+    if (ownBuilding(b)) return b
+    seen ??= context.seen()
+    const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
+    return shown ? untagged(shown) : null
+  }
   let nodes: ResourceNode[] | undefined
   const exploredNodes = () => (nodes ??= world.nodes.filter((n) => context.explored(n.x, n.y)))
 
@@ -208,13 +221,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     },
     building: ([id]) => {
       const b = world.buildings.find((x) => x.id === id)
-      if (!b) return null
-      if (ownBuilding(b)) return b
-      // Another's as the Player sees it, its stock only when they see inside (`CONTEXT.md`:
-      // Seeing inside a storage).
-      seen ??= context.seen()
-      const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
-      return shown ? untagged(shown) : null
+      return b ? asSeenBuilding(b) : null
+    },
+    buildingAt: ([x, y]) => {
+      const at = tile(x, y, 'buildingAt')
+      const b = buildingAt(world, at.x, at.y, terrain.size)
+      return b && (ownBuilding(b) || inSight(at)) ? asSeenBuilding(b) : null
     },
     pileAt: ([x, y]) => {
       const at = tile(x, y, 'pileAt')
@@ -290,7 +302,8 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       else context.memory.doing = doing
       return null
     }
-    actions.end = () => {
+    actions.end = ([reason]) => {
+      endReason = shortText(reason, 'end')
       ended = true
       return null
     }
@@ -299,6 +312,15 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         throw new ScriptRuntimeError(`"fits" needs a good, not ${String(good)}`)
       }
       return unitsThatFit(resident, good as Good, world.tick)
+    }
+    queries.breedingPair = ([stable]) => {
+      const id = (stable as Record<string, Value> | null)?.id
+      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      if (!b || b.kind !== 'stable' || side === undefined || !(ownBuilding(b) || inSight(b)))
+        return null
+      const owner = sender.npcCityId !== undefined ? { cityId: side } : { realmId: side }
+      const pair = breedingPair(world, b, owner, resident)
+      return pair ? pair.map((h) => h.id) : null
     }
     const time = (a: { x: number; y: number }, b: { x: number; y: number }) =>
       walkTime(world, terrain, context.explored, resident, a, b)
@@ -371,7 +393,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         : (call as (args: Value[]) => Value)
     globals[binding.name] = new NativeFunction(binding.name, answer, binding.cost)
   }
-  return { globals, requests, ended: () => ended }
+  return { globals, requests, ended: () => ended, endReason: () => endReason }
 }
 
 /**
@@ -379,8 +401,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
  * `DOING_MAX_LENGTH` characters, or null, as for empty text, to give the derived line back.
  */
 export function doingText(text: Value | undefined): string | null {
+  return shortText(text, 'doing')
+}
+
+/** A short text a script gives `call`: trimmed and cut to `DOING_MAX_LENGTH`; empty is null. */
+function shortText(text: Value | undefined, call: string): string | null {
   if (text === undefined || text === null) return null
-  if (typeof text !== 'string') throw new ScriptRuntimeError('"doing" needs a text or null')
+  if (typeof text !== 'string') throw new ScriptRuntimeError(`"${call}" needs a text or null`)
   return text.trim().slice(0, DOING_MAX_LENGTH) || null
 }
 

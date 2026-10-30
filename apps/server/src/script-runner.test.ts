@@ -12,6 +12,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openDb, schema, type Db, type OpenDb } from './db/index.js'
 import { OrderQueue, orderKinds } from './orders.js'
+import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
 import {
   ScriptRunner,
@@ -61,9 +62,10 @@ function setup(count = 1) {
     r.lifespan = 60
     world.residents.push(r)
   }
-  const orders = new OrderQueue({ ...orderKinds, runScript: runScriptOrder(host()) }, terrain)
+  const kinds = { ...orderKinds, runScript: runScriptOrder(host()) }
+  const orders = new OrderQueue(kinds, terrain)
   const runner = new ScriptRunner(terrain, host())
-  return { world, orders, runner }
+  return { world, kinds, orders, runner }
 }
 
 const sender = () => ({ userId: mara, account: { name: 'Mara', isAdmin: false } })
@@ -170,7 +172,45 @@ describe('running scripts', () => {
     runner.runAll(world, true)
     expect(a0.script).toBeUndefined()
     expect(a0.order).toBeNull()
+    // Without a reason, the realm log notes nothing.
     expect(scriptEvents(world)).toEqual([])
+  })
+
+  it('notes the reason end(reason) gives in the realm log, and a queue moves on', () => {
+    const { world, kinds, orders, runner } = setup()
+    const s = createScript(db, mara, { name: 'Work', source: 'end("no workplace here")' })
+    const queues = new QueueRunner(host(), kinds, terrain)
+    const steps = [
+      { order: { kind: 'runScript', scriptId: s.id } },
+      { order: { kind: 'walkTo', x: 13, y: 10 } },
+    ]
+    const queue = { kind: 'queue', residentId: 'a0', steps }
+    expect(orders.receive(world, sender(), 'q', queue)).toMatchObject({ type: 'ack' })
+    const a0 = world.residents[0]!
+    const tick = () => {
+      orders.applyAll(world)
+      queues.runAll(world)
+      expect(runner.runAll(world, true)).toEqual([])
+    }
+    tick()
+    expect(a0.script).toBeUndefined()
+    expect(scriptEvents(world)).toMatchObject([
+      {
+        kind: 'scriptStopped',
+        residentId: 'a0',
+        name: a0.name,
+        scriptId: s.id,
+        script: 'Work',
+        reason: 'no workplace here',
+      },
+    ])
+    tick()
+    expect(a0.order).toMatchObject({ kind: 'walkTo', target: { x: 13, y: 10 } })
+    expect(a0.queue).toMatchObject({ current: 1 })
+    // One note for each end: running it again notes it again, not rate-limited like errors.
+    giveScript(world, orders, s.id, ['a0'])
+    runner.runAll(world)
+    expect(scriptEvents(world).filter((e) => e.kind === 'scriptStopped')).toHaveLength(2)
   })
 
   it('picks up a saved change on the next tick, and ends when the script is deleted', () => {

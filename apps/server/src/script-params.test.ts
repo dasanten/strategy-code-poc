@@ -66,7 +66,9 @@ function storage(world: WorldState, id: string, x: number, y: number, stock: Sto
 /** A host whose script 1 is Mara's, with `source` as its active version. */
 const host = (source: { value: string }): ScriptHost => ({
   script: (id) =>
-    id === SCRIPT ? { userId: MARA, source: source.value, followsDefault: false } : undefined,
+    id === SCRIPT
+      ? { userId: MARA, name: 'Test', source: source.value, followsDefault: false }
+      : undefined,
   sender: (userId) => ({ userId, account: { name: 'Mara', isAdmin: false } }),
   explored: () => true,
 })

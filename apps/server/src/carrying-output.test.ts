@@ -69,7 +69,12 @@ function storage(world: WorldState, id: string, x: number, y: number, stock: Sto
 }
 
 const host = (defaultScript?: ScriptHost['defaultScript']): ScriptHost => ({
-  script: () => ({ userId: 1, source: DEFAULT_SCRIPTS.work.source, followsDefault: true }),
+  script: () => ({
+    userId: 1,
+    name: DEFAULT_SCRIPTS.work.name,
+    source: DEFAULT_SCRIPTS.work.source,
+    followsDefault: true,
+  }),
   sender: (userId) => ({ userId, account: { name: 'Mara', isAdmin: false } }),
   explored: () => true,
   ...(defaultScript ? { defaultScript } : {}),

@@ -99,8 +99,8 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
   field(
     'realmId',
     'string',
-    'The realm an outpost storage, a storage of no city, belongs to.',
-    'for any other building, and for a storage of no city that belongs to no realm',
+    'The realm an outpost storage, a storage of no city, belongs to; for a construction site, the realm whose resident laid it out.',
+    'for any other building, for a storage of no city that belongs to no realm, and for a site no realm’s resident laid out',
   ),
   x,
   y,
@@ -579,7 +579,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
           ? field(
               'realmId',
               'string',
-              'The realm a city, or an outpost storage (a storage of no city), belongs to.',
+              'The realm a city, an outpost storage (a storage of no city) or a construction site belongs to.',
               'for an NPC city, and for any other building',
             )
           : { ...f, nullWhen: f.nullWhen ? `for a building, ${f.nullWhen}` : 'for a building' },

@@ -1,5 +1,6 @@
 import {
   isParamNumber,
+  targetParam,
   type OrderRequest,
   type ScriptParam,
   type ScriptParamValue,
@@ -31,6 +32,16 @@ export function startedScript(
   return undefined
 }
 
+/**
+ * The params the form shows for an order starting `script`: its `param` lines, but for a task
+ * not the script's target param (`targetParam`; `CONTEXT.md`: Started directly), which the task
+ * fills itself.
+ */
+export function startFormParams(order: OrderRequest, script: ScriptSummary): ScriptParam[] {
+  const target = targetParam(script)
+  return order.kind === 'task' ? script.params.filter((p) => p.name !== target) : script.params
+}
+
 /** A kept value that still fits the param's type: a number for a `number` param, else an id. */
 function fits(param: ScriptParam, value: ScriptParamValue | undefined): boolean {
   return param.type === 'number' ? typeof value === 'number' : typeof value === 'string'
@@ -38,15 +49,17 @@ function fits(param: ScriptParam, value: ScriptParamValue | undefined): boolean 
 
 /**
  * The form's starting values for a resident: the value they keep for each param of the script,
- * else its default, else none.
+ * else its default, else none. The script's `target` param is never kept between starts, so it
+ * starts empty: the one they stand on.
  */
 export function startValues(
   params: readonly ScriptParam[],
   kept: ScriptParamValues[string] | undefined,
+  target?: string,
 ): StartValues {
   return Object.fromEntries(
     params.map((p) => {
-      const value = kept?.[p.name]
+      const value = p.name === target ? undefined : kept?.[p.name]
       return [p.name, fits(p, value) ? value : p.default]
     }),
   )
@@ -54,13 +67,14 @@ export function startValues(
 
 /**
  * The form's starting values for a group: a value all of them keep, else the param's default,
- * else none.
+ * else none; the `target` param empty.
  */
 export function groupStartValues(
   params: readonly ScriptParam[],
   keptByEach: readonly (ScriptParamValues[string] | undefined)[],
+  target?: string,
 ): StartValues {
-  const each = keptByEach.map((kept) => startValues(params, kept))
+  const each = keptByEach.map((kept) => startValues(params, kept, target))
   return Object.fromEntries(
     params.map((p) => {
       const values = new Set(each.map((v) => v[p.name]))

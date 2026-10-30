@@ -10,6 +10,7 @@ import {
 import {
   buildAtProblem,
   buildingAt,
+  constructionAt,
   canWork,
   DEFAULT_SCRIPTS,
   commanderOf,
@@ -52,10 +53,12 @@ import {
 } from './script-bindings.js'
 import type { RunnableScript } from './scripts.js'
 import {
+  paramTarget,
   paramValues,
   scriptParamsSound,
   setStartParams,
   startParamsProblem,
+  withTargetParam,
 } from './script-params.js'
 import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
@@ -133,8 +136,9 @@ function paramsProblem(
 
 /**
  * The run-script order: one of the Player's residents runs one of the Player's scripts, from a
- * fresh memory, with the param values it gives set first (`CONTEXT.md`: Before it starts). It
- * ends whatever the resident was doing.
+ * fresh memory, with the param values it gives set first (`CONTEXT.md`: Before it starts); a
+ * default script's target param is cleared unless it gives one (`withTargetParam`). It ends
+ * whatever the resident was doing.
  */
 export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
   return {
@@ -154,7 +158,7 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
       if (!r) return
       r.order = null
       r.script = { scriptId, memory: {} }
-      setStartParams(r, scriptId, params)
+      setStartParams(r, scriptId, withTargetParam(host.script(scriptId), params))
     },
   }
 }
@@ -322,7 +326,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
  * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
  * own: the resident stands in the stable and is grown up. The param values it gives are checked
- * against the default script's and set first (`CONTEXT.md`: Before it starts).
+ * against the default script's and set first (`CONTEXT.md`: Before it starts), the task's target
+ * in the script's target param (`withTargetParam`, `taskTarget`).
  */
 export function taskOrder(host: DefaultScriptHost): OrderKind {
   return {
@@ -343,9 +348,50 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       r.order = null
       const scriptId = host.defaultScript(sender.userId, o.task)
       r.script = { scriptId, memory: taskMemory(o, r) }
-      setStartParams(r, scriptId, o.params)
+      const source = host.script?.(scriptId)?.source
+      const script = source === undefined ? undefined : { source, task: o.task }
+      const target = taskTarget(world, realmId, o, r)
+      setStartParams(r, scriptId, withTargetParam(script, o.params, target))
     },
   }
+}
+
+/**
+ * The task's target as its default's target param holds it (`TARGET_PARAMS`): Work's workplace,
+ * Tear down's building, the stable of Breed horses and Feed the stable, Haul's carriage, and for
+ * Build the unfinished site of its kind it joins at `at` (or the resident's tile); none while
+ * Build lays out a new one, which isn't there yet. Only one of the realm's own, which a param can
+ * name; another's stays in the memory alone (`TaskMemory`).
+ */
+function taskTarget(
+  world: WorldState,
+  realmId: string | undefined,
+  o: TaskRequest,
+  r: { x: number; y: number },
+): string | undefined {
+  const [id, type] =
+    o.task === 'work'
+      ? [o.workplaceId, 'building' as const]
+      : o.task === 'tearDown'
+        ? [o.buildingId, 'building' as const]
+        : o.task === 'breed' || o.task === 'feedStable'
+          ? [o.stableId, 'storage' as const]
+          : o.task === 'haul'
+            ? [o.carriageId, 'storage' as const]
+            : [buildSite(world, o, r), 'building' as const]
+  if (id === undefined) return undefined
+  return paramTarget(world, realmId, type, id) ? id : undefined
+}
+
+/** The unfinished site a Build task joins at `at` (or the resident's tile), if one stands there. */
+function buildSite(
+  world: WorldState,
+  o: Extract<TaskRequest, { task: 'build' }>,
+  r: { x: number; y: number },
+): string | undefined {
+  const at = o.at ?? r
+  const site = constructionAt(world, at.x, at.y, o.building)
+  return site?.site && site.kind === o.building ? site.id : undefined
 }
 
 /** Why the resident can't be given the task on its target, if they can't (`taskOrder`). */
@@ -461,6 +507,8 @@ export class ScriptRunner {
       add(a.realmId, { holder: a, id: a.id, name: a.name, by, bind: by })
     }
     const used = new Map<number, { source: string; program: Program }>()
+    // Those whose script ran this tick, not skipped for the realm's budget.
+    const ran = new Set<string>()
     for (const realm of world.realms) {
       const running = byRealm.get(realm.id)
       const sender = this.host.sender(realm.userId)
@@ -478,6 +526,7 @@ export class ScriptRunner {
           logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, true))
           continue
         }
+        ran.add(r.id)
         const steps = Math.min(SCRIPT_STEP_BUDGET, left)
         left -= this.runOne(
           world,
@@ -497,6 +546,9 @@ export class ScriptRunner {
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
+      const taskOf = (r: Resident) =>
+        ran.has(r.id) && unedited(r) ? this.host.script(r.script!.scriptId)?.task : undefined
+      out.push(...defaultsHaveATarget(world, taskOf))
     }
     return out
   }
@@ -582,6 +634,18 @@ export class ScriptRunner {
     for (const order of requests) this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
     if (bound.ended()) {
       endScript(world, r.id)
+      // A reason is noted each time, not rate-limited: an end is no error.
+      const reason = bound.endReason()
+      if (reason !== null) {
+        recordEvent(world, realm.id, {
+          kind: 'scriptStopped',
+          ...r.by,
+          name: r.name,
+          scriptId: running.scriptId,
+          script: script.name,
+          reason,
+        })
+      }
       return result.steps
     }
 
@@ -804,6 +868,55 @@ export function oneCarrierAtATime(
     message: `${ids.length} residents carry ${place}'s output at once: ${ids.join(', ')}`,
     entityIds: [place, ...ids],
   }))
+}
+
+/** What a default script keeps in memory once it knows its target (`defaultsHaveATarget`). */
+const TARGET_KNOWN: Partial<
+  Record<Task, { invariant: string; memory: readonly string[]; without: string }>
+> = {
+  work: {
+    invariant: 'workers-have-a-workplace',
+    memory: ['workplaceId'],
+    without: 'Work without a workplace',
+  },
+  build: {
+    invariant: 'builders-have-a-site',
+    memory: ['building', 'at'],
+    without: 'Build without a site',
+  },
+  haul: {
+    invariant: 'haulers-have-a-route',
+    memory: ['to', 'carriageId'],
+    without: 'Haul without a route or carriage',
+  },
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Default script, Started directly): a resident running the
+ * Work, Build or Haul default as the game ships it (`taskOf` names the task, for those that
+ * count) knows its target once it has run: Work its workplace (`memory.workplaceId`), Build the
+ * site's kind and place (`memory.building`, `memory.at`), Haul its route and carriage
+ * (`memory.to`, `memory.carriageId`). With none picked and none on their tile, or Haul with no
+ * route, it ends, so nobody runs one for longer than a tick without its target.
+ */
+export function defaultsHaveATarget(
+  world: WorldState,
+  taskOf: (r: Resident) => Task | undefined,
+): InvariantViolation[] {
+  const out: InvariantViolation[] = []
+  for (const r of world.residents) {
+    if (!r.script) continue
+    const memory = r.script.memory
+    const task = taskOf(r)
+    const known = task && TARGET_KNOWN[task]
+    if (!known || known.memory.every((key) => memory[key] != null)) continue
+    out.push({
+      invariant: known.invariant,
+      message: `${r.id} runs ${known.without}`,
+      entityIds: [r.id],
+    })
+  }
+  return out
 }
 
 /**

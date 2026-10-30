@@ -111,7 +111,7 @@ import { hqRingsSound } from './hq-growth.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
-import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
+import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
 
@@ -309,8 +309,9 @@ export const citiesFromBuildings: Invariant = {
 }
 
 /**
- * Only an outpost storage has a realm of its own (`CONTEXT.md`: Outpost storage): a finished
- * storage of no city, of a realm that exists. One in a city goes with the city.
+ * Only an outpost storage (`CONTEXT.md`: Outpost storage), a finished storage of no city, or a
+ * construction site (the realm that laid it out, `CONTEXT.md`: Construction site) has a realm of
+ * its own, and only one that exists. A finished building in a city goes with the city.
  */
 export const outpostStorageRealms: Invariant = {
   name: 'outpost-storage-realms',
@@ -318,8 +319,8 @@ export const outpostStorageRealms: Invariant = {
     const realms = new Set(world.realms.map((x) => x.id))
     return world.buildings.flatMap((b) => {
       if (b.realmId === undefined) return []
-      const why = !isOutpostStorage(b)
-        ? `is a ${b.site ? `${b.kind} site` : b.kind}${b.cityId ? ` of city ${b.cityId}` : ''} with realm ${b.realmId}`
+      const why = !isOutpostStorage(b) && !b.site
+        ? `is a ${b.kind}${b.cityId ? ` of city ${b.cityId}` : ''} with realm ${b.realmId}`
         : !realms.has(b.realmId)
           ? `belongs to realm ${b.realmId}, which doesn't exist`
           : undefined
@@ -1799,6 +1800,18 @@ export const gameDefaultFetchers: Invariant = {
   check: (world) => oneFetcherAtATime(world, (r) => r.script?.scriptId === 0),
 }
 
+/**
+ * Nobody runs Work, Build or Haul for longer than a tick without its target (`CONTEXT.md`:
+ * Default script, Started directly; `defaultsHaveATarget`), among NPC cities' residents running
+ * the game's own defaults, whose city names the target when it puts them to the task; a
+ * Player's are checked where their scripts run.
+ */
+export const gameDefaultTargets: Invariant = {
+  name: 'defaults-have-a-target',
+  check: (world) =>
+    defaultsHaveATarget(world, (r) => (r.script?.scriptId === 0 ? r.script.task : undefined)),
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -1883,6 +1896,7 @@ export const worldInvariants: Invariant[] = [
   pathsAreSteps,
   gameDefaultCarriers,
   gameDefaultFetchers,
+  gameDefaultTargets,
   queuesSound,
 ]
 

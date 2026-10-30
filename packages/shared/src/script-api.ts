@@ -128,6 +128,15 @@ const SHARED: readonly ScriptBinding[] = [
       'The building or construction site with that id, if the Player sees it or it is one of my realm’s cities’; else null.',
   },
   {
+    name: 'buildingAt',
+    is: 'query',
+    params: ['x', 'y'],
+    returns: { view: 'building' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The building or construction site on a tile, roads and carriage sites left out, as `building(id)` gives it; null where there is none or the Player doesn’t see it.',
+  },
+  {
     name: 'pileAt',
     is: 'query',
     params: ['x', 'y'],
@@ -221,6 +230,15 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     cost: SCRIPT_TILE_QUERY_COST,
     description: 'How many units of a good still fit in my hands.',
   },
+  {
+    name: 'breedingPair',
+    is: 'query',
+    params: ['stable'],
+    returns: { list: 'string' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The two horses of mine I would `breed` in a stable I see, as ids like ["h1", "h2"]: a pair whose breeding it keeps first, else two fed ones standing in it; null while there are none.',
+  },
   list(
     'storages',
     'building',
@@ -263,8 +281,8 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('stop', [], 'Stop what I was ordered to do and stand idle.'),
   action(
     'end',
-    [],
-    'End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. It asks for no order.',
+    ['reason?'],
+    `End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. With \`reason\`, short text (cut to ${DOING_MAX_LENGTH} characters), my Player’s realm log says why, like “Ana stopped Work: no workplace on her tile”. It asks for no order.`,
   ),
   action(
     'doing',
