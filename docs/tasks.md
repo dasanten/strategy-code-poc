@@ -66,6 +66,10 @@ I sleep.
 | 41  | [Scripts started directly](https://github.com/dasanten/strategy-code-poc/issues/450)            | ticketed                |
 | 42  | [Script debugging](https://github.com/dasanten/strategy-code-poc/issues/451)                    | ticketed                |
 | 43  | [Script library tidy-up](https://github.com/dasanten/strategy-code-poc/issues/452)              | ticketed                |
+| 44  | [Server hardening](https://github.com/dasanten/strategy-code-poc/issues/511)                  | ticketed                |
+| 45  | [Quick wins 3](https://github.com/dasanten/strategy-code-poc/issues/522)                      | ticketed                |
+| 46  | [Horses and food](https://github.com/dasanten/strategy-code-poc/issues/527)                   | ticketed                |
+| 47  | [Under attack](https://github.com/dasanten/strategy-code-poc/issues/531)                      | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
