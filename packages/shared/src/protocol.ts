@@ -12,6 +12,7 @@ import type {
   Pile,
   RealmEvent,
   RunningScript,
+  ScriptLogLine,
   ScriptMemory,
   SeenArmy,
   SeenCaravan,
@@ -176,6 +177,12 @@ export type ServerMessage =
    * script): its last runtime error and the steps it used, sent like `scriptMemory`.
    */
   | { type: 'scriptRun'; id: string; run: ScriptRunSeen | null }
+  /**
+   * The script log of a resident whose Script tab the Player has open (`CONTEXT.md`: Script
+   * log), oldest first: once when they start watching it, then whenever it changed after a
+   * tick. Only for the Player owning the resident; null for anyone else's, or an army.
+   */
+  | { type: 'scriptLog'; id: string; lines: ScriptLogLine[] | null }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }
 
@@ -189,7 +196,8 @@ export type ClientMessage =
   | { type: 'found'; requestId: string; realmName: string; leaderName: string }
   /**
    * The residents and armies whose cards show their Script tab now, replacing those before: the
-   * server sends their script's memory (`scriptMemory`) while they are watched, at most
+   * server sends their script's memory (`scriptMemory`) and a resident's script log
+   * (`scriptLog`) while they are watched, at most
    * `SCRIPT_WATCH_MAX` of them.
    */
   | { type: 'watch'; ids: string[] }

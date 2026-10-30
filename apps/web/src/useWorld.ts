@@ -15,6 +15,7 @@ import {
   type SeenCaravan,
   type SeenEntity,
   type Remembered,
+  type ScriptLogLine,
   type ScriptMemory,
   type ScriptRunSeen,
   type ServerMessage,
@@ -106,10 +107,13 @@ export function useWorld(onLoggedOut: () => void) {
   const answers = useRef(new Map<string, (rejected: string | undefined) => void>())
   // The residents and armies whose Script tab is open, with how many cards show it, and the
   // memory the server last sent of each one's script and how it last ran (`CONTEXT.md`:
-  // Debugging a script).
+  // Debugging a script), and of each resident's script log (Script log).
   const watched = useRef(new Map<string, number>())
   const [memories, setMemories] = useState<ReadonlyMap<string, ScriptMemory | null>>(new Map())
   const [runs, setRuns] = useState<ReadonlyMap<string, ScriptRunSeen | null>>(new Map())
+  const [scriptLogs, setScriptLogs] = useState<ReadonlyMap<string, ScriptLogLine[] | null>>(
+    new Map(),
+  )
 
   useEffect(() => {
     let socket: WebSocket | null = null
@@ -159,6 +163,9 @@ export function useWorld(onLoggedOut: () => void) {
         } else if (msg.type === 'scriptRun') {
           if (!watched.current.has(msg.id)) return
           setRuns((m) => new Map(m).set(msg.id, msg.run))
+        } else if (msg.type === 'scriptLog') {
+          if (!watched.current.has(msg.id)) return
+          setScriptLogs((m) => new Map(m).set(msg.id, msg.lines))
         } else if (msg.type === 'ack' || msg.type === 'rejected') {
           const answer = answers.current.get(msg.requestId)
           answers.current.delete(msg.requestId)
@@ -223,8 +230,8 @@ export function useWorld(onLoggedOut: () => void) {
   }, [onLoggedOut])
 
   /**
-   * Watches the script memory of a resident or army while its Script tab is open (`memories`);
-   * the function it returns stops watching it.
+   * Watches the script memory of a resident or army while its Script tab is open (`memories`),
+   * and a resident's script log (`scriptLogs`); the function it returns stops watching it.
    */
   const watchScript = useCallback((id: string) => {
     const count = watched.current.get(id) ?? 0
@@ -235,16 +242,14 @@ export function useWorld(onLoggedOut: () => void) {
       if (left > 0) return void watched.current.set(id, left)
       watched.current.delete(id)
       sendWatch(socketRef.current, watched.current)
-      setMemories((m) => {
+      const without = <T>(m: ReadonlyMap<string, T>) => {
         const next = new Map(m)
         next.delete(id)
         return next
-      })
-      setRuns((m) => {
-        const next = new Map(m)
-        next.delete(id)
-        return next
-      })
+      }
+      setMemories(without)
+      setRuns(without)
+      setScriptLogs(without)
     }
   }, [])
 
@@ -280,5 +285,5 @@ export function useWorld(onLoggedOut: () => void) {
     })
   }, [])
 
-  return { world, founding, status, sendOrder, found, memories, runs, watchScript }
+  return { world, founding, status, sendOrder, found, memories, runs, scriptLogs, watchScript }
 }

@@ -1703,6 +1703,12 @@ export const SCRIPT_MEMORY_MAX = 4000
 export const DOING_MAX_LENGTH = 60
 
 /**
+ * The lines a resident's script log keeps (`CONTEXT.md`: Script log); once full, the oldest
+ * goes. Enough to follow a few minutes of a script logging its turns.
+ */
+export const SCRIPT_LOG_LINES = 20
+
+/**
  * Ticks between two realm-log entries about the same resident's script going wrong (an error,
  * or running out of steps), so a script failing every tick doesn't flood the log. A minute.
  */

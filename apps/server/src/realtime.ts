@@ -14,6 +14,7 @@ import {
   type Realm,
   type RegionMap,
   type Remembered,
+  type ScriptLogLine,
   type ScriptMemory,
   type ScriptRunSeen,
   type SeenEntity,
@@ -86,16 +87,29 @@ export function scriptRunFor(world: WorldState, realmId: string, id: string): Sc
   return { ...(lastError ? { lastError } : {}), ...(lastRun ? { lastRun } : {}) }
 }
 
+/**
+ * A resident's script log, for the realm owning them (`CONTEXT.md`: Script log): null for anyone
+ * else's resident, or an army.
+ */
+export function scriptLogFor(
+  world: WorldState,
+  realmId: string,
+  id: string,
+): ScriptLogLine[] | null {
+  const r = world.residents.find((r) => r.id === id)
+  return r?.owner === realmId ? (r.scriptLog ?? []) : null
+}
+
 interface Client {
   account: Account
   userId: number
   realmId: string
   /**
    * The residents and armies whose Script tab the Player has open, with what was last sent for
-   * each as JSON (its script's memory, and how it last ran), so a tick sends each only when it
-   * changed.
+   * each as JSON (its script's memory, how it last ran, and a resident's script log), so a tick
+   * sends each only when it changed.
    */
-  watching: Map<string, { memory: string; run: string }>
+  watching: Map<string, { memory: string; run: string; log: string }>
   view: ClientView
   /** What has been sent of the Player's Last seen out of sight (`CONTEXT.md`: Last seen). */
   lastSeenView: ClientView<Remembered>
@@ -198,6 +212,18 @@ export function attachRealtime(
         last.run = runJson
         send(socket, { type: 'scriptRun', id, run })
       }
+    }
+  }
+
+  /** Sends the client the script log of each resident it watches that changed since last sent. */
+  function sendScriptLogs(socket: WebSocket, client: Client) {
+    for (const id of client.watching.keys()) {
+      const lines = scriptLogFor(world, client.realmId, id)
+      const json = JSON.stringify(lines)
+      const last = client.watching.get(id)!
+      if (json === last.log) continue
+      last.log = json
+      send(socket, { type: 'scriptLog', id, lines })
     }
   }
 
@@ -304,9 +330,10 @@ export function attachRealtime(
         const ids = msg.ids.filter((id) => typeof id === 'string').slice(0, SCRIPT_WATCH_MAX)
         // Newly watched ones go out now; those still watched only when they change.
         client.watching = new Map(
-          ids.map((id) => [id, client.watching.get(id) ?? { memory: '', run: '' }]),
+          ids.map((id) => [id, client.watching.get(id) ?? { memory: '', run: '', log: '' }]),
         )
         sendScriptMemory(socket, client)
+        sendScriptLogs(socket, client)
       }
     })
     socket.on('close', () => clients.delete(socket))
@@ -360,6 +387,7 @@ export function attachRealtime(
         }
         send(socket, { type: 'tick', ...tick })
         sendScriptMemory(socket, client)
+        sendScriptLogs(socket, client)
       }
     },
     close() {

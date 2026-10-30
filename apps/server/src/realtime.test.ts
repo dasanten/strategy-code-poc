@@ -449,6 +449,45 @@ describe('realtime', () => {
     expect(daniel.messages.filter((m) => m.type === 'scriptRun')).toEqual([])
   })
 
+  it('sends a watched resident’s script log to the Player owning them, and to nobody else', async () => {
+    const { url, token, db, userId, world, realtime } = await start()
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const daniel = connect(url, token)
+    const mara = connect(url, createSession(db, other.id))
+    await daniel.next('welcome')
+    await mara.next('welcome')
+    const realm = realmOf(world, userId)!
+    // No script running: the log stays to show why the last one ended.
+    const worker = world.residents.find((r) => r.owner === realm.id)!
+    worker.scriptLog = [{ tick: 3, text: 'no workplace here' }]
+    const watch = JSON.stringify({ type: 'watch', ids: [worker.id] })
+
+    daniel.socket.send(watch)
+    expect(await daniel.next('scriptLog')).toEqual({
+      type: 'scriptLog',
+      id: worker.id,
+      lines: [{ tick: 3, text: 'no workplace here' }],
+    })
+    mara.socket.send(watch)
+    expect(await mara.next('scriptLog')).toEqual({ type: 'scriptLog', id: worker.id, lines: null })
+
+    // A new line goes out after the tick, to the owner only; nothing in the tick itself.
+    worker.scriptLog.push({ tick: 4, text: 'tick' })
+    realtime.broadcastTick()
+    expect(await daniel.next('scriptLog')).toMatchObject({ lines: [{ tick: 3 }, { tick: 4 }] })
+    const ticks = await Promise.all([daniel.next('tick'), mara.next('tick')])
+    expect(JSON.stringify(ticks)).not.toContain('no workplace here')
+    daniel.socket.send(JSON.stringify({ type: 'order', requestId: 's', order: { kind: 'fly' } }))
+    await daniel.next('rejected')
+    mara.socket.send(JSON.stringify({ type: 'order', requestId: 's', order: { kind: 'fly' } }))
+    await mara.next('rejected')
+    expect(mara.messages.filter((m) => m.type === 'scriptLog')).toEqual([])
+  })
+
   it('tells a Player how their Leader died and what became of their cities, then starts them afresh', async () => {
     const { url, token, userId, world, realtime, territory, violations } = await start()
     const first = connect(url, token)

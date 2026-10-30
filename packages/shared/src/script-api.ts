@@ -2,6 +2,7 @@ import {
   DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
   SCRIPT_LIST_QUERY_COST,
+  SCRIPT_LOG_LINES,
   SCRIPT_TILE_QUERY_COST,
 } from './balance.js'
 import type { ScriptType, ScriptViewName } from './script-views.js'
@@ -18,8 +19,9 @@ import type { ScriptType, ScriptViewName } from './script-views.js'
  * - A **query** answers from what the Player sees and has explored, nothing more.
  * - An **action** asks for the order of the same name for `me`, checked exactly as a UI order
  *   is. It answers `null` when requested, or why not as a string; a script can request nothing
- *   an order couldn't. `doing` and `end` ask for no order: `doing` keeps the resident's Doing
- *   line in `memory` (`CONTEXT.md`: Doing), `end` ends the script once this run is over.
+ *   an order couldn't. `doing`, `log` and `end` ask for no order: `doing` keeps the resident's
+ *   Doing line in `memory` (`CONTEXT.md`: Doing), `log` adds to their script log (Script log),
+ *   `end` ends the script once this run is over.
  *
  * `cost` is the steps one call costs on top of the 1 every evaluated node costs. `returns` is
  * what a value holds or a call answers, in terms of the script views (ADR 0011).
@@ -251,13 +253,18 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('stop', [], 'Stop what I was ordered to do and stand idle.'),
   action(
     'end',
-    [],
-    'End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. It asks for no order.',
+    ['reason?'],
+    `End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. With \`reason\`, short text (cut to ${DOING_MAX_LENGTH} characters), my Player’s realm log says why, like “Ana stopped Work: no workplace on her tile”. It asks for no order.`,
   ),
   action(
     'doing',
     ['text'],
     `Say what I’m doing, for my Player’s Doing line: the text (cut to ${DOING_MAX_LENGTH} characters) shows instead of the one the game derives from my task and order, until I call it again; null gives the derived one back. Kept as \`memory.doing\`; it asks for no order.`,
+  ),
+  action(
+    'log',
+    ['text'],
+    `Add a line to my script log, with the game time: short text (cut to ${DOING_MAX_LENGTH} characters) that my Player sees on my Script tab, and nobody else. I keep my last ${SCRIPT_LOG_LINES} lines across scripts; \`end(reason)\` adds its reason too. It asks for no order.`,
   ),
   action(
     'pickUp',

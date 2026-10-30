@@ -102,14 +102,18 @@ export interface ScriptBindings {
   requests: OrderRequest[]
   /** Whether the script called `end()`: once its requests are applied, it ends. */
   ended(): boolean
+  /** The reason it gave `end(reason)`, cut like `doing`'s text; null without one. */
+  endReason(): string | null
+  /** The lines it gave `log(text)`, in order, cut like `doing`'s text (`CONTEXT.md`: Script log). */
+  logged: string[]
 }
 
 /**
- * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`
- * and `end`, which ask for none.
+ * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`,
+ * `log` and `end`, which ask for none.
  */
 export const SCRIPT_ORDER_KINDS: readonly string[] = SCRIPT_API.filter(
-  (b) => b.is === 'action' && b.name !== 'doing' && b.name !== 'end',
+  (b) => b.is === 'action' && !['doing', 'log', 'end'].includes(b.name),
 ).map((b) => b.name)
 
 /** The army order each action of an army's script asks for (`ARMY_SCRIPT_API`). */
@@ -136,6 +140,8 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const kinds = context.kinds ?? orderKinds
   const requests: OrderRequest[] = []
   let ended = false
+  let endReason: string | null = null
+  const logged: string[] = []
 
   let seen: readonly SeenEntity[] | undefined
   const untagged = ({ is: _, ...rest }: SeenEntity) => rest
@@ -284,8 +290,14 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       else context.memory.doing = doing
       return null
     }
-    actions.end = () => {
+    actions.end = ([reason]) => {
+      endReason = shortText(reason, 'end')
       ended = true
+      return null
+    }
+    actions.log = ([text]) => {
+      const line = shortText(text, 'log')
+      if (line !== null) logged.push(line)
       return null
     }
     queries.fits = ([good]) => {
@@ -358,7 +370,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         : (call as (args: Value[]) => Value)
     globals[binding.name] = new NativeFunction(binding.name, answer, binding.cost)
   }
-  return { globals, requests, ended: () => ended }
+  return { globals, requests, ended: () => ended, endReason: () => endReason, logged }
 }
 
 /**
@@ -366,8 +378,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
  * `DOING_MAX_LENGTH` characters, or null, as for empty text, to give the derived line back.
  */
 export function doingText(text: Value | undefined): string | null {
+  return shortText(text, 'doing')
+}
+
+/** A short text a script gives `call`: trimmed and cut to `DOING_MAX_LENGTH`; empty is null. */
+function shortText(text: Value | undefined, call: string): string | null {
   if (text === undefined || text === null) return null
-  if (typeof text !== 'string') throw new ScriptRuntimeError('"doing" needs a text or null')
+  if (typeof text !== 'string') throw new ScriptRuntimeError(`"${call}" needs a text or null`)
   return text.trim().slice(0, DOING_MAX_LENGTH) || null
 }
 

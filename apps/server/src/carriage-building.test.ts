@@ -233,6 +233,7 @@ describe('building a carriage', () => {
     const host: ScriptHost = {
       script: () => ({
         userId: 7,
+        name: DEFAULT_SCRIPTS.build.name,
         version: 1,
         source: DEFAULT_SCRIPTS.build.source,
         followsDefault: true,

@@ -79,6 +79,7 @@ import {
   type ActionId,
 } from './selection-view.js'
 import { ScriptLibrary, type ScriptToOpen } from './ScriptLibrary.js'
+import { ScriptLog } from './ScriptLog.js'
 import { ScriptMemoryTree } from './ScriptMemory.js'
 import { ScriptRunInfo } from './ScriptRun.js'
 import { ScriptParamFields } from './ScriptParams.js'
@@ -116,7 +117,7 @@ function Pages() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, founding, status, sendOrder, found, memories, runs, watchScript } =
+  const { world, founding, status, sendOrder, found, memories, runs, scriptLogs, watchScript } =
     useWorld(onLoggedOut)
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -927,6 +928,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               )
             }
             scriptMemory={selected.script && scriptDebug(selected.id, selected.script.scriptId)}
+            scriptLog={
+              <ScriptLog id={selected.id} lines={scriptLogs.get(selected.id)} watch={watchScript} />
+            }
             onStore={async () =>
               setOrderError(await giveOrder({ ...STORE_ALL, residentId: selected.id }))
             }
