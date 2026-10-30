@@ -135,7 +135,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(54)
+    expect(WORLD_FORMAT_VERSION).toBe(56)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -175,6 +175,51 @@ describe('world saves', () => {
     const [w, n, o] = migrated.residents
     expect(w!.scriptParams).toEqual({ 7: { storage: 'storage-1', workplace: farm.id } })
     expect(w!.script).toEqual(worker!.script)
+    expect(n!.scriptParams).toBeUndefined()
+    expect(o!.scriptParams).toBeUndefined()
+  })
+
+  it('gives a builder their site and a hauler their carriage as params (migration 55 → 56)', () => {
+    const { world, terrain } = worldWithCity()
+    const [builder, hauler, npc, other, nobodys] = world.residents
+    const site = { delivered: {}, work: 0 }
+    // A farm site laid out for the realm's city is the realm's, so the param can hold it.
+    world.buildings.push({
+      id: 'site-1',
+      kind: 'farm',
+      cityId: world.cities[0]!.id,
+      x: 1,
+      y: 1,
+      site,
+    })
+    world.carriages.push({
+      id: 'k1',
+      realmId: world.realms[0]!.id,
+      cityId: null,
+      x: 3,
+      y: 3,
+      horseId: null,
+      load: {},
+    })
+    const building = { building: 'farm', at: { x: 1, y: 1 }, siteId: 'site-1' }
+    builder!.script = { scriptId: 7, memory: building }
+    builder!.scriptParams = { 7: { source: 'storage-1' } }
+    const route = { from: { x: 3, y: 3 }, to: { x: 9, y: 9 }, goods: ['wood'], returnGoods: [] }
+    hauler!.script = { scriptId: 8, memory: { carriageId: 'k1', ...route, keepFood: 0 } }
+    // The game's own default, run by an NPC city, keeps its memory only.
+    npc!.script = { scriptId: 0, task: 'build', memory: building }
+    // A finished building is no site to join, and a carriage gone is none to drive.
+    world.buildings.push({ id: 'done', kind: 'house', cityId: null, x: 5, y: 5 })
+    other!.script = { scriptId: 9, memory: { siteId: 'done', carriageId: 'gone' } }
+    // A house site out of every city is nobody's: the param can't hold it, the memory keeps it.
+    world.buildings.push({ id: 'site-2', kind: 'house', cityId: null, x: 7, y: 1, site })
+    nobodys!.script = { scriptId: 7, memory: { ...building, building: 'house', siteId: 'site-2' } }
+    const migrated = migrateWorld(structuredClone(world), 55, { terrain }, migrations, 56)
+    const [b, h, n, o, none] = migrated.residents
+    expect(none!.scriptParams).toBeUndefined()
+    expect(b!.scriptParams).toEqual({ 7: { source: 'storage-1', site: 'site-1' } })
+    expect(b!.script).toEqual(builder!.script)
+    expect(h!.scriptParams).toEqual({ 8: { carriage: 'k1' } })
     expect(n!.scriptParams).toBeUndefined()
     expect(o!.scriptParams).toBeUndefined()
   })

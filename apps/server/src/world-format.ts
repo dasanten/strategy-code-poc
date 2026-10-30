@@ -8,13 +8,14 @@ import {
 } from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
 import { grantHorses } from './horse-grant.js'
+import { paramTarget } from './script-params.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 54
+export const WORLD_FORMAT_VERSION = 56
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -138,6 +139,34 @@ export const migrations: Record<number, MigrationStep> = {
       if (!world.buildings.some((b) => b.id === id)) continue
       const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
       picked.workplace ??= id
+    }
+    return world
+  },
+  // Taken by T41.3 (#455), built alongside; its step replaces this one when both are merged.
+  54: (state) => state,
+  // Build takes the site it joins as the param `site`, Haul its carriage as the param `carriage`
+  // (`CONTEXT.md`: Default script, Started directly; ADR 0014). A resident building or hauling by
+  // a script of their Player's gets the unfinished site (`memory.siteId`) or the carriage
+  // (`memory.carriageId`) its memory names as that param, where the param can hold it (one of
+  // their realm's); the memory keeps them too, as both defaults still read them there. A script
+  // with no such param drops it on its next run.
+  55: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const r of world.residents) {
+      const s = r.script
+      if (!s || s.scriptId <= 0 || r.owner === null) continue
+      const { siteId, carriageId } = s.memory
+      const site =
+        typeof siteId === 'string' &&
+        paramTarget(world, r.owner, 'building', siteId)?.is === 'building' &&
+        world.buildings.some((b) => b.id === siteId && b.site)
+      const carriage =
+        typeof carriageId === 'string' &&
+        paramTarget(world, r.owner, 'storage', carriageId)?.is === 'carriage'
+      if (!site && !carriage) continue
+      const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
+      if (site) picked.site ??= siteId
+      if (carriage) picked.carriage ??= carriageId
     }
     return world
   },

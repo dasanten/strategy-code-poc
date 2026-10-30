@@ -823,6 +823,14 @@ export function Wiki() {
           <code>foodAt</code> 0 turns this off.
         </p>
         <p>
+          Build can be run directly too, with Run script or as a queue step: they join the
+          construction site in its <code>site</code> param, or with none picked the one they stand
+          on when it starts. Laying out a new site (what and where) is only the Build order's.
+          Giving Build on a site of your realm's fills <code>site</code>; it is never kept, so a
+          queue can walk them to a site and then run Build there. With no construction site there,
+          Build ends and your realm log says why.
+        </p>
+        <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
           <strong>outpost storage</strong>: it belongs to the realm whose residents finished it and
           counts as a storage of your realm everywhere (Store, Fetch, carrying the output, fetching
@@ -920,6 +928,11 @@ export function Wiki() {
           carriage's load or food on the ground next to them. A stable holds up to{' '}
           {num(STABLE_CAPACITY)} horses. A haul route keeps {num(HAUL_KEEP_FOOD)} Food on board for
           its horse.
+        </p>
+        <p>
+          The route (where to, which goods) comes only from the Haul order, which also fills the
+          Haul default's <code>carriage</code> param. Run directly, with Run script or as a queue
+          step, Haul has no route: it ends at once and your realm log says “no route given”.
         </p>
         <h3>Breeding</h3>
         <p>
@@ -1430,14 +1443,17 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             The Work default has <code>workplace</code>: the workplace to work, the one they stand
             on while none is picked; it is never kept between starts, so the form before it starts
             shows it empty, and giving Work on a workplace fills it without asking. It also has{' '}
-            <code>storage</code>: where the output goes. The Build default has <code>source</code>:
-            where materials come from, a carriage too. Unset, each uses the nearest storage; a
-            source picked that holds none of what the site lacks is left alone, and they just build.
-            The Tear down default has <code>source</code>: where Food comes from. The Work, Build
-            and Tear down defaults also have the <code>number</code> params <code>foodAt</code>{' '}
-            (default {num(GET_FOOD_AT)}; 0 turns it off) and <code>foodTake</code> (default{' '}
-            {num(GET_FOOD_TAKE)}) for getting food, in units of Food (a resident eats about{' '}
-            {num(foodEatenPerDay())} a game day).
+            <code>storage</code>: where the output goes. The Build default has <code>site</code>:
+            the construction site to join, the one they stand on while none is picked, never kept
+            like <code>workplace</code>; and <code>source</code>: where materials come from, a
+            carriage too. Unset, each uses the nearest storage; a source picked that holds none of
+            what the site lacks is left alone, and they just build. The Haul default has{' '}
+            <code>carriage</code>: the carriage to drive, the one they stand on while none is
+            picked, never kept either. The Tear down default has <code>source</code>: where Food
+            comes from. The Work, Build and Tear down defaults also have the <code>number</code>{' '}
+            params <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0 turns it off) and{' '}
+            <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food, in units of Food
+            (a resident eats about {num(foodEatenPerDay())} a game day).
           </li>
         </ul>
       </Section>
