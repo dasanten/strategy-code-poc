@@ -116,9 +116,32 @@ describe('group orders', () => {
     expect(skipped).toEqual([{ id: 'b', name: 'B', why: 'carries nothing' }])
   })
 
+  it('lets children store and fetch Food, and only Food', () => {
+    const rs = [resident('a', 0, 0), resident('c', 0, 0, { bornAt: TICK, carried: { food: 4 } })]
+    expect(send({ kind: 'fetch', good: 'food' }, rs).requests.map((q) => q.order)).toEqual([
+      { kind: 'fetch', goods: ['food'], residentId: 'a' },
+      { kind: 'fetch', goods: ['food'], residentId: 'c' },
+    ])
+    expect(send({ kind: 'store' }, rs).requests.map((q) => q.order)).toEqual([
+      { kind: 'store', goods: ['food'], residentId: 'c' },
+    ])
+    const queued = groupRequests({ kind: 'store' }, rs, {
+      tick: TICK,
+      size: SIZE,
+      free: everywhere,
+      queued: true,
+    }).requests.map((q) => q.order.steps)
+    expect(queued).toEqual([
+      [{ order: { kind: 'store', goods: [...GOODS] } }],
+      [{ order: { kind: 'store', goods: ['food'] } }],
+    ])
+  })
+
   it('sends fetch, run script and stop to each; children walk, stop and run scripts', () => {
     const rs = [resident('a', 0, 0), child('c', 0, 0)]
-    expect(send({ kind: 'fetch', good: 'wood' }, rs).skipped.map((s) => s.id)).toEqual(['c'])
+    expect(send({ kind: 'fetch', good: 'wood' }, rs).skipped).toEqual([
+      { id: 'c', name: 'C', why: 'a child' },
+    ])
     const script = send({ kind: 'runScript', scriptId: 7 }, rs)
     expect(script.skipped).toEqual([])
     expect(script.requests.map((q) => q.order)).toEqual([

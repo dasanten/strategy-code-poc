@@ -29,6 +29,7 @@ import {
   TRAINED_CAP_SHARE,
   ageInYears,
   bestWeapon,
+  canHandle,
   canWork,
   wrapDelta,
   wrapDistance,
@@ -1002,8 +1003,9 @@ export function ResidentCard({
   const age = Math.floor(ageInYears(r, tick))
   const skills = (Object.keys(SKILL_LABELS) as SkillName[]).filter((s) => (r.skills[s] ?? 0) > 0)
   const carried = goodsIn(r.carried)
-  // Children can't pick up or put down goods (`CONTEXT.md`: Child).
   const child = !canWork(r, tick)
+  // Children pick up and put down only Food (`CONTEXT.md`: Child).
+  const refused = (good: Good) => !canHandle(r, tick, [good])
   const family = familyLine(r, residents, tick)
   const ground: GoodsSpot = { kind: 'ground' }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
@@ -1208,7 +1210,7 @@ export function ResidentCard({
                 )}
                 {onStore && carried.length > 0 && (
                   <div className="order-buttons">
-                    <button type="button" disabled={child} onClick={onStore}>
+                    <button type="button" onClick={onStore}>
                       Store all
                     </button>
                     <span className="muted small">
@@ -1222,7 +1224,7 @@ export function ResidentCard({
                     good={good}
                     units={units}
                     byDefault={putAwayUnits(good, units)}
-                    disabled={child}
+                    disabled={refused(good)}
                     actions={[
                       { label: 'Drop', spot: ground },
                       ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
@@ -1250,7 +1252,7 @@ export function ResidentCard({
                     stock={pile?.goods}
                     spot={ground}
                     onPickUp={onPickUp}
-                    disabled={child}
+                    refused={refused}
                   />
                   {storage && (
                     <TileGoods
@@ -1258,7 +1260,7 @@ export function ResidentCard({
                       stock={storage.stock}
                       spot={inStorage}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {site && (
@@ -1267,7 +1269,7 @@ export function ResidentCard({
                       stock={site.site!.delivered}
                       spot={atSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {carriageSite && (
@@ -1276,7 +1278,7 @@ export function ResidentCard({
                       stock={carriageSite.site!.delivered}
                       spot={atCarriageSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {roadSite && (
@@ -1285,7 +1287,7 @@ export function ResidentCard({
                       stock={roadSite.site!.delivered}
                       spot={atRoadSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {carriage && (
@@ -1294,7 +1296,7 @@ export function ResidentCard({
                       stock={carriage.load}
                       spot={onCarriage}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                 </section>
@@ -2260,13 +2262,14 @@ function TileGoods({
   stock,
   spot,
   onPickUp,
-  disabled,
+  refused,
 }: {
   title: string
   stock: Stock | undefined
   spot: GoodsSpot
   onPickUp: (from: GoodsSpot, goods: Stock) => void
-  disabled: boolean
+  /** Whether the resident may not pick up this good, as a child anything but Food. */
+  refused: (good: Good) => boolean
 }) {
   const goods = goodsIn(stock)
   return (
@@ -2279,7 +2282,7 @@ function TileGoods({
           good={good}
           units={units}
           byDefault={units}
-          disabled={disabled}
+          disabled={refused(good)}
           actions={[{ label: 'Pick up', spot }]}
           onAct={onPickUp}
         />

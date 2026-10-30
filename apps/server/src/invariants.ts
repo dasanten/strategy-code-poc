@@ -25,7 +25,6 @@ import {
   drivenCarriageId,
   GOOD_WEIGHT,
   MAX_WORKERS,
-  HOME_FOOD_LOW,
   MEAL_UNITS,
   unitsThatFit,
   NODE_WORKPLACE,
@@ -42,6 +41,7 @@ import {
   ageInYears,
   CARRYING_TICKS,
   canWork,
+  canHandle,
   MAX_HUNGER,
   STABLE_BREED_TICKS,
   KEEPS_GOODS,
@@ -83,7 +83,7 @@ import {
   tileIndex,
 } from '@csp/shared'
 import { tallyGoods } from './goods-made.js'
-import { refillSource } from './survival.js'
+import { refillSource, refillTarget } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
@@ -835,9 +835,10 @@ export const workOrdersOnWorkplaces: Invariant = {
 
 /**
  * After a tick, nobody at home, near an outpost storage of their realm, at their workplace or in
- * an army by a carriage runs low on food while the storage, pile or carriage they refill from
- * still has some and a meal would fit (`stepRefill`, `CONTEXT.md`: Refilling at home, Refilling at
- * an outpost storage, Refilling at a workplace, Refilling from a carriage).
+ * an army by a carriage runs low on food (a child at home: has less than their own food) while the
+ * storage, pile or carriage they refill from still has some and a meal would fit (`stepRefill`,
+ * `refillTarget`, `CONTEXT.md`: Refilling at home, Refilling at an outpost storage, Refilling at a
+ * workplace, Refilling from a carriage, Child).
  */
 export const refilledWhenLow: Invariant = {
   name: 'refilled-when-low',
@@ -845,13 +846,13 @@ export const refilledWhenLow: Invariant = {
     return world.residents
       .filter(
         (r) =>
-          (r.carried.food ?? 0) < HOME_FOOD_LOW &&
+          (r.carried.food ?? 0) < refillTarget(world, r, terrain.size) &&
           (refillSource(world, r, terrain.size)?.food ?? 0) > 0 &&
           unitsThatFit(r, 'food', world.tick) >= MEAL_UNITS,
       )
       .map((r) => ({
         invariant: this.name,
-        message: `resident ${r.id} runs low with ${r.carried.food ?? 0} food where there is more`,
+        message: `resident ${r.id} has only ${r.carried.food ?? 0} food where there is more`,
         entityIds: [r.id],
       }))
   },
@@ -1353,8 +1354,6 @@ const ADULT_ORDERS = new Set([
   'workAt',
   'breed',
   'drive',
-  'pickUp',
-  'drop',
 ])
 
 /** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
@@ -1366,6 +1365,33 @@ export const childrenDontWork: Invariant = {
       .map((r) => ({
         invariant: this.name,
         message: `resident ${r.id} holds a ${r.order!.kind} order as a child`,
+        entityIds: [r.id],
+      }))
+  },
+}
+
+/** The order kinds that move goods into or out of a resident's hands (`CONTEXT.md`: Child). */
+const HANDLING_ORDERS = new Set(['pickUp', 'drop', 'store', 'fetch'])
+
+/**
+ * Children handle only Food (`CONTEXT.md`: Child): no child carries another good, or holds a
+ * pick-up, drop, store or fetch order for one.
+ */
+export const childrenCarryOnlyFood: Invariant = {
+  name: 'children-carry-only-food',
+  check(world) {
+    const goodsOf = (r: Resident) => {
+      const carried = Object.keys(r.carried).filter((g) => (r.carried[g as Good] ?? 0) > 0)
+      const o = r.order
+      const ordered =
+        o && HANDLING_ORDERS.has(o.kind) ? Object.keys((o as { goods: object }).goods) : []
+      return [...carried, ...ordered]
+    }
+    return world.residents
+      .filter((r) => !canHandle(r, world.tick, goodsOf(r)))
+      .map((r) => ({
+        invariant: this.name,
+        message: `child ${r.id} handles ${goodsOf(r).join(', ')}`,
         entityIds: [r.id],
       }))
   },
@@ -1770,6 +1796,7 @@ export const worldInvariants: Invariant[] = [
   pairsHoldTogether,
   carryingDoesntWork,
   childrenDontWork,
+  childrenCarryOnlyFood,
   carriagesInPlace,
   ridersOnHorses,
   driversOnCarriages,

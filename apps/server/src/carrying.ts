@@ -1,7 +1,7 @@
 import {
   GOODS,
   MAP_SIZE,
-  canWork,
+  canHandle,
   goodsAtSpot,
   materialsNeeded,
   outpostStorageGuarded,
@@ -81,11 +81,12 @@ function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   const o = order as Partial<CarryRequest>
   const r = orderedResident(world, sender, o.residentId)
   if (!r) return 'not one of your residents'
-  if (!canWork(r, world.tick)) return 'children can’t pick up or put down goods'
   const spot = readSpot(o.spot)
   if (!spot) return 'the spot must be the ground, a storage, a construction site or a carriage'
   const goods = readGoods(o.goods)
   if (!goods) return 'goods must be whole units of known goods'
+  if (!canHandle(r, world.tick, Object.keys(goods)))
+    return 'children can’t pick up or put down goods'
   if (spot.kind === 'storage' && storageAt(world, r.x, r.y)?.id !== spot.storageId) {
     return 'the resident is not at that storage'
   }
