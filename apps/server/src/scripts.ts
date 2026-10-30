@@ -374,17 +374,20 @@ export interface RunnableScript {
   source: string
   /** A default script its Player hasn't edited: running out of steps is the game's fault. */
   followsDefault: boolean
+  /** The task it is the default script of; absent for any other script. */
+  task?: Task
 }
 
 /** A script that can run: its Player and active version; undefined if it has none (or is gone). */
 export function runnableScript(db: Db, scriptId: number): RunnableScript | undefined {
-  return db
+  const row = db
     .select({
       userId: scripts.userId,
       name: scripts.name,
       version: scriptVersions.version,
       source: scriptVersions.source,
       followsDefault: scripts.followsDefault,
+      task: scripts.task,
     })
     .from(scripts)
     .innerJoin(
@@ -396,6 +399,9 @@ export function runnableScript(db: Db, scriptId: number): RunnableScript | undef
     )
     .where(eq(scripts.id, scriptId))
     .get()
+  if (!row) return undefined
+  const { task, ...rest } = row
+  return isTask(task) ? { ...rest, task } : rest
 }
 
 /** The source of the script's active version, or undefined if it has none (or is gone). */

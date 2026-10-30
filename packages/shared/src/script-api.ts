@@ -130,6 +130,15 @@ const SHARED: readonly ScriptBinding[] = [
       'The building or construction site with that id, if the Player sees it or it is one of my realm’s cities’; else null.',
   },
   {
+    name: 'buildingAt',
+    is: 'query',
+    params: ['x', 'y'],
+    returns: { view: 'building' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The building or construction site on a tile, roads and carriage sites left out, as `building(id)` gives it; null where there is none or the Player doesn’t see it.',
+  },
+  {
     name: 'pileAt',
     is: 'query',
     params: ['x', 'y'],
@@ -223,6 +232,15 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     cost: SCRIPT_TILE_QUERY_COST,
     description: 'How many units of a good still fit in my hands.',
   },
+  {
+    name: 'breedingPair',
+    is: 'query',
+    params: ['stable'],
+    returns: { list: 'string' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The two horses of mine I would `breed` in a stable I see, as ids like ["h1", "h2"]: a pair whose breeding it keeps first, else two fed ones standing in it; null while there are none.',
+  },
   list(
     'storages',
     'building',
@@ -247,6 +265,16 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'Get on a horse of my realm on my tile that pulls no carriage, and ride it.',
   ),
   action('dismount', [], 'Get off the horse I ride; it stays on my tile.'),
+  action(
+    'board',
+    ['carriageId'],
+    'Get on a carriage of my realm on my tile as a passenger, and ride along with it.',
+  ),
+  action(
+    'getOff',
+    ['x?', 'y?'],
+    'Get off the carriage I am aboard, onto its tile or the tile x, y right next to it.',
+  ),
   action(
     'haul',
     ['carriageId', 'x', 'y', 'goods', 'returnGoods?', 'keepFood?'],

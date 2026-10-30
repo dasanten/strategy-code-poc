@@ -161,6 +161,7 @@ export function StartParamsForm({
   script,
   params,
   values,
+  target,
   label,
   canStart,
   error,
@@ -174,6 +175,8 @@ export function StartParamsForm({
   params: readonly ScriptParam[]
   /** What each param is set to now, by name; none while empty. */
   values: Readonly<Record<string, ScriptParamValue | undefined>>
+  /** The script's target param (`targetParam`), which left empty is the one they stand on. */
+  target?: string
   /** How a picked value is named; null when it is out of sight. */
   label: (id: string) => string | null
   /** Whether every number typed is whole and zero or more. */
@@ -233,7 +236,8 @@ export function StartParamsForm({
               )
             }
             const id = typeof value === 'string' ? value : undefined
-            const shown = id === undefined ? 'none picked' : (label(id) ?? 'out of sight')
+            const none = p.name === target ? 'the one they stand on' : 'none picked'
+            const shown = id === undefined ? none : (label(id) ?? 'out of sight')
             return (
               <div key={p.name} className="goods-row">
                 <span className="small">

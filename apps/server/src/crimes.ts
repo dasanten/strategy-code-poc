@@ -39,9 +39,11 @@ export function cityOrganization(c: City): string {
 
 /**
  * The Organization a building belongs to, through its city, or an outpost storage's realm
- * (`CONTEXT.md`: Outpost storage); null for one of neither.
+ * (`CONTEXT.md`: Outpost storage); null for one of neither. A construction site laid out by a
+ * realm's resident is that realm's (`CONTEXT.md`: Construction site).
  */
 export function buildingOrganization(world: WorldState, b: Building): string | null {
+  if (b.site && b.realmId !== undefined) return b.realmId
   const city = world.cities.find((c) => c.id === b.cityId)
   return city ? cityOrganization(city) : (b.realmId ?? null)
 }

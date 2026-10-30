@@ -3,8 +3,8 @@
  * task the UI can give, written in the game's own language. Each Player has their own version
  * of every one in their library, which follows the game's default until they edit it.
  *
- * Giving a resident a task from the UI runs its default script with the task's target written
- * into `memory`, as `TaskMemory` lists. Defaults use the step budget like any script; a test
+ * Giving a resident a task from the UI runs its default script with the task's target in its
+ * target param (`TARGET_PARAMS`) or written into `memory`, as `TaskMemory` lists. Defaults use the step budget like any script; a test
  * keeps each at most a quarter of `SCRIPT_STEP_BUDGET`.
  */
 import {
@@ -21,19 +21,47 @@ import { FOOTPRINT } from './footprint.js'
 export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable'] as const
 export type Task = (typeof TASKS)[number]
 
+/**
+ * The param each task's default script takes its target in (`CONTEXT.md`: Default script,
+ * Started directly). Giving the task fills it; unset, the default works the one on the
+ * resident's tile when it starts. It is never kept between starts, unlike the script's other
+ * params.
+ */
+export const TARGET_PARAMS: Partial<Readonly<Record<Task, string>>> = {
+  work: 'workplace',
+  build: 'site',
+  haul: 'carriage',
+  tearDown: 'building',
+  breed: 'stable',
+  feedStable: 'stable',
+}
+
+/** The target param of a script (`TARGET_PARAMS`), if it is the default of a task with one. */
+export function targetParam(script: { task?: Task | null }): string | undefined {
+  return script.task ? TARGET_PARAMS[script.task] : undefined
+}
+
 /** What giving a task from the UI writes into the script's memory. */
 export interface TaskMemory {
-  /** Work: the workplace to work, the one the resident stands on; `makes` at a smithy. */
+  /**
+   * Work: the workplace, the one the resident stands on; `makes` at a smithy. The workplace goes
+   * in the param `workplace` too (`TARGET_PARAMS`), which the default reads; it keeps the one it
+   * works here, so Work scripts edited before it took the param, and scripts reading
+   * `withMemory("workplaceId", …)`, keep working.
+   */
   work: { workplaceId: string; makes?: string }
   /**
    * Build: the kind of building, with the north-west tile of its footprint `at` the tile the
    * resident stood on when given it, or the one the task named: they walk there, then lay out the
-   * site there or join the one there.
+   * site there or join the one there. Joining one, the site goes in the param `site` too
+   * (`TARGET_PARAMS`); started without this memory, the default takes both from that site.
    */
   build: { building: string; at: { x: number; y: number } }
   /**
    * Haul: the carriage, the route's stops (`from` the tile the resident stood on when given it),
-   * the goods going to `to` and those coming back, and the Food kept on board for the horse.
+   * the goods going to `to` and those coming back, and the Food kept on board for the horse. The
+   * carriage goes in the param `carriage` too (`TARGET_PARAMS`), which the default reads; the
+   * route comes only from here, so the default started without it ends.
    */
   haul: {
     carriageId: string
@@ -43,11 +71,20 @@ export interface TaskMemory {
     returnGoods: string[]
     keepFood: number
   }
-  /** Tear down: the building or construction site on the resident's tile. */
+  /**
+   * Tear down: the building or construction site on the resident's tile, in the param `building`
+   * too (`TARGET_PARAMS`); kept here for one of another's, which no param can hold.
+   */
   tearDown: { buildingId: string }
-  /** Breed horses: the stable, and the two horses in it to breed. */
+  /**
+   * Breed horses: the stable, in the param `stable` too (`TARGET_PARAMS`), and the two horses in
+   * it to breed. Started directly, the default picks the pair itself (`breedingPair`).
+   */
   breed: { stableId: string; horseIds: string[] }
-  /** Feed the stable: the stable the resident stood in when given it. */
+  /**
+   * Feed the stable: the stable the resident stood in when given it, in the param `stable` too
+   * (`TARGET_PARAMS`).
+   */
   feedStable: { stableId: string }
 }
 
@@ -67,7 +104,7 @@ export interface DefaultScript {
 const FOOD_PARAMS = `param foodAt: number = ${GET_FOOD_AT} // get Food below this many units on me; 0 never
 param foodTake: number = ${GET_FOOD_TAKE} // units of Food to take along`
 
-const GET_FOOD =`// The Food that tops me up to params.foodTake, in whole units.
+const GET_FOOD = `// The Food that tops me up to params.foodTake, in whole units.
 fn foodToTake() {
   let food = 0
   if (me.carried.food != null) { food = me.carried.food }
@@ -101,23 +138,71 @@ fn getFood(from, near) {
 }`
 
 /**
+ * Which stable the Breed horses and Feed the stable defaults work in (`CONTEXT.md`: Default
+ * script, Started directly), both declaring `param stable: storage`: the one picked, else the one
+ * the resident stands in when it starts, kept in `memory.stableId`; with none there, the script
+ * ends.
+ */
+const PICK_STABLE = `// Which stable: the one picked, else the one I started in.
+if (params.stable != null) {
+  if (params.stable.kind != "stable") {
+    end("the one picked is no stable")
+    return
+  }
+  memory.stableId = params.stable.id
+}
+if (memory.stableId == null) {
+  let here = buildingAt(me.x, me.y)
+  if (here == null || here.kind != "stable" || here.site != null) {
+    end("no stable here")
+    return
+  }
+  memory.stableId = here.id
+}`
+
+/**
  * The game's current default of each task. Changing a source here reaches every Player still
  * following it on the next start; those who edited theirs are told it changed.
  */
 export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
   work: {
     name: 'Work',
-    source: `// Work (default): work the workplace memory.workplaceId; once its pile holds
-// a full load, one of us, picked at random, stores it in params.storage, or
-// the nearest storage of my realm while none is picked, and comes back. At a
-// smithy, memory.makes says what to make. Meals come from the workplace's
-// pile on their own, without an order. Below params.foodAt units of Food on
-// me I get Food up to params.foodTake at params.storage, or the nearest
-// storage of my realm with Food, and come back; storing a load tops my food
-// up to foodTake too. foodAt 0 turns getting food off.
+    source: `// Work (default): work params.workplace, or while none is picked the
+// workplace on my tile when I start, kept in memory.workplaceId; with none I
+// end. Once its pile holds a full load, one of us, picked at random, stores
+// it in params.storage, or the nearest storage of my realm while none is
+// picked, and comes back. At a smithy, memory.makes says what to make. Meals
+// come from the workplace's pile on their own, without an order. Below
+// params.foodAt units of Food on me I get Food up to params.foodTake at
+// params.storage, or the nearest storage of my realm with Food, and come
+// back; storing a load tops my food up to foodTake too. foodAt 0 turns
+// getting food off.
+param workplace: building // the workplace to work; none: the one I stand on
 param storage: storage // where the output goes
 ${FOOD_PARAMS}
 let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
+
+// A finished building that makes goods.
+fn isWorkplace(b) {
+  return b != null && b.site == null && outputOf(b).length > 0
+}
+
+// Which workplace I work: the one picked, else the one I started on.
+if (params.workplace != null) {
+  if (!isWorkplace(params.workplace)) {
+    end("the " + params.workplace.kind + " is no workplace")
+    return
+  }
+  memory.workplaceId = params.workplace.id
+}
+if (memory.workplaceId == null) {
+  let here = buildingAt(me.x, me.y)
+  if (!isWorkplace(here)) {
+    end("no workplace on their tile")
+    return
+  }
+  memory.workplaceId = here.id
+}
 
 // Where the workplace is, kept for when it is out of sight.
 let place = building(memory.workplaceId)
@@ -143,7 +228,10 @@ if (me.x != memory.at.x || me.y != memory.at.y) {
 }
 if (carry != null) { memory.carry = null }
 if (memory.food != null) { memory.food = null }
-if (place == null) { return } // gone
+if (place == null) { // here, and it isn't: torn down, or no longer ours
+  end("the workplace is gone")
+  return
+}
 
 // Low on Food: get some, then back to work. With none anywhere, work on.
 ${GET_FOOD}
@@ -194,7 +282,9 @@ memory.carry = {storageId: to.id, goods: goods}
   build: {
     name: 'Build',
     source: `// Build (default): build a memory.building with the north-west tile of its
-// footprint at memory.at, laying out the site or joining the one there.
+// footprint at memory.at, laying out the site or joining the one there, as
+// the Build order gives it. Without one I join params.site, or while none is
+// picked the construction site on my tile when I start; with none I end.
 // While the site lacks materials, one of us building it, picked at random,
 // fetches a load of what is missing from params.source, or the nearest
 // storage of my realm that holds it while none is picked, and brings it
@@ -202,8 +292,24 @@ memory.carry = {storageId: to.id, goods: goods}
 // me I get Food up to params.foodTake at params.source, or the nearest
 // storage of my realm with Food, and come back; fetching materials tops my
 // food up to foodTake too. foodAt 0 turns getting food off.
+param site: building // the construction site to join; none: the one I stand on
 param source: storage // where materials come from; a carriage too
 ${FOOD_PARAMS}
+
+// Which site I build: the Build order's, else the one picked, else the one I
+// started on.
+if (memory.building == null) {
+  let join = params.site
+  if (join == null) { join = buildingAt(me.x, me.y) }
+  if (join == null || join.site == null) {
+    if (params.site != null) { end("the " + params.site.kind + " is no construction site") }
+    else { end("no construction site on their tile") }
+    return
+  }
+  memory.building = join.kind
+  memory.at = {x: join.x, y: join.y}
+  memory.siteId = join.id
+}
 if (memory.stuck) { return }
 if (me.order != null && me.order.kind != "build") { return } // on my way
 
@@ -311,10 +417,35 @@ if (fetch(load, from.id) == null) {
   },
   haul: {
     name: 'Haul',
-    source: `// Haul (default): drive carriage memory.carriageId on a haul route between
-// memory.from and memory.to: memory.goods there, memory.returnGoods back,
-// memory.keepFood Food kept on board for the horse. The built-in haul order
-// loads, drives and unloads, again and again; this starts it at memory.from.
+    source: `// Haul (default): drive params.carriage, or while none is picked the carriage
+// on my tile when I start, on a haul route between memory.from and memory.to:
+// memory.goods there, memory.returnGoods back, memory.keepFood Food kept on
+// board for the horse. The route comes only from the Haul order; started
+// without one I end. The built-in haul order loads, drives and unloads, again
+// and again; this starts it at memory.from.
+param carriage: storage // the carriage to drive; none: the one I stand on
+if (memory.to == null) {
+  end("no route given")
+  return
+}
+
+// Which carriage I drive: the one picked, else the one I started on.
+if (params.carriage != null) {
+  if (params.carriage.kind != null) {
+    end("the " + params.carriage.kind + " is no carriage")
+    return
+  }
+  memory.carriageId = params.carriage.id
+}
+if (memory.carriageId == null) {
+  for (c of carriages()) {
+    if (c.x == me.x && c.y == me.y) { memory.carriageId = c.id }
+  }
+  if (memory.carriageId == null) {
+    end("no carriage on their tile")
+    return
+  }
+}
 if (me.order == null || me.order.kind != "haul") {
   if (me.x == memory.from.x && me.y == memory.from.y) {
     haul(memory.carriageId, memory.to.x, memory.to.y, memory.goods, memory.returnGoods, memory.keepFood)
@@ -324,13 +455,28 @@ if (me.order == null || me.order.kind != "haul") {
   },
   tearDown: {
     name: 'Tear down',
-    source: `// Tear down (default): tear down memory.buildingId, the building or site
-// I stand on, until it is gone; then end. Below params.foodAt units of Food
-// on me I get Food up to params.foodTake at params.source, or the nearest
-// storage of my realm with Food, and come back. foodAt 0 turns it off.
+    source: `// Tear down (default): tear down params.building, or while none is picked
+// the building or site on my tile when I start, kept in memory.buildingId,
+// until it is gone; then end. With none I end. Away from it, I walk there
+// first. Below params.foodAt units of Food on me I get Food up to
+// params.foodTake at params.source, or the nearest storage of my realm with
+// Food, and come back. foodAt 0 turns it off.
+param building: building // the building or site to tear down; none: the one I stand on
 param source: storage // where Food comes from; a carriage too
 ${FOOD_PARAMS}
 if (memory.stuck) { return }
+
+// What I tear down: the one picked, else the one I started on.
+if (params.building != null) { memory.buildingId = params.building.id }
+if (memory.buildingId == null) {
+  let here = buildingAt(me.x, me.y)
+  if (here == null) {
+    end("no building on their tile")
+    return
+  }
+  memory.buildingId = here.id
+}
+if (memory.walked && me.order != null && me.order.kind == "walkTo") { return } // on my way
 
 // Getting food: on my way, then back to the tile I tear down from.
 let away = memory.food
@@ -356,17 +502,29 @@ if (getFood(params.source, me)) {
   return
 }
 if (me.order == null || me.order.kind != "tearDown") {
+  let problem = tearDown(memory.buildingId)
+  // Picked somewhere else: walk there once, then tear it down.
+  let target = building(memory.buildingId)
+  if (problem == "the resident is not at that building" && target != null && !memory.walked) {
+    memory.walked = true
+    walkTo(target.x, target.y)
+    return
+  }
   // Turned down, such as with the building gone, tearDown says why: done.
-  if (tearDown(memory.buildingId) != null) { end() }
+  if (problem != null) { end() }
 }
 `,
   },
   breed: {
     name: 'Breed horses',
-    source: `// Breed horses (default): at stable memory.stableId, tend the two horses
-// memory.horseIds until their foal is born; then stand idle. Away from the
-// stable, walk there first. Before starting, take Food for the days of
-// tending from the stable, if it has some.
+    source: `// Breed horses (default): in params.stable, or while none is picked the
+// stable I stand in when I start, kept in memory.stableId, tend the two
+// horses memory.horseIds until their foal is born; then end. Without a pair
+// given, I pick one in the stable: a pair whose breeding it keeps first,
+// else two fed horses of my realm in it; with none, or no stable, I end.
+// Away from the stable, walk there first. Before starting, take Food for
+// the days of tending from the stable, if it has some.
+param stable: storage // the stable to breed in; none: the one I stand in
 let needFood = ${BREED_FOOD} // Food I take along for my meals while tending
 if (memory.done == true) { end() }
 if (me.order != null && me.order.kind == "breed") {
@@ -378,6 +536,29 @@ if (memory.started == true) {
   end()
 }
 if (me.order != null && (me.order.kind == "walkTo" || me.order.kind == "pickUp")) { return }
+
+${PICK_STABLE}
+let stable = building(memory.stableId)
+if (stable == null) {
+  end("the stable is gone")
+  return
+}
+
+// Which two: those given, else picked once I stand in the stable.
+if (memory.horseIds == null) {
+  let here = buildingAt(me.x, me.y)
+  if ((here == null || here.id != stable.id) && memory.walked != true) {
+    memory.walked = true
+    walkTo(stable.x, stable.y)
+    return
+  }
+  let pair = breedingPair(stable)
+  if (pair == null) {
+    end("no two fed horses here")
+    return
+  }
+  memory.horseIds = pair
+}
 let food = 0
 if (me.carried.food != null) { food = me.carried.food }
 if (memory.fed != true && food < needFood) {
@@ -389,8 +570,7 @@ if (memory.fed != true && food < needFood) {
 }
 let problem = breed(memory.stableId, memory.horseIds)
 if (problem == null) { return }
-let stable = building(memory.stableId)
-if (problem == "not standing at that stable" && stable != null && memory.walked != true) {
+if (problem == "not standing at that stable" && memory.walked != true) {
   memory.walked = true
   walkTo(stable.x, stable.y)
   return
@@ -401,20 +581,30 @@ end()
   feedStable: {
     name: 'Feed the stable',
     source: `// Feed the stable (default): keep Food for ${STABLE_FEED_DAYS} game days for the
-// horses standing in params.stable, or in memory.stableId while none is
-// picked. Below that I fetch what is missing from params.source, or the
-// nearest storage of my realm with Food while none is picked, and store it
-// in the stable; otherwise I wait there.
-param stable: storage // the stable to feed
+// horses standing in params.stable, or while none is picked in the stable I
+// stand in when I start, kept in memory.stableId; with none, or once it is
+// gone, I end. Below that I fetch what is missing from params.source, or
+// the nearest storage of my realm with Food while none is picked, and store
+// it in the stable; otherwise I wait there.
+param stable: storage // the stable to feed; none: the one I stand in
 param source: storage // where the Food comes from; a carriage too
 let days = ${STABLE_FEED_DAYS} // game days of Food to keep
 let perHorse = ${HORSE_FOOD_PER_DAY} // Food a horse eats a game day
 let side = ${FOOTPRINT.stable} // tiles along each side of a stable
 
-let stable = params.stable
-if (stable == null) { stable = building(memory.stableId) }
-if (stable == null) { return } // gone or out of sight
+${PICK_STABLE}
+
+// Where the stable is, kept for when it is out of sight.
+let stable = building(memory.stableId)
+if (stable != null) { memory.at = {x: stable.x, y: stable.y} }
 if (me.order != null) { return } // on my way
+if (stable == null) {
+  // Out of sight: back to it. There, and it isn't: torn down.
+  let at = memory.at
+  if (at != null && (me.x != at.x || me.y != at.y) && walkTo(at.x, at.y) == null) { return }
+  end("the stable is gone")
+  return
+}
 
 // Back with Food: what I fetched goes into the stable; my own food stays.
 let fetched = memory.fetched
