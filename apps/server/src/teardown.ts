@@ -4,7 +4,10 @@ import {
   buildWork,
   canWork,
   constructionLearned,
+  strandsOnMountain,
+  siteWorkOf,
   tearDownProblem,
+  terrainAt,
   teardownLeft,
   teardownReturns,
   teardownWork,
@@ -39,7 +42,7 @@ interface TearDownRequest extends OrderRequest {
  * in later ticks.
  */
 export const tearDown: OrderKind = {
-  validate(world, sender, order) {
+  validate(world, sender, order, terrain) {
     const o = order as Partial<TearDownRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
@@ -47,7 +50,7 @@ export const tearDown: OrderKind = {
     if (!canWork(r, world.tick)) return 'children can’t tear down buildings'
     if (r.carrying) return CARRYING_A_CHILD
     if (typeof o.buildingId !== 'string') return 'which building?'
-    return tearDownProblem(world, r.x, r.y, o.buildingId)
+    return tearDownProblem(world, r.x, r.y, o.buildingId, terrain)
   },
   apply(world, _sender, order) {
     const { residentId, buildingId } = order as TearDownRequest
@@ -65,7 +68,8 @@ export function requestTearingDown(world: WorldState): TearDownAction[] {
 
 /**
  * Resolves tear-down work (ADR 0002), one action after another. A resident who has left the tile
- * stops. Work goes into the building on the tile and teaches Construction; once enough is in, the
+ * stops. Work goes into the building on the tile (slower on a road on Mountain,
+ * `siteWorkOf`) and teaches Construction; once enough is in, the
  * building or site is gone, its returned materials lie on the tile as goods, and everyone's build
  * or tear-down order on it is done. Tearing down a town hall dissolves its city, and tearing down
  * any city building may shrink or split a city (`updateCityMembership`). Taking down another
@@ -86,8 +90,12 @@ export function resolveTearingDown(
       r.order = null
       continue
     }
+    // A carriage or ridden horse on the mountain road: the work waits for them to leave.
+    if (terrain && strandsOnMountain(world, b, terrain)) continue
     if (teardownLeft(b) > 0) {
-      b.teardown = Math.min(teardownWork(b), (b.teardown ?? 0) + buildWork(r, world.tick))
+      const under = terrain && terrainAt(terrain, b.x, b.y)
+      const work = siteWorkOf(buildWork(r, world.tick), b.kind, under)
+      b.teardown = Math.min(teardownWork(b), (b.teardown ?? 0) + work)
       r.skills.construction = (r.skills.construction ?? 0) + constructionLearned(r, world.tick)
     }
     if (teardownLeft(b) === 0) {

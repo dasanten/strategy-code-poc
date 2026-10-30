@@ -12,6 +12,8 @@ import {
   GOODS,
   HAUL_KEEP_FOOD,
   buildMenu,
+  buildingWork,
+  workFactor,
   MAX_HEALTH,
   MAX_HUNGER,
   MAX_WORKERS,
@@ -27,7 +29,9 @@ import {
   TRAINED_CAP_SHARE,
   ageInYears,
   bestWeapon,
+  canHandle,
   canWork,
+  isAt,
   wrapDelta,
   wrapDistance,
   wallStrength,
@@ -64,6 +68,8 @@ import {
   STABLE_BREED_TICKS,
   breedProblem,
   horsesIn,
+  keptBreeding,
+  keptPair,
 } from '@csp/shared'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
@@ -92,7 +98,15 @@ import {
   timeStep,
   type QueueRow,
 } from './queue-view.js'
-import { groupNumberParams, groupSentLine, type GroupOrder, type Skipped } from './group-orders.js'
+import {
+  GROUP_BUTTONS,
+  groupNumberParams,
+  groupSentLine,
+  type GroupButton,
+  type GroupOrder,
+  type Skipped,
+} from './group-orders.js'
+import { GROUP_HINTS } from './pick-mode.js'
 import { NumberField, foodParamsHint } from './ScriptParams.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
@@ -101,8 +115,11 @@ import {
   horseDetail,
   groupOrders,
   residentActions,
+  ORDER_GROUP_LABELS,
+  riddenHorseLine,
   type ActionId,
   type CardAction,
+  type OrderGroup,
 } from './selection-view.js'
 
 /** Good names as the UI shows them. */
@@ -243,27 +260,30 @@ function TaskScript({
 /**
  * The resident's queue (`CONTEXT.md`: Queue): its steps in order, the current one with its Doing
  * line. Steps are reordered by dragging or the arrows, removed, given a duration or none, and the
- * queue looped; each change is an edit-queue order.
+ * queue looped; each change is an edit-queue order. The group card lists its plan with it, then
+ * titled "Plan", with no current step.
  */
-function QueueBlock({
+export function QueueBlock({
   queue: q,
-  doing,
+  doing = '',
   scripts,
   buildings,
   onEdit,
+  title = 'Queue',
 }: {
-  queue: Queue
-  doing: string
+  queue: Pick<Queue, 'steps' | 'current' | 'loop'>
+  doing?: string
   scripts: ScriptSummary[]
   buildings: Building[]
   onEdit: (steps: QueueStepRequest[], loop?: boolean) => void
+  title?: string
 }) {
   const [dragged, setDragged] = useState<number>()
   const rows = queueRows(q, { scripts, buildings })
   return (
-    <section className="inspector-block" aria-label="Queue">
+    <section className="inspector-block" aria-label={title}>
       <div className="panel-head">
-        <h3>Queue</h3>
+        <h3>{title}</h3>
         <label className="small queue-loop">
           <input
             type="checkbox"
@@ -372,12 +392,16 @@ function StepMinutes({
   )
 }
 
-/** What a resident's built-in order has them doing. */
-export function orderDoing(r: Pick<Resident, 'order'>): string {
+/**
+ * What a resident's built-in order has them doing. A rider rides where others walk (`CONTEXT.md`:
+ * Riding): "Riding to 4, 5 · 3 tiles to go".
+ */
+export function orderDoing(r: Pick<Resident, 'order' | 'riding'>): string {
   const o = r.order
+  const walking = r.riding === undefined ? 'Walking' : 'Riding'
   if (o?.kind === 'walkTo') {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
-    return `Walking to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
+    return `${walking} to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
   }
   if (o?.kind === 'drive') {
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
@@ -418,7 +442,7 @@ export function orderDoing(r: Pick<Resident, 'order'>): string {
     const what = LINE_BUILDING[o.kind]
     const left = `${o.tiles.length} ${what} tile${o.tiles.length === 1 ? '' : 's'} to go`
     return o.phase === 'walking'
-      ? `Walking to lay ${what} at ${x}, ${y} · ${left}`
+      ? `${walking} to lay ${what} at ${x}, ${y} · ${left}`
       : `Building ${what} at ${x}, ${y} · ${left}`
   }
   return 'Idle'
@@ -517,13 +541,17 @@ export function ResidentsList({
 /**
  * The selection card for several of the Player's residents picked at once on the map (ADR 0012;
  * `CONTEXT.md`: Group, Resident card): a header with how many and who, then one open tab. Orders
- * gives each of them the same order, grouped by kind; Members lists what each is doing, a click
- * picking just that one; Script says what they run and gives them all one.
+ * gives each of them the same order, grouped by kind as on a resident card (`GROUP_BUTTONS`), each
+ * to those who can take it; Queue plans a queue to give them all; Members lists what each is doing,
+ * a click picking just that one; Script says what they run and gives them all one.
  */
 export function GroupCard({
   residents,
   scripts,
   buildings,
+  horses = [],
+  realmId,
+  tick,
   picking,
   onPicking,
   buildAt,
@@ -532,15 +560,23 @@ export function GroupCard({
   orderError,
   onPick,
   onClose,
+  planner,
   collapsed = false,
 }: {
   residents: Resident[]
   scripts: ScriptSummary[]
   buildings: Building[]
-  /** The map is waiting for a tile for the group's walk-to, work or build order. */
+  /** The queue planner (`GroupPlanner`), on the Queue tab (`CONTEXT.md`: Planning for a group). */
+  planner?: ReactNode
+  /** Horses in sight, to pick two in a stable where some of them stand to breed. */
+  horses?: SeenHorse[]
+  /** The Player's realm, whose horses they breed. */
+  realmId?: string
+  tick?: number
+  /** The map is waiting for a tile for one of the group's orders. */
   picking: GroupPicking
-  /** Starts (or cancels) picking a tile for the group. */
-  onPicking: (picking: GroupPicking) => void
+  /** Starts (or cancels) picking a tile for the group, with what the order needs besides. */
+  onPicking: (picking: GroupPicking, with_?: GroupPickWith) => void
   /** The tile picked to build on: the site there to join, or the kinds that may go there. */
   buildAt: GroupBuildTile | undefined
   /** Gives each resident of the group the order (`CONTEXT.md`: Group). */
@@ -556,7 +592,8 @@ export function GroupCard({
 }) {
   const card = groupCard(residents)
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
-  const [fetching, setFetching] = useState(false)
+  // The order whose panel is open under the buttons: what it needs before it goes out.
+  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed'>()
   const [good, setGood] = useState<Good>('food')
   const numberParams = groupNumberParams(residents, scripts)
   const foodHint = foodParamsHint(numberParams.map((p) => p.name))
@@ -564,14 +601,74 @@ export function GroupCard({
     setTab(t)
     rememberTabOf('group', t)
   }
-  const toggle = (p: Exclude<GroupPicking, false>) => {
-    setFetching(false)
-    onPicking(picking === p ? false : p)
+  // A line's far end is still the line's button.
+  const picked = picking === 'roadTo' ? 'roadFrom' : picking === 'wallTo' ? 'wallFrom' : picking
+  const toggle = (p: Exclude<GroupPicking, false>, with_?: GroupPickWith) => {
+    if (!with_) setPanel(undefined)
+    onPicking(picked === p ? false : p, with_)
   }
-  const pickButton = (p: Exclude<GroupPicking, false>, label: string) => (
-    <button type="button" aria-pressed={picking === p} onClick={() => toggle(p)}>
-      {label}
-    </button>
+  // The buttons that start picking a tile on the map, and what for.
+  const picks: Partial<Record<GroupButton, Exclude<GroupPicking, false>>> = {
+    walk: 'walk',
+    drive: 'drive',
+    work: 'work',
+    build: 'build',
+    roadTo: 'roadFrom',
+    wallTo: 'wallFrom',
+    tearDown: 'tearDown',
+    storeAt: 'storeAt',
+    attack: 'attack',
+    climb: 'climb',
+  }
+  // The orders that go out as they are.
+  const at_once: Partial<Record<GroupButton, GroupOrder>> = {
+    stop: { kind: 'stop' },
+    mount: { kind: 'mount' },
+    dismount: { kind: 'dismount' },
+    feedStable: { kind: 'feedStable' },
+    store: { kind: 'store' },
+    drop: { kind: 'drop' },
+  }
+  const orderButton = (id: GroupButton, label: string) => {
+    const p = picks[id]
+    if (p) {
+      return (
+        <button type="button" key={id} aria-pressed={picked === p} onClick={() => toggle(p)}>
+          {label}
+        </button>
+      )
+    }
+    const order = at_once[id]
+    if (order)
+      return (
+        <button type="button" key={id} onClick={() => onOrder(order)}>
+          {label}
+        </button>
+      )
+    if (id === 'script')
+      return (
+        <button type="button" key={id} onClick={() => showTab('script')}>
+          {label}
+        </button>
+      )
+    const opens = id as 'haul' | 'fetch' | 'breed'
+    return (
+      <button
+        type="button"
+        key={id}
+        aria-pressed={panel === opens}
+        onClick={() => {
+          onPicking(false)
+          setPanel(panel === opens ? undefined : opens)
+        }}
+      >
+        {label}
+      </button>
+    )
+  }
+  // The finished stables some of them stand in, to breed horses in.
+  const stables = buildings.filter(
+    (b) => b.kind === 'stable' && !b.site && residents.some((r) => isAt(r, b)),
   )
   const idle = residents.filter((r) => !r.order && !r.script).length
   return (
@@ -589,44 +686,20 @@ export function GroupCard({
     >
       <CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
 
-      {tab === 'orders' && (
-        <>
-          <div className="sel-order-group">
-            <h3>Move</h3>
-            <div className="order-buttons" aria-label="Move">
-              {pickButton('walk', 'Walk to')}
-              <button type="button" onClick={() => onOrder({ kind: 'stop' })}>
-                Stop
-              </button>
+      {tab === 'orders' &&
+        (Object.keys(ORDER_GROUP_LABELS) as OrderGroup[]).map((g) => {
+          const buttons = GROUP_BUTTONS.filter((b) => b.group === g)
+          if (buttons.length === 0) return null
+          const label = ORDER_GROUP_LABELS[g]
+          return (
+            <div className="sel-order-group" key={g}>
+              <h3>{label}</h3>
+              <div className="order-buttons" aria-label={label}>
+                {buttons.map((b) => orderButton(b.id, b.label))}
+              </div>
             </div>
-          </div>
-          <div className="sel-order-group">
-            <h3>Work &amp; build</h3>
-            <div className="order-buttons" aria-label="Work & build">
-              {pickButton('work', 'Work')}
-              {pickButton('build', 'Build')}
-            </div>
-          </div>
-          <div className="sel-order-group">
-            <h3>Goods</h3>
-            <div className="order-buttons" aria-label="Goods">
-              <button type="button" onClick={() => onOrder({ kind: 'store' })}>
-                Store
-              </button>
-              <button
-                type="button"
-                aria-pressed={fetching}
-                onClick={() => {
-                  onPicking(false)
-                  setFetching(!fetching)
-                }}
-              >
-                Fetch
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+          )
+        })}
       {tab === 'orders' && buildAt && !picking && (
         <section className="inspector-block" aria-label="Build">
           <div className="panel-head">
@@ -673,7 +746,7 @@ export function GroupCard({
           </p>
         </section>
       )}
-      {tab === 'orders' && fetching && (
+      {tab === 'orders' && panel === 'fetch' && (
         <section className="inspector-block" aria-label="Fetch">
           <div className="order-buttons">
             <select
@@ -690,12 +763,52 @@ export function GroupCard({
             <button type="button" onClick={() => onOrder({ kind: 'fetch', good })}>
               Fetch
             </button>
+            <button
+              type="button"
+              aria-pressed={picking === 'fetchFrom'}
+              onClick={() => toggle('fetchFrom', { good })}
+            >
+              Fetch from…
+            </button>
           </div>
           <p className="muted small">
-            Each fetches as much as fits from the nearest storage or carriage holding it.
+            Each fetches as much as fits from the nearest storage or carriage holding it, or from
+            the storage, stable or carriage picked on the map.
           </p>
         </section>
       )}
+      {tab === 'orders' && panel === 'haul' && (
+        <HaulBlock
+          adult
+          onRoute={false}
+          picking={picking === 'haul'}
+          onHaulTo={(haul) => toggle('haul', { haul })}
+        />
+      )}
+      {tab === 'orders' && panel === 'breed' && (
+        <section className="inspector-block" aria-label="Breed horses">
+          <div className="panel-head">
+            <h3>Breed horses</h3>
+          </div>
+          {stables.length === 0 && (
+            <p className="muted small">None of them stands in a finished stable.</p>
+          )}
+          {stables.map((s) => (
+            <GroupBreed
+              key={s.id}
+              stable={s}
+              horses={horsesIn(horses, s).filter((h) => h.realmId === realmId)}
+              tick={tick ?? 0}
+              onBreed={(horseIds) => onOrder({ kind: 'breed', stable: s, horseIds })}
+            />
+          ))}
+          <p className="muted small">
+            One of them standing there who isn’t breeding yet tends the two; pick two more for the
+            next one.
+          </p>
+        </section>
+      )}
+      {tab === 'queue' && planner}
       {tab === 'members' && (
         <ul className="sel-facts sel-group" aria-label="Selected residents">
           {card.rows.map((r) => (
@@ -726,7 +839,7 @@ export function GroupCard({
           {numberParams.length > 0 && (
             <section className="inspector-block" aria-label="Script params">
               <div className="script-params">
-                {numberParams.map(({ name, scriptIds }) => (
+                {numberParams.map(({ name, scriptIds, default: fallback }) => (
                   <div key={name} className="goods-row">
                     <span className="small">
                       <strong>{name}</strong> <span className="muted">(number)</span>
@@ -734,6 +847,7 @@ export function GroupCard({
                     <NumberField
                       name={name}
                       value={undefined}
+                      fallback={fallback}
                       onSet={(v) =>
                         onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
                       }
@@ -786,7 +900,28 @@ export function GroupCard({
 }
 
 /** What the map waits for while a group order is being given. */
-export type GroupPicking = false | 'walk' | 'work' | 'build'
+export type GroupPicking =
+  | false
+  | 'walk'
+  | 'work'
+  | 'build'
+  | 'drive'
+  | 'haul'
+  | 'roadFrom'
+  | 'roadTo'
+  | 'wallFrom'
+  | 'wallTo'
+  | 'tearDown'
+  | 'storeAt'
+  | 'fetchFrom'
+  | 'attack'
+  | 'climb'
+
+/** What a group order picked on the map needs besides the tile: a haul route's goods, a good. */
+export interface GroupPickWith {
+  haul?: HaulSetup
+  good?: Good
+}
 
 /** The tile a group is to build on, with the site there or the kinds that may go there. */
 export interface GroupBuildTile {
@@ -798,8 +933,7 @@ export interface GroupBuildTile {
 
 /** What picking a tile does for a group, said while the map waits for it. */
 const GROUP_PICKING_HINTS: Record<Exclude<GroupPicking, false>, string> = {
-  walk: 'They spread over free tiles around it, nearest first.',
-  work: 'Those standing at the workplace there work it.',
+  ...GROUP_HINTS,
   build: 'Where to build, or a site to join.',
 }
 
@@ -824,6 +958,7 @@ export function ResidentCard({
   onDrop,
   building,
   road,
+  terrain,
   carriageSite,
   node,
   onBuild,
@@ -866,6 +1001,7 @@ export function ResidentCard({
   scriptParams,
   onStore,
   onEditQueue,
+  addStep,
   collapsed = false,
 }: {
   resident: Resident
@@ -917,6 +1053,8 @@ export function ResidentCard({
   building: Building | undefined
   /** The road or road site on the resident's tile, if one is in sight; it may share the tile. */
   road: Building | undefined
+  /** The explored terrain beneath the resident's tile, if known: a road on Mountain takes more work. */
+  terrain?: number
   /** The carriage site on the resident's tile, if one is in sight; it may share a stable's tile. */
   carriageSite: Building | undefined
   /** The resource node on the resident's tile, if the Player knows of one. */
@@ -982,6 +1120,8 @@ export function ResidentCard({
   onStore?: () => void
   /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
   onEditQueue?: (steps: QueueStepRequest[], loop?: boolean) => void
+  /** The queue planner's Add step (`AddStep`), under the queue. */
+  addStep?: ReactNode
   /** Shrunk to its header while the map waits for a target (ADR 0012: pick mode). */
   collapsed?: boolean
 }) {
@@ -989,8 +1129,9 @@ export function ResidentCard({
   const age = Math.floor(ageInYears(r, tick))
   const skills = (Object.keys(SKILL_LABELS) as SkillName[]).filter((s) => (r.skills[s] ?? 0) > 0)
   const carried = goodsIn(r.carried)
-  // Children can't pick up or put down goods (`CONTEXT.md`: Child).
   const child = !canWork(r, tick)
+  // Children pick up and put down only Food (`CONTEXT.md`: Child).
+  const refused = (good: Good) => !canHandle(r, tick, [good])
   const family = familyLine(r, residents, tick)
   const ground: GoodsSpot = { kind: 'ground' }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
@@ -1041,6 +1182,7 @@ export function ResidentCard({
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
   useActionKeys(actions, act)
+  const ridden = riddenHorseLine(r, horses, tick)
   return (
     <SelectionCard
       rel={r.owner === realmId ? 'own' : 'alliance'}
@@ -1049,6 +1191,7 @@ export function ResidentCard({
       lines={[
         <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
         `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
+        ...(ridden ? [ridden] : []),
       ]}
       head={
         <div className="vitals">
@@ -1104,8 +1247,11 @@ export function ResidentCard({
             onEdit={onEditQueue}
           />
         ) : (
-          <p className="muted small">Nothing queued. Hold Shift with any order to queue it.</p>
+          <p className="muted small">
+            Nothing queued. Hold Shift with any order to queue it, or plan steps with Add step.
+          </p>
         ))}
+      {tab === 'queue' && addStep}
       {tab === 'script' &&
         (r.script ? (
           <>
@@ -1118,7 +1264,12 @@ export function ResidentCard({
       {tab === 'orders' && shown && (
         <div className="sel-panel">
           {shown === 'haul' && carriage && (
-            <HaulBlock resident={r} tick={tick} picking={picking === 'haul'} onHaulTo={onHaulTo} />
+            <HaulBlock
+              adult={!child}
+              onRoute={r.order?.kind === 'haul'}
+              picking={picking === 'haul'}
+              onHaulTo={onHaulTo}
+            />
           )}
           {shown === 'work' && (
             <WorkBlock
@@ -1150,7 +1301,7 @@ export function ResidentCard({
                 buildProblem={buildProblem}
                 onBuild={onBuild}
               />
-              <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
+              <RoadBlock resident={r} tick={tick} road={road} terrain={terrain} onBuild={onBuild} />
             </>
           )}
           {shown === 'tearDown' && (
@@ -1193,7 +1344,7 @@ export function ResidentCard({
                 )}
                 {onStore && carried.length > 0 && (
                   <div className="order-buttons">
-                    <button type="button" disabled={child} onClick={onStore}>
+                    <button type="button" onClick={onStore}>
                       Store all
                     </button>
                     <span className="muted small">
@@ -1207,7 +1358,7 @@ export function ResidentCard({
                     good={good}
                     units={units}
                     byDefault={putAwayUnits(good, units)}
-                    disabled={child}
+                    disabled={refused(good)}
                     actions={[
                       { label: 'Drop', spot: ground },
                       ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
@@ -1235,7 +1386,7 @@ export function ResidentCard({
                     stock={pile?.goods}
                     spot={ground}
                     onPickUp={onPickUp}
-                    disabled={child}
+                    refused={refused}
                   />
                   {storage && (
                     <TileGoods
@@ -1243,7 +1394,7 @@ export function ResidentCard({
                       stock={storage.stock}
                       spot={inStorage}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {site && (
@@ -1252,7 +1403,7 @@ export function ResidentCard({
                       stock={site.site!.delivered}
                       spot={atSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {carriageSite && (
@@ -1261,7 +1412,7 @@ export function ResidentCard({
                       stock={carriageSite.site!.delivered}
                       spot={atCarriageSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {roadSite && (
@@ -1270,7 +1421,7 @@ export function ResidentCard({
                       stock={roadSite.site!.delivered}
                       spot={atRoadSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {carriage && (
@@ -1279,7 +1430,7 @@ export function ResidentCard({
                       stock={carriage.load}
                       spot={onCarriage}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                 </section>
@@ -1421,13 +1572,15 @@ export function ResidentCard({
  * for the horse, then the other stop on the map.
  */
 function HaulBlock({
-  resident,
-  tick,
+  adult,
+  onRoute,
   picking,
   onHaulTo,
 }: {
-  resident: Resident
-  tick: number
+  /** Grown up, so they can drive (`CONTEXT.md`: Child). */
+  adult: boolean
+  /** Already hauling on a route. */
+  onRoute: boolean
   /** The map is waiting for the route's other stop. */
   picking: boolean
   onHaulTo: (setup: HaulSetup) => void
@@ -1441,12 +1594,11 @@ function HaulBlock({
     set((now) => (now.includes(g) ? now.filter((x) => x !== g) : [...now, g]))
     other((now) => now.filter((x) => x !== g))
   }
-  const o = resident.order
   return (
     <section className="inspector-block" aria-label="Haul route">
       <div className="panel-head">
         <h3>Haul route</h3>
-        {o?.kind === 'haul' && <span className="small muted">on a route</span>}
+        {onRoute && <span className="small muted">on a route</span>}
       </div>
       {([false, true] as const).map((back) => (
         <div key={String(back)}>
@@ -1481,7 +1633,7 @@ function HaulBlock({
           type="button"
           className={picking ? 'primary' : ''}
           aria-pressed={picking}
-          disabled={!canWork(resident, tick) || goods.length === 0}
+          disabled={!adult || goods.length === 0}
           onClick={() => onHaulTo({ goods, returnGoods, keepFood })}
         >
           {picking ? 'Pick a tile…' : 'Pick the other stop'}
@@ -1507,6 +1659,7 @@ function BuildBlock({
   tick,
   building,
   node,
+  terrain,
   buildProblem = () => undefined,
   onBuild,
 }: {
@@ -1514,6 +1667,8 @@ function BuildBlock({
   tick: number
   building: Building | undefined
   node: KnownNode | undefined
+  /** The explored terrain beneath the site, if known (`buildingWork`). */
+  terrain?: number
   /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
   buildProblem?: (kind: BuildingKind) => string | undefined
   onBuild: (kind: BuildingKind) => void
@@ -1552,7 +1707,11 @@ function BuildBlock({
           </button>
         </div>
         <p className="muted small">
-          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done.
+          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
+          about {workSpan(buildingWork(building.kind, terrain))} of one resident’s work in all
+          {workFactor(building.kind, terrain) > 1 &&
+            `, on Mountain ${workFactor(building.kind, terrain)} times as much as elsewhere`}
+          .
         </p>
       </section>
     )
@@ -1670,11 +1829,14 @@ function RoadBlock({
   resident,
   tick,
   road,
+  terrain,
   onBuild,
 }: {
   resident: Resident
   tick: number
   road: Building | undefined
+  /** The explored terrain beneath the resident's tile, if known (`buildingWork`). */
+  terrain?: number
   onBuild: (kind: BuildingKind) => void
 }) {
   if (road?.site) {
@@ -1684,6 +1846,7 @@ function RoadBlock({
         tick={tick}
         building={road}
         node={undefined}
+        terrain={terrain}
         onBuild={onBuild}
       />
     )
@@ -1698,7 +1861,8 @@ function RoadBlock({
       <p className="muted small">
         {BUILDING_PURPOSE.road} Needs{' '}
         {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
-        {workSpan(BUILD_WORK.road ?? 0)} of one resident’s work.
+        {workSpan(buildingWork('road', terrain))} of one resident’s work
+        {workFactor('road', terrain) > 1 && ' here on Mountain'}.
       </p>
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
@@ -1864,7 +2028,8 @@ function TearDownBlock({
 
 /**
  * Breeding (`CONTEXT.md`: Breeding): pick two of the Player's horses in the stable on the
- * resident's tile for them to breed, or see how far their breeding has come.
+ * resident's tile for them to breed, or see how far their breeding has come. A pair whose
+ * breeding the stable kept comes first (`keptPair`): it is picked, with how far along it is.
  */
 function BreedBlock({
   resident,
@@ -1887,9 +2052,12 @@ function BreedBlock({
   const own = horsesIn(horses, stable).filter((h) => h.realmId === realmId)
   const o = resident.order
   const breeding = o?.kind === 'breed' && o.stableId === stable.id ? o : undefined
-  const pair = picked.length === 2 ? ([picked[0]!, picked[1]!] as [string, string]) : undefined
   // The Player knows how their own horses fare (`CONTEXT.md`: Seeing how someone fares).
   const seen = { horses: horses.filter(horseFaresKnown), residents }
+  const kept = breeding ? undefined : keptPair(seen, stable, { realmId }, resident)
+  const keptShare = kept ? keptBreeding(stable, kept)!.progress / STABLE_BREED_TICKS : 0
+  const chosen = kept ?? picked
+  const pair = chosen.length === 2 ? ([chosen[0]!, chosen[1]!] as [string, string]) : undefined
   const problem = !canWork(resident, tick)
     ? 'children can’t breed horses'
     : pair
@@ -1910,19 +2078,27 @@ function BreedBlock({
           share={breeding.progress / STABLE_BREED_TICKS}
         />
       )}
+      {kept && (
+        <>
+          <Meter label="Paused" value={pct(keptShare)} share={keptShare} />
+          <p className="muted small">
+            The stable kept this pair&apos;s breeding: they carry on with it first.
+          </p>
+        </>
+      )}
       <p className="muted small">
         Tending two fed horses for {STABLE_BREED_DAYS} game days brings a foal with their average
-        stats, give or take {FOAL_STAT_SPREAD}. It stops, and starts over, if the resident or a
-        horse leaves.
+        stats, give or take {FOAL_STAT_SPREAD}. If the resident leaves, the stable keeps how far the
+        two have come; it is lost if one of them leaves the stable or dies.
       </p>
       {own.length === 0 && <p className="muted small">No horses of yours in this stable.</p>}
       {own.map((h) => (
         <label key={h.id} className="small" style={{ display: 'block' }}>
           <input
             type="checkbox"
-            checked={picked.includes(h.id)}
+            checked={chosen.includes(h.id)}
             onChange={() => toggle(h.id)}
-            disabled={!!breeding}
+            disabled={!!breeding || !!kept}
           />{' '}
           {horseDetail(h, tick)}
         </label>
@@ -1934,11 +2110,59 @@ function BreedBlock({
           title={problem}
           onClick={() => pair && onBreed(stable.id, pair)}
         >
-          {breeding ? 'Breeding…' : 'Breed these two'}
+          {breeding ? 'Breeding…' : kept ? 'Carry on with these two' : 'Breed these two'}
         </button>
       </div>
       {!breeding && pair && problem && <p className="muted small">{problem}</p>}
     </section>
+  )
+}
+
+/**
+ * Breeding for a group (`CONTEXT.md`: Breeding, Group): pick two of the Player's horses in a
+ * stable some of them stand in; one of them there tends the pair.
+ */
+function GroupBreed({
+  stable,
+  horses,
+  tick,
+  onBreed,
+}: {
+  stable: Building
+  /** The Player's horses in the stable. */
+  horses: SeenHorse[]
+  tick: number
+  onBreed: (horseIds: [string, string]) => void
+}) {
+  const [picked, setPicked] = useState<string[]>([])
+  const pair = picked.length === 2 ? ([picked[0]!, picked[1]!] as [string, string]) : undefined
+  const toggle = (id: string) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id].slice(-2)))
+  return (
+    <div aria-label={`Stable at ${stable.x}, ${stable.y}`}>
+      <span className="small muted">
+        Stable at {stable.x}, {stable.y} · {horses.length} of yours
+      </span>
+      {horses.map((h) => (
+        <label key={h.id} className="small" style={{ display: 'block' }}>
+          <input type="checkbox" checked={picked.includes(h.id)} onChange={() => toggle(h.id)} />{' '}
+          {horseDetail(h, tick)}
+        </label>
+      ))}
+      <div className="order-buttons">
+        <button
+          type="button"
+          disabled={!pair}
+          onClick={() => {
+            if (!pair) return
+            setPicked([])
+            onBreed(pair)
+          }}
+        >
+          Breed these two
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -2221,13 +2445,14 @@ function TileGoods({
   stock,
   spot,
   onPickUp,
-  disabled,
+  refused,
 }: {
   title: string
   stock: Stock | undefined
   spot: GoodsSpot
   onPickUp: (from: GoodsSpot, goods: Stock) => void
-  disabled: boolean
+  /** Whether the resident may not pick up this good, as a child anything but Food. */
+  refused: (good: Good) => boolean
 }) {
   const goods = goodsIn(stock)
   return (
@@ -2240,7 +2465,7 @@ function TileGoods({
           good={good}
           units={units}
           byDefault={units}
-          disabled={disabled}
+          disabled={refused(good)}
           actions={[{ label: 'Pick up', spot }]}
           onAct={onPickUp}
         />

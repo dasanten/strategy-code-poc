@@ -79,7 +79,7 @@ const SHARED: readonly ScriptBinding[] = [
   value(
     'params',
     'any',
-    'The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; null while none is picked.',
+    'The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; a `number` param’s default (`param name: number = 3`) while none is set, else null.',
   ),
   value('tick', 'number', 'The world tick this run is for.'),
   value('mapSize', 'number', 'Tiles along each side of the map; its opposite sides join.'),
@@ -208,7 +208,7 @@ export function isScriptParamType(value: unknown): value is ScriptParamType {
 export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
   building: 'One of my realm’s buildings or construction sites.',
   storage: 'One of my realm’s storages or stables, or one of its carriages.',
-  number: 'A whole number of zero or more, typed in.',
+  number: 'A whole number of zero or more, typed in; `= n` after the type gives it a default.',
 }
 
 /** Whether a value fits a `number` param: a whole number of zero or more. */
@@ -220,6 +220,8 @@ export function isParamNumber(value: unknown): value is number {
 export interface ScriptParam {
   name: string
   type: ScriptParamType
+  /** A `number` param's default (`param name: number = 3`), read while none is set. */
+  default?: number
 }
 
 /** The game API of a resident's script. */
@@ -353,6 +355,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'renameCity',
     ['cityId', 'name'],
     'Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.',
+  ),
+  action(
+    'claimHorses',
+    [],
+    'Claim my Player’s Horse offer, once ever: two new horses for my realm, in its stable nearest the Leader’s city, or else by a storage or the Leader with Food by them. Free and at once; refused once claimed, or while my realm has no living Leader.',
   ),
   action(
     'roadLine',

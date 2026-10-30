@@ -31,6 +31,45 @@ describe('param lines', () => {
     )
   })
 
+  it('may give a number param a default, a whole number of zero or more', () => {
+    expect(parse('param foodAt: number = 3\nparam take: number = 0;\nlet x = 1').params).toEqual([
+      { name: 'foodAt', type: 'number', default: 3, line: 1, column: 1 },
+      { name: 'take', type: 'number', default: 0, line: 2, column: 1 },
+    ])
+    expect(scriptParams('param rounds: number = 5')).toEqual([
+      { name: 'rounds', type: 'number', default: 5, line: 1, column: 1 },
+    ])
+  })
+
+  it('give no default to a building or storage param, nor one that is no whole number', () => {
+    expect(checkScript('param home: building = 3')).toEqual([
+      {
+        message: 'A "building" param can\'t have a default, only a "number" param',
+        line: 1,
+        column: 22,
+      },
+    ])
+    expect(checkScript('param s: storage = 1')[0]?.message).toBe(
+      'A "storage" param can\'t have a default, only a "number" param',
+    )
+    expect(checkScript('param n: number = -1')).toEqual([
+      {
+        message: 'The default of "param n" must be a whole number of zero or more but found "-"',
+        line: 1,
+        column: 19,
+      },
+    ])
+    expect(checkScript('param n: number = 1.5')[0]?.message).toBe(
+      'The default of "param n" must be a whole number of zero or more but found the number 1.5',
+    )
+    expect(checkScript('param n: number = "3"')[0]?.message).toBe(
+      'The default of "param n" must be a whole number of zero or more but found a string',
+    )
+    expect(checkScript('param n: number =')[0]?.message).toBe(
+      'The default of "param n" must be a whole number of zero or more but found the end of the script',
+    )
+  })
+
   it('leave "param" free as a name elsewhere', () => {
     expect(checkScript('let param = 1\nparam = param + 1\nfn f(param) { return param }')).toEqual(
       [],

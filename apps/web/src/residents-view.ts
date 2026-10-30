@@ -102,7 +102,7 @@ export const CARD_TAB_LABELS: Record<CardTab, string> = {
 }
 
 /** The tabs under the group card's header (ADR 0012), in the order they show. */
-export const GROUP_TABS = ['orders', 'members', 'script'] as const
+export const GROUP_TABS = ['orders', 'queue', 'members', 'script'] as const
 export type GroupTab = (typeof GROUP_TABS)[number]
 
 /** The tabs under the army card's header (ADR 0012), in the order they show. */
