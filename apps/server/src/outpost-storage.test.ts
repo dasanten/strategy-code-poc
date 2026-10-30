@@ -87,7 +87,8 @@ describe('an outpost storage', () => {
     stepWorld(world, terrain)
     const site = world.buildings.find((b) => b.kind === 'storage' && b.site)!
     expect(site).toMatchObject({ x: 10, y: 10, cityId: null })
-    expect(site.realmId).toBeUndefined()
+    // The site is the realm's whose resident laid it out (`CONTEXT.md`: Construction site).
+    expect(site.realmId).toBe('r1')
     // The last of the work finishes it.
     site.site = { delivered: { ...BUILD_MATERIALS.storage }, work: (BUILD_WORK.storage ?? 1) - 1 }
     stepWorld(world, terrain)
@@ -116,7 +117,13 @@ describe('an outpost storage', () => {
     }
     world.piles.push({ id: 'p', x: farm.x, y: farm.y, goods: { food: 100 } })
     const host: ScriptHost = {
-      script: () => ({ userId: 7, source: DEFAULT_SCRIPTS.work.source, followsDefault: true }),
+      script: () => ({
+        userId: 7,
+        name: DEFAULT_SCRIPTS.work.name,
+        version: 1,
+        source: DEFAULT_SCRIPTS.work.source,
+        followsDefault: true,
+      }),
       sender: (userId) => ({ userId, account: { name: 'Mara', isAdmin: false } }),
       explored: () => true,
     }

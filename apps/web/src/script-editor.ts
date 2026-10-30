@@ -90,8 +90,9 @@ export const scriptHighlighting: StreamParser<HighlightState> = {
 }
 
 /**
- * Where in the source a syntax error sits, as offsets: from its line and column (1-based) to the
- * end of the word there, or one character if there is none, kept inside the source.
+ * Where in the source a syntax error (or a runtime error) sits, as offsets: from its line and
+ * column (1-based) to the end of the word there, or one character if there is none, kept inside
+ * the source.
  */
 export function diagnosticRange(source: string, d: Diagnostic): { from: number; to: number } {
   const lines = source.split('\n')

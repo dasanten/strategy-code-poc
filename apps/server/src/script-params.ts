@@ -3,6 +3,7 @@ import {
   commands,
   isParamNumber,
   isScriptParamType,
+  targetParam,
   type Building,
   type Carriage,
   type OrderRequest,
@@ -151,6 +152,22 @@ export function setStartParams(
   params: StartParamValues | undefined,
 ): void {
   for (const [name, value] of Object.entries(params ?? {})) keep(r, scriptId, name, value)
+}
+
+/**
+ * The param values a start sets, with the script's target param (`targetParam`; `CONTEXT.md`:
+ * Default script, Started directly) never kept from the start before: `target`, else what the
+ * order gives, else cleared, so the script works the one on the resident's tile. Only while the
+ * script declares it.
+ */
+export function withTargetParam(
+  script: Pick<RunnableScript, 'source' | 'task'> | undefined,
+  params: StartParamValues | undefined,
+  target?: string,
+): StartParamValues | undefined {
+  const name = script && targetParam(script)
+  if (!name || !scriptParams(script.source).some((p) => p.name === name)) return params
+  return { ...params, [name]: target ?? params?.[name] ?? null }
 }
 
 interface SetScriptParamRequest extends OrderRequest {

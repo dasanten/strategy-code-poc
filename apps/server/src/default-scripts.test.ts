@@ -689,7 +689,7 @@ describe('the step budget', () => {
         },
         // Carrying: ordering the load stored.
         {
-          memory: { ...work, carry: { storageId: 's1', goods: ['food'] } },
+          memory: { ...work, carry: { storageId: 's1', goods: ['food'], load: { food: 24 } } },
           prepare: (world) => {
             world.buildings.push({ id: 's1', kind: 'storage', cityId: 'c1', x: 3, y: 3 })
             world.residents[0]!.carried = { food: 30 }
@@ -798,7 +798,7 @@ describe('the step budget', () => {
       world.residents[0]!.script = { scriptId: 1, memory: {} }
       const runner = new ScriptRunner(terrain, {
         ...host(),
-        script: () => ({ userId: mara, source: loop, followsDefault }),
+        script: () => ({ userId: mara, version: 1, source: loop, followsDefault }),
       })
       const violations = runner.runAll(world, true)
       expect(violations.map((v) => v.invariant)).toEqual(

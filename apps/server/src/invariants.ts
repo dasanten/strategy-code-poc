@@ -1,6 +1,8 @@
 import {
   isWallOrGate,
   carriagePulledBy,
+  carriageOfResident,
+  PASSENGER_WEIGHT,
   horseOfResident,
   isLineOrder,
   LINE_BUILDING,
@@ -109,9 +111,10 @@ import { hqRingsSound } from './hq-growth.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
-import { oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
+import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
+import { scriptLogsSound } from './script-log.js'
 
 /**
  * A rule the simulation must always keep (ADR 0004). A broken invariant does not crash
@@ -307,8 +310,9 @@ export const citiesFromBuildings: Invariant = {
 }
 
 /**
- * Only an outpost storage has a realm of its own (`CONTEXT.md`: Outpost storage): a finished
- * storage of no city, of a realm that exists. One in a city goes with the city.
+ * Only an outpost storage (`CONTEXT.md`: Outpost storage), a finished storage of no city, or a
+ * construction site (the realm that laid it out, `CONTEXT.md`: Construction site) has a realm of
+ * its own, and only one that exists. A finished building in a city goes with the city.
  */
 export const outpostStorageRealms: Invariant = {
   name: 'outpost-storage-realms',
@@ -316,8 +320,8 @@ export const outpostStorageRealms: Invariant = {
     const realms = new Set(world.realms.map((x) => x.id))
     return world.buildings.flatMap((b) => {
       if (b.realmId === undefined) return []
-      const why = !isOutpostStorage(b)
-        ? `is a ${b.site ? `${b.kind} site` : b.kind}${b.cityId ? ` of city ${b.cityId}` : ''} with realm ${b.realmId}`
+      const why = !isOutpostStorage(b) && !b.site
+        ? `is a ${b.kind}${b.cityId ? ` of city ${b.cityId}` : ''} with realm ${b.realmId}`
         : !realms.has(b.realmId)
           ? `belongs to realm ${b.realmId}, which doesn't exist`
           : undefined
@@ -834,11 +838,11 @@ export const workOrdersOnWorkplaces: Invariant = {
 }
 
 /**
- * After a tick, nobody at home, near an outpost storage of their realm, at their workplace or in
- * an army by a carriage runs low on food (a child at home: has less than their own food) while the
- * storage, pile or carriage they refill from still has some and a meal would fit (`stepRefill`,
- * `refillTarget`, `CONTEXT.md`: Refilling at home, Refilling at an outpost storage, Refilling at a
- * workplace, Refilling from a carriage, Child).
+ * After a tick, nobody at home, near an outpost storage of their realm, at their workplace, or in
+ * an army or aboard as a passenger by a carriage runs low on food (a child at home: has less than
+ * their own food) while the storage, pile or carriage they refill from still has some and a meal
+ * would fit (`stepRefill`, `refillTarget`, `CONTEXT.md`: Refilling at home, Refilling at an outpost
+ * storage, Refilling at a workplace, Refilling from a carriage, Child).
  */
 export const refilledWhenLow: Invariant = {
   name: 'refilled-when-low',
@@ -938,6 +942,49 @@ export const ridersOnHorses: Invariant = {
       if (other)
         fail([horse.id, r.id, other], `horse ${horse.id} has two riders, ${other} and ${r.id}`)
       riders.set(horse.id, r.id)
+    }
+    return out
+  },
+}
+
+/**
+ * After a tick, a passenger's carriage exists, is of their realm and stands on their tile, and
+ * they neither drive nor ride; a carriage's goods and passengers together never weigh more than
+ * the strongest horse lets one hold (`CONTEXT.md`: Passenger; `stepPassengers` gets off those who
+ * can't stay aboard, and a carriage keeps its passengers when its horse dies).
+ */
+export const passengersAboard: Invariant = {
+  name: 'passengers-aboard',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (ids: string[], message: string) =>
+      out.push({ invariant: this.name, message, entityIds: ids })
+    const aboard = new Map<string, number>()
+    for (const r of world.residents) {
+      if (r.aboard === undefined) continue
+      aboard.set(r.aboard, (aboard.get(r.aboard) ?? 0) + 1)
+      const k = world.carriages.find((c) => c.id === r.aboard)
+      if (!k) {
+        fail([r.id], `resident ${r.id} is aboard ${r.aboard}, which doesn't exist`)
+        continue
+      }
+      if (k.x !== r.x || k.y !== r.y) {
+        fail(
+          [r.id, k.id],
+          `resident ${r.id} at (${r.x}, ${r.y}) is aboard carriage ${k.id} at (${k.x}, ${k.y})`,
+        )
+      }
+      if (!carriageOfResident(k, r)) {
+        fail([r.id, k.id], `resident ${r.id} is aboard carriage ${k.id} of another realm`)
+      }
+      if (drivenCarriageId(r) !== undefined) fail([r.id, k.id], `resident ${r.id} drives aboard`)
+      if (r.riding !== undefined) fail([r.id, k.id], `resident ${r.id} rides aboard`)
+    }
+    for (const k of world.carriages) {
+      const kg = stockWeight(k.load) + (aboard.get(k.id) ?? 0) * PASSENGER_WEIGHT
+      if (kg > CARRIAGE_MAX_CAPACITY + 1e-9) {
+        fail([k.id], `carriage ${k.id} holds ${kg} kg of goods and passengers, more than any can`)
+      }
     }
     return out
   },
@@ -1754,6 +1801,18 @@ export const gameDefaultFetchers: Invariant = {
   check: (world) => oneFetcherAtATime(world, (r) => r.script?.scriptId === 0),
 }
 
+/**
+ * Nobody runs Work, Build or Haul for longer than a tick without its target (`CONTEXT.md`:
+ * Default script, Started directly; `defaultsHaveATarget`), among NPC cities' residents running
+ * the game's own defaults, whose city names the target when it puts them to the task; a
+ * Player's are checked where their scripts run.
+ */
+export const gameDefaultTargets: Invariant = {
+  name: 'defaults-have-a-target',
+  check: (world) =>
+    defaultsHaveATarget(world, (r) => (r.script?.scriptId === 0 ? r.script.task : undefined)),
+}
+
 export const worldInvariants: Invariant[] = [
   nothingOnImpassableTerrain,
   positionsOnMap,
@@ -1799,6 +1858,7 @@ export const worldInvariants: Invariant[] = [
   childrenCarryOnlyFood,
   carriagesInPlace,
   ridersOnHorses,
+  passengersAboard,
   driversOnCarriages,
   haulRoutesSound,
   alliancesSound,
@@ -1837,7 +1897,9 @@ export const worldInvariants: Invariant[] = [
   pathsAreSteps,
   gameDefaultCarriers,
   gameDefaultFetchers,
+  gameDefaultTargets,
   queuesSound,
+  scriptLogsSound,
 ]
 
 export function checkInvariants(

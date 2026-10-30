@@ -14,6 +14,7 @@ import {
   cityOrganization,
   loadLevel,
   carriageCapacity,
+  passengersOf,
   tradeCoinWarehouse,
   warehousePrices,
   type Army,
@@ -254,12 +255,16 @@ function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBui
   return shown
 }
 
-/** A carriage as the side sees it: how heavily it is loaded, its load only when it sees inside. */
+/**
+ * A carriage as the side sees it: how heavily it is loaded, its load only when it sees inside,
+ * and who is aboard it.
+ */
 function seenCarriage(world: WorldState, insight: Insight, k: Carriage): SeenCarriage {
   const level = loadLevel(k.load, carriageCapacity(world, k))
-  if (insight.insideCarriage(k)) return { ...k, loadLevel: level }
+  const passengerIds = passengersOf(world, k).map((r) => r.id)
+  if (insight.insideCarriage(k)) return { ...k, loadLevel: level, passengerIds }
   const { id, realmId, cityId, x, y, horseId } = k
-  return { id, realmId, cityId, x, y, horseId, loadLevel: level }
+  return { id, realmId, cityId, x, y, horseId, loadLevel: level, passengerIds }
 }
 
 /**
@@ -285,6 +290,12 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
 }
 
 /**
+ * A resident without their script log, which only the owning Player gets, on the Script tab
+ * (`CONTEXT.md`: Script log); it never goes with the resident.
+ */
+export const withoutScriptLog = ({ scriptLog: _, ...rest }: Resident) => rest
+
+/**
  * What a realm's Player sees (`CONTEXT.md`: Sight): everything within sight range of any of
  * their residents or their alliance's, their own things included. A city counts as seen when
  * any of it is. What is inside, and how residents and horses fare, only as `CONTEXT.md` says
@@ -308,7 +319,7 @@ export function entitiesInSight(
     // Which script a resident runs is seen; its memory stays on the server, and the values of
     // its params are shown only to the realm commanding them, all they keep (to fill in before a
     // script starts), as is the queue to the realm that gave it.
-    const { script, scriptParams, queue, ...rest } = r
+    const { script, scriptParams, queue, ...rest } = withoutScriptLog(r)
     const kept = commanderOf(world, r) === realmId ? scriptParams : undefined
     const params = script ? kept?.[script.scriptId] : undefined
     const shown: SeenEntity = {

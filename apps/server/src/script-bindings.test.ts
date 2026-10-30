@@ -309,6 +309,9 @@ describe('script bindings', () => {
     ['stop()', { kind: 'stop' }],
     ['mount("h9")', { kind: 'mount', horseId: 'h9' }],
     ['dismount()', { kind: 'dismount' }],
+    ['board("k9")', { kind: 'board', carriageId: 'k9' }],
+    ['getOff()', { kind: 'getOff' }],
+    ['getOff(3, 4)', { kind: 'getOff', x: 3, y: 4 }],
     [
       'pickUp({ kind: "ground" }, { food: 2 })',
       { kind: 'pickUp', spot: { kind: 'ground' }, goods: { food: 2 } },
@@ -523,5 +526,52 @@ describe('doing()', () => {
     const { result } = runAs(world, explored, 'doing(3)', memory)
     expect(result.status).toBe('error')
     expect(memory.doing).toBeUndefined()
+  })
+})
+
+describe('end()', () => {
+  it('ends with a reason, trimmed and cut like doing’s text, or with none', () => {
+    const { world, explored } = setup()
+    const ends = (source: string) => {
+      const { result, requests, ended, endReason } = runAs(world, explored, source)
+      expect(result.status).toBe('done')
+      expect(requests).toEqual([])
+      expect(ended()).toBe(true)
+      return endReason()
+    }
+    expect(ends('end("  no workplace here  ")')).toBe('no workplace here')
+    expect(ends(`end("${'x'.repeat(DOING_MAX_LENGTH + 20)}")`)).toBe('x'.repeat(DOING_MAX_LENGTH))
+    expect(ends('end()')).toBeNull()
+    expect(ends('end(null)')).toBeNull()
+    expect(ends('end(" ")')).toBeNull()
+  })
+
+  it('needs a text or nothing', () => {
+    const { world, explored } = setup()
+    const { result, ended } = runAs(world, explored, 'end(3)')
+    expect(result.status).toBe('error')
+    expect(ended()).toBe(false)
+  })
+})
+
+describe('log()', () => {
+  it('collects short lines, cut like doing’s text, and asks for no order', () => {
+    const { world, explored } = setup()
+    const long = 'x'.repeat(DOING_MAX_LENGTH + 20)
+    const { result, requests, logged } = runAs(
+      world,
+      explored,
+      `log("  one ")\nlog(null)\nlog(" ")\nlog("${long}")`,
+    )
+    expect(result.status).toBe('done')
+    expect(requests).toEqual([])
+    expect(logged).toEqual(['one', 'x'.repeat(DOING_MAX_LENGTH)])
+  })
+
+  it('needs a text', () => {
+    const { world, explored } = setup()
+    const { result, logged } = runAs(world, explored, 'log(3)')
+    expect(result.status).toBe('error')
+    expect(logged).toEqual([])
   })
 })

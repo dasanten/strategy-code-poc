@@ -3,8 +3,10 @@ import {
   BUILDABLE,
   carriagePulledBy,
   holdersOf,
+  carriageOfResident,
   horseOfResident,
   riderOf,
+  seatsLeft,
   KEEPS_GOODS,
   MAX_WORKERS,
   buildMenu,
@@ -24,6 +26,7 @@ import {
   type Stock,
   isAt,
   SHARES_A_TILE,
+  targetParam,
   covers,
   type SeenResident,
   HORSE_GRANT_HORSES,
@@ -105,11 +108,15 @@ import {
   nodeFit,
   type ActionId,
 } from './selection-view.js'
-import { ScriptLibrary } from './ScriptLibrary.js'
+import { ScriptLibrary, type ScriptToOpen } from './ScriptLibrary.js'
+import { ScriptLog } from './ScriptLog.js'
+import { ScriptMemoryTree } from './ScriptMemory.js'
+import { ScriptRunInfo } from './ScriptRun.js'
 import { ScriptParamFields, StartParamsForm } from './ScriptParams.js'
 import {
   groupStartValues,
   startedScript,
+  startFormParams,
   startParamValues,
   startValues,
   startValuesValid,
@@ -126,6 +133,8 @@ import { useWorld } from './useWorld.js'
  */
 interface Starting {
   script: ScriptSummary
+  /** The params the form shows (`startFormParams`). */
+  params: ScriptParam[]
   values: StartValues
   picking?: ScriptParam
   error?: string
@@ -167,7 +176,8 @@ function Pages() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, founding, status, sendOrder, found } = useWorld(onLoggedOut)
+  const { world, founding, status, sendOrder, found, memories, runs, scriptLogs, watchScript } =
+    useWorld(onLoggedOut)
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
@@ -213,11 +223,25 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     : []
   const group = selectedIds.flatMap((id) => own.filter((r) => r.id === id))
   const selected = group.length === 1 ? group[0] : undefined
+  // The realm's carriages someone of the group stands on, to board with the seats left on each
+  // (`CONTEXT.md`: Passenger).
+  const groupCarriages = world
+    ? world.carriages.flatMap((k) =>
+        k.load && group.some((r) => r.x === k.x && r.y === k.y && carriageOfResident(k, r))
+          ? [
+              {
+                carriage: k,
+                seats: seatsLeft(world, { ...k, load: k.load }, k.passengerIds?.length ?? 0),
+              },
+            ]
+          : [],
+      )
+    : []
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
   // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
-  const [scriptToOpen, setScriptToOpen] = useState<{ id: number; at: number }>()
+  const [scriptToOpen, setScriptToOpen] = useState<ScriptToOpen>()
   // A place to show on the map, such as one from the realm log or a resident picked in the list:
   // asked for, then centred between the open drawer and the selection card once they are drawn.
   const [toShow, setToShow] = useState<{ x: number; y: number }>()
@@ -226,6 +250,25 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
+  /** Opens a script in the library, at a version and line when given. */
+  const openScript = (id: number, where?: Omit<ScriptToOpen, 'id' | 'at'>) => {
+    setScriptToOpen({ id, at: Date.now(), ...where })
+    setOpenDrawer('scripts')
+  }
+  /**
+   * The Script tab's live view of the script a resident or army runs (`CONTEXT.md`: Debugging a
+   * script): how it last ran, and its memory.
+   */
+  const scriptDebug = (id: string, scriptId: number) => (
+    <>
+      <ScriptRunInfo
+        run={runs.get(id)}
+        tick={world?.tick ?? 0}
+        onOpenError={({ version, line, column }) => openScript(scriptId, { version, line, column })}
+      />
+      <ScriptMemoryTree id={id} memory={memories.get(id)} watch={watchScript} />
+    </>
+  )
   // What the map waits for while an order that needs a target is given (ADR 0012: pick mode).
   const touch = useTouchScreen()
   // Narrow or touch: cards are bottom sheets and the HUD folds into a menu button (ADR 0012).
@@ -315,10 +358,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const giveOrder = (order: OrderRequest, queued = shift.current): Promise<string | undefined> => {
     const r = own.find((x) => x.id === order.residentId)
     const script = order.params === undefined ? startedScript(order, scripts) : undefined
-    if (script && script.params.length > 0) {
+    const params = script ? startFormParams(order, script) : []
+    if (script && params.length > 0) {
       setStarting({
         script,
-        values: startValues(script.params, r?.scriptParams?.[script.id]),
+        params,
+        values: startValues(params, r?.scriptParams?.[script.id], targetParam(script)),
         start: async (params) => setOrderError(await giveOrder({ ...order, params }, queued)),
       })
       return Promise.resolve(undefined)
@@ -564,11 +609,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           : undefined
     const given = 'params' in order && order.params !== undefined
     const script = starts && !given ? startedScript(starts, scripts) : undefined
-    if (script && script.params.length > 0) {
+    const params = script ? startFormParams(starts!, script) : []
+    if (script && params.length > 0) {
       const kept = group.map((r) => r.scriptParams?.[script.id])
       setStarting({
         script,
-        values: groupStartValues(script.params, kept),
+        params,
+        values: groupStartValues(params, kept, targetParam(script)),
         start: (params) => sendGroup({ ...order, params } as GroupOrder, queued),
       })
       return
@@ -733,6 +780,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       : { kind: 'dismount', residentId: selected.id }
     setOrderError(await sendOrder(order))
   }
+  /**
+   * Orders the picked resident to board a carriage on their tile, or with none to get off the one
+   * they are aboard, onto its tile (`CONTEXT.md`: Passenger); with Shift held, appends it to their
+   * queue.
+   */
+  async function boardCarriage(carriageId?: string) {
+    if (!selected) return
+    const order = carriageId
+      ? { kind: 'board', residentId: selected.id, carriageId }
+      : { kind: 'getOff', residentId: selected.id }
+    setOrderError(await giveOrder(order))
+  }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
     if (!selected) return
@@ -859,6 +918,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             leaderId={world.home.leaderId}
             scripts={scripts}
             buildings={world.buildings}
+            inSight={world.residents}
             tick={world.tick}
             selectedId={selected?.id}
             onSelect={(id) => {
@@ -887,6 +947,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             pickError={armyError}
             scripts={scripts}
             sendOrder={sendOrder}
+            scriptMemory={(id) =>
+              scriptDebug(id, world.armies.find((a) => a.id === id)?.script?.scriptId ?? 0)
+            }
           />,
         )}
       {world &&
@@ -1052,6 +1115,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               const order = { kind: 'renameCity', residentId: world.home.leaderId, cityId, name }
               setOrderError(await giveOrder(order))
             }}
+            onSelectResident={(id) => select([id])}
           />
         </CardSheet>
       )}
@@ -1081,13 +1145,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               ),
             )}
             onRide={ride}
+            carriageToBoard={onTile(world.carriages.filter((k) => carriageOfResident(k, selected)))}
+            onBoard={boardCarriage}
             scripts={scripts}
             buildings={world.buildings}
             onRunScript={runScript}
-            onEditScript={(id) => {
-              setScriptToOpen({ id, at: Date.now() })
-              setOpenDrawer('scripts')
-            }}
+            onEditScript={(id) => openScript(id)}
             orderError={orderError}
             pile={world.piles.find(
               (p) => p.x === (buildingHere ?? selected).x && p.y === (buildingHere ?? selected).y,
@@ -1186,6 +1249,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 />
               )
             }
+            scriptMemory={selected.script && scriptDebug(selected.id, selected.script.scriptId)}
+            scriptLog={
+              <ScriptLog id={selected.id} lines={scriptLogs.get(selected.id)} watch={watchScript} />
+            }
             onStore={async () =>
               setOrderError(
                 await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
@@ -1211,6 +1278,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             residents={group}
             scripts={scripts}
             buildings={world.buildings}
+            carriages={groupCarriages}
+            inSight={world.residents}
             horses={world.horses}
             realmId={world.home.realmId}
             tick={world.tick}
@@ -1263,10 +1332,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       {world && starting && !starting.picking && (
         <StartParamsForm
           script={starting.script.name}
-          params={starting.script.params}
+          params={starting.params}
+          target={targetParam(starting.script)}
           values={starting.values}
           label={(id) => paramValueLabel(paramWorld(world), id)}
-          canStart={startValuesValid(starting.script.params, starting.values)}
+          canStart={startValuesValid(starting.params, starting.values)}
           error={starting.error}
           onPick={(p) => {
             setPicking(false)
@@ -1278,7 +1348,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           }
           onStart={() => {
             setStarting(undefined)
-            void starting.start(startParamValues(starting.script.params, starting.values))
+            void starting.start(startParamValues(starting.params, starting.values))
           }}
           onCancel={() => setStarting(undefined)}
         />

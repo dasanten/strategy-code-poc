@@ -459,6 +459,7 @@ export function ResidentsList({
   tick,
   scripts = [],
   buildings = [],
+  inSight = [],
   selectedId,
   onSelect,
 }: {
@@ -469,6 +470,8 @@ export function ResidentsList({
   scripts?: ScriptSummary[]
   /** The buildings in sight, to name where residents store or fetch goods. */
   buildings?: Building[]
+  /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
+  inSight?: readonly SeenResident[]
   selectedId: string | undefined
   onSelect: (id: string) => void
 }) {
@@ -515,8 +518,11 @@ export function ResidentsList({
                     {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
                   </span>
                   <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
-                  <span className="doing" title={doingLine(r, { scripts, buildings })}>
-                    {doingLine(r, { scripts, buildings })}
+                  <span
+                    className="doing"
+                    title={doingLine(r, { scripts, buildings, residents: inSight })}
+                  >
+                    {doingLine(r, { scripts, buildings, residents: inSight })}
                     {r.script && <small className="muted">{scriptName(r, scripts)}</small>}
                   </span>
                   <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
@@ -549,6 +555,8 @@ export function GroupCard({
   residents,
   scripts,
   buildings,
+  carriages = [],
+  inSight = [],
   horses = [],
   realmId,
   tick,
@@ -566,6 +574,13 @@ export function GroupCard({
   residents: Resident[]
   scripts: ScriptSummary[]
   buildings: Building[]
+  /**
+   * The realm's carriages someone of the group stands on, with how many more passengers fit on
+   * each, to board (`CONTEXT.md`: Passenger).
+   */
+  carriages?: { carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>; seats: number }[]
+  /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
+  inSight?: readonly SeenResident[]
   /** The queue planner (`GroupPlanner`), on the Queue tab (`CONTEXT.md`: Planning for a group). */
   planner?: ReactNode
   /** Horses in sight, to pick two in a stable where some of them stand to breed. */
@@ -628,8 +643,33 @@ export function GroupCard({
     feedStable: { kind: 'feedStable' },
     store: { kind: 'store' },
     drop: { kind: 'drop' },
+    getOff: { kind: 'getOff' },
   }
   const orderButton = (id: GroupButton, label: string) => {
+    // One Board button for each carriage some of them stand on; with none, nobody can board.
+    if (id === 'board') {
+      if (carriages.length === 0)
+        return (
+          <button
+            type="button"
+            key={id}
+            disabled
+            title="none of them stands on a carriage of your realm"
+          >
+            {label}
+          </button>
+        )
+      return carriages.map(({ carriage, seats }) => (
+        <button
+          type="button"
+          key={`${id}-${carriage.id}`}
+          onClick={() => onOrder({ kind: 'board', carriage, seats })}
+        >
+          {label}
+          {carriages.length > 1 ? ` at ${carriage.x}, ${carriage.y}` : ''}
+        </button>
+      ))
+    }
     const p = picks[id]
     if (p) {
       return (
@@ -814,7 +854,8 @@ export function GroupCard({
           {card.rows.map((r) => (
             <li key={r.id}>
               <button type="button" onClick={() => onPick(r.id)}>
-                <strong>{r.name}</strong> · {doingLine(r, { scripts, buildings })}
+                <strong>{r.name}</strong> ·{' '}
+                {doingLine(r, { scripts, buildings, residents: inSight })}
               </button>
             </li>
           ))}
@@ -985,6 +1026,8 @@ export function ResidentCard({
   onWallTo,
   onStop,
   horseToRide,
+  carriageToBoard,
+  onBoard,
   onRide,
   scripts,
   buildings = [],
@@ -999,6 +1042,8 @@ export function ResidentCard({
   sections,
   onSections,
   scriptParams,
+  scriptMemory,
+  scriptLog,
   onStore,
   onEditQueue,
   addStep,
@@ -1029,6 +1074,10 @@ export function ResidentCard({
    * in sight (`CONTEXT.md`: Riding).
    */
   horseToRide: { id: string } | undefined
+  /** A carriage of the realm on the resident's tile (`CONTEXT.md`: Passenger), to board. */
+  carriageToBoard: { id: string } | undefined
+  /** Orders the resident to board that carriage, or with none to get off the one they are on. */
+  onBoard: (carriageId?: string) => void
   /** Orders the resident to mount that horse, or with none to dismount. */
   onRide: (horseId?: string) => void
   /** The Player's script library, to pick a script to run. */
@@ -1116,6 +1165,10 @@ export function ResidentCard({
   onSections: (sections: CardSections<ActionId>) => void
   /** The fields for the params of the script they run (`ScriptParamFields`), if any. */
   scriptParams?: ReactNode
+  /** The memory of the script they run (`ScriptMemoryTree`), for the Player running it. */
+  scriptMemory?: ReactNode
+  /** Their script log (`ScriptLog`), for the Player owning them, running a script or not. */
+  scriptLog?: ReactNode
   /** Orders the resident to store what they carry at the nearest storage (`STORE_ALL`). */
   onStore?: () => void
   /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
@@ -1162,6 +1215,9 @@ export function ResidentCard({
     renamable: !!rename,
     riding: r.riding !== undefined,
     horseToRide: !!horseToRide,
+    aboard: r.aboard !== undefined,
+    driving: r.order?.kind === 'drive' || r.order?.kind === 'haul',
+    carriageToBoard: !!carriageToBoard,
     carrying: !!r.carrying,
     carries: carried.length > 0,
   })
@@ -1179,6 +1235,7 @@ export function ResidentCard({
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
     if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
+    if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }
   useActionKeys(actions, act)
@@ -1189,7 +1246,7 @@ export function ResidentCard({
       title={r.name}
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
-        <strong key="doing">{doingLine(r, { scripts, buildings })}</strong>,
+        <strong key="doing">{doingLine(r, { scripts, buildings, residents })}</strong>,
         `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
         ...(ridden ? [ridden] : []),
       ]}
@@ -1241,7 +1298,7 @@ export function ResidentCard({
         (r.queue && onEditQueue ? (
           <QueueBlock
             queue={r.queue}
-            doing={doingLine(r, { scripts, buildings })}
+            doing={doingLine(r, { scripts, buildings, residents })}
             scripts={scripts}
             buildings={buildings}
             onEdit={onEditQueue}
@@ -1257,9 +1314,16 @@ export function ResidentCard({
           <>
             <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
             {scriptParams}
+            {scriptMemory}
+            {scriptLog}
           </>
         ) : (
-          <p className="muted small">Runs no script. Give them one with Run script under Orders.</p>
+          <>
+            <p className="muted small">
+              Runs no script. Give them one with Run script under Orders.
+            </p>
+            {scriptLog}
+          </>
         ))}
       {tab === 'orders' && shown && (
         <div className="sel-panel">
@@ -1515,6 +1579,7 @@ export function ResidentCard({
             <li>
               {child ? 'Child' : 'Adult'} · {age} years{cityName ? ` · ${cityName}` : ''}
               {r.riding ? ' · on horseback' : ''}
+              {r.aboard ? ' · aboard a carriage' : ''}
             </li>
             {family && <li>{family}</li>}
           </ul>

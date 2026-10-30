@@ -7,6 +7,7 @@ import {
   GOODS,
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
+  PASSENGER_WEIGHT,
   carriageCapacity,
   horseAgeInYears,
   horseFoodFactor,
@@ -84,6 +85,7 @@ export type ActionId =
   | 'walk'
   | 'stop'
   | 'ride'
+  | 'board'
   | 'drive'
   | 'haul'
   | 'build'
@@ -110,6 +112,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   walk: 'W',
   stop: 'S',
   ride: 'M',
+  board: 'K',
   drive: 'D',
   haul: 'H',
   build: 'B',
@@ -181,6 +184,12 @@ export interface ResidentHere {
   renamable?: boolean
   /** They ride a horse, and can dismount (`CONTEXT.md`: Riding). */
   riding?: boolean
+  /** They are aboard a carriage, and can get off (`CONTEXT.md`: Passenger). */
+  aboard?: boolean
+  /** They drive a carriage, so they can't board one (`CONTEXT.md`: Passenger). */
+  driving?: boolean
+  /** A carriage of their realm on their tile, to board (`CONTEXT.md`: Passenger). */
+  carriageToBoard?: boolean
   /** A horse of their realm on their tile that pulls no carriage and nobody rides, to mount. */
   horseToRide?: boolean
   /** They carry a child (`CONTEXT.md`: Carrying), so they can't work, build, tear down, haul or pair. */
@@ -223,6 +232,14 @@ export function residentActions(h: ResidentHere): CardAction[] {
   if (h.busy) add(row('stop', 'Stop'))
   if (h.riding) add(row('ride', 'Dismount'))
   else if (h.horseToRide) add(row('ride', 'Mount horse'))
+  // Children ride along too; a rider gets off their horse first, and the driver stays the driver
+  // (`CONTEXT.md`: Passenger).
+  if (h.aboard) add(row('board', 'Get off'))
+  else if (h.carriageToBoard) {
+    const reason = h.driving ? 'the driver can’t board' : h.riding ? 'dismount first to board' : ''
+    const refused = reason ? { disabled: true as const, reason } : {}
+    add(row('board', 'Board carriage', refused))
+  }
   if (h.carriage && h.adult) {
     // A rider doesn't drive (`CONTEXT.md`: Riding).
     const riding = h.riding ? { disabled: true as const, reason: 'dismount first to drive' } : {}
@@ -312,6 +329,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   walk: 'move',
   stop: 'move',
   ride: 'move',
+  board: 'move',
   drive: 'move',
   haul: 'move',
   work: 'work',
@@ -470,6 +488,16 @@ export interface TileCard {
    * and what they saw of it then, shown apart from the lines about what is there now.
    */
   lastSeen?: { when: string; lines: string[] }
+  /**
+   * The carriage's passengers (`CONTEXT.md`: Passenger), written out on `lines[line]`: each by
+   * name, a link that picks them when they are the Player's to command (`pick`), and what they
+   * weigh together of what it holds.
+   */
+  passengers?: {
+    line: number
+    residents: { id: string; name: string; pick: boolean }[]
+    weight: string
+  }
 }
 
 /** What the Player sees on a tile, for the tile card. */
@@ -728,6 +756,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const lines: string[] = []
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
+  let passengers: TileCard['passengers']
   if (building) {
     const city = cityOf(building)
     // An outpost storage goes by its own realm (`CONTEXT.md`: Outpost storage).
@@ -803,10 +832,17 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
     card ??= { title: 'Carriage', rel, what: 'carriage' }
-    // Its load only when the Player sees inside (`CONTEXT.md`: Seeing inside a storage).
+    // Its passengers, as many as are in sight (they are on its tile, `CONTEXT.md`: Passenger).
+    const aboard = (carriage.passengerIds ?? []).flatMap((id) => {
+      const r = t.residents?.find((x) => x.id === id)
+      return r ? [{ id, name: r.name, pick: !t.strangers.some((s) => s.id === id) }] : []
+    })
+    const people = aboard.length * PASSENGER_WEIGHT
+    // Its load only when the Player sees inside (`CONTEXT.md`: Seeing inside a storage), its
+    // passengers counted in.
     const capacity = carriageCapacity(t, carriage)
     const load = carriage.load
-      ? `${Math.round(stockWeight(carriage.load))} / ${Math.round(capacity)} kg`
+      ? `${Math.round(stockWeight(carriage.load) + people)} / ${Math.round(capacity)} kg`
       : LOAD_LEVEL_NAMES[carriage.loadLevel]
     // How its horse fares only for the Player's own and allies' (`CONTEXT.md`: Seeing how someone fares).
     const horse = t.horses.find((h) => h.id === carriage.horseId)
@@ -822,6 +858,11 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     lines.push(
       `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${load}${horseText}`,
     )
+    if (aboard.length > 0) {
+      const weight = `${Math.round(people)} kg of it people`
+      passengers = { line: lines.length, residents: aboard, weight }
+      lines.push(`Passengers: ${aboard.map((p) => p.name).join(', ')} · ${weight}`)
+    }
     if (horse) {
       const parts = [`Horse: ${horseDetail(horse, t.tick)}`]
       if (fares) {
@@ -887,6 +928,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     }),
     lines,
     ...(buildHere ? { buildHere } : {}),
+    ...(passengers ? { passengers } : {}),
   }
 }
 

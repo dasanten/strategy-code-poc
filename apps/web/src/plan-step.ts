@@ -48,6 +48,8 @@ export type PlanStepId =
   | 'wall'
   | 'mount'
   | 'dismount'
+  | 'board'
+  | 'getOff'
   | 'runScript'
 
 /** One kind of step Add step offers. */
@@ -73,6 +75,12 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   },
   { id: 'mount', label: 'Mount a horse', picks: [{ pick: 'horse', prompt: 'the horse to mount' }] },
   { id: 'dismount', label: 'Dismount', picks: [] },
+  {
+    id: 'board',
+    label: 'Board a carriage',
+    picks: [{ pick: 'carriage', prompt: 'the carriage to board' }],
+  },
+  { id: 'getOff', label: 'Get off', picks: [] },
   { id: 'work', label: 'Work', picks: [{ pick: 'workplace', prompt: 'the workplace to work' }] },
   {
     id: 'build',
@@ -300,6 +308,10 @@ export function planOrder(
       return { order: { kind: 'mount', horseId: p.id }, at }
     case 'dismount':
       return { order: { kind: 'dismount' } }
+    case 'board':
+      return { order: { kind: 'board', carriageId: p.id }, at }
+    case 'getOff':
+      return { order: { kind: 'getOff' } }
     case 'work': {
       const makes = a?.ask === 'makes' ? { makes: a.makes } : {}
       return { order: { kind: 'task', task: 'work', workplaceId: p.id, ...makes }, at }

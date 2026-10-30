@@ -77,6 +77,12 @@ export interface Resident {
    */
   scriptParams?: ScriptParamValues
   /**
+   * The resident's script log (`CONTEXT.md`: Script log): what their scripts gave `log()` and
+   * `end(reason)`, oldest first, at most `SCRIPT_LOG_LINES`. Kept across scripts; only the
+   * owning Player sees it. Absent while nothing was logged.
+   */
+  scriptLog?: ScriptLogLine[]
+  /**
    * The queue the resident works through (`CONTEXT.md`: Queue), when they were given one. Its
    * current step sets `order` or `script` as if it had been given on its own; any order that
    * isn't a step of it ends it. Absent when they have none.
@@ -91,6 +97,11 @@ export interface Resident {
    * on with whatever they do, at the horse's pace.
    */
   riding?: string
+  /**
+   * The carriage the resident rides on as a passenger (`CONTEXT.md`: Passenger), if they are
+   * aboard one. Not an order: they move with the carriage and don't walk on their own.
+   */
+  aboard?: string
 }
 
 /**
@@ -165,6 +176,12 @@ export interface ScriptParamValues {
   [scriptId: string]: { [name: string]: ScriptParamValue }
 }
 
+/** One line of a resident's script log: the tick it was logged and its short text. */
+export interface ScriptLogLine {
+  tick: number
+  text: string
+}
+
 /** A picked script parameter value: a building or carriage id, or a whole number of zero or more. */
 export type ScriptParamValue = string | number
 
@@ -198,6 +215,35 @@ export interface RunningScript {
   errorLoggedAt?: number
   /** The tick its last out-of-steps warning went into the realm log. */
   budgetLoggedAt?: number
+  /**
+   * Its last runtime error (`CONTEXT.md`: Debugging a script), kept until the script ends or
+   * another version of it runs.
+   */
+  lastError?: ScriptRunError
+  /** The steps it used the last tick it ran, and whether it ran out (`CONTEXT.md`: Step budget). */
+  lastRun?: ScriptRunSteps
+}
+
+/** A script's last runtime error, as its Script tab shows it (`CONTEXT.md`: Debugging a script). */
+export interface ScriptRunError {
+  message: string
+  /** Where in the script, when the error is in the script itself. */
+  line?: number
+  column?: number
+  /** The tick it stopped with the error. */
+  tick: number
+  /** The version of the script that ran into it. */
+  version: number
+}
+
+/**
+ * The steps a script used the last tick it ran (`CONTEXT.md`: Step budget), out of
+ * `SCRIPT_STEP_BUDGET`. `outOfSteps` when it ran out: of its own budget, or of the realm's, which
+ * cut it short or skipped it.
+ */
+export interface ScriptRunSteps {
+  steps: number
+  outOfSteps?: 'own' | 'realm'
 }
 
 /**
@@ -220,12 +266,16 @@ export interface SeenScript {
 
 /**
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
- * memory, which stays on the server. Their hunger and health only for their own realm and its
- * allies (`CONTEXT.md`: Seeing how someone fares). Their script parameter values only for the
- * realm that commands them: all they keep, so a script's params can be filled in before it starts
- * (`CONTEXT.md`: Script parameter), and those of the script they run with it.
+ * memory, which stays on the server, nor their script log, which the owning Player gets only on
+ * the Script tab. Their hunger and health only for their own realm and its allies (`CONTEXT.md`:
+ * Seeing how someone fares). Their script parameter values only for the realm that commands them:
+ * all they keep, so a script's params can be filled in before it starts (`CONTEXT.md`: Script
+ * parameter), and those of the script they run with it.
  */
-export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health' | 'scriptParams'> &
+export type SeenResident = Omit<
+  Resident,
+  'script' | 'hunger' | 'health' | 'scriptParams' | 'scriptLog'
+> &
   Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & { script?: SeenScript }
 
 /**
@@ -1422,6 +1472,17 @@ export type RealmEventWhat =
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
   /**
+   * A resident's script ended itself with `end(reason)` (`CONTEXT.md`: Script): `script` is its
+   * name, `reason` the short text it gave. Not an error: one for each end, never rate-limited.
+   */
+  | ({
+      kind: 'scriptStopped'
+      name: string
+      scriptId: number
+      script: string
+      reason: string
+    } & ScriptRunBy)
+  /**
    * A field the Player's active scripts read was renamed or removed from its script view
    * (`CONTEXT.md`: Script view), as `view.field`; it reads `null` from now on. `scripts` are
    * those that read it, by name.
@@ -1647,7 +1708,9 @@ export interface Building {
   cityId: string | null
   /**
    * The realm an outpost storage belongs to (`CONTEXT.md`: Outpost storage): finished storages
-   * of no city only, and only those a realm has. A city that takes it in drops it.
+   * of no city only, and only those a realm has. A city that takes it in drops it. A
+   * construction site has the realm whose resident laid it out, until it is finished
+   * (`CONTEXT.md`: Construction site); one an NPC city's resident laid out has none.
    */
   realmId?: string
   x: number

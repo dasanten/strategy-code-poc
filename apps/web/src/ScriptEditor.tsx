@@ -114,14 +114,19 @@ const hudLook = EditorView.theme(
 /**
  * Script editor with highlighting, inline syntax errors, and completions and hovers for the game
  * API. A default script gets the resident's API only. It starts from `initialSource`; give it a
- * new React `key` to open other source.
+ * new React `key` to open other source. With a `line`, it opens there, the word at `column`
+ * picked, as for a runtime error (`CONTEXT.md`: Debugging a script).
  */
 export function ScriptEditor({
   initialSource,
+  line,
+  column,
   defaultScript,
   onChange,
 }: {
   initialSource: string
+  line?: number
+  column?: number
   defaultScript: boolean
   onChange: (source: string) => void
 }) {
@@ -148,8 +153,17 @@ export function ScriptEditor({
         }),
       ],
     })
+    if (line !== undefined) {
+      const at = { line, column: column ?? 1, message: '' }
+      const { from, to } = diagnosticRange(initialSource, at)
+      view.dispatch({
+        selection: { anchor: from, head: to },
+        effects: EditorView.scrollIntoView(from, { y: 'center' }),
+      })
+      view.focus()
+    }
     return () => view.destroy()
-  }, [initialSource, defaultScript])
+  }, [initialSource, defaultScript, line, column])
 
   return <div ref={hostRef} className="editor" />
 }

@@ -41,4 +41,12 @@ describe('selecting residents on the map', () => {
     expect(close).toEqual([{ id: 'b', x: 100, y: 100, reach: 14 }])
     expect(inBox(close, { x: 0, y: 0 }, { x: 200, y: 200 })).toEqual(['b'])
   })
+
+  it('boxes a passenger at their carriage, but a click there is the carriage’s', () => {
+    const spots = new Map([['p', { x: 50, y: 50, r: 10 }]])
+    const aboard = [{ id: 'p', owner: 'me', x: 5, y: 5, aboard: 'k1' }]
+    const list = pickables(aboard, 'me', spots, place, 40, true)
+    expect(pickableAt(list, 50, 50)).toBeUndefined()
+    expect(inBox(list, { x: 0, y: 0 }, { x: 100, y: 100 })).toEqual(['p'])
+  })
 })

@@ -1026,6 +1026,12 @@ export function carriageCapacityWith(horse: Pick<Horse, 'stats'> | undefined): n
 export const CARRIAGE_MAX_CAPACITY = CARRIAGE_CAPACITY * (1 + HORSE_STRENGTH_LIMIT)
 
 /**
+ * What each passenger counts for against what a carriage holds, in kg (`CONTEXT.md`: Passenger),
+ * grown-up or child: five fit on a carriage behind an average horse, or four with some Food.
+ */
+export const PASSENGER_WEIGHT = 70
+
+/**
  * Driving skill a driver learns from one tick of driving (`CONTEXT.md`: Skill, learned by doing),
  * faster with more Intellect.
  */
@@ -1737,6 +1743,12 @@ export const SCRIPT_MEMORY_MAX = 4000
  * Doing), in characters after trimming; longer text is cut. One line of the resident card.
  */
 export const DOING_MAX_LENGTH = 60
+
+/**
+ * The lines a resident's script log keeps (`CONTEXT.md`: Script log); once full, the oldest
+ * goes. Enough to follow a few minutes of a script logging its turns.
+ */
+export const SCRIPT_LOG_LINES = 20
 
 /**
  * Ticks between two realm-log entries about the same resident's script going wrong (an error,
