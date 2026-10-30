@@ -715,6 +715,9 @@ The shared language of the game. Domain terms only — no implementation details
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again. **Deleting versions:** any version but the active one can be deleted for good,
   one at a time or all those older than the active one at once; the others keep their numbers.
+- **Library cap:** a Player's library holds at most so many scripts, and each script so many versions,
+  the defaults' versions included. A save past either cap is refused and says to delete versions or
+  scripts first. The caps are listed in the Wiki.
 - **Script parameter:** a value the Player picks for whoever runs a script, declared by a
   `param name: type` line at the top of the script and read there as `params.name`; a `param`
   line anywhere else is a syntax error. A `building` param holds one of the realm's own buildings
@@ -786,6 +789,9 @@ The shared language of the game. Domain terms only — no implementation details
   counts. Default scripts count like any other. NPC cities have no realm budget, only the one
   for each resident. A script sees only what its Player sees: their sight, explored terrain and
   what they last saw (Last seen), told apart from what is in sight now.
+- **Value limits:** a single value a script holds is bounded: a string's length, a list's items and an
+  object's keys each have a cap. Past it the script fails with a runtime error, like a call too
+  deep. The caps are listed in the Wiki.
 - **Script view:** what a script gets of each kind of thing (a resident, a building, a city, …):
   a fixed set of fields, the same for every Player and listed in the Wiki. A field the Player
   isn't allowed to see is always there and `null`, never missing. A script sees no field beyond
