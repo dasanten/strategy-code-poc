@@ -105,8 +105,10 @@ import {
   MOUNTAIN_ROAD_WORK_FACTOR,
   DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
+  SCRIPT_LIBRARY_MAX_SCRIPTS,
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_MAX_VERSIONS,
   SCRIPT_LOG_LINES,
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
@@ -1579,6 +1581,13 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
           <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
         </ul>
+        <p>
+          The Library has its caps too: it holds at most {num(SCRIPT_LIBRARY_MAX_SCRIPTS)} scripts,
+          your default scripts among them, and each script keeps at most {num(SCRIPT_MAX_VERSIONS)}{' '}
+          versions. A save past either is refused and says so next to the Save button: delete old
+          versions, or whole scripts, to make room. The versions the game adds to a default script
+          you haven’t edited don’t count against you.
+        </p>
         <p>
           To debug a script, open the Script tab of a resident or army running it: it shows the
           script's memory and params as they are now, changing every tick. You can't change memory
