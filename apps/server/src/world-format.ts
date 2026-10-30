@@ -14,7 +14,7 @@ import { grantHorses } from './horse-grant.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 53
+export const WORLD_FORMAT_VERSION = 54
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -125,6 +125,22 @@ export const migrations: Record<number, MigrationStep> = {
   // Nobody could claim it before, so every existing Player starts unclaimed, whether or not they
   // have horses or got the Horse grant.
   52: (state) => ({ ...(state as object), horseOffersClaimed: [] }),
+  // Work takes its workplace as the param `workplace` (`CONTEXT.md`: Default script, Started
+  // directly; ADR 0014), no longer from memory. A resident working by a script of their Player's
+  // gets the workplace its memory names as that param, so they work on; the memory keeps it too,
+  // as Work still writes it there. A script with no such param drops it on its next run.
+  53: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const r of world.residents) {
+      const s = r.script
+      const id = s?.memory.workplaceId
+      if (!s || s.scriptId <= 0 || typeof id !== 'string') continue
+      if (!world.buildings.some((b) => b.id === id)) continue
+      const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
+      picked.workplace ??= id
+    }
+    return world
+  },
 }
 
 export class WorldFormatError extends Error {}

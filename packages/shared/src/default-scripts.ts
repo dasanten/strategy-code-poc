@@ -3,8 +3,8 @@
  * task the UI can give, written in the game's own language. Each Player has their own version
  * of every one in their library, which follows the game's default until they edit it.
  *
- * Giving a resident a task from the UI runs its default script with the task's target written
- * into `memory`, as `TaskMemory` lists. Defaults use the step budget like any script; a test
+ * Giving a resident a task from the UI runs its default script with the task's target in its
+ * target param (`TARGET_PARAMS`) or written into `memory`, as `TaskMemory` lists. Defaults use the step budget like any script; a test
  * keeps each at most a quarter of `SCRIPT_STEP_BUDGET`.
  */
 import {
@@ -21,9 +21,27 @@ import { FOOTPRINT } from './footprint.js'
 export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable'] as const
 export type Task = (typeof TASKS)[number]
 
+/**
+ * The param each task's default script takes its target in (`CONTEXT.md`: Default script,
+ * Started directly). Giving the task fills it; unset, the default works the one on the
+ * resident's tile when it starts. It is never kept between starts, unlike the script's other
+ * params.
+ */
+export const TARGET_PARAMS: Partial<Readonly<Record<Task, string>>> = { work: 'workplace' }
+
+/** The target param of a script (`TARGET_PARAMS`), if it is the default of a task with one. */
+export function targetParam(script: { task?: Task | null }): string | undefined {
+  return script.task ? TARGET_PARAMS[script.task] : undefined
+}
+
 /** What giving a task from the UI writes into the script's memory. */
 export interface TaskMemory {
-  /** Work: the workplace to work, the one the resident stands on; `makes` at a smithy. */
+  /**
+   * Work: the workplace, the one the resident stands on; `makes` at a smithy. The workplace goes
+   * in the param `workplace` too (`TARGET_PARAMS`), which the default reads; it keeps the one it
+   * works here, so Work scripts edited before it took the param, and scripts reading
+   * `withMemory("workplaceId", …)`, keep working.
+   */
   work: { workplaceId: string; makes?: string }
   /**
    * Build: the kind of building, with the north-west tile of its footprint `at` the tile the
@@ -67,7 +85,7 @@ export interface DefaultScript {
 const FOOD_PARAMS = `param foodAt: number = ${GET_FOOD_AT} // get Food below this many units on me; 0 never
 param foodTake: number = ${GET_FOOD_TAKE} // units of Food to take along`
 
-const GET_FOOD =`// The Food that tops me up to params.foodTake, in whole units.
+const GET_FOOD = `// The Food that tops me up to params.foodTake, in whole units.
 fn foodToTake() {
   let food = 0
   if (me.carried.food != null) { food = me.carried.food }
@@ -107,17 +125,42 @@ fn getFood(from, near) {
 export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
   work: {
     name: 'Work',
-    source: `// Work (default): work the workplace memory.workplaceId; once its pile holds
-// a full load, one of us, picked at random, stores it in params.storage, or
-// the nearest storage of my realm while none is picked, and comes back. At a
-// smithy, memory.makes says what to make. Meals come from the workplace's
-// pile on their own, without an order. Below params.foodAt units of Food on
-// me I get Food up to params.foodTake at params.storage, or the nearest
-// storage of my realm with Food, and come back; storing a load tops my food
-// up to foodTake too. foodAt 0 turns getting food off.
+    source: `// Work (default): work params.workplace, or while none is picked the
+// workplace on my tile when I start, kept in memory.workplaceId; with none I
+// end. Once its pile holds a full load, one of us, picked at random, stores
+// it in params.storage, or the nearest storage of my realm while none is
+// picked, and comes back. At a smithy, memory.makes says what to make. Meals
+// come from the workplace's pile on their own, without an order. Below
+// params.foodAt units of Food on me I get Food up to params.foodTake at
+// params.storage, or the nearest storage of my realm with Food, and come
+// back; storing a load tops my food up to foodTake too. foodAt 0 turns
+// getting food off.
+param workplace: building // the workplace to work; none: the one I stand on
 param storage: storage // where the output goes
 ${FOOD_PARAMS}
 let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
+
+// A finished building that makes goods.
+fn isWorkplace(b) {
+  return b != null && b.site == null && outputOf(b).length > 0
+}
+
+// Which workplace I work: the one picked, else the one I started on.
+if (params.workplace != null) {
+  if (!isWorkplace(params.workplace)) {
+    end("the " + params.workplace.kind + " is no workplace")
+    return
+  }
+  memory.workplaceId = params.workplace.id
+}
+if (memory.workplaceId == null) {
+  let here = buildingAt(me.x, me.y)
+  if (!isWorkplace(here)) {
+    end("no workplace on their tile")
+    return
+  }
+  memory.workplaceId = here.id
+}
 
 // Where the workplace is, kept for when it is out of sight.
 let place = building(memory.workplaceId)
@@ -143,7 +186,10 @@ if (me.x != memory.at.x || me.y != memory.at.y) {
 }
 if (carry != null) { memory.carry = null }
 if (memory.food != null) { memory.food = null }
-if (place == null) { return } // gone
+if (place == null) { // here, and it isn't: torn down, or no longer ours
+  end("the workplace is gone")
+  return
+}
 
 // Low on Food: get some, then back to work. With none anywhere, work on.
 ${GET_FOOD}

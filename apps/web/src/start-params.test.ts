@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   groupStartValues,
   startedScript,
+  startFormParams,
   startParamValues,
   startValues,
   startValuesValid,
@@ -72,6 +73,29 @@ describe('the form before a script starts', () => {
       rounds: 3,
       take: 0,
     })
+  })
+
+  it('starts a default’s target param empty, and leaves it out for its task, which fills it', () => {
+    const work = {
+      ...summary(2, 'work'),
+      params: [{ name: 'workplace', type: 'building' as const }, ...PARAMS],
+    }
+    const runScript = startFormParams({ kind: 'runScript', scriptId: 2 }, work)
+    expect(runScript.map((p) => p.name)).toEqual(['workplace', 'storage', 'rounds', 'take'])
+    // Never kept between starts: empty is the one they stand on.
+    expect(startValues(runScript, { workplace: 'f1', storage: 's1' }, 'workplace')).toEqual({
+      workplace: undefined,
+      storage: 's1',
+      rounds: 5,
+      take: undefined,
+    })
+    expect(
+      groupStartValues(runScript, [{ workplace: 'f1' }, { workplace: 'f1' }], 'workplace'),
+    ).toMatchObject({ workplace: undefined })
+    const task = startFormParams({ kind: 'task', task: 'work' }, work)
+    expect(task.map((p) => p.name)).toEqual(['storage', 'rounds', 'take'])
+    // A script of the Player's own has no target param.
+    expect(startFormParams({ kind: 'task', task: 'work' }, summary(1, null))).toEqual(PARAMS)
   })
 
   it('can start only with whole numbers of zero or more', () => {

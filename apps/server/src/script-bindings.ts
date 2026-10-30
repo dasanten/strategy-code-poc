@@ -16,6 +16,7 @@ import {
   DIAGONAL_STEP,
   DOING_MAX_LENGTH,
   ageInYears,
+  buildingAt,
   buildingRealm,
   directivesFor,
   materialsNeeded,
@@ -182,6 +183,14 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const running = { scriptId: script!.scriptId, memory: script!.memory }
     return withQueueView({ ...rest, script: running })
   }
+  // A building as `building(id)` gives it: one of the side's own as it is, another's as the
+  // Player sees it, its stock only when they see inside (`CONTEXT.md`: Seeing inside a storage).
+  const asSeenBuilding = (b: Building) => {
+    if (ownBuilding(b)) return b
+    seen ??= context.seen()
+    const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
+    return shown ? untagged(shown) : null
+  }
   let nodes: ResourceNode[] | undefined
   const exploredNodes = () => (nodes ??= world.nodes.filter((n) => context.explored(n.x, n.y)))
 
@@ -210,13 +219,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     },
     building: ([id]) => {
       const b = world.buildings.find((x) => x.id === id)
-      if (!b) return null
-      if (ownBuilding(b)) return b
-      // Another's as the Player sees it, its stock only when they see inside (`CONTEXT.md`:
-      // Seeing inside a storage).
-      seen ??= context.seen()
-      const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
-      return shown ? untagged(shown) : null
+      return b ? asSeenBuilding(b) : null
+    },
+    buildingAt: ([x, y]) => {
+      const at = tile(x, y, 'buildingAt')
+      const b = buildingAt(world, at.x, at.y, terrain.size)
+      return b && (ownBuilding(b) || inSight(at)) ? asSeenBuilding(b) : null
     },
     pileAt: ([x, y]) => {
       const at = tile(x, y, 'pileAt')
