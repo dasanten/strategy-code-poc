@@ -16,7 +16,9 @@ Queue planner and groups (37), Children and food (38) and Passenger carriages (3
 order, all ahead of Bandits. The tickets of 35–40 wait for Epic 34's T34.1 and T34.2. Agreed
 later the same day: Scripts started directly (41, ADR 0014), Script debugging (42) and Script
 library tidy-up (43) come right after Script params (36). So: 35, 40, 36, 41, 42, 43, 37, 38,
-39, then Bandits.
+39, then Bandits. Agreed with Daniel on 2026-10-30: the bugs #508–#510 first, then Server
+hardening (Epic 44, the nine findings of the 2026-10-30 security review), Quick wins 3 (45),
+Horses and food (46) and Under attack (47), in that order, all ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -64,6 +66,10 @@ I sleep.
 | 41  | [Scripts started directly](https://github.com/dasanten/strategy-code-poc/issues/450)            | ticketed                |
 | 42  | [Script debugging](https://github.com/dasanten/strategy-code-poc/issues/451)                    | ticketed                |
 | 43  | [Script library tidy-up](https://github.com/dasanten/strategy-code-poc/issues/452)              | ticketed                |
+| 44  | [Server hardening](https://github.com/dasanten/strategy-code-poc/issues/511)                  | ticketed                |
+| 45  | [Quick wins 3](https://github.com/dasanten/strategy-code-poc/issues/522)                      | ticketed                |
+| 46  | [Horses and food](https://github.com/dasanten/strategy-code-poc/issues/527)                   | ticketed                |
+| 47  | [Under attack](https://github.com/dasanten/strategy-code-poc/issues/531)                      | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
