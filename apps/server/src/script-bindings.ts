@@ -39,6 +39,7 @@ import {
   type OrderRequest,
   type Queue,
   type Resident,
+  type Struck,
   type ResourceNode,
   type RunningScript,
   type ScriptBinding,
@@ -158,7 +159,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     return seen
       .filter((e) => e.is === is)
       .map(untagged)
-      .map((rest) => withQueueView({ ...rest, ...add?.(rest.id) }))
+      .map((rest) => asView(world, { ...rest, ...add?.(rest.id) }))
   }
   // Whose script it is: the Player's realm, or the NPC city running the game's defaults.
   const side = sender.npcCityId ?? realmOf(world, sender.userId)?.id
@@ -186,7 +187,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const asSeen = (r: Resident) => {
     const { script, ...rest } = r
     const running = { scriptId: script!.scriptId, memory: script!.memory }
-    return withQueueView({ ...rest, script: running })
+    return asView(world, { ...rest, script: running })
   }
   // A building as `building(id)` gives it: one of the side's own as it is, another's as the
   // Player sees it, its stock only when they see inside (`CONTEXT.md`: Seeing inside a storage).
@@ -283,7 +284,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       const r = world.residents.find((x) => x.id === id)
       return r ? [{ ...r, script: undefined, age: ageInYears(r, world.tick) }] : []
     })
-    me = { ...army, members }
+    const struck = lastStruck(members)
+    me = {
+      ...army,
+      members: members.map((m) => asView(world, m)),
+      ...(struck ? struckView(world, struck) : {}),
+    }
     actions = {
       walkTo: ([x, y]) => request('armyWalkTo', { x: plain(x), y: plain(y) }),
       guard: ([x, y]) => request('armyGuard', { x: plain(x), y: plain(y) }),
@@ -297,7 +303,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = SCRIPT_API
     forMe = { residentId: resident.id }
     // The script's own state is `memory`, not part of `me`.
-    me = withQueueView({ ...resident, script: undefined, age: ageInYears(resident, world.tick) })
+    me = asView(world, { ...resident, script: undefined, age: ageInYears(resident, world.tick) })
     actions = residentActions(request, resident)
     actions.doing = ([text]) => {
       const doing = doingText(text)
@@ -641,10 +647,32 @@ function requestsSound(
   return out
 }
 
-/** A resident's queue as its script view shows it (`queueView`), not its steps. */
-function withQueueView(r: object): object {
-  const queue = (r as { queue?: Queue }).queue
-  return queue ? { ...r, queue: queueView(queue) } : r
+/**
+ * A resident as its script view shows it: its queue as `queueView`, not its steps, and who last
+ * struck them as `struckBy` and `struckAt`, while that attacker is still there (`CONTEXT.md`:
+ * Combat, Under attack). Anything else passes as it is.
+ */
+function asView(world: WorldState, r: object): object {
+  const { queue, struck } = r as { queue?: Queue; struck?: Struck }
+  return {
+    ...r,
+    ...(queue ? { queue: queueView(queue) } : {}),
+    ...(struck ? struckView(world, struck) : {}),
+  }
+}
+
+/** `struckBy` and `struckAt` for who last struck a resident, or nothing once they are gone. */
+function struckView(world: WorldState, struck: Struck): object {
+  return world.residents.some((x) => x.id === struck.by)
+    ? { struckBy: struck.by, struckAt: struck.tick }
+    : {}
+}
+
+/** Who last struck any of `members`: the `struck` with the latest tick, if any was. */
+function lastStruck(members: readonly Resident[]): Struck | undefined {
+  let last: Struck | undefined
+  for (const m of members) if (m.struck && (!last || m.struck.tick > last.tick)) last = m.struck
+  return last
 }
 
 /**

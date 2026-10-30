@@ -339,6 +339,7 @@ export function entitiesInSight(
     if (!insight.fares(r)) {
       delete shown.hunger
       delete shown.health
+      delete shown.struck
     }
     out.push(shown)
   }
@@ -528,7 +529,8 @@ export function sentInsideUnseen(
         return hasStock(e.trade) && !insight.insideCity(e.id)
       case 'resident': {
         const r = byId(world.residents, e.id)
-        return (e.hunger !== undefined || e.health !== undefined) && !(r && insight.fares(r))
+        const told = e.hunger !== undefined || e.health !== undefined || e.struck !== undefined
+        return told && !(r && insight.fares(r))
       }
       case 'horse': {
         const h = byId(world.horses, e.id)
