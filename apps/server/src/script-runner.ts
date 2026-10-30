@@ -350,37 +350,48 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       r.script = { scriptId, memory: taskMemory(o, r) }
       const source = host.script?.(scriptId)?.source
       const script = source === undefined ? undefined : { source, task: o.task }
-      const target = taskTarget(world, o, r, realmId)
+      const target = taskTarget(world, realmId, o, r)
       setStartParams(r, scriptId, withTargetParam(script, o.params, target))
     },
   }
 }
 
 /**
- * The id the task order fills its script's target param with (`TARGET_PARAMS`): Work's
- * workplace, Haul's carriage, and for Build the unfinished site of its kind it joins, if one of
- * the realm's stands there; none while Build lays out a new one, which isn't there yet.
+ * The task's target as its default's target param holds it (`TARGET_PARAMS`): Work's workplace,
+ * Tear down's building, the stable of Breed horses and Feed the stable, Haul's carriage, and for
+ * Build the unfinished site of its kind it joins at `at` (or the resident's tile); none while
+ * Build lays out a new one, which isn't there yet. Only one of the realm's own, which a param can
+ * name; another's stays in the memory alone (`TaskMemory`).
  */
 function taskTarget(
   world: WorldState,
+  realmId: string | undefined,
   o: TaskRequest,
   r: { x: number; y: number },
-  realmId: string | undefined,
 ): string | undefined {
-  switch (o.task) {
-    case 'work':
-      return o.workplaceId
-    case 'haul':
-      return o.carriageId
-    case 'build': {
-      const at = o.at ?? r
-      const site = constructionAt(world, at.x, at.y, o.building)
-      if (!site?.site || site.kind !== o.building) return undefined
-      return paramTarget(world, realmId, 'building', site.id) ? site.id : undefined
-    }
-    default:
-      return undefined
-  }
+  const [id, type] =
+    o.task === 'work'
+      ? [o.workplaceId, 'building' as const]
+      : o.task === 'tearDown'
+        ? [o.buildingId, 'building' as const]
+        : o.task === 'breed' || o.task === 'feedStable'
+          ? [o.stableId, 'storage' as const]
+          : o.task === 'haul'
+            ? [o.carriageId, 'storage' as const]
+            : [buildSite(world, o, r), 'building' as const]
+  if (id === undefined) return undefined
+  return paramTarget(world, realmId, type, id) ? id : undefined
+}
+
+/** The unfinished site a Build task joins at `at` (or the resident's tile), if one stands there. */
+function buildSite(
+  world: WorldState,
+  o: Extract<TaskRequest, { task: 'build' }>,
+  r: { x: number; y: number },
+): string | undefined {
+  const at = o.at ?? r
+  const site = constructionAt(world, at.x, at.y, o.building)
+  return site?.site && site.kind === o.building ? site.id : undefined
 }
 
 /** Why the resident can't be given the task on its target, if they can't (`taskOrder`). */

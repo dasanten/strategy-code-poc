@@ -224,6 +224,31 @@ describe('world saves', () => {
     expect(o!.scriptParams).toBeUndefined()
   })
 
+  it('gives residents tearing down, breeding and feeding their target as its param (migration 54 → 55)', () => {
+    const { world, terrain } = worldWithCity()
+    const [wrecker, breeder, feeder, npc, other] = world.residents
+    const farm = world.buildings[0]!
+    const stable = { id: 'stable-1', kind: 'stable' as const, cityId: farm.cityId, x: 1, y: 1 }
+    // Another realm's building, which no param of theirs can name.
+    const theirs = { id: 'theirs', kind: 'house' as const, cityId: 'elsewhere', x: 9, y: 9 }
+    world.buildings.push(stable, theirs)
+    wrecker!.script = { scriptId: 9, memory: { buildingId: farm.id } }
+    wrecker!.scriptParams = { 9: { foodTake: 4 } }
+    breeder!.script = { scriptId: 10, memory: { stableId: stable.id, horseIds: ['h1', 'h2'] } }
+    feeder!.script = { scriptId: 11, memory: { stableId: stable.id } }
+    // The game's own default, run by an NPC city, keeps its memory only.
+    npc!.script = { scriptId: 0, task: 'tearDown', memory: { buildingId: farm.id } }
+    other!.script = { scriptId: 12, memory: { buildingId: theirs.id } }
+    const migrated = migrateWorld(structuredClone(world), 54, { terrain }, migrations, 55)
+    const [w, b, f, n, o] = migrated.residents
+    expect(w!.scriptParams).toEqual({ 9: { foodTake: 4, building: farm.id } })
+    expect(w!.script).toEqual(wrecker!.script)
+    expect(b!.scriptParams).toEqual({ 10: { stable: stable.id } })
+    expect(f!.scriptParams).toEqual({ 11: { stable: stable.id } })
+    expect(n!.scriptParams).toBeUndefined()
+    expect(o!.scriptParams).toBeUndefined()
+  })
+
   it('keeps a format 50 world as it is: picked param values stay ids (migration 50 → 51)', () => {
     const { world, terrain } = worldWithCity()
     const r = world.residents[0]!

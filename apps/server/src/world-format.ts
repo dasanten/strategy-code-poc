@@ -142,8 +142,26 @@ export const migrations: Record<number, MigrationStep> = {
     }
     return world
   },
-  // Taken by T41.3 (#455), built alongside; its step replaces this one when both are merged.
-  54: (state) => state,
+  // Tear down, Breed horses and Feed the stable take their target as a param too: `building`,
+  // and `stable` for both (`CONTEXT.md`: Default script, Started directly). A resident running
+  // one by a script of their Player's gets the building or stable its memory names as that
+  // param, when it is one of their realm's a param can name; the memory keeps it too, which the
+  // defaults still read. A script with no such param drops it on its next run.
+  54: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const r of world.residents) {
+      const s = r.script
+      if (!s || s.scriptId <= 0 || r.owner === null) continue
+      const give = (name: string, type: 'building' | 'storage', id: unknown) => {
+        if (typeof id !== 'string' || !paramTarget(world, r.owner!, type, id)) return
+        const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
+        picked[name] ??= id
+      }
+      give('building', 'building', s.memory.buildingId)
+      give('stable', 'storage', s.memory.stableId)
+    }
+    return world
+  },
   // Build takes the site it joins as the param `site`, Haul its carriage as the param `carriage`
   // (`CONTEXT.md`: Default script, Started directly; ADR 0014). A resident building or hauling by
   // a script of their Player's gets the unfinished site (`memory.siteId`) or the carriage
