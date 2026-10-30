@@ -99,8 +99,8 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
   field(
     'realmId',
     'string',
-    'The realm an outpost storage, a storage of no city, belongs to.',
-    'for any other building, and for a storage of no city that belongs to no realm',
+    'The realm an outpost storage, a storage of no city, belongs to; for a construction site, the realm whose resident laid it out.',
+    'for any other building, for a storage of no city that belongs to no realm, and for a site no realm’s resident laid out',
   ),
   x,
   y,
@@ -231,6 +231,12 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('pair', view('pair'), 'Their pair, to have a child.', 'unless they are paired'),
       field('carrying', view('carrying'), 'The child they carry.', 'unless they carry one'),
       field('riding', 'string', 'The id of the horse they ride.', 'unless they ride one'),
+      field(
+        'aboard',
+        'string',
+        'The id of the carriage they ride on as a passenger.',
+        'unless they are aboard one',
+      ),
       field(
         'script',
         view('runningScript'),
@@ -535,6 +541,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       x,
       y,
       field('horseId', 'string', 'The horse hitched to it.', 'when none is'),
+      field('passengerIds', listOf('string'), 'The residents aboard it as passengers.'),
       field('load', view('goods'), 'The goods on board.', 'unless the Player sees inside'),
       field(
         'loadLevel',
@@ -572,7 +579,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
           ? field(
               'realmId',
               'string',
-              'The realm a city, or an outpost storage (a storage of no city), belongs to.',
+              'The realm a city, an outpost storage (a storage of no city) or a construction site belongs to.',
               'for an NPC city, and for any other building',
             )
           : { ...f, nullWhen: f.nullWhen ? `for a building, ${f.nullWhen}` : 'for a building' },

@@ -16,6 +16,8 @@ import {
   DIAGONAL_STEP,
   DOING_MAX_LENGTH,
   ageInYears,
+  breedingPair,
+  buildingAt,
   buildingRealm,
   directivesFor,
   materialsNeeded,
@@ -27,6 +29,7 @@ import {
   walkSpeed,
   rideSpeed,
   horseRidden,
+  passengersOf,
   workplaceGood,
   wrap,
   wrapDelta,
@@ -185,6 +188,14 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const running = { scriptId: script!.scriptId, memory: script!.memory }
     return withQueueView({ ...rest, script: running })
   }
+  // A building as `building(id)` gives it: one of the side's own as it is, another's as the
+  // Player sees it, its stock only when they see inside (`CONTEXT.md`: Seeing inside a storage).
+  const asSeenBuilding = (b: Building) => {
+    if (ownBuilding(b)) return b
+    seen ??= context.seen()
+    const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
+    return shown ? untagged(shown) : null
+  }
   let nodes: ResourceNode[] | undefined
   const exploredNodes = () => (nodes ??= world.nodes.filter((n) => context.explored(n.x, n.y)))
 
@@ -213,13 +224,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     },
     building: ([id]) => {
       const b = world.buildings.find((x) => x.id === id)
-      if (!b) return null
-      if (ownBuilding(b)) return b
-      // Another's as the Player sees it, its stock only when they see inside (`CONTEXT.md`:
-      // Seeing inside a storage).
-      seen ??= context.seen()
-      const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
-      return shown ? untagged(shown) : null
+      return b ? asSeenBuilding(b) : null
+    },
+    buildingAt: ([x, y]) => {
+      const at = tile(x, y, 'buildingAt')
+      const b = buildingAt(world, at.x, at.y, terrain.size)
+      return b && (ownBuilding(b) || inSight(at)) ? asSeenBuilding(b) : null
     },
     pileAt: ([x, y]) => {
       const at = tile(x, y, 'pileAt')
@@ -311,6 +321,15 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       }
       return unitsThatFit(resident, good as Good, world.tick)
     }
+    queries.breedingPair = ([stable]) => {
+      const id = (stable as Record<string, Value> | null)?.id
+      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      if (!b || b.kind !== 'stable' || side === undefined || !(ownBuilding(b) || inSight(b)))
+        return null
+      const owner = sender.npcCityId !== undefined ? { cityId: side } : { realmId: side }
+      const pair = breedingPair(world, b, owner, resident)
+      return pair ? pair.map((h) => h.id) : null
+    }
     const time = (a: { x: number; y: number }, b: { x: number; y: number }) =>
       walkTime(world, terrain, context.explored, resident, a, b)
     queries.walkTime = ([a, b]) => time(spot(a, 'walkTime'), spot(b, 'walkTime'))
@@ -346,10 +365,17 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
     const id = typeof p.value === 'string' ? p.value : undefined
     const target = id === undefined ? undefined : paramTarget(world, side, p.type, id)
+    const carriage = target?.is === 'carriage' ? target.carriage : undefined
     params[p.name] =
       target?.is === 'building'
         ? viewValue(target.building, { view: 'building' })
-        : viewValue(target?.carriage, { view: 'carriage' })
+        : viewValue(
+            carriage && {
+              ...carriage,
+              passengerIds: passengersOf(world, carriage).map((r) => r.id),
+            },
+            { view: 'carriage' },
+          )
   }
 
   const values: Record<string, Value> = {
@@ -458,6 +484,9 @@ function residentActions(
       }),
     mount: ([horseId]) => request('mount', { horseId: plain(horseId) }),
     dismount: () => request('dismount', {}),
+    board: ([carriageId]) => request('board', { carriageId: plain(carriageId) }),
+    getOff: ([x, y]) =>
+      request('getOff', (x ?? y ?? null) === null ? {} : { x: plain(x), y: plain(y) }),
     stop: () => request('stop', {}),
     pickUp: ([spot, goods]) => request('pickUp', { spot: plain(spot), goods: plain(goods) }),
     drop: ([spot, goods]) => request('drop', { spot: plain(spot), goods: plain(goods) }),

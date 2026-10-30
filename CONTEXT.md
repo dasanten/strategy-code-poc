@@ -94,6 +94,8 @@ The shared language of the game. Domain terms only — no implementation details
   the site and residents working there have put in enough **work**. More or stronger workers
   finish it sooner. Any adult resident can build; how fast depends on Strength and the
   Construction skill, which also covers tearing down. Materials delivered to a site are goods like any others and can be taken.
+  Until it is finished, a site belongs to the realm whose resident laid it out, so that realm's
+  scripts and params can pick it; finished, the building belongs where it does today.
   A resident has to be on the tile to lay out a site. Like a workplace, a site has no owner:
   whoever works on it holds it, and an unattended site can be finished by anyone.
 - **Fetching materials:** building a site includes getting its materials there. While the site

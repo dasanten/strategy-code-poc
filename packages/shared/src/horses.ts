@@ -112,15 +112,16 @@ export function keptPair(
 
 /**
  * Two fed horses of the owner's in a finished stable with room for a foal, which a resident there
- * can breed (`CONTEXT.md`: Breeding), or undefined when there are none. A pair whose breeding the
- * stable keeps comes first (`keptPair`).
+ * (`breeder`, when it is one) can breed (`CONTEXT.md`: Breeding), or undefined when there are
+ * none. A pair whose breeding the stable keeps comes first (`keptPair`).
  */
 export function breedingPair(
   world: Pick<WorldState, 'horses' | 'residents'>,
   stable: Building,
   owner: HorseOwner,
+  breeder?: Pick<Resident, 'id'>,
 ): [Horse, Horse] | undefined {
-  const kept = keptPair(world, stable, owner, undefined)
+  const kept = keptPair(world, stable, owner, breeder)
   if (kept) {
     const [a, b] = kept.map((id) => world.horses.find((h) => h.id === id)!)
     return [a!, b!]
@@ -128,7 +129,7 @@ export function breedingPair(
   const fed = horsesIn(world.horses, stable).filter((h) => ownsHorse(owner, h) && h.hunger > 0)
   const pair = fed.slice(0, 2)
   if (pair.length < 2) return undefined
-  return breedProblem(world, stable, owner, undefined, [pair[0]!.id, pair[1]!.id])
+  return breedProblem(world, stable, owner, breeder, [pair[0]!.id, pair[1]!.id])
     ? undefined
     : [pair[0]!, pair[1]!]
 }

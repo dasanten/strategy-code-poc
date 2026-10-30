@@ -3,18 +3,20 @@ import {
   HORSE_START_AGE_MAX,
   HORSE_START_AGE_MIN,
   TICKS_PER_GAME_YEAR,
+  inCityArea,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
 import { grantHorses } from './horse-grant.js'
+import { paramTarget } from './script-params.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 55
+export const WORLD_FORMAT_VERSION = 60
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -125,13 +127,97 @@ export const migrations: Record<number, MigrationStep> = {
   // Nobody could claim it before, so every existing Player starts unclaimed, whether or not they
   // have horses or got the Horse grant.
   52: (state) => ({ ...(state as object), horseOffersClaimed: [] }),
+  // Residents ride carriages as passengers (`CONTEXT.md`: Passenger), a new `aboard` field.
+  // Nobody was aboard before, so the step leaves the world as it is.
+  53: (state) => state,
+  // Work takes its workplace as the param `workplace` (`CONTEXT.md`: Default script, Started
+  // directly; ADR 0014), no longer from memory. A resident working by a script of their Player's
+  // gets the workplace its memory names as that param, so they work on; the memory keeps it too,
+  // as Work still writes it there. A script with no such param drops it on its next run.
+  54: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const r of world.residents) {
+      const s = r.script
+      const id = s?.memory.workplaceId
+      if (!s || s.scriptId <= 0 || typeof id !== 'string') continue
+      if (!world.buildings.some((b) => b.id === id)) continue
+      const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
+      picked.workplace ??= id
+    }
+    return world
+  },
+  // Tear down, Breed horses and Feed the stable take their target as a param too: `building`,
+  // and `stable` for both (`CONTEXT.md`: Default script, Started directly). A resident running
+  // one by a script of their Player's gets the building or stable its memory names as that
+  // param, when it is one of their realm's a param can name; the memory keeps it too, which the
+  // defaults still read. A script with no such param drops it on its next run.
+  55: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const r of world.residents) {
+      const s = r.script
+      if (!s || s.scriptId <= 0 || r.owner === null) continue
+      const give = (name: string, type: 'building' | 'storage', id: unknown) => {
+        if (typeof id !== 'string' || !paramTarget(world, r.owner!, type, id)) return
+        const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
+        picked[name] ??= id
+      }
+      give('building', 'building', s.memory.buildingId)
+      give('stable', 'storage', s.memory.stableId)
+    }
+    return world
+  },
+  // Build takes the site it joins as the param `site`, Haul its carriage as the param `carriage`
+  // (`CONTEXT.md`: Default script, Started directly; ADR 0014). A resident building or hauling by
+  // a script of their Player's gets the unfinished site (`memory.siteId`) or the carriage
+  // (`memory.carriageId`) its memory names as that param, where the param can hold it (one of
+  // their realm's); the memory keeps them too, as both defaults still read them there. A script
+  // with no such param drops it on its next run.
+  56: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const r of world.residents) {
+      const s = r.script
+      if (!s || s.scriptId <= 0 || r.owner === null) continue
+      const { siteId, carriageId } = s.memory
+      const site =
+        typeof siteId === 'string' &&
+        paramTarget(world, r.owner, 'building', siteId)?.is === 'building' &&
+        world.buildings.some((b) => b.id === siteId && b.site)
+      const carriage =
+        typeof carriageId === 'string' &&
+        paramTarget(world, r.owner, 'storage', carriageId)?.is === 'carriage'
+      if (!site && !carriage) continue
+      const picked = ((r.scriptParams ??= {})[s.scriptId] ??= {})
+      if (site) picked.site ??= siteId
+      if (carriage) picked.carriage ??= carriageId
+    }
+    return world
+  },
+  // A construction site belongs to the realm whose resident laid it out, until it is finished
+  // (`CONTEXT.md`: Construction site; `Building.realmId`). Who laid out a site already there
+  // isn't known: each gets the realm of a resident building it, else of the city it stands in
+  // (the one a farm or stable was laid out for, or whose area it is in), else none.
+  57: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    for (const b of world.buildings) {
+      if (!b.site) continue
+      const builder = world.residents.find(
+        (r) => r.owner !== null && (r.order as { siteId?: unknown } | null)?.siteId === b.id,
+      )
+      const city =
+        world.cities.find((c) => c.id === b.cityId) ??
+        world.cities.find((c) => inCityArea(world, c, b.x, b.y, terrain.size))
+      const realm = builder?.owner ?? city?.realmId ?? null
+      if (realm !== null) b.realmId = realm
+    }
+    return world
+  },
   // A running script keeps its last runtime error and the steps it used (`CONTEXT.md`:
   // Debugging a script). Scripts from before have neither until they next run, so the step
   // leaves them as they are.
-  53: (state) => state,
+  58: (state) => state,
   // Script logs (`CONTEXT.md`: Script log, `Resident.scriptLog`). Nothing was logged before, so
   // every resident starts with none and the step leaves them as they are.
-  54: (state) => state,
+  59: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

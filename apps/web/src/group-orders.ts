@@ -1,6 +1,7 @@
 import {
   CARRYING_A_CHILD,
   GOODS,
+  boarderProblem,
   canHandle,
   canWork,
   covers,
@@ -37,6 +38,16 @@ export type GroupOrder =
   | { kind: 'drop' }
   | ({ kind: 'runScript'; scriptId: number } & Starts)
   | { kind: 'stop' }
+  /**
+   * Boards the carriage (`CONTEXT.md`: Passenger): those on its tile, in the group's order, until
+   * its `seats` are taken.
+   */
+  | {
+      kind: 'board'
+      carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>
+      seats: number
+    }
+  | { kind: 'getOff' }
   /**
    * Sets a number param (`CONTEXT.md`: Script parameter), or clears it with null, for each one
    * running one of `scriptIds`, the scripts that declare it.
@@ -113,8 +124,11 @@ export interface GroupSend {
 /** How far from the target a group's walk-to looks for free tiles, in tiles each way. */
 const SPREAD_RADIUS = 8
 
-type GroupResident = Pick<Resident, 'id' | 'name' | 'x' | 'y' | 'bornAt' | 'carried'> &
-  Partial<Pick<Resident, 'carrying' | 'order' | 'script' | 'queue' | 'riding'>>
+type GroupResident = Pick<
+  Resident,
+  'id' | 'name' | 'x' | 'y' | 'bornAt' | 'carried' | 'owner' | 'cityId'
+> &
+  Partial<Pick<Resident, 'carrying' | 'order' | 'script' | 'queue' | 'aboard' | 'riding'>>
 
 /** The goods carried, at least one unit of each. */
 const carriedGoods = (stock: Stock): Good[] => GOODS.filter((g) => (stock[g] ?? 0) > 0)
@@ -158,9 +172,11 @@ function stableOf(r: GroupResident, seen: GroupSeen, size: number) {
  * carrying a child doesn't work, build, tear down, breed or haul. Tile-bound orders go only to
  * those standing there: Work and Tear down at the building, Breed at the stable, Feed the stable
  * in one, Climb next to the wall, Drive and Haul on a carriage, Mount on a free horse's tile.
- * Walking, attacking, running a script and stopping go to everyone. Queued (Shift held), Work,
- * Tear down and Breed also go to those away from the place, who walk there first, and Store to
- * those carrying nothing yet. A number param goes to those running a script that has it.
+ * Walking, attacking, running a script and stopping go to everyone. Board goes to those who could
+ * board the carriage, room aside (`boarderProblem`), Get off to those aboard one. Queued (Shift
+ * held), Work, Tear down and Breed also go to those away from the place, who walk there first,
+ * Store to those carrying nothing yet, and Board and Get off to everyone: whether they can is
+ * checked when the step's turn comes. A number param goes to those running a script that has it.
  */
 export function groupSkip(
   order: GroupOrder,
@@ -204,6 +220,11 @@ export function groupSkip(
       break
   }
   if (queued) return undefined
+  if (order.kind === 'board') {
+    const why = boarderProblem({ ...r, order: r.order ?? null }, order.carriage)
+    return why === 'that carriage is not on the resident’s tile' ? 'not there' : why
+  }
+  if (order.kind === 'getOff' && r.aboard === undefined) return 'not aboard'
   if (order.kind === 'work' && !isAt(r, order.workplace, size))
     return `too far: not at the ${order.name}`
   if (order.kind === 'tearDown' && !isAt(r, order.building, size))
@@ -255,7 +276,8 @@ function distance(r: { x: number; y: number }, t: { x: number; y: number }, size
  * target: the resident nearest it gets the nearest tile, and so on; with too few free tiles the
  * rest are skipped. Work and Build make each join the workplace or site. A horse, a carriage or
  * a pair to breed goes to one of them only: the first on its tile takes it, and the rest are
- * skipped once none is left.
+ * skipped once none is left. Board fills the carriage's seats in the group's order and skips the
+ * rest, the carriage being full.
  *
  * Queued (Shift held), each request is appended to the resident's queue instead (`CONTEXT.md`:
  * Queue), as their own card appends it: Work, Tear down and Breed after a walk to the place,
@@ -303,6 +325,7 @@ export function groupRequests(
     })
     return { requests: queued ? appended(requests, residents) : requests, skipped }
   }
+  let seats = order.kind === 'board' ? order.seats : 0
   // Horses and carriages handed out so far: one each.
   const taken = new Set<string>()
   const take = (r: GroupResident, things: readonly { id: string; x: number; y: number }[]) => {
@@ -312,6 +335,17 @@ export function groupRequests(
   }
   for (const r of going) {
     switch (order.kind) {
+      case 'board':
+        // Queued, whether a seat is left is checked when the step's turn comes.
+        if (!queued && seats-- <= 0) {
+          skipped.push({ id: r.id, name: r.name, why: 'the carriage is full' })
+          break
+        }
+        send(r, { kind: 'board', carriageId: order.carriage.id })
+        break
+      case 'getOff':
+        send(r, { kind: 'getOff' })
+        break
       case 'work':
         send(r, { kind: 'task', task: 'work', workplaceId: order.workplace.id, ...params })
         break
@@ -409,6 +443,7 @@ function placeOf(order: GroupOrder): { x: number; y: number } | undefined {
   if (order.kind === 'work') return order.workplace
   if (order.kind === 'tearDown') return order.building
   if (order.kind === 'breed') return order.stable
+  if (order.kind === 'board') return order.carriage
   return undefined
 }
 
@@ -470,6 +505,8 @@ export type GroupButton =
   | 'stop'
   | 'mount'
   | 'dismount'
+  | 'board'
+  | 'getOff'
   | 'drive'
   | 'haul'
   | 'work'
@@ -489,13 +526,16 @@ export type GroupButton =
 
 /**
  * The group card's order buttons, in the order it shows them, under the same kinds as a
- * resident card's (ADR 0012). All of them always show: each goes to those who can take it.
+ * resident card's (ADR 0012). All of them always show: each goes to those who can take it. Board
+ * shows once for each carriage of the realm some of them stand on, and greyed out with none.
  */
 export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: OrderGroup }[] = [
   { id: 'walk', label: 'Walk to', group: 'move' },
   { id: 'stop', label: 'Stop', group: 'move' },
   { id: 'mount', label: 'Mount horses', group: 'move' },
   { id: 'dismount', label: 'Dismount', group: 'move' },
+  { id: 'board', label: 'Board carriage', group: 'move' },
+  { id: 'getOff', label: 'Get off', group: 'move' },
   { id: 'drive', label: 'Drive carriages to', group: 'move' },
   { id: 'haul', label: 'Haul route…', group: 'move' },
   { id: 'work', label: 'Work', group: 'work' },
@@ -529,6 +569,7 @@ export const GROUP_COUNTERPARTS: Record<
   walk: ['walk'],
   stop: ['stop'],
   ride: ['mount', 'dismount'],
+  board: ['board', 'getOff'],
   drive: ['drive'],
   haul: ['haul'],
   work: ['work'],

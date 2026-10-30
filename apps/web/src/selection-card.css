@@ -157,6 +157,16 @@
   flex-direction: column;
   gap: 2px;
 }
+/* A name in a line that picks that resident, such as a carriage's passenger. */
+.sel-facts button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
 /* What the Player only remembers (`CONTEXT.md`: Last seen): greyed, apart from what is there now. */
 .sel-past,
 .last-seen {

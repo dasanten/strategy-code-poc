@@ -97,6 +97,11 @@ export interface Resident {
    * on with whatever they do, at the horse's pace.
    */
   riding?: string
+  /**
+   * The carriage the resident rides on as a passenger (`CONTEXT.md`: Passenger), if they are
+   * aboard one. Not an order: they move with the carriage and don't walk on their own.
+   */
+  aboard?: string
 }
 
 /**
@@ -1703,7 +1708,9 @@ export interface Building {
   cityId: string | null
   /**
    * The realm an outpost storage belongs to (`CONTEXT.md`: Outpost storage): finished storages
-   * of no city only, and only those a realm has. A city that takes it in drops it.
+   * of no city only, and only those a realm has. A city that takes it in drops it. A
+   * construction site has the realm whose resident laid it out, until it is finished
+   * (`CONTEXT.md`: Construction site); one an NPC city's resident laid out has none.
    */
   realmId?: string
   x: number

@@ -153,6 +153,21 @@ describe('the queue list', () => {
     expect(q.loop).toBe(true)
   })
 
+  it('lists boarding and getting off a carriage', () => {
+    // Board at the carriage, run along, get off: the Shift-queued passenger's plan.
+    const r = shiftQueue(idle, [
+      { kind: 'board', residentId: 'w1', carriageId: 'k1' },
+      { kind: 'getOff', residentId: 'w1' },
+      { kind: 'getOff', residentId: 'w1', x: 20, y: 7 },
+    ])
+    expect(queueRows(r.queue!).map((row) => row.label)).toEqual([
+      'Walk to 6, 6',
+      'Board the carriage',
+      'Get off',
+      'Get off at 20, 7',
+    ])
+  })
+
   it('reorders, removes and times steps by id', () => {
     expect(moveStep(q, 4, -1).map((s) => s.id)).toEqual([1, 2, 4, 3])
     expect(moveStep(q, 1, -1).map((s) => s.id)).toEqual([1, 2, 3, 4])
