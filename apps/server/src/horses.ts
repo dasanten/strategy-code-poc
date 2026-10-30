@@ -15,9 +15,9 @@ import {
   TICKS_PER_GAME_YEAR,
   horseFood,
   horseFoodFactor,
-  riderOf,
   type Horse,
   type HorseStats,
+  type Resident,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -76,14 +76,17 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
   const heal = MAX_HEALTH / (HEAL_DAYS * TICKS_PER_GAME_DAY)
   const died: Horse[] = []
   let ate = false
-
   const hungry = HORSE_HUNGRY_SHARE * MAX_HUNGER
+  // Who rides which horse, looked up once a tick rather than for every horse that eats.
+  const riders = new Map<string, Resident>()
+  for (const r of world.residents) if (r.riding !== undefined) riders.set(r.riding, r)
+
   for (const h of world.horses) {
     const wasFed = h.hunger >= hungry
     // Endurance sets how fast the meter runs down, so how much Food the horse needs.
     h.hunger = Math.max(0, h.hunger - drain * horseFoodFactor(h))
     if (h.hunger <= MAX_HUNGER - FILL_PER_FOOD) {
-      const food = horseFood(world, h, terrain.size)[0]
+      const food = horseFood(world, h, terrain.size, riders.get(h.id))[0]
       if (food) {
         const left = food.food! - 1
         if (left > 0) food.food = left
@@ -93,7 +96,7 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
       }
     }
     // Going hungry with nothing in reach: a rider has no Food to spare for it (`CONTEXT.md`: Riding).
-    const rider = wasFed && h.hunger < hungry ? riderOf(world, h) : undefined
+    const rider = wasFed && h.hunger < hungry ? riders.get(h.id) : undefined
     if (rider) {
       recordEvent(world, h.realmId, {
         kind: 'horseHungry',

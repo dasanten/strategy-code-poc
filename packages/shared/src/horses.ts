@@ -40,9 +40,15 @@ export function horsesAt(world: WorldState, x: number, y: number): Horse[] {
  * no inventory): the load of the carriage it pulls, then the storage of the stable it stands in,
  * then the Food on the ground on its tile and within `HORSE_REACH` of it, then, for a ridden horse,
  * its rider's carried Food while they have a unit to spare (`riderSpareFood`). Only places that
- * hold Food the horse may eat are listed.
+ * hold Food the horse may eat are listed. `rider` saves looking up who rides it, for callers that
+ * know.
  */
-export function horseFood(world: WorldState, horse: Horse, mapSize: number): Stock[] {
+export function horseFood(
+  world: WorldState,
+  horse: Horse,
+  mapSize: number,
+  rider: Pick<Resident, 'carried'> | undefined = riderOf(world, horse),
+): Stock[] {
   const out: Stock[] = []
   const load = carriagePulledBy(world, horse)?.load
   if ((load?.food ?? 0) > 0) out.push(load!)
@@ -56,7 +62,6 @@ export function horseFood(world: WorldState, horse: Horse, mapSize: number): Sto
       if ((pile?.goods.food ?? 0) > 0 && !out.includes(pile!.goods)) out.push(pile!.goods)
     }
   }
-  const rider = riderOf(world, horse)
   if (rider && riderSpareFood(rider) >= 1) out.push(rider.carried)
   return out
 }
