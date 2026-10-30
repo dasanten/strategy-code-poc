@@ -169,6 +169,15 @@ export interface ScriptParamValues {
 export type ScriptParamValue = string | number
 
 /**
+ * The param values an order starting a script gives (`CONTEXT.md`: Script parameter, Before it
+ * starts), by name: what is picked or typed for each, or null to clear it back to its default.
+ * A param left out keeps its value.
+ */
+export interface StartParamValues {
+  [name: string]: ScriptParamValue | null
+}
+
+/**
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
  */
 export interface RunningScript {
@@ -213,10 +222,11 @@ export interface SeenScript {
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
  * memory, which stays on the server. Their hunger and health only for their own realm and its
  * allies (`CONTEXT.md`: Seeing how someone fares). Their script parameter values only for the
- * realm that runs their script, and only those of the script they run.
+ * realm that commands them: all they keep, so a script's params can be filled in before it starts
+ * (`CONTEXT.md`: Script parameter), and those of the script they run with it.
  */
 export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health' | 'scriptParams'> &
-  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: SeenScript }
+  Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & { script?: SeenScript }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order

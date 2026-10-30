@@ -265,6 +265,12 @@ button.hud-logout {
   line-height: 1.5;
   color: var(--ui-muted);
 }
+.hud-dialog.start-params {
+  border-top-color: var(--ui-live);
+}
+.hud-dialog.start-params .goods-row {
+  margin: 6px 0;
+}
 .hud-dialog-actions {
   display: flex;
   justify-content: flex-end;

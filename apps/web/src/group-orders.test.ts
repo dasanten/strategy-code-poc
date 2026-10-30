@@ -144,7 +144,12 @@ describe('group orders', () => {
       ['b', 'runs no script with foodAt'],
       ['c', 'runs no script with foodAt'],
     ])
-    const queued = groupRequests(order, rs, { tick: TICK, size: SIZE, free: everywhere, queued: true })
+    const queued = groupRequests(order, rs, {
+      tick: TICK,
+      size: SIZE,
+      free: everywhere,
+      queued: true,
+    })
     expect(queued.requests).toEqual(requests)
     const clear = send({ ...order, value: null }, rs).requests.map((q) => q.order)
     expect(clear).toEqual([
@@ -166,6 +171,24 @@ describe('group orders', () => {
     ]
     const rs = [{ script: { scriptId: 3 } }, { script: { scriptId: 4 } }, {}]
     expect(groupNumberParams(rs, scripts)).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
+  })
+
+  it('shows a number param’s default only when every script declares the same one', () => {
+    const foodAt = (d?: number) => ({
+      name: 'foodAt',
+      type: 'number' as const,
+      ...(d === undefined ? {} : { default: d }),
+    })
+    const rs = [{ script: { scriptId: 3 } }, { script: { scriptId: 4 } }]
+    const with3 = (other?: number) => [
+      { id: 3, params: [foodAt(3)] },
+      { id: 4, params: [foodAt(other)] },
+    ]
+    expect(groupNumberParams(rs, with3(3))).toEqual([
+      { name: 'foodAt', scriptIds: [3, 4], default: 3 },
+    ])
+    expect(groupNumberParams(rs, with3(5))).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
+    expect(groupNumberParams(rs, with3())).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
   })
 
   it('says how many the order went to', () => {
@@ -226,6 +249,21 @@ describe('group orders with Shift held', () => {
       ]),
     )
     expect(skipped).toEqual([{ id: 'c', name: 'C', why: 'a child' }])
+  })
+
+  it('gives each the params set before the script starts, a queued step keeping them', () => {
+    const params = { foodAt: 2, storage: null }
+    const rs = [resident('a', 10, 10), resident('b', 10, 10)]
+    const run = send({ kind: 'runScript', scriptId: 7, params }, rs)
+    expect(run.requests.map((q) => q.order)).toEqual([
+      { kind: 'runScript', scriptId: 7, params, residentId: 'a' },
+      { kind: 'runScript', scriptId: 7, params, residentId: 'b' },
+    ])
+    const { requests } = queue({ kind: 'work', workplace: farm, name: 'farm', params }, rs)
+    for (const q of requests)
+      expect(q.order.steps).toContainEqual({
+        order: { kind: 'task', task: 'work', workplaceId: 'farm', params },
+      })
   })
 
   it('queues storing everything, even for those carrying nothing yet', () => {

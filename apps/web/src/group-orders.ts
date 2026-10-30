@@ -11,6 +11,7 @@ import {
   type OrderRequest,
   type Resident,
   type ScriptSummary,
+  type StartParamValues,
   type Stock,
 } from '@csp/shared'
 import { appendRequests } from './queue-view.js'
@@ -21,17 +22,25 @@ import { appendRequests } from './queue-view.js'
  */
 export type GroupOrder =
   | { kind: 'walkTo'; x: number; y: number }
-  | { kind: 'work'; workplace: Pick<Building, 'id' | 'kind' | 'x' | 'y'>; name: string }
-  | { kind: 'build'; building: BuildingKind; at: { x: number; y: number } }
+  | ({ kind: 'work'; workplace: Pick<Building, 'id' | 'kind' | 'x' | 'y'>; name: string } & Starts)
+  | ({ kind: 'build'; building: BuildingKind; at: { x: number; y: number } } & Starts)
   | { kind: 'store' }
   | { kind: 'fetch'; good: Good }
-  | { kind: 'runScript'; scriptId: number }
+  | ({ kind: 'runScript'; scriptId: number } & Starts)
   | { kind: 'stop' }
   /**
    * Sets a number param (`CONTEXT.md`: Script parameter), or clears it with null, for each one
    * running one of `scriptIds`, the scripts that declare it.
    */
   | { kind: 'setNumber'; name: string; value: number | null; scriptIds: readonly number[] }
+
+/**
+ * A group order that starts a script: the values for its params, the same for each of them
+ * (`CONTEXT.md`: Script parameter, Before it starts).
+ */
+interface Starts {
+  params?: StartParamValues
+}
 
 /** A resident the order wasn't sent to, or that the server turned down, and why. */
 export interface Skipped {
@@ -151,6 +160,7 @@ export function groupRequests(
     else going.push(r)
   }
   const requests: GroupSend['requests'] = []
+  const params = 'params' in order && order.params ? { params: order.params } : {}
   const send = (r: GroupResident, o: OrderRequest) =>
     requests.push({ residentId: r.id, order: { ...o, residentId: r.id } })
   if (order.kind === 'walkTo') {
@@ -168,11 +178,11 @@ export function groupRequests(
   for (const r of going) {
     switch (order.kind) {
       case 'work':
-        send(r, { kind: 'task', task: 'work', workplaceId: order.workplace.id })
+        send(r, { kind: 'task', task: 'work', workplaceId: order.workplace.id, ...params })
         break
       case 'build':
         // The Build task walks there first and joins the site once one of them has laid it out.
-        send(r, { kind: 'task', task: 'build', building: order.building, at: order.at })
+        send(r, { kind: 'task', task: 'build', building: order.building, at: order.at, ...params })
         break
       case 'store':
         // Everything they carry to the nearest storage; their own food stays in their hands.
@@ -182,7 +192,7 @@ export function groupRequests(
         send(r, { kind: 'fetch', goods: [order.good] })
         break
       case 'runScript':
-        send(r, { kind: 'runScript', scriptId: order.scriptId })
+        send(r, { kind: 'runScript', scriptId: order.scriptId, ...params })
         break
       case 'stop':
         send(r, { kind: 'stop' })
@@ -222,22 +232,30 @@ function appended(
 
 /**
  * The number params the group card can set (`CONTEXT.md`: Script parameter): each one declared
- * by a script someone in the group runs, by name, with the scripts that declare it.
+ * by a script someone in the group runs, by name, with the scripts that declare it and its
+ * default when they all declare the same one.
  */
 export function groupNumberParams(
   residents: readonly { script?: { scriptId: number } }[],
   scripts: readonly Pick<ScriptSummary, 'id' | 'params'>[],
-): { name: string; scriptIds: number[] }[] {
+): { name: string; scriptIds: number[]; default?: number }[] {
   const running = new Set(residents.flatMap((r) => (r.script ? [r.script.scriptId] : [])))
-  const byName = new Map<string, number[]>()
+  const byName = new Map<string, { scriptIds: number[]; defaults: (number | undefined)[] }>()
   for (const s of scripts) {
     if (!running.has(s.id)) continue
     for (const p of s.params) {
       if (p.type !== 'number') continue
-      byName.set(p.name, [...(byName.get(p.name) ?? []), s.id])
+      const seen = byName.get(p.name) ?? { scriptIds: [], defaults: [] }
+      byName.set(p.name, {
+        scriptIds: [...seen.scriptIds, s.id],
+        defaults: [...seen.defaults, p.default],
+      })
     }
   }
-  return [...byName].map(([name, scriptIds]) => ({ name, scriptIds }))
+  return [...byName].map(([name, { scriptIds, defaults }]) => {
+    const shared = defaults.every((d) => d === defaults[0]) ? defaults[0] : undefined
+    return shared === undefined ? { name, scriptIds } : { name, scriptIds, default: shared }
+  })
 }
 
 /** The line the group card shows once an order went out: how many it went to. */
