@@ -1,12 +1,26 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { GOODS, QUEUE_DEFAULT_STEP_MINUTES, TICKS_PER_GAME_YEAR, type Stock } from '@csp/shared'
 import {
+  GOODS,
+  QUEUE_DEFAULT_STEP_MINUTES,
+  TICKS_PER_GAME_YEAR,
+  type Building,
+  type Stock,
+} from '@csp/shared'
+import {
+  GROUP_BUTTONS,
+  GROUP_COUNTERPARTS,
   groupNumberParams,
   groupRequests,
   groupSentLine,
   spreadTiles,
   type GroupOrder,
+  type GroupSeen,
+  type ResidentOrderId,
 } from './group-orders.js'
+import { GroupCard } from './Residents.js'
+import { ORDER_GROUP_LABELS, residentActions, type ResidentHere } from './selection-view.js'
 
 const TICK = 100 * TICKS_PER_GAME_YEAR
 const SIZE = 64
@@ -351,5 +365,256 @@ describe('group orders with Shift held', () => {
     expect(queue({ kind: 'stop' }, [resident('a', 0, 0)]).requests).toEqual([
       { residentId: 'a', order: { kind: 'stop', residentId: 'a' } },
     ])
+  })
+})
+
+describe('every resident order on the group card', () => {
+  const farm: Building = { id: 'farm', kind: 'farm', cityId: null, x: 5, y: 5 }
+  const stable: Building = { id: 'stable', kind: 'stable', cityId: null, x: 5, y: 5 }
+  const carriage = { id: 'k1', realmId: 'me', cityId: null, x: 5, y: 5, horseId: null, load: {} }
+  /** An adult with everything about them, so their card offers every order it has. */
+  const everything = (building: Building): ResidentHere => ({
+    adult: true,
+    busy: true,
+    inCity: true,
+    carriage,
+    building,
+    othersInSight: 1,
+    wallsInSight: 1,
+    picking: false,
+    makeLeader: { problem: undefined },
+    renamable: true,
+    horseToRide: true,
+    carries: true,
+  })
+  const offered = [
+    ...residentActions(everything(farm)),
+    ...residentActions({ ...everything(stable), horseToRide: false, riding: true }),
+  ].map((a) => a.id)
+
+  it('has a counterpart on the group card for each, or says why it goes to one resident only', () => {
+    expect(new Set(offered)).toEqual(new Set(Object.keys(GROUP_COUNTERPARTS)))
+    const buttons = new Set(GROUP_BUTTONS.map((b) => b.id))
+    for (const id of offered) {
+      const counterpart = GROUP_COUNTERPARTS[id as ResidentOrderId]
+      if ('none' in counterpart) continue
+      expect(counterpart.length, id).toBeGreaterThan(0)
+      for (const b of counterpart) expect(buttons.has(b), `${id}: ${b}`).toBe(true)
+    }
+    const oneOnly = Object.entries(GROUP_COUNTERPARTS).filter(([, c]) => 'none' in c)
+    expect(oneOnly.map(([id]) => id).sort()).toEqual(['makeLeader', 'pair', 'rename'])
+  })
+
+  it('shows every one of its buttons on the Orders tab, under the resident card’s kinds', () => {
+    const html = renderToStaticMarkup(
+      createElement(GroupCard, {
+        residents: [],
+        scripts: [],
+        buildings: [],
+        picking: false,
+        onPicking: () => {},
+        buildAt: undefined,
+        onOrder: () => {},
+        report: undefined,
+        orderError: undefined,
+        onPick: () => {},
+        onClose: () => {},
+      }),
+    )
+    for (const b of GROUP_BUTTONS) expect(html).toContain(`>${b.label}</button>`)
+    for (const g of new Set(GROUP_BUTTONS.map((b) => b.group)))
+      expect(html).toContain(`<h3>${ORDER_GROUP_LABELS[g].replace('&', '&amp;')}</h3>`)
+  })
+})
+
+describe('the group card’s other orders', () => {
+  const seenSend = (order: GroupOrder, rs: ReturnType<typeof resident>[], seen: GroupSeen) =>
+    groupRequests(order, rs, { tick: TICK, size: SIZE, free: everywhere, seen })
+  const orders = (s: { requests: { order: object }[] }) => s.requests.map((q) => q.order)
+  const why = (s: { skipped: { id: string; why: string }[] }) => s.skipped.map((x) => [x.id, x.why])
+
+  it('mounts each on a different free horse on their tile, and dismounts those riding', () => {
+    const horses = [
+      { id: 'h1', x: 5, y: 5 },
+      { id: 'h2', x: 5, y: 5 },
+      { id: 'h3', x: 9, y: 9 },
+    ]
+    const rs = [
+      resident('a', 5, 5),
+      resident('b', 5, 5),
+      resident('c', 5, 5),
+      resident('d', 0, 0),
+      resident('e', 5, 5, { riding: 'h9' }),
+    ]
+    const mount = seenSend({ kind: 'mount' }, rs, { horses })
+    expect(orders(mount)).toEqual([
+      { kind: 'mount', horseId: 'h1', residentId: 'a' },
+      { kind: 'mount', horseId: 'h2', residentId: 'b' },
+    ])
+    expect(why(mount)).toEqual([
+      ['d', 'no free horse here'],
+      ['e', 'already riding'],
+      ['c', 'no free horse left here'],
+    ])
+    const off = seenSend({ kind: 'dismount' }, rs, {})
+    expect(orders(off)).toEqual([{ kind: 'dismount', residentId: 'e' }])
+    expect(why(off)).toHaveLength(4)
+  })
+
+  it('makes each standing in a stable feed it; children and those elsewhere are skipped', () => {
+    const buildings = [
+      { id: 's1', kind: 'stable' as const, x: 10, y: 10 },
+      { id: 's2', kind: 'stable' as const, x: 20, y: 20, site: { work: 0, delivered: {} } },
+    ]
+    const rs = [
+      resident('a', 10, 10),
+      resident('b', 11, 11),
+      child('c', 10, 10),
+      resident('d', 20, 20),
+      resident('e', 0, 0),
+    ]
+    const feed = seenSend({ kind: 'feedStable' }, rs, { buildings })
+    expect(orders(feed)).toEqual([
+      { kind: 'task', task: 'feedStable', stableId: 's1', residentId: 'a' },
+      { kind: 'task', task: 'feedStable', stableId: 's1', residentId: 'b' },
+    ])
+    expect(why(feed)).toEqual([
+      ['c', 'a child'],
+      ['d', 'not at a stable'],
+      ['e', 'not at a stable'],
+    ])
+  })
+
+  it('drives and hauls with a different carriage each; riders don’t drive', () => {
+    const carriages = [{ id: 'k1', x: 5, y: 5 }]
+    const rs = [
+      resident('a', 5, 5),
+      resident('b', 5, 5),
+      resident('c', 0, 0),
+      resident('d', 5, 5, { riding: 'h1' }),
+      child('e', 5, 5),
+    ]
+    const drive = seenSend({ kind: 'drive', x: 30, y: 30 }, rs, { carriages })
+    expect(orders(drive)).toEqual([
+      { kind: 'drive', carriageId: 'k1', x: 30, y: 30, residentId: 'a' },
+    ])
+    expect(why(drive)).toEqual([
+      ['c', 'no carriage here'],
+      ['d', 'dismount first to drive'],
+      ['e', 'a child'],
+      ['b', 'another of them drives the carriage here'],
+    ])
+    const route = { x: 30, y: 30, goods: ['wood' as const], returnGoods: [], keepFood: 2 }
+    const haul = seenSend({ kind: 'haul', ...route }, [carrying('f', 5, 5), ...rs], { carriages })
+    expect(orders(haul)).toEqual([
+      { kind: 'task', task: 'haul', carriageId: 'k1', ...route, residentId: 'a' },
+    ])
+    expect(why(haul)[0]).toEqual(['f', 'carrying a child'])
+  })
+
+  it('builds road or wall along one line, the same for each adult', () => {
+    const line = { from: { x: 1, y: 1 }, to: { x: 5, y: 1 } }
+    const rs = [resident('a', 0, 0), resident('b', 9, 9), child('c', 0, 0), carrying('d', 0, 0)]
+    const road = send({ kind: 'line', line: 'roadLine', ...line }, rs)
+    expect(orders(road)).toEqual([
+      { kind: 'roadLine', ...line, residentId: 'a' },
+      { kind: 'roadLine', ...line, residentId: 'b' },
+    ])
+    expect(why(road)).toEqual([
+      ['c', 'a child'],
+      ['d', 'carrying a child'],
+    ])
+    expect(orders(send({ kind: 'line', line: 'wallLine', ...line }, rs))[0]).toMatchObject({
+      kind: 'wallLine',
+    })
+  })
+
+  it('tears down with those standing at the building, queued with the rest too', () => {
+    const house = { id: 'house', kind: 'house' as const, x: 10, y: 10 }
+    const rs = [resident('a', 10, 10), resident('b', 30, 30)]
+    const order: GroupOrder = { kind: 'tearDown', building: house, name: 'house' }
+    const now = send(order, rs)
+    expect(orders(now)).toEqual([
+      { kind: 'task', task: 'tearDown', buildingId: 'house', residentId: 'a' },
+    ])
+    expect(why(now)).toEqual([['b', 'too far: not at the house']])
+    const queued = groupRequests(order, rs, {
+      tick: TICK,
+      size: SIZE,
+      free: everywhere,
+      queued: true,
+    })
+    expect(queued.requests.map((q) => q.order.steps)).toEqual(
+      ['a', 'b'].map(() => [
+        { order: { kind: 'walkTo', x: 10, y: 10 } },
+        { order: { kind: 'task', task: 'tearDown', buildingId: 'house' } },
+      ]),
+    )
+  })
+
+  it('gives a pair of horses to breed to one standing at the stable who isn’t breeding yet', () => {
+    const stable = { id: 's1', kind: 'stable' as const, x: 10, y: 10 }
+    const breeding = {
+      kind: 'breed',
+      stableId: 's1',
+      horseIds: ['h8', 'h9'],
+      at: { x: 10, y: 10 },
+      progress: 0,
+    }
+    const rs = [
+      resident('a', 10, 10, { order: breeding }),
+      resident('b', 10, 10),
+      resident('c', 10, 10),
+      resident('d', 0, 0),
+      carrying('e', 10, 10),
+    ]
+    const breed = send({ kind: 'breed', stable, horseIds: ['h1', 'h2'] }, rs)
+    expect(orders(breed)).toEqual([
+      { kind: 'task', task: 'breed', stableId: 's1', horseIds: ['h1', 'h2'], residentId: 'b' },
+    ])
+    expect(why(breed)).toEqual([
+      ['a', 'already breeding'],
+      ['d', 'too far: not at the stable'],
+      ['e', 'carrying a child'],
+      ['c', 'B breeds those two'],
+    ])
+  })
+
+  it('stores at and fetches from the place picked, and drops everything carried', () => {
+    const rs = [resident('a', 0, 0, { carried: { wood: 3 } }), resident('b', 0, 0)]
+    const at = { id: 'st1', name: 'storage' }
+    expect(orders(send({ kind: 'store', to: at }, rs))).toEqual([
+      { kind: 'store', goods: ['wood'], to: 'st1', residentId: 'a' },
+    ])
+    expect(orders(send({ kind: 'fetch', good: 'stone', from: at }, rs))).toEqual([
+      { kind: 'fetch', goods: ['stone'], from: 'st1', residentId: 'a' },
+      { kind: 'fetch', goods: ['stone'], from: 'st1', residentId: 'b' },
+    ])
+    // A child puts down only Food (`CONTEXT.md`: Child).
+    const kids = [
+      resident('c', 0, 0, { bornAt: TICK, carried: { wood: 1 } }),
+      resident('d', 0, 0, { bornAt: TICK, carried: { food: 2 } }),
+    ]
+    const drop = send({ kind: 'drop' }, [...rs, ...kids])
+    expect(orders(drop)).toEqual([
+      { kind: 'drop', spot: { kind: 'ground' }, goods: { wood: 3 }, residentId: 'a' },
+      { kind: 'drop', spot: { kind: 'ground' }, goods: { food: 2 }, residentId: 'd' },
+    ])
+    expect(why(drop)).toEqual([
+      ['b', 'carries nothing'],
+      ['c', 'a child'],
+    ])
+  })
+
+  it('attacks one target with all of them, and climbs with those next to the wall', () => {
+    const rs = [resident('a', 4, 5), resident('b', 9, 9), child('c', 5, 6)]
+    expect(orders(send({ kind: 'attack', targetId: 'x1' }, rs))).toHaveLength(3)
+    const wall = { id: 'w1', x: 5, y: 5 }
+    const climb = send({ kind: 'climb', wall }, rs)
+    expect(orders(climb)).toEqual([
+      { kind: 'climb', wallId: 'w1', residentId: 'a' },
+      { kind: 'climb', wallId: 'w1', residentId: 'c' },
+    ])
+    expect(why(climb)).toEqual([['b', 'not next to the wall']])
   })
 })
