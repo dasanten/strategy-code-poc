@@ -97,6 +97,7 @@ import {
   type HaulSetup,
   type Picking,
 } from './Residents.js'
+import { arrivalOf } from './doing-view.js'
 import { CardSheet, PickBanner, TileCard } from './SelectionCard.js'
 import { pickHint, pickPrompt, pickTarget, useMediaQuery, useTouchScreen } from './pick-mode.js'
 import { PHONE_QUERY } from './sheet-view.js'
@@ -807,6 +808,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     (lookup: (x: number, y: number) => number | undefined) => setTerrainAt(() => lookup),
     [],
   )
+  const arrivesIn =
+    world &&
+    arrivalOf(
+      {
+        size: world.map.size,
+        tick: world.tick,
+        horses: world.horses,
+        carriages: world.carriages,
+        residents: world.residents,
+        buildings: world.buildings,
+      },
+      terrainAt,
+    )
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
     selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
   // A road may share its tile with a building (`CONTEXT.md`: Road); a building is wherever its
@@ -919,6 +933,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             scripts={scripts}
             buildings={world.buildings}
             inSight={world.residents}
+            arrivesIn={arrivesIn || undefined}
             tick={world.tick}
             selectedId={selected?.id}
             onSelect={(id) => {
@@ -1124,6 +1139,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           <ResidentCard
             key={selected.id}
             resident={selected}
+            arrivesIn={arrivesIn || undefined}
             leaderId={world.home.leaderId}
             cityName={homeCity?.name}
             tick={world.tick}
@@ -1280,6 +1296,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             buildings={world.buildings}
             carriages={groupCarriages}
             inSight={world.residents}
+            arrivesIn={arrivesIn || undefined}
             horses={world.horses}
             realmId={world.home.realmId}
             tick={world.tick}

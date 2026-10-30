@@ -149,6 +149,7 @@ import {
   WALL_DEFENCE,
   WALL_STRENGTH,
   WALK_TICKS_PER_TILE,
+  aboutTime,
   WAREHOUSE_BASE_PRICE,
   WEAPON_ATTACK,
   WORK_SKILL_EFFECT,
@@ -404,6 +405,14 @@ export function Wiki() {
         <p>
           Click one of your residents on the map to pick them and open their card. Each action on
           the card shows its letter key; press it to run the action. Escape drops what is picked.
+        </p>
+        <p>
+          The card and the residents list say what each resident is doing. Walking, riding or
+          driving somewhere, they also say about when they arrive, real time first and game time in
+          brackets: “Walking to 12, 40 · {aboutTime(24 * WALK_TICKS_PER_TILE)}”. It is an estimate
+          from the current pace on the way still to go (terrain, roads, Agility, the horse’s Speed
+          and hunger, Driving skill), so it changes as that does; unexplored ground counts as
+          Plains.
         </p>
         <p>
           To pick several at once, drag a box around them with Shift held (or after the Select

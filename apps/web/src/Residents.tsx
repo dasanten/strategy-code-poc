@@ -1,5 +1,6 @@
 import {
   BUILD_MATERIALS,
+  aboutTime,
   BUILDING_PURPOSE,
   LINE_BUILDING,
   isLineOrder,
@@ -394,18 +395,21 @@ function StepMinutes({
 
 /**
  * What a resident's built-in order has them doing. A rider rides where others walk (`CONTEXT.md`:
- * Riding): "Riding to 4, 5 · 3 tiles to go".
+ * Riding): "Riding to 4, 5 · about 3 min (3 game hours)", or tiles to go without an
+ * estimate (`arrivalTicks`).
  */
-export function orderDoing(r: Pick<Resident, 'order' | 'riding'>): string {
+export function orderDoing(r: Pick<Resident, 'order' | 'riding'>, arrives?: number): string {
+  const left = (path: readonly unknown[]) =>
+    arrives === undefined ? `${path.length} tiles to go` : aboutTime(arrives)
   const o = r.order
   const walking = r.riding === undefined ? 'Walking' : 'Riding'
   if (o?.kind === 'walkTo') {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
-    return `${walking} to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
+    return `${walking} to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   }
   if (o?.kind === 'drive') {
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
-    return `Driving to ${o.target.x}, ${o.target.y} · ${o.path.length} tiles to go`
+    return `Driving to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   }
   if (o?.kind === 'haul') {
     const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
@@ -416,7 +420,7 @@ export function orderDoing(r: Pick<Resident, 'order' | 'riding'>): string {
     const back = o.returnGoods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
     const leg =
       o.stop === 'to' ? `Hauling ${what} to` : back ? `Hauling ${back} back to` : 'Driving back to'
-    return o.path ? `${leg} ${x}, ${y} · ${o.path.length} tiles to go` : `${leg} ${x}, ${y}`
+    return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
@@ -460,6 +464,7 @@ export function ResidentsList({
   scripts = [],
   buildings = [],
   inSight = [],
+  arrivesIn,
   selectedId,
   onSelect,
 }: {
@@ -472,6 +477,8 @@ export function ResidentsList({
   buildings?: Building[]
   /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
   inSight?: readonly SeenResident[]
+  /** About how many ticks until a resident arrives where they walk, ride or drive (`arrivalTicks`). */
+  arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
   onSelect: (id: string) => void
 }) {
@@ -520,9 +527,19 @@ export function ResidentsList({
                   <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
                   <span
                     className="doing"
-                    title={doingLine(r, { scripts, buildings, residents: inSight })}
+                    title={doingLine(r, {
+                      scripts,
+                      buildings,
+                      residents: inSight,
+                      arrives: arrivesIn?.(r),
+                    })}
                   >
-                    {doingLine(r, { scripts, buildings, residents: inSight })}
+                    {doingLine(r, {
+                      scripts,
+                      buildings,
+                      residents: inSight,
+                      arrives: arrivesIn?.(r),
+                    })}
                     {r.script && <small className="muted">{scriptName(r, scripts)}</small>}
                   </span>
                   <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
@@ -557,6 +574,7 @@ export function GroupCard({
   buildings,
   carriages = [],
   inSight = [],
+  arrivesIn,
   horses = [],
   realmId,
   tick,
@@ -581,6 +599,8 @@ export function GroupCard({
   carriages?: { carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>; seats: number }[]
   /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
   inSight?: readonly SeenResident[]
+  /** About how many ticks until a resident arrives where they walk, ride or drive (`arrivalTicks`). */
+  arrivesIn?: (r: Resident) => number | undefined
   /** The queue planner (`GroupPlanner`), on the Queue tab (`CONTEXT.md`: Planning for a group). */
   planner?: ReactNode
   /** Horses in sight, to pick two in a stable where some of them stand to breed. */
@@ -855,7 +875,7 @@ export function GroupCard({
             <li key={r.id}>
               <button type="button" onClick={() => onPick(r.id)}>
                 <strong>{r.name}</strong> ·{' '}
-                {doingLine(r, { scripts, buildings, residents: inSight })}
+                {doingLine(r, { scripts, buildings, residents: inSight, arrives: arrivesIn?.(r) })}
               </button>
             </li>
           ))}
@@ -987,6 +1007,7 @@ const GROUP_PICKING_HINTS: Record<Exclude<GroupPicking, false>, string> = {
  */
 export function ResidentCard({
   resident: r,
+  arrivesIn,
   leaderId,
   cityName,
   tick,
@@ -1050,6 +1071,8 @@ export function ResidentCard({
   collapsed = false,
 }: {
   resident: Resident
+  /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
+  arrivesIn?: (r: Resident) => number | undefined
   leaderId: string
   cityName: string | undefined
   tick: number
@@ -1246,7 +1269,9 @@ export function ResidentCard({
       title={r.name}
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
-        <strong key="doing">{doingLine(r, { scripts, buildings, residents })}</strong>,
+        <strong key="doing">
+          {doingLine(r, { scripts, buildings, residents, arrives: arrivesIn?.(r) })}
+        </strong>,
         `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
         ...(ridden ? [ridden] : []),
       ]}
@@ -1298,7 +1323,7 @@ export function ResidentCard({
         (r.queue && onEditQueue ? (
           <QueueBlock
             queue={r.queue}
-            doing={doingLine(r, { scripts, buildings, residents })}
+            doing={doingLine(r, { scripts, buildings, residents, arrives: arrivesIn?.(r) })}
             scripts={scripts}
             buildings={buildings}
             onEdit={onEditQueue}
