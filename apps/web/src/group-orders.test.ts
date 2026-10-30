@@ -121,9 +121,32 @@ describe('group orders', () => {
     expect(skipped).toEqual([{ id: 'b', name: 'B', why: 'carries nothing' }])
   })
 
+  it('lets children store and fetch Food, and only Food', () => {
+    const rs = [resident('a', 0, 0), resident('c', 0, 0, { bornAt: TICK, carried: { food: 4 } })]
+    expect(send({ kind: 'fetch', good: 'food' }, rs).requests.map((q) => q.order)).toEqual([
+      { kind: 'fetch', goods: ['food'], residentId: 'a' },
+      { kind: 'fetch', goods: ['food'], residentId: 'c' },
+    ])
+    expect(send({ kind: 'store' }, rs).requests.map((q) => q.order)).toEqual([
+      { kind: 'store', goods: ['food'], residentId: 'c' },
+    ])
+    const queued = groupRequests({ kind: 'store' }, rs, {
+      tick: TICK,
+      size: SIZE,
+      free: everywhere,
+      queued: true,
+    }).requests.map((q) => q.order.steps)
+    expect(queued).toEqual([
+      [{ order: { kind: 'store', goods: [...GOODS] } }],
+      [{ order: { kind: 'store', goods: ['food'] } }],
+    ])
+  })
+
   it('sends fetch, run script and stop to each; children walk, stop and run scripts', () => {
     const rs = [resident('a', 0, 0), child('c', 0, 0)]
-    expect(send({ kind: 'fetch', good: 'wood' }, rs).skipped.map((s) => s.id)).toEqual(['c'])
+    expect(send({ kind: 'fetch', good: 'wood' }, rs).skipped).toEqual([
+      { id: 'c', name: 'C', why: 'a child' },
+    ])
     const script = send({ kind: 'runScript', scriptId: 7 }, rs)
     expect(script.skipped).toEqual([])
     expect(script.requests.map((q) => q.order)).toEqual([
@@ -210,6 +233,24 @@ describe('group orders', () => {
     expect(skipped).toEqual([{ id: 'b', name: 'B', why: 'not aboard' }])
   })
 
+  it('shows a number param’s default only when every script declares the same one', () => {
+    const foodAt = (d?: number) => ({
+      name: 'foodAt',
+      type: 'number' as const,
+      ...(d === undefined ? {} : { default: d }),
+    })
+    const rs = [{ script: { scriptId: 3 } }, { script: { scriptId: 4 } }]
+    const with3 = (other?: number) => [
+      { id: 3, params: [foodAt(3)] },
+      { id: 4, params: [foodAt(other)] },
+    ]
+    expect(groupNumberParams(rs, with3(3))).toEqual([
+      { name: 'foodAt', scriptIds: [3, 4], default: 3 },
+    ])
+    expect(groupNumberParams(rs, with3(5))).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
+    expect(groupNumberParams(rs, with3())).toEqual([{ name: 'foodAt', scriptIds: [3, 4] }])
+  })
+
   it('says how many the order went to', () => {
     expect(groupSentLine(5, 5)).toBe('Sent to all 5.')
     expect(groupSentLine(3, 5)).toBe('Sent to 3 of 5.')
@@ -268,6 +309,21 @@ describe('group orders with Shift held', () => {
       ]),
     )
     expect(skipped).toEqual([{ id: 'c', name: 'C', why: 'a child' }])
+  })
+
+  it('gives each the params set before the script starts, a queued step keeping them', () => {
+    const params = { foodAt: 2, storage: null }
+    const rs = [resident('a', 10, 10), resident('b', 10, 10)]
+    const run = send({ kind: 'runScript', scriptId: 7, params }, rs)
+    expect(run.requests.map((q) => q.order)).toEqual([
+      { kind: 'runScript', scriptId: 7, params, residentId: 'a' },
+      { kind: 'runScript', scriptId: 7, params, residentId: 'b' },
+    ])
+    const { requests } = queue({ kind: 'work', workplace: farm, name: 'farm', params }, rs)
+    for (const q of requests)
+      expect(q.order.steps).toContainEqual({
+        order: { kind: 'task', task: 'work', workplaceId: 'farm', params },
+      })
   })
 
   it('queues storing everything, even for those carrying nothing yet', () => {

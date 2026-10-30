@@ -12,6 +12,8 @@ import {
   GOODS,
   HAUL_KEEP_FOOD,
   buildMenu,
+  buildingWork,
+  workFactor,
   MAX_HEALTH,
   MAX_HUNGER,
   MAX_WORKERS,
@@ -27,6 +29,7 @@ import {
   TRAINED_CAP_SHARE,
   ageInYears,
   bestWeapon,
+  canHandle,
   canWork,
   wrapDelta,
   wrapDistance,
@@ -764,7 +767,7 @@ export function GroupCard({
           {numberParams.length > 0 && (
             <section className="inspector-block" aria-label="Script params">
               <div className="script-params">
-                {numberParams.map(({ name, scriptIds }) => (
+                {numberParams.map(({ name, scriptIds, default: fallback }) => (
                   <div key={name} className="goods-row">
                     <span className="small">
                       <strong>{name}</strong> <span className="muted">(number)</span>
@@ -772,6 +775,7 @@ export function GroupCard({
                     <NumberField
                       name={name}
                       value={undefined}
+                      fallback={fallback}
                       onSet={(v) =>
                         onOrder({ kind: 'setNumber', name, value: v ?? null, scriptIds })
                       }
@@ -862,6 +866,7 @@ export function ResidentCard({
   onDrop,
   building,
   road,
+  terrain,
   carriageSite,
   node,
   onBuild,
@@ -961,6 +966,8 @@ export function ResidentCard({
   building: Building | undefined
   /** The road or road site on the resident's tile, if one is in sight; it may share the tile. */
   road: Building | undefined
+  /** The explored terrain beneath the resident's tile, if known: a road on Mountain takes more work. */
+  terrain?: number
   /** The carriage site on the resident's tile, if one is in sight; it may share a stable's tile. */
   carriageSite: Building | undefined
   /** The resource node on the resident's tile, if the Player knows of one. */
@@ -1033,8 +1040,9 @@ export function ResidentCard({
   const age = Math.floor(ageInYears(r, tick))
   const skills = (Object.keys(SKILL_LABELS) as SkillName[]).filter((s) => (r.skills[s] ?? 0) > 0)
   const carried = goodsIn(r.carried)
-  // Children can't pick up or put down goods (`CONTEXT.md`: Child).
   const child = !canWork(r, tick)
+  // Children pick up and put down only Food (`CONTEXT.md`: Child).
+  const refused = (good: Good) => !canHandle(r, tick, [good])
   const family = familyLine(r, residents, tick)
   const ground: GoodsSpot = { kind: 'ground' }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
@@ -1200,7 +1208,7 @@ export function ResidentCard({
                 buildProblem={buildProblem}
                 onBuild={onBuild}
               />
-              <RoadBlock resident={r} tick={tick} road={road} onBuild={onBuild} />
+              <RoadBlock resident={r} tick={tick} road={road} terrain={terrain} onBuild={onBuild} />
             </>
           )}
           {shown === 'tearDown' && (
@@ -1243,7 +1251,7 @@ export function ResidentCard({
                 )}
                 {onStore && carried.length > 0 && (
                   <div className="order-buttons">
-                    <button type="button" disabled={child} onClick={onStore}>
+                    <button type="button" onClick={onStore}>
                       Store all
                     </button>
                     <span className="muted small">
@@ -1257,7 +1265,7 @@ export function ResidentCard({
                     good={good}
                     units={units}
                     byDefault={putAwayUnits(good, units)}
-                    disabled={child}
+                    disabled={refused(good)}
                     actions={[
                       { label: 'Drop', spot: ground },
                       ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
@@ -1285,7 +1293,7 @@ export function ResidentCard({
                     stock={pile?.goods}
                     spot={ground}
                     onPickUp={onPickUp}
-                    disabled={child}
+                    refused={refused}
                   />
                   {storage && (
                     <TileGoods
@@ -1293,7 +1301,7 @@ export function ResidentCard({
                       stock={storage.stock}
                       spot={inStorage}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {site && (
@@ -1302,7 +1310,7 @@ export function ResidentCard({
                       stock={site.site!.delivered}
                       spot={atSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {carriageSite && (
@@ -1311,7 +1319,7 @@ export function ResidentCard({
                       stock={carriageSite.site!.delivered}
                       spot={atCarriageSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {roadSite && (
@@ -1320,7 +1328,7 @@ export function ResidentCard({
                       stock={roadSite.site!.delivered}
                       spot={atRoadSite}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                   {carriage && (
@@ -1329,7 +1337,7 @@ export function ResidentCard({
                       stock={carriage.load}
                       spot={onCarriage}
                       onPickUp={onPickUp}
-                      disabled={child}
+                      refused={refused}
                     />
                   )}
                 </section>
@@ -1558,6 +1566,7 @@ function BuildBlock({
   tick,
   building,
   node,
+  terrain,
   buildProblem = () => undefined,
   onBuild,
 }: {
@@ -1565,6 +1574,8 @@ function BuildBlock({
   tick: number
   building: Building | undefined
   node: KnownNode | undefined
+  /** The explored terrain beneath the site, if known (`buildingWork`). */
+  terrain?: number
   /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
   buildProblem?: (kind: BuildingKind) => string | undefined
   onBuild: (kind: BuildingKind) => void
@@ -1603,7 +1614,11 @@ function BuildBlock({
           </button>
         </div>
         <p className="muted small">
-          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done.
+          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
+          about {workSpan(buildingWork(building.kind, terrain))} of one resident’s work in all
+          {workFactor(building.kind, terrain) > 1 &&
+            `, on Mountain ${workFactor(building.kind, terrain)} times as much as elsewhere`}
+          .
         </p>
       </section>
     )
@@ -1721,11 +1736,14 @@ function RoadBlock({
   resident,
   tick,
   road,
+  terrain,
   onBuild,
 }: {
   resident: Resident
   tick: number
   road: Building | undefined
+  /** The explored terrain beneath the resident's tile, if known (`buildingWork`). */
+  terrain?: number
   onBuild: (kind: BuildingKind) => void
 }) {
   if (road?.site) {
@@ -1735,6 +1753,7 @@ function RoadBlock({
         tick={tick}
         building={road}
         node={undefined}
+        terrain={terrain}
         onBuild={onBuild}
       />
     )
@@ -1749,7 +1768,8 @@ function RoadBlock({
       <p className="muted small">
         {BUILDING_PURPOSE.road} Needs{' '}
         {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
-        {workSpan(BUILD_WORK.road ?? 0)} of one resident’s work.
+        {workSpan(buildingWork('road', terrain))} of one resident’s work
+        {workFactor('road', terrain) > 1 && ' here on Mountain'}.
       </p>
       <div className="order-buttons">
         <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
@@ -2284,13 +2304,14 @@ function TileGoods({
   stock,
   spot,
   onPickUp,
-  disabled,
+  refused,
 }: {
   title: string
   stock: Stock | undefined
   spot: GoodsSpot
   onPickUp: (from: GoodsSpot, goods: Stock) => void
-  disabled: boolean
+  /** Whether the resident may not pick up this good, as a child anything but Food. */
+  refused: (good: Good) => boolean
 }) {
   const goods = goodsIn(stock)
   return (
@@ -2303,7 +2324,7 @@ function TileGoods({
           good={good}
           units={units}
           byDefault={units}
-          disabled={disabled}
+          disabled={refused(good)}
           actions={[{ label: 'Pick up', spot }]}
           onAct={onPickUp}
         />

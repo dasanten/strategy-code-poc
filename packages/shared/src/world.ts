@@ -174,6 +174,15 @@ export interface ScriptParamValues {
 export type ScriptParamValue = string | number
 
 /**
+ * The param values an order starting a script gives (`CONTEXT.md`: Script parameter, Before it
+ * starts), by name: what is picked or typed for each, or null to clear it back to its default.
+ * A param left out keeps its value.
+ */
+export interface StartParamValues {
+  [name: string]: ScriptParamValue | null
+}
+
+/**
  * A resident's or army's run-script order: which script of the Player's library, and its memory.
  */
 export interface RunningScript {
@@ -218,10 +227,11 @@ export interface SeenScript {
  * A resident as Players see them (`CONTEXT.md`: Sight): which script they run, but not its
  * memory, which stays on the server. Their hunger and health only for their own realm and its
  * allies (`CONTEXT.md`: Seeing how someone fares). Their script parameter values only for the
- * realm that runs their script, and only those of the script they run.
+ * realm that commands them: all they keep, so a script's params can be filled in before it starts
+ * (`CONTEXT.md`: Script parameter), and those of the script they run with it.
  */
 export type SeenResident = Omit<Resident, 'script' | 'hunger' | 'health' | 'scriptParams'> &
-  Partial<Pick<Resident, 'hunger' | 'health'>> & { script?: SeenScript }
+  Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & { script?: SeenScript }
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -367,7 +377,7 @@ export interface TearDownOrder {
 /**
  * Driving a carriage to a tile (`CONTEXT.md`: Carriage): the resident drives the carriage
  * `carriageId` from their tile, and the carriage, its horse and the driver move together. The
- * path and `progress` work as for walking, at the carriage's speeds and never into mountains.
+ * path and `progress` work as for walking, at the carriage's speeds, into mountains only on a road.
  */
 export interface DriveOrder {
   kind: 'drive'
@@ -1651,7 +1661,7 @@ export interface Building {
   stock?: Stock
   /** There while the building is still a construction site. */
   site?: ConstructionSite
-  /** Work put into tearing it down so far, once someone has started (`teardownWork`). */
+  /** Work put into tearing it down so far, once someone has started (`teardownWork`, `siteWorkOf`). */
   teardown?: number
   /** A gate its city's realm has closed (`CONTEXT.md`: Walls in combat); gates only, open without it. */
   closed?: true
@@ -1682,7 +1692,10 @@ export interface KeptBreeding {
 export interface ConstructionSite {
   /** Materials delivered so far; never more of a good than the building needs. */
   delivered: Stock
-  /** Work put in so far, at most what the building needs (`BUILD_WORK`). */
+  /**
+   * Work put in so far, at most what the building needs (`BUILD_WORK`); on a road on Mountain a
+   * resident's work counts less (`siteWorkOf`).
+   */
   work: number
 }
 

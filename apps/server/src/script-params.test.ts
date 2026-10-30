@@ -12,8 +12,9 @@ import {
 import { describe, expect, it } from 'vitest'
 
 import { OrderQueue, orderKinds } from './orders.js'
+import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
-import { ScriptRunner, taskOrder, type ScriptHost } from './script-runner.js'
+import { runScriptOrder, ScriptRunner, taskOrder, type ScriptHost } from './script-runner.js'
 import { scriptParamsSound, setScriptParamOrder } from './script-params.js'
 import { entitiesInSight } from './sight.js'
 import { addCity } from './test-terrain.js'
@@ -151,6 +152,36 @@ describe('params in a script', () => {
     expect(w.script!.memory.foodAt).toBe(0)
   })
 
+  it('read a number param’s default while unset, the value set, and the default once cleared', () => {
+    const { world, terrain, w } = farmWorld()
+    const source = 'param foodAt: number = 3\nmemory.foodAt = params.foodAt'
+    const runner = new ScriptRunner(terrain, host({ value: source }))
+    const kind = setScriptParamOrder({ script: () => ({ userId: MARA, source }) })
+    const sender = { userId: MARA, account: { name: 'Mara', isAdmin: false } }
+    const set = (value: number | null) => ({
+      kind: 'setScriptParam',
+      residentId: 'w1',
+      scriptId: SCRIPT,
+      name: 'foodAt',
+      ...(value === null ? { targetId: null } : { value }),
+    })
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory.foodAt).toBe(3)
+
+    for (const value of [7, 0]) {
+      expect(kind.validate(world, sender, set(value))).toBeUndefined()
+      kind.apply(world, sender, set(value))
+      expect(runner.runAll(world, true)).toEqual([])
+      expect(w.script!.memory.foodAt).toBe(value)
+    }
+
+    expect(kind.validate(world, sender, set(null))).toBeUndefined()
+    kind.apply(world, sender, set(null))
+    expect(w.scriptParams).toBeUndefined()
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory.foodAt).toBe(3)
+  })
+
   it('drop a value that no longer fits its param’s type', () => {
     const { world, terrain, w } = farmWorld()
     w.scriptParams = { [SCRIPT]: { home: 4, store: 'farm' } }
@@ -166,7 +197,8 @@ describe('params in a script', () => {
     const seen = (realmId: string) =>
       entitiesInSight(world, terrain, realmId).find((e) => e.id === 'w1')
     expect(seen('r1')).toMatchObject({ script: { scriptId: SCRIPT, params: { store: 's1' } } })
-    expect(seen('r1')).not.toHaveProperty('scriptParams')
+    // All it keeps, to fill in before another script starts (`CONTEXT.md`: Before it starts).
+    expect(seen('r1')!.scriptParams).toEqual(w.scriptParams)
     world.realms.push({ id: 'r2', userId: 2, leaderId: 'x' })
     addCity(world, { id: 'c2', realmId: 'r2', x: 8, y: 6 })
     world.residents.push(
@@ -174,6 +206,7 @@ describe('params in a script', () => {
     )
     expect(seen('r2')).toMatchObject({ script: { scriptId: SCRIPT } })
     expect(seen('r2')!.script).not.toHaveProperty('params')
+    expect(seen('r2')).not.toHaveProperty('scriptParams')
   })
 })
 
@@ -241,7 +274,8 @@ describe('the set-script-param order', () => {
 
     it('keeps a whole number of zero or more, and clears it with null', () => {
       const { world } = farmWorld()
-      for (const n of [0, 12]) expect(numbers.validate(world, sender, typed('take', n))).toBeUndefined()
+      for (const n of [0, 12])
+        expect(numbers.validate(world, sender, typed('take', n))).toBeUndefined()
       numbers.apply(world, sender, typed('take', 12))
       expect(world.residents[0]!.scriptParams).toEqual({ [SCRIPT]: { take: 12 } })
       expect(scriptParamsSound(world)).toEqual([])
@@ -283,6 +317,102 @@ describe('the set-script-param order', () => {
     queue.applyAll(world)
     expect(world.residents[0]!.script?.scriptId).toBe(SCRIPT)
     expect(world.residents[0]!.scriptParams).toEqual({ [SCRIPT]: { home: 'farm' } })
+  })
+})
+
+describe('params given with the order starting a script', () => {
+  const sender = { userId: MARA, account: { name: 'Mara', isAdmin: false } }
+  const SOURCE = `param store: storage
+param rounds: number = 5
+param take: number
+memory.store = params.store
+memory.rounds = params.rounds
+memory.take = params.take
+`
+  const scripts = host({ value: SOURCE })
+  const kinds = {
+    ...orderKinds,
+    runScript: runScriptOrder(scripts),
+    task: taskOrder({ defaultScript: () => SCRIPT, script: scripts.script }),
+  }
+  const run = (params?: unknown) => ({
+    kind: 'runScript',
+    residentId: 'w1',
+    scriptId: SCRIPT,
+    ...(params === undefined ? {} : { params }),
+  })
+
+  /** Gives the order as the UI does, then runs scripts once, as the next tick does. */
+  function give(world: WorldState, terrain: TerrainMap, order: object) {
+    const queue = new OrderQueue(kinds, terrain)
+    expect(queue.receive(world, sender, 'a', order)).toEqual({ type: 'ack', requestId: 'a' })
+    queue.applyAll(world)
+    expect(new ScriptRunner(terrain, scripts).runAll(world, true)).toEqual([])
+  }
+
+  it('sets them before the script’s first tick', () => {
+    const { world, terrain, w } = farmWorld()
+    storage(world, 's1', 12, 6)
+    give(world, terrain, run({ store: 's1', rounds: 3 }))
+    expect(w.script!.memory).toMatchObject({ store: { id: 's1' }, rounds: 3, take: null })
+    expect(w.scriptParams).toEqual({ [SCRIPT]: { store: 's1', rounds: 3 } })
+    expect(scriptParamsSound(world)).toEqual([])
+  })
+
+  it('null clears a kept value back to its default, and one left out keeps its value', () => {
+    const { world, terrain, w } = farmWorld()
+    storage(world, 's1', 12, 6)
+    w.scriptParams = { [SCRIPT]: { store: 's1', rounds: 3, take: 2 } }
+    give(world, terrain, run({ rounds: null, take: 7 }))
+    expect(w.script!.memory).toMatchObject({ store: { id: 's1' }, rounds: 5, take: 7 })
+    expect(w.scriptParams).toEqual({ [SCRIPT]: { store: 's1', take: 7 } })
+  })
+
+  it('the task order sets them for the default script too', () => {
+    const { world, terrain, farm, w } = farmWorld()
+    w.script = undefined
+    give(world, terrain, {
+      kind: 'task',
+      task: 'work',
+      residentId: 'w1',
+      workplaceId: farm.id,
+      params: { take: 4 },
+    })
+    expect(w.script!.memory).toMatchObject({ workplaceId: farm.id, rounds: 5, take: 4 })
+  })
+
+  it('turns down values that don’t fit the script’s params', () => {
+    const { world, farm, w } = farmWorld()
+    // Working there by a bare work-at order, so the Work task can be given.
+    w.script = undefined
+    const check = (order: { kind: string }) => kinds[order.kind]!.validate(world, sender, order)
+    expect(check(run({ away: 3 }))).toBe('away: the script has no such param')
+    expect(check(run({ rounds: -1 }))).toBe('rounds: must be a whole number of zero or more')
+    expect(check(run({ store: 'farm' }))).toBe(
+      'store: must be a storage, a stable or a carriage of yours',
+    )
+    expect(check(run([3]))).toBe('params must be values by name')
+    const task = { kind: 'task', task: 'work', residentId: 'w1', workplaceId: farm.id }
+    expect(check({ ...task, params: { take: 'farm' } })).toBe(
+      'take: must be a whole number of zero or more',
+    )
+    expect(check(run({ rounds: 0, take: null }))).toBeUndefined()
+  })
+
+  it('a queue step keeps its values and sets them when it starts', () => {
+    const { world, terrain, w } = farmWorld()
+    w.script = undefined
+    w.order = null
+    give(world, terrain, {
+      kind: 'queue',
+      residentId: 'w1',
+      steps: [{ order: run({ take: 9 }) }],
+    })
+    expect(w.queue!.steps[0]!.order).toMatchObject({ params: { take: 9 } })
+    new QueueRunner(scripts, kinds, terrain).runAll(world)
+    expect(w.scriptParams).toEqual({ [SCRIPT]: { take: 9 } })
+    expect(new ScriptRunner(terrain, scripts).runAll(world, true)).toEqual([])
+    expect(w.script!.memory).toMatchObject({ take: 9 })
   })
 })
 

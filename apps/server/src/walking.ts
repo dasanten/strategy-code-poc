@@ -3,6 +3,7 @@ import {
   armySpot,
   inContact,
   carriageCanEnter,
+  carriageCanGoTo,
   driveSpeed,
   drivingLearned,
   groundAt,
@@ -14,7 +15,6 @@ import {
   wallSide,
   strandedOnWall,
   tileIndex,
-  terrainAt,
   wallMap,
   wallsKey,
   roadTiles,
@@ -79,7 +79,7 @@ export const walkTo: OrderKind = {
     if (!r) return 'not one of your residents'
     if (!Number.isInteger(o.x) || !Number.isInteger(o.y)) return 'the target must be a tile'
     // A rider goes where a carriage could (`CONTEXT.md`: Riding).
-    if (r.riding !== undefined && terrain && !carriageCanEnter(terrainAt(terrain, o.x!, o.y!))) {
+    if (r.riding !== undefined && terrain && !carriageCanGoTo(world, terrain, o.x!, o.y!)) {
       return 'a horse can’t go there'
     }
     return undefined
@@ -288,6 +288,12 @@ export class Walking {
       if (waiting.has(r.id)) continue
       const ground = groundAt(this.terrain, roads, next[0], next[1])
       const riding = onFoot(o) ? horseRidden(world, r) : undefined
+      // The road over Mountain on the way is gone: a carriage or horse finds a new way.
+      if ((!onFoot(o) || riding) && !carriageCanEnter(ground)) {
+        o.path = null
+        o.progress = 0
+        continue
+      }
       if (!onFoot(o)) {
         // The horse sets the pace (`CONTEXT.md`: Horse stats). Without one the step goes at
         // once, so resolving it ends the order.
@@ -409,8 +415,17 @@ export class Walking {
         const horse = carriage && horseFor(world, carriage)
         const together =
           carriage?.x === r.x && carriage.y === r.y && horse?.x === r.x && horse.y === r.y
-        if (!carriage || !horse || !together || !carriageCanEnter(ground)) {
+        if (!carriage || !horse || !together) {
           r.order = null
+          continue
+        }
+        // A road torn down on Mountain under a path found earlier: find a new way.
+        if (!carriageCanEnter(ground)) {
+          const o = moveOrder(r)
+          if (o) {
+            o.path = null
+            o.progress = 0
+          }
           continue
         }
         carriage.horseId = horse.id

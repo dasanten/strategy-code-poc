@@ -130,6 +130,19 @@ export function canWork(resident: Resident, tick: number): boolean {
   return ageInYears(resident, tick) >= ADULT_AGE
 }
 
+/** The goods a child may pick up, put down, Fetch and Store: their meals (`CONTEXT.md`: Child). */
+export const CHILD_GOODS: readonly Good[] = ['food']
+
+/**
+ * Whether a resident may pick up, put down, Fetch or Store these goods: anyone grown up, a child
+ * only `CHILD_GOODS` (`CONTEXT.md`: Child).
+ */
+export function canHandle(resident: Resident, tick: number, goods: readonly string[]): boolean {
+  return (
+    canWork(resident, tick) || goods.every((g) => (CHILD_GOODS as readonly string[]).includes(g))
+  )
+}
+
 /** Stats start to decline at this age in game years (`CONTEXT.md`: Aging). */
 export const DECLINE_AGE = 45
 
@@ -768,6 +781,16 @@ export const OUTPOST_REFILL_REACH = 3
 export const OWN_FOOD = 4 * FOOD_PER_DAY
 
 /**
+ * The default of `foodAt` in the Work, Build and Tear down defaults (`CONTEXT.md`: Getting food),
+ * in whole units: about a day of Food, rounded up. No more than `HOME_FOOD_LOW`, so a resident at
+ * home refills before they would walk for Food.
+ */
+export const GET_FOOD_AT = Math.ceil(FOOD_PER_DAY)
+
+/** The default of `foodTake` in those defaults, in whole units: six game days of Food. */
+export const GET_FOOD_TAKE = Math.ceil(6 * FOOD_PER_DAY)
+
+/**
  * Food a resident running the Breed horses default takes from the stable before they start, if
  * they carry less (`CONTEXT.md`: Breeding): their meals for the `STABLE_BREED_DAYS` of tending,
  * away from home.
@@ -932,7 +955,8 @@ export const HAUL_KEEP_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
  * Plains (`CONTEXT.md`: Carriage): twice as fast on Plains, a little slower than walking in Forest
- * and Hills, and faster still on a road. Mountains are missing: a carriage cannot enter them.
+ * and Hills, and faster still on a road. Mountains are missing: a carriage enters them only on a
+ * road (`Terrain.Road`).
  */
 export const CARRIAGE_SPEED = {
   [Terrain.Plains]: 2,
@@ -951,7 +975,10 @@ export const DRIVING_SKILL_LIMIT = 0.5
 /** Driving skill a driver of average Intellect gains per game day of driving. */
 export const DRIVING_SKILL_PER_DAY = 1
 
-/** Whether a carriage can enter a tile of the given terrain: passable land, but no mountains. */
+/**
+ * Whether a carriage can enter ground of the given kind (`groundAt`): passable land or a road, but
+ * no bare mountains (`carriageCanGoTo`).
+ */
 export function carriageCanEnter(terrain: number): boolean {
   return ((CARRIAGE_SPEED as Partial<Record<number, number>>)[terrain] ?? 0) > 0
 }
@@ -1247,6 +1274,12 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   farm: TICKS_PER_GAME_DAY / 2,
   carriage: 2 * TICKS_PER_GAME_DAY,
 }
+
+/**
+ * How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
+ * materials, but building goes at a quarter of the usual speed.
+ */
+export const MOUNTAIN_ROAD_WORK_FACTOR = 4
 
 /**
  * The most tiles one road order along a line may cover (`roadLine`): about a game week of one

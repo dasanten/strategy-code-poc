@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react'
 import {
+  CHILD_GOODS,
   GOODS,
   QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_STEP_KINDS,
   TICKS_PER_GAME_HOUR,
+  canWork,
   neverEnds,
   type Building,
   type BuildingKind,
@@ -36,7 +38,12 @@ type Tile = { x: number; y: number }
 const TICKS_PER_GAME_MINUTE = TICKS_PER_GAME_HOUR / 60
 
 /** The Store order the card gives: everything carried, keeping their own Food. */
-export const STORE_ALL: OrderRequest = { kind: 'store', goods: [...GOODS] }
+export const STORE_ALL = { kind: 'store', goods: [...GOODS] } satisfies OrderRequest
+
+/** `STORE_ALL` for this resident: a child stores only the goods children may (`CONTEXT.md`: Child). */
+export function storeAll(r: Pick<Resident, 'bornAt'>, tick: number): typeof STORE_ALL {
+  return canWork(r as Resident, tick) ? STORE_ALL : { kind: 'store', goods: [...CHILD_GOODS] }
+}
 
 /**
  * The order that appends `order` to the resident's queue, or starts one with it: a `queue` order

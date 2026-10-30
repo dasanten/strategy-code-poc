@@ -15,11 +15,14 @@ export interface Program {
 
 /**
  * `param name: type`: a value the Player picks for whoever runs the script, read as
- * `params.name`.
+ * `params.name`. A `number` param may declare a default, `param name: number = 3`, that it
+ * reads while none is set.
  */
 export interface ParamDeclaration extends Position {
   name: string
   type: ParamType
+  /** The `= n` of a `number` param: a whole number of zero or more. */
+  default?: number
 }
 
 /** What a `param` can hold. */

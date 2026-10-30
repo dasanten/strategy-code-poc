@@ -103,22 +103,58 @@ describe('children', () => {
     expect(world.events.filter((e) => e.kind === 'grownUp')).toHaveLength(1)
   })
 
-  it('can’t pick up or put down goods, but can walk home and be fed there', () => {
+  it('pick up, put down, fetch and store Food, but no other good', () => {
+    const { world, queue, child } = bornOnTheFarm()
+    const storage = world.buildings.find((b) => b.cityId === child.cityId && b.kind === 'storage')!
+    storage.stock = { food: 100_000, wood: 50 }
+    const walking = new Walking(terrain)
+    const send = (o: object) => queue.receive(world, me, 'q', { residentId: child.id, ...o })
+    const carry = 'children can’t pick up or put down goods'
+    const storing = 'children can’t store or fetch goods'
+    const ground = { kind: 'ground' }
+    world.piles.push({ id: 'p1', x: child.x, y: child.y, goods: { food: 5, wood: 5 } })
+
+    // Wood stays refused, alone or with Food, for every way of handling goods.
+    expect(send({ kind: 'pickUp', spot: ground, goods: { wood: 5 } })).toMatchObject({
+      type: 'rejected',
+      reason: carry,
+    })
+    expect(send({ kind: 'pickUp', spot: ground, goods: { food: 5, wood: 5 } })).toMatchObject({
+      reason: carry,
+    })
+    expect(send({ kind: 'fetch', goods: ['wood'] })).toMatchObject({ reason: storing })
+    expect(send({ kind: 'store', goods: ['food', 'wood'] })).toMatchObject({ reason: storing })
+
+    // Food they pick up from the ground and put down again.
+    child.carried = {}
+    expect(send({ kind: 'pickUp', spot: ground, goods: { food: 5 } })).toMatchObject({
+      type: 'ack',
+    })
+    queue.applyAll(world)
+    stepWorld(world, terrain, walking)
+    expect(child.carried).toEqual({ food: 5 })
+    expect(send({ kind: 'drop', spot: ground, goods: { food: 2 } })).toMatchObject({ type: 'ack' })
+    queue.applyAll(world)
+    stepWorld(world, terrain, walking)
+    expect(child.carried.food).toBe(3)
+    expect(world.piles.find((p) => p.x === child.x && p.y === child.y)?.goods.wood).toBe(5)
+
+    // Food they fetch from the city's storage, walking there.
+    expect(send({ kind: 'fetch', goods: { food: 10 } })).toMatchObject({ type: 'ack' })
+    queue.applyAll(world)
+    for (let t = 0; t < 5000 && child.order?.kind === 'fetch'; t++)
+      stepWorld(world, terrain, walking)
+    expect(child.orderEnded).toMatchObject({ kind: 'fetch', reason: null })
+    expect(child.carried.food).toBeGreaterThanOrEqual(13)
+    expect(child.carried.wood ?? 0).toBe(0)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('walk home and are fed there', () => {
     const { world, queue, child } = bornOnTheFarm()
     const storage = world.buildings.find((b) => b.cityId === child.cityId && b.kind === 'storage')!
     const walking = new Walking(terrain)
     const send = (o: object) => queue.receive(world, me, 'q', { residentId: child.id, ...o })
-    const carry = 'children can’t pick up or put down goods'
-    world.piles.push({ id: 'p1', x: child.x, y: child.y, goods: { food: 5 } })
-    expect(send({ kind: 'pickUp', spot: { kind: 'ground' }, goods: { food: 5 } })).toMatchObject({
-      type: 'rejected',
-      reason: carry,
-    })
-    child.carried = { food: 1 }
-    expect(send({ kind: 'drop', spot: { kind: 'ground' }, goods: { food: 1 } })).toMatchObject({
-      type: 'rejected',
-      reason: carry,
-    })
 
     // Born on the farm outside the wall, they walk home, where they take meals from storage.
     const home = { x: storage.x - 2, y: storage.y + 2 }
@@ -144,5 +180,27 @@ describe('children', () => {
     expect(checkInvariants(world, terrain)).toContainEqual(
       expect.objectContaining({ invariant: 'children-dont-work', entityIds: [child.id] }),
     )
+  })
+
+  it('are watched by an invariant: a child handles no good but Food', () => {
+    const { world, child } = bornOnTheFarm()
+    const broken = () =>
+      checkInvariants(world, terrain).filter((v) => v.invariant === 'children-carry-only-food')
+    child.carried = { food: 4 }
+    child.order = { kind: 'drop', to: { kind: 'ground' }, goods: { food: 2 } }
+    expect(broken()).toEqual([])
+
+    child.carried = { food: 4, wood: 1 }
+    child.order = null
+    expect(broken()).toEqual([expect.objectContaining({ entityIds: [child.id] })])
+
+    child.carried = { food: 4 }
+    child.order = { kind: 'pickUp', from: { kind: 'ground' }, goods: { stone: 1 } }
+    expect(broken()).toEqual([expect.objectContaining({ entityIds: [child.id] })])
+
+    // Grown up, anything goes.
+    world.tick = child.bornAt + ticksForAge(ADULT_AGE)
+    child.carried = { food: 4, wood: 1 }
+    expect(broken()).toEqual([])
   })
 })

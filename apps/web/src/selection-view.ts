@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   BUILDABLE,
+  CHILD_GOODS,
   SHARES_A_TILE,
   GOODS,
   HORSE_FOOD_PER_DAY,
@@ -64,6 +65,7 @@ import {
   recipeFor,
   recipeGood,
   teardownWork,
+  workFactor,
   UNEXPLORED,
 } from '@csp/shared'
 import type { Relationship } from './theme.js'
@@ -151,7 +153,7 @@ export interface CardAction {
 
 /** What a resident's card needs to know about them and their tile. */
 export interface ResidentHere {
-  /** A child can't build, work, carry goods, drive or pair (`CONTEXT.md`: Child). */
+  /** A child can't build, work, drive or pair, and handles only Food (`CONTEXT.md`: Child). */
   adult: boolean
   /** They have an order or run a script, so there is something to stop. */
   busy: boolean
@@ -209,9 +211,9 @@ export function isWorkable(building: Building | undefined, node: KnownNode | und
 
 /**
  * The actions a resident's card offers, in the order it shows them. Orders they can't take right
- * now are left out (ADR 0012): a child's work, building, goods and pairing (`CONTEXT.md`: Child),
- * the work, building, hauling and pairing of someone carrying a child (`CONTEXT.md`: Carrying),
- * and Goods with nothing carried and nothing on their tile to pick up.
+ * now are left out (ADR 0012): a child's work, building and pairing (`CONTEXT.md`: Child), the
+ * work, building, hauling and pairing of someone carrying a child (`CONTEXT.md`: Carrying), and
+ * Goods with nothing carried and nothing on their tile to pick up (for a child: no Food).
  */
 export function residentActions(h: ResidentHere): CardAction[] {
   const row = (id: ActionId, label: string, more: Partial<CardAction> = {}): CardAction => ({
@@ -274,7 +276,9 @@ export function residentActions(h: ResidentHere): CardAction[] {
     if (h.building?.kind === 'stable' && !h.building.site)
       add(row('breed', 'Breed horses…', { opens: true }))
   }
-  if (h.adult && (h.carries || goodsOnTile(h))) add(row('goods', 'Goods…', { opens: true }))
+  if (h.carries || goodsOnTile(h, h.adult ? GOODS : CHILD_GOODS)) {
+    add(row('goods', 'Goods…', { opens: true }))
+  }
   if (works && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
   if (h.wallsInSight > 0) add(row('walls', 'Break or climb a wall…', { opens: true }))
@@ -292,10 +296,12 @@ export function residentActions(h: ResidentHere): CardAction[] {
   return actions
 }
 
-/** Whether there are goods on a resident's tile to pick up: on the ground, stored, at a site or on a carriage. */
-function goodsOnTile(h: ResidentHere): boolean {
-  const some = (stock: Stock | undefined) =>
-    !!stock && Object.values(stock).some((n) => (n ?? 0) > 0)
+/**
+ * Whether there are some of `goods` on a resident's tile to pick up: on the ground, stored, at a
+ * site or on a carriage.
+ */
+function goodsOnTile(h: ResidentHere, goods: readonly Good[]): boolean {
+  const some = (stock: Stock | undefined) => !!stock && goods.some((g) => (stock[g] ?? 0) > 0)
   return (
     some(h.pile?.goods) ||
     some(h.storage?.stock) ||
@@ -910,7 +916,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   }
   const terrain = terrainLine(t.terrain, road)
   if (road) {
-    lines.push(road.site ? 'Road site' : terrain!)
+    lines.push(road.site ? roadSiteLine(road, t.terrain) : terrain!)
     if (road.teardown) lines.push(teardownLine(road))
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
@@ -924,6 +930,18 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(buildHere ? { buildHere } : {}),
     ...(passengers ? { passengers } : {}),
   }
+}
+
+/**
+ * How far a road site has come (`CONTEXT.md`: Road), on `terrain` beneath it: "Road site · 25% of
+ * the work done", and on Mountain how many times the work it takes there (`workFactor`).
+ */
+function roadSiteLine(site: Building, terrain: number | undefined): string {
+  const work = BUILD_WORK.road ?? 0
+  const done = work > 0 ? Math.floor(((site.site?.work ?? 0) / work) * 100) : 100
+  const factor = workFactor('road', terrain)
+  const mountain = factor > 1 ? ` · ${factor}× the work on Mountain` : ''
+  return `Road site · ${done}% of the work done${mountain}`
 }
 
 /** The explored terrain's name, undefined while it is unknown. */
