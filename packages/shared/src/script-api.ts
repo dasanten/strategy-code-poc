@@ -278,6 +278,15 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     description:
       'About how many ticks I take to walk from one thing with `x` and `y` to another: the straight way across the terrain, diagonally where it slants, roads and walls left out.',
   },
+  {
+    name: 'crewTile',
+    is: 'query',
+    params: ['building'],
+    returns: { view: 'tile' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'Where to stand at a building I see to work, build or breed there: the tile of its footprint with the fewest of my realm’s crew on it (those holding a work-at, build or breed order there, and those on their way with the tile in their `memory.at`), the nearest to me on ties, so my own tile while it is among the fewest; null for a building I don’t see.',
+  },
 
   action('walkTo', ['x', 'y'], 'Walk to a tile.'),
   action('drive', ['carriageId', 'x', 'y'], 'Drive the carriage on my tile to a tile.'),
@@ -413,6 +422,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'renameCity',
     ['cityId', 'name'],
     'Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.',
+  ),
+  action(
+    'renameHorse',
+    ['horseId', 'name'],
+    'Give a horse of my realm a new name: free and at once, from anywhere, like renaming a resident. Names need not be unique.',
   ),
   action(
     'claimHorses',

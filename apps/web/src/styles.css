@@ -947,6 +947,24 @@ label > select {
   background: transparent;
   font-size: 12px;
 }
+/* A horse: name and place, stats, age, health and hunger; narrow enough not to scroll. */
+.horses .residents-table {
+  min-width: 0;
+}
+.horses-row {
+  grid-template-columns: minmax(0, 2fr) 54px 22px 44px 44px;
+  gap: 6px;
+}
+.residents-row.horses-row.heading {
+  letter-spacing: 0;
+}
+.horses-row .mono {
+  white-space: nowrap;
+}
+.residents-row .doing .name {
+  display: block;
+  color: var(--ui-text);
+}
 .residents-row .mono {
   font-variant-numeric: tabular-nums;
   color: var(--ui-muted);

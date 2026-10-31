@@ -6,6 +6,7 @@ import {
   nearestWarehouse,
   owedBy,
   quoteTransfer,
+  stockFloor,
   transferFee,
   transferLoad,
   transferTiles,
@@ -137,6 +138,11 @@ describe('caravans carrying out transfers', () => {
     () => {
       const { world, terrain, queue, city, toCity, storage, toStorage, realm, other } = setup()
       storage.stock!.iron = 40
+      // Every warehouse at its floor in every good, so the Trade Organization's own chain
+      // (`CONTEXT.md`: Trade Org HQ) forges no Iron away while the transfer is under way.
+      for (const b of world.buildings) {
+        if (b.kind === 'warehouse') b.stock = { ...stockFloor(world, b), ...b.stock }
+      }
       const coins = storage.stock!.coins ?? 0
       const iron = total(world, 'iron')
       const before = toStorage.stock!.iron ?? 0

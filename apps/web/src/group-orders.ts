@@ -624,7 +624,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
 /** The resident card's own orders: every action it offers but the tile card's. */
 export type ResidentOrderId = Exclude<
   ActionId,
-  'sendHere' | 'gate' | 'openCity' | 'tradeHere' | 'renameCity'
+  'sendHere' | 'gate' | 'openCity' | 'tradeHere' | 'renameCity' | 'renameHorse'
 >
 
 /**

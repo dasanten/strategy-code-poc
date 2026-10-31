@@ -200,7 +200,7 @@ describe('getting food in the Work default', () => {
   it('carrying the output with foodTake set tops their food up to it', () => {
     const { world, terrain, camp } = campWorld()
     const s = storage(world, 's1', camp.x + 6, camp.y, { food: 50 })
-    const w = addWorker(world, camp, OWN_FOOD, { foodTake: 12 })
+    const w = addWorker(world, camp, OWN_FOOD, { foodTake: 12, crewFood: 0 })
     world.piles.push({ id: 'p', x: camp.x, y: camp.y, goods: { wood: 100 } })
     let went = false
     run(world, terrain, w, () => {

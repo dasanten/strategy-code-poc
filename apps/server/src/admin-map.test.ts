@@ -94,6 +94,7 @@ function setup(): WorldState {
     y: 40,
     hunger: 100,
     health: 100,
+    name: 'Rowan',
     stats: { ...AVERAGE_HORSE_STATS },
     bornAt: 0,
   })

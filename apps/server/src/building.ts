@@ -1,7 +1,6 @@
 import {
   MAX_WORKERS,
   ON_PLAINS,
-  PROCESSING,
   BUILD_WORK,
   MAP_SIZE,
   buildAtProblem,
@@ -118,13 +117,13 @@ function laidOutFor(world: WorldState, r: Resident, kind: BuildingKind): string 
 }
 
 /**
- * A workplace on a node that a resident of an NPC city lays out is one of that city's workplaces
+ * A workplace other than a farm that a resident of an NPC city lays out, on a node or one that
+ * processes goods (a smelter, mint or smithy), is one of that city's workplaces
  * (`City.workplaceIds`), so the city works it (`CONTEXT.md`: NPC city). It still belongs to no
  * city: whoever works it holds it.
  */
 function ownWorkplace(world: WorldState, r: Resident, kind: BuildingKind, id: string): void {
-  if (MAX_WORKERS[kind] === undefined || ON_PLAINS.includes(kind) || PROCESSING.includes(kind))
-    return
+  if (MAX_WORKERS[kind] === undefined || ON_PLAINS.includes(kind)) return
   const city = world.cities.find((c) => c.id === r.cityId)
   if (!city || city.realmId !== null || r.owner !== null) return
   city.workplaceIds = [...(city.workplaceIds ?? []), id]

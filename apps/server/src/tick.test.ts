@@ -41,6 +41,7 @@ describe('runTick', () => {
       phases: expect.any(Object),
       residents: 8,
       actions: 8,
+      npcPlanMs: expect.any(Number),
       scriptRuns: 0,
       // Last seen works out once what the one realm sees.
       sightBuilds: 1,

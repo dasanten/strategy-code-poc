@@ -741,6 +741,69 @@ export interface WorldState {
    * kept with the Player, not the realm, so a claim outlives a Leader death.
    */
   horseOffersClaimed: number[]
+  /**
+   * The plan of each city the game runs, by city id (`CONTEXT.md`: NPC city; ADR 0016): what its
+   * residents do until its next planning pass. A city without one has not planned yet.
+   */
+  cityPlans: Record<string, CityPlan>
+}
+
+/**
+ * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
+ * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
+ * (NPC trader), found its daughter (Founding), or nothing, until the next pass moves them.
+ */
+export interface CityJob {
+  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'idle'
+  /** The farm or workplace to work, for `farm` and `work`. */
+  buildingId?: string
+}
+
+/** What a game-run city builds or takes down next (`CONTEXT.md`: NPC city), as plain data. */
+export type CityProject =
+  | { kind: 'build'; building: BuildingKind; x: number; y: number }
+  | { kind: 'tearDown'; buildingId: string }
+
+/** A game-run city's trade run under way (`CONTEXT.md`: NPC trader). */
+export interface CityTrader {
+  /** The trader, one of its spare hands. */
+  residentId: string
+  /** The Trade Org warehouse they trade at. */
+  warehouseId: string
+  /** The load still to sell there; empty once sold. */
+  sells: Stock
+  /** What they still buy there, up to what the city is short of; empty once bought. */
+  buys: Stock
+  /** The tick they were sent. */
+  since: number
+}
+
+/**
+ * What a city the game runs decided at its last planning pass (`CONTEXT.md`: NPC city;
+ * ADR 0016), kept in the world so a restart forgets nothing: plain serialisable data like an
+ * order's state (ADR 0002). Only the pass changes the jobs; between passes the city hands them
+ * out, and replaces its project once it is finished.
+ */
+export interface CityPlan {
+  /** The tick of the pass that made it. */
+  plannedAt: number
+  /** A job per resident of the city, by resident id. */
+  jobs: Record<string, CityJob>
+  /** What the city builds or takes down next; none when it has nothing to build. */
+  project?: CityProject
+  /** Its trade run under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
+  trader?: CityTrader
+  /**
+   * Since when it has been full (`CONTEXT.md`: Full city); while its founding party is out (its
+   * residents with the `found` job), since when the party has been on its way (`CONTEXT.md`:
+   * Founding).
+   */
+  fullSince?: number
+  /**
+   * The tile of the town hall it founds its daughter round (`CONTEXT.md`: Founding): found once
+   * full, and the founding party's goal once it is out.
+   */
+  foundingSite?: { x: number; y: number }
 }
 
 /**
@@ -1485,13 +1548,16 @@ export type RealmEventWhat =
   | { kind: 'born'; residentId: string; name: string; parents: [string, string] }
   /** A child reached `ADULT_AGE` and can now work (`CONTEXT.md`: Child, Aging). */
   | { kind: 'grownUp'; residentId: string; name: string }
-  /** One of the realm's horses starved to death (`CONTEXT.md`: Horse). */
-  | { kind: 'horseDied'; horseId: string }
   /**
-   * A ridden horse of the realm went hungry and its rider, `name`, carries no Food to spare for it
-   * (`CONTEXT.md`: Riding).
+   * One of the realm's horses, `name`, starved to death (`CONTEXT.md`: Horse). Entries from before
+   * horses had names (`CONTEXT.md`: Horse name) have none.
    */
-  | { kind: 'horseHungry'; horseId: string; residentId: string; name: string }
+  | { kind: 'horseDied'; horseId: string; name?: string }
+  /**
+   * A ridden horse of the realm, `horseName`, went hungry and its rider, `name`, carries no Food
+   * to spare for it (`CONTEXT.md`: Riding). Entries from before horses had names have no `horseName`.
+   */
+  | { kind: 'horseHungry'; horseId: string; residentId: string; name: string; horseName?: string }
   /**
    * The one-time Horse grant (`CONTEXT.md`: Horse grant) gave the realm `horseIds`: in its stable
    * at (`x`, `y`), or, with no stable, on the ground next to the storage of `city` or next to the
@@ -1517,8 +1583,11 @@ export type RealmEventWhat =
       x: number
       y: number
     }
-  /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
-  | { kind: 'foaled'; horseId: string; stableId: string }
+  /**
+   * Two of the realm's horses had a foal, `name`, at a stable (`CONTEXT.md`: Stable). Entries from
+   * before horses had names have none.
+   */
+  | { kind: 'foaled'; horseId: string; stableId: string; name?: string }
   /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */
   | { kind: 'allianceInvited'; allianceId: string; name: string }
   /**
@@ -1878,6 +1947,11 @@ export interface ConstructionSite {
  */
 export interface Horse {
   id: string
+  /**
+   * Its name (`CONTEXT.md`: Horse name): given by the game when it came into being, from a pool
+   * apart from the residents'; the Player may rename a horse of their realm. Need not be unique.
+   */
+  name: string
   /** The realm it belongs to; null for one of an NPC city (`cityId`) or of nobody. */
   realmId: string | null
   /**

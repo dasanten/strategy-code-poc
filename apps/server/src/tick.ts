@@ -49,6 +49,8 @@ export interface TickHealth {
   phases: Record<TickPhase, number>
   residents: number
   actions: number
+  /** Milliseconds the game-run cities spent planning (ADR 0016). */
+  npcPlanMs: number
   /**
    * The scripts that ran this tick, the Players' and the NPC cities' residents': waiting ones
    * (`CONTEXT.md`: Running a script, Waiting) and those a realm's budget skipped don't count.
@@ -152,7 +154,7 @@ export function runTick(
     const check = shouldCheckInvariants(opts.invariantSampleRate, opts.rand)
     const scriptViolations = timer.time('scripts', () => opts.scripts?.runAll(world, check) ?? [])
     const before = timer.time('invariants', () => (check ? tallyGoods(world) : undefined))
-    const { actions, npcScriptRuns } = timer.time('world', () => {
+    const { actions, npcScriptRuns, npcPlanMs } = timer.time('world', () => {
       takeMade(world)
       return stepWorld(world, terrain, opts.walking, timer)
     })
@@ -175,6 +177,7 @@ export function runTick(
       phases: timer.phases,
       residents: world.residents.length,
       actions,
+      npcPlanMs,
       scriptRuns: (opts.scripts?.runs ?? 0) + npcScriptRuns,
       sightBuilds: sight.builds,
       slow: durationMs > opts.slowTickMs,

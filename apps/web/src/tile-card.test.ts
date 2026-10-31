@@ -16,6 +16,7 @@ const horses: Horse[] = ['h1', 'h2', 'h3'].map((id) => ({
   y: 5,
   hunger: MAX_HUNGER,
   health: MAX_HEALTH,
+  name: 'Rowan',
   stats: { speed: 12, strength: 8, endurance: 10 },
   bornAt: 0,
 }))
@@ -49,6 +50,7 @@ const props = {
   onSetGate: () => {},
   onOpenCity: () => {},
   onRenameCity: () => {},
+  onRenameHorse: () => {},
   onSelectResident: () => {},
   onUnhitch: () => {},
 }
@@ -76,7 +78,7 @@ describe('the tile card of a stable', () => {
       }),
     )
     expect(html).toContain('3 horses (yours)')
-    expect(html.match(/<li>· Speed/g)).toHaveLength(3)
+    expect(html.match(/<li>· Rowan · Speed/g)).toHaveLength(3)
     expect(sharedKeys(tree)).toEqual([])
   })
 })

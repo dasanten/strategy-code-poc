@@ -3,7 +3,7 @@ import type { ResidentOrder, SeenResident } from '@csp/shared'
 import { ACTIVITY_ART, PAINTED_UNIT_ART, UNIT_ART, paintedCell } from './art.js'
 import { CLOSE_SCALE, FAR_SCALE, type Camera } from './camera.js'
 import { RELATIONSHIP_COLORS, type BadgeLayer, type TokenLayer } from './tokens.js'
-import { drawUnits, mountSpot, type UnitWorld } from './unit-tokens.js'
+import { drawUnits, mountSpot, type UnitWorld, type Where } from './unit-tokens.js'
 
 interface Placed {
   file: string
@@ -29,8 +29,11 @@ const resident = (
 ): SeenResident =>
   ({ id, owner, cityId: null, x: 10, y: 10, carried: {}, order: null, ...more }) as SeenResident
 
-/** Draws the residents at a zoom and returns every sprite placed, in drawing order. */
-function draw(residents: SeenResident[], scale: number) {
+/**
+ * Draws the residents at a zoom and returns every sprite placed, in drawing order; `where` puts
+ * tokens on their way between tiles (`Motion`), by default in place.
+ */
+function draw(residents: SeenResident[], scale: number, where?: Where) {
   const placed: Placed[] = []
   const tokens = {
     place: (file: string, x: number, y: number, size: number, tint?: number) =>
@@ -50,7 +53,7 @@ function draw(residents: SeenResident[], scale: number) {
     buildings: [],
   }
   const cam: Camera = { x: 10.5, y: 10.5, scale }
-  const spots = drawUnits(tokens, badges, cam, view, world, viewer, null)
+  const spots = drawUnits(tokens, badges, cam, view, world, viewer, null, where)
   return { placed, spots }
 }
 
@@ -119,6 +122,39 @@ describe('drawUnits: riders (CONTEXT.md: Riding)', () => {
     expect(icons.map((p) => p.file).sort()).toEqual(
       [ACTIVITY_ART.riding, ACTIVITY_ART.walking].sort(),
     )
+  })
+})
+
+describe('drawUnits: tokens on their way (CONTEXT.md: Motion on the map)', () => {
+  // Resident `a` is half a tile short of the tile it stepped onto, from the left.
+  const halfway: Where = (id, x, y) => (id === 'a' ? [x - 0.5, y] : [x, y])
+  /** The screen x of a tile x, the view centred on tile 10. */
+  const screenX = (tx: number, scale: number) => view.width / 2 + (tx - 10) * scale
+
+  it('draws a lone token where it is on its way', () => {
+    const { spots } = draw([resident('a', 'r1')], MIDDLE, halfway)
+    expect(spots.get('a')!.x).toBeCloseTo(screenX(9.5, MIDDLE))
+    expect(spots.get('a')!.y).toBeCloseTo(view.height / 2)
+  })
+
+  it('draws a group token at the mean of where its members are', () => {
+    const { spots } = draw([resident('a', 'r1'), resident('b', 'r1')], MIDDLE, halfway)
+    expect(spots.get('a')).toBe(spots.get('b'))
+    expect(spots.get('a')!.x).toBeCloseTo(screenX(9.75, MIDDLE))
+  })
+
+  it('draws each figure where it is on its way up close, the others in place', () => {
+    const inPlace = draw([resident('a', 'r1'), resident('b', 'r1')], CLOSE)
+    const moving = draw([resident('a', 'r1'), resident('b', 'r1')], CLOSE, halfway)
+    expect(moving.spots.get('a')!.x).toBeCloseTo(inPlace.spots.get('a')!.x - 0.5 * CLOSE)
+    expect(moving.spots.get('a')!.y).toBeCloseTo(inPlace.spots.get('a')!.y)
+    expect(moving.spots.get('b')).toEqual(inPlace.spots.get('b'))
+  })
+
+  it('draws a rider and their horse as one, on their way together', () => {
+    const { placed, spots } = draw([resident('a', 'r1', { riding: 'h' })], MIDDLE, halfway)
+    const mount = mountSpot(spots.get('a')!)
+    expect(horses(placed).map((h) => [h.x, h.y])).toEqual([[mount.x, mount.y]])
   })
 })
 
