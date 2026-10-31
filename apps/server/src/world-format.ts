@@ -18,7 +18,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 64
+export const WORLD_FORMAT_VERSION = 65
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -232,9 +232,12 @@ export const migrations: Record<number, MigrationStep> = {
   // `Resident.defenceScriptId`), absent for the Defend default. Nobody picked one before, so the
   // step leaves every resident as they are.
   62: (state) => state,
+  // Taken by Epic 48 (PR #603: cities keep their plan, `WorldState.cityPlans`), which reaches dev
+  // first; its step replaces this pass-through when the epics meet there.
+  63: (state) => state,
   // Every horse has a name (`CONTEXT.md`: Horse name, `Horse.name`). Those from before get one
   // from the pool, drawn from the world's seed and their id so every server names them alike.
-  63: (state) => {
+  64: (state) => {
     const world = structuredClone(state) as WorldState
     for (const h of world.horses) {
       h.name = horseName(mulberry32(hash(`${world.seed}:horse-name:${h.id}`)))
