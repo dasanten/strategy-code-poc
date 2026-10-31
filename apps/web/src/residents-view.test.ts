@@ -1,4 +1,10 @@
-import type { ContractView, Diplomacy } from '@csp/shared'
+import {
+  PAIRING_WAIT_DAYS,
+  PAIRING_WAIT_TICKS,
+  TICKS_PER_GAME_DAY,
+  type ContractView,
+  type Diplomacy,
+} from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
   GROUP_LIST_MAX,
@@ -6,6 +12,7 @@ import {
   carryLine,
   groupCard,
   groupResidents,
+  pairingDaysLeft,
   ARMY_TABS,
   GROUP_TABS,
   rememberTab,
@@ -205,5 +212,20 @@ describe('supplyLines', () => {
         (id) => food[id]!,
       ),
     ).toEqual(['Ada · following · 12 Food to take', 'Bo · haul route · 0 Food to take'])
+  })
+})
+
+describe('pairingDaysLeft', () => {
+  const since = 50 * TICKS_PER_GAME_DAY
+
+  it('counts the pairing wait down from when they paired', () => {
+    expect(pairingDaysLeft(since, since)).toBe(PAIRING_WAIT_DAYS)
+    expect(pairingDaysLeft(since, since + TICKS_PER_GAME_DAY)).toBe(PAIRING_WAIT_DAYS - 1)
+    expect(pairingDaysLeft(since, since + PAIRING_WAIT_TICKS - 1)).toBe(1)
+  })
+
+  it('is 0 ("Now") once the pairing wait has passed', () => {
+    expect(pairingDaysLeft(since, since + PAIRING_WAIT_TICKS)).toBe(0)
+    expect(pairingDaysLeft(since, since + 10 * PAIRING_WAIT_TICKS)).toBe(0)
   })
 })
