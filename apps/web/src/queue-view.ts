@@ -203,6 +203,35 @@ function withoutResident(order: OrderRequest): OrderRequest {
   return step
 }
 
+/**
+ * The order making these the resident's queue: an edit of the queue they work through, or a
+ * `queue` order starting one when they have none, as a paste into an empty planner does
+ * (`CONTEXT.md`: Planner clipboard). With no steps, the edit ends the queue.
+ */
+export function queueRequest(
+  r: Pick<Resident, 'id'> & Partial<Pick<Resident, 'queue'>>,
+  steps: QueueStepRequest[],
+  loop?: boolean,
+): OrderRequest {
+  if (r.queue) return editRequest(r, steps, loop)
+  return { kind: 'queue', residentId: r.id, steps, ...(loop === undefined ? {} : { loop }) }
+}
+
+/**
+ * The steps with `added` put after the one at index `after` (-1: first); a step that never ends
+ * gets a duration once another follows it. The ids `added` lack are given by whoever keeps the
+ * queue.
+ */
+export function insertSteps(
+  q: Pick<Queue, 'steps'>,
+  after: number,
+  added: readonly QueueStepRequest[],
+): QueueStepRequest[] {
+  const steps = stepsOf(q)
+  steps.splice(after + 1, 0, ...added)
+  return timed(steps)
+}
+
 /** The order editing the resident's queue to these steps. */
 export function editRequest(
   r: Pick<Resident, 'id'>,

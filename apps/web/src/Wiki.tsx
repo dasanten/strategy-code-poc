@@ -582,6 +582,16 @@ export function Wiki() {
           minutes (the real time shows beside it) or clear it, and switch loop on or off.
         </p>
         <p>
+          To reuse steps, tap one in the planner to pick it (<kbd>Shift</kbd>+tap picks a range;
+          tapping the picked one again unpicks it), then <strong>Copy</strong>.{' '}
+          <strong>Paste</strong> puts copies after the picked step, or at the end with none picked,
+          in the same planner, another resident's or a group's; the pasted steps are picked, so a
+          second Paste goes after them. <kbd>Ctrl</kbd>+<kbd>C</kbd> and <kbd>Ctrl</kbd>+
+          <kbd>V</kbd> do the same while the planner has focus. The clipboard is this browser's: it
+          survives switching cards, not reloading the page, and the server never sees it. A pasted
+          step keeps its places and the walk before it, and is checked again when its turn comes.
+        </p>
+        <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
           <code>end()</code>), or once its duration in game minutes is up, if you gave it one.
           Working a workplace, hauling and feeding a stable never end on their own, so such a step

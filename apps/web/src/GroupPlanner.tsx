@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { queueStepsProblem, type Building, type ScriptSummary } from '@csp/shared'
-import { QueueBlock } from './Residents.js'
+import { PasteSteps, QueueBlock } from './Residents.js'
 import { editPlan, EMPTY_PLAN, type QueuePlan } from './queue-view.js'
 
 /**
@@ -55,7 +55,12 @@ export function GroupPlanner({
           onEdit={(steps, loop) => onPlan(editPlan(plan, steps, loop))}
         />
       ) : (
-        <p className="muted small">Nothing planned yet. Plan steps with Add step.</p>
+        <>
+          <p className="muted small">
+            Nothing planned yet. Plan steps with Add step, or paste copied ones.
+          </p>
+          <PasteSteps onPaste={(steps) => onPlan(editPlan(plan, steps))} />
+        </>
       )}
       {addStep}
       <div className="order-buttons">
