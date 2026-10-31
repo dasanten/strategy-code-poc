@@ -897,7 +897,9 @@ export function Wiki() {
           within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
           the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house goes only in a
           city's area; a town hall, storage, wall or gate goes anywhere off Mountain and off
-          resource nodes, and a new town hall founds a city.
+          resource nodes, and a new town hall founds a city. A training ground, where residents
+          will train under a teacher, goes anywhere off Mountain and off resource nodes too, and
+          like a workplace it belongs to nobody.
         </p>
         <p>
           A resident building or tearing down who carries less Food than <code>foodAt</code> (

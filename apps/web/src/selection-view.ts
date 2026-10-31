@@ -815,6 +815,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       }
       const makes = live && makesLine(live, t, pile, goodLabels)
       if (makes) lines.push(makes)
+      // A finished training ground teaches nothing until someone teaches there (`CONTEXT.md`:
+      // Training ground); the Teach order comes with Training's next ticket.
+      if (building.kind === 'trainingGround') lines.push('Nobody teaches here yet')
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)

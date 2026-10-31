@@ -136,6 +136,15 @@ describe('buildings on a tile’s card', () => {
     )
   })
 
+  it('says nobody teaches at a finished training ground yet, and nothing of the kind at its site', () => {
+    const ground = building({ kind: 'trainingGround' })
+    const lines = linesOf({ buildings: [ground] })
+    expect(lines).toContain('Nobody teaches here yet')
+    expect(lines.some((l) => l.startsWith('Makes') || l.includes('workers'))).toBe(false)
+    const site = building({ kind: 'trainingGround', site: { work: 0, delivered: {} } })
+    expect(linesOf({ buildings: [site] })).not.toContain('Nobody teaches here yet')
+  })
+
   it('links a warehouse and a trading NPC city’s storage to their prices', () => {
     const cities = [
       { id: 'c-post', name: 'Saltgate', realmId: null, tradeOrg: 'post' as const },

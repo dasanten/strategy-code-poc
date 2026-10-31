@@ -1738,6 +1738,11 @@ export type BuildingKind =
   | 'smelter'
   | 'mint'
   | 'smithy'
+  /**
+   * A training ground (`CONTEXT.md`: Training ground): where residents train. It makes nothing,
+   * so it is no workplace; like one, it has no owner.
+   */
+  | 'trainingGround'
   | 'road'
   /**
    * A carriage site (`CONTEXT.md`: Carriage): only ever a construction site, laid out at a

@@ -44,8 +44,9 @@ import {
 /**
  * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters,
  * mints and smithies, town halls, storages, walls and gates (`CONTEXT.md`: Town hall, Storage,
- * Wall / Gate), houses and farms (`CONTEXT.md`: House, Farm), roads (`CONTEXT.md`: Road), and
- * carriages, whose site becomes a carriage (`CONTEXT.md`: Carriage).
+ * Wall / Gate), houses and farms (`CONTEXT.md`: House, Farm), training grounds (`CONTEXT.md`:
+ * Training ground), roads (`CONTEXT.md`: Road), and carriages, whose site becomes a carriage
+ * (`CONTEXT.md`: Carriage).
  */
 export const BUILDABLE: readonly BuildingKind[] = [
   'lumberCamp',
@@ -59,6 +60,7 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'smithy',
   'townHall',
   'storage',
+  'trainingGround',
   'wall',
   'gate',
   'road',
@@ -96,7 +98,8 @@ export function hasChoice(kind: BuildingKind): boolean {
 }
 /**
  * Buildable kinds that go on any passable terrain but Mountain, off any resource node
- * (`CONTEXT.md`: Where buildings go).
+ * (`CONTEXT.md`: Where buildings go): the processing workplaces, the city buildings and training
+ * grounds (`CONTEXT.md`: Training ground).
  */
 export const OFF_NODES: readonly BuildingKind[] = [
   ...PROCESSING,
@@ -105,6 +108,7 @@ export const OFF_NODES: readonly BuildingKind[] = [
   'storage',
   'wall',
   'gate',
+  'trainingGround',
 ]
 
 /** Buildable kinds that go on Plains, off any resource node: stables and farms. */
@@ -324,7 +328,7 @@ function lookupOf(terrain: TerrainMap | TerrainLookup): (x: number, y: number) =
  * (x, y) (`CONTEXT.md`: Where buildings go, Footprint), or undefined if it can: every tile of the
  * footprint passable and free of other buildings; workplaces with one tile on a resource node of
  * their kind, stables and farms wholly on Plains, smelters, mints, smithies, town halls, houses,
- * storages, walls and gates off Mountain, a house only in a city’s area (`CONTEXT.md`:
+ * storages, training grounds, walls and gates off Mountain, a house only in a city’s area (`CONTEXT.md`:
  * House); only a node’s workplace covers a node. A road goes on any passable land, Mountain too, node or not, and
  * next to a building on its tile, but one road per tile (`CONTEXT.md`: Road). A carriage site
  * goes on a tile of a finished stable or right next to one, where a carriage can stand, off any
