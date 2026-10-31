@@ -945,12 +945,19 @@ export const CARRIAGE_HALF_LOAD = 2 / 3
 export const DELIVERY_LOAD = CARRIAGE_CAPACITY - CARAVAN_FOOD
 
 /**
- * Food a haul route keeps on board for its horse unless the Player picks another amount, in
- * units (`CONTEXT.md`: Haul route): five game days (two real hours) of the horse's eating, topped
- * up at each stop that has Food. A trip takes real time, so this keeps its real-time length;
- * rounded up to whole units.
+ * The horse's share of the Food a haul route keeps on board, in units (`CONTEXT.md`: Haul route,
+ * Refilling from a carriage): five game days (two real hours) of the horse's eating, rounded up.
+ * The driver refills from the rest of what is kept, never from this.
  */
-export const HAUL_KEEP_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
+export const HAUL_HORSE_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
+
+/**
+ * Food a haul route keeps on board for its horse and its driver unless the Player picks another
+ * amount, in units (`CONTEXT.md`: Haul route, Refilling from a carriage): five game days (two
+ * real hours) of the horse's eating and the driver's, topped up at each stop that has Food. A trip
+ * takes real time, so this keeps its real-time length; rounded up to whole units.
+ */
+export const HAUL_KEEP_FOOD = Math.ceil(5 * (HORSE_FOOD_PER_DAY + FOOD_PER_DAY))
 
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
