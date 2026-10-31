@@ -670,7 +670,9 @@ export function Wiki() {
           storage, so they leave the city with food on them. Stats decline from age{' '}
           {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below {pct(DECLINE_FLOOR)};
           residents die of old age between {num(LIFESPAN_MIN)} and {num(LIFESPAN_MAX)}. A house
-          holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs up to {num(MAX_HEALTH)}.
+          holds {num(HOUSING_ROOM.house ?? 0)} residents (a site holds nobody yet), and a city's
+          free housing is the room of its houses minus its residents. Health runs up to{' '}
+          {num(MAX_HEALTH)}.
         </p>
       </Section>
 
