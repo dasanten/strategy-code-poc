@@ -268,6 +268,7 @@ export function QueueBlock({
   doing = '',
   scripts,
   buildings,
+  lastSeen,
   onEdit,
   title = 'Queue',
 }: {
@@ -275,11 +276,13 @@ export function QueueBlock({
   doing?: string
   scripts: ScriptSummary[]
   buildings: Building[]
+  /** The buildings remembered out of sight, to name steps acting there. */
+  lastSeen?: Building[]
   onEdit: (steps: QueueStepRequest[], loop?: boolean) => void
   title?: string
 }) {
   const [dragged, setDragged] = useState<number>()
-  const rows = queueRows(q, { scripts, buildings })
+  const rows = queueRows(q, { scripts, buildings, lastSeen })
   return (
     <section className="inspector-block" aria-label={title}>
       <div className="panel-head">
@@ -1031,6 +1034,7 @@ export function ResidentCard({
   onRide,
   scripts,
   buildings = [],
+  lastSeen,
   onRunScript,
   onEditScript,
   makeLeader,
@@ -1084,6 +1088,8 @@ export function ResidentCard({
   scripts: ScriptSummary[]
   /** The buildings in sight, to name where the resident stores or fetches goods. */
   buildings?: Building[]
+  /** The buildings remembered out of sight, to name queue steps acting there. */
+  lastSeen?: Building[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
   onRunScript: (scriptId: number) => void
   /** Opens a script in the library, such as the one the resident's task runs. */
@@ -1301,6 +1307,7 @@ export function ResidentCard({
             doing={doingLine(r, { scripts, buildings, residents })}
             scripts={scripts}
             buildings={buildings}
+            lastSeen={lastSeen}
             onEdit={onEditQueue}
           />
         ) : (
