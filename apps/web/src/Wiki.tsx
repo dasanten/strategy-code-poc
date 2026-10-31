@@ -224,6 +224,7 @@ import {
 } from './wiki-view.js'
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
+import { DEFAULT_REPEAT } from './plan-blocks.js'
 import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
@@ -587,6 +588,39 @@ export function Wiki() {
           The resident's card lists the queue with the current step marked and what they are doing
           in it. Drag a step or use its arrows to reorder it, remove it, type a duration in game
           minutes (the real time shows beside it) or clear it, and switch loop on or off.
+        </p>
+        <p>
+          To reuse steps, tap one in the planner to pick it (<kbd>Shift</kbd>+tap picks a range;
+          tapping the picked one again unpicks it), then <strong>Copy</strong>.{' '}
+          <strong>Paste</strong> puts copies after the picked step, or at the end with none picked,
+          in the same planner, another resident's or a group's; the pasted steps are picked, so a
+          second Paste goes after them. <kbd>Ctrl</kbd>+<kbd>C</kbd> and <kbd>Ctrl</kbd>+
+          <kbd>V</kbd> do the same while the planner has focus. The clipboard is this browser's: it
+          survives switching cards, not reloading the page, and the server never sees it. A pasted
+          step keeps its places and the walk before it, and is checked again when its turn comes.
+        </p>
+        <p>
+          To keep a plan, <strong>Save…</strong> it under a name, such as “Mine run”; saving under a
+          name already taken asks before it overwrites. <strong>Load…</strong> lists the saved
+          queues with their step count and date, to load one or delete it; loading adds its steps
+          after the planned ones, in any resident's planner or a group's. Saved queues are kept in
+          this browser, as saved groups are: the server never sees them, and another browser has its
+          own. A saved step keeps its places, so one whose building is gone from the map (torn down,
+          say) is flagged in the planner; it is still given, and skipped when its turn comes.
+        </p>
+        <p>
+          To do some steps several times in a row, pick them (in a row) and press{' '}
+          <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
+          times until you type another count. The block shows its count with its steps indented
+          under it; it is picked, moved, copied, pasted, saved and removed as one,
+          <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
+          Repeat blocks are the planner's own: on a resident's card, wrapping steps opens a plan of
+          their queue that waits for <strong>Give</strong> (or Discard), and giving it, or Give to
+          all on a group's plan, makes each block that many plain copies of its steps, so the queue,
+          the server and your scripts only ever see steps. The running queue lists the copies, the
+          current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after repeats; the
+          planner counts them and won't give a plan over that, saying by how much. Loop still loops
+          the whole queue.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}

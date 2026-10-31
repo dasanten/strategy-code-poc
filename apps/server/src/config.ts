@@ -52,7 +52,7 @@ export const config = {
   realtime: {
     /**
      * The largest frame a client may send, in bytes. The largest message the client has is a
-     * queue of `QUEUE_MAX_STEPS` steps of `QUEUE_STEP_MAX_CHARS` each, about 20 KB; a script
+     * queue of `QUEUE_MAX_STEPS` steps of `QUEUE_STEP_MAX_CHARS` each, about 50 KB; a script
      * save goes over HTTP. A larger frame closes the socket.
      */
     maxPayloadBytes: 64 * 1024,
