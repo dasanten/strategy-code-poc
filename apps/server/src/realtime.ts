@@ -1,4 +1,5 @@
 import type { IncomingMessage, Server } from 'node:http'
+import { fastifyCookie } from '@fastify/cookie'
 import { WebSocket, WebSocketServer } from 'ws'
 import {
   SCRIPT_WATCH_MAX,
@@ -28,6 +29,7 @@ import { getSessionUser, type SessionUser } from './auth.js'
 import { config } from './config.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
+import type { Logger } from './log.js'
 import type { OrderQueue } from './orders.js'
 import { foundStartingCity, realmOf, suggestedLeaderName } from './starting-city.js'
 import { eventsFor } from './events.js'
@@ -38,12 +40,14 @@ import type { TickReporter } from './tick.js'
 import { ClientView } from './sync.js'
 import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
 
-function readCookie(header: string | undefined, name: string): string | undefined {
-  for (const part of header?.split(';') ?? []) {
-    const [k, ...v] = part.trim().split('=')
-    if (k === name) return decodeURIComponent(v.join('='))
-  }
-  return undefined
+/**
+ * The session token in an upgrade request's cookie header, read as the HTTP routes read theirs
+ * (`@fastify/cookie`). A value that is not valid percent-encoding is kept as sent, so it matches
+ * no session; decoding it ourselves threw in the `upgrade` event, where nothing catches, and
+ * ended the process (#512).
+ */
+function sessionToken(header: string | undefined): string | undefined {
+  return header ? fastifyCookie.parse(header)[SESSION_COOKIE] : undefined
 }
 
 function send(socket: WebSocket, msg: ServerMessage) {
@@ -209,6 +213,8 @@ export function attachRealtime(
      * reports what is.
      */
     sightCheck?: { reporter: TickReporter; sampleRate: number; rand?: () => number }
+    /** Where an upgrade refused for an unexpected error is logged. */
+    logger?: Pick<Logger, 'error'>
     /** Which browsers may connect; the server's config by default. */
     origins?: OriginPolicy
     /** What one client may do; the server's config by default. */
@@ -305,15 +311,22 @@ export function attachRealtime(
     path: WS_PATH,
     // A larger frame closes the socket (1009) before it is buffered whole or parsed.
     maxPayload: limits.maxPayloadBytes,
+    // Runs in the HTTP `upgrade` event, where an uncaught error ends the process: whatever goes
+    // wrong refuses this one upgrade, and the server keeps serving the next (#512).
     verifyClient: ({ req }, done) => {
-      if (!originAllowed(req, origins)) return done(false, 403, 'Origin not allowed')
-      const user = getSessionUser(opts.db, readCookie(req.headers.cookie, SESSION_COOKIE))
-      if (!user) return done(false, 401, 'Not logged in')
-      if ((socketsOf.get(user.id)?.size ?? 0) >= limits.connectionsPerUser) {
-        return done(false, 429, 'Too many connections')
+      try {
+        if (!originAllowed(req, origins)) return done(false, 403, 'Origin not allowed')
+        const user = getSessionUser(opts.db, sessionToken(req.headers.cookie))
+        if (!user) return done(false, 401, 'Not logged in')
+        if ((socketsOf.get(user.id)?.size ?? 0) >= limits.connectionsPerUser) {
+          return done(false, 429, 'Too many connections')
+        }
+        users.set(req, user)
+        done(true)
+      } catch (err) {
+        opts.logger?.error({ err }, 'WebSocket upgrade refused: unexpected error')
+        done(false, 400, 'Bad request')
       }
-      users.set(req, user)
-      done(true)
     },
   })
 

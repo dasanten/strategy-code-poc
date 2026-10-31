@@ -76,6 +76,22 @@ export function createTickReporter(log: Logger): TickReporter {
       log.error({ err: error, tick: world.tick, seed: world.seed }, 'tick failed')
       withWorldScope(world, [], () => Sentry.captureException(error))
     },
+
+    scriptError(world, error, where) {
+      log.error(
+        { err: error, tick: world.tick, seed: world.seed, ...where },
+        where.scriptId === undefined
+          ? `scripts of realm ${where.realmId} failed`
+          : `script ${where.scriptId} failed and ended`,
+      )
+      withWorldScope(world, where.entityIds, (scope) => {
+        scope.setTag('realm_id', where.realmId)
+        if (where.scriptId !== undefined) scope.setTag('script_id', where.scriptId)
+        // The same bug groups into one Sentry issue, whichever script or resident hit it.
+        scope.setFingerprint(['script-error', '{{ default }}'])
+        Sentry.captureException(error)
+      })
+    },
   }
 }
 
