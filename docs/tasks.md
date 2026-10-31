@@ -21,6 +21,9 @@ hardening (Epic 44, the nine findings of the 2026-10-30 security review), Quick 
 Horses and food (46) and Under attack (47), in that order, all ahead of Bandits. Agreed with
 Daniel on 2026-10-31: NPC ambitions (Epic 48, ADR 0016, `docs/proposals/npc-ambitions.md`) next,
 ahead of Bandits.
+Agreed with Daniel on 2026-10-31, once its tickets were written: Cheaper ticks (Epic 49, the
+server-load review of the same day) comes right after NPC ambitions, ahead of everything agreed
+for after it.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -73,6 +76,7 @@ I sleep.
 | 46  | [Horses and food](https://github.com/dasanten/strategy-code-poc/issues/527)                   | ticketed                |
 | 47  | [Under attack](https://github.com/dasanten/strategy-code-poc/issues/531)                      | ticketed                |
 | 48  | [NPC ambitions](https://github.com/dasanten/strategy-code-poc/issues/567)                     | ticketed                |
+| 49  | [Cheaper ticks](https://github.com/dasanten/strategy-code-poc/issues/574)                     | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
