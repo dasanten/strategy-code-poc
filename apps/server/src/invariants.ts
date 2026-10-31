@@ -110,6 +110,7 @@ import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
 import { cityPlansSound, npcFarmersKept } from './npc-plan.js'
 import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
+import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
@@ -1909,6 +1910,7 @@ export const worldInvariants: Invariant[] = [
   foundingPartiesSound,
   npcCitiesHaveHalls,
   npcFarmersKept,
+  npcTradersSound,
   lineOrdersSound,
   pathsAreSteps,
   gameDefaultCarriers,

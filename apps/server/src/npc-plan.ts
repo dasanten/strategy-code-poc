@@ -1,5 +1,6 @@
 import {
   FOOD_PER_DAY,
+  MAP_SIZE,
   MAX_WORKERS,
   NPC_FOOD_SHORT_DAYS,
   NPC_PLAN_TICKS,
@@ -41,6 +42,7 @@ import {
 } from './npc-growth.js'
 import { chainGood, chainInput, holdsBatch, ownWorkplaces, shortGoods } from './npc-chain.js'
 import { foundingParty, planFounding } from './npc-founding.js'
+import { planTrader, traderOut } from './npc-trader.js'
 import { hash } from './residents.js'
 
 /*
@@ -208,9 +210,12 @@ export function planCity(
   const jobs: Record<string, CityJob> = {}
   let builders = adults.filter(isBuilder).length
   const spare: Resident[] = []
+  // The trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
+  const trader = city.tradeOrg ? undefined : traderOut(world, plan)
   for (const r of adults) {
     const at = workplaceOf(r)
-    if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
+    if (r.id === trader) jobs[r.id] = { kind: 'trade' }
+    else if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
     else if (r.carrying) jobs[r.id] = { kind: 'idle' }
     else if (isBuilder(r)) jobs[r.id] = { kind: 'build' }
     else if (at !== undefined) jobs[r.id] = workJob(placeById.get(at) ?? at)
@@ -236,7 +241,10 @@ export function planCity(
   }
   if (!city.tradeOrg) {
     const unneeded = shareOut(world, city, adults, jobs, held, spare, plan.project, builders, short)
-    planFounding(world, city, plan, jobs, { adults, unneeded, members }, home, terrain)
+    if (!trader) planTrader(world, city, plan, adults, jobs, short, terrain?.size ?? MAP_SIZE)
+    // A spare hand just sent off as the trader isn't one any more.
+    const left = unneeded.filter((r) => jobs[r.id]?.kind !== 'trade')
+    planFounding(world, city, plan, jobs, { adults, unneeded: left, members }, home, terrain)
     plan.jobs = jobs
     return plan
   }

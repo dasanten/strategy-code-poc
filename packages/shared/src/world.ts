@@ -710,10 +710,15 @@ export type CityProject =
 
 /** A game-run city's trade run under way (`CONTEXT.md`: NPC trader). */
 export interface CityTrader {
+  /** The trader, one of its spare hands. */
   residentId: string
+  /** The Trade Org warehouse they trade at. */
   warehouseId: string
+  /** The load still to sell there; empty once sold. */
   sells: Stock
+  /** What they still buy there, up to what the city is short of; empty once bought. */
   buys: Stock
+  /** The tick they were sent. */
   since: number
 }
 
@@ -730,7 +735,7 @@ export interface CityPlan {
   jobs: Record<string, CityJob>
   /** What the city builds or takes down next; none when it has nothing to build. */
   project?: CityProject
-  /** Its trade run under way (`CONTEXT.md`: NPC trader); unused until the NPC trader is built. */
+  /** Its trade run under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
   trader?: CityTrader
   /**
    * Since when it has been full (`CONTEXT.md`: Full city); while its founding party is out (its

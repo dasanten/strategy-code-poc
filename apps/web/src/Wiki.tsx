@@ -104,6 +104,8 @@ import {
   NPC_FULL_DAYS,
   NPC_VILLAGE,
   NPC_NODE_REACH,
+  NPC_TRADER_GIVE_UP_DAYS,
+  NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SMITHY_WEAPON,
   NPC_SOLDIER_SHARE,
@@ -1231,6 +1233,10 @@ export function Wiki() {
 
       <Section id="trade">
         <p>
+          A Trade Org warehouse, at the HQ or a trading post, trades in person with whoever stands
+          on it: a Player's resident or carriage, or an NPC city's trader.
+        </p>
+        <p>
           Each warehouse prices every good from its own stock. At {num(PRICE_REFERENCE_FLOORS)}{' '}
           times its stock floor it sells at the base price; less stock costs more (to the power{' '}
           {num(PRICE_ELASTICITY)}), between {pct(PRICE_RANGE.min)} and {pct(PRICE_RANGE.max)} of the
@@ -1320,6 +1326,16 @@ export function Wiki() {
           isn't short of what it makes, they stop. A good with no node in reach stays short: a
           village with no ore in reach forges no weapons, and a mint is built only with Gold ore in
           reach.
+        </p>
+        <p>
+          Once one good's surplus makes a full load for one of its spare hands (beside the Food for
+          the walk) and a Trade Org warehouse lies within {num(NPC_TRADER_REACH)} tiles, an NPC city
+          sends that spare hand, never a soldier, as its trader: they carry the load and the coins
+          above its war chest there, sell the load, buy the good shortest of its reserve that it has
+          no node for (never Food or a weapon) as far as their coins and arms allow, and walk home
+          to the storage. One trader at a time, and none while Food runs short or armed outsiders
+          stand in its area. Nothing protects them on the way; a trader not back after{' '}
+          {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
         </p>
         <p>
           A city is full once it has had spare hands with nothing to do and nothing short of its
