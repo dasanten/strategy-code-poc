@@ -353,8 +353,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       }
       const holds = (b: Building) =>
         !wanted || (wanted as Good[]).some((g) => (b.stock?.[g] ?? 0) > 0)
+      // A Trade Org city's warehouses hold its goods (`CONTEXT.md`: Warehouse): its residents
+      // fetch materials and Food there too, when they name the goods.
+      const kinds =
+        wanted && sender.npcCityId !== undefined ? ['storage', 'warehouse'] : ['storage']
       const storages = world.buildings.filter(
-        (b) => b.kind === 'storage' && !b.site && ownBuilding(b) && holds(b),
+        (b) => kinds.includes(b.kind) && !b.site && ownBuilding(b) && holds(b),
       )
       if (from !== undefined && from !== null) {
         const at = spot(from, 'storages')

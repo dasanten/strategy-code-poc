@@ -7,6 +7,8 @@ import {
   npcCityStock,
   npcReserve,
   recipeFor,
+  stockFloor,
+  warehouseKeeps,
   workplaceGood,
   type Building,
   type BuildingKind,
@@ -21,7 +23,9 @@ import {
  * The chain an NPC city's reserve drives (`CONTEXT.md`: NPC city, NPC reserve): which goods it is
  * short of, most first, and which workplace makes each. Its planning pass sends spare hands to
  * the workplace of the good shortest (`planCity`) and picks the next workplace to build from the
- * same list (`nextProject`). Queries only: nothing moves.
+ * same list (`nextProject`). The Trade Organization's cities run the same chain for their
+ * warehouses (`CONTEXT.md`: Trade Org HQ, Trading post), whose stock floor is their reserve.
+ * Queries only: nothing moves.
  */
 
 /** The workplaces that process goods into one the chain wants, by that good (`RECIPES`). */
@@ -69,16 +73,17 @@ export function holdsBatch(stock: Stock | undefined, input: Stock): boolean {
 
 /**
  * The goods an NPC city is short of (`CONTEXT.md`: NPC reserve), the shortest first: what its
- * storages lack of its reserve (`npcReserve`), and of the materials its `project` still needs
+ * storages lack of its reserve (`npcReserve`; a Trade Org city, what its warehouses lack of their
+ * stock floor, `tradeOrgReserve`), and of the materials its `project` still needs
  * beyond that, as a share of what it wants of each. Ties go by the reserve's order (Food,
  * building materials, weapons, their Iron, Coins).
  */
 export function shortGoods(world: WorldState, city: City, project?: CityProject): Good[] {
-  const want = npcReserve(world, city)
+  const want = city.tradeOrg ? tradeOrgReserve(world, city) : npcReserve(world, city)
   for (const [good, n] of Object.entries(projectNeeds(world, project)) as [Good, number][]) {
     want[good] = (want[good] ?? 0) + n
   }
-  const stock = npcCityStock(world, city)
+  const stock = city.tradeOrg ? warehouseStock(world, city) : npcCityStock(world, city)
   return (Object.entries(want) as [Good, number][])
     .map(([good, n]) => ({ good, share: n > 0 ? (n - (stock[good] ?? 0)) / n : 0 }))
     .filter((s) => s.share > 1e-9)
@@ -92,4 +97,63 @@ export function projectNeeds(world: WorldState, project: CityProject | undefined
   const site = buildingAt(world, project.x, project.y)
   if (site?.site) return materialsNeeded(site)
   return site ? {} : { ...(BUILD_MATERIALS[project.building] ?? {}) }
+}
+
+/** A Trade Org city's finished warehouses (`CONTEXT.md`: Warehouse); none for any other city. */
+export function tradeOrgWarehouses(world: WorldState, city: City): Building[] {
+  if (!city.tradeOrg) return []
+  return world.buildings.filter((b) => b.cityId === city.id && b.kind === 'warehouse' && !b.site)
+}
+
+/**
+ * The reserve of a Trade Org city (`CONTEXT.md`: Trade Org HQ, Trading post): the stock floor of
+ * its warehouses (`stockFloor`), Food aside. Its Food is its storage's, which its residents eat
+ * from and its farms fill, and it keeps farmers by its residents (`farmersWanted`).
+ */
+export function tradeOrgReserve(world: WorldState, city: City): Stock {
+  const reserve: Stock = {}
+  for (const b of tradeOrgWarehouses(world, city)) {
+    for (const [good, n] of Object.entries(stockFloor(world, b)) as [Good, number][]) {
+      if (good !== 'food') reserve[good] = (reserve[good] ?? 0) + n
+    }
+  }
+  return reserve
+}
+
+/** What a Trade Org city's warehouses hold together. */
+export function warehouseStock(world: WorldState, city: City): Stock {
+  const sum: Stock = {}
+  for (const b of tradeOrgWarehouses(world, city)) {
+    for (const [good, n] of Object.entries(b.stock ?? {}) as [Good, number][]) {
+      sum[good] = (sum[good] ?? 0) + n
+    }
+  }
+  return sum
+}
+
+/**
+ * Where a city keeps what its chain makes and uses up: an NPC city its storage; a Trade Org city
+ * its warehouse of goods (`warehouseKeeps`), at the HQ the one that is not its coin warehouse.
+ * Its builders' materials and the input of its smelter, mint and smithy come from there.
+ */
+export function chainStore(world: WorldState, city: City): Building | undefined {
+  if (city.tradeOrg) {
+    return tradeOrgWarehouses(world, city).find((b) =>
+      warehouseKeeps(world, b).some((g) => g !== 'coins'),
+    )
+  }
+  return world.buildings.find((b) => b.cityId === city.id && b.kind === 'storage' && !b.site)
+}
+
+/**
+ * The warehouse a Trade Org city's worker stores a load of `goods` in (`CONTEXT.md`: Trading
+ * post, Trade Org HQ): the first that keeps one of them, Food aside. None for a load of Food, which
+ * goes to the storage its residents eat from, and none for any other city.
+ */
+export function warehouseFor(world: WorldState, city: City, goods: Good[]): Building | undefined {
+  const kept: Good[] = goods.filter((g) => g !== 'food')
+  if (kept.length === 0) return undefined
+  return tradeOrgWarehouses(world, city).find((b) =>
+    warehouseKeeps(world, b).some((g) => kept.includes(g)),
+  )
 }

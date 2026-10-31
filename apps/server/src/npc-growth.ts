@@ -17,6 +17,7 @@ import {
   inCityArea,
   isCityBuilding,
   materialsNeeded,
+  townHallOf,
   workNeeded,
   wrap,
   wrapDelta,
@@ -39,11 +40,11 @@ import {
   npcCityStock,
   npcReserve,
 } from '@csp/shared'
-import { hqGrows, hqProject } from './hq-growth.js'
+import { hqGrows, hqHouseTile, hqProject, hqRings } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
 import { npcSender } from './order-sender.js'
 import { pair } from './pairing.js'
-import { PROCESSED_BY, chainInput, makes, shortGoods } from './npc-chain.js'
+import { PROCESSED_BY, chainInput, chainStore, makes, shortGoods } from './npc-chain.js'
 import { Ground } from './placing.js'
 
 /**
@@ -94,16 +95,44 @@ export function cityGrows(world: WorldState, city: City, adults: Resident[]): bo
 }
 
 /**
- * What a growing city builds or takes down next: the HQ its rings and houses (`hqProject`), an
- * NPC city whatever it wants most (`nextProject`).
+ * What a city builds or takes down next: an NPC city whatever it wants most (`nextProject`); the
+ * HQ its rings and houses while it `grows` (`hqProject`); and otherwise a Trade Org city the chain
+ * for what is short of its warehouses' floor (`tradeOrgChainProject`).
  */
 export function cityProject(
   world: WorldState,
   city: City,
   home: Building,
   terrain: TerrainMap,
+  grows: boolean,
 ): Project | undefined {
-  return city.tradeOrg ? hqProject(world, city, terrain) : nextProject(world, city, home, terrain)
+  if (!city.tradeOrg) return grows ? nextProject(world, city, home, terrain) : undefined
+  return (
+    (grows ? hqProject(world, city, terrain) : undefined) ??
+    tradeOrgChainProject(world, city, home, terrain)
+  )
+}
+
+/**
+ * The chain a Trade Org city builds (`CONTEXT.md`: Trade Org HQ, Trading post): a workplace of its
+ * own it has begun, else the workplace for the good shortest of its warehouses' floor it can make
+ * (`chainProject`), on the nearest node within `NPC_NODE_REACH` of its home.
+ */
+function tradeOrgChainProject(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+): BuildProject | undefined {
+  const own = new Set(city.workplaceIds)
+  const begun = world.buildings.find((b) => b.site && own.has(b.id))
+  if (begun) return { kind: 'build', building: begun.kind, x: begun.x, y: begun.y }
+  const rings = city.tradeOrg === 'hq' ? undefined : wallRings(world, city, home, terrain.size)
+  for (const good of shortGoods(world, city)) {
+    const chain = chainProject(world, city, home, terrain, rings, good)
+    if (chain) return chain
+  }
+  return undefined
 }
 
 /**
@@ -364,9 +393,7 @@ export function chainProject(
 ): BuildProject | undefined {
   if (seen.has(good)) return undefined
   seen.add(good)
-  const storage = world.buildings.find(
-    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-  )
+  const storage = chainStore(world, city)
   const input = chainInput(good)
   for (const [g, n] of Object.entries(input ?? {}) as [Good, number][]) {
     if ((storage?.stock?.[g] ?? 0) >= n || makes(world, city, g)) continue
@@ -375,7 +402,10 @@ export function chainProject(
   if (makes(world, city, good)) return undefined
   const kind = PROCESSED_BY[good]
   if (kind) {
-    const t = houseTile(world, city, home, terrain, rings, kind)
+    const hall = city.tradeOrg === 'hq' ? townHallOf(world, city) : undefined
+    const t = hall
+      ? hqHouseTile(world, hall, terrain, hqRings(world, hall, terrain).outermost, kind)
+      : houseTile(world, city, home, terrain, rings, kind)
     return t && { kind: 'build', building: kind, ...t }
   }
   const node = nearestNode(world, home, terrain, good)
