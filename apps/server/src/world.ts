@@ -159,11 +159,13 @@ export interface StepResult {
  * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
  * realm (`stepCaptures`); admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
  * (`stepContracts`); standing drifts toward neutral (`stepStanding`); armies
- * lose members who are gone and give the rest their orders for the next tick; last, riders who
+ * lose members who are gone and give the rest their orders for the next tick; the realms whose
+ * turn it is bring their Last seen up to date (`stepLastSeen`); last, riders who
  * lost their horse get off it (`stepRiders`), and passengers who lost their carriage get off
  * (`stepPassengers`). Without `walking`
- * nobody moves. With a `timer`, the NPC planning (`npc`), the walking (`walking`) and all the
- * rest (`rest`) are timed as the parts of the tick's `world` phase (ADR 0004).
+ * nobody moves. With a `timer`, the NPC planning (`npc`), the walking (`walking`), Last seen
+ * (`lastSeen`) and all the rest (`rest`) are timed as the parts of the tick's `world` phase
+ * (ADR 0004).
  */
 export function stepWorld(
   world: WorldState,
@@ -196,10 +198,23 @@ export function stepWorld(
     return steps
   })
   const result = time('rest', () => stepRest(world, terrain, steps, survival, horsesDied))
+  time('lastSeen', () => {
+    // Who sees what has changed since the NPC scripts ran: Last seen and sync share the new sight
+    // (`SightCache`). Nobody moves or changes hands after this.
+    newSightPhase(world)
+    stepLastSeen(world, terrain.size)
+  })
+  time('rest', () => {
+    stepRiders(world)
+    stepPassengers(world)
+  })
   return { ...result, npcScriptRuns }
 }
 
-/** The rest of `stepWorld` once the residents walked: everything else they do, then the tick turns. */
+/**
+ * The rest of `stepWorld` once the residents walked: everything else they do, then the tick turns,
+ * up to Last seen.
+ */
 function stepRest(
   world: WorldState,
   terrain: TerrainMap,
@@ -243,12 +258,6 @@ function stepRest(
   stepStanding(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
-  // Who sees what has changed since the NPC scripts ran: Last seen and sync share the new sight
-  // (`SightCache`). Nobody moves or changes hands after this.
-  newSightPhase(world)
-  stepLastSeen(world, terrain.size)
-  stepRiders(world)
-  stepPassengers(world)
   const actions =
     steps.length +
     strikes.length +

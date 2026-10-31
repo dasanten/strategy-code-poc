@@ -214,7 +214,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     nodes: exploredNodes,
     // A Player's memory, apart from what is in sight (`CONTEXT.md`: Last seen); an NPC city has none.
     lastSeen: () =>
-      sender.npcCityId !== undefined ? [] : lastSeenOutOfSight(world, sender.userId),
+      sender.npcCityId !== undefined ? [] : lastSeenOutOfSight(world, terrain.size, sender.userId),
     directives: () => directivesFor(world, (org) => organizationLabel(world, org)),
     withMemory: ([key, value]) => {
       if (typeof key !== 'string') throw new ScriptRuntimeError('"withMemory" needs a key')

@@ -461,8 +461,9 @@ function places(
 }
 
 /**
- * The buildings and cities a realm's Player sees, as `entitiesInSight` shows them, and whether
- * any tile of a footprint is in their sight (`CONTEXT.md`: Last seen). `bySquare`, from
+ * The buildings and cities a realm's Player sees, as `entitiesInSight` shows them, whether any
+ * tile of a footprint is in their sight (`CONTEXT.md`: Last seen) and whether they have anyone to
+ * see through at all (`looking`). `bySquare`, from
  * `buildingsBySquare` this tick, saves looking at every building. `afresh` works it out apart
  * from any open `SightCache`, as an invariant should.
  */
@@ -471,9 +472,9 @@ export function placesInSight(
   size: number,
   realmId: string,
   { bySquare, afresh = false }: { bySquare?: Map<number, number[]>; afresh?: boolean } = {},
-): { seen: readonly SeenPlace[]; sees: (b: Placed) => boolean } {
+): { seen: readonly SeenPlace[]; sees: (b: Placed) => boolean; looking: boolean } {
   const sight = afresh ? new SideSight(world, size, realmId) : sideSight(world, size, realmId)
-  return { seen: sight.places(bySquare), sees: sight.buildingSeen }
+  return { seen: sight.places(bySquare), sees: sight.buildingSeen, looking: sight.looking }
 }
 
 /**
@@ -498,6 +499,11 @@ class SideSight {
   }
 
   readonly sees = (at: Spot): boolean => this.eyes.sees(at)
+
+  /** Whether the side has anyone to see through. */
+  get looking(): boolean {
+    return this.observers.length > 0
+  }
 
   readonly buildingSeen = (b: Placed): boolean => buildingSeen(this.eyes, b)
 
