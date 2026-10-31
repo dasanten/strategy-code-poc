@@ -1179,9 +1179,10 @@ function drawStructures(
     if (!occupier) continue
     const side = FOOTPRINT[b.kind]
     const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
-    const [px, py] = [sx + side * tile - Math.max(6, tile * 0.3), sy + Math.max(3, tile * 0.12)]
-    if (!near(px, py)) continue
     const h = Math.max(14, tile * 0.7)
+    const inset = Math.max(2, tile * 0.1)
+    const [px, py] = [sx + side * tile - h * 0.6 - inset, sy + inset]
+    if (!near(px, py)) continue
     const occupierCity = cityById.get(occupier)
     const color = relationshipColor(
       occupierCity ? cityRelationship(occupierCity, viewer) : realmRelationship(occupier, viewer),
