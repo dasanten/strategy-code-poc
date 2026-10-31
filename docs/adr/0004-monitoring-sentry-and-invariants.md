@@ -9,7 +9,11 @@ Status: decided (2026-10-18, with Daniel)
   carry capacity. A violated invariant is reported to Sentry as an error even though nothing
   crashed.
 - **Tick health:** tick duration and the counts of residents and actions are reported as
-  performance data, with an alert when ticks approach the 1 s budget (e.g. above 800 ms).
+  performance data, with an alert when ticks approach the 1 s budget (e.g. above 800 ms). Since
+  2026-10-31 (Epic 49) the duration covers the whole tick, broadcast and save included, and comes
+  with how long each phase took (orders, queues, scripts, world with its NPC planning and walking,
+  invariants, territory, sight, broadcast, save), so a slow tick names its slowest phase and a
+  tick made cheaper is judged by numbers.
 - **pino** writes structured JSON logs on the server for detail once Sentry points somewhere.
 - An in-game admin dashboard comes later.
 

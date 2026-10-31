@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Terrain, type WorldState } from '@csp/shared'
-import { runTick, type TickReporter } from './tick.js'
+import { TOP_LEVEL_PHASES, TickTimer, runTick, type TickReporter } from './tick.js'
+import type { OrderQueue } from './orders.js'
+import type { ScriptRunner } from './script-runner.js'
+import { Walking } from './walking.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 
 const terrain = cityTerrain()
@@ -31,7 +34,14 @@ describe('runTick', () => {
       now: clock(5),
     })
     // Everyone starts working the farm: one work action each.
-    expect(health).toEqual({ tick: 1, durationMs: 5, residents: 8, actions: 8, slow: false })
+    expect(health).toEqual({
+      tick: 1,
+      durationMs: expect.any(Number),
+      phases: expect.any(Object),
+      residents: 8,
+      actions: 8,
+      slow: false,
+    })
     expect(reporter.tickHealth).toHaveBeenCalledWith(world, health)
     expect(reporter.invariantViolations).not.toHaveBeenCalled()
   })
@@ -74,5 +84,110 @@ describe('runTick', () => {
       runTick(broken, terrain, { reporter, invariantSampleRate: 1, slowTickMs: 800 }),
     ).toBeUndefined()
     expect(reporter.tickError).toHaveBeenCalledWith(broken, expect.any(TypeError))
+  })
+})
+
+describe('TickTimer', () => {
+  it('counts the time of a phase that throws, then lets the error on', () => {
+    const timer = new TickTimer(clock(5))
+    expect(() =>
+      timer.time('world', () => {
+        throw new Error('boom')
+      }),
+    ).toThrow('boom')
+    expect(timer.phases.world).toBe(5)
+    // The timer still works for the next phase.
+    expect(timer.time('save', () => 'saved')).toBe('saved')
+    expect(timer.phases.save).toBe(5)
+  })
+
+  it('adds up the calls of one phase', () => {
+    const timer = new TickTimer(clock(2))
+    timer.time('rest', () => undefined)
+    timer.time('rest', () => undefined)
+    expect(timer.phases.rest).toBe(4)
+    expect(timer.phases.npc).toBe(0)
+  })
+})
+
+describe('runTick phases', () => {
+  /** A clock that stands still unless a phase moves it on. */
+  function stillClock() {
+    let t = 0
+    return { now: () => t, advance: (ms: number) => void (t += ms) }
+  }
+
+  it('times each phase, finish included, and they add up to the tick', () => {
+    const world = worldWithCity().world
+    const { now, advance } = stillClock()
+    const health = runTick(world, terrain, {
+      reporter: fakeReporter(),
+      invariantSampleRate: 1,
+      slowTickMs: 800,
+      now,
+      orders: { applyAll: () => advance(10) } as unknown as OrderQueue,
+      scripts: { runAll: () => (advance(20), []) } as unknown as ScriptRunner,
+      finish: (timer) => {
+        timer.time('sight', () => advance(30))
+        timer.time('broadcast', () => advance(40))
+      },
+    })!
+    expect(health.phases).toMatchObject({ orders: 10, scripts: 20, sight: 30, broadcast: 40 })
+    expect(health.durationMs).toBe(100)
+    const topLevel = TOP_LEVEL_PHASES.reduce((sum, p) => sum + health.phases[p], 0)
+    expect(topLevel).toBeCloseTo(health.durationMs, 5)
+    const { npc, walking, rest } = health.phases
+    expect(npc + walking + rest).toBeCloseTo(health.phases.world, 5)
+  })
+
+  it('splits the world phase into npc, walking and rest', () => {
+    const world = worldWithCity().world
+    const health = runTick(world, terrain, {
+      reporter: fakeReporter(),
+      invariantSampleRate: 0,
+      slowTickMs: 800,
+      walking: new Walking(terrain),
+    })!
+    for (const phase of ['world', 'npc', 'walking', 'rest'] as const) {
+      expect(health.phases[phase]).toBeGreaterThan(0)
+    }
+    for (const phase of ['territory', 'sight', 'broadcast', 'save'] as const) {
+      expect(health.phases[phase]).toBe(0)
+    }
+  })
+
+  it('reports a slow tick with its phases', () => {
+    const reporter = fakeReporter()
+    const health = runTick(worldWithCity().world, terrain, {
+      reporter,
+      invariantSampleRate: 1,
+      slowTickMs: 800,
+      now: clock(801),
+    })
+    expect(health?.slow).toBe(true)
+    expect(reporter.tickHealth).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        slow: true,
+        phases: expect.objectContaining({ world: expect.any(Number) }),
+      }),
+    )
+  })
+
+  it('reports an error thrown while finishing instead of throwing', () => {
+    const world = worldWithCity().world
+    const reporter = fakeReporter()
+    const health = runTick(world, terrain, {
+      reporter,
+      invariantSampleRate: 1,
+      slowTickMs: 800,
+      finish: (timer) =>
+        timer.time('broadcast', () => {
+          throw new Error('socket gone')
+        }),
+    })
+    expect(health).toBeUndefined()
+    expect(reporter.tickError).toHaveBeenCalledWith(world, expect.any(Error))
+    expect(reporter.tickHealth).not.toHaveBeenCalled()
   })
 })

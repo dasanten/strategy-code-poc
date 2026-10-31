@@ -137,15 +137,20 @@ const loop = setInterval(() => {
     walking,
     invariantSampleRate: config.invariantSampleRate,
     slowTickMs: config.slowTickMs,
+    finish: (timer) => {
+      timer.time('territory', () => territory.update(world, terrain))
+      const grown = timer.time('sight', () => sight.update(world, explored))
+      timer.time('broadcast', () => realtime.broadcastTick(grown))
+      if (world.tick % config.saveEveryTicks === 0) {
+        timer.time('save', () => {
+          saveWorld(db, world)
+          explored.save(db)
+          pruneSaves(db)
+        })
+      }
+    },
   })
   tagWorld(world)
-  territory.update(world, terrain)
-  realtime.broadcastTick(sight.update(world, explored))
-  if (world.tick % config.saveEveryTicks === 0) {
-    saveWorld(db, world)
-    explored.save(db)
-    pruneSaves(db)
-  }
 }, TICK_MS)
 
 const DAY_MS = 24 * 60 * 60 * 1000
