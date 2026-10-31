@@ -5,6 +5,7 @@ import {
   MAX_HEALTH,
   MAX_HUNGER,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_VALUE_LIMITS,
   SCRIPT_STEP_BUDGET,
   STABLE_CAPACITY,
   TASKS,
@@ -89,6 +90,7 @@ describe('a Player’s default scripts', () => {
     expect(list.map((s) => [s.name, s.task, s.followsDefault])).toEqual([
       ['Breed horses (default)', 'breed', true],
       ['Build (default)', 'build', true],
+      ['Defend (default)', 'defend', true],
       ['Feed the stable (default)', 'feedStable', true],
       ['Haul (default)', 'haul', true],
       ['Tear down (default)', 'tearDown', true],
@@ -282,7 +284,12 @@ describe('residents’ memory', () => {
         let w2 = residents()[1]
         w2.script.memory.role = "changed"
       `),
-      { globals, steps: SCRIPT_STEP_BUDGET },
+      {
+        globals,
+        steps: SCRIPT_STEP_BUDGET,
+        maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+        limits: SCRIPT_VALUE_LIMITS,
+      },
     )
     expect(result.status).toBe('error')
     const found = (globals.memory as { found: Record<string, unknown> }).found
@@ -545,6 +552,7 @@ describe('the step budget', () => {
       globals,
       steps: SCRIPT_STEP_BUDGET,
       maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
     })
     expect(result.status).toBe('done')
     return result.steps
@@ -781,6 +789,24 @@ describe('the step budget', () => {
             feeding(world, 100)
             world.residents[0]!.x = 5
           },
+        },
+      ],
+      defend: [
+        // Struck by Tobin's t1: armed, fighting back; unarmed, fleeing home; calm again.
+        {
+          memory: {},
+          prepare: (world) => {
+            world.residents[0]!.carried.spear = 1
+            world.residents[0]!.struck = { by: 't1', tick: world.tick }
+          },
+        },
+        {
+          memory: {},
+          prepare: (world) => void (world.residents[0]!.struck = { by: 't1', tick: world.tick }),
+        },
+        {
+          memory: {},
+          prepare: (world) => void (world.residents[0]!.struck = { by: 't1', tick: -1000 }),
         },
       ],
     }

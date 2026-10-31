@@ -2,6 +2,9 @@
 // writes only the values it is given, so the same program, globals and budget always give the
 // same result. Every evaluated node costs 1 step, a native function call costs its own `cost`
 // on top, and the run stops when the budget is used up. What the script already did still counts.
+// A value the script builds is bounded too (`CONTEXT.md`: Value limits, `RunOptions.limits`): a
+// string, list or object past its cap is a runtime error, so no script can reach the host's own
+// limits and bring a `RangeError` out of `run()`.
 
 import type {
   AssignExpression,
@@ -53,6 +56,19 @@ export class ScriptRuntimeError extends Error {
   }
 }
 
+/**
+ * The caps on one value a script builds (`CONTEXT.md`: Value limits). A value the host gives the
+ * script, such as a long list of what it sees, may be bigger; the script just can't grow it.
+ */
+export interface ValueLimits {
+  /** The longest string, in characters. */
+  maxStringLength: number
+  /** The most items in a list. */
+  maxListLength: number
+  /** The most keys in an object. */
+  maxObjectKeys: number
+}
+
 export interface RunOptions {
   /** The built-in globals, such as `me`, `memory` and the actions. Scripts can't reassign them. */
   globals: Readonly<Record<string, Value>>
@@ -60,6 +76,8 @@ export interface RunOptions {
   steps: number
   /** How deeply script function calls may nest. */
   maxCallDepth: number
+  /** How big one string, list or object the script builds may get. */
+  limits: ValueLimits
 }
 
 export type RunResult =
@@ -159,11 +177,13 @@ class Interpreter {
   private callDepth = 0
   private readonly budget: number
   private readonly maxCallDepth: number
+  private readonly limits: ValueLimits
   private readonly globals: Scope
 
   constructor(options: RunOptions) {
     this.budget = options.steps
     this.maxCallDepth = options.maxCallDepth
+    this.limits = options.limits
     this.globals = new Scope(null, options.globals)
   }
 
@@ -290,8 +310,10 @@ class Interpreter {
   private expressionIn(node: Expression, scope: Scope): Value {
     switch (node.kind) {
       case 'Number':
-      case 'String':
       case 'Boolean':
+        return node.value
+      case 'String':
+        if (node.value.length > this.limits.maxStringLength) throw this.tooBig('string', node)
         return node.value
       case 'Null':
         return null
@@ -301,8 +323,11 @@ class Interpreter {
         return binding.value
       }
       case 'List':
+        if (node.items.length > this.limits.maxListLength) throw this.tooBig('list', node)
         return node.items.map((item) => this.expression(item, scope))
       case 'Object': {
+        // The parser refuses a key given twice, so the properties are the keys.
+        if (node.properties.length > this.limits.maxObjectKeys) throw this.tooBig('object', node)
         const object: ScriptObject = Object.create(null) as ScriptObject
         for (const property of node.properties) {
           setOwn(object, property.key, this.expression(property.value, scope))
@@ -349,7 +374,11 @@ class Interpreter {
     if (op === '==') return left === right
     if (op === '!=') return left !== right
     if (op === '+' && (typeof left === 'string' || typeof right === 'string')) {
-      return text(left, node) + text(right, node)
+      const l = text(left, node)
+      const r = text(right, node)
+      // Checked before joining: the two together could be more than the host can hold.
+      if (l.length + r.length > this.limits.maxStringLength) throw this.tooBig('string', node)
+      return l + r
     }
     if (op === '<' || op === '<=' || op === '>' || op === '>=') {
       const comparable =
@@ -472,6 +501,9 @@ class Interpreter {
         )
       }
       if (Object.isFrozen(object)) throw new Failure(`The list can't be changed`, node)
+      if (key === object.length && object.length >= this.limits.maxListLength) {
+        throw this.tooBig('list', node)
+      }
       object[key] = value
       return
     }
@@ -480,10 +512,23 @@ class Interpreter {
         throw new Failure(`An object's keys are strings, not ${describe(key)}`, node)
       }
       if (Object.isFrozen(object)) throw new Failure(`The object can't be changed`, node)
+      if (!Object.hasOwn(object, key) && Object.keys(object).length >= this.limits.maxObjectKeys) {
+        throw this.tooBig('object', node)
+      }
       setOwn(object, key, value)
       return
     }
     throw new Failure(`Can't set ${describeKey(key)} of ${describe(object)}`, node)
+  }
+
+  /** The error for a value that would grow past its cap (`CONTEXT.md`: Value limits). */
+  private tooBig(kind: 'string' | 'list' | 'object', node: Position): Failure {
+    const { maxStringLength, maxListLength, maxObjectKeys } = this.limits
+    if (kind === 'string') {
+      return new Failure(`A string can hold at most ${maxStringLength} characters`, node)
+    }
+    if (kind === 'list') return new Failure(`A list can hold at most ${maxListLength} items`, node)
+    return new Failure(`An object can hold at most ${maxObjectKeys} keys`, node)
   }
 }
 

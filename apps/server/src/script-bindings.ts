@@ -1,15 +1,10 @@
-import {
-  NativeFunction,
-  ScriptFunction,
-  ScriptRuntimeError,
-  type ScriptObject,
-  type Value,
-} from '@csp/lang'
+import { NativeFunction, ScriptRuntimeError, type ScriptObject, type Value } from '@csp/lang'
 import {
   ARMY_SCRIPT_API,
   GOODS,
   HAUL_KEEP_FOOD,
   RECIPES,
+  SCRIPT_ACTION_VALUE_MAX,
   SCRIPT_API,
   SCRIPT_VIEWS,
   Terrain,
@@ -39,6 +34,7 @@ import {
   type OrderRequest,
   type Queue,
   type Resident,
+  type Struck,
   type ResourceNode,
   type RunningScript,
   type ScriptBinding,
@@ -50,10 +46,11 @@ import {
   type WorldState,
 } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
-import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
+import { orderKindOf, orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
 import { sightOf } from './sight.js'
 import { lastSeenOutOfSight } from './last-seen.js'
+import { plainValue, type PlainValue } from './plain-value.js'
 import { paramTarget } from './script-params.js'
 import { realmOf } from './starting-city.js'
 
@@ -158,7 +155,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     return seen
       .filter((e) => e.is === is)
       .map(untagged)
-      .map((rest) => withQueueView({ ...rest, ...add?.(rest.id) }))
+      .map((rest) => asView(world, { ...rest, ...add?.(rest.id) }))
   }
   // Whose script it is: the Player's realm, or the NPC city running the game's defaults.
   const side = sender.npcCityId ?? realmOf(world, sender.userId)?.id
@@ -186,7 +183,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const asSeen = (r: Resident) => {
     const { script, ...rest } = r
     const running = { scriptId: script!.scriptId, memory: script!.memory }
-    return withQueueView({ ...rest, script: running })
+    return asView(world, { ...rest, script: running })
   }
   // A building as `building(id)` gives it: one of the side's own as it is, another's as the
   // Player sees it, its stock only when they see inside (`CONTEXT.md`: Seeing inside a storage).
@@ -196,6 +193,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
     return shown ? untagged(shown) : null
   }
+  // The building as the Player remembers it (`CONTEXT.md`: Last seen); an NPC city has no memory.
+  const lastSaw = (b: Building) =>
+    sender.npcCityId !== undefined
+      ? undefined
+      : world.lastSeen[sender.userId]?.find((e) => e.id === b.id && e.is === 'building')
   let nodes: ResourceNode[] | undefined
   const exploredNodes = () => (nodes ??= world.nodes.filter((n) => context.explored(n.x, n.y)))
 
@@ -238,7 +240,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     outputOf: ([building]) => {
       const id = (building as Record<string, Value> | null)?.id
       const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
-      if (!b || !(ownBuilding(b) || inSight(b))) return []
+      if (!b || !(ownBuilding(b) || inSight(b) || lastSaw(b))) return []
       const recipes = RECIPES[b.kind]
       const goods = recipes
         ? [...new Set(recipes.flatMap((r) => Object.keys(r.output)))]
@@ -262,7 +264,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   /** Asks for an order for `me`, checked exactly as one from the UI. */
   const request = (kind: string, input: Record<string, unknown>): Value => {
     const order: OrderRequest = { kind, ...forMe, ...input }
-    const orderKind = kinds[kind]
+    const orderKind = orderKindOf(kinds, kind)
     if (!orderKind) throw new Error(`no order kind ${kind} for the script action`)
     const reason = orderKind.validate(world, sender, order, terrain)
     if (reason !== undefined) return reason
@@ -281,9 +283,16 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     forMe = { armyId: army.id }
     const members = army.memberIds.flatMap((id) => {
       const r = world.residents.find((x) => x.id === id)
-      return r ? [{ ...r, script: undefined, age: ageInYears(r, world.tick) }] : []
+      if (!r) return []
+      const defenceScriptId = r.owner === side ? r.defenceScriptId : undefined
+      return [{ ...r, script: undefined, defenceScriptId, age: ageInYears(r, world.tick) }]
     })
-    me = { ...army, members }
+    const struck = lastStruck(members)
+    me = {
+      ...army,
+      members: members.map((m) => asView(world, m)),
+      ...(struck ? struckView(world, struck) : {}),
+    }
     actions = {
       walkTo: ([x, y]) => request('armyWalkTo', { x: plain(x), y: plain(y) }),
       guard: ([x, y]) => request('armyGuard', { x: plain(x), y: plain(y) }),
@@ -297,7 +306,10 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = SCRIPT_API
     forMe = { residentId: resident.id }
     // The script's own state is `memory`, not part of `me`.
-    me = withQueueView({ ...resident, script: undefined, age: ageInYears(resident, world.tick) })
+    // The defence script picked is its owner's to see (`CONTEXT.md`: Defence script).
+    const defenceScriptId = resident.owner === side ? resident.defenceScriptId : undefined
+    const age = ageInYears(resident, world.tick)
+    me = asView(world, { ...resident, script: undefined, defenceScriptId, age })
     actions = residentActions(request, resident)
     actions.doing = ([text]) => {
       const doing = doingText(text)
@@ -355,6 +367,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
   }
 
+  // A building a param names: one of the side's own as it is; another's (a workplace or site
+  // anyone may work) as the Player sees it, else as they last saw it.
+  // The view takes only its own fields, so the memory's tag and `seenAt` stay out.
+  const paramBuilding = (b: Building) => asSeenBuilding(b) ?? lastSaw(b)
+
   // Each param as what it names while that is still the side's and fits its type, or the
   // number typed for a number param, or its default while none is; else null.
   const params = Object.create(null) as ScriptObject
@@ -368,7 +385,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const carriage = target?.is === 'carriage' ? target.carriage : undefined
     params[p.name] =
       target?.is === 'building'
-        ? viewValue(target.building, { view: 'building' })
+        ? viewValue(paramBuilding(target.building), { view: 'building' })
         : viewValue(
             carriage && {
               ...carriage,
@@ -508,6 +525,8 @@ function residentActions(
       }),
     mount: ([horseId]) => request('mount', { horseId: plain(horseId) }),
     dismount: () => request('dismount', {}),
+    unhitch: ([carriage]) =>
+      request('unhitch', { carriageId: carriage == null ? null : placeId(carriage) }),
     board: ([carriageId]) => request('board', { carriageId: plain(carriageId) }),
     getOff: ([x, y]) =>
       request('getOff', (x ?? y ?? null) === null ? {} : { x: plain(x), y: plain(y) }),
@@ -629,7 +648,7 @@ function requestsSound(
         message: `${id}'s script requested ${order.kind}: ${message}`,
         entityIds: [id],
       })
-    const kind = kinds[order.kind]
+    const kind = orderKindOf(kinds, order.kind)
     if (!allowed.includes(order.kind) || !kind) {
       fail(`not an order ${who === 'army' ? 'an army' : 'a resident'} can get`)
     } else if (order[field] !== id) fail(`for another ${who}, ${String(order[field])}`)
@@ -641,10 +660,37 @@ function requestsSound(
   return out
 }
 
-/** A resident's queue as its script view shows it (`queueView`), not its steps. */
-function withQueueView(r: object): object {
-  const queue = (r as { queue?: Queue }).queue
-  return queue ? { ...r, queue: queueView(queue) } : r
+/**
+ * A resident as its script view shows it: its queue as `queueView`, not its steps, and who last
+ * struck them as `struckBy` and `struckAt`, while that attacker is still there (`CONTEXT.md`:
+ * Combat, Under attack). Anything else passes as it is.
+ */
+function asView(world: WorldState, r: object): object {
+  const { queue, struck, defenceScriptId } = r as {
+    queue?: Queue
+    struck?: Struck
+    defenceScriptId?: number
+  }
+  return {
+    ...r,
+    ...(queue ? { queue: queueView(queue) } : {}),
+    ...(struck ? struckView(world, struck) : {}),
+    ...(defenceScriptId !== undefined ? { defenceScript: defenceScriptId } : {}),
+  }
+}
+
+/** `struckBy` and `struckAt` for who last struck a resident, or nothing once they are gone. */
+function struckView(world: WorldState, struck: Struck): object {
+  return world.residents.some((x) => x.id === struck.by)
+    ? { struckBy: struck.by, struckAt: struck.tick }
+    : {}
+}
+
+/** Who last struck any of `members`: the `struck` with the latest tick, if any was. */
+function lastStruck(members: readonly Resident[]): Struck | undefined {
+  let last: Struck | undefined
+  for (const m of members) if (m.struck && (!last || m.struck.tick > last.tick)) last = m.struck
+  return last
 }
 
 /**
@@ -686,17 +732,24 @@ function toValue(data: unknown): Value {
   return null
 }
 
-/** A script value as plain data for an order request; functions can't be sent. */
-function plain(value: Value | undefined): unknown {
+/**
+ * A script value as plain data for an order request, within `SCRIPT_ACTION_VALUE_MAX` characters
+ * of JSON; functions, values that hold themselves and larger values can't be sent.
+ */
+function plain(value: Value | undefined): PlainValue | undefined {
   if (value === undefined || value === null) return undefined
-  if (value instanceof NativeFunction || value instanceof ScriptFunction) {
-    throw new ScriptRuntimeError('A function can’t be passed to an action')
+  const result = plainValue(value, SCRIPT_ACTION_VALUE_MAX)
+  if (result.ok) return result.value
+  switch (result.why) {
+    case 'function':
+      throw new ScriptRuntimeError('A function can’t be passed to an action')
+    case 'cycle':
+      throw new ScriptRuntimeError('A value that holds itself can’t be passed to an action')
+    case 'size':
+      throw new ScriptRuntimeError(
+        `A value passed to an action can have at most ${SCRIPT_ACTION_VALUE_MAX} characters`,
+      )
   }
-  if (typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map(plain)
-  const out: Record<string, unknown> = {}
-  for (const [key, item] of Object.entries(value)) out[key] = plain(item)
-  return out
 }
 
 /** A place for `store` and `fetch`: its id, or the id of a thing a script holds, like a building. */

@@ -4,7 +4,7 @@ import { tearDown } from './teardown.js'
 import { breed } from './breeding.js'
 import { drop, pickUp } from './carrying.js'
 import { fetch, store } from './storing.js'
-import { drive } from './driving.js'
+import { drive, unhitch } from './driving.js'
 import { haul, stop } from './hauling.js'
 import { pair } from './pairing.js'
 import { walkTo } from './walking.js'
@@ -55,6 +55,18 @@ export interface OrderKind {
 }
 
 /**
+ * The order kind called `name`, if there is one. Only the kinds' own entries count: a name such as
+ * `"constructor"` or `"toString"` would otherwise find a function inherited from
+ * `Object.prototype`, and a client can send any name.
+ */
+export function orderKindOf(
+  kinds: Record<string, OrderKind>,
+  name: unknown,
+): OrderKind | undefined {
+  return typeof name === 'string' && Object.hasOwn(kinds, name) ? kinds[name] : undefined
+}
+
+/**
  * The order kinds that exist. Those that act on a tile get a passenger off their carriage first
  * (`CONTEXT.md`: Passenger, `GETS_OFF_FIRST`).
  */
@@ -62,6 +74,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
   Object.entries({
     walkTo,
     drive,
+    unhitch,
     haul,
     stop,
     pickUp,
@@ -128,8 +141,10 @@ export class OrderQueue {
       return { type: 'rejected', requestId: id, reason: 'malformed order' }
     }
     const req = order as OrderRequest
-    const kind = typeof req.kind === 'string' ? this.kinds[req.kind] : undefined
-    if (!kind) return { type: 'rejected', requestId: id, reason: `unknown order: ${req.kind}` }
+    const kind = orderKindOf(this.kinds, req.kind)
+    if (!kind) {
+      return { type: 'rejected', requestId: id, reason: `unknown order: ${String(req.kind)}` }
+    }
     const reason = kind.validate(world, sender, req, this.terrain)
     if (reason) return { type: 'rejected', requestId: id, reason }
     this.pending.push({ sender, order: req })
@@ -146,8 +161,8 @@ export class OrderQueue {
     for (const { sender, order } of batch) {
       // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
       // script). Pairing, the Leader handover, renaming and claiming the Horse offer change
-      // nobody's order, so they leave scripts running too, as does picking a param value
-      // (`CONTEXT.md`: Script parameter).
+      // nobody's order, so they leave scripts running too, as do picking a param value and a
+      // defence script (`CONTEXT.md`: Script parameter, Defence script).
       // Editing a queue keeps its current step going (`CONTEXT.md`: Queue).
       const keeps = [
         'runScript',
@@ -157,6 +172,7 @@ export class OrderQueue {
         'renameCity',
         'claimHorses',
         'setScriptParam',
+        'setDefenceScript',
         'editQueue',
       ]
       const r = world.residents.find((x) => x.id === order.residentId)
@@ -166,20 +182,33 @@ export class OrderQueue {
         delete r.orderEnded
       }
       // Any order that isn't a step of it ends the resident's queue, running a script too; a new
-      // queue replaces it.
-      if (r && (order.kind === 'runScript' || !keeps.includes(order.kind))) delete r.queue
+      // queue replaces it. It ends a defence script and what it interrupted too (`CONTEXT.md`:
+      // Defence script).
+      if (r && (order.kind === 'runScript' || !keeps.includes(order.kind))) {
+        delete r.queue
+        if (r.interrupted) {
+          delete r.interrupted
+          delete r.script
+        }
+      }
       if (order.kind !== 'armyRunScript') {
         const a = world.armies.find((x) => x.id === order.armyId)
         if (a) delete a.script
       }
-      const toArmy = order.kind in armyOrders || order.kind === 'armyRunScript'
+      const toArmy = Object.hasOwn(armyOrders, order.kind) || order.kind === 'armyRunScript'
       const before = toArmy ? undefined : memberOrders(world)
-      this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
+      // Accepted by `receive`, so the kind exists.
+      orderKindOf(this.kinds, order.kind)!.apply(world, sender, order, this.terrain)
       if (before) leaveOnOwnOrders(world, before)
     }
   }
 
   get size(): number {
     return this.pending.length
+  }
+
+  /** How many orders a Player has waiting for the next tick. */
+  pendingFor(userId: number): number {
+    return this.pending.filter((p) => p.sender.userId === userId).length
   }
 }

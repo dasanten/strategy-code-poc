@@ -2,8 +2,10 @@ import { parse, run, type ScriptObject, type Value } from '@csp/lang'
 import {
   DOING_MAX_LENGTH,
   HAUL_KEEP_FOOD,
+  SCRIPT_ACTION_VALUE_MAX,
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_VALUE_LIMITS,
   SIGHT_RANGE,
   TICKS_PER_GAME_YEAR,
   DIAGONAL_STEP,
@@ -91,6 +93,7 @@ function runAs(
     globals: bindings.globals,
     steps: 10_000,
     maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+    limits: SCRIPT_VALUE_LIMITS,
   })
   return { result, ...bindings, memory }
 }
@@ -249,6 +252,67 @@ describe('script bindings', () => {
     expect(memory.me).toBeTypeOf('number')
   })
 
+  it('show who last struck a resident and when, as far as the Player sees how they fare', () => {
+    const { world, a1, explored } = setup()
+    resident(world, 'a2', 'r1', 12, 10)
+    world.tick = 50
+    a1.struck = { by: 'b1', tick: 40 }
+    world.residents.find((r) => r.id === 'b1')!.struck = { by: 'a1', tick: 45 }
+    world.residents.find((r) => r.id === 'a2')!.struck = { by: 'gone', tick: 30 }
+    const memory: ScriptObject = {}
+    runAs(
+      world,
+      explored,
+      `
+      memory.me = [me.struckBy, me.struckAt]
+      for (r of residents()) { memory[r.id] = [r.struckBy, r.struckAt] }
+      `,
+      memory,
+    )
+    expect(memory.me).toEqual(['b1', 40])
+    expect(memory.a1).toEqual(['b1', 40])
+    // A resident of another realm, not allied: how they fare is hidden (`CONTEXT.md`: Seeing how
+    // someone fares).
+    expect(memory.b1).toEqual([null, null])
+    // The attacker is gone.
+    expect(memory.a2).toEqual([null, null])
+  })
+
+  it('show an army who last struck one of its members, and when', () => {
+    const { world, a1, explored } = setup()
+    const a2 = resident(world, 'a2', 'r1', 12, 10)
+    world.armies.push({
+      id: 'ar1',
+      name: 'Guard',
+      realmId: 'r1',
+      memberIds: ['a1', 'a2'],
+      order: null,
+    })
+    world.tick = 50
+    const memory: ScriptObject = {}
+    const runArmy = () =>
+      run(parse('memory.army = [me.struckBy, me.struckAt, me.members[1].struckAt]'), {
+        globals: bindScript({
+          world,
+          terrain,
+          sender,
+          armyId: 'ar1',
+          memory,
+          seen: () => entitiesInSight(world, terrain, 'r1'),
+          explored: (x, y) => explored.isExplored({ id: 7 }, x, y),
+        }).globals,
+        steps: 10_000,
+        maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+        limits: SCRIPT_VALUE_LIMITS,
+      })
+    runArmy()
+    expect(memory.army).toEqual([null, null, null])
+    a1.struck = { by: 'b1', tick: 40 }
+    a2.struck = { by: 'b2', tick: 45 }
+    runArmy()
+    expect(memory.army).toEqual(['b2', 45, 45])
+  })
+
   it('list the admin directives in force with their price, never who gave them', () => {
     const { world, explored } = setup()
     world.directives.push({
@@ -309,6 +373,8 @@ describe('script bindings', () => {
     ['stop()', { kind: 'stop' }],
     ['mount("h9")', { kind: 'mount', horseId: 'h9' }],
     ['dismount()', { kind: 'dismount' }],
+    ['unhitch("k9")', { kind: 'unhitch', carriageId: 'k9' }],
+    ['unhitch({ id: "k9", x: 1, y: 2 })', { kind: 'unhitch', carriageId: 'k9' }],
     ['board("k9")', { kind: 'board', carriageId: 'k9' }],
     ['getOff()', { kind: 'getOff' }],
     ['getOff(3, 4)', { kind: 'getOff', x: 3, y: 4 }],
@@ -411,8 +477,56 @@ describe('script bindings', () => {
   it('pass no function to an action', () => {
     const { world, explored } = setup()
     const { result, requests } = runAs(world, explored, 'walkTo(fn () {}, 1)')
-    expect(result).toMatchObject({ status: 'error' })
+    expect(result).toMatchObject({ status: 'error', message: /function/ })
     expect(requests).toEqual([])
+  })
+
+  it('rejects a doubly-shared action value of 40 levels within 50 ms', () => {
+    const { world, explored } = setup()
+    let value: Value = { leaf: 'x' }
+    for (let level = 0; level < 40; level += 1) value = { a: value, b: value }
+    const started = performance.now()
+    const { result, requests } = runAs(world, explored, 'pickUp({ kind: "ground" }, memory.big)', {
+      big: value,
+    })
+    expect(performance.now() - started).toBeLessThan(50)
+    expect(result).toMatchObject({
+      status: 'error',
+      message: `A value passed to an action can have at most ${SCRIPT_ACTION_VALUE_MAX} characters`,
+    })
+    expect(requests).toEqual([])
+  })
+
+  it('rejects an action value that holds itself, with a clear message', () => {
+    const { world, explored } = setup()
+    const loop: ScriptObject = {}
+    loop.self = loop
+    const { result, requests } = runAs(world, explored, 'pickUp({ kind: "ground" }, memory.loop)', {
+      loop,
+    })
+    expect(result).toMatchObject({ status: 'error', message: /holds itself/ })
+    expect(requests).toEqual([])
+  })
+
+  it('passes shared references within the limit as plain data', () => {
+    const { world, explored } = setup()
+    const goods: ScriptObject = { food: 1 }
+    const { result, requests } = runAs(world, explored, 'pickUp({ kind: "ground" }, memory.same)', {
+      same: goods,
+      other: [goods, goods],
+    })
+    expect(result).toMatchObject({ status: 'done' })
+    expect(requests).toMatchObject([{ kind: 'pickUp', goods: { food: 1 } }])
+  })
+
+  it('"withMemory" has the same limit on its value', () => {
+    const { world, explored } = setup()
+    let value: Value = { leaf: 'x' }
+    for (let level = 0; level < 40; level += 1) value = { a: value, b: value }
+    const started = performance.now()
+    const { result } = runAs(world, explored, 'withMemory("role", memory.big)', { big: value })
+    expect(performance.now() - started).toBeLessThan(50)
+    expect(result).toMatchObject({ status: 'error', message: /at most/ })
   })
 })
 

@@ -59,6 +59,7 @@ import {
   FORMER_PLAYER_STANDING,
   GAME_DAYS_PER_YEAR,
   GOOD_WEIGHT,
+  HAUL_HORSE_FOOD,
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
@@ -105,9 +106,15 @@ import {
   MOUNTAIN_ROAD_WORK_FACTOR,
   DOING_MAX_LENGTH,
   SCRIPT_ACTION_COST,
+  SCRIPT_LIBRARY_MAX_SCRIPTS,
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_MAX_VERSIONS,
+  SCRIPT_MAX_LIST_LENGTH,
+  SCRIPT_MAX_OBJECT_KEYS,
+  SCRIPT_MAX_STRING_LENGTH,
   SCRIPT_LOG_LINES,
+  SCRIPT_ACTION_VALUE_MAX,
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
@@ -118,6 +125,7 @@ import {
   FOAL_STAT_SPREAD,
   BREED_FOOD,
   STABLE_FEED_DAYS,
+  DEFEND_CALM_TICKS,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
   STANDING_PER_PAID_WEEK,
@@ -149,6 +157,7 @@ import {
   WALL_DEFENCE,
   WALL_STRENGTH,
   WALK_TICKS_PER_TILE,
+  aboutTime,
   WAREHOUSE_BASE_PRICE,
   WEAPON_ATTACK,
   WORK_SKILL_EFFECT,
@@ -406,6 +415,17 @@ export function Wiki() {
           the card shows its letter key; press it to run the action. Escape drops what is picked.
         </p>
         <p>
+          The card and the residents list say what each resident is doing. Walking, riding or
+          driving somewhere, they also say about when they arrive, and the card’s meters and
+          countdowns (building, tearing down, breeding, carrying, pairing, growing up) say about how
+          long is left, real time first and game time in brackets: “Walking to 12, 40 ·{' '}
+          {aboutTime(24 * WALK_TICKS_PER_TILE)}”. Each is an estimate from the current pace, so it
+          changes as that does: a way from the ground still to go (terrain, roads, Agility, the
+          horse’s Speed and hunger, Driving skill; unexplored ground counts as Plains), a
+          construction site from who works on it now, so it says nobody is building while nobody
+          does.
+        </p>
+        <p>
           To pick several at once, drag a box around them with Shift held (or after the Select
           button on the map), or Shift-click residents to add them or take them out.
         </p>
@@ -529,9 +549,9 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, mount or dismount, board or get off a carriage,
-          work, build, haul, feed the stable, breed horses, tear down, build a road or wall line, or
-          run one of your scripts with its params.
+          to, pick up, drop, store, fetch, drive, unhitch a horse, mount or dismount, board or get
+          off a carriage, work, build, haul, feed the stable, breed horses, tear down, build a road
+          or wall line, or run one of your scripts with its params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
@@ -541,8 +561,10 @@ export function Wiki() {
           what to build, what a smithy makes, which script) asks for it on the card after. A step
           that has to be done on its tile goes after a walk there, unless the step before already
           walks there. It works on a resident with no queue too, and starts one. Adding a step only
-          checks that it could make sense (the place is there, and a carriage or horse is yours);
-          whether it can start is checked when its turn comes.
+          checks that it could make sense (the place is there as you last knew it, and a carriage or
+          horse is yours). A workplace or construction site can be anyone's, in sight or as last
+          seen, since a workplace has no owner: queue Work at a far mine and they walk there and
+          work it. Whether a step can start is checked when its turn comes.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -659,18 +681,20 @@ export function Wiki() {
           Intellect, twice as fast).
         </p>
         <p>
-          A pair has one child at a time: once {days(PAIRING_WAIT_DAYS)} have passed since they
-          paired, and their city has free housing and a food surplus, one partner carries the child
-          for {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
-          {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a child is grown after{' '}
-          {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Until
-          grown, a child walks but doesn't work, build, tear down, drive or pair, and of all goods
-          handles only Food: they pick it up, put it down, fetch and store it like anyone, so they
-          can carry their meals. At home a child tops up to their own {num(OWN_FOOD)} Food from the
-          storage, so they leave the city with food on them. Stats decline from age{' '}
-          {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below {pct(DECLINE_FLOOR)};
-          residents die of old age between {num(LIFESPAN_MIN)} and {num(LIFESPAN_MAX)}. A house
-          holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs up to {num(MAX_HEALTH)}.
+          A pair has one child: once {days(PAIRING_WAIT_DAYS)} have passed since they paired, and
+          their city has free housing and a food surplus, one partner carries the child for{' '}
+          {days(CARRYING_DAYS)} and doesn't work meanwhile; for another child, pair them again.
+          Children age faster: each year up to {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a
+          child is grown after {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a
+          game year. Until grown, a child walks but doesn't work, build, tear down, drive or pair,
+          and of all goods handles only Food: they pick it up, put it down, fetch and store it like
+          anyone, so they can carry their meals. At home a child tops up to their own{' '}
+          {num(OWN_FOOD)} Food from the storage, so they leave the city with food on them. Stats
+          decline from age {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below{' '}
+          {pct(DECLINE_FLOOR)}; residents die of old age between {num(LIFESPAN_MIN)} and{' '}
+          {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents (a site holds
+          nobody yet), and a city's free housing is the room of its houses minus its residents.
+          Health runs up to {num(MAX_HEALTH)}.
         </p>
       </Section>
 
@@ -732,8 +756,9 @@ export function Wiki() {
           in its <code>workplace</code> param, or with none picked the one they stand on when it
           starts. Giving Work on a workplace fills it. It is never kept: each start works what it is
           given or where they stand, so a queue can walk them to a workplace and then run Work
-          there. With no workplace there, or once theirs is gone, Work ends and your realm log says
-          why.
+          there. The workplace can be anyone's you know, out of sight too: they walk to where you
+          last saw it. With no workplace there, once theirs is gone, or when they find it held by
+          another realm's workers with no room left, Work ends and your realm log says why.
         </p>
         <table>
           <thead>
@@ -926,6 +951,16 @@ export function Wiki() {
           an empty carriage of their realm, with no horse hitched until it is first driven. Torn
           down before it is finished, it leaves all the materials delivered to it.
         </p>
+        <p>
+          The first time a carriage is driven, a free horse of its realm standing with it is
+          hitched, and it stays hitched until <strong>Unhitch horse</strong>: any grown resident of
+          the carriage's realm standing on its tile can unhitch it, from their card, the carriage's
+          tile card, the group card, as a queue step or with a script's{' '}
+          <code>unhitch(carriage)</code>. The horse then stands free on the tile, to be ridden or
+          led into a stable, and a carriage being driven stops where it is. The carriage stands
+          there until it is next driven, when a free horse of the realm standing with it is hitched
+          again. A carriage whose horse dies waits the same way.
+        </p>
         <table>
           <thead>
             <tr>
@@ -985,9 +1020,10 @@ export function Wiki() {
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
-          carriage's load or food on the ground next to them. A stable holds up to{' '}
+          carriage's load or food on the ground next to them, and a ridden horse after that from the
+          Food its rider carries beyond their own {num(OWN_FOOD)}. A stable holds up to{' '}
           {num(STABLE_CAPACITY)} horses. A haul route keeps {num(HAUL_KEEP_FOOD)} Food on board for
-          its horse.
+          its horse and its driver, {num(HAUL_HORSE_FOOD)} of it the horse's share.
         </p>
         <p>
           The route (where to, which goods) comes only from the Haul order, which also fills the
@@ -1059,13 +1095,16 @@ export function Wiki() {
           {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes at {pct(HUNGRY_HORSE_PACE)} of its
           pace. Riding trains Driving like driving does, and Driving makes riding faster. A rider
           carries no more than on foot, and can't drive a carriage; a ridden horse is never hitched.
-          On the map a rider sits on a horse token, and up close their activity icon is a horseshoe
-          while they ride somewhere.
+          A hungry ridden horse eats Food on the ground in reach first, then what its rider carries
+          beyond their own {num(OWN_FOOD)} Food: the rider never goes without for the horse, so give
+          a rider extra Food for a long ride. When a ridden horse goes hungry with nothing to spare,
+          your realm log says so. On the map a rider sits on a horse token, and up close their
+          activity icon is a horseshoe while they ride somewhere.
         </p>
         <p>
           A rider’s Doing line says <em>Riding to …</em> where it would say <em>Walking to …</em>,
-          and their card shows the horse they ride: its stats, age, health and hunger, with{' '}
-          <strong>Dismount</strong> under Orders.
+          and their card shows the horse they ride: its stats, age, health and hunger, and that it
+          eats from their spare Food, with <strong>Dismount</strong> under Orders.
         </p>
         <h3>Passengers</h3>
         <p>
@@ -1085,11 +1124,13 @@ export function Wiki() {
           <code>aboard</code> and a carriage's <code>passengerIds</code>.
         </p>
         <p>
-          <strong>Refilling from a carriage:</strong> passengers eat the food they carry, and when
-          they run low take a meal from the carriage's Food (or another carriage of your realm on or
-          next to their tile), as at home, so a carriage with Food on board keeps them fed on a long
-          drive. The Food a haul route keeps for the horse stays on board. On a carriage without
-          Food they go hungry like anyone away from home.
+          <strong>Refilling from a carriage:</strong> passengers and the driver eat the food they
+          carry, and when they run low take a meal from the carriage's Food (passengers also from
+          another carriage of your realm on or next to their tile), as at home, so a carriage with
+          Food on board keeps them fed on a long drive. The Food a haul route keeps on board is left
+          for the horse and the driver: passengers don't touch it, and the driver leaves the horse's
+          share of {num(HAUL_HORSE_FOOD)}. On a carriage without Food they go hungry like anyone
+          away from home.
         </p>
         <p>
           The group card boards everyone of the group standing on the carriage at once, until it is
@@ -1355,6 +1396,34 @@ export function Wiki() {
           {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
           {duration(CLIMB_TICKS)}, unable to dodge or strike back.
         </p>
+        <h3>Under attack</h3>
+        <p>
+          A resident of yours who is struck and lives runs their defence script,{' '}
+          <strong>Defend</strong> (one of your default scripts): armed, they fight back at whoever
+          struck them until that one is dead, gone or out of sight; unarmed, they walk home to their
+          city's town hall, and stop once there or once no blow has landed for{' '}
+          {duration(DEFEND_CALM_TICKS)}. Their card says “Defending: fighting back at Bo” or
+          “Defending: fleeing home”, with what they were doing on the line under it. What they were
+          doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
+          queue at its step, or a plain order. Struck again while defending, they keep defending; an
+          order you give them meanwhile ends both. Scripts see the last blow as{' '}
+          <code>me.struckBy</code> and <code>me.struckAt</code>. Residents of NPC cities, and in an
+          army, fight back or flee home the same way.
+        </p>
+        <h3>Defence script</h3>
+        <p>
+          Defend is only the default: on a resident's card, the Script tab's{' '}
+          <strong>Defence script</strong> picks any of your scripts for them to run when struck
+          instead, a default script such as Work too; the group card picks it for all of them at
+          once. If the script has params, you pick them as you pick it, as before a script starts,
+          and they are kept for that resident like any script's. Back on “Defend (default)”, they
+          defend by Defend again. It runs just as Defend does: in place of what they were doing,
+          which goes on once it calls <code>end()</code>. It is kept for the resident, across your
+          Leader's death too, and only you see it; scripts read it as <code>me.defenceScript</code>,
+          the script's id, or <code>null</code> for Defend. If the script is gone from your library
+          when they are struck, they defend by Defend, your realm log says so once, and the pick
+          goes back to Defend. A resident lent to another realm defends by that realm's Defend.
+        </p>
       </Section>
 
       <Section id="territory">
@@ -1424,14 +1493,14 @@ export function Wiki() {
           only you see it. Without it they show what the task and its current order have the
           resident doing, such as “Building a house: fetching 10 wood from the storage”.{' '}
           <code>end</code>: once this run is over the script ends and the resident stands idle; in a
-          queue, its next step starts. Given a reason, <code>end(reason)</code> also notes it in
-          your realm log, like “Ana stopped Work: no workplace on her tile”: short text, cut like{' '}
-          <code>doing</code>’s, that only you see, for every end. <code>log</code>: adds a short
-          line, cut like <code>doing</code>’s, to the resident's script log, with the game time. The
-          Build and Tear down defaults end once the site is finished or the building is gone; a
-          script that never calls it runs until another order ends it. A script runs as a resident's
-          or as an army's: names marked resident only or army only are only there for one of them,
-          and a default script runs as a resident's.
+          queue, its next step starts; a defence script hands back to what it interrupted. Given a
+          reason, <code>end(reason)</code> also notes it in your realm log, like “Ana stopped Work:
+          no workplace on her tile”: short text, cut like <code>doing</code>’s, that only you see,
+          for every end. <code>log</code>: adds a short line, cut like <code>doing</code>’s, to the
+          resident's script log, with the game time. The Build and Tear down defaults end once the
+          site is finished or the building is gone; a script that never calls it runs until another
+          order ends it. A script runs as a resident's or as an army's: names marked resident only
+          or army only are only there for one of them, and a default script runs as a resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />
@@ -1532,9 +1601,11 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             a param removed from the script is dropped, and a new one starts unset.
           </li>
           <li>
-            A param reads <code>null</code> while none is picked, and once the one picked is gone or
-            no longer yours. A <code>number</code> param reads the number typed, or{' '}
-            <code>null</code> while unset.
+            A <code>building</code> param can name a workplace or construction site of anyone's you
+            know, in sight or last seen; out of sight the card names it with "(last seen)" and the
+            script reads it as you last saw it. A param reads <code>null</code> while none is
+            picked, and once the one picked is gone or no longer one it may name. A{' '}
+            <code>number</code> param reads the number typed, or <code>null</code> while unset.
           </li>
           <li>
             A <code>number</code> param may have a default: <code>= n</code> after its type, a whole
@@ -1578,7 +1649,24 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>All of a realm's scripts together: {num(SCRIPT_REALM_STEP_BUDGET)} steps a tick.</li>
           <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
           <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
+          <li>
+            A value passed to an action or <code>withMemory</code> holds at most{' '}
+            {num(SCRIPT_ACTION_VALUE_MAX)} characters of JSON.
+          </li>
+          <li>
+            One value a script builds is bounded: a string holds at most{' '}
+            {num(SCRIPT_MAX_STRING_LENGTH)} characters, a list {num(SCRIPT_MAX_LIST_LENGTH)} items
+            and an object {num(SCRIPT_MAX_OBJECT_KEYS)} keys. Past that the script stops with a
+            runtime error, like a call too deep.
+          </li>
         </ul>
+        <p>
+          The Library has its caps too: it holds at most {num(SCRIPT_LIBRARY_MAX_SCRIPTS)} scripts,
+          your default scripts among them, and each script keeps at most {num(SCRIPT_MAX_VERSIONS)}{' '}
+          versions. A save past either is refused and says so next to the Save button: delete old
+          versions, or whole scripts, to make room. The versions the game adds to a default script
+          you haven’t edited don’t count against you.
+        </p>
         <p>
           To debug a script, open the Script tab of a resident or army running it: it shows the
           script's memory and params as they are now, changing every tick. You can't change memory
@@ -1589,6 +1677,8 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           {num(SCRIPT_STEP_BUDGET)}, marked when it ran out, and its last runtime error with the
           line and how long ago. The error stays until the script ends or you save a new version;
           click it to open that line in the Library. Errors still go into the realm log as well.
+          Should the game itself hit an error running a script, that script ends as if it had called{' '}
+          <code>end()</code>, your realm log says so once, and everything else goes on.
         </p>
         <p>
           The Script tab of your resident also shows their script log, newest first: the lines their
@@ -1605,8 +1695,8 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
       <Section id="examples">
         <p>
           The game's default scripts, as they are now: what residents run for a task you give them
-          on the map. Each Player has their own copy to edit in the script editor; here they are to
-          read.
+          on the map, and Defend, which they run when struck. Each Player has their own copy to edit
+          in the script editor; here they are to read.
         </p>
         {Object.entries(DEFAULT_SCRIPTS).map(([task, s]) => (
           <div key={task}>

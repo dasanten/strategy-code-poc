@@ -44,6 +44,7 @@ import {
   residentActions,
   riddenHorseLine,
   tileActions,
+  unhitcherOf,
   type ResidentHere,
   type TileThings,
 } from './selection-view.js'
@@ -227,6 +228,15 @@ describe('the actions on a resident’s card', () => {
     expect(off.map((a) => a.label)).toEqual(['Dismount'])
     const drive = residentActions(here({ riding: true, carriage })).find((a) => a.id === 'drive')
     expect(drive).toMatchObject({ disabled: true, reason: 'dismount first to drive' })
+  })
+
+  it('offers unhitching a hitched carriage of the realm on their tile to grown-ups', () => {
+    expect(ids(here({ carriage }))).not.toContain('unhitch')
+    const unhitch = residentActions(here({ carriageToUnhitch: true })).find(
+      (a) => a.id === 'unhitch',
+    )
+    expect(unhitch).toMatchObject({ label: 'Unhitch horse', key: 'U' })
+    expect(ids(here({ carriageToUnhitch: true, adult: false }))).not.toContain('unhitch')
   })
 
   it('offers boarding a carriage of the realm on their tile, children too, and getting off aboard', () => {
@@ -647,7 +657,7 @@ describe('horses on the tile card', () => {
     const ridden = horse({ id: 'h2', hunger: 10, health: MAX_HEALTH - 5 })
     const horses = [horse(), ridden]
     expect(riddenHorseLine({ riding: 'h2' }, horses, at)).toBe(
-      'Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt',
+      'Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt · eats from your spare Food',
     )
     expect(riddenHorseLine({}, horses, at)).toBeUndefined()
     // A horse not in sight shows nothing.
@@ -765,6 +775,44 @@ describe('horses on the tile card', () => {
 
 describe('the actions on a tile’s card', () => {
   const actor = { id: 'r1', name: 'Ada' } as Resident
+
+  it('unhitches a carriage’s horse by a grown resident of the realm on its tile', () => {
+    const grown = (id: string, more: object = {}) =>
+      ({
+        id,
+        name: id,
+        owner: 'me',
+        cityId: null,
+        x: 5,
+        y: 5,
+        bornAt: 0,
+        carried: {},
+        ...more,
+      }) as Resident
+    const tick = 100 * TICKS_PER_GAME_YEAR
+    const ada = grown('ada')
+    const bo = grown('bo')
+    const kid = grown('kid', { bornAt: tick })
+    const away = grown('away', { x: 6 })
+    const stranger = grown('st', { owner: 'them' })
+    const residents = [kid, away, stranger, ada, bo]
+    const card = tile({ carriages: [carriage], residents, strangers: [stranger], tick })
+    expect(card.unhitch).toEqual({
+      carriageId: 'k1',
+      residents: [
+        { id: 'ada', name: 'ada' },
+        { id: 'bo', name: 'bo' },
+      ],
+    })
+    expect(tileActions(card, undefined).map((a) => a.label)).toEqual(['Unhitch horse'])
+    // The resident picked last when they may, else the first who may.
+    expect(unhitcherOf(card, bo)).toBe('bo')
+    expect(unhitcherOf(card, kid)).toBe('ada')
+    // Nobody to do it, or no horse hitched: no button.
+    expect(tile({ carriages: [carriage], residents: [kid], tick }).unhitch).toBeUndefined()
+    const bare = tile({ carriages: [{ ...carriage, horseId: null }], residents, tick })
+    expect(bare.unhitch).toBeUndefined()
+  })
 
   it('sends the resident picked last there', () => {
     const card = tile()

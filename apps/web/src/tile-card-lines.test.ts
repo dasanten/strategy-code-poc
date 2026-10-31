@@ -213,6 +213,37 @@ describe('buildings on a tile’s card', () => {
     expect(theirs.lines.some((l) => l.includes('residents') || l.startsWith('Food'))).toBe(false)
   })
 
+  it('says a house’s room, and how its city is housed where the Player may know', () => {
+    const cities = [
+      { id: 'c-me', name: 'Eastmere', realmId: 'me' },
+      { id: 'c-them', name: 'Farreach', realmId: 'them' },
+    ]
+    const houses = (cityId: string) => [
+      building({ id: `h1-${cityId}`, kind: 'house', cityId }),
+      building({ id: `h2-${cityId}`, kind: 'house', cityId, x: 30 }),
+    ]
+    const residents = ['c-me', 'c-me', 'c-me', 'c-them'].map((cityId, i) =>
+      resident({ id: `r${i}`, cityId, owner: cityId === 'c-me' ? 'me' : 'them' }),
+    )
+    const viewer = { realmId: 'me', allies: new Set<string>() }
+    const room = HOUSING_ROOM.house!
+    expect(linesOf({ buildings: houses('c-me'), residents, cities, viewer })).toContain(
+      `Room for ${room} residents · Eastmere: 3 residents · ${2 * room - 3} free housing`,
+    )
+    // Another realm's house says its room, nothing of how its city lives.
+    expect(linesOf({ buildings: houses('c-them'), residents, cities, viewer })).toContain(
+      `Room for ${room} residents`,
+    )
+    // A house site houses nobody yet.
+    const site = {
+      ...building({ kind: 'house', cityId: 'c-me' }),
+      site: { work: 0, delivered: {} },
+    }
+    expect(linesOf({ buildings: [site], cities, viewer }).some((l) => l.startsWith('Room'))).toBe(
+      false,
+    )
+  })
+
   it('offers renaming only an own city, at its town hall in sight', () => {
     const cities = [
       { id: 'c-me', name: 'Eastmere', realmId: 'me' },

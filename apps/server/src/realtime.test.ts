@@ -6,6 +6,8 @@ import {
   RESIDENT_NAME_MAX_LENGTH,
   SCRIPT_STEP_BUDGET,
   SESSION_COOKIE,
+  WS_CLOSE_LOGGED_OUT,
+  WS_CLOSE_TOO_MANY_REQUESTS,
   WS_PATH,
   chunksAcross,
   realmName,
@@ -16,33 +18,49 @@ import { createAdmin, createInviteCode, createSession, signUp } from './auth.js'
 import { recordEvent } from './events.js'
 import { ExploredTerrain } from './explored.js'
 import type { InvariantViolation } from './invariants.js'
-import { openDb, schema } from './db/index.js'
-import { OrderQueue } from './orders.js'
+import { openDb, schema, type Db } from './db/index.js'
+import { OrderQueue, orderKinds, type OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { SightTracker } from './sight.js'
 import { dieAll } from './survival.js'
-import { attachRealtime, scriptMemoryFor } from './realtime.js'
+import { SESSION_RECHECK_MS, attachRealtime, scriptMemoryFor } from './realtime.js'
 import { TerritoryTracker } from './territory.js'
 import { cityTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
 
 const terrain = cityTerrain()
 
+
 const cleanup: (() => Promise<void> | void)[] = []
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn()
 })
 
-async function start() {
+/**
+ * Starts a server. `sessionDb` is what the upgrade checks sessions against, the app's db unless
+ * given; `kinds` the order kinds, the game's unless given; `onError` hears of a message handler's
+ * exceptions; `origins`, `limits` and `now` go to `attachRealtime` as they are.
+ */
+async function start(
+  options: {
+    sessionDb?: Db
+    kinds?: Record<string, OrderKind>
+  } & Partial<Pick<Parameters<typeof attachRealtime>[1], 'onError' | 'origins' | 'limits' | 'now'>> = {},
+) {
   const opened = await openDb(':memory:')
   const app = await buildApp({
     db: opened.db,
     logger: false,
     secureCookies: false,
     trustProxy: false,
+    // Wired as in `index.ts`: the sockets are attached once the app has its server.
+    sockets: {
+      disconnectSession: (tokenHash) => realtime.disconnectSession(tokenHash),
+      disconnectUser: (userId) => realtime.disconnectUser(userId),
+    },
   })
   const world = createWorld(terrain)
-  const orders = new OrderQueue()
+  const orders = new OrderQueue(options.kinds)
   const territory = new TerritoryTracker()
   // Every send is checked against the Player's sight; what breaks it lands here.
   const violations: InvariantViolation[] = []
@@ -52,7 +70,7 @@ async function start() {
     tickError() {},
   }
   const realtime = attachRealtime(app.server, {
-    db: opened.db,
+    db: options.sessionDb ?? opened.db,
     world,
     terrain,
     explored: new ExploredTerrain(terrain),
@@ -60,6 +78,10 @@ async function start() {
     orders,
     territory,
     sightCheck: { reporter, sampleRate: 1 },
+    onError: options.onError,
+    origins: options.origins,
+    limits: options.limits,
+    now: options.now,
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
   cleanup.push(
@@ -71,6 +93,7 @@ async function start() {
   await createAdmin(opened.db, 'Daniel', 'admin password')
   const user = opened.db.select().from(schema.users).get()!
   return {
+    app,
     db: opened.db,
     userId: user.id,
     world,
@@ -92,8 +115,9 @@ function connect(
   url: string,
   token?: string,
   found: { realmName: string; leaderName?: string } | null = { realmName: 'Ironvale' },
+  headers: Record<string, string> = {},
 ) {
-  const headers = token ? { cookie: `${SESSION_COOKIE}=${token}` } : undefined
+  if (token) headers = { ...headers, cookie: `${SESSION_COOKIE}=${token}` }
   const socket = new WebSocket(url, { headers })
   const messages: ServerMessage[] = []
   socket.on('message', (raw) => {
@@ -106,6 +130,7 @@ function connect(
   })
   // Closing a refused socket mid-handshake reports an error; the tests check status codes instead.
   socket.on('error', () => {})
+  const closed = new Promise<number>((resolve) => socket.on('close', (code) => resolve(code)))
   cleanup.push(() => socket.terminate())
   const next = async (type: ServerMessage['type']) => {
     for (let i = 0; i < 100; i++) {
@@ -118,17 +143,161 @@ function connect(
     }
     throw new Error(`no ${type} message`)
   }
-  return { socket, next, messages }
+  const refused = () =>
+    new Promise<number | undefined>((resolve) =>
+      socket.on('unexpected-response', (_req, res) => resolve(res.statusCode)),
+    )
+  return { socket, next, messages, refused, closed }
+}
+
+/** Whether a socket is still open after what was just sent arrived: it still gets ticks. */
+async function stillOpen(client: ReturnType<typeof connect>, realtime: { broadcastTick(): void }) {
+  realtime.broadcastTick()
+  await client.next('tick')
+  return client.socket.readyState === WebSocket.OPEN
 }
 
 describe('realtime', () => {
   it('refuses sockets without a session', async () => {
     const { url } = await start()
-    const { socket } = connect(url)
-    const status = await new Promise<number | undefined>((resolve) =>
+    expect(await connect(url).refused()).toBe(401)
+  })
+
+  it('refuses a socket from another origin, and takes the allowed ones and its own host', async () => {
+    const origins = { allowed: ['https://game.example.com'], allowMissing: false }
+    const { url, token, world } = await start({ origins })
+    const open = (origin?: string) =>
+      connect(url, token, { realmName: 'Ironvale' }, origin === undefined ? {} : { origin })
+    // Another site a Player has open, with their cookie: refused before the session is looked at.
+    expect(await open('https://evil.example.com').refused()).toBe(403)
+    // A browser always sends an Origin; without one it is let in only outside production.
+    expect(await open().refused()).toBe(403)
+    expect(world.realms).toEqual([])
+    // The game's own domain, as configured, and whatever host the request came in at.
+    expect(await open('https://game.example.com').next('welcome')).toMatchObject({ type: 'welcome' })
+    const own = `http://${new URL(url).host}`
+    expect(await open(own).next('welcome')).toMatchObject({ type: 'welcome' })
+    expect(await open('http://localhost:5173').refused()).toBe(403)
+  })
+
+  it('lets a socket without an Origin in where the policy allows it (development)', async () => {
+    const { url, token } = await start({ origins: { allowed: [], allowMissing: true } })
+    expect(await connect(url, token).next('welcome')).toMatchObject({ type: 'welcome' })
+  })
+
+  it('closes a socket that sends a frame over maxPayload, and stays up', async () => {
+    const { url, token } = await start({ limits: { maxPayloadBytes: 1024 } })
+    const first = connect(url, token)
+    await first.next('welcome')
+    first.socket.send(JSON.stringify({ type: 'watch', ids: ['x'.repeat(2000)] }))
+    expect(await first.closed).toBe(1009)
+    // The server took no harm: the next connection plays on, and a frame within the cap is fine.
+    const second = connect(url, token)
+    await second.next('welcome')
+    second.socket.send(JSON.stringify({ type: 'order', requestId: 'r1', order: { kind: 'fly' } }))
+    expect(await second.next('rejected')).toMatchObject({ requestId: 'r1' })
+  })
+
+  it('closes a socket that floods it with messages, as "too many requests"', async () => {
+    let time = 0
+    const { url, token } = await start({
+      limits: { messageBurst: 4, messagesPerSecond: 1 },
+      now: () => time,
+    })
+    const { socket, next, closed } = connect(url, token)
+    await next('welcome')
+    const order = (id: string) =>
+      socket.send(JSON.stringify({ type: 'order', requestId: id, order: { kind: 'fly' } }))
+    // The burst goes through, each answered.
+    for (const id of ['a', 'b', 'c']) {
+      order(id)
+      expect(await next('rejected')).toMatchObject({ requestId: id })
+    }
+    // Half a second on, half a message is earned: not enough.
+    time = 500
+    order('d')
+    expect(await closed).toBe(WS_CLOSE_TOO_MANY_REQUESTS)
+
+    // Given time, the allowance comes back.
+    time = 2500
+    const again = connect(url, token)
+    await again.next('welcome')
+    again.socket.send(JSON.stringify({ type: 'order', requestId: 'e', order: { kind: 'fly' } }))
+    expect(await again.next('rejected')).toMatchObject({ requestId: 'e' })
+  })
+
+  it('caps the sockets one account holds open, and frees a slot when one closes', async () => {
+    const { url, token, db, userId } = await start({ limits: { connectionsPerUser: 2 } })
+    const first = connect(url, token)
+    await first.next('welcome')
+    const second = connect(url, token)
+    await second.next('welcome')
+    expect(await connect(url, token).refused()).toBe(429)
+    // Another account is counted on its own.
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    await connect(url, createSession(db, other.id)).next('welcome')
+    first.socket.close()
+    await first.closed
+    await connect(url, token).next('welcome')
+  })
+
+  it("caps a realm's orders waiting for the next tick, and takes more once it ran", async () => {
+    const { url, token, world, orders } = await start({ limits: { pendingOrdersPerRealm: 2 } })
+    const { socket, next } = connect(url, token)
+    await next('welcome')
+    // Renaming the Leader is valid any number of times, before and after a tick applied it.
+    const leaderId = world.realms[0]!.leaderId
+    const order = (id: string) =>
+      socket.send(
+        JSON.stringify({
+          type: 'order',
+          requestId: id,
+          order: { kind: 'rename', residentId: leaderId, targetId: leaderId, name: `Brann ${id}` },
+        }),
+      )
+    order('a')
+    expect(await next('ack')).toEqual({ type: 'ack', requestId: 'a' })
+    order('b')
+    expect(await next('ack')).toEqual({ type: 'ack', requestId: 'b' })
+    order('c')
+    expect(await next('rejected')).toEqual({
+      type: 'rejected',
+      requestId: 'c',
+      reason: 'too many orders waiting',
+    })
+    expect(orders.size).toBe(2)
+    orders.applyAll(world)
+    order('d')
+    expect(await next('ack')).toEqual({ type: 'ack', requestId: 'd' })
+  })
+
+  /** The status the server refuses an upgrade with. */
+  const refusal = (socket: WebSocket) =>
+    new Promise<number | undefined>((resolve) =>
       socket.on('unexpected-response', (_req, res) => resolve(res.statusCode)),
     )
-    expect(status).toBe(401)
+
+  it('refuses a malformed session cookie and keeps serving the next upgrade', async () => {
+    const { url, token } = await start()
+    // Not valid percent-encoding: decoding it threw inside the upgrade and ended the process.
+    expect(await refusal(connect(url, '%E0%A4%A').socket)).toBe(401)
+    const { next } = connect(url, token)
+    expect(await next('welcome')).toMatchObject({ type: 'welcome', account: { name: 'Daniel' } })
+  })
+
+  it('refuses an upgrade that errors unexpectedly with 400, instead of going down', async () => {
+    const broken = {
+      select() {
+        throw new Error('database gone')
+      },
+    } as unknown as Db
+    const { url, token } = await start({ sessionDb: broken })
+    expect(await refusal(connect(url, token).socket)).toBe(400)
+    expect(await refusal(connect(url, token).socket)).toBe(400)
   })
 
   it('welcomes a logged-in Player, then sends only changes', async () => {
@@ -301,6 +470,47 @@ describe('realtime', () => {
       requestId: 'r1',
       reason: 'unknown order: fly',
     })
+  })
+
+  it('rejects an order kind named after something inherited from Object.prototype', async () => {
+    const { url, token } = await start()
+    const { socket, next } = connect(url, token)
+    await next('welcome')
+    for (const kind of ['constructor', 'toString', '__proto__']) {
+      socket.send(JSON.stringify({ type: 'order', requestId: kind, order: { kind } }))
+      expect(await next('rejected')).toEqual({
+        type: 'rejected',
+        requestId: kind,
+        reason: `unknown order: ${kind}`,
+      })
+    }
+  })
+
+  it('answers a message whose handling throws, reports it and keeps the socket open', async () => {
+    const errors: unknown[] = []
+    const broken: OrderKind = {
+      validate: () => {
+        throw new Error('bug in the check')
+      },
+      apply: () => {},
+    }
+    const { url, token, userId } = await start({
+      kinds: { ...orderKinds, broken },
+      onError: (error, from) => errors.push([error, from]),
+    })
+    const { socket, next } = connect(url, token)
+    await next('welcome')
+    socket.send(JSON.stringify({ type: 'order', requestId: 'r1', order: { kind: 'broken' } }))
+    expect(await next('rejected')).toEqual({
+      type: 'rejected',
+      requestId: 'r1',
+      reason: 'server error',
+    })
+    expect(errors).toEqual([[new Error('bug in the check'), userId]])
+    // The socket, and the server, are still there for the next message.
+    socket.send(JSON.stringify({ type: 'order', requestId: 'r2', order: { kind: 'fly' } }))
+    expect(await next('rejected')).toMatchObject({ requestId: 'r2', reason: 'unknown order: fly' })
+    expect(socket.readyState).toBe(WebSocket.OPEN)
   })
 
   it('sends each Player only their own realm events, each once, and the log on connect', async () => {
@@ -623,5 +833,66 @@ describe('realtime', () => {
     const part = await next('tick')
     expect(part.type === 'tick' && part.region?.chunks).toEqual([explored[0]])
     expect(violations).toEqual([])
+  })
+
+  it('closes the socket of a session logged out, and keeps the account’s other sessions’', async () => {
+    const { app, url, token, db, userId, realtime } = await start()
+    const here = connect(url, token)
+    await here.next('welcome')
+    const elsewhere = connect(url, createSession(db, userId))
+    await elsewhere.next('welcome')
+
+    const out = await app.inject({
+      method: 'POST',
+      url: '/api/logout',
+      cookies: { [SESSION_COOKIE]: token },
+    })
+    expect(out.statusCode).toBe(204)
+    expect(await here.closed).toBe(WS_CLOSE_LOGGED_OUT)
+    expect(await stillOpen(elsewhere, realtime)).toBe(true)
+  })
+
+  it('closes every socket of an account whose password an admin reset, and nobody else’s', async () => {
+    const { app, url, token, db, userId, realtime } = await start()
+    const mara = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const daniel = connect(url, token)
+    await daniel.next('welcome')
+    const found = { realmName: 'Marafield' }
+    const marasPhone = connect(url, createSession(db, mara.id), found)
+    await marasPhone.next('welcome')
+    const marasLaptop = connect(url, createSession(db, mara.id), found)
+    await marasLaptop.next('welcome')
+
+    const reset = await app.inject({
+      method: 'POST',
+      url: '/api/admin/password',
+      cookies: { [SESSION_COOKIE]: token },
+      payload: { name: 'Mara', password: 'a new password' },
+    })
+    expect(reset.statusCode).toBe(204)
+    expect(await marasPhone.closed).toBe(WS_CLOSE_LOGGED_OUT)
+    expect(await marasLaptop.closed).toBe(WS_CLOSE_LOGGED_OUT)
+    expect(await stillOpen(daniel, realtime)).toBe(true)
+  })
+
+  it('closes the socket of a session that expired, on the next check a minute later', async () => {
+    const { url, token, db, realtime } = await start()
+    const daniel = connect(url, token)
+    await daniel.next('welcome')
+    // The only session there is: it expires, but the socket is checked once a minute, not every tick.
+    db.update(schema.sessions)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .run()
+    const now = Date.now()
+    realtime.broadcastTick(new Map(), now)
+    expect(await daniel.next('tick')).toMatchObject({ type: 'tick' })
+    expect(daniel.socket.readyState).toBe(WebSocket.OPEN)
+
+    realtime.broadcastTick(new Map(), now + SESSION_RECHECK_MS)
+    expect(await daniel.closed).toBe(WS_CLOSE_LOGGED_OUT)
   })
 })

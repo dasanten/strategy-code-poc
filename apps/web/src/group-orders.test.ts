@@ -340,6 +340,22 @@ describe('group orders with Shift held', () => {
       })
   })
 
+  it('picks the defence script for each, children too, with the params picked for it', () => {
+    const rs = [resident('a', 0, 0), child('c', 0, 0)]
+    const params = { foodAt: 2 }
+    const picked = send({ kind: 'setDefenceScript', scriptId: 7, params }, rs)
+    expect(picked.skipped).toEqual([])
+    expect(picked.requests.map((q) => q.order)).toEqual([
+      { kind: 'setDefenceScript', scriptId: 7, params, residentId: 'a' },
+      { kind: 'setDefenceScript', scriptId: 7, params, residentId: 'c' },
+    ])
+    expect(send({ kind: 'setDefenceScript', scriptId: null }, rs).requests[0]!.order).toEqual({
+      kind: 'setDefenceScript',
+      scriptId: null,
+      residentId: 'a',
+    })
+  })
+
   it('queues storing everything, even for those carrying nothing yet', () => {
     const { requests, skipped } = queue({ kind: 'store' }, [resident('a', 0, 0)])
     expect(skipped).toEqual([])
@@ -387,6 +403,7 @@ describe('every resident order on the group card', () => {
     horseToRide: true,
     carries: true,
     carriageToBoard: true,
+    carriageToUnhitch: true,
   })
   const offered = [
     ...residentActions(everything(farm)),
@@ -460,6 +477,22 @@ describe('the group card’s other orders', () => {
     const off = seenSend({ kind: 'dismount' }, rs, {})
     expect(orders(off)).toEqual([{ kind: 'dismount', residentId: 'e' }])
     expect(why(off)).toHaveLength(4)
+  })
+
+  it('unhitches a different hitched carriage each, skipping children and those without one', () => {
+    const carriages = [
+      { id: 'k1', x: 5, y: 5, horseId: 'h1' },
+      { id: 'k2', x: 5, y: 5, horseId: null },
+      { id: 'k3', x: 9, y: 9, horseId: 'h3' },
+    ]
+    const rs = [resident('a', 5, 5), resident('b', 5, 5), child('c', 9, 9), resident('d', 0, 0)]
+    const sent = seenSend({ kind: 'unhitch' }, rs, { carriages })
+    expect(orders(sent)).toEqual([{ kind: 'unhitch', carriageId: 'k1', residentId: 'a' }])
+    expect(why(sent)).toEqual([
+      ['c', 'a child'],
+      ['d', 'no hitched horse here'],
+      ['b', 'another of them unhitches the horse here'],
+    ])
   })
 
   it('makes each standing in a stable feed it; children and those elsewhere are skipped', () => {

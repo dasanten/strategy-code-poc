@@ -2,7 +2,9 @@ import { and, asc, eq, gt, isNotNull, lt, sql } from 'drizzle-orm'
 import { checkScript, scriptParams } from '@csp/lang'
 import {
   DEFAULT_SCRIPTS,
+  SCRIPT_LIBRARY_MAX_SCRIPTS,
   SCRIPT_MAX_LENGTH,
+  SCRIPT_MAX_VERSIONS,
   SCRIPT_NAME_MAX_LENGTH,
   TASKS,
   defaultScriptName,
@@ -71,6 +73,43 @@ function ownScript(db: Db, userId: number, id: number) {
     .get()
   if (!row) throw new AuthError('not-found', 'No such script.')
   return row
+}
+
+/**
+ * The library cap (`CONTEXT.md`: Library cap): a new script is refused once the Player's library,
+ * their default scripts among them, holds `SCRIPT_LIBRARY_MAX_SCRIPTS`.
+ */
+function roomForScript(db: Db, userId: number): void {
+  const { count } = db
+    .select({ count: sql<number>`count(*)` })
+    .from(scripts)
+    .where(eq(scripts.userId, userId))
+    .get()!
+  if (count >= SCRIPT_LIBRARY_MAX_SCRIPTS) {
+    throw new AuthError(
+      'library-full',
+      `Your library has ${count} scripts, the most it can hold: delete scripts first.`,
+    )
+  }
+}
+
+/**
+ * The version cap (`CONTEXT.md`: Library cap): a Player's save or reset is refused once the
+ * script keeps `SCRIPT_MAX_VERSIONS` versions. The game adding a changed default to a script that
+ * follows it (`ensureDefaultScripts`) isn't the Player's save and never checks this.
+ */
+function roomForVersion(db: Db, scriptId: number): void {
+  const { count } = db
+    .select({ count: sql<number>`count(*)` })
+    .from(scriptVersions)
+    .where(eq(scriptVersions.scriptId, scriptId))
+    .get()!
+  if (count >= SCRIPT_MAX_VERSIONS) {
+    throw new AuthError(
+      'library-full',
+      `This script has ${count} versions, the most it can keep: delete old versions first.`,
+    )
+  }
 }
 
 /** A script that isn't a default script; those can't be renamed or deleted. */
@@ -258,6 +297,7 @@ export function createScript(
     const txDb = tx as unknown as Db
     if (nameTaken(txDb, userId, name))
       throw new AuthError('name-taken', 'You have a script by that name.')
+    roomForScript(txDb, userId)
     const { id } = tx.insert(scripts).values({ userId, name }).returning({ id: scripts.id }).get()
     addVersion(txDb, id, source)
     return id
@@ -278,6 +318,7 @@ export function saveScript(
   const source = validateSource(input.source)
   db.transaction((tx) => {
     const row = ownScript(tx as unknown as Db, userId, id)
+    roomForVersion(tx as unknown as Db, id)
     addVersion(tx as unknown as Db, id, source)
     markEdited(tx as unknown as Db, row)
   })
@@ -348,6 +389,7 @@ export function resetScript(db: Db, userId: number, id: number): ScriptDetail {
     if (!isTask(row.task)) {
       throw new AuthError('default-script', 'Only a default script can be reset.')
     }
+    roomForVersion(txDb, id)
     addVersion(txDb, id, DEFAULT_SCRIPTS[row.task].source)
     tx.update(scripts)
       .set({ followsDefault: true, editedFrom: null })

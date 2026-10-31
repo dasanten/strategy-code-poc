@@ -97,6 +97,7 @@ import {
   type HaulSetup,
   type Picking,
 } from './Residents.js'
+import { arrivalOf } from './doing-view.js'
 import { CardSheet, PickBanner, TileCard } from './SelectionCard.js'
 import { pickHint, pickPrompt, pickTarget, useMediaQuery, useTouchScreen } from './pick-mode.js'
 import { PHONE_QUERY } from './sheet-view.js'
@@ -144,7 +145,8 @@ interface Starting {
 /** What the resident card's script param fields need of the world (`script-params-view`). */
 function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): ParamWorld {
   const { buildings, carriages, cities } = world
-  return { buildings, carriages, cities, realmId: world.home.realmId, size: world.map.size }
+  const [lastSeen, realmId] = [world.lastSeen.buildings, world.home.realmId]
+  return { buildings, lastSeen, carriages, cities, realmId, size: world.map.size }
 }
 
 /** What the queue planner's map picks need of the world (`plan-step`). */
@@ -602,8 +604,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function sendGroup(order: GroupOrder, queued = shift.current) {
     if (!world) return
     const starts =
-      order.kind === 'runScript'
-        ? { kind: 'runScript', scriptId: order.scriptId }
+      order.kind === 'runScript' || order.kind === 'setDefenceScript'
+        ? { kind: order.kind, scriptId: order.scriptId }
         : order.kind === 'work' || order.kind === 'build'
           ? { kind: 'task', task: order.kind }
           : undefined
@@ -729,6 +731,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await giveOrder({ kind: 'runScript', residentId: selected.id, scriptId }))
   }
   /**
+   * Picks the script the picked resident runs when struck, or with null the Defend default
+   * (`CONTEXT.md`: Defence script); its params are picked first, as before a script starts. Never
+   * queued: it leaves what they do as it is.
+   */
+  async function setDefenceScript(scriptId: number | null) {
+    if (!selected) return
+    const order = { kind: 'setDefenceScript', residentId: selected.id, scriptId }
+    setOrderError(await giveOrder(order, false))
+  }
+  /**
    * Picks, or clears with null, the value of a param of the script the picked resident runs
    * (`CONTEXT.md`: Script parameter): the building or carriage's id, or the number typed for a
    * number param. It leaves the script running.
@@ -792,6 +804,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       : { kind: 'getOff', residentId: selected.id }
     setOrderError(await giveOrder(order))
   }
+  /**
+   * Orders the picked resident to unhitch the horse from a carriage on their tile (`CONTEXT.md`:
+   * Hitched horse); with Shift held, appends it to their queue.
+   */
+  async function unhitch(carriageId: string, residentId = selected?.id) {
+    if (!residentId) return
+    setOrderError(await giveOrder({ kind: 'unhitch', residentId, carriageId }))
+  }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
     if (!selected) return
@@ -807,6 +827,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     (lookup: (x: number, y: number) => number | undefined) => setTerrainAt(() => lookup),
     [],
   )
+  const arrivesIn =
+    world &&
+    arrivalOf(
+      {
+        size: world.map.size,
+        tick: world.tick,
+        horses: world.horses,
+        carriages: world.carriages,
+        residents: world.residents,
+        buildings: world.buildings,
+      },
+      terrainAt,
+    )
   const onTile = <T extends { x: number; y: number }>(things: T[] | undefined) =>
     selected && things?.find((t) => t.x === selected.x && t.y === selected.y)
   // A road may share its tile with a building (`CONTEXT.md`: Road); a building is wherever its
@@ -919,6 +952,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             scripts={scripts}
             buildings={world.buildings}
             inSight={world.residents}
+            arrivesIn={arrivesIn || undefined}
             tick={world.tick}
             selectedId={selected?.id}
             onSelect={(id) => {
@@ -1090,6 +1124,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               nodeAt,
             )}
             actor={selected}
+            onUnhitch={(carriageId, residentId) => void unhitch(carriageId, residentId)}
             orderError={orderError}
             onClose={() => setSelectedTile(undefined)}
             onSendHere={async () => {
@@ -1124,6 +1159,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           <ResidentCard
             key={selected.id}
             resident={selected}
+            arrivesIn={arrivesIn || undefined}
             leaderId={world.home.leaderId}
             cityName={homeCity?.name}
             tick={world.tick}
@@ -1147,9 +1183,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onRide={ride}
             carriageToBoard={onTile(world.carriages.filter((k) => carriageOfResident(k, selected)))}
             onBoard={boardCarriage}
+            carriageToUnhitch={onTile(
+              world.carriages.filter((k) => carriageOfResident(k, selected) && k.horseId),
+            )}
+            onUnhitch={unhitch}
             scripts={scripts}
             buildings={world.buildings}
+            lastSeen={world.lastSeen.buildings}
             onRunScript={runScript}
+            onSetDefenceScript={setDefenceScript}
             onEditScript={(id) => openScript(id)}
             orderError={orderError}
             pile={world.piles.find(
@@ -1280,6 +1322,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             buildings={world.buildings}
             carriages={groupCarriages}
             inSight={world.residents}
+            arrivesIn={arrivesIn || undefined}
             horses={world.horses}
             realmId={world.home.realmId}
             tick={world.tick}
@@ -1310,7 +1353,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 })),
               }
             }
-            onOrder={(order) => void sendGroup(order)}
+            // Picking a defence script is never queued: it leaves what they do as it is.
+            onOrder={(order) =>
+              void sendGroup(order, order.kind !== 'setDefenceScript' && shift.current)
+            }
             report={groupReport}
             orderError={groupError}
             onPick={(id) => select([id])}

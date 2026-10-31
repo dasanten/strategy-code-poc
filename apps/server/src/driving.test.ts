@@ -222,6 +222,89 @@ describe('driving a carriage', () => {
   })
 })
 
+describe('the unhitch order (`CONTEXT.md`: Hitched horse)', () => {
+  /** Sends an unhitch order of the Player's and applies it, as the next tick would. */
+  function unhitch(world: WorldState, o: object = {}) {
+    const q = new OrderQueue(undefined, open)
+    const reply = q.receive(world, me, 'q', {
+      kind: 'unhitch',
+      residentId: 'w1',
+      carriageId: 'k1',
+      ...o,
+    })
+    q.applyAll(world)
+    return reply
+  }
+
+  it('frees the horse on the tile and stops the carriage’s driver', () => {
+    const { world, w1, horse, carriage } = setup(open)
+    drive(w1, 'k1', 8, 2)
+    const walking = new Walking(open)
+    while (carriage.x < 4) stepWorld(world, open, walking)
+    expect(carriage.horseId).toBe('h1')
+
+    expect(unhitch(world)).toEqual({ type: 'ack', requestId: 'q' })
+    expect(carriage.horseId).toBeNull()
+    expect(w1.order).toBeNull()
+    for (let i = 0; i < 5; i++) stepWorld(world, open, walking)
+    expect([carriage.x, carriage.y]).toEqual([4, 2])
+    expect([horse.x, horse.y]).toEqual([4, 2])
+    expect(checkInvariants(world, open)).toEqual([])
+
+    // The free horse can be ridden now.
+    const q = new OrderQueue(undefined, open)
+    q.receive(world, me, 'q', { kind: 'mount', residentId: 'w1', horseId: 'h1' })
+    q.applyAll(world)
+    expect(w1.riding).toBe('h1')
+    stepWorld(world, open, walking)
+    expect(w1.riding).toBe('h1')
+    expect(checkInvariants(world, open)).toEqual([])
+  })
+
+  it('refuses a child, someone off the tile, another realm and a carriage with no horse', () => {
+    const { world, w1, carriage } = setup(open)
+    expect(unhitch(world)).toMatchObject({ reason: 'no horse is hitched to that carriage' })
+    carriage.horseId = 'h1'
+    expect(unhitch(world, { carriageId: 'nope' })).toMatchObject({ reason: 'no such carriage' })
+
+    const born = w1.bornAt
+    w1.bornAt = world.tick - ticksForAge(5)
+    expect(unhitch(world)).toMatchObject({ reason: 'children can’t unhitch' })
+    w1.bornAt = born
+
+    w1.x = 3
+    expect(unhitch(world)).toMatchObject({ reason: 'that carriage is not on the resident’s tile' })
+    w1.x = 2
+
+    carriage.realmId = 'r2'
+    expect(unhitch(world)).toMatchObject({ reason: 'not a carriage of your realm' })
+    carriage.realmId = 'r1'
+
+    const q = new OrderQueue(undefined, open)
+    const stranger = { ...me, userId: 8 }
+    const o = { kind: 'unhitch', residentId: 'w1', carriageId: 'k1' }
+    expect(q.receive(world, stranger, 'q', o)).toMatchObject({
+      reason: 'not one of your residents',
+    })
+    expect(carriage.horseId).toBe('h1')
+  })
+
+  it('leaves the carriage to hitch a free horse standing with it when next driven', () => {
+    const { world, w1, horse, carriage } = setup(open)
+    carriage.horseId = 'h1'
+    expect(unhitch(world)).toEqual({ type: 'ack', requestId: 'q' })
+    expect(carriage.horseId).toBeNull()
+    const q = new OrderQueue(undefined, open)
+    expect(
+      q.receive(world, me, 'q', { kind: 'drive', residentId: 'w1', carriageId: 'k1', x: 6, y: 2 }),
+    ).toEqual({ type: 'ack', requestId: 'q' })
+    q.applyAll(world)
+    driveOut(world, open, w1)
+    expect([carriage.x, carriage.y, horse.x, horse.y]).toEqual([6, 2, 6, 2])
+    expect(carriage.horseId).toBe('h1')
+  })
+})
+
 describe('horse stats on the road (`CONTEXT.md`: Horse stats)', () => {
   it('a faster horse pulls its carriage faster, a slower one slower', () => {
     const ticks = (speed: number) => {

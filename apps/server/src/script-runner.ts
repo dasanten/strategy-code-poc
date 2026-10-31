@@ -1,12 +1,4 @@
-import {
-  NativeFunction,
-  ScriptFunction,
-  parse,
-  run,
-  scriptParams,
-  type Program,
-  type ScriptObject,
-} from '@csp/lang'
+import { parse, run, scriptParams, type Program, type ScriptObject } from '@csp/lang'
 import {
   buildAtProblem,
   buildingAt,
@@ -27,6 +19,7 @@ import {
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
+  SCRIPT_VALUE_LIMITS,
   type BuildingKind,
   type City,
   type OrderRequest,
@@ -41,6 +34,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { resumeInterrupted } from './defence.js'
 import { recordEvent } from './events.js'
 import type { InvariantViolation } from './invariants.js'
 import { npcSender, orderedResident } from './order-sender.js'
@@ -51,6 +45,7 @@ import {
   scriptRequestsSound,
   type ScriptContext,
 } from './script-bindings.js'
+import { plainValue } from './plain-value.js'
 import { addToScriptLog } from './script-log.js'
 import type { RunnableScript } from './scripts.js'
 import {
@@ -89,6 +84,21 @@ export interface ScriptHost {
    * on the task without one (`RunningScript.task`); without it such a script ends.
    */
   defaultScript?(userId: number, task: Task): number
+  /**
+   * Where an error of the game's own while running scripts is reported (ADR 0004). One in a
+   * script's run ends that script and is reported with its `scriptId` and resident or army; one
+   * in a realm's set-up skips the realm's scripts for the tick and is reported without. Either
+   * way the tick goes on.
+   */
+  scriptError?(world: WorldState, error: unknown, where: ScriptErrorWhere): void
+}
+
+/** Where an error of the game's own hit while running scripts (`ScriptHost.scriptError`). */
+export interface ScriptErrorWhere {
+  realmId: string
+  /** The resident or army whose script ended; none when the whole realm's set-up failed. */
+  entityIds: string[]
+  scriptId?: number
 }
 
 interface RunScriptRequest extends OrderRequest {
@@ -160,6 +170,49 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
       r.order = null
       r.script = { scriptId, memory: {} }
       setStartParams(r, scriptId, withTargetParam(host.script(scriptId), params))
+    },
+  }
+}
+
+interface SetDefenceScriptRequest extends OrderRequest {
+  kind: 'setDefenceScript'
+  residentId: string
+  /** The Player's script to run when struck, or null for the Defend default. */
+  scriptId: number | null
+  /** Values for the script's params, kept for the resident (`CONTEXT.md`: Before it starts). */
+  params?: StartParamValues
+}
+
+/**
+ * The set-defence-script order (`CONTEXT.md`: Defence script): the Player picks one of their
+ * scripts as the defence script of a resident of their own, or with null clears it, back to the
+ * Defend default; picking their Defend itself clears it too. Free and instant; it leaves what
+ * the resident does as it is. Any of their scripts may be picked, a default other than Defend
+ * too. The param values it gives are kept for the resident and the script, as a start's are.
+ */
+export function setDefenceScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
+  return {
+    validate(world, sender, order) {
+      const o = order as Partial<SetDefenceScriptRequest>
+      const realm = realmOf(world, sender.userId)
+      const r = world.residents.find((x) => x.id === o.residentId)
+      if (!realm || !r || r.owner !== realm.id) return 'not one of your residents'
+      if (o.scriptId === null) return o.params === undefined ? undefined : 'Defend takes no params'
+      return (
+        badScript(host, sender, o.scriptId) ??
+        paramsProblem(host, world, realm.id, o.scriptId!, o.params)
+      )
+    },
+    apply(world, _sender, order) {
+      const { residentId, scriptId, params } = order as SetDefenceScriptRequest
+      const r = world.residents.find((x) => x.id === residentId)
+      if (!r) return
+      if (scriptId === null || host.script(scriptId)?.task === 'defend') {
+        delete r.defenceScriptId
+        return
+      }
+      r.defenceScriptId = scriptId
+      setStartParams(r, scriptId, params)
     },
   }
 }
@@ -402,6 +455,8 @@ function taskProblem(
   o: Partial<TaskRequest>,
   terrain: TerrainMap | undefined,
 ): string | undefined {
+  // Being struck starts Defend (`CONTEXT.md`: Defence script); it is no task to give.
+  if ((o.task as unknown) === 'defend') return 'Defend runs when they are struck'
   if (!isTask(o.task)) return 'no such task'
   const realm = realmOf(world, sender.userId)
   const r = world.residents.find((x) => x.id === o.residentId)
@@ -496,7 +551,10 @@ export class ScriptRunner {
       const realmId = commanderOf(world, r)
       // An NPC city runs its residents' game defaults itself (`runNpcScripts`).
       if (realmId === null) {
-        if (!(r.script.task && r.script.scriptId === 0 && r.owner === null)) delete r.script
+        // Nobody runs their defence script any more: what it interrupted goes on, if anything.
+        resumeInterrupted(r)
+        if (r.script && !(r.script.task && r.script.scriptId === 0 && r.owner === null))
+          delete r.script
       } else {
         const by = { residentId: r.id }
         add(realmId, { holder: r, id: r.id, name: r.name, by, bind: by })
@@ -511,35 +569,11 @@ export class ScriptRunner {
     // Those whose script ran this tick, not skipped for the realm's budget.
     const ran = new Set<string>()
     for (const realm of world.realms) {
-      const running = byRealm.get(realm.id)
-      const sender = this.host.sender(realm.userId)
-      if (!running || !sender) continue
-      let seen: SeenEntity[] | undefined
-      const seenOnce = () => (seen ??= entitiesInSight(world, this.terrain, realm.id))
-      const sees = seesOnce(world, this.terrain, realm.id)
-      let left = SCRIPT_REALM_STEP_BUDGET
-      const first = world.tick % running.length
-      for (let i = 0; i < running.length; i++) {
-        const r = running[(first + i) % running.length]!
-        // Its script may have ended this tick.
-        if (!r.holder.script) continue
-        if (left <= 0) {
-          r.holder.script.lastRun = { steps: 0, outOfSteps: 'realm' }
-          logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, true))
-          continue
-        }
-        ran.add(r.id)
-        const steps = Math.min(SCRIPT_STEP_BUDGET, left)
-        left -= this.runOne(
-          world,
-          realm,
-          sender,
-          r,
-          steps,
-          { seen: seenOnce, sees },
-          used,
-          check ? out : undefined,
-        )
+      // A bug of the game's in one realm's scripts never stops the other realms' or the tick.
+      try {
+        this.runRealm(world, realm, byRealm.get(realm.id), used, ran, check ? out : undefined)
+      } catch (error) {
+        this.host.scriptError?.(world, error, { realmId: realm.id, entityIds: [] })
       }
     }
     this.programs = used
@@ -555,6 +589,71 @@ export class ScriptRunner {
     return out
   }
 
+  /** Runs one realm's scripts in turn, within the realm's step budget. */
+  private runRealm(
+    world: WorldState,
+    realm: Realm,
+    running: Runner[] | undefined,
+    used: Map<number, { source: string; program: Program }>,
+    ran: Set<string>,
+    violations: InvariantViolation[] | undefined,
+  ): void {
+    const sender = this.host.sender(realm.userId)
+    if (!running || !sender) return
+    let seen: SeenEntity[] | undefined
+    const seenOnce = () => (seen ??= entitiesInSight(world, this.terrain, realm.id))
+    const sees = seesOnce(world, this.terrain, realm.id)
+    let left = SCRIPT_REALM_STEP_BUDGET
+    const first = world.tick % running.length
+    for (let i = 0; i < running.length; i++) {
+      const r = running[(first + i) % running.length]!
+      // Its script may have ended this tick.
+      if (!r.holder.script) continue
+      if (left <= 0) {
+        r.holder.script.lastRun = { steps: 0, outOfSteps: 'realm' }
+        logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, true))
+        continue
+      }
+      ran.add(r.id)
+      const steps = Math.min(SCRIPT_STEP_BUDGET, left)
+      try {
+        left -= this.runOne(
+          world,
+          realm,
+          sender,
+          r,
+          steps,
+          { seen: seenOnce, sees },
+          used,
+          violations,
+        )
+      } catch (error) {
+        // The game's own bug, not the script's: it ends this one script and the tick goes on.
+        left -= steps
+        this.failedInGame(world, realm, r, error)
+      }
+    }
+  }
+
+  /**
+   * A script's run threw something the game didn't expect, from a native or from applying what
+   * it requested: a bug in the game. The script ends as with `end()`, the realm log notes it
+   * once (the script doesn't run again, so it isn't rate-limited) and monitoring gets the error.
+   */
+  private failedInGame(world: WorldState, realm: Realm, r: Runner, error: unknown): void {
+    const running = r.holder.script
+    const scriptId = running?.scriptId
+    if (running) {
+      const message = `the game hit an error running this script, so it ended: ${errorMessage(error)}`
+      recordEvent(world, realm.id, scriptError(r, running, message))
+      // A resident's ends as on `end()`: a defence script hands back to what it interrupted.
+      if ('residentId' in r.bind) endScript(world, r.id)
+      else delete r.holder.script
+    }
+    const where = scriptId === undefined ? {} : { scriptId }
+    this.host.scriptError?.(world, error, { realmId: realm.id, entityIds: [r.id], ...where })
+  }
+
   /** Runs one resident's or army's script with `steps`; returns the steps it used. */
   private runOne(
     world: WorldState,
@@ -568,20 +667,41 @@ export class ScriptRunner {
   ): number {
     const running = r.holder.script!
     // Started on a task without a script of the Player's, a resident of theirs runs their version
-    // of its default; one the realm commands but doesn't own (hired, lent) stops.
+    // of its default; one the realm commands but doesn't own (hired, lent) stops, but for
+    // Defend: struck, they defend themselves as the realm commanding them has it.
     if (running.scriptId === 0) {
       const owned = world.residents.some((x) => x.id === r.id && x.owner === realm.id)
-      const id = running.task && owned ? this.host.defaultScript?.(realm.userId, running.task) : 0
+      const runs = owned || running.task === 'defend'
+      const id = running.task && runs ? this.host.defaultScript?.(realm.userId, running.task) : 0
       if (!id) {
-        delete r.holder.script
+        stopScript(world, r)
         return 0
       }
       running.scriptId = id
     }
     const script = this.host.script(running.scriptId)
+    const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
+    if (
+      (!script || script.userId !== realm.userId) &&
+      running.task === 'defend' &&
+      resident?.defenceScriptId === running.scriptId
+    ) {
+      // The defence script picked is deleted or no longer theirs: they defend by the Defend
+      // default, from now on (`CONTEXT.md`: Defence script).
+      const { scriptId } = running
+      delete resident.defenceScriptId
+      recordEvent(world, realm.id, {
+        kind: 'defenceScriptGone',
+        residentId: r.id,
+        name: r.name,
+        scriptId,
+      })
+      running.scriptId = 0
+      return this.runOne(world, realm, sender, r, steps, { seen, sees }, used, violations)
+    }
     if (!script || script.userId !== realm.userId) {
       // Deleted, or the resident now belongs to another Player, whose script it isn't.
-      delete r.holder.script
+      stopScript(world, r)
       if (!script) {
         const { scriptId } = running
         recordEvent(world, realm.id, { kind: 'scriptEnded', ...r.by, name: r.name, scriptId })
@@ -600,7 +720,6 @@ export class ScriptRunner {
 
     const memory = structuredClone(running.memory) as ScriptObject
     // A resident's picked param values; an army's params are never picked.
-    const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
     const declared = parsed.program.params
     const params = resident ? paramValues(world, resident, running.scriptId, declared) : declared
     const bound = bindScript({
@@ -616,7 +735,12 @@ export class ScriptRunner {
       kinds: this.kinds,
     })
     const { globals, requests } = bound
-    const result = run(parsed.program, { globals, steps, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    const result = run(parsed.program, {
+      globals,
+      steps,
+      maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
+    })
     if (violations) {
       const sound = 'armyId' in r.bind ? armyScriptRequestsSound : scriptRequestsSound
       violations.push(...sound(world, this.terrain, sender, r.id, requests, this.kinds))
@@ -690,13 +814,30 @@ export class ScriptRunner {
 
 /**
  * A resident's script called `end()` (`CONTEXT.md`: Running a script): it ends and they stand
- * idle; in a queue, its next step starts.
+ * idle; in a queue, its next step starts. A defence script hands back to what it interrupted
+ * (`CONTEXT.md`: Defence script).
  */
 function endScript(world: WorldState, residentId: string): void {
   const r = world.residents.find((x) => x.id === residentId)
-  if (!r) return
+  if (!r || resumeInterrupted(r)) return
   delete r.script
   r.order = null
+}
+
+/**
+ * A script that can't run any more stops; a resident's defence script hands back to what it
+ * interrupted, as on `end()`.
+ */
+function stopScript(world: WorldState, r: Runner): void {
+  const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
+  if (resident && resumeInterrupted(resident)) return
+  delete r.holder.script
+}
+
+/** What an error of the game's own says, short enough for the realm log. */
+function errorMessage(error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error)
+  return text.length > 200 ? `${text.slice(0, 199)}…` : text
 }
 
 const scriptError = (
@@ -747,22 +888,16 @@ function logLimited(
  * memory from before the run stays.
  */
 export function keepMemory(memory: ScriptObject): ScriptMemory | string {
-  const hasFunction = (v: unknown): boolean =>
-    v instanceof NativeFunction ||
-    v instanceof ScriptFunction ||
-    (typeof v === 'object' && v !== null && Object.values(v).some(hasFunction))
-  let json: string
-  try {
-    if (hasFunction(memory)) return 'Memory can’t keep functions; this tick’s changes were dropped'
-    json = JSON.stringify(memory)
-  } catch {
-    // Something that holds itself, which can't be kept as plain data.
-    return 'Memory can’t keep something that holds itself; this tick’s changes were dropped'
+  const plain = plainValue(memory, SCRIPT_MEMORY_MAX)
+  if (plain.ok) return plain.value as ScriptMemory
+  switch (plain.why) {
+    case 'function':
+      return 'Memory can’t keep functions; this tick’s changes were dropped'
+    case 'cycle':
+      return 'Memory can’t keep something that holds itself; this tick’s changes were dropped'
+    case 'size':
+      return `Memory can keep at most ${SCRIPT_MEMORY_MAX} characters; this tick’s changes were dropped`
   }
-  if (json.length > SCRIPT_MEMORY_MAX) {
-    return `Memory can keep at most ${SCRIPT_MEMORY_MAX} characters; this tick’s changes were dropped`
-  }
-  return JSON.parse(json) as ScriptMemory
 }
 
 /**
@@ -866,7 +1001,12 @@ function runCityScripts(
       params: program.params,
     })
     const { globals, requests } = bound
-    run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    run(program, {
+      globals,
+      steps: SCRIPT_STEP_BUDGET,
+      maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
+    })
     // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
     if (bound.ended()) {

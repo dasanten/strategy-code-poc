@@ -5,6 +5,7 @@ import {
   DEFAULT_SCRIPTS,
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_VALUE_LIMITS,
   SCRIPT_VIEWS,
   SIGHT_RANGE,
   TICKS_PER_GAME_YEAR,
@@ -162,6 +163,7 @@ function answers(calls: Record<string, string>, army = false, prepare?: (w: Worl
     globals: bindings.globals,
     steps: 100_000,
     maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+    limits: SCRIPT_VALUE_LIMITS,
   })
   expect(result).toMatchObject({ status: 'done' })
   return memory.out as Record<string, unknown>

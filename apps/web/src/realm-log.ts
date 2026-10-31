@@ -293,6 +293,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return { text: `${e.name} has grown up and can work now.`, tone: 'info' }
     case 'horseDied':
       return { text: 'A horse starved to death.', tone: 'bad' }
+    case 'horseHungry':
+      return {
+        text: `${e.name}’s horse is hungry, and ${e.name} carries no Food to spare for it.`,
+        tone: 'warn',
+      }
     case 'foaled':
       return { text: 'A foal was born in a stable.', tone: 'info' }
     case 'horsesGranted':
@@ -359,6 +364,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         : { text: `${e.name}’s script ran out of steps this tick.`, tone: 'warn' }
     case 'scriptEnded':
       return { text: `${e.name} stopped running a script: it was deleted.`, tone: 'info' }
+    case 'defenceScriptGone':
+      return {
+        text: `${e.name}’s defence script is gone, so they defend by Defend (default) again.`,
+        tone: 'warn',
+      }
     case 'scriptStopped':
       return { text: `${e.name} stopped ${e.script}: ${e.reason}`, tone: 'info' }
     case 'scriptFieldDropped': {

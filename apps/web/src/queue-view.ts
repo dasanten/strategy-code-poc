@@ -187,7 +187,7 @@ function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
 
 /** Orders that act on the tile they are given for (by the card, their own): they only start there. */
 function actsHere(order: OrderRequest): boolean {
-  if (['pickUp', 'drop', 'drive', 'mount', 'board'].includes(order.kind)) return true
+  if (['pickUp', 'drop', 'drive', 'mount', 'board', 'unhitch'].includes(order.kind)) return true
   if (order.kind !== 'task') return false
   // A Build task laid out somewhere else (`at`) walks there itself.
   return order.task !== 'build' || order.at === undefined
@@ -266,10 +266,11 @@ export interface QueueRow {
   endless: boolean
 }
 
-/** What step labels name: the Player's scripts and the buildings in sight. */
+/** What step labels name: the Player's scripts, the buildings in sight and those last seen. */
 export interface StepNames {
   scripts?: readonly Pick<ScriptSummary, 'id' | 'name'>[]
   buildings?: readonly Pick<Building, 'id' | 'kind'>[]
+  lastSeen?: readonly Pick<Building, 'id' | 'kind'>[]
 }
 
 /** The queue as the card lists it, step by step. */
@@ -289,7 +290,7 @@ export const realMinutes = (minutes: number) => realTimeOf(minutes * TICKS_PER_G
 /** What a queue step does, as the card lists it: "Work the farm", "Walk to 12, 6". */
 export function stepLabel(
   order: OrderRequest,
-  { scripts = [], buildings = [] }: StepNames,
+  { scripts = [], buildings = [], lastSeen = [] }: StepNames,
 ): string {
   const at = (p: unknown) => {
     const { x, y } = p as { x: number; y: number }
@@ -297,7 +298,9 @@ export function stepLabel(
   }
   const building = (id: unknown) => {
     const kind = buildings.find((b) => b.id === id)?.kind
-    return kind ? `the ${BUILDING_NAMES[kind]}` : 'the building'
+    if (kind) return `the ${BUILDING_NAMES[kind]}`
+    const was = lastSeen.find((b) => b.id === id)?.kind
+    return was ? `the ${BUILDING_NAMES[was]} (as last seen)` : 'the building'
   }
   // A storage or stable in sight a store or fetch names, if it names one; a carriage goes unnamed.
   const named = (word: string, id: unknown) => {
@@ -311,6 +314,8 @@ export function stepLabel(
       return `Drive the carriage to ${at(order)}`
     case 'board':
       return 'Board the carriage'
+    case 'unhitch':
+      return 'Unhitch the horse'
     case 'getOff':
       return order.x === undefined ? 'Get off' : `Get off at ${at(order)}`
     case 'pickUp':

@@ -9,6 +9,7 @@
  */
 import {
   BREED_FOOD,
+  DEFEND_CALM_TICKS,
   GET_FOOD_AT,
   GET_FOOD_TAKE,
   HORSE_FOOD_PER_DAY,
@@ -17,8 +18,11 @@ import {
 } from './balance.js'
 import { FOOTPRINT } from './footprint.js'
 
-/** The tasks that run a default script. */
-export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable'] as const
+/**
+ * The tasks that run a default script. Defend is never given: being struck starts it
+ * (`CONTEXT.md`: Defence script).
+ */
+export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable', 'defend'] as const
 export type Task = (typeof TASKS)[number]
 
 /**
@@ -217,14 +221,17 @@ let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
 
 if (!pickWorkplace()) { return }
 let workplace = building(memory.workplaceId)
-// Kept for when it is out of sight.
+// Kept for when it is out of sight; one picked out of sight is where I last saw it.
 if (workplace != null) { memory.at = {x: workplace.x, y: workplace.y} }
+if (memory.at == null && params.workplace != null) {
+  memory.at = {x: params.workplace.x, y: params.workplace.y}
+}
 if (memory.at == null || memory.stuck) { return }
 if (me.order != null && me.order.kind != "workAt") { return } // on my way
 
 if (storeLoad()) { return }
 if (walkBack()) { return }
-if (workplace == null) { // here, and it isn't: torn down, or no longer ours
+if (workplace == null) { // here, and it isn't: torn down
   end("the workplace is gone")
   return
 }
@@ -234,7 +241,9 @@ if (getFoodIfLow(params.storage, workplace)) {
   return
 }
 if (me.order == null) {
-  workAt(memory.makes)
+  if (workAt(memory.makes) != null && heldBySomeoneElse(workplace)) {
+    end("the " + workplace.kind + " is held by someone else")
+  }
   return
 }
 carryLoadOffIfFull(workplace)
@@ -263,6 +272,17 @@ fn pickWorkplace() {
 // A finished building that makes goods.
 fn isWorkplace(b) {
   return b != null && b.site == null && outputOf(b).length > 0
+}
+
+// Whether residents of another realm work it, so it has no room for me.
+fn heldBySomeoneElse(workplace) {
+  for (r of residents()) {
+    let o = r.order
+    if (r.owner != me.owner && o != null && o.kind == "workAt" && o.buildingId == workplace.id) {
+      return true
+    }
+  }
+  return false
 }
 
 // With a load picked up: store it, keeping my own food. True once I set off.
@@ -548,7 +568,7 @@ ${LOG_TEXT}
     source: `// Haul (default): drive params.carriage, or while none is picked the carriage
 // on my tile when I start, on a haul route between memory.from and memory.to:
 // memory.goods there, memory.returnGoods back, memory.keepFood Food kept on
-// board for the horse. The route comes only from the Haul order; started
+// board for the horse and me. The route comes only from the Haul order; started
 // without one I end. The built-in haul order loads, drives and unloads, again
 // and again; this starts it at memory.from.
 param carriage: storage // the carriage to drive; none: the one I stand on
@@ -670,6 +690,7 @@ fn walkBack() {
 fn startTearingDown() {
   let problem = tearDown(memory.buildingId)
   let target = building(memory.buildingId)
+  if (target == null) { target = params.building } // picked out of sight: as last seen
   if (problem == "the resident is not at that building" && target != null && !memory.walked) {
     memory.walked = true
     walkTo(target.x, target.y)
@@ -894,6 +915,88 @@ fn say(text) {
 }
 
 ${PICK_STABLE}
+
+${LOG_TEXT}
+`,
+  },
+  defend: {
+    name: 'Defend',
+    source: `// Defend (default): what I do when struck, in place of what I was doing,
+// which goes on once I end. Armed, I fight back at whoever struck me while
+// they are in sight, and end once they are dead, gone or out of sight.
+// Unarmed, I walk home to my city's town hall, and end there, or once no
+// blow has landed for calm ticks.
+let calm = ${DEFEND_CALM_TICKS} // ticks without a blow before I go back, fleeing
+
+if (armed()) {
+  fightBack()
+} else {
+  fleeHome()
+}
+
+// Whether I carry a weapon.
+fn armed() {
+  for (w of ["spear", "sword"]) {
+    let n = me.carried[w]
+    if (n != null && n > 0) { return true }
+  }
+  return false
+}
+
+// At whoever struck me, while they are in sight.
+fn fightBack() {
+  let foe = null
+  for (r of residents()) {
+    if (r.id == me.struckBy) { foe = r }
+  }
+  if (foe == null) {
+    end("the attacker is gone")
+    return
+  }
+  let o = me.order
+  if (o != null && o.kind == "attack" && o.targetId == foe.id) { return } // at it
+  let problem = attack(foe.id)
+  if (problem != null) {
+    end("can't fight back: " + problem)
+    return
+  }
+  doing("Defending: fighting back at " + foe.name)
+  log("fighting back at " + foe.name)
+}
+
+// Home to my city's town hall, until I am there or it has been calm.
+fn fleeHome() {
+  if (me.struckAt == null || tick - me.struckAt >= calm) {
+    end("no blow for a while")
+    return
+  }
+  let hall = townHall()
+  if (hall == null) {
+    end("no home to flee to")
+    return
+  }
+  let here = buildingAt(me.x, me.y)
+  if (here != null && here.id == hall.id) {
+    end("home")
+    return
+  }
+  if (me.order != null && me.order.kind == "walkTo") { return } // on my way
+  let problem = walkTo(hall.x, hall.y)
+  if (problem != null) {
+    end("can't flee home: " + problem)
+    return
+  }
+  doing("Defending: fleeing home")
+  log("fleeing home to " + placeName(hall))
+}
+
+// My city's town hall, if I see my city.
+fn townHall() {
+  for (c of cities()) {
+    if (c.id == me.cityId) { return building(c.townHallId) }
+  }
+  return null
+}
 
 ${LOG_TEXT}
 `,

@@ -16,6 +16,7 @@ import {
   type Stock,
 } from '@csp/shared'
 import type { HaulSetup } from './Residents.js'
+import { anyonesToWork } from './script-params-view.js'
 
 /**
  * The queue planner's Add step (`CONTEXT.md`: Queue, Planning ahead): every kind of step a queue
@@ -50,6 +51,7 @@ export type PlanStepId =
   | 'dismount'
   | 'board'
   | 'getOff'
+  | 'unhitch'
   | 'runScript'
 
 /** One kind of step Add step offers. */
@@ -81,6 +83,11 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     picks: [{ pick: 'carriage', prompt: 'the carriage to board' }],
   },
   { id: 'getOff', label: 'Get off', picks: [] },
+  {
+    id: 'unhitch',
+    label: 'Unhitch a horse',
+    picks: [{ pick: 'carriage', prompt: 'the carriage to unhitch the horse from' }],
+  },
   { id: 'work', label: 'Work', picks: [{ pick: 'workplace', prompt: 'the workplace to work' }] },
   {
     id: 'build',
@@ -203,6 +210,8 @@ export function makesAt(p: Picked): Good[] {
 /** What picking places needs of the world: what is where and whose. */
 export interface PlanWorld {
   buildings: readonly Building[]
+  /** The buildings the Player remembers out of sight (`CONTEXT.md`: Last seen). */
+  lastSeen: readonly Building[]
   carriages: readonly Pick<Carriage, 'id' | 'x' | 'y' | 'realmId'>[]
   horses: readonly Pick<SeenHorse, 'id' | 'x' | 'y' | 'realmId'>[]
   cities: readonly Pick<City, 'id' | 'realmId'>[]
@@ -212,8 +221,9 @@ export interface PlanWorld {
 
 /**
  * What a tap on the tile picks for `pick`, or why nothing, as a string: only that it could make
- * sense (the place is there, and the realm's where it must be). Whether the step can start is
- * checked when its turn comes.
+ * sense (the place is there as last known, and the realm's where it must be: a workplace or site
+ * anyone may work can be anywhere in sight or last seen). Whether the step can start is checked
+ * when its turn comes.
  */
 export function planPickAt(
   w: PlanWorld,
@@ -221,7 +231,10 @@ export function planPickAt(
   at: { x: number; y: number },
 ): Picked | string {
   const tile = { x: at.x, y: at.y }
-  const here = w.buildings.filter((b) => isAt(at, b, w.size))
+  const on = (list: readonly Building[]) => list.filter((b) => isAt(at, b, w.size))
+  const inSight = on(w.buildings)
+  // Out of sight, what is there as last seen.
+  const here = inSight.length > 0 ? inSight : on(w.lastSeen)
   const building = here.find((b) => b.kind !== 'road') ?? here[0]
   const own = (b: Building) => buildingRealm(w, b) === w.realmId
   const ownCarriage = w.carriages.find(
@@ -244,7 +257,9 @@ export function planPickAt(
       return b ? named(b) : 'no workplace there'
     }
     case 'building':
-      return building && own(building) ? named(building) : 'no building of yours there'
+      return building && (own(building) || anyonesToWork(building))
+        ? named(building)
+        : 'no building of yours, workplace or site there'
     case 'stable': {
       const b = here.find((x) => x.kind === 'stable' && !x.site && own(x))
       return b ? named(b) : 'no stable of yours there'
@@ -312,6 +327,8 @@ export function planOrder(
       return { order: { kind: 'board', carriageId: p.id }, at }
     case 'getOff':
       return { order: { kind: 'getOff' } }
+    case 'unhitch':
+      return { order: { kind: 'unhitch', carriageId: p.id }, at }
     case 'work': {
       const makes = a?.ask === 'makes' ? { makes: a.makes } : {}
       return { order: { kind: 'task', task: 'work', workplaceId: p.id, ...makes }, at }

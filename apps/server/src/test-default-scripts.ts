@@ -1,17 +1,24 @@
-import { DEFAULT_SCRIPTS, TASKS, type TerrainMap, type WorldState } from '@csp/shared'
+import { DEFAULT_SCRIPTS, TASKS, type Task, type TerrainMap, type WorldState } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
+import type { RunnableScript } from './scripts.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
-import { ScriptRunner, runScriptOrder, taskOrder } from './script-runner.js'
+import { ScriptRunner, runScriptOrder, setDefenceScriptOrder, taskOrder } from './script-runner.js'
 
 /**
  * For tests without a script library: tasks given as from the UI, every Player running the
  * game's default scripts unedited (`CONTEXT.md`: Default script). A Player's version of a task's
  * default has the id `userId * 100` plus the task's place in `TASKS`, from 1; Run script runs it
- * by that id.
+ * by that id. Other scripts of theirs go in `library`, by id; deleting one there deletes it.
  */
-export function defaultScripts(terrain: TerrainMap, senders: OrderSender[]) {
+export function defaultScripts(
+  terrain: TerrainMap,
+  senders: OrderSender[],
+  library: Map<number, RunnableScript> = new Map(),
+) {
+  const defaultScript = (userId: number, task: Task) => userId * 100 + TASKS.indexOf(task) + 1
   const host = {
-    script: (id: number) => {
+    script: (id: number): RunnableScript | undefined => {
+      if (library.has(id)) return library.get(id)
       const task = TASKS[(id % 100) - 1]
       if (!task) return undefined
       const userId = Math.floor(id / 100)
@@ -26,14 +33,13 @@ export function defaultScripts(terrain: TerrainMap, senders: OrderSender[]) {
     },
     sender: (userId: number) => senders.find((s) => s.userId === userId),
     explored: () => true,
+    defaultScript,
   }
   const kinds: Record<string, OrderKind> = {
     ...orderKinds,
     runScript: runScriptOrder(host),
-    task: taskOrder({
-      defaultScript: (userId, task) => userId * 100 + TASKS.indexOf(task) + 1,
-      script: host.script,
-    }),
+    setDefenceScript: setDefenceScriptOrder(host),
+    task: taskOrder({ defaultScript, script: host.script }),
   }
   const runner = new ScriptRunner(terrain, host)
   return {

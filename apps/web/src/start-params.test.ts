@@ -32,6 +32,9 @@ describe('the form before a script starts', () => {
     expect(startedScript({ kind: 'task', task: 'work' }, scripts)?.id).toBe(2)
     expect(startedScript({ kind: 'task', task: 'build' }, scripts)).toBeUndefined()
     expect(startedScript({ kind: 'walkTo', x: 1, y: 1 }, scripts)).toBeUndefined()
+    // A defence script's params are picked when it is picked; Defend has none to pick.
+    expect(startedScript({ kind: 'setDefenceScript', scriptId: 1 }, scripts)?.id).toBe(1)
+    expect(startedScript({ kind: 'setDefenceScript', scriptId: null }, scripts)).toBeUndefined()
   })
 
   it('starts from the kept value, else the default, else empty', () => {
