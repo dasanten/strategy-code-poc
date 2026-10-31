@@ -1,9 +1,19 @@
-import { MAX_HUNGER, driveSpeed, rideSpeed, walkSpeed } from './balance.js'
+import {
+  ADULT_AGE,
+  CARRYING_TICKS,
+  MAX_HUNGER,
+  PAIRING_WAIT_TICKS,
+  driveSpeed,
+  rideSpeed,
+  ticksForAge,
+  walkSpeed,
+} from './balance.js'
+import { teardownLeft, workNeeded, workPace, workingOn } from './building.js'
 import { horseFor, type CarriagePlace, type CarriageHorse } from './carriages.js'
-import { horseRidden } from './horses.js'
+import { STABLE_BREED_TICKS, horseRidden } from './horses.js'
 import { Terrain, stepLength } from './terrain.js'
 import { TICKS_PER_GAME_HOUR } from './time.js'
-import { TICKS_PER_GAME_DAY, TICK_MS, type Horse, type Resident } from './world.js'
+import { TICKS_PER_GAME_DAY, TICK_MS, type Building, type Horse, type Resident } from './world.js'
 
 /**
  * Ticks a way of `path` from `from` takes (`CONTEXT.md`: Doing, Estimates): each step its length
@@ -91,4 +101,48 @@ function gameTimeAbout(ticks: number): string {
   if (hours < 18) return 'half a game day'
   const days = Math.max(1, Math.round(ticks / TICKS_PER_GAME_DAY))
   return days === 1 ? 'a game day' : `${days} game days`
+}
+
+/** How long is left, as `aboutTime` says it: "about 2 h (5 game days) left". */
+export const timeLeft = (ticks: number) => `${aboutTime(ticks)} left`
+
+/** Ticks left of `work` at `pace` work a tick; undefined when nobody is at it (pace 0). */
+export function ticksAtPace(work: number, pace: number): number | undefined {
+  return pace > 0 ? Math.ceil(Math.max(0, work) / pace) : undefined
+}
+
+// ---------- Meters and countdowns, each from its rule's pace ----------
+
+/** A foal at breeding `progress`: the stable brings it on one tick a tick while tended. */
+export const foalLeft = (progress: number) => timeLeft(STABLE_BREED_TICKS - progress)
+
+/**
+ * A construction site or tear-down, from the work left and the residents on it now (`workingOn`,
+ * `workPace`); with nobody at it, who would be missing.
+ */
+export function workLeft(
+  b: Building,
+  residents: readonly Resident[],
+  tick: number,
+  { tearingDown = false, under, size }: { tearingDown?: boolean; under?: number; size?: number },
+): string {
+  const work = tearingDown ? teardownLeft(b) : workNeeded(b)
+  const pace = workPace(b, workingOn(b, residents, tearingDown, size), tick, under)
+  const ticks = ticksAtPace(work, pace)
+  if (ticks === undefined) return tearingDown ? 'nobody is tearing it down' : 'nobody is building'
+  return timeLeft(ticks)
+}
+
+/** A child carried since `since`: "born in about 4 h (10 game days)". */
+export const bornIn = (since: number, tick: number) =>
+  `born in ${aboutTime(Math.max(0, since + CARRYING_TICKS - tick))}`
+
+/** A pair paired since `since`: ticks until one partner can start carrying (`CONTEXT.md`: Pairing). */
+export const pairingTicksLeft = (since: number, tick: number) =>
+  Math.max(0, since + PAIRING_WAIT_TICKS - tick)
+
+/** A child: "grown in about 56 h (140 game days)"; undefined once grown (`CONTEXT.md`: Child). */
+export function grownIn(r: Pick<Resident, 'bornAt'>, tick: number): string | undefined {
+  const left = r.bornAt + ticksForAge(ADULT_AGE) - tick
+  return left > 0 ? `grown in ${aboutTime(left)}` : undefined
 }
