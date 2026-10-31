@@ -20,7 +20,10 @@ import {
   type Good,
   type NpcCityPrice,
   type PricedGood,
+  type TradeHolder,
+  type TradeLimit,
   type TradeQuote,
+  type TradeSide,
   type City,
   type RealmLabel,
   type Resident,
@@ -187,6 +190,31 @@ export function tradersAt(
 }
 
 /**
+ * What a trader trades with: a resident's hands, or `carriage` with its room by its horse among
+ * `horses`.
+ */
+function holderOf(
+  resident: Resident,
+  carriage: Carriage | undefined,
+  tick: number,
+  horses: readonly CarriageHorse[],
+): TradeHolder {
+  return carriage
+    ? loadOf(carriage, carriageCapacity({ horses, carriages: [carriage] }, carriage))
+    : handsOf(resident, tick)
+}
+
+/**
+ * A trade previewed both ways, each saying what cut it short (`TradeQuote.limit`), and what the
+ * trader holds: their hands or the carriage, with the room left.
+ */
+export interface TradePreview {
+  buy: TradeQuote
+  sell: TradeQuote
+  holder: TradeHolder
+}
+
+/**
  * What buying and selling up to `units` of a good would move for one of the Player's residents,
  * from their hands or `carriage` (`quoteTrade`, room by its horse among `horses`), from what
  * the Player sees. The server decides; this is the preview.
@@ -200,16 +228,15 @@ export function previewTrade(
   units: number,
   tick: number,
   horses: readonly CarriageHorse[],
-): { buy: TradeQuote; sell: TradeQuote } {
+): TradePreview {
   const warehouse = seen.buildings.find((b) => b.id === warehouseId)
+  const holder = holderOf(resident, carriage, tick, horses)
   const none = { units: 0, coins: 0 }
-  if (!warehouse || !(units > 0)) return { buy: none, sell: none }
-  const holder = carriage
-    ? loadOf(carriage, carriageCapacity({ horses, carriages: [carriage] }, carriage))
-    : handsOf(resident, tick)
+  if (!warehouse || !(units > 0)) return { buy: none, sell: none, holder }
   return {
     buy: quoteTrade(seen, warehouse, holder, 'buy', good, units),
     sell: quoteTrade(seen, warehouse, holder, 'sell', good, units),
+    holder,
   }
 }
 
@@ -314,12 +341,13 @@ export function npcStoragesInSight(
 
 /**
  * About what a trade with an NPC city at its `storage` would move (`CONTEXT.md`: Trading with an
- * NPC city), from the prices it names the Player: each unit at today's price, cut down to its
- * surplus or what it lacks of its reserve, what that storage holds, the coins on either side and
- * what fits. The server prices each unit as the stock moves, so the coins may differ a little.
+ * NPC city), from the prices it names the Player (none when it won't trade with them,
+ * `CONTEXT.md`: NPC city reaction): each unit at today's price, cut down to its surplus or what it
+ * lacks of its reserve, what that storage holds, the coins on either side and what fits, saying
+ * which cut it. The server prices each unit as the stock moves, so the coins may differ a little.
  */
 export function previewNpcTrade(
-  prices: NpcCityPrice[],
+  prices: NpcCityPrice[] | undefined,
   storage: Building,
   resident: Resident,
   carriage: Carriage | undefined,
@@ -327,39 +355,115 @@ export function previewNpcTrade(
   units: number,
   tick: number,
   horses: readonly CarriageHorse[],
-): { buy: TradeQuote; sell: TradeQuote } {
+): TradePreview {
+  const holder = holderOf(resident, carriage, tick, horses)
+  if (!prices) {
+    const refused = { units: 0, coins: 0, limit: 'refused' as const }
+    return { buy: refused, sell: refused, holder }
+  }
   const line = prices.find((p) => p.good === good)
   const none = { units: 0, coins: 0 }
-  if (!line || !(units > 0)) return { buy: none, sell: none }
-  const holder = carriage
-    ? loadOf(carriage, carriageCapacity({ horses, carriages: [carriage] }, carriage))
-    : handsOf(resident, tick)
+  if (!line || !(units > 0)) return { buy: none, sell: none, holder }
+  // How many units `coins` pay for at `price` each.
+  const perPrice = (coins: number, price: number) => (price > 0 ? coins / price : Infinity)
   // How many units fit when each adds `per` kg to the holder.
   const fits = (per: number) => (per > 0 ? (holder.room + 1e-9) / per : Infinity)
   const perBuy = GOOD_WEIGHT[good] - line.sell * GOOD_WEIGHT.coins
   const perSell = line.buy * GOOD_WEIGHT.coins - GOOD_WEIGHT[good]
-  const buyUnits = Math.floor(
-    Math.min(
-      units,
-      line.forSale,
-      storage.stock?.[good] ?? 0,
-      (holder.stock.coins ?? 0) / line.sell,
-      fits(perBuy),
-    ),
-  )
-  const sellUnits = Math.floor(
-    Math.min(
-      units,
-      line.wanted,
-      holder.stock[good] ?? 0,
-      (storage.stock?.coins ?? 0) / line.buy,
-      fits(perSell),
-    ),
-  )
+  const buy = cutDown(units, [
+    ['stock', line.forSale],
+    ['stock', storage.stock?.[good] ?? 0],
+    ['coins', perPrice(holder.stock.coins ?? 0, line.sell)],
+    ['room', fits(perBuy)],
+  ])
+  const sell = cutDown(units, [
+    ['unwanted', line.wanted],
+    ['held', holder.stock[good] ?? 0],
+    ['theirCoins', perPrice(storage.stock?.coins ?? 0, line.buy)],
+    ['room', fits(perSell)],
+  ])
   return {
-    buy: { units: buyUnits, coins: buyUnits * line.sell },
-    sell: { units: sellUnits, coins: sellUnits * line.buy },
+    buy: { ...buy, coins: buy.units * line.sell },
+    sell: { ...sell, coins: sell.units * line.buy },
+    holder,
   }
+}
+
+/** Up to `wanted` whole units under each bound, and the first bound that cut it short. */
+function cutDown(
+  wanted: number,
+  bounds: [TradeLimit, number][],
+): { units: number; limit?: TradeLimit } {
+  const units = Math.floor(Math.min(wanted, ...bounds.map(([, n]) => n)))
+  if (units >= wanted) return { units }
+  const [limit] = bounds.find(([, n]) => Math.floor(n) <= units)!
+  return { units, limit }
+}
+
+/** Why a trade won't go at all, as its button says (`CONTEXT.md`: Trade section). */
+const WONT_GO: Record<TradeLimit, string> = {
+  coins: 'no coins in hand',
+  held: 'nothing of it to sell',
+  room: 'no room',
+  stock: 'none in stock',
+  theirCoins: 'it has no coins to pay',
+  unwanted: 'it doesn’t want it',
+  refused: 'it won’t trade with you',
+}
+
+/** What cut a trade down to fewer units than asked. */
+const CUT_BY: Record<TradeLimit, string> = {
+  coins: 'your coins run out',
+  held: 'that’s all you have',
+  room: 'no room for more',
+  stock: 'that’s all it has',
+  theirCoins: 'its coins run out',
+  unwanted: 'that’s all it wants',
+  refused: 'it won’t trade with you',
+}
+
+/**
+ * The text of a trade's button: the trade it makes ("Buy 4 iron for 36 coins"), with what cut it
+ * down when it moves fewer units than asked ("…: your coins run out"), or, when it won't go, why
+ * ("Can’t buy iron: no coins in hand"). `label` is the good's, lower case; `onCarriage` when the
+ * trade is from a carriage, whose coins are not in hand.
+ */
+export function tradeText(
+  side: TradeSide,
+  label: string,
+  quote: TradeQuote,
+  onCarriage: boolean,
+): string {
+  const verb = side === 'buy' ? 'Buy' : 'Sell'
+  if (quote.units > 0) {
+    const made = `${verb} ${quote.units} ${label} for ${quote.coins} coins`
+    return quote.limit ? `${made}: ${CUT_BY[quote.limit]}` : made
+  }
+  const cant = `Can’t ${verb.toLowerCase()} ${label}`
+  if (!quote.limit) return cant
+  const why =
+    quote.limit === 'coins' && onCarriage ? 'no coins on the carriage' : WONT_GO[quote.limit]
+  return `${cant}: ${why}`
+}
+
+/**
+ * What a trader holds, under the Trader picker (`CONTEXT.md`: Trade section): the coins and the
+ * picked good in their hands, or on `carriageId` when they trade from a carriage, and the room
+ * left in kg and in units of the good. `label` is the good's, lower case.
+ */
+export function holderText(
+  holder: TradeHolder,
+  good: PricedGood,
+  label: string,
+  carriageId: string | undefined,
+): string {
+  const room = Math.max(0, holder.room)
+  const kg = Math.round(room * 10) / 10
+  const fit = Math.floor((room + 1e-9) / GOOD_WEIGHT[good])
+  const coins = Math.floor(holder.stock.coins ?? 0)
+  const held = Math.floor(holder.stock[good] ?? 0)
+  const who = carriageId ? `Carriage ${carriageId} holds` : 'Carries'
+  return `${who} ${coins} coins and ${held} ${label}; room for ${kg} kg more (${fit} ${label})`
 }
 
 /** One line of what the Player can buy or sell at a warehouse or storage. */

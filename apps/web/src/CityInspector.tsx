@@ -12,7 +12,6 @@ import {
   type RealmLabel,
   type Resident,
   type SeenCity,
-  type TradeQuote,
   type TradeSide,
   type SeenResident,
   type SeenCarriage,
@@ -28,15 +27,18 @@ import {
   previewNpcTrade,
   previewTrade,
   previewTransfer,
+  holderText,
   takesTransfers,
   tradedGoods,
   tradeLists,
   tradersAt,
+  tradeText,
   warehousesInSight,
   type BuyView,
   type DeliveryCity,
   type TradeLine,
   type TradeLists,
+  type TradePreview,
   type TradersView,
   type WarehouseView,
 } from './city-view.js'
@@ -473,7 +475,8 @@ export interface TradeRequest {
 /**
  * Buying and selling at a warehouse (`CONTEXT.md`: Trading with the Trade Organization): one of
  * the Player's residents on its tile trades a good from their hands or their carriage there, with
- * a preview of what it would move at its prices. Or, with one of the Player's cities picked, a
+ * what they hold and room left, and a preview of what it would move at its prices: what cut it
+ * down, or why it won't go (`CONTEXT.md`: Trade section). Or, with one of the Player's cities picked, a
  * caravan delivers what is bought to its storage, or picks up what is sold from there, for a fee
  * (`CONTEXT.md`: Delivery). Nobody of theirs there, and it says how to trade.
  */
@@ -499,7 +502,7 @@ function Trading({
     carriage: Carriage | undefined,
     good: PricedGood,
     units: number,
-  ) => { buy: TradeQuote; sell: TradeQuote }
+  ) => TradePreview
   previewDelivery: (
     resident: Resident,
     carriage: Carriage | undefined,
@@ -527,6 +530,7 @@ function Trading({
     )
   }
   const label = GOOD_LABELS[picked].toLowerCase()
+  const quote = preview(resident, carriage, picked, units)
   const trade = (side: TradeSide) =>
     onTrade({
       side,
@@ -542,25 +546,20 @@ function Trading({
   let canBuy: boolean
   let canSell: boolean
   if (city) {
-    const quote = previewDelivery(resident, carriage, picked, units, city)
-    canBuy = quote.buy.units > 0
-    canSell = quote.sell.units > 0
+    const delivery = previewDelivery(resident, carriage, picked, units, city)
+    canBuy = delivery.buy.units > 0
+    canSell = delivery.sell.units > 0
     buyText = canBuy
-      ? `Buy ${quote.buy.units} ${label} for ${quote.buy.coins} coins + ${quote.buy.fee} fee, delivered to ${city.name}`
+      ? `Buy ${delivery.buy.units} ${label} for ${delivery.buy.coins} coins + ${delivery.buy.fee} fee, delivered to ${city.name}`
       : `Can’t buy ${label} for delivery`
     sellText = canSell
-      ? `Sell ${quote.sell.units} ${label} from ${city.name}, picked up for about ${quote.sell.coins} coins after a ${quote.sell.fee} fee`
+      ? `Sell ${delivery.sell.units} ${label} from ${city.name}, picked up for about ${delivery.sell.coins} coins after a ${delivery.sell.fee} fee`
       : `Nothing to pick up in ${city.name}`
   } else {
-    const quote = preview(resident, carriage, picked, units)
     canBuy = quote.buy.units > 0
     canSell = quote.sell.units > 0
-    buyText = canBuy
-      ? `Buy ${quote.buy.units} ${label} for ${quote.buy.coins} coins`
-      : `Can’t buy ${label}`
-    sellText = canSell
-      ? `Sell ${quote.sell.units} ${label} for ${quote.sell.coins} coins`
-      : `Can’t sell ${label}`
+    buyText = tradeText('buy', label, quote.buy, !!carriage)
+    sellText = tradeText('sell', label, quote.sell, !!carriage)
   }
   return (
     <div className="warehouse-trading" aria-label="Trading">
@@ -587,6 +586,9 @@ function Trading({
           </select>
         </label>
       )}
+      <p className="small muted trader-holds">
+        {holderText(quote.holder, picked, label, carriage?.id)}
+      </p>
       {deliveryCities.length > 0 && (
         <label>
           Delivery{' '}
