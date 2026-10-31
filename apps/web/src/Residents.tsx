@@ -1,6 +1,11 @@
 import {
   BUILD_MATERIALS,
   aboutTime,
+  bornIn,
+  foalLeft,
+  grownIn,
+  pairingTicksLeft,
+  workLeft,
   BUILDING_PURPOSE,
   LINE_BUILDING,
   isLineOrder,
@@ -87,7 +92,6 @@ import {
   type ResidentGroup,
 } from './residents-view.js'
 import { doingLine } from './doing-view.js'
-import { bornIn, foalLeft, grownIn, pairingTicksLeft, about, workLeft } from './time-left.js'
 import {
   dropStep,
   moveStep,
@@ -2356,9 +2360,9 @@ function PairBlock({
         o && (
           <p className="muted small">
             Paired with {partner?.name ?? 'someone out of sight'}.{' '}
-            {wait > 0 ? `In ${about(wait)}` : 'Now'}, once the city has free housing and a
-            food surplus, one of them starts carrying a child for {CARRYING_DAYS} game days; the
-            other keeps working.
+            {wait > 0 ? `In ${aboutTime(wait)}` : 'Now'}, once the city has free housing and a food
+            surplus, one of them starts carrying a child for {CARRYING_DAYS} game days; the other
+            keeps working.
           </p>
         )
       )}
