@@ -240,6 +240,12 @@ export interface RunningScript {
   lastError?: ScriptRunError
   /** The steps it used the last tick it ran, and whether it ran out (`CONTEXT.md`: Step budget). */
   lastRun?: ScriptRunSteps
+  /**
+   * The tick it called `wait()` (`CONTEXT.md`: Running a script, Waiting): it is not run again
+   * until the order it waits on ends or is replaced, or the resident is struck from this tick on.
+   * Absent while it runs every tick.
+   */
+  waitingSince?: number
 }
 
 /** A script's last runtime error, as its Script tab shows it (`CONTEXT.md`: Debugging a script). */
@@ -275,6 +281,8 @@ export interface SeenScript {
   task?: Task
   building?: BuildingKind
   doing?: string
+  /** It waits on the resident's order (`RunningScript.waitingSince`); only for the owning Player. */
+  waiting?: true
   /**
    * The values picked for its params, by name (`Resident.scriptParams`); only for the realm
    * running it.

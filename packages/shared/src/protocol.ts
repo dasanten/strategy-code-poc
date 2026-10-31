@@ -209,7 +209,7 @@ export type ClientMessage =
   | { type: 'watch'; ids: string[] }
 
 /** What the Player running a script sees of how it last ran (`RunningScript`). */
-export type ScriptRunSeen = Pick<RunningScript, 'lastError' | 'lastRun'>
+export type ScriptRunSeen = Pick<RunningScript, 'lastError' | 'lastRun' | 'waitingSince'>
 
 /** The most residents and armies one client may watch the script memory of at once. */
 export const SCRIPT_WATCH_MAX = 4

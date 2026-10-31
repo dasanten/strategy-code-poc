@@ -145,6 +145,8 @@ export interface StepResult {
   aging: AgingResult
   /** Cities captured as the tick ended (`CONTEXT.md`: Capturing a city). */
   captures: Capture[]
+  /** The NPC cities' residents' scripts that ran this tick (`runNpcScripts`), for tick health. */
+  npcScriptRuns: number
 }
 
 /**
@@ -181,14 +183,14 @@ export function stepWorld(
     stepStockFloor(world)
     return { survival, horsesDied }
   })
-  time('npc', () => {
+  const npcScriptRuns = time('npc', () => {
     stepCaravans(world, terrain.size)
     stepNpcDefence(world, terrain.size)
     stepTradeOrgArmy(world, terrain.size)
     stepNpcHire(world, terrain.size)
     stepPunishments(world, terrain.size)
     stepNpcCities(world, terrain.size, terrain)
-    runNpcScripts(world, terrain)
+    return runNpcScripts(world, terrain)
   })
   const steps = time('walking', () => {
     const steps = walking?.requestSteps(world) ?? []
@@ -206,7 +208,7 @@ export function stepWorld(
     stepRiders(world)
     stepPassengers(world)
   })
-  return result
+  return { ...result, npcScriptRuns }
 }
 
 /**
@@ -219,7 +221,7 @@ function stepRest(
   steps: unknown[],
   survival: SurvivalResult,
   horsesDied: Horse[],
-): StepResult {
+): Omit<StepResult, 'npcScriptRuns'> {
   const strikes = requestStrikes(world, terrain.size)
   const combat = resolveStrikes(world, strikes, terrain.size)
   const climbs = requestClimbing(world)
