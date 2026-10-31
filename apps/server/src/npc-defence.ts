@@ -1,7 +1,8 @@
 import {
   NPC_GATE_WATCH_RANGE,
-  NPC_SOLDIER_SHARE,
+  NPC_SMITHY_WEAPON,
   TRADE_ORG_ARMY,
+  npcSoldierTarget,
   tradeOrgArmyWanted,
   WEAPONS,
   canWork,
@@ -32,17 +33,6 @@ import { attackOrder } from './combat.js'
 import { knownThieves } from './crimes.js'
 import { stopWork, walkTo } from './npc-behaviour.js'
 import { startWork } from './work.js'
-
-/** What an NPC city's smithy makes for its soldiers: the cheapest weapon (`RECIPES`). */
-const SMITHY_WEAPON: Weapon = 'spear'
-
-/**
- * How many soldiers an NPC city keeps (`CONTEXT.md`: NPC city): `NPC_SOLDIER_SHARE` of its
- * adults, rounded up.
- */
-export function npcSoldierTarget(adults: number): number {
-  return Math.ceil(adults * NPC_SOLDIER_SHARE)
-}
 
 /**
  * One tick of NPC cities defending themselves (`CONTEXT.md`: NPC city, Combat, Trading post):
@@ -199,7 +189,7 @@ function keepSoldiers(
     fetch(world, storage, unarmed, { [weapon]: 1 })
     return
   }
-  const recipe = recipeFor('smithy', SMITHY_WEAPON)
+  const recipe = recipeFor('smithy', NPC_SMITHY_WEAPON)
   if (!smithy || !storage || !recipe) return
   if (smithing(world, smithy, unarmed, recipe.input)) return
   const stock = storage.stock ?? {}
@@ -286,8 +276,8 @@ function smithing(world: WorldState, smithy: Building, unarmed: Resident[], inpu
     walkTo(smith, smithy)
     return true
   }
-  if (workProblem(world, smith, SMITHY_WEAPON) !== undefined) return false
-  startWork(smith, smithy, SMITHY_WEAPON)
+  if (workProblem(world, smith, NPC_SMITHY_WEAPON) !== undefined) return false
+  startWork(smith, smithy, NPC_SMITHY_WEAPON)
   return true
 }
 

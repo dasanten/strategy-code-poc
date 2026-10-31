@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 import { checkInvariants } from './invariants.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
-import { cityPlansSound, planCity, planDue } from './npc-plan.js'
+import { cityPlansSound, farmersWanted, npcFarmersKept, planCity, planDue } from './npc-plan.js'
 import { mulberry32 } from './residents.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
@@ -48,9 +48,12 @@ function villages(n: number): { world: WorldState; terrain: TerrainMap; cities: 
 }
 
 describe('planCity', () => {
-  it('gives every adult a job: soldiers stand, the rest work the farm while it has room', () => {
+  it('gives every adult a job: soldiers stand, farmers feed the city, two build, the rest wait', () => {
     const { world, terrain, city, home } = village()
-    for (const r of world.residents) Object.assign(r, { x: home.x, y: home.y, order: null })
+    for (const r of world.residents) {
+      Object.assign(r, { x: home.x, y: home.y, order: null })
+      delete r.script
+    }
     const soldier = world.residents[0]!
     soldier.carried.spear = 1
     const plan = planCity(world, city, terrain)
@@ -59,10 +62,17 @@ describe('planCity', () => {
     const farm = world.buildings.find((b) => b.kind === 'farm' && b.cityId === city.id)!
     const jobs = world.residents.map((r) => plan.jobs[r.id])
     expect(jobs[0]).toEqual({ kind: 'soldier' })
-    // The farm has room for everyone else; nobody builds, since nothing is wanted.
-    expect(NPC_VILLAGE.residents - 1).toBeLessThanOrEqual(MAX_WORKERS.farm!)
-    for (const job of jobs.slice(1)) expect(job).toEqual({ kind: 'farm', buildingId: farm.id })
-    expect(plan.project).toBeUndefined()
+    // As many farmers as feed the village, which has a food surplus: no more.
+    const farmers = jobs.filter((j) => j?.kind === 'farm')
+    expect(farmers).toHaveLength(farmersWanted(world, city))
+    expect(farmers.length).toBeLessThan(NPC_VILLAGE.residents - 1)
+    for (const job of farmers) expect(job).toEqual({ kind: 'farm', buildingId: farm.id })
+    // Its reserve lacks Wood: two build the lumber camp; the last waits for it.
+    expect(plan.project).toEqual({ kind: 'build', building: 'lumberCamp', ...FOREST })
+    expect(jobs.filter((j) => j?.kind === 'build')).toHaveLength(NPC_BUILDERS)
+    expect(jobs.filter((j) => j?.kind === 'idle')).toHaveLength(
+      NPC_VILLAGE.residents - 1 - farmers.length - NPC_BUILDERS,
+    )
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
@@ -194,5 +204,24 @@ describe('cities plan once a game hour', () => {
     // A planned building that is gone is stale, not wrong.
     plan.jobs[r.id] = { kind: 'work', buildingId: 'gone' }
     expect(cityPlansSound.check(world, terrain)).toEqual([])
+    // Nor a workplace that isn't the city's.
+    world.buildings.push({ id: 'theirs', kind: 'lumberCamp', cityId: null, ...FOREST })
+    plan.jobs[r.id] = { kind: 'work', buildingId: 'theirs' }
+    expect(cityPlansSound.check(world, terrain)).toHaveLength(1)
+  })
+
+  it('catches a plan that leaves an adult idle while the farms lack farmers', () => {
+    const { world, terrain, city } = village()
+    const plan = planCity(world, city, terrain)
+    expect(npcFarmersKept.check(world, terrain)).toEqual([])
+    for (const [id, job] of Object.entries(plan.jobs)) {
+      if (job.kind === 'farm') plan.jobs[id] = { kind: 'idle' }
+    }
+    const idle = Object.values(plan.jobs).filter((j) => j.kind === 'idle').length
+    expect(npcFarmersKept.check(world, terrain).length).toBeGreaterThanOrEqual(1)
+    expect(npcFarmersKept.check(world, terrain).length).toBeLessThanOrEqual(idle)
+    // A plan of an earlier tick is not held to it: residents come and go since.
+    world.tick++
+    expect(npcFarmersKept.check(world, terrain)).toEqual([])
   })
 })

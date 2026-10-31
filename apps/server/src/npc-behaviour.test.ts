@@ -117,7 +117,9 @@ describe('NPC cities work and eat', () => {
     const { world, terrain, city } = village()
     const farm = farmOf(world, city)
     const storage = storageOf(world, city)
+    // Two of them: the adult is the farmer who feeds them.
     const [adult, child] = world.residents
+    world.residents = [adult!, child!]
     for (const r of [adult!, child!]) {
       Object.assign(r, { x: storage.x, y: storage.y, order: null })
       delete r.script

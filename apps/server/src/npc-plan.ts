@@ -1,4 +1,5 @@
 import {
+  FOOD_PER_DAY,
   MAX_WORKERS,
   NPC_BUILDERS,
   NPC_FOOD_SHORT_DAYS,
@@ -7,6 +8,7 @@ import {
   buildingAt,
   canWork,
   cityFoodUse,
+  cityResidents,
   contractOf,
   hasFoodSurplus,
   isArmed,
@@ -14,6 +16,8 @@ import {
   punishers,
   storedFood,
   workplaceGood,
+  WORK_OUTPUT_PER_DAY,
+  type Good,
   type Building,
   type City,
   type CityJob,
@@ -27,6 +31,7 @@ import { caravanCrew } from './caravans.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { npcHome } from './npc-behaviour.js'
 import { cityGrows, cityProject, endPairs, isBuilder, pairAdults } from './npc-growth.js'
+import { chainGood, chainInput, holdsBatch, ownWorkplaces, shortGoods } from './npc-chain.js'
 import { hash } from './residents.js'
 
 /*
@@ -35,9 +40,10 @@ import { hash } from './residents.js'
  * decides everything that takes thought and keeps the result in the city's plan
  * (`WorldState.cityPlans`): pairs, the next project, and a job for every adult. Between passes
  * the city only hands idle residents their planned job (`stepNpcCities`), and a worker stays where
- * the plan put them until the next pass moves them. The pass decides as the city did when it
- * decided every tick: farms first until it has a food surplus, soldiers put to no work, at most
- * `NPC_BUILDERS` building, everyone else at the first workplace with room.
+ * the plan put them until the next pass moves them. An NPC city shares its adults out by its
+ * reserve (`shareOut`); the Trade Organization's cities put farms first until they have a food
+ * surplus, soldiers to no work, at most `NPC_BUILDERS` building and everyone else at the first
+ * workplace with room.
  */
 
 /** Whether a city's planning pass is due this tick: once every `NPC_PLAN_TICKS`, staggered by id. */
@@ -151,7 +157,8 @@ export function workplaceOf(r: Resident): string | undefined {
  * while it has a food surplus; picks its project (`cityProject`), if it grows and Food isn't
  * short; and gives every adult a job: soldiers (armed adults) stand as soldiers; one carrying a
  * child does nothing; builders go on building; a worker stays at their workplace, except that
- * while Food runs short workers off the farms move to farms with room; the rest build the
+ * while Food runs short workers off the farms move to farms with room. An NPC city shares out
+ * the rest by its reserve (`shareOut`); for the Trade Organization's cities they build the
  * project while fewer than `NPC_BUILDERS` do, else take the first workplace with room, farms first
  * until the city has a food surplus, else are idle. Without `terrain` the city picks no project.
  * `people` are the residents the city gives orders to (`runResidents`).
@@ -209,6 +216,11 @@ export function planCity(
       }
     }
   }
+  if (!city.tradeOrg) {
+    shareOut(world, city, adults, jobs, held, spare, plan.project, builders, short)
+    plan.jobs = jobs
+    return plan
+  }
   for (const r of spare) {
     if (plan.project && builders < NPC_BUILDERS && canTakePart(world, city, r, plan.project)) {
       jobs[r.id] = { kind: 'build' }
@@ -223,6 +235,135 @@ export function planCity(
   }
   plan.jobs = jobs
   return plan
+}
+
+/**
+ * How many farmers an NPC city keeps (`CONTEXT.md`: NPC city): as many as feed all its residents
+ * (`FOOD_PER_DAY` each, a farmer making `WORK_OUTPUT_PER_DAY.food`), and one more while it has no
+ * food surplus.
+ */
+export function farmersWanted(world: WorldState, city: City): number {
+  return feeders(cityResidents(world, city).length) + (hasFoodSurplus(world, city) ? 0 : 1)
+}
+
+/** Farmers who feed `residents`, rounded up. */
+const feeders = (residents: number) =>
+  Math.ceil((residents * FOOD_PER_DAY) / (WORK_OUTPUT_PER_DAY.food ?? 1) - 1e-9)
+
+/**
+ * How an NPC city shares out its adults beyond its soldiers and those carrying a child
+ * (`CONTEXT.md`: NPC city, NPC reserve). Workers stay where they are, except that the workers of a
+ * workplace that processes goods the city isn't short of become spare hands, as do farmers beyond
+ * those it keeps (`farmersWanted`). Then: spare hands, and after them workers off the farms, farm
+ * until it has its farmers, while a farm has room; up to `NPC_BUILDERS` build the project; the
+ * rest go to the workplace of the good shortest of the reserve (`chainPlace`), filling its crew
+ * before the next. A spare hand with nowhere to go is idle; a farmer let go goes back to farming.
+ */
+function shareOut(
+  world: WorldState,
+  city: City,
+  adults: Resident[],
+  jobs: Record<string, CityJob>,
+  held: Places,
+  spare: Resident[],
+  project: CityProject | undefined,
+  builders: number,
+  foodShort: boolean,
+): void {
+  const own = ownWorkplaces(world, city).filter((b) => !b.site)
+  const byId = new Map(own.map((b) => [b.id, b]))
+  const placeOf = (r: Resident) => byId.get(jobs[r.id]?.buildingId ?? '')
+  const farms = own.filter((b) => b.kind === 'farm')
+  const short = shortGoods(world, city, project)
+  const shortOf = new Set(short)
+  const kept = new Map<string, CityJob>()
+  const release = (r: Resident, keep: boolean) => {
+    const place = placeOf(r)
+    if (place) held.leave(place)
+    if (keep) kept.set(r.id, jobs[r.id]!)
+    delete jobs[r.id]
+    spare.push(r)
+  }
+  for (const r of adults) {
+    const place = placeOf(r)
+    const good = place && RECIPES[place.kind] && chainGood(world, place)
+    if (good && !shortOf.has(good)) release(r, false)
+  }
+  const wanted = farmersWanted(world, city)
+  const farmers = adults.filter((r) => jobs[r.id]?.kind === 'farm')
+  if (!foodShort) for (const r of farmers.slice(wanted).reverse()) release(r, true)
+  let farming = foodShort ? farmers.length : Math.min(farmers.length, wanted)
+  const toFarm = (r: Resident) => {
+    const farm = farms.find((f) => held.room(f) > 0)
+    if (!farm) return false
+    const place = placeOf(r)
+    if (place) held.leave(place)
+    jobs[r.id] = workJob(farm)
+    held.take(farm)
+    farming++
+    return true
+  }
+  const rest = spare.filter((r) => farming >= wanted || !toFarm(r))
+  for (const r of adults) {
+    if (farming >= wanted) break
+    if (jobs[r.id]?.kind === 'work' && !toFarm(r)) break
+  }
+  const storage = world.buildings.find(
+    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
+  )
+  for (const r of rest) {
+    if (project && builders < NPC_BUILDERS && canTakePart(world, city, r, project)) {
+      jobs[r.id] = { kind: 'build' }
+      builders++
+      continue
+    }
+    const place = chainPlace(world, short, own, held, storage)
+    const back = kept.get(r.id)
+    const backTo = back && byId.get(back.buildingId ?? '')
+    if (place) {
+      jobs[r.id] = workJob(place)
+      held.take(place)
+    } else if (back && backTo && held.room(backTo) > 0) {
+      jobs[r.id] = back
+      held.take(backTo)
+    } else jobs[r.id] = { kind: 'idle' }
+  }
+}
+
+/**
+ * The workplace a spare hand goes to (`CONTEXT.md`: NPC city): of the city's finished `own`
+ * workplaces, one with room that makes the first good of `short` it can work on. For a good a
+ * workplace processes, only while the storage holds a batch of its input; else the workplace of
+ * an input it lacks, so the ore is dug before it is smelted.
+ */
+function chainPlace(
+  world: WorldState,
+  short: Good[],
+  own: Building[],
+  held: Places,
+  storage: Building | undefined,
+): Building | undefined {
+  const seen = new Set<Good>()
+  const workFor = (good: Good): Building | undefined => {
+    if (seen.has(good)) return undefined
+    seen.add(good)
+    const input = chainInput(good)
+    if (input && !holdsBatch(storage?.stock, input)) {
+      for (const [g, n] of Object.entries(input) as [Good, number][]) {
+        if ((storage?.stock?.[g] ?? 0) >= n) continue
+        const place = workFor(g)
+        if (place) return place
+      }
+      return undefined
+    }
+    return own.find((b) => chainGood(world, b) === good && held.room(b) > 0)
+  }
+  for (const good of short) {
+    seen.clear()
+    const place = workFor(good)
+    if (place) return place
+  }
+  return undefined
 }
 
 /**
@@ -264,7 +405,7 @@ export function projectDone(world: WorldState, project: CityProject): boolean {
 /**
  * The city plans hold together (ADR 0016; ADR 0004): every plan is a city's that exists and the
  * game runs, made no later than now; a planned farm or workplace that still stands is a finished
- * workplace. A planned building that is gone, and a job of a resident who died, are stale until
+ * workplace of the city (its own by `cityId` or `workplaceIds`). A planned building that is gone, and a job of a resident who died, are stale until
  * the next pass and not wrong.
  */
 export const cityPlansSound: Invariant = {
@@ -299,7 +440,52 @@ export const cityPlansSound: Invariant = {
             message: `${cityId} plans ${residentId} to work ${b.id}, a ${b.site ? 'site of a ' : ''}${b.kind}`,
             entityIds: [cityId, residentId, b.id],
           })
+        } else if (b && b.cityId !== cityId && !city.workplaceIds?.includes(b.id)) {
+          out.push({
+            invariant: this.name,
+            message: `${cityId} plans ${residentId} to work ${b.id}, not one of its workplaces`,
+            entityIds: [cityId, residentId, b.id],
+          })
         }
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * An NPC city keeps its farmers (`CONTEXT.md`: NPC city; ADR 0004): in the plan its pass made
+ * this tick, while it plans fewer farmers than feed all its residents (`farmersWanted` without
+ * the one more) and one of its farms has room, no adult it could send there is idle or working
+ * elsewhere (soldiers, builders and those carrying a child aside). Residents born this tick don't
+ * count; the Trade Organization's cities share out their adults otherwise.
+ */
+export const npcFarmersKept: Invariant = {
+  name: 'npc-farmers-kept',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const residents = new Map(world.residents.map((r) => [r.id, r]))
+    for (const [cityId, plan] of Object.entries(world.cityPlans)) {
+      const city = world.cities.find((c) => c.id === cityId)
+      if (!city || city.tradeOrg || plan.plannedAt !== world.tick) continue
+      const wanted = feeders(cityResidents(world, city).filter((r) => r.bornAt < world.tick).length)
+      const jobs = Object.values(plan.jobs)
+      const farmers = jobs.filter((j) => j.kind === 'farm').length
+      if (farmers >= wanted) continue
+      const planned = (f: Building) => jobs.filter((j) => j.buildingId === f.id).length
+      const room = ownWorkplaces(world, city).some(
+        (f) => f.kind === 'farm' && !f.site && planned(f) < (MAX_WORKERS.farm ?? 0),
+      )
+      if (!room) continue
+      for (const [residentId, job] of Object.entries(plan.jobs)) {
+        const r = residents.get(residentId)
+        if (!r || r.health <= 0 || r.carrying || isArmed(r)) continue
+        if (job.kind !== 'work' && job.kind !== 'idle') continue
+        out.push({
+          invariant: this.name,
+          message: `${cityId} plans ${farmers} of ${wanted} farmers, and ${residentId} ${job.kind === 'idle' ? 'idle' : `at ${job.buildingId}`}`,
+          entityIds: [cityId, residentId],
+        })
       }
     }
     return out

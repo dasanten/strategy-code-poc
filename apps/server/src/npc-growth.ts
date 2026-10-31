@@ -18,7 +18,6 @@ import {
   isCityBuilding,
   materialsNeeded,
   workNeeded,
-  workplaceGood,
   wrap,
   wrapDelta,
   wrapDistance,
@@ -40,6 +39,7 @@ import { hqGrows, hqProject } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
 import { npcSender } from './order-sender.js'
 import { pair } from './pairing.js'
+import { PROCESSED_BY, chainInput, makes, shortGoods } from './npc-chain.js'
 import { Ground } from './placing.js'
 
 /**
@@ -260,7 +260,7 @@ function pick(stock: Stock | undefined, wanted: Stock): Stock | undefined {
  * What an NPC city builds or takes down next, if anything: once its new wall is finished, the
  * old one, a stretch at a time and the gate last; else whatever it wants most (`wanted`). When
  * that needs a material the storage lacks and none of the city's workplaces makes, it is first
- * that material's workplace, on the nearest fitting resource node (`NPC_NODE_REACH`).
+ * that material's workplace (`materialsFirst`).
  */
 export function nextProject(
   world: WorldState,
@@ -272,7 +272,26 @@ export function nextProject(
   const old = rings && oldWallToTearDown(world, city, home, terrain, rings)
   if (old) return { kind: 'tearDown', buildingId: old.id }
   const want = wanted(world, city, home, terrain, rings)
-  if (!want) return undefined
+  return want && materialsFirst(world, city, home, terrain, rings, want, new Set())
+}
+
+/** A project of building something. */
+type BuildProject = Extract<Project, { kind: 'build' }>
+
+/**
+ * The project to take on before `want`: when it needs a material the storage lacks and none of
+ * the city's workplaces makes, the workplace for that material first (`chainProject`), and that
+ * one's materials before it in turn. Else `want` itself.
+ */
+function materialsFirst(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings | undefined,
+  want: BuildProject,
+  seen: Set<Good>,
+): BuildProject {
   const site = buildingAt(world, want.x, want.y)
   const need = site?.site ? materialsNeeded(site) : (BUILD_MATERIALS[want.building] ?? {})
   const storage = world.buildings.find(
@@ -280,18 +299,48 @@ export function nextProject(
   )
   for (const [good, units] of Object.entries(need) as [Good, number][]) {
     if ((storage?.stock?.[good] ?? 0) >= units || makes(world, city, good)) continue
-    const node = nearestNode(world, home, terrain, good)
-    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.node.kind], ...node.at }
+    const first = chainProject(world, city, home, terrain, rings, good, seen)
+    if (first) return materialsFirst(world, city, home, terrain, rings, first, seen)
   }
   return want
 }
 
-/** Whether one of the city's workplaces, finished or not, makes a good. */
-function makes(world: WorldState, city: City, good: Good): boolean {
-  const own = new Set(city.workplaceIds)
-  return world.buildings.some(
-    (b) => (b.cityId === city.id || own.has(b.id)) && workplaceGood(world, b) === good,
+/**
+ * The workplace an NPC city builds next for a good it is short of (`CONTEXT.md`: NPC city), if
+ * it can make the good at all: for a good a workplace processes (Iron, Coins, weapons) whose
+ * input its storage lacks a batch of and none of its workplaces makes, the workplace for that
+ * input first, so the chain goes up from the node (mine, smelter, smithy); without a way to make
+ * the input, nothing. Then, while none of its workplaces makes the good: on the nearest fitting
+ * node of it within `NPC_NODE_REACH` (`nearestNode`), or for a processing workplace in its area
+ * like a house (`houseTile`). `seen` keeps the goods already asked after, so it never goes round.
+ */
+export function chainProject(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings | undefined,
+  good: Good,
+  seen: Set<Good> = new Set(),
+): BuildProject | undefined {
+  if (seen.has(good)) return undefined
+  seen.add(good)
+  const storage = world.buildings.find(
+    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
+  const input = chainInput(good)
+  for (const [g, n] of Object.entries(input ?? {}) as [Good, number][]) {
+    if ((storage?.stock?.[g] ?? 0) >= n || makes(world, city, g)) continue
+    return chainProject(world, city, home, terrain, rings, g, seen)
+  }
+  if (makes(world, city, good)) return undefined
+  const kind = PROCESSED_BY[good]
+  if (kind) {
+    const t = houseTile(world, city, home, terrain, rings, kind)
+    return t && { kind: 'build', building: kind, ...t }
+  }
+  const node = nearestNode(world, home, terrain, good)
+  return node && { kind: 'build', building: NODE_WORKPLACE[node.node.kind], ...node.at }
 }
 
 /**
@@ -314,7 +363,9 @@ function nearestNode(world: WorldState, home: Building, terrain: TerrainMap, goo
 /**
  * What the city wants built most, where: a site of its own already begun (a farm, a workplace of
  * its own, a house in its area, its new wall); else a farm when every farm is full; else a house
- * when it has a food surplus and no free housing; else the next stretch of its new wall.
+ * when it has a food surplus and no free housing; else, for an NPC city, a stable once it has a
+ * horse (`wantsStable`), or the workplace for the shortest good of its reserve it can make
+ * (`chainProject`, `CONTEXT.md`: NPC reserve); else the next stretch of its new wall.
  */
 function wanted(
   world: WorldState,
@@ -346,8 +397,27 @@ function wanted(
     const house = at('house', houseTile(world, city, home, terrain, rings))
     if (house) return house
   }
+  if (!city.tradeOrg) {
+    const stable =
+      wantsStable(world, city) &&
+      at('stable', houseTile(world, city, home, terrain, rings, 'stable'))
+    if (stable) return stable
+    for (const good of shortGoods(world, city)) {
+      const chain = chainProject(world, city, home, terrain, rings, good)
+      if (chain) return chain
+    }
+  }
   const next = ring.find((t) => !t.done)
   return next && { kind: 'build', building: next.kind, x: next.x, y: next.y }
+}
+
+/**
+ * Whether an NPC city wants a stable (`CONTEXT.md`: NPC reserve): a living horse of it, and no
+ * stable of it, finished or begun.
+ */
+function wantsStable(world: WorldState, city: City): boolean {
+  if (!world.horses.some((h) => h.cityId === city.id && h.health > 0)) return false
+  return !world.buildings.some((b) => b.kind === 'stable' && b.cityId === city.id)
 }
 
 /** Whether the city has farms and none of them has room for another worker, coming or there. */
@@ -532,7 +602,8 @@ function ringsOf(
 }
 
 /**
- * Where the city puts its next house (`CONTEXT.md`: House), by the north-west tile of its
+ * Where the city puts its next house (`CONTEXT.md`: House), or another `kind` of building that
+ * goes in its area like one (a smelter, smithy, mint or stable), by the north-west tile of its
  * footprint: wholly on free ground of its area inside its wall, nearest its home first; when it is
  * expanding, inside the new wall. With no room left there, on its edge just outside the wall,
  * which starts its expansion. A city without walls builds anywhere in its area.
@@ -543,6 +614,7 @@ export function houseTile(
   home: Building,
   terrain: TerrainMap,
   rings: Rings | undefined,
+  kind: BuildingKind = 'house',
 ): { x: number; y: number } | undefined {
   const size = terrain.size
   const area = cityAreaTiles(world, city, size)
@@ -551,9 +623,9 @@ export function houseTile(
   const free = [...area]
     .map((k) => {
       const [x, y] = k.split(',').map(Number) as [number, number]
-      return { x, y, ...ringsOf(home, { kind: 'house', x, y }, size) }
+      return { x, y, ...ringsOf(home, { kind, x, y }, size) }
     })
-    .filter((t) => ground.fits('house', t.x, t.y, inArea))
+    .filter((t) => ground.fits(kind, t.x, t.y, inArea))
     .sort((a, b) => a.near - b.near || a.y - b.y || a.x - b.x)
   const at = (t: { x: number; y: number } | undefined) => t && { x: t.x, y: t.y }
   if (!rings) return at(free[0])

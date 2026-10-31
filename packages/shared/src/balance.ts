@@ -441,6 +441,12 @@ export const WORK_FOOD_KEPT = 2
 export const NPC_SOLDIER_SHARE = 0.25
 
 /**
+ * Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
+ * a town of 16 keeps 160, what two mint workers strike in two game days (`RECIPES`).
+ */
+export const NPC_WAR_CHEST_PER_RESIDENT = 10
+
+/**
  * How near to an NPC city's gate, in tiles, an armed outsider makes it close its gates
  * (`CONTEXT.md`: NPC city): a little inside sight, so the gate shuts before they reach it.
  */
