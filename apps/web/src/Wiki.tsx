@@ -39,6 +39,7 @@ import {
   CONSTRUCTION_SKILL_MAX,
   CONSTRUCTION_SKILL_PER_DAY,
   CONTRACT_MAX_DAYS,
+  CREW_FOOD,
   CRIME_MEMORY_DAYS,
   DECLINE_AGE,
   DECLINE_FLOOR,
@@ -112,6 +113,7 @@ import {
   SCRIPT_MAX_CALL_DEPTH,
   SCRIPT_MAX_VERSIONS,
   SCRIPT_MAX_LIST_LENGTH,
+  SET_OUT_WORK_DAYS,
   SCRIPT_MAX_OBJECT_KEYS,
   SCRIPT_MAX_STRING_LENGTH,
   SCRIPT_LOG_LINES,
@@ -722,6 +724,15 @@ export function Wiki() {
           don't go on their own and rely on refilling.
         </p>
         <p>
+          A crew at a far workplace is fed by its carrier: the worker who carries a load to the
+          storage brings back the Food the workplace's pile lacks of <code>crewFood</code> (
+          {num(CREW_FOOD)} unless set) and puts it on the pile, where the crew takes its meals, so
+          nobody else leaves for Food while the pile holds some. A farm's pile keeps its own Food
+          instead. <code>crewFood</code> 0 brings none. A resident an NPC city sends to a workplace
+          sets out with Food for the walk there and back plus {days(SET_OUT_WORK_DAYS)} of work, not
+          a fixed amount, so they last until the carrier's first round trip.
+        </p>
+        <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
           health in {days(STARVE_DAYS)}, so a resident without food dies{' '}
           {days(HUNGER_DAYS + STARVE_DAYS)} after their last meal. Fed again, they heal from nothing
@@ -750,7 +761,10 @@ export function Wiki() {
           leaves work for their <code>storage</code>, or the nearest storage of your realm with
           Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes
           back. With no Food anywhere they work on. Carrying a load tops their food up to{' '}
-          <code>foodTake</code> too. <code>foodAt</code> 0 turns this off.
+          <code>foodTake</code> too, and the carrier brings back what the workplace's pile lacks of{' '}
+          <code>crewFood</code> ({num(CREW_FOOD)} unless set) for the crew's meals, so a worker with
+          Food on the pile stays. <code>foodAt</code> 0 turns getting food off,{' '}
+          <code>crewFood</code> 0 the crew's Food.
         </p>
         <p>
           Work can be run directly too, with Run script or as a queue step: they work the workplace
@@ -1639,7 +1653,10 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             <code>source</code>: where Food comes from. The Work, Build and Tear down defaults also
             have the <code>number</code> params <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0
             turns it off) and <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food,
-            in units of Food (a resident eats about {num(foodEatenPerDay())} a game day).
+            in units of Food (a resident eats about {num(foodEatenPerDay())} a game day). Work also
+            has <code>crewFood</code> (default {num(CREW_FOOD)}; 0 brings none): the Food the
+            workplace's pile keeps for the crew, which the carrier tops up on the way back from the
+            storage.
           </li>
         </ul>
       </Section>
