@@ -59,6 +59,7 @@ import {
   FORMER_PLAYER_STANDING,
   GAME_DAYS_PER_YEAR,
   GOOD_WEIGHT,
+  HAUL_HORSE_FOOD,
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
@@ -988,7 +989,7 @@ export function Wiki() {
           carriage's load or food on the ground next to them, and a ridden horse after that from the
           Food its rider carries beyond their own {num(OWN_FOOD)}. A stable holds up to{' '}
           {num(STABLE_CAPACITY)} horses. A haul route keeps {num(HAUL_KEEP_FOOD)} Food on board for
-          its horse.
+          its horse and its driver, {num(HAUL_HORSE_FOOD)} of it the horse's share.
         </p>
         <p>
           The route (where to, which goods) comes only from the Haul order, which also fills the
@@ -1089,11 +1090,13 @@ export function Wiki() {
           <code>aboard</code> and a carriage's <code>passengerIds</code>.
         </p>
         <p>
-          <strong>Refilling from a carriage:</strong> passengers eat the food they carry, and when
-          they run low take a meal from the carriage's Food (or another carriage of your realm on or
-          next to their tile), as at home, so a carriage with Food on board keeps them fed on a long
-          drive. The Food a haul route keeps for the horse stays on board. On a carriage without
-          Food they go hungry like anyone away from home.
+          <strong>Refilling from a carriage:</strong> passengers and the driver eat the food they
+          carry, and when they run low take a meal from the carriage's Food (passengers also from
+          another carriage of your realm on or next to their tile), as at home, so a carriage with
+          Food on board keeps them fed on a long drive. The Food a haul route keeps on board is left
+          for the horse and the driver: passengers don't touch it, and the driver leaves the horse's
+          share of {num(HAUL_HORSE_FOOD)}. On a carriage without Food they go hungry like anyone
+          away from home.
         </p>
         <p>
           The group card boards everyone of the group standing on the carriage at once, until it is

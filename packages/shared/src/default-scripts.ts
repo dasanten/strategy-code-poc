@@ -548,7 +548,7 @@ ${LOG_TEXT}
     source: `// Haul (default): drive params.carriage, or while none is picked the carriage
 // on my tile when I start, on a haul route between memory.from and memory.to:
 // memory.goods there, memory.returnGoods back, memory.keepFood Food kept on
-// board for the horse. The route comes only from the Haul order; started
+// board for the horse and me. The route comes only from the Haul order; started
 // without one I end. The built-in haul order loads, drives and unloads, again
 // and again; this starts it at memory.from.
 param carriage: storage // the carriage to drive; none: the one I stand on
