@@ -69,6 +69,11 @@ const app = await buildApp({
   world,
   terrain,
   territory,
+  // Attached below, once the app has its server; logout and resets only run after that.
+  sockets: {
+    disconnectSession: (tokenHash) => realtime.disconnectSession(tokenHash),
+    disconnectUser: (userId) => realtime.disconnectUser(userId),
+  },
 })
 if (sentryOn) setupFastifyErrorHandler(app)
 
