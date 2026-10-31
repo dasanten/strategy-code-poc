@@ -60,6 +60,10 @@ export function createTickReporter(log: Logger): TickReporter {
       })
       Sentry.metrics.gauge('tick.residents', health.residents, { attributes })
       Sentry.metrics.gauge('tick.actions', health.actions, { attributes })
+      Sentry.metrics.distribution('tick.npc_plan', health.npcPlanMs, {
+        unit: 'millisecond',
+        attributes,
+      })
       if (health.slow) {
         log.warn({ ...health, seed: world.seed }, `slow tick: ${health.durationMs.toFixed(0)} ms`)
         withWorldScope(world, [], (scope) => {

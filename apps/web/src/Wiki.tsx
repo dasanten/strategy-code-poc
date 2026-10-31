@@ -93,6 +93,7 @@ import {
   NPC_ALLIANCE_LEAVE_STANDING,
   NPC_CITY_REFUSES_STANDING,
   NPC_CITY_WONT_SELL_STANDING,
+  NPC_PLAN_TICKS,
   NPC_TRADE,
   OWN_FOOD,
   OUTPOST_REFILL_REACH,
@@ -1254,6 +1255,12 @@ export function Wiki() {
           </tbody>
         </table>
         <h3>NPC cities</h3>
+        <p>
+          An NPC city thinks over what its people do once a game hour ({realTimeOf(NPC_PLAN_TICKS)}
+          of real time) and keeps to that plan in between: a worker stays where the city put them
+          until it moves them, and a builder picks up the next piece of a project as soon as one is
+          finished. Only its defence acts at once.
+        </p>
         <p>
           An NPC city sells only what it holds above its reserve ({days(NPC_TRADE.reserveFoodDays)}{' '}
           of Food for everyone, and the materials for a house and{' '}

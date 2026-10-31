@@ -472,6 +472,13 @@ export const PAIRING_WAIT_DAYS = 10
 export const PAIRING_WAIT_TICKS = PAIRING_WAIT_DAYS * TICKS_PER_GAME_DAY
 
 /**
+ * Ticks between a game-run city's planning passes (`CONTEXT.md`: NPC city; ADR 0016): a game
+ * hour, so a city reacts to a change within a real minute. Cities are staggered by their id, so
+ * about one plans per tick.
+ */
+export const NPC_PLAN_TICKS = 60
+
+/**
  * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
  * materials to the site, building or tearing down. The others keep working.
  */
