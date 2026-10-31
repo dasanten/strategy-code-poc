@@ -4,6 +4,7 @@ import {
   isParamNumber,
   isScriptParamType,
   targetParam,
+  WORKPLACE_MAX_WORKERS,
   type Building,
   type Carriage,
   type OrderRequest,
@@ -29,11 +30,22 @@ import { realmOf } from './starting-city.js'
 /** The buildings a storage param may name besides carriages: those a store or fetch goes to. */
 const STORAGE_KINDS: readonly string[] = ['storage', 'stable']
 
+/** A workplace or construction site, which anyone may work (`CONTEXT.md`: Holding a workplace). */
+const anyonesToWork = (b: Building) => !!b.site || WORKPLACE_MAX_WORKERS[b.kind] !== undefined
+
+/** Whether the realm's Player knows the building, in sight or last seen (`CONTEXT.md`: Last seen). */
+function knows(world: WorldState, realmId: string, b: Building): boolean {
+  const userId = world.realms.find((x) => x.id === realmId)?.userId
+  const memory = userId === undefined ? undefined : world.lastSeen[userId]
+  return memory?.some((e) => e.is === 'building' && e.id === b.id) ?? false
+}
+
 /**
- * What a param of `type` holding `id` names for the side (a realm, or an NPC city): one of its
- * own buildings or construction sites for `building`; one of its own finished storages or
- * stables, or one of its carriages, for `storage`. Undefined when the id names nothing of the
- * kind, or nothing of the side's.
+ * What a param of `type` holding `id` names for the side (a realm, or an NPC city): for
+ * `building` one of its own buildings or construction sites, or a workplace or site of anyone's
+ * that its Player knows, in sight or last seen; for `storage` one of its own finished storages or
+ * stables, or one of its carriages. Undefined when the id names nothing of the kind, or nothing
+ * the side may name.
  */
 export function paramTarget(
   world: WorldState,
@@ -44,7 +56,10 @@ export function paramTarget(
   if (side === undefined) return undefined
   const b = world.buildings.find((x) => x.id === id)
   if (b) {
-    if (buildingOrganization(world, b) !== side) return undefined
+    if (buildingOrganization(world, b) !== side) {
+      const known = type === 'building' && anyonesToWork(b) && knows(world, side, b)
+      return known ? { is: 'building', building: b } : undefined
+    }
     if (type === 'storage' && (!STORAGE_KINDS.includes(b.kind) || b.site)) return undefined
     return { is: 'building', building: b }
   }
@@ -100,7 +115,7 @@ function valueProblem(
   if (typeof value !== 'string' || !paramTarget(world, realmId, param.type, value))
     return param.type === 'storage'
       ? 'must be a storage, a stable or a carriage of yours'
-      : 'must be a building or construction site of yours'
+      : 'must be a building of yours, or a workplace or construction site you know'
   return undefined
 }
 

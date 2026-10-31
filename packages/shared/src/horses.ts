@@ -1,4 +1,4 @@
-import { HORSE_REACH, STABLE_BREED_DAYS, STABLE_CAPACITY } from './balance.js'
+import { HORSE_REACH, OWN_FOOD, STABLE_BREED_DAYS, STABLE_CAPACITY } from './balance.js'
 import { carriagePulledBy, drivenCarriageId } from './carriages.js'
 import { covers, isAt } from './footprint.js'
 import { carriageCanGoTo } from './building.js'
@@ -38,10 +38,17 @@ export function horsesAt(world: WorldState, x: number, y: number): Horse[] {
 /**
  * Where a horse finds Food it can eat, in the order it eats from them (`CONTEXT.md`: Horses have
  * no inventory): the load of the carriage it pulls, then the storage of the stable it stands in,
- * then the Food on the ground on its tile and within `HORSE_REACH` of it. Only places that hold
- * Food are listed.
+ * then the Food on the ground on its tile and within `HORSE_REACH` of it, then, for a ridden horse,
+ * its rider's carried Food while they have a unit to spare (`riderSpareFood`). Only places that
+ * hold Food the horse may eat are listed. `rider` saves looking up who rides it, for callers that
+ * know.
  */
-export function horseFood(world: WorldState, horse: Horse, mapSize: number): Stock[] {
+export function horseFood(
+  world: WorldState,
+  horse: Horse,
+  mapSize: number,
+  rider: Pick<Resident, 'carried'> | undefined = riderOf(world, horse),
+): Stock[] {
   const out: Stock[] = []
   const load = carriagePulledBy(world, horse)?.load
   if ((load?.food ?? 0) > 0) out.push(load!)
@@ -55,7 +62,16 @@ export function horseFood(world: WorldState, horse: Horse, mapSize: number): Sto
       if ((pile?.goods.food ?? 0) > 0 && !out.includes(pile!.goods)) out.push(pile!.goods)
     }
   }
+  if (rider && riderSpareFood(rider) >= 1) out.push(rider.carried)
   return out
+}
+
+/**
+ * The Food a rider carries beyond their own food (`OWN_FOOD`), which the horse they ride may eat
+ * (`CONTEXT.md`: Riding): the rider never goes without for the horse.
+ */
+export function riderSpareFood(rider: Pick<Resident, 'carried'>): number {
+  return Math.max(0, (rider.carried.food ?? 0) - OWN_FOOD)
 }
 
 /** Whose horses a resident may breed (`CONTEXT.md`: Breeding): a realm's, or an NPC city's. */

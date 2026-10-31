@@ -1,6 +1,9 @@
 import {
   AVERAGE_HORSE_STATS,
   CARRIAGE_CAPACITY,
+  HAUL_HORSE_FOOD,
+  HAUL_KEEP_FOOD,
+  HOME_FOOD_LOW,
   HUNGER_DAYS,
   MAX_HEALTH,
   MAX_HUNGER,
@@ -22,6 +25,7 @@ import { OrderQueue, orderKinds } from './orders.js'
 import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
 import { ScriptRunner, runScriptOrder } from './script-runner.js'
+import { stepRefill } from './survival.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
@@ -350,6 +354,73 @@ describe('passengers', () => {
       const { p1 } = longDrive(0)
       expect(p1.hunger).toBe(0)
       expect(p1.carried.food ?? 0).toBe(0)
+    })
+  })
+
+  describe('the driver eats from the carriage too (Refilling from a carriage)', () => {
+    const drive = { kind: 'drive', residentId: 'w1', carriageId: 'k1', x: 20, y: 2 }
+    const haulTo = { kind: 'haul', residentId: 'w1', carriageId: 'k1', x: 20, y: 2, goods: ['wood'] }
+
+    it('takes a meal from the load when running low, and nothing from a carriage without Food', () => {
+      const { world, w1, carriage } = setup()
+      expect(order(world, drive)).toMatchObject({ type: 'ack' })
+      w1.carried = {}
+      carriage.load = { food: 5 }
+      expect(checkInvariants(world, open)).toContainEqual(
+        expect.objectContaining({ invariant: 'refilled-when-low', entityIds: ['w1'] }),
+      )
+      stepRefill(world, SIZE)
+      expect(w1.carried.food).toBe(HOME_FOOD_LOW)
+      expect(carriage.load.food).toBe(5 - HOME_FOOD_LOW)
+
+      w1.carried = {}
+      carriage.load = {}
+      stepRefill(world, SIZE)
+      expect(w1.carried.food ?? 0).toBe(0)
+      expect(checkInvariants(world, open)).toEqual([])
+    })
+
+    it('on a haul route, leaves the horse’s share of the kept Food on board', () => {
+      const { world, w1, p1, carriage } = setup()
+      board(world, 'p1')
+      expect(order(world, { ...haulTo, keepFood: HAUL_KEEP_FOOD })).toMatchObject({ type: 'ack' })
+      expect(w1.order?.kind).toBe('haul')
+      for (const r of [w1, p1]) r.carried = {}
+      carriage.load = { food: HAUL_HORSE_FOOD + HOME_FOOD_LOW }
+      stepRefill(world, SIZE)
+      // The driver eats from what is kept; the passenger only from Food beyond it.
+      expect(w1.carried.food).toBe(HOME_FOOD_LOW)
+      expect(p1.carried.food ?? 0).toBe(0)
+      expect(carriage.load.food).toBe(HAUL_HORSE_FOOD)
+      w1.carried = {}
+      stepRefill(world, SIZE)
+      expect(w1.carried.food ?? 0).toBe(0)
+      expect(carriage.load.food).toBe(HAUL_HORSE_FOOD)
+      expect(checkInvariants(world, open)).toEqual([])
+    })
+
+    it('keeps the Haul default’s Food enough for the horse and the driver both', () => {
+      expect(HAUL_KEEP_FOOD - HAUL_HORSE_FOOD).toBeGreaterThanOrEqual(HOME_FOOD_LOW)
+    })
+
+    it('keep a driver with no Food fed over a long drive', () => {
+      const { world, w1, carriage } = setup()
+      world.residents = world.residents.filter((r) => r.id === 'w1')
+      w1.carried = {}
+      carriage.load = { food: 20 }
+      const walking = new Walking(open)
+      const ends = [20, 2]
+      for (let t = 0; t < (HUNGER_DAYS + 1) * TICKS_PER_GAME_DAY; t++) {
+        if (!w1.order) {
+          order(world, { ...drive, x: ends[0] })
+          ends.reverse()
+        }
+        stepWorld(world, open, walking)
+        if (t % 240 === 0) expect(checkInvariants(world, open)).toEqual([])
+      }
+      expect(w1.hunger).toBeGreaterThan(MAX_HUNGER / 2)
+      expect(w1.health).toBe(MAX_HEALTH)
+      expect(carriage.load.food ?? 0).toBeLessThan(20)
     })
   })
 

@@ -279,7 +279,7 @@ The shared language of the game. Domain terms only — no implementation details
   Walls count as city buildings, so they grow the area like houses do. A wall can be built along
   a line like a road, skipping tiles that have a wall or gate; a diagonal line closes the way,
   since two wall tiles touching at a corner do (see Step).
-- **House:** a building in a city's area where a few residents live. A city's **free housing** is
+- **House:** a building in a city's area where a fixed number of residents live (the number is in `balance.ts` and the Wiki). A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
   (a palace, a castle) may add room the same way.
 - **Food surplus:** a city has one when its storage holds more Food than all its residents eat
@@ -388,7 +388,8 @@ The shared language of the game. Domain terms only — no implementation details
   stop, so food keeps coming to wherever the army is. Cut the route and the army starves.
   At its army stop the carriage unloads nothing: it stays with the army, which refills from it,
   until the hauled goods are gone, then goes back for more. Nothing comes back from an army.
-  A supply wagon's driver, not being of the army, eats only what they carry.
+  A supply wagon's driver, not being of the army, refills from the carriage like anyone aboard
+  (Refilling from a carriage).
 - **Combat:** resolved between residents in contact (the same or a neighbouring tile). Attack
   from Strength, weapon and Combat skill; Agility dodges, armour and shields take off damage.
   Fighting teaches Combat. An armed resident who is hit fights back; an unarmed one flees home.
@@ -582,7 +583,7 @@ The shared language of the game. Domain terms only — no implementation details
   takes a meal the same way from Food lying on the workplace's tile, or else from a carriage
   standing there. Anywhere else (travelling, building) there is no refill: they need food on
   them or a delivery.
-- **Refilling from a carriage:** a resident of an army, or a passenger, running low on food
+- **Refilling from a carriage:** a resident of an army, a passenger, or the driver, running low on food
   takes a meal from a carriage of their own realm on or next to their tile, like refilling at
   home.
 - **Getting food:** in the Work, Build and Tear down defaults, a resident whose `foodAt` param is
@@ -620,6 +621,9 @@ The shared language of the game. Domain terms only — no implementation details
 - **Horses have no inventory:** a horse eats only what is in reach. At a stable it eats from the
   stable's storage; pulling a carriage, from the carriage's load; anywhere, from Food lying on the
   ground on its tile or right next to it, so Players can feed a horse by putting food down by it.
+  A ridden horse also eats from the Food its rider carries beyond the rider's own food, after
+  Food in reach on the ground: the rider never goes without for the horse, and the realm log says
+  when a ridden horse is hungry with nothing to spare.
 - **Stable:** a building on Plains where horses are kept. It has a storage for their Food, which
   residents fill and empty like any storage. Horses don't breed there on their own: a resident
   breeds them (**Breeding**). Like a workplace, a stable has no owner: any horse standing in it
@@ -653,7 +657,9 @@ The shared language of the game. Domain terms only — no implementation details
   the carriage and its horse move together. Driving teaches the Driving skill, and a more
   skilled driver goes faster. Players drive only their own carriages, with their own horses.
 - **Hitched horse:** the one horse that pulls a carriage. A horse of the carriage's realm standing
-  with it is hitched when the carriage is first driven, and stays hitched (for now). A carriage
+  with it is hitched when the carriage is first driven, and stays hitched until **unhitched**: a grown resident of the carriage's realm standing on its
+  tile unhitches it (an order, as a script could do it); the horse stands free on the tile, and
+  the carriage stands where it is until it is next driven. A carriage
   whose horse dies stands where it is until another horse is hitched.
 - **Riding:** a resident on a tile with a horse of their realm that pulls no carriage and nobody
   rides mounts it, and dismounts anywhere; the horse stays on that tile. Riding is not an order:
@@ -723,8 +729,9 @@ The shared language of the game. Domain terms only — no implementation details
   scripts first. The caps are listed in the Wiki.
 - **Script parameter:** a value the Player picks for whoever runs a script, declared by a
   `param name: type` line at the top of the script and read there as `params.name`; a `param`
-  line anywhere else is a syntax error. A `building` param holds one of the realm's own buildings
-  or construction sites; a `storage` param one of its storages, stables or carriages; a `number`
+  line anywhere else is a syntax error. A `building` param holds a building the Player knows: a workplace or construction site
+  anywhere in sight or last seen, whoever built it (a workplace has no owner), or any other
+  building of the realm's own; a `storage` param one of its storages, stables or carriages; a `number`
   param a whole number of zero or more, typed into a number field. A `number` param may declare a
   **default** (`param foodAt: number = 3`); `building` and `storage` params can't. The values
   are kept for each resident and each script: giving the task again keeps them, a param removed
@@ -774,6 +781,11 @@ The shared language of the game. Domain terms only — no implementation details
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
   run is named on a small line of its own. A script can say it itself with `doing(text)`: short
   text, kept in its memory, that shows instead until the script says something else or stops.
+  **Estimates:** the Doing line and every meter or countdown that shows progress also say about
+  how long is left, in real time with game time in brackets ("about 3 min (half a game day)"),
+  from the current pace (terrain, horse, hunger, skill), rounded to one coarse unit: walking,
+  driving and riding say when they arrive; breeding, building, tearing down, carrying a child,
+  pairing and growing up say how long is left.
 - **Memory:** the small store a running script or order keeps between ticks. Roles are just
   something a script keeps there. A script can read, never change, the memory of its own
   Player's residents and armies, so residents doing the same task can agree on who does what;
@@ -827,8 +839,9 @@ The shared language of the game. Domain terms only — no implementation details
   and then the step in its place starts. **Planning ahead:** a step may act somewhere else than
   where the resident stands now: the planner's Add step offers every kind of step, and one that
   acts on a place (work, build, fetch, store, pick up, feed the stable, breed, …) is picked on the
-  map, with a walk there put before it. Adding only checks that the step could make sense (the
-  place exists and is the realm's); whether it can start is checked when its turn comes. A step that can't start or ends in a failure is skipped
+  map, with a walk there put before it. Adding only checks that the step could make sense (the place
+  exists as last known, and is the realm's where it must be: a workplace or site anyone may work
+  can be anywhere in sight or last seen); whether it can start is checked when its turn comes. A step that can't start or ends in a failure is skipped
   and noted in the realm log; when none of them can start, the queue ends. Any order that isn't a
   step ends it. Scripts see a resident's queue (which step, and what it is) but can't start or
   change one; their `order` and `script` stay the current step's own.

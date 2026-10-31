@@ -206,6 +206,13 @@ describe('step labels', () => {
     )
     expect(stepLabel({ kind: 'mount', horseId: 'h1' }, {})).toBe('Mount a horse')
   })
+
+  it('names a place out of sight as last seen', () => {
+    const lastSeen = [{ id: 'm2', kind: 'mine' as const }]
+    expect(stepLabel({ kind: 'task', task: 'work', workplaceId: 'm2' }, { lastSeen })).toBe(
+      'Work the mine (as last seen)',
+    )
+  })
 })
 
 describe('the group planner', () => {

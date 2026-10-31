@@ -50,6 +50,7 @@ const props = {
   onOpenCity: () => {},
   onRenameCity: () => {},
   onSelectResident: () => {},
+  onUnhitch: () => {},
 }
 
 /** The keys that two siblings in a list share, anywhere in the tree. */

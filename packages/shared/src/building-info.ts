@@ -1,6 +1,7 @@
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
+  HOUSING_ROOM,
   RECIPES,
   WORKPLACE_MAX_WORKERS,
   WORKPLACE_SKILL,
@@ -19,12 +20,12 @@ import {
 
 /**
  * What each kind of building is for, in words (`CONTEXT.md`: each building's own entry): the one
- * description the Build menu and the building card's ⓘ share. No numbers: those come from
- * `buildingInfo`, so the text never drifts from the balance.
+ * description the Build menu and the building card's ⓘ share. No numbers typed in: they come
+ * from the balance, here or through `buildingInfo`, so the text never drifts from it.
  */
 export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
   townHall: 'A town hall founds a new city of your realm; tearing it down dissolves the city.',
-  house: 'A house is room for a few residents; only in a city’s area, and it grows the city.',
+  house: `A house is room for ${HOUSING_ROOM.house} residents; only in a city’s area, and it grows the city.`,
   storage:
     'A storage keeps a city’s goods: workers carry their output here, and builders fetch materials from it.',
   warehouse:
