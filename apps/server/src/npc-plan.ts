@@ -193,7 +193,7 @@ export function planCity(
   const placeById = new Map(places.map((p) => [p.id, p]))
   const held = new Places(people)
   const jobs: Record<string, CityJob> = {}
-  let builders = adults.filter(isBuilder).length
+  const builders = adults.filter(isBuilder).length
   const spare: Resident[] = []
   for (const r of adults) {
     const at = workplaceOf(r)
