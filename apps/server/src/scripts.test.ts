@@ -7,7 +7,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { SESSION_COOKIE, TASKS } from '@csp/shared'
+import { SCRIPT_LIBRARY_MAX_SCRIPTS, SCRIPT_MAX_VERSIONS, SESSION_COOKIE, TASKS } from '@csp/shared'
 import { buildApp } from './app.js'
 import { createSession } from './auth.js'
 import { openDb, schema, type Db, type OpenDb } from './db/index.js'
@@ -148,6 +148,60 @@ describe('script library', () => {
     expect(() => createScript(db, mara, { name: 'x'.repeat(41), source: VALID })).toThrow(invalid)
     expect(() => createScript(db, mara, { name: 'a', source: 'x'.repeat(20_001) })).toThrow(invalid)
     expect(() => createScript(db, mara, { name: 'a', source: 3 })).toThrow(invalid)
+  })
+})
+
+describe('library cap (`CONTEXT.md`: Library cap)', () => {
+  it('refuses a script past the cap, default scripts counted, and allows one after a delete', () => {
+    const mara = addUser('Mara')
+    expect(listScripts(db, mara)).toHaveLength(TASKS.length)
+    const made = []
+    for (let i = TASKS.length; i < SCRIPT_LIBRARY_MAX_SCRIPTS; i++) {
+      made.push(createScript(db, mara, { name: `script ${i}`, source: VALID }))
+    }
+    expect(listScripts(db, mara)).toHaveLength(SCRIPT_LIBRARY_MAX_SCRIPTS)
+    expect(() => createScript(db, mara, { name: 'one more', source: VALID })).toThrow(
+      expect.objectContaining({
+        code: 'library-full',
+        message: expect.stringContaining(`${SCRIPT_LIBRARY_MAX_SCRIPTS} scripts`),
+      }),
+    )
+    deleteScript(db, mara, made[0]!.id)
+    expect(createScript(db, mara, { name: 'one more', source: VALID }).name).toBe('one more')
+    // Another Player's library is their own.
+    expect(createScript(db, addUser('Tobin'), { name: 'mine', source: VALID }).name).toBe('mine')
+  })
+
+  it('refuses a save or reset past the version cap, and allows one after a delete', () => {
+    const mara = addUser('Mara')
+    const s = createScript(db, mara, { name: 'miners', source: VALID })
+    for (let v = 2; v <= SCRIPT_MAX_VERSIONS; v++) {
+      saveScript(db, mara, s.id, { source: `let x = ${v}\n` })
+    }
+    expect(getScript(db, mara, s.id).versions).toHaveLength(SCRIPT_MAX_VERSIONS)
+    const full = expect.objectContaining({
+      code: 'library-full',
+      message: expect.stringContaining(`${SCRIPT_MAX_VERSIONS} versions`),
+    })
+    expect(() => saveScript(db, mara, s.id, { source: VALID_2 })).toThrow(full)
+    // Deleting any version makes room; the new one still gets the next number.
+    deleteVersion(db, mara, s.id, { version: 1 })
+    expect(saveScript(db, mara, s.id, { source: VALID_2 })).toMatchObject({
+      activeVersion: SCRIPT_MAX_VERSIONS + 1,
+      latestVersion: SCRIPT_MAX_VERSIONS + 1,
+    })
+    deleteOlderVersions(db, mara, s.id)
+    expect(saveScript(db, mara, s.id, { source: VALID }).versions).toHaveLength(2)
+
+    // A default script is capped like any other, Reset included.
+    const work = defaultScriptId(db, mara, 'work')
+    while (getScript(db, mara, work).versions.length < SCRIPT_MAX_VERSIONS) {
+      saveScript(db, mara, work, { source: VALID })
+    }
+    expect(() => resetScript(db, mara, work)).toThrow(full)
+    deleteVersion(db, mara, work, { version: 2 })
+    expect(resetScript(db, mara, work).followsDefault).toBe(true)
+    expect(checkScriptLibrary(db)).toEqual([])
   })
 })
 
@@ -519,5 +573,55 @@ describe('script library API', () => {
     expect((await app.inject({ method: 'GET', url: '/api/scripts' })).statusCode).toBe(401)
     expect((await tobin('GET', `/api/scripts/${id}`)).statusCode).toBe(404)
     expect((await tobin('DELETE', `/api/scripts/${id}`)).statusCode).toBe(404)
+  })
+
+  it('rate-limits a Player’s writes together, not their reads or other Players', async () => {
+    const limited = await buildApp({
+      db,
+      logger: false,
+      secureCookies: false,
+      trustProxy: false,
+      scriptWriteRateLimit: 2,
+    })
+    try {
+      const mara = addUser('Mara')
+      const call = (userId: number, method: 'GET' | 'POST', url: string, payload?: object) =>
+        limited.inject({
+          method,
+          url,
+          cookies: { [SESSION_COOKIE]: createSession(db, userId) },
+          payload,
+        })
+      const created = await call(mara, 'POST', '/api/scripts', { name: 'a', source: VALID })
+      expect(created.statusCode).toBe(201)
+      const id = created.json().id as number
+      // A second write of another kind counts against the same limit.
+      expect(
+        (await call(mara, 'POST', `/api/scripts/${id}/versions`, { source: VALID_2 })).statusCode,
+      ).toBe(201)
+      const res = await call(mara, 'POST', '/api/scripts', { name: 'c', source: VALID })
+      expect(res.statusCode).toBe(429)
+      expect(res.json().error).toBe('rate-limited')
+      expect((await call(mara, 'GET', '/api/scripts')).statusCode).toBe(200)
+      const tobin = addUser('Tobin')
+      expect(
+        (await call(tobin, 'POST', '/api/scripts', { name: 'a', source: VALID })).statusCode,
+      ).toBe(201)
+    } finally {
+      await limited.close()
+    }
+  })
+
+  it('answers a save past a cap with 409 library-full', async () => {
+    const mara = addUser('Mara')
+    const call = as(mara)
+    const s = createScript(db, mara, { name: 'miners', source: VALID })
+    for (let v = 2; v <= SCRIPT_MAX_VERSIONS; v++) saveScript(db, mara, s.id, { source: VALID })
+    const res = await call('POST', `/api/scripts/${s.id}/versions`, { source: VALID_2 })
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toMatchObject({
+      error: 'library-full',
+      message: `This script has ${SCRIPT_MAX_VERSIONS} versions, the most it can keep: delete old versions first.`,
+    })
   })
 })

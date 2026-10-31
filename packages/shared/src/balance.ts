@@ -1790,6 +1790,26 @@ export const SCRIPT_LOG_LINES = 20
  */
 export const SCRIPT_LOG_INTERVAL = 60
 
+/**
+ * The most scripts a Player's library holds (`CONTEXT.md`: Library cap), their default scripts
+ * among them; a new script past it is refused until one is deleted. A few dozen: room for a
+ * script per task and plenty of experiments, too few to grow the database without bound.
+ */
+export const SCRIPT_LIBRARY_MAX_SCRIPTS = 40
+
+/**
+ * The most versions one script keeps (`CONTEXT.md`: Library cap); a save or reset past it is
+ * refused until old versions are deleted. A few dozen saves of history to go back to.
+ */
+export const SCRIPT_MAX_VERSIONS = 40
+
+/**
+ * Script library writes (create, save, rename, activate, reset, delete) one Player may make in a
+ * minute before the server answers 429. One a second: far more than anyone saves by hand, so
+ * only a script hammering the API ever meets it.
+ */
+export const SCRIPT_WRITES_PER_MINUTE = 60
+
 /** The most steps a queue holds (`CONTEXT.md`: Queue): plenty for a day's round. */
 export const QUEUE_MAX_STEPS = 20
 
