@@ -73,6 +73,16 @@ const haul: ResidentOrder = {
 const line = (r: DoingOf) => doingLine(r, { scripts, buildings })
 
 describe('doingLine', () => {
+  it('says what a teacher teaches (`CONTEXT.md`: Teacher)', () => {
+    const teach = (subject: 'strength' | 'combat'): ResidentOrder => ({
+      kind: 'teach',
+      buildingId: 'g1',
+      subject,
+    })
+    expect(line({ order: teach('strength') })).toBe('Teaching Strength')
+    expect(line({ order: teach('combat') })).toBe('Teaching Combat')
+  })
+
   it('names the task and what its current order has them doing', () => {
     const worker = { scriptId: 1, building: 'mine' as const }
     expect(line({ order: work, script: worker })).toBe('Working the mine')

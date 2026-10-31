@@ -64,6 +64,7 @@ import {
   type ScriptSummary,
   type SkillName,
   type StatName,
+  type TrainingSubject,
   type Stock,
   type SeenResident,
   type SeenHorse,
@@ -172,6 +173,13 @@ export const SKILL_LABELS: Record<SkillName, string> = {
   farming: 'Farming',
   combat: 'Combat',
   driving: 'Driving',
+}
+
+/** A stat or skill a training ground teaches, as the UI names it: "Strength", "Combat". */
+export function subjectLabel(subject: TrainingSubject): string {
+  return subject in STAT_LABELS
+    ? STAT_LABELS[subject as StatName]
+    : SKILL_LABELS[subject as SkillName]
 }
 
 /** The longest a stat bar can be: the highest base plus the most training could add to it. */
@@ -438,6 +446,7 @@ export function orderDoing(r: Pick<Resident, 'order' | 'riding'>, arrives?: numb
   }
   if (o?.kind === 'workAt')
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
+  if (o?.kind === 'teach') return `Teaching ${subjectLabel(o.subject)}`
   if (o?.kind === 'pay') return 'Paying for mercenaries'
   if (o?.kind === 'buyCity') return 'Buying a city'
   if (o?.kind === 'buyOff') return 'Buying off a directive'

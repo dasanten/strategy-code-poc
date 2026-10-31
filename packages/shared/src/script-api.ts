@@ -341,6 +341,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('tearDown', ['buildingId'], 'Tear down the building or site on my tile.'),
   action('workAt', ['makes?'], 'Work the workplace on my tile; at a smithy, say what to make.'),
   action(
+    'teach',
+    ['subject'],
+    'Teach a stat ("strength", "endurance", "agility", "intellect") or a skill ("combat", …) at the training ground on my tile, while I stand there. One teacher per ground.',
+  ),
+  action(
     'breed',
     ['stableId', 'horseIds'],
     'At the stable I stand at, tend two fed horses of mine in it, like ["h1", "h2"], until their foal is born.',

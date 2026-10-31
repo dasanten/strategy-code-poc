@@ -400,6 +400,7 @@ describe('script bindings', () => {
     ['breed("st", ["h1", "h2"])', { kind: 'breed', stableId: 'st', horseIds: ['h1', 'h2'] }],
     ['workAt()', { kind: 'workAt' }],
     ['workAt("sword")', { kind: 'workAt', makes: 'sword' }],
+    ['teach("strength")', { kind: 'teach', buildingId: null, subject: 'strength' }],
     ['pair("b1")', { kind: 'pair', partnerId: 'b1' }],
     ['attack("b1")', { kind: 'attack', targetId: 'b1' }],
     ['attack("b2")', { kind: 'attack', targetId: 'b2' }],
