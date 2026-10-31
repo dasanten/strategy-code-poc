@@ -21,6 +21,7 @@ import { requestCarrying, resolveCarrying } from './carrying.js'
 import { checkInvariants } from './invariants.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { nextProject, wallRings } from './npc-growth.js'
+import { planCity } from './npc-plan.js'
 import { mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
 import { Walking } from './walking.js'
@@ -66,6 +67,8 @@ describe('NPC cities grow', () => {
     const { world, terrain, city, home } = village()
     for (const r of world.residents) Object.assign(r, { x: home.x, y: home.y, order: null })
     storageOf(world, city).stock = { food: 400 }
+    // The city decides in its planning pass (ADR 0016) and hands the jobs out in the tick.
+    planCity(world, city, terrain)
     stepNpcCities(world, terrain.size, terrain)
     const paired = world.residents.filter((r) => r.pair)
     expect(paired).toHaveLength(2 * Math.floor(NPC_VILLAGE.residents / NPC_ADULTS_PER_PAIR))
@@ -73,7 +76,7 @@ describe('NPC cities grow', () => {
     // Pairing stops nobody: the pair are put to work like everyone else.
     expect(paired.every((r) => r.order !== null || r.script)).toBe(true)
     storageOf(world, city).stock = { food: 1 }
-    stepNpcCities(world, terrain.size, terrain)
+    planCity(world, city, terrain)
     expect(world.residents.filter((r) => r.pair)).toEqual([])
   })
 
@@ -81,7 +84,7 @@ describe('NPC cities grow', () => {
     const { world, terrain, city, home } = village()
     for (const r of world.residents) Object.assign(r, { x: home.x, y: home.y, order: null })
     storageOf(world, city).stock = { food: 400 }
-    stepNpcCities(world, terrain.size, terrain)
+    planCity(world, city, terrain)
     const [a, b] = world.residents.filter((r) => r.pair) as [Resident, Resident]
     for (const r of [a, b]) {
       r.order = null
@@ -93,13 +96,14 @@ describe('NPC cities grow', () => {
       partnerName: b.name,
       partnerBase: { strength: 10, endurance: 10, agility: 10, intellect: 10 },
     }
+    planCity(world, city, terrain)
     stepNpcCities(world, terrain.size, terrain)
     expect(a.order).toBeNull()
     expect(a.script).toBeUndefined()
     expect(b.order !== null || b.script !== undefined).toBe(true)
     // Food running short doesn't end a pair with a child on the way.
     storageOf(world, city).stock = { food: 1 }
-    stepNpcCities(world, terrain.size, terrain)
+    planCity(world, city, terrain)
     expect([a.pair?.partnerId, b.pair?.partnerId]).toEqual([b.id, a.id])
   })
 
@@ -205,7 +209,7 @@ describe('NPC cities grow', () => {
     city.tradeOrg = 'post'
     for (const r of world.residents) Object.assign(r, { x: home.x, y: home.y, order: null })
     storageOf(world, city).stock = { food: 400 }
-    stepNpcCities(world, terrain.size, terrain)
+    planCity(world, city, terrain)
     expect(world.residents.some((r) => r.pair)).toBe(false)
   })
 })

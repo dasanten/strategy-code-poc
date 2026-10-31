@@ -122,13 +122,15 @@ export function hqGrows(world: WorldState, adults: Resident[]): boolean {
 /**
  * Where the HQ puts its next house, by the north-west tile of its footprint: wholly in its area
  * between its inner ring and its outermost ring, off its rings and clear of the straight ways in
- * from its gates (as in `hqLayout`), nearest the town hall first.
+ * from its gates (as in `hqLayout`), nearest the town hall first. Another `kind` of building
+ * that goes there like a house (a smithy, say) the same way.
  */
 export function hqHouseTile(
   world: WorldState,
   hall: Building,
   terrain: TerrainMap,
   outermost: number,
+  kind: Building['kind'] = 'house',
 ): { x: number; y: number } | undefined {
   const size = terrain.size
   const c = middleOf(hall, size)
@@ -156,7 +158,7 @@ export function hqHouseTile(
     for (let dx = -r; dx <= r; dx++) {
       const x = wrap(c.x + dx, size)
       const y = wrap(c.y + dy, size)
-      if (ground.fits('house', x, y, fine)) free.push({ x, y, d: Math.hypot(dx, dy) })
+      if (ground.fits(kind, x, y, fine)) free.push({ x, y, d: Math.hypot(dx, dy) })
     }
   }
   free.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x)

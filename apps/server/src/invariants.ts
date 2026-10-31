@@ -111,8 +111,11 @@ import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
+import { cityPlansSound, npcFarmersKept, tradeOrgSendsNoOne } from './npc-plan.js'
+import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
+import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
-import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
+import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
 import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
@@ -1923,6 +1926,7 @@ export const worldInvariants: Invariant[] = [
   leadersServeNoOne,
   residentNamesWellFormed,
   cityNamesWellFormed,
+  horseNamesWellFormed,
   horseOffersOnce,
   buildingsInPlace,
   citiesFromBuildings,
@@ -1993,6 +1997,12 @@ export const worldInvariants: Invariant[] = [
   buyOffsSound,
   buyOffOrdersDone,
   hqRingsSound,
+  cityPlansSound,
+  foundingPartiesSound,
+  npcCitiesHaveHalls,
+  npcFarmersKept,
+  tradeOrgSendsNoOne,
+  npcTradersSound,
   lineOrdersSound,
   pathsAreSteps,
   gameDefaultCarriers,

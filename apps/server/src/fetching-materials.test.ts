@@ -111,7 +111,9 @@ describe('fetching materials', () => {
       ...AT,
       site: { delivered: { wood: 5 }, work: 0 },
     })
-    run(world, terrain, 5, undefined, () => fetchers(world).length > 0)
+    // They spread over the site's footprint as they join (`CONTEXT.md`: Spreading over the footprint).
+    const joined = () => world.residents.every((r) => r.script?.memory.siteId === 'site')
+    run(world, terrain, 60, undefined, () => joined() && fetchers(world).length > 0)
     expect(world.residents.map((r) => r.script!.memory.siteId)).toEqual(['site', 'site', 'site'])
     const [fetcher, ...more] = fetchers(world)
     expect(more).toEqual([])

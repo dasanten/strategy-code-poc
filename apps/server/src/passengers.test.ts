@@ -57,6 +57,7 @@ function setup() {
     y: 2,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    name: 'Rowan',
     stats: { ...AVERAGE_HORSE_STATS },
     bornAt: 0,
   }
@@ -359,7 +360,14 @@ describe('passengers', () => {
 
   describe('the driver eats from the carriage too (Refilling from a carriage)', () => {
     const drive = { kind: 'drive', residentId: 'w1', carriageId: 'k1', x: 20, y: 2 }
-    const haulTo = { kind: 'haul', residentId: 'w1', carriageId: 'k1', x: 20, y: 2, goods: ['wood'] }
+    const haulTo = {
+      kind: 'haul',
+      residentId: 'w1',
+      carriageId: 'k1',
+      x: 20,
+      y: 2,
+      goods: ['wood'],
+    }
 
     it('takes a meal from the load when running low, and nothing from a carriage without Food', () => {
       const { world, w1, carriage } = setup()

@@ -6,6 +6,7 @@ import {
   BATCHES_PER_DAY,
   BUILD_MATERIALS,
   BUILD_WORK,
+  DELIVERY_LOAD,
   FOOD_PER_DAY,
   RECIPES,
   SCRIPT_LIBRARY_MAX_SCRIPTS,
@@ -36,6 +37,8 @@ import {
   residentsPerFarmer,
   transport,
   wikiResident,
+  HOW_TO_TRADE_PATH,
+  WIKI_PATH,
 } from './wiki-view.js'
 import { WIKI_TOPICS, Wiki } from './Wiki.js'
 
@@ -165,5 +168,32 @@ describe('training pace', () => {
     expect(trainingDays('strength')).toBeCloseTo(GAME_DAYS_PER_YEAR)
     expect(trainingDays('mining')).toBeCloseTo(daysToWorkSkillMax / TRAIN_SKILL_FACTOR)
     expect(trainingDays('combat')).toBeCloseTo(GAME_DAYS_PER_YEAR / TRAIN_SKILL_FACTOR)
+  })
+})
+
+describe('the Wiki’s How to trade topic (`CONTEXT.md`: Trade section)', () => {
+  it('is a section the trade section’s link lands on', () => {
+    const [path, anchor] = HOW_TO_TRADE_PATH.split('#')
+    expect(path).toBe(WIKI_PATH)
+    expect(WIKI_TOPICS.map((t) => t.id)).toContain(anchor)
+    const html = render()
+    expect(html).toContain(`id="${anchor}"`)
+    expect(html).toContain('How to trade')
+  })
+
+  it('covers where trade happens, sending a trader, NPC cities, delivery and transfer', () => {
+    const html = render()
+    const section = html.slice(html.indexOf('id="how-to-trade"'), html.indexOf('id="trade"'))
+    for (const heading of [
+      'Sending a trader',
+      'Buying and selling',
+      'What an NPC city buys and sells',
+      'Delivery',
+      'Transfer',
+    ]) {
+      expect(section).toContain(`<h3>${heading}</h3>`)
+    }
+    expect(section).toContain('Trade here')
+    expect(section).toContain(`at most ${DELIVERY_LOAD} kg`)
   })
 })

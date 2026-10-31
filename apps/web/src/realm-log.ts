@@ -324,14 +324,21 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     case 'grownUp':
       return { text: `${e.name} has grown up and can work now.`, tone: 'info' }
     case 'horseDied':
-      return { text: 'A horse starved to death.', tone: 'bad' }
+      // Entries from before horses had names (`CONTEXT.md`: Horse name) say "a horse".
+      return {
+        text: e.name ? `Your horse ${e.name} starved to death.` : 'A horse starved to death.',
+        tone: 'bad',
+      }
     case 'horseHungry':
       return {
-        text: `${e.name}’s horse is hungry, and ${e.name} carries no Food to spare for it.`,
+        text: `${e.name}’s horse${e.horseName ? ` ${e.horseName}` : ''} is hungry, and ${e.name} carries no Food to spare for it.`,
         tone: 'warn',
       }
     case 'foaled':
-      return { text: 'A foal was born in a stable.', tone: 'info' }
+      return {
+        text: e.name ? `A foal, ${e.name}, was born in a stable.` : 'A foal was born in a stable.',
+        tone: 'info',
+      }
     case 'horsesGranted':
     case 'horsesClaimed': {
       const where = {

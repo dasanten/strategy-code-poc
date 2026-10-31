@@ -190,6 +190,16 @@ The shared language of the game. Domain terms only — no implementation details
   trader moves them like the city price: the better, the cheaper it sells and the more it pays.
   Anyone with a resident in sight of the storage sees its prices. A trade raises its standing
   toward the trader, like trade with the Trade Organization.
+- **Trade section:** where a city's panel shows trading, for each of its warehouses or storages
+  in sight, from the Player's side: what they **can buy** there and what they **can sell**, with
+  how many units and the price (an NPC city lists only its surplus and what it is short of, and
+  says it takes nothing else). With nobody of theirs there, it offers to **send** one of their
+  residents (nearest first, with what they carry) or carriages: a walk order to the tile, then
+  shown on the way. Once one is there, it shows what the trader carries and room left, and a
+  trade that won't go says why (no coins in hand, no room, none in stock, not wanted). Delivery
+  and Transfer each have a heading and a line saying what they do, with the fee before ordering,
+  and the section links to the Wiki's "How to trade". The tile card of a warehouse or an NPC
+  city's storage has **Trade here**, which opens it. Only the UI: the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse runs low, it tops up to a minimum at the end of
   each game day. This is the one controlled exception to "everything is physical" (see ADR 0003).

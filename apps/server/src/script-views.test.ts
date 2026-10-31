@@ -90,6 +90,7 @@ function setup() {
     y: 12,
     hunger: 90,
     health: 100,
+    name: 'Rowan',
     stats: { ...AVERAGE_HORSE_STATS },
     bornAt: 0,
   })
@@ -208,6 +209,7 @@ describe('script views', () => {
       breedingPair: 'breedingPair(building("s1"))',
       storages: 'storages()',
       walkTime: 'walkTime(me, building("s1"))',
+      crewTile: 'crewTile(building("s1"))',
       tick: 'tick',
       mapSize: 'mapSize',
       random: 'random',

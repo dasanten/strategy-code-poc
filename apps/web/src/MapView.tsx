@@ -88,6 +88,7 @@ import {
   type Viewer,
 } from './map/tokens.js'
 import type { MapWorld } from './map/map-world.js'
+import { Motion, workSway } from './map/motion.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
@@ -207,6 +208,7 @@ export function MapView({
   const terrainPathRef = useRef(terrainPath)
   const overviewRef = useRef<(overview: Uint8Array | null) => void>(() => {})
   const redrawRef = useRef<() => void>(() => {})
+  const motionRef = useRef<(world: MapWorld) => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
   const regionRef = useRef<(region: RegionState | null) => void>(() => {})
   const controlsRef = useRef<{
@@ -255,6 +257,7 @@ export function MapView({
   useEffect(() => {
     worldRef.current = world
     if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
+    motionRef.current(world)
     redrawRef.current()
   }, [world])
 
@@ -278,6 +281,8 @@ export function MapView({
     const labels = new LabelLayer()
     // Where each resident's token was drawn last frame; up close each has its own figure.
     let drawnSpots = new Map<string, Spot>()
+    // Where the tokens are between ticks (`CONTEXT.md`: Motion on the map).
+    const motion = new Motion()
     // The box being dragged to select residents, from where it started to the pointer.
     let box: { from: Point; to: Point } | undefined
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
@@ -317,6 +322,9 @@ export function MapView({
     }
     redrawRef.current = redraw
     forgetRef.current = (chunks) => store.forget(chunks)
+    motionRef.current = (w) =>
+      motion.update([...w.residents, ...w.horses, ...w.carriages], performance.now())
+    motionRef.current(worldRef.current)
 
     /** Redraws the Region map's chunks that changed, or all of them. */
     function updateRegion(region: RegionState | null) {
@@ -495,8 +503,31 @@ export function MapView({
       drawStructures(under, g, tokens, cam, view, worldRef.current)
 
       const world = worldRef.current
-      const spots = drawUnits(tokens, badges, cam, view, world, viewerOf(world), leadersOf(world))
+      const now = performance.now()
+      // Residents at work sway on their tile; one gliding to the next tile does not.
+      const sways = new Map<string, readonly [number, number]>()
+      for (const r of world.residents) {
+        const sway = workSway(r, now)
+        if (sway[0] !== 0 || sway[1] !== 0) sways.set(r.id, sway)
+      }
+      const spots = drawUnits(
+        tokens,
+        badges,
+        cam,
+        view,
+        world,
+        viewerOf(world),
+        leadersOf(world),
+        (id, x, y) => {
+          const [px, py] = motion.at(id, x, y, now)
+          const sway = sways.get(id)
+          if (!sway || motion.gliding(id, now)) return [px, py]
+          return [px + sway[0], py + sway[1]]
+        },
+      )
       drawnSpots = spots
+      // Tokens still on their way, and residents at work, ask for another frame.
+      if (motion.moving(now) || sways.size > 0) redraw()
       // A ring round each selected resident; the way ahead only when there is just one.
       const ids = selectedRef.current
       let rings = false

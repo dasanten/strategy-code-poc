@@ -10,6 +10,7 @@ import {
   canWork,
   occupierOf,
   isArmed,
+  npcSoldierTarget,
   onOwnWall,
   type Building,
   type City,
@@ -23,7 +24,7 @@ import { attackOrder } from './combat.js'
 import { commitCrime } from './crimes.js'
 import { checkInvariants } from './invariants.js'
 import { foundNpcCity } from './npc-cities.js'
-import { npcSoldierTarget, stepNpcDefence } from './npc-defence.js'
+import { stepNpcDefence } from './npc-defence.js'
 import { mulberry32, newResident } from './residents.js'
 import { foundTradingPost } from './trading-posts.js'
 import { Walking } from './walking.js'

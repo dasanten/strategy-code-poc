@@ -4,6 +4,8 @@ import {
   CARAVAN_SPREAD,
   CARRIAGE_CAPACITY,
   Terrain,
+  WAREHOUSE_FLOOR,
+  stockFloor,
   stockWeight,
   wrapDistance,
   type Carriage,
@@ -130,8 +132,13 @@ describe('caravans on their route', () => {
       const postWarehouse = routeEnd(world, caravan, 'post').warehouse!
       const hqWarehouse = routeEnd(world, caravan, 'hq').warehouse!
       // Wood and coins stay above the stock floor, so the floor adds none of them on the way.
-      postWarehouse.stock = { coins: 2_000, wood: 30 }
-      hqWarehouse.stock = { wood: 300, iron: 100 }
+      // Every other good stands at the HQ's floor in both, spears ten times that for the army it
+      // arms: nothing runs short, so neither city's own chain (`CONTEXT.md`: Trading post, Trade
+      // Org HQ) uses up wood, and nothing else needs evening out.
+      const floor = stockFloor(world, hqWarehouse)
+      const kept = { ...floor, spear: 10 * (floor.spear ?? 0) }
+      postWarehouse.stock = { ...kept, coins: 2_000, wood: 30, iron: WAREHOUSE_FLOOR.iron }
+      hqWarehouse.stock = { ...kept, wood: 300, iron: 100 }
       const wood = total(world, 'wood')
       const carriage = world.carriages.find((k) => k.id === caravan.carriageId)!
       let reachedPost = false

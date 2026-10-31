@@ -178,7 +178,7 @@ describe('carrying the output', () => {
     const w = addWorker(world, 'w1', camp)
     w.carried = {}
     // Not getting food on their own: only storing the load tops their food up.
-    w.scriptParams = { [WORK]: { foodAt: 0 } }
+    w.scriptParams = { [WORK]: { foodAt: 0, crewFood: 0 } }
     const s = storage(world, 's1', at.x + 1, at.y, { food: 50 })
     world.piles.push({ id: 'p', ...at, goods: { wood: 100 } })
     const load = unitsThatFit(w, 'wood', world.tick)

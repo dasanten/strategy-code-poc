@@ -11,7 +11,9 @@ import {
   type Building,
   type City,
   type NpcCityPrice,
+  type SeenBuilding,
   type Resident,
+  type TradeLimit,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
@@ -20,13 +22,21 @@ import {
   describeCity,
   describeOccupation,
   deliveryCities,
+  holderText,
   npcStoragesInSight,
   previewDelivery,
   previewNpcTrade,
   previewTrade,
   previewTransfer,
+  onTheWay,
+  onTheWayLine,
+  sendable,
   takesTransfers,
+  tradesHere,
+  tradedGoods,
+  tradeLists,
   tradersAt,
+  tradeText,
   warehousesInSight,
 } from './city-view.js'
 
@@ -207,10 +217,46 @@ describe('trading at a warehouse in the inspector', () => {
       horseId: null,
       load: {},
     }
-    expect(previewTrade(seen, 'w1', trader, carriage, 'iron', 2, 0, [])).toEqual({
-      buy: { units: 0, coins: 0 },
-      sell: { units: 0, coins: 0 },
-    })
+    const empty = previewTrade(seen, 'w1', trader, carriage, 'iron', 2, 0, [])
+    expect(empty.buy).toEqual({ units: 0, coins: 0, limit: 'coins' })
+    expect(empty.sell).toEqual({ units: 0, coins: 0, limit: 'held' })
+    expect(empty.holder.stock).toBe(carriage.load)
+  })
+
+  it('says why a trade at the warehouse won’t go, or what cut it down', () => {
+    const q = (carried: Resident['carried'], stock: Building['stock']) =>
+      previewTrade(
+        { ...seen, buildings: [seen.buildings[0]!, { ...warehouse, stock }] },
+        'w1',
+        { ...trader, carried } as Resident,
+        undefined,
+        'iron',
+        5,
+        0,
+        [],
+      )
+    expect(q({ iron: 2 }, { iron: 20, coins: 500 }).buy.limit).toBe('coins')
+    expect(q({ coins: 100 }, { iron: 0, coins: 500 }).buy.limit).toBe('stock')
+    expect(q({ coins: 100 }, { iron: 20, coins: 500 }).sell.limit).toBe('held')
+    expect(q({ iron: 2 }, { iron: 20, coins: 0 }).sell.limit).toBe('theirCoins')
+    expect(q({ coins: 100, stone: 40 }, { iron: 20, coins: 500 }).buy.limit).toBe('room')
+    // Cut down: 3 of the 5 in stock, 2 of the 5 held to sell.
+    const cut = q({ iron: 2, coins: 100 }, { iron: 3, coins: 500 })
+    expect(cut.buy).toMatchObject({ units: 3, limit: 'stock' })
+    expect(cut.sell).toMatchObject({ units: 2, limit: 'held' })
+    // A trade that moves all it asks for names no limit.
+    expect(q({ iron: 9, coins: 100 }, { iron: 20, coins: 500 }).sell.limit).toBe(undefined)
+  })
+
+  it('says what the trader holds and the room left', () => {
+    const hands = previewTrade(seen, 'w1', trader, undefined, 'iron', 1, 0, []).holder
+    expect(holderText(hands, 'iron', 'iron', undefined)).toBe(
+      `Carries 100 coins and 2 iron; room for ${hands.room} kg more (${Math.floor(hands.room)} iron)`,
+    )
+    const load = { stock: { coins: 40, spear: 1 }, room: 10.5 }
+    expect(holderText(load, 'spear', 'spear', 'k1')).toBe(
+      'Carriage k1 holds 40 coins and 1 spear; room for 10.5 kg more (3 spear)',
+    )
   })
 
   it('previews a delivery to and a pick-up from one of the Player’s cities, fee and all', () => {
@@ -318,10 +364,246 @@ describe('trading with an NPC city in the inspector', () => {
     } as unknown as Resident
     const q = (good: 'food' | 'wood', units: number) =>
       previewNpcTrade([food, wood], storage, trader, undefined, good, units, 0, [])
-    expect(q('food', 50).buy).toEqual({ units: 10, coins: 30 })
+    expect(q('food', 50).buy).toEqual({ units: 10, coins: 30, limit: 'stock' })
     expect(q('food', 50).sell.units).toBe(0)
     // It lacks 20 wood, but has only 12 coins: 3 wood at 4 coins.
-    expect(q('wood', 10).sell).toEqual({ units: 3, coins: 12 })
+    expect(q('wood', 10).sell).toEqual({ units: 3, coins: 12, limit: 'theirCoins' })
     expect(q('wood', 10).buy.units).toBe(0)
+  })
+
+  it('says why a trade with an NPC city won’t go, or what cut it down', () => {
+    const trader = (carried: Resident['carried']) =>
+      ({ carried, bornAt: -1e9, stats: { strength: { base: 10, trained: 0 } } }) as never
+    const q = (carried: Resident['carried'], good: 'food' | 'wood') =>
+      previewNpcTrade([food, wood], storage, trader(carried), undefined, good, 50, 0, [])
+    expect(q({ coins: 100 }, 'food').buy).toEqual({ units: 10, coins: 30, limit: 'stock' })
+    expect(q({ coins: 100 }, 'wood').buy.limit).toBe('stock')
+    expect(q({ wood: 1 }, 'food').buy.limit).toBe('coins')
+    expect(q({ coins: 100, stone: 40 }, 'food').buy.limit).toBe('room')
+    expect(q({ food: 5 }, 'food').sell.limit).toBe('unwanted')
+    expect(q({ coins: 5 }, 'wood').sell.limit).toBe('held')
+    // A city that names the Player no prices won't trade with them.
+    const refused = previewNpcTrade(undefined, storage, trader({}), undefined, 'food', 5, 0, [])
+    expect(refused.buy).toEqual({
+      units: 0,
+      coins: 0,
+      limit: 'refused',
+    })
+  })
+})
+
+describe('the trade buttons', () => {
+  it('names the trade, and what cut it down', () => {
+    expect(tradeText('buy', 'iron', { units: 4, coins: 36 }, false)).toBe('Buy 4 iron for 36 coins')
+    expect(tradeText('buy', 'iron', { units: 4, coins: 36, limit: 'coins' }, false)).toBe(
+      'Buy 4 iron for 36 coins: your coins run out',
+    )
+    expect(tradeText('sell', 'wood', { units: 3, coins: 12, limit: 'theirCoins' }, false)).toBe(
+      'Sell 3 wood for 12 coins: its coins run out',
+    )
+  })
+
+  it('says why a trade won’t go', () => {
+    const zero = (limit?: TradeLimit) => ({ units: 0, coins: 0, ...(limit ? { limit } : {}) })
+    expect(tradeText('buy', 'iron', zero('coins'), false)).toBe('Can’t buy iron: no coins in hand')
+    expect(tradeText('buy', 'iron', zero('coins'), true)).toBe(
+      'Can’t buy iron: no coins on the carriage',
+    )
+    expect(tradeText('sell', 'iron', zero('held'), false)).toBe(
+      'Can’t sell iron: nothing of it to sell',
+    )
+    expect(tradeText('buy', 'iron', zero('room'), false)).toBe('Can’t buy iron: no room')
+    expect(tradeText('buy', 'iron', zero('stock'), false)).toBe('Can’t buy iron: none in stock')
+    expect(tradeText('sell', 'food', zero('unwanted'), false)).toBe(
+      'Can’t sell food: it doesn’t want it',
+    )
+    expect(tradeText('buy', 'food', zero('refused'), false)).toBe(
+      'Can’t buy food: it won’t trade with you',
+    )
+    expect(tradeText('buy', 'food', zero(), false)).toBe('Can’t buy food')
+  })
+})
+
+describe('sending a trader in the inspector', () => {
+  const storage = { ...b('s1', 'storage', 'city1'), x: 10, y: 10 }
+  const size = 100
+  const r = (id: string, x: number, y: number, more: Partial<Resident> = {}) =>
+    ({
+      id,
+      name: id,
+      owner: 'realm1',
+      x,
+      y,
+      carried: {},
+      bornAt: -1e9,
+      hunger: 100,
+      health: 100,
+      order: null,
+      ...more,
+    }) as unknown as Resident
+  const carriage = (id: string, x: number, y: number) => ({
+    id,
+    realmId: 'realm1',
+    cityId: null,
+    x,
+    y,
+    horseId: null,
+    load: { iron: 5 },
+  })
+
+  it('lists the Player’s residents and driven carriages nearest first, with what each carries', () => {
+    const far = r('far', 40, 10, { carried: { coins: 50 } })
+    const near = r('near', 13, 14, { carried: { coins: 20, wood: 2 } })
+    const driver = r('driver', 20, 10)
+    const theirs = r('theirs', 11, 10, { owner: 'realm2' } as Partial<Resident>)
+    const there = r('there', 10, 10)
+    const child = r('child', 12, 10, { bornAt: 0 })
+    const list = sendable(
+      storage,
+      {
+        residents: [far, near, driver, theirs, there, child],
+        carriages: [carriage('k1', 20, 10), carriage('k2', 30, 30)],
+      },
+      'realm1',
+      size,
+      0,
+    )
+    expect(list).toEqual([
+      { residentId: 'near', name: 'near', tiles: 5, carries: { coins: 20, wood: 2 } },
+      { residentId: 'driver', name: 'driver', tiles: 10, carries: {} },
+      {
+        residentId: 'driver',
+        carriageId: 'k1',
+        name: 'carriage k1, driven by driver',
+        tiles: 10,
+        carries: { iron: 5 },
+      },
+      { residentId: 'far', name: 'far', tiles: 30, carries: { coins: 50 } },
+    ])
+  })
+
+  it('counts the way round the map edge', () => {
+    const list = sendable(
+      storage,
+      { residents: [r('a', 95, 10)], carriages: [] },
+      'realm1',
+      size,
+      0,
+    )
+    expect(list.map((s) => s.tiles)).toEqual([15])
+  })
+
+  it('finds those on the way and leaves them, and the carriage driven, out of the picker', () => {
+    const walking = r('walking', 30, 10, {
+      order: { kind: 'walkTo', target: { x: 10, y: 10 }, path: null, progress: 0 },
+    } as Partial<Resident>)
+    const driving = r('driving', 20, 10, {
+      order: { kind: 'drive', carriageId: 'k1', target: { x: 10, y: 10 }, path: null, progress: 0 },
+    } as Partial<Resident>)
+    const elsewhere = r('elsewhere', 30, 30, {
+      order: { kind: 'walkTo', target: { x: 50, y: 50 }, path: null, progress: 0 },
+    } as Partial<Resident>)
+    const seen = {
+      residents: [walking, driving, elsewhere, r('rider', 20, 10)],
+      carriages: [carriage('k1', 20, 10)],
+    }
+    expect(onTheWay(storage, seen, 'realm1', size).map((x) => x.id)).toEqual(['walking', 'driving'])
+    expect(sendable(storage, seen, 'realm1', size, 0).map((s) => s.name)).toEqual([
+      'rider',
+      'elsewhere',
+    ])
+  })
+
+  it('says who is on the way and about when they arrive', () => {
+    expect(onTheWayLine('Ann', undefined)).toBe('Ann is on the way')
+    expect(onTheWayLine('Ann', 1e6)).toMatch(/^Ann is on the way, about \d+ h \(/)
+  })
+})
+
+describe('prices from the Player’s side', () => {
+  const lines = PRICED_GOODS.map((good) => ({ good, buy: 2, sell: 5 }))
+  const warehouse = { id: 'w1', kind: 'warehouse' as const, x: 0, y: 0 }
+
+  it('lists every good both ways at a warehouse, its units for sale only when seen inside', () => {
+    const inside = tradeLists(
+      { ...warehouse, prices: lines.map((p) => ({ ...p, stock: p.good === 'food' ? 40 : 0 })) },
+      { buildings: [] },
+    )
+    expect(inside.canBuy.map((l) => l.good)).toEqual(PRICED_GOODS)
+    expect(inside.canBuy[0]).toEqual({ good: 'food', units: 40, price: 5 })
+    // It takes any amount: no units, its buying price.
+    expect(inside.canSell[0]).toEqual({ good: 'food', price: 2 })
+    expect(inside.canSell.map((l) => l.good)).toEqual(PRICED_GOODS)
+    expect(inside.takesOnlyListed).toBe(false)
+    const afar = tradeLists({ ...warehouse, prices: lines }, { buildings: [] })
+    expect(afar.canBuy.every((l) => l.units === undefined)).toBe(true)
+    expect(tradedGoods({ ...warehouse, prices: lines }, afar)).toEqual(PRICED_GOODS)
+  })
+
+  describe('at an NPC city’s storage', () => {
+    // Surplus food, short of wood and stone, iron neither: it won’t trade iron.
+    const prices: NpcCityPrice[] = [
+      { good: 'food', stock: 30, forSale: 10, wanted: 0, buy: 1, sell: 3 },
+      { good: 'wood', stock: 5, forSale: 0, wanted: 20, buy: 4, sell: 6 },
+      { good: 'stone', stock: 0, forSale: 0, wanted: 2, buy: 3, sell: 5 },
+      { good: 'iron', stock: 8, forSale: 0, wanted: 0, buy: 5, sell: 9 },
+    ]
+    const view = { id: 's1', kind: 'storage' as const, x: 0, y: 0, prices }
+
+    it('lists only its surplus to buy and what it is short of to sell, as far as its coins go', () => {
+      // This storage holds 6 of its 10 spare food, and 14 coins: 3 wood at 4, 2 stone at 3.
+      const storage = { ...b('s1', 'storage', 'city1'), stock: { food: 6, coins: 14 } }
+      const lists = tradeLists(view, { buildings: [storage] })
+      expect(lists.canBuy).toEqual([{ good: 'food', units: 6, price: 3 }])
+      expect(lists.canSell).toEqual([
+        { good: 'wood', units: 3, price: 4 },
+        { good: 'stone', units: 2, price: 3 },
+      ])
+      expect(lists.takesOnlyListed).toBe(true)
+      expect(tradedGoods(view, lists)).toEqual(['food', 'wood', 'stone'])
+    })
+
+    it('drops what its coins or this storage can’t cover', () => {
+      const storage = { ...b('s1', 'storage', 'city1'), stock: { coins: 3 } }
+      const lists = tradeLists(view, { buildings: [storage] })
+      expect(lists.canBuy).toEqual([])
+      expect(lists.canSell).toEqual([{ good: 'stone', units: 1, price: 3 }])
+    })
+
+    it('shows the prices without units when the Player doesn’t see inside', () => {
+      const shown = prices.map(({ stock: _, ...p }) => p)
+      const lists = tradeLists(
+        { ...view, prices: shown },
+        { buildings: [b('s1', 'storage', 'city1')] },
+      )
+      expect(lists.canBuy).toEqual([{ good: 'food', price: 3 }])
+      expect(lists.canSell).toEqual([
+        { good: 'wood', price: 4 },
+        { good: 'stone', price: 3 },
+      ])
+    })
+  })
+})
+
+describe('linking How to trade from the inspector', () => {
+  it('links it where the panel shows trading: a warehouse, an NPC storage or a transfer', () => {
+    const post = { ...city(null), tradeOrg: 'post' as const }
+    const prices = PRICED_GOODS.map((good) => ({
+      good,
+      ...priceFor(good, 0, WAREHOUSE_FLOOR[good]),
+    }))
+    const food: NpcCityPrice = { good: 'food', stock: 30, forSale: 10, wanted: 0, buy: 1, sell: 3 }
+    const theirs = city('realm2')
+    const at = (buildings: SeenBuilding[]) => ({ cities: [post], buildings })
+    expect(tradesHere(post, at([{ ...b('w1', 'warehouse', 'city1'), prices }]), 'realm1')).toBe(
+      true,
+    )
+    expect(
+      tradesHere({ ...city(null), trade: [food] }, at([b('s1', 'storage', 'city1')]), 'realm1'),
+    ).toBe(true)
+    expect(tradesHere(theirs, at([b('s1', 'storage', 'city1')]), 'realm1')).toBe(true)
+    // An NPC city that names no prices, or the Player's own city: nothing to trade there.
+    expect(tradesHere(city(null), at([b('s1', 'storage', 'city1')]), 'realm1')).toBe(false)
+    expect(tradesHere(city('realm1'), at([b('s1', 'storage', 'city1')]), 'realm1')).toBe(false)
   })
 })

@@ -455,6 +455,12 @@ export const WORK_FOOD_KEPT = 2
 export const NPC_SOLDIER_SHARE = 0.25
 
 /**
+ * Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
+ * a town of 16 keeps 160, what two mint workers strike in two game days (`RECIPES`).
+ */
+export const NPC_WAR_CHEST_PER_RESIDENT = 10
+
+/**
  * How near to an NPC city's gate, in tiles, an armed outsider makes it close its gates
  * (`CONTEXT.md`: NPC city): a little inside sight, so the gate shuts before they reach it.
  */
@@ -486,6 +492,13 @@ export const PAIRING_WAIT_DAYS = 10
 export const PAIRING_WAIT_TICKS = PAIRING_WAIT_DAYS * TICKS_PER_GAME_DAY
 
 /**
+ * Ticks between a game-run city's planning passes (`CONTEXT.md`: NPC city; ADR 0016): a game
+ * hour, so a city reacts to a change within a real minute. Cities are staggered by their id, so
+ * about one plans per tick.
+ */
+export const NPC_PLAN_TICKS = 60
+
+/**
  * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
  * materials to the site, building or tearing down. The others keep working.
  */
@@ -513,10 +526,60 @@ export const NPC_WALL_TILES_PER_TRIP = 4
 export const NPC_NODE_REACH = 160
 
 /**
+ * How far from its home a Trade Org warehouse may be for an NPC city to send its trader there
+ * (`CONTEXT.md`: NPC trader), in tiles: about a game day and a half's walk on plains each way.
+ */
+export const NPC_TRADER_REACH = 720
+
+/**
+ * Game days after it left that an NPC city stops waiting for its trader (`CONTEXT.md`: NPC
+ * trader): dead, robbed or stuck, they are dropped from its plan and it may send another.
+ * Several times the longest trade run (`NPC_TRADER_REACH` there and back).
+ */
+export const NPC_TRADER_GIVE_UP_DAYS = 10
+
+/**
  * How far beyond its wall an NPC city looks for Plains to lay out a new farm on, in tiles. Farms
  * go beyond where its next wall would stand.
  */
 export const NPC_FARM_REACH = 48
+
+/**
+ * Game days an NPC city must have been full before it founds a daughter (`CONTEXT.md`: Full
+ * city): a game week of idle spare hands and nothing short.
+ */
+export const NPC_FULL_DAYS = 7
+
+/**
+ * Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
+ * Founding), once a game day: enough to find free Plains on most maps, cheap enough to do while
+ * it waits.
+ */
+export const NPC_FOUND_SAMPLES = 200
+
+/**
+ * How far from its home a full NPC city looks for its daughter's site, in tiles (`CONTEXT.md`:
+ * Founding): twice the usual distance between cities, about five game days' walk on Plains.
+ */
+export const NPC_FOUND_REACH = 960
+
+/**
+ * Game days of Food a founding party's member carries for their first weeks at the site
+ * (`CONTEXT.md`: Founding), besides the Food for twice the walk there.
+ */
+export const NPC_FOUND_FOOD_DAYS = 20
+
+/**
+ * Game days after setting out that a founding party whose town hall doesn't stand gives up and
+ * walks home (`CONTEXT.md`: Founding); the mother may try again once it is full again.
+ */
+export const NPC_FOUND_GIVE_UP_DAYS = 20
+
+/**
+ * The standing a daughter and its mother start at toward each other (`CONTEXT.md`: Founding):
+ * high, of `STANDING_RANGE`, fading like any standing.
+ */
+export const NPC_FOUND_STANDING = 80
 
 /**
  * What the Trade Org HQ is placed with (`CONTEXT.md`: Trade Org HQ): a round city, the largest on
@@ -811,6 +874,31 @@ export const GET_FOOD_AT = Math.ceil(FOOD_PER_DAY)
 
 /** The default of `foodTake` in those defaults, in whole units: six game days of Food. */
 export const GET_FOOD_TAKE = Math.ceil(6 * FOOD_PER_DAY)
+
+/**
+ * The default of `crewFood` in the Work default (`CONTEXT.md`: Crew food), in whole units: the
+ * Food the workplace's pile keeps for its crew, which the carrier tops up on the way back from
+ * storing a load. About six days for a crew of six, ten for one of four, and well inside a load.
+ * 0 brings none.
+ */
+export const CREW_FOOD = 20
+
+/**
+ * Game days of work a resident an NPC city sends to a workplace sets out with Food for, on top
+ * of the walk there and back (`setOutFood`; `CONTEXT.md`: Crew food, NPC city): enough to last
+ * until the carrier's first round trip brings the crew's Food.
+ */
+export const SET_OUT_WORK_DAYS = 3
+
+/**
+ * Units of Food a resident sent to a workplace sets out with (`CONTEXT.md`: Crew food): twice a
+ * walk of `walkTicks` ticks plus `SET_OUT_WORK_DAYS` of work, at `FOOD_PER_DAY`, in whole units
+ * rounded up. Never less than their own food (`OWN_FOOD`).
+ */
+export function setOutFood(walkTicks: number): number {
+  const days = (2 * walkTicks) / TICKS_PER_GAME_DAY + SET_OUT_WORK_DAYS
+  return Math.max(OWN_FOOD, Math.ceil(days * FOOD_PER_DAY))
+}
 
 /**
  * Food a resident running the Breed horses default takes from the stable before they start, if
@@ -1973,3 +2061,6 @@ export const RESIDENT_NAME_MAX_LENGTH = 30
 
 /** The longest name a Player may give a city of their realm, in characters after trimming. */
 export const CITY_NAME_MAX_LENGTH = 30
+
+/** The longest name a Player may give a horse of their realm, in characters after trimming (`CONTEXT.md`: Renaming a horse). */
+export const HORSE_NAME_MAX_LENGTH = 30

@@ -370,6 +370,7 @@ describe('capturing a city', () => {
       y: 21,
       hunger: 100,
       health: 100,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })
@@ -415,6 +416,7 @@ describe('capturing a city', () => {
       y: 40,
       hunger: 100,
       health: 100,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })
@@ -426,6 +428,7 @@ describe('capturing a city', () => {
       y: 40,
       hunger: 100,
       health: 100,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })

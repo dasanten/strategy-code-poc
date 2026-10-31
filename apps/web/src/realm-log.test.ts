@@ -36,6 +36,21 @@ describe('realm log', () => {
       text: 'Mara’s horse is hungry, and Mara carries no Food to spare for it.',
       tone: 'warn',
     })
+    // Horses have names (`CONTEXT.md`: Horse name); entries from before say "a horse".
+    expect(describeEvent({ ...horseHungry, horseName: 'Ember', seq: 6, ...at }).text).toBe(
+      'Mara’s horse Ember is hungry, and Mara carries no Food to spare for it.',
+    )
+    const starved = { kind: 'horseDied', horseId: 'h1', seq: 7, ...at } as const
+    expect(describeEvent({ ...starved, name: 'Ember' })).toEqual({
+      text: 'Your horse Ember starved to death.',
+      tone: 'bad',
+    })
+    expect(describeEvent(starved).text).toBe('A horse starved to death.')
+    const foaled = { kind: 'foaled', horseId: 'h2', stableId: 's1', seq: 8, ...at } as const
+    expect(describeEvent({ ...foaled, name: 'Flint' }).text).toBe(
+      'A foal, Flint, was born in a stable.',
+    )
+    expect(describeEvent(foaled).text).toBe('A foal was born in a stable.')
   })
 
   it('describes a script’s trouble', () => {
