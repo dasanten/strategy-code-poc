@@ -9,13 +9,13 @@ export class ClientView<T extends { id: string } = SeenEntity> {
   private sent = new Map<string, string>()
 
   /** Everything in sight, for the welcome message; remembers it as sent. */
-  initial(entities: T[]): T[] {
+  initial(entities: readonly T[]): T[] {
     this.sent.clear()
     for (const e of entities) this.sent.set(e.id, JSON.stringify(e))
-    return entities
+    return [...entities]
   }
 
-  diff(entities: T[]): { changed: T[]; gone: string[] } {
+  diff(entities: readonly T[]): { changed: T[]; gone: string[] } {
     const changed: T[] = []
     const seen = new Set<string>()
     for (const e of entities) {

@@ -40,6 +40,8 @@ describe('runTick', () => {
       phases: expect.any(Object),
       residents: 8,
       actions: 8,
+      // Last seen works out once what the one realm sees.
+      sightBuilds: 1,
       slow: false,
     })
     expect(reporter.tickHealth).toHaveBeenCalledWith(world, health)

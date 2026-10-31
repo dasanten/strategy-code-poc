@@ -19,10 +19,16 @@ import { ExploredTerrain } from './explored.js'
 import { stepAlliances } from './alliances.js'
 import {
   SightTracker,
+  closeSight,
   entitiesInSight,
+  newSightPhase,
+  openSight,
+  placesInSight,
   seenScript,
   sentInsideUnseen,
   sentOutOfSight,
+  sightOf,
+  withSight,
 } from './sight.js'
 import { foundStartingCity } from './starting-city.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
@@ -110,6 +116,65 @@ describe('entitiesInSight', () => {
     Object.assign(watcher, { x: 1, y: 100 })
     Object.assign(walker, { x: terrain.size - 3, y: 100, owner: 'someone-else' })
     expect(entitiesInSight(world, terrain, realm.id).map((e) => e.id)).toContain(walker.id)
+  })
+})
+
+describe('SightCache', () => {
+  it('works out what a side sees once per phase, shares it frozen, and sees afresh in the next', () => {
+    const { world } = worldWithCity()
+    const realm = world.realms[0]!
+    const uncached = entitiesInSight(world, terrain, realm.id)
+    // Without a cache, each caller gets their own.
+    expect(entitiesInSight(world, terrain, realm.id)).not.toBe(uncached)
+
+    const cache = openSight(world, terrain.size)
+    try {
+      const seen = entitiesInSight(world, terrain, realm.id)
+      expect(seen).toEqual(uncached)
+      // Sync, scripts and Last seen share one list, and one working out of who sees what.
+      expect(entitiesInSight(world, terrain, realm.id)).toBe(seen)
+      sightOf(world, terrain.size, realm.id)(world.residents[0]!)
+      const { seen: places } = placesInSight(world, terrain.size, realm.id)
+      expect(places).toEqual(seen.filter((e) => e.is === 'building' || e.is === 'city'))
+      expect(cache.builds).toBe(1)
+      // Nobody can change what the next caller gets.
+      expect(Object.isFrozen(seen)).toBe(true)
+      expect(seen.every((e) => Object.isFrozen(e))).toBe(true)
+      expect(() => (seen[0] as { x: number }).x++).toThrow(TypeError)
+      // An invariant works its own out.
+      expect(placesInSight(world, terrain.size, realm.id, { afresh: true }).seen).not.toBe(places)
+      expect(cache.builds).toBe(1)
+
+      // Everyone walks off: the next phase sees that, the last one never would.
+      for (const r of world.residents) Object.assign(r, { x: (r.x + 150) % terrain.size })
+      expect(entitiesInSight(world, terrain, realm.id)).toBe(seen)
+      newSightPhase(world)
+      const away = entitiesInSight(world, terrain, realm.id)
+      expect(away.map((e) => e.is).sort()).toEqual(world.residents.map(() => 'resident'))
+      expect(cache.builds).toBe(2)
+    } finally {
+      closeSight(world)
+    }
+    expect(entitiesInSight(world, terrain, realm.id)).not.toBe(
+      entitiesInSight(world, terrain, realm.id),
+    )
+  })
+
+  it('is opened for the call alone by `withSight` unless one is open', () => {
+    const { world } = worldWithCity()
+    const realm = world.realms[0]!
+    const twice = withSight(world, terrain.size, () => [
+      entitiesInSight(world, terrain, realm.id),
+      entitiesInSight(world, terrain, realm.id),
+    ])
+    expect(twice[0]).toBe(twice[1])
+    const cache = openSight(world, terrain.size)
+    withSight(world, terrain.size, () => entitiesInSight(world, terrain, realm.id))
+    expect(entitiesInSight(world, terrain, realm.id)).toBe(
+      withSight(world, terrain.size, () => entitiesInSight(world, terrain, realm.id)),
+    )
+    expect(cache.builds).toBe(1)
+    closeSight(world)
   })
 })
 

@@ -28,7 +28,6 @@ import {
   type RunningScript,
   type ScriptMemory,
   type ScriptRunBy,
-  type SeenEntity,
   type StartParamValues,
   type TerrainMap,
   type WorldState,
@@ -55,7 +54,7 @@ import {
   startParamsProblem,
   withTargetParam,
 } from './script-params.js'
-import { entitiesInSight, sightOf } from './sight.js'
+import { entitiesInSight, withSight } from './sight.js'
 import { realmOf } from './starting-city.js'
 import { worldIndex } from './world-index.js'
 
@@ -569,14 +568,16 @@ export class ScriptRunner {
     const used = new Map<number, { source: string; program: Program }>()
     // Those whose script ran this tick, not skipped for the realm's budget.
     const ran = new Set<string>()
-    for (const realm of world.realms) {
-      // A bug of the game's in one realm's scripts never stops the other realms' or the tick.
-      try {
-        this.runRealm(world, realm, byRealm.get(realm.id), used, ran, check ? out : undefined)
-      } catch (error) {
-        this.host.scriptError?.(world, error, { realmId: realm.id, entityIds: [] })
+    withSight(world, this.terrain.size, () => {
+      for (const realm of world.realms) {
+        // A bug of the game's in one realm's scripts never stops the other realms' or the tick.
+        try {
+          this.runRealm(world, realm, byRealm.get(realm.id), used, ran, check ? out : undefined)
+        } catch (error) {
+          this.host.scriptError?.(world, error, { realmId: realm.id, entityIds: [] })
+        }
       }
-    }
+    })
     this.programs = used
     if (check) {
       out.push(...runningScriptsSound(world), ...scriptParamsSound(world))
@@ -601,9 +602,8 @@ export class ScriptRunner {
   ): void {
     const sender = this.host.sender(realm.userId)
     if (!running || !sender) return
-    let seen: SeenEntity[] | undefined
-    const seenOnce = () => (seen ??= entitiesInSight(world, this.terrain, realm.id))
-    const sees = seesOnce(world, this.terrain, realm.id)
+    // Worked out once for the realm this phase and shared (`SightCache`, opened by `runAll`).
+    const seen = () => entitiesInSight(world, this.terrain, realm.id)
     let left = SCRIPT_REALM_STEP_BUDGET
     const first = world.tick % running.length
     for (let i = 0; i < running.length; i++) {
@@ -618,16 +618,7 @@ export class ScriptRunner {
       ran.add(r.id)
       const steps = Math.min(SCRIPT_STEP_BUDGET, left)
       try {
-        left -= this.runOne(
-          world,
-          realm,
-          sender,
-          r,
-          steps,
-          { seen: seenOnce, sees },
-          used,
-          violations,
-        )
+        left -= this.runOne(world, realm, sender, r, steps, { seen }, used, violations)
       } catch (error) {
         // The game's own bug, not the script's: it ends this one script and the tick goes on.
         left -= steps
@@ -662,7 +653,7 @@ export class ScriptRunner {
     sender: OrderSender,
     r: Runner,
     steps: number,
-    { seen, sees }: Pick<ScriptContext, 'seen' | 'sees'>,
+    { seen }: Pick<ScriptContext, 'seen'>,
     used: Map<number, { source: string; program: Program }>,
     violations: InvariantViolation[] | undefined,
   ): number {
@@ -698,7 +689,7 @@ export class ScriptRunner {
         scriptId,
       })
       running.scriptId = 0
-      return this.runOne(world, realm, sender, r, steps, { seen, sees }, used, violations)
+      return this.runOne(world, realm, sender, r, steps, { seen }, used, violations)
     }
     if (!script || script.userId !== realm.userId) {
       // Deleted, or the resident now belongs to another Player, whose script it isn't.
@@ -731,7 +722,6 @@ export class ScriptRunner {
       memory,
       params,
       seen,
-      sees,
       explored: (x, y) => this.host.explored(realm.userId, x, y),
       kinds: this.kinds,
     })
@@ -966,7 +956,9 @@ export function runNpcScripts(
     list.push(r)
     byCity.set(city, list)
   }
-  for (const [city, people] of byCity) runCityScripts(world, terrain, city, people, kinds)
+  withSight(world, terrain.size, () => {
+    for (const [city, people] of byCity) runCityScripts(world, terrain, city, people, kinds)
+  })
 }
 
 function runCityScripts(
@@ -977,9 +969,8 @@ function runCityScripts(
   kinds: Record<string, OrderKind>,
 ): void {
   const sender = npcSender(city)
-  let seen: SeenEntity[] | undefined
-  const seenOnce = () => (seen ??= entitiesInSight(world, terrain, city.id))
-  const sees = seesOnce(world, terrain, city.id)
+  // Worked out once for the city this phase and shared (`SightCache`, opened by `runNpcScripts`).
+  const seen = () => entitiesInSight(world, terrain, city.id)
   for (const r of people) {
     const running = r.script
     // Its script may have ended this tick; a resident lent out is run by the hirer.
@@ -994,8 +985,7 @@ function runCityScripts(
       sender,
       residentId: r.id,
       memory,
-      seen: seenOnce,
-      sees,
+      seen,
       explored: () => true,
       kinds,
       // Nobody picks values for an NPC city: its defaults fall back on their own.
@@ -1120,10 +1110,4 @@ function oneAwayAtATime(
     byKey.set(at, ids)
   }
   return [...byKey].filter(([, ids]) => ids.length > 1)
-}
-
-/** What a realm or an NPC city sees (`sightOf`), worked out once when first asked. */
-function seesOnce(world: WorldState, terrain: TerrainMap, side: string) {
-  let sight: ((at: { x: number; y: number }) => boolean) | undefined
-  return (at: { x: number; y: number }) => (sight ??= sightOf(world, terrain.size, side))(at)
 }
