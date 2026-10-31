@@ -81,6 +81,12 @@ The shared language of the game. Domain terms only — no implementation details
   takes a load (beside their own food; a farm keeps some Food for refills) to the nearest storage
   of their realm, stores it and comes back to work; only one carries at a time. With no storage
   in reach the pile just grows.
+- **Crew food:** on the way back from storing a load, the carrier brings Food for the whole crew
+  and puts it on the workplace's pile, where the workers take their meals (Refilling at a
+  workplace). So a far-off crew keeps working while one of them walks, and nobody else goes
+  home for Food. How much they bring is a setting of the Work default (`crewFood`); 0 brings
+  none. A resident sent to a workplace sets out with Food for the walk there and the first days
+  of work, not a fixed amount, so they last until the carrier's first round trip.
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
 - **Spoilage:** Food slowly goes bad. Other goods don't.
@@ -143,12 +149,17 @@ The shared language of the game. Domain terms only — no implementation details
   the old rings. The world starts out with it, as far from
   every city as the map allows and out of every Player's sight; starting cities keep well away
   from it. Its own workplaces stand on the nearest node of every kind, with a smelter and a mint
-  between its rings, and the game runs it like an NPC city.
+  between its rings, and the game runs it like an NPC city: its warehouses' stock floor is its
+  reserve, and its spare hands work and build the chain for whatever is short of it (NPC city),
+  so less of its stock comes from the floor. It never founds cities and sends no trader; its
+  caravans carry its goods.
 - **Warehouse:** a Trade Org building that keeps goods like a storage, a city building of the
   storage kind. The HQ keeps its coins in one and its other goods in another, inside the inner
   ring.
 - **Trading post:** a small Trade Org city in a region, with a warehouse, so Players can trade
-  nearby. Goods move between posts and HQ by caravan. It keeps soldiers like an NPC city, armed
+  nearby. Goods move between posts and HQ by caravan. Its few spare hands work and build the
+  chain for what is short of its warehouse's floor, like the HQ, but it never grows in people,
+  founds nothing and sends no trader. It keeps soldiers like an NPC city, armed
   from its warehouse, so it is captured only by beating them; they fight attackers in its area,
   and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
   A captured post joins the captor's realm like any city and leaves the Trade Organization: its
@@ -168,11 +179,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Trading with an NPC city:** only in person, by a resident (or a carriage) on the tile of an
   NPC city's storage, exactly like trading at a warehouse: it happens at once, goods and coins
   move between the trader's hands (or carriage) and the storage, and a trade is cut down to what
-  the trader holds, what the storage holds and what fits. The city keeps a **reserve** of each
-  good: Food for some game days for all its residents, and the materials its next house and some
-  wall need. It sells only its surplus, what its storages hold above the reserve, and buys only
-  goods it is short of, up to the reserve and with the coins in its storage; other goods it
-  doesn't take. Its prices come from its own stock the way warehouse prices do (buying lower
+  the trader holds, what the storage holds and what fits. It sells only its surplus, what its
+  storages hold above its reserve (NPC reserve), and buys only goods it is short of, up to the
+  reserve and with the coins in its storage; other goods it doesn't take. Its prices come from
+  its own stock the way warehouse prices do (buying lower
   than it sells, each unit priced with its stock as it moves), then its standing toward the
   trader moves them like the city price: the better, the cheaper it sells and the more it pays.
   Anyone with a resident in sight of the storage sees its prices. A trade raises its standing
@@ -300,13 +310,20 @@ The shared language of the game. Domain terms only — no implementation details
   NPC city, in the area of that city.
 - **NPC city:** a city run by the game. Self-managed cities are NPC cities. On its own it works
   its farms and workplaces and carries the output to its storage like anyone working a workplace
-  (Carrying the output, to the nearest storage of that city; its workers take food from
-  the storage before they set out and come home for more when they run low), pairs its adults,
-  builds a house when it has a food surplus and no free housing, and puts more residents on farms (or
-  builds a farm, when every farm is full) when Food runs short. When it needs a material it has no
-  workplace for (Wood for walls and houses), it builds the matching workplace on the nearest
-  fitting resource node and works it like its other workplaces, carrying the output to its
-  storage. It never founds new cities: when it has no room left inside its wall it grows its area
+  (Carrying the output, to the nearest storage of that city; its workers set out with Food for
+  the walk and the first days, and the carrier brings the crew's Food back: Crew food), pairs its adults,
+  builds a house when it has a food surplus and no free housing, and shares its adults out:
+  soldiers by its size first; then farmers, as many as feed everyone (one farmer feeds about
+  four) and one more while it has no food surplus, building a farm when they don't fit; then at
+  most two builders while it has a project; everyone else is its **spare hands**. A worker stays
+  where they are until the city moves them. Beyond that it is driven by its
+  reserve (NPC reserve): its spare hands go to the good shortest of its reserve first; they work
+  the workplace that makes the good, or build it first on the nearest fitting resource node
+  (within a set reach of its home) and work it like its other workplaces, carrying the output to
+  its storage (Crew food). So a city builds the whole chain its land allows, one need at a time:
+  weapons short means a smithy, which wants Iron, so a smelter, which wants ore, so a mine. A
+  good with no node in reach stays short; the city buys it from its trader or a visiting trader,
+  or does without. When it has no room left inside its wall it grows its area
   by building on the edge, puts up a new wall 8 tiles further out on every side, with the gate in
   the same place, and only once every tile of the new wall is finished tears down the old one.
   Its residents stand on its walls and pass its gates as a realm's do. It keeps some soldiers by
@@ -314,6 +331,31 @@ The shared language of the game. Domain terms only — no implementation details
   gates when armed outsiders come near. A Player does the same by hand, if they want to. The world starts out with NPC villages
   and towns, on Plains, far from every starting city and from each other, and out of every
   Player's sight.
+- **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
+  some game days for all its residents; Wood and Stone for its next house and some wall; weapons
+  for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
+  chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, a mint
+  only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
+  for sale (Trading with an NPC city); whatever is below is short and drives what it works and
+  builds next (NPC city).
+- **NPC trader:** an NPC city's own trade run. Once a good's surplus makes a full load and a
+  Trade Org warehouse (HQ or trading post) lies within a set reach, one of its spare hands,
+  never a soldier, carries the load there, sells it, buys the good shortest of the reserve that
+  the city has no node for, as far as its coins and their arms allow, and walks home to the
+  storage. One trader per city at a time. Nothing protects them on the way but what they carry.
+- **Full city:** an NPC city that for a whole game week has had idle spare hands and nothing
+  short of its reserve, holds a food surplus, and holds a town hall's and a storage's materials
+  above its reserve. A full city founds a daughter (Founding).
+- **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
+  from every city, within a set reach of itself and on no realm's territory, nearest a node of
+  the good it is short of and has no node for. A **founding party** of a village's worth of
+  adults, one of them armed, each carrying a share of the materials and Food for the walk and
+  the first weeks, walks there and builds the town hall, which founds the **daughter** as an
+  ordinary NPC city with a name from the game; then its storage, a farm and a house. Its first
+  wall comes later out of its own reserve, a ring round its home. Mother and daughter are
+  independent and hold each other in high standing, which fades like any standing; neither
+  shares anything with the other. A city founds again once it is full again. Trading posts and
+  the Trade Org HQ never found cities.
 - **Integrating:** bringing a village or city into your realm, with its residents. Three ways:
   **conquer** it (capture by force), **buy** it, or **persuade** it (with high standing and
   respect it asks to join).

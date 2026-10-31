@@ -18,7 +18,9 @@ later the same day: Scripts started directly (41, ADR 0014), Script debugging (4
 library tidy-up (43) come right after Script params (36). So: 35, 40, 36, 41, 42, 43, 37, 38,
 39, then Bandits. Agreed with Daniel on 2026-10-30: the bugs #508–#510 first, then Server
 hardening (Epic 44, the nine findings of the 2026-10-30 security review), Quick wins 3 (45),
-Horses and food (46) and Under attack (47), in that order, all ahead of Bandits.
+Horses and food (46) and Under attack (47), in that order, all ahead of Bandits. Agreed with
+Daniel on 2026-10-31: NPC ambitions (Epic 48, ADR 0016, `docs/proposals/npc-ambitions.md`) next,
+ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -70,6 +72,7 @@ I sleep.
 | 45  | [Quick wins 3](https://github.com/dasanten/strategy-code-poc/issues/522)                      | ticketed                |
 | 46  | [Horses and food](https://github.com/dasanten/strategy-code-poc/issues/527)                   | ticketed                |
 | 47  | [Under attack](https://github.com/dasanten/strategy-code-poc/issues/531)                      | ticketed                |
+| 48  | [NPC ambitions](https://github.com/dasanten/strategy-code-poc/issues/567)                     | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
