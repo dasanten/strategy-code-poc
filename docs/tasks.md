@@ -25,7 +25,10 @@ Agreed with Daniel on 2026-10-31, once its tickets were written: Cheaper ticks (
 server-load review of the same day) comes right after NPC ambitions, ahead of everything agreed
 for after it. Agreed with Daniel later on 2026-10-31: then Quick wins 4 (Epic 50: the whole
 footprint workable, smooth movement on the map, horse names and a Horses drawer), Saved queues and
-repeats (51) and Training (52), in that order, all ahead of Bandits.
+repeats (51) and Training (52), in that order, all ahead of Bandits. Agreed with Daniel later on
+2026-10-31: then Clear trading (Epic 53: the trade section explains itself) and Holding the town
+hall (54, ADR 0017: a city is captured by occupying its town hall for some game days), in that
+order, both ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -82,6 +85,8 @@ I sleep.
 | 50  | [Quick wins 4](https://github.com/dasanten/strategy-code-poc/issues/582)                      | ticketed                |
 | 51  | [Saved queues and repeats](https://github.com/dasanten/strategy-code-poc/issues/588)          | ticketed                |
 | 52  | [Training](https://github.com/dasanten/strategy-code-poc/issues/592)                          | ticketed                |
+| 53  | [Clear trading](https://github.com/dasanten/strategy-code-poc/issues/631)                     | ticketed                |
+| 54  | [Holding the town hall](https://github.com/dasanten/strategy-code-poc/issues/632)             | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
