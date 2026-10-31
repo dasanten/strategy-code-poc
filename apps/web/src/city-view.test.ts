@@ -22,6 +22,8 @@ import {
   previewTrade,
   previewTransfer,
   takesTransfers,
+  tradedGoods,
+  tradeLists,
   tradersAt,
   warehousesInSight,
 } from './city-view.js'
@@ -279,5 +281,70 @@ describe('trading with an NPC city in the inspector', () => {
     // It lacks 20 wood, but has only 12 coins: 3 wood at 4 coins.
     expect(q('wood', 10).sell).toEqual({ units: 3, coins: 12 })
     expect(q('wood', 10).buy.units).toBe(0)
+  })
+})
+
+describe('prices from the Player’s side', () => {
+  const lines = PRICED_GOODS.map((good) => ({ good, buy: 2, sell: 5 }))
+  const warehouse = { id: 'w1', kind: 'warehouse' as const, x: 0, y: 0 }
+
+  it('lists every good both ways at a warehouse, its units for sale only when seen inside', () => {
+    const inside = tradeLists(
+      { ...warehouse, prices: lines.map((p) => ({ ...p, stock: p.good === 'food' ? 40 : 0 })) },
+      { buildings: [] },
+    )
+    expect(inside.canBuy.map((l) => l.good)).toEqual(PRICED_GOODS)
+    expect(inside.canBuy[0]).toEqual({ good: 'food', units: 40, price: 5 })
+    // It takes any amount: no units, its buying price.
+    expect(inside.canSell[0]).toEqual({ good: 'food', price: 2 })
+    expect(inside.canSell.map((l) => l.good)).toEqual(PRICED_GOODS)
+    expect(inside.takesOnlyListed).toBe(false)
+    const afar = tradeLists({ ...warehouse, prices: lines }, { buildings: [] })
+    expect(afar.canBuy.every((l) => l.units === undefined)).toBe(true)
+    expect(tradedGoods({ ...warehouse, prices: lines }, afar)).toEqual(PRICED_GOODS)
+  })
+
+  describe('at an NPC city’s storage', () => {
+    // Surplus food, short of wood and stone, iron neither: it won’t trade iron.
+    const prices: NpcCityPrice[] = [
+      { good: 'food', stock: 30, forSale: 10, wanted: 0, buy: 1, sell: 3 },
+      { good: 'wood', stock: 5, forSale: 0, wanted: 20, buy: 4, sell: 6 },
+      { good: 'stone', stock: 0, forSale: 0, wanted: 2, buy: 3, sell: 5 },
+      { good: 'iron', stock: 8, forSale: 0, wanted: 0, buy: 5, sell: 9 },
+    ]
+    const view = { id: 's1', kind: 'storage' as const, x: 0, y: 0, prices }
+
+    it('lists only its surplus to buy and what it is short of to sell, as far as its coins go', () => {
+      // This storage holds 6 of its 10 spare food, and 14 coins: 3 wood at 4, 2 stone at 3.
+      const storage = { ...b('s1', 'storage', 'city1'), stock: { food: 6, coins: 14 } }
+      const lists = tradeLists(view, { buildings: [storage] })
+      expect(lists.canBuy).toEqual([{ good: 'food', units: 6, price: 3 }])
+      expect(lists.canSell).toEqual([
+        { good: 'wood', units: 3, price: 4 },
+        { good: 'stone', units: 2, price: 3 },
+      ])
+      expect(lists.takesOnlyListed).toBe(true)
+      expect(tradedGoods(view, lists)).toEqual(['food', 'wood', 'stone'])
+    })
+
+    it('drops what its coins or this storage can’t cover', () => {
+      const storage = { ...b('s1', 'storage', 'city1'), stock: { coins: 3 } }
+      const lists = tradeLists(view, { buildings: [storage] })
+      expect(lists.canBuy).toEqual([])
+      expect(lists.canSell).toEqual([{ good: 'stone', units: 1, price: 3 }])
+    })
+
+    it('shows the prices without units when the Player doesn’t see inside', () => {
+      const shown = prices.map(({ stock: _, ...p }) => p)
+      const lists = tradeLists(
+        { ...view, prices: shown },
+        { buildings: [b('s1', 'storage', 'city1')] },
+      )
+      expect(lists.canBuy).toEqual([{ good: 'food', price: 3 }])
+      expect(lists.canSell).toEqual([
+        { good: 'wood', price: 4 },
+        { good: 'stone', price: 3 },
+      ])
+    })
   })
 })

@@ -29,10 +29,14 @@ import {
   previewTrade,
   previewTransfer,
   takesTransfers,
+  tradedGoods,
+  tradeLists,
   tradersAt,
   warehousesInSight,
   type BuyView,
   type DeliveryCity,
+  type TradeLine,
+  type TradeLists,
   type TradersView,
   type WarehouseView,
 } from './city-view.js'
@@ -135,7 +139,7 @@ export function CityInspector({
               <p className="city-details">
                 {v.residents} {v.residents === 1 ? 'resident' : 'residents'} in sight
                 {v.buildings.length > 0 &&
-                  ` Â· ${v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}`}
+                  ` · ${v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}`}
               </p>
             )}
             {openId === v.id &&
@@ -144,9 +148,10 @@ export function CityInspector({
                 { cities, buildings },
               ).map((w) => (
                 <div key={w.id} data-trade-at={w.id}>
-                  <Prices warehouse={w} />
+                  <Prices warehouse={w} lists={tradeLists(w, { buildings })} />
                   <Trading
                     warehouse={w}
+                    goods={tradedGoods(w, tradeLists(w, { buildings }))}
                     traders={tradersAt(w, { residents, carriages }, realmId)}
                     deliveryCities={deliveryCities({ cities, buildings }, realmId)}
                     preview={(resident, carriage, good, units) =>
@@ -203,9 +208,10 @@ export function CityInspector({
                 { buildings },
               ).map((s) => (
                 <div key={s.id} data-trade-at={s.id}>
-                  <Prices warehouse={s} place="Storage" />
+                  <Prices warehouse={s} lists={tradeLists(s, { buildings })} place="Storage" />
                   <Trading
                     warehouse={s}
+                    goods={tradedGoods(s, tradeLists(s, { buildings }))}
                     place="storage"
                     traders={tradersAt(s, { residents, carriages }, realmId)}
                     deliveryCities={[]}
@@ -309,10 +315,10 @@ function RememberedCity({
             </p>
           )}
           {warehousesInSight(city, lastSeen).map((w) => (
-            <Prices key={w.id} warehouse={w} />
+            <Prices key={w.id} warehouse={w} lists={tradeLists(w, lastSeen)} />
           ))}
           {npcStoragesInSight(city, lastSeen).map((s) => (
-            <Prices key={s.id} warehouse={s} place="Storage" />
+            <Prices key={s.id} warehouse={s} lists={tradeLists(s, lastSeen)} place="Storage" />
           ))}
         </div>
       )}
@@ -334,7 +340,7 @@ function Reaction({ city }: { city: SeenCity }) {
           are shut to your residents.
         </p>
       )}
-      {city.wontSell && <p>It wonât sell itself to you.</p>}
+      {city.wontSell && <p>It won’t sell itself to you.</p>}
     </div>
   )
 }
@@ -397,35 +403,68 @@ function Gates({
   )
 }
 
-/** A warehouse's prices: per good, what it holds, what it pays and what it asks, in coins. */
+/**
+ * A warehouse's or an NPC city's storage's prices from the Player's side (`CONTEXT.md`: Trade
+ * section): what they can buy there and what they can sell, with units where they see them and
+ * the price of each in coins. An NPC city says it takes nothing else.
+ */
 function Prices({
   warehouse,
+  lists,
   place = 'Warehouse',
 }: {
   warehouse: WarehouseView
+  lists: TradeLists
   /** What it is called: a Trade Org warehouse or an NPC city's storage. */
   place?: 'Warehouse' | 'Storage'
 }) {
+  const at = `${place} at (${warehouse.x}, ${warehouse.y})`
   return (
-    <table className="warehouse-prices" aria-label={`${place} at (${warehouse.x}, ${warehouse.y})`}>
-      <caption>
-        {place} at ({warehouse.x}, {warehouse.y}): prices in coins
-      </caption>
+    <div className="warehouse-prices" aria-label={at}>
+      <p className="warehouse-prices-place">{at}</p>
+      <PriceList
+        title="You can buy"
+        lines={lists.canBuy}
+        none={lists.takesOnlyListed ? 'It has nothing to spare.' : 'Nothing.'}
+      />
+      <PriceList
+        title="You can sell"
+        lines={lists.canSell}
+        none={lists.takesOnlyListed ? 'It takes nothing.' : 'Nothing.'}
+      />
+      {lists.takesOnlyListed && lists.canSell.length > 0 && (
+        <p className="small muted">It takes nothing else.</p>
+      )}
+    </div>
+  )
+}
+
+/** One side of the prices: per good, the units (where known) and the price of each in coins. */
+function PriceList({ title, lines, none }: { title: string; lines: TradeLine[]; none: string }) {
+  if (lines.length === 0) {
+    return (
+      <p className="small">
+        <strong>{title}:</strong> {none}
+      </p>
+    )
+  }
+  const units = lines.some((l) => l.units !== undefined)
+  return (
+    <table aria-label={title}>
+      <caption>{title}</caption>
       <thead>
         <tr>
           <th scope="col">Good</th>
-          <th scope="col">Stock</th>
-          <th scope="col">Buys at</th>
-          <th scope="col">Sells at</th>
+          {units && <th scope="col">Units</th>}
+          <th scope="col">Coins each</th>
         </tr>
       </thead>
       <tbody>
-        {warehouse.prices.map((p) => (
-          <tr key={p.good}>
-            <th scope="row">{GOOD_LABELS[p.good]}</th>
-            <td>{p.stock ?? '?'}</td>
-            <td>{p.buy}</td>
-            <td>{p.sell}</td>
+        {lines.map((l) => (
+          <tr key={l.good}>
+            <th scope="row">{GOOD_LABELS[l.good]}</th>
+            {units && <td>{l.units ?? ''}</td>}
+            <td>{l.price}</td>
           </tr>
         ))}
       </tbody>
@@ -453,6 +492,7 @@ export interface TradeRequest {
  */
 function Trading({
   warehouse,
+  goods,
   place = 'warehouse',
   traders,
   deliveryCities,
@@ -461,6 +501,8 @@ function Trading({
   onTrade,
 }: {
   warehouse: WarehouseView
+  /** The goods that can be traded there (`tradedGoods`), for the Good picker. */
+  goods: PricedGood[]
   /** Where the trade happens: a Trade Org warehouse or an NPC city's storage. */
   place?: 'warehouse' | 'storage'
   traders: TradersView
@@ -488,8 +530,9 @@ function Trading({
   const resident = traders.residents.find((r) => r.id === residentId) ?? traders.residents[0]
   const carriage = traders.carriages.find((k) => k.id === carriageId)
   const city = deliveryCities.find((c) => c.id === cityId)
-  const picked = good ?? warehouse.prices[0]?.good
-  if (!resident || !picked) {
+  const picked = good !== undefined && goods.includes(good) ? good : goods[0]
+  if (!picked) return null
+  if (!resident) {
     return (
       <p className="small muted">
         To trade here, bring a resident to the {place} at ({warehouse.x}, {warehouse.y}).
@@ -517,7 +560,7 @@ function Trading({
     canSell = quote.sell.units > 0
     buyText = canBuy
       ? `Buy ${quote.buy.units} ${label} for ${quote.buy.coins} coins + ${quote.buy.fee} fee, delivered to ${city.name}`
-      : `Canât buy ${label} for delivery`
+      : `Can’t buy ${label} for delivery`
     sellText = canSell
       ? `Sell ${quote.sell.units} ${label} from ${city.name}, picked up for about ${quote.sell.coins} coins after a ${quote.sell.fee} fee`
       : `Nothing to pick up in ${city.name}`
@@ -527,10 +570,10 @@ function Trading({
     canSell = quote.sell.units > 0
     buyText = canBuy
       ? `Buy ${quote.buy.units} ${label} for ${quote.buy.coins} coins`
-      : `Canât buy ${label}`
+      : `Can’t buy ${label}`
     sellText = canSell
       ? `Sell ${quote.sell.units} ${label} for ${quote.sell.coins} coins`
-      : `Canât sell ${label}`
+      : `Can’t sell ${label}`
   }
   return (
     <div className="warehouse-trading" aria-label="Trading">
@@ -573,9 +616,9 @@ function Trading({
       <label>
         Good{' '}
         <select value={picked} onChange={(e) => setGood(e.target.value as PricedGood)}>
-          {warehouse.prices.map((p) => (
-            <option key={p.good} value={p.good}>
-              {GOOD_LABELS[p.good]}
+          {goods.map((g) => (
+            <option key={g} value={g}>
+              {GOOD_LABELS[g]}
             </option>
           ))}
         </select>
