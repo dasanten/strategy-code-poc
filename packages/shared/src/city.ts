@@ -388,7 +388,10 @@ export function occupierOf(
 export const OCCUPATION_TICKS = OCCUPATION_GAME_DAYS * TICKS_PER_GAME_DAY
 
 /** Ticks left before the occupation of a city's town hall captures it; null with none running. */
-export function occupationTicksLeft(world: Pick<WorldState, 'tick'>, city: City): number | null {
+export function occupationTicksLeft(
+  world: Pick<WorldState, 'tick'>,
+  city: Pick<City, 'occupation'>,
+): number | null {
   const o = city.occupation
   return o ? Math.max(0, o.since + OCCUPATION_TICKS - world.tick) : null
 }

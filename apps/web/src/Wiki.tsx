@@ -1531,8 +1531,11 @@ export function Wiki() {
           occupied, by whom, and when the occupation is broken, and likewise when you occupy a town
           hall and when your occupation is broken. Every city is captured this way: NPC cities,
           Players' cities, trading posts and the Trade Org HQ, whose hired mercenaries defend it.
-          Scripts see it as <code>city.occupation</code>: who occupies a town hall in sight, and the
-          ticks left.
+          Anyone with the town hall in sight sees who occupies it and the game days left: a small
+          flag in the occupier's colour on the hall, and "Occupied by …" on its tile card and in the
+          city inspector, a warning when it is your city. Out of sight it isn't shown, nor
+          remembered in Last seen. Scripts see it as <code>city.occupation</code>: who occupies a
+          town hall in sight, and the ticks left.
         </p>
       </Section>
 

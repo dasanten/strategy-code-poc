@@ -20,6 +20,7 @@ import { KEEP_LATEST, WorldSaver, loadOrCreateWorld, pruneSaves, saveWorld } fro
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { checkInvariants } from './invariants.js'
+import { refreshLastSeen } from './last-seen.js'
 import { smallTerrain, worldWithCity, worldWithPost } from './test-terrain.js'
 import {
   RESET_BEFORE,
@@ -373,11 +374,17 @@ describe('world saves', () => {
 
   it('migrates a format 64 world: no city’s town hall is occupied (migration 64 → 65)', () => {
     const { world, terrain } = worldWithPost()
-    const old = structuredClone(world) as { cities: Partial<(typeof world.cities)[number]>[] }
-    for (const c of old.cities) delete c.occupation
+    // The Player remembers their own city, as it was before cities could be occupied.
+    refreshLastSeen(world, terrain.size)
+    const old = structuredClone(world)
+    for (const c of old.cities) delete (c as Partial<typeof c>).occupation
+    for (const e of Object.values(old.lastSeen).flat())
+      if (e.is === 'city') delete (e as Partial<typeof e>).occupation
     const migrated = migrateWorld(old, 64, { terrain }, migrations, 65)
     expect(migrated.cities.length).toBeGreaterThan(1)
     expect(migrated.cities.every((c) => c.occupation === null)).toBe(true)
+    const remembered = Object.values(migrated.lastSeen).flat()
+    expect(remembered.filter((e) => e.is === 'city').length).toBeGreaterThan(0)
     expect(migrated).toEqual(world)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })

@@ -27,6 +27,8 @@ import {
   type SeenCity,
   type WarehousePrice,
   isAt,
+  occupationTicksLeft,
+  TICKS_PER_GAME_DAY,
   type SeenResident,
   type SeenCarriage,
   type SeenBuilding,
@@ -104,6 +106,42 @@ export function describeCity(
     whose,
     residents: seen.residents.filter((r) => r.cityId === city.id).length,
     buildings: [...counts].sort((a, b) => b[1] - a[1]),
+  }
+}
+
+/** Who occupies a city's town hall, as the tile card and the city inspector say it. */
+export interface OccupationView {
+  /** The realm occupying it, by its own name or "you", and the game days left. */
+  text: string
+  /** The Player's own city: they are about to lose it. */
+  warning: boolean
+  /** The occupying realm (or NPC city), for its colour. */
+  realmId: string
+}
+
+/**
+ * Who occupies a city's town hall and how long is left before the city is captured
+ * (`CONTEXT.md`: Occupying a town hall), when the Player sees it: only while the hall is in sight,
+ * which the server decides. A part of a game day left counts as a day.
+ */
+export function describeOccupation(
+  city: Pick<City, 'realmId'> & Partial<Pick<City, 'occupation'>>,
+  tick: number,
+  realmId: string,
+  realms: RealmLabel[],
+): OccupationView | undefined {
+  const o = city.occupation ?? null
+  const ticks = occupationTicksLeft({ tick }, { occupation: o })
+  if (!o || ticks === null) return undefined
+  const by =
+    o.realmId === realmId
+      ? 'you'
+      : (realms.find((r) => r.realmId === o.realmId)?.realm ?? 'another realm')
+  const days = Math.max(1, Math.ceil(ticks / TICKS_PER_GAME_DAY))
+  return {
+    text: `Occupied by ${by}, ${days} game ${days === 1 ? 'day' : 'days'} left`,
+    warning: city.realmId === realmId,
+    realmId: o.realmId,
   }
 }
 

@@ -235,10 +235,13 @@ export const migrations: Record<number, MigrationStep> = {
   // the step leaves them as they are.
   63: (state) => state,
   // A city is captured by occupying its town hall (`CONTEXT.md`: Occupying a town hall; ADR 0017;
-  // `City.occupation`). Cities fell at once before, so none is occupied.
+  // `City.occupation`). Cities fell at once before, so none is occupied, nor any city remembered
+  // in Last seen: who occupies a town hall is never remembered.
   64: (state) => {
     const world = structuredClone(state) as WorldState
     for (const c of world.cities) c.occupation = null
+    for (const memory of Object.values(world.lastSeen))
+      for (const e of memory) if (e.is === 'city') e.occupation = null
     return world
   },
 }
