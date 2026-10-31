@@ -18,6 +18,7 @@ import {
   rememberTab,
   rememberTabOf,
   rememberedTabOf,
+  statLine,
   scriptsRun,
   supplyLines,
   rememberedTab,
@@ -227,5 +228,14 @@ describe('pairingDaysLeft', () => {
   it('is 0 ("Now") once the pairing wait has passed', () => {
     expect(pairingDaysLeft(since, since + PAIRING_WAIT_TICKS)).toBe(0)
     expect(pairingDaysLeft(since, since + 10 * PAIRING_WAIT_TICKS)).toBe(0)
+  })
+})
+
+describe('a stat on the Stats tab', () => {
+  it('shows a trained bonus to a tenth, never rounded up to its cap', () => {
+    expect(statLine(10, 0, 5)).toBe('10 + 0 (5)')
+    expect(statLine(10, 2.3456, 5)).toBe('10 + 2.3 (5)')
+    expect(statLine(10, 4.99, 5)).toBe('10 + 4.9 (5)')
+    expect(statLine(10, 5, 5)).toBe('10 + 5 (5)')
   })
 })

@@ -13,6 +13,8 @@ import {
   ageInYears,
   breedingPair,
   buildingAt,
+  teacherAt,
+  traineesOf,
   buildingRealm,
   directivesFor,
   materialsNeeded,
@@ -187,11 +189,23 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   }
   // A building as `building(id)` gives it: one of the side's own as it is, another's as the
   // Player sees it, its stock only when they see inside (`CONTEXT.md`: Seeing inside a storage).
+  // Who teaches what and who trains at a training ground (`CONTEXT.md`: Teacher, Trainee), from
+  // residents' orders.
+  const teachingAt = (id: string) => {
+    const ground = world.buildings.find((b) => b.id === id)
+    if (ground?.kind !== 'trainingGround') return undefined
+    const teacher = teacherAt(ground, world.residents, terrain.size)
+    const o = teacher?.order
+    const trainees = traineesOf(ground, world.residents, terrain.size).map((r) => r.id)
+    return teacher && o?.kind === 'teach'
+      ? { teacher: teacher.id, subject: o.subject, trainees }
+      : { trainees }
+  }
   const asSeenBuilding = (b: Building) => {
     if (ownBuilding(b)) return b
     seen ??= context.seen()
     const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
-    return shown ? untagged(shown) : null
+    return shown ? { ...untagged(shown), ...teachingAt(b.id) } : null
   }
   // The building as the Player remembers it (`CONTEXT.md`: Last seen); an NPC city has no memory.
   const lastSaw = (b: Building) =>
@@ -205,7 +219,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   // query returns (`viewValue`).
   const queries: Record<string, (args: Value[]) => unknown> = {
     residents: () => seenOf('resident', ownMemory),
-    buildings: () => seenOf('building'),
+    buildings: () => seenOf('building', teachingAt),
     cities: () => seenOf('city'),
     horses: () => seenOf('horse'),
     carriages: () => seenOf('carriage'),
@@ -311,6 +325,16 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const age = ageInYears(resident, world.tick)
     me = asView(world, { ...resident, script: undefined, defenceScriptId, age })
     actions = residentActions(request, resident)
+    // At the training ground on my tile; the order checks it is one.
+    actions.teach = ([subject]) =>
+      request('teach', {
+        buildingId: buildingAt(world, resident.x, resident.y, terrain.size)?.id ?? null,
+        subject: plain(subject),
+      })
+    actions.train = () =>
+      request('train', {
+        buildingId: buildingAt(world, resident.x, resident.y, terrain.size)?.id ?? null,
+      })
     actions.doing = ([text]) => {
       const doing = doingText(text)
       if (doing === null) delete context.memory.doing

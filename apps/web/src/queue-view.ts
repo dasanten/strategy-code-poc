@@ -16,9 +16,10 @@ import {
   type QueueStepRequest,
   type Resident,
   type ScriptSummary,
+  type TrainingSubject,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
-import { GOOD_LABELS } from './Residents.js'
+import { GOOD_LABELS, subjectLabel } from './Residents.js'
 import { gonePlace } from './saved-queues.js'
 import { timedItems, unroll, withIds, type PlanItem } from './plan-blocks.js'
 import { realTimeOf } from './wiki-view.js'
@@ -227,7 +228,8 @@ function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
 
 /** Orders that act on the tile they are given for (by the card, their own): they only start there. */
 function actsHere(order: OrderRequest): boolean {
-  if (['pickUp', 'drop', 'drive', 'mount', 'board', 'unhitch'].includes(order.kind)) return true
+  if (['pickUp', 'drop', 'drive', 'mount', 'board', 'unhitch', 'teach'].includes(order.kind))
+    return true
   if (order.kind !== 'task') return false
   // A Build task laid out somewhere else (`at`) walks there itself.
   return order.task !== 'build' || order.at === undefined
@@ -370,6 +372,8 @@ export function stepLabel(
       return `Tear down ${building(order.buildingId)}`
     case 'workAt':
       return `Work ${building(order.buildingId)}`
+    case 'teach':
+      return `Teach ${subjectLabel(order.subject as TrainingSubject)} at ${building(order.buildingId)}`
     case 'haul':
       return 'Haul'
     case 'roadLine':
@@ -393,6 +397,7 @@ export function stepLabel(
       if (order.task === 'tearDown') return `Tear down ${building(order.buildingId)}`
       if (order.task === 'feedStable') return `Feed ${building(order.stableId)}`
       if (order.task === 'breed') return `Breed horses at ${building(order.stableId)}`
+      if (order.task === 'train') return `Train at ${building(order.groundId)}`
       return `Haul to ${at(order)}`
   }
   return order.kind

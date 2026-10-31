@@ -373,6 +373,27 @@ describe('planning ahead', () => {
     )
   })
 
+  it('walks to a training ground elsewhere and teaches there until its minutes are up', () => {
+    const s = farOff()
+    s.world.buildings.push({ id: 'g1', kind: 'trainingGround', cityId: null, x: 14, y: 14 })
+    const teach = { kind: 'teach', buildingId: 'g1', subject: 'combat' }
+    // Teaching never ends on its own: it needs minutes unless it is the last step.
+    expect(s.reason('queue', [walk(15, 15), { order: teach }, walk(9, 9)])).toBe(
+      'step 2 never ends on its own: give it a duration or make it the last',
+    )
+    expect(s.reason('queue', [walk(15, 15), { order: teach, minutes: 30 }, walk(9, 9)])).toBe(
+      undefined,
+    )
+    let taught = false
+    for (let i = 0; i < 300 && (i === 0 || s.r.queue); i++) {
+      s.tick()
+      if (s.r.order?.kind === 'teach') taught = true
+    }
+    expect(taught).toBe(true)
+    expect(s.r).toMatchObject({ x: 9, y: 9 })
+    expect(skips(s.world.events)).toEqual([])
+  })
+
   it('walks to a horse elsewhere and mounts it', () => {
     const s = farOff()
     s.world.horses.push(

@@ -25,6 +25,8 @@ import { stepStockFloor } from './stock-floor.js'
 import { stepRefill, stepSurvival, type SurvivalResult } from './survival.js'
 import { stepAging, type AgingResult } from './aging.js'
 import { requestWork, resolveWork } from './work.js'
+import { stepTeaching } from './teaching.js'
+import { stepTraining } from './training.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestClimbing, resolveClimbing } from './climbing.js'
@@ -195,6 +197,8 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveTearingDown(world, teardowns, terrain)
   const work = requestWork(world)
   resolveWork(world, work)
+  stepTeaching(world, terrain.size)
+  stepTraining(world, terrain.size)
   const breeding = requestBreeding(world)
   resolveBreeding(world, breeding, terrain.size)
   const births = requestBirths(world)

@@ -241,3 +241,12 @@ export function scriptsRun(scripts: readonly (string | undefined)[]): string[] {
 export function pairingDaysLeft(since: number, tick: number): number {
   return Math.max(0, Math.ceil((since + PAIRING_WAIT_TICKS - tick) / TICKS_PER_GAME_DAY))
 }
+
+/**
+ * A stat on the Stats tab (`CONTEXT.md`: Trained bonus): "10 + 2.3 (5)", base, trained bonus and
+ * its cap. Training adds a little each tick, so the bonus shows to a tenth, rounded down: it reads
+ * as the cap only once it is there.
+ */
+export function statLine(base: number, trained: number, cap: number): string {
+  return `${base} + ${Math.floor(trained * 10 + 1e-9) / 10} (${cap})`
+}

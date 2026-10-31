@@ -27,6 +27,10 @@ import {
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
   STAT_NAMES,
+  SKILL_NAMES,
+  TRAINING_GROUND_MAX_TRAINEES,
+  teacherAt,
+  traineesOf,
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_HOUR,
@@ -63,6 +67,7 @@ import {
   type ScriptSummary,
   type SkillName,
   type StatName,
+  type TrainingSubject,
   type Stock,
   type SeenResident,
   type SeenHorse,
@@ -92,6 +97,7 @@ import {
   rememberedTabOf,
   rememberTabOf,
   scriptsRun,
+  statLine,
   TAB_LABELS,
   type GroupTab,
   type CardSections,
@@ -209,6 +215,60 @@ export const SKILL_LABELS: Record<SkillName, string> = {
   farming: 'Farming',
   combat: 'Combat',
   driving: 'Driving',
+}
+
+/** A stat or skill a training ground teaches, as the UI names it: "Strength", "Combat". */
+export function subjectLabel(subject: TrainingSubject): string {
+  return subject in STAT_LABELS
+    ? STAT_LABELS[subject as StatName]
+    : SKILL_LABELS[subject as SkillName]
+}
+
+/**
+ * Picks a subject to teach, a stat or a skill (`CONTEXT.md`: Training ground), and gives it with
+ * the button `action` names.
+ */
+export function SubjectPicker({
+  action,
+  onPick,
+  picked,
+  disabled = false,
+}: {
+  action: string
+  onPick: (subject: TrainingSubject) => void
+  /** The subject chosen to start with, such as what they teach now. */
+  picked?: TrainingSubject
+  disabled?: boolean
+}) {
+  const [subject, setSubject] = useState<TrainingSubject>(picked ?? 'strength')
+  return (
+    <div className="order-buttons">
+      <select
+        aria-label="Subject to teach"
+        value={subject}
+        disabled={disabled}
+        onChange={(e) => setSubject(e.target.value as TrainingSubject)}
+      >
+        <optgroup label="Stats">
+          {STAT_NAMES.map((s) => (
+            <option key={s} value={s}>
+              {STAT_LABELS[s]}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="Skills">
+          {SKILL_NAMES.map((s) => (
+            <option key={s} value={s}>
+              {SKILL_LABELS[s]}
+            </option>
+          ))}
+        </optgroup>
+      </select>
+      <button type="button" className="primary" disabled={disabled} onClick={() => onPick(subject)}>
+        {action}
+      </button>
+    </div>
+  )
 }
 
 /** The longest a stat bar can be: the highest base plus the most training could add to it. */
@@ -517,7 +577,7 @@ export function QueueBlock({
         })}
       </ol>
       <p className="muted small">
-        Drag a step or use the arrows to reorder. Working and hauling never end on their own, so
+        Drag a step or use the arrows to reorder. Working, hauling, teaching and training never end on their own, so
         they need a duration unless they are last. Tap a step to pick it (Shift for a range), then
         Copy; Paste puts the copies after the picked step. Repeat wraps the picked steps in a block
         done so many times in a row; giving the queue makes it that many copies, up to{' '}
@@ -819,6 +879,9 @@ export function orderDoing(r: Pick<Resident, 'order' | 'riding'>, arrives?: numb
   }
   if (o?.kind === 'workAt')
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
+  if (o?.kind === 'teach') return `Teaching ${subjectLabel(o.subject)}`
+  if (o?.kind === 'train')
+    return o.learning ? `Training ${subjectLabel(o.learning)}` : 'Waiting to train'
   if (o?.kind === 'pay') return 'Paying for mercenaries'
   if (o?.kind === 'buyCity') return 'Buying a city'
   if (o?.kind === 'buyOff') return 'Buying off a directive'
@@ -1018,7 +1081,7 @@ export function GroupCard({
   const card = groupCard(residents)
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
   // The order whose panel is open under the buttons: what it needs before it goes out.
-  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed'>()
+  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed' | 'teach'>()
   const [good, setGood] = useState<Good>('food')
   const numberParams = groupNumberParams(residents, scripts)
   const foodHint = foodParamsHint(numberParams.map((p) => p.name))
@@ -1051,6 +1114,7 @@ export function GroupCard({
     mount: { kind: 'mount' },
     dismount: { kind: 'dismount' },
     feedStable: { kind: 'feedStable' },
+    train: { kind: 'train' },
     store: { kind: 'store' },
     drop: { kind: 'drop' },
     getOff: { kind: 'getOff' },
@@ -1102,7 +1166,7 @@ export function GroupCard({
           {label}
         </button>
       )
-    const opens = id as 'haul' | 'fetch' | 'breed'
+    const opens = id as 'haul' | 'fetch' | 'breed' | 'teach'
     return (
       <button
         type="button"
@@ -1235,6 +1299,17 @@ export function GroupCard({
           picking={picking === 'haul'}
           onHaulTo={(haul) => toggle('haul', { haul })}
         />
+      )}
+      {tab === 'orders' && panel === 'teach' && (
+        <section className="inspector-block" aria-label="Teach">
+          <div className="panel-head">
+            <h3>Teach</h3>
+          </div>
+          <SubjectPicker action="Teach" onPick={(subject) => onOrder({ kind: 'teach', subject })} />
+          <p className="muted small">
+            The first of them on each training ground teaches it there; one teacher per ground.
+          </p>
+        </section>
       )}
       {tab === 'orders' && panel === 'breed' && (
         <section className="inspector-block" aria-label="Breed horses">
@@ -1427,6 +1502,8 @@ export function ResidentCard({
   realmId,
   onWork,
   onFeedStable,
+  onTrain,
+  onTeach,
   onTearDown,
   horses,
   onBreed,
@@ -1563,6 +1640,10 @@ export function ResidentCard({
   onWork: (makes?: Good) => void
   /** Gives the resident the Feed the stable task for the stable they stand in. */
   onFeedStable: (stableId: string) => void
+  /** Gives the resident the Train task for the training ground they stand on. */
+  onTrain: (groundId: string) => void
+  /** Orders the resident to teach `subject` at the training ground they stand on. */
+  onTeach: (groundId: string, subject: TrainingSubject) => void
   /** Orders the resident to tear down the building or site on their tile. */
   onTearDown: (buildingId: string) => void
   /** Horses in sight, to pick two in the stable on the resident's tile to breed. */
@@ -1699,6 +1780,7 @@ export function ResidentCard({
     if (a.id === 'unhitch' && carriageToUnhitch) onUnhitch(carriageToUnhitch.id)
     if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
+    if (a.id === 'train' && building) onTrain(building.id)
   }
   useActionKeys(actions, act)
   const ridden = riddenHorseLine(r, horses, tick)
@@ -1905,6 +1987,15 @@ export function ResidentCard({
                 onTearDown={onTearDown}
               />
             </>
+          )}
+          {shown === 'teach' && building && (
+            <TeachBlock
+              resident={r}
+              ground={building}
+              residents={residents}
+              mapSize={mapSize}
+              onTeach={(subject) => onTeach(building.id, subject)}
+            />
           )}
           {shown === 'breed' && building && (
             <BreedBlock
@@ -2126,9 +2217,7 @@ export function ResidentCard({
                     <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
                     <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
                   </span>
-                  <span className="mono right">
-                    {base} + {trained} ({cap})
-                  </span>
+                  <span className="mono right">{statLine(base, trained, cap)}</span>
                 </div>
               )
             })}
@@ -2644,6 +2733,56 @@ function TearDownBlock({
           {joined ? 'Tearing down…' : `Tear down ${what}`}
         </button>
       </div>
+    </section>
+  )
+}
+
+/**
+ * Teaching (`CONTEXT.md`: Teacher): pick the subject the training ground on the resident's tile
+ * teaches, or switch it while they teach there. One teacher per ground: with another there, it
+ * says who and teaches nothing.
+ */
+function TeachBlock({
+  resident,
+  ground,
+  residents,
+  mapSize,
+  onTeach,
+}: {
+  resident: Resident
+  ground: Building
+  residents: readonly Resident[]
+  mapSize: number
+  onTeach: (subject: TrainingSubject) => void
+}) {
+  const teacher = teacherAt(ground, residents, mapSize)
+  const other = teacher && teacher.id !== resident.id ? teacher : undefined
+  const o = resident.order
+  const teaching = o?.kind === 'teach' && o.buildingId === ground.id ? o.subject : undefined
+  const trainees = traineesOf(ground, residents, mapSize).length
+  const otherTeaches = other?.order?.kind === 'teach' ? other.order.subject : undefined
+  return (
+    <section className="inspector-block" aria-label="Teach">
+      <div className="panel-head">
+        <h3>Teach</h3>
+        <span className="mono small">
+          {trainees} / {TRAINING_GROUND_MAX_TRAINEES} trainees
+        </span>
+      </div>
+      <p className="small">
+        {otherTeaches
+          ? `${other!.name} teaches ${subjectLabel(otherTeaches)} here: one teacher per ground.`
+          : teaching
+            ? `Teaching ${subjectLabel(teaching)}. Pick another subject to switch.`
+            : 'Trainees here learn the subject while you teach, never past your own value.'}
+      </p>
+      <SubjectPicker
+        key={teaching}
+        action={teaching ? 'Teach instead' : 'Teach'}
+        picked={teaching}
+        disabled={!!other}
+        onPick={onTeach}
+      />
     </section>
   )
 }
