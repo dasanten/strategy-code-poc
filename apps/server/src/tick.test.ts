@@ -77,6 +77,31 @@ describe('runTick', () => {
     )
   })
 
+  it('spreads the world invariants over the ticks of a round', () => {
+    const world = worldWithCity().world
+    const lake = terrain.tiles.indexOf(Terrain.Lake)
+    for (const r of world.residents) {
+      Object.assign(r, { x: lake % terrain.size, y: Math.floor(lake / terrain.size) })
+    }
+    const reporter = fakeReporter()
+    // A rate of 0.1 and no before-and-after checks drawn: one tick in ten finds them in the lake.
+    const ticks = 10
+    for (let i = 0; i < ticks; i++) {
+      runTick(world, terrain, {
+        reporter,
+        invariantSampleRate: 0.1,
+        slowTickMs: 800,
+        rand: () => 1,
+      })
+    }
+    const found = reporter.invariantViolations.mock.calls.filter(([, violations]) =>
+      (violations as { invariant: string }[]).some(
+        (v) => v.invariant === 'nothing-on-impassable-terrain',
+      ),
+    )
+    expect(found).toHaveLength(1)
+  })
+
   it('reports an error instead of throwing', () => {
     const broken = { ...worldWithCity().world, residents: null } as unknown as WorldState
     const reporter = fakeReporter()

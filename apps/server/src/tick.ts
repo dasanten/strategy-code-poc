@@ -3,6 +3,7 @@ import { tallyGoods, takeMade } from './goods-made.js'
 import {
   checkInvariants,
   goodsOnlyFromNothingAtTheFloor,
+  invariantsForTick,
   shouldCheckInvariants,
   type InvariantViolation,
 } from './invariants.js'
@@ -122,7 +123,7 @@ export interface TickOptions {
 
 /**
  * Runs one tick of the simulation with monitoring around it: applies waiting orders, runs scripts, steps the world, checks the
- * invariants on sampled ticks, runs `finish` and reports tick health with how long each phase
+ * tick's slice of the world invariants and, on sampled ticks, the before-and-after ones, runs `finish` and reports tick health with how long each phase
  * took. A thrown error is reported, not rethrown, so one bad tick does not stop the loop.
  */
 export function runTick(
@@ -141,12 +142,13 @@ export function runTick(
       takeMade(world)
       return stepWorld(world, terrain, opts.walking, timer)
     })
-    if (check) {
+    const slice = invariantsForTick(world.tick, opts.invariantSampleRate)
+    if (check || slice.length > 0) {
       timer.time('invariants', () => {
         const violations = [
           ...scriptViolations,
-          ...checkInvariants(world, terrain),
-          ...goodsOnlyFromNothingAtTheFloor(before!, world, takeMade(world)),
+          ...checkInvariants(world, terrain, slice),
+          ...(check ? goodsOnlyFromNothingAtTheFloor(before!, world, takeMade(world)) : []),
         ]
         if (violations.length > 0) opts.reporter.invariantViolations(world, violations)
       })
