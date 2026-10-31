@@ -1,4 +1,5 @@
-import { TICK_MS } from '@csp/shared'
+import { TICK_MS, type Resident } from '@csp/shared'
+import { residentActivity } from './figures.js'
 
 /**
  * How long a token takes to glide from one tile to the next (`CONTEXT.md`: Motion on the map): the
@@ -68,8 +69,41 @@ export class Motion {
     return [s.x + (x - s.x) * t, s.y + (y - s.y) * t]
   }
 
+  /** Whether the token `id` is on its way at `now`, from one tile to the next. */
+  gliding(id: string, now: number): boolean {
+    const s = this.steps.get(id)
+    return s !== undefined && now - s.since < GLIDE_MS
+  }
+
   /** Whether a token is still on its way at `now`: the map wants another frame. */
   moving(now: number): boolean {
     return now - this.lastStep < GLIDE_MS
   }
+}
+
+/** How far a resident at work sways on their tile, in tiles: a few pixels. */
+export const WORK_SWAY = 0.06
+
+/** How long one sway of a resident at work takes, in ms. */
+export const WORK_SWAY_MS = 1400
+
+/** A phase from 0 to 1 out of a token's id, so a crew does not sway in lockstep. */
+function phaseOf(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return (h % 1000) / 1000
+}
+
+/**
+ * How far a resident is drawn off their spot at `now` (`CONTEXT.md`: Motion on the map), in
+ * tiles: one at work (`residentActivity`) sways side to side and bobs, from the animation clock
+ * and seeded by their id; anyone else keeps still. One sine per token.
+ */
+export function workSway(
+  r: Pick<Resident, 'id' | 'order' | 'carried' | 'x' | 'y' | 'riding'>,
+  now: number,
+): readonly [number, number] {
+  if (residentActivity(r) !== 'working') return [0, 0]
+  const s = Math.sin(2 * Math.PI * (now / WORK_SWAY_MS + phaseOf(r.id)))
+  return [WORK_SWAY * s, -WORK_SWAY * 0.6 * s * s]
 }
