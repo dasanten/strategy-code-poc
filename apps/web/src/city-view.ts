@@ -428,6 +428,22 @@ export function npcStoragesInSight(
 }
 
 /**
+ * Whether the city's panel shows trading (`CONTEXT.md`: Trade section): a warehouse or NPC
+ * storage of it in sight, or a transfer the Player can send it. Then it links "How to trade".
+ */
+export function tradesHere(
+  city: SeenCity,
+  seen: { cities: City[]; buildings: SeenBuilding[] },
+  realmId: string,
+): boolean {
+  return (
+    warehousesInSight(city, seen).length > 0 ||
+    npcStoragesInSight(city, seen).length > 0 ||
+    takesTransfers(city, seen, realmId)
+  )
+}
+
+/**
  * About what a trade with an NPC city at its `storage` would move (`CONTEXT.md`: Trading with an
  * NPC city), from the prices it names the Player (none when it won't trade with them,
  * `CONTEXT.md`: NPC city reaction): each unit at today's price, cut down to its surplus or what it
