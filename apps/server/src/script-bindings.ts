@@ -10,6 +10,7 @@ import {
   Terrain,
   DOING_MAX_LENGTH,
   ageInYears,
+  occupationTicksLeft,
   breedingPair,
   buildingAt,
   teacherAt,
@@ -213,6 +214,14 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     sender.npcCityId !== undefined
       ? undefined
       : world.lastSeen[sender.userId]?.find((e) => e.id === b.id && e.is === 'building')
+  // Who occupies a seen city's town hall and the ticks left (`CONTEXT.md`: Occupying a town
+  // hall), only with the hall in sight, as the Player sees it.
+  const occupationSeen = (id: string) => {
+    const c = seen?.find((e) => e.is === 'city' && e.id === id)
+    if (c?.is !== 'city' || !c.occupation) return { occupation: null }
+    const ticksLeft = occupationTicksLeft(world, c)
+    return { occupation: { realmId: c.occupation.realmId, ticksLeft } }
+  }
   let nodes: ResourceNode[] | undefined
   const exploredNodes = () => (nodes ??= world.nodes.filter((n) => context.explored(n.x, n.y)))
 
@@ -221,7 +230,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const queries: Record<string, (args: Value[]) => unknown> = {
     residents: () => seenOf('resident', ownMemory),
     buildings: () => seenOf('building', teachingAt),
-    cities: () => seenOf('city'),
+    cities: () => seenOf('city', occupationSeen),
     horses: () => seenOf('horse'),
     carriages: () => seenOf('carriage'),
     piles: () => seenOf('pile'),

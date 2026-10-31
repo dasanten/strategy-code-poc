@@ -21,6 +21,7 @@ import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { HORSE_NAMES } from './horses.js'
 import { checkInvariants } from './invariants.js'
+import { refreshLastSeen } from './last-seen.js'
 import { smallTerrain, worldWithCity, worldWithPost } from './test-terrain.js'
 import {
   RESET_BEFORE,
@@ -137,7 +138,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(66)
+    expect(WORLD_FORMAT_VERSION).toBe(67)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -378,6 +379,23 @@ describe('world saves', () => {
     const migrated = migrateWorld(structuredClone(world), 63, { terrain }, migrations, 64)
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.script?.waitingSince === undefined)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('migrates a format 66 world: no city’s town hall is occupied (migration 66 → 67)', () => {
+    const { world, terrain } = worldWithPost()
+    // The Player remembers their own city, as it was before cities could be occupied.
+    refreshLastSeen(world, terrain.size)
+    const old = structuredClone(world)
+    for (const c of old.cities) delete (c as Partial<typeof c>).occupation
+    for (const e of Object.values(old.lastSeen).flat())
+      if (e.is === 'city') delete (e as Partial<typeof e>).occupation
+    const migrated = migrateWorld(old, 66, { terrain }, migrations, 67)
+    expect(migrated.cities.length).toBeGreaterThan(1)
+    expect(migrated.cities.every((c) => c.occupation === null)).toBe(true)
+    const remembered = Object.values(migrated.lastSeen).flat()
+    expect(remembered.filter((e) => e.is === 'city').length).toBeGreaterThan(0)
+    expect(migrated).toEqual(world)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

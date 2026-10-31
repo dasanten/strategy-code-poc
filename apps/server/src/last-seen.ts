@@ -96,7 +96,11 @@ export function refreshLastSeen(
     for (const e of before) {
       if (e.is === 'building' && !inSight.has(e.id) && sees(e)) memory.delete(e.id)
     }
-    for (const e of seen) {
+    for (const seenNow of seen) {
+      // Who occupies a town hall is seen only while it is in sight (`CONTEXT.md`: Occupying a
+      // town hall), never remembered.
+      const e =
+        seenNow.is === 'city' && seenNow.occupation ? { ...seenNow, occupation: null } : seenNow
       const was = memory.get(e.id)
       // Most of it is as it was at the last refresh; anything else is copied, since what it holds is the
       // world's own and changes in place once out of sight. Compared as JSON, the same string

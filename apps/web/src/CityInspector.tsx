@@ -22,6 +22,7 @@ import {
   describeBuying,
   deliveryCities,
   describeCity,
+  describeOccupation,
   npcStoragesInSight,
   previewDelivery,
   previewNpcTrade,
@@ -125,7 +126,10 @@ export function CityInspector({
    */
   scrollTo?: { buildingId: string }
 }) {
-  const views = cities.map((c) => describeCity(c, { residents, buildings }, realmId, realms))
+  const views = cities.map((c) => ({
+    ...describeCity(c, { residents, buildings }, realmId, realms),
+    occupation: describeOccupation(c, tick, realmId, realms),
+  }))
   const sending = (place: WarehouseView): SendingProps => ({
     sendable: sendable(place, { residents, carriages }, realmId, mapSize, tick),
     going: onTheWay(place, { residents }, realmId, mapSize).map((r) =>
@@ -158,6 +162,11 @@ export function CityInspector({
               <strong>{v.name}</strong>
               <span>{v.whose}</span>
             </button>
+            {v.occupation && (
+              <p className={`occupation${v.occupation.warning ? ' warn' : ''}`}>
+                {v.occupation.text}
+              </p>
+            )}
             {openId === v.id && (
               <p className="city-details">
                 {v.residents} {v.residents === 1 ? 'resident' : 'residents'} in sight

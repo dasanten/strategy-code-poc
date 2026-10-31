@@ -160,9 +160,10 @@ export interface StepResult {
  * putting down goods, store, fetch, haul routes' and road orders' included, then paying for mercenary contracts, then buying NPC cities, then trading at Trade Org warehouses, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then residents breeding horses, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
- * whose delay ran out take effect; then residents at
- * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
- * realm (`stepCaptures`); admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
+ * whose delay ran out take effect; occupations of town halls run, and a city held long enough
+ * changes realm (`stepCaptures`); then residents at
+ * home, at their workplace or in an army by a carriage who run low on food take meals there, those of
+ * a city captured this tick too; admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
  * (`stepContracts`); standing drifts toward neutral (`stepStanding`); armies
  * lose members who are gone and give the rest their orders for the next tick; the realms whose
  * turn it is bring their Last seen up to date (`stepLastSeen`); last, riders who
@@ -258,8 +259,8 @@ function stepRest(
   world.tick++
   const aging = stepAging(world, terrain.size)
   stepAlliances(world)
-  stepRefill(world, terrain.size)
   const captures = stepCaptures(world, terrain.size)
+  stepRefill(world, terrain.size)
   stepDirectives(world)
   stepCrimes(world, terrain.size)
   stepContracts(world)

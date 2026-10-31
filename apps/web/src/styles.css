@@ -1265,6 +1265,20 @@ button.residents-row.selected:hover {
   padding: 0 8px;
   color: var(--ui-muted);
 }
+/* Who occupies a town hall and the game days left (`CONTEXT.md`: Occupying a town hall), on the
+   tile card and in the city inspector; a warning on the Player's own city. */
+.occupation {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.city-list .occupation {
+  padding: 0 8px;
+}
+.occupation.warn {
+  color: var(--ui-warn);
+}
 
 /* The script editor: the library beside a full-height editor. */
 .script-library {

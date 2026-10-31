@@ -130,6 +130,7 @@ export function foundNpcCity(
     name: CITY_NAMES[hash(`${world.seed}:${id}`) % CITY_NAMES.length]!,
     realmId: null,
     townHallId: '',
+    occupation: null,
   }
   const building = (k: Building['kind'], bx: number, by: number): Building => ({
     id: newId(world, 'b'),

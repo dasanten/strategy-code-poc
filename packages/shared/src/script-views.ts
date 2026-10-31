@@ -47,6 +47,7 @@ export type ScriptViewName =
   | 'site'
   | 'price'
   | 'city'
+  | 'occupation'
   | 'hire'
   | 'horse'
   | 'horseStats'
@@ -167,6 +168,12 @@ const CITY_FIELDS: readonly ScriptField[] = [
     listOf(view('price')),
     'An NPC city’s prices to the Player, one for each good.',
     'unless a storage of the NPC city is in sight',
+  ),
+  field(
+    'occupation',
+    view('occupation'),
+    'Who occupies its town hall and how long is left before the city is captured.',
+    'unless its town hall is occupied and in sight',
   ),
 ]
 
@@ -542,6 +549,13 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
   city: {
     description: 'A city, as the Player sees it.',
     fields: CITY_FIELDS,
+  },
+  occupation: {
+    description: 'A realm occupying a city’s town hall.',
+    fields: [
+      field('realmId', 'string', 'The realm occupying it.'),
+      field('ticksLeft', 'number', 'Ticks it has to hold the town hall to capture the city.'),
+    ],
   },
   hire: {
     description: 'What an NPC city would lend.',

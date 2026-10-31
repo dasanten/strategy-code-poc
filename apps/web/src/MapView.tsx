@@ -81,6 +81,7 @@ import {
   BadgeLayer,
   TokenLayer,
   cityRelationship,
+  realmRelationship,
   relationshipColor,
   type Leaders,
   type Tone,
@@ -1199,6 +1200,32 @@ function drawStructures(
         b.closed ? relationshipColor(rel) : GLYPH_COLOR,
       )
     else drawBuilding(tokens, BUILDING_ART[b.kind], cx, cy, r, rel, alpha)
+  }
+  // An occupied town hall flies a small flag in the occupier's colour in its top right corner
+  // (`CONTEXT.md`: Occupying a town hall), so it shows without opening its card. Only while the
+  // hall is in sight: the server sends no occupation otherwise.
+  for (const b of buildings) {
+    if (b.kind !== 'townHall' || b.cityId === null) continue
+    const occupier = cityById.get(b.cityId)?.occupation?.realmId
+    if (!occupier) continue
+    const side = FOOTPRINT[b.kind]
+    const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
+    const h = Math.max(14, tile * 0.7)
+    const inset = Math.max(2, tile * 0.1)
+    const [px, py] = [sx + side * tile - h * 0.6 - inset, sy + inset]
+    if (!near(px, py)) continue
+    const occupierCity = cityById.get(occupier)
+    const color = relationshipColor(
+      occupierCity ? cityRelationship(occupierCity, viewer) : realmRelationship(occupier, viewer),
+    )
+    over
+      .moveTo(px, py)
+      .lineTo(px, py + h)
+      .stroke({ width: Math.max(1.5, tile * 0.06), color: 0x0e1419, alpha: fade })
+    over
+      .poly([px, py, px + h * 0.6, py + h * 0.22, px, py + h * 0.44])
+      .fill({ color, alpha: fade })
+      .stroke({ width: 1, color: 0x0e1419, alpha: fade })
   }
   for (const p of piles) {
     // A small heap in the tile's lower corner, so a building on the tile still shows.

@@ -220,6 +220,36 @@ describe('Last seen (`CONTEXT.md`)', () => {
     expect(lastSeenOutOfSight(world, terrain.size, 2).length).toBeGreaterThan(0)
   })
 
+  it('shows who occupies a town hall only while the hall is in sight, and never remembers it', () => {
+    const { world, tobin, city, scout, goHome } = twoRealms()
+    const hall = world.buildings.find((b) => b.cityId === city.id && b.kind === 'townHall')!
+    city.occupation = { realmId: tobin.id, since: world.tick }
+    const cityInSight = () =>
+      entitiesInSight(world, terrain, tobin.id).find((e) => e.id === city.id)
+    const hallInSight = () =>
+      entitiesInSight(world, terrain, tobin.id).some((e) => e.id === hall.id)
+    Object.assign(scout, { x: hall.x, y: hall.y })
+    expect(cityInSight()).toMatchObject({ occupation: { realmId: tobin.id } })
+    step(world)
+    expect(world.lastSeen[2]!.find((e) => e.id === city.id)).toMatchObject({ occupation: null })
+    // Another building of the city in sight, the hall not: the city shows, its occupation doesn't.
+    // Walks out from the hall past the city's furthest building until the hall drops out of sight.
+    const far = world.buildings
+      .filter((b) => b.cityId === city.id)
+      .reduce((a, b) => (Math.abs(b.x - hall.x) > Math.abs(a.x - hall.x) ? b : a))
+    const dir = Math.sign(far.x - hall.x) || 1
+    for (let x = far.x; hallInSight() || !cityInSight(); x += dir) {
+      Object.assign(scout, { x, y: far.y })
+      if (Math.abs(x - far.x) > 40)
+        throw new Error('found no spot seeing the city but not its hall')
+    }
+    expect(cityInSight()).toMatchObject({ occupation: null })
+    goHome()
+    step(world)
+    const remembered = lastSeenOutOfSight(world, terrain.size, 2).find((e) => e.id === city.id)
+    expect(remembered).toMatchObject({ is: 'city', occupation: null })
+  })
+
   it('flags, as an invariant, Last seen sent while it is in sight', () => {
     const { world, tobin, storage, goHome } = twoRealms()
     step(world)

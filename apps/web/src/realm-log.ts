@@ -95,6 +95,38 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const from = e.other === null ? '' : ` from the realm of ${e.other}`
       return { text: `You captured ${e.city}${from}, with its ${people}.`, tone: 'info' }
     }
+    case 'hallOccupied': {
+      const days = `${e.days} game day${e.days === 1 ? '' : 's'}`
+      const places = [{ name: `${e.city}’s town hall`, x: e.x, y: e.y }]
+      return e.occupier
+        ? {
+            text: `You hold the town hall of ${e.city}: ${days} to capture it.`,
+            tone: 'info',
+            places,
+          }
+        : {
+            text: `Your town hall in ${e.city} is occupied by the realm of ${e.other}: it falls in ${days} unless you retake it.`,
+            tone: 'bad',
+            places,
+          }
+    }
+    case 'occupationBroken': {
+      const places =
+        e.x === undefined || e.y === undefined
+          ? undefined
+          : [{ name: `${e.city}’s town hall`, x: e.x, y: e.y }]
+      return e.occupier
+        ? {
+            text: `Your occupation of ${e.city}’s town hall is broken: its days are lost.`,
+            tone: 'warn',
+            ...(places && { places }),
+          }
+        : {
+            text: `The occupation of your town hall in ${e.city} by the realm of ${e.other} is broken.`,
+            tone: 'info',
+            ...(places && { places }),
+          }
+    }
     case 'cityBought': {
       const people = `${e.residents} resident${e.residents === 1 ? '' : 's'}`
       return {

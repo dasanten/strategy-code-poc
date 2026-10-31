@@ -421,6 +421,11 @@ export function TileCard({
           )}
         </ul>
       )}
+      {card.occupation && (
+        <p className={`occupation${card.occupation.warning ? ' warn' : ''}`}>
+          {card.occupation.text}
+        </p>
+      )}
       {card.what === 'building' && building && (
         <BuildingInfo
           kind={building.kind}

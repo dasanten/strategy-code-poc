@@ -12,6 +12,7 @@ import {
   MAP_SIZE,
   NPC_CITY_REFUSES_STANDING,
   NPC_CITY_WONT_SELL_STANDING,
+  OCCUPATION_GAME_DAYS,
   STANDING_RANGE,
 } from './balance.js'
 import { allied } from './alliance.js'
@@ -19,7 +20,14 @@ import { standingOf } from './standing.js'
 import { TRADE_ORG } from './trade-org.js'
 import { FOOTPRINT, footprintsNear, isAt, nearFootprint } from './footprint.js'
 import { wrap, wrapDelta, wrapDistance } from './terrain.js'
-import type { Building, BuildingKind, City, Resident, WorldState } from './world.js'
+import {
+  TICKS_PER_GAME_DAY,
+  type Building,
+  type BuildingKind,
+  type City,
+  type Resident,
+  type WorldState,
+} from './world.js'
 
 /** World queries about cities (ADR 0002: the game API orders and scripts share). */
 
@@ -347,29 +355,45 @@ export function defendsCity(
 }
 
 /**
- * The realm about to capture a city (`CONTEXT.md`: Capturing a city), if any: no defender of it
- * is left in its area (`defendsCity`), and armed residents of exactly one other realm, not
- * allied with it, stand there. With two such realms inside, neither has it yet. Mercenaries the
- * Trade Organization hired capture nothing, and defend its HQ (`CONTEXT.md`: Trade Org army).
- * `size` is the map's.
+ * The realm occupying a city's town hall (`CONTEXT.md`: Occupying a town hall), if any: armed
+ * residents of exactly one realm not on the city's side stand on the hall's footprint, and no
+ * defender of the city (`defendsCity`) does. An ally of that realm there is another realm, so
+ * nobody occupies it; armed residents elsewhere in the city don't count. Mercenaries the Trade
+ * Organization hired occupy nothing, and defend its HQ (`CONTEXT.md`: Trade Org army). None while
+ * the hall is gone. `size` is the map's.
  */
-export function captorOf(
+export function occupierOf(
   world: Pick<WorldState, 'buildings' | 'alliances' | 'residents' | 'contracts'>,
   city: City,
   size: number,
 ): string | null {
-  const captors = new Set<string>()
+  const hall = townHallOf(world, city)
+  if (!hall) return null
+  let occupier: string | null = null
   for (const r of world.residents) {
-    if (!isArmed(r) || !inCityArea(world, city, r.x, r.y, size)) continue
+    if (!isArmed(r) || !isAt(r, hall, size)) continue
     if (defendsCity(world, city, r, size)) return null
     const forTradeOrg = world.contracts.some(
       (c) => c.startedAt !== null && c.hirerId === TRADE_ORG && c.residentIds.includes(r.id),
     )
     if (forTradeOrg && city.tradeOrg === 'hq') return null
-    if (forTradeOrg) continue
-    if (r.owner !== null && !onCitySide(world, city, r.owner)) captors.add(r.owner)
+    if (forTradeOrg || r.owner === null || onCitySide(world, city, r.owner)) continue
+    if (occupier !== null && occupier !== r.owner) return null
+    occupier = r.owner
   }
-  return captors.size === 1 ? [...captors][0]! : null
+  return occupier
+}
+
+/** Ticks a city's town hall has to be occupied (`OCCUPATION_GAME_DAYS`) before it is captured. */
+export const OCCUPATION_TICKS = OCCUPATION_GAME_DAYS * TICKS_PER_GAME_DAY
+
+/** Ticks left before the occupation of a city's town hall captures it; null with none running. */
+export function occupationTicksLeft(
+  world: Pick<WorldState, 'tick'>,
+  city: Pick<City, 'occupation'>,
+): number | null {
+  const o = city.occupation
+  return o ? Math.max(0, o.since + OCCUPATION_TICKS - world.tick) : null
 }
 
 /**

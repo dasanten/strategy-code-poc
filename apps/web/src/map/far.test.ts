@@ -26,6 +26,7 @@ const city = (id: string, realmId: string | null, hall: string): City => ({
   name: `City ${id}`,
   realmId,
   townHallId: hall,
+  occupation: null,
 })
 /** A town hall at (x, 10) with `houses` houses next to it, in a row. */
 const withHouses = (prefix: string, x: number, houses: number) => [

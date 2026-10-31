@@ -28,7 +28,13 @@ function setup(terrain = open) {
   const world = createWorld(terrain)
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'w1' })
   world.realms.push({ id: 'r2', userId: 8, leaderId: 'x1' })
-  world.cities.push({ id: 'c1', name: 'Ashford', realmId: 'r1', townHallId: 'h1' })
+  world.cities.push({
+    id: 'c1',
+    name: 'Ashford',
+    realmId: 'r1',
+    townHallId: 'h1',
+    occupation: null,
+  })
   const r = newResident(mulberry32(1), { id: 'w1', owner: 'r1', x: 5, y: 5, tick: 0 })
   r.stats.strength = { base: 10, trained: 0 }
   r.carried = { wood: 10, food: 1 }

@@ -154,7 +154,15 @@ describe('the admin inspector', () => {
       tick: 1,
       org: npc,
       is: 'city',
-      city: { id: 'n1', name: 'Nook', realmId: null, townHallId: 'h', x: 40, y: 41 },
+      city: {
+        id: 'n1',
+        name: 'Nook',
+        realmId: null,
+        townHallId: 'h',
+        occupation: null,
+        x: 40,
+        y: 41,
+      },
       residents: [
         { id: 'a', name: 'Ann' },
         { id: 'b', name: 'Bo' },

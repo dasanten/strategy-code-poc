@@ -18,7 +18,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 66
+export const WORLD_FORMAT_VERSION = 67
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -247,6 +247,16 @@ export const migrations: Record<number, MigrationStep> = {
     for (const h of world.horses) {
       h.name = horseName(mulberry32(hash(`${world.seed}:horse-name:${h.id}`)))
     }
+    return world
+  },
+  // A city is captured by occupying its town hall (`CONTEXT.md`: Occupying a town hall; ADR 0017;
+  // `City.occupation`). Cities fell at once before, so none is occupied, nor any city remembered
+  // in Last seen: who occupies a town hall is never remembered.
+  66: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const c of world.cities) c.occupation = null
+    for (const memory of Object.values(world.lastSeen))
+      for (const e of memory) if (e.is === 'city') e.occupation = null
     return world
   },
 }
