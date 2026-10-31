@@ -530,9 +530,9 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, mount or dismount, board or get off a carriage,
-          work, build, haul, feed the stable, breed horses, tear down, build a road or wall line, or
-          run one of your scripts with its params.
+          to, pick up, drop, store, fetch, drive, unhitch a horse, mount or dismount, board or get
+          off a carriage, work, build, haul, feed the stable, breed horses, tear down, build a road
+          or wall line, or run one of your scripts with its params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
@@ -926,6 +926,16 @@ export function Wiki() {
           builder's work, fetched and built like any construction site, and whoever finishes it gets
           an empty carriage of their realm, with no horse hitched until it is first driven. Torn
           down before it is finished, it leaves all the materials delivered to it.
+        </p>
+        <p>
+          The first time a carriage is driven, a free horse of its realm standing with it is
+          hitched, and it stays hitched until <strong>Unhitch horse</strong>: any grown resident of
+          the carriage's realm standing on its tile can unhitch it, from their card, the carriage's
+          tile card, the group card, as a queue step or with a script's{' '}
+          <code>unhitch(carriage)</code>. The horse then stands free on the tile, to be ridden or
+          led into a stable, and a carriage being driven stops where it is. The carriage stands
+          there until it is next driven, when a free horse of the realm standing with it is hitched
+          again. A carriage whose horse dies waits the same way.
         </p>
         <table>
           <thead>

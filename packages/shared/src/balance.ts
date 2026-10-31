@@ -113,7 +113,7 @@ const CHILDHOOD_TICKS = ADULT_AGE * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY
  * A resident's age in game years at the given tick: each year up to `ADULT_AGE` takes
  * `CHILD_YEAR_DAYS`, later years a full game year (`CONTEXT.md`: Aging).
  */
-export function ageInYears(resident: Resident, tick: number): number {
+export function ageInYears(resident: Pick<Resident, 'bornAt'>, tick: number): number {
   const lived = tick - resident.bornAt
   if (lived <= CHILDHOOD_TICKS) return lived / (CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY)
   return ADULT_AGE + (lived - CHILDHOOD_TICKS) / TICKS_PER_GAME_YEAR
@@ -126,7 +126,7 @@ export function ticksForAge(age: number): number {
 }
 
 /** Whether a resident is grown up, so they can work, build or take any job (`CONTEXT.md`: Child). */
-export function canWork(resident: Resident, tick: number): boolean {
+export function canWork(resident: Pick<Resident, 'bornAt'>, tick: number): boolean {
   return ageInYears(resident, tick) >= ADULT_AGE
 }
 

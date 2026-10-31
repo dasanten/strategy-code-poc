@@ -108,12 +108,13 @@ export const getOff: OrderKind = {
 
 /**
  * The orders that act on a tile, and so get a passenger off their carriage first (`CONTEXT.md`:
- * Passenger): walking anywhere, driving, goods, building, work, fighting, climbing, mounting,
+ * Passenger): walking anywhere, driving, unhitching, goods, building, work, fighting, climbing, mounting,
  * trading. They get off onto the carriage's tile, where they stand, and the order goes on.
  */
 export const GETS_OFF_FIRST: readonly string[] = [
   'walkTo',
   'drive',
+  'unhitch',
   'haul',
   'pickUp',
   'drop',
