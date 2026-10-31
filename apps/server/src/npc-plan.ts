@@ -274,8 +274,8 @@ const feeders = (residents: number) =>
 /**
  * How an NPC city shares out its adults beyond its soldiers and those carrying a child
  * (`CONTEXT.md`: NPC city, NPC reserve). Workers stay where they are, except that the workers of a
- * workplace that processes goods the city isn't short of become spare hands, as do farmers beyond
- * those it keeps (`farmersWanted`). Then: spare hands, and after them workers off the farms, farm
+ * workplace whose good the city isn't short of become spare hands (and go back when nothing else
+ * needs them), as do farmers beyond those it keeps (`farmersWanted`). Then: spare hands, and after them workers off the farms, farm
  * until it has its farmers, while a farm has room; up to `NPC_BUILDERS` (`npcBuilders`) build the project; the
  * rest go to the workplace of the good shortest of the reserve (`chainPlace`), filling its crew
  * before the next. A spare hand with nowhere to go is idle; a farmer let go goes back to farming.
@@ -307,10 +307,12 @@ function shareOut(
     delete jobs[r.id]
     spare.push(r)
   }
+  // Workers of a workplace whose good the city isn't short of become spare hands, the farms aside
+  // (farmersWanted): the city moves them to what is short, and they go back when nothing is.
   for (const r of adults) {
     const place = placeOf(r)
-    const good = place && RECIPES[place.kind] && chainGood(world, place)
-    if (good && !shortOf.has(good)) release(r, false)
+    const good = place && place.kind !== 'farm' && chainGood(world, place)
+    if (good && !shortOf.has(good)) release(r, true)
   }
   const wanted = farmersWanted(world, city)
   const farmers = adults.filter((r) => jobs[r.id]?.kind === 'farm')
