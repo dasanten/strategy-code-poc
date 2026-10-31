@@ -592,6 +592,15 @@ export function Wiki() {
           step keeps its places and the walk before it, and is checked again when its turn comes.
         </p>
         <p>
+          To keep a plan, <strong>Save…</strong> it under a name, such as “Mine run”; saving under a
+          name already taken asks before it overwrites. <strong>Load…</strong> lists the saved
+          queues with their step count and date, to load one or delete it; loading adds its steps
+          after the planned ones, in any resident's planner or a group's. Saved queues are kept in
+          this browser, as saved groups are: the server never sees them, and another browser has its
+          own. A saved step keeps its places, so one whose building is gone from the map (torn down,
+          say) is flagged in the planner; it is still given, and skipped when its turn comes.
+        </p>
+        <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
           <code>end()</code>), or once its duration in game minutes is up, if you gave it one.
           Working a workplace, hauling and feeding a stable never end on their own, so such a step

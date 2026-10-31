@@ -1370,6 +1370,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 addStep={addStep(world)}
                 scripts={scripts}
                 buildings={world.buildings}
+                lastSeen={world.lastSeen.buildings}
+                realm={world.home.realmId}
               />
             }
             collapsed={pick?.kind === 'group' || pick?.kind === 'plan'}
