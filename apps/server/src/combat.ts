@@ -309,7 +309,7 @@ function breakWall(world: WorldState, a: Resident, b: Building, size: number): b
 function react(world: WorldState, t: Resident, a: Resident): void {
   if (t.order?.kind === 'climb') return
   if (defendsByScript(world, t)) {
-    startDefence(t)
+    startDefence(world, t)
     return
   }
   if (isArmed(t)) {

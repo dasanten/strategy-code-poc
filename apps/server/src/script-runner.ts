@@ -165,6 +165,49 @@ export function runScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
   }
 }
 
+interface SetDefenceScriptRequest extends OrderRequest {
+  kind: 'setDefenceScript'
+  residentId: string
+  /** The Player's script to run when struck, or null for the Defend default. */
+  scriptId: number | null
+  /** Values for the script's params, kept for the resident (`CONTEXT.md`: Before it starts). */
+  params?: StartParamValues
+}
+
+/**
+ * The set-defence-script order (`CONTEXT.md`: Defence script): the Player picks one of their
+ * scripts as the defence script of a resident of their own, or with null clears it, back to the
+ * Defend default; picking their Defend itself clears it too. Free and instant; it leaves what
+ * the resident does as it is. Any of their scripts may be picked, a default other than Defend
+ * too. The param values it gives are kept for the resident and the script, as a start's are.
+ */
+export function setDefenceScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
+  return {
+    validate(world, sender, order) {
+      const o = order as Partial<SetDefenceScriptRequest>
+      const realm = realmOf(world, sender.userId)
+      const r = world.residents.find((x) => x.id === o.residentId)
+      if (!realm || !r || r.owner !== realm.id) return 'not one of your residents'
+      if (o.scriptId === null) return o.params === undefined ? undefined : 'Defend takes no params'
+      return (
+        badScript(host, sender, o.scriptId) ??
+        paramsProblem(host, world, realm.id, o.scriptId!, o.params)
+      )
+    },
+    apply(world, _sender, order) {
+      const { residentId, scriptId, params } = order as SetDefenceScriptRequest
+      const r = world.residents.find((x) => x.id === residentId)
+      if (!r) return
+      if (scriptId === null || host.script(scriptId)?.task === 'defend') {
+        delete r.defenceScriptId
+        return
+      }
+      r.defenceScriptId = scriptId
+      setStartParams(r, scriptId, params)
+    },
+  }
+}
+
 /** Where a task order finds the Player's version of a task's default script. */
 export interface DefaultScriptHost {
   /** The id of the Player's version of the task's default script, made if they have none. */
@@ -587,6 +630,25 @@ export class ScriptRunner {
       running.scriptId = id
     }
     const script = this.host.script(running.scriptId)
+    const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
+    if (
+      (!script || script.userId !== realm.userId) &&
+      running.task === 'defend' &&
+      resident?.defenceScriptId === running.scriptId
+    ) {
+      // The defence script picked is deleted or no longer theirs: they defend by the Defend
+      // default, from now on (`CONTEXT.md`: Defence script).
+      const { scriptId } = running
+      delete resident.defenceScriptId
+      recordEvent(world, realm.id, {
+        kind: 'defenceScriptGone',
+        residentId: r.id,
+        name: r.name,
+        scriptId,
+      })
+      running.scriptId = 0
+      return this.runOne(world, realm, sender, r, steps, { seen, sees }, used, violations)
+    }
     if (!script || script.userId !== realm.userId) {
       // Deleted, or the resident now belongs to another Player, whose script it isn't.
       stopScript(world, r)
@@ -608,7 +670,6 @@ export class ScriptRunner {
 
     const memory = structuredClone(running.memory) as ScriptObject
     // A resident's picked param values; an army's params are never picked.
-    const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
     const declared = parsed.program.params
     const params = resident ? paramValues(world, resident, running.scriptId, declared) : declared
     const bound = bindScript({

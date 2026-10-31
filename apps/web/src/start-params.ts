@@ -20,14 +20,16 @@ import {
 export type StartValues = Record<string, ScriptParamValue | undefined>
 
 /**
- * The script an order starts, from the Player's library: the one Run script names, or the
+ * The script an order starts, from the Player's library: the one Run script names, the defence
+ * script picked (`CONTEXT.md`: Defence script), whose params are picked then, or the
  * Player's version of a task's default script. Undefined for an order that starts none.
  */
 export function startedScript(
   order: OrderRequest,
   scripts: readonly ScriptSummary[],
 ): ScriptSummary | undefined {
-  if (order.kind === 'runScript') return scripts.find((s) => s.id === order.scriptId)
+  if (order.kind === 'runScript' || order.kind === 'setDefenceScript')
+    return scripts.find((s) => s.id === order.scriptId)
   if (order.kind === 'task') return scripts.find((s) => s.task === order.task)
   return undefined
 }

@@ -320,8 +320,9 @@ export function entitiesInSight(
     // its params are shown only to the realm commanding them, all they keep (to fill in before a
     // script starts), as is the queue to the realm that gave it.
     // What a defence script interrupted goes on the owning Player's Doing line only, its memory
-    // never.
-    const { script, scriptParams, queue, interrupted, ...rest } = withoutScriptLog(r)
+    // never; the defence script picked is the owning Player's to see too.
+    const { script, scriptParams, queue, interrupted, defenceScriptId, ...rest } =
+      withoutScriptLog(r)
     const kept = commanderOf(world, r) === realmId ? scriptParams : undefined
     const params = script ? kept?.[script.scriptId] : undefined
     const own = r.owner === realmId
@@ -329,6 +330,7 @@ export function entitiesInSight(
       is: 'resident',
       ...rest,
       ...(kept ? { scriptParams: kept } : {}),
+      ...(defenceScriptId !== undefined && own ? { defenceScriptId } : {}),
       ...(queue && queue.realmId === realmId ? { queue } : {}),
       ...(interrupted && own
         ? {

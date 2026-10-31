@@ -282,7 +282,9 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     forMe = { armyId: army.id }
     const members = army.memberIds.flatMap((id) => {
       const r = world.residents.find((x) => x.id === id)
-      return r ? [{ ...r, script: undefined, age: ageInYears(r, world.tick) }] : []
+      if (!r) return []
+      const defenceScriptId = r.owner === side ? r.defenceScriptId : undefined
+      return [{ ...r, script: undefined, defenceScriptId, age: ageInYears(r, world.tick) }]
     })
     const struck = lastStruck(members)
     me = {
@@ -303,7 +305,10 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = SCRIPT_API
     forMe = { residentId: resident.id }
     // The script's own state is `memory`, not part of `me`.
-    me = asView(world, { ...resident, script: undefined, age: ageInYears(resident, world.tick) })
+    // The defence script picked is its owner's to see (`CONTEXT.md`: Defence script).
+    const defenceScriptId = resident.owner === side ? resident.defenceScriptId : undefined
+    const age = ageInYears(resident, world.tick)
+    me = asView(world, { ...resident, script: undefined, defenceScriptId, age })
     actions = residentActions(request, resident)
     actions.doing = ([text]) => {
       const doing = doingText(text)
@@ -653,11 +658,16 @@ function requestsSound(
  * Combat, Under attack). Anything else passes as it is.
  */
 function asView(world: WorldState, r: object): object {
-  const { queue, struck } = r as { queue?: Queue; struck?: Struck }
+  const { queue, struck, defenceScriptId } = r as {
+    queue?: Queue
+    struck?: Struck
+    defenceScriptId?: number
+  }
   return {
     ...r,
     ...(queue ? { queue: queueView(queue) } : {}),
     ...(struck ? struckView(world, struck) : {}),
+    ...(defenceScriptId !== undefined ? { defenceScript: defenceScriptId } : {}),
   }
 }
 

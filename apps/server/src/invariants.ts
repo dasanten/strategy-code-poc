@@ -114,7 +114,7 @@ import { horseOffersOnce } from './horse-grant.js'
 import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
-import { interruptedSound } from './defence.js'
+import { defenceScriptSound, interruptedSound } from './defence.js'
 import { scriptLogsSound } from './script-log.js'
 
 /**
@@ -321,11 +321,12 @@ export const outpostStorageRealms: Invariant = {
     const realms = new Set(world.realms.map((x) => x.id))
     return world.buildings.flatMap((b) => {
       if (b.realmId === undefined) return []
-      const why = !isOutpostStorage(b) && !b.site
-        ? `is a ${b.kind}${b.cityId ? ` of city ${b.cityId}` : ''} with realm ${b.realmId}`
-        : !realms.has(b.realmId)
-          ? `belongs to realm ${b.realmId}, which doesn't exist`
-          : undefined
+      const why =
+        !isOutpostStorage(b) && !b.site
+          ? `is a ${b.kind}${b.cityId ? ` of city ${b.cityId}` : ''} with realm ${b.realmId}`
+          : !realms.has(b.realmId)
+            ? `belongs to realm ${b.realmId}, which doesn't exist`
+            : undefined
       return why ? [{ invariant: this.name, message: `${b.id} ${why}`, entityIds: [b.id] }] : []
     })
   },
@@ -1909,6 +1910,7 @@ export const worldInvariants: Invariant[] = [
   gameDefaultTargets,
   queuesSound,
   interruptedSound,
+  defenceScriptSound,
   scriptLogsSound,
 ]
 
