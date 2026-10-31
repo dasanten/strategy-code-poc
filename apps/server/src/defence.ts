@@ -26,6 +26,8 @@ export function defendsByScript(world: WorldState, t: Resident): boolean {
  */
 export function startDefence(world: WorldState, t: Resident): void {
   if (t.interrupted) return
+  // Being struck ends a wait (`CONTEXT.md`: Running a script, Waiting): back, it runs again.
+  if (t.script) delete t.script.waitingSince
   t.interrupted = { order: t.order, ...(t.script ? { script: t.script } : {}) }
   t.order = null
   const picked = commanderOf(world, t) === t.owner ? t.defenceScriptId : undefined

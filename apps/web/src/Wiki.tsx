@@ -1487,7 +1487,7 @@ export function Wiki() {
           see and have explored, nothing more; the helpers <code>floor</code> and{' '}
           <code>pickRandom</code> work only on what you give them. An action asks for the order of
           its name for <code>me</code>, checked exactly as one from the map, and answers{' '}
-          <code>null</code> when asked for, or why not. Three actions ask for no order.{' '}
+          <code>null</code> when asked for, or why not. Four actions ask for no order.{' '}
           <code>doing</code>: its text, at most {num(DOING_MAX_LENGTH)} characters, is what the
           resident card and list say the resident is doing, until the script says something else;
           only you see it. Without it they show what the task and its current order have the
@@ -1497,10 +1497,16 @@ export function Wiki() {
           reason, <code>end(reason)</code> also notes it in your realm log, like “Ana stopped Work:
           no workplace on her tile”: short text, cut like <code>doing</code>’s, that only you see,
           for every end. <code>log</code>: adds a short line, cut like <code>doing</code>’s, to the
-          resident's script log, with the game time. The Build and Tear down defaults end once the
-          site is finished or the building is gone; a script that never calls it runs until another
-          order ends it. A script runs as a resident's or as an army's: names marked resident only
-          or army only are only there for one of them, and a default script runs as a resident's.
+          resident's script log, with the game time. <code>wait</code>: once this run is over the
+          script is not run again until the resident's order ends or is replaced, or they are
+          struck; then it runs every tick again. With no order it does nothing. The defaults wait
+          after every walk, store and fetch, and Breed horses while it tends, so a resident on the
+          move costs no step; the resident card says “script waiting”, and an edited copy of a
+          default waits just the same. The Build and Tear down defaults end once the site is
+          finished or the building is gone; a script that never calls <code>end</code> runs until
+          another order ends it. A script runs as a resident's or as an army's: names marked
+          resident only or army only are only there for one of them, and a default script runs as a
+          resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />

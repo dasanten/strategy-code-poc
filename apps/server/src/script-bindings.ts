@@ -109,16 +109,21 @@ export interface ScriptBindings {
   ended(): boolean
   /** The reason it gave `end(reason)`, cut like `doing`'s text; null without one. */
   endReason(): string | null
+  /**
+   * Whether the script called `wait()` (`CONTEXT.md`: Running a script, Waiting): once its
+   * requests are applied, it waits on the resident's order, if they have one.
+   */
+  waited(): boolean
   /** The lines it gave `log(text)`, in order, cut like `doing`'s text (`CONTEXT.md`: Script log). */
   logged: string[]
 }
 
 /**
  * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`,
- * `log` and `end`, which ask for none.
+ * `log`, `end` and `wait`, which ask for none.
  */
 export const SCRIPT_ORDER_KINDS: readonly string[] = SCRIPT_API.filter(
-  (b) => b.is === 'action' && !['doing', 'log', 'end'].includes(b.name),
+  (b) => b.is === 'action' && !['doing', 'log', 'end', 'wait'].includes(b.name),
 ).map((b) => b.name)
 
 /** The army order each action of an army's script asks for (`ARMY_SCRIPT_API`). */
@@ -146,6 +151,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const requests: OrderRequest[] = []
   let ended = false
   let endReason: string | null = null
+  let waited = false
   const logged: string[] = []
 
   let seen: readonly SeenEntity[] | undefined
@@ -322,6 +328,10 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       ended = true
       return null
     }
+    actions.wait = () => {
+      waited = true
+      return null
+    }
     actions.log = ([text]) => {
       const line = shortText(text, 'log')
       if (line !== null) logged.push(line)
@@ -425,7 +435,14 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         : (call as (args: Value[]) => Value)
     globals[binding.name] = new NativeFunction(binding.name, answer, binding.cost)
   }
-  return { globals, requests, ended: () => ended, endReason: () => endReason, logged }
+  return {
+    globals,
+    requests,
+    ended: () => ended,
+    endReason: () => endReason,
+    waited: () => waited,
+    logged,
+  }
 }
 
 /**

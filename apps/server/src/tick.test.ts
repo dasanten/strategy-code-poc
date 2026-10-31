@@ -33,13 +33,15 @@ describe('runTick', () => {
       slowTickMs: 800,
       now: clock(5),
     })
-    // Everyone starts working the farm: one work action each.
+    // Everyone starts working the farm: one work action each. Without a script runner and NPC
+    // cities, no script runs.
     expect(health).toEqual({
       tick: 1,
       durationMs: expect.any(Number),
       phases: expect.any(Object),
       residents: 8,
       actions: 8,
+      scriptRuns: 0,
       slow: false,
     })
     expect(reporter.tickHealth).toHaveBeenCalledWith(world, health)

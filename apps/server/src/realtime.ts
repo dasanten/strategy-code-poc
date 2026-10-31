@@ -155,13 +155,18 @@ export function scriptMemoryFor(
 
 /**
  * How the script a resident or army runs last ran, for the realm running it (`CONTEXT.md`:
- * Debugging a script): its last runtime error and the steps it used; null as `scriptMemoryFor`.
+ * Debugging a script): its last runtime error, the steps it used and since when it waits
+ * (Running a script, Waiting); null as `scriptMemoryFor`.
  */
 export function scriptRunFor(world: WorldState, realmId: string, id: string): ScriptRunSeen | null {
   const running = runningScriptFor(world, realmId, id)
   if (!running) return null
-  const { lastError, lastRun } = running
-  return { ...(lastError ? { lastError } : {}), ...(lastRun ? { lastRun } : {}) }
+  const { lastError, lastRun, waitingSince } = running
+  return {
+    ...(lastError ? { lastError } : {}),
+    ...(lastRun ? { lastRun } : {}),
+    ...(waitingSince !== undefined ? { waitingSince } : {}),
+  }
 }
 
 /**

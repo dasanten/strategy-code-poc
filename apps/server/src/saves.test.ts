@@ -136,7 +136,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(63)
+    expect(WORLD_FORMAT_VERSION).toBe(64)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -360,6 +360,14 @@ describe('world saves', () => {
     const migrated = migrateWorld(structuredClone(world), 62, { terrain }, migrations, 63)
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.defenceScriptId === undefined)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps a format 63 world as it is: no script waits yet (migration 63 → 64)', () => {
+    const { world, terrain } = worldWithCity()
+    const migrated = migrateWorld(structuredClone(world), 63, { terrain }, migrations, 64)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents.every((r) => r.script?.waitingSince === undefined)).toBe(true)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

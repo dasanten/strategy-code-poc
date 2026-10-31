@@ -24,6 +24,7 @@ import {
   type OrderRequest,
   type Realm,
   type Resident,
+  type ResidentOrder,
   type RealmEventWhat,
   type RunningScript,
   type ScriptMemory,
@@ -511,6 +512,64 @@ export function armyRunScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind 
   }
 }
 
+/**
+ * The order each waiting script waits on (`RunningScript.waitingSince`), by identity: a replaced
+ * order is another object. Scratch memory, never saved: after a restart a waiting script runs
+ * once more and waits again.
+ */
+const waitingOn = new WeakMap<RunningScript, ResidentOrder>()
+
+/**
+ * Whether resident `r`'s script waits this tick (`CONTEXT.md`: Running a script, Waiting): it
+ * called `wait()` and the order it waits on still runs, unreplaced, and no blow struck them since.
+ * Otherwise its wait is over and it runs every tick again.
+ */
+function waits(r: Resident): boolean {
+  const running = r.script
+  if (running?.waitingSince === undefined) return false
+  const struck = r.struck !== undefined && r.struck.tick >= running.waitingSince
+  if (r.order !== null && waitingOn.get(running) === r.order && !struck) return true
+  delete running.waitingSince
+  return false
+}
+
+/**
+ * After a run that called `wait()`, resident `r`'s script waits on the order they have now that
+ * its requests are applied; with none, or with its script ended or replaced, it does nothing.
+ */
+function startWaiting(world: WorldState, r: Resident | undefined, running: RunningScript): void {
+  if (!r || r.script !== running || r.order === null) return
+  running.waitingSince = world.tick
+  waitingOn.set(running, r.order)
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Running a script, Waiting): once scripts have run, every
+ * waiting script of `residents` has an order to wait on, the one it called `wait()` with, and
+ * began waiting no later than now: no script waits past its order's end.
+ */
+export function waitingSound(
+  world: WorldState,
+  residents: readonly Resident[],
+): InvariantViolation[] {
+  const out: InvariantViolation[] = []
+  for (const r of residents) {
+    const since = r.script?.waitingSince
+    if (since === undefined) continue
+    const fail = (message: string) =>
+      out.push({
+        invariant: 'waiting-has-an-order',
+        message: `${r.id} ${message}`,
+        entityIds: [r.id],
+      })
+    if (r.order === null) fail('waits with no order')
+    else if (waitingOn.has(r.script!) && waitingOn.get(r.script!) !== r.order)
+      fail('waits past the end of the order it waited on')
+    if (since > world.tick) fail(`began waiting at tick ${since}, after ${world.tick}`)
+  }
+  return out
+}
+
 /** A resident or an army running a script. */
 interface Runner {
   /** Where the running script is kept: the resident or the army. */
@@ -526,6 +585,11 @@ interface Runner {
 /** Runs every resident's and army's script once a tick. Keeps parsed scripts between ticks. */
 export class ScriptRunner {
   private programs = new Map<number, { source: string; program: Program }>()
+  /**
+   * The scripts that ran the last `runAll`, waiting ones and those the realm's budget skipped
+   * left out: for tick health (ADR 0004).
+   */
+  runs = 0
 
   constructor(
     private terrain: TerrainMap,
@@ -545,6 +609,8 @@ export class ScriptRunner {
     const add = (realmId: string, runner: Runner) =>
       byRealm.set(realmId, [...(byRealm.get(realmId) ?? []), runner])
     const index = worldIndex(world)
+    // The residents whose scripts the realms run, waiting or not.
+    const commanded: Resident[] = []
     for (const r of world.residents) {
       if (!r.script) continue
       // A script runs for the realm the resident takes orders from (`CONTEXT.md`: Alliance army);
@@ -557,6 +623,8 @@ export class ScriptRunner {
         if (r.script && !(r.script.task && r.script.scriptId === 0 && r.owner === null))
           delete r.script
       } else {
+        commanded.push(r)
+        if (waits(r)) continue
         const by = { residentId: r.id }
         add(realmId, { holder: r, id: r.id, name: r.name, by, bind: by })
       }
@@ -578,8 +646,10 @@ export class ScriptRunner {
       }
     }
     this.programs = used
+    this.runs = ran.size
     if (check) {
       out.push(...runningScriptsSound(world), ...scriptParamsSound(world))
+      out.push(...waitingSound(world, commanded))
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
@@ -786,6 +856,7 @@ export class ScriptRunner {
       }
       return result.steps
     }
+    if (bound.waited()) startWaiting(world, resident, running)
 
     const failed = (message: string, line?: number, column?: number) => {
       const where = line === undefined ? {} : { line, column }
@@ -949,14 +1020,15 @@ const gamePrograms = new Map<string, Program>()
  * An NPC city's residents run the game's default of their task (`CONTEXT.md`: NPC city, Default
  * script; ADR 0009), through the same interpreter and game API as a Player's scripts, with the
  * city as the sender: it sees what its residents see, explored or not, and has no realm budget.
- * What they request is applied at once, as a Player's scripts' requests are. Run after
- * `stepNpcCities` has put them to work.
+ * What they request is applied at once, as a Player's scripts' requests are; one that waits
+ * (`CONTEXT.md`: Running a script, Waiting) skips the tick. Run after `stepNpcCities` has put
+ * them to work. Returns how many scripts ran, for tick health.
  */
 export function runNpcScripts(
   world: WorldState,
   terrain: TerrainMap,
   kinds: Record<string, OrderKind> = orderKinds,
-): void {
+): number {
   const npc = new Map(world.cities.filter((c) => c.realmId === null).map((c) => [c.id, c]))
   const byCity = new Map<City, Resident[]>()
   for (const r of world.residents) {
@@ -966,24 +1038,29 @@ export function runNpcScripts(
     list.push(r)
     byCity.set(city, list)
   }
-  for (const [city, people] of byCity) runCityScripts(world, terrain, city, people, kinds)
+  let runs = 0
+  for (const [city, people] of byCity) runs += runCityScripts(world, terrain, city, people, kinds)
+  return runs
 }
 
+/** Runs one NPC city's residents' scripts; returns how many ran. */
 function runCityScripts(
   world: WorldState,
   terrain: TerrainMap,
   city: City,
   people: readonly Resident[],
   kinds: Record<string, OrderKind>,
-): void {
+): number {
   const sender = npcSender(city)
   let seen: SeenEntity[] | undefined
   const seenOnce = () => (seen ??= entitiesInSight(world, terrain, city.id))
   const sees = seesOnce(world, terrain, city.id)
+  let runs = 0
   for (const r of people) {
     const running = r.script
     // Its script may have ended this tick; a resident lent out is run by the hirer.
-    if (!running?.task || !orderedResident(world, sender, r.id)) continue
+    if (!running?.task || !orderedResident(world, sender, r.id) || waits(r)) continue
+    runs++
     const { source } = DEFAULT_SCRIPTS[running.task]
     let program = gamePrograms.get(source)
     if (!program) gamePrograms.set(source, (program = parse(source)))
@@ -1014,9 +1091,11 @@ function runCityScripts(
       endScript(world, r.id)
       continue
     }
+    if (bound.waited()) startWaiting(world, r, running)
     const kept = keepMemory(memory)
     if (typeof kept !== 'string' && r.script === running) running.memory = kept
   }
+  return runs
 }
 
 /**
