@@ -163,7 +163,7 @@ The shared language of the game. Domain terms only — no implementation details
   nearby. Goods move between posts and HQ by caravan. Its few spare hands work and build the
   chain for what is short of its warehouse's floor, like the HQ, but it never grows in people,
   founds nothing and sends no trader. It keeps soldiers like an NPC city, armed
-  from its warehouse, so it is captured only by beating them; they fight attackers in its area,
+  from its warehouse, so its town hall is occupied only by beating them; they fight attackers in its area,
   and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
   A captured post joins the captor's realm like any city and leaves the Trade Organization: its
   warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
@@ -452,8 +452,19 @@ The shared language of the game. Domain terms only — no implementation details
   (attacked until it falls, leaving part of its materials) or **climbed** (slow, and a climber
   can't defend themselves, so a defended wall is costly to climb).
 - **Loot:** when a resident dies, everything they carried drops on the ground for anyone to take.
-- **Capturing a city:** armed residents inside and no defender left fighting. The city and its
-  residents join the captor's realm, loyal at once (for now).
+- **Capturing a city:** only by occupying its town hall for a set number of game days without a
+  break (Occupying a town hall; ADR 0017). When the time is up, the city and its residents join
+  the occupier's realm, loyal at once (for now). Beating its defenders is not enough on its own.
+  Every city is captured this way: NPC cities, Players' cities, trading posts and the HQ.
+- **Occupying a town hall:** armed residents of one realm stand on a city's town hall (any of its
+  tiles), no armed resident of any other realm stands there, and no defender of the city does
+  (one on its side: its realm, an ally, or for an NPC city its own residents). An ally of the
+  occupier on the hall counts as another realm, so nobody occupies it. The occupation starts the
+  tick that holds and runs as long as it keeps holding; the first tick it doesn't, it is broken
+  and its days are lost: the next one starts again from nothing. The city goes on as before
+  meanwhile; its soldiers fight the occupiers as they fight any attacker in its area. Its realm's
+  log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
+  with the town hall in sight sees who occupies it and how long is left; scripts see it too.
 - **Mercenary contract:** one Organization rents residents to another for coins over a period.
   One side offers (residents, game days, price per game week, a storage of the lender to pay
   into), the other accepts. The residents stay in the lender's realm but take only the hirer's
