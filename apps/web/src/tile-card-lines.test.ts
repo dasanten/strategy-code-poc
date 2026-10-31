@@ -156,6 +156,46 @@ describe('buildings on a tile’s card', () => {
     expect(linesOf({ buildings: [ground], residents: [off] })).toContain('Nobody teaches here yet')
   })
 
+  it('lists each trainee with their value, their ceiling, and whether they wait', () => {
+    const ground = building({ id: 'g1', kind: 'trainingGround', x: 4, y: 4 })
+    const tick = 30 * TICKS_PER_GAME_YEAR
+    const stats = (strength: number, trained = 0) => ({
+      strength: { base: strength, trained },
+      endurance: { base: 10, trained: 0 },
+      agility: { base: 10, trained: 0 },
+      intellect: { base: 10, trained: 0 },
+    })
+    const grown = { bornAt: 0, skills: {} }
+    const ann = resident({
+      ...grown,
+      id: 'a',
+      name: 'Ann',
+      stats: stats(14),
+      order: { kind: 'teach', buildingId: 'g1', subject: 'strength' },
+    })
+    const trainee = (id: string, name: string, s: number, t: number, learning: boolean) =>
+      resident({
+        ...grown,
+        id,
+        name,
+        stats: stats(s, t),
+        order: { kind: 'train', buildingId: 'g1', learning: learning ? 'strength' : null },
+      })
+    // Bo's cap (10 + 5) is above Ann's 14; Cy's (8 + 4) is below it, and Cy has reached it.
+    const bo = trainee('b', 'Bo', 10, 1.27, true)
+    const cy = trainee('c', 'Cy', 8, 4, false)
+    const lines = linesOf({ buildings: [ground], residents: [ann, bo, cy], tick })
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        'Ann teaches Strength',
+        'Bo trains: 11.2 of 14',
+        'Cy trains: 12 of 12, waiting',
+      ]),
+    )
+    const alone = linesOf({ buildings: [ground], residents: [cy], tick })
+    expect(alone).toEqual(expect.arrayContaining(['Nobody teaches here yet', 'Cy trains, waiting']))
+  })
+
   it('links a warehouse and a trading NPC city’s storage to their prices', () => {
     const cities = [
       { id: 'c-post', name: 'Saltgate', realmId: null, tradeOrg: 'post' as const },

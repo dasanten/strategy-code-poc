@@ -24,6 +24,7 @@ export const QUEUE_STEP_KINDS: readonly string[] = [
   'build',
   'tearDown',
   'workAt',
+  'teach',
   'haul',
   'roadLine',
   'wallLine',
@@ -39,11 +40,11 @@ export function runsScript(order: Pick<OrderRequest, 'kind'>): boolean {
 }
 
 /**
- * A step that never ends on its own: working a workplace, a haul route, feeding a stable or
- * training.
+ * A step that never ends on its own: working a workplace, a haul route, feeding a stable,
+ * teaching or training.
  */
 export function neverEnds(order: OrderRequest): boolean {
-  if (order.kind === 'workAt' || order.kind === 'haul') return true
+  if (['workAt', 'haul', 'teach'].includes(order.kind)) return true
   return (
     order.kind === 'task' && ['work', 'haul', 'feedStable', 'train'].includes(order.task as string)
   )

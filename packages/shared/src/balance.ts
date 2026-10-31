@@ -1746,6 +1746,37 @@ export function trainingGain(
 }
 
 /**
+ * A resident's value in a training subject (`CONTEXT.md`: Training): a stat as it counts now
+ * (`statValue`), or a skill's points.
+ */
+export function subjectValue(
+  resident: Resident,
+  subject: StatName | SkillName,
+  tick: number,
+): number {
+  return subject in resident.stats
+    ? statValue(resident, subject as StatName, tick)
+    : (resident.skills[subject as SkillName] ?? 0)
+}
+
+/**
+ * The most `trainee` can reach in `subject` under `teacher` (`CONTEXT.md`: Training), as
+ * `subjectValue` counts it: the lower of the teacher's own value and the trainee's cap, a stat's
+ * base with its full trained bonus, or a skill's `SKILL_MAX`. `trainingGain` stops there.
+ */
+export function trainingCeiling(
+  trainee: Resident,
+  teacher: Resident,
+  subject: StatName | SkillName,
+  tick: number,
+): number {
+  const teaches = subjectValue(teacher, subject, tick)
+  if (!(subject in trainee.stats)) return Math.min(teaches, SKILL_MAX[subject as SkillName])
+  const { base } = trainee.stats[subject as StatName]
+  return Math.min(teaches, (base + trainedCap(base)) * ageFactor(trainee, tick))
+}
+
+/**
  * How many tiles further along an army's way a member may get than the one furthest behind
  * (`CONTEXT.md`: Army): one ahead waits, so the army keeps together at the pace of the slowest.
  */
