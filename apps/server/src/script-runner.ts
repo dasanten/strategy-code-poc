@@ -5,7 +5,6 @@ import {
   constructionAt,
   canWork,
   DEFAULT_SCRIPTS,
-  commanderOf,
   MAP_SIZE,
   stableAt,
   commands,
@@ -58,6 +57,7 @@ import {
 } from './script-params.js'
 import { entitiesInSight, sightOf } from './sight.js'
 import { realmOf } from './starting-city.js'
+import { worldIndex } from './world-index.js'
 
 /**
  * Running a script as a resident's or an army's order (`CONTEXT.md`: Running a script, Memory,
@@ -544,11 +544,12 @@ export class ScriptRunner {
     const byRealm = new Map<string, Runner[]>()
     const add = (realmId: string, runner: Runner) =>
       byRealm.set(realmId, [...(byRealm.get(realmId) ?? []), runner])
+    const index = worldIndex(world)
     for (const r of world.residents) {
       if (!r.script) continue
       // A script runs for the realm the resident takes orders from (`CONTEXT.md`: Alliance army);
       // a resident of no realm has no Player to run a script for.
-      const realmId = commanderOf(world, r)
+      const realmId = index.commanderOf(r)
       // An NPC city runs its residents' game defaults itself (`runNpcScripts`).
       if (realmId === null) {
         // Nobody runs their defence script any more: what it interrupted goes on, if anything.

@@ -44,6 +44,7 @@ import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
 import { hqLayout, tradeOrgHq } from './trade-org.js'
 import { tradingPosts } from './trading-posts.js'
+import { worldIndex } from './world-index.js'
 
 /*
  * Caravans (`CONTEXT.md`: Caravan): the Trade Organization's carriages, each on the fixed route
@@ -451,9 +452,11 @@ function runCaravan(
 export function stepCaravans(world: WorldState, size: number): void {
   const hq = tradeOrgHq(world)
   world.caravans = world.caravans.filter((caravan) => {
-    caravan.escortIds = caravan.escortIds.filter((id) => world.residents.some((r) => r.id === id))
-    const driver = world.residents.find((r) => r.id === caravan.driverId)
-    const carriage = world.carriages.find((k) => k.id === caravan.carriageId)
+    // Asked for each caravan: the last one breaking up may have changed the world.
+    const index = worldIndex(world)
+    caravan.escortIds = caravan.escortIds.filter((id) => index.residentById(id) !== undefined)
+    const driver = index.residentById(caravan.driverId)
+    const carriage = index.carriageById(caravan.carriageId)
     const post = world.cities.find((c) => c.id === caravan.postId && c.tradeOrg === 'post')
     if (!hq || !driver || !carriage || !post) {
       releaseDelivery(world, caravan)
@@ -477,11 +480,12 @@ export function stepCaravans(world: WorldState, size: number): void {
  */
 export function waitingForEscort(world: WorldState, size: number): Set<string> {
   const waiting = new Set<string>()
+  const index = worldIndex(world)
   for (const caravan of world.caravans) {
-    const driver = world.residents.find((r) => r.id === caravan.driverId)
+    const driver = index.residentById(caravan.driverId)
     if (driver?.order?.kind !== 'drive') continue
     const behind = caravan.escortIds.some((id) => {
-      const r = world.residents.find((x) => x.id === id)
+      const r = index.residentById(id)
       if (r?.order?.kind === 'attack') return true
       return r?.order?.kind === 'walkTo' && wrapDistance(size, r, driver) > CARAVAN_SPREAD
     })
@@ -497,7 +501,7 @@ export function waitingForEscort(world: WorldState, size: number): Set<string> {
  */
 export function caravanFood(world: WorldState, r: Resident, size: number): Stock | undefined {
   const caravan = r.owner === null ? caravanOf(world, r.id) : undefined
-  const carriage = caravan && world.carriages.find((k) => k.id === caravan.carriageId)
+  const carriage = caravan && worldIndex(world).carriageById(caravan.carriageId)
   if (!carriage || (carriage.load.food ?? 0) <= 0) return undefined
   return wrapDistance(size, r, carriage) <= CARAVAN_SPREAD ? carriage.load : undefined
 }

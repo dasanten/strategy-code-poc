@@ -1,7 +1,6 @@
 import {
   SIGHT_RANGE,
   cityPrice,
-  commanderOf,
   forSale,
   npcCityPrices,
   npcCityRefuses,
@@ -37,6 +36,7 @@ import {
 } from '@csp/shared'
 import type { ExploredTerrain } from './explored.js'
 import type { InvariantViolation } from './invariants.js'
+import { worldIndex } from './world-index.js'
 
 /** A spot something can be seen from or at. */
 interface Spot {
@@ -149,8 +149,9 @@ function armySeen(
  */
 function observersOf(world: WorldState, realmId: string): Spot[] {
   const members = new Set(sharingSight(world, realmId))
+  const index = worldIndex(world)
   return world.residents.filter((r) => {
-    const by = commanderOf(world, r)
+    const by = index.commanderOf(r)
     const org = r.owner ?? r.cityId
     return (org !== null && members.has(org)) || (by !== null && members.has(by))
   })
@@ -187,6 +188,7 @@ interface Insight {
 function insightOf(world: WorldState, size: number, side: string, observers: Spot[]): Insight {
   const cities = new Map(world.cities.map((c) => [c.id, c]))
   const orgs = new Set(sharingSight(world, side))
+  const index = worldIndex(world)
   // A Trade Org city sees for its Organization, as all of the Trade Org's cities are one.
   const sideCity = cities.get(side)
   if (sideCity) orgs.add(cityOrganization(sideCity))
@@ -221,7 +223,7 @@ function insightOf(world: WorldState, size: number, side: string, observers: Spo
       )
     },
     fares: (r) => {
-      const by = commanderOf(world, r)
+      const by = index.commanderOf(r)
       return ours(r.owner, r.cityId) || (by !== null && orgs.has(by))
     },
   }
@@ -313,6 +315,7 @@ export function entitiesInSight(
   const insight = insightOf(world, size, realmId, observers)
   const eyes = eyesOf(size, observers)
   const inSight = (at: Spot) => eyes.sees(at)
+  const index = worldIndex(world)
   const out: SeenEntity[] = []
   for (const r of world.residents) {
     if (!inSight(r)) continue
@@ -323,7 +326,7 @@ export function entitiesInSight(
     // never; the defence script picked is the owning Player's to see too.
     const { script, scriptParams, queue, interrupted, defenceScriptId, ...rest } =
       withoutScriptLog(r)
-    const kept = commanderOf(world, r) === realmId ? scriptParams : undefined
+    const kept = index.commanderOf(r) === realmId ? scriptParams : undefined
     const params = script ? kept?.[script.scriptId] : undefined
     const own = r.owner === realmId
     const shown: SeenEntity = {
@@ -591,8 +594,9 @@ export class SightTracker {
     }
     const grown = new Map<number, Set<number>>()
     const looking = new Set<string>()
+    const index = worldIndex(world)
     for (const r of world.residents) {
-      const by = commanderOf(world, r)
+      const by = index.commanderOf(r)
       const org = r.owner ?? r.cityId
       const viewers = [org, by === r.owner ? null : by].flatMap((id) =>
         id === null ? [] : (viewersOf.get(id) ?? []),
