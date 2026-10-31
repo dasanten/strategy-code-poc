@@ -5,6 +5,7 @@ import {
   MAX_HEALTH,
   MAX_HUNGER,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_VALUE_LIMITS,
   SCRIPT_STEP_BUDGET,
   STABLE_CAPACITY,
   TASKS,
@@ -282,7 +283,12 @@ describe('residents’ memory', () => {
         let w2 = residents()[1]
         w2.script.memory.role = "changed"
       `),
-      { globals, steps: SCRIPT_STEP_BUDGET },
+      {
+        globals,
+        steps: SCRIPT_STEP_BUDGET,
+        maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+        limits: SCRIPT_VALUE_LIMITS,
+      },
     )
     expect(result.status).toBe('error')
     const found = (globals.memory as { found: Record<string, unknown> }).found
@@ -545,6 +551,7 @@ describe('the step budget', () => {
       globals,
       steps: SCRIPT_STEP_BUDGET,
       maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
     })
     expect(result.status).toBe('done')
     return result.steps

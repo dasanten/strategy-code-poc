@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  WS_CLOSE_LOGGED_OUT,
   WS_CLOSE_TOO_MANY_REQUESTS,
   WS_PATH,
   type SeenBuilding,
@@ -223,6 +224,9 @@ export function useWorld(onLoggedOut: () => void) {
           return
         }
         setStatus('closed')
+        // The server ended the session (logged out elsewhere, a password reset, or it expired):
+        // the login screen, not a reconnect.
+        if (ev.code === WS_CLOSE_LOGGED_OUT) return onLoggedOut()
         // A refused socket looks like any other close; ask the API whether we're still logged in.
         api.me().then(
           () => {

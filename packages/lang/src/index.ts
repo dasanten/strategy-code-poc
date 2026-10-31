@@ -29,6 +29,7 @@ export {
   ScriptRuntimeError,
   truthy,
   type Value,
+  type ValueLimits,
 } from './interpreter.js'
 
 export const LANGUAGE_VERSION = 1

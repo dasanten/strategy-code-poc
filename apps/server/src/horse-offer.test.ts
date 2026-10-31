@@ -5,6 +5,7 @@ import {
   HORSE_GRANT_HORSES,
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_VALUE_LIMITS,
   isAt,
   pileAt,
   type WorldState,
@@ -158,6 +159,7 @@ describe('the Horse offer from a script', () => {
         globals,
         steps: 10_000,
         maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+        limits: SCRIPT_VALUE_LIMITS,
       })
       return requests
     }

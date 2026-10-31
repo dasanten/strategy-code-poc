@@ -1,12 +1,4 @@
-import {
-  NativeFunction,
-  ScriptFunction,
-  parse,
-  run,
-  scriptParams,
-  type Program,
-  type ScriptObject,
-} from '@csp/lang'
+import { parse, run, scriptParams, type Program, type ScriptObject } from '@csp/lang'
 import {
   buildAtProblem,
   buildingAt,
@@ -27,6 +19,7 @@ import {
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
+  SCRIPT_VALUE_LIMITS,
   type BuildingKind,
   type City,
   type OrderRequest,
@@ -51,6 +44,7 @@ import {
   scriptRequestsSound,
   type ScriptContext,
 } from './script-bindings.js'
+import { plainValue } from './plain-value.js'
 import { addToScriptLog } from './script-log.js'
 import type { RunnableScript } from './scripts.js'
 import {
@@ -671,7 +665,12 @@ export class ScriptRunner {
       kinds: this.kinds,
     })
     const { globals, requests } = bound
-    const result = run(parsed.program, { globals, steps, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    const result = run(parsed.program, {
+      globals,
+      steps,
+      maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
+    })
     if (violations) {
       const sound = 'armyId' in r.bind ? armyScriptRequestsSound : scriptRequestsSound
       violations.push(...sound(world, this.terrain, sender, r.id, requests, this.kinds))
@@ -808,22 +807,16 @@ function logLimited(
  * memory from before the run stays.
  */
 export function keepMemory(memory: ScriptObject): ScriptMemory | string {
-  const hasFunction = (v: unknown): boolean =>
-    v instanceof NativeFunction ||
-    v instanceof ScriptFunction ||
-    (typeof v === 'object' && v !== null && Object.values(v).some(hasFunction))
-  let json: string
-  try {
-    if (hasFunction(memory)) return 'Memory can’t keep functions; this tick’s changes were dropped'
-    json = JSON.stringify(memory)
-  } catch {
-    // Something that holds itself, which can't be kept as plain data.
-    return 'Memory can’t keep something that holds itself; this tick’s changes were dropped'
+  const plain = plainValue(memory, SCRIPT_MEMORY_MAX)
+  if (plain.ok) return plain.value as ScriptMemory
+  switch (plain.why) {
+    case 'function':
+      return 'Memory can’t keep functions; this tick’s changes were dropped'
+    case 'cycle':
+      return 'Memory can’t keep something that holds itself; this tick’s changes were dropped'
+    case 'size':
+      return `Memory can keep at most ${SCRIPT_MEMORY_MAX} characters; this tick’s changes were dropped`
   }
-  if (json.length > SCRIPT_MEMORY_MAX) {
-    return `Memory can keep at most ${SCRIPT_MEMORY_MAX} characters; this tick’s changes were dropped`
-  }
-  return JSON.parse(json) as ScriptMemory
 }
 
 /**
@@ -927,7 +920,12 @@ function runCityScripts(
       params: program.params,
     })
     const { globals, requests } = bound
-    run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    run(program, {
+      globals,
+      steps: SCRIPT_STEP_BUDGET,
+      maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
+    })
     // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
     if (bound.ended()) {

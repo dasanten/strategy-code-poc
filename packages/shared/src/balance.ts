@@ -1710,6 +1710,32 @@ export const SCRIPT_STEP_BUDGET = 2000
 export const SCRIPT_MAX_CALL_DEPTH = 50
 
 /**
+ * The longest string a script may build, in characters (`CONTEXT.md`: Value limits): as much as
+ * its whole memory holds (`SCRIPT_MEMORY_MAX`), so no one string outgrows it. Past the cap the
+ * script stops with a runtime error.
+ */
+export const SCRIPT_MAX_STRING_LENGTH = 4000
+
+/**
+ * The most items a list a script builds may hold (`CONTEXT.md`: Value limits): more than a large
+ * realm has residents and buildings in sight, so a script can collect all it sees in one list.
+ */
+export const SCRIPT_MAX_LIST_LENGTH = 500
+
+/**
+ * The most keys an object a script builds may hold (`CONTEXT.md`: Value limits): plenty for a
+ * memory keyed by id or tile, far fewer than the memory could hold anyway.
+ */
+export const SCRIPT_MAX_OBJECT_KEYS = 200
+
+/** The three together, in the shape the interpreter's `run` takes (`ValueLimits` in `@csp/lang`). */
+export const SCRIPT_VALUE_LIMITS = {
+  maxStringLength: SCRIPT_MAX_STRING_LENGTH,
+  maxListLength: SCRIPT_MAX_LIST_LENGTH,
+  maxObjectKeys: SCRIPT_MAX_OBJECT_KEYS,
+}
+
+/**
  * Extra steps a script pays to ask the world something it sees as a list (`residents()`,
  * `buildings()`, `nodes()`, …), on top of the 1 every evaluated node costs (`CONTEXT.md`: Step
  * budget). Dear enough that a script keeps what it found in a variable rather than asking again.
@@ -1737,6 +1763,14 @@ export const SCRIPT_REALM_STEP_BUDGET = 20000
  * Memory). Enough for a role, a few tiles and ids; a run that leaves more keeps the old memory.
  */
 export const SCRIPT_MEMORY_MAX = 4000
+
+/**
+ * The most a value a script passes to an action or `withMemory` may hold, in characters of its
+ * JSON: as much as its memory, so anything a script keeps it can also pass. Script values are
+ * shared by reference, so one built in a few steps can stand for far more than this; the check
+ * gives up as soon as it passes the limit and the call fails with a runtime error.
+ */
+export const SCRIPT_ACTION_VALUE_MAX = SCRIPT_MEMORY_MAX
 
 /**
  * The longest text a script can give `doing()` for its resident's Doing line (`CONTEXT.md`:

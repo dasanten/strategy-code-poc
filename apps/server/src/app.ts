@@ -41,6 +41,7 @@ import {
   logIn,
   resetPassword,
   signUp,
+  type SessionSockets,
   type SessionUser,
 } from './auth.js'
 import { schema, type Db } from './db/index.js'
@@ -86,6 +87,8 @@ export interface AppOptions {
   terrain?: TerrainMap
   /** The world's territory, for the admin map's territory layer. */
   territory?: TerritoryTracker
+  /** The open sockets (`attachRealtime`), closed when logout or a password reset ends sessions. */
+  sockets?: SessionSockets
 }
 
 declare module 'fastify' {
@@ -180,7 +183,7 @@ export async function buildApp(opts: AppOptions) {
 
   app.post('/api/logout', async (req, reply) => {
     const token = req.cookies[SESSION_COOKIE]
-    if (token) deleteSession(db, token)
+    if (token) deleteSession(db, token, opts.sockets)
     reply.clearCookie(SESSION_COOKIE, { path: '/' })
     return reply.code(204).send()
   })
@@ -257,7 +260,7 @@ export async function buildApp(opts: AppOptions) {
     })
     admin.post('/api/admin/password', async (req, reply) => {
       const b = body(req)
-      await resetPassword(db, b.name, b.password)
+      await resetPassword(db, b.name, b.password, opts.sockets)
       return reply.code(204).send()
     })
 

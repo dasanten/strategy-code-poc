@@ -4,6 +4,7 @@ import { WebSocket, WebSocketServer } from 'ws'
 import {
   SCRIPT_WATCH_MAX,
   SESSION_COOKIE,
+  WS_CLOSE_LOGGED_OUT,
   WS_CLOSE_TOO_MANY_REQUESTS,
   WS_PATH,
   commanderOf,
@@ -25,7 +26,7 @@ import {
   type Territory,
   type WorldState,
 } from '@csp/shared'
-import { getSessionUser, type SessionUser } from './auth.js'
+import { getSessionUser, hashToken, sessionAlive, type SessionUser } from './auth.js'
 import { config } from './config.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
@@ -110,6 +111,18 @@ class TokenBucket {
     this.tokens -= 1
     return true
   }
+}
+
+/**
+ * How often each client's session is checked again after the handshake, so a session that
+ * expired, or was deleted some other way than logout or a reset, ends its sockets within that.
+ */
+export const SESSION_RECHECK_MS = 60_000
+
+/** A connected socket's session: what it is closed by when the session ends. */
+interface Session {
+  tokenHash: string
+  userId: number
 }
 
 /** The realms whose residents are among the entities, and the cities among them. */
@@ -227,10 +240,34 @@ export function attachRealtime(
   const origins = opts.origins ?? config.origins
   const limits = { ...config.realtime, ...opts.limits }
   const now = opts.now ?? Date.now
-  const users = new WeakMap<object, SessionUser>()
+  const users = new WeakMap<object, { user: SessionUser; session: Session }>()
+  /** Every connected socket, whether or not its Player has a realm yet. */
+  const sessions = new Map<WebSocket, Session>()
   const clients = new Map<WebSocket, Client>()
-  /** Every open socket of each account, with or without a realm, for the connection cap. */
-  const socketsOf = new Map<number, Set<WebSocket>>()
+  let lastSessionCheck = Date.now()
+
+  /** How many sockets an account holds open, with or without a realm (the connection cap). */
+  function socketsOf(userId: number): number {
+    let n = 0
+    for (const session of sessions.values()) if (session.userId === userId) n++
+    return n
+  }
+
+  /** Closes a socket because its session ended; the client shows the login screen. */
+  function endSession(socket: WebSocket) {
+    sessions.delete(socket)
+    clients.delete(socket)
+    socket.close(WS_CLOSE_LOGGED_OUT, 'logged out')
+  }
+
+  /** Closes the sockets whose session is gone or expired, at most once in `SESSION_RECHECK_MS`. */
+  function recheckSessions(now: number) {
+    if (now - lastSessionCheck < SESSION_RECHECK_MS) return
+    lastSessionCheck = now
+    for (const [socket, session] of sessions) {
+      if (!sessionAlive(opts.db, session.tokenHash, now)) endSession(socket)
+    }
+  }
 
   /** Reports entities about to go to a realm's Player outside their sight, on sampled ticks. */
   function checkSent(realmId: string, sent: SeenEntity[]) {
@@ -316,12 +353,13 @@ export function attachRealtime(
     verifyClient: ({ req }, done) => {
       try {
         if (!originAllowed(req, origins)) return done(false, 403, 'Origin not allowed')
-        const user = getSessionUser(opts.db, sessionToken(req.headers.cookie))
-        if (!user) return done(false, 401, 'Not logged in')
-        if ((socketsOf.get(user.id)?.size ?? 0) >= limits.connectionsPerUser) {
+        const token = sessionToken(req.headers.cookie)
+        const user = getSessionUser(opts.db, token)
+        if (!user || !token) return done(false, 401, 'Not logged in')
+        if (socketsOf(user.id) >= limits.connectionsPerUser) {
           return done(false, 429, 'Too many connections')
         }
-        users.set(req, user)
+        users.set(req, { user, session: { tokenHash: hashToken(token), userId: user.id } })
         done(true)
       } catch (err) {
         opts.logger?.error({ err }, 'WebSocket upgrade refused: unexpected error')
@@ -387,11 +425,9 @@ export function attachRealtime(
   }
 
   wss.on('connection', (socket, req) => {
-    const user = users.get(req)!
+    const { user, session } = users.get(req)!
+    sessions.set(socket, session)
     const account = { name: user.name, isAdmin: user.isAdmin }
-    const sockets = socketsOf.get(user.id) ?? new Set()
-    sockets.add(socket)
-    socketsOf.set(user.id, sockets)
     const allowance = new TokenBucket(limits, now)
     // A frame over `maxPayload` (or a bad one) is an error on the socket; it closes on its own,
     // and without a listener the error would take the server down.
@@ -444,21 +480,33 @@ export function attachRealtime(
       }
     })
     socket.on('close', () => {
+      sessions.delete(socket)
       clients.delete(socket)
-      sockets.delete(socket)
-      if (sockets.size === 0) socketsOf.delete(user.id)
     })
   })
 
   return {
+    /** Closes the sockets of one session: called when it is logged out. */
+    disconnectSession(tokenHash: string) {
+      for (const [socket, session] of sessions) {
+        if (session.tokenHash === tokenHash) endSession(socket)
+      }
+    },
+    /** Closes every socket of an account: called when a password reset ends all its sessions. */
+    disconnectUser(userId: number) {
+      for (const [socket, session] of sessions) {
+        if (session.userId === userId) endSession(socket)
+      }
+    },
     /**
      * Sends every client the changes in its sight since the last tick, and the chunks whose
      * explored terrain grew for its Player (`explored`, from `SightTracker.update`), and its
      * Player's new realm events, and their alliance matters when those changed, and the Region map
      * when territory was worked out again or their explored terrain grew: each Player gets only
-     * their own.
+     * their own. First, once a minute, the sockets whose session ended meanwhile are closed.
      */
-    broadcastTick(explored: Map<number, Set<number>> = new Map()) {
+    broadcastTick(explored: Map<number, Set<number>> = new Map(), now = Date.now()) {
+      recheckSessions(now)
       for (const [socket, client] of clients) {
         const inSight = entitiesInSight(world, opts.terrain, client.realmId)
         const { changed, gone } = client.view.diff(inSight)

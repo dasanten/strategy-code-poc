@@ -221,3 +221,8 @@ export const WS_PATH = '/ws'
  */
 export const WS_CLOSE_TOO_MANY_REQUESTS = 4429
 export const SESSION_COOKIE = 'csp_session'
+/**
+ * The close code a socket gets when its session ended (logout, a password reset, or expiry): the
+ * client shows the login screen instead of reconnecting.
+ */
+export const WS_CLOSE_LOGGED_OUT = 4001
