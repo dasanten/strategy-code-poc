@@ -27,6 +27,7 @@ import {
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
+  SCRIPT_VALUE_LIMITS,
   type BuildingKind,
   type City,
   type OrderRequest,
@@ -671,7 +672,12 @@ export class ScriptRunner {
       kinds: this.kinds,
     })
     const { globals, requests } = bound
-    const result = run(parsed.program, { globals, steps, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    const result = run(parsed.program, {
+      globals,
+      steps,
+      maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
+    })
     if (violations) {
       const sound = 'armyId' in r.bind ? armyScriptRequestsSound : scriptRequestsSound
       violations.push(...sound(world, this.terrain, sender, r.id, requests, this.kinds))
@@ -927,7 +933,12 @@ function runCityScripts(
       params: program.params,
     })
     const { globals, requests } = bound
-    run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    run(program, {
+      globals,
+      steps: SCRIPT_STEP_BUDGET,
+      maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
+    })
     // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
     if (bound.ended()) {

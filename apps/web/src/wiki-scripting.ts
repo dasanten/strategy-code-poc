@@ -1,6 +1,9 @@
 import {
   SCRIPT_LOG_INTERVAL,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_MAX_LIST_LENGTH,
+  SCRIPT_MAX_OBJECT_KEYS,
+  SCRIPT_MAX_STRING_LENGTH,
   SCRIPT_MEMORY_MAX,
   SCRIPT_STEP_BUDGET,
 } from '@csp/shared'
@@ -122,7 +125,7 @@ let n = twice(add(1, 2))`,
   },
   {
     title: 'Running out of steps',
-    text: `Every step counts against the budget (${SCRIPT_STEP_BUDGET} for each resident’s or army’s script a tick; see Scripting budgets). A script that runs out stops where it is, as with an error: what it asked for still happens and \`memory\` is kept, and your realm log says so. Calls nest at most ${SCRIPT_MAX_CALL_DEPTH} deep, and \`memory\` holds at most ${SCRIPT_MEMORY_MAX} characters of JSON, or that tick’s changes to it are dropped.`,
+    text: `Every step counts against the budget (${SCRIPT_STEP_BUDGET} for each resident’s or army’s script a tick; see Scripting budgets). A script that runs out stops where it is, as with an error: what it asked for still happens and \`memory\` is kept, and your realm log says so. Calls nest at most ${SCRIPT_MAX_CALL_DEPTH} deep, and \`memory\` holds at most ${SCRIPT_MEMORY_MAX} characters of JSON, or that tick’s changes to it are dropped. One value is bounded too: a string holds at most ${SCRIPT_MAX_STRING_LENGTH} characters, a list ${SCRIPT_MAX_LIST_LENGTH} items and an object ${SCRIPT_MAX_OBJECT_KEYS} keys; past that the script stops with an error.`,
   },
 ]
 
