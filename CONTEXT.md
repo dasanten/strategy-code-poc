@@ -710,7 +710,10 @@ The shared language of the game. Domain terms only — no implementation details
   step starts. `end(reason)` also notes the short reason in the realm log ("Ana stopped Work: no
   workplace on her tile"). The defaults end that way when their target is missing or gone; the
   Build, Tear down and Breed horses defaults also end once the site is finished, the building is
-  gone or the foal is born. A saved change is picked up on the next tick: each save is a new version, and the
+  gone or the foal is born. A script's own runtime error stops it for the tick and it runs again
+  next tick; an error of the game's own while running it ends the script like `end()`, noted
+  once in the realm log, and the rest of the tick goes on for everyone else. A saved change is
+  picked up on the next tick: each save is a new version, and the
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again. **Deleting versions:** any version but the active one can be deleted for good,

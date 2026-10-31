@@ -1589,6 +1589,8 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           {num(SCRIPT_STEP_BUDGET)}, marked when it ran out, and its last runtime error with the
           line and how long ago. The error stays until the script ends or you save a new version;
           click it to open that line in the Library. Errors still go into the realm log as well.
+          Should the game itself hit an error running a script, that script ends as if it had called{' '}
+          <code>end()</code>, your realm log says so once, and everything else goes on.
         </p>
         <p>
           The Script tab of your resident also shows their script log, newest first: the lines their
