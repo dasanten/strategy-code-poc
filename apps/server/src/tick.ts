@@ -15,8 +15,8 @@ import type { Walking } from './walking.js'
 import { stepWorld } from './world.js'
 
 /**
- * The phases of a tick, in the order they run (ADR 0004). `npc`, `walking` and `rest` are the
- * parts of `world`: the `TOP_LEVEL_PHASES` add up to the tick, these three to `world`.
+ * The phases of a tick, in the order they run (ADR 0004). `npc`, `walking`, `rest` and `lastSeen`
+ * are the parts of `world`: the `TOP_LEVEL_PHASES` add up to the tick, these four to `world`.
  */
 export const TICK_PHASES = [
   'orders',
@@ -26,6 +26,7 @@ export const TICK_PHASES = [
   'npc',
   'walking',
   'rest',
+  'lastSeen',
   'invariants',
   'territory',
   'sight',
@@ -36,7 +37,7 @@ export type TickPhase = (typeof TICK_PHASES)[number]
 
 /** The phases that together make up a whole tick; the parts of `world` are left out. */
 export const TOP_LEVEL_PHASES: readonly TickPhase[] = TICK_PHASES.filter(
-  (p) => p !== 'npc' && p !== 'walking' && p !== 'rest',
+  (p) => p !== 'npc' && p !== 'walking' && p !== 'rest' && p !== 'lastSeen',
 )
 
 /** How one tick went, reported as performance data (ADR 0004). */

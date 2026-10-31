@@ -119,6 +119,7 @@ import {
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
   SCRIPT_TILE_QUERY_COST,
+  LAST_SEEN_EVERY_TICKS,
   SIGHT_RANGE,
   STABLE_BREED_DAYS,
   STABLE_CAPACITY,
@@ -613,6 +614,13 @@ export function Wiki() {
           the east side and you come back in from the west. Walking once around it on plains takes
           an average resident {duration(MAP_SIZE * plainsTicksPerTile)}. A resident sees{' '}
           {num(SIGHT_RANGE)} tiles around them.
+        </p>
+        <p>
+          Buildings and cities you have had in sight stay on your map once they leave it, as you
+          last saw them and marked apart from what you see now (last seen). Your map of them is
+          brought up to date once every {duration(LAST_SEEN_EVERY_TICKS)}, so a building that leaves
+          your sight in between is remembered as it was up to that long before. What is in sight now
+          is always shown as it is.
         </p>
       </Section>
 

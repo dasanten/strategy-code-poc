@@ -45,7 +45,12 @@ import {
 } from './sight.js'
 import type { TickReporter } from './tick.js'
 import { ClientView } from './sync.js'
-import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
+import {
+  lastSeenInSight,
+  lastSeenOnCadence,
+  lastSeenOutOfSight,
+  refreshLastSeenSoon,
+} from './last-seen.js'
 
 /**
  * The session token in an upgrade request's cookie header, read as the HTTP routes read theirs
@@ -291,11 +296,17 @@ export function attachRealtime(
     if (violations.length > 0) check.reporter.invariantViolations(world, violations)
   }
 
-  /** Reports Last seen about to go to a realm's Player that is in their sight, as `checkSent`. */
+  /**
+   * Reports Last seen about to go to a realm's Player that is in their sight, or that is off its
+   * cadence, as `checkSent`.
+   */
   function checkLastSeen(realmId: string, sent: Remembered[]) {
     const check = opts.sightCheck
-    if (!check || sent.length === 0 || !shouldCheckInvariants(check.sampleRate, check.rand)) return
-    const violations = lastSeenInSight(world, opts.terrain, realmId, sent)
+    if (!check || !shouldCheckInvariants(check.sampleRate, check.rand)) return
+    const violations = [
+      ...(sent.length > 0 ? lastSeenInSight(world, opts.terrain, realmId, sent) : []),
+      ...lastSeenOnCadence(world, realmId),
+    ]
     if (violations.length > 0) check.reporter.invariantViolations(world, violations)
   }
 
@@ -406,8 +417,12 @@ export function attachRealtime(
     const [cx, cy] = [start.x, start.y]
     const entities = client.view.initial(entitiesInSight(world, opts.terrain, realm.id))
     checkSent(realm.id, entities)
-    const lastSeen = client.lastSeenView.initial(lastSeenOutOfSight(world, user.id))
+    const lastSeen = client.lastSeenView.initial(
+      lastSeenOutOfSight(world, opts.terrain.size, user.id),
+    )
     checkLastSeen(realm.id, lastSeen)
+    // Their map is fresh from the next tick, not when the realm's turn comes round.
+    refreshLastSeenSoon(world, realm.id)
     const events = eventsFor(world, user.id)
     client.lastEventSeq = events.at(-1)?.seq ?? 0
     const diplomacy = diplomacyFor(world, realm.id, realmsSeen(entities))
@@ -550,7 +565,9 @@ export function attachRealtime(
       const inSight = entitiesInSight(world, opts.terrain, client.realmId)
       const { changed, gone } = client.view.diff(inSight)
       checkSent(client.realmId, changed)
-      const remembered = client.lastSeenView.diff(lastSeenOutOfSight(world, client.userId))
+      const remembered = client.lastSeenView.diff(
+        lastSeenOutOfSight(world, opts.terrain.size, client.userId),
+      )
       checkLastSeen(client.realmId, remembered.changed)
       const lastSeen =
         remembered.changed.length > 0 || remembered.gone.length > 0 ? { lastSeen: remembered } : {}

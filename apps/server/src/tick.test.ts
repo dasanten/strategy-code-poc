@@ -167,7 +167,7 @@ describe('runTick phases', () => {
     expect(npc + walking + rest).toBeCloseTo(health.phases.world, 5)
   })
 
-  it('splits the world phase into npc, walking and rest', () => {
+  it('splits the world phase into npc, walking, rest and lastSeen', () => {
     const world = worldWithCity().world
     const health = runTick(world, terrain, {
       reporter: fakeReporter(),
@@ -175,7 +175,7 @@ describe('runTick phases', () => {
       slowTickMs: 800,
       walking: new Walking(terrain),
     })!
-    for (const phase of ['world', 'npc', 'walking', 'rest'] as const) {
+    for (const phase of ['world', 'npc', 'walking', 'rest', 'lastSeen'] as const) {
       expect(health.phases[phase]).toBeGreaterThan(0)
     }
     for (const phase of ['territory', 'sight', 'broadcast', 'save'] as const) {
