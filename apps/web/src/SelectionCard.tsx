@@ -381,16 +381,17 @@ export function TileCard({
     >
       {card.lastSeen && (
         <ul className="sel-facts sel-past" aria-label="As last seen">
-          {card.lastSeen.lines.map((l) => (
-            <li key={l}>{l}</li>
+          {card.lastSeen.lines.map((l, i) => (
+            <li key={i}>{l}</li>
           ))}
         </ul>
       )}
       {card.lines.length > (card.lastSeen ? 0 : 1) && (
         <ul className="sel-facts">
+          {/* By place, not text: horses alike give the same line twice. */}
           {card.lines.map((l, i) =>
             i === 0 && !card.lastSeen ? null : i === card.passengers?.line ? (
-              <li key={l}>
+              <li key={i}>
                 Passengers:{' '}
                 {card.passengers.residents.map((p, j) => (
                   <Fragment key={p.id}>
@@ -407,7 +408,7 @@ export function TileCard({
                 · {card.passengers.weight}
               </li>
             ) : (
-              <li key={l}>{l}</li>
+              <li key={i}>{l}</li>
             ),
           )}
         </ul>
