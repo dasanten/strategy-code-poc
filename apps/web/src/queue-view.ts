@@ -12,12 +12,15 @@ import {
   type Good,
   type OrderRequest,
   type Queue,
+  type QueueStep,
   type QueueStepRequest,
   type Resident,
   type ScriptSummary,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
 import { GOOD_LABELS } from './Residents.js'
+import { gonePlace } from './saved-queues.js'
+import { timedItems, unroll, withIds, type PlanItem } from './plan-blocks.js'
 import { realTimeOf } from './wiki-view.js'
 
 /**
@@ -78,12 +81,24 @@ export function appendRequest(
  * before doesn't already walk there; a step that never ends gets a duration once another follows.
  */
 function withStep(before: QueueStepRequest[], order: OrderRequest, at: Tile | undefined) {
+  return timed([...before, ...stepsAfter(before.at(-1), order, at)])
+}
+
+/**
+ * The steps that add `order` after the step `last`: a walk to `at` first when it acts on that
+ * tile and `last` doesn't already walk there.
+ */
+function stepsAfter(
+  last: QueueStepRequest | undefined,
+  order: OrderRequest,
+  at: Tile | undefined,
+): QueueStepRequest[] {
   const added: QueueStepRequest[] = []
   const here = at && actsHere(order) ? { x: at.x, y: at.y } : undefined
-  const last = before.at(-1)?.order
-  if (here && !(last && walksTo(last, here))) added.push({ order: { kind: 'walkTo', ...here } })
+  if (here && !(last && walksTo(last.order, here)))
+    added.push({ order: { kind: 'walkTo', ...here } })
   added.push({ order: withoutResident(order) })
-  return timed([...before, ...added])
+  return added
 }
 
 /**
@@ -119,27 +134,28 @@ export function appendToEach(
 }
 
 /**
- * A queue planned on the group card (`CONTEXT.md`: Group, Planning for a group), held in this
- * browser until it is given to all: steps with ids of the plan's own, none of them current.
+ * A queue planned in this browser until it is given: on the group card (`CONTEXT.md`: Group,
+ * Planning for a group), or on a resident's card once a step is wrapped in a repeat block
+ * (`CONTEXT.md`: Repeat block). Its items are steps and repeat blocks with ids of the plan's own,
+ * and those of a resident's queue it was planned from.
  */
-export type QueuePlan = Pick<Queue, 'steps' | 'current' | 'loop' | 'nextStepId'>
+export interface QueuePlan {
+  items: PlanItem[]
+  loop: boolean
+  /** The id the next step or block added gets. */
+  nextStepId: number
+}
 
 /** A plan with no steps yet. */
-export const EMPTY_PLAN: QueuePlan = { steps: [], current: -1, loop: false, nextStepId: 1 }
+export const EMPTY_PLAN: QueuePlan = { items: [], loop: false, nextStepId: 1 }
 
-/** The plan with its steps as the planner edited them, and loop when given; new steps get ids. */
-export function editPlan(plan: QueuePlan, steps: QueueStepRequest[], loop?: boolean): QueuePlan {
-  let nextStepId = plan.nextStepId
-  return {
-    steps: steps.map((s) => ({
-      id: s.id ?? nextStepId++,
-      order: s.order,
-      ...(s.minutes === undefined ? {} : { minutes: s.minutes }),
-    })),
-    current: -1,
-    loop: loop ?? plan.loop,
-    nextStepId,
-  }
+/**
+ * The plan with its items as the planner edited them, and loop when given; new steps and blocks
+ * get ids, and a step that never ends gets a duration once another follows it.
+ */
+export function editPlan(plan: QueuePlan, items: readonly PlanItem[], loop?: boolean): QueuePlan {
+  const given = withIds(items, plan.nextStepId)
+  return { items: timedItems(given.items), loop: loop ?? plan.loop, nextStepId: given.nextStepId }
 }
 
 /**
@@ -147,15 +163,21 @@ export function editPlan(plan: QueuePlan, steps: QueueStepRequest[], loop?: bool
  * that tile, as a resident's own queue gets it (`appendRequest`).
  */
 export function planStep(plan: QueuePlan, order: OrderRequest, at?: Tile): QueuePlan {
-  return editPlan(plan, withStep(stepsOf(plan), order, at))
+  return editPlan(plan, [...plan.items, ...stepsAfter(unroll(plan.items).at(-1), order, at)])
+}
+
+/** A resident's queue as a plan, to wrap its steps in a repeat block before giving it back. */
+export function planOf(q: Pick<Queue, 'steps' | 'loop' | 'nextStepId'>): QueuePlan {
+  return { items: stepsOf(q), loop: q.loop, nextStepId: q.nextStepId }
 }
 
 /**
- * Give to all: each member's queue becomes a copy of the plan, one `queue` request each, ending
- * what they do. A member who can't do a step gets it anyway and skips it when its turn comes.
+ * Give to all: each member's queue becomes a copy of the plan unrolled, one `queue` request each,
+ * ending what they do. A member who can't do a step gets it anyway and skips it when its turn
+ * comes.
  */
 export function giveToAll(plan: QueuePlan, residents: readonly Pick<Resident, 'id'>[]) {
-  const steps = stepsOf(plan).map(({ order, minutes }) => ({
+  const steps = unroll(plan.items).map(({ order, minutes }) => ({
     order,
     ...(minutes === undefined ? {} : { minutes }),
   }))
@@ -165,6 +187,24 @@ export function giveToAll(plan: QueuePlan, residents: readonly Pick<Resident, 'i
     steps,
     loop: plan.loop,
   }))
+}
+
+/**
+ * The order giving a resident the plan, unrolled: an edit of the queue they work through, keeping
+ * the steps it still has (the current one keeps going), or a new queue when it has ended since.
+ */
+export function givePlan(
+  r: Pick<Resident, 'id'> & Partial<Pick<Resident, 'queue'>>,
+  plan: Pick<QueuePlan, 'items'> & { loop?: boolean },
+): OrderRequest {
+  const kept = new Set(r.queue?.steps.map((s) => s.id))
+  const steps = unroll(plan.items).map((s) => {
+    if (s.id === undefined || kept.has(s.id)) return s
+    const fresh = { ...s }
+    delete fresh.id
+    return fresh
+  })
+  return queueRequest(r, steps, plan.loop)
 }
 
 /** The queue's steps as an edit-queue request keeps them: each by its id. */
@@ -203,6 +243,20 @@ function withoutResident(order: OrderRequest): OrderRequest {
   return step
 }
 
+/**
+ * The order making these the resident's queue: an edit of the queue they work through, or a
+ * `queue` order starting one when they have none, as a paste into an empty planner does
+ * (`CONTEXT.md`: Planner clipboard). With no steps, the edit ends the queue.
+ */
+export function queueRequest(
+  r: Pick<Resident, 'id'> & Partial<Pick<Resident, 'queue'>>,
+  steps: QueueStepRequest[],
+  loop?: boolean,
+): OrderRequest {
+  if (r.queue) return editRequest(r, steps, loop)
+  return { kind: 'queue', residentId: r.id, steps, ...(loop === undefined ? {} : { loop }) }
+}
+
 /** The order editing the resident's queue to these steps. */
 export function editRequest(
   r: Pick<Resident, 'id'>,
@@ -210,45 +264,6 @@ export function editRequest(
   loop?: boolean,
 ): OrderRequest {
   return { kind: 'editQueue', residentId: r.id, steps, ...(loop === undefined ? {} : { loop }) }
-}
-
-/** The steps with one moved up (-1) or down (+1); a step that never ends gets a duration. */
-export function moveStep(q: Pick<Queue, 'steps'>, id: number, by: -1 | 1): QueueStepRequest[] {
-  const steps = stepsOf(q)
-  const i = steps.findIndex((s) => s.id === id)
-  const j = i + by
-  if (i < 0 || j < 0 || j >= steps.length) return steps
-  ;[steps[i], steps[j]] = [steps[j]!, steps[i]!]
-  return timed(steps)
-}
-
-/** The steps with one dragged to the place of another. */
-export function dropStep(q: Pick<Queue, 'steps'>, id: number, onto: number): QueueStepRequest[] {
-  const steps = stepsOf(q)
-  const from = steps.findIndex((s) => s.id === id)
-  const to = steps.findIndex((s) => s.id === onto)
-  if (from < 0 || to < 0) return steps
-  steps.splice(to, 0, ...steps.splice(from, 1))
-  return timed(steps)
-}
-
-/** The steps without one; with none left, the edit ends the queue. */
-export function removeStep(q: Pick<Queue, 'steps'>, id: number): QueueStepRequest[] {
-  return stepsOf(q).filter((s) => s.id !== id)
-}
-
-/** The steps with one's duration set in game minutes, or cleared with undefined. */
-export function timeStep(
-  q: Pick<Queue, 'steps'>,
-  id: number,
-  minutes: number | undefined,
-): QueueStepRequest[] {
-  return stepsOf(q).map((s) => {
-    if (s.id !== id) return s
-    const step = { ...s, minutes }
-    if (minutes === undefined) delete step.minutes
-    return step
-  })
 }
 
 /** One step as the card lists it. */
@@ -264,6 +279,8 @@ export interface QueueRow {
   real?: string
   /** It never ends on its own: work or haul. */
   endless: boolean
+  /** Why its place is gone, if it is: "the workplace is gone" (`CONTEXT.md`: Saved queue). */
+  gone?: string
 }
 
 /** What step labels name: the Player's scripts, the buildings in sight and those last seen. */
@@ -273,15 +290,31 @@ export interface StepNames {
   lastSeen?: readonly Pick<Building, 'id' | 'kind'>[]
 }
 
-/** The queue as the card lists it, step by step. */
+/**
+ * The queue as the card lists it, step by step. With the buildings last seen given, a step whose
+ * place is gone from the map is flagged (`gonePlace`), as a saved queue's step loaded after its
+ * workplace was torn down.
+ */
 export function queueRows(q: Pick<Queue, 'steps' | 'current'>, names: StepNames = {}): QueueRow[] {
-  return q.steps.map((s, i) => ({
+  return q.steps.map((s, i) => stepRow(s, i === q.current, names))
+}
+
+/** One step as the card lists it, in a queue or a plan's repeat block. */
+export function stepRow(
+  s: Pick<QueueStep, 'id' | 'order' | 'minutes'>,
+  current: boolean,
+  names: StepNames = {},
+): QueueRow {
+  const { buildings = [], lastSeen } = names
+  const gone = lastSeen && gonePlace(s.order, { buildings, lastSeen })
+  return {
     id: s.id,
     label: stepLabel(s.order, names),
-    current: i === q.current,
+    current,
     ...(s.minutes === undefined ? {} : { minutes: s.minutes, real: realMinutes(s.minutes) }),
     endless: neverEnds(s.order),
-  }))
+    ...(gone ? { gone } : {}),
+  }
 }
 
 /** A duration in game minutes as real time, "10 s", "1 min". */

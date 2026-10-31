@@ -312,6 +312,75 @@
   border-left-color: var(--ui-live);
   background: var(--ui-raised);
 }
+/* A step picked for the planner clipboard (tap; Shift for a range). */
+.queue-step.picked {
+  border-color: var(--ui-line-strong);
+  background: color-mix(in srgb, var(--ui-live) 14%, transparent);
+}
+.queue-step.current.picked {
+  border-left-color: var(--ui-live);
+}
+.queue-steps:focus-visible {
+  outline: 2px solid var(--ui-line-strong);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* The planner's toolbar: Copy and Paste, with how many steps are picked. */
+.queue-tools {
+  align-items: center;
+  margin-bottom: 6px;
+}
+.queue-tools .muted {
+  margin-left: auto;
+}
+/* A step whose place is gone from the map, as a saved queue's loaded after a tear-down. */
+.queue-step-gone {
+  color: var(--ui-warn);
+}
+/* A repeat block's head (`CONTEXT.md`: Repeat block): its count; its steps follow, indented. */
+.queue-step.queue-block {
+  border-style: dashed;
+  border-left-style: solid;
+  border-left-color: var(--ui-line-strong);
+}
+.queue-block-count {
+  width: 4em;
+}
+/* How many steps the plan becomes after repeats, warned when over what a queue holds. */
+.queue-unrolled-over {
+  color: var(--ui-warn);
+}
+/* Save and Load for saved queues: the name to save under, and the list to load from. */
+.saved-queues {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.saved-queues-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.saved-queues-save input {
+  flex: 1 1 10em;
+  min-width: 0;
+}
+.saved-queues-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.saved-queues-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
 .queue-step-head {
   display: flex;
   justify-content: space-between;

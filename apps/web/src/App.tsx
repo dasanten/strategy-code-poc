@@ -58,8 +58,11 @@ import { Founding } from './Founding.js'
 import {
   appendRequest,
   appendToEach,
-  editRequest,
+  editPlan,
+  EMPTY_PLAN,
+  givePlan,
   giveToAll,
+  planOf,
   planStep,
   storeAll,
   useShiftHeld,
@@ -67,6 +70,7 @@ import {
 } from './queue-view.js'
 import { AddStep } from './AddStep.js'
 import { GroupPlanner } from './GroupPlanner.js'
+import { hasBlocks, type PlanItem } from './plan-blocks.js'
 import {
   horsesIn,
   nextPick,
@@ -204,6 +208,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The queue planned on the group card, held here until given to all (`CONTEXT.md`: Planning
   // for a group); with none open, a step planned for a group goes onto each one's own queue.
   const [groupPlan, setGroupPlan] = useState<QueuePlan>()
+  // Plans with repeat blocks waiting to be given, by resident (`CONTEXT.md`: Repeat block): they
+  // stay while other cards are open, until given or discarded.
+  const [queuePlans, setQueuePlans] = useState<Record<string, QueuePlan>>({})
+  const planQueue = (id: string, plan: QueuePlan | undefined) =>
+    setQueuePlans((plans) => {
+      const next = { ...plans }
+      if (plan) next[id] = plan
+      else delete next[id]
+      return next
+    })
   const [starting, setStarting] = useState<Starting>()
   // The param whose value the map is waiting for: of the running script, or for the form.
   const pickingParam = paramPick ?? starting?.picking
@@ -473,6 +487,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (!selected) return
+    const open = queuePlans[selected.id]
+    if (open) {
+      planQueue(selected.id, planStep(open, step.order, step.at))
+      return
+    }
     const order = { ...step.order, residentId: selected.id }
     setOrderError(await sendOrder(appendRequest(selected, order, step.at) ?? order))
   }
@@ -1300,9 +1319,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
               )
             }
-            onEditQueue={async (steps, loop) =>
-              setOrderError(await sendOrder(editRequest(selected, steps, loop)))
-            }
+            // A paste into the planner of a resident with no queue starts one; steps wrapped in
+            // a repeat block open a plan to give instead.
+            onEditQueue={async (items: PlanItem[], loop?: boolean) => {
+              if (!hasBlocks(items))
+                return setOrderError(await sendOrder(givePlan(selected, { items, loop })))
+              const from = selected.queue ? planOf(selected.queue) : EMPTY_PLAN
+              planQueue(selected.id, editPlan(from, items, loop))
+            }}
+            queuePlan={queuePlans[selected.id]}
+            onPlanQueue={(plan) => planQueue(selected.id, plan)}
+            onGivePlan={async () => {
+              const plan = queuePlans[selected.id]
+              if (!plan) return
+              planQueue(selected.id, undefined)
+              setOrderError(await sendOrder(givePlan(selected, plan)))
+            }}
             addStep={addStep(world)}
             onClose={() => {
               setSelectedIds([])
@@ -1369,6 +1401,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 addStep={addStep(world)}
                 scripts={scripts}
                 buildings={world.buildings}
+                lastSeen={world.lastSeen.buildings}
+                realm={world.home.realmId}
               />
             }
             collapsed={pick?.kind === 'group' || pick?.kind === 'plan'}
