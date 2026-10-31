@@ -91,6 +91,10 @@ describe('doingLine', () => {
       'Building a house: fetching 10 wood and 4 stone from the storage',
     )
     expect(line({ order: null, script: builder })).toBe('Building a house: waiting')
+    // Its script waits on the order (`CONTEXT.md`: Running a script, Waiting).
+    expect(line({ order: fetch, script: { ...builder, waiting: true } })).toBe(
+      'Building a house: fetching 10 wood and 4 stone from the storage · script waiting',
+    )
     expect(line({ order: build, script: { scriptId: 2, building: 'lumberCamp' } })).toBe(
       'Building a lumber camp',
     )

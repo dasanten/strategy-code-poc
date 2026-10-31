@@ -271,8 +271,8 @@ function seenCarriage(world: WorldState, insight: Insight, k: Carriage): SeenCar
 /**
  * What a Player sees of the script a resident runs (`SeenScript`): which one, and for the owning
  * Player (`own`) what goes into the resident's Doing line (`CONTEXT.md`: Doing): the task, the
- * kind of building the task is about, as its memory names it (`TaskMemory`), and the text the
- * script gave `doing()`.
+ * kind of building the task is about, as its memory names it (`TaskMemory`), the text the
+ * script gave `doing()`, and whether it waits (`CONTEXT.md`: Running a script, Waiting).
  */
 export function seenScript(world: WorldState, script: RunningScript, own: boolean): SeenScript {
   if (!own) return { scriptId: script.scriptId }
@@ -287,6 +287,7 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
     ...(script.task ? { task: script.task } : {}),
     ...(building ? { building } : {}),
     ...(typeof memory.doing === 'string' && memory.doing ? { doing: memory.doing } : {}),
+    ...(script.waitingSince !== undefined ? { waiting: true as const } : {}),
   }
 }
 

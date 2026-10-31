@@ -1,6 +1,12 @@
 import { SCRIPT_STEP_BUDGET, TICKS_PER_GAME_HOUR, type ScriptSummary } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { defenceChoices, errorWhen, groupDefenceScript, stepsText } from './script-run-view.js'
+import {
+  defenceChoices,
+  errorWhen,
+  groupDefenceScript,
+  stepsText,
+  waitingText,
+} from './script-run-view.js'
 
 describe('stepsText', () => {
   it('shows the steps used against the budget, and why it stopped when it ran out', () => {
@@ -9,6 +15,15 @@ describe('stepsText', () => {
       `${SCRIPT_STEP_BUDGET} / ${SCRIPT_STEP_BUDGET} steps: ran out, stopped for the tick`,
     )
     expect(stepsText({ steps: 0, outOfSteps: 'realm' })).toMatch(/realm’s scripts used up/)
+  })
+})
+
+describe('waitingText', () => {
+  it('says the script waits on the order, and since when in game time', () => {
+    expect(waitingText(100, 100)).toBe('Waiting until the order ends · began just now')
+    expect(waitingText(100, 100 + 2 * TICKS_PER_GAME_HOUR)).toBe(
+      'Waiting until the order ends · began 2 hours ago',
+    )
   })
 })
 

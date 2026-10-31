@@ -491,6 +491,60 @@ describe('Build a … here from a node’s card', () => {
   })
 })
 
+describe('Defaults waiting while their order runs (`CONTEXT.md`: Running a script, Waiting)', () => {
+  /**
+   * w1 given Build at a node far off, its default as shipped or as an edited copy: the ticks
+   * its script ran, until the site is laid out, and where they stand then.
+   */
+  function buildFarOff(edited: boolean) {
+    const world = farmWorld()
+    world.residents = world.residents.filter((r) => r.id === 'w1')
+    world.nodes.push({ id: 'n1', kind: 'forest', x: 13, y: 9 })
+    const corner = nodeCorner(world, terrain, world.nodes[0]!)!
+    if (edited) {
+      const id = defaultScriptId(db, mara, 'build')
+      saveScript(db, mara, id, { source: `${DEFAULT_SCRIPTS.build.source}\n// mine\n` })
+      expect(runnableScript(db, id)?.followsDefault).toBe(false)
+    }
+    const orders = queue()
+    orders.receive(world, sender(), 'q', {
+      kind: 'task',
+      task: 'build',
+      residentId: 'w1',
+      building: 'lumberCamp',
+      at: corner,
+    })
+    orders.applyAll(world)
+    const runner = new ScriptRunner(terrain, host())
+    const walking = new Walking(terrain)
+    const ran: number[] = []
+    for (let i = 0; i < 500 && !world.buildings.some((b) => b.kind === 'lumberCamp'); i++) {
+      for (const r of world.residents) r.hunger = MAX_HUNGER
+      expect(runner.runAll(world, true)).toEqual([])
+      if (runner.runs > 0) ran.push(world.tick)
+      stepWorld(world, terrain, walking)
+    }
+    return { ran, w1: world.residents[0]!, corner, tick: world.tick }
+  }
+
+  it('Build runs once to set off, not on the way, and again on arrival', () => {
+    const { ran, w1, corner, tick } = buildFarOff(false)
+    expect(w1).toMatchObject(corner)
+    expect(w1.order).toMatchObject({ kind: 'build' })
+    // Set off, arrived, laid out: the walk of many ticks between ran no script.
+    expect(tick).toBeGreaterThan(8)
+    expect(ran.length).toBeLessThanOrEqual(3)
+  })
+
+  it('an edited copy waits just like the default', () => {
+    const shipped = buildFarOff(false)
+    const edited = buildFarOff(true)
+    expect(edited.ran).toEqual(shipped.ran)
+    expect(edited.tick).toBe(shipped.tick)
+    expect(edited.w1).toMatchObject(edited.corner)
+  })
+})
+
 describe('Build for a group (`CONTEXT.md`: Group)', () => {
   it('walks each to the same tile: the first lays out the site and the others join it', () => {
     const world = farmWorld()

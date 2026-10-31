@@ -49,6 +49,11 @@ export interface TickHealth {
   residents: number
   actions: number
   /**
+   * The scripts that ran this tick, the Players' and the NPC cities' residents': waiting ones
+   * (`CONTEXT.md`: Running a script, Waiting) and those a realm's budget skipped don't count.
+   */
+  scriptRuns: number
+  /**
    * How many times a side's sight was worked out this tick (`SightCache.builds`): about one per
    * realm or NPC city looking, per phase; one per socket would show here.
    */
@@ -146,7 +151,7 @@ export function runTick(
     const check = shouldCheckInvariants(opts.invariantSampleRate, opts.rand)
     const scriptViolations = timer.time('scripts', () => opts.scripts?.runAll(world, check) ?? [])
     const before = timer.time('invariants', () => (check ? tallyGoods(world) : undefined))
-    const { actions } = timer.time('world', () => {
+    const { actions, npcScriptRuns } = timer.time('world', () => {
       takeMade(world)
       return stepWorld(world, terrain, opts.walking, timer)
     })
@@ -169,6 +174,7 @@ export function runTick(
       phases: timer.phases,
       residents: world.residents.length,
       actions,
+      scriptRuns: (opts.scripts?.runs ?? 0) + npcScriptRuns,
       sightBuilds: sight.builds,
       slow: durationMs > opts.slowTickMs,
     }
