@@ -60,6 +60,7 @@ function setup() {
       y,
       hunger: MAX_HUNGER,
       health: MAX_HEALTH,
+      name: 'Rowan',
       stats: { speed: 10, strength: 10, endurance: 10 },
       bornAt: 0,
     })

@@ -384,6 +384,7 @@ function withCarriage(world: WorldState) {
     y: 3,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    name: 'Rowan',
     stats: { ...AVERAGE_HORSE_STATS },
     bornAt: 0,
   })
@@ -584,6 +585,7 @@ describe('the step budget', () => {
           y: 3,
           hunger: MAX_HUNGER,
           health: MAX_HEALTH,
+          name: 'Rowan',
           stats: { ...AVERAGE_HORSE_STATS },
           bornAt: 0,
         })
@@ -610,6 +612,7 @@ describe('the step budget', () => {
           ...at,
           hunger: 100,
           health: 100,
+          name: 'Rowan',
           stats: { ...AVERAGE_HORSE_STATS },
           bornAt: 0,
         })

@@ -61,6 +61,7 @@ function setup(food: number) {
       y: 11,
       hunger: MAX_HUNGER,
       health: MAX_HEALTH,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })
@@ -149,6 +150,7 @@ describe('feeding the stable', () => {
       y: 15,
       hunger: MAX_HUNGER,
       health: MAX_HEALTH,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })

@@ -290,6 +290,7 @@ describe('the admin inspector', () => {
         y: 1,
         hunger: 40,
         health: 90,
+        name: 'Rowan',
         stats: { speed: 12, strength: 8, endurance: 10 },
         bornAt: 0,
       },
