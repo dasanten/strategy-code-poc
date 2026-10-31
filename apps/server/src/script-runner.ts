@@ -27,6 +27,7 @@ import {
   SCRIPT_MEMORY_MAX,
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
+  SCRIPT_VALUE_LIMITS,
   type BuildingKind,
   type City,
   type OrderRequest,
@@ -89,6 +90,21 @@ export interface ScriptHost {
    * on the task without one (`RunningScript.task`); without it such a script ends.
    */
   defaultScript?(userId: number, task: Task): number
+  /**
+   * Where an error of the game's own while running scripts is reported (ADR 0004). One in a
+   * script's run ends that script and is reported with its `scriptId` and resident or army; one
+   * in a realm's set-up skips the realm's scripts for the tick and is reported without. Either
+   * way the tick goes on.
+   */
+  scriptError?(world: WorldState, error: unknown, where: ScriptErrorWhere): void
+}
+
+/** Where an error of the game's own hit while running scripts (`ScriptHost.scriptError`). */
+export interface ScriptErrorWhere {
+  realmId: string
+  /** The resident or army whose script ended; none when the whole realm's set-up failed. */
+  entityIds: string[]
+  scriptId?: number
 }
 
 interface RunScriptRequest extends OrderRequest {
@@ -511,35 +527,11 @@ export class ScriptRunner {
     // Those whose script ran this tick, not skipped for the realm's budget.
     const ran = new Set<string>()
     for (const realm of world.realms) {
-      const running = byRealm.get(realm.id)
-      const sender = this.host.sender(realm.userId)
-      if (!running || !sender) continue
-      let seen: SeenEntity[] | undefined
-      const seenOnce = () => (seen ??= entitiesInSight(world, this.terrain, realm.id))
-      const sees = seesOnce(world, this.terrain, realm.id)
-      let left = SCRIPT_REALM_STEP_BUDGET
-      const first = world.tick % running.length
-      for (let i = 0; i < running.length; i++) {
-        const r = running[(first + i) % running.length]!
-        // Its script may have ended this tick.
-        if (!r.holder.script) continue
-        if (left <= 0) {
-          r.holder.script.lastRun = { steps: 0, outOfSteps: 'realm' }
-          logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, true))
-          continue
-        }
-        ran.add(r.id)
-        const steps = Math.min(SCRIPT_STEP_BUDGET, left)
-        left -= this.runOne(
-          world,
-          realm,
-          sender,
-          r,
-          steps,
-          { seen: seenOnce, sees },
-          used,
-          check ? out : undefined,
-        )
+      // A bug of the game's in one realm's scripts never stops the other realms' or the tick.
+      try {
+        this.runRealm(world, realm, byRealm.get(realm.id), used, ran, check ? out : undefined)
+      } catch (error) {
+        this.host.scriptError?.(world, error, { realmId: realm.id, entityIds: [] })
       }
     }
     this.programs = used
@@ -553,6 +545,70 @@ export class ScriptRunner {
       out.push(...defaultsHaveATarget(world, taskOf))
     }
     return out
+  }
+
+  /** Runs one realm's scripts in turn, within the realm's step budget. */
+  private runRealm(
+    world: WorldState,
+    realm: Realm,
+    running: Runner[] | undefined,
+    used: Map<number, { source: string; program: Program }>,
+    ran: Set<string>,
+    violations: InvariantViolation[] | undefined,
+  ): void {
+    const sender = this.host.sender(realm.userId)
+    if (!running || !sender) return
+    let seen: SeenEntity[] | undefined
+    const seenOnce = () => (seen ??= entitiesInSight(world, this.terrain, realm.id))
+    const sees = seesOnce(world, this.terrain, realm.id)
+    let left = SCRIPT_REALM_STEP_BUDGET
+    const first = world.tick % running.length
+    for (let i = 0; i < running.length; i++) {
+      const r = running[(first + i) % running.length]!
+      // Its script may have ended this tick.
+      if (!r.holder.script) continue
+      if (left <= 0) {
+        r.holder.script.lastRun = { steps: 0, outOfSteps: 'realm' }
+        logLimited(world, realm.id, r, 'budgetLoggedAt', outOfSteps(r, true))
+        continue
+      }
+      ran.add(r.id)
+      const steps = Math.min(SCRIPT_STEP_BUDGET, left)
+      try {
+        left -= this.runOne(
+          world,
+          realm,
+          sender,
+          r,
+          steps,
+          { seen: seenOnce, sees },
+          used,
+          violations,
+        )
+      } catch (error) {
+        // The game's own bug, not the script's: it ends this one script and the tick goes on.
+        left -= steps
+        this.failedInGame(world, realm, r, error)
+      }
+    }
+  }
+
+  /**
+   * A script's run threw something the game didn't expect, from a native or from applying what
+   * it requested: a bug in the game. The script ends as with `end()`, the realm log notes it
+   * once (the script doesn't run again, so it isn't rate-limited) and monitoring gets the error.
+   */
+  private failedInGame(world: WorldState, realm: Realm, r: Runner, error: unknown): void {
+    const running = r.holder.script
+    const scriptId = running?.scriptId
+    if (running) {
+      const message = `the game hit an error running this script, so it ended: ${errorMessage(error)}`
+      recordEvent(world, realm.id, scriptError(r, running, message))
+      endScript(world, r.id)
+      delete r.holder.script
+    }
+    const where = scriptId === undefined ? {} : { scriptId }
+    this.host.scriptError?.(world, error, { realmId: realm.id, entityIds: [r.id], ...where })
   }
 
   /** Runs one resident's or army's script with `steps`; returns the steps it used. */
@@ -616,7 +672,12 @@ export class ScriptRunner {
       kinds: this.kinds,
     })
     const { globals, requests } = bound
-    const result = run(parsed.program, { globals, steps, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    const result = run(parsed.program, {
+      globals,
+      steps,
+      maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
+    })
     if (violations) {
       const sound = 'armyId' in r.bind ? armyScriptRequestsSound : scriptRequestsSound
       violations.push(...sound(world, this.terrain, sender, r.id, requests, this.kinds))
@@ -697,6 +758,12 @@ function endScript(world: WorldState, residentId: string): void {
   if (!r) return
   delete r.script
   r.order = null
+}
+
+/** What an error of the game's own says, short enough for the realm log. */
+function errorMessage(error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error)
+  return text.length > 200 ? `${text.slice(0, 199)}…` : text
 }
 
 const scriptError = (
@@ -866,7 +933,12 @@ function runCityScripts(
       params: program.params,
     })
     const { globals, requests } = bound
-    run(program, { globals, steps: SCRIPT_STEP_BUDGET, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+    run(program, {
+      globals,
+      steps: SCRIPT_STEP_BUDGET,
+      maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+      limits: SCRIPT_VALUE_LIMITS,
+    })
     // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
     if (bound.ended()) {

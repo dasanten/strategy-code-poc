@@ -90,6 +90,7 @@ describe('param lines', () => {
       globals: { memory, params: { a: null } },
       steps: 100,
       maxCallDepth: 10,
+      limits: { maxStringLength: 100, maxListLength: 10, maxObjectKeys: 10 },
     })
     expect(result.status).toBe('done')
     expect(memory).toEqual({ seen: null })

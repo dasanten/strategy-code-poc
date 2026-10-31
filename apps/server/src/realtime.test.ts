@@ -16,7 +16,7 @@ import { createAdmin, createInviteCode, createSession, signUp } from './auth.js'
 import { recordEvent } from './events.js'
 import { ExploredTerrain } from './explored.js'
 import type { InvariantViolation } from './invariants.js'
-import { openDb, schema } from './db/index.js'
+import { openDb, schema, type Db } from './db/index.js'
 import { OrderQueue, orderKinds, type OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { SightTracker } from './sight.js'
@@ -35,7 +35,14 @@ afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn()
 })
 
-async function start(options: { kinds?: Record<string, OrderKind>; onError?: OnError } = {}) {
+/**
+ * Starts a server. `sessionDb` is what the upgrade checks sessions against, the app's db unless
+ * given; `kinds` the order kinds, the game's unless given; `onError` hears of a message handler's
+ * exceptions.
+ */
+async function start(
+  options: { sessionDb?: Db; kinds?: Record<string, OrderKind>; onError?: OnError } = {},
+) {
   const opened = await openDb(':memory:')
   const app = await buildApp({
     db: opened.db,
@@ -54,7 +61,7 @@ async function start(options: { kinds?: Record<string, OrderKind>; onError?: OnE
     tickError() {},
   }
   const realtime = attachRealtime(app.server, {
-    db: opened.db,
+    db: options.sessionDb ?? opened.db,
     world,
     terrain,
     explored: new ExploredTerrain(terrain),
@@ -132,6 +139,31 @@ describe('realtime', () => {
       socket.on('unexpected-response', (_req, res) => resolve(res.statusCode)),
     )
     expect(status).toBe(401)
+  })
+
+  /** The status the server refuses an upgrade with. */
+  const refusal = (socket: WebSocket) =>
+    new Promise<number | undefined>((resolve) =>
+      socket.on('unexpected-response', (_req, res) => resolve(res.statusCode)),
+    )
+
+  it('refuses a malformed session cookie and keeps serving the next upgrade', async () => {
+    const { url, token } = await start()
+    // Not valid percent-encoding: decoding it threw inside the upgrade and ended the process.
+    expect(await refusal(connect(url, '%E0%A4%A').socket)).toBe(401)
+    const { next } = connect(url, token)
+    expect(await next('welcome')).toMatchObject({ type: 'welcome', account: { name: 'Daniel' } })
+  })
+
+  it('refuses an upgrade that errors unexpectedly with 400, instead of going down', async () => {
+    const broken = {
+      select() {
+        throw new Error('database gone')
+      },
+    } as unknown as Db
+    const { url, token } = await start({ sessionDb: broken })
+    expect(await refusal(connect(url, token).socket)).toBe(400)
+    expect(await refusal(connect(url, token).socket)).toBe(400)
   })
 
   it('welcomes a logged-in Player, then sends only changes', async () => {
