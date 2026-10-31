@@ -358,12 +358,11 @@ describe('planning ahead', () => {
   it('turns down a step whose place can’t make sense', () => {
     const s = farOff()
     const work = (workplaceId: string) => ({ order: { kind: 'task', task: 'work', workplaceId } })
-    expect(s.reason('queue', [work('nowhere')])).toBe('step 1: no such building')
     expect(s.reason('queue', [walk(1, 1), walk(SIZE, 1)])).toBe('step 2: that tile is off the map')
     const road = { kind: 'roadLine', from: { x: 1, y: 1 }, to: { x: 1, y: -1 } }
     expect(s.reason('queue', [{ order: road }])).toBe('step 1: that tile is off the map')
-    expect(s.reason('queue', [{ order: { kind: 'store', goods: ['wood'], to: 'gone' } }])).toBe(
-      'step 1: no such storage',
+    expect(s.reason('queue', [{ order: { kind: 'board', carriageId: 'k9' } }])).toBe(
+      'step 1: no such carriage',
     )
     expect(s.reason('queue', [{ order: { kind: 'fetch', goods: ['food'], from: 'k2' } }])).toBe(
       'step 1: not a carriage of your realm',
@@ -401,9 +400,22 @@ describe('planning ahead', () => {
         { id: 2, ...workF2() },
       ]),
     ).toBe(undefined)
-    expect(s.reason('editQueue', [{ id: 1, ...walk(20, 6) }, workF2()])).toBe(
-      'step 2: no such building',
-    )
+    // Added again, as a saved queue loaded after the tear-down: given, to be skipped too.
+    expect(s.reason('editQueue', [{ id: 1, ...walk(20, 6) }, workF2()])).toBe(undefined)
+  })
+
+  it('gives a step whose building or storage is gone, and skips it when its turn comes', () => {
+    const s = farOff()
+    // A saved queue loaded after its workplace and storage were torn down (`CONTEXT.md`: Saved queue).
+    const work = { order: { kind: 'task', task: 'work', workplaceId: 'torn-down' }, minutes: 5 }
+    const store = { order: { kind: 'store', goods: ['wood'], to: 'torn-down-storage' } }
+    expect(s.reason('queue', [work, store, walk(3, 3)])).toBeUndefined()
+    for (let i = 0; i < 100 && (i === 0 || s.r.queue); i++) s.tick()
+    expect(skips(s.world.events)).toEqual([
+      expect.objectContaining({ step: 1, order: 'task' }),
+      expect.objectContaining({ step: 2, order: 'store' }),
+    ])
+    expect(s.r).toMatchObject({ x: 3, y: 3 })
   })
 })
 
