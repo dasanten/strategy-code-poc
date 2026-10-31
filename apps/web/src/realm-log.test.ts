@@ -306,6 +306,35 @@ describe('realm log', () => {
     })
   })
 
+  it('describes town halls occupied and occupations broken, to both sides', () => {
+    const hall = { cityId: 'c1', city: 'Ashford', x: 4, y: 5, seq: 9, ...at } as const
+    const places = [{ name: 'Ashford’s town hall', x: 4, y: 5 }]
+    const occupied = { ...hall, kind: 'hallOccupied', days: 10 } as const
+    expect(describeEvent({ ...occupied, other: 'Northmarch', occupier: false })).toEqual({
+      text: 'Your town hall in Ashford is occupied by the realm of Northmarch: it falls in 10 game days unless you retake it.',
+      tone: 'bad',
+      places,
+    })
+    expect(describeEvent({ ...occupied, other: null, occupier: true })).toEqual({
+      text: 'You hold the town hall of Ashford: 10 game days to capture it.',
+      tone: 'info',
+      places,
+    })
+    const broken = { ...hall, kind: 'occupationBroken' } as const
+    expect(describeEvent({ ...broken, other: 'Northmarch', occupier: false })).toEqual({
+      text: 'The occupation of your town hall in Ashford by the realm of Northmarch is broken.',
+      tone: 'info',
+      places,
+    })
+    expect(describeEvent({ ...broken, other: 'Mara', occupier: true })).toEqual({
+      text: 'Your occupation of Ashford’s town hall is broken: its days are lost.',
+      tone: 'warn',
+      places,
+    })
+    const gone = { ...broken, x: undefined, y: undefined }
+    expect(describeEvent({ ...gone, other: null, occupier: true }).places).toBeUndefined()
+  })
+
   it('describes alliance events, saying which are about the Player’s own realm', () => {
     const north = { allianceId: 'a1', name: 'North', seq: 6, ...at } as const
     const about = (realmId: string) => ({ ...north, realmId, realm: 'Tobin' })

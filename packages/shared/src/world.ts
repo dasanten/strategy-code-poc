@@ -1269,6 +1269,36 @@ export type RealmEventWhat =
       residents: number
     }
   /**
+   * The town hall of `city`, at (`x`, `y`), is now occupied (`CONTEXT.md`: Occupying a town hall):
+   * by this realm, when `occupier`, and held `days` game days it captures the city from the realm
+   * of `other` (null for an NPC city); or, when not `occupier`, by the realm of `other`, and the
+   * city falls to it in `days` game days unless this realm retakes its hall.
+   */
+  | {
+      kind: 'hallOccupied'
+      cityId: string
+      city: string
+      other: string | null
+      occupier: boolean
+      days: number
+      x: number
+      y: number
+    }
+  /**
+   * The occupation of `city`'s town hall, at (`x`, `y`) while it stands, is broken and its days
+   * are lost: this realm's, when `occupier`, of a city of the realm of `other` (null for an NPC
+   * city), or, when not `occupier`, the one by the realm of `other`.
+   */
+  | {
+      kind: 'occupationBroken'
+      cityId: string
+      city: string
+      other: string | null
+      occupier: boolean
+      x?: number
+      y?: number
+    }
+  /**
    * The realm bought the NPC city `city` (`CONTEXT.md`: Buying a city) for `price` coins, now
    * gone, with its `residents`; its town hall is at (`x`, `y`).
    */

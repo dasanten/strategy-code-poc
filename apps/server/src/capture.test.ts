@@ -1,11 +1,13 @@
 import {
   AVERAGE_HORSE_STATS,
+  OCCUPATION_GAME_DAYS,
   OCCUPATION_TICKS,
   TICKS_PER_GAME_DAY,
   Terrain,
   defendsCity,
   occupationTicksLeft,
   occupierOf,
+  realmName,
   townHallOf,
   type City,
   type TerrainMap,
@@ -261,6 +263,85 @@ describe('occupying a town hall', () => {
     for (const r of world.residents) if (r.cityId === 'npc') r.owner = 'r2'
     ally(world, 'r1', 'r2')
     expect(names()).toEqual(['occupations-sound'])
+  })
+})
+
+describe('occupations in the realm log', () => {
+  /** The occupation events in the world's logs, as (Player, kind, other, occupier). */
+  const logged = (world: WorldState) =>
+    world.events
+      .filter((e) => e.kind === 'hallOccupied' || e.kind === 'occupationBroken')
+      .map((e) => [e.userId, e.kind, 'other' in e ? e.other : '', 'occupier' in e && e.occupier])
+
+  it('an NPC city has no log: only the occupier hears it is occupied and broken', () => {
+    const { world, npc, n1 } = setup()
+    Object.assign(n1, { x: 30, y: 20 })
+    armed(resident(world, 'a2', 'r1', 21, 21))
+    tick(world)
+    const hall = townHallOf(world, npc)!
+    expect(world.events.find((e) => e.kind === 'hallOccupied')).toMatchObject({
+      userId: 7,
+      tick: world.tick,
+      cityId: 'npc',
+      city: 'Dunmere',
+      other: null,
+      occupier: true,
+      days: OCCUPATION_GAME_DAYS,
+      x: hall.x,
+      y: hall.y,
+    })
+    tick(world)
+    expect(logged(world)).toEqual([[7, 'hallOccupied', null, true]])
+    armed(n1)
+    Object.assign(n1, { x: 20, y: 22 })
+    tick(world)
+    expect(world.events.at(-1)).toMatchObject({
+      userId: 7,
+      kind: 'occupationBroken',
+      cityId: 'npc',
+      x: hall.x,
+      y: hall.y,
+    })
+    expect(logged(world)).toEqual([
+      [7, 'hallOccupied', null, true],
+      [7, 'occupationBroken', null, true],
+    ])
+  })
+
+  it('a Player’s city: both realms hear it, by each other’s name, and a new occupier is both', () => {
+    const { world } = setup()
+    world.realms.push({ id: 'r3', userId: 9, leaderId: 'c1', name: 'Northmarch' })
+    resident(world, 'c1', 'r3', 5, 5)
+    addCity(world, { id: 'c2', realmId: 'r2', x: 40, y: 40 })
+    const a2 = armed(resident(world, 'a2', 'r1', 40, 41))
+    tick(world)
+    const r1 = realmName(world, 'r1')
+    const r2 = realmName(world, 'r2')
+    expect(logged(world)).toEqual([
+      [7, 'hallOccupied', r2, true],
+      [8, 'hallOccupied', r1, false],
+    ])
+    // r1 leaves the hall the tick r3 steps onto it: one occupation broken, the next started.
+    world.events = []
+    a2.x = 10
+    armed(resident(world, 'c3', 'r3', 41, 41))
+    tick(world)
+    expect(logged(world)).toEqual([
+      [7, 'occupationBroken', r2, true],
+      [8, 'occupationBroken', r1, false],
+      [9, 'hallOccupied', r2, true],
+      [8, 'hallOccupied', 'Northmarch', false],
+    ])
+  })
+
+  it('a capture ends the occupation without a break in the logs', () => {
+    const { world, npc } = setup()
+    armed(resident(world, 'a2', 'r1', 21, 20))
+    heldAllButOneTick(world, npc, 'r1')
+    tick(world)
+    expect(npc.realmId).toBe('r1')
+    tick(world)
+    expect(world.events.map((e) => e.kind)).toEqual(['cityCaptured'])
   })
 })
 
