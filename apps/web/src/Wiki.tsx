@@ -65,6 +65,7 @@ import {
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
   HORSE_GRANT_FOOD,
+  HQ_FLOOR_FACTOR,
   HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
   HUNGRY_HORSE_PACE,
@@ -170,6 +171,7 @@ import {
   WALK_TICKS_PER_TILE,
   aboutTime,
   WAREHOUSE_BASE_PRICE,
+  WAREHOUSE_FLOOR,
   WEAPON_ATTACK,
   WORK_SKILL_EFFECT,
   WORK_SKILL_MAX,
@@ -1313,6 +1315,17 @@ export function Wiki() {
           isn't short of what it makes, they stop. A good with no node in reach stays short: a
           village with no ore in reach forges no weapons, and a mint is built only with Gold ore in
           reach.
+        </p>
+        <h3>Trading posts and the HQ</h3>
+        <p>
+          The Trade Organization runs its own chain the same way. A trading post's reserve is its
+          warehouse's stock floor ({num(WAREHOUSE_FLOOR.ironOre)} Iron ore,{' '}
+          {num(WAREHOUSE_FLOOR.wood)} Wood, {num(WAREHOUSE_FLOOR.coins)} coins and so on), the HQ's{' '}
+          {num(HQ_FLOOR_FACTOR)} times that; their Food is their storage's, kept by their farmers.
+          Their spare hands work and build for whatever their warehouses are short of, on the
+          nearest node within {num(NPC_NODE_REACH)} tiles, and carry the output into the warehouse,
+          so less of its stock comes from the floor. A post never grows in people; the HQ grows only
+          while it is too weak. Neither sends a trader or founds a city.
         </p>
         <p>
           Once one good's surplus makes a full load for one of its spare hands (beside the Food for

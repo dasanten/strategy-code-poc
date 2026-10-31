@@ -67,15 +67,17 @@ function sideOf(world: WorldState, sender: OrderSender): string | undefined {
 }
 
 /**
- * The place an id names: a finished storage or stable, anyone's, or a carriage of the sender's
- * own. An id may also come as anything with an `id`, such as a building a script holds.
+ * The place an id names: a finished storage or stable, anyone's, a Trade Org city's own warehouse
+ * (`CONTEXT.md`: Warehouse) when that city sends it, or a carriage of the sender's own. An id may
+ * also come as anything with an `id`, such as a building a script holds.
  */
 function namedPlace(world: WorldState, side: string | undefined, id: unknown) {
   const key = typeof id === 'object' && id !== null ? (id as { id?: unknown }).id : id
   if (typeof key !== 'string') return undefined
   const b = world.buildings.find((x) => x.id === key)
   if (b) {
-    return PLACE_KINDS.includes(b.kind) && !b.site
+    const ownWarehouse = b.kind === 'warehouse' && side !== undefined && b.cityId === side
+    return (PLACE_KINDS.includes(b.kind) || ownWarehouse) && !b.site
       ? ({ kind: 'storage', storageId: b.id } as const)
       : undefined
   }

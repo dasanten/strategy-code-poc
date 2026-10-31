@@ -32,7 +32,14 @@ import { caravanCrew } from './caravans.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { npcHome } from './npc-behaviour.js'
 import { cityGrows, cityProject, endPairs, isBuilder, pairAdults } from './npc-growth.js'
-import { chainGood, chainInput, holdsBatch, ownWorkplaces, shortGoods } from './npc-chain.js'
+import {
+  chainGood,
+  chainInput,
+  chainStore,
+  holdsBatch,
+  ownWorkplaces,
+  shortGoods,
+} from './npc-chain.js'
 import { planTrader, traderOut } from './npc-trader.js'
 import { hash } from './residents.js'
 
@@ -42,10 +49,10 @@ import { hash } from './residents.js'
  * decides everything that takes thought and keeps the result in the city's plan
  * (`WorldState.cityPlans`): pairs, the next project, and a job for every adult. Between passes
  * the city only hands idle residents their planned job (`stepNpcCities`), and a worker stays where
- * the plan put them until the next pass moves them. An NPC city shares its adults out by its
- * reserve (`shareOut`); the Trade Organization's cities put farms first until they have a food
- * surplus, soldiers to no work, at most `NPC_BUILDERS` building and everyone else at the first
- * workplace with room.
+ * the plan put them until the next pass moves them. A city shares its adults out by its reserve
+ * (`shareOut`): an NPC city by its NPC reserve, the Trade Organization's cities by their
+ * warehouses' stock floor (`tradeOrgReserve`). Neither the HQ nor a trading post ever sends a
+ * trader or founds a city (`tradeOrgSendsNoOne`).
  */
 
 /** Whether a city's planning pass is due this tick: once every `NPC_PLAN_TICKS`, staggered by id. */
@@ -156,13 +163,11 @@ export function workplaceOf(r: Resident): string | undefined {
 /**
  * A city's planning pass (`CONTEXT.md`: NPC city; ADR 0016): makes or remakes its plan from what
  * it has now. Ends its pairs with no child on the way while Food runs short, else pairs adults
- * while it has a food surplus; picks its project (`cityProject`), if it grows and Food isn't
- * short; and gives every adult a job: soldiers (armed adults) stand as soldiers; one carrying a
- * child does nothing; builders go on building; a worker stays at their workplace, except that
- * while Food runs short workers off the farms move to farms with room. An NPC city shares out
- * the rest by its reserve (`shareOut`); for the Trade Organization's cities they build the
- * project while fewer than `NPC_BUILDERS` do, else take the first workplace with room, farms first
- * until the city has a food surplus, else are idle. Without `terrain` the city picks no project.
+ * while it has a food surplus, if it grows (`cityGrows`); picks its project (`cityProject`) while
+ * Food isn't short; and gives every adult a job: soldiers (armed adults) stand as soldiers; one
+ * carrying a child does nothing; builders go on building; a worker stays at their workplace,
+ * except that while Food runs short workers off the farms move to farms with room. It shares out
+ * the rest by its reserve (`shareOut`). Without `terrain` the city picks no project.
  * `people` are the residents the city gives orders to (`runResidents`).
  */
 export function planCity(
@@ -182,7 +187,7 @@ export function planCity(
   }
   const home = npcHome(world, city)
   const project =
-    grows && !short && terrain && home ? cityProject(world, city, home, terrain) : undefined
+    !short && terrain && home ? cityProject(world, city, home, terrain, grows) : undefined
   if (project) plan.project = project
   else delete plan.project
 
@@ -190,7 +195,7 @@ export function planCity(
   const placeById = new Map(places.map((p) => [p.id, p]))
   const held = new Places(people)
   const jobs: Record<string, CityJob> = {}
-  let builders = adults.filter(isBuilder).length
+  const builders = adults.filter(isBuilder).length
   const spare: Resident[] = []
   // The trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
   const trader = city.tradeOrg ? undefined : traderOut(world, plan)
@@ -221,23 +226,10 @@ export function planCity(
       }
     }
   }
-  if (!city.tradeOrg) {
-    shareOut(world, city, adults, jobs, held, spare, plan.project, builders, short)
-    if (!trader) planTrader(world, city, plan, adults, jobs, short, terrain?.size ?? MAP_SIZE)
-    plan.jobs = jobs
-    return plan
-  }
-  for (const r of spare) {
-    if (plan.project && builders < NPC_BUILDERS && canTakePart(world, city, r, plan.project)) {
-      jobs[r.id] = { kind: 'build' }
-      builders++
-      continue
-    }
-    const place = places.find((p) => held.room(p) > 0)
-    if (place) {
-      jobs[r.id] = workJob(place)
-      held.take(place)
-    } else jobs[r.id] = { kind: 'idle' }
+  shareOut(world, city, adults, jobs, held, spare, plan.project, builders, short)
+  // The Trade Organization sends no trader (`tradeOrgSendsNoOne`).
+  if (!city.tradeOrg && !trader) {
+    planTrader(world, city, plan, adults, jobs, short, terrain?.size ?? MAP_SIZE)
   }
   plan.jobs = jobs
   return plan
@@ -314,9 +306,7 @@ function shareOut(
     if (farming >= wanted) break
     if (jobs[r.id]?.kind === 'work' && !toFarm(r)) break
   }
-  const storage = world.buildings.find(
-    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-  )
+  const storage = chainStore(world, city)
   for (const r of rest) {
     if (project && builders < NPC_BUILDERS && canTakePart(world, city, r, project)) {
       jobs[r.id] = { kind: 'build' }
@@ -392,9 +382,7 @@ function canTakePart(world: WorldState, city: City, r: Resident, project: CityPr
   const need = materialsNeeded(site)
   const goods = Object.keys(need) as (keyof typeof need)[]
   if (goods.length === 0) return true
-  const storage = world.buildings.find(
-    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-  )
+  const storage = chainStore(world, city)
   return goods.some((g) => (r.carried[g] ?? 0) > 0 || (storage?.stock?.[g] ?? 0) > 0)
 }
 
@@ -464,7 +452,7 @@ export const cityPlansSound: Invariant = {
  * this tick, while it plans fewer farmers than feed all its residents (`farmersWanted` without
  * the one more) and one of its farms has room, no adult it could send there is idle or working
  * elsewhere (soldiers, builders and those carrying a child aside). Residents born this tick don't
- * count; the Trade Organization's cities share out their adults otherwise.
+ * count. The Trade Organization's cities keep theirs the same way.
  */
 export const npcFarmersKept: Invariant = {
   name: 'npc-farmers-kept',
@@ -473,7 +461,7 @@ export const npcFarmersKept: Invariant = {
     const residents = new Map(world.residents.map((r) => [r.id, r]))
     for (const [cityId, plan] of Object.entries(world.cityPlans)) {
       const city = world.cities.find((c) => c.id === cityId)
-      if (!city || city.tradeOrg || plan.plannedAt !== world.tick) continue
+      if (!city || plan.plannedAt !== world.tick) continue
       const wanted = feeders(cityResidents(world, city).filter((r) => r.bornAt < world.tick).length)
       const jobs = Object.values(plan.jobs)
       const farmers = jobs.filter((j) => j.kind === 'farm').length
@@ -491,6 +479,29 @@ export const npcFarmersKept: Invariant = {
           invariant: this.name,
           message: `${cityId} plans ${farmers} of ${wanted} farmers, and ${residentId} ${job.kind === 'idle' ? 'idle' : `at ${job.buildingId}`}`,
           entityIds: [cityId, residentId],
+        })
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * The Trade Organization sends no trader and founds nothing (`CONTEXT.md`: Trade Org HQ, Trading
+ * post; ADR 0004): no plan of the HQ or a trading post gives anyone a `trade` or `found` job.
+ */
+export const tradeOrgSendsNoOne: Invariant = {
+  name: 'trade-org-sends-no-one',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const city of world.cities) {
+      if (!city.tradeOrg) continue
+      for (const [residentId, job] of Object.entries(world.cityPlans[city.id]?.jobs ?? {})) {
+        if (job.kind !== 'trade' && job.kind !== 'found') continue
+        out.push({
+          invariant: this.name,
+          message: `${city.id}, of the Trade Organization, gives ${residentId} a ${job.kind} job`,
+          entityIds: [city.id, residentId],
         })
       }
     }
