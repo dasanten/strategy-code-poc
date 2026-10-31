@@ -21,6 +21,7 @@ import {
   STABLE_CAPACITY,
   breedersAt,
   keptBreeding,
+  teacherAt,
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
@@ -594,6 +595,18 @@ const aOrAn = (words: string) => `${/^[aeiou]/.test(words) ? 'an' : 'a'} ${words
 const capital = (words: string) => `${words[0]!.toUpperCase()}${words.slice(1)}`
 
 /**
+ * Who teaches what at a training ground, among the residents in sight (`teacherAt`): "Ann
+ * teaches Strength", or "Nobody teaches here yet".
+ */
+function teacherLine(ground: Building, t: TileThings): string {
+  const teacher = teacherAt(ground, t.residents ?? [])
+  const o = teacher?.order
+  return teacher && o?.kind === 'teach'
+    ? `${teacher.name} teaches ${capital(o.subject)}`
+    : 'Nobody teaches here yet'
+}
+
+/**
  * What an unbuilt resource node's card says (`CONTEXT.md`: Resource node, Workplace): what can be
  * built on it and whether it fits, what that takes, makes and teaches, and what a worker of
  * average Strength and no skill makes there a game day.
@@ -815,9 +828,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       }
       const makes = live && makesLine(live, t, pile, goodLabels)
       if (makes) lines.push(makes)
-      // A finished training ground teaches nothing until someone teaches there (`CONTEXT.md`:
-      // Training ground); the Teach order comes with Training's next ticket.
-      if (building.kind === 'trainingGround') lines.push('Nobody teaches here yet')
+      // A finished training ground teaches what its teacher set, and nothing while nobody
+      // teaches there (`CONTEXT.md`: Training ground, Teacher).
+      if (building.kind === 'trainingGround') lines.push(teacherLine(building, t))
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)

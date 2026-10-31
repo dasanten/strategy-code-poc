@@ -1401,6 +1401,7 @@ const ADULT_ORDERS = new Set([
   'wallLine',
   'tearDown',
   'workAt',
+  'teach',
   'breed',
   'drive',
 ])
@@ -1650,6 +1651,40 @@ export const wallDamageSound: Invariant = {
 }
 
 /**
+ * Teachers are sound (`CONTEXT.md`: Teacher): a teacher stands on the footprint of a finished
+ * training ground, and a ground has at most one teacher.
+ */
+export const teachersSound: Invariant = {
+  name: 'teachers-sound',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const teachers = new Map<string, string>()
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'teach') continue
+      const ground = world.buildings.find((b) => b.id === o.buildingId)
+      const other = teachers.get(o.buildingId)
+      const problem =
+        !ground || ground.kind !== 'trainingGround' || ground.site
+          ? `teaches at ${o.buildingId}, no finished training ground`
+          : !isAt(r, ground, terrain.size)
+            ? `teaches at ${ground.id} but stands off it, on (${r.x}, ${r.y})`
+            : other !== undefined
+              ? `teaches at ${ground.id}, where ${other} teaches already`
+              : undefined
+      if (problem)
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${problem}`,
+          entityIds: other === undefined ? [r.id] : [r.id, other],
+        })
+      else teachers.set(o.buildingId, r.id)
+    }
+    return out
+  },
+}
+
+/**
  * Climb orders are sound (`CONTEXT.md`: Walls in combat): the climber stands where they started
  * climbing, and is between 0 and 1 of the way over.
  */
@@ -1893,6 +1928,7 @@ export const worldInvariants: Invariant[] = [
   gatesSound,
   wallDamageSound,
   climbOrdersSound,
+  teachersSound,
   tradeOrgSound,
   caravansSound,
   routeRobberiesSound,

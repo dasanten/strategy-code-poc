@@ -1,4 +1,4 @@
-import { GOODS, HORSE_STAT_NAMES, STAT_NAMES, type SkillName } from './world.js'
+import { GOODS, HORSE_STAT_NAMES, SKILL_NAMES, STAT_NAMES } from './world.js'
 
 /**
  * Script views (`CONTEXT.md`: Script view; ADR 0011): what a script gets of each kind of thing,
@@ -67,17 +67,6 @@ const field = (
 
 const view = (name: ScriptViewName): ScriptType => ({ view: name })
 const listOf = (type: ScriptType): ScriptType => ({ list: type })
-
-const SKILLS: readonly SkillName[] = [
-  'mining',
-  'woodcutting',
-  'smelting',
-  'smithing',
-  'construction',
-  'farming',
-  'combat',
-  'driving',
-]
 
 const id = (what: string) => field('id', 'string', `The ${what}’s id, unique in the world.`)
 const x = field('x', 'number', 'The tile it stands on, from west to east.')
@@ -298,7 +287,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
   },
   skills: {
     description: 'What a resident has learned by doing; a skill they haven’t learned is null (0).',
-    fields: SKILLS.map((s) =>
+    fields: SKILL_NAMES.map((s) =>
       field(s, 'number', `How far they have learned ${s}.`, 'until they start learning it'),
     ),
   },
@@ -336,7 +325,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
       ),
       field('target', view('tile'), 'Where a walk or drive goes.', 'for other orders'),
       field(
@@ -351,7 +340,13 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'How far into the next step or piece of work; for breeding, the ticks tended so far.',
         'for orders that have none',
       ),
-      field('buildingId', 'string', 'The building worked or torn down.', 'for other orders'),
+      field(
+        'buildingId',
+        'string',
+        'The building worked, taught at or torn down.',
+        'for other orders',
+      ),
+      field('subject', 'string', 'The stat or skill taught.', 'for other orders'),
       field('building', 'string', 'The kind of building being built.', 'for other orders'),
       field(
         'siteId',
@@ -498,7 +493,21 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
   },
   building: {
     description: 'A building or construction site, as the Player sees it.',
-    fields: BUILDING_FIELDS,
+    fields: [
+      ...BUILDING_FIELDS,
+      field(
+        'teacher',
+        'string',
+        'The resident teaching at a training ground.',
+        'for any other building, and while nobody teaches there',
+      ),
+      field(
+        'subject',
+        'string',
+        'The stat or skill a training ground teaches: "strength", "endurance", "agility", "intellect" or a skill such as "combat".',
+        'for any other building, and while nobody teaches there',
+      ),
+    ],
   },
   site: {
     description: 'How far a construction site has come.',

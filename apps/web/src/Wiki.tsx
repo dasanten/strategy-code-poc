@@ -899,7 +899,11 @@ export function Wiki() {
           city's area; a town hall, storage, wall or gate goes anywhere off Mountain and off
           resource nodes, and a new town hall founds a city. A training ground, where residents
           will train under a teacher, goes anywhere off Mountain and off resource nodes too, and
-          like a workplace it belongs to nobody.
+          like a workplace it belongs to nobody. A grown resident standing on a finished one can{' '}
+          <b>Teach</b> a stat or a skill there (a script's <code>teach("strength")</code>); the
+          ground then teaches that subject. It has one teacher at a time, so a second Teach there
+          fails. Walking off or taking another order ends the teaching, and the ground teaches
+          nothing until someone teaches again. The ground's card names the teacher and subject.
         </p>
         <p>
           A resident building or tearing down who carries less Food than <code>foodAt</code> (

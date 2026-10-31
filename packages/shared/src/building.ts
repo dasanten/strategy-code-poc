@@ -28,6 +28,7 @@ import {
   type ResourceNode,
   type Stock,
   type WorldState,
+  isTrainingSubject,
 } from './world.js'
 import {
   Terrain,
@@ -503,6 +504,49 @@ export function workersOf<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
     (r) => r.order?.kind === 'workAt' && r.order.buildingId === workplace.id && isAt(r, workplace),
   )
 }
+
+/**
+ * Who teaches at a training ground (`CONTEXT.md`: Teacher): the resident holding a teach order
+ * for it and standing on its footprint, found from residents' orders as workers are; the ground
+ * keeps no state of its own.
+ */
+export function teacherAt<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
+  ground: Building,
+  residents: readonly R[],
+  size = MAP_SIZE,
+): R | undefined {
+  return residents.find(
+    (r) => r.order?.kind === 'teach' && r.order.buildingId === ground.id && isAt(r, ground, size),
+  )
+}
+
+/**
+ * Why a resident can't start teaching `subject` at the building on their tile, or undefined if
+ * they can (`CONTEXT.md`: Teacher): it has to be a finished training ground nobody else teaches
+ * at, and they grown. A teacher there may switch to another subject.
+ */
+export function teachProblem(
+  world: WorldState,
+  resident: Resident,
+  subject: unknown,
+): string | undefined {
+  if (!canWork(resident, world.tick)) return 'children can’t teach'
+  if (!isTrainingSubject(subject)) return 'teach a stat or a skill'
+  const here = buildingAt(world, resident.x, resident.y)
+  if (!here || here.kind !== 'trainingGround') return 'there is no training ground here'
+  if (here.site) return 'it is still a construction site'
+  const o = resident.order
+  if (o?.kind === 'teach' && o.buildingId === here.id && o.subject === subject)
+    return 'already teaching here'
+  const teacher = teacherAt(here, world.residents)
+  if (teacher && teacher !== resident) {
+    const what = teacher.order?.kind === 'teach' ? teacher.order.subject : subject
+    return `${teacher.name} teaches ${capitalised(what)} here`
+  }
+  return undefined
+}
+
+const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /**
  * The realms holding a workplace (`CONTEXT.md`: Holding a workplace): those whose residents work

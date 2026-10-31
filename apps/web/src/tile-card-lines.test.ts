@@ -145,6 +145,17 @@ describe('buildings on a tile’s card', () => {
     expect(linesOf({ buildings: [site] })).not.toContain('Nobody teaches here yet')
   })
 
+  it('names who teaches what at a training ground, while they stand on it', () => {
+    const ground = building({ id: 'g1', kind: 'trainingGround', x: 4, y: 4 })
+    const ann = resident({
+      name: 'Ann',
+      order: { kind: 'teach', buildingId: 'g1', subject: 'strength' },
+    })
+    expect(linesOf({ buildings: [ground], residents: [ann] })).toContain('Ann teaches Strength')
+    const off = { ...ann, x: 9 }
+    expect(linesOf({ buildings: [ground], residents: [off] })).toContain('Nobody teaches here yet')
+  })
+
   it('links a warehouse and a trading NPC city’s storage to their prices', () => {
     const cities = [
       { id: 'c-post', name: 'Saltgate', realmId: null, tradeOrg: 'post' as const },
