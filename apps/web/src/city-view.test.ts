@@ -9,6 +9,7 @@ import {
   type City,
   type NpcCityPrice,
   type Resident,
+  type TradeLimit,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
@@ -16,6 +17,7 @@ import {
   describeBuying,
   describeCity,
   deliveryCities,
+  holderText,
   npcStoragesInSight,
   previewDelivery,
   previewNpcTrade,
@@ -28,6 +30,7 @@ import {
   tradedGoods,
   tradeLists,
   tradersAt,
+  tradeText,
   warehousesInSight,
 } from './city-view.js'
 
@@ -180,10 +183,46 @@ describe('trading at a warehouse in the inspector', () => {
       horseId: null,
       load: {},
     }
-    expect(previewTrade(seen, 'w1', trader, carriage, 'iron', 2, 0, [])).toEqual({
-      buy: { units: 0, coins: 0 },
-      sell: { units: 0, coins: 0 },
-    })
+    const empty = previewTrade(seen, 'w1', trader, carriage, 'iron', 2, 0, [])
+    expect(empty.buy).toEqual({ units: 0, coins: 0, limit: 'coins' })
+    expect(empty.sell).toEqual({ units: 0, coins: 0, limit: 'held' })
+    expect(empty.holder.stock).toBe(carriage.load)
+  })
+
+  it('says why a trade at the warehouse won’t go, or what cut it down', () => {
+    const q = (carried: Resident['carried'], stock: Building['stock']) =>
+      previewTrade(
+        { ...seen, buildings: [seen.buildings[0]!, { ...warehouse, stock }] },
+        'w1',
+        { ...trader, carried } as Resident,
+        undefined,
+        'iron',
+        5,
+        0,
+        [],
+      )
+    expect(q({ iron: 2 }, { iron: 20, coins: 500 }).buy.limit).toBe('coins')
+    expect(q({ coins: 100 }, { iron: 0, coins: 500 }).buy.limit).toBe('stock')
+    expect(q({ coins: 100 }, { iron: 20, coins: 500 }).sell.limit).toBe('held')
+    expect(q({ iron: 2 }, { iron: 20, coins: 0 }).sell.limit).toBe('theirCoins')
+    expect(q({ coins: 100, stone: 40 }, { iron: 20, coins: 500 }).buy.limit).toBe('room')
+    // Cut down: 3 of the 5 in stock, 2 of the 5 held to sell.
+    const cut = q({ iron: 2, coins: 100 }, { iron: 3, coins: 500 })
+    expect(cut.buy).toMatchObject({ units: 3, limit: 'stock' })
+    expect(cut.sell).toMatchObject({ units: 2, limit: 'held' })
+    // A trade that moves all it asks for names no limit.
+    expect(q({ iron: 9, coins: 100 }, { iron: 20, coins: 500 }).sell.limit).toBe(undefined)
+  })
+
+  it('says what the trader holds and the room left', () => {
+    const hands = previewTrade(seen, 'w1', trader, undefined, 'iron', 1, 0, []).holder
+    expect(holderText(hands, 'iron', 'iron', undefined)).toBe(
+      `Carries 100 coins and 2 iron; room for ${hands.room} kg more (${Math.floor(hands.room)} iron)`,
+    )
+    const load = { stock: { coins: 40, spear: 1 }, room: 10.5 }
+    expect(holderText(load, 'spear', 'spear', 'k1')).toBe(
+      'Carriage k1 holds 40 coins and 1 spear; room for 10.5 kg more (3 spear)',
+    )
   })
 
   it('previews a delivery to and a pick-up from one of the Player’s cities, fee and all', () => {
@@ -279,11 +318,63 @@ describe('trading with an NPC city in the inspector', () => {
     } as unknown as Resident
     const q = (good: 'food' | 'wood', units: number) =>
       previewNpcTrade([food, wood], storage, trader, undefined, good, units, 0, [])
-    expect(q('food', 50).buy).toEqual({ units: 10, coins: 30 })
+    expect(q('food', 50).buy).toEqual({ units: 10, coins: 30, limit: 'stock' })
     expect(q('food', 50).sell.units).toBe(0)
     // It lacks 20 wood, but has only 12 coins: 3 wood at 4 coins.
-    expect(q('wood', 10).sell).toEqual({ units: 3, coins: 12 })
+    expect(q('wood', 10).sell).toEqual({ units: 3, coins: 12, limit: 'theirCoins' })
     expect(q('wood', 10).buy.units).toBe(0)
+  })
+
+  it('says why a trade with an NPC city won’t go, or what cut it down', () => {
+    const trader = (carried: Resident['carried']) =>
+      ({ carried, bornAt: -1e9, stats: { strength: { base: 10, trained: 0 } } }) as never
+    const q = (carried: Resident['carried'], good: 'food' | 'wood') =>
+      previewNpcTrade([food, wood], storage, trader(carried), undefined, good, 50, 0, [])
+    expect(q({ coins: 100 }, 'food').buy).toEqual({ units: 10, coins: 30, limit: 'stock' })
+    expect(q({ coins: 100 }, 'wood').buy.limit).toBe('stock')
+    expect(q({ wood: 1 }, 'food').buy.limit).toBe('coins')
+    expect(q({ coins: 100, stone: 40 }, 'food').buy.limit).toBe('room')
+    expect(q({ food: 5 }, 'food').sell.limit).toBe('unwanted')
+    expect(q({ coins: 5 }, 'wood').sell.limit).toBe('held')
+    // A city that names the Player no prices won't trade with them.
+    const refused = previewNpcTrade(undefined, storage, trader({}), undefined, 'food', 5, 0, [])
+    expect(refused.buy).toEqual({
+      units: 0,
+      coins: 0,
+      limit: 'refused',
+    })
+  })
+})
+
+describe('the trade buttons', () => {
+  it('names the trade, and what cut it down', () => {
+    expect(tradeText('buy', 'iron', { units: 4, coins: 36 }, false)).toBe('Buy 4 iron for 36 coins')
+    expect(tradeText('buy', 'iron', { units: 4, coins: 36, limit: 'coins' }, false)).toBe(
+      'Buy 4 iron for 36 coins: your coins run out',
+    )
+    expect(tradeText('sell', 'wood', { units: 3, coins: 12, limit: 'theirCoins' }, false)).toBe(
+      'Sell 3 wood for 12 coins: its coins run out',
+    )
+  })
+
+  it('says why a trade won’t go', () => {
+    const zero = (limit?: TradeLimit) => ({ units: 0, coins: 0, ...(limit ? { limit } : {}) })
+    expect(tradeText('buy', 'iron', zero('coins'), false)).toBe('Can’t buy iron: no coins in hand')
+    expect(tradeText('buy', 'iron', zero('coins'), true)).toBe(
+      'Can’t buy iron: no coins on the carriage',
+    )
+    expect(tradeText('sell', 'iron', zero('held'), false)).toBe(
+      'Can’t sell iron: nothing of it to sell',
+    )
+    expect(tradeText('buy', 'iron', zero('room'), false)).toBe('Can’t buy iron: no room')
+    expect(tradeText('buy', 'iron', zero('stock'), false)).toBe('Can’t buy iron: none in stock')
+    expect(tradeText('sell', 'food', zero('unwanted'), false)).toBe(
+      'Can’t sell food: it doesn’t want it',
+    )
+    expect(tradeText('buy', 'food', zero('refused'), false)).toBe(
+      'Can’t buy food: it won’t trade with you',
+    )
+    expect(tradeText('buy', 'food', zero(), false)).toBe('Can’t buy food')
   })
 })
 
