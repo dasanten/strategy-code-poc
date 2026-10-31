@@ -1458,8 +1458,9 @@ export type RealmEventWhat =
   | { kind: 'allianceLeader'; allianceId: string; name: string; realmId: string; realm: string }
   /**
    * A resident's or army's script stopped with an error this tick (`CONTEXT.md`: Running a
-   * script); it runs again next tick. `line` and `column` say where, when the error is in the
-   * script itself. Script events name the resident by `residentId` or the army by `armyId`.
+   * script); it runs again next tick, unless the error was the game's own (the message says so):
+   * then the script ended. `line` and `column` say where, when the error is in the script
+   * itself. Script events name the resident by `residentId` or the army by `armyId`.
    */
   | ({
       kind: 'scriptError'

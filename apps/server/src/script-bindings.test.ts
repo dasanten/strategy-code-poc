@@ -2,8 +2,10 @@ import { parse, run, type ScriptObject, type Value } from '@csp/lang'
 import {
   DOING_MAX_LENGTH,
   HAUL_KEEP_FOOD,
+  SCRIPT_ACTION_VALUE_MAX,
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_VALUE_LIMITS,
   SIGHT_RANGE,
   TICKS_PER_GAME_YEAR,
   DIAGONAL_STEP,
@@ -91,6 +93,7 @@ function runAs(
     globals: bindings.globals,
     steps: 10_000,
     maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+    limits: SCRIPT_VALUE_LIMITS,
   })
   return { result, ...bindings, memory }
 }
@@ -413,8 +416,56 @@ describe('script bindings', () => {
   it('pass no function to an action', () => {
     const { world, explored } = setup()
     const { result, requests } = runAs(world, explored, 'walkTo(fn () {}, 1)')
-    expect(result).toMatchObject({ status: 'error' })
+    expect(result).toMatchObject({ status: 'error', message: /function/ })
     expect(requests).toEqual([])
+  })
+
+  it('rejects a doubly-shared action value of 40 levels within 50 ms', () => {
+    const { world, explored } = setup()
+    let value: Value = { leaf: 'x' }
+    for (let level = 0; level < 40; level += 1) value = { a: value, b: value }
+    const started = performance.now()
+    const { result, requests } = runAs(world, explored, 'pickUp({ kind: "ground" }, memory.big)', {
+      big: value,
+    })
+    expect(performance.now() - started).toBeLessThan(50)
+    expect(result).toMatchObject({
+      status: 'error',
+      message: `A value passed to an action can have at most ${SCRIPT_ACTION_VALUE_MAX} characters`,
+    })
+    expect(requests).toEqual([])
+  })
+
+  it('rejects an action value that holds itself, with a clear message', () => {
+    const { world, explored } = setup()
+    const loop: ScriptObject = {}
+    loop.self = loop
+    const { result, requests } = runAs(world, explored, 'pickUp({ kind: "ground" }, memory.loop)', {
+      loop,
+    })
+    expect(result).toMatchObject({ status: 'error', message: /holds itself/ })
+    expect(requests).toEqual([])
+  })
+
+  it('passes shared references within the limit as plain data', () => {
+    const { world, explored } = setup()
+    const goods: ScriptObject = { food: 1 }
+    const { result, requests } = runAs(world, explored, 'pickUp({ kind: "ground" }, memory.same)', {
+      same: goods,
+      other: [goods, goods],
+    })
+    expect(result).toMatchObject({ status: 'done' })
+    expect(requests).toMatchObject([{ kind: 'pickUp', goods: { food: 1 } }])
+  })
+
+  it('"withMemory" has the same limit on its value', () => {
+    const { world, explored } = setup()
+    let value: Value = { leaf: 'x' }
+    for (let level = 0; level < 40; level += 1) value = { a: value, b: value }
+    const started = performance.now()
+    const { result } = runAs(world, explored, 'withMemory("role", memory.big)', { big: value })
+    expect(performance.now() - started).toBeLessThan(50)
+    expect(result).toMatchObject({ status: 'error', message: /at most/ })
   })
 })
 

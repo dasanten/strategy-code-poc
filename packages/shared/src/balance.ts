@@ -1717,6 +1717,32 @@ export const SCRIPT_STEP_BUDGET = 2000
 export const SCRIPT_MAX_CALL_DEPTH = 50
 
 /**
+ * The longest string a script may build, in characters (`CONTEXT.md`: Value limits): as much as
+ * its whole memory holds (`SCRIPT_MEMORY_MAX`), so no one string outgrows it. Past the cap the
+ * script stops with a runtime error.
+ */
+export const SCRIPT_MAX_STRING_LENGTH = 4000
+
+/**
+ * The most items a list a script builds may hold (`CONTEXT.md`: Value limits): more than a large
+ * realm has residents and buildings in sight, so a script can collect all it sees in one list.
+ */
+export const SCRIPT_MAX_LIST_LENGTH = 500
+
+/**
+ * The most keys an object a script builds may hold (`CONTEXT.md`: Value limits): plenty for a
+ * memory keyed by id or tile, far fewer than the memory could hold anyway.
+ */
+export const SCRIPT_MAX_OBJECT_KEYS = 200
+
+/** The three together, in the shape the interpreter's `run` takes (`ValueLimits` in `@csp/lang`). */
+export const SCRIPT_VALUE_LIMITS = {
+  maxStringLength: SCRIPT_MAX_STRING_LENGTH,
+  maxListLength: SCRIPT_MAX_LIST_LENGTH,
+  maxObjectKeys: SCRIPT_MAX_OBJECT_KEYS,
+}
+
+/**
  * Extra steps a script pays to ask the world something it sees as a list (`residents()`,
  * `buildings()`, `nodes()`, …), on top of the 1 every evaluated node costs (`CONTEXT.md`: Step
  * budget). Dear enough that a script keeps what it found in a variable rather than asking again.
@@ -1746,6 +1772,14 @@ export const SCRIPT_REALM_STEP_BUDGET = 20000
 export const SCRIPT_MEMORY_MAX = 4000
 
 /**
+ * The most a value a script passes to an action or `withMemory` may hold, in characters of its
+ * JSON: as much as its memory, so anything a script keeps it can also pass. Script values are
+ * shared by reference, so one built in a few steps can stand for far more than this; the check
+ * gives up as soon as it passes the limit and the call fails with a runtime error.
+ */
+export const SCRIPT_ACTION_VALUE_MAX = SCRIPT_MEMORY_MAX
+
+/**
  * The longest text a script can give `doing()` for its resident's Doing line (`CONTEXT.md`:
  * Doing), in characters after trimming; longer text is cut. One line of the resident card.
  */
@@ -1762,6 +1796,26 @@ export const SCRIPT_LOG_LINES = 20
  * or running out of steps), so a script failing every tick doesn't flood the log. A minute.
  */
 export const SCRIPT_LOG_INTERVAL = 60
+
+/**
+ * The most scripts a Player's library holds (`CONTEXT.md`: Library cap), their default scripts
+ * among them; a new script past it is refused until one is deleted. A few dozen: room for a
+ * script per task and plenty of experiments, too few to grow the database without bound.
+ */
+export const SCRIPT_LIBRARY_MAX_SCRIPTS = 40
+
+/**
+ * The most versions one script keeps (`CONTEXT.md`: Library cap); a save or reset past it is
+ * refused until old versions are deleted. A few dozen saves of history to go back to.
+ */
+export const SCRIPT_MAX_VERSIONS = 40
+
+/**
+ * Script library writes (create, save, rename, activate, reset, delete) one Player may make in a
+ * minute before the server answers 429. One a second: far more than anyone saves by hand, so
+ * only a script hammering the API ever meets it.
+ */
+export const SCRIPT_WRITES_PER_MINUTE = 60
 
 /** The most steps a queue holds (`CONTEXT.md`: Queue): plenty for a day's round. */
 export const QUEUE_MAX_STEPS = 20

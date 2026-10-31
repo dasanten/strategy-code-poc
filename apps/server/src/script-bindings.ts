@@ -1,15 +1,10 @@
-import {
-  NativeFunction,
-  ScriptFunction,
-  ScriptRuntimeError,
-  type ScriptObject,
-  type Value,
-} from '@csp/lang'
+import { NativeFunction, ScriptRuntimeError, type ScriptObject, type Value } from '@csp/lang'
 import {
   ARMY_SCRIPT_API,
   GOODS,
   HAUL_KEEP_FOOD,
   RECIPES,
+  SCRIPT_ACTION_VALUE_MAX,
   SCRIPT_API,
   SCRIPT_VIEWS,
   Terrain,
@@ -50,10 +45,11 @@ import {
   type WorldState,
 } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
-import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
+import { orderKindOf, orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
 import { sightOf } from './sight.js'
 import { lastSeenOutOfSight } from './last-seen.js'
+import { plainValue, type PlainValue } from './plain-value.js'
 import { paramTarget } from './script-params.js'
 import { realmOf } from './starting-city.js'
 
@@ -267,7 +263,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   /** Asks for an order for `me`, checked exactly as one from the UI. */
   const request = (kind: string, input: Record<string, unknown>): Value => {
     const order: OrderRequest = { kind, ...forMe, ...input }
-    const orderKind = kinds[kind]
+    const orderKind = orderKindOf(kinds, kind)
     if (!orderKind) throw new Error(`no order kind ${kind} for the script action`)
     const reason = orderKind.validate(world, sender, order, terrain)
     if (reason !== undefined) return reason
@@ -641,7 +637,7 @@ function requestsSound(
         message: `${id}'s script requested ${order.kind}: ${message}`,
         entityIds: [id],
       })
-    const kind = kinds[order.kind]
+    const kind = orderKindOf(kinds, order.kind)
     if (!allowed.includes(order.kind) || !kind) {
       fail(`not an order ${who === 'army' ? 'an army' : 'a resident'} can get`)
     } else if (order[field] !== id) fail(`for another ${who}, ${String(order[field])}`)
@@ -698,17 +694,24 @@ function toValue(data: unknown): Value {
   return null
 }
 
-/** A script value as plain data for an order request; functions can't be sent. */
-function plain(value: Value | undefined): unknown {
+/**
+ * A script value as plain data for an order request, within `SCRIPT_ACTION_VALUE_MAX` characters
+ * of JSON; functions, values that hold themselves and larger values can't be sent.
+ */
+function plain(value: Value | undefined): PlainValue | undefined {
   if (value === undefined || value === null) return undefined
-  if (value instanceof NativeFunction || value instanceof ScriptFunction) {
-    throw new ScriptRuntimeError('A function can’t be passed to an action')
+  const result = plainValue(value, SCRIPT_ACTION_VALUE_MAX)
+  if (result.ok) return result.value
+  switch (result.why) {
+    case 'function':
+      throw new ScriptRuntimeError('A function can’t be passed to an action')
+    case 'cycle':
+      throw new ScriptRuntimeError('A value that holds itself can’t be passed to an action')
+    case 'size':
+      throw new ScriptRuntimeError(
+        `A value passed to an action can have at most ${SCRIPT_ACTION_VALUE_MAX} characters`,
+      )
   }
-  if (typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map(plain)
-  const out: Record<string, unknown> = {}
-  for (const [key, item] of Object.entries(value)) out[key] = plain(item)
-  return out
 }
 
 /** A place for `store` and `fetch`: its id, or the id of a thing a script holds, like a building. */

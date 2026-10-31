@@ -9,6 +9,7 @@ import {
   createTickReporter,
   flushSentry,
   initSentry,
+  reportClientError,
   setupFastifyErrorHandler,
   tagWorld,
 } from './monitoring.js'
@@ -68,9 +69,15 @@ const app = await buildApp({
   world,
   terrain,
   territory,
+  // Attached below, once the app has its server; logout and resets only run after that.
+  sockets: {
+    disconnectSession: (tokenHash) => realtime.disconnectSession(tokenHash),
+    disconnectUser: (userId) => realtime.disconnectUser(userId),
+  },
 })
 if (sentryOn) setupFastifyErrorHandler(app)
 
+const reporter = createTickReporter(logger)
 const scriptHost: ScriptHost = {
   script: (id) => runnableScript(db, id),
   sender: (userId) => {
@@ -83,6 +90,7 @@ const scriptHost: ScriptHost = {
   },
   explored: (userId, x, y) => explored.isExplored({ id: userId }, x, y),
   defaultScript: (userId, task) => defaultScriptId(db, userId, task),
+  scriptError: (world, error, where) => reporter.scriptError(world, error, where),
 }
 const kinds = {
   ...orderKinds,
@@ -99,7 +107,6 @@ const queues = new QueueRunner(scriptHost, kinds, terrain)
 const scripts = new ScriptRunner(terrain, scriptHost)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
-const reporter = createTickReporter(logger)
 // Players who haven't edited a default script run the game's current default from now on.
 syncDefaultScripts(db)
 // Players whose scripts read a field a script view dropped since the last start are told so.
@@ -115,6 +122,8 @@ const realtime = attachRealtime(app.server, {
   orders,
   territory,
   sightCheck: { reporter, sampleRate: config.invariantSampleRate },
+  logger,
+  onError: (error, userId) => reportClientError(logger, error, userId),
 })
 
 const loop = setInterval(() => {

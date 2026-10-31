@@ -13,6 +13,7 @@ import {
   ADMIN_TERRAIN_OVERVIEW_PATH,
   ADMIN_TERRITORY_PATH,
   ADMIN_WORLD_PATH,
+  SCRIPT_WRITES_PER_MINUTE,
   SESSION_COOKIE,
   type Account,
   type AdminDirectives,
@@ -41,6 +42,7 @@ import {
   logIn,
   resetPassword,
   signUp,
+  type SessionSockets,
   type SessionUser,
 } from './auth.js'
 import { schema, type Db } from './db/index.js'
@@ -80,12 +82,16 @@ export interface AppOptions {
   explored?: ExploredTerrain
   /** Login and sign-up attempts allowed per IP and minute. */
   authRateLimit?: number
+  /** Script library writes allowed per Player and minute; `SCRIPT_WRITES_PER_MINUTE` by default. */
+  scriptWriteRateLimit?: number
   /** The running world, for admin directives and the admin map. Without it there is neither. */
   world?: WorldState
   /** The world's terrain, for the admin map's wrapping view; needed with `world`. */
   terrain?: TerrainMap
   /** The world's territory, for the admin map's territory layer. */
   territory?: TerritoryTracker
+  /** The open sockets (`attachRealtime`), closed when logout or a password reset ends sessions. */
+  sockets?: SessionSockets
 }
 
 declare module 'fastify' {
@@ -107,6 +113,7 @@ const STATUS: Record<ApiError['error'], number> = {
   'script-has-errors': 422,
   'default-script': 409,
   'active-version': 409,
+  'library-full': 409,
 }
 
 function fail(reply: FastifyReply, code: ApiError['error'], message: string) {
@@ -180,7 +187,7 @@ export async function buildApp(opts: AppOptions) {
 
   app.post('/api/logout', async (req, reply) => {
     const token = req.cookies[SESSION_COOKIE]
-    if (token) deleteSession(db, token)
+    if (token) deleteSession(db, token, opts.sockets)
     reply.clearCookie(SESSION_COOKIE, { path: '/' })
     return reply.code(204).send()
   })
@@ -209,39 +216,54 @@ export async function buildApp(opts: AppOptions) {
     type ById = { Params: { id: string } }
     const id = (req: FastifyRequest<ById>) => Number(req.params.id)
     lib.get('/api/scripts', async (req) => listScripts(db, req.user!.id))
-    lib.post('/api/scripts', async (req, reply) => {
-      const b = body(req)
-      return reply
-        .code(201)
-        .send(createScript(db, req.user!.id, { name: b.name, source: b.source }))
-    })
     lib.get<ById>('/api/scripts/:id', async (req) => getScript(db, req.user!.id, id(req)))
-    lib.post<ById>('/api/scripts/:id/versions', async (req, reply) => {
-      const b = body(req)
-      return reply.code(201).send(saveScript(db, req.user!.id, id(req), { source: b.source }))
-    })
-    lib.post<ById>('/api/scripts/:id/name', async (req) =>
-      renameScript(db, req.user!.id, id(req), { name: body(req).name }),
-    )
-    lib.post<ById>('/api/scripts/:id/active', async (req) =>
-      activateVersion(db, req.user!.id, id(req), { version: body(req).version }),
-    )
-    // Resetting a default script makes the game's current default its newest version.
-    lib.post<ById>('/api/scripts/:id/reset', async (req) => resetScript(db, req.user!.id, id(req)))
-    // Deleting versions (`CONTEXT.md`: Script): one, or all older than the active one.
-    lib.delete<{ Params: { id: string; version: string } }>(
-      '/api/scripts/:id/versions/:version',
-      async (req) =>
-        deleteVersion(db, req.user!.id, Number(req.params.id), {
-          version: Number(req.params.version),
+
+    // The writes share one rate limit per Player (`CONTEXT.md`: Library cap), so a script
+    // hammering the API can't grow the database faster than a Player saving by hand would.
+    lib.register(async (write) => {
+      write.addHook(
+        'onRequest',
+        app.rateLimit({
+          max: opts.scriptWriteRateLimit ?? SCRIPT_WRITES_PER_MINUTE,
+          timeWindow: '1 minute',
+          keyGenerator: (req) => (req.user ? `user:${req.user.id}` : req.ip),
         }),
-    )
-    lib.post<ById>('/api/scripts/:id/delete-older', async (req) =>
-      deleteOlderVersions(db, req.user!.id, id(req)),
-    )
-    lib.delete<ById>('/api/scripts/:id', async (req, reply) => {
-      deleteScript(db, req.user!.id, id(req))
-      return reply.code(204).send()
+      )
+      write.post('/api/scripts', async (req, reply) => {
+        const b = body(req)
+        return reply
+          .code(201)
+          .send(createScript(db, req.user!.id, { name: b.name, source: b.source }))
+      })
+      write.post<ById>('/api/scripts/:id/versions', async (req, reply) => {
+        const b = body(req)
+        return reply.code(201).send(saveScript(db, req.user!.id, id(req), { source: b.source }))
+      })
+      write.post<ById>('/api/scripts/:id/name', async (req) =>
+        renameScript(db, req.user!.id, id(req), { name: body(req).name }),
+      )
+      write.post<ById>('/api/scripts/:id/active', async (req) =>
+        activateVersion(db, req.user!.id, id(req), { version: body(req).version }),
+      )
+      // Resetting a default script makes the game's current default its newest version.
+      write.post<ById>('/api/scripts/:id/reset', async (req) =>
+        resetScript(db, req.user!.id, id(req)),
+      )
+      // Deleting versions (`CONTEXT.md`: Script): one, or all older than the active one.
+      write.delete<{ Params: { id: string; version: string } }>(
+        '/api/scripts/:id/versions/:version',
+        async (req) =>
+          deleteVersion(db, req.user!.id, Number(req.params.id), {
+            version: Number(req.params.version),
+          }),
+      )
+      write.post<ById>('/api/scripts/:id/delete-older', async (req) =>
+        deleteOlderVersions(db, req.user!.id, id(req)),
+      )
+      write.delete<ById>('/api/scripts/:id', async (req, reply) => {
+        deleteScript(db, req.user!.id, id(req))
+        return reply.code(204).send()
+      })
     })
   })
 
@@ -257,7 +279,7 @@ export async function buildApp(opts: AppOptions) {
     })
     admin.post('/api/admin/password', async (req, reply) => {
       const b = body(req)
-      await resetPassword(db, b.name, b.password)
+      await resetPassword(db, b.name, b.password, opts.sockets)
       return reply.code(204).send()
     })
 

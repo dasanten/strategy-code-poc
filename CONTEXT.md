@@ -716,11 +716,17 @@ The shared language of the game. Domain terms only — no implementation details
   step starts. `end(reason)` also notes the short reason in the realm log ("Ana stopped Work: no
   workplace on her tile"). The defaults end that way when their target is missing or gone; the
   Build, Tear down and Breed horses defaults also end once the site is finished, the building is
-  gone or the foal is born. A saved change is picked up on the next tick: each save is a new version, and the
+  gone or the foal is born. A script's own runtime error stops it for the tick and it runs again
+  next tick; an error of the game's own while running it ends the script like `end()`, noted
+  once in the realm log, and the rest of the tick goes on for everyone else. A saved change is
+  picked up on the next tick: each save is a new version, and the
   newest one without syntax errors is the **active version** that runs. A version with syntax
   errors stays in the history but never becomes active; the Player can make an earlier version
   active again. **Deleting versions:** any version but the active one can be deleted for good,
   one at a time or all those older than the active one at once; the others keep their numbers.
+- **Library cap:** a Player's library holds at most so many scripts, and each script so many versions,
+  the defaults' versions included. A save past either cap is refused and says to delete versions or
+  scripts first. The caps are listed in the Wiki.
 - **Script parameter:** a value the Player picks for whoever runs a script, declared by a
   `param name: type` line at the top of the script and read there as `params.name`; a `param`
   line anywhere else is a syntax error. A `building` param holds a building the Player knows: a workplace or construction site
@@ -798,6 +804,9 @@ The shared language of the game. Domain terms only — no implementation details
   counts. Default scripts count like any other. NPC cities have no realm budget, only the one
   for each resident. A script sees only what its Player sees: their sight, explored terrain and
   what they last saw (Last seen), told apart from what is in sight now.
+- **Value limits:** a single value a script holds is bounded: a string's length, a list's items and an
+  object's keys each have a cap. Past it the script fails with a runtime error, like a call too
+  deep. The caps are listed in the Wiki.
 - **Script view:** what a script gets of each kind of thing (a resident, a building, a city, …):
   a fixed set of fields, the same for every Player and listed in the Wiki. A field the Player
   isn't allowed to see is always there and `null`, never missing. A script sees no field beyond
