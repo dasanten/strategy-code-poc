@@ -161,8 +161,8 @@ export class OrderQueue {
     for (const { sender, order } of batch) {
       // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
       // script). Pairing, the Leader handover, renaming and claiming the Horse offer change
-      // nobody's order, so they leave scripts running too, as does picking a param value
-      // (`CONTEXT.md`: Script parameter).
+      // nobody's order, so they leave scripts running too, as do picking a param value and a
+      // defence script (`CONTEXT.md`: Script parameter, Defence script).
       // Editing a queue keeps its current step going (`CONTEXT.md`: Queue).
       const keeps = [
         'runScript',
@@ -172,6 +172,7 @@ export class OrderQueue {
         'renameCity',
         'claimHorses',
         'setScriptParam',
+        'setDefenceScript',
         'editQueue',
       ]
       const r = world.residents.find((x) => x.id === order.residentId)
@@ -181,8 +182,15 @@ export class OrderQueue {
         delete r.orderEnded
       }
       // Any order that isn't a step of it ends the resident's queue, running a script too; a new
-      // queue replaces it.
-      if (r && (order.kind === 'runScript' || !keeps.includes(order.kind))) delete r.queue
+      // queue replaces it. It ends a defence script and what it interrupted too (`CONTEXT.md`:
+      // Defence script).
+      if (r && (order.kind === 'runScript' || !keeps.includes(order.kind))) {
+        delete r.queue
+        if (r.interrupted) {
+          delete r.interrupted
+          delete r.script
+        }
+      }
       if (order.kind !== 'armyRunScript') {
         const a = world.armies.find((x) => x.id === order.armyId)
         if (a) delete a.script

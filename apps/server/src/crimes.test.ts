@@ -15,6 +15,7 @@ import { attackOrder, resolveStrikes } from './combat.js'
 import { commitCrime } from './crimes.js'
 import { eventsFor } from './events.js'
 import { checkInvariants, crimesSound } from './invariants.js'
+import { orderKinds } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
 import { resolveTearingDown } from './teardown.js'
 import { addCity } from './test-terrain.js'
@@ -163,6 +164,10 @@ describe('crimes and witnesses', () => {
     b.carried.spear = 1
     a.order = attackOrder(b.id)
     resolveStrikes(world, [{ attackerId: a.id, targetId: b.id }], size)
+    // Their defence script, Defend, goes after who struck them.
+    expect(b.script).toMatchObject({ task: 'defend' })
+    const them = { userId: 8, account: { name: 'Tobin', isAdmin: false } }
+    orderKinds.attack!.apply(world, them, { kind: 'attack', residentId: b.id, targetId: a.id })
     expect(b.order).toMatchObject({ kind: 'attack', targetId: a.id, defending: true })
     resolveStrikes(world, [{ attackerId: b.id, targetId: a.id }], size)
     expect(world.crimes.map((c) => c.culprit.residentId)).toEqual(['a1'])

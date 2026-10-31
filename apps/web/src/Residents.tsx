@@ -91,7 +91,7 @@ import {
   type CardSections,
   type ResidentGroup,
 } from './residents-view.js'
-import { doingLine } from './doing-view.js'
+import { doingLine, interruptedLine } from './doing-view.js'
 import {
   dropStep,
   moveStep,
@@ -112,6 +112,7 @@ import {
 } from './group-orders.js'
 import { GROUP_HINTS } from './pick-mode.js'
 import { NumberField, foodParamsHint } from './ScriptParams.js'
+import { defenceChoices, groupDefenceScript } from './script-run-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
 import { ActionRows, CardTabs, SelectionCard, useActionKeys } from './SelectionCard.js'
@@ -543,7 +544,12 @@ export function ResidentsList({
                       residents: inSight,
                       arrives: arrivesIn?.(r),
                     })}
-                    {r.script && <small className="muted">{scriptName(r, scripts)}</small>}
+                    {r.script && (
+                      <small className="muted">
+                        {interruptedLine(r, { scripts, buildings, residents: inSight }) ??
+                          scriptName(r, scripts)}
+                      </small>
+                    )}
                   </span>
                   <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
                     <span
@@ -901,6 +907,12 @@ export function GroupCard({
               onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
             />
           </section>
+          <DefenceScript
+            picked={groupDefenceScript(residents)}
+            scripts={scripts}
+            label="Defence script for all of them"
+            onPick={(scriptId) => onOrder({ kind: 'setDefenceScript', scriptId })}
+          />
           {numberParams.length > 0 && (
             <section className="inspector-block" aria-label="Script params">
               <div className="script-params">
@@ -1060,6 +1072,7 @@ export function ResidentCard({
   buildings = [],
   lastSeen,
   onRunScript,
+  onSetDefenceScript,
   onEditScript,
   makeLeader,
   leaderName,
@@ -1125,6 +1138,11 @@ export function ResidentCard({
   lastSeen?: Building[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
   onRunScript: (scriptId: number) => void
+  /**
+   * Picks the script one of the Player's own residents runs when struck, null for Defend
+   * (`CONTEXT.md`: Defence script); without it the card offers no picker.
+   */
+  onSetDefenceScript?: (scriptId: number | null) => void
   /** Opens a script in the library, such as the one the resident's task runs. */
   onEditScript: (scriptId: number) => void
   /** Why the last order was turned down, if it was. */
@@ -1225,6 +1243,14 @@ export function ResidentCard({
   // Children pick up and put down only Food (`CONTEXT.md`: Child).
   const refused = (good: Good) => !canHandle(r, tick, [good])
   const family = familyLine(r, residents, tick)
+  // Only the owning Player picks it (`CONTEXT.md`: Defence script).
+  const defenceScript = onSetDefenceScript && r.owner === realmId && (
+    <DefenceScript
+      picked={r.defenceScriptId ?? null}
+      scripts={scripts}
+      onPick={onSetDefenceScript}
+    />
+  )
   const grown = grownIn(r, tick)
   const at: OnSite = { residents, mapSize }
   const ground: GoodsSpot = { kind: 'ground' }
@@ -1292,6 +1318,13 @@ export function ResidentCard({
         <strong key="doing">
           {doingLine(r, { scripts, buildings, residents, arrives: arrivesIn?.(r) })}
         </strong>,
+        ...(r.interrupted
+          ? [
+              <span key="then" className="muted">
+                {interruptedLine(r, { scripts, buildings, residents })}
+              </span>,
+            ]
+          : []),
         `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
         ...(ridden ? [ridden] : []),
       ]}
@@ -1359,6 +1392,7 @@ export function ResidentCard({
         (r.script ? (
           <>
             <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
+            {defenceScript}
             {scriptParams}
             {scriptMemory}
             {scriptLog}
@@ -1368,6 +1402,7 @@ export function ResidentCard({
             <p className="muted small">
               Runs no script. Give them one with Run script under Orders.
             </p>
+            {defenceScript}
             {scriptLog}
           </>
         ))}
@@ -2732,6 +2767,55 @@ function holding(holders: string[], realmId: string): string {
   if (others === 0) return 'Held by your realm.'
   if (others === holders.length) return 'Held by another realm: its workers get the output.'
   return 'Held by your realm and another: their workers share the output.'
+}
+
+/**
+ * Picks the script a resident runs when struck (`CONTEXT.md`: Defence script): Defend (default)
+ * first, then the Player's scripts. For a group, `picked` is the one all of them keep, or
+ * undefined while they differ; picking sets it for all of them.
+ */
+export function DefenceScript({
+  picked,
+  scripts,
+  onPick,
+  label = 'Defence script',
+}: {
+  picked: number | null | undefined
+  scripts: readonly ScriptSummary[]
+  onPick: (scriptId: number | null) => void
+  label?: string
+}) {
+  const choices = defenceChoices(scripts, picked)
+  const value = picked === undefined ? '' : picked === null ? 'defend' : String(picked)
+  return (
+    <section className="inspector-block" aria-label="Defence script">
+      <div className="goods-row">
+        <span className="small">
+          <strong>Defence script</strong>
+        </span>
+        <select
+          aria-label={label}
+          value={value}
+          onChange={(e) => onPick(e.target.value === 'defend' ? null : Number(e.target.value))}
+        >
+          {picked === undefined && (
+            <option value="" disabled>
+              They differ
+            </option>
+          )}
+          <option value="defend">Defend (default)</option>
+          {choices.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="muted small">
+        What they run when struck. Once it ends, they go on with what they were doing.
+      </p>
+    </section>
+  )
 }
 
 /**

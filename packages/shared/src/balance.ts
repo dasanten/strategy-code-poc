@@ -245,6 +245,14 @@ export const HORSE_HUNGRY_SHARE = 0.25
  */
 export const STABLE_FEED_DAYS = 10
 
+/**
+ * Ticks without a blow after which the Defend default ends for a resident fleeing home
+ * (`CONTEXT.md`: Defence script): half a minute, so a lone blow from someone who walks off
+ * doesn't send them all the way home. Written into the default's source, where a Player can
+ * change it.
+ */
+export const DEFEND_CALM_TICKS = 30
+
 /** Most horses a stable has room for; no foal is bred there once that many stand in it. */
 export const STABLE_CAPACITY = 6
 

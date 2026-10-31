@@ -26,6 +26,7 @@ import {
   ScriptRunner,
   armyRunScriptOrder,
   runScriptOrder,
+  setDefenceScriptOrder,
   taskOrder,
   type ScriptHost,
 } from './script-runner.js'
@@ -97,6 +98,7 @@ const kinds = {
   runScript: runScriptOrder(scriptHost),
   armyRunScript: armyRunScriptOrder(scriptHost),
   setScriptParam: setScriptParamOrder(scriptHost),
+  setDefenceScript: setDefenceScriptOrder(scriptHost),
   task: taskOrder({
     defaultScript: (userId, task) => defaultScriptId(db, userId, task),
     script: (id) => runnableScript(db, id),

@@ -340,6 +340,22 @@ describe('group orders with Shift held', () => {
       })
   })
 
+  it('picks the defence script for each, children too, with the params picked for it', () => {
+    const rs = [resident('a', 0, 0), child('c', 0, 0)]
+    const params = { foodAt: 2 }
+    const picked = send({ kind: 'setDefenceScript', scriptId: 7, params }, rs)
+    expect(picked.skipped).toEqual([])
+    expect(picked.requests.map((q) => q.order)).toEqual([
+      { kind: 'setDefenceScript', scriptId: 7, params, residentId: 'a' },
+      { kind: 'setDefenceScript', scriptId: 7, params, residentId: 'c' },
+    ])
+    expect(send({ kind: 'setDefenceScript', scriptId: null }, rs).requests[0]!.order).toEqual({
+      kind: 'setDefenceScript',
+      scriptId: null,
+      residentId: 'a',
+    })
+  })
+
   it('queues storing everything, even for those carrying nothing yet', () => {
     const { requests, skipped } = queue({ kind: 'store' }, [resident('a', 0, 0)])
     expect(skipped).toEqual([])

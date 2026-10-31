@@ -125,6 +125,7 @@ import {
   FOAL_STAT_SPREAD,
   BREED_FOOD,
   STABLE_FEED_DAYS,
+  DEFEND_CALM_TICKS,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
   STANDING_PER_PAID_WEEK,
@@ -1395,6 +1396,34 @@ export function Wiki() {
           {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
           {duration(CLIMB_TICKS)}, unable to dodge or strike back.
         </p>
+        <h3>Under attack</h3>
+        <p>
+          A resident of yours who is struck and lives runs their defence script,{' '}
+          <strong>Defend</strong> (one of your default scripts): armed, they fight back at whoever
+          struck them until that one is dead, gone or out of sight; unarmed, they walk home to their
+          city's town hall, and stop once there or once no blow has landed for{' '}
+          {duration(DEFEND_CALM_TICKS)}. Their card says “Defending: fighting back at Bo” or
+          “Defending: fleeing home”, with what they were doing on the line under it. What they were
+          doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
+          queue at its step, or a plain order. Struck again while defending, they keep defending; an
+          order you give them meanwhile ends both. Scripts see the last blow as{' '}
+          <code>me.struckBy</code> and <code>me.struckAt</code>. Residents of NPC cities, and in an
+          army, fight back or flee home the same way.
+        </p>
+        <h3>Defence script</h3>
+        <p>
+          Defend is only the default: on a resident's card, the Script tab's{' '}
+          <strong>Defence script</strong> picks any of your scripts for them to run when struck
+          instead, a default script such as Work too; the group card picks it for all of them at
+          once. If the script has params, you pick them as you pick it, as before a script starts,
+          and they are kept for that resident like any script's. Back on “Defend (default)”, they
+          defend by Defend again. It runs just as Defend does: in place of what they were doing,
+          which goes on once it calls <code>end()</code>. It is kept for the resident, across your
+          Leader's death too, and only you see it; scripts read it as <code>me.defenceScript</code>,
+          the script's id, or <code>null</code> for Defend. If the script is gone from your library
+          when they are struck, they defend by Defend, your realm log says so once, and the pick
+          goes back to Defend. A resident lent to another realm defends by that realm's Defend.
+        </p>
       </Section>
 
       <Section id="territory">
@@ -1464,14 +1493,14 @@ export function Wiki() {
           only you see it. Without it they show what the task and its current order have the
           resident doing, such as “Building a house: fetching 10 wood from the storage”.{' '}
           <code>end</code>: once this run is over the script ends and the resident stands idle; in a
-          queue, its next step starts. Given a reason, <code>end(reason)</code> also notes it in
-          your realm log, like “Ana stopped Work: no workplace on her tile”: short text, cut like{' '}
-          <code>doing</code>’s, that only you see, for every end. <code>log</code>: adds a short
-          line, cut like <code>doing</code>’s, to the resident's script log, with the game time. The
-          Build and Tear down defaults end once the site is finished or the building is gone; a
-          script that never calls it runs until another order ends it. A script runs as a resident's
-          or as an army's: names marked resident only or army only are only there for one of them,
-          and a default script runs as a resident's.
+          queue, its next step starts; a defence script hands back to what it interrupted. Given a
+          reason, <code>end(reason)</code> also notes it in your realm log, like “Ana stopped Work:
+          no workplace on her tile”: short text, cut like <code>doing</code>’s, that only you see,
+          for every end. <code>log</code>: adds a short line, cut like <code>doing</code>’s, to the
+          resident's script log, with the game time. The Build and Tear down defaults end once the
+          site is finished or the building is gone; a script that never calls it runs until another
+          order ends it. A script runs as a resident's or as an army's: names marked resident only
+          or army only are only there for one of them, and a default script runs as a resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />
@@ -1666,8 +1695,8 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
       <Section id="examples">
         <p>
           The game's default scripts, as they are now: what residents run for a task you give them
-          on the map. Each Player has their own copy to edit in the script editor; here they are to
-          read.
+          on the map, and Defend, which they run when struck. Each Player has their own copy to edit
+          in the script editor; here they are to read.
         </p>
         {Object.entries(DEFAULT_SCRIPTS).map(([task, s]) => (
           <div key={task}>

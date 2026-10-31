@@ -89,6 +89,7 @@ const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   tearDown: 'tearDown',
   breed: 'breed',
   feedStable: undefined,
+  defend: undefined,
 }
 
 /**
@@ -106,6 +107,7 @@ function taskLine(task: Task, building: SeenScript['building']): string {
   if (task === 'build') return name ? `Building ${article(name)} ${name}` : 'Building'
   if (task === 'tearDown') return name ? `Tearing down the ${name}` : 'Tearing down'
   if (task === 'feedStable') return 'Feeding the stable'
+  if (task === 'defend') return 'Defending'
   if (task === 'breed') return 'Breeding horses'
   if (task === 'haul') return 'Hauling'
   return task satisfies never
@@ -142,6 +144,23 @@ function placeLine(place: GoodsPlace, buildings: readonly Pick<Building, 'id' | 
   if (place.kind === 'carriage') return 'the carriage'
   const kind = buildings.find((b) => b.id === place.storageId)?.kind
   return `the ${kind ? BUILDING_NAMES[kind] : 'storage'}`
+}
+
+/**
+ * What a resident goes on with once their defence script ends (`CONTEXT.md`: Defence script), for
+ * the small line under their Doing line: "Then: working the farm". Undefined while none runs.
+ */
+export function interruptedLine(
+  r: { interrupted?: { order: ResidentOrder | null; script?: SeenScript } },
+  seen: Parameters<typeof doingLine>[1],
+): string | undefined {
+  const kept = r.interrupted
+  if (!kept) return undefined
+  const line = doingLine(
+    { order: kept.order, ...(kept.script ? { script: kept.script } : {}) },
+    seen,
+  )
+  return `Then: ${lower(line)}`
 }
 
 const article = (name: string) => (/^[aeiou]/.test(name) ? 'an' : 'a')

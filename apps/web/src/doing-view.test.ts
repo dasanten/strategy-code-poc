@@ -9,7 +9,7 @@ import {
   type ScriptSummary,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { arrivalOf, doingLine, type DoingOf } from './doing-view.js'
+import { arrivalOf, doingLine, interruptedLine, type DoingOf } from './doing-view.js'
 
 const summary = (id: number, task: ScriptSummary['task']): ScriptSummary => ({
   id,
@@ -271,5 +271,27 @@ describe('arrivalOf', () => {
       WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Plains] +
         WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Road],
     )
+  })
+})
+
+describe('defending (`CONTEXT.md`: Defence script)', () => {
+  const work: ResidentOrder = { kind: 'workAt', buildingId: 'f1', at, progress: 0 }
+  it('says what Defend says, and what goes on once it ends', () => {
+    const defending: DoingOf = {
+      order: walk,
+      script: { scriptId: 7, task: 'defend', doing: 'Defending: fleeing home' },
+    }
+    expect(doingLine(defending, { scripts, buildings })).toBe('Defending: fleeing home')
+    expect(doingLine({ order: null, script: { scriptId: 0, task: 'defend' } }, {})).toBe(
+      'Defending: waiting',
+    )
+    const kept = { order: work, script: { scriptId: 1, building: 'farm' as const } }
+    expect(interruptedLine({ interrupted: kept }, { scripts, buildings })).toBe(
+      'Then: working the farm',
+    )
+    expect(interruptedLine({ interrupted: { order: walk } }, {})).toBe(
+      'Then: walking to 4, 5 · 1 tiles to go',
+    )
+    expect(interruptedLine({}, {})).toBeUndefined()
   })
 })

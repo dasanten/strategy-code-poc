@@ -37,6 +37,8 @@ export type GroupOrder =
   /** Everything carried put down on their own tile. */
   | { kind: 'drop' }
   | ({ kind: 'runScript'; scriptId: number } & Starts)
+  /** Picks each one's defence script, null for Defend (`CONTEXT.md`: Defence script). */
+  | ({ kind: 'setDefenceScript'; scriptId: number | null } & Starts)
   | { kind: 'stop' }
   /**
    * Boards the carriage (`CONTEXT.md`: Passenger): those on its tile, in the group's order, until
@@ -380,6 +382,9 @@ export function groupRequests(
         send(r, { kind: 'drop', spot: { kind: 'ground' }, goods })
         break
       }
+      case 'setDefenceScript':
+        send(r, { kind: 'setDefenceScript', scriptId: order.scriptId, ...params })
+        break
       case 'runScript':
         send(r, { kind: 'runScript', scriptId: order.scriptId, ...params })
         break

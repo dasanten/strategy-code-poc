@@ -65,11 +65,29 @@ export interface Resident {
   /** How their last store or fetch order ended (`OrderEnded`); absent when none did since. */
   orderEnded?: OrderEnded
   /**
+   * Who last struck the resident and when (`CONTEXT.md`: Combat, Under attack), a dodged blow
+   * too; absent until someone does. `by` stays the attacker's id after they are gone.
+   */
+  struck?: Struck
+  /**
    * The script the resident runs, when they were given the run-script order (`CONTEXT.md`:
    * Running a script). Its actions set `order` like UI orders; any other order ends it. Absent
    * when they run none.
    */
   script?: RunningScript
+  /**
+   * What the resident was doing when a blow started their defence script (`CONTEXT.md`: Defence
+   * script), kept aside while it runs as `script`: their order and the script they ran, with its
+   * memory; a queue stays in `queue` and waits. When the defence script ends they go on; a
+   * Player order given meanwhile ends both. Absent while no defence script runs.
+   */
+  interrupted?: Interrupted
+  /**
+   * The id of the Player's script this resident runs as their defence script when struck
+   * (`CONTEXT.md`: Defence script), picked on their card; absent for the game's Defend default.
+   * Only the owning Player sees it.
+   */
+  defenceScriptId?: number
   /**
    * The values the Player picked for this resident's script parameters (`CONTEXT.md`: Script
    * parameter): by script id, then by param name, the id of the building or carriage picked.
@@ -274,9 +292,21 @@ export interface SeenScript {
  */
 export type SeenResident = Omit<
   Resident,
-  'script' | 'hunger' | 'health' | 'scriptParams' | 'scriptLog'
+  'script' | 'hunger' | 'health' | 'scriptParams' | 'scriptLog' | 'interrupted'
 > &
-  Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & { script?: SeenScript }
+  Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & {
+    script?: SeenScript
+    interrupted?: SeenInterrupted
+  }
+
+/**
+ * What a defence script interrupted, as the owning Player sees it (`Resident.interrupted`): the
+ * order and which script, for the line of what goes on once it ends.
+ */
+export interface SeenInterrupted {
+  order: ResidentOrder | null
+  script?: SeenScript
+}
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -374,6 +404,18 @@ export interface FetchOrder {
  * it was done, else why it ended early ("no way", "the storage is gone", "the carriage is gone"). Kept until their next
  * store or fetch order, or until the Player orders them otherwise.
  */
+/** Who last struck a resident (`Resident.struck`): the attacker's id, and the tick. */
+/** What a defence script interrupted (`Resident.interrupted`). */
+export interface Interrupted {
+  order: ResidentOrder | null
+  script?: RunningScript
+}
+
+export interface Struck {
+  by: string
+  tick: number
+}
+
 export interface OrderEnded {
   kind: 'store' | 'fetch'
   tick: number
@@ -1477,6 +1519,12 @@ export type RealmEventWhat =
   | ({ kind: 'scriptOutOfSteps'; name: string; scriptId: number; realm: boolean } & ScriptRunBy)
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
+  /**
+   * A resident's defence script (`Resident.defenceScriptId`) couldn't run when they were struck,
+   * deleted or no longer theirs (`CONTEXT.md`: Defence script): they defend by the Defend default
+   * instead, from now on.
+   */
+  | { kind: 'defenceScriptGone'; residentId: string; name: string; scriptId: number }
   /**
    * A resident's script ended itself with `end(reason)` (`CONTEXT.md`: Script): `script` is its
    * name, `reason` the short text it gave. Not an error: one for each end, never rate-limited.

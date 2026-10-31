@@ -18,6 +18,7 @@ import {
 } from './invariants.js'
 import { mulberry32, newResident } from './residents.js'
 import { stepStockFloor } from './stock-floor.js'
+import { defaultScripts } from './test-default-scripts.js'
 import { addCity, worldWithPost } from './test-terrain.js'
 import { stepWorld } from './world.js'
 import { createWorld } from './world.js'
@@ -72,9 +73,21 @@ function armed<T extends { carried: Record<string, number | undefined> }>(r: T):
   return r
 }
 
-/** Steps the world until `done` holds, at most `ticks` times; answers whether it did. */
+/** Struck, a Player's residents run their defence script, the Defend default. */
+const scripts = defaultScripts(terrain, [
+  { userId: 7, account: { name: 'Mara', isAdmin: false } },
+  { userId: 8, account: { name: 'Tobin', isAdmin: false } },
+])
+
+/**
+ * Steps the world, after running scripts as the game does, until `done` holds, at most `ticks`
+ * times; answers whether it did.
+ */
 function stepUntil(world: WorldState, done: () => boolean, ticks = 200): boolean {
-  for (let i = 0; i < ticks && !done(); i++) stepWorld(world, terrain)
+  for (let i = 0; i < ticks && !done(); i++) {
+    scripts.runAll(world)
+    stepWorld(world, terrain)
+  }
   return done()
 }
 

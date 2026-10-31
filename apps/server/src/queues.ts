@@ -26,7 +26,8 @@ import { realmOf } from './starting-city.js'
  * request; the edit-queue order replaces the steps of the one they work through. Every tick,
  * after the orders are applied and before scripts run, `QueueRunner` starts the current step by
  * applying its request as if it had been given on its own, and moves on once it is done or its
- * duration is up. Any order that isn't a step ends the queue (`OrderQueue`).
+ * duration is up. Any order that isn't a step ends the queue (`OrderQueue`). While a defence
+ * script runs, the queue waits, its step kept aside with what it interrupted.
  *
  * A step may act somewhere else than where the resident stands (Planning ahead): adding it only
  * checks that the places it names could make sense (`stepPlaceProblem`); whether it can start is
@@ -224,8 +225,15 @@ export const editQueue: OrderKind = {
 /** The queue order kinds. */
 export const queueOrders: Record<string, OrderKind> = { queue, editQueue }
 
-/** Stops what the resident's current step had them do. */
+/**
+ * Stops what the resident's current step had them do; while their defence script runs, what it
+ * interrupted (`CONTEXT.md`: Defence script), which then has nothing to go on with.
+ */
 function stopStep(r: Resident): void {
+  if (r.interrupted) {
+    r.interrupted = { order: null }
+    return
+  }
   r.order = null
   delete r.script
 }
@@ -263,6 +271,9 @@ export class QueueRunner {
         delete r.queue
         continue
       }
+      // Defending themselves, the queue waits until their defence script hands back
+      // (`CONTEXT.md`: Defence script).
+      if (r.interrupted) continue
       if (q.startedAt !== null) {
         const step = q.steps[q.current]!
         const timeUp =

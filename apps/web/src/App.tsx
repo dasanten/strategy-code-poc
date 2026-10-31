@@ -604,8 +604,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function sendGroup(order: GroupOrder, queued = shift.current) {
     if (!world) return
     const starts =
-      order.kind === 'runScript'
-        ? { kind: 'runScript', scriptId: order.scriptId }
+      order.kind === 'runScript' || order.kind === 'setDefenceScript'
+        ? { kind: order.kind, scriptId: order.scriptId }
         : order.kind === 'work' || order.kind === 'build'
           ? { kind: 'task', task: order.kind }
           : undefined
@@ -729,6 +729,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function runScript(scriptId: number) {
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'runScript', residentId: selected.id, scriptId }))
+  }
+  /**
+   * Picks the script the picked resident runs when struck, or with null the Defend default
+   * (`CONTEXT.md`: Defence script); its params are picked first, as before a script starts. Never
+   * queued: it leaves what they do as it is.
+   */
+  async function setDefenceScript(scriptId: number | null) {
+    if (!selected) return
+    const order = { kind: 'setDefenceScript', residentId: selected.id, scriptId }
+    setOrderError(await giveOrder(order, false))
   }
   /**
    * Picks, or clears with null, the value of a param of the script the picked resident runs
@@ -1181,6 +1191,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             buildings={world.buildings}
             lastSeen={world.lastSeen.buildings}
             onRunScript={runScript}
+            onSetDefenceScript={setDefenceScript}
             onEditScript={(id) => openScript(id)}
             orderError={orderError}
             pile={world.piles.find(
@@ -1342,7 +1353,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 })),
               }
             }
-            onOrder={(order) => void sendGroup(order)}
+            // Picking a defence script is never queued: it leaves what they do as it is.
+            onOrder={(order) =>
+              void sendGroup(order, order.kind !== 'setDefenceScript' && shift.current)
+            }
             report={groupReport}
             orderError={groupError}
             onPick={(id) => select([id])}

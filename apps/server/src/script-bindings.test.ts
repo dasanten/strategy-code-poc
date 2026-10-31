@@ -252,6 +252,67 @@ describe('script bindings', () => {
     expect(memory.me).toBeTypeOf('number')
   })
 
+  it('show who last struck a resident and when, as far as the Player sees how they fare', () => {
+    const { world, a1, explored } = setup()
+    resident(world, 'a2', 'r1', 12, 10)
+    world.tick = 50
+    a1.struck = { by: 'b1', tick: 40 }
+    world.residents.find((r) => r.id === 'b1')!.struck = { by: 'a1', tick: 45 }
+    world.residents.find((r) => r.id === 'a2')!.struck = { by: 'gone', tick: 30 }
+    const memory: ScriptObject = {}
+    runAs(
+      world,
+      explored,
+      `
+      memory.me = [me.struckBy, me.struckAt]
+      for (r of residents()) { memory[r.id] = [r.struckBy, r.struckAt] }
+      `,
+      memory,
+    )
+    expect(memory.me).toEqual(['b1', 40])
+    expect(memory.a1).toEqual(['b1', 40])
+    // A resident of another realm, not allied: how they fare is hidden (`CONTEXT.md`: Seeing how
+    // someone fares).
+    expect(memory.b1).toEqual([null, null])
+    // The attacker is gone.
+    expect(memory.a2).toEqual([null, null])
+  })
+
+  it('show an army who last struck one of its members, and when', () => {
+    const { world, a1, explored } = setup()
+    const a2 = resident(world, 'a2', 'r1', 12, 10)
+    world.armies.push({
+      id: 'ar1',
+      name: 'Guard',
+      realmId: 'r1',
+      memberIds: ['a1', 'a2'],
+      order: null,
+    })
+    world.tick = 50
+    const memory: ScriptObject = {}
+    const runArmy = () =>
+      run(parse('memory.army = [me.struckBy, me.struckAt, me.members[1].struckAt]'), {
+        globals: bindScript({
+          world,
+          terrain,
+          sender,
+          armyId: 'ar1',
+          memory,
+          seen: () => entitiesInSight(world, terrain, 'r1'),
+          explored: (x, y) => explored.isExplored({ id: 7 }, x, y),
+        }).globals,
+        steps: 10_000,
+        maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+        limits: SCRIPT_VALUE_LIMITS,
+      })
+    runArmy()
+    expect(memory.army).toEqual([null, null, null])
+    a1.struck = { by: 'b1', tick: 40 }
+    a2.struck = { by: 'b2', tick: 45 }
+    runArmy()
+    expect(memory.army).toEqual(['b2', 45, 45])
+  })
+
   it('list the admin directives in force with their price, never who gave them', () => {
     const { world, explored } = setup()
     world.directives.push({
