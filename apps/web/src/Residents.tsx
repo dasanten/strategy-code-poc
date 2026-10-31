@@ -75,7 +75,14 @@ import {
   keptBreeding,
   keptPair,
 } from '@csp/shared'
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import {
   CARD_TAB_LABELS,
   CARD_TABS,
@@ -94,6 +101,7 @@ import {
 import { doingLine, interruptedLine } from './doing-view.js'
 import {
   dropStep,
+  insertSteps,
   moveStep,
   queueRows,
   realMinutes,
@@ -102,6 +110,14 @@ import {
   timeStep,
   type QueueRow,
 } from './queue-view.js'
+import {
+  copy,
+  paste,
+  pastedIds,
+  pastePosition,
+  pickStep,
+  useClipboardEmpty,
+} from './planner-clipboard.js'
 import {
   GROUP_BUTTONS,
   groupNumberParams,
@@ -264,6 +280,11 @@ function TaskScript({
  * line. Steps are reordered by dragging or the arrows, removed, given a duration or none, and the
  * queue looped; each change is an edit-queue order. The group card lists its plan with it, then
  * titled "Plan", with no current step.
+ *
+ * It is the queue planner the clipboard works in (`CONTEXT.md`: Planner clipboard): a tap picks
+ * a step, Shift+tap a range, and Copy and Paste (or Ctrl+C and Ctrl+V while the list has focus)
+ * copy the picked steps and put copies after the last picked one, or at the end with none picked.
+ * The pasted steps are picked afterwards, so a second Paste goes after them.
  */
 export function QueueBlock({
   queue: q,
@@ -274,7 +295,7 @@ export function QueueBlock({
   onEdit,
   title = 'Queue',
 }: {
-  queue: Pick<Queue, 'steps' | 'current' | 'loop'>
+  queue: Pick<Queue, 'steps' | 'current' | 'loop' | 'nextStepId'>
   doing?: string
   scripts: ScriptSummary[]
   buildings: Building[]
@@ -284,7 +305,32 @@ export function QueueBlock({
   title?: string
 }) {
   const [dragged, setDragged] = useState<number>()
+  // The steps picked for the clipboard, by id; one removed since drops out.
+  const [pickedIds, setPicked] = useState<number[]>([])
+  const clipboardEmpty = useClipboardEmpty()
   const rows = queueRows(q, { scripts, buildings, lastSeen })
+  const ids = rows.map((row) => row.id)
+  const picked = pickedIds.filter((id) => ids.includes(id))
+  const copyPicked = () => {
+    if (picked.length > 0) copy(q.steps.filter((s) => picked.includes(s.id)))
+  }
+  const pasteSteps = () => {
+    const pasted = paste()
+    if (pasted.length === 0) return
+    onEdit(insertSteps(q, pastePosition(ids, picked), pasted))
+    setPicked(pastedIds(q.nextStepId, pasted.length))
+  }
+  // Ctrl+C and Ctrl+V while the list has focus, not while typing in a field.
+  const onKey = (e: KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+    const tag = (e.target as HTMLElement).tagName
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
+    const key = e.key.toLowerCase()
+    if (key !== 'c' && key !== 'v') return
+    e.preventDefault()
+    if (key === 'c') copyPicked()
+    else pasteSteps()
+  }
   return (
     <section className="inspector-block" aria-label={title}>
       <div className="panel-head">
@@ -298,12 +344,31 @@ export function QueueBlock({
           Loop
         </label>
       </div>
-      <ol className="queue-steps">
+      <div className="order-buttons queue-tools">
+        <button type="button" disabled={picked.length === 0} onClick={copyPicked}>
+          Copy
+        </button>
+        <button type="button" disabled={clipboardEmpty} onClick={pasteSteps}>
+          Paste
+        </button>
+        <span className="small muted">
+          {picked.length === 0 ? 'Tap a step to pick it' : `${picked.length} picked`}
+        </span>
+      </div>
+      <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
         {rows.map((row, i) => (
           <li
             key={row.id}
-            className={`queue-step${row.current ? ' current' : ''}`}
+            className={`queue-step${row.current ? ' current' : ''}${picked.includes(row.id) ? ' picked' : ''}`}
             aria-current={row.current ? 'step' : undefined}
+            aria-selected={picked.includes(row.id)}
+            // Shift+tap picks a range rather than selecting text.
+            onMouseDown={(e) => e.shiftKey && e.preventDefault()}
+            onClick={(e) => {
+              // The step's own buttons and fields do their own thing.
+              if ((e.target as HTMLElement).closest('button, input, label')) return
+              setPicked(pickStep(picked, ids, row.id, e.shiftKey))
+            }}
             draggable
             onDragStart={() => setDragged(row.id)}
             onDragEnd={() => setDragged(undefined)}
@@ -351,9 +416,26 @@ export function QueueBlock({
       </ol>
       <p className="muted small">
         Drag a step or use the arrows to reorder. Working and hauling never end on their own, so
-        they need a duration unless they are last.
+        they need a duration unless they are last. Tap a step to pick it (Shift for a range), then
+        Copy; Paste puts the copies after the picked step.
       </p>
     </section>
+  )
+}
+
+/**
+ * Paste for a planner with no steps yet (`CONTEXT.md`: Planner clipboard): the button, shown only
+ * while the clipboard holds steps; `onPaste` gets fresh copies of them.
+ */
+export function PasteSteps({ onPaste }: { onPaste: (steps: QueueStepRequest[]) => void }) {
+  const empty = useClipboardEmpty()
+  if (empty) return null
+  return (
+    <div className="order-buttons">
+      <button type="button" onClick={() => onPaste(paste())}>
+        Paste
+      </button>
+    </div>
   )
 }
 
@@ -1383,9 +1465,13 @@ export function ResidentCard({
             onEdit={onEditQueue}
           />
         ) : (
-          <p className="muted small">
-            Nothing queued. Hold Shift with any order to queue it, or plan steps with Add step.
-          </p>
+          <>
+            <p className="muted small">
+              Nothing queued. Hold Shift with any order to queue it, plan steps with Add step, or
+              paste copied ones.
+            </p>
+            {onEditQueue && <PasteSteps onPaste={(steps) => onEditQueue(steps)} />}
+          </>
         ))}
       {tab === 'queue' && addStep}
       {tab === 'script' &&

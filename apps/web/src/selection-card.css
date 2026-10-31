@@ -312,6 +312,27 @@
   border-left-color: var(--ui-live);
   background: var(--ui-raised);
 }
+/* A step picked for the planner clipboard (tap; Shift for a range). */
+.queue-step.picked {
+  border-color: var(--ui-line-strong);
+  background: color-mix(in srgb, var(--ui-live) 14%, transparent);
+}
+.queue-step.current.picked {
+  border-left-color: var(--ui-live);
+}
+.queue-steps:focus-visible {
+  outline: 2px solid var(--ui-line-strong);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* The planner's toolbar: Copy and Paste, with how many steps are picked. */
+.queue-tools {
+  align-items: center;
+  margin-bottom: 6px;
+}
+.queue-tools .muted {
+  margin-left: auto;
+}
 .queue-step-head {
   display: flex;
   justify-content: space-between;

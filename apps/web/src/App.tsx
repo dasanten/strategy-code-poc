@@ -58,7 +58,7 @@ import { Founding } from './Founding.js'
 import {
   appendRequest,
   appendToEach,
-  editRequest,
+  queueRequest,
   giveToAll,
   planStep,
   storeAll,
@@ -1300,8 +1300,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
               )
             }
+            // A paste into the planner of a resident with no queue starts one.
             onEditQueue={async (steps, loop) =>
-              setOrderError(await sendOrder(editRequest(selected, steps, loop)))
+              setOrderError(await sendOrder(queueRequest(selected, steps, loop)))
             }
             addStep={addStep(world)}
             onClose={() => {
