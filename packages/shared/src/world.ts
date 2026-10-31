@@ -65,6 +65,11 @@ export interface Resident {
   /** How their last store or fetch order ended (`OrderEnded`); absent when none did since. */
   orderEnded?: OrderEnded
   /**
+   * Who last struck the resident and when (`CONTEXT.md`: Combat, Under attack), a dodged blow
+   * too; absent until someone does. `by` stays the attacker's id after they are gone.
+   */
+  struck?: Struck
+  /**
    * The script the resident runs, when they were given the run-script order (`CONTEXT.md`:
    * Running a script). Its actions set `order` like UI orders; any other order ends it. Absent
    * when they run none.
@@ -374,6 +379,12 @@ export interface FetchOrder {
  * it was done, else why it ended early ("no way", "the storage is gone", "the carriage is gone"). Kept until their next
  * store or fetch order, or until the Player orders them otherwise.
  */
+/** Who last struck a resident (`Resident.struck`): the attacker's id, and the tick. */
+export interface Struck {
+  by: string
+  tick: number
+}
+
 export interface OrderEnded {
   kind: 'store' | 'fetch'
   tick: number

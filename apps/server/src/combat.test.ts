@@ -204,6 +204,23 @@ describe('combat', () => {
     expect(a.order?.kind).toBe('attack')
   })
 
+  it('the target keeps who struck them and when, a dodged blow too', () => {
+    const { world, queue, b } = setup()
+    b.stats.agility = { base: 25, trained: 0 }
+    expect(b.struck).toBeUndefined()
+    expect(order(world, queue, 'a1', 'b1')).toBe('ack')
+    let dodged = 0
+    for (let i = 0; i < 20; i++) {
+      const before = b.health
+      run(world, STRIKE_TICKS)
+      if (b.health >= before - 0.5) dodged++
+      expect(b.struck).toEqual({ by: 'a1', tick: world.tick - 1 })
+      b.health = MAX_HEALTH
+      b.order = null
+    }
+    expect(dodged).toBeGreaterThan(0)
+  })
+
   it('an armed resident who is hit fights back', () => {
     const { world, queue, b } = setup()
     b.carried = { spear: 1 }
@@ -281,6 +298,14 @@ describe('combat invariants', () => {
     a.order = attackOrder('a1')
     b.order = { ...attackOrder('a1'), strike: 1 }
     expect(broken(attackOrdersSound, world).map((v) => v.entityIds)).toEqual([['a1'], ['b1']])
+  })
+
+  it('flag a resident struck after the current tick', () => {
+    const { world, b } = setup()
+    b.struck = { by: 'a1', tick: world.tick }
+    expect(broken(attackOrdersSound, world)).toEqual([])
+    b.struck = { by: 'a1', tick: world.tick + 1 }
+    expect(broken(attackOrdersSound, world)).toMatchObject([{ entityIds: ['b1'] }])
   })
 })
 

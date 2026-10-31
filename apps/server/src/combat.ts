@@ -191,7 +191,8 @@ export interface CombatResult {
 /**
  * Resolves blows (ADR 0002), one after another (`CONTEXT.md`: Combat), on a map of `size` tiles.
  * A blow is struck only by a living attacker still attacking a living target in contact. The
- * first blow of a fight goes in both realms' logs. Both learn Combat from it; the target dodges
+ * first blow of a fight goes in both realms' logs. The target keeps who struck them and when
+ * (`Resident.struck`), a dodged blow too. Both learn Combat from it; the target dodges
  * it by Agility, or it lands and takes its `blowDamage` off their health, only `WALL_DEFENCE` of it
  * for a target on their own city's wall (`CONTEXT.md`: Walls in combat). A target left with no
  * health is killed and drops what they carried (`CONTEXT.md`: Loot); otherwise one who is armed
@@ -245,6 +246,7 @@ export function resolveStrikes(
         commitCrime(world, size, 'attack', a, { victimOrg: organizationOf(t), victim: t })
       }
     }
+    t.struck = { by: a.id, tick: world.tick }
     a.skills.combat = (a.skills.combat ?? 0) + combatLearned(a, world.tick)
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
     const roll = mulberry32(hash(`${world.seed}:${world.tick}:${a.id}:strike`))()

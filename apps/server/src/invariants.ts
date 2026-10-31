@@ -1465,13 +1465,21 @@ export const deadLeaveLoot: Invariant = {
 
 /**
  * Attack orders are sound (`CONTEXT.md`: Combat): nobody attacks themselves, and a blow is
- * always between 0 and 1 of the way to being struck.
+ * always between 0 and 1 of the way to being struck. Who last struck a resident struck them no
+ * later than now (`Resident.struck`).
  */
 export const attackOrdersSound: Invariant = {
   name: 'attack-orders-sound',
   check(world) {
     const out: InvariantViolation[] = []
     for (const r of world.residents) {
+      if (r.struck && r.struck.tick > world.tick) {
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} was struck at tick ${r.struck.tick}, after tick ${world.tick}`,
+          entityIds: [r.id],
+        })
+      }
       const o = r.order
       if (o?.kind !== 'attack') continue
       const problem =
