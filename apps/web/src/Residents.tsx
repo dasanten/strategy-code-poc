@@ -2352,7 +2352,7 @@ function PairBlock({
     <section className="inspector-block" aria-label="Pairing">
       <div className="panel-head">
         <h3>Pairing</h3>
-        <span className="small muted">one child a year at most</span>
+        <span className="small muted">one child per pair; pair again for another</span>
       </div>
       {expecting ? (
         <p className="muted small">{familyLine(resident, residents, tick)}.</p>
