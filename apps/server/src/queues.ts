@@ -73,8 +73,9 @@ function isTile(p: unknown): p is { x: unknown; y: unknown } {
 
 /**
  * Why a step can't make sense wherever the resident stands when its turn comes (`CONTEXT.md`:
- * Queue, Planning ahead): a tile it names is off the map, a building, carriage or horse it names
- * isn't there, or a carriage or horse it names isn't the realm's. Everything else, such as
+ * Queue, Planning ahead): a tile it names is off the map, a carriage or horse it names isn't
+ * there, or isn't the realm's. A building it names that is gone passes: the step is skipped
+ * when its turn comes. Everything else, such as
  * standing on the right tile or carrying the goods, is checked when the step starts.
  */
 export function stepPlaceProblem(
@@ -92,17 +93,15 @@ export function stepPlaceProblem(
   const places = [order.to, order.from]
     .filter((p) => p !== undefined && p !== null && !isTile(p))
     .map((p) => (typeof p === 'object' ? (p as { id?: unknown }).id : p))
-  const buildingIds = [order.workplaceId, order.buildingId, order.stableId, order.wallId]
-  for (const id of [...buildingIds, spot.storageId, spot.siteId]) {
-    if (typeof id === 'string' && !world.buildings.some((b) => b.id === id))
-      return 'no such building'
-  }
+  // A building (workplace, stable, storage, site, wall) a step names may be gone by now, as one a
+  // saved queue kept after it was torn down (`CONTEXT.md`: Saved queue): the step is given, and
+  // skipped when its turn comes. So may a store's or fetch's storage, which no carriage is.
   for (const id of [order.carriageId, spot.carriageId, ...places]) {
     if (typeof id !== 'string') continue
     const k = world.carriages.find((x) => x.id === id)
     const isPlace = places.includes(id)
-    if (!k && isPlace && world.buildings.some((b) => b.id === id)) continue
-    if (!k) return isPlace ? 'no such storage' : 'no such carriage'
+    if (!k && isPlace) continue
+    if (!k) return 'no such carriage'
     if (carriageOrganization(k) !== realmId) return 'not a carriage of your realm'
   }
   const horseIds = Array.isArray(order.horseIds) ? (order.horseIds as unknown[]) : []

@@ -119,6 +119,16 @@ import {
   useClipboardEmpty,
 } from './planner-clipboard.js'
 import {
+  browserStorage,
+  list,
+  load as loadQueue,
+  readQueues,
+  remove as removeQueue,
+  save as saveQueue,
+  storeQueues,
+  type SavedQueues,
+} from './saved-queues.js'
+import {
   GROUP_BUTTONS,
   groupNumberParams,
   groupSentLine,
@@ -294,6 +304,7 @@ export function QueueBlock({
   lastSeen,
   onEdit,
   title = 'Queue',
+  realm,
 }: {
   queue: Pick<Queue, 'steps' | 'current' | 'loop' | 'nextStepId'>
   doing?: string
@@ -303,6 +314,8 @@ export function QueueBlock({
   lastSeen?: Building[]
   onEdit: (steps: QueueStepRequest[], loop?: boolean) => void
   title?: string
+  /** The realm whose saved queues Save and Load keep (`CONTEXT.md`: Saved queue); none without. */
+  realm?: string
 }) {
   const [dragged, setDragged] = useState<number>()
   // The steps picked for the clipboard, by id; one removed since drops out.
@@ -331,6 +344,11 @@ export function QueueBlock({
     if (key === 'c') copyPicked()
     else pasteSteps()
   }
+  // A saved queue loaded goes after the planned steps, picked, as pasted ones are.
+  const loadSteps = (loaded: QueueStepRequest[]) => {
+    onEdit(insertSteps(q, ids.length - 1, loaded))
+    setPicked(pastedIds(q.nextStepId, loaded.length))
+  }
   return (
     <section className="inspector-block" aria-label={title}>
       <div className="panel-head">
@@ -355,6 +373,7 @@ export function QueueBlock({
           {picked.length === 0 ? 'Tap a step to pick it' : `${picked.length} picked`}
         </span>
       </div>
+      {realm && <SavedQueueTools realm={realm} steps={stepsOf(q)} onLoad={loadSteps} />}
       <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
         {rows.map((row, i) => (
           <li
@@ -409,6 +428,9 @@ export function QueueBlock({
                 </button>
               </span>
             </div>
+            {row.gone && (
+              <span className="small queue-step-gone">{row.gone}: it will be skipped</span>
+            )}
             {row.current && <span className="small muted">{doing}</span>}
             <StepMinutes row={row} onSet={(minutes) => onEdit(timeStep(q, row.id, minutes))} />
           </li>
@@ -417,9 +439,116 @@ export function QueueBlock({
       <p className="muted small">
         Drag a step or use the arrows to reorder. Working and hauling never end on their own, so
         they need a duration unless they are last. Tap a step to pick it (Shift for a range), then
-        Copy; Paste puts the copies after the picked step.
+        Copy; Paste puts the copies after the picked step. Save keeps the steps in this browser
+        under a name; Load adds a saved queue’s steps at the end.
       </p>
     </section>
+  )
+}
+
+/**
+ * Save and Load for a queue planner (`CONTEXT.md`: Saved queue): Save keeps `steps` in this
+ * browser under a name, asking before it overwrites one saved under the same name; Load lists the
+ * saved queues, each with its step count and date, to load (`onLoad` gets fresh copies of its
+ * steps) or delete. With no steps, only Load shows.
+ */
+export function SavedQueueTools({
+  realm,
+  steps,
+  onLoad,
+}: {
+  realm: string
+  steps: readonly QueueStepRequest[]
+  onLoad: (steps: QueueStepRequest[]) => void
+}) {
+  const [open, setOpen] = useState<'save' | 'load'>()
+  const [name, setName] = useState('')
+  const [queues, setQueues] = useState(() => readQueues(browserStorage(), realm))
+  const keep = (next: SavedQueues) => {
+    storeQueues(browserStorage(), realm, next)
+    setQueues(next)
+  }
+  const toggle = (panel: 'save' | 'load') => {
+    // Read again: another planner may have saved since.
+    setQueues(readQueues(browserStorage(), realm))
+    setOpen(open === panel ? undefined : panel)
+  }
+  const saved = list(queues)
+  const taken = name.trim() in queues
+  const onSave = (e: FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    keep(saveQueue(queues, name, steps, Date.now()))
+    setName('')
+    setOpen(undefined)
+  }
+  return (
+    <div className="saved-queues">
+      <div className="order-buttons">
+        {steps.length > 0 && (
+          <button type="button" aria-expanded={open === 'save'} onClick={() => toggle('save')}>
+            Save…
+          </button>
+        )}
+        <button type="button" aria-expanded={open === 'load'} onClick={() => toggle('load')}>
+          Load…
+        </button>
+      </div>
+      {open === 'save' && (
+        <form className="saved-queues-save" onSubmit={onSave}>
+          <input
+            aria-label="Name to save the queue under"
+            placeholder="Name, such as Mine run"
+            value={name}
+            maxLength={60}
+            autoFocus
+            onChange={(e) => setName(e.target.value)}
+          />
+          <button type="submit" disabled={!name.trim()}>
+            {taken ? 'Overwrite' : 'Save'}
+          </button>
+          {taken && (
+            <span className="small muted">A queue is saved as “{name.trim()}”: overwrite it?</span>
+          )}
+        </form>
+      )}
+      {open === 'load' &&
+        (saved.length === 0 ? (
+          <p className="muted small">No queues saved in this browser yet.</p>
+        ) : (
+          <ul className="saved-queues-list">
+            {saved.map((s) => (
+              <li key={s.name}>
+                <span className="small">
+                  {s.name}{' '}
+                  <span className="muted">
+                    {s.steps.length} step{s.steps.length === 1 ? '' : 's'},{' '}
+                    {new Date(s.savedAt).toLocaleDateString()}
+                  </span>
+                </span>
+                <span className="buttons">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onLoad(loadQueue(queues, s.name))
+                      setOpen(undefined)
+                    }}
+                  >
+                    Load
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${s.name}`}
+                    onClick={() => keep(removeQueue(queues, s.name))}
+                  >
+                    Delete
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ))}
+    </div>
   )
 }
 
@@ -1463,14 +1592,18 @@ export function ResidentCard({
             buildings={buildings}
             lastSeen={lastSeen}
             onEdit={onEditQueue}
+            realm={realmId}
           />
         ) : (
           <>
             <p className="muted small">
-              Nothing queued. Hold Shift with any order to queue it, plan steps with Add step, or
-              paste copied ones.
+              Nothing queued. Hold Shift with any order to queue it, plan steps with Add step, paste
+              copied ones or load a saved queue.
             </p>
             {onEditQueue && <PasteSteps onPaste={(steps) => onEditQueue(steps)} />}
+            {onEditQueue && (
+              <SavedQueueTools realm={realmId} steps={[]} onLoad={(steps) => onEditQueue(steps)} />
+            )}
           </>
         ))}
       {tab === 'queue' && addStep}

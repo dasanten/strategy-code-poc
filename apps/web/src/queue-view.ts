@@ -18,6 +18,7 @@ import {
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
 import { GOOD_LABELS } from './Residents.js'
+import { gonePlace } from './saved-queues.js'
 import { realTimeOf } from './wiki-view.js'
 
 /**
@@ -293,6 +294,8 @@ export interface QueueRow {
   real?: string
   /** It never ends on its own: work or haul. */
   endless: boolean
+  /** Why its place is gone, if it is: "the workplace is gone" (`CONTEXT.md`: Saved queue). */
+  gone?: string
 }
 
 /** What step labels name: the Player's scripts, the buildings in sight and those last seen. */
@@ -302,15 +305,24 @@ export interface StepNames {
   lastSeen?: readonly Pick<Building, 'id' | 'kind'>[]
 }
 
-/** The queue as the card lists it, step by step. */
+/**
+ * The queue as the card lists it, step by step. With the buildings last seen given, a step whose
+ * place is gone from the map is flagged (`gonePlace`), as a saved queue's step loaded after its
+ * workplace was torn down.
+ */
 export function queueRows(q: Pick<Queue, 'steps' | 'current'>, names: StepNames = {}): QueueRow[] {
-  return q.steps.map((s, i) => ({
-    id: s.id,
-    label: stepLabel(s.order, names),
-    current: i === q.current,
-    ...(s.minutes === undefined ? {} : { minutes: s.minutes, real: realMinutes(s.minutes) }),
-    endless: neverEnds(s.order),
-  }))
+  const { buildings = [], lastSeen } = names
+  return q.steps.map((s, i) => {
+    const gone = lastSeen && gonePlace(s.order, { buildings, lastSeen })
+    return {
+      id: s.id,
+      label: stepLabel(s.order, names),
+      current: i === q.current,
+      ...(s.minutes === undefined ? {} : { minutes: s.minutes, real: realMinutes(s.minutes) }),
+      endless: neverEnds(s.order),
+      ...(gone ? { gone } : {}),
+    }
+  })
 }
 
 /** A duration in game minutes as real time, "10 s", "1 min". */

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { queueStepsProblem, type Building, type ScriptSummary } from '@csp/shared'
-import { PasteSteps, QueueBlock } from './Residents.js'
+import { PasteSteps, QueueBlock, SavedQueueTools } from './Residents.js'
 import { editPlan, EMPTY_PLAN, type QueuePlan } from './queue-view.js'
 
 /**
@@ -16,6 +16,8 @@ export function GroupPlanner({
   addStep,
   scripts,
   buildings,
+  lastSeen,
+  realm,
 }: {
   /** The plan open, if one is. */
   plan: QueuePlan | undefined
@@ -27,6 +29,10 @@ export function GroupPlanner({
   addStep: ReactNode
   scripts: ScriptSummary[]
   buildings: Building[]
+  /** The buildings remembered out of sight, to name steps and flag those whose place is gone. */
+  lastSeen: Building[]
+  /** The Player's realm, whose saved queues Save and Load keep (`CONTEXT.md`: Saved queue). */
+  realm: string
 }) {
   if (!plan)
     return (
@@ -52,14 +58,21 @@ export function GroupPlanner({
           queue={plan}
           scripts={scripts}
           buildings={buildings}
+          lastSeen={lastSeen}
           onEdit={(steps, loop) => onPlan(editPlan(plan, steps, loop))}
+          realm={realm}
         />
       ) : (
         <>
           <p className="muted small">
-            Nothing planned yet. Plan steps with Add step, or paste copied ones.
+            Nothing planned yet. Plan steps with Add step, paste copied ones or load a saved queue.
           </p>
           <PasteSteps onPaste={(steps) => onPlan(editPlan(plan, steps))} />
+          <SavedQueueTools
+            realm={realm}
+            steps={[]}
+            onLoad={(steps) => onPlan(editPlan(plan, steps))}
+          />
         </>
       )}
       {addStep}
