@@ -20,6 +20,7 @@ import { requestStoring } from './storing.js'
 import { requestHauling } from './hauling.js'
 import { requestRoadMaterials } from './road-line.js'
 import type { Walking } from './walking.js'
+import type { TickPhase, TickTimer } from './tick.js'
 import { stepSpoilage } from './spoilage.js'
 import { stepStockFloor } from './stock-floor.js'
 import { stepRefill, stepSurvival, type SurvivalResult } from './survival.js'
@@ -158,22 +159,48 @@ export interface StepResult {
  * lose members who are gone and give the rest their orders for the next tick; last, riders who
  * lost their horse get off it (`stepRiders`), and passengers who lost their carriage get off
  * (`stepPassengers`). Without `walking`
- * nobody moves.
+ * nobody moves. With a `timer`, the NPC planning (`npc`), the walking (`walking`) and all the
+ * rest (`rest`) are timed as the parts of the tick's `world` phase (ADR 0004).
  */
-export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
-  const survival = stepSurvival(world, terrain)
-  const horsesDied = stepHorses(world, terrain)
-  stepSpoilage(world)
-  stepStockFloor(world)
-  stepCaravans(world, terrain.size)
-  stepNpcDefence(world, terrain.size)
-  stepTradeOrgArmy(world, terrain.size)
-  stepNpcHire(world, terrain.size)
-  stepPunishments(world, terrain.size)
-  stepNpcCities(world, terrain.size, terrain)
-  runNpcScripts(world, terrain)
-  const steps = walking?.requestSteps(world) ?? []
-  walking?.resolve(world, steps)
+export function stepWorld(
+  world: WorldState,
+  terrain: TerrainMap,
+  walking?: Walking,
+  timer?: Pick<TickTimer, 'time'>,
+): StepResult {
+  const time = <T>(phase: TickPhase, fn: () => T): T => (timer ? timer.time(phase, fn) : fn())
+  const { survival, horsesDied } = time('rest', () => {
+    const survival = stepSurvival(world, terrain)
+    const horsesDied = stepHorses(world, terrain)
+    stepSpoilage(world)
+    stepStockFloor(world)
+    return { survival, horsesDied }
+  })
+  time('npc', () => {
+    stepCaravans(world, terrain.size)
+    stepNpcDefence(world, terrain.size)
+    stepTradeOrgArmy(world, terrain.size)
+    stepNpcHire(world, terrain.size)
+    stepPunishments(world, terrain.size)
+    stepNpcCities(world, terrain.size, terrain)
+    runNpcScripts(world, terrain)
+  })
+  const steps = time('walking', () => {
+    const steps = walking?.requestSteps(world) ?? []
+    walking?.resolve(world, steps)
+    return steps
+  })
+  return time('rest', () => stepRest(world, terrain, steps, survival, horsesDied))
+}
+
+/** The rest of `stepWorld` once the residents walked: everything else they do, then the tick turns. */
+function stepRest(
+  world: WorldState,
+  terrain: TerrainMap,
+  steps: unknown[],
+  survival: SurvivalResult,
+  horsesDied: Horse[],
+): StepResult {
   const strikes = requestStrikes(world, terrain.size)
   const combat = resolveStrikes(world, strikes, terrain.size)
   const climbs = requestClimbing(world)
