@@ -985,7 +985,8 @@ export function Wiki() {
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
-          carriage's load or food on the ground next to them. A stable holds up to{' '}
+          carriage's load or food on the ground next to them, and a ridden horse after that from the
+          Food its rider carries beyond their own {num(OWN_FOOD)}. A stable holds up to{' '}
           {num(STABLE_CAPACITY)} horses. A haul route keeps {num(HAUL_KEEP_FOOD)} Food on board for
           its horse.
         </p>
@@ -1059,13 +1060,16 @@ export function Wiki() {
           {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes at {pct(HUNGRY_HORSE_PACE)} of its
           pace. Riding trains Driving like driving does, and Driving makes riding faster. A rider
           carries no more than on foot, and can't drive a carriage; a ridden horse is never hitched.
-          On the map a rider sits on a horse token, and up close their activity icon is a horseshoe
-          while they ride somewhere.
+          A hungry ridden horse eats Food on the ground in reach first, then what its rider carries
+          beyond their own {num(OWN_FOOD)} Food: the rider never goes without for the horse, so give
+          a rider extra Food for a long ride. When a ridden horse goes hungry with nothing to spare,
+          your realm log says so. On the map a rider sits on a horse token, and up close their
+          activity icon is a horseshoe while they ride somewhere.
         </p>
         <p>
           A rider’s Doing line says <em>Riding to …</em> where it would say <em>Walking to …</em>,
-          and their card shows the horse they ride: its stats, age, health and hunger, with{' '}
-          <strong>Dismount</strong> under Orders.
+          and their card shows the horse they ride: its stats, age, health and hunger, and that it
+          eats from their spare Food, with <strong>Dismount</strong> under Orders.
         </p>
         <h3>Passengers</h3>
         <p>

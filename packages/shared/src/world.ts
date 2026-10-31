@@ -1390,6 +1390,11 @@ export type RealmEventWhat =
   /** One of the realm's horses starved to death (`CONTEXT.md`: Horse). */
   | { kind: 'horseDied'; horseId: string }
   /**
+   * A ridden horse of the realm went hungry and its rider, `name`, carries no Food to spare for it
+   * (`CONTEXT.md`: Riding).
+   */
+  | { kind: 'horseHungry'; horseId: string; residentId: string; name: string }
+  /**
    * The one-time Horse grant (`CONTEXT.md`: Horse grant) gave the realm `horseIds`: in its stable
    * at (`x`, `y`), or, with no stable, on the ground next to the storage of `city` or next to the
    * Leader, with Food by them.
