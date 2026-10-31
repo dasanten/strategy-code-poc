@@ -123,6 +123,8 @@ export const GETS_OFF_FIRST: readonly string[] = [
   'build',
   'tearDown',
   'workAt',
+  'teach',
+  'train',
   'breed',
   'attack',
   'climb',

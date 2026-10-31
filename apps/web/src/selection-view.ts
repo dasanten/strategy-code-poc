@@ -21,6 +21,10 @@ import {
   STABLE_CAPACITY,
   breedersAt,
   keptBreeding,
+  teacherAt,
+  traineesOf,
+  trainingCeiling,
+  subjectValue,
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
@@ -95,6 +99,8 @@ export type ActionId =
   | 'wallTo'
   | 'work'
   | 'feedStable'
+  | 'teach'
+  | 'train'
   | 'tearDown'
   | 'breed'
   | 'goods'
@@ -123,6 +129,8 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   wallTo: 'Q',
   work: 'E',
   feedStable: 'F',
+  teach: 'Y',
+  train: 'I',
   tearDown: 'T',
   breed: 'F',
   goods: 'G',
@@ -266,6 +274,11 @@ export function residentActions(h: ResidentHere): CardAction[] {
   if (h.adult && h.building?.kind === 'stable' && !h.building.site) {
     add(row('feedStable', 'Feed the stable'))
   }
+  // A finished training ground: teach a subject there, or train (`CONTEXT.md`: Teacher, Trainee).
+  if (h.adult && h.building?.kind === 'trainingGround' && !h.building.site) {
+    add(row('teach', 'Teach…', { opens: true }))
+    add(row('train', 'Train'))
+  }
   if (works) {
     const site = h.building?.site
       ? h.building
@@ -341,6 +354,8 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   haul: 'move',
   work: 'work',
   feedStable: 'work',
+  teach: 'work',
+  train: 'work',
   build: 'work',
   roadTo: 'work',
   wallTo: 'work',
@@ -593,6 +608,37 @@ const aOrAn = (words: string) => `${/^[aeiou]/.test(words) ? 'an' : 'a'} ${words
 
 const capital = (words: string) => `${words[0]!.toUpperCase()}${words.slice(1)}`
 
+/** A value in a stat or skill to a tenth, rounded down so nobody shows at a ceiling too soon. */
+const tenths = (n: number) => `${Math.floor(n * 10 + 1e-9) / 10}`
+
+/**
+ * Who teaches and trains at a training ground, among the residents in sight (`teacherAt`,
+ * `traineesOf`): "Ann teaches Strength", or "Nobody teaches here yet"; then each trainee with
+ * their value in the subject and their ceiling (`trainingCeiling`), "waiting" while they learn
+ * nothing (`CONTEXT.md`: Training).
+ */
+function trainingLines(ground: Building, t: TileThings): string[] {
+  const residents = t.residents ?? []
+  const teacher = teacherAt(ground, residents)
+  const o = teacher?.order
+  const subject = o?.kind === 'teach' ? o.subject : undefined
+  const tick = t.tick ?? 0
+  const lines = [
+    teacher && subject ? `${teacher.name} teaches ${capital(subject)}` : 'Nobody teaches here yet',
+  ]
+  for (const r of traineesOf(ground, residents)) {
+    const waiting = r.order?.kind === 'train' && r.order.learning ? '' : ', waiting'
+    if (!teacher || !subject) {
+      lines.push(`${r.name} trains${waiting}`)
+      continue
+    }
+    const has = subjectValue(r as Resident, subject, tick)
+    const ceiling = trainingCeiling(r as Resident, teacher as Resident, subject, tick)
+    lines.push(`${r.name} trains: ${tenths(has)} of ${tenths(ceiling)}${waiting}`)
+  }
+  return lines
+}
+
 /**
  * What an unbuilt resource node's card says (`CONTEXT.md`: Resource node, Workplace): what can be
  * built on it and whether it fits, what that takes, makes and teaches, and what a worker of
@@ -815,6 +861,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       }
       const makes = live && makesLine(live, t, pile, goodLabels)
       if (makes) lines.push(makes)
+      // A finished training ground teaches what its teacher set, and nothing while nobody
+      // teaches there (`CONTEXT.md`: Training ground, Teacher).
+      if (building.kind === 'trainingGround') lines.push(...trainingLines(building, t))
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)

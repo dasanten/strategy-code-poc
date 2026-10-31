@@ -88,6 +88,7 @@ describe('Add step', () => {
       horses: { ask: 'horses', horseIds: ['h1', 'h2'] },
       haul: { ask: 'haul', setup: { goods: ['wood'], returnGoods: [], keepFood: 0 } },
       script: { ask: 'script', scriptId: 1 },
+      subject: { ask: 'subject', subject: 'strength' },
     }
     const kinds = new Set(
       PLAN_STEPS.map((k) => {
@@ -221,5 +222,30 @@ describe('Add step', () => {
       stableId: 'b1',
       horseIds: ['h1', 'h2'],
     })
+  })
+
+  it('teaches and trains at a training ground picked, anyone’s, after a walk there', () => {
+    const ground: Building = { id: 'g1', kind: 'trainingGround', cityId: 'c2', x: 24, y: 24 }
+    const groundSite: Building = { ...ground, id: 'g2', x: 34, y: 34, site: site.site }
+    const tw = { ...w, buildings: [...w.buildings, ground, groundSite] }
+    const plan = (kind: Plan['kind'], x: number, y: number) =>
+      pickInto(tw, { kind, picked: [] }, { x, y })
+    expect(plan('train', 34, 34).error).toBe('no finished training ground there')
+    expect(plan('teach', 20, 20).error).toBe('no finished training ground there')
+
+    const train = plan('train', 25, 25)
+    expect(planAsk(train)).toBeUndefined()
+    const teach = plan('teach', 25, 25)
+    expect(planAsk(teach)).toBe('subject')
+    expect(planOrder(teach)).toBeUndefined()
+    const taught = planOrder(teach, { ask: 'subject', subject: 'combat' })!
+    expect(taught.order).toEqual({ kind: 'teach', buildingId: 'g1', subject: 'combat' })
+
+    for (const { order, at } of [planOrder(train)!, taught]) {
+      const request = appendRequest(inCity, order, at)!
+      expect(request.steps).toEqual([{ order: { kind: 'walkTo', x: 25, y: 25 } }, { order }])
+      expect(queueStepsProblem(request.steps)).toBeUndefined()
+    }
+    expect(planOrder(train)!.order).toEqual({ kind: 'task', task: 'train', groundId: 'g1' })
   })
 })

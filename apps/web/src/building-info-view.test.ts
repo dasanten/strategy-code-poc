@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   BUILDING_PURPOSE,
   FOOTPRINT,
+  TRAINING_GROUND_MAX_TRAINEES,
   WORKPLACE_MAX_WORKERS,
   type Building,
   type KnownNode,
@@ -52,6 +53,15 @@ describe('buildingInfoLines', () => {
       BUILDING_PURPOSE.house,
       `Footprint ${FOOTPRINT.house} × ${FOOTPRINT.house} tiles`,
       'Built from 20 wood and about 1 game day of one resident’s work',
+    ])
+  })
+
+  it('says how many teach and train at a training ground', () => {
+    expect(buildingInfoLines('trainingGround', labels)).toEqual([
+      BUILDING_PURPOSE.trainingGround,
+      `One teacher, up to ${TRAINING_GROUND_MAX_TRAINEES} trainees`,
+      `Footprint ${FOOTPRINT.trainingGround} × ${FOOTPRINT.trainingGround} tiles`,
+      'Built from 50 wood, 10 stone and about 3 game days of one resident’s work',
     ])
   })
 

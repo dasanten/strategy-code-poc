@@ -9,6 +9,7 @@ import {
   stableAt,
   commands,
   isTask,
+  isTrainingSubject,
   keptPair,
   type Good,
   type Task,
@@ -267,6 +268,18 @@ interface FeedStableTaskRequest extends OrderRequest {
   stableId: string
 }
 
+/**
+ * Train: the training ground the resident stands on (`CONTEXT.md`: Trainee), and the subject
+ * they mean to learn there, if any.
+ */
+interface TrainTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'train'
+  residentId: string
+  groundId: string
+  subject?: string
+}
+
 interface BuildTaskRequest extends OrderRequest {
   kind: 'task'
   task: 'build'
@@ -295,6 +308,7 @@ type TaskRequest = (
   | TearDownTaskRequest
   | BreedTaskRequest
   | FeedStableTaskRequest
+  | TrainTaskRequest
 ) &
   TaskParams
 
@@ -310,6 +324,7 @@ function asOrder(o: Partial<TaskRequest>): OrderRequest {
   if (o.task === 'breed')
     return { kind: 'breed', residentId, stableId: o.stableId, horseIds: o.horseIds }
   if (o.task === 'build') return { kind: 'build', residentId, building: o.building }
+  if (o.task === 'train') return { kind: 'train', residentId, buildingId: o.groundId }
   return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
 }
 
@@ -365,6 +380,11 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
       }
       return { ...memory }
     }
+    case 'train': {
+      const memory: TaskMemory['train'] = { groundId: order.groundId }
+      if (order.subject !== undefined) memory.subject = order.subject
+      return { ...memory }
+    }
     case 'feedStable': {
       const memory: TaskMemory['feedStable'] = { stableId: order.stableId }
       return { ...memory }
@@ -377,9 +397,10 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * runs the Player's version of the task's default script, from a memory holding the task's
  * target (`TaskMemory`). It ends whatever the resident was doing. Each task is checked as the
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
- * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
- * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
- * own: the resident stands in the stable and is grown up. The param values it gives are checked
+ * Build as the build order on the resident's tile or the one it names, Haul as the haul order to
+ * a tile, Tear down as the tear-down order, Breed horses as the breed order, Train as the train
+ * order. Feed the stable starts no order of its own: the resident stands in the stable and is
+ * grown up. The param values it gives are checked
  * against the default script's and set first (`CONTEXT.md`: Before it starts), the task's target
  * in the script's target param (`withTargetParam`, `taskTarget`).
  */
@@ -428,11 +449,13 @@ function taskTarget(
       ? [o.workplaceId, 'building' as const]
       : o.task === 'tearDown'
         ? [o.buildingId, 'building' as const]
-        : o.task === 'breed' || o.task === 'feedStable'
-          ? [o.stableId, 'storage' as const]
-          : o.task === 'haul'
-            ? [o.carriageId, 'storage' as const]
-            : [buildSite(world, o, r), 'building' as const]
+        : o.task === 'train'
+          ? [o.groundId, 'building' as const]
+          : o.task === 'breed' || o.task === 'feedStable'
+            ? [o.stableId, 'storage' as const]
+            : o.task === 'haul'
+              ? [o.carriageId, 'storage' as const]
+              : [buildSite(world, o, r), 'building' as const]
   if (id === undefined) return undefined
   return paramTarget(world, realmId, type, id) ? id : undefined
 }
@@ -479,11 +502,14 @@ function taskProblem(
       return 'the target must be a tile'
     return buildAtProblem(world, r!, o.building, at as { x: number; y: number }, terrain)
   }
+  if (o.task === 'train' && o.subject !== undefined && !isTrainingSubject(o.subject))
+    return 'train a stat or a skill'
   const built = asOrder(withKeptPair(world, o, realm.id))
   const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)
   // Working there by a bare work-at order, as the starting residents do, they can still be
   // given the task; already running it there, they can't.
-  if (problem === 'already working here' && !r.script) return undefined
+  if ((problem === 'already working here' || problem === 'already training here') && !r.script)
+    return undefined
   return problem
 }
 

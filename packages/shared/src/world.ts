@@ -37,6 +37,29 @@ export type SkillName =
   | 'combat'
   | 'driving'
 
+/** Every skill, in the order the UI lists them. */
+export const SKILL_NAMES: readonly SkillName[] = [
+  'mining',
+  'woodcutting',
+  'smelting',
+  'smithing',
+  'construction',
+  'farming',
+  'combat',
+  'driving',
+]
+
+/** What a training ground teaches (`CONTEXT.md`: Training ground): a stat or a skill. */
+export type TrainingSubject = StatName | SkillName
+
+/** Whether `x` names a stat or a skill, something a training ground can teach. */
+export function isTrainingSubject(x: unknown): x is TrainingSubject {
+  return (
+    (STAT_NAMES as readonly unknown[]).includes(x) ||
+    (SKILL_NAMES as readonly unknown[]).includes(x)
+  )
+}
+
 /** A person living in the world (`CONTEXT.md`: Resident). Plain data. */
 export interface Resident {
   id: string
@@ -599,6 +622,29 @@ export interface BreedOrder {
   progress: number
 }
 
+/**
+ * Teaching (`CONTEXT.md`: Teacher): the resident teaches `subject` at the finished training
+ * ground `buildingId` while they stand on its footprint, until ordered otherwise. Walking off
+ * ends it.
+ */
+export interface TeachOrder {
+  kind: 'teach'
+  buildingId: string
+  subject: TrainingSubject
+}
+
+/**
+ * Training (`CONTEXT.md`: Trainee, Training): the resident trains at the finished training ground
+ * `buildingId` while they stand on its footprint, until ordered otherwise; walking off ends it.
+ * `learning` is the subject they gained in on the last tick, null while they wait: no teacher
+ * there, or at their ceiling in its subject.
+ */
+export interface TrainOrder {
+  kind: 'train'
+  buildingId: string
+  learning: TrainingSubject | null
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -614,6 +660,8 @@ export type ResidentOrder =
   | BreedOrder
   | AttackOrder
   | ClimbOrder
+  | TeachOrder
+  | TrainOrder
   | LineOrder
   | PayOrder
   | BuyCityOrder
@@ -1746,6 +1794,11 @@ export type BuildingKind =
   | 'smelter'
   | 'mint'
   | 'smithy'
+  /**
+   * A training ground (`CONTEXT.md`: Training ground): where residents train. It makes nothing,
+   * so it is no workplace; like one, it has no owner.
+   */
+  | 'trainingGround'
   | 'road'
   /**
    * A carriage site (`CONTEXT.md`: Carriage): only ever a construction site, laid out at a

@@ -9,19 +9,17 @@ import {
   appendRequest,
   appendRequests,
   appendToEach,
-  dropStep,
   editPlan,
   EMPTY_PLAN,
   giveToAll,
+  planOf,
   planStep,
-  moveStep,
   queueRows,
-  removeStep,
   STORE_ALL,
   stepLabel,
-  timeStep,
   type Queued,
 } from './queue-view.js'
+import { dropItem, idsOf, moveItem, removeItem, timeItem, unroll } from './plan-blocks.js'
 
 /** Queues on the resident card (`CONTEXT.md`: Queue): Shift-append and the queue list. */
 
@@ -169,17 +167,18 @@ describe('the queue list', () => {
   })
 
   it('reorders, removes and times steps by id', () => {
-    expect(moveStep(q, 4, -1).map((s) => s.id)).toEqual([1, 2, 4, 3])
-    expect(moveStep(q, 1, -1).map((s) => s.id)).toEqual([1, 2, 3, 4])
-    expect(dropStep(q, 4, 1).map((s) => s.id)).toEqual([4, 1, 2, 3])
-    expect(removeStep(q, 3).map((s) => s.id)).toEqual([1, 2, 4])
-    expect(timeStep(q, 2, 10)[1]).toMatchObject({ id: 2, minutes: 10 })
-    expect(timeStep(q, 2, undefined)[1]).not.toHaveProperty('minutes')
+    const steps = planOf(q).items
+    expect(idsOf(moveItem(steps, 4, -1))).toEqual([1, 2, 4, 3])
+    expect(idsOf(moveItem(steps, 1, -1))).toEqual([1, 2, 3, 4])
+    expect(idsOf(dropItem(steps, 4, 1))).toEqual([4, 1, 2, 3])
+    expect(idsOf(removeItem(steps, 3))).toEqual([1, 2, 4])
+    expect(timeItem(steps, 2, 10)[1]).toMatchObject({ id: 2, minutes: 10 })
+    expect(timeItem(steps, 2, undefined)[1]).not.toHaveProperty('minutes')
   })
 
   it('gives work moved off the end a duration', () => {
     const last = shiftQueue(idle, [walkHome, work])
-    const moved = moveStep(last.queue!, 3, -1)
+    const moved = unroll(moveItem(planOf(last.queue!).items, 3, -1))
     expect(moved.map((s) => [s.id, s.minutes])).toEqual([
       [1, undefined],
       [3, QUEUE_DEFAULT_STEP_MINUTES],
@@ -228,20 +227,32 @@ describe('the group planner', () => {
   ]
 
   it('plans a step acting on a place after a walk there, and times one that never ends', () => {
-    expect(plan.steps).toEqual([
+    expect(plan.items).toEqual([
       { id: 1, order: { kind: 'walkTo', ...mine } },
       { id: 2, order: workMine, minutes: QUEUE_DEFAULT_STEP_MINUTES },
       { id: 3, order: store },
     ])
-    expect(plan.current).toBe(-1)
   })
 
   it('edits the plan as the queue list does, keeping its ids', () => {
-    const looped = editPlan(plan, removeStep(plan, 3), true)
-    expect(looped.steps.map((s) => s.id)).toEqual([1, 2])
+    const looped = editPlan(plan, removeItem(plan.items, 3), true)
+    expect(idsOf(looped.items)).toEqual([1, 2])
     expect(looped.loop).toBe(true)
     // A step added after a removal gets a fresh id.
-    expect(planStep(looped, store).steps.at(-1)!.id).toBe(4)
+    expect(planStep(looped, store).items.at(-1)!.id).toBe(4)
+  })
+
+  it('Give to all unrolls repeat blocks into plain steps', () => {
+    const repeated = editPlan(plan, [{ repeat: 3, items: plan.items }])
+    const [request] = giveToAll(repeated, members.slice(0, 1))
+    const steps = request!.steps as { order: OrderRequest }[]
+    expect(steps).toHaveLength(9)
+    expect(steps.map((s) => s.order).slice(3, 6)).toEqual([
+      { kind: 'walkTo', ...mine },
+      workMine,
+      store,
+    ])
+    expect(queueStepsProblem(steps)).toBeUndefined()
   })
 
   it('Give to all sends one queue request per member with the same steps', () => {

@@ -333,7 +333,8 @@ const whole = (stock: Stock | undefined): RefillSource | undefined =>
  * Where a resident running low on food takes a meal from, if anywhere (`CONTEXT.md`: Refilling):
  * at home, their city's storage (a mercenary of the Trade Org's, the HQ's); near an outpost storage
  * of their realm, that storage; working at a
- * workplace, the Food in its pile, else on a carriage standing at it; on a caravan's crew, its
+ * workplace, or teaching or training at a training ground, the Food in its pile, else on a
+ * carriage standing at it; on a caravan's crew, its
  * carriage close by (`caravanFood`); driving a carriage of their realm, that carriage, but not
  * the horse's share of what a haul route keeps on board (`driversFood`); in an army or aboard a
  * carriage as a passenger, a carriage of their realm on or next to their tile, but not the Food
@@ -348,7 +349,11 @@ export function refillSource(
     homeStorage(world, r, size) ?? hirersStorage(world, r, size) ?? outpostStorage(world, r, size)
   if (home) return whole(home.stock)
   const o = r.order
-  const atWork = o?.kind === 'workAt' && r.x === o.at.x && r.y === o.at.y
+  // Teaching and training refill at the training ground as at a workplace (`CONTEXT.md`: Training).
+  const atWork =
+    (o?.kind === 'workAt' && r.x === o.at.x && r.y === o.at.y) ||
+    o?.kind === 'teach' ||
+    o?.kind === 'train'
   const place = atWork && world.buildings.find((b) => b.id === o.buildingId)
   if (place && !place.site && isAt(r, place, size)) {
     const pile = buildingPile(world, place)
