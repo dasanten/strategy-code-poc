@@ -31,6 +31,7 @@ const city = (realmId: string | null): City => ({
   name: 'Ashford',
   realmId,
   townHallId: 'b1',
+  occupation: null,
 })
 const b = (id: string, kind: Building['kind'], cityId: string | null, site = false): Building => ({
   id,
@@ -182,7 +183,13 @@ describe('trading at a warehouse in the inspector', () => {
   })
 
   it('previews a delivery to and a pick-up from one of the Player’s cities, fee and all', () => {
-    const home: City = { id: 'city2', name: 'Home', realmId: 'realm1', townHallId: 'h2' }
+    const home: City = {
+      id: 'city2',
+      name: 'Home',
+      realmId: 'realm1',
+      townHallId: 'h2',
+      occupation: null,
+    }
     const storage = { ...b('s2', 'storage', 'city2'), x: 23, y: 4, stock: { iron: 5 } }
     const theirs = { ...b('s3', 'storage', 'city3'), x: 30, y: 4 }
     const all = {
@@ -204,7 +211,13 @@ describe('trading at a warehouse in the inspector', () => {
   })
 
   it('previews a transfer from one of the Player’s cities to another realm’s, fee and all', () => {
-    const home: City = { id: 'city2', name: 'Home', realmId: 'realm1', townHallId: 'h2' }
+    const home: City = {
+      id: 'city2',
+      name: 'Home',
+      realmId: 'realm1',
+      townHallId: 'h2',
+      occupation: null,
+    }
     const theirs: City = { ...home, id: 'city3', name: 'Yonder', realmId: 'realm2' }
     const storage = { ...b('s2', 'storage', 'city2'), x: 23, y: 4, stock: { iron: 5, coins: 900 } }
     const their = { ...b('s3', 'storage', 'city3'), x: 30, y: 4 }

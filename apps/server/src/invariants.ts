@@ -54,7 +54,7 @@ import {
   Terrain,
   OFF_NODES,
   ON_PLAINS,
-  captorOf,
+  OCCUPATION_TICKS,
   cityMembership,
   cityOrganization,
   computeTerritory,
@@ -79,6 +79,8 @@ import {
   isPassableTerrain,
   buildingAt,
   isAt,
+  isArmed,
+  allied,
   TRAINING_GROUND_MAX_TRAINEES,
   keptBreeding,
   besideStep,
@@ -1243,23 +1245,32 @@ export const cityResidentsInItsRealm: Invariant = {
 }
 
 /**
- * After a tick, no city is left standing taken (`CONTEXT.md`: Capturing a city): a city with
- * armed residents of one other realm inside and no defender left has changed realm already.
+ * Occupations of town halls hold (`CONTEXT.md`: Occupying a town hall, Capturing a city): none
+ * has run the full `OCCUPATION_TICKS` without capturing its city, or started in the future; the
+ * occupier still has armed residents on the hall; and it is never the city's own realm or an
+ * ally of it.
  */
-export const takenCitiesCaptured: Invariant = {
-  name: 'taken-cities-captured',
+export const occupationsSound: Invariant = {
+  name: 'occupations-sound',
   check(world, terrain) {
-    return world.cities.flatMap((c) => {
-      const captor = captorOf(world, c, terrain.size)
-      if (captor === null || captor === c.realmId) return []
-      return [
-        {
-          invariant: this.name,
-          message: `city ${c.id} of ${c.realmId ?? 'no realm'} is taken by ${captor} but hasn't changed realm`,
-          entityIds: [c.id],
-        },
-      ]
-    })
+    const out: InvariantViolation[] = []
+    for (const c of world.cities) {
+      const o = c.occupation
+      if (!o) continue
+      const fail = (message: string) =>
+        out.push({ invariant: this.name, message: `city ${c.id}: ${message}`, entityIds: [c.id] })
+      const ran = world.tick - o.since
+      if (ran < 0 || ran >= OCCUPATION_TICKS)
+        fail(`occupied by ${o.realmId} for ${ran} ticks without being captured`)
+      const hall = world.buildings.find((b) => b.id === c.townHallId)
+      const holds = world.residents.some(
+        (r) => r.owner === o.realmId && isArmed(r) && !!hall && isAt(r, hall, terrain.size),
+      )
+      if (!holds) fail(`occupied by ${o.realmId} with none of its armed residents on the hall`)
+      if (c.realmId !== null && allied(world, c.realmId, o.realmId))
+        fail(`occupied by ${o.realmId}, its own realm or an ally`)
+    }
+    return out
   },
 }
 
@@ -1935,7 +1946,7 @@ export const worldInvariants: Invariant[] = [
   npcCityResidentsUnowned,
   ownersExist,
   cityResidentsInItsRealm,
-  takenCitiesCaptured,
+  occupationsSound,
   npcOrdersAllowed,
   npcFightsOutsiders,
   cityWorkplacesSound,

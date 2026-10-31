@@ -38,6 +38,7 @@ export function addCity(
     name: city.name ?? 'Ashford',
     realmId: city.realmId,
     townHallId: hall.id,
+    occupation: null,
   }
   world.buildings.push(hall)
   world.cities.push(c)

@@ -265,6 +265,7 @@ export function foundStartingCity(
     name: CITY_NAMES[Math.floor(rand() * CITY_NAMES.length)]!,
     realmId,
     townHallId: '',
+    occupation: null,
   }
 
   // Inside the wall: the storage on the middle tile, the town hall south of it, houses in a row

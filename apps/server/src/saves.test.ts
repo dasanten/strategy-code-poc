@@ -136,7 +136,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(64)
+    expect(WORLD_FORMAT_VERSION).toBe(65)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -368,6 +368,17 @@ describe('world saves', () => {
     const migrated = migrateWorld(structuredClone(world), 63, { terrain }, migrations, 64)
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.script?.waitingSince === undefined)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('migrates a format 64 world: no city’s town hall is occupied (migration 64 → 65)', () => {
+    const { world, terrain } = worldWithPost()
+    const old = structuredClone(world) as { cities: Partial<(typeof world.cities)[number]>[] }
+    for (const c of old.cities) delete c.occupation
+    const migrated = migrateWorld(old, 64, { terrain }, migrations, 65)
+    expect(migrated.cities.length).toBeGreaterThan(1)
+    expect(migrated.cities.every((c) => c.occupation === null)).toBe(true)
+    expect(migrated).toEqual(world)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

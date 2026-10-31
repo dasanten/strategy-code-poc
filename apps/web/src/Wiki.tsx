@@ -89,6 +89,7 @@ import {
   MAP_SIZE,
   MAX_HEALTH,
   MIN_BLOW_DAMAGE,
+  OCCUPATION_GAME_DAYS,
   NPC_ALLIANCE_JOIN_STANDING,
   NPC_ALLIANCE_LEAVE_STANDING,
   NPC_CITY_REFUSES_STANDING,
@@ -1515,6 +1516,20 @@ export function Wiki() {
           the script's id, or <code>null</code> for Defend. If the script is gone from your library
           when they are struck, they defend by Defend, your realm log says so once, and the pick
           goes back to Defend. A resident lent to another realm defends by that realm's Defend.
+        </p>
+        <h3>Capturing a city</h3>
+        <p>
+          A city is captured by occupying its town hall: armed residents of your realm stand on it
+          (any of its tiles), nobody else's armed residents do, and none of the city's defenders do
+          (armed residents of its realm or an ally, or for an NPC city its own). An ally of yours on
+          the hall counts as another realm, so nobody occupies it. Held {days(OCCUPATION_GAME_DAYS)}{' '}
+          without a break, the city joins your realm with its buildings and the residents who live
+          there, loyal at once; its Leader never joins. Beating its defenders is not enough on its
+          own, and defenders elsewhere in the city don't stop the clock: they have to come to the
+          hall. The first tick the occupation doesn't hold, it is broken and its days are lost; the
+          next one starts again from nothing. Every city is captured this way: NPC cities, Players'
+          cities, trading posts and the Trade Org HQ, whose hired mercenaries defend it. Scripts see
+          it as <code>city.occupation</code>: who occupies a town hall in sight, and the ticks left.
         </p>
       </Section>
 

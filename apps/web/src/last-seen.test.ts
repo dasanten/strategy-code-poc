@@ -27,7 +27,15 @@ describe('lastSeenByKind', () => {
   it('sorts buildings from cities and drops the tag', () => {
     const sorted = lastSeenByKind([
       { is: 'building', id: 'b', kind: 'house', cityId: 'c', x: 1, y: 2, seenAt: 5 },
-      { is: 'city', id: 'c', name: 'Far', realmId: null, townHallId: 'h', seenAt: 5 },
+      {
+        is: 'city',
+        id: 'c',
+        name: 'Far',
+        realmId: null,
+        townHallId: 'h',
+        occupation: null,
+        seenAt: 5,
+      },
     ])
     expect(sorted.buildings).toEqual([
       { id: 'b', kind: 'house', cityId: 'c', x: 1, y: 2, seenAt: 5 },
