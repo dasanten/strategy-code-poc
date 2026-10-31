@@ -304,6 +304,9 @@ describe('setting out for a workplace in an NPC city', () => {
     storage.stock = { food: 200 }
     world.residents = []
     const far = farCamp(world, terrain, city, { x: storage.x + 150, y: storage.y })
+    // One farmer feeds them all, so the newcomers are spare hands for the Wood it lacks.
+    const farmer = villager(world, city, 'f1', storage, OWN_FOOD)
+    putToWork(farmer, farmOf(world, city))
     const r = villager(world, city, 'a1', storage, OWN_FOOD)
     // The city decides in its planning pass (ADR 0016) and hands the jobs out in the tick.
     planCity(world, city, terrain)
@@ -333,6 +336,8 @@ describe('setting out for a workplace in an NPC city', () => {
 
     // The farm next door needs no more than their own food.
     world.buildings = world.buildings.filter((b) => b.id !== far.id)
+    // Alone now, they are the farmer that feeds the village.
+    world.residents = []
     const f = villager(world, city, 'a2', storage, OWN_FOOD)
     planCity(world, city, terrain)
     stepNpcCities(world, terrain.size, terrain)

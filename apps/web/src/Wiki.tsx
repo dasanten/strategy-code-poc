@@ -94,7 +94,13 @@ import {
   NPC_ALLIANCE_LEAVE_STANDING,
   NPC_CITY_REFUSES_STANDING,
   NPC_CITY_WONT_SELL_STANDING,
+  FOOD_PER_DAY,
+  NPC_BUILDERS,
+  NPC_NODE_REACH,
   NPC_PLAN_TICKS,
+  NPC_SMITHY_WEAPON,
+  NPC_SOLDIER_SHARE,
+  NPC_WAR_CHEST_PER_RESIDENT,
   NPC_TRADE,
   OWN_FOOD,
   OUTPOST_REFILL_REACH,
@@ -1276,13 +1282,38 @@ export function Wiki() {
           finished. Only its defence acts at once.
         </p>
         <p>
-          An NPC city sells only what it holds above its reserve ({days(NPC_TRADE.reserveFoodDays)}{' '}
-          of Food for everyone, and the materials for a house and{' '}
-          {num(NPC_TRADE.reserveWallStretches)} tiles of wall) and buys only what it is short of. It
-          lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week, keeping{' '}
-          {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires out
-          soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A contract
-          runs at most {days(CONTRACT_MAX_DAYS)}.
+          An NPC city keeps a reserve: {days(NPC_TRADE.reserveFoodDays)} of Food for everyone; the
+          materials for a house and {num(NPC_TRADE.reserveWallStretches)} tiles of wall; a{' '}
+          {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()} for each soldier it keeps and hasn't armed
+          yet ({pct(NPC_SOLDIER_SHARE)} of its adults), with the Iron and Wood to forge them; and{' '}
+          {num(NPC_WAR_CHEST_PER_RESIDENT)} coins a resident as its war chest. A stable is wanted
+          once it has a horse.
+        </p>
+        <p>
+          It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
+          eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
+          and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
+          {num(NPC_BUILDERS)} builders while it has a project; everyone else is a spare hand. Spare
+          hands go to the good the reserve is shortest of, as a share of what it wants of it,
+          filling one workplace's crew before the next. Without a workplace for that good, the city
+          builds one: on the nearest fitting resource node within {num(NPC_NODE_REACH)} tiles of
+          home, or a smelter, smithy or mint in its area like a house.
+        </p>
+        <p>
+          So it builds the whole chain its land allows, from the node up: weapons short wants a
+          smithy, which wants Iron, so a smelter, which wants Iron ore, so a mine first, and the
+          Wood and Stone the mine is built of before that. A smelter or smithy is worked only while
+          the storage holds the input for a batch, which its workers take with them; once the city
+          isn't short of what it makes, they stop. A good with no node in reach stays short: a
+          village with no ore in reach forges no weapons, and a mint is built only with Gold ore in
+          reach.
+        </p>
+        <p>
+          An NPC city sells only what it holds above this reserve and buys only what it is short of.
+          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week,
+          keeping {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires
+          out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A
+          contract runs at most {days(CONTRACT_MAX_DAYS)}.
         </p>
         <p>
           Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,

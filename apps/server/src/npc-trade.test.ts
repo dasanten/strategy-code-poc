@@ -1,12 +1,17 @@
 import {
   BUILD_MATERIALS,
   NPC_CITY_REFUSES_STANDING,
+  NPC_SMITHY_WEAPON,
   NPC_TRADE,
+  NPC_WAR_CHEST_PER_RESIDENT,
+  canWork,
+  npcSoldierTarget,
+  recipeFor,
   Terrain,
   commanderOf,
   isArmed,
   npcCityPrices,
-  npcCityReserve,
+  npcReserve,
   npcHirePrice,
   spareResidents,
   standingOf,
@@ -98,19 +103,32 @@ const trade = (side: 'buy' | 'sell', good: string, units: number, extra = {}) =>
 })
 
 describe('trading with an NPC city', () => {
-  it('keeps a reserve of Food for its residents and of materials for a house and some wall', () => {
+  it('keeps a reserve of Food, materials for a house and some wall, weapons and a war chest', () => {
     const { world, npc } = setup()
-    const reserve = npcCityReserve(world, npc)
+    const reserve = npcReserve(world, npc)
     expect(reserve.food).toBeGreaterThan(0)
+    const residents = world.residents.filter((r) => r.cityId === npc.id)
+    const adults = residents.filter((r) => canWork(r, world.tick))
+    const unarmed = npcSoldierTarget(adults.length) - adults.filter(isArmed).length
+    const spear = recipeFor('smithy', NPC_SMITHY_WEAPON)!.input
+    expect(reserve[NPC_SMITHY_WEAPON]).toBe(unarmed)
     expect(reserve.wood).toBe(
-      BUILD_MATERIALS.house!.wood! + BUILD_MATERIALS.wall!.wood! * NPC_TRADE.reserveWallStretches,
+      BUILD_MATERIALS.house!.wood! +
+        BUILD_MATERIALS.wall!.wood! * NPC_TRADE.reserveWallStretches +
+        spear.wood! * unarmed,
     )
+    expect(reserve.iron).toBe(spear.iron! * unarmed)
     expect(reserve.stone).toBeUndefined()
+    expect(reserve.coins).toBe(residents.length * NPC_WAR_CHEST_PER_RESIDENT)
+    // Armed soldiers want no more weapons, nor Iron to forge them.
+    for (const r of residents) r.carried.spear = 1
+    expect(npcReserve(world, npc).iron).toBeUndefined()
+    expect(npcReserve(world, npc)[NPC_SMITHY_WEAPON]).toBeUndefined()
   })
 
   it('sells only its surplus, and the trade raises its standing', () => {
     const { world, npc, p1, queue } = setup()
-    const keep = npcCityReserve(world, npc).food!
+    const keep = npcReserve(world, npc).food!
     storage(world).stock = { food: keep + 5 }
     p1.carried.coins = 500
     expect(order(world, queue, trade('buy', 'food', 50))).toBe('ack')
@@ -127,7 +145,7 @@ describe('trading with an NPC city', () => {
 
   it('buys only what it lacks of its reserve, with the coins in its storage', () => {
     const { world, npc, p1, queue } = setup()
-    const keep = npcCityReserve(world, npc).wood!
+    const keep = npcReserve(world, npc).wood!
     storage(world).stock = { wood: keep - 3, coins: 1000 }
     p1.carried = { wood: 8, stone: 4 }
     expect(order(world, queue, trade('sell', 'wood', 8))).toBe('ack')
@@ -188,7 +206,7 @@ describe('trading with an NPC city', () => {
 
   it('reports a trade that broke into the reserve', () => {
     const { world, npc, p1, queue } = setup()
-    storage(world).stock = { food: npcCityReserve(world, npc).food! + 1 }
+    storage(world).stock = { food: npcReserve(world, npc).food! + 1 }
     p1.carried.coins = 100
     order(world, queue, trade('buy', 'food', 1))
     run(world)

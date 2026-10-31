@@ -30,7 +30,6 @@ import { createWorld, stepWorld } from './world.js'
 
 const terrain = cityTerrain()
 
-
 const cleanup: (() => Promise<void> | void)[] = []
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn()
@@ -45,7 +44,9 @@ async function start(
   options: {
     sessionDb?: Db
     kinds?: Record<string, OrderKind>
-  } & Partial<Pick<Parameters<typeof attachRealtime>[1], 'onError' | 'origins' | 'limits' | 'now'>> = {},
+  } & Partial<
+    Pick<Parameters<typeof attachRealtime>[1], 'onError' | 'origins' | 'limits' | 'now'>
+  > = {},
 ) {
   const opened = await openDb(':memory:')
   const app = await buildApp({
@@ -174,7 +175,9 @@ describe('realtime', () => {
     expect(await open().refused()).toBe(403)
     expect(world.realms).toEqual([])
     // The game's own domain, as configured, and whatever host the request came in at.
-    expect(await open('https://game.example.com').next('welcome')).toMatchObject({ type: 'welcome' })
+    expect(await open('https://game.example.com').next('welcome')).toMatchObject({
+      type: 'welcome',
+    })
     const own = `http://${new URL(url).host}`
     expect(await open(own).next('welcome')).toMatchObject({ type: 'welcome' })
     expect(await open('http://localhost:5173').refused()).toBe(403)
