@@ -1,4 +1,12 @@
-import type { City, Diplomacy, Good, Resident, Stock } from '@csp/shared'
+import {
+  PAIRING_WAIT_TICKS,
+  TICKS_PER_GAME_DAY,
+  type City,
+  type Diplomacy,
+  type Good,
+  type Resident,
+  type Stock,
+} from '@csp/shared'
 
 /** One heading of the Residents drawer and the residents under it. */
 export interface ResidentGroup<R> {
@@ -224,4 +232,12 @@ export function scriptsRun(scripts: readonly (string | undefined)[]): string[] {
     .map(([name, n]) => `${n} ${n === 1 ? 'runs' : 'run'} ${name}`)
   if (none > 0) lines.push(`${none} ${none === 1 ? 'runs' : 'run'} no script`)
   return lines
+}
+
+/**
+ * Game days until a pair's wait is over and one partner can start carrying (`CONTEXT.md`:
+ * Pairing): the pairing wait counted from when they paired, never below 0.
+ */
+export function pairingDaysLeft(since: number, tick: number): number {
+  return Math.max(0, Math.ceil((since + PAIRING_WAIT_TICKS - tick) / TICKS_PER_GAME_DAY))
 }
