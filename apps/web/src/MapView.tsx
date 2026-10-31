@@ -87,7 +87,7 @@ import {
   type Viewer,
 } from './map/tokens.js'
 import type { MapWorld } from './map/map-world.js'
-import { Motion } from './map/motion.js'
+import { Motion, workSway } from './map/motion.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
@@ -503,6 +503,12 @@ export function MapView({
 
       const world = worldRef.current
       const now = performance.now()
+      // Residents at work sway on their tile; one gliding to the next tile does not.
+      const sways = new Map<string, readonly [number, number]>()
+      for (const r of world.residents) {
+        const sway = workSway(r, now)
+        if (sway[0] !== 0 || sway[1] !== 0) sways.set(r.id, sway)
+      }
       const spots = drawUnits(
         tokens,
         badges,
@@ -511,11 +517,16 @@ export function MapView({
         world,
         viewerOf(world),
         leadersOf(world),
-        (id, x, y) => motion.at(id, x, y, now),
+        (id, x, y) => {
+          const [px, py] = motion.at(id, x, y, now)
+          const sway = sways.get(id)
+          if (!sway || motion.gliding(id, now)) return [px, py]
+          return [px + sway[0], py + sway[1]]
+        },
       )
       drawnSpots = spots
-      // Tokens still on their way ask for another frame.
-      if (motion.moving(now)) redraw()
+      // Tokens still on their way, and residents at work, ask for another frame.
+      if (motion.moving(now) || sways.size > 0) redraw()
       // A ring round each selected resident; the way ahead only when there is just one.
       const ids = selectedRef.current
       let rings = false

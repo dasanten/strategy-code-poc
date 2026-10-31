@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { GLIDE_MS, Motion, type Token } from './motion.js'
+import type { ResidentOrder } from '@csp/shared'
+import { GLIDE_MS, Motion, WORK_SWAY, WORK_SWAY_MS, workSway, type Token } from './motion.js'
 
 const token = (id: string, x: number, y: number): Token => ({ id, x, y })
 
@@ -86,5 +87,62 @@ describe('Motion (CONTEXT.md: Motion on the map)', () => {
     const m = stepped([6, 5])
     m.update([token('a', 20, 20)], 1500)
     expect(m.at('a', 20, 20, 1600)).toEqual([20, 20])
+  })
+})
+
+describe('workSway (CONTEXT.md: Motion on the map)', () => {
+  const at = { x: 5, y: 5 }
+  const resident = (id: string, order: ResidentOrder | null) => ({
+    id,
+    order,
+    carried: {},
+    x: 5,
+    y: 5,
+    riding: undefined,
+  })
+  const working = (id: string) =>
+    resident(id, { kind: 'workAt', buildingId: 'mine', at, progress: 0 })
+
+  it('sways a resident at work over time, no more than a few pixels', () => {
+    const r = working('r1')
+    const seen = new Set<string>()
+    for (let t = 0; t < WORK_SWAY_MS; t += WORK_SWAY_MS / 8) {
+      const [dx, dy] = workSway(r, t)
+      expect(Math.abs(dx)).toBeLessThanOrEqual(WORK_SWAY)
+      expect(Math.abs(dy)).toBeLessThanOrEqual(WORK_SWAY)
+      seen.add(`${dx.toFixed(4)},${dy.toFixed(4)}`)
+    }
+    expect(seen.size).toBeGreaterThan(1)
+  })
+
+  it('sways two residents of a crew out of step', () => {
+    expect(workSway(working('r1'), 300)).not.toEqual(workSway(working('r2'), 300))
+  })
+
+  it('comes round again after one sway', () => {
+    const [dx, dy] = workSway(working('r1'), 300)
+    const [ex, ey] = workSway(working('r1'), 300 + WORK_SWAY_MS)
+    expect(ex).toBeCloseTo(dx)
+    expect(ey).toBeCloseTo(dy)
+  })
+
+  it('keeps a resident standing about still', () => {
+    expect(workSway(resident('r1', null), 300)).toEqual([0, 0])
+  })
+
+  it('keeps a walking resident still: they glide instead', () => {
+    const walk: ResidentOrder = { kind: 'walkTo', target: { x: 9, y: 9 }, path: [], progress: 0 }
+    expect(workSway(resident('r1', walk), 300)).toEqual([0, 0])
+  })
+})
+
+describe('Motion.gliding', () => {
+  it('tells a token on its way from one standing still', () => {
+    const m = new Motion()
+    m.update([token('a', 5, 5), token('b', 8, 8)], 0)
+    m.update([token('a', 6, 5), token('b', 8, 8)], 1000)
+    expect(m.gliding('a', 1000 + GLIDE_MS / 2)).toBe(true)
+    expect(m.gliding('a', 1000 + GLIDE_MS)).toBe(false)
+    expect(m.gliding('b', 1000 + GLIDE_MS / 2)).toBe(false)
   })
 })
