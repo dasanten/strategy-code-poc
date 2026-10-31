@@ -59,6 +59,7 @@ import {
   FORMER_PLAYER_STANDING,
   GAME_DAYS_PER_YEAR,
   GOOD_WEIGHT,
+  HAUL_HORSE_FOOD,
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
@@ -529,9 +530,9 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, mount or dismount, board or get off a carriage,
-          work, build, haul, feed the stable, breed horses, tear down, build a road or wall line, or
-          run one of your scripts with its params.
+          to, pick up, drop, store, fetch, drive, unhitch a horse, mount or dismount, board or get
+          off a carriage, work, build, haul, feed the stable, breed horses, tear down, build a road
+          or wall line, or run one of your scripts with its params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
@@ -927,6 +928,16 @@ export function Wiki() {
           an empty carriage of their realm, with no horse hitched until it is first driven. Torn
           down before it is finished, it leaves all the materials delivered to it.
         </p>
+        <p>
+          The first time a carriage is driven, a free horse of its realm standing with it is
+          hitched, and it stays hitched until <strong>Unhitch horse</strong>: any grown resident of
+          the carriage's realm standing on its tile can unhitch it, from their card, the carriage's
+          tile card, the group card, as a queue step or with a script's{' '}
+          <code>unhitch(carriage)</code>. The horse then stands free on the tile, to be ridden or
+          led into a stable, and a carriage being driven stops where it is. The carriage stands
+          there until it is next driven, when a free horse of the realm standing with it is hitched
+          again. A carriage whose horse dies waits the same way.
+        </p>
         <table>
           <thead>
             <tr>
@@ -986,9 +997,10 @@ export function Wiki() {
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
-          carriage's load or food on the ground next to them. A stable holds up to{' '}
+          carriage's load or food on the ground next to them, and a ridden horse after that from the
+          Food its rider carries beyond their own {num(OWN_FOOD)}. A stable holds up to{' '}
           {num(STABLE_CAPACITY)} horses. A haul route keeps {num(HAUL_KEEP_FOOD)} Food on board for
-          its horse.
+          its horse and its driver, {num(HAUL_HORSE_FOOD)} of it the horse's share.
         </p>
         <p>
           The route (where to, which goods) comes only from the Haul order, which also fills the
@@ -1060,13 +1072,16 @@ export function Wiki() {
           {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes at {pct(HUNGRY_HORSE_PACE)} of its
           pace. Riding trains Driving like driving does, and Driving makes riding faster. A rider
           carries no more than on foot, and can't drive a carriage; a ridden horse is never hitched.
-          On the map a rider sits on a horse token, and up close their activity icon is a horseshoe
-          while they ride somewhere.
+          A hungry ridden horse eats Food on the ground in reach first, then what its rider carries
+          beyond their own {num(OWN_FOOD)} Food: the rider never goes without for the horse, so give
+          a rider extra Food for a long ride. When a ridden horse goes hungry with nothing to spare,
+          your realm log says so. On the map a rider sits on a horse token, and up close their
+          activity icon is a horseshoe while they ride somewhere.
         </p>
         <p>
           A rider’s Doing line says <em>Riding to …</em> where it would say <em>Walking to …</em>,
-          and their card shows the horse they ride: its stats, age, health and hunger, with{' '}
-          <strong>Dismount</strong> under Orders.
+          and their card shows the horse they ride: its stats, age, health and hunger, and that it
+          eats from their spare Food, with <strong>Dismount</strong> under Orders.
         </p>
         <h3>Passengers</h3>
         <p>
@@ -1086,11 +1101,13 @@ export function Wiki() {
           <code>aboard</code> and a carriage's <code>passengerIds</code>.
         </p>
         <p>
-          <strong>Refilling from a carriage:</strong> passengers eat the food they carry, and when
-          they run low take a meal from the carriage's Food (or another carriage of your realm on or
-          next to their tile), as at home, so a carriage with Food on board keeps them fed on a long
-          drive. The Food a haul route keeps for the horse stays on board. On a carriage without
-          Food they go hungry like anyone away from home.
+          <strong>Refilling from a carriage:</strong> passengers and the driver eat the food they
+          carry, and when they run low take a meal from the carriage's Food (passengers also from
+          another carriage of your realm on or next to their tile), as at home, so a carriage with
+          Food on board keeps them fed on a long drive. The Food a haul route keeps on board is left
+          for the horse and the driver: passengers don't touch it, and the driver leaves the horse's
+          share of {num(HAUL_HORSE_FOOD)}. On a carriage without Food they go hungry like anyone
+          away from home.
         </p>
         <p>
           The group card boards everyone of the group standing on the carriage at once, until it is

@@ -26,6 +26,7 @@ import {
   WORKPLACE_SKILL,
   buildProblem,
   canWork,
+  unhitchProblem,
   isOutpostStorage,
   nodeCorner,
   stockWeight,
@@ -86,6 +87,7 @@ export type ActionId =
   | 'stop'
   | 'ride'
   | 'board'
+  | 'unhitch'
   | 'drive'
   | 'haul'
   | 'build'
@@ -113,6 +115,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   stop: 'S',
   ride: 'M',
   board: 'K',
+  unhitch: 'U',
   drive: 'D',
   haul: 'H',
   build: 'B',
@@ -190,6 +193,8 @@ export interface ResidentHere {
   driving?: boolean
   /** A carriage of their realm on their tile, to board (`CONTEXT.md`: Passenger). */
   carriageToBoard?: boolean
+  /** A carriage of their realm on their tile with a horse hitched, to unhitch (`CONTEXT.md`: Hitched horse). */
+  carriageToUnhitch?: boolean
   /** A horse of their realm on their tile that pulls no carriage and nobody rides, to mount. */
   horseToRide?: boolean
   /** They carry a child (`CONTEXT.md`: Carrying), so they can't work, build, tear down, haul or pair. */
@@ -240,6 +245,7 @@ export function residentActions(h: ResidentHere): CardAction[] {
     const refused = reason ? { disabled: true as const, reason } : {}
     add(row('board', 'Board carriage', refused))
   }
+  if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   if (h.carriage && h.adult) {
     // A rider doesn't drive (`CONTEXT.md`: Riding).
     const riding = h.riding ? { disabled: true as const, reason: 'dismount first to drive' } : {}
@@ -330,6 +336,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   stop: 'move',
   ride: 'move',
   board: 'move',
+  unhitch: 'move',
   drive: 'move',
   haul: 'move',
   work: 'work',
@@ -498,6 +505,11 @@ export interface TileCard {
     residents: { id: string; name: string; pick: boolean }[]
     weight: string
   }
+  /**
+   * The carriage on the tile with a horse hitched, and the Player's residents on it who may
+   * unhitch the horse (`unhitchProblem`), when there are any (`CONTEXT.md`: Hitched horse).
+   */
+  unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
 }
 
 /** What the Player sees on a tile, for the tile card. */
@@ -648,8 +660,9 @@ export function horseDetail(h: SeenHorse, tick: number | undefined): string {
 
 /**
  * The line on a rider's card for the horse they ride (`CONTEXT.md`: Riding), as the tile card
- * shows a horse: "Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
- * Undefined for someone on foot.
+ * shows a horse, and that it eats from the rider's spare Food: "Horse: Speed 12, Strength 8,
+ * Endurance 10 · 5 years old · fed, healthy · eats from your spare Food". Undefined for someone
+ * on foot.
  */
 export function riddenHorseLine(
   r: Pick<Resident, 'riding'>,
@@ -657,7 +670,7 @@ export function riddenHorseLine(
   tick: number | undefined,
 ): string | undefined {
   const horse = r.riding === undefined ? undefined : horses.find((h) => h.id === r.riding)
-  return horse && `Horse: ${horseDetail(horse, tick)}`
+  return horse && `Horse: ${horseDetail(horse, tick)} · eats from your spare Food`
 }
 
 /**
@@ -757,6 +770,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
   let passengers: TileCard['passengers']
+  let unhitch: TileCard['unhitch']
   if (building) {
     const city = cityOf(building)
     // An outpost storage goes by its own realm (`CONTEXT.md`: Outpost storage).
@@ -863,6 +877,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       passengers = { line: lines.length, residents: aboard, weight }
       lines.push(`Passengers: ${aboard.map((p) => p.name).join(', ')} · ${weight}`)
     }
+    const own = (t.residents ?? []).filter(
+      (r) => !t.strangers.some((s) => s.id === r.id) && !unhitchProblem(r, carriage, t.tick ?? 0),
+    )
+    if (own.length > 0) {
+      unhitch = { carriageId: carriage.id, residents: own.map(({ id, name }) => ({ id, name })) }
+    }
     if (horse) {
       const parts = [`Horse: ${horseDetail(horse, t.tick)}`]
       if (fares) {
@@ -929,6 +949,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     lines,
     ...(buildHere ? { buildHere } : {}),
     ...(passengers ? { passengers } : {}),
+    ...(unhitch ? { unhitch } : {}),
   }
 }
 
@@ -1140,6 +1161,8 @@ export function tileActions(card: TileCard, actor: Resident | undefined, tick = 
       ...(reason ? { disabled: true as const, reason } : {}),
     })
   }
+  if (card.unhitch)
+    actions.push({ id: 'unhitch', label: 'Unhitch horse', key: ACTION_KEYS.unhitch })
   if (card.gate)
     actions.push({
       id: 'gate',
@@ -1155,6 +1178,15 @@ export function tileActions(card: TileCard, actor: Resident | undefined, tick = 
       opens: true,
     })
   return actions
+}
+
+/**
+ * Who unhitches the horse from the tile card's carriage (`TileCard.unhitch`): the resident picked
+ * last when they may, or else the first of the Player's residents on its tile who may.
+ */
+export function unhitcherOf(card: TileCard, actor: { id: string } | undefined): string | undefined {
+  const residents = card.unhitch?.residents ?? []
+  return (residents.find((r) => r.id === actor?.id) ?? residents[0])?.id
 }
 
 /**

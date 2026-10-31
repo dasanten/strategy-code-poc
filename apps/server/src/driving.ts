@@ -3,11 +3,14 @@ import {
   commands,
   commandsCarriage,
   driveProblem,
+  driverOf,
+  unhitchProblem,
   type Army,
   type OrderRequest,
   type WorldState,
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
+import { orderedResident } from './order-sender.js'
 import { realmOf } from './starting-city.js'
 
 /**
@@ -76,5 +79,38 @@ export const drive: OrderKind = {
     if (!army) return
     const target = armyStart(world, army)
     r.order = { kind: 'drive', carriageId, target, path: null, progress: 0, army: army.id }
+  },
+}
+
+/** The input of an unhitch order: which resident unhitches the horse of which carriage. */
+interface UnhitchRequest extends OrderRequest {
+  kind: 'unhitch'
+  residentId: string
+  carriageId: string
+}
+
+/**
+ * The unhitch order (`CONTEXT.md`: Hitched horse): a grown resident of the carriage's realm on its
+ * tile unhitches its horse, which stands free on the tile. A carriage being driven stops first:
+ * its driver's drive order or haul route ends. Unhitching is no order of its own, so what the
+ * resident was doing goes on; the carriage stands until it is next driven, when a free horse
+ * standing with it is hitched (`horseFor`).
+ */
+export const unhitch: OrderKind = {
+  validate(world, sender, order) {
+    const o = order as Partial<UnhitchRequest>
+    const r = orderedResident(world, sender, o.residentId)
+    if (!r) return 'not one of your residents'
+    const carriage = world.carriages.find((k) => k.id === o.carriageId)
+    return unhitchProblem(r, carriage, world.tick)
+  },
+  apply(world, _sender, order) {
+    const { residentId, carriageId } = order as UnhitchRequest
+    const r = world.residents.find((x) => x.id === residentId)
+    const carriage = world.carriages.find((k) => k.id === carriageId)
+    if (!r || !carriage || unhitchProblem(r, carriage, world.tick)) return
+    const driver = driverOf(world, carriage)
+    if (driver) driver.order = null
+    carriage.horseId = null
   },
 }

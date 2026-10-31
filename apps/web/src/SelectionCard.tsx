@@ -22,6 +22,7 @@ import type { Relationship } from './theme.js'
 import {
   actionForKey,
   tileActions,
+  unhitcherOf,
   type CardAction,
   type TileCard as TileCardData,
 } from './selection-view.js'
@@ -337,6 +338,7 @@ export function TileCard({
   onOpenCity,
   onRenameCity,
   onSelectResident,
+  onUnhitch,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -359,6 +361,8 @@ export function TileCard({
   onRenameCity: (cityId: string, name: string) => void
   /** Picks one of the Player's residents, such as a carriage's passenger. */
   onSelectResident: (id: string) => void
+  /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
+  onUnhitch: (carriageId: string, residentId: string) => void
 }) {
   const actions = tileActions(card, actor, tick)
   const [open, setOpen] = useState<string | undefined>()
@@ -431,6 +435,9 @@ export function TileCard({
               onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)
             if (a.id === 'openCity' && card.city) onOpenCity(card.city.id)
+            const unhitcher = unhitcherOf(card, actor)
+            if (a.id === 'unhitch' && card.unhitch && unhitcher)
+              onUnhitch(card.unhitch.carriageId, unhitcher)
           }}
         />
       )}

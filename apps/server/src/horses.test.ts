@@ -3,6 +3,7 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   HORSE_FOOD_PER_DAY,
+  HORSE_HUNGRY_SHARE,
   HORSE_START_AGE_MAX,
   HORSE_START_AGE_MIN,
   HORSE_STAT_AVERAGE,
@@ -10,7 +11,9 @@ import {
   HORSE_STAT_MIN,
   HORSE_STAT_NAMES,
   TICKS_PER_GAME_YEAR,
+  OWN_FOOD,
   horseAgeInYears,
+  horseFood,
   horseFoodFactor,
   HUNGER_DAYS,
   MAX_HEALTH,
@@ -224,6 +227,66 @@ describe('horse hunger', () => {
     h.health = MAX_HEALTH / 2
     run(world, 1)
     expect(h.health).toBeGreaterThan(MAX_HEALTH / 2)
+  })
+})
+
+describe('a ridden horse (`CONTEXT.md`: Riding)', () => {
+  /** w1 riding h1 at (2, 2), out of the stable's reach, carrying `food`. */
+  function ridden(food: number) {
+    const { world, w1 } = setup()
+    const h = horse(world, 'h1', 2, 2)
+    w1.x = h.x
+    w1.y = h.y
+    w1.riding = h.id
+    w1.carried = { food }
+    return { world, w1, h }
+  }
+  const horseHungry = (world: WorldState) =>
+    eventsFor(world, 7).filter((e) => e.kind === 'horseHungry')
+
+  it('eats its rider’s spare Food and leaves their own food alone', () => {
+    const { world, w1, h } = ridden(OWN_FOOD + 3)
+    expect(horseFood(world, h, terrain.size)).toEqual([w1.carried])
+    // Kept starving, it eats a unit a tick until only the rider's own food is left.
+    for (let i = 0; i < 5; i++) {
+      h.hunger = 0
+      stepHorses(world, terrain)
+    }
+    expect(w1.carried.food).toBe(OWN_FOOD)
+    expect(horseFood(world, h, terrain.size)).toEqual([])
+    // Off the horse, the resident's food is out of its reach again.
+    w1.carried.food = OWN_FOOD + 3
+    delete w1.riding
+    expect(horseFood(world, h, terrain.size)).toEqual([])
+  })
+
+  it('eats Food on the ground in reach before its rider’s', () => {
+    const { world, w1, h } = ridden(OWN_FOOD + 3)
+    world.piles.push({ id: 'p1', x: 3, y: 3, goods: { food: 1 } })
+    expect(horseFood(world, h, terrain.size)).toEqual([world.piles[0]!.goods, w1.carried])
+    h.hunger = 0
+    stepHorses(world, terrain)
+    expect(world.piles).toEqual([])
+    expect(w1.carried.food).toBe(OWN_FOOD + 3)
+    stepHorses(world, terrain)
+    expect(w1.carried.food).toBe(OWN_FOOD + 2)
+  })
+
+  it('logs once when it goes hungry and its rider has no Food to spare', () => {
+    const { world, h } = ridden(OWN_FOOD)
+    run(world, HUNGER_DAYS)
+    expect(h.hunger).toBeLessThan(HORSE_HUNGRY_SHARE * MAX_HUNGER)
+    expect(horseHungry(world)).toEqual([
+      expect.objectContaining({ horseId: 'h1', residentId: 'w1', name: world.residents[0]!.name }),
+    ])
+  })
+
+  it('logs nothing while its rider’s spare Food keeps it fed', () => {
+    const { world, w1, h } = ridden(OWN_FOOD + 4 * HORSE_FOOD_PER_DAY)
+    run(world, 3)
+    expect(h.hunger).toBeGreaterThan(HORSE_HUNGRY_SHARE * MAX_HUNGER)
+    expect(w1.carried.food).toBeGreaterThanOrEqual(OWN_FOOD)
+    expect(horseHungry(world)).toEqual([])
   })
 })
 

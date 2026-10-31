@@ -792,6 +792,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       : { kind: 'getOff', residentId: selected.id }
     setOrderError(await giveOrder(order))
   }
+  /**
+   * Orders the picked resident to unhitch the horse from a carriage on their tile (`CONTEXT.md`:
+   * Hitched horse); with Shift held, appends it to their queue.
+   */
+  async function unhitch(carriageId: string, residentId = selected?.id) {
+    if (!residentId) return
+    setOrderError(await giveOrder({ kind: 'unhitch', residentId, carriageId }))
+  }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
     if (!selected) return
@@ -1090,6 +1098,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               nodeAt,
             )}
             actor={selected}
+            onUnhitch={(carriageId, residentId) => void unhitch(carriageId, residentId)}
             orderError={orderError}
             onClose={() => setSelectedTile(undefined)}
             onSendHere={async () => {
@@ -1147,6 +1156,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onRide={ride}
             carriageToBoard={onTile(world.carriages.filter((k) => carriageOfResident(k, selected)))}
             onBoard={boardCarriage}
+            carriageToUnhitch={onTile(
+              world.carriages.filter((k) => carriageOfResident(k, selected) && k.horseId),
+            )}
+            onUnhitch={unhitch}
             scripts={scripts}
             buildings={world.buildings}
             onRunScript={runScript}
