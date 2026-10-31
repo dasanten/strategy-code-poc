@@ -6,6 +6,7 @@ import {
   RESIDENT_NAME_MAX_LENGTH,
   SCRIPT_STEP_BUDGET,
   SESSION_COOKIE,
+  WS_CLOSE_LOGGED_OUT,
   WS_PATH,
   chunksAcross,
   realmName,
@@ -21,7 +22,7 @@ import { OrderQueue } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { SightTracker } from './sight.js'
 import { dieAll } from './survival.js'
-import { attachRealtime, scriptMemoryFor } from './realtime.js'
+import { SESSION_RECHECK_MS, attachRealtime, scriptMemoryFor } from './realtime.js'
 import { TerritoryTracker } from './territory.js'
 import { cityTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
@@ -41,6 +42,11 @@ async function start(sessionDb?: Db) {
     logger: false,
     secureCookies: false,
     trustProxy: false,
+    // Wired as in `index.ts`: the sockets are attached once the app has its server.
+    sockets: {
+      disconnectSession: (tokenHash) => realtime.disconnectSession(tokenHash),
+      disconnectUser: (userId) => realtime.disconnectUser(userId),
+    },
   })
   const world = createWorld(terrain)
   const orders = new OrderQueue()
@@ -72,6 +78,7 @@ async function start(sessionDb?: Db) {
   await createAdmin(opened.db, 'Daniel', 'admin password')
   const user = opened.db.select().from(schema.users).get()!
   return {
+    app,
     db: opened.db,
     userId: user.id,
     world,
@@ -107,6 +114,7 @@ function connect(
   })
   // Closing a refused socket mid-handshake reports an error; the tests check status codes instead.
   socket.on('error', () => {})
+  const closed = new Promise<number>((resolve) => socket.on('close', (code) => resolve(code)))
   cleanup.push(() => socket.terminate())
   const next = async (type: ServerMessage['type']) => {
     for (let i = 0; i < 100; i++) {
@@ -119,7 +127,14 @@ function connect(
     }
     throw new Error(`no ${type} message`)
   }
-  return { socket, next, messages }
+  return { socket, next, messages, closed }
+}
+
+/** Whether a socket is still open after what was just sent arrived: it still gets ticks. */
+async function stillOpen(client: ReturnType<typeof connect>, realtime: { broadcastTick(): void }) {
+  realtime.broadcastTick()
+  await client.next('tick')
+  return client.socket.readyState === WebSocket.OPEN
 }
 
 describe('realtime', () => {
@@ -649,5 +664,66 @@ describe('realtime', () => {
     const part = await next('tick')
     expect(part.type === 'tick' && part.region?.chunks).toEqual([explored[0]])
     expect(violations).toEqual([])
+  })
+
+  it('closes the socket of a session logged out, and keeps the account’s other sessions’', async () => {
+    const { app, url, token, db, userId, realtime } = await start()
+    const here = connect(url, token)
+    await here.next('welcome')
+    const elsewhere = connect(url, createSession(db, userId))
+    await elsewhere.next('welcome')
+
+    const out = await app.inject({
+      method: 'POST',
+      url: '/api/logout',
+      cookies: { [SESSION_COOKIE]: token },
+    })
+    expect(out.statusCode).toBe(204)
+    expect(await here.closed).toBe(WS_CLOSE_LOGGED_OUT)
+    expect(await stillOpen(elsewhere, realtime)).toBe(true)
+  })
+
+  it('closes every socket of an account whose password an admin reset, and nobody else’s', async () => {
+    const { app, url, token, db, userId, realtime } = await start()
+    const mara = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const daniel = connect(url, token)
+    await daniel.next('welcome')
+    const found = { realmName: 'Marafield' }
+    const marasPhone = connect(url, createSession(db, mara.id), found)
+    await marasPhone.next('welcome')
+    const marasLaptop = connect(url, createSession(db, mara.id), found)
+    await marasLaptop.next('welcome')
+
+    const reset = await app.inject({
+      method: 'POST',
+      url: '/api/admin/password',
+      cookies: { [SESSION_COOKIE]: token },
+      payload: { name: 'Mara', password: 'a new password' },
+    })
+    expect(reset.statusCode).toBe(204)
+    expect(await marasPhone.closed).toBe(WS_CLOSE_LOGGED_OUT)
+    expect(await marasLaptop.closed).toBe(WS_CLOSE_LOGGED_OUT)
+    expect(await stillOpen(daniel, realtime)).toBe(true)
+  })
+
+  it('closes the socket of a session that expired, on the next check a minute later', async () => {
+    const { url, token, db, realtime } = await start()
+    const daniel = connect(url, token)
+    await daniel.next('welcome')
+    // The only session there is: it expires, but the socket is checked once a minute, not every tick.
+    db.update(schema.sessions)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .run()
+    const now = Date.now()
+    realtime.broadcastTick(new Map(), now)
+    expect(await daniel.next('tick')).toMatchObject({ type: 'tick' })
+    expect(daniel.socket.readyState).toBe(WebSocket.OPEN)
+
+    realtime.broadcastTick(new Map(), now + SESSION_RECHECK_MS)
+    expect(await daniel.closed).toBe(WS_CLOSE_LOGGED_OUT)
   })
 })
