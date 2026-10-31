@@ -115,6 +115,7 @@ const realtime = attachRealtime(app.server, {
   orders,
   territory,
   sightCheck: { reporter, sampleRate: config.invariantSampleRate },
+  logger,
 })
 
 const loop = setInterval(() => {
