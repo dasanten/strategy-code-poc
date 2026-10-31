@@ -62,7 +62,7 @@ function addWorker(world: WorldState, camp: Building, food: number): Resident {
   r.carried = { food }
   r.order = { kind: 'workAt', buildingId: camp.id, at: { x: camp.x, y: camp.y }, progress: 0 }
   r.script = { scriptId: SCRIPT, memory: { workplaceId: camp.id } }
-  r.scriptParams = { [SCRIPT]: { foodAt: 4, foodTake: 12 } }
+  r.scriptParams = { [SCRIPT]: { foodAt: 4, foodTake: 12, crewFood: 0 } }
   world.residents.push(r)
   return r
 }

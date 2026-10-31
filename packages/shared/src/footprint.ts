@@ -25,6 +25,7 @@ export const FOOTPRINT: Record<BuildingKind, number> = {
   townHall: 3,
   warehouse: 3,
   stable: 3,
+  trainingGround: 3,
   farm: 4,
 }
 

@@ -35,22 +35,27 @@ export interface DoingOf {
  * their task and current order have them doing, "Building a house: fetching 10 wood from the
  * storage". The script's name is not part of it; the card and list show it on a line of its own.
  * A passenger with no order is "Aboard a carriage", heading where its driver among `residents`
- * drives it.
+ * drives it. While the script waits on the order (`CONTEXT.md`: Running a script, Waiting), the
+ * line ends in "· script waiting".
  */
-export function doingLine(
+export function doingLine(r: DoingOf, seen: DoingSeen): string {
+  const line = doingOfOrder(r, seen)
+  return r.script?.waiting ? `${line} · script waiting` : line
+}
+
+/** What else the Doing line is worked out from (`doingLine`). */
+interface DoingSeen {
+  scripts?: readonly ScriptSummary[]
+  buildings?: readonly Pick<Building, 'id' | 'kind'>[]
+  residents?: readonly Pick<Resident, 'order'>[]
+  /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
+  arrives?: number
+}
+
+/** The Doing line but for the script waiting (`doingLine`). */
+function doingOfOrder(
   r: DoingOf,
-  {
-    scripts = [],
-    buildings = [],
-    residents = [],
-    arrives,
-  }: {
-    scripts?: readonly ScriptSummary[]
-    buildings?: readonly Pick<Building, 'id' | 'kind'>[]
-    residents?: readonly Pick<Resident, 'order'>[]
-    /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
-    arrives?: number
-  },
+  { scripts = [], buildings = [], residents = [], arrives }: DoingSeen,
 ): string {
   if (r.script?.doing) return r.script.doing
   if (r.aboard !== undefined && !r.order) return aboardLine(r, residents)
@@ -60,10 +65,10 @@ export function doingLine(
   if (!task) return step ?? orderDoing(r, arrives)
   const what = taskLine(task, r.script!.building)
   const o = r.order
-  // The task's own order says no more than the task does, but where a haul route is and what a
-  // smithy makes.
+  // The task's own order says no more than the task does, but where a haul route is, what a
+  // trainee learns and what a smithy makes.
   if (o && o.kind === TASK_ORDER[task]) {
-    if (o.kind === 'haul') return orderDoing(r, arrives)
+    if (o.kind === 'haul' || o.kind === 'train') return orderDoing(r, arrives)
     return o.kind === 'workAt' && o.makes ? `${what}: ${lower(orderDoing(r, arrives))}` : what
   }
   return `${what}: ${o ? lower(step ?? orderDoing(r, arrives)) : 'waiting'}`
@@ -89,6 +94,7 @@ const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   tearDown: 'tearDown',
   breed: 'breed',
   feedStable: undefined,
+  train: 'train',
   defend: undefined,
 }
 
@@ -107,6 +113,7 @@ function taskLine(task: Task, building: SeenScript['building']): string {
   if (task === 'build') return name ? `Building ${article(name)} ${name}` : 'Building'
   if (task === 'tearDown') return name ? `Tearing down the ${name}` : 'Tearing down'
   if (task === 'feedStable') return 'Feeding the stable'
+  if (task === 'train') return 'Training'
   if (task === 'defend') return 'Defending'
   if (task === 'breed') return 'Breeding horses'
   if (task === 'haul') return 'Hauling'

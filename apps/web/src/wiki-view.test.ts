@@ -13,6 +13,8 @@ import {
   TICKS_PER_GAME_DAY,
   WAREHOUSE_BASE_PRICE,
   WORK_OUTPUT_PER_DAY,
+  GAME_DAYS_PER_YEAR,
+  TRAIN_SKILL_FACTOR,
   buildWork,
   carryCapacity,
   hungerFactor,
@@ -25,6 +27,8 @@ import {
   buildCosts,
   carriageCost,
   coinsPerMintWorkerDay,
+  daysToWorkSkillMax,
+  trainingDays,
   duration,
   goldMinersPerMintWorker,
   jobDays,
@@ -153,5 +157,13 @@ describe('the Wiki’s Scripting budgets topic', () => {
     const html = render()
     expect(html).toContain(`holds at most ${SCRIPT_LIBRARY_MAX_SCRIPTS} scripts`)
     expect(html).toContain(`keeps at most ${SCRIPT_MAX_VERSIONS} versions`)
+  })
+})
+
+describe('training pace', () => {
+  it('takes an average learner a stat’s bonus to its cap in a game year, a skill twice as fast as doing', () => {
+    expect(trainingDays('strength')).toBeCloseTo(GAME_DAYS_PER_YEAR)
+    expect(trainingDays('mining')).toBeCloseTo(daysToWorkSkillMax / TRAIN_SKILL_FACTOR)
+    expect(trainingDays('combat')).toBeCloseTo(GAME_DAYS_PER_YEAR / TRAIN_SKILL_FACTOR)
   })
 })

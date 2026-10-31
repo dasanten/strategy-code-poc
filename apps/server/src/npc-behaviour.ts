@@ -1,26 +1,31 @@
 import {
+  GOOD_WEIGHT,
   HOME_FOOD_LOW,
-  MAX_WORKERS,
-  NPC_FOOD_SHORT_DAYS,
-  OWN_FOOD,
+  NPC_SMITHY_WEAPON,
   RECIPES,
+  carryCapacity,
+  hasInput,
+  recipeFor,
+  stockWeight,
+  type CityJob,
+  type ScriptMemory,
+  OWN_FOOD,
+  WALK_TICKS_PER_TILE,
   WORK_OUTPUT_PER_DAY,
   breedersAt,
   breedingPair,
   canWork,
-  cityFoodUse,
   contractOf,
-  hasFoodSurplus,
   inCityArea,
   isArmed,
   isAt,
-  punishers,
   putAwayUnits,
-  storedFood,
-  workersOf,
-  workplaceGood,
+  setOutFood,
+  unitsThatFit,
+  wrapDistance,
   type Building,
   type City,
+  type CityPlan,
   type Good,
   type Resident,
   type ResidentOrder,
@@ -28,9 +33,29 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
-import { cityGrowth } from './npc-growth.js'
+import {
+  cityGrows,
+  cityProject,
+  isBuilder,
+  noFarm,
+  npcBuilders,
+  stopBuildersWhoCantGoOn,
+  takePart,
+} from './npc-growth.js'
+import {
+  Places,
+  foodShort,
+  planCity,
+  planDue,
+  projectDone,
+  runResidents,
+  workplaceOf,
+} from './npc-plan.js'
+import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
+import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
+import { runTrader } from './npc-trader.js'
 import { refillSource } from './survival.js'
-import { caravanCrew } from './caravans.js'
+import { walkTime } from './walk-time.js'
 
 /**
  * The orders an NPC city gives its residents: only kinds a Player's order can give too
@@ -47,6 +72,7 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'tearDown',
   'breed',
   'attack',
+  'trade',
 ]
 
 /**
@@ -62,70 +88,101 @@ export function runByNpcCity(world: WorldState, r: Resident): boolean {
  * One tick of NPC city behaviour (`CONTEXT.md`: NPC city): each city run by the game keeps
  * itself alive. It only gives its residents orders, which request actions like a Player's
  * orders do (ADR 0002); the world resolves them later in the tick. Run before the actions are
- * requested. `size` is the map's. With `terrain` the cities also grow (`cityGrowth`).
+ * requested. `size` is the map's. A city whose planning pass is due plans (`planCity`, ADR 0016),
+ * with `terrain` picking its project too; the others go by their plan. Plans of cities the game
+ * no longer runs are dropped. Returns the milliseconds spent planning, for the tick health.
  */
-export function stepNpcCities(world: WorldState, size: number, terrain?: TerrainMap): void {
-  const residents = new Map<string, Resident[]>()
-  // A caravan's crew is run by its caravan (`stepCaravans`), a hired-out resident by the hirer, a
-  // punisher by its punishment (`stepPunishments`).
-  const crew = caravanCrew(world)
-  const away = punishers(world)
-  for (const r of world.residents) {
-    if (r.owner !== null || r.cityId === null) continue
-    if (crew.has(r.id) || away.has(r.id) || contractOf(world, r.id)) {
-      // Nor do they go on with the city's Work default.
-      if (r.script?.scriptId === 0) delete r.script
-      continue
-    }
-    const list = residents.get(r.cityId) ?? []
-    list.push(r)
-    residents.set(r.cityId, list)
+export function stepNpcCities(world: WorldState, size: number, terrain?: TerrainMap): number {
+  const cities = new Map(world.cities.map((c) => [c.id, c]))
+  for (const id of Object.keys(world.cityPlans)) {
+    const city = cities.get(id)
+    if (!city || city.realmId !== null) delete world.cityPlans[id]
   }
+  const residents = runResidents(world)
+  const buildings = new Map(world.buildings.map((b) => [b.id, b]))
+  let planMs = 0
   for (const city of world.cities) {
     if (city.realmId !== null) continue
     const people = residents.get(city.id)
-    if (people) runCity(world, city, people, size, terrain)
+    if (people) planMs += runCity(world, city, people, size, buildings, terrain)
   }
+  return planMs
 }
 
 /**
- * What an NPC city does each tick: puts its idle adults to work on its farms and workplaces,
- * farms first until it has a food surplus; moves workers to its farms while Food runs short
- * (`NPC_FOOD_SHORT_DAYS`); has its workers run the game's Work default, which carries the
- * output to the storage (`CONTEXT.md`: Carrying the output; run right after, `runNpcScripts`);
- * sends workers who
- * run low on food where there is none to refill from home, and has residents take `OWN_FOOD`
- * from the storage before they set out; gives idle adults their part in the city's growth
- * (`cityGrowth`); and brings idle residents with nothing to do home. Its soldiers (armed adults)
- * are put to no work and no building (`stepNpcDefence`). Children are left alone:
- * they refill at home. A resident carrying a child gets no work and goes home.
+ * What an NPC city does each tick: plans when its pass is due (`planCity`); moves its founding
+ * party to the daughter once the town hall stands (`foundDaughter`), else sends it on its way
+ * (`stepFounders`), apart from everyone else; stops workers who run low on food where there is
+ * none, carriers home with their load stored, builders stuck or out of materials (with no
+ * storage yet, everyone builds, `npcBuilders`), breeders who are done and workers at a smelter or
+ * smithy with nothing left to process, so they get their next job; moves a worker whose plan puts
+ * them elsewhere, or nowhere; then gives each idle adult what comes first: its trader goes on with
+ * their run (`runTrader`); a resident carrying a child stays at home; one
+ * carrying materials the project needs takes them to its site; a load of goods goes into the
+ * storage; they take `OWN_FOOD` from the storage before they set out; one of them breeds the
+ * city's horses (`breedHorses`); a planned builder takes their part in the project (`takePart`),
+ * picking the next one once it is finished; a planned worker at a workplace that processes goods
+ * first takes its input from the storage (`takeInput`), and waits at home while the storage holds
+ * none; a planned worker runs the game's Work default at their workplace (`runNpcScripts`), which
+ * carries the output to the storage
+ * (`CONTEXT.md`: Carrying the output), taking the Food for the walk and their first days there
+ * from the storage first (`takeSetOutFood`); with nothing to do they come home. Its soldiers (armed
+ * adults) are put to no work and no building (`stepNpcDefence`). Children are left alone: they
+ * refill at home. Returns the milliseconds spent planning.
  */
 function runCity(
   world: WorldState,
   city: City,
   people: Resident[],
   size: number,
+  buildings: Map<string, Building>,
   terrain?: TerrainMap,
-): void {
+): number {
+  let planMs = 0
+  let plan: CityPlan | undefined = world.cityPlans[city.id]
+  if (planDue(world, city)) {
+    const start = performance.now()
+    plan = planCity(world, city, terrain, people)
+    planMs += performance.now() - start
+  }
   const storage = world.buildings.find(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
-  const short = storedFood(world, city) < cityFoodUse(world, city, NPC_FOOD_SHORT_DAYS)
-  const places = workplaces(world, city, !hasFoodSurplus(world, city))
-  const adults = people.filter((r) => canWork(r, world.tick))
+  // Its founding party (`CONTEXT.md`: Founding) moves to the daughter once the town hall stands,
+  // and goes by the founding until then, apart from the rest.
+  if (plan && foundDaughter(world, city, plan)) people = people.filter((r) => r.cityId === city.id)
+  const party = new Set(foundingParty(plan))
+  if (plan && party.size > 0) {
+    stepFounders(
+      world,
+      city,
+      plan,
+      people.filter((r) => party.has(r.id)),
+      storage,
+      size,
+    )
+  }
+  // Materials and a smith's input: a Trade Org city's from its warehouse (`chainStore`).
+  const store = chainStore(world, city)
+  const adults = people.filter((r) => canWork(r, world.tick) && !party.has(r.id))
+  const jobs = plan?.jobs ?? {}
 
-  if (short) moveToFarms(world, places)
+  stopBuildersWhoCantGoOn(world, adults, store)
   for (const r of adults) {
+    sendToWarehouse(world, city, r)
     const o = r.order
     const busy = o?.kind === 'workAt' || o?.kind === 'build' || o?.kind === 'tearDown'
     if (busy && lowOnFood(r) && !refillSource(world, r, size)) stopWork(r)
     // Home at the storage with the load stored, a carrier is free for whatever the city needs
-    // most (building, pairing), else back to work.
+    // most (building, pairing), else back to work; one bringing the crew's Food back
+    // (`CONTEXT.md`: Crew food) goes back by the Work default.
     const carry = r.script?.scriptId === 0 ? r.script.memory.carry : undefined
     const carrying = typeof carry === 'object' && carry !== null && !Array.isArray(carry)
+    const bringsCrewFood = carrying && typeof carry.crewFood === 'number' && carry.crewFood >= 1
     if (
       carrying &&
       carry.stored === true &&
+      !bringsCrewFood &&
       r.order?.kind !== 'store' &&
       storage &&
       isAt(r, storage, size)
@@ -139,19 +196,58 @@ function runCity(
     // Done breeding (a foal born, or the breeding stopped), a breeder is free too.
     const bred = r.script?.scriptId === 0 && r.script.task === 'breed' ? r.script.memory : null
     if (bred && bred.done === true) stopWork(r)
+    // The pass just now put them at another workplace, or to building, or let them go. Only
+    // then: between passes someone else may have put them to work (a smithy forging their spear).
+    const job = jobs[r.id]
+    const at = workplaceOf(r)
+    const moved =
+      job !== undefined && job.kind !== 'soldier' && at !== undefined && at !== job.buildingId
+    if (moved && !r.carrying && plan?.plannedAt === world.tick) stopWork(r)
+    // At a workplace that processes goods with nothing left to process, they fetch more.
+    const place = at !== undefined && r.order?.kind === 'workAt' ? buildings.get(at) : undefined
+    if (place && RECIPES[place.kind] && !inputLeft(world, place, r)) stopWork(r)
   }
+
   const home = npcHome(world, city)
-  const growth = terrain && home && cityGrowth(world, city, home, adults, terrain, short)
+  const held = new Places(people)
+  let free = npcBuilders(world, city) - adults.filter(isBuilder).length
+  // The project, picked anew once the planned one is finished: a site search, so once a tick at most.
+  let checked = false
+  const project = () => {
+    if (!plan || !terrain || !home) return undefined
+    if (!checked && plan.project && projectDone(world, plan.project)) {
+      const start = performance.now()
+      const next =
+        !foodShort(world, city) || noFarm(world, city)
+          ? cityProject(world, city, home, terrain, cityGrows(world, city, adults))
+          : undefined
+      if (next) plan.project = next
+      else delete plan.project
+      planMs += performance.now() - start
+    }
+    checked = true
+    return plan.project
+  }
 
   for (const r of adults) {
     if (r.order !== null || r.script) continue
+    if (plan?.trader?.residentId === r.id && !city.tradeOrg) {
+      runTrader(world, city, plan, r, storage, size)
+      continue
+    }
     // Carrying a child, they get no work and stay at home, where they take their meals.
     if (r.carrying) {
       if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
       continue
     }
-    if (growth && growth.assign(r, true)) continue
-    const load = storage && haul(r)
+    if (free > 0 && carriesMaterials(r)) {
+      const p = project()
+      if (p && takePart(world, r, p, store, true)) {
+        free--
+        continue
+      }
+    }
+    const load = storage && haul(r, inputOf(buildings, jobs[r.id]))
     if (storage && load) {
       if (isAt(r, storage, size)) {
         r.order = { kind: 'drop', to: { kind: 'storage', storageId: storage.id }, goods: load }
@@ -167,16 +263,42 @@ function runCity(
       } else walkTo(r, storage)
       continue
     }
-    const soldier = isArmed(r)
+    const job = jobs[r.id]
+    const soldier = isArmed(r) || job?.kind === 'soldier'
     if (!soldier && breedHorses(world, city, r)) continue
-    if (!soldier && growth && growth.assign(r)) continue
-    const place = !soldier && places.find((p) => room(world, p) > 0)
-    if (place) {
-      putToWork(r, place)
-      continue
+    if (!soldier && job?.kind === 'build' && free > 0) {
+      const p = project()
+      if (p && takePart(world, r, p, store, false)) {
+        free--
+        continue
+      }
+    }
+    if (!soldier && job?.buildingId !== undefined) {
+      const place = world.buildings.find((b) => b.id === job.buildingId)
+      if (place && !place.site && held.room(place) > 0) {
+        const input = inputOf(buildings, job)
+        if (input && !takeInput(world, r, input, store, size)) {
+          if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
+          continue
+        }
+        if (r.order !== null) continue
+        if (!storage || takeSetOutFood(world, r, place, storage, size, terrain)) {
+          putToWork(r, place)
+          held.take(place)
+        }
+        continue
+      }
     }
     if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
   }
+  return planMs
+}
+
+/** Whether a resident carries goods a site could take: anything workplaces make but Food. */
+function carriesMaterials(r: Resident): boolean {
+  return (Object.entries(r.carried) as [Good, number][]).some(
+    ([good, units]) => good !== 'food' && units > 0 && WORK_OUTPUT_PER_DAY[good] !== undefined,
+  )
 }
 
 /**
@@ -202,49 +324,118 @@ function breedHorses(world: WorldState, city: City, r: Resident): boolean {
 }
 
 /**
- * The city's finished workplaces that make something from nothing (farms, camps, quarries,
- * mines; not those that process goods), its farms and those in its `workplaceIds`, in the order
- * it fills them: farms first until the city has a food surplus, else last.
+ * Before a resident sets out for a workplace, they take the Food for the walk there and back and
+ * their first days of work (`setOutFood`; `CONTEXT.md`: Crew food, NPC city) from the storage
+ * while it has Food and they carry less: at it, a pick-up of what they lack, as much as fits,
+ * which the Work default given the same tick waits for (so an idle resident never puts the
+ * surplus back, `haul`); away from it, the walk there first. The walk is reckoned from where they
+ * stand, by the terrain when given, else by tiles. Whether they set out now, rather than walking
+ * to the storage first.
  */
-function workplaces(world: WorldState, city: City, farmsFirst: boolean): Building[] {
-  const own = new Set(city.workplaceIds)
-  const places = world.buildings.filter(
-    (b) =>
-      (b.cityId === city.id || own.has(b.id)) &&
-      !b.site &&
-      MAX_WORKERS[b.kind] !== undefined &&
-      !RECIPES[b.kind] &&
-      workplaceGood(world, b) !== undefined,
-  )
-  const farm = (b: Building) => (b.kind === 'farm' ? 0 : 1)
-  return places.sort((a, b) => (farmsFirst ? 1 : -1) * (farm(a) - farm(b)))
+function takeSetOutFood(
+  world: WorldState,
+  r: Resident,
+  place: Building,
+  storage: Building,
+  size: number,
+  terrain?: TerrainMap,
+): boolean {
+  const food = storage.stock?.food ?? 0
+  if (food <= 0) return true
+  const walk = terrain
+    ? walkTime(world, terrain, () => true, r, r, place)
+    : wrapDistance(size, r, place) * WALK_TICKS_PER_TILE
+  const short = setOutFood(walk) - (r.carried.food ?? 0)
+  if (short <= 1e-9) return true
+  if (!isAt(r, storage, size)) {
+    walkTo(r, storage)
+    return false
+  }
+  const units = Math.min(food, short, unitsThatFit(r, 'food', world.tick))
+  if (units <= 0) return true
+  const from = { kind: 'storage' as const, storageId: storage.id }
+  r.order = { kind: 'pickUp', from, goods: { food: units } }
+  return true
 }
 
 /**
- * Room left at a workplace: its most workers, minus those working it by its Work default (there,
- * on their way or away carrying), on it by a bare work-at order, or walking to it.
+ * A Trade Org city's carrier takes the load to the warehouse that keeps it (`warehouseFor`;
+ * `CONTEXT.md`: Trading post, Trade Org HQ), so less of its stock comes from the floor: the Work
+ * default picked the nearest storage, and before it stores the load the city names the warehouse
+ * instead, as a Player names one by its storage param. A load of Food stays for the storage.
  */
-function room(world: WorldState, place: Building): number {
-  return (MAX_WORKERS[place.kind] ?? 0) - takenPlaces(world, place)
-}
-
-/** Residents working a workplace by its Work default or a bare work-at order, or walking to it. */
-export function takenPlaces(world: WorldState, place: Building): number {
-  return world.residents.filter(
-    (r) =>
-      r.script?.memory.workplaceId === place.id ||
-      (r.order?.kind === 'workAt' && r.order.buildingId === place.id) ||
-      (r.order?.kind === 'walkTo' && isAt(r.order.target, place)),
-  ).length
+function sendToWarehouse(world: WorldState, city: City, r: Resident): void {
+  if (!city.tradeOrg || r.script?.scriptId !== 0) return
+  const carry = r.script.memory.carry
+  if (typeof carry !== 'object' || carry === null || Array.isArray(carry)) return
+  if (carry.stored === true || !Array.isArray(carry.goods)) return
+  const warehouse = warehouseFor(world, city, carry.goods as Good[])
+  if (warehouse) carry.storageId = warehouse.id
 }
 
 /**
  * Puts one of the city's residents to work a workplace: they run the game's Work default for it
- * (`runNpcScripts`), which walks them there and picks the footprint tile they stand on
+ * (`runNpcScripts`), which walks them to its anchor tile (`at`, so the walk starts while the
+ * workplace is out of sight) and once there picks the footprint tile they stand on
  * (`CONTEXT.md`: Spreading over the footprint).
  */
 export function putToWork(r: Resident, place: Building): void {
-  r.script = { scriptId: 0, task: 'work', memory: { workplaceId: place.id } }
+  const at = { x: place.x, y: place.y }
+  const memory: ScriptMemory = { workplaceId: place.id, at }
+  if (place.kind === 'smithy') memory.makes = NPC_SMITHY_WEAPON
+  r.script = { scriptId: 0, task: 'work', memory }
+}
+
+/**
+ * What one batch uses up at the workplace that processes goods a job is at (`RECIPES`; a smithy,
+ * the city's weapon's); undefined for any other job.
+ */
+function inputOf(buildings: Map<string, Building>, job: CityJob | undefined): Stock | undefined {
+  const place = job?.buildingId !== undefined ? buildings.get(job.buildingId) : undefined
+  if (!place || !RECIPES[place.kind]) return undefined
+  return recipeFor(place.kind, place.kind === 'smithy' ? NPC_SMITHY_WEAPON : undefined)?.input
+}
+
+/**
+ * Whether a worker at a workplace that processes goods can go on (`CONTEXT.md`: Smelter,
+ * Smithy): it has the input of a batch (`hasInput`), or they carry some of it still.
+ */
+function inputLeft(world: WorldState, place: Building, r: Resident): boolean {
+  const recipe = recipeFor(place.kind, place.kind === 'smithy' ? NPC_SMITHY_WEAPON : undefined)
+  if (!recipe || hasInput(world, place, recipe)) return true
+  return Object.keys(recipe.input).some((g) => (r.carried[g as Good] ?? 0) > 0)
+}
+
+/**
+ * Before a resident sets out for a workplace that processes goods, they take its `input` from
+ * the storage, as many batches as fit beside the Food they set out with (`setOutFood` aside, a
+ * game day's): at it, a pick-up; away from it, the walk there first. Whether they carry a batch,
+ * or have just been given the pick-up (`r.order`); false while the storage holds no batch.
+ */
+function takeInput(
+  world: WorldState,
+  r: Resident,
+  input: Stock,
+  storage: Building | undefined,
+  size: number,
+): boolean {
+  if (holdsBatch(r.carried, input)) return true
+  if (!storage || !holdsBatch(storage.stock, input)) return false
+  if (!isAt(r, storage, size)) {
+    walkTo(r, storage)
+    return true
+  }
+  const batch = stockWeight(input)
+  const room = carryCapacity(r, world.tick) - stockWeight(r.carried) - OWN_FOOD * GOOD_WEIGHT.food
+  let batches = Math.floor(room / batch)
+  for (const [g, n] of Object.entries(input) as [Good, number][]) {
+    batches = Math.min(batches, Math.floor((storage.stock?.[g] ?? 0) / n))
+  }
+  if (batches < 1) return false
+  const goods: Stock = {}
+  for (const [g, n] of Object.entries(input) as [Good, number][]) goods[g] = n * batches
+  r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods }
+  return true
 }
 
 /** Ends a resident's work: their order, and the Work default they run, if any. */
@@ -254,29 +445,14 @@ export function stopWork(r: Resident): void {
 }
 
 /**
- * Food runs short: one worker of a workplace that isn't a farm stops, so they go to a farm with
- * room, if there is one.
- */
-function moveToFarms(world: WorldState, places: Building[]): void {
-  if (!places.some((p) => p.kind === 'farm' && room(world, p) > 0)) return
-  for (const place of places) {
-    if (place.kind === 'farm') continue
-    const worker = workersOf(world, place)[0]
-    if (worker) {
-      stopWork(worker)
-      return
-    }
-  }
-}
-
-/**
  * What a resident carries for the storage: the goods workplaces make, all but `OWN_FOOD` Food
- * to eat; none if nothing. Weapons and armour stay on them.
+ * to eat and the `input` of the workplace they go to process at; none if nothing. Weapons and
+ * armour stay on them.
  */
-function haul(r: Resident): Stock | undefined {
+function haul(r: Resident, input?: Stock): Stock | undefined {
   const load: Stock = {}
   for (const [good, units] of Object.entries(r.carried) as [Good, number][]) {
-    if (WORK_OUTPUT_PER_DAY[good] === undefined) continue
+    if (WORK_OUTPUT_PER_DAY[good] === undefined || input?.[good] !== undefined) continue
     const n = putAwayUnits(good, units)
     if (n > 0) load[good] = n
   }

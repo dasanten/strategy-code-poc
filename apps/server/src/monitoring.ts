@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/node'
 import type { WorldState } from '@csp/shared'
 import type { Logger } from './log.js'
-import type { TickReporter } from './tick.js'
+import { phasesSlowestFirst, type TickReporter } from './tick.js'
 
 /**
  * Starts Sentry when a DSN is configured. Without one, reporting is off and only logs are
@@ -60,15 +60,32 @@ export function createTickReporter(log: Logger): TickReporter {
       })
       Sentry.metrics.gauge('tick.residents', health.residents, { attributes })
       Sentry.metrics.gauge('tick.actions', health.actions, { attributes })
+      Sentry.metrics.distribution('tick.npc_plan', health.npcPlanMs, {
+        unit: 'millisecond',
+        attributes,
+      })
+      Sentry.metrics.gauge('tick.scriptRuns', health.scriptRuns, { attributes })
+      for (const [phase, ms] of phasesSlowestFirst(health.phases)) {
+        Sentry.metrics.distribution(`tick.phase.${phase}`, ms, { unit: 'millisecond', attributes })
+      }
+      // Logged slowest phase first, so the terminal says where the tick went at a glance.
+      const phases = Object.fromEntries(
+        phasesSlowestFirst(health.phases).map(([phase, ms]) => [phase, Math.round(ms * 10) / 10]),
+      )
+      const [slowest, slowestMs] = phasesSlowestFirst(health.phases)[0] ?? ['world', 0]
       if (health.slow) {
-        log.warn({ ...health, seed: world.seed }, `slow tick: ${health.durationMs.toFixed(0)} ms`)
+        log.warn(
+          { ...health, phases, seed: world.seed },
+          `slow tick: ${health.durationMs.toFixed(0)} ms, slowest phase ${slowest} (${slowestMs.toFixed(0)} ms)`,
+        )
         withWorldScope(world, [], (scope) => {
-          scope.setContext('tick_health', { ...health })
+          scope.setContext('tick_health', { ...health, phases })
+          scope.setTag('slowest_phase', slowest)
           scope.setFingerprint(['slow-tick'])
           Sentry.captureMessage('Slow tick', 'warning')
         })
       } else {
-        log.trace({ ...health }, 'tick')
+        log.debug({ ...health, phases }, `tick ${health.tick}: ${health.durationMs.toFixed(1)} ms`)
       }
     },
 

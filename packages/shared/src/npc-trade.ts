@@ -3,13 +3,16 @@ import {
   BUILD_MATERIALS,
   CITY_PRICE_STANDING_SWING,
   GOOD_WEIGHT,
+  NPC_SOLDIER_SHARE,
   NPC_TRADE,
+  NPC_WAR_CHEST_PER_RESIDENT,
   STANDING_RANGE,
   WAREHOUSE_FLOOR,
   canWork,
   isArmed,
 } from './balance.js'
-import { cityFoodUse, forSale, npcCityRefuses } from './city.js'
+import { recipeFor } from './building.js'
+import { cityFoodUse, cityResidents, forSale, npcCityRefuses } from './city.js'
 import { covers, isAt } from './footprint.js'
 import { standingOf } from './standing.js'
 import {
@@ -21,7 +24,16 @@ import {
   type TradeQuote,
   type TradeSide,
 } from './warehouse.js'
-import type { Building, City, Good, Resident, Stock, WorldState } from './world.js'
+import {
+  WEAPONS,
+  type Building,
+  type City,
+  type Good,
+  type Resident,
+  type Stock,
+  type Weapon,
+  type WorldState,
+} from './world.js'
 
 /*
  * Trading with and hiring from an NPC city (`CONTEXT.md`: Trading with an NPC city, Hiring from
@@ -60,22 +72,47 @@ export function npcCityStock(world: Pick<WorldState, 'buildings'>, city: City): 
   return sum
 }
 
+/** What an NPC city's smithy makes for its soldiers: the cheapest weapon (`RECIPES`). */
+export const NPC_SMITHY_WEAPON: Weapon = 'spear'
+
 /**
- * The reserve an NPC city keeps (`CONTEXT.md`: Trading with an NPC city): Food for
- * `NPC_TRADE.reserveFoodDays` game days for all its residents, and the materials of a house and
- * `NPC_TRADE.reserveWallStretches` stretches of wall. Nothing of any other good. Whole units.
+ * How many soldiers an NPC city keeps (`CONTEXT.md`: NPC city): `NPC_SOLDIER_SHARE` of its
+ * adults, rounded up.
  */
-export function npcCityReserve(world: WorldState, city: City): Stock {
+export function npcSoldierTarget(adults: number): number {
+  return Math.ceil(adults * NPC_SOLDIER_SHARE)
+}
+
+/**
+ * The reserve an NPC city keeps (`CONTEXT.md`: NPC reserve): Food for `NPC_TRADE.reserveFoodDays`
+ * game days for all its residents; the materials of a house and `NPC_TRADE.reserveWallStretches`
+ * stretches of wall; a weapon (`NPC_SMITHY_WEAPON`) for each soldier it keeps by its size
+ * (`npcSoldierTarget`) and has not armed yet, and the smithy recipe's Iron and Wood for those of
+ * them its storages hold no weapon for; and `NPC_WAR_CHEST_PER_RESIDENT` coins for each of its
+ * residents. Whole units. What it holds above this is for sale, what it lacks drives its work.
+ */
+export function npcReserve(world: WorldState, city: City): Stock {
   const reserve: Stock = {}
   const food = Math.ceil(cityFoodUse(world, city, NPC_TRADE.reserveFoodDays) - 1e-9)
   if (food > 0) reserve.food = food
-  const add = (materials: Stock | undefined, times: number) => {
-    for (const [good, n] of Object.entries(materials ?? {}) as [Good, number][]) {
+  const add = (goods: Stock | undefined, times: number) => {
+    if (times <= 0) return
+    for (const [good, n] of Object.entries(goods ?? {}) as [Good, number][]) {
       reserve[good] = (reserve[good] ?? 0) + n * times
     }
   }
   add(BUILD_MATERIALS.house, 1)
   add(BUILD_MATERIALS.wall, NPC_TRADE.reserveWallStretches)
+  const residents = cityResidents(world, city).filter((r) => r.owner === null && r.health > 0)
+  const adults = residents.filter((r) => canWork(r, world.tick))
+  const unarmed = npcSoldierTarget(adults.length) - adults.filter(isArmed).length
+  if (unarmed > 0) {
+    reserve[NPC_SMITHY_WEAPON] = unarmed
+    const stock = npcCityStock(world, city)
+    const held = WEAPONS.reduce((n, w) => n + (stock[w] ?? 0), 0)
+    add(recipeFor('smithy', NPC_SMITHY_WEAPON)?.input, unarmed - held)
+  }
+  if (residents.length > 0) reserve.coins = residents.length * NPC_WAR_CHEST_PER_RESIDENT
   return reserve
 }
 
@@ -137,7 +174,7 @@ export function npcCityPrices(
 ): NpcCityPrice[] {
   if (!forSale(city)) return []
   const stock = npcCityStock(world, city)
-  const reserve = npcCityReserve(world, city)
+  const reserve = npcReserve(world, city)
   const swing = standingSwing(world, city, traderId)
   return PRICED_GOODS.map((good) => {
     const held = stock[good] ?? 0
@@ -172,7 +209,7 @@ export function quoteNpcTrade(
 ): TradeQuote {
   if (!forSale(city) || storage.cityId !== city.id) return { units: 0, coins: 0 }
   const total = npcCityStock(world, city)[good] ?? 0
-  const reserve = npcCityReserve(world, city)
+  const reserve = npcReserve(world, city)
   const keep = reserve[good] ?? 0
   const swing = standingSwing(world, city, traderId)
   const here = storage.stock?.[good] ?? 0

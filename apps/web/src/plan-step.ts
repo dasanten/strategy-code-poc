@@ -14,6 +14,7 @@ import {
   type OrderRequest,
   type SeenHorse,
   type Stock,
+  type TrainingSubject,
 } from '@csp/shared'
 import type { HaulSetup } from './Residents.js'
 import { anyonesToWork } from './script-params-view.js'
@@ -27,10 +28,18 @@ import { anyonesToWork } from './script-params-view.js'
 
 /** What a planned step picks on the map, one after another. */
 export type PlanPick =
-  'tile' | 'spot' | 'workplace' | 'building' | 'storage' | 'stable' | 'carriage' | 'horse'
+  | 'tile'
+  | 'spot'
+  | 'workplace'
+  | 'building'
+  | 'storage'
+  | 'stable'
+  | 'ground'
+  | 'carriage'
+  | 'horse'
 
 /** What a planned step asks for on the card once its places are picked. */
-export type PlanAsk = 'goods' | 'buildingKind' | 'makes' | 'horses' | 'haul' | 'script'
+export type PlanAsk = 'goods' | 'buildingKind' | 'makes' | 'horses' | 'haul' | 'script' | 'subject'
 
 export type PlanStepId =
   | 'walk'
@@ -43,6 +52,8 @@ export type PlanStepId =
   | 'drop'
   | 'feedStable'
   | 'breed'
+  | 'teach'
+  | 'train'
   | 'haul'
   | 'drive'
   | 'road'
@@ -126,6 +137,17 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     label: 'Breed horses',
     picks: [{ pick: 'stable', prompt: 'the stable to breed in' }],
     ask: 'horses',
+  },
+  {
+    id: 'teach',
+    label: 'Teach',
+    picks: [{ pick: 'ground', prompt: 'the training ground to teach at' }],
+    ask: 'subject',
+  },
+  {
+    id: 'train',
+    label: 'Train',
+    picks: [{ pick: 'ground', prompt: 'the training ground to train at' }],
   },
   {
     id: 'store',
@@ -264,6 +286,11 @@ export function planPickAt(
       const b = here.find((x) => x.kind === 'stable' && !x.site && own(x))
       return b ? named(b) : 'no stable of yours there'
     }
+    case 'ground': {
+      // Nobody owns a training ground: anyone's will do (`CONTEXT.md`: Training ground).
+      const b = here.find((x) => x.kind === 'trainingGround' && !x.site)
+      return b ? named(b) : 'no finished training ground there'
+    }
     case 'storage': {
       const b = here.find((x) => ['storage', 'stable'].includes(x.kind) && !x.site)
       if (b) return named(b)
@@ -295,6 +322,7 @@ export type PlanAnswer =
   | { ask: 'horses'; horseIds: [string, string] }
   | { ask: 'haul'; setup: HaulSetup }
   | { ask: 'script'; scriptId: number }
+  | { ask: 'subject'; subject: TrainingSubject }
 
 /** Where a step acts, for the walk put before it (`appendRequest`'s `at`). */
 type At = { x: number; y: number }
@@ -350,6 +378,12 @@ export function planOrder(
       const horseIds = a?.ask === 'horses' ? a.horseIds : []
       return { order: { kind: 'task', task: 'breed', stableId: p.id, horseIds }, at }
     }
+    case 'teach': {
+      const subject = a?.ask === 'subject' ? a.subject : null
+      return { order: { kind: 'teach', buildingId: p.id, subject }, at }
+    }
+    case 'train':
+      return { order: { kind: 'task', task: 'train', groundId: p.id }, at }
     case 'store':
       return { order: { kind: 'store', goods: [...GOODS], to: p.id } }
     case 'fetch':

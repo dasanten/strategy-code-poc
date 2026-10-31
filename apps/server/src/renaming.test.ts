@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
 import { recordEvent } from './events.js'
 import { OrderQueue } from './orders.js'
 import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
-import { lastSeenOutOfSight, stepLastSeen } from './last-seen.js'
+import { lastSeenOutOfSight, refreshLastSeen } from './last-seen.js'
 import { bindScript } from './script-bindings.js'
 import { entitiesInSight } from './sight.js'
 import { foundStartingCity } from './starting-city.js'
@@ -447,10 +447,10 @@ describe('Renaming a city', () => {
     const homes = tobins.map((r) => ({ x: r.x, y: r.y }))
     const step = () => {
       world.tick++
-      stepLastSeen(world, terrain.size)
+      refreshLastSeen(world, terrain.size)
     }
     const remembered = () =>
-      lastSeenOutOfSight(world, tobin.userId).find((e) => e.id === city.id) as
+      lastSeenOutOfSight(world, terrain.size, tobin.userId).find((e) => e.id === city.id) as
         { name: string } | undefined
     const before = city.name
     // Tobin's people stand at Mara's town hall, then go home.

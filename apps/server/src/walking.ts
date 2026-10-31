@@ -17,7 +17,6 @@ import {
   tileIndex,
   wallMap,
   wallsKey,
-  roadTiles,
   walkSpeed,
   rideSpeed,
   besideStep,
@@ -43,6 +42,7 @@ import { waitingForArmy } from './armies.js'
 import { waitingForEscort } from './caravans.js'
 import { attackTarget } from './combat.js'
 import { endOrder, placeOf, placeTile } from './storing.js'
+import { worldIndex } from './world-index.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
 export const PATH_BUDGET_MS = 50
@@ -231,16 +231,27 @@ export class Walking {
   private finder: PathFinder
   private searching = new Map<string, string>()
   private walls: { key: string; map: WallMap } | undefined
+  private roads: Set<number> | undefined
 
   constructor(private terrain: TerrainMap) {
     this.finder = new PathFinder(terrain)
   }
 
-  /** The walls and gates on the map, built again only when they change. */
+  /**
+   * The walls and gates on the map, built again only when they change. Looked at again as the
+   * steps resolve: a gate may have closed since they were requested.
+   */
   private wallsOf(world: WorldState): WallMap {
     const key = wallsKey(world)
     if (this.walls?.key !== key) this.walls = { key, map: wallMap(world, this.terrain) }
     return this.walls.map
+  }
+
+  /** Tells the pathfinder the finished roads and the walls, when they changed. */
+  private setGround(world: WorldState, roads: Set<number>): void {
+    if (!this.roads || !sameTiles(this.roads, roads)) this.finder.setRoads(roads)
+    this.roads = roads
+    this.finder.setWalls(this.wallsOf(world))
   }
 
   /**
@@ -250,9 +261,9 @@ export class Walking {
    * road speed, whatever the terrain beneath (`CONTEXT.md`: Road), and paths prefer roads.
    */
   requestSteps(world: WorldState, budgetMs = PATH_BUDGET_MS): StepAction[] {
-    const roads = roadTiles(world, this.terrain.size)
-    this.finder.setRoads(roads)
-    this.finder.setWalls(this.wallsOf(world))
+    const index = worldIndex(world)
+    const roads = index.roads(this.terrain.size)
+    this.setGround(world, roads)
     const holding = new Set<string>()
     for (const r of world.residents) {
       const o = moveOrder(r)
@@ -297,7 +308,7 @@ export class Walking {
       if (!onFoot(o)) {
         // The horse sets the pace (`CONTEXT.md`: Horse stats). Without one the step goes at
         // once, so resolving it ends the order.
-        const carriage = world.carriages.find((k) => k.id === o.carriageId)
+        const carriage = index.carriageById(o.carriageId)
         const horse = carriage && horseFor(world, carriage)
         if (!horse) {
           const to = { x: next[0], y: next[1] }
@@ -354,11 +365,12 @@ export class Walking {
       }
     }
     if (this.finder.pending > 0) this.finder.advance(budgetMs)
+    const index = worldIndex(world)
     for (const [id, key] of this.searching) {
       const result = this.finder.result(id)
       if (!result || result.status === 'searching') continue
       this.searching.delete(id)
-      const r = world.residents.find((x) => x.id === id)
+      const r = index.residentById(id)
       const o = r && moveOrder(r)
       if (!o || o.path || searchKey(world, r, o) !== key) continue
       if (result.status === 'found') o.path = result.path.map(([x, y]) => [x, y])
@@ -378,10 +390,11 @@ export class Walking {
    */
   resolve(world: WorldState, steps: StepAction[]): number {
     let taken = 0
-    const roads = roadTiles(world, this.terrain.size)
+    const index = worldIndex(world)
+    const roads = index.roads(this.terrain.size)
     const walls = this.wallsOf(world)
     for (const step of steps) {
-      const r = world.residents.find((x) => x.id === step.residentId)
+      const r = index.residentById(step.residentId)
       if (!r) continue
       const size = this.terrain.size
       const length = stepLength(size, r.x, r.y, step.to.x, step.to.y)
@@ -411,7 +424,7 @@ export class Walking {
         continue
       }
       if (step.carriageId) {
-        const carriage = world.carriages.find((k) => k.id === step.carriageId)
+        const carriage = index.carriageById(step.carriageId)
         const horse = carriage && horseFor(world, carriage)
         const together =
           carriage?.x === r.x && carriage.y === r.y && horse?.x === r.x && horse.y === r.y
@@ -464,4 +477,12 @@ export class Walking {
     }
     return taken
   }
+}
+
+/** Whether two sets of tiles hold the same tiles. */
+function sameTiles(a: Set<number>, b: Set<number>): boolean {
+  if (a === b) return true
+  if (a.size !== b.size) return false
+  for (const t of a) if (!b.has(t)) return false
+  return true
 }

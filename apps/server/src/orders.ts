@@ -9,6 +9,8 @@ import { haul, stop } from './hauling.js'
 import { pair } from './pairing.js'
 import { walkTo } from './walking.js'
 import { workAt } from './work.js'
+import { teach } from './teaching.js'
+import { train } from './training.js'
 import { allianceOrders } from './alliances.js'
 import { climb } from './climbing.js'
 import { dismount, mount } from './riding.js'
@@ -84,6 +86,8 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     build,
     tearDown,
     workAt,
+    teach,
+    train,
     breed,
     pair,
     attack,

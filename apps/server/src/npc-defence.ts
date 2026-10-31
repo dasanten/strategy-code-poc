@@ -1,7 +1,8 @@
 import {
   NPC_GATE_WATCH_RANGE,
-  NPC_SOLDIER_SHARE,
+  NPC_SMITHY_WEAPON,
   TRADE_ORG_ARMY,
+  npcSoldierTarget,
   tradeOrgArmyWanted,
   WEAPONS,
   canWork,
@@ -31,18 +32,8 @@ import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
 import { knownThieves } from './crimes.js'
 import { stopWork, walkTo } from './npc-behaviour.js'
+import { foundingParty } from './npc-founding.js'
 import { startWork } from './work.js'
-
-/** What an NPC city's smithy makes for its soldiers: the cheapest weapon (`RECIPES`). */
-const SMITHY_WEAPON: Weapon = 'spear'
-
-/**
- * How many soldiers an NPC city keeps (`CONTEXT.md`: NPC city): `NPC_SOLDIER_SHARE` of its
- * adults, rounded up.
- */
-export function npcSoldierTarget(adults: number): number {
-  return Math.ceil(adults * NPC_SOLDIER_SHARE)
-}
 
 /**
  * One tick of NPC cities defending themselves (`CONTEXT.md`: NPC city, Combat, Trading post):
@@ -177,14 +168,18 @@ function keepSoldiers(
   target: number,
   storage: Building | undefined,
 ): void {
-  const adults = people.filter((r) => canWork(r, world.tick))
+  // The armed member of a founding party goes with it (`CONTEXT.md`: Founding), not counted here.
+  const party = new Set(foundingParty(world.cityPlans[city.id]))
+  const adults = people.filter((r) => canWork(r, world.tick) && !party.has(r.id))
   const soldiers = adults.filter(isArmed)
   for (const r of soldiers) {
     if (r.order?.kind === 'workAt') stopWork(r)
     else delete r.script
   }
   if (soldiers.length >= target) return
-  const unarmed = adults.filter((r) => !isArmed(r) && r.order?.kind !== 'attack')
+  // Its trader (`CONTEXT.md`: NPC trader) is never made a soldier.
+  const trader = world.cityPlans[city.id]?.trader?.residentId
+  const unarmed = adults.filter((r) => !isArmed(r) && r.order?.kind !== 'attack' && r.id !== trader)
   if (unarmed.length === 0) return
 
   const smithy = world.buildings.find(
@@ -199,7 +194,7 @@ function keepSoldiers(
     fetch(world, storage, unarmed, { [weapon]: 1 })
     return
   }
-  const recipe = recipeFor('smithy', SMITHY_WEAPON)
+  const recipe = recipeFor('smithy', NPC_SMITHY_WEAPON)
   if (!smithy || !storage || !recipe) return
   if (smithing(world, smithy, unarmed, recipe.input)) return
   const stock = storage.stock ?? {}
@@ -286,8 +281,8 @@ function smithing(world: WorldState, smithy: Building, unarmed: Resident[], inpu
     walkTo(smith, smithy)
     return true
   }
-  if (workProblem(world, smith, SMITHY_WEAPON) !== undefined) return false
-  startWork(smith, smithy, SMITHY_WEAPON)
+  if (workProblem(world, smith, NPC_SMITHY_WEAPON) !== undefined) return false
+  startWork(smith, smithy, NPC_SMITHY_WEAPON)
   return true
 }
 

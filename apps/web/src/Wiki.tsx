@@ -39,6 +39,7 @@ import {
   CONSTRUCTION_SKILL_MAX,
   CONSTRUCTION_SKILL_PER_DAY,
   CONTRACT_MAX_DAYS,
+  CREW_FOOD,
   CRIME_MEMORY_DAYS,
   DECLINE_AGE,
   DECLINE_FLOOR,
@@ -64,6 +65,7 @@ import {
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
   HORSE_GRANT_FOOD,
+  HQ_FLOOR_FACTOR,
   HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
   HORSE_NAME_MAX_LENGTH,
@@ -94,6 +96,22 @@ import {
   NPC_ALLIANCE_LEAVE_STANDING,
   NPC_CITY_REFUSES_STANDING,
   NPC_CITY_WONT_SELL_STANDING,
+  FOOD_PER_DAY,
+  NPC_BUILDERS,
+  NPC_CITY_MIN_DISTANCE,
+  NPC_FOUND_FOOD_DAYS,
+  NPC_FOUND_GIVE_UP_DAYS,
+  NPC_FOUND_REACH,
+  NPC_FOUND_STANDING,
+  NPC_FULL_DAYS,
+  NPC_VILLAGE,
+  NPC_NODE_REACH,
+  NPC_TRADER_GIVE_UP_DAYS,
+  NPC_TRADER_REACH,
+  NPC_PLAN_TICKS,
+  NPC_SMITHY_WEAPON,
+  NPC_SOLDIER_SHARE,
+  NPC_WAR_CHEST_PER_RESIDENT,
   NPC_TRADE,
   OWN_FOOD,
   OUTPOST_REFILL_REACH,
@@ -112,6 +130,7 @@ import {
   SCRIPT_MAX_CALL_DEPTH,
   SCRIPT_MAX_VERSIONS,
   SCRIPT_MAX_LIST_LENGTH,
+  SET_OUT_WORK_DAYS,
   SCRIPT_MAX_OBJECT_KEYS,
   SCRIPT_MAX_STRING_LENGTH,
   SCRIPT_LOG_LINES,
@@ -120,6 +139,7 @@ import {
   SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
   SCRIPT_TILE_QUERY_COST,
+  LAST_SEEN_EVERY_TICKS,
   SIGHT_RANGE,
   STABLE_BREED_DAYS,
   STABLE_CAPACITY,
@@ -153,6 +173,10 @@ import {
   TRADE_ORG_PUNISHES_BELOW,
   TRADE_ORG_REFUSES_TRADE_BELOW,
   TRAINED_CAP_SHARE,
+  TRAINING_GROUND_MAX_TRAINEES,
+  TRAIN_SKILL_FACTOR,
+  FOOTPRINT,
+  trainedCap,
   TRANSFER_FEE_FACTOR,
   Terrain,
   WALL_DEFENCE,
@@ -160,6 +184,7 @@ import {
   WALK_TICKS_PER_TILE,
   aboutTime,
   WAREHOUSE_BASE_PRICE,
+  WAREHOUSE_FLOOR,
   WEAPON_ATTACK,
   WORK_SKILL_EFFECT,
   WORK_SKILL_MAX,
@@ -197,6 +222,7 @@ import {
   coinsPerMintWorkerDay,
   crimeForgotten,
   days,
+  trainingDays,
   daysToWorkSkillMax,
   duration,
   feeExamples,
@@ -220,6 +246,7 @@ import {
 } from './wiki-view.js'
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
+import { DEFAULT_REPEAT } from './plan-blocks.js'
 import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
@@ -230,6 +257,7 @@ export const WIKI_TOPICS = [
   { id: 'time', title: 'Time & map' },
   { id: 'terrain', title: 'Terrain & walking' },
   { id: 'residents', title: 'Residents & stats' },
+  { id: 'training', title: 'Training' },
   { id: 'food', title: 'Food & hunger' },
   { id: 'work', title: 'Workplaces & output' },
   { id: 'building', title: 'Building & tearing down' },
@@ -378,6 +406,7 @@ export function Wiki() {
     if (id) document.getElementById(id)?.scrollIntoView()
   }, [])
   const avg = AVERAGE_STATS.strength
+  const groundCost = buildCosts().find((b) => b.kind === 'trainingGround')!
   const strong = wikiResident({ strength: avg * 1.5 }, { mining: WORK_SKILL_MAX / 10 })
   const strongAgile = wikiResident({ agility: avg * 1.5 })
   const plainsTicksPerTile = 1 / walkSpeed(AVERAGE, Terrain.Plains, 0)
@@ -583,6 +612,39 @@ export function Wiki() {
           minutes (the real time shows beside it) or clear it, and switch loop on or off.
         </p>
         <p>
+          To reuse steps, tap one in the planner to pick it (<kbd>Shift</kbd>+tap picks a range;
+          tapping the picked one again unpicks it), then <strong>Copy</strong>.{' '}
+          <strong>Paste</strong> puts copies after the picked step, or at the end with none picked,
+          in the same planner, another resident's or a group's; the pasted steps are picked, so a
+          second Paste goes after them. <kbd>Ctrl</kbd>+<kbd>C</kbd> and <kbd>Ctrl</kbd>+
+          <kbd>V</kbd> do the same while the planner has focus. The clipboard is this browser's: it
+          survives switching cards, not reloading the page, and the server never sees it. A pasted
+          step keeps its places and the walk before it, and is checked again when its turn comes.
+        </p>
+        <p>
+          To keep a plan, <strong>Save…</strong> it under a name, such as “Mine run”; saving under a
+          name already taken asks before it overwrites. <strong>Load…</strong> lists the saved
+          queues with their step count and date, to load one or delete it; loading adds its steps
+          after the planned ones, in any resident's planner or a group's. Saved queues are kept in
+          this browser, as saved groups are: the server never sees them, and another browser has its
+          own. A saved step keeps its places, so one whose building is gone from the map (torn down,
+          say) is flagged in the planner; it is still given, and skipped when its turn comes.
+        </p>
+        <p>
+          To do some steps several times in a row, pick them (in a row) and press{' '}
+          <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
+          times until you type another count. The block shows its count with its steps indented
+          under it; it is picked, moved, copied, pasted, saved and removed as one,
+          <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
+          Repeat blocks are the planner's own: on a resident's card, wrapping steps opens a plan of
+          their queue that waits for <strong>Give</strong> (or Discard), and giving it, or Give to
+          all on a group's plan, makes each block that many plain copies of its steps, so the queue,
+          the server and your scripts only ever see steps. The running queue lists the copies, the
+          current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after repeats; the
+          planner counts them and won't give a plan over that, saying by how much. Loop still loops
+          the whole queue.
+        </p>
+        <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
           <code>end()</code>), or once its duration in game minutes is up, if you gave it one.
           Working a workplace, hauling and feeding a stable never end on their own, so such a step
@@ -614,6 +676,19 @@ export function Wiki() {
           the east side and you come back in from the west. Walking once around it on plains takes
           an average resident {duration(MAP_SIZE * plainsTicksPerTile)}. A resident sees{' '}
           {num(SIGHT_RANGE)} tiles around them.
+        </p>
+        <p>
+          The world fills in by itself: an NPC city that has grown full sends some of its people to
+          found a new village on free land up to {num(NPC_FOUND_REACH)} tiles away (see NPC cities
+          under Trade &amp; prices), which then grows like any other. Land within a realm's
+          territory is never founded on.
+        </p>
+        <p>
+          Buildings and cities you have had in sight stay on your map once they leave it, as you
+          last saw them and marked apart from what you see now (last seen). Your map of them is
+          brought up to date once every {duration(LAST_SEEN_EVERY_TICKS)}, so a building that leaves
+          your sight in between is remembered as it was up to that long before. What is in sight now
+          is always shown as it is.
         </p>
       </Section>
 
@@ -699,6 +774,47 @@ export function Wiki() {
         </p>
       </Section>
 
+      <Section id="training">
+        <p>
+          Residents train their stats and skills at a <b>training ground</b>, a{' '}
+          {num(FOOTPRINT.trainingGround)} × {num(FOOTPRINT.trainingGround)} building that goes
+          anywhere off Mountain and off resource nodes and belongs to nobody. It is built from{' '}
+          {goods(groundCost.materials)} and {duration(groundCost.buildTicks)} of one average
+          resident's work. A ground teaches one subject at a time: a stat (Strength, Endurance,
+          Agility, Intellect) or a skill (Combat, Mining, …), the one its teacher set.
+        </p>
+        <p>
+          <b>Teach:</b> a grown resident standing on a finished ground teaches there, naming the
+          subject: <i>Teach…</i> on their card, a Teach step in a queue, or a script's{' '}
+          <code>teach("strength")</code>. A ground has one teacher at a time; walking off or taking
+          another order ends the teaching. The teacher gains nothing.
+        </p>
+        <p>
+          <b>Train:</b> a grown resident standing on the ground trains there with the Train task:{' '}
+          <i>Train</i> on their card, a Train step in a queue, or a script's <code>train()</code>.
+          Up to {num(TRAINING_GROUND_MAX_TRAINEES)} train at a ground at once. They learn only while
+          a teacher is there, and only up to a <b>ceiling</b>: never past the teacher's own value,
+          and never past their own cap, a stat's trained bonus at most {pct(TRAINED_CAP_SHARE)} of
+          its base, a work skill at most {num(WORK_SKILL_MAX)} points. At their ceiling they wait.
+          The ground's card lists the teacher and subject, then each trainee with their value and
+          their ceiling.
+        </p>
+        <p>
+          The trainee's Intellect sets the pace (twice the Intellect, twice as fast); the teacher's
+          level is only the ceiling. An average learner under a better teacher takes a stat's
+          trained bonus from nothing to its cap (+{num(trainedCap(AVERAGE_STATS.strength))} on an
+          average base of {num(AVERAGE_STATS.strength)}) in {days(trainingDays('strength'))}, a work
+          skill to {num(WORK_SKILL_MAX)} in {days(trainingDays('mining'))},{' '}
+          {num(TRAIN_SKILL_FACTOR)} times as fast as by working, and Combat to its most in{' '}
+          {days(trainingDays('combat'))}. Training costs time and the food trainees eat; nothing
+          trained decays, though old age shrinks a trained stat with its base.
+        </p>
+        <p>
+          Players' residents train, by order, queue step or script. NPC cities and the Trade
+          Organization train nobody yet.
+        </p>
+      </Section>
+
       <Section id="food">
         <p>
           Residents eat only food they carry. An average resident eats {num(foodEatenPerDay())} Food
@@ -720,6 +836,15 @@ export function Wiki() {
           Whenever they are at a storage anyway, their own food is topped up to{' '}
           <code>foodTake</code> instead of {num(OWN_FOOD)}. With <code>foodAt</code> set to 0 they
           don't go on their own and rely on refilling.
+        </p>
+        <p>
+          A crew at a far workplace is fed by its carrier: the worker who carries a load to the
+          storage brings back the Food the workplace's pile lacks of <code>crewFood</code> (
+          {num(CREW_FOOD)} unless set) and puts it on the pile, where the crew takes its meals, so
+          nobody else leaves for Food while the pile holds some. A farm's pile keeps its own Food
+          instead. <code>crewFood</code> 0 brings none. A resident an NPC city sends to a workplace
+          sets out with Food for the walk there and back plus {days(SET_OUT_WORK_DAYS)} of work, not
+          a fixed amount, so they last until the carrier's first round trip.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -750,7 +875,10 @@ export function Wiki() {
           leaves work for their <code>storage</code>, or the nearest storage of your realm with
           Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes
           back. With no Food anywhere they work on. Carrying a load tops their food up to{' '}
-          <code>foodTake</code> too. <code>foodAt</code> 0 turns this off.
+          <code>foodTake</code> too, and the carrier brings back what the workplace's pile lacks of{' '}
+          <code>crewFood</code> ({num(CREW_FOOD)} unless set) for the crew's meals, so a worker with
+          Food on the pile stays. <code>foodAt</code> 0 turns getting food off,{' '}
+          <code>crewFood</code> 0 the crew's Food.
         </p>
         <p>
           Work can be run directly too, with Run script or as a queue step: they work the workplace
@@ -900,7 +1028,9 @@ export function Wiki() {
           within {num(CITY_BUILDING_REACH)} tiles of its town hall or of another of its buildings;
           the city's area reaches {num(CITY_AREA_MARGIN)} tiles around them. A house goes only in a
           city's area; a town hall, storage, wall or gate goes anywhere off Mountain and off
-          resource nodes, and a new town hall founds a city.
+          resource nodes, and a new town hall founds a city. A training ground goes anywhere off
+          Mountain and off resource nodes too, and like a workplace it belongs to nobody; what
+          happens there is under <a href="#training">Training</a>.
         </p>
         <p>
           A resident building or tearing down who carries less Food than <code>foodAt</code> (
@@ -1219,6 +1349,10 @@ export function Wiki() {
 
       <Section id="trade">
         <p>
+          A Trade Org warehouse, at the HQ or a trading post, trades in person with whoever stands
+          on it: a Player's resident or carriage, or an NPC city's trader.
+        </p>
+        <p>
           Each warehouse prices every good from its own stock. At {num(PRICE_REFERENCE_FLOORS)}{' '}
           times its stock floor it sells at the base price; less stock costs more (to the power{' '}
           {num(PRICE_ELASTICITY)}), between {pct(PRICE_RANGE.min)} and {pct(PRICE_RANGE.max)} of the
@@ -1277,13 +1411,81 @@ export function Wiki() {
         </table>
         <h3>NPC cities</h3>
         <p>
-          An NPC city sells only what it holds above its reserve ({days(NPC_TRADE.reserveFoodDays)}{' '}
-          of Food for everyone, and the materials for a house and{' '}
-          {num(NPC_TRADE.reserveWallStretches)} tiles of wall) and buys only what it is short of. It
-          lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week, keeping{' '}
-          {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires out
-          soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A contract
-          runs at most {days(CONTRACT_MAX_DAYS)}.
+          An NPC city thinks over what its people do once a game hour ({realTimeOf(NPC_PLAN_TICKS)}
+          of real time) and keeps to that plan in between: a worker stays where the city put them
+          until it moves them, and a builder picks up the next piece of a project as soon as one is
+          finished. Only its defence acts at once.
+        </p>
+        <p>
+          An NPC city keeps a reserve: {days(NPC_TRADE.reserveFoodDays)} of Food for everyone; the
+          materials for a house and {num(NPC_TRADE.reserveWallStretches)} tiles of wall; a{' '}
+          {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()} for each soldier it keeps and hasn't armed
+          yet ({pct(NPC_SOLDIER_SHARE)} of its adults), with the Iron and Wood to forge them; and{' '}
+          {num(NPC_WAR_CHEST_PER_RESIDENT)} coins a resident as its war chest. A stable is wanted
+          once it has a horse.
+        </p>
+        <p>
+          It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
+          eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
+          and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
+          {num(NPC_BUILDERS)} builders while it has a project; everyone else is a spare hand. Spare
+          hands go to the good the reserve is shortest of, as a share of what it wants of it,
+          filling one workplace's crew before the next. Without a workplace for that good, the city
+          builds one: on the nearest fitting resource node within {num(NPC_NODE_REACH)} tiles of
+          home, or a smelter, smithy or mint in its area like a house.
+        </p>
+        <p>
+          So it builds the whole chain its land allows, from the node up: weapons short wants a
+          smithy, which wants Iron, so a smelter, which wants Iron ore, so a mine first, and the
+          Wood and Stone the mine is built of before that. A smelter or smithy is worked only while
+          the storage holds the input for a batch, which its workers take with them; once the city
+          isn't short of what it makes, they stop. A good with no node in reach stays short: a
+          village with no ore in reach forges no weapons, and a mint is built only with Gold ore in
+          reach.
+        </p>
+        <h3>Trading posts and the HQ</h3>
+        <p>
+          The Trade Organization runs its own chain the same way. A trading post's reserve is its
+          warehouse's stock floor ({num(WAREHOUSE_FLOOR.ironOre)} Iron ore,{' '}
+          {num(WAREHOUSE_FLOOR.wood)} Wood, {num(WAREHOUSE_FLOOR.coins)} coins and so on), the HQ's{' '}
+          {num(HQ_FLOOR_FACTOR)} times that; their Food is their storage's, kept by their farmers.
+          Their spare hands work and build for whatever their warehouses are short of, on the
+          nearest node within {num(NPC_NODE_REACH)} tiles, and carry the output into the warehouse,
+          so less of its stock comes from the floor. A post never grows in people; the HQ grows only
+          while it is too weak. Neither sends a trader or founds a city.
+        </p>
+        <p>
+          Once one good's surplus makes a full load for one of its spare hands (beside the Food for
+          the walk) and a Trade Org warehouse lies within {num(NPC_TRADER_REACH)} tiles, an NPC city
+          sends that spare hand, never a soldier, as its trader: they carry the load and the coins
+          above its war chest there, sell the load, buy the good shortest of its reserve that it has
+          no node for (never Food or a weapon) as far as their coins and arms allow, and walk home
+          to the storage. One trader at a time, and none while Food runs short or armed outsiders
+          stand in its area. Nothing protects them on the way; a trader not back after{' '}
+          {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
+        </p>
+        <p>
+          A city is full once it has had spare hands with nothing to do and nothing short of its
+          reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
+          materials above its reserve. A full city founds a daughter. Once a game day it looks for a
+          free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with
+          room for a village and on no realm's territory, nearest a node of a material it has none
+          of in reach. A founding party of {num(NPC_VILLAGE.residents)} adults, one of them armed,
+          sets out carrying the materials and Food for twice the walk and{' '}
+          {days(NPC_FOUND_FOOD_DAYS)} there, and builds the town hall, which founds the daughter: an
+          NPC city of its own with a name from the game. It then builds its storage, a farm and a
+          house, and once its storage holds the Wood of its reserve, its first wall, a ring{' '}
+          {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
+          a standing of {num(NPC_FOUND_STANDING)} toward each other, which fades like any other, and
+          share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
+          gives up and walks home. Trading posts and the Trade Organization's HQ never found cities.
+        </p>
+        <p>
+          An NPC city sells only what it holds above this reserve and buys only what it is short of.
+          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week,
+          keeping {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires
+          out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A
+          contract runs at most {days(CONTRACT_MAX_DAYS)}.
         </p>
         <p>
           Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,
@@ -1509,7 +1711,7 @@ export function Wiki() {
           see and have explored, nothing more; the helpers <code>floor</code> and{' '}
           <code>pickRandom</code> work only on what you give them. An action asks for the order of
           its name for <code>me</code>, checked exactly as one from the map, and answers{' '}
-          <code>null</code> when asked for, or why not. Three actions ask for no order.{' '}
+          <code>null</code> when asked for, or why not. Four actions ask for no order.{' '}
           <code>doing</code>: its text, at most {num(DOING_MAX_LENGTH)} characters, is what the
           resident card and list say the resident is doing, until the script says something else;
           only you see it. Without it they show what the task and its current order have the
@@ -1519,10 +1721,16 @@ export function Wiki() {
           reason, <code>end(reason)</code> also notes it in your realm log, like “Ana stopped Work:
           no workplace on her tile”: short text, cut like <code>doing</code>’s, that only you see,
           for every end. <code>log</code>: adds a short line, cut like <code>doing</code>’s, to the
-          resident's script log, with the game time. The Build and Tear down defaults end once the
-          site is finished or the building is gone; a script that never calls it runs until another
-          order ends it. A script runs as a resident's or as an army's: names marked resident only
-          or army only are only there for one of them, and a default script runs as a resident's.
+          resident's script log, with the game time. <code>wait</code>: once this run is over the
+          script is not run again until the resident's order ends or is replaced, or they are
+          struck; then it runs every tick again. With no order it does nothing. The defaults wait
+          after every walk, store and fetch, and Breed horses while it tends, so a resident on the
+          move costs no step; the resident card says “script waiting”, and an edited copy of a
+          default waits just the same. The Build and Tear down defaults end once the site is
+          finished or the building is gone; a script that never calls <code>end</code> runs until
+          another order ends it. A script runs as a resident's or as an army's: names marked
+          resident only or army only are only there for one of them, and a default script runs as a
+          resident's.
         </p>
         <h3>Values</h3>
         <ApiTable is="value" />
@@ -1654,7 +1862,10 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             <code>source</code>: where Food comes from. The Work, Build and Tear down defaults also
             have the <code>number</code> params <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0
             turns it off) and <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food,
-            in units of Food (a resident eats about {num(foodEatenPerDay())} a game day).
+            in units of Food (a resident eats about {num(foodEatenPerDay())} a game day). Work also
+            has <code>crewFood</code> (default {num(CREW_FOOD)}; 0 brings none): the Food the
+            workplace's pile keeps for the crew, which the carrier tops up on the way back from the
+            storage.
           </li>
         </ul>
       </Section>

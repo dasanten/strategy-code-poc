@@ -12,7 +12,7 @@ import {
   loadOf,
   goodsCapacity,
   npcCityRefuses,
-  npcCityReserve,
+  npcReserve,
   npcCityStock,
   npcTradeProblem,
   npcTradingStorageAt,
@@ -276,7 +276,7 @@ function tradeWithCity(
   move(goodsFrom, goodsTo, o.good, units)
   move(goodsTo, goodsFrom, 'coins', coins)
   const held = npcCityStock(world, city)[o.good] ?? 0
-  const keep = npcCityReserve(world, city)[o.good] ?? 0
+  const keep = npcReserve(world, city)[o.good] ?? 0
   records.push({
     residentId: r.id,
     realm,

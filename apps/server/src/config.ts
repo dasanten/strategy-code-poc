@@ -32,8 +32,11 @@ export const config = {
   sentryDsn: process.env.SENTRY_DSN || undefined,
   /** Share of ticks whose invariants are checked: every tick in dev, sampled in prod. */
   invariantSampleRate: Number(process.env.INVARIANT_SAMPLE_RATE ?? (isProduction ? 0.1 : 1)),
-  /** A tick slower than this is reported as a warning (the budget is TICK_MS). */
-  slowTickMs: 800,
+  /**
+   * A tick slower than this is reported as a warning naming its slowest phase (the budget is
+   * TICK_MS). `SLOW_TICK_MS` lowers it in development to see the warning on a quiet world.
+   */
+  slowTickMs: Number(process.env.SLOW_TICK_MS ?? 800),
   /**
    * Which browsers may open the WebSocket (`deploy/.env.example`): the request's own host always
    * may, which is the game's domain as Caddy forwards it in production, or the server itself in
@@ -52,7 +55,7 @@ export const config = {
   realtime: {
     /**
      * The largest frame a client may send, in bytes. The largest message the client has is a
-     * queue of `QUEUE_MAX_STEPS` steps of `QUEUE_STEP_MAX_CHARS` each, about 20 KB; a script
+     * queue of `QUEUE_MAX_STEPS` steps of `QUEUE_STEP_MAX_CHARS` each, about 50 KB; a script
      * save goes over HTTP. A larger frame closes the socket.
      */
     maxPayloadBytes: 64 * 1024,

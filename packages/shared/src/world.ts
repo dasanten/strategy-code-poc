@@ -37,6 +37,29 @@ export type SkillName =
   | 'combat'
   | 'driving'
 
+/** Every skill, in the order the UI lists them. */
+export const SKILL_NAMES: readonly SkillName[] = [
+  'mining',
+  'woodcutting',
+  'smelting',
+  'smithing',
+  'construction',
+  'farming',
+  'combat',
+  'driving',
+]
+
+/** What a training ground teaches (`CONTEXT.md`: Training ground): a stat or a skill. */
+export type TrainingSubject = StatName | SkillName
+
+/** Whether `x` names a stat or a skill, something a training ground can teach. */
+export function isTrainingSubject(x: unknown): x is TrainingSubject {
+  return (
+    (STAT_NAMES as readonly unknown[]).includes(x) ||
+    (SKILL_NAMES as readonly unknown[]).includes(x)
+  )
+}
+
 /** A person living in the world (`CONTEXT.md`: Resident). Plain data. */
 export interface Resident {
   id: string
@@ -240,6 +263,12 @@ export interface RunningScript {
   lastError?: ScriptRunError
   /** The steps it used the last tick it ran, and whether it ran out (`CONTEXT.md`: Step budget). */
   lastRun?: ScriptRunSteps
+  /**
+   * The tick it called `wait()` (`CONTEXT.md`: Running a script, Waiting): it is not run again
+   * until the order it waits on ends or is replaced, or the resident is struck from this tick on.
+   * Absent while it runs every tick.
+   */
+  waitingSince?: number
 }
 
 /** A script's last runtime error, as its Script tab shows it (`CONTEXT.md`: Debugging a script). */
@@ -275,6 +304,8 @@ export interface SeenScript {
   task?: Task
   building?: BuildingKind
   doing?: string
+  /** It waits on the resident's order (`RunningScript.waitingSince`); only for the owning Player. */
+  waiting?: true
   /**
    * The values picked for its params, by name (`Resident.scriptParams`); only for the realm
    * running it.
@@ -591,6 +622,29 @@ export interface BreedOrder {
   progress: number
 }
 
+/**
+ * Teaching (`CONTEXT.md`: Teacher): the resident teaches `subject` at the finished training
+ * ground `buildingId` while they stand on its footprint, until ordered otherwise. Walking off
+ * ends it.
+ */
+export interface TeachOrder {
+  kind: 'teach'
+  buildingId: string
+  subject: TrainingSubject
+}
+
+/**
+ * Training (`CONTEXT.md`: Trainee, Training): the resident trains at the finished training ground
+ * `buildingId` while they stand on its footprint, until ordered otherwise; walking off ends it.
+ * `learning` is the subject they gained in on the last tick, null while they wait: no teacher
+ * there, or at their ceiling in its subject.
+ */
+export interface TrainOrder {
+  kind: 'train'
+  buildingId: string
+  learning: TrainingSubject | null
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -606,6 +660,8 @@ export type ResidentOrder =
   | BreedOrder
   | AttackOrder
   | ClimbOrder
+  | TeachOrder
+  | TrainOrder
   | LineOrder
   | PayOrder
   | BuyCityOrder
@@ -685,6 +741,69 @@ export interface WorldState {
    * kept with the Player, not the realm, so a claim outlives a Leader death.
    */
   horseOffersClaimed: number[]
+  /**
+   * The plan of each city the game runs, by city id (`CONTEXT.md`: NPC city; ADR 0016): what its
+   * residents do until its next planning pass. A city without one has not planned yet.
+   */
+  cityPlans: Record<string, CityPlan>
+}
+
+/**
+ * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
+ * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
+ * (NPC trader), found its daughter (Founding), or nothing, until the next pass moves them.
+ */
+export interface CityJob {
+  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'idle'
+  /** The farm or workplace to work, for `farm` and `work`. */
+  buildingId?: string
+}
+
+/** What a game-run city builds or takes down next (`CONTEXT.md`: NPC city), as plain data. */
+export type CityProject =
+  | { kind: 'build'; building: BuildingKind; x: number; y: number }
+  | { kind: 'tearDown'; buildingId: string }
+
+/** A game-run city's trade run under way (`CONTEXT.md`: NPC trader). */
+export interface CityTrader {
+  /** The trader, one of its spare hands. */
+  residentId: string
+  /** The Trade Org warehouse they trade at. */
+  warehouseId: string
+  /** The load still to sell there; empty once sold. */
+  sells: Stock
+  /** What they still buy there, up to what the city is short of; empty once bought. */
+  buys: Stock
+  /** The tick they were sent. */
+  since: number
+}
+
+/**
+ * What a city the game runs decided at its last planning pass (`CONTEXT.md`: NPC city;
+ * ADR 0016), kept in the world so a restart forgets nothing: plain serialisable data like an
+ * order's state (ADR 0002). Only the pass changes the jobs; between passes the city hands them
+ * out, and replaces its project once it is finished.
+ */
+export interface CityPlan {
+  /** The tick of the pass that made it. */
+  plannedAt: number
+  /** A job per resident of the city, by resident id. */
+  jobs: Record<string, CityJob>
+  /** What the city builds or takes down next; none when it has nothing to build. */
+  project?: CityProject
+  /** Its trade run under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
+  trader?: CityTrader
+  /**
+   * Since when it has been full (`CONTEXT.md`: Full city); while its founding party is out (its
+   * residents with the `found` job), since when the party has been on its way (`CONTEXT.md`:
+   * Founding).
+   */
+  fullSince?: number
+  /**
+   * The tile of the town hall it founds its daughter round (`CONTEXT.md`: Founding): found once
+   * full, and the founding party's goal once it is out.
+   */
+  foundingSite?: { x: number; y: number }
 }
 
 /**
@@ -1744,6 +1863,11 @@ export type BuildingKind =
   | 'smelter'
   | 'mint'
   | 'smithy'
+  /**
+   * A training ground (`CONTEXT.md`: Training ground): where residents train. It makes nothing,
+   * so it is no workplace; like one, it has no owner.
+   */
+  | 'trainingGround'
   | 'road'
   /**
    * A carriage site (`CONTEXT.md`: Carriage): only ever a construction site, laid out at a

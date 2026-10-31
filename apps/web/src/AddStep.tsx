@@ -9,7 +9,7 @@ import {
   type Stock,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
-import { GOOD_LABELS } from './Residents.js'
+import { GOOD_LABELS, SubjectPicker } from './Residents.js'
 import {
   makesAt,
   PLAN_STEPS,
@@ -82,6 +82,9 @@ export function AddStep({
           <HorsesAsk horses={horses} onAnswer={(horseIds) => onAnswer({ ask, horseIds })} />
         )}
         {ask === 'haul' && <HaulAsk onAnswer={(setup) => onAnswer({ ask, setup })} />}
+        {ask === 'subject' && (
+          <SubjectPicker action="Add" onPick={(subject) => onAnswer({ ask, subject })} />
+        )}
         {ask === 'script' &&
           (scripts.length === 0 ? (
             <p className="muted small">No scripts yet. Write one in the library.</p>
