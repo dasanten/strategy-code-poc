@@ -364,7 +364,8 @@ describe('setting out for a workplace in an NPC city', () => {
       const { world, terrain, city } = village(400)
       const storage = storageOf(world, city)
       storage.stock = { food: 2000 }
-      world.residents = []
+      // The village's own residents farm and stand guard, so the city keeps its soldiers
+      // without drafting the crew.
       const camp = farCamp(world, terrain, city, { x: storage.x + 160, y: storage.y })
       const walk = 160 * WALK_TICKS_PER_TILE
       const crew = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6'].map((id) =>
@@ -374,31 +375,42 @@ describe('setting out for a workplace in an NPC city', () => {
       const walking = new Walking(terrain)
       const atCamp = (r: Resident) => r.x === camp.x && r.y === camp.y
       let arrived = false
-      let pileFed = false
+      let lastPileFood = 0
       let trips = 0
+      const here = new Map<string, boolean>()
       for (let t = 0; t < 30 * TICKS_PER_GAME_DAY; t++) {
         stepWorld(world, terrain, walking)
         if (!arrived) {
           arrived = crew.every(atCamp)
+          for (const r of crew) here.set(r.id, true)
           continue
         }
-        // Once there, whoever is away from the camp is its one carrier.
+        // Once there, one of them at a time is away, and only ever as its carrier: who leaves the
+        // camp carries a load off, nobody walks home for Food. Home with the load stored, a
+        // carrier bringing no crew food is free and the city sends them back (Carrying the
+        // output, NPC city).
         const away = crew.filter((r) => !atCamp(r))
-        expect(away.map((r) => r.id)).toEqual(
-          away.filter((r) => r.script?.memory.carry).map((r) => r.id),
-        )
-        expect(away.length).toBeLessThanOrEqual(1)
-        if (away[0]?.order?.kind === 'fetch') trips++
-        pileFed ||= (pileAt(world, camp.x, camp.y)?.goods.food ?? 0) > 0
+        expect(away.filter((r) => r.script?.memory.carry).length).toBeLessThanOrEqual(1)
+        for (const r of crew) {
+          if (here.get(r.id) && !atCamp(r)) expect(r.script?.memory.carry).toBeTruthy()
+          expect(r.script?.memory.food).toBeUndefined()
+          here.set(r.id, atCamp(r))
+        }
+        // A trip with the crew's Food: the pile's Food goes up (it only ever goes down otherwise).
+        const pileFood = pileAt(world, camp.x, camp.y)?.goods.food ?? 0
+        if (pileFood > lastPileFood) trips++
+        lastPileFood = pileFood
         if (world.tick % TICKS_PER_GAME_DAY === 0)
           expect(checkInvariants(world, terrain)).toEqual([])
       }
       expect(arrived).toBe(true)
-      expect(pileFed).toBe(true)
-      expect(trips).toBeGreaterThan(0)
-      expect(world.residents.map((r) => r.id)).toEqual(crew.map((r) => r.id))
-      for (const r of crew)
-        expect(r.script).toMatchObject({ task: 'work', memory: { workplaceId: camp.id } })
+      // In 30 days the carrier walks the 160 tiles both ways many times, Food back each time.
+      expect(trips).toBeGreaterThan(5)
+      for (const r of crew) expect(world.residents).toContain(r)
+      // Still a crew of six on the camp: all at work there, or one of them away as its carrier.
+      const workers = crew.filter((r) => r.script?.memory.workplaceId === camp.id)
+      expect(workers.length + crew.filter((r) => !r.script).length).toBe(6)
+      expect(crew.filter((r) => atCamp(r) && r.order?.kind === 'workAt').length).toBeGreaterThan(4)
       // The pile keeps about crewFood: the carrier tops it up, never heaps it.
       expect(pileAt(world, camp.x, camp.y)?.goods.food ?? 0).toBeLessThanOrEqual(CREW_FOOD)
       expect((storage.stock?.wood ?? 0) > 0).toBe(true)
