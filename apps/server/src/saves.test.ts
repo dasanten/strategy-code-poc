@@ -19,6 +19,7 @@ import { createAdmin } from './auth.js'
 import { KEEP_LATEST, WorldSaver, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
+import { HORSE_NAMES } from './horses.js'
 import { checkInvariants } from './invariants.js'
 import { smallTerrain, worldWithCity, worldWithPost } from './test-terrain.js'
 import {
@@ -136,7 +137,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(65)
+    expect(WORLD_FORMAT_VERSION).toBe(66)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -380,6 +381,22 @@ describe('world saves', () => {
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
+  it('names every horse from before horses had names, alike on every server (migration 65 → 66)', () => {
+    const { world, terrain: land } = worldWithCity()
+    expect(world.horses.length).toBeGreaterThan(0)
+    // A format 65 horse: no name.
+    const old = structuredClone(world) as unknown as { horses: Record<string, unknown>[] }
+    for (const h of old.horses) delete h.name
+    const migrated = migrateWorld(structuredClone(old), 65, { terrain: land }, migrations, 66)
+    for (const h of migrated.horses) expect(HORSE_NAMES).toContain(h.name)
+    // Drawn from the seed and the horse's id, so a second run names them the same.
+    expect(migrateWorld(old, 65, { terrain: land }, migrations, 66)).toEqual(migrated)
+    expect(migrated.horses.map(({ id, x, y }) => ({ id, x, y }))).toEqual(
+      world.horses.map(({ id, x, y }) => ({ id, x, y })),
+    )
+    expect(checkInvariants(migrated, land)).toEqual([])
+  })
+
   it('keeps a format 46 world as it is: no resident has a queue yet (migration 46 → 47)', () => {
     const { world, terrain } = worldWithCity()
     const migrated = migrateWorld(structuredClone(world), 46, { terrain }, migrations, 47)
@@ -392,7 +409,7 @@ describe('world saves', () => {
     const { world, terrain } = worldWithCity()
     const old: Partial<typeof world> = { ...world }
     delete old.scriptViewChanges
-    const migrated = migrateWorld(old, 49, { terrain })
+    const migrated = migrateWorld(old, 49, { terrain }, migrations, 50)
     expect(migrated).toEqual({ ...world, scriptViewChanges: 0 })
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })

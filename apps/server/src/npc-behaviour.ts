@@ -375,7 +375,9 @@ function sendToWarehouse(world: WorldState, city: City, r: Resident): void {
 
 /**
  * Puts one of the city's residents to work a workplace: they run the game's Work default for it
- * (`runNpcScripts`), which walks them there.
+ * (`runNpcScripts`), which walks them to its anchor tile (`at`, so the walk starts while the
+ * workplace is out of sight) and once there picks the footprint tile they stand on
+ * (`CONTEXT.md`: Spreading over the footprint).
  */
 export function putToWork(r: Resident, place: Building): void {
   const at = { x: place.x, y: place.y }

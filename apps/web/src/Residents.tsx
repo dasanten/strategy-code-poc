@@ -2867,7 +2867,7 @@ function BreedBlock({
             onChange={() => toggle(h.id)}
             disabled={!!breeding || !!kept}
           />{' '}
-          {horseDetail(h, tick)}
+          {h.name} · {horseDetail(h, tick)}
         </label>
       ))}
       <div className="order-buttons">
@@ -2913,7 +2913,7 @@ function GroupBreed({
       {horses.map((h) => (
         <label key={h.id} className="small" style={{ display: 'block' }}>
           <input type="checkbox" checked={picked.includes(h.id)} onChange={() => toggle(h.id)} />{' '}
-          {horseDetail(h, tick)}
+          {h.name} · {horseDetail(h, tick)}
         </label>
       ))}
       <div className="order-buttons">

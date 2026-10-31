@@ -234,7 +234,8 @@ export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
 // params.foodAt units of Food on me, while the pile holds none, I get Food
 // up to params.foodTake at params.storage, or the nearest storage of my
 // realm with Food, and come back; storing a load tops my food up to foodTake
-// too. foodAt 0 turns getting food off.
+// too. foodAt 0 turns getting food off. At the workplace we stand spread over
+// its footprint.
 param workplace: building // the workplace to work; none: the one I stand on
 param storage: storage // where the output goes
 ${FOOD_PARAMS}
@@ -243,8 +244,16 @@ let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
 
 if (!pickWorkplace()) { return }
 let workplace = building(memory.workplaceId)
-// Kept for when it is out of sight; one picked out of sight is where I last saw it.
-if (workplace != null) { memory.at = {x: workplace.x, y: workplace.y} }
+// Where I stand at it: the footprint tile with the fewest of us (Spreading
+// over the footprint), picked when I set out and again whenever I stand idle
+// there; kept while I hold my order or am away, so I neither drift nor lose
+// my spot. One picked out of sight is where I last saw it, until I see it.
+// Already at work there, I keep the tile I stand on.
+if (memory.at == null && me.order != null && me.order.kind == "workAt") {
+  memory.at = {x: me.x, y: me.y}
+} else if (me.order == null && workplace != null && memory.carry == null && memory.food == null) {
+  memory.at = crewTile(workplace)
+}
 if (memory.at == null && params.workplace != null) {
   memory.at = {x: params.workplace.x, y: params.workplace.y}
 }
@@ -481,7 +490,8 @@ ${LOG_TEXT}
 // back. With none there we just build. Below params.foodAt units of Food on
 // me I get Food up to params.foodTake at params.source, or the nearest
 // storage of my realm with Food, and come back; fetching materials tops my
-// food up to foodTake too. foodAt 0 turns getting food off.
+// food up to foodTake too. foodAt 0 turns getting food off. At the site we
+// stand spread over its footprint.
 param site: building // the construction site to join; none: the one I stand on
 param source: storage // where materials come from; a carriage too
 ${FOOD_PARAMS}
@@ -496,6 +506,7 @@ if (me.order != null && me.order.kind != "build") { // on my way
 let site = null
 if (memory.siteId != null) { site = building(memory.siteId) }
 if (endIfDone(site)) { return }
+spreadOut(site)
 if (walkBack()) { return }
 if (site != null && bringCarried(site)) { return }
 // With no Food anywhere, I build on.
@@ -523,7 +534,7 @@ fn pickSite() {
     return false
   }
   memory.building = join.kind
-  memory.at = {x: join.x, y: join.y}
+  memory.at = crewTile(join)
   memory.siteId = join.id
   log("joining the site of " + placeName(join))
   return true
@@ -539,6 +550,18 @@ fn endIfDone(site) {
   else { log("the " + site.kind + " is finished") }
   end()
   return true
+}
+
+// Where I stand at the site: the footprint tile with the fewest of us
+// (Spreading over the footprint), picked whenever I stand idle and not away;
+// a site another of us laid out at memory.at counts too. Laying out a new
+// site keeps the picked tile.
+fn spreadOut(site) {
+  if (me.order != null || memory.fetch != null || memory.food != null) { return }
+  if (site == null) { site = buildingAt(memory.at.x, memory.at.y) }
+  if (site != null && site.site != null && site.kind == memory.building) {
+    memory.at = crewTile(site)
+  }
 }
 
 // Not there yet, or away fetching or getting food: walk to the site, once;
@@ -819,8 +842,9 @@ ${LOG_TEXT}
 // horses memory.horseIds until their foal is born; then end. Without a pair
 // given, I pick one in the stable: a pair whose breeding it keeps first,
 // else two fed horses of my realm in it; with none, or no stable, I end.
-// Away from the stable, walk there first. Before starting, take Food for
-// the days of tending from the stable, if it has some.
+// Away from the stable, walk there first; at it we stand spread over its
+// footprint. Before starting, take Food for the days of tending from the
+// stable, if it has some.
 param stable: storage // the stable to breed in; none: the one I stand in
 let needFood = ${BREED_FOOD} // Food I take along for my meals while tending
 
@@ -848,6 +872,7 @@ if (stable == null) {
 }
 if (!pickPair(stable)) { return }
 if (takeFood()) { return }
+if (walkToStable(stable)) { return }
 startBreeding(stable)
 
 // Which two: those given, else picked once I stand in the stable. False while
@@ -855,10 +880,7 @@ startBreeding(stable)
 fn pickPair(stable) {
   if (memory.horseIds != null) { return true }
   let here = buildingAt(me.x, me.y)
-  if ((here == null || here.id != stable.id) && memory.walked != true) {
-    walkToStable(stable)
-    return false
-  }
+  if ((here == null || here.id != stable.id) && walkToStable(stable)) { return false }
   let pair = breedingPair(stable)
   if (pair == null) {
     end("no two fed horses here")
@@ -891,18 +913,24 @@ fn startBreeding(stable) {
     log("breeding two horses in " + placeName(stable))
     return
   }
-  if (problem == "not standing at that stable" && memory.walked != true) {
-    walkToStable(stable)
-    return
-  }
+  if (problem == "not standing at that stable" && walkToStable(stable)) { return }
   log(problem)
   end()
 }
 
+// Where I stand at it: the footprint tile with the fewest of us (Spreading
+// over the footprint), the nearest on ties. I walk there once, kept as
+// memory.at; still away from it after that, breed says why. True while I
+// set out.
 fn walkToStable(stable) {
+  if (memory.walked == true) { return false }
+  let at = crewTile(stable)
+  if (me.x == at.x && me.y == at.y) { return false }
   memory.walked = true
-  if (walkTo(stable.x, stable.y) == null) { wait() } // until I am there
+  memory.at = at
+  if (walkTo(at.x, at.y) == null) { wait() } // until I am there
   log("walking to " + placeName(stable))
+  return true
 }
 
 ${PICK_STABLE}

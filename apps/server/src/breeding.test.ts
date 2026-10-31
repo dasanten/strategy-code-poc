@@ -18,6 +18,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { foalStats } from './breeding.js'
 import { eventsFor } from './events.js'
+import { HORSE_NAMES } from './horses.js'
 import { breedOrdersSound, checkInvariants, keptBreedingsSound } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -77,6 +78,7 @@ function horse(
     y,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    name: 'Rowan',
     stats: { ...stats },
     bornAt: 0,
   }
@@ -110,13 +112,20 @@ describe('breeding horses', () => {
     const foal = world.horses[2]!
     expect(foal).toMatchObject({ realmId: 'r1', x: 8, y: 8, hunger: MAX_HUNGER })
     expect(foal.bornAt).toBe(world.tick - 1)
+    // A foal gets a name from the pool like any new horse (`CONTEXT.md`: Horse name).
+    expect(HORSE_NAMES).toContain(foal.name)
     // Parents average 10 Speed, 10 Strength, 11 Endurance.
     const average = { speed: 10, strength: 10, endurance: 11 }
     for (const s of HORSE_STAT_NAMES)
       expect(Math.abs(foal.stats[s] - average[s])).toBeLessThanOrEqual(FOAL_STAT_SPREAD)
     expect(w1.order).toBeNull()
     expect(eventsFor(world, 7)).toContainEqual(
-      expect.objectContaining({ kind: 'foaled', horseId: foal.id, stableId: 's1' }),
+      expect.objectContaining({
+        kind: 'foaled',
+        horseId: foal.id,
+        stableId: 's1',
+        name: foal.name,
+      }),
     )
     expect(checkInvariants(world, terrain)).toEqual([])
   })

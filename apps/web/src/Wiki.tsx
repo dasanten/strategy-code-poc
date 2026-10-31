@@ -68,6 +68,7 @@ import {
   HQ_FLOOR_FACTOR,
   HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
+  HORSE_NAME_MAX_LENGTH,
   HUNGRY_HORSE_PACE,
   HORSE_ENDURANCE_EFFECT,
   HORSE_ENDURANCE_LIMIT,
@@ -981,11 +982,13 @@ export function Wiki() {
           does (a city's, or an outpost storage). Building goes in proportion to Strength, plus{' '}
           {pct(CONSTRUCTION_SKILL_EFFECT)} for each point of Construction (at most{' '}
           {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
-          more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
-          leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a building's materials on the tile (all of an
-          unfinished site's). A road over a mountain can't be torn down while a carriage or a ridden
-          horse stands on it: the work waits until they leave. A horse left there unridden can't be
-          ridden off a road.
+          more builders finish sooner. A crew sent to work, build or breed at a building stands
+          spread over its footprint: each goes to the tile with the fewest of the crew on it, the
+          nearest on ties, and which tile they stand on changes nothing else. Tearing down takes{' '}
+          {pct(TEARDOWN_WORK_SHARE)} of the work and leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a
+          building's materials on the tile (all of an unfinished site's). A road over a mountain
+          can't be torn down while a carriage or a ridden horse stands on it: the work waits until
+          they leave. A horse left there unridden can't be ridden off a road.
         </p>
         <p>
           Tear down can be run directly too, with Run script or as a queue step: they tear down the
@@ -1182,6 +1185,25 @@ export function Wiki() {
           stable first, else two fed horses of your realm in it. Giving Breed horses in a stable
           fills the param; it is never kept between starts. With no stable there, or no two fed
           horses in it, Breed horses ends and your realm log says why.
+        </p>
+        <h3>Horse names</h3>
+        <p>
+          Every horse has a name, given by the game when it comes into being: in a starting city, at
+          the Trade Organization, as a foal, or from the Horse grant or offer. You can rename any
+          horse of your realm, free and at once, from anywhere: with <strong>Rename</strong> on the
+          card of the tile it stands on, or a script's <code>renameHorse(horse, name)</code>. A name
+          takes up to {num(HORSE_NAME_MAX_LENGTH)} characters and need not be unique. The name shows
+          on the tile card, the stable, the carriage it pulls, its rider's card and the realm log,
+          and scripts see it as <code>horse.name</code>.
+        </p>
+        <h3>Horses drawer</h3>
+        <p>
+          The <strong>Horses</strong> button on the tool rail (in the menu on a phone) opens a list
+          of your realm's horses, like the Residents drawer does for residents. They are grouped by
+          where they stand: under each stable they are in (by its city), then Hitched to a carriage,
+          Ridden and Loose. Each row shows the horse's name and where it is (“Pulling the carriage
+          Ann drives”), its Speed, Strength and Endurance, its age, and its health and hunger. Click
+          a row to centre the map on the horse and open the card of its tile, or of its rider.
         </p>
         <h3>Horse stats</h3>
         <p>

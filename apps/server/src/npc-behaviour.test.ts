@@ -1,5 +1,6 @@
 import {
   FOOTPRINT,
+  isAt,
   OWN_FOOD,
   WORK_FOOD_KEPT,
   NPC_VILLAGE,
@@ -128,14 +129,16 @@ describe('NPC cities work and eat', () => {
     // The city decides in its planning pass (ADR 0016) and hands the jobs out in the tick.
     planCity(world, city)
     stepNpcCities(world, terrain.size)
-    // On the Work default, which walks them there.
+    // On the Work default, which walks them to the farm (its anchor tile, then a tile of its
+    // footprint once there).
     expect(adult!.script).toEqual({
       scriptId: 0,
       task: 'work',
       memory: { workplaceId: farm.id, at: { x: farm.x, y: farm.y } },
     })
     runNpcScripts(world, terrain)
-    expect(adult!.order).toMatchObject({ kind: 'walkTo', target: { x: farm.x, y: farm.y } })
+    expect(adult!.order).toMatchObject({ kind: 'walkTo' })
+    expect(isAt((adult!.order as { target: { x: number; y: number } }).target, farm)).toBe(true)
     expect(child!.order).toBeNull()
   })
 
@@ -162,7 +165,8 @@ describe('NPC cities work and eat', () => {
     stepNpcCities(world, terrain.size)
     stepNpcCities(world, terrain.size)
     runNpcScripts(world, terrain)
-    expect(r.order).toMatchObject({ kind: 'walkTo', target: { x: farm.x, y: farm.y } })
+    expect(r.order).toMatchObject({ kind: 'walkTo' })
+    expect(isAt((r.order as { target: { x: number; y: number } }).target, farm)).toBe(true)
   })
 
   it('a Player’s city whose Leader died runs on its own, Player-only orders ended', () => {

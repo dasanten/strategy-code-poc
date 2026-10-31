@@ -1548,13 +1548,16 @@ export type RealmEventWhat =
   | { kind: 'born'; residentId: string; name: string; parents: [string, string] }
   /** A child reached `ADULT_AGE` and can now work (`CONTEXT.md`: Child, Aging). */
   | { kind: 'grownUp'; residentId: string; name: string }
-  /** One of the realm's horses starved to death (`CONTEXT.md`: Horse). */
-  | { kind: 'horseDied'; horseId: string }
   /**
-   * A ridden horse of the realm went hungry and its rider, `name`, carries no Food to spare for it
-   * (`CONTEXT.md`: Riding).
+   * One of the realm's horses, `name`, starved to death (`CONTEXT.md`: Horse). Entries from before
+   * horses had names (`CONTEXT.md`: Horse name) have none.
    */
-  | { kind: 'horseHungry'; horseId: string; residentId: string; name: string }
+  | { kind: 'horseDied'; horseId: string; name?: string }
+  /**
+   * A ridden horse of the realm, `horseName`, went hungry and its rider, `name`, carries no Food
+   * to spare for it (`CONTEXT.md`: Riding). Entries from before horses had names have no `horseName`.
+   */
+  | { kind: 'horseHungry'; horseId: string; residentId: string; name: string; horseName?: string }
   /**
    * The one-time Horse grant (`CONTEXT.md`: Horse grant) gave the realm `horseIds`: in its stable
    * at (`x`, `y`), or, with no stable, on the ground next to the storage of `city` or next to the
@@ -1580,8 +1583,11 @@ export type RealmEventWhat =
       x: number
       y: number
     }
-  /** Two of the realm's horses had a foal at a stable (`CONTEXT.md`: Stable). */
-  | { kind: 'foaled'; horseId: string; stableId: string }
+  /**
+   * Two of the realm's horses had a foal, `name`, at a stable (`CONTEXT.md`: Stable). Entries from
+   * before horses had names have none.
+   */
+  | { kind: 'foaled'; horseId: string; stableId: string; name?: string }
   /** An alliance leader invited the realm to join their alliance (`CONTEXT.md`: Alliance leader). */
   | { kind: 'allianceInvited'; allianceId: string; name: string }
   /**
@@ -1941,6 +1947,11 @@ export interface ConstructionSite {
  */
 export interface Horse {
   id: string
+  /**
+   * Its name (`CONTEXT.md`: Horse name): given by the game when it came into being, from a pool
+   * apart from the residents'; the Player may rename a horse of their realm. Need not be unique.
+   */
+  name: string
   /** The realm it belongs to; null for one of an NPC city (`cityId`) or of nobody. */
   realmId: string | null
   /**

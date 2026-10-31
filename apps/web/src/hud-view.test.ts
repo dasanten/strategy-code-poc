@@ -18,6 +18,7 @@ describe('drawers', () => {
     const labels = DRAWERS.map((d) => d.label)
     for (const tool of [
       'Residents',
+      'Horses',
       'Armies',
       'Contracts',
       'Alliance',

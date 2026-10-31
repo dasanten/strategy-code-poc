@@ -554,6 +554,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     description: 'A horse, as the Player sees it.',
     fields: [
       id('horse'),
+      field('name', 'string', 'Its name, given by the game or its Player.'),
       field('realmId', 'string', 'The realm it belongs to.', 'for one of an NPC city or of nobody'),
       field('cityId', 'string', 'The NPC city it belongs to.', 'for one of a realm or of nobody'),
       x,

@@ -113,7 +113,7 @@ import { cityPlansSound, npcFarmersKept, tradeOrgSendsNoOne } from './npc-plan.j
 import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
 import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
-import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
+import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
 import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
@@ -1915,6 +1915,7 @@ export const worldInvariants: Invariant[] = [
   leadersServeNoOne,
   residentNamesWellFormed,
   cityNamesWellFormed,
+  horseNamesWellFormed,
   horseOffersOnce,
   buildingsInPlace,
   citiesFromBuildings,

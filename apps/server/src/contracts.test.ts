@@ -402,6 +402,7 @@ describe('contracts when a Leader dies', () => {
       y: 40,
       hunger: MAX_HUNGER,
       health: MAX_HEALTH,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })

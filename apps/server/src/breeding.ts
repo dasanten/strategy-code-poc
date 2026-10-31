@@ -20,6 +20,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
+import { horseName } from './horses.js'
 import { orderedResident } from './order-sender.js'
 import type { OrderKind, OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
@@ -159,23 +160,31 @@ export function resolveBreeding(world: WorldState, actions: BreedAction[], size?
     const foal = newFoal(world, stable, mother!, father!)
     world.horses.push(foal)
     foals.push(foal)
-    recordEvent(world, foal.realmId, { kind: 'foaled', horseId: foal.id, stableId: stable.id })
+    recordEvent(world, foal.realmId, {
+      kind: 'foaled',
+      horseId: foal.id,
+      stableId: stable.id,
+      name: foal.name,
+    })
   }
   return foals
 }
 
-/** A foal of the two horses, born now in the stable, fed and healthy. */
+/** A foal of the two horses, born now in the stable, fed and healthy, with a name from the pool. */
 function newFoal(world: WorldState, stable: Building, a: Horse, b: Horse): Horse {
   const id = newId(world, 'horse')
+  const rand = mulberry32(hash(`${world.seed}:foal:${id}`))
+  const stats = foalStats(rand, a.stats, b.stats)
   return {
     id,
+    name: horseName(rand),
     realmId: a.realmId,
     cityId: a.cityId,
     x: stable.x,
     y: stable.y,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
-    stats: foalStats(mulberry32(hash(`${world.seed}:foal:${id}`)), a.stats, b.stats),
+    stats,
     bornAt: world.tick,
   }
 }

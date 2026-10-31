@@ -9,6 +9,8 @@ import {
   TICKS_PER_GAME_DAY,
   Terrain,
   WALK_TICKS_PER_TILE,
+  buildingPile,
+  isAt,
   pileAt,
   setOutFood,
   type Building,
@@ -383,7 +385,8 @@ describe('setting out for a workplace in an NPC city', () => {
       )
       for (const r of crew) putToWork(r, camp)
       const walking = new Walking(terrain)
-      const atCamp = (r: Resident) => r.x === camp.x && r.y === camp.y
+      // At the camp: on any tile of its footprint (Spreading over the footprint).
+      const atCamp = (r: Resident) => isAt(r, camp, terrain.size)
       let arrived = false
       let lastPileFood = 0
       let trips = 0
@@ -407,7 +410,7 @@ describe('setting out for a workplace in an NPC city', () => {
           here.set(r.id, atCamp(r))
         }
         // A trip with the crew's Food: the pile's Food goes up (it only ever goes down otherwise).
-        const pileFood = pileAt(world, camp.x, camp.y)?.goods.food ?? 0
+        const pileFood = buildingPile(world, camp)?.goods.food ?? 0
         if (pileFood > lastPileFood) trips++
         lastPileFood = pileFood
         if (world.tick % TICKS_PER_GAME_DAY === 0)
@@ -422,7 +425,7 @@ describe('setting out for a workplace in an NPC city', () => {
       expect(workers.length + crew.filter((r) => !r.script).length).toBe(6)
       expect(crew.filter((r) => atCamp(r) && r.order?.kind === 'workAt').length).toBeGreaterThan(4)
       // The pile keeps about crewFood: the carrier tops it up, never heaps it.
-      expect(pileAt(world, camp.x, camp.y)?.goods.food ?? 0).toBeLessThanOrEqual(CREW_FOOD)
+      expect(buildingPile(world, camp)?.goods.food ?? 0).toBeLessThanOrEqual(CREW_FOOD)
       expect((storage.stock?.wood ?? 0) > 0).toBe(true)
     },
   )

@@ -157,6 +157,7 @@ describe('building a carriage', () => {
       y: 5,
       hunger: MAX_HUNGER,
       health: 100,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: world.tick,
     })
