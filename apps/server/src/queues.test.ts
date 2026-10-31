@@ -357,7 +357,6 @@ describe('planning ahead', () => {
 
   it('turns down a step whose place can’t make sense', () => {
     const s = farOff()
-    const work = (workplaceId: string) => ({ order: { kind: 'task', task: 'work', workplaceId } })
     expect(s.reason('queue', [walk(1, 1), walk(SIZE, 1)])).toBe('step 2: that tile is off the map')
     const road = { kind: 'roadLine', from: { x: 1, y: 1 }, to: { x: 1, y: -1 } }
     expect(s.reason('queue', [{ order: road }])).toBe('step 1: that tile is off the map')
