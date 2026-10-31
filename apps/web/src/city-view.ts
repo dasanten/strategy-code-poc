@@ -361,3 +361,75 @@ export function previewNpcTrade(
     sell: { units: sellUnits, coins: sellUnits * line.buy },
   }
 }
+
+/** One line of what the Player can buy or sell at a warehouse or storage. */
+export interface TradeLine {
+  good: PricedGood
+  /** Units it would sell or take; missing when the Player can't see them, or it takes any. */
+  units?: number
+  /** Coins for each unit. */
+  price: number
+}
+
+/**
+ * A warehouse's or an NPC city's storage's prices from the Player's side (`CONTEXT.md`: Trade
+ * section): what they **can buy** there and what they **can sell**.
+ */
+export interface TradeLists {
+  canBuy: TradeLine[]
+  canSell: TradeLine[]
+  /** An NPC city takes nothing but what it lists in `canSell`. */
+  takesOnlyListed: boolean
+}
+
+/**
+ * What the Player can buy and sell at a warehouse or an NPC city's storage, at the prices the
+ * server names. A Trade Org warehouse lists every good both ways: the units it holds for sale, and
+ * any amount it takes. An NPC city lists in `canBuy` only its surplus that this storage holds, and
+ * in `canSell` only what it is short of, as far as the coins in this storage go (`CONTEXT.md`:
+ * Trading with an NPC city). Units are only worked out from what the Player sees inside the
+ * building (`CONTEXT.md`: Seeing inside a storage); without that, only the price.
+ */
+export function tradeLists(w: WarehouseView, seen: { buildings: Building[] }): TradeLists {
+  if (w.kind !== 'storage') {
+    return {
+      canBuy: w.prices.map((p) => ({
+        good: p.good,
+        ...(p.stock !== undefined ? { units: p.stock } : {}),
+        price: p.sell,
+      })),
+      canSell: w.prices.map((p) => ({ good: p.good, price: p.buy })),
+      takesOnlyListed: false,
+    }
+  }
+  const stock = seen.buildings.find((b) => b.id === w.id)?.stock
+  const lines = w.prices as Shown<NpcCityPrice>[]
+  const coins = stock?.coins ?? 0
+  return {
+    canBuy: lines
+      .filter((p) => p.forSale > 0)
+      .map((p) => ({
+        good: p.good,
+        ...(stock ? { units: Math.min(p.forSale, stock[p.good] ?? 0) } : {}),
+        price: p.sell,
+      }))
+      .filter((l) => l.units !== 0),
+    canSell: lines
+      .filter((p) => p.wanted > 0)
+      .map((p) => ({
+        good: p.good,
+        ...(stock
+          ? { units: p.buy > 0 ? Math.min(p.wanted, Math.floor(coins / p.buy)) : p.wanted }
+          : {}),
+        price: p.buy,
+      }))
+      .filter((l) => l.units !== 0),
+    takesOnlyListed: true,
+  }
+}
+
+/** The goods that can be traded at all at a warehouse or storage, in the order of its prices. */
+export function tradedGoods(w: WarehouseView, lists: TradeLists): PricedGood[] {
+  const goods = new Set([...lists.canBuy, ...lists.canSell].map((l) => l.good))
+  return w.prices.map((p) => p.good).filter((g) => goods.has(g))
+}
