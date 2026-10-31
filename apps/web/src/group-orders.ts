@@ -56,6 +56,11 @@ export type GroupOrder =
   /** Each mounts a free horse of the realm on their tile, a different one each (`CONTEXT.md`: Riding). */
   | { kind: 'mount' }
   | { kind: 'dismount' }
+  /**
+   * Each unhitches the horse from a carriage of the realm on their tile, a different one each
+   * (`CONTEXT.md`: Hitched horse).
+   */
+  | { kind: 'unhitch' }
   /** Each drives the carriage on their tile there, a different one each. */
   | { kind: 'drive'; x: number; y: number }
   /**
@@ -94,8 +99,8 @@ export interface Place {
 export interface GroupSeen {
   /** Horses of the realm that pull no carriage and nobody rides, to mount. */
   horses?: readonly Pick<Horse, 'id' | 'x' | 'y'>[]
-  /** The realm's carriages, to drive or haul with. */
-  carriages?: readonly Pick<Carriage, 'id' | 'x' | 'y'>[]
+  /** The realm's carriages, to drive or haul with, and whether a horse is hitched to unhitch. */
+  carriages?: readonly (Pick<Carriage, 'id' | 'x' | 'y'> & Partial<Pick<Carriage, 'horseId'>>)[]
   /** The buildings in sight, to find the stable each one stands in. */
   buildings?: readonly Pick<Building, 'id' | 'kind' | 'x' | 'y' | 'site'>[]
 }
@@ -146,6 +151,7 @@ const ADULTS_ONLY: GroupOrder['kind'][] = [
   'breed',
   'drive',
   'haul',
+  'unhitch',
 ]
 
 /** Orders one carrying a child can't take (`CONTEXT.md`: Carrying). */
@@ -202,6 +208,9 @@ export function groupSkip(
       break
     case 'dismount':
       if (r.riding === undefined) return 'not riding'
+      break
+    case 'unhitch':
+      if (!onTile(r, seen.carriages).some((k) => k.horseId)) return 'no hitched horse here'
       break
     case 'drive':
     case 'haul':
@@ -393,6 +402,15 @@ export function groupRequests(
       case 'dismount':
         send(r, { kind: 'dismount' })
         break
+      case 'unhitch': {
+        const carriage = take(
+          r,
+          (seen.carriages ?? []).filter((k) => k.horseId),
+        )
+        if (carriage) send(r, { kind: 'unhitch', carriageId: carriage.id })
+        else skip(r, 'another of them unhitches the horse here')
+        break
+      }
       case 'drive':
       case 'haul': {
         const carriage = take(r, seen.carriages ?? [])
@@ -507,6 +525,7 @@ export type GroupButton =
   | 'dismount'
   | 'board'
   | 'getOff'
+  | 'unhitch'
   | 'drive'
   | 'haul'
   | 'work'
@@ -536,6 +555,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'dismount', label: 'Dismount', group: 'move' },
   { id: 'board', label: 'Board carriage', group: 'move' },
   { id: 'getOff', label: 'Get off', group: 'move' },
+  { id: 'unhitch', label: 'Unhitch horses', group: 'move' },
   { id: 'drive', label: 'Drive carriages to', group: 'move' },
   { id: 'haul', label: 'Haul route…', group: 'move' },
   { id: 'work', label: 'Work', group: 'work' },
@@ -570,6 +590,7 @@ export const GROUP_COUNTERPARTS: Record<
   stop: ['stop'],
   ride: ['mount', 'dismount'],
   board: ['board', 'getOff'],
+  unhitch: ['unhitch'],
   drive: ['drive'],
   haul: ['haul'],
   work: ['work'],

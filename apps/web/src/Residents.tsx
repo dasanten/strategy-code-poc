@@ -667,6 +667,7 @@ export function GroupCard({
     store: { kind: 'store' },
     drop: { kind: 'drop' },
     getOff: { kind: 'getOff' },
+    unhitch: { kind: 'unhitch' },
   }
   const orderButton = (id: GroupButton, label: string) => {
     // One Board button for each carriage some of them stand on; with none, nobody can board.
@@ -1052,6 +1053,8 @@ export function ResidentCard({
   horseToRide,
   carriageToBoard,
   onBoard,
+  carriageToUnhitch,
+  onUnhitch,
   onRide,
   scripts,
   buildings = [],
@@ -1105,6 +1108,13 @@ export function ResidentCard({
   carriageToBoard: { id: string } | undefined
   /** Orders the resident to board that carriage, or with none to get off the one they are on. */
   onBoard: (carriageId?: string) => void
+  /**
+   * A carriage of the realm on the resident's tile with a horse hitched to it, to unhitch
+   * (`CONTEXT.md`: Hitched horse).
+   */
+  carriageToUnhitch: { id: string } | undefined
+  /** Orders the resident to unhitch the horse from that carriage. */
+  onUnhitch: (carriageId: string) => void
   /** Orders the resident to mount that horse, or with none to dismount. */
   onRide: (horseId?: string) => void
   /** The Player's script library, to pick a script to run. */
@@ -1249,6 +1259,7 @@ export function ResidentCard({
     aboard: r.aboard !== undefined,
     driving: r.order?.kind === 'drive' || r.order?.kind === 'haul',
     carriageToBoard: !!carriageToBoard,
+    carriageToUnhitch: !!carriageToUnhitch,
     carrying: !!r.carrying,
     carries: carried.length > 0,
   })
@@ -1266,6 +1277,7 @@ export function ResidentCard({
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
     if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
+    if (a.id === 'unhitch' && carriageToUnhitch) onUnhitch(carriageToUnhitch.id)
     if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
   }

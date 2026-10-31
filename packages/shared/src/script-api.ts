@@ -286,6 +286,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   ),
   action('dismount', [], 'Get off the horse I ride; it stays on my tile.'),
   action(
+    'unhitch',
+    ['carriage'],
+    'Unhitch the horse from a carriage of my realm on my tile, by it or its id; the horse stands free there, and a driver stops.',
+  ),
+  action(
     'board',
     ['carriageId'],
     'Get on a carriage of my realm on my tile as a passenger, and ride along with it.',

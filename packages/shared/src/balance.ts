@@ -113,7 +113,7 @@ const CHILDHOOD_TICKS = ADULT_AGE * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY
  * A resident's age in game years at the given tick: each year up to `ADULT_AGE` takes
  * `CHILD_YEAR_DAYS`, later years a full game year (`CONTEXT.md`: Aging).
  */
-export function ageInYears(resident: Resident, tick: number): number {
+export function ageInYears(resident: Pick<Resident, 'bornAt'>, tick: number): number {
   const lived = tick - resident.bornAt
   if (lived <= CHILDHOOD_TICKS) return lived / (CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY)
   return ADULT_AGE + (lived - CHILDHOOD_TICKS) / TICKS_PER_GAME_YEAR
@@ -126,7 +126,7 @@ export function ticksForAge(age: number): number {
 }
 
 /** Whether a resident is grown up, so they can work, build or take any job (`CONTEXT.md`: Child). */
-export function canWork(resident: Resident, tick: number): boolean {
+export function canWork(resident: Pick<Resident, 'bornAt'>, tick: number): boolean {
   return ageInYears(resident, tick) >= ADULT_AGE
 }
 
@@ -945,12 +945,19 @@ export const CARRIAGE_HALF_LOAD = 2 / 3
 export const DELIVERY_LOAD = CARRIAGE_CAPACITY - CARAVAN_FOOD
 
 /**
- * Food a haul route keeps on board for its horse unless the Player picks another amount, in
- * units (`CONTEXT.md`: Haul route): five game days (two real hours) of the horse's eating, topped
- * up at each stop that has Food. A trip takes real time, so this keeps its real-time length;
- * rounded up to whole units.
+ * The horse's share of the Food a haul route keeps on board, in units (`CONTEXT.md`: Haul route,
+ * Refilling from a carriage): five game days (two real hours) of the horse's eating, rounded up.
+ * The driver refills from the rest of what is kept, never from this.
  */
-export const HAUL_KEEP_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
+export const HAUL_HORSE_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
+
+/**
+ * Food a haul route keeps on board for its horse and its driver unless the Player picks another
+ * amount, in units (`CONTEXT.md`: Haul route, Refilling from a carriage): five game days (two
+ * real hours) of the horse's eating and the driver's, topped up at each stop that has Food. A trip
+ * takes real time, so this keeps its real-time length; rounded up to whole units.
+ */
+export const HAUL_KEEP_FOOD = Math.ceil(5 * (HORSE_FOOD_PER_DAY + FOOD_PER_DAY))
 
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
