@@ -25,7 +25,6 @@ import {
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_HOUR,
-  TICKS_PER_GAME_YEAR,
   TRAINED_CAP_SHARE,
   ageInYears,
   bestWeapon,
@@ -79,6 +78,7 @@ import {
   carryLine,
   GROUP_TABS,
   groupCard,
+  pairingDaysLeft,
   rememberedTabOf,
   rememberTabOf,
   scriptsRun,
@@ -2265,15 +2265,13 @@ function PairBlock({
   const choices = residents.filter(
     (x) => x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick) && !x.carrying,
   )
-  const days = o
-    ? Math.max(0, Math.ceil((o.since + TICKS_PER_GAME_YEAR - tick) / TICKS_PER_GAME_DAY))
-    : 0
+  const days = o ? pairingDaysLeft(o.since, tick) : 0
   const expecting = resident.carrying || partner?.carrying
   return (
     <section className="inspector-block" aria-label="Pairing">
       <div className="panel-head">
         <h3>Pairing</h3>
-        <span className="small muted">one child a year at most</span>
+        <span className="small muted">one child per pair; pair again for another</span>
       </div>
       {expecting ? (
         <p className="muted small">{familyLine(resident, residents, tick)}.</p>

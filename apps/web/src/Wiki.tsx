@@ -660,18 +660,19 @@ export function Wiki() {
           Intellect, twice as fast).
         </p>
         <p>
-          A pair has one child at a time: once {days(PAIRING_WAIT_DAYS)} have passed since they
-          paired, and their city has free housing and a food surplus, one partner carries the child
-          for {days(CARRYING_DAYS)} and doesn't work meanwhile. Children age faster: each year up to{' '}
-          {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a child is grown after{' '}
-          {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a game year. Until
-          grown, a child walks but doesn't work, build, tear down, drive or pair, and of all goods
-          handles only Food: they pick it up, put it down, fetch and store it like anyone, so they
-          can carry their meals. At home a child tops up to their own {num(OWN_FOOD)} Food from the
-          storage, so they leave the city with food on them. Stats decline from age{' '}
-          {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below {pct(DECLINE_FLOOR)};
-          residents die of old age between {num(LIFESPAN_MIN)} and {num(LIFESPAN_MAX)}. A house
-          holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs up to {num(MAX_HEALTH)}.
+          A pair has one child: once {days(PAIRING_WAIT_DAYS)} have passed since they paired, and
+          their city has free housing and a food surplus, one partner carries the child for{' '}
+          {days(CARRYING_DAYS)} and doesn't work meanwhile; for another child, pair them again.
+          Children age faster: each year up to {num(ADULT_AGE)} takes {days(CHILD_YEAR_DAYS)}, so a
+          child is grown after {days(ADULT_AGE * CHILD_YEAR_DAYS)}. From then on a year of age is a
+          game year. Until grown, a child walks but doesn't work, build, tear down, drive or pair,
+          and of all goods handles only Food: they pick it up, put it down, fetch and store it like
+          anyone, so they can carry their meals. At home a child tops up to their own{' '}
+          {num(OWN_FOOD)} Food from the storage, so they leave the city with food on them. Stats
+          decline from age {num(DECLINE_AGE)} by {pct(DECLINE_PER_YEAR)} a year, never below{' '}
+          {pct(DECLINE_FLOOR)}; residents die of old age between {num(LIFESPAN_MIN)} and{' '}
+          {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents; health runs
+          up to {num(MAX_HEALTH)}.
         </p>
       </Section>
 
