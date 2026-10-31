@@ -28,6 +28,9 @@ import {
   previewNpcTrade,
   previewTrade,
   previewTransfer,
+  onTheWay,
+  onTheWayLine,
+  sendable,
   takesTransfers,
   tradedGoods,
   tradeLists,
@@ -35,12 +38,14 @@ import {
   warehousesInSight,
   type BuyView,
   type DeliveryCity,
+  type SendView,
   type TradeLine,
   type TradeLists,
   type TradersView,
   type WarehouseView,
 } from './city-view.js'
 import { GOOD_LABELS } from './Residents.js'
+import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
 
 /**
@@ -71,6 +76,8 @@ export function CityInspector({
   onBuyCity,
   onTrade,
   onTransfer,
+  onSend,
+  arrivesIn,
   directives,
   onBuyOff,
   openId,
@@ -96,6 +103,10 @@ export function CityInspector({
   onTrade: (trade: TradeRequest) => void
   /** Orders a transfer from one of the Player's cities to another realm's city. */
   onTransfer: (transfer: TransferRequest) => void
+  /** Sends one of the Player's residents, or a carriage they drive, to a warehouse or storage. */
+  onSend: (send: SendRequest) => void
+  /** About how many ticks until a resident arrives where they walk, ride or drive (`arrivalTicks`). */
+  arrivesIn: ((r: Resident) => number | undefined) | undefined
   /** The admin directives in force; one naming the Player's realm may be bought off here. */
   directives: DirectiveView[]
   /** Gives the buy-off order for a directive to one of the Player's residents on a warehouse. */
@@ -111,6 +122,14 @@ export function CityInspector({
   scrollTo?: { buildingId: string }
 }) {
   const views = cities.map((c) => describeCity(c, { residents, buildings }, realmId, realms))
+  const sending = (place: WarehouseView): SendingProps => ({
+    sendable: sendable(place, { residents, carriages }, realmId, mapSize, tick),
+    going: onTheWay(place, { residents }, realmId, mapSize).map((r) =>
+      onTheWayLine(r.name, arrivesIn?.(r)),
+    ),
+    onSend: (s) =>
+      onSend({ residentId: s.residentId, carriageId: s.carriageId, x: place.x, y: place.y }),
+  })
   const list = useRef<HTMLElement>(null)
   useEffect(() => {
     if (!scrollTo) return
@@ -153,6 +172,7 @@ export function CityInspector({
                     warehouse={w}
                     goods={tradedGoods(w, tradeLists(w, { buildings }))}
                     traders={tradersAt(w, { residents, carriages }, realmId)}
+                    sending={sending(w)}
                     deliveryCities={deliveryCities({ cities, buildings }, realmId)}
                     preview={(resident, carriage, good, units) =>
                       previewTrade(
@@ -214,6 +234,7 @@ export function CityInspector({
                     goods={tradedGoods(s, tradeLists(s, { buildings }))}
                     place="storage"
                     traders={tradersAt(s, { residents, carriages }, realmId)}
+                    sending={sending(s)}
                     deliveryCities={[]}
                     preview={(resident, carriage, good, units) =>
                       previewNpcTrade(
@@ -472,6 +493,17 @@ function PriceList({ title, lines, none }: { title: string; lines: TradeLine[]; 
   )
 }
 
+/**
+ * Sending someone to a warehouse or storage to trade (`CONTEXT.md`: Trade section): a walk order
+ * to its tile, or with `carriageId` a drive order for the carriage.
+ */
+export interface SendRequest {
+  residentId: string
+  carriageId: string | undefined
+  x: number
+  y: number
+}
+
 /** A buy or sell order as the inspector gives it (`CONTEXT.md`: Trading with the Trade Organization). */
 export interface TradeRequest {
   side: TradeSide
@@ -488,13 +520,14 @@ export interface TradeRequest {
  * the Player's residents on its tile trades a good from their hands or their carriage there, with
  * a preview of what it would move at its prices. Or, with one of the Player's cities picked, a
  * caravan delivers what is bought to its storage, or picks up what is sold from there, for a fee
- * (`CONTEXT.md`: Delivery). Nobody of theirs there, and it says how to trade.
+ * (`CONTEXT.md`: Delivery). Nobody of theirs there, and it offers to send someone (`Sending`).
  */
 function Trading({
   warehouse,
   goods,
   place = 'warehouse',
   traders,
+  sending,
   deliveryCities,
   preview,
   previewDelivery,
@@ -506,6 +539,8 @@ function Trading({
   /** Where the trade happens: a Trade Org warehouse or an NPC city's storage. */
   place?: 'warehouse' | 'storage'
   traders: TradersView
+  /** Whom to send there while nobody of the Player's is, and who is on the way. */
+  sending: SendingProps
   deliveryCities: DeliveryCity[]
   preview: (
     resident: Resident,
@@ -532,13 +567,7 @@ function Trading({
   const city = deliveryCities.find((c) => c.id === cityId)
   const picked = good !== undefined && goods.includes(good) ? good : goods[0]
   if (!picked) return null
-  if (!resident) {
-    return (
-      <p className="small muted">
-        To trade here, bring a resident to the {place} at ({warehouse.x}, {warehouse.y}).
-      </p>
-    )
-  }
+  if (!resident) return <Sending warehouse={warehouse} place={place} {...sending} />
   const label = GOOD_LABELS[picked].toLowerCase()
   const trade = (side: TradeSide) =>
     onTrade({
@@ -641,6 +670,62 @@ function Trading({
           {sellText}
         </button>
       </p>
+    </div>
+  )
+}
+
+interface SendingProps {
+  /** Whom the Player can send there, nearest first (`sendable`). */
+  sendable: SendView[]
+  /** A line for each of theirs on the way there (`onTheWayLine`). */
+  going: string[]
+  onSend: (send: SendView) => void
+}
+
+/**
+ * With nobody of the Player's at a warehouse or storage (`CONTEXT.md`: Trade section): who is on
+ * the way there, and a picker to send one of their residents, or a carriage, nearest first with
+ * what each carries.
+ */
+function Sending({
+  warehouse,
+  place,
+  sendable,
+  going,
+  onSend,
+}: SendingProps & { warehouse: WarehouseView; place: 'warehouse' | 'storage' }) {
+  const [key, setKey] = useState('')
+  const keyOf = (s: SendView) => `${s.residentId}:${s.carriageId ?? ''}`
+  const picked = sendable.find((s) => keyOf(s) === key) ?? sendable[0]
+  return (
+    <div className="warehouse-sending" aria-label="Sending a trader">
+      {going.length > 0 ? (
+        going.map((line) => <p key={line}>{line}.</p>)
+      ) : (
+        <p className="small muted">
+          Nobody of yours is at the {place} at ({warehouse.x}, {warehouse.y}) to trade.
+        </p>
+      )}
+      {picked ? (
+        <p>
+          <label>
+            Send{' '}
+            <select value={keyOf(picked)} onChange={(e) => setKey(e.target.value)}>
+              {sendable.map((s) => (
+                <option key={keyOf(s)} value={keyOf(s)}>
+                  {s.name}, {s.tiles} {s.tiles === 1 ? 'tile' : 'tiles'} away,{' '}
+                  {carriedShort(s.carries, GOOD_LABELS).toLowerCase()}
+                </option>
+              ))}
+            </select>
+          </label>{' '}
+          <button type="button" onClick={() => onSend(picked)}>
+            Send
+          </button>
+        </p>
+      ) : (
+        <p className="small muted">Nobody of yours in sight to send.</p>
+      )}
     </div>
   )
 }
