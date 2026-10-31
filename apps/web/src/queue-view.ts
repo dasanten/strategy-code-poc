@@ -19,13 +19,9 @@ import {
   type TrainingSubject,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
-<<<<<<< HEAD
 import { GOOD_LABELS, subjectLabel } from './Residents.js'
-=======
-import { GOOD_LABELS } from './Residents.js'
 import { gonePlace } from './saved-queues.js'
 import { timedItems, unroll, withIds, type PlanItem } from './plan-blocks.js'
->>>>>>> origin/dev
 import { realTimeOf } from './wiki-view.js'
 
 /**

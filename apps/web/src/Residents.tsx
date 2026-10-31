@@ -577,17 +577,12 @@ export function QueueBlock({
         })}
       </ol>
       <p className="muted small">
-<<<<<<< HEAD
-        Drag a step or use the arrows to reorder. Working, hauling, teaching and training never end
-        on their own, so they need a duration unless they are last.
-=======
-        Drag a step or use the arrows to reorder. Working and hauling never end on their own, so
+        Drag a step or use the arrows to reorder. Working, hauling, teaching and training never end on their own, so
         they need a duration unless they are last. Tap a step to pick it (Shift for a range), then
         Copy; Paste puts the copies after the picked step. Repeat wraps the picked steps in a block
         done so many times in a row; giving the queue makes it that many copies, up to{' '}
         {QUEUE_MAX_STEPS} steps in all. Save keeps the steps in this browser under a name; Load adds
         a saved queue’s steps at the end.
->>>>>>> origin/dev
       </p>
     </section>
   )
