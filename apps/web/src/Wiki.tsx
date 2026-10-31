@@ -1066,6 +1066,15 @@ export function Wiki() {
           on the tile card, the stable, the carriage it pulls, its rider's card and the realm log,
           and scripts see it as <code>horse.name</code>.
         </p>
+        <h3>Horses drawer</h3>
+        <p>
+          The <strong>Horses</strong> button on the tool rail (in the menu on a phone) opens a list
+          of your realm's horses, like the Residents drawer does for residents. They are grouped by
+          where they stand: under each stable they are in (by its city), then Hitched to a carriage,
+          Ridden and Loose. Each row shows the horse's name and where it is (“Pulling the carriage
+          Ann drives”), its Speed, Strength and Endurance, its age, and its health and hunger. Click
+          a row to centre the map on the horse and open the card of its tile, or of its rider.
+        </p>
         <h3>Horse stats</h3>
         <p>
           Every horse has Speed, Strength and Endurance, and an age. A new horse's stats are whole

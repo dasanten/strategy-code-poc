@@ -54,6 +54,8 @@ import {
 } from './Hud.js'
 import type { Covered } from './map/camera.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
+import { groupHorses } from './horses-view.js'
+import { HorsesList } from './Horses.js'
 import { Founding } from './Founding.js'
 import {
   appendRequest,
@@ -185,6 +187,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
+  // The horse last picked in the Horses drawer, to mark its row among others on the same tile.
+  const [pickedHorseId, setPickedHorseId] = useState<string>()
   // The resident card's open tab and panel, kept here so they stay as the Player picks others;
   // the tab is also remembered in this browser (ADR 0012).
   const [cardSections, setCardSections] = useState<CardSections<ActionId>>(() => ({
@@ -960,6 +964,47 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setSelectedTile(undefined)
               const r = own.find((x) => x.id === id)
               if (r) showOnMap(Math.floor(r.x), Math.floor(r.y))
+            }}
+          />,
+        )}
+      {world &&
+        drawer(
+          'horses',
+          <HorsesList
+            groups={groupHorses(
+              world.horses.filter((h) => h.realmId === world.home.realmId),
+              world.buildings,
+              world.carriages,
+              world.residents,
+              world.cities,
+            )}
+            tick={world.tick}
+            selectedId={(() => {
+              // A horse whose tile card is open, the last one picked here first, or the one the
+              // picked resident rides.
+              const shown = world.horses.filter(
+                (h) =>
+                  h.realmId === world.home.realmId &&
+                  (selectedTile
+                    ? Math.floor(h.x) === selectedTile.x && Math.floor(h.y) === selectedTile.y
+                    : selected?.riding === h.id),
+              )
+              return (shown.find((h) => h.id === pickedHorseId) ?? shown[0])?.id
+            })()}
+            onSelect={(h) => {
+              setPickedHorseId(h.id)
+              const x = Math.floor(h.x)
+              const y = Math.floor(h.y)
+              // A ridden horse shows on its rider's card; any other on its tile's card.
+              const rider = own.find((r) => r.riding === h.id)
+              if (rider) {
+                setSelectedIds([rider.id])
+                setSelectedTile(undefined)
+              } else {
+                setSelectedIds([])
+                setSelectedTile({ x, y })
+              }
+              showOnMap(x, y)
             }}
           />,
         )}
