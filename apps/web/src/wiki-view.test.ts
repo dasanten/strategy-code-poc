@@ -8,6 +8,8 @@ import {
   BUILD_WORK,
   FOOD_PER_DAY,
   RECIPES,
+  SCRIPT_LIBRARY_MAX_SCRIPTS,
+  SCRIPT_MAX_VERSIONS,
   TICKS_PER_GAME_DAY,
   WAREHOUSE_BASE_PRICE,
   WORK_OUTPUT_PER_DAY,
@@ -143,5 +145,13 @@ describe('wiki page', () => {
       BUILD_MATERIALS.house = house
     }
     expect(render()).toContain(`One average farmer feeds ${food / FOOD_PER_DAY} residents`)
+  })
+})
+
+describe('the Wiki’s Scripting budgets topic', () => {
+  it('lists the library caps from the balance (`CONTEXT.md`: Library cap)', () => {
+    const html = render()
+    expect(html).toContain(`holds at most ${SCRIPT_LIBRARY_MAX_SCRIPTS} scripts`)
+    expect(html).toContain(`keeps at most ${SCRIPT_MAX_VERSIONS} versions`)
   })
 })
