@@ -1,6 +1,15 @@
-import type { Building, ResidentOrder, ScriptSummary } from '@csp/shared'
+import {
+  TERRAIN_SPEED,
+  TICKS_PER_GAME_YEAR,
+  Terrain,
+  UNEXPLORED,
+  WALK_TICKS_PER_TILE,
+  type Building,
+  type ResidentOrder,
+  type ScriptSummary,
+} from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { doingLine, type DoingOf } from './doing-view.js'
+import { arrivalOf, doingLine, type DoingOf } from './doing-view.js'
 
 const summary = (id: number, task: ScriptSummary['task']): ScriptSummary => ({
   id,
@@ -204,5 +213,63 @@ describe('doingLine', () => {
     expect(aboard([], { script: { scriptId: 1, building: 'farm' } })).toBe('Aboard a carriage')
     expect(aboard([], { carrying: { since: 0 } })).toBe('Aboard a carriage')
     expect(aboard([], { script: { scriptId: 5, doing: 'Riding along' } })).toBe('Riding along')
+  })
+
+  it('says about when a walker, rider or driver arrives (CONTEXT.md: Doing, Estimates)', () => {
+    const soon = (r: DoingOf, arrives: number) => doingLine(r, { scripts, buildings, arrives })
+    expect(soon({ order: walk }, 180)).toBe('Walking to 4, 5 · about 3 min (3 game hours)')
+    expect(soon({ order: walk, riding: 'h1' }, 30)).toBe('Riding to 4, 5 · under a minute')
+    const drive: ResidentOrder = {
+      kind: 'drive',
+      carriageId: 'k1',
+      target: at,
+      path: [],
+      progress: 0,
+    }
+    expect(soon({ order: drive }, 1200)).toBe('Driving to 4, 5 · about 20 min (a game day)')
+    const hauling = { ...haul, path: [[4, 5]] as [number, number][] }
+    expect(soon({ order: hauling, script: { scriptId: 3 } }, 180)).toBe(
+      'Hauling wood to 4, 5 · about 3 min (3 game hours)',
+    )
+    expect(soon({ order: walk, script: { scriptId: 1, building: 'mine' } }, 180)).toBe(
+      'Working the mine: walking to 4, 5 · about 3 min (3 game hours)',
+    )
+  })
+})
+
+describe('arrivalOf', () => {
+  it('counts a road over any terrain, and unexplored ground as Plains', () => {
+    const stat = { base: 10, trained: 0 }
+    const r = {
+      id: 'r1',
+      name: 'Ada',
+      owner: 'me',
+      cityId: null,
+      x: 0,
+      y: 0,
+      stats: { strength: stat, endurance: stat, agility: stat, intellect: stat },
+      skills: {},
+      health: 100,
+      hunger: 100,
+      bornAt: -30 * TICKS_PER_GAME_YEAR,
+      lifespan: 60,
+      carried: {},
+      order: {
+        kind: 'walkTo' as const,
+        target: { x: 2, y: 0 },
+        path: [
+          [1, 0],
+          [2, 0],
+        ] as [number, number][],
+        progress: 0,
+      },
+    }
+    const road = { id: 'rd', kind: 'road' as const, x: 2, y: 0 } as Building
+    const world = { size: 64, tick: 0, horses: [], carriages: [], buildings: [road] }
+    const ticks = arrivalOf(world, (x) => (x === 1 ? UNEXPLORED : Terrain.Mountain))(r)
+    expect(ticks).toBeCloseTo(
+      WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Plains] +
+        WALK_TICKS_PER_TILE / TERRAIN_SPEED[Terrain.Road],
+    )
   })
 })

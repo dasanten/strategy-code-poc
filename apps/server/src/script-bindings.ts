@@ -196,6 +196,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
     return shown ? untagged(shown) : null
   }
+  // The building as the Player remembers it (`CONTEXT.md`: Last seen); an NPC city has no memory.
+  const lastSaw = (b: Building) =>
+    sender.npcCityId !== undefined
+      ? undefined
+      : world.lastSeen[sender.userId]?.find((e) => e.id === b.id && e.is === 'building')
   let nodes: ResourceNode[] | undefined
   const exploredNodes = () => (nodes ??= world.nodes.filter((n) => context.explored(n.x, n.y)))
 
@@ -238,7 +243,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     outputOf: ([building]) => {
       const id = (building as Record<string, Value> | null)?.id
       const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
-      if (!b || !(ownBuilding(b) || inSight(b))) return []
+      if (!b || !(ownBuilding(b) || inSight(b) || lastSaw(b))) return []
       const recipes = RECIPES[b.kind]
       const goods = recipes
         ? [...new Set(recipes.flatMap((r) => Object.keys(r.output)))]
@@ -355,6 +360,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
   }
 
+  // A building a param names: one of the side's own as it is; another's (a workplace or site
+  // anyone may work) as the Player sees it, else as they last saw it.
+  // The view takes only its own fields, so the memory's tag and `seenAt` stay out.
+  const paramBuilding = (b: Building) => asSeenBuilding(b) ?? lastSaw(b)
+
   // Each param as what it names while that is still the side's and fits its type, or the
   // number typed for a number param, or its default while none is; else null.
   const params = Object.create(null) as ScriptObject
@@ -368,7 +378,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const carriage = target?.is === 'carriage' ? target.carriage : undefined
     params[p.name] =
       target?.is === 'building'
-        ? viewValue(target.building, { view: 'building' })
+        ? viewValue(paramBuilding(target.building), { view: 'building' })
         : viewValue(
             carriage && {
               ...carriage,

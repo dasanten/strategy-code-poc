@@ -217,7 +217,8 @@ export function isScriptParamType(value: unknown): value is ScriptParamType {
 
 /** What each param type accepts, for the Wiki and the editor. */
 export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
-  building: 'One of my realm’s buildings or construction sites.',
+  building:
+    'One of my realm’s buildings, or a workplace or construction site of anyone’s I know: in sight, or as last seen.',
   storage: 'One of my realm’s storages or stables, or one of its carriages.',
   number: 'A whole number of zero or more, typed in; `= n` after the type gives it a default.',
 }

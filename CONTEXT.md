@@ -279,7 +279,7 @@ The shared language of the game. Domain terms only — no implementation details
   Walls count as city buildings, so they grow the area like houses do. A wall can be built along
   a line like a road, skipping tiles that have a wall or gate; a diagonal line closes the way,
   since two wall tiles touching at a corner do (see Step).
-- **House:** a building in a city's area where a few residents live. A city's **free housing** is
+- **House:** a building in a city's area where a fixed number of residents live (the number is in `balance.ts` and the Wiki). A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
   (a palace, a castle) may add room the same way.
 - **Food surplus:** a city has one when its storage holds more Food than all its residents eat
@@ -723,8 +723,9 @@ The shared language of the game. Domain terms only — no implementation details
   one at a time or all those older than the active one at once; the others keep their numbers.
 - **Script parameter:** a value the Player picks for whoever runs a script, declared by a
   `param name: type` line at the top of the script and read there as `params.name`; a `param`
-  line anywhere else is a syntax error. A `building` param holds one of the realm's own buildings
-  or construction sites; a `storage` param one of its storages, stables or carriages; a `number`
+  line anywhere else is a syntax error. A `building` param holds a building the Player knows: a workplace or construction site
+  anywhere in sight or last seen, whoever built it (a workplace has no owner), or any other
+  building of the realm's own; a `storage` param one of its storages, stables or carriages; a `number`
   param a whole number of zero or more, typed into a number field. A `number` param may declare a
   **default** (`param foodAt: number = 3`); `building` and `storage` params can't. The values
   are kept for each resident and each script: giving the task again keeps them, a param removed
@@ -774,6 +775,11 @@ The shared language of the game. Domain terms only — no implementation details
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
   run is named on a small line of its own. A script can say it itself with `doing(text)`: short
   text, kept in its memory, that shows instead until the script says something else or stops.
+  **Estimates:** the Doing line and every meter or countdown that shows progress also say about
+  how long is left, in real time with game time in brackets ("about 3 min (half a game day)"),
+  from the current pace (terrain, horse, hunger, skill), rounded to one coarse unit: walking,
+  driving and riding say when they arrive; breeding, building, tearing down, carrying a child,
+  pairing and growing up say how long is left.
 - **Memory:** the small store a running script or order keeps between ticks. Roles are just
   something a script keeps there. A script can read, never change, the memory of its own
   Player's residents and armies, so residents doing the same task can agree on who does what;
@@ -824,8 +830,9 @@ The shared language of the game. Domain terms only — no implementation details
   and then the step in its place starts. **Planning ahead:** a step may act somewhere else than
   where the resident stands now: the planner's Add step offers every kind of step, and one that
   acts on a place (work, build, fetch, store, pick up, feed the stable, breed, …) is picked on the
-  map, with a walk there put before it. Adding only checks that the step could make sense (the
-  place exists and is the realm's); whether it can start is checked when its turn comes. A step that can't start or ends in a failure is skipped
+  map, with a walk there put before it. Adding only checks that the step could make sense (the place
+  exists as last known, and is the realm's where it must be: a workplace or site anyone may work
+  can be anywhere in sight or last seen); whether it can start is checked when its turn comes. A step that can't start or ends in a failure is skipped
   and noted in the realm log; when none of them can start, the queue ends. Any order that isn't a
   step ends it. Scripts see a resident's queue (which step, and what it is) but can't start or
   change one; their `order` and `script` stay the current step's own.
