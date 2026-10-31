@@ -102,6 +102,7 @@ const STATUS_LABELS: Record<ConnectionStatus, string> = {
   open: 'live',
   connecting: 'connecting…',
   closed: 'offline',
+  throttled: 'too many requests',
 }
 
 export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: number }) {
