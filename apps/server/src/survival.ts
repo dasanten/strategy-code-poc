@@ -30,7 +30,6 @@ import {
   groundAt,
   townHallOf,
   wrapDistance,
-  roadTiles,
   type Good,
   type Realm,
   type Resident,
@@ -50,6 +49,7 @@ import { endContractsOnLeaderDeath } from './contracts.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
 import { caravanFood } from './caravans.js'
 import { countSoldiersKilled } from './directives.js'
+import { worldIndex } from './world-index.js'
 
 /** How far one unit of food fills the hunger meter: a full meter holds `HUNGER_DAYS` of meals. */
 const FILL_PER_FOOD = MAX_HUNGER / (HUNGER_DAYS * FOOD_PER_DAY)
@@ -75,7 +75,7 @@ export function stepSurvival(world: WorldState, terrain: TerrainMap): SurvivalRe
   const starve = MAX_HEALTH / (STARVE_DAYS * TICKS_PER_GAME_DAY)
   const heal = MAX_HEALTH / (HEAL_DAYS * TICKS_PER_GAME_DAY)
   const died: Resident[] = []
-  const roads = roadTiles(world, terrain.size)
+  const roads = worldIndex(world).roads(terrain.size)
 
   for (const r of world.residents) {
     const wasFed = r.hunger > 0

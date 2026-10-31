@@ -12,7 +12,6 @@ import {
   DOING_MAX_LENGTH,
   ageInYears,
   breedingPair,
-  buildingAt,
   buildingRealm,
   directivesFor,
   materialsNeeded,
@@ -53,6 +52,7 @@ import { lastSeenOutOfSight } from './last-seen.js'
 import { plainValue, type PlainValue } from './plain-value.js'
 import { paramTarget } from './script-params.js'
 import { realmOf } from './starting-city.js'
+import { worldIndex } from './world-index.js'
 
 /**
  * The game API bound for a running script (`CONTEXT.md`: Script, Memory, Step budget; ADR 0002).
@@ -225,12 +225,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         .map(asSeen)
     },
     building: ([id]) => {
-      const b = world.buildings.find((x) => x.id === id)
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
       return b ? asSeenBuilding(b) : null
     },
     buildingAt: ([x, y]) => {
       const at = tile(x, y, 'buildingAt')
-      const b = buildingAt(world, at.x, at.y, terrain.size)
+      const b = worldIndex(world).buildingAt(at.x, at.y, terrain.size)
       return b && (ownBuilding(b) || inSight(at)) ? asSeenBuilding(b) : null
     },
     pileAt: ([x, y]) => {
@@ -239,7 +239,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     },
     outputOf: ([building]) => {
       const id = (building as Record<string, Value> | null)?.id
-      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
       if (!b || !(ownBuilding(b) || inSight(b) || lastSaw(b))) return []
       const recipes = RECIPES[b.kind]
       const goods = recipes
@@ -249,7 +249,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     },
     materialsNeeded: ([site]) => {
       const id = (site as Record<string, Value> | null)?.id
-      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
       if (!b?.site || !(ownBuilding(b) || inSight(b))) return []
       return Object.entries(materialsNeeded(b)).map(([good, units]) => ({ good, units }))
     },
@@ -282,7 +282,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = ARMY_SCRIPT_API
     forMe = { armyId: army.id }
     const members = army.memberIds.flatMap((id) => {
-      const r = world.residents.find((x) => x.id === id)
+      const r = worldIndex(world).residentById(id)
       if (!r) return []
       const defenceScriptId = r.owner === side ? r.defenceScriptId : undefined
       return [{ ...r, script: undefined, defenceScriptId, age: ageInYears(r, world.tick) }]
@@ -335,7 +335,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
     queries.breedingPair = ([stable]) => {
       const id = (stable as Record<string, Value> | null)?.id
-      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
       if (!b || b.kind !== 'stable' || side === undefined || !(ownBuilding(b) || inSight(b)))
         return null
       const owner = sender.npcCityId !== undefined ? { cityId: side } : { realmId: side }
