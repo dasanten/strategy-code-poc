@@ -50,7 +50,7 @@ import {
   runResidents,
   workplaceOf,
 } from './npc-plan.js'
-import { holdsBatch } from './npc-chain.js'
+import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
 import { refillSource } from './survival.js'
 import { walkTime } from './walk-time.js'
 
@@ -141,11 +141,14 @@ function runCity(
   const storage = world.buildings.find(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
+  // Materials and a smith's input: a Trade Org city's from its warehouse (`chainStore`).
+  const store = chainStore(world, city)
   const adults = people.filter((r) => canWork(r, world.tick))
   const jobs = plan?.jobs ?? {}
 
-  stopBuildersWhoCantGoOn(world, adults, storage)
+  stopBuildersWhoCantGoOn(world, adults, store)
   for (const r of adults) {
+    sendToWarehouse(world, city, r)
     const o = r.order
     const busy = o?.kind === 'workAt' || o?.kind === 'build' || o?.kind === 'tearDown'
     if (busy && lowOnFood(r) && !refillSource(world, r, size)) stopWork(r)
@@ -193,10 +196,9 @@ function runCity(
     if (!plan || !terrain || !home) return undefined
     if (!checked && plan.project && projectDone(world, plan.project)) {
       const start = performance.now()
-      const next =
-        cityGrows(world, city, adults) && !foodShort(world, city)
-          ? cityProject(world, city, home, terrain)
-          : undefined
+      const next = !foodShort(world, city)
+        ? cityProject(world, city, home, terrain, cityGrows(world, city, adults))
+        : undefined
       if (next) plan.project = next
       else delete plan.project
       planMs += performance.now() - start
@@ -214,7 +216,7 @@ function runCity(
     }
     if (free > 0 && carriesMaterials(r)) {
       const p = project()
-      if (p && takePart(world, r, p, storage, true)) {
+      if (p && takePart(world, r, p, store, true)) {
         free--
         continue
       }
@@ -240,7 +242,7 @@ function runCity(
     if (!soldier && breedHorses(world, city, r)) continue
     if (!soldier && job?.kind === 'build' && free > 0) {
       const p = project()
-      if (p && takePart(world, r, p, storage, false)) {
+      if (p && takePart(world, r, p, store, false)) {
         free--
         continue
       }
@@ -249,7 +251,7 @@ function runCity(
       const place = world.buildings.find((b) => b.id === job.buildingId)
       if (place && !place.site && held.room(place) > 0) {
         const input = inputOf(buildings, job)
-        if (input && !takeInput(world, r, input, storage, size)) {
+        if (input && !takeInput(world, r, input, store, size)) {
           if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
           continue
         }
@@ -328,6 +330,21 @@ function takeSetOutFood(
   const from = { kind: 'storage' as const, storageId: storage.id }
   r.order = { kind: 'pickUp', from, goods: { food: units } }
   return true
+}
+
+/**
+ * A Trade Org city's carrier takes the load to the warehouse that keeps it (`warehouseFor`;
+ * `CONTEXT.md`: Trading post, Trade Org HQ), so less of its stock comes from the floor: the Work
+ * default picked the nearest storage, and before it stores the load the city names the warehouse
+ * instead, as a Player names one by its storage param. A load of Food stays for the storage.
+ */
+function sendToWarehouse(world: WorldState, city: City, r: Resident): void {
+  if (!city.tradeOrg || r.script?.scriptId !== 0) return
+  const carry = r.script.memory.carry
+  if (typeof carry !== 'object' || carry === null || Array.isArray(carry)) return
+  if (carry.stored === true || !Array.isArray(carry.goods)) return
+  const warehouse = warehouseFor(world, city, carry.goods as Good[])
+  if (warehouse) carry.storageId = warehouse.id
 }
 
 /**
