@@ -1,5 +1,6 @@
 import {
   FOOD_PER_DAY,
+  MAP_SIZE,
   MAX_WORKERS,
   NPC_BUILDERS,
   NPC_FOOD_SHORT_DAYS,
@@ -39,6 +40,7 @@ import {
   ownWorkplaces,
   shortGoods,
 } from './npc-chain.js'
+import { planTrader, traderOut } from './npc-trader.js'
 import { hash } from './residents.js'
 
 /*
@@ -195,9 +197,12 @@ export function planCity(
   const jobs: Record<string, CityJob> = {}
   const builders = adults.filter(isBuilder).length
   const spare: Resident[] = []
+  // The trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
+  const trader = city.tradeOrg ? undefined : traderOut(world, plan)
   for (const r of adults) {
     const at = workplaceOf(r)
-    if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
+    if (r.id === trader) jobs[r.id] = { kind: 'trade' }
+    else if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
     else if (r.carrying) jobs[r.id] = { kind: 'idle' }
     else if (isBuilder(r)) jobs[r.id] = { kind: 'build' }
     else if (at !== undefined) jobs[r.id] = workJob(placeById.get(at) ?? at)
@@ -222,6 +227,10 @@ export function planCity(
     }
   }
   shareOut(world, city, adults, jobs, held, spare, plan.project, builders, short)
+  // The Trade Organization sends no trader (`tradeOrgSendsNoOne`).
+  if (!city.tradeOrg && !trader) {
+    planTrader(world, city, plan, adults, jobs, short, terrain?.size ?? MAP_SIZE)
+  }
   plan.jobs = jobs
   return plan
 }

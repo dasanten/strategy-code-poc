@@ -109,6 +109,7 @@ import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js
 import { punishmentsSound } from './trade-org-punishment.js'
 import { hqRingsSound } from './hq-growth.js'
 import { cityPlansSound, npcFarmersKept, tradeOrgSendsNoOne } from './npc-plan.js'
+import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
@@ -1907,6 +1908,7 @@ export const worldInvariants: Invariant[] = [
   cityPlansSound,
   npcFarmersKept,
   tradeOrgSendsNoOne,
+  npcTradersSound,
   lineOrdersSound,
   pathsAreSteps,
   gameDefaultCarriers,
