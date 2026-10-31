@@ -368,6 +368,10 @@ The shared language of the game. Domain terms only — no implementation details
   that is gone is forgotten. A city stays remembered while any of its buildings does. Things that
   move are never remembered. Like explored terrain, it grows only from sight: joining an alliance
   does not hand over what its members saw before, and leaving one keeps what was seen through it.
+  Last seen is brought up to date once every few ticks for each realm, staggered across realms
+  like NPC planning (ADR 0016), not every tick: a building that leaves sight between two refreshes
+  is remembered as it was at the last refresh, up to those few ticks earlier. What is in sight now
+  is unaffected.
 
 ## Military
 
@@ -715,7 +719,11 @@ The shared language of the game. Domain terms only — no implementation details
   **Running a script** is an order for a resident or an army: the script runs once a tick for
   each of them, with its own memory, and can request only what that resident or army could. Any
   other order ends it. A script can hand over to a built-in order for a while and take control
-  back. A script ends itself by calling `end()`: the resident stands idle, and in a queue its next
+  back. **Waiting:** a script may call `wait()`: it is not run again until its current order ends,
+  is replaced, or the resident is struck (Defence script); then it runs every tick again. The
+  game's defaults wait after every walk, store and fetch, so a resident on the move costs no
+  script run; an edited copy of a default behaves like the default. A script ends itself by
+  calling `end()`: the resident stands idle, and in a queue its next
   step starts. `end(reason)` also notes the short reason in the realm log ("Ana stopped Work: no
   workplace on her tile"). The defaults end that way when their target is missing or gone; the
   Build, Tear down and Breed horses defaults also end once the site is finished, the building is
