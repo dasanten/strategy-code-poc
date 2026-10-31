@@ -13,6 +13,7 @@ import {
 
 const BUDGET = 100_000
 const CALL_DEPTH = 50
+const LIMITS = { maxStringLength: 1000, maxListLength: 100, maxObjectKeys: 50 }
 
 /** Runs a script with an `out(value)` global and returns what it printed and the result. */
 function exec(source: string, options: Partial<RunOptions> = {}) {
@@ -24,6 +25,7 @@ function exec(source: string, options: Partial<RunOptions> = {}) {
   const result = run(parse(source), {
     steps: BUDGET,
     maxCallDepth: CALL_DEPTH,
+    limits: LIMITS,
     ...options,
     globals: { out, ...options.globals },
   })
@@ -347,12 +349,22 @@ describe('step budget', () => {
     for (const source of scripts) {
       const program = parse(source)
       for (let steps = 0; steps <= 600; steps += 1) {
-        const result = run(program, { globals: { cost }, steps, maxCallDepth: CALL_DEPTH })
+        const result = run(program, {
+          globals: { cost },
+          steps,
+          maxCallDepth: CALL_DEPTH,
+          limits: LIMITS,
+        })
         expect(result.steps).toBeLessThanOrEqual(steps)
         if (result.status === 'done') {
           // Any bigger budget gives the same result.
           expect(
-            run(program, { globals: { cost }, steps: BUDGET, maxCallDepth: CALL_DEPTH }),
+            run(program, {
+              globals: { cost },
+              steps: BUDGET,
+              maxCallDepth: CALL_DEPTH,
+              limits: LIMITS,
+            }),
           ).toEqual(result)
         } else {
           expect(result.status).toBe('out-of-steps')
@@ -403,7 +415,12 @@ describe('purity and determinism', () => {
     const once = (): [RunResult, ScriptObject] => {
       const memory: ScriptObject = {}
       return [
-        run(program, { globals: { memory }, steps: BUDGET, maxCallDepth: CALL_DEPTH }),
+        run(program, {
+          globals: { memory },
+          steps: BUDGET,
+          maxCallDepth: CALL_DEPTH,
+          limits: LIMITS,
+        }),
         memory,
       ]
     }
@@ -414,7 +431,7 @@ describe('purity and determinism', () => {
     const program = parse(source)
     const before = JSON.stringify(program)
     const globals = Object.freeze({ memory: {} as ScriptObject })
-    run(program, { globals, steps: BUDGET, maxCallDepth: CALL_DEPTH })
+    run(program, { globals, steps: BUDGET, maxCallDepth: CALL_DEPTH, limits: LIMITS })
     expect(JSON.stringify(program)).toBe(before)
     expect(Object.keys(globals)).toEqual(['memory'])
   })
@@ -429,5 +446,89 @@ describe('purity and determinism', () => {
     const memory: ScriptObject = {}
     exec('memory.a = { list: [1, "x", null, true] }', { globals: { memory } })
     expect(JSON.parse(JSON.stringify(memory))).toEqual(memory)
+  })
+})
+
+describe('value limits', () => {
+  const { maxStringLength, maxListLength, maxObjectKeys } = LIMITS
+
+  it('stops a string doubling past the cap, quickly and within the budget', () => {
+    const start = performance.now()
+    const { result } = exec('let s = "x"\nwhile (true) { s = s + s }')
+    expect(result).toMatchObject({
+      status: 'error',
+      message: `A string can hold at most ${maxStringLength} characters`,
+      line: 2,
+    })
+    expect(result.steps).toBeLessThan(BUDGET)
+    expect(performance.now() - start).toBeLessThan(1000)
+  })
+
+  it('allows a string just at the cap and refuses one more character', () => {
+    const grow = `let s = ""; let i = 0; while (i < ${maxStringLength}) { s = s + "x"; i = i + 1 }`
+    const { printed, result } = exec(`${grow} out(s.length)`)
+    expect(result.status).toBe('done')
+    expect(printed).toEqual([maxStringLength])
+    expect(error(`${grow} s = s + 1`)).toBe(
+      `A string can hold at most ${maxStringLength} characters`,
+    )
+    expect(error(`${grow} s = 1 + s`)).toBe(
+      `A string can hold at most ${maxStringLength} characters`,
+    )
+    expect(value(`"${'y'.repeat(maxStringLength)}".length`)).toBe(maxStringLength)
+    expect(error(`"${'y'.repeat(maxStringLength + 1)}"`)).toMatch(/at most/)
+  })
+
+  it('stops a list growing past the cap, quickly and within the budget', () => {
+    const start = performance.now()
+    const { result } = exec('let l = []\nwhile (true) { l[l.length] = 1 }')
+    expect(result).toMatchObject({
+      status: 'error',
+      message: `A list can hold at most ${maxListLength} items`,
+      line: 2,
+    })
+    expect(result.steps).toBeLessThan(BUDGET)
+    expect(performance.now() - start).toBeLessThan(1000)
+  })
+
+  it('allows a full list, replacing its items, and a literal of that size', () => {
+    const items = Array<number>(maxListLength).fill(1).join(', ')
+    expect(value(`[${items}].length`)).toBe(maxListLength)
+    expect(error(`[${items}, 1]`)).toBe(`A list can hold at most ${maxListLength} items`)
+    const full = `let l = [${items}]; l[0] = 2; l[${maxListLength - 1}] = 3`
+    expect(exec(full).result.status).toBe('done')
+    expect(error(`${full}; l[${maxListLength}] = 4`)).toMatch(/at most/)
+  })
+
+  it('stops an object gaining keys past the cap, quickly and within the budget', () => {
+    const start = performance.now()
+    const { result } = exec('let o = {}; let i = 0\nwhile (true) { o["k" + i] = i; i = i + 1 }')
+    expect(result).toMatchObject({
+      status: 'error',
+      message: `An object can hold at most ${maxObjectKeys} keys`,
+      line: 2,
+    })
+    expect(result.steps).toBeLessThan(BUDGET)
+    expect(performance.now() - start).toBeLessThan(1000)
+  })
+
+  it('allows a full object, rewriting its keys, and a literal of that size', () => {
+    const keys = (n: number) => Array.from({ length: n }, (_, i) => `k${i}: ${i}`).join(', ')
+    const full = `let o = {${keys(maxObjectKeys)}}; o.k0 = 9; o["k1"] = 8`
+    expect(exec(full).result.status).toBe('done')
+    expect(error(`${full}; o.more = 1`)).toBe(`An object can hold at most ${maxObjectKeys} keys`)
+    expect(error(`let o = {${keys(maxObjectKeys + 1)}}`)).toMatch(/at most/)
+  })
+
+  it('reads host values bigger than the caps but cannot grow them', () => {
+    const list = Array<number>(maxListLength + 5).fill(0)
+    const text = 'z'.repeat(maxStringLength + 5)
+    const { printed, result } = exec('out(list.length); out(text.length)', {
+      globals: { list, text },
+    })
+    expect(result.status).toBe('done')
+    expect(printed).toEqual([maxListLength + 5, maxStringLength + 5])
+    expect(error('list[list.length] = 1', { globals: { list } })).toMatch(/at most/)
+    expect(error('text + "!"', { globals: { text } })).toMatch(/at most/)
   })
 })

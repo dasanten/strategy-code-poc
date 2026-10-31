@@ -2,6 +2,7 @@ import { parse, run } from '@csp/lang'
 import {
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
+  SCRIPT_VALUE_LIMITS,
   allianceOf,
   canWork,
   diplomacyFor,
@@ -281,7 +282,12 @@ describe('Leader handover from a script', () => {
         seen: () => entitiesInSight(world, terrain, realm.id),
         explored: () => true,
       })
-      run(parse(source), { globals, steps: 10_000, maxCallDepth: SCRIPT_MAX_CALL_DEPTH })
+      run(parse(source), {
+        globals,
+        steps: 10_000,
+        maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+        limits: SCRIPT_VALUE_LIMITS,
+      })
       return { memory: memory as { answer?: unknown }, requests }
     }
     // Only the Leader's script can hand over.
