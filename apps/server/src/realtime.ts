@@ -228,6 +228,11 @@ export function attachRealtime(
     sightCheck?: { reporter: TickReporter; sampleRate: number; rand?: () => number }
     /** Where an upgrade refused for an unexpected error is logged. */
     logger?: Pick<Logger, 'error'>
+    /**
+     * Told of an error that escaped a client's message handler, such as a bug in one order kind's
+     * check (ADR 0004). The message is answered `rejected` and the socket stays open either way.
+     */
+    onError?: (error: unknown, userId: number) => void
     /** Which browsers may connect; the server's config by default. */
     origins?: OriginPolicy
     /** What one client may do; the server's config by default. */
@@ -447,6 +452,27 @@ export function attachRealtime(
       } catch {
         return send(socket, { type: 'rejected', requestId: '', reason: 'not JSON' })
       }
+      try {
+        handle(socket, msg)
+      } catch (error) {
+        // An exception here would otherwise escape the socket's emitter and end the process, and
+        // any logged-in Player can send any message: one bug must not take the game down.
+        opts.onError?.(error, user.id)
+        const { requestId } = (msg ?? {}) as { requestId?: unknown }
+        send(socket, {
+          type: 'rejected',
+          requestId: typeof requestId === 'string' ? requestId : '',
+          reason: 'server error',
+        })
+      }
+    })
+    socket.on('close', () => {
+      sessions.delete(socket)
+      clients.delete(socket)
+    })
+
+    /** Answers one message from a logged-in client. */
+    function handle(socket: WebSocket, msg: ClientMessage) {
       const client = clients.get(socket)
       if (msg?.type === 'found' && !client) {
         const requestId = typeof msg.requestId === 'string' ? msg.requestId : ''
@@ -478,11 +504,7 @@ export function attachRealtime(
         sendScriptMemory(socket, client)
         sendScriptLogs(socket, client)
       }
-    })
-    socket.on('close', () => {
-      sessions.delete(socket)
-      clients.delete(socket)
-    })
+    }
   })
 
   return {

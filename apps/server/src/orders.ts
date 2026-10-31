@@ -55,6 +55,18 @@ export interface OrderKind {
 }
 
 /**
+ * The order kind called `name`, if there is one. Only the kinds' own entries count: a name such as
+ * `"constructor"` or `"toString"` would otherwise find a function inherited from
+ * `Object.prototype`, and a client can send any name.
+ */
+export function orderKindOf(
+  kinds: Record<string, OrderKind>,
+  name: unknown,
+): OrderKind | undefined {
+  return typeof name === 'string' && Object.hasOwn(kinds, name) ? kinds[name] : undefined
+}
+
+/**
  * The order kinds that exist. Those that act on a tile get a passenger off their carriage first
  * (`CONTEXT.md`: Passenger, `GETS_OFF_FIRST`).
  */
@@ -128,8 +140,10 @@ export class OrderQueue {
       return { type: 'rejected', requestId: id, reason: 'malformed order' }
     }
     const req = order as OrderRequest
-    const kind = typeof req.kind === 'string' ? this.kinds[req.kind] : undefined
-    if (!kind) return { type: 'rejected', requestId: id, reason: `unknown order: ${req.kind}` }
+    const kind = orderKindOf(this.kinds, req.kind)
+    if (!kind) {
+      return { type: 'rejected', requestId: id, reason: `unknown order: ${String(req.kind)}` }
+    }
     const reason = kind.validate(world, sender, req, this.terrain)
     if (reason) return { type: 'rejected', requestId: id, reason }
     this.pending.push({ sender, order: req })
@@ -172,9 +186,10 @@ export class OrderQueue {
         const a = world.armies.find((x) => x.id === order.armyId)
         if (a) delete a.script
       }
-      const toArmy = order.kind in armyOrders || order.kind === 'armyRunScript'
+      const toArmy = Object.hasOwn(armyOrders, order.kind) || order.kind === 'armyRunScript'
       const before = toArmy ? undefined : memberOrders(world)
-      this.kinds[order.kind]!.apply(world, sender, order, this.terrain)
+      // Accepted by `receive`, so the kind exists.
+      orderKindOf(this.kinds, order.kind)!.apply(world, sender, order, this.terrain)
       if (before) leaveOnOwnOrders(world, before)
     }
   }

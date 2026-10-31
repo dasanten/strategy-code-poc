@@ -19,7 +19,7 @@ import { recordEvent } from './events.js'
 import { ExploredTerrain } from './explored.js'
 import type { InvariantViolation } from './invariants.js'
 import { openDb, schema, type Db } from './db/index.js'
-import { OrderQueue } from './orders.js'
+import { OrderQueue, orderKinds, type OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
 import { SightTracker } from './sight.js'
 import { dieAll } from './survival.js'
@@ -30,19 +30,23 @@ import { createWorld, stepWorld } from './world.js'
 
 const terrain = cityTerrain()
 
+
 const cleanup: (() => Promise<void> | void)[] = []
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn()
 })
 
 /**
- * Starts a server. `db` is what the upgrade checks sessions against, the app's db unless given;
- * `origins`, `limits` and `now` go to `attachRealtime` as they are.
+ * Starts a server. `sessionDb` is what the upgrade checks sessions against, the app's db unless
+ * given; `kinds` the order kinds, the game's unless given; `onError` hears of a message handler's
+ * exceptions; `origins`, `limits` and `now` go to `attachRealtime` as they are.
  */
-async function start({
-  db: sessionDb,
-  ...opts
-}: Partial<Pick<Parameters<typeof attachRealtime>[1], 'db' | 'origins' | 'limits' | 'now'>> = {}) {
+async function start(
+  options: {
+    sessionDb?: Db
+    kinds?: Record<string, OrderKind>
+  } & Partial<Pick<Parameters<typeof attachRealtime>[1], 'onError' | 'origins' | 'limits' | 'now'>> = {},
+) {
   const opened = await openDb(':memory:')
   const app = await buildApp({
     db: opened.db,
@@ -56,7 +60,7 @@ async function start({
     },
   })
   const world = createWorld(terrain)
-  const orders = new OrderQueue()
+  const orders = new OrderQueue(options.kinds)
   const territory = new TerritoryTracker()
   // Every send is checked against the Player's sight; what breaks it lands here.
   const violations: InvariantViolation[] = []
@@ -66,7 +70,7 @@ async function start({
     tickError() {},
   }
   const realtime = attachRealtime(app.server, {
-    db: sessionDb ?? opened.db,
+    db: options.sessionDb ?? opened.db,
     world,
     terrain,
     explored: new ExploredTerrain(terrain),
@@ -74,7 +78,10 @@ async function start({
     orders,
     territory,
     sightCheck: { reporter, sampleRate: 1 },
-    ...opts,
+    onError: options.onError,
+    origins: options.origins,
+    limits: options.limits,
+    now: options.now,
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
   cleanup.push(
@@ -288,7 +295,7 @@ describe('realtime', () => {
         throw new Error('database gone')
       },
     } as unknown as Db
-    const { url, token } = await start({ db: broken })
+    const { url, token } = await start({ sessionDb: broken })
     expect(await refusal(connect(url, token).socket)).toBe(400)
     expect(await refusal(connect(url, token).socket)).toBe(400)
   })
@@ -463,6 +470,47 @@ describe('realtime', () => {
       requestId: 'r1',
       reason: 'unknown order: fly',
     })
+  })
+
+  it('rejects an order kind named after something inherited from Object.prototype', async () => {
+    const { url, token } = await start()
+    const { socket, next } = connect(url, token)
+    await next('welcome')
+    for (const kind of ['constructor', 'toString', '__proto__']) {
+      socket.send(JSON.stringify({ type: 'order', requestId: kind, order: { kind } }))
+      expect(await next('rejected')).toEqual({
+        type: 'rejected',
+        requestId: kind,
+        reason: `unknown order: ${kind}`,
+      })
+    }
+  })
+
+  it('answers a message whose handling throws, reports it and keeps the socket open', async () => {
+    const errors: unknown[] = []
+    const broken: OrderKind = {
+      validate: () => {
+        throw new Error('bug in the check')
+      },
+      apply: () => {},
+    }
+    const { url, token, userId } = await start({
+      kinds: { ...orderKinds, broken },
+      onError: (error, from) => errors.push([error, from]),
+    })
+    const { socket, next } = connect(url, token)
+    await next('welcome')
+    socket.send(JSON.stringify({ type: 'order', requestId: 'r1', order: { kind: 'broken' } }))
+    expect(await next('rejected')).toEqual({
+      type: 'rejected',
+      requestId: 'r1',
+      reason: 'server error',
+    })
+    expect(errors).toEqual([[new Error('bug in the check'), userId]])
+    // The socket, and the server, are still there for the next message.
+    socket.send(JSON.stringify({ type: 'order', requestId: 'r2', order: { kind: 'fly' } }))
+    expect(await next('rejected')).toMatchObject({ requestId: 'r2', reason: 'unknown order: fly' })
+    expect(socket.readyState).toBe(WebSocket.OPEN)
   })
 
   it('sends each Player only their own realm events, each once, and the log on connect', async () => {
