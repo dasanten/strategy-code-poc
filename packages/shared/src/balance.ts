@@ -512,6 +512,19 @@ export const NPC_WALL_TILES_PER_TRIP = 4
 export const NPC_NODE_REACH = 160
 
 /**
+ * How far from its home a Trade Org warehouse may be for an NPC city to send its trader there
+ * (`CONTEXT.md`: NPC trader), in tiles: about a game day and a half's walk on plains each way.
+ */
+export const NPC_TRADER_REACH = 720
+
+/**
+ * Game days after it left that an NPC city stops waiting for its trader (`CONTEXT.md`: NPC
+ * trader): dead, robbed or stuck, they are dropped from its plan and it may send another.
+ * Several times the longest trade run (`NPC_TRADER_REACH` there and back).
+ */
+export const NPC_TRADER_GIVE_UP_DAYS = 10
+
+/**
  * How far beyond its wall an NPC city looks for Plains to lay out a new farm on, in tiles. Farms
  * go beyond where its next wall would stand.
  */

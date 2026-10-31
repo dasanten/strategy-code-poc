@@ -51,6 +51,7 @@ import {
   workplaceOf,
 } from './npc-plan.js'
 import { holdsBatch } from './npc-chain.js'
+import { runTrader } from './npc-trader.js'
 import { refillSource } from './survival.js'
 import { walkTime } from './walk-time.js'
 
@@ -69,6 +70,7 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'tearDown',
   'breed',
   'attack',
+  'trade',
 ]
 
 /**
@@ -110,7 +112,8 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * run low on food where there is none, carriers home with their load stored, builders stuck or
  * out of materials, breeders who are done and workers at a smelter or smithy with nothing left to
  * process, so they get their next job; moves a worker whose plan puts them elsewhere, or nowhere;
- * then gives each idle adult what comes first: a resident carrying a child stays at home; one
+ * then gives each idle adult what comes first: its trader goes on with their run (`runTrader`);
+ * a resident carrying a child stays at home; one
  * carrying materials the project needs takes them to its site; a load of goods goes into the
  * storage; they take `OWN_FOOD` from the storage before they set out; one of them breeds the
  * city's horses (`breedHorses`); a planned builder takes their part in the project (`takePart`),
@@ -207,6 +210,10 @@ function runCity(
 
   for (const r of adults) {
     if (r.order !== null || r.script) continue
+    if (plan?.trader?.residentId === r.id && !city.tradeOrg) {
+      runTrader(world, city, plan, r, storage, size)
+      continue
+    }
     // Carrying a child, they get no work and stay at home, where they take their meals.
     if (r.carrying) {
       if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
