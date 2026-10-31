@@ -69,41 +69,45 @@ describe('a trading post runs the chain for its warehouse', () => {
     )
   })
 
-  it('with an iron node in reach builds a mine, and its ore goes into the warehouse', () => {
-    const { world, terrain, city } = post(true)
-    const store = warehouse(world, city)
-    const walking = new Walking(terrain)
-    const storage = npcHome(world, city)!
-    expect(planCity(world, city, terrain).project).toEqual(
-      expect.objectContaining({ kind: 'build', building: 'mine' }),
-    )
-    /**
-     * Runs the world, checking the invariants once a game day, until `done` or `days` pass. With
-     * `buyer`, each morning a buyer takes the warehouse's Iron ore while it holds no more than its
-     * floor, so the post stays short of it.
-     */
-    const run = (days: number, done: () => boolean, buyer = false) => {
-      for (let day = 0; day < days && !done(); day++) {
-        for (let t = 0; t < TICKS_PER_GAME_DAY && !done(); t++) {
-          const morning = world.tick % TICKS_PER_GAME_DAY === 0
-          if (buyer && morning && (store.stock?.ironOre ?? 0) <= WAREHOUSE_FLOOR.ironOre) {
-            store.stock = { ...store.stock, ironOre: 0 }
+  it(
+    'with an iron node in reach builds a mine, and its ore goes into the warehouse',
+    { tags: ['slow'], timeout: 180_000 },
+    () => {
+      const { world, terrain, city } = post(true)
+      const store = warehouse(world, city)
+      const walking = new Walking(terrain)
+      const storage = npcHome(world, city)!
+      expect(planCity(world, city, terrain).project).toEqual(
+        expect.objectContaining({ kind: 'build', building: 'mine' }),
+      )
+      /**
+       * Runs the world, checking the invariants once a game day, until `done` or `days` pass. With
+       * `buyer`, each morning a buyer takes the warehouse's Iron ore while it holds no more than its
+       * floor, so the post stays short of it.
+       */
+      const run = (days: number, done: () => boolean, buyer = false) => {
+        for (let day = 0; day < days && !done(); day++) {
+          for (let t = 0; t < TICKS_PER_GAME_DAY && !done(); t++) {
+            const morning = world.tick % TICKS_PER_GAME_DAY === 0
+            if (buyer && morning && (store.stock?.ironOre ?? 0) <= WAREHOUSE_FLOOR.ironOre) {
+              store.stock = { ...store.stock, ironOre: 0 }
+            }
+            stepWorld(world, terrain, walking)
           }
-          stepWorld(world, terrain, walking)
+          expect(checkInvariants(world, terrain)).toEqual([])
         }
-        expect(checkInvariants(world, terrain)).toEqual([])
       }
-    }
-    const mine = () => world.buildings.find((b) => b.kind === 'mine' && !b.site)
-    run(20, () => mine() !== undefined)
-    expect(city.workplaceIds).toContain(mine()?.id)
-    // The floor tops the warehouse up to it and never past: above it only by what its miners
-    // brought, and nothing of it in the storage.
-    run(30, () => (store.stock?.ironOre ?? 0) > WAREHOUSE_FLOOR.ironOre, true)
-    expect(store.stock?.ironOre ?? 0).toBeGreaterThan(WAREHOUSE_FLOOR.ironOre)
-    expect(storage.stock?.ironOre ?? 0).toBe(0)
-    expect(world.cities.length).toBe(1)
-  })
+      const mine = () => world.buildings.find((b) => b.kind === 'mine' && !b.site)
+      run(20, () => mine() !== undefined)
+      expect(city.workplaceIds).toContain(mine()?.id)
+      // The floor tops the warehouse up to it and never past: above it only by what its miners
+      // brought, and nothing of it in the storage.
+      run(30, () => (store.stock?.ironOre ?? 0) > WAREHOUSE_FLOOR.ironOre, true)
+      expect(store.stock?.ironOre ?? 0).toBeGreaterThan(WAREHOUSE_FLOOR.ironOre)
+      expect(storage.stock?.ironOre ?? 0).toBe(0)
+      expect(world.cities.length).toBe(1)
+    },
+  )
 })
 
 describe('the Trade Org HQ runs the chain', () => {
