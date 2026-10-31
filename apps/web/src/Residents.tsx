@@ -8,7 +8,6 @@ import {
   BATCHES_PER_DAY,
   CARRIAGE_CAPACITY,
   CARRYING_DAYS,
-  CARRYING_TICKS,
   GOODS,
   HAUL_KEEP_FOOD,
   buildMenu,
@@ -25,7 +24,6 @@ import {
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_HOUR,
-  TICKS_PER_GAME_YEAR,
   TRAINED_CAP_SHARE,
   ageInYears,
   bestWeapon,
@@ -88,6 +86,7 @@ import {
   type ResidentGroup,
 } from './residents-view.js'
 import { doingLine } from './doing-view.js'
+import { bornIn, foalLeft, grownIn, pairingTicksLeft, about, workLeft } from './time-left.js'
 import {
   dropStep,
   moveStep,
@@ -204,21 +203,18 @@ export interface HaulSetup {
 
 /**
  * A resident's pair and the child they carry (`CONTEXT.md`: Pairing, Carrying): who carries, and
- * how many game days are left until it is born; undefined for one who is neither.
+ * about how long until it is born; undefined for one who is neither.
  */
 export function familyLine(r: Resident, residents: Resident[], tick: number): string | undefined {
-  const days = (until: number) => Math.max(0, Math.ceil((until - tick) / TICKS_PER_GAME_DAY))
   if (r.carrying) {
-    const left = days(r.carrying.since + CARRYING_TICKS)
-    return `Carrying ${r.carrying.partnerName}’s child · born in ${left} game day${left === 1 ? '' : 's'}`
+    return `Carrying ${r.carrying.partnerName}’s child · ${bornIn(r.carrying.since, tick)}`
   }
   if (!r.pair) return undefined
   const partnerId = r.pair.partnerId
   const partner = residents.find((x) => x.id === partnerId)
   const name = partner?.name ?? 'someone out of sight'
   if (partner?.carrying) {
-    const left = days(partner.carrying.since + CARRYING_TICKS)
-    return `${name} is carrying their child · born in ${left} game day${left === 1 ? '' : 's'}`
+    return `${name} is carrying their child · ${bornIn(partner.carrying.since, tick)}`
   }
   return `Paired with ${name}`
 }
@@ -1192,6 +1188,8 @@ export function ResidentCard({
   // Children pick up and put down only Food (`CONTEXT.md`: Child).
   const refused = (good: Good) => !canHandle(r, tick, [good])
   const family = familyLine(r, residents, tick)
+  const grown = grownIn(r, tick)
+  const at: OnSite = { residents, mapSize }
   const ground: GoodsSpot = { kind: 'ground' }
   const inStorage: GoodsSpot = { kind: 'storage', storageId: storage?.id ?? '' }
   const site = building?.site ? building : undefined
@@ -1361,6 +1359,7 @@ export function ResidentCard({
                 tick={tick}
                 building={building}
                 node={node}
+                at={at}
                 buildProblem={buildProblem}
                 onBuild={onBuild}
               />
@@ -1369,22 +1368,43 @@ export function ResidentCard({
                 tick={tick}
                 building={building}
                 carriageSite={carriageSite}
+                at={at}
                 buildProblem={buildProblem}
                 onBuild={onBuild}
               />
-              <RoadBlock resident={r} tick={tick} road={road} terrain={terrain} onBuild={onBuild} />
+              <RoadBlock
+                resident={r}
+                tick={tick}
+                road={road}
+                terrain={terrain}
+                at={at}
+                onBuild={onBuild}
+              />
             </>
           )}
           {shown === 'tearDown' && (
             <>
-              <TearDownBlock resident={r} tick={tick} building={building} onTearDown={onTearDown} />
+              <TearDownBlock
+                resident={r}
+                tick={tick}
+                building={building}
+                at={at}
+                onTearDown={onTearDown}
+              />
               <TearDownBlock
                 resident={r}
                 tick={tick}
                 building={carriageSite}
+                at={at}
                 onTearDown={onTearDown}
               />
-              <TearDownBlock resident={r} tick={tick} building={road} onTearDown={onTearDown} />
+              <TearDownBlock
+                resident={r}
+                tick={tick}
+                building={road}
+                at={{ ...at, terrain }}
+                onTearDown={onTearDown}
+              />
             </>
           )}
           {shown === 'breed' && building && (
@@ -1588,6 +1608,7 @@ export function ResidentCard({
               {r.riding ? ' · on horseback' : ''}
               {r.aboard ? ' · aboard a carriage' : ''}
             </li>
+            {grown && <li>{capitalised(grown)}</li>}
             {family && <li>{family}</li>}
           </ul>
           <section className="inspector-block" aria-label="Stats">
@@ -1722,6 +1743,16 @@ function HaulBlock({
 }
 
 /**
+ * Who works on a building or site as far as the Player sees, for how long it has left
+ * (`workLeft`), and the terrain beneath it where that slows the work.
+ */
+interface OnSite {
+  residents: readonly Resident[]
+  mapSize: number
+  terrain?: number
+}
+
+/**
  * Building on the resident's tile (`CONTEXT.md`: Building): on a resource node with nothing on it,
  * build its workplace; on any other empty tile, whatever goes off a node (`buildMenu`), saying why
  * a kind can't go here; on a construction site, see what it still needs and help build it.
@@ -1732,6 +1763,7 @@ function BuildBlock({
   building,
   node,
   terrain,
+  at,
   buildProblem = () => undefined,
   onBuild,
 }: {
@@ -1741,6 +1773,7 @@ function BuildBlock({
   node: KnownNode | undefined
   /** The explored terrain beneath the site, if known (`buildingWork`). */
   terrain?: number
+  at: OnSite
   /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
   buildProblem?: (kind: BuildingKind) => string | undefined
   onBuild: (kind: BuildingKind) => void
@@ -1762,6 +1795,7 @@ function BuildBlock({
           label="Work"
           value={pct(work > 0 ? building.site.work / work : 1)}
           share={work > 0 ? building.site.work / work : 1}
+          left={workLeft(building, at.residents, tick, { under: terrain, size: at.mapSize })}
         />
         {materials.length === 0 && <p className="muted small">Needs no materials.</p>}
         {materials.map(([good, units]) => (
@@ -1843,6 +1877,7 @@ function CarriageBlock({
   tick,
   building,
   carriageSite,
+  at,
   buildProblem = () => undefined,
   onBuild,
 }: {
@@ -1850,6 +1885,7 @@ function CarriageBlock({
   tick: number
   building: Building | undefined
   carriageSite: Building | undefined
+  at: OnSite
   buildProblem?: (kind: BuildingKind) => string | undefined
   onBuild: (kind: BuildingKind) => void
 }) {
@@ -1860,6 +1896,7 @@ function CarriageBlock({
         tick={tick}
         building={carriageSite}
         node={undefined}
+        at={at}
         onBuild={onBuild}
       />
     )
@@ -1902,6 +1939,7 @@ function RoadBlock({
   tick,
   road,
   terrain,
+  at,
   onBuild,
 }: {
   resident: Resident
@@ -1909,6 +1947,7 @@ function RoadBlock({
   road: Building | undefined
   /** The explored terrain beneath the resident's tile, if known (`buildingWork`). */
   terrain?: number
+  at: OnSite
   onBuild: (kind: BuildingKind) => void
 }) {
   if (road?.site) {
@@ -1919,6 +1958,7 @@ function RoadBlock({
         building={road}
         node={undefined}
         terrain={terrain}
+        at={at}
         onBuild={onBuild}
       />
     )
@@ -2053,11 +2093,13 @@ function TearDownBlock({
   resident,
   tick,
   building,
+  at,
   onTearDown,
 }: {
   resident: Resident
   tick: number
   building: Building | undefined
+  at: OnSite
   onTearDown: (buildingId: string) => void
 }) {
   if (!building || !BUILDABLE.includes(building.kind)) return null
@@ -2075,7 +2117,16 @@ function TearDownBlock({
         <span className="small muted">{what}</span>
       </div>
       {building.teardown !== undefined && (
-        <Meter label="Torn down" value={pct(share)} share={share} />
+        <Meter
+          label="Torn down"
+          value={pct(share)}
+          share={share}
+          left={workLeft(building, at.residents, tick, {
+            tearingDown: true,
+            under: at.terrain,
+            size: at.mapSize,
+          })}
+        />
       )}
       <p className="muted small">
         Takes about {Math.ceil((work / TICKS_PER_GAME_DAY) * 10) / 10} game days of one resident’s
@@ -2148,11 +2199,17 @@ function BreedBlock({
           label="Foal"
           value={pct(breeding.progress / STABLE_BREED_TICKS)}
           share={breeding.progress / STABLE_BREED_TICKS}
+          left={foalLeft(breeding.progress)}
         />
       )}
       {kept && (
         <>
-          <Meter label="Paused" value={pct(keptShare)} share={keptShare} />
+          <Meter
+            label="Paused"
+            value={pct(keptShare)}
+            share={keptShare}
+            left={`${foalLeft(keptShare * STABLE_BREED_TICKS)} once tended`}
+          />
           <p className="muted small">
             The stable kept this pair&apos;s breeding: they carry on with it first.
           </p>
@@ -2260,9 +2317,7 @@ function PairBlock({
   const choices = residents.filter(
     (x) => x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick) && !x.carrying,
   )
-  const days = o
-    ? Math.max(0, Math.ceil((o.since + TICKS_PER_GAME_YEAR - tick) / TICKS_PER_GAME_DAY))
-    : 0
+  const wait = o ? pairingTicksLeft(o.since, tick) : 0
   const expecting = resident.carrying || partner?.carrying
   return (
     <section className="inspector-block" aria-label="Pairing">
@@ -2276,7 +2331,7 @@ function PairBlock({
         o && (
           <p className="muted small">
             Paired with {partner?.name ?? 'someone out of sight'}.{' '}
-            {days > 0 ? `In about ${days} game days` : 'Now'}, once the city has free housing and a
+            {wait > 0 ? `In ${about(wait)}` : 'Now'}, once the city has free housing and a
             food surplus, one of them starts carrying a child for {CARRYING_DAYS} game days; the
             other keeps working.
           </p>
@@ -2601,7 +2656,18 @@ function GoodsRow({
   )
 }
 
-function Meter({ label, value, share }: { label: string; value: string; share: number }) {
+function Meter({
+  label,
+  value,
+  share,
+  left,
+}: {
+  label: string
+  value: string
+  share: number
+  /** About how long is left at the current pace (`CONTEXT.md`: Estimates). */
+  left?: string
+}) {
   return (
     <div className="vital">
       <div className="vital-head">
@@ -2611,9 +2677,12 @@ function Meter({ label, value, share }: { label: string; value: string; share: n
       <span className="meter big">
         <span className={meterClass(share)} style={{ width: pct(share) }} />
       </span>
+      {left && <span className="small muted">{capitalised(left)}</span>}
     </div>
   )
 }
+
+const capitalised = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /** Who holds a workplace, in the Player's words (`CONTEXT.md`: Holding a workplace). */
 function holding(holders: string[], realmId: string): string {

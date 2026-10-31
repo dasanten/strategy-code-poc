@@ -6,6 +6,8 @@ import {
   buildWork,
   constructionLearned,
   ticksForAge,
+  workPace,
+  workingOn,
   type Building,
   type TerrainMap,
   type WorldState,
@@ -118,6 +120,21 @@ describe('build order', () => {
     strong.stats.strength.base = 15
     strong.skills.construction = 10
     expect(buildWork(strong, world.tick)).toBeCloseTo(1.5 * (1 + 10 * CONSTRUCTION_SKILL_EFFECT))
+  })
+
+  it('puts in what workPace says for the residents workingOn it, so estimates match', () => {
+    const { world, r, queue } = setup()
+    order(world, queue, buildOrder('lumberCamp'))
+    const helper = resident(world, 'w2', 3, 3)
+    helper.stats.strength.base = 15
+    order(world, queue, buildOrder('lumberCamp', 'w2'))
+    const site = siteOf(world)!
+    const on = workingOn(site, world.residents, false, 16)
+    expect(on.map((x) => x.id).sort()).toEqual([r.id, helper.id])
+    const pace = workPace(site, on, world.tick)
+    const before = site.site!.work
+    run(world)
+    expect(site.site!.work - before).toBeCloseTo(pace)
   })
 
   it('finishes a lumber camp once enough work is in, and the order is done', () => {

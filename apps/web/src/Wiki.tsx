@@ -404,6 +404,9 @@ export function Wiki() {
         <p>
           Click one of your residents on the map to pick them and open their card. Each action on
           the card shows its letter key; press it to run the action. Escape drops what is picked.
+          Meters and countdowns on the card say about how long is left, in real time with game time
+          in brackets, estimated from the current pace: a construction site from who works on it
+          now, so it says nobody is building while nobody does.
         </p>
         <p>
           To pick several at once, drag a box around them with Shift held (or after the Select
