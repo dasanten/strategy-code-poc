@@ -1090,6 +1090,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onTransfer={async (transfer) =>
               setOrderError(await giveOrder({ kind: 'transfer', ...transfer }))
             }
+            onSend={async ({ residentId, carriageId, x, y }) =>
+              setOrderError(
+                await giveOrder(
+                  carriageId
+                    ? { kind: 'drive', residentId, carriageId, x, y }
+                    : { kind: 'walkTo', residentId, x, y },
+                ),
+              )
+            }
+            arrivesIn={arrivesIn || undefined}
             directives={world.diplomacy.directives}
             openId={openCityId}
             onOpen={setOpenCityId}

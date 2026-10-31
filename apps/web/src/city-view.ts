@@ -12,6 +12,9 @@ import {
   quoteTrade,
   tradeCoinWarehouse,
   wrapDistance,
+  canWork,
+  aboutTime,
+  type Stock,
   type Building,
   type BuildingKind,
   type Carriage,
@@ -184,6 +187,91 @@ export function tradersAt(
     residents: seen.residents.filter((r) => r.owner === realmId && here(r)).filter(faresKnown),
     carriages: seen.carriages.filter((k) => k.realmId === realmId && here(k)).filter(loadKnown),
   }
+}
+
+/**
+ * The Player's residents on their way to a warehouse or an NPC city's storage (`CONTEXT.md`: Trade
+ * section): walking, riding or driving to a tile of it and not there yet.
+ */
+export function onTheWay(
+  place: Pick<Building, 'kind' | 'x' | 'y'>,
+  seen: { residents: SeenResident[] },
+  realmId: string,
+  size: number,
+): Resident[] {
+  return seen.residents
+    .filter((r) => r.owner === realmId)
+    .filter(faresKnown)
+    .filter((r) => {
+      const o = r.order
+      return (
+        (o?.kind === 'walkTo' || o?.kind === 'drive') &&
+        isAt(o.target, place, size) &&
+        !isAt(r, place, size)
+      )
+    })
+}
+
+/**
+ * One of the Player's that the trade section can send to a warehouse or an NPC city's storage
+ * (`CONTEXT.md`: Trade section): a resident who walks there, or a carriage with the resident who
+ * drives it.
+ */
+export interface SendView {
+  /** Who is given the order: the walker, or the carriage's driver. */
+  residentId: string
+  /** The carriage driven there, if it is one. */
+  carriageId?: string
+  name: string
+  /** How far it is, in tiles as the crow flies, rounded. */
+  tiles: number
+  /** What they carry: coins and goods in hand, or the carriage's load. */
+  carries: Stock
+}
+
+/**
+ * Whom the trade section offers to send to a warehouse or an NPC city's storage, nearest first:
+ * the Player's grown residents elsewhere in sight, and their carriages elsewhere with a grown
+ * resident of theirs on the tile to drive it (`CONTEXT.md`: Child). Those on their way there
+ * already (`onTheWay`) and the carriages they drive are left out.
+ */
+export function sendable(
+  place: Pick<Building, 'kind' | 'x' | 'y'>,
+  seen: { residents: SeenResident[]; carriages: SeenCarriage[] },
+  realmId: string,
+  size: number,
+  tick: number,
+): SendView[] {
+  const going = onTheWay(place, seen, realmId, size)
+  const driven = new Set(going.map((r) => (r.order?.kind === 'drive' ? r.order.carriageId : '')))
+  const free = seen.residents
+    .filter((r) => r.owner === realmId)
+    .filter(faresKnown)
+    .filter((r) => canWork(r, tick) && !isAt(r, place, size) && !going.includes(r))
+  const tiles = (t: { x: number; y: number }) => Math.round(wrapDistance(size, t, place))
+  const walkers = free.map((r) => ({
+    residentId: r.id,
+    name: r.name,
+    tiles: tiles(r),
+    carries: r.carried,
+  }))
+  const carriages = seen.carriages
+    .filter((k) => k.realmId === realmId && !driven.has(k.id) && !isAt(k, place, size))
+    .filter(loadKnown)
+    .flatMap((k) => {
+      const driver = free.find((r) => r.x === k.x && r.y === k.y)
+      if (!driver) return []
+      const name = `carriage ${k.id}, driven by ${driver.name}`
+      return [{ residentId: driver.id, carriageId: k.id, name, tiles: tiles(k), carries: k.load }]
+    })
+  return [...walkers, ...carriages].sort((a, b) => a.tiles - b.tiles)
+}
+
+/** "Ann is on the way, about 3 min (3 game hours)", or without the time while it isn't known. */
+export function onTheWayLine(name: string, arrives: number | undefined): string {
+  return arrives === undefined
+    ? `${name} is on the way`
+    : `${name} is on the way, ${aboutTime(arrives)}`
 }
 
 /**
