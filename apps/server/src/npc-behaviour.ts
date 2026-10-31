@@ -4,6 +4,7 @@ import {
   NPC_FOOD_SHORT_DAYS,
   OWN_FOOD,
   RECIPES,
+  WALK_TICKS_PER_TILE,
   WORK_OUTPUT_PER_DAY,
   breedersAt,
   breedingPair,
@@ -16,9 +17,12 @@ import {
   isAt,
   punishers,
   putAwayUnits,
+  setOutFood,
   storedFood,
+  unitsThatFit,
   workersOf,
   workplaceGood,
+  wrapDistance,
   type Building,
   type City,
   type Good,
@@ -31,6 +35,7 @@ import {
 import { cityGrowth } from './npc-growth.js'
 import { refillSource } from './survival.js'
 import { caravanCrew } from './caravans.js'
+import { walkTime } from './walk-time.js'
 
 /**
  * The orders an NPC city gives its residents: only kinds a Player's order can give too
@@ -95,7 +100,8 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * output to the storage (`CONTEXT.md`: Carrying the output; run right after, `runNpcScripts`);
  * sends workers who
  * run low on food where there is none to refill from home, and has residents take `OWN_FOOD`
- * from the storage before they set out; gives idle adults their part in the city's growth
+ * from the storage before they set out, and one sent to a workplace the Food for the walk and
+ * their first days there (`takeSetOutFood`); gives idle adults their part in the city's growth
  * (`cityGrowth`); and brings idle residents with nothing to do home. Its soldiers (armed adults)
  * are put to no work and no building (`stepNpcDefence`). Children are left alone:
  * they refill at home. A resident carrying a child gets no work and goes home.
@@ -120,12 +126,15 @@ function runCity(
     const busy = o?.kind === 'workAt' || o?.kind === 'build' || o?.kind === 'tearDown'
     if (busy && lowOnFood(r) && !refillSource(world, r, size)) stopWork(r)
     // Home at the storage with the load stored, a carrier is free for whatever the city needs
-    // most (building, pairing), else back to work.
+    // most (building, pairing), else back to work; one bringing the crew's Food back
+    // (`CONTEXT.md`: Crew food) goes back by the Work default.
     const carry = r.script?.scriptId === 0 ? r.script.memory.carry : undefined
     const carrying = typeof carry === 'object' && carry !== null && !Array.isArray(carry)
+    const bringsCrewFood = carrying && typeof carry.crewFood === 'number' && carry.crewFood >= 1
     if (
       carrying &&
       carry.stored === true &&
+      !bringsCrewFood &&
       r.order?.kind !== 'store' &&
       storage &&
       isAt(r, storage, size)
@@ -172,7 +181,7 @@ function runCity(
     if (!soldier && growth && growth.assign(r)) continue
     const place = !soldier && places.find((p) => room(world, p) > 0)
     if (place) {
-      putToWork(r, place)
+      if (!storage || takeSetOutFood(world, r, place, storage, size, terrain)) putToWork(r, place)
       continue
     }
     if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
@@ -236,6 +245,41 @@ export function takenPlaces(world: WorldState, place: Building): number {
       (r.order?.kind === 'workAt' && r.order.buildingId === place.id) ||
       (r.order?.kind === 'walkTo' && r.order.target.x === place.x && r.order.target.y === place.y),
   ).length
+}
+
+/**
+ * Before a resident sets out for a workplace, they take the Food for the walk there and back and
+ * their first days of work (`setOutFood`; `CONTEXT.md`: Crew food, NPC city) from the storage
+ * while it has Food and they carry less: at it, a pick-up of what they lack, as much as fits,
+ * which the Work default given the same tick waits for (so an idle resident never puts the
+ * surplus back, `haul`); away from it, the walk there first. The walk is reckoned from where they
+ * stand, by the terrain when given, else by tiles. Whether they set out now, rather than walking
+ * to the storage first.
+ */
+function takeSetOutFood(
+  world: WorldState,
+  r: Resident,
+  place: Building,
+  storage: Building,
+  size: number,
+  terrain?: TerrainMap,
+): boolean {
+  const food = storage.stock?.food ?? 0
+  if (food <= 0) return true
+  const walk = terrain
+    ? walkTime(world, terrain, () => true, r, r, place)
+    : wrapDistance(size, r, place) * WALK_TICKS_PER_TILE
+  const short = setOutFood(walk) - (r.carried.food ?? 0)
+  if (short <= 1e-9) return true
+  if (!isAt(r, storage, size)) {
+    walkTo(r, storage)
+    return false
+  }
+  const units = Math.min(food, short, unitsThatFit(r, 'food', world.tick))
+  if (units <= 0) return true
+  const from = { kind: 'storage' as const, storageId: storage.id }
+  r.order = { kind: 'pickUp', from, goods: { food: units } }
+  return true
 }
 
 /**

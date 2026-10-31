@@ -799,6 +799,31 @@ export const GET_FOOD_AT = Math.ceil(FOOD_PER_DAY)
 export const GET_FOOD_TAKE = Math.ceil(6 * FOOD_PER_DAY)
 
 /**
+ * The default of `crewFood` in the Work default (`CONTEXT.md`: Crew food), in whole units: the
+ * Food the workplace's pile keeps for its crew, which the carrier tops up on the way back from
+ * storing a load. About six days for a crew of six, ten for one of four, and well inside a load.
+ * 0 brings none.
+ */
+export const CREW_FOOD = 20
+
+/**
+ * Game days of work a resident an NPC city sends to a workplace sets out with Food for, on top
+ * of the walk there and back (`setOutFood`; `CONTEXT.md`: Crew food, NPC city): enough to last
+ * until the carrier's first round trip brings the crew's Food.
+ */
+export const SET_OUT_WORK_DAYS = 3
+
+/**
+ * Units of Food a resident sent to a workplace sets out with (`CONTEXT.md`: Crew food): twice a
+ * walk of `walkTicks` ticks plus `SET_OUT_WORK_DAYS` of work, at `FOOD_PER_DAY`, in whole units
+ * rounded up. Never less than their own food (`OWN_FOOD`).
+ */
+export function setOutFood(walkTicks: number): number {
+  const days = (2 * walkTicks) / TICKS_PER_GAME_DAY + SET_OUT_WORK_DAYS
+  return Math.max(OWN_FOOD, Math.ceil(days * FOOD_PER_DAY))
+}
+
+/**
  * Food a resident running the Breed horses default takes from the stable before they start, if
  * they carry less (`CONTEXT.md`: Breeding): their meals for the `STABLE_BREED_DAYS` of tending,
  * away from home.
