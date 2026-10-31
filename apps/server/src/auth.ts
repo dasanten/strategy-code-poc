@@ -184,7 +184,8 @@ export async function logIn(
 }
 
 /** The hash a session token is stored and tracked by; the token itself is only in the cookie. */
-export const hashToken = (token: string) => createHash('sha256').update(token).digest('base64url')
+export const hashToken = (token: string) =>
+  createHash('sha256').update(token).digest('base64url')
 
 /** Starts a session and returns the token for the cookie. */
 export function createSession(db: Db, userId: number, now = Date.now()): string {
