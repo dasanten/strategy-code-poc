@@ -1,12 +1,18 @@
-import type {
-  Building,
-  GoodsPlace,
-  GoodsWanted,
-  Resident,
-  ResidentOrder,
-  ScriptSummary,
-  SeenScript,
-  Task,
+import {
+  Terrain,
+  UNEXPLORED,
+  arrivalTicks,
+  roadTiles,
+  tileIndex,
+  type ArrivalWorld,
+  type Building,
+  type GoodsPlace,
+  type GoodsWanted,
+  type Resident,
+  type ResidentOrder,
+  type ScriptSummary,
+  type SeenScript,
+  type Task,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
 import { selectedWay } from './map/way.js'
@@ -37,10 +43,13 @@ export function doingLine(
     scripts = [],
     buildings = [],
     residents = [],
+    arrives,
   }: {
     scripts?: readonly ScriptSummary[]
     buildings?: readonly Pick<Building, 'id' | 'kind'>[]
     residents?: readonly Pick<Resident, 'order'>[]
+    /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
+    arrives?: number
   },
 ): string {
   if (r.script?.doing) return r.script.doing
@@ -48,16 +57,16 @@ export function doingLine(
   if (r.carrying && !r.order) return 'Carrying a child'
   const task = r.script && taskOf(r.script, scripts)
   const step = stepLine(r.order, buildings)
-  if (!task) return step ?? orderDoing(r)
+  if (!task) return step ?? orderDoing(r, arrives)
   const what = taskLine(task, r.script!.building)
   const o = r.order
   // The task's own order says no more than the task does, but where a haul route is and what a
   // smithy makes.
   if (o && o.kind === TASK_ORDER[task]) {
-    if (o.kind === 'haul') return orderDoing(r)
-    return o.kind === 'workAt' && o.makes ? `${what}: ${lower(orderDoing(r))}` : what
+    if (o.kind === 'haul') return orderDoing(r, arrives)
+    return o.kind === 'workAt' && o.makes ? `${what}: ${lower(orderDoing(r, arrives))}` : what
   }
-  return `${what}: ${o ? lower(step ?? orderDoing(r)) : 'waiting'}`
+  return `${what}: ${o ? lower(step ?? orderDoing(r, arrives)) : 'waiting'}`
 }
 
 /**
@@ -135,3 +144,21 @@ function placeLine(place: GoodsPlace, buildings: readonly Pick<Building, 'id' | 
 
 const article = (name: string) => (/^[aeiou]/.test(name) ? 'an' : 'a')
 const lower = (line: string) => line.charAt(0).toLowerCase() + line.slice(1)
+
+/**
+ * About how many ticks until each resident arrives where they walk, ride or drive
+ * (`arrivalTicks`), on the ground as the Player knows it: a road wherever one is built, and
+ * Plains where the terrain is unexplored or not loaded yet, as the server guesses too.
+ */
+export function arrivalOf(
+  world: Omit<ArrivalWorld, 'ground'> & { buildings: Building[] },
+  terrainAt: ((x: number, y: number) => number | undefined) | undefined,
+): (r: Resident) => number | undefined {
+  const roads = roadTiles(world, world.size)
+  const ground = (x: number, y: number): Terrain => {
+    if (roads.has(tileIndex(world.size, x, y))) return Terrain.Road
+    const t = terrainAt?.(x, y)
+    return t === undefined || t === UNEXPLORED ? Terrain.Plains : (t as Terrain)
+  }
+  return (r) => arrivalTicks({ ...world, ground }, r)
+}
