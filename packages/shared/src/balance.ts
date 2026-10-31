@@ -1673,6 +1673,78 @@ export function combatLearned(resident: Resident, tick: number): number {
   return COMBAT_SKILL_PER_BLOW * (statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE)
 }
 
+/** Most trainees at one training ground at a time (`CONTEXT.md`: Trainee). */
+export const TRAINING_GROUND_MAX_TRAINEES = 3
+
+/**
+ * Trained bonus a trainee of average Intellect gains in a stat each tick a teacher is there
+ * (`CONTEXT.md`: Training): an average base of 10 reaches its cap of 5 in about a game year.
+ */
+export const TRAIN_STAT_PER_TICK = 5 / TICKS_PER_GAME_YEAR
+
+/** How much faster training a skill goes than learning it by doing (`CONTEXT.md`: Training). */
+export const TRAIN_SKILL_FACTOR = 2
+
+/**
+ * The most of each skill a resident can have (`CONTEXT.md`: Skill): where it stops making them
+ * better. Training never takes a skill past it.
+ */
+export const SKILL_MAX: Readonly<Record<SkillName, number>> = {
+  mining: WORK_SKILL_MAX,
+  woodcutting: WORK_SKILL_MAX,
+  smelting: WORK_SKILL_MAX,
+  smithing: WORK_SKILL_MAX,
+  farming: WORK_SKILL_MAX,
+  construction: CONSTRUCTION_SKILL_MAX,
+  combat: COMBAT_SKILL_LIMIT / COMBAT_SKILL_EFFECT,
+  driving: DRIVING_SKILL_LIMIT / DRIVING_SKILL_EFFECT,
+}
+
+/**
+ * Each skill learned by doing, in points per game day for a learner of average Intellect. Combat
+ * is learned by blows rather than days; for training it counts as reaching its maximum in a game
+ * year, as the work skills do.
+ */
+export const SKILL_PER_DAY: Readonly<Record<SkillName, number>> = {
+  mining: WORK_SKILL_PER_DAY,
+  woodcutting: WORK_SKILL_PER_DAY,
+  smelting: WORK_SKILL_PER_DAY,
+  smithing: WORK_SKILL_PER_DAY,
+  farming: WORK_SKILL_PER_DAY,
+  construction: CONSTRUCTION_SKILL_PER_DAY,
+  combat: SKILL_MAX.combat / (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY),
+  driving: DRIVING_SKILL_PER_DAY,
+}
+
+/**
+ * What `trainee` gains in `subject` from one tick with `teacher` at the ground (`CONTEXT.md`:
+ * Training): their Intellect sets the pace, `TRAIN_STAT_PER_TICK` for a stat, `TRAIN_SKILL_FACTOR`
+ * times the by-doing rate for a skill. Never past the teacher's own effective value, nor a stat's
+ * `trainedCap` or a skill's `SKILL_MAX`; 0 at that ceiling. A stat's gain goes into its trained
+ * bonus, which old age shrinks along with the base, so the teacher's ceiling is scaled back by it.
+ */
+export function trainingGain(
+  trainee: Resident,
+  teacher: Resident,
+  subject: StatName | SkillName,
+  tick: number,
+): number {
+  const pace = statValue(trainee, 'intellect', tick) / INTELLECT_AVERAGE
+  if (subject in trainee.stats) {
+    const stat = subject as StatName
+    const { base, trained } = trainee.stats[stat]
+    const toCap = trainedCap(base) - trained
+    const toTeacher =
+      (statValue(teacher, stat, tick) - statValue(trainee, stat, tick)) / ageFactor(trainee, tick)
+    return Math.max(0, Math.min(TRAIN_STAT_PER_TICK * pace, toCap, toTeacher))
+  }
+  const skill = subject as SkillName
+  const has = trainee.skills[skill] ?? 0
+  const toTeacher = (teacher.skills[skill] ?? 0) - has
+  const perTick = (SKILL_PER_DAY[skill] / TICKS_PER_GAME_DAY) * TRAIN_SKILL_FACTOR * pace
+  return Math.max(0, Math.min(perTick, SKILL_MAX[skill] - has, toTeacher))
+}
+
 /**
  * How many tiles further along an army's way a member may get than the one furthest behind
  * (`CONTEXT.md`: Army): one ahead waits, so the army keeps together at the pace of the slowest.

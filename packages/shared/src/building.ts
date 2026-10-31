@@ -6,6 +6,7 @@ import {
   RECIPES,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
+  TRAINING_GROUND_MAX_TRAINEES,
   WORKPLACE_MAX_WORKERS,
   buildWork,
   canWork,
@@ -547,6 +548,37 @@ export function teachProblem(
 }
 
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/**
+ * Who trains at a training ground (`CONTEXT.md`: Trainee): the residents holding a train order for
+ * it and standing on its footprint, found from residents' orders as its teacher is.
+ */
+export function traineesOf<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
+  ground: Building,
+  residents: readonly R[],
+  size = MAP_SIZE,
+): R[] {
+  return residents.filter(
+    (r) => r.order?.kind === 'train' && r.order.buildingId === ground.id && isAt(r, ground, size),
+  )
+}
+
+/**
+ * Why a resident can't start training at the building on their tile, or undefined if they can
+ * (`CONTEXT.md`: Trainee): it has to be a finished training ground with room for another
+ * trainee, and they grown. They need no teacher there to start: without one they wait.
+ */
+export function trainProblem(world: WorldState, resident: Resident): string | undefined {
+  if (!canWork(resident, world.tick)) return 'children can’t train'
+  const here = buildingAt(world, resident.x, resident.y)
+  if (!here || here.kind !== 'trainingGround') return 'there is no training ground here'
+  if (here.site) return 'it is still a construction site'
+  const o = resident.order
+  if (o?.kind === 'train' && o.buildingId === here.id) return 'already training here'
+  if (traineesOf(here, world.residents).length >= TRAINING_GROUND_MAX_TRAINEES)
+    return `the training ground has room for ${TRAINING_GROUND_MAX_TRAINEES} trainees`
+  return undefined
+}
 
 /**
  * The realms holding a workplace (`CONTEXT.md`: Holding a workplace): those whose residents work

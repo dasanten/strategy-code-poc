@@ -55,7 +55,8 @@ export type TrainingSubject = StatName | SkillName
 /** Whether `x` names a stat or a skill, something a training ground can teach. */
 export function isTrainingSubject(x: unknown): x is TrainingSubject {
   return (
-    (STAT_NAMES as readonly unknown[]).includes(x) || (SKILL_NAMES as readonly unknown[]).includes(x)
+    (STAT_NAMES as readonly unknown[]).includes(x) ||
+    (SKILL_NAMES as readonly unknown[]).includes(x)
   )
 }
 
@@ -624,6 +625,18 @@ export interface TeachOrder {
   subject: TrainingSubject
 }
 
+/**
+ * Training (`CONTEXT.md`: Trainee, Training): the resident trains at the finished training ground
+ * `buildingId` while they stand on its footprint, until ordered otherwise; walking off ends it.
+ * `learning` is the subject they gained in on the last tick, null while they wait: no teacher
+ * there, or at their ceiling in its subject.
+ */
+export interface TrainOrder {
+  kind: 'train'
+  buildingId: string
+  learning: TrainingSubject | null
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -640,6 +653,7 @@ export type ResidentOrder =
   | AttackOrder
   | ClimbOrder
   | TeachOrder
+  | TrainOrder
   | LineOrder
   | PayOrder
   | BuyCityOrder

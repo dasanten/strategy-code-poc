@@ -124,6 +124,7 @@ export const GETS_OFF_FIRST: readonly string[] = [
   'tearDown',
   'workAt',
   'teach',
+  'train',
   'breed',
   'attack',
   'climb',

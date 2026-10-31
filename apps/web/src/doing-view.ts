@@ -60,10 +60,10 @@ export function doingLine(
   if (!task) return step ?? orderDoing(r, arrives)
   const what = taskLine(task, r.script!.building)
   const o = r.order
-  // The task's own order says no more than the task does, but where a haul route is and what a
-  // smithy makes.
+  // The task's own order says no more than the task does, but where a haul route is, what a
+  // trainee learns and what a smithy makes.
   if (o && o.kind === TASK_ORDER[task]) {
-    if (o.kind === 'haul') return orderDoing(r, arrives)
+    if (o.kind === 'haul' || o.kind === 'train') return orderDoing(r, arrives)
     return o.kind === 'workAt' && o.makes ? `${what}: ${lower(orderDoing(r, arrives))}` : what
   }
   return `${what}: ${o ? lower(step ?? orderDoing(r, arrives)) : 'waiting'}`
@@ -89,6 +89,7 @@ const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   tearDown: 'tearDown',
   breed: 'breed',
   feedStable: undefined,
+  train: 'train',
   defend: undefined,
 }
 
@@ -107,6 +108,7 @@ function taskLine(task: Task, building: SeenScript['building']): string {
   if (task === 'build') return name ? `Building ${article(name)} ${name}` : 'Building'
   if (task === 'tearDown') return name ? `Tearing down the ${name}` : 'Tearing down'
   if (task === 'feedStable') return 'Feeding the stable'
+  if (task === 'train') return 'Training'
   if (task === 'defend') return 'Defending'
   if (task === 'breed') return 'Breeding horses'
   if (task === 'haul') return 'Hauling'

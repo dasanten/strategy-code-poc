@@ -325,7 +325,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
       ),
       field('target', view('tile'), 'Where a walk or drive goes.', 'for other orders'),
       field(
@@ -343,10 +343,16 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'buildingId',
         'string',
-        'The building worked, taught at or torn down.',
+        'The building worked, taught or trained at, or torn down.',
         'for other orders',
       ),
       field('subject', 'string', 'The stat or skill taught.', 'for other orders'),
+      field(
+        'learning',
+        'string',
+        'The stat or skill a trainee gained in on the last tick.',
+        'while a trainee waits (no teacher, or at their ceiling), and for other orders',
+      ),
       field('building', 'string', 'The kind of building being built.', 'for other orders'),
       field(
         'siteId',
@@ -506,6 +512,12 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'string',
         'The stat or skill a training ground teaches: "strength", "endurance", "agility", "intellect" or a skill such as "combat".',
         'for any other building, and while nobody teaches there',
+      ),
+      field(
+        'trainees',
+        listOf('string'),
+        'The residents training at a training ground; empty while nobody trains there.',
+        'for any other building',
       ),
     ],
   },

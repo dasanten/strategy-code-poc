@@ -96,6 +96,7 @@ export type ActionId =
   | 'wallTo'
   | 'work'
   | 'feedStable'
+  | 'train'
   | 'tearDown'
   | 'breed'
   | 'goods'
@@ -124,6 +125,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   wallTo: 'Q',
   work: 'E',
   feedStable: 'F',
+  train: 'I',
   tearDown: 'T',
   breed: 'F',
   goods: 'G',
@@ -267,6 +269,10 @@ export function residentActions(h: ResidentHere): CardAction[] {
   if (h.adult && h.building?.kind === 'stable' && !h.building.site) {
     add(row('feedStable', 'Feed the stable'))
   }
+  // A finished training ground: train there (`CONTEXT.md`: Trainee).
+  if (h.adult && h.building?.kind === 'trainingGround' && !h.building.site) {
+    add(row('train', 'Train'))
+  }
   if (works) {
     const site = h.building?.site
       ? h.building
@@ -342,6 +348,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   haul: 'move',
   work: 'work',
   feedStable: 'work',
+  train: 'work',
   build: 'work',
   roadTo: 'work',
   wallTo: 'work',
