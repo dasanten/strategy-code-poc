@@ -94,6 +94,7 @@ describe('admin map world', () => {
     name: id,
     realmId,
     townHallId: `${id}-hall`,
+    occupation: null,
     ...(tradeOrg ? { tradeOrg } : {}),
     x: 10,
     y: 20,

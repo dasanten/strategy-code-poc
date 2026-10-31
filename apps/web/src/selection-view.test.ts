@@ -960,7 +960,9 @@ describe('what the build menu offers off a node, and why a kind can’t go here'
   const hall = building({ id: 'hall', kind: 'townHall', cityId: 'c1', x: 20, y: 20 })
   const seen = {
     buildings: [hall],
-    cities: [{ id: 'c1', name: 'Ashford', realmId: 'me', townHallId: 'hall' }] as City[],
+    cities: [
+      { id: 'c1', name: 'Ashford', realmId: 'me', townHallId: 'hall', occupation: null },
+    ] as City[],
   }
   const noNodes = () => undefined
 

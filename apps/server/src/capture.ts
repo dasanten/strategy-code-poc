@@ -1,5 +1,6 @@
 import {
-  captorOf,
+  OCCUPATION_TICKS,
+  occupierOf,
   drivenCarriageId,
   inCityArea,
   realmName,
@@ -20,16 +21,26 @@ export interface Capture {
 }
 
 /**
- * Captures every city that has a captor (`captorOf`, `CONTEXT.md`: Capturing a city), on a map
- * of `size` tiles. Runs last in the tick, once fights, deaths and dropped weapons are settled.
+ * Runs the occupations of town halls (`CONTEXT.md`: Occupying a town hall, Capturing a city), on
+ * a map of `size` tiles: one starts the tick a realm occupies a hall (`occupierOf`) with none
+ * running; the first tick another realm or nobody does, it is broken and its days are lost; held
+ * `OCCUPATION_TICKS`, the city is captured. Runs once fights, deaths and dropped weapons are
+ * settled, and before refilling, so whoever is at home in a city captured this tick refills there.
  */
 export function stepCaptures(world: WorldState, size: number): Capture[] {
   const captures: Capture[] = []
   for (const city of world.cities) {
-    const captor = captorOf(world, city, size)
-    if (captor === null || captor === city.realmId) continue
-    captures.push({ cityId: city.id, from: city.realmId, to: captor })
-    captureCity(world, city, captor, size)
+    const occupier = occupierOf(world, city, size)
+    if (occupier === null) {
+      city.occupation = null
+      continue
+    }
+    if (city.occupation?.realmId !== occupier)
+      city.occupation = { realmId: occupier, since: world.tick }
+    if (world.tick - city.occupation.since < OCCUPATION_TICKS) continue
+    city.occupation = null
+    captures.push({ cityId: city.id, from: city.realmId, to: occupier })
+    captureCity(world, city, occupier, size)
   }
   return captures
 }

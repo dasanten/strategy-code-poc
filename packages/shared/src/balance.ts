@@ -407,6 +407,13 @@ export const NPC_VILLAGE: NpcCitySize = { size: 29, residents: 6, houses: 2, far
 export const NPC_TOWN: NpcCitySize = { size: 45, residents: 16, houses: 5, farms: 2, food: 200 }
 
 /**
+ * Game days a realm must occupy a city's town hall without a break to capture the city
+ * (`CONTEXT.md`: Capturing a city, Occupying a town hall; ADR 0017): long enough for its owner to
+ * hear of it and march back.
+ */
+export const OCCUPATION_GAME_DAYS = 10
+
+/**
  * What an NPC city asks for each resident living there when it is bought (`CONTEXT.md`: Buying a
  * city), in Coins: five game days of one mint worker's coins (`RECIPES`, `BATCHES_PER_DAY`).
  */

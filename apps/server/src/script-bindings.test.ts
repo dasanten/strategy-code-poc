@@ -224,7 +224,7 @@ describe('script bindings', () => {
     const { world, explored } = setup()
     // Realm r2's storage, in sight of a1 but with no one of r1's at it (`CONTEXT.md`: Seeing
     // inside a storage, Seeing how someone fares).
-    world.cities.push({ id: 'c2', name: 'Elm', realmId: 'r2', townHallId: 'th2' })
+    world.cities.push({ id: 'c2', name: 'Elm', realmId: 'r2', townHallId: 'th2', occupation: null })
     world.buildings.push({
       id: 's2',
       kind: 'storage',
@@ -336,7 +336,7 @@ describe('script bindings', () => {
     const { world, explored } = setup()
     world.tick = 10
     const house = { id: 'h1', kind: 'house' as const, cityId: 'c1', x: 160, y: 160 }
-    const city = { id: 'c1', name: 'Far', realmId: 'r2', townHallId: 'h0' }
+    const city = { id: 'c1', name: 'Far', realmId: 'r2', townHallId: 'h0', occupation: null }
     world.lastSeen[7] = [
       { is: 'building', ...house, seenAt: 4 },
       { is: 'city', ...city, seenAt: 4 },

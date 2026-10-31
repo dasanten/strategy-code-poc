@@ -418,6 +418,7 @@ function places(
   const out: SeenPlace[] = []
   const seenCities = new Set<string>()
   const seenStorages = new Set<string>()
+  const seenHalls = new Set<string>()
   // Only the buildings near the observers, in the world's order, when they are sorted by square.
   const near = bySquare
     ? [...eyes.watched]
@@ -430,6 +431,7 @@ function places(
     out.push({ is: 'building', ...seenBuilding(world, insight, b) })
     if (b.cityId !== null) seenCities.add(b.cityId)
     if (b.cityId !== null && b.kind === 'storage' && !b.site) seenStorages.add(b.cityId)
+    if (b.cityId !== null && b.kind === 'townHall') seenHalls.add(b.cityId)
   }
   // An NPC city names the Player its price (`CONTEXT.md`: Buying a city), from all of it, or says
   // it won't sell to them or refuses them at all (`CONTEXT.md`: NPC city reaction). One that doesn't
@@ -455,7 +457,9 @@ function places(
               ? { trade: shownLines(npcCityPrices(world, c, realmId), insight.insideCity(c.id)) }
               : {}),
           }
-    out.push({ is: 'city', ...c, ...sale, ...refuses, ...deal })
+    // Who occupies its town hall only with the hall in sight (`CONTEXT.md`: Occupying a town hall).
+    const occupation = seenHalls.has(c.id) ? c.occupation : null
+    out.push({ is: 'city', ...c, occupation, ...sale, ...refuses, ...deal })
   }
   return out
 }

@@ -1777,6 +1777,19 @@ export interface City {
    * on (`formerPlayerStanding`), which goes to their next realm when it is founded.
    */
   formerPlayer?: { userId: number; tick: number }
+  /**
+   * The occupation of its town hall running now (`CONTEXT.md`: Occupying a town hall), or null.
+   * Held `OCCUPATION_GAME_DAYS` without a break, it captures the city.
+   */
+  occupation: Occupation | null
+}
+
+/** A realm occupying a city's town hall (`CONTEXT.md`: Occupying a town hall). */
+export interface Occupation {
+  /** The occupier's realm. */
+  realmId: string
+  /** The tick it started. */
+  since: number
 }
 
 export type BuildingKind =

@@ -66,6 +66,7 @@ export function foundCity(world: WorldState, hall: Building, realmId: string | n
     name: CITY_NAMES[hash(`${world.seed}:${id}`) % CITY_NAMES.length]!,
     realmId,
     townHallId: hall.id,
+    occupation: null,
   }
   world.cities.push(city)
   hall.cityId = id

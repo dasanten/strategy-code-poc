@@ -297,6 +297,7 @@ export function foundTradeOrgHq(
     name: CITY_NAMES[hash(`${world.seed}:${id}`) % CITY_NAMES.length]!,
     realmId: null,
     townHallId: '',
+    occupation: null,
     tradeOrg: 'hq',
   }
   // Workplaces belong to no city; the HQ keeps a list of its own.

@@ -151,7 +151,13 @@ describe('fetching materials', () => {
   it('just builds with no storage of the realm holding the materials', () => {
     const { world, terrain } = houseWorld()
     storage(world, 's1', AT.x + 6, AT.y, { stone: 50 })
-    world.cities.push({ id: 'c2', name: 'Elsewhere', realmId: 'r2', townHallId: 'none' })
+    world.cities.push({
+      id: 'c2',
+      name: 'Elsewhere',
+      realmId: 'r2',
+      townHallId: 'none',
+      occupation: null,
+    })
     world.buildings.push({
       id: 'theirs',
       kind: 'storage',
