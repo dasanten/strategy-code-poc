@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   ADMIN_TERRAIN_OVERVIEW_PATH,
   CHUNK_SIZE,
+  MAP_SIZE,
   SESSION_COOKIE,
+  SIGHT_RANGE,
   Terrain,
   UNEXPLORED,
   adminTerrainChunkPath,
@@ -72,6 +74,114 @@ describe('ExploredTerrain', () => {
     expect(loaded.isExplored(viewer, 60, 65)).toBe(true)
     expect(loaded.isExplored(viewer, 20, 60)).toBe(true)
     expect(loaded.isExplored(viewer, 40, 60)).toBe(false)
+    close()
+  })
+})
+
+/** The chunks with an explored tile, found by asking every tile: what `exploredChunks` replaced. */
+function scannedChunks(explored: ExploredTerrain, size: number): number[] {
+  const n = chunksAcross(size)
+  const found = new Set<number>()
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const c = Math.floor(y / CHUNK_SIZE) * n + Math.floor(x / CHUNK_SIZE)
+      if (!found.has(c) && explored.isExplored(player, x, y)) found.add(c)
+    }
+  }
+  return [...found].sort((a, b) => a - b)
+}
+
+/** Every tile within `radius` of (x, y), across the joins: the disc `explore` marks. */
+function disc(size: number, x: number, y: number, radius: number): Set<string> {
+  const tiles = new Set<string>()
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (dx * dx + dy * dy > radius * radius) continue
+      tiles.add(`${(((x + dx) % size) + size) % size},${(((y + dy) % size) + size) % size}`)
+    }
+  }
+  return tiles
+}
+
+describe('explored chunks', () => {
+  /** A few scattered looks, some across the joins and over each other. */
+  const looks = [
+    [5, 5, 3],
+    [60, 60, 7],
+    [127, 64, 9],
+    [64, 0, 12],
+    [62, 58, 10],
+    [100, 100, 1],
+  ] as const
+
+  it('agree with a scan of every tile, grow after explore, and come back the same after a load', async () => {
+    const explored = new ExploredTerrain(terrain)
+    expect(explored.exploredChunks(player)).toEqual([])
+    const seen: number[][] = []
+    for (const [x, y, r] of looks) {
+      explored.explore(player.id, x, y, r)
+      const chunks = explored.exploredChunks(player)
+      expect(chunks).toEqual(scannedChunks(explored, terrain.size))
+      seen.push(chunks)
+    }
+    expect(seen.at(-1)!.length).toBeGreaterThan(seen[0]!.length)
+
+    const { db, close } = await openDb(':memory:')
+    await createAdmin(db, 'Daniel', 'admin password')
+    const { id } = db.select().from(schema.users).get()!
+    const fresh = new ExploredTerrain(terrain)
+    for (const [x, y, r] of looks) fresh.explore(id, x, y, r)
+    fresh.save(db)
+    const loaded = ExploredTerrain.load(db, terrain)
+    expect(loaded.exploredChunks({ id })).toEqual(fresh.exploredChunks({ id }))
+    close()
+  })
+
+  it('come back the same after a load on a map whose side is not a whole number of bytes', async () => {
+    const odd = { size: 77, tiles: new Uint8Array(77 * 77) }
+    const { db, close } = await openDb(':memory:')
+    await createAdmin(db, 'Daniel', 'admin password')
+    const { id } = db.select().from(schema.users).get()!
+    const fresh = new ExploredTerrain(odd)
+    for (const [x, y, r] of looks) fresh.explore(id, x, y, r)
+    fresh.save(db)
+    expect(ExploredTerrain.load(db, odd).exploredChunks({ id })).toEqual(
+      fresh.exploredChunks({ id }),
+    )
+    close()
+  })
+
+  it('explore marks exactly the disc, skipping what is already explored', () => {
+    for (const map of [terrain, { size: 77, tiles: new Uint8Array(77 * 77) }]) {
+      const explored = new ExploredTerrain(map)
+      const expected = new Set<string>()
+      for (const [x, y, r] of looks) {
+        for (const t of disc(map.size, x, y, r)) expected.add(t)
+        explored.explore(player.id, x, y, r)
+      }
+      for (let y = 0; y < map.size; y++) {
+        for (let x = 0; x < map.size; x++) {
+          expect(explored.isExplored(player, x, y)).toBe(expected.has(`${x},${y}`))
+        }
+      }
+    }
+  })
+
+  it('ten welcomes on a full-size map take well under a second', async () => {
+    const full = { size: MAP_SIZE, tiles: new Uint8Array(MAP_SIZE * MAP_SIZE) }
+    const { db, close } = await openDb(':memory:')
+    await createAdmin(db, 'Daniel', 'admin password')
+    const { id } = db.select().from(schema.users).get()!
+    const before = new ExploredTerrain(full)
+    for (let i = 0; i < 40; i++) {
+      before.explore(id, (i * 977) % MAP_SIZE, (i * 1931) % MAP_SIZE, SIGHT_RANGE)
+    }
+    before.save(db)
+    const explored = ExploredTerrain.load(db, full)
+    const start = performance.now()
+    for (let i = 0; i < 10; i++) explored.exploredChunks({ id })
+    expect(performance.now() - start).toBeLessThan(100)
+    expect(explored.exploredChunks({ id })).toEqual(before.exploredChunks({ id }))
     close()
   })
 })

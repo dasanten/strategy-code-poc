@@ -115,7 +115,7 @@ The shared language of the game. Domain terms only — no implementation details
   can't be ridden on bare Mountain.
 - **Footprint:** the square of tiles a building or construction site covers, the same for every
   building of a kind: Wall, Gate and Road 1×1; House, Storage, Smelter, Mint, Smithy, Mine,
-  Quarry and Lumber camp 2×2; Town hall, Warehouse and Stable 3×3; Farm 4×4. A site covers its
+  Quarry and Lumber camp 2×2; Town hall, Warehouse, Stable and Training ground 3×3; Farm 4×4. A site covers its
   building's footprint from the moment it is laid out. Footprints are never turned.
 - **Where buildings go:** one building per tile: every tile of a footprint must be free and
   passable. Mines, quarries and lumber camps go with one tile of their footprint on a resource
@@ -124,7 +124,10 @@ The shared language of the game. Domain terms only — no implementation details
   including in another Organization's territory.
 - **At a building:** standing on any tile of its footprint. Wherever a rule says "on a
   building's tile", it means at the building. Laying out a site takes a resident on one tile of
-  the footprint it will cover.
+  the footprint it will cover. **Spreading over the footprint:** a resident sent to work, build or
+  breed at a building (the Work, Build and Breeding defaults) walks to the footprint tile with
+  the fewest of the crew standing on it, the nearest on ties, so a crew stands spread over the
+  building rather than on one corner. Which tile they stand on changes nothing else.
 - **A building's pile:** goods lying anywhere on a building's footprint are one pile, reached by
   anyone at the building: a workplace's output, a site's delivered materials, what a smelter
   uses. Elsewhere a pile is the goods on one tile.
@@ -410,6 +413,10 @@ The shared language of the game. Domain terms only — no implementation details
   that is gone is forgotten. A city stays remembered while any of its buildings does. Things that
   move are never remembered. Like explored terrain, it grows only from sight: joining an alliance
   does not hand over what its members saw before, and leaving one keeps what was seen through it.
+  Last seen is brought up to date once every few ticks for each realm, staggered across realms
+  like NPC planning (ADR 0016), not every tick: a building that leaves sight between two refreshes
+  is remembered as it was at the last refresh, up to those few ticks earlier. What is in sight now
+  is unaffected.
 
 ## Military
 
@@ -591,6 +598,30 @@ The shared language of the game. Domain terms only — no implementation details
   and Construction run from 0 to 100: each point adds 1 % to output or building work, so a
   skilled resident does at most twice what an unskilled one does; an average learner takes about
   a game year to get there.
+- **Training ground:** a building where residents train (`Training`). 3×3, on any passable terrain
+  except Mountain, built like any building. Like a workplace, it has no owner: whoever teaches
+  there holds it. One ground teaches one **subject** at a time: a stat (Strength, Endurance,
+  Agility, Intellect) or a skill (Combat, Driving, Mining, …), the one its teacher set.
+- **Teacher:** a grown resident at a training ground with the **Teach** order, which names the
+  subject. A ground has one teacher at a time; a second Teach there fails. Leaving the ground or
+  taking another order ends the teaching, and the ground teaches nothing until someone teaches
+  again.
+- **Trainee:** a grown resident at a training ground with the **Train** task (default script
+  "Train"), up to a maximum per ground (a balance number). Trainees learn only while a teacher is
+  there; without one they wait.
+- **Training:** a trainee gains in the ground's subject each tick a teacher is there, only while
+  below the teacher's own effective value in it: nobody learns past their teacher. A stat's
+  trained bonus never passes its cap (Trained bonus); a skill trains toward the teacher's skill,
+  up to the skill's maximum. A trainee at the ceiling waits. The trainee's Intellect sets the
+  pace, as for learning by doing; training a skill goes faster than learning it by doing. The
+  teacher's level is only the ceiling, never the pace. The teacher gains nothing and needs no
+  skill to teach. Training costs nothing but time and food: teacher and trainees eat as usual and
+  refill at the ground as at a workplace (Refilling at a workplace); the Train default has the
+  usual food params. Nothing trained decays; only old age lowers stats.
+- **Who trains:** Players' residents, by order, queue step or script. NPC cities and the Trade
+  Organization train nobody for now; whether an NPC city puts a spare hand to teaching its
+  soldiers is a question for the reserve-driven chain (NPC city), not settled here. Scripts have
+  `teach(subject)` and `train()`; a building's script view shows its teacher, subject and trainees.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
@@ -657,6 +688,16 @@ The shared language of the game. Domain terms only — no implementation details
   places them as the Horse grant does (stats, stable or storage, Food by them, realm log) and
   the notice is gone for good, also across Leader deaths. A Player with no living Leader can't
   claim until they have one again.
+- **Horse name:** every horse has a name, given by the game when it comes into being (starting
+  city, Trade Organization, foal, Horse grant) from a pool of horse names apart from the
+  residents' pool. **Renaming a horse:** the Player can rename any horse of their realm, by hand
+  or from a script, like renaming a resident: free, instant, from anywhere; names need not be
+  unique. The name shows wherever the horse shows: the tile card, the stable, the carriage it
+  pulls, its rider's card and the realm log. Scripts see it.
+- **Horses drawer:** a drawer on the tool rail, like the Residents drawer, listing the realm's
+  horses grouped by where they stand: each stable by name, hitched to a carriage, ridden, loose.
+  A row shows name, stats, age, health and hunger; tapping it centres the map on the horse and
+  picks it.
 - **Horse stats:** every horse has Speed, Strength and Endurance, and an age. Speed is how fast
   it pulls its carriage or carries a rider (`Riding`); Strength is how much the carriage it pulls
   can hold; Endurance is how much Food it needs, as a resident's Endurance is for them. New
@@ -757,7 +798,11 @@ The shared language of the game. Domain terms only — no implementation details
   **Running a script** is an order for a resident or an army: the script runs once a tick for
   each of them, with its own memory, and can request only what that resident or army could. Any
   other order ends it. A script can hand over to a built-in order for a while and take control
-  back. A script ends itself by calling `end()`: the resident stands idle, and in a queue its next
+  back. **Waiting:** a script may call `wait()`: it is not run again until its current order ends,
+  is replaced, or the resident is struck (Defence script); then it runs every tick again. The
+  game's defaults wait after every walk, store and fetch, so a resident on the move costs no
+  script run; an edited copy of a default behaves like the default. A script ends itself by
+  calling `end()`: the resident stands idle, and in a queue its next
   step starts. `end(reason)` also notes the short reason in the realm log ("Ana stopped Work: no
   workplace on her tile"). The defaults end that way when their target is missing or gone; the
   Build, Tear down and Breed horses defaults also end once the site is finished, the building is
@@ -899,6 +944,20 @@ The shared language of the game. Domain terms only — no implementation details
   and noted in the realm log; when none of them can start, the queue ends. Any order that isn't a
   step ends it. Scripts see a resident's queue (which step, and what it is) but can't start or
   change one; their `order` and `script` stay the current step's own.
+- **Saved queue:** the Player saves the planner's steps under a name, kept per browser like saved
+  groups, so the server never sees them. The planner offers Save and Load; Load appends the
+  saved steps to the planned ones. A saved step keeps its places (buildings, tiles); on Load, a
+  step whose place is gone from the last-seen map is flagged in the planner, and the server
+  skips it when its turn comes, as any step that can't start.
+- **Planner clipboard:** steps are picked in the planner (tap; Shift for a range); Copy puts
+  copies on a clipboard in the browser, Paste inserts them after the picked step, in the same
+  planner or another resident's or a group's. The clipboard survives switching cards, not
+  reloading the page.
+- **Repeat block:** in the planner, some steps in a row wrapped with a count, nestable. It is a
+  planner thing only: when the queue is given, the block becomes that many plain copies of its
+  steps, so the queue, the server and scripts see only steps. A queue holds at most so many
+  steps (a balance number); the planner says when a plan would exceed it. A running queue shows
+  the copies, the current one marked. The whole-queue loop stays as it is.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.
@@ -908,6 +967,10 @@ The shared language of the game. Domain terms only — no implementation details
   an army): a header that always shows (name, Doing, hunger and health, what they carry) and one
   open tab under it: Orders, Queue, Stats or Script. Orders are grouped by kind (Move, Work &
   build, Goods, Scripts), and orders they can't take right now are left out.
+- **Motion on the map:** the world moves once a tick, but the map shows it smoothly: a token that
+  changed tile glides from the old tile to the new one over the tick, and the tokens of residents
+  at work move a little on their tile, so a crew looks busy rather than frozen. Pure drawing in
+  the browser: the world and what it sends change nothing.
 - **Picking a target:** an order that needs a tile or building (walk to, store at, build here)
   shrinks the card to its header and shows "Tap where …" with Cancel until the Player picks one
   on the map; then the card comes back as it was. On a phone every card is a bottom sheet (peek,

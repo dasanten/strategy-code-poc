@@ -23,7 +23,16 @@ import { FOOTPRINT } from './footprint.js'
  * The tasks that run a default script. Defend is never given: being struck starts it
  * (`CONTEXT.md`: Defence script).
  */
-export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable', 'defend'] as const
+export const TASKS = [
+  'work',
+  'build',
+  'haul',
+  'tearDown',
+  'breed',
+  'feedStable',
+  'defend',
+  'train',
+] as const
 export type Task = (typeof TASKS)[number]
 
 /**
@@ -39,6 +48,7 @@ export const TARGET_PARAMS: Partial<Readonly<Record<Task, string>>> = {
   tearDown: 'building',
   breed: 'stable',
   feedStable: 'stable',
+  train: 'ground',
 }
 
 /** The target param of a script (`TARGET_PARAMS`), if it is the default of a task with one. */
@@ -91,6 +101,12 @@ export interface TaskMemory {
    * (`TARGET_PARAMS`).
    */
   feedStable: { stableId: string }
+  /**
+   * Train: the training ground the resident stood on when given it, in the param `ground` too
+   * (`TARGET_PARAMS`), and the `subject` to learn there, if one was asked for: the default ends
+   * if the ground teaches something else.
+   */
+  train: { groundId: string; subject?: string }
 }
 
 export interface DefaultScript {
@@ -137,7 +153,8 @@ param foodTake: number = ${GET_FOOD_TAKE} // units of Food to take along`
 
 const GET_FOOD = `// Getting food: below params.foodAt units of Food on me, fetch Food up to
 // params.foodTake at from while it holds Food, else at the nearest storage of
-// my realm with Food from near. True once I set off, which I log.
+// my realm with Food from near. True once I set off, which I log; I wait
+// until I have it.
 fn getFoodIfLow(from, near) {
   let food = me.carried.food
   if (food == null) { food = 0 }
@@ -151,6 +168,7 @@ fn getFoodIfLow(from, near) {
     if (stores.length > 0) { at = stores[0] }
   }
   if (at == null || fetch({food: units}, at.id) != null) { return false }
+  wait() // until I have it
   log("low on Food (" + floor(food) + "): fetching " + units + " at " + placeName(at))
   return true
 }
@@ -231,7 +249,10 @@ if (memory.at == null && params.workplace != null) {
   memory.at = {x: params.workplace.x, y: params.workplace.y}
 }
 if (memory.at == null || memory.stuck) { return }
-if (me.order != null && me.order.kind != "workAt") { return } // on my way
+if (me.order != null && me.order.kind != "workAt") { // on my way
+  wait()
+  return
+}
 
 if (storeLoad()) { return }
 if (walkBack()) { return }
@@ -303,6 +324,7 @@ fn storeLoad() {
     carry.crewFood = 0 // not storing: no crew food either
     return false
   }
+  wait() // until it is stored
   let to = building(carry.storageId)
   if (carry.load != null && to != null) {
     log("pile full: carrying " + goodsText(carry.load, carry.goods) + " to " + placeName(to))
@@ -360,7 +382,7 @@ fn walkBack() {
     memory.stuck = true
     log("no way back to the workplace")
   } else {
-    walkTo(memory.at.x, memory.at.y)
+    if (walkTo(memory.at.x, memory.at.y) == null) { wait() } // until I am there
     if (away != null) { away.walked = true }
   }
   return true
@@ -466,7 +488,10 @@ ${FOOD_PARAMS}
 
 if (!pickSite()) { return }
 if (memory.stuck) { return }
-if (me.order != null && me.order.kind != "build") { return } // on my way
+if (me.order != null && me.order.kind != "build") { // on my way
+  wait()
+  return
+}
 
 let site = null
 if (memory.siteId != null) { site = building(memory.siteId) }
@@ -530,7 +555,7 @@ fn walkBack() {
     memory.stuck = true
     log("no way back to the site")
   } else {
-    walkTo(memory.at.x, memory.at.y)
+    if (walkTo(memory.at.x, memory.at.y) == null) { wait() } // until I am there
     if (away != null) { away.walked = true }
   }
   return true
@@ -572,6 +597,7 @@ fn fetchMissing(site) {
   if (topUp > 0) { load.food = topUp }
   for (m of missing) { load[m.good] = m.units }
   if (fetch(load, from.id) == null) {
+    wait() // until I have it
     memory.fetch = {storageId: from.id, goods: load}
     log("fetching " + goodsText(load, goods) + " at " + placeName(from))
   }
@@ -711,7 +737,10 @@ ${FOOD_PARAMS}
 
 if (memory.stuck) { return }
 if (!pickBuilding()) { return }
-if (memory.walked && me.order != null && me.order.kind == "walkTo") { return } // on my way
+if (memory.walked && me.order != null && me.order.kind == "walkTo") { // on my way
+  wait()
+  return
+}
 if (walkBack()) { return }
 // With no Food anywhere, I tear down on.
 let x = me.x
@@ -742,7 +771,10 @@ fn pickBuilding() {
 fn walkBack() {
   let away = memory.food
   if (away == null) { return false }
-  if (me.order != null && me.order.kind != "tearDown") { return true } // on my way
+  if (me.order != null && me.order.kind != "tearDown") { // on my way
+    wait()
+    return true
+  }
   if (me.x == away.x && me.y == away.y) {
     memory.food = null
     return false
@@ -751,7 +783,7 @@ fn walkBack() {
     memory.stuck = true
     log("no way back to where I tear down")
   } else {
-    walkTo(away.x, away.y)
+    if (walkTo(away.x, away.y) == null) { wait() } // until I am there
     away.walked = true
   }
   return true
@@ -765,7 +797,7 @@ fn startTearingDown() {
   if (target == null) { target = params.building } // picked out of sight: as last seen
   if (problem == "the resident is not at that building" && target != null && !memory.walked) {
     memory.walked = true
-    walkTo(target.x, target.y)
+    if (walkTo(target.x, target.y) == null) { wait() } // until I am there
     log("walking to " + placeName(target) + " to tear it down")
     return
   }
@@ -795,6 +827,7 @@ let needFood = ${BREED_FOOD} // Food I take along for my meals while tending
 if (memory.done == true) { end() }
 if (me.order != null && me.order.kind == "breed") {
   memory.started = true
+  wait() // until the foal is born or the breeding stops
   return
 }
 if (memory.started == true) {
@@ -803,7 +836,10 @@ if (memory.started == true) {
   end()
   return
 }
-if (me.order != null && (me.order.kind == "walkTo" || me.order.kind == "pickUp")) { return }
+if (me.order != null && (me.order.kind == "walkTo" || me.order.kind == "pickUp")) {
+  wait()
+  return
+}
 if (!pickStable()) { return }
 let stable = building(memory.stableId)
 if (stable == null) {
@@ -865,7 +901,7 @@ fn startBreeding(stable) {
 
 fn walkToStable(stable) {
   memory.walked = true
-  walkTo(stable.x, stable.y)
+  if (walkTo(stable.x, stable.y) == null) { wait() } // until I am there
   log("walking to " + placeName(stable))
 }
 
@@ -892,7 +928,10 @@ if (!pickStable()) { return }
 let stable = building(memory.stableId)
 // Kept for when it is out of sight.
 if (stable != null) { memory.at = {x: stable.x, y: stable.y} }
-if (me.order != null) { return } // on my way
+if (me.order != null) { // on my way
+  wait()
+  return
+}
 if (stable == null) {
   walkBackOrEnd()
   return
@@ -900,12 +939,15 @@ if (stable == null) {
 if (storeFetched(stable)) { return }
 if (fetchIfLow(stable)) { return }
 // Enough, or none to fetch: wait at the stable.
-if (!inStable(stable, me)) { walkTo(stable.x, stable.y) }
+if (!inStable(stable, me) && walkTo(stable.x, stable.y) == null) { wait() }
 
 // Out of sight: back to it. There, and it isn't, it is torn down: I end.
 fn walkBackOrEnd() {
   let at = memory.at
-  if (at != null && (me.x != at.x || me.y != at.y) && walkTo(at.x, at.y) == null) { return }
+  if (at != null && (me.x != at.x || me.y != at.y) && walkTo(at.x, at.y) == null) {
+    wait() // until I am there
+    return
+  }
   end("the stable is gone")
 }
 
@@ -919,6 +961,7 @@ fn storeFetched(stable) {
   if (food == null) { return false }
   let got = floor(food - fetched.before)
   if (got < 1 || store({food: got}, stable.id) != null) { return false }
+  wait() // until it is stored
   say("storing " + goodsText({food: got}, ["food"]) + " in the stable")
   return true
 }
@@ -940,6 +983,7 @@ fn fetchIfLow(stable) {
     let before = me.carried.food
     if (before == null) { before = 0 }
     if (fetch({food: units}, from.id) == null) {
+      wait() // until I have it
       memory.fetched = {before: before}
       say("stable low (" + floor(held) + "): fetching " + units + " Food at " + placeName(from))
       return true
@@ -987,6 +1031,99 @@ fn say(text) {
 }
 
 ${PICK_STABLE}
+
+${LOG_TEXT}
+`,
+  },
+  train: {
+    name: 'Train',
+    source: `// Train (default): train at params.ground, or while none is picked the
+// training ground I stand on when I start, kept in memory.groundId; with
+// none, or once it is gone, I end. Away from it I walk there first. With
+// memory.subject set, I end once the ground teaches something else. While
+// no teacher is there, or I have learned all the teacher can teach me, I
+// wait there. Meals come from the ground's pile on their own, without an
+// order. Below params.foodAt units of Food on me I get Food up to
+// params.foodTake at the nearest storage of my realm with Food, and come
+// back. foodAt 0 turns getting food off.
+param ground: building // the training ground; none: the one I stand on
+${FOOD_PARAMS}
+
+if (!pickGround()) { return }
+let ground = building(memory.groundId)
+// Kept for when it is out of sight.
+if (ground != null) { memory.at = {x: ground.x, y: ground.y} }
+if (memory.at == null && params.ground != null) {
+  memory.at = {x: params.ground.x, y: params.ground.y}
+}
+if (memory.at == null || memory.stuck) { return }
+if (me.order != null && me.order.kind != "train") { return } // on my way
+
+if (walkBack()) { return }
+if (ground == null) { // here, and it isn't: torn down
+  end("the training ground is gone")
+  return
+}
+if (memory.subject != null && ground.subject != null && ground.subject != memory.subject) {
+  end("the ground teaches " + ground.subject + ", not " + memory.subject)
+  return
+}
+// With no Food anywhere, I train on.
+if (getFoodIfLow(null, ground)) { return }
+if (me.order == null) {
+  let problem = train()
+  if (problem != null) { end(problem) }
+  return
+}
+if (ground.teacher == null) { doing("Waiting for a teacher") }
+else if (me.order.learning == null) { doing("Waiting: learned all I can here") }
+else { doing(null) } // the order says what I learn
+
+// Which ground I train at: the one picked, else the one I started on, kept in
+// memory.groundId. False once I end: neither is a training ground.
+fn pickGround() {
+  if (params.ground != null) {
+    if (!isGround(params.ground)) {
+      end("the " + params.ground.kind + " is no training ground")
+      return false
+    }
+    memory.groundId = params.ground.id
+  }
+  if (memory.groundId == null) {
+    let here = buildingAt(me.x, me.y)
+    if (!isGround(here)) {
+      end("no training ground on their tile")
+      return false
+    }
+    memory.groundId = here.id
+  }
+  return true
+}
+
+// A finished training ground.
+fn isGround(b) {
+  return b != null && b.kind == "trainingGround" && b.site == null
+}
+
+// Off the ground (not there yet, or back from getting food): walk to it,
+// once; with no way there I stay put. True until I am on it.
+fn walkBack() {
+  let here = buildingAt(me.x, me.y)
+  if (here != null && here.id == memory.groundId) {
+    if (memory.walked != null) { memory.walked = null }
+    return false
+  }
+  if (memory.walked == true) {
+    memory.stuck = true
+    log("no way to the training ground")
+  } else {
+    memory.walked = true
+    walkTo(memory.at.x, memory.at.y)
+  }
+  return true
+}
+
+${GET_FOOD}
 
 ${LOG_TEXT}
 `,

@@ -365,6 +365,13 @@ export const WALL_ENCLOSES_MAX = 160_000
 export const SIGHT_RANGE = 48
 
 /**
+ * How often each realm's Last seen is brought up to date, in ticks (`CONTEXT.md`: Last seen).
+ * Realms are staggered by their id, so about one in this many refreshes on a tick; a building
+ * that leaves sight between two refreshes is remembered as it was up to this many ticks earlier.
+ */
+export const LAST_SEEN_EVERY_TICKS = 5
+
+/**
  * NPC villages placed on a full-size map (`CONTEXT.md`: NPC city); a smaller map gets fewer, by
  * its area. Fewer are placed when the map has no room left for them.
  */
@@ -1346,6 +1353,12 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   /** A farm is fields on Plains: work, but no materials, so a city can always feed itself. */
   farm: {},
   /**
+   * A training ground (`CONTEXT.md`: Training ground): a fenced yard with posts and racks on a
+   * few paving stones, so mostly Wood and a little Stone, no iron; a bit more timber than a
+   * stable, and buildable before any smelter.
+   */
+  trainingGround: { wood: 50, stone: 10 },
+  /**
    * A carriage, built at a stable (`CONTEXT.md`: Carriage): a wooden cart with iron fittings, so a
    * realm needs a smelter's iron for its second carriage.
    */
@@ -1355,10 +1368,10 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
- * a mint 5, a smithy 5, a town hall 6. A tile of wooden wall takes a sixteenth of a game day, a
- * gate an eighth, a tile of road a sixteenth (a quarter of what a 40 m tile took), a house one
- * game day, a storage two and a farm half of one; a carriage two. More or stronger workers
- * finish it sooner (`buildWork`).
+ * a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable). A tile of wooden
+ * wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
+ * what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
+ * two. More or stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -1375,6 +1388,7 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   house: TICKS_PER_GAME_DAY,
   storage: 2 * TICKS_PER_GAME_DAY,
   farm: TICKS_PER_GAME_DAY / 2,
+  trainingGround: 3 * TICKS_PER_GAME_DAY,
   carriage: 2 * TICKS_PER_GAME_DAY,
 }
 
@@ -1754,6 +1768,109 @@ export function combatLearned(resident: Resident, tick: number): number {
   return COMBAT_SKILL_PER_BLOW * (statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE)
 }
 
+/** Most trainees at one training ground at a time (`CONTEXT.md`: Trainee). */
+export const TRAINING_GROUND_MAX_TRAINEES = 3
+
+/**
+ * Trained bonus a trainee of average Intellect gains in a stat each tick a teacher is there
+ * (`CONTEXT.md`: Training): an average base of 10 reaches its cap of 5 in about a game year.
+ */
+export const TRAIN_STAT_PER_TICK = 5 / TICKS_PER_GAME_YEAR
+
+/** How much faster training a skill goes than learning it by doing (`CONTEXT.md`: Training). */
+export const TRAIN_SKILL_FACTOR = 2
+
+/**
+ * The most of each skill a resident can have (`CONTEXT.md`: Skill): where it stops making them
+ * better. Training never takes a skill past it.
+ */
+export const SKILL_MAX: Readonly<Record<SkillName, number>> = {
+  mining: WORK_SKILL_MAX,
+  woodcutting: WORK_SKILL_MAX,
+  smelting: WORK_SKILL_MAX,
+  smithing: WORK_SKILL_MAX,
+  farming: WORK_SKILL_MAX,
+  construction: CONSTRUCTION_SKILL_MAX,
+  combat: COMBAT_SKILL_LIMIT / COMBAT_SKILL_EFFECT,
+  driving: DRIVING_SKILL_LIMIT / DRIVING_SKILL_EFFECT,
+}
+
+/**
+ * Each skill learned by doing, in points per game day for a learner of average Intellect. Combat
+ * is learned by blows rather than days; for training it counts as reaching its maximum in a game
+ * year, as the work skills do.
+ */
+export const SKILL_PER_DAY: Readonly<Record<SkillName, number>> = {
+  mining: WORK_SKILL_PER_DAY,
+  woodcutting: WORK_SKILL_PER_DAY,
+  smelting: WORK_SKILL_PER_DAY,
+  smithing: WORK_SKILL_PER_DAY,
+  farming: WORK_SKILL_PER_DAY,
+  construction: CONSTRUCTION_SKILL_PER_DAY,
+  combat: SKILL_MAX.combat / (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY),
+  driving: DRIVING_SKILL_PER_DAY,
+}
+
+/**
+ * What `trainee` gains in `subject` from one tick with `teacher` at the ground (`CONTEXT.md`:
+ * Training): their Intellect sets the pace, `TRAIN_STAT_PER_TICK` for a stat, `TRAIN_SKILL_FACTOR`
+ * times the by-doing rate for a skill. Never past the teacher's own effective value, nor a stat's
+ * `trainedCap` or a skill's `SKILL_MAX`; 0 at that ceiling. A stat's gain goes into its trained
+ * bonus, which old age shrinks along with the base, so the teacher's ceiling is scaled back by it.
+ */
+export function trainingGain(
+  trainee: Resident,
+  teacher: Resident,
+  subject: StatName | SkillName,
+  tick: number,
+): number {
+  const pace = statValue(trainee, 'intellect', tick) / INTELLECT_AVERAGE
+  if (subject in trainee.stats) {
+    const stat = subject as StatName
+    const { base, trained } = trainee.stats[stat]
+    const toCap = trainedCap(base) - trained
+    const toTeacher =
+      (statValue(teacher, stat, tick) - statValue(trainee, stat, tick)) / ageFactor(trainee, tick)
+    return Math.max(0, Math.min(TRAIN_STAT_PER_TICK * pace, toCap, toTeacher))
+  }
+  const skill = subject as SkillName
+  const has = trainee.skills[skill] ?? 0
+  const toTeacher = (teacher.skills[skill] ?? 0) - has
+  const perTick = (SKILL_PER_DAY[skill] / TICKS_PER_GAME_DAY) * TRAIN_SKILL_FACTOR * pace
+  return Math.max(0, Math.min(perTick, SKILL_MAX[skill] - has, toTeacher))
+}
+
+/**
+ * A resident's value in a training subject (`CONTEXT.md`: Training): a stat as it counts now
+ * (`statValue`), or a skill's points.
+ */
+export function subjectValue(
+  resident: Resident,
+  subject: StatName | SkillName,
+  tick: number,
+): number {
+  return subject in resident.stats
+    ? statValue(resident, subject as StatName, tick)
+    : (resident.skills[subject as SkillName] ?? 0)
+}
+
+/**
+ * The most `trainee` can reach in `subject` under `teacher` (`CONTEXT.md`: Training), as
+ * `subjectValue` counts it: the lower of the teacher's own value and the trainee's cap, a stat's
+ * base with its full trained bonus, or a skill's `SKILL_MAX`. `trainingGain` stops there.
+ */
+export function trainingCeiling(
+  trainee: Resident,
+  teacher: Resident,
+  subject: StatName | SkillName,
+  tick: number,
+): number {
+  const teaches = subjectValue(teacher, subject, tick)
+  if (!(subject in trainee.stats)) return Math.min(teaches, SKILL_MAX[subject as SkillName])
+  const { base } = trainee.stats[subject as StatName]
+  return Math.min(teaches, (base + trainedCap(base)) * ageFactor(trainee, tick))
+}
+
 /**
  * How many tiles further along an army's way a member may get than the one furthest behind
  * (`CONTEXT.md`: Army): one ahead waits, so the army keeps together at the pace of the slowest.
@@ -1913,8 +2030,12 @@ export const SCRIPT_MAX_VERSIONS = 40
  */
 export const SCRIPT_WRITES_PER_MINUTE = 60
 
-/** The most steps a queue holds (`CONTEXT.md`: Queue): plenty for a day's round. */
-export const QUEUE_MAX_STEPS = 20
+/**
+ * The most steps a queue holds (`CONTEXT.md`: Queue, Repeat block): a day's round, or a few steps
+ * repeated ten times over. With `QUEUE_STEP_MAX_CHARS` a full queue still fits the socket's
+ * largest frame (`realtime.maxPayloadBytes`).
+ */
+export const QUEUE_MAX_STEPS = 50
 
 /** The most a queue step's order request may hold, in characters of its JSON. */
 export const QUEUE_STEP_MAX_CHARS = 1000

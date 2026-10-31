@@ -10,6 +10,7 @@ import {
   type Good,
   type GoodsPlace,
   type GoodsWanted,
+  type Building,
   type OrderRequest,
   type Resident,
   type Stock,
@@ -21,6 +22,7 @@ import { buildingOrganization, carriageOrganization } from './crimes.js'
 import { orderedResident } from './order-sender.js'
 import type { OrderKind, OrderSender } from './orders.js'
 import { realmOf } from './starting-city.js'
+import { worldIndex } from './world-index.js'
 
 /** The buildings a store or fetch order goes to: a storage, or a stable's storage. */
 const PLACE_KINDS = ['storage', 'stable']
@@ -92,24 +94,24 @@ export function placeTile(
   world: WorldState,
   place: GoodsPlace,
 ): { x: number; y: number } | undefined {
-  if (place.kind === 'carriage') return world.carriages.find((k) => k.id === place.carriageId)
-  return world.buildings.find((b) => b.id === place.storageId && !b.site)
+  if (place.kind === 'carriage') return worldIndex(world).carriageById(place.carriageId)
+  return finishedStorage(world, place.storageId)
 }
 
 /** The goods at a place, wherever it stands. */
 function placeStock(world: WorldState, place: GoodsPlace): Stock | undefined {
-  if (place.kind === 'carriage') return world.carriages.find((k) => k.id === place.carriageId)?.load
-  const b = world.buildings.find((x) => x.id === place.storageId && !x.site)
+  if (place.kind === 'carriage') return worldIndex(world).carriageById(place.carriageId)?.load
+  const b = finishedStorage(world, place.storageId)
   return b && (b.stock ?? {})
 }
 
 /** Whether the resident stands at the place: on a tile of the building, or the carriage's. */
 function atPlace(world: WorldState, r: Resident, place: GoodsPlace): boolean {
   if (place.kind === 'carriage') {
-    const k = world.carriages.find((x) => x.id === place.carriageId)
+    const k = worldIndex(world).carriageById(place.carriageId)
     return k?.x === r.x && k.y === r.y
   }
-  const b = world.buildings.find((x) => x.id === place.storageId && !x.site)
+  const b = finishedStorage(world, place.storageId)
   return b !== undefined && covers(b, r.x, r.y)
 }
 
@@ -362,4 +364,10 @@ export function carriedForOrder(world: WorldState, r: Resident): void {
     }
   }
   if (o?.kind === 'store' || o?.kind === 'fetch') endOrder(world, r, null)
+}
+
+/** The building `id`, if it is finished: a storage a store or fetch order may use. */
+function finishedStorage(world: WorldState, id: string): Building | undefined {
+  const b = worldIndex(world).buildingById(id)
+  return b && !b.site ? b : undefined
 }

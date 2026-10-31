@@ -27,6 +27,7 @@ const scripts = [
   summary(4, 'tearDown'),
   summary(6, 'feedStable'),
   summary(7, 'breed'),
+  summary(8, 'train'),
   summary(5, null),
 ]
 const buildings: Pick<Building, 'id' | 'kind'>[] = [
@@ -73,6 +74,32 @@ const haul: ResidentOrder = {
 const line = (r: DoingOf) => doingLine(r, { scripts, buildings })
 
 describe('doingLine', () => {
+  it('says what a teacher teaches (`CONTEXT.md`: Teacher)', () => {
+    const teach = (subject: 'strength' | 'combat'): ResidentOrder => ({
+      kind: 'teach',
+      buildingId: 'g1',
+      subject,
+    })
+    expect(line({ order: teach('strength') })).toBe('Teaching Strength')
+    expect(line({ order: teach('combat') })).toBe('Teaching Combat')
+  })
+
+  it('says what a trainee learns, or that they wait (`CONTEXT.md`: Training)', () => {
+    const train = (learning: 'strength' | null): ResidentOrder => ({
+      kind: 'train',
+      buildingId: 'g1',
+      learning,
+    })
+    expect(line({ order: train('strength') })).toBe('Training Strength')
+    expect(line({ order: train(null) })).toBe('Waiting to train')
+    // Under the Train task the order's line shows, unless the script says otherwise.
+    const trainee = { scriptId: 8 }
+    expect(line({ order: train('strength'), script: trainee })).toBe('Training Strength')
+    expect(line({ order: null, script: trainee })).toBe('Training: waiting')
+    const waiting = { scriptId: 8, doing: 'Waiting for a teacher' }
+    expect(line({ order: train(null), script: waiting })).toBe('Waiting for a teacher')
+  })
+
   it('names the task and what its current order has them doing', () => {
     const worker = { scriptId: 1, building: 'mine' as const }
     expect(line({ order: work, script: worker })).toBe('Working the mine')
@@ -91,6 +118,10 @@ describe('doingLine', () => {
       'Building a house: fetching 10 wood and 4 stone from the storage',
     )
     expect(line({ order: null, script: builder })).toBe('Building a house: waiting')
+    // Its script waits on the order (`CONTEXT.md`: Running a script, Waiting).
+    expect(line({ order: fetch, script: { ...builder, waiting: true } })).toBe(
+      'Building a house: fetching 10 wood and 4 stone from the storage · script waiting',
+    )
     expect(line({ order: build, script: { scriptId: 2, building: 'lumberCamp' } })).toBe(
       'Building a lumber camp',
     )

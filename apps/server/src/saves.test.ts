@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
@@ -15,7 +15,8 @@ import {
   type TerrainMap,
 } from '@csp/shared'
 import { createAdmin } from './auth.js'
-import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
+
+import { KEEP_LATEST, WorldSaver, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { checkInvariants } from './invariants.js'
@@ -135,7 +136,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(64)
+    expect(WORLD_FORMAT_VERSION).toBe(65)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -151,11 +152,11 @@ describe('world saves', () => {
     expect(migrated.buildings).toEqual(world.buildings)
   })
 
-  it('migrates a format 63 world: every city starts without a plan (migration 63 → 64)', () => {
+  it('migrates a format 64 world: every city starts without a plan (migration 64 → 65)', () => {
     const { world, terrain } = worldWithPost()
     const old: Partial<typeof world> = structuredClone(world)
     delete old.cityPlans
-    const migrated = migrateWorld(old, 63, { terrain }, migrations, 64)
+    const migrated = migrateWorld(old, 64, { terrain }, migrations, 65)
     expect(migrated).toEqual({ ...world, cityPlans: {} })
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
@@ -371,6 +372,14 @@ describe('world saves', () => {
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
+  it('keeps a format 63 world as it is: no script waits yet (migration 63 → 64)', () => {
+    const { world, terrain } = worldWithCity()
+    const migrated = migrateWorld(structuredClone(world), 63, { terrain }, migrations, 64)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents.every((r) => r.script?.waitingSince === undefined)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
   it('keeps a format 46 world as it is: no resident has a queue yet (migration 46 → 47)', () => {
     const { world, terrain } = worldWithCity()
     const migrated = migrateWorld(structuredClone(world), 46, { terrain }, migrations, 47)
@@ -552,5 +561,90 @@ describe('backups', () => {
     expect(fs.existsSync(old)).toBe(false)
     expect(fs.existsSync(backupFile)).toBe(true)
     fs.rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe('WorldSaver', () => {
+  function fakeLog() {
+    return { skipped: vi.fn(), failed: vi.fn() }
+  }
+
+  it('writes a save asynchronously that loads back to the same world', async () => {
+    const { db, close } = await openDb(':memory:')
+    const { world, terrain: map } = loadOrCreateWorld(db, counting().generate)
+    world.tick = 30
+    const log = fakeLog()
+    const saver = new WorldSaver(db, log)
+    expect(saver.start(world)).toBe(true)
+    const taken = structuredClone(world)
+    // The world goes on while the save is written; the save is the world as it was.
+    world.tick = 31
+    await saver.settled()
+    const loaded = loadOrCreateWorld(db, counting().generate)
+    expect(loaded.world).toEqual(taken)
+    expect(loaded.terrain).toEqual(map)
+    expect(db.select().from(schema.worldSaves).all().at(-1)?.tick).toBe(30)
+    expect(log.failed).not.toHaveBeenCalled()
+    close()
+  })
+
+  it('skips and logs a save asked for while one is in flight', async () => {
+    const { db, close } = await openDb(':memory:')
+    const world = createWorld(terrain, 1)
+    const log = fakeLog()
+    const saver = new WorldSaver(db, log)
+    world.tick = 30
+    expect(saver.start(world)).toBe(true)
+    world.tick = 60
+    expect(saver.start(world)).toBe(false)
+    expect(log.skipped).toHaveBeenCalledWith(60, 30)
+    await saver.settled()
+    expect(
+      db
+        .select()
+        .from(schema.worldSaves)
+        .all()
+        .map((r) => r.tick),
+    ).toEqual([30])
+    // Once it is written, the next save starts again.
+    world.tick = 90
+    expect(saver.start(world)).toBe(true)
+    await saver.settled()
+    expect(
+      db
+        .select()
+        .from(schema.worldSaves)
+        .all()
+        .map((r) => r.tick),
+    ).toEqual([30, 90])
+    close()
+  })
+
+  it('saves synchronously on shutdown, and a save still in flight does not land after it', async () => {
+    const { db, close } = await openDb(':memory:')
+    const world = createWorld(terrain, 1)
+    const saver = new WorldSaver(db, fakeLog())
+    world.tick = 30
+    saver.start(world)
+    world.tick = 45
+    saver.saveNow(world)
+    // Written before anything else runs.
+    expect(
+      db
+        .select()
+        .from(schema.worldSaves)
+        .all()
+        .map((r) => r.tick),
+    ).toEqual([45])
+    await saver.settled()
+    expect(
+      db
+        .select()
+        .from(schema.worldSaves)
+        .all()
+        .map((r) => r.tick),
+    ).toEqual([45])
+    expect(saver.start(world)).toBe(false)
+    close()
   })
 })

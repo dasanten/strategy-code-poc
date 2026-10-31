@@ -27,6 +27,10 @@ import {
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
   STAT_NAMES,
+  SKILL_NAMES,
+  TRAINING_GROUND_MAX_TRAINEES,
+  teacherAt,
+  traineesOf,
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_HOUR,
@@ -58,12 +62,12 @@ import {
   type GoodsSpot,
   type KnownNode,
   type Pile,
-  type Queue,
-  type QueueStepRequest,
+  QUEUE_MAX_STEPS,
   type Resident,
   type ScriptSummary,
   type SkillName,
   type StatName,
+  type TrainingSubject,
   type Stock,
   type SeenResident,
   type SeenHorse,
@@ -75,7 +79,14 @@ import {
   keptBreeding,
   keptPair,
 } from '@csp/shared'
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
 import {
   CARD_TAB_LABELS,
   CARD_TABS,
@@ -86,6 +97,7 @@ import {
   rememberedTabOf,
   rememberTabOf,
   scriptsRun,
+  statLine,
   TAB_LABELS,
   type GroupTab,
   type CardSections,
@@ -93,15 +105,46 @@ import {
 } from './residents-view.js'
 import { doingLine, interruptedLine } from './doing-view.js'
 import {
-  dropStep,
-  moveStep,
-  queueRows,
+  editPlan,
+  planOf,
   realMinutes,
-  removeStep,
-  stepsOf,
-  timeStep,
+  stepRow,
+  type QueuePlan,
   type QueueRow,
 } from './queue-view.js'
+import { copy, paste, pickStep, useClipboardEmpty } from './planner-clipboard.js'
+import {
+  canMove,
+  capProblem,
+  dropItem,
+  hasBlocks,
+  idsOf,
+  insertItems,
+  isBlock,
+  lastPicked,
+  moveItem,
+  planProblem,
+  planRows,
+  removeItem,
+  setRepeat,
+  stepCount,
+  timeItem,
+  topPicked,
+  unwrap,
+  withIds,
+  wrap,
+  type PlanItem,
+} from './plan-blocks.js'
+import {
+  browserStorage,
+  list,
+  load as loadQueue,
+  readQueues,
+  remove as removeQueue,
+  save as saveQueue,
+  storeQueues,
+  type SavedQueues,
+} from './saved-queues.js'
 import {
   GROUP_BUTTONS,
   groupNumberParams,
@@ -172,6 +215,60 @@ export const SKILL_LABELS: Record<SkillName, string> = {
   farming: 'Farming',
   combat: 'Combat',
   driving: 'Driving',
+}
+
+/** A stat or skill a training ground teaches, as the UI names it: "Strength", "Combat". */
+export function subjectLabel(subject: TrainingSubject): string {
+  return subject in STAT_LABELS
+    ? STAT_LABELS[subject as StatName]
+    : SKILL_LABELS[subject as SkillName]
+}
+
+/**
+ * Picks a subject to teach, a stat or a skill (`CONTEXT.md`: Training ground), and gives it with
+ * the button `action` names.
+ */
+export function SubjectPicker({
+  action,
+  onPick,
+  picked,
+  disabled = false,
+}: {
+  action: string
+  onPick: (subject: TrainingSubject) => void
+  /** The subject chosen to start with, such as what they teach now. */
+  picked?: TrainingSubject
+  disabled?: boolean
+}) {
+  const [subject, setSubject] = useState<TrainingSubject>(picked ?? 'strength')
+  return (
+    <div className="order-buttons">
+      <select
+        aria-label="Subject to teach"
+        value={subject}
+        disabled={disabled}
+        onChange={(e) => setSubject(e.target.value as TrainingSubject)}
+      >
+        <optgroup label="Stats">
+          {STAT_NAMES.map((s) => (
+            <option key={s} value={s}>
+              {STAT_LABELS[s]}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="Skills">
+          {SKILL_NAMES.map((s) => (
+            <option key={s} value={s}>
+              {SKILL_LABELS[s]}
+            </option>
+          ))}
+        </optgroup>
+      </select>
+      <button type="button" className="primary" disabled={disabled} onClick={() => onPick(subject)}>
+        {action}
+      </button>
+    </div>
+  )
 }
 
 /** The longest a stat bar can be: the highest base plus the most training could add to it. */
@@ -263,28 +360,85 @@ function TaskScript({
  * The resident's queue (`CONTEXT.md`: Queue): its steps in order, the current one with its Doing
  * line. Steps are reordered by dragging or the arrows, removed, given a duration or none, and the
  * queue looped; each change is an edit-queue order. The group card lists its plan with it, then
- * titled "Plan", with no current step.
+ * titled "Plan", with no current step, as does a resident's card while a plan with repeat blocks
+ * waits to be given.
+ *
+ * It is the queue planner the clipboard works in (`CONTEXT.md`: Planner clipboard): a tap picks
+ * a step, Shift+tap a range, and Copy and Paste (or Ctrl+C and Ctrl+V while the list has focus)
+ * copy the picked steps and put copies after the last picked one, or at the end with none picked.
+ * The pasted steps are picked afterwards, so a second Paste goes after them.
+ *
+ * Repeat wraps the picked steps in a repeat block (`CONTEXT.md`: Repeat block): its head shows
+ * the count, its steps follow indented, and it is picked, moved, copied and removed as one, or
+ * unwrapped. `onEdit` gets the items with every step and block given an id (`withIds`).
  */
 export function QueueBlock({
   queue: q,
+  currentId,
   doing = '',
   scripts,
   buildings,
   lastSeen,
   onEdit,
   title = 'Queue',
+  realm,
 }: {
-  queue: Pick<Queue, 'steps' | 'current' | 'loop'>
+  queue: Pick<QueuePlan, 'items' | 'loop' | 'nextStepId'>
+  /** The id of the step being done, in a running queue. */
+  currentId?: number
   doing?: string
   scripts: ScriptSummary[]
   buildings: Building[]
   /** The buildings remembered out of sight, to name steps acting there. */
   lastSeen?: Building[]
-  onEdit: (steps: QueueStepRequest[], loop?: boolean) => void
+  onEdit: (items: PlanItem[], loop?: boolean) => void
   title?: string
+  /** The realm whose saved queues Save and Load keep (`CONTEXT.md`: Saved queue); none without. */
+  realm?: string
 }) {
   const [dragged, setDragged] = useState<number>()
-  const rows = queueRows(q, { scripts, buildings, lastSeen })
+  // The steps and blocks picked for the clipboard, by id; one removed since drops out.
+  const [pickedIds, setPicked] = useState<number[]>([])
+  const clipboardEmpty = useClipboardEmpty()
+  const names = { scripts, buildings, lastSeen }
+  const rows = planRows(q.items)
+  const ids = rows.map((row) => row.id)
+  const picked = pickedIds.filter((id) => ids.includes(id))
+  const edit = (items: PlanItem[], loop?: boolean) => {
+    const given = withIds(items, q.nextStepId)
+    onEdit(given.items, loop)
+    return given
+  }
+  // The added items go after `after` (or at the end) and are picked, so a second Paste follows.
+  const add = (after: number | undefined, added: PlanItem[]) => {
+    if (added.length === 0) return
+    const given = edit(insertItems(q.items, after, added))
+    setPicked(newIds(q.items, given.items))
+  }
+  const copyPicked = () => {
+    if (picked.length > 0) copy(topPicked(q.items, picked))
+  }
+  const pasteSteps = () => add(lastPicked(q.items, picked), paste())
+  const wrapped = picked.length > 0 ? wrap(q.items, picked) : undefined
+  const repeat = () => {
+    if (!wrapped) return
+    const given = edit(wrapped)
+    setPicked(newIds(q.items, given.items))
+  }
+  // Ctrl+C and Ctrl+V while the list has focus, not while typing in a field.
+  const onKey = (e: KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+    const tag = (e.target as HTMLElement).tagName
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
+    const key = e.key.toLowerCase()
+    if (key !== 'c' && key !== 'v') return
+    e.preventDefault()
+    if (key === 'c') copyPicked()
+    else pasteSteps()
+  }
+  const unrolled = stepCount(q.items)
+  const over = capProblem(q.items)
+  let n = 0
   return (
     <section className="inspector-block" aria-label={title}>
       <div className="panel-head">
@@ -293,67 +447,354 @@ export function QueueBlock({
           <input
             type="checkbox"
             checked={q.loop}
-            onChange={(e) => onEdit(stepsOf(q), e.target.checked)}
+            onChange={(e) => edit(q.items, e.target.checked)}
           />{' '}
           Loop
         </label>
       </div>
-      <ol className="queue-steps">
-        {rows.map((row, i) => (
-          <li
-            key={row.id}
-            className={`queue-step${row.current ? ' current' : ''}`}
-            aria-current={row.current ? 'step' : undefined}
-            draggable
-            onDragStart={() => setDragged(row.id)}
-            onDragEnd={() => setDragged(undefined)}
-            onDragOver={(e) => dragged !== undefined && e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault()
-              if (dragged !== undefined && dragged !== row.id) onEdit(dropStep(q, dragged, row.id))
-              setDragged(undefined)
-            }}
-          >
-            <div className="queue-step-head">
-              <span className="small">
-                {i + 1}. {row.label}
-              </span>
-              <span className="buttons">
-                <button
-                  type="button"
-                  aria-label="Move up"
-                  disabled={i === 0}
-                  onClick={() => onEdit(moveStep(q, row.id, -1))}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  aria-label="Move down"
-                  disabled={i === rows.length - 1}
-                  onClick={() => onEdit(moveStep(q, row.id, 1))}
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  aria-label="Remove"
-                  onClick={() => onEdit(removeStep(q, row.id))}
-                >
-                  ✕
-                </button>
-              </span>
-            </div>
-            {row.current && <span className="small muted">{doing}</span>}
-            <StepMinutes row={row} onSet={(minutes) => onEdit(timeStep(q, row.id, minutes))} />
-          </li>
-        ))}
+      <div className="order-buttons queue-tools">
+        <button type="button" disabled={picked.length === 0} onClick={copyPicked}>
+          Copy
+        </button>
+        <button type="button" disabled={clipboardEmpty} onClick={pasteSteps}>
+          Paste
+        </button>
+        <button
+          type="button"
+          disabled={!wrapped}
+          title="Wrap the picked steps, in a row, in a repeat block"
+          onClick={repeat}
+        >
+          Repeat
+        </button>
+        <span className="small muted">
+          {picked.length === 0 ? 'Tap a step to pick it' : `${picked.length} picked`}
+        </span>
+      </div>
+      {realm && (
+        <SavedQueueTools
+          realm={realm}
+          steps={q.items}
+          onLoad={(loaded) => add(undefined, loaded)}
+        />
+      )}
+      {hasBlocks(q.items) && (
+        <p className={`small ${over ? 'queue-unrolled-over' : 'muted'}`}>
+          {over ? `Too long: ${over}.` : `${unrolled} steps after repeats.`}
+        </p>
+      )}
+      <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
+        {rows.map((row) => {
+          const isPicked = picked.includes(row.id)
+          const step =
+            row.kind === 'step'
+              ? stepRow({ ...row.step, id: row.id }, row.id === currentId, names)
+              : undefined
+          if (step) n++
+          return (
+            <li
+              key={row.id}
+              className={`queue-step${row.kind === 'block' ? ' queue-block' : ''}${step?.current ? ' current' : ''}${isPicked ? ' picked' : ''}`}
+              style={row.depth > 0 ? { marginLeft: `${row.depth * 1.25}em` } : undefined}
+              aria-current={step?.current ? 'step' : undefined}
+              aria-selected={isPicked}
+              // Shift+tap picks a range rather than selecting text.
+              onMouseDown={(e) => e.shiftKey && e.preventDefault()}
+              onClick={(e) => {
+                // The row's own buttons and fields do their own thing.
+                if ((e.target as HTMLElement).closest('button, input, label')) return
+                setPicked(pickStep(picked, ids, row.id, e.shiftKey))
+              }}
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation()
+                setDragged(row.id)
+              }}
+              onDragEnd={() => setDragged(undefined)}
+              onDragOver={(e) => dragged !== undefined && e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                if (dragged !== undefined && dragged !== row.id)
+                  edit(dropItem(q.items, dragged, row.id))
+                setDragged(undefined)
+              }}
+            >
+              <div className="queue-step-head">
+                {step ? (
+                  <span className="small">
+                    {n}. {step.label}
+                  </span>
+                ) : (
+                  <RepeatCount
+                    repeat={row.kind === 'block' ? row.repeat : 1}
+                    steps={row.kind === 'block' ? row.steps : 0}
+                    onSet={(count) => edit(setRepeat(q.items, row.id, count))}
+                  />
+                )}
+                <span className="buttons">
+                  {row.kind === 'block' && (
+                    <button type="button" onClick={() => edit(unwrap(q.items, row.id))}>
+                      Unwrap
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-label="Move up"
+                    disabled={!canMove(q.items, row.id, -1)}
+                    onClick={() => edit(moveItem(q.items, row.id, -1))}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Move down"
+                    disabled={!canMove(q.items, row.id, 1)}
+                    onClick={() => edit(moveItem(q.items, row.id, 1))}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={row.kind === 'block' ? 'Remove the block and its steps' : 'Remove'}
+                    onClick={() => edit(removeItem(q.items, row.id))}
+                  >
+                    ✕
+                  </button>
+                </span>
+              </div>
+              {step?.gone && (
+                <span className="small queue-step-gone">{step.gone}: it will be skipped</span>
+              )}
+              {step?.current && <span className="small muted">{doing}</span>}
+              {step && (
+                <StepMinutes
+                  row={step}
+                  onSet={(minutes) => edit(timeItem(q.items, row.id, minutes))}
+                />
+              )}
+            </li>
+          )
+        })}
       </ol>
       <p className="muted small">
-        Drag a step or use the arrows to reorder. Working and hauling never end on their own, so
-        they need a duration unless they are last.
+        Drag a step or use the arrows to reorder. Working, hauling, teaching and training never end on their own, so
+        they need a duration unless they are last. Tap a step to pick it (Shift for a range), then
+        Copy; Paste puts the copies after the picked step. Repeat wraps the picked steps in a block
+        done so many times in a row; giving the queue makes it that many copies, up to{' '}
+        {QUEUE_MAX_STEPS} steps in all. Save keeps the steps in this browser under a name; Load adds
+        a saved queue’s steps at the end.
       </p>
     </section>
+  )
+}
+
+/** The ids in `after` that `before` didn't have, the outermost of each new item only. */
+function newIds(before: readonly PlanItem[], after: readonly PlanItem[]): number[] {
+  const had = new Set(idsOf(before))
+  const fresh = (items: readonly PlanItem[]): number[] =>
+    items.flatMap((item) => {
+      if (item.id !== undefined && !had.has(item.id)) return [item.id]
+      return isBlock(item) ? fresh(item.items) : []
+    })
+  return fresh(after)
+}
+
+/** A repeat block's count, set on Enter or leaving the field, with how many steps it repeats. */
+function RepeatCount({
+  repeat,
+  steps,
+  onSet,
+}: {
+  repeat: number
+  steps: number
+  onSet: (repeat: number) => void
+}) {
+  const [text, setText] = useState(String(repeat))
+  useEffect(() => setText(String(repeat)), [repeat])
+  const commit = () => {
+    const typed = Math.floor(Number(text))
+    if (typed >= 1 && typed !== repeat) onSet(typed)
+    else setText(String(repeat))
+  }
+  return (
+    <label className="small queue-step-minutes">
+      Repeat ×
+      <input
+        className="queue-block-count"
+        aria-label="Times to repeat"
+        type="number"
+        min={1}
+        step={1}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && commit()}
+      />
+      <span className="muted">
+        {steps} step{steps === 1 ? '' : 's'} each, {steps * repeat} in all
+      </span>
+    </label>
+  )
+}
+
+/**
+ * Save and Load for a queue planner (`CONTEXT.md`: Saved queue): Save keeps `steps` in this
+ * browser under a name, asking before it overwrites one saved under the same name; Load lists the
+ * saved queues, each with its step count after repeats and date, to load (`onLoad` gets fresh
+ * copies of its steps and blocks) or delete. With no steps, only Load shows.
+ */
+export function SavedQueueTools({
+  realm,
+  steps,
+  onLoad,
+}: {
+  realm: string
+  steps: readonly PlanItem[]
+  onLoad: (steps: PlanItem[]) => void
+}) {
+  const [open, setOpen] = useState<'save' | 'load'>()
+  const [name, setName] = useState('')
+  const [queues, setQueues] = useState(() => readQueues(browserStorage(), realm))
+  const keep = (next: SavedQueues) => {
+    storeQueues(browserStorage(), realm, next)
+    setQueues(next)
+  }
+  const toggle = (panel: 'save' | 'load') => {
+    // Read again: another planner may have saved since.
+    setQueues(readQueues(browserStorage(), realm))
+    setOpen(open === panel ? undefined : panel)
+  }
+  const saved = list(queues)
+  const taken = name.trim() in queues
+  const onSave = (e: FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    keep(saveQueue(queues, name, steps, Date.now()))
+    setName('')
+    setOpen(undefined)
+  }
+  return (
+    <div className="saved-queues">
+      <div className="order-buttons">
+        {steps.length > 0 && (
+          <button type="button" aria-expanded={open === 'save'} onClick={() => toggle('save')}>
+            Save…
+          </button>
+        )}
+        <button type="button" aria-expanded={open === 'load'} onClick={() => toggle('load')}>
+          Load…
+        </button>
+      </div>
+      {open === 'save' && (
+        <form className="saved-queues-save" onSubmit={onSave}>
+          <input
+            aria-label="Name to save the queue under"
+            placeholder="Name, such as Mine run"
+            value={name}
+            maxLength={60}
+            autoFocus
+            onChange={(e) => setName(e.target.value)}
+          />
+          <button type="submit" disabled={!name.trim()}>
+            {taken ? 'Overwrite' : 'Save'}
+          </button>
+          {taken && (
+            <span className="small muted">A queue is saved as “{name.trim()}”: overwrite it?</span>
+          )}
+        </form>
+      )}
+      {open === 'load' &&
+        (saved.length === 0 ? (
+          <p className="muted small">No queues saved in this browser yet.</p>
+        ) : (
+          <ul className="saved-queues-list">
+            {saved.map((s) => (
+              <li key={s.name}>
+                <span className="small">
+                  {s.name}{' '}
+                  <span className="muted">
+                    {stepCount(s.steps)} step{stepCount(s.steps) === 1 ? '' : 's'},{' '}
+                    {new Date(s.savedAt).toLocaleDateString()}
+                  </span>
+                </span>
+                <span className="buttons">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onLoad(loadQueue(queues, s.name))
+                      setOpen(undefined)
+                    }}
+                  >
+                    Load
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${s.name}`}
+                    onClick={() => keep(removeQueue(queues, s.name))}
+                  >
+                    Delete
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ))}
+    </div>
+  )
+}
+
+/**
+ * Paste for a planner with no steps yet (`CONTEXT.md`: Planner clipboard): the button, shown only
+ * while the clipboard holds steps; `onPaste` gets fresh copies of them.
+ */
+export function PasteSteps({ onPaste }: { onPaste: (steps: PlanItem[]) => void }) {
+  const empty = useClipboardEmpty()
+  if (empty) return null
+  return (
+    <div className="order-buttons">
+      <button type="button" onClick={() => onPaste(paste())}>
+        Paste
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Give and Discard under a plan held in this browser (`QueuePlan`): on a resident's card while it
+ * has repeat blocks, and on the group card. A plan that can't be given (no steps, more steps after
+ * repeats than a queue holds, a step that never ends before another) says why, by how much when
+ * it is too long, and Give waits.
+ */
+export function GivePlan({
+  plan,
+  give,
+  note,
+  onGive,
+  onDiscard,
+}: {
+  plan: Pick<QueuePlan, 'items'>
+  /** The Give button's label. */
+  give: string
+  /** What giving does, said while it can be given. */
+  note: string
+  onGive: () => void
+  onDiscard: () => void
+}) {
+  const problem = planProblem(plan.items)
+  return (
+    <>
+      <div className="order-buttons">
+        <button type="button" className="primary" disabled={problem !== undefined} onClick={onGive}>
+          {give}
+        </button>
+        <button type="button" onClick={onDiscard}>
+          Discard plan
+        </button>
+      </div>
+      <p className={`small ${problem && plan.items.length > 0 ? 'queue-unrolled-over' : 'muted'}`}>
+        {problem && plan.items.length > 0 ? `Can’t give it yet: ${problem}.` : note}
+      </p>
+    </>
   )
 }
 
@@ -438,6 +879,9 @@ export function orderDoing(r: Pick<Resident, 'order' | 'riding'>, arrives?: numb
   }
   if (o?.kind === 'workAt')
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
+  if (o?.kind === 'teach') return `Teaching ${subjectLabel(o.subject)}`
+  if (o?.kind === 'train')
+    return o.learning ? `Training ${subjectLabel(o.learning)}` : 'Waiting to train'
   if (o?.kind === 'pay') return 'Paying for mercenaries'
   if (o?.kind === 'buyCity') return 'Buying a city'
   if (o?.kind === 'buyOff') return 'Buying off a directive'
@@ -637,7 +1081,7 @@ export function GroupCard({
   const card = groupCard(residents)
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
   // The order whose panel is open under the buttons: what it needs before it goes out.
-  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed'>()
+  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed' | 'teach'>()
   const [good, setGood] = useState<Good>('food')
   const numberParams = groupNumberParams(residents, scripts)
   const foodHint = foodParamsHint(numberParams.map((p) => p.name))
@@ -670,6 +1114,7 @@ export function GroupCard({
     mount: { kind: 'mount' },
     dismount: { kind: 'dismount' },
     feedStable: { kind: 'feedStable' },
+    train: { kind: 'train' },
     store: { kind: 'store' },
     drop: { kind: 'drop' },
     getOff: { kind: 'getOff' },
@@ -721,7 +1166,7 @@ export function GroupCard({
           {label}
         </button>
       )
-    const opens = id as 'haul' | 'fetch' | 'breed'
+    const opens = id as 'haul' | 'fetch' | 'breed' | 'teach'
     return (
       <button
         type="button"
@@ -854,6 +1299,17 @@ export function GroupCard({
           picking={picking === 'haul'}
           onHaulTo={(haul) => toggle('haul', { haul })}
         />
+      )}
+      {tab === 'orders' && panel === 'teach' && (
+        <section className="inspector-block" aria-label="Teach">
+          <div className="panel-head">
+            <h3>Teach</h3>
+          </div>
+          <SubjectPicker action="Teach" onPick={(subject) => onOrder({ kind: 'teach', subject })} />
+          <p className="muted small">
+            The first of them on each training ground teaches it there; one teacher per ground.
+          </p>
+        </section>
       )}
       {tab === 'orders' && panel === 'breed' && (
         <section className="inspector-block" aria-label="Breed horses">
@@ -1046,6 +1502,8 @@ export function ResidentCard({
   realmId,
   onWork,
   onFeedStable,
+  onTrain,
+  onTeach,
   onTearDown,
   horses,
   onBreed,
@@ -1087,6 +1545,9 @@ export function ResidentCard({
   scriptLog,
   onStore,
   onEditQueue,
+  queuePlan,
+  onPlanQueue,
+  onGivePlan,
   addStep,
   collapsed = false,
 }: {
@@ -1179,6 +1640,10 @@ export function ResidentCard({
   onWork: (makes?: Good) => void
   /** Gives the resident the Feed the stable task for the stable they stand in. */
   onFeedStable: (stableId: string) => void
+  /** Gives the resident the Train task for the training ground they stand on. */
+  onTrain: (groundId: string) => void
+  /** Orders the resident to teach `subject` at the training ground they stand on. */
+  onTeach: (groundId: string, subject: TrainingSubject) => void
   /** Orders the resident to tear down the building or site on their tile. */
   onTearDown: (buildingId: string) => void
   /** Horses in sight, to pick two in the stable on the resident's tile to breed. */
@@ -1228,8 +1693,17 @@ export function ResidentCard({
   scriptLog?: ReactNode
   /** Orders the resident to store what they carry at the nearest storage (`STORE_ALL`). */
   onStore?: () => void
-  /** Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue). */
-  onEditQueue?: (steps: QueueStepRequest[], loop?: boolean) => void
+  /**
+   * Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue); with a
+   * repeat block among them, opens a plan of them to give instead (`CONTEXT.md`: Repeat block).
+   */
+  onEditQueue?: (items: PlanItem[], loop?: boolean) => void
+  /** The plan with repeat blocks waiting to be given to the resident, if one is open. */
+  queuePlan?: QueuePlan
+  /** Edits or discards (undefined) that plan. */
+  onPlanQueue?: (plan: QueuePlan | undefined) => void
+  /** Gives the resident the plan unrolled, as their queue. */
+  onGivePlan?: () => void
   /** The queue planner's Add step (`AddStep`), under the queue. */
   addStep?: ReactNode
   /** Shrunk to its header while the map waits for a target (ADR 0012: pick mode). */
@@ -1306,6 +1780,7 @@ export function ResidentCard({
     if (a.id === 'unhitch' && carriageToUnhitch) onUnhitch(carriageToUnhitch.id)
     if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
+    if (a.id === 'train' && building) onTrain(building.id)
   }
   useActionKeys(actions, act)
   const ridden = riddenHorseLine(r, horses, tick)
@@ -1373,19 +1848,49 @@ export function ResidentCard({
           </div>
         ))}
       {tab === 'queue' &&
-        (r.queue && onEditQueue ? (
+        (queuePlan && onPlanQueue ? (
+          <>
+            <QueueBlock
+              title="Plan"
+              queue={queuePlan}
+              currentId={r.queue?.steps[r.queue.current]?.id}
+              doing={doingLine(r, { scripts, buildings, residents, arrives: arrivesIn?.(r) })}
+              scripts={scripts}
+              buildings={buildings}
+              lastSeen={lastSeen}
+              onEdit={(items, loop) => onPlanQueue(editPlan(queuePlan, items, loop))}
+              realm={realmId}
+            />
+            <GivePlan
+              plan={queuePlan}
+              give="Give"
+              note="Give makes their queue this plan, each repeat block that many copies of its steps; the step they are on keeps going if it is still in it."
+              onGive={() => onGivePlan?.()}
+              onDiscard={() => onPlanQueue(undefined)}
+            />
+          </>
+        ) : r.queue && onEditQueue ? (
           <QueueBlock
-            queue={r.queue}
+            queue={planOf(r.queue)}
+            currentId={r.queue.steps[r.queue.current]?.id}
             doing={doingLine(r, { scripts, buildings, residents, arrives: arrivesIn?.(r) })}
             scripts={scripts}
             buildings={buildings}
             lastSeen={lastSeen}
             onEdit={onEditQueue}
+            realm={realmId}
           />
         ) : (
-          <p className="muted small">
-            Nothing queued. Hold Shift with any order to queue it, or plan steps with Add step.
-          </p>
+          <>
+            <p className="muted small">
+              Nothing queued. Hold Shift with any order to queue it, plan steps with Add step, paste
+              copied ones or load a saved queue.
+            </p>
+            {onEditQueue && <PasteSteps onPaste={(steps) => onEditQueue(steps)} />}
+            {onEditQueue && (
+              <SavedQueueTools realm={realmId} steps={[]} onLoad={(steps) => onEditQueue(steps)} />
+            )}
+          </>
         ))}
       {tab === 'queue' && addStep}
       {tab === 'script' &&
@@ -1482,6 +1987,15 @@ export function ResidentCard({
                 onTearDown={onTearDown}
               />
             </>
+          )}
+          {shown === 'teach' && building && (
+            <TeachBlock
+              resident={r}
+              ground={building}
+              residents={residents}
+              mapSize={mapSize}
+              onTeach={(subject) => onTeach(building.id, subject)}
+            />
           )}
           {shown === 'breed' && building && (
             <BreedBlock
@@ -1703,9 +2217,7 @@ export function ResidentCard({
                     <span className="trained" style={{ width: pct(trained / STAT_SCALE) }} />
                     <span className="cap" style={{ width: pct((cap - trained) / STAT_SCALE) }} />
                   </span>
-                  <span className="mono right">
-                    {base} + {trained} ({cap})
-                  </span>
+                  <span className="mono right">{statLine(base, trained, cap)}</span>
                 </div>
               )
             })}
@@ -2221,6 +2733,56 @@ function TearDownBlock({
           {joined ? 'Tearing down…' : `Tear down ${what}`}
         </button>
       </div>
+    </section>
+  )
+}
+
+/**
+ * Teaching (`CONTEXT.md`: Teacher): pick the subject the training ground on the resident's tile
+ * teaches, or switch it while they teach there. One teacher per ground: with another there, it
+ * says who and teaches nothing.
+ */
+function TeachBlock({
+  resident,
+  ground,
+  residents,
+  mapSize,
+  onTeach,
+}: {
+  resident: Resident
+  ground: Building
+  residents: readonly Resident[]
+  mapSize: number
+  onTeach: (subject: TrainingSubject) => void
+}) {
+  const teacher = teacherAt(ground, residents, mapSize)
+  const other = teacher && teacher.id !== resident.id ? teacher : undefined
+  const o = resident.order
+  const teaching = o?.kind === 'teach' && o.buildingId === ground.id ? o.subject : undefined
+  const trainees = traineesOf(ground, residents, mapSize).length
+  const otherTeaches = other?.order?.kind === 'teach' ? other.order.subject : undefined
+  return (
+    <section className="inspector-block" aria-label="Teach">
+      <div className="panel-head">
+        <h3>Teach</h3>
+        <span className="mono small">
+          {trainees} / {TRAINING_GROUND_MAX_TRAINEES} trainees
+        </span>
+      </div>
+      <p className="small">
+        {otherTeaches
+          ? `${other!.name} teaches ${subjectLabel(otherTeaches)} here: one teacher per ground.`
+          : teaching
+            ? `Teaching ${subjectLabel(teaching)}. Pick another subject to switch.`
+            : 'Trainees here learn the subject while you teach, never past your own value.'}
+      </p>
+      <SubjectPicker
+        key={teaching}
+        action={teaching ? 'Teach instead' : 'Teach'}
+        picked={teaching}
+        disabled={!!other}
+        onPick={onTeach}
+      />
     </section>
   )
 }

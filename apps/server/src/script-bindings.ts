@@ -12,6 +12,8 @@ import {
   ageInYears,
   breedingPair,
   buildingAt,
+  teacherAt,
+  traineesOf,
   buildingRealm,
   directivesFor,
   materialsNeeded,
@@ -51,6 +53,7 @@ import { walkTime } from './walk-time.js'
 
 /** Re-exported for the callers that reckon walks like scripts do. */
 export { walkTime } from './walk-time.js'
+import { worldIndex } from './world-index.js'
 
 /**
  * The game API bound for a running script (`CONTEXT.md`: Script, Memory, Step budget; ADR 0002).
@@ -77,11 +80,6 @@ export interface ScriptContext {
   memory: ScriptObject
   /** Everything the Player sees (`entitiesInSight`); called at most once a run. */
   seen: () => readonly SeenEntity[]
-  /**
-   * Whether the Player sees a spot (`sightOf`), shared by every run of theirs this tick; worked
-   * out for this run alone without it.
-   */
-  sees?: (at: { x: number; y: number }) => boolean
   /** Whether the Player has explored a tile (`ExploredTerrain.isExplored`). */
   explored: (x: number, y: number) => boolean
   /** The order kinds actions go through; the game's own by default. */
@@ -107,16 +105,21 @@ export interface ScriptBindings {
   ended(): boolean
   /** The reason it gave `end(reason)`, cut like `doing`'s text; null without one. */
   endReason(): string | null
+  /**
+   * Whether the script called `wait()` (`CONTEXT.md`: Running a script, Waiting): once its
+   * requests are applied, it waits on the resident's order, if they have one.
+   */
+  waited(): boolean
   /** The lines it gave `log(text)`, in order, cut like `doing`'s text (`CONTEXT.md`: Script log). */
   logged: string[]
 }
 
 /**
  * The order kinds a resident's script can request: one per action in `SCRIPT_API`, but `doing`,
- * `log` and `end`, which ask for none.
+ * `log`, `end` and `wait`, which ask for none.
  */
 export const SCRIPT_ORDER_KINDS: readonly string[] = SCRIPT_API.filter(
-  (b) => b.is === 'action' && !['doing', 'log', 'end'].includes(b.name),
+  (b) => b.is === 'action' && !['doing', 'log', 'end', 'wait'].includes(b.name),
 ).map((b) => b.name)
 
 /** The army order each action of an army's script asks for (`ARMY_SCRIPT_API`). */
@@ -144,6 +147,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const requests: OrderRequest[] = []
   let ended = false
   let endReason: string | null = null
+  let waited = false
   const logged: string[] = []
 
   let seen: readonly SeenEntity[] | undefined
@@ -162,7 +166,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     (sender.npcCityId === undefined ? r.owner === side : r.owner === null && r.cityId === side)
   let sees: ((at: { x: number; y: number }) => boolean) | undefined
   const inSight = (at: { x: number; y: number }) =>
-    side !== undefined && (sees ??= context.sees ?? sightOf(world, terrain.size, side))(at)
+    side !== undefined && (sees ??= sightOf(world, terrain.size, side))(at)
   // A building of one of the side's own cities, or an outpost storage of its realm, which it
   // knows of in sight or not.
   const ownBuilding = (b: Building) =>
@@ -185,11 +189,23 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   }
   // A building as `building(id)` gives it: one of the side's own as it is, another's as the
   // Player sees it, its stock only when they see inside (`CONTEXT.md`: Seeing inside a storage).
+  // Who teaches what and who trains at a training ground (`CONTEXT.md`: Teacher, Trainee), from
+  // residents' orders.
+  const teachingAt = (id: string) => {
+    const ground = world.buildings.find((b) => b.id === id)
+    if (ground?.kind !== 'trainingGround') return undefined
+    const teacher = teacherAt(ground, world.residents, terrain.size)
+    const o = teacher?.order
+    const trainees = traineesOf(ground, world.residents, terrain.size).map((r) => r.id)
+    return teacher && o?.kind === 'teach'
+      ? { teacher: teacher.id, subject: o.subject, trainees }
+      : { trainees }
+  }
   const asSeenBuilding = (b: Building) => {
     if (ownBuilding(b)) return b
     seen ??= context.seen()
     const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
-    return shown ? untagged(shown) : null
+    return shown ? { ...untagged(shown), ...teachingAt(b.id) } : null
   }
   // The building as the Player remembers it (`CONTEXT.md`: Last seen); an NPC city has no memory.
   const lastSaw = (b: Building) =>
@@ -203,7 +219,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   // query returns (`viewValue`).
   const queries: Record<string, (args: Value[]) => unknown> = {
     residents: () => seenOf('resident', ownMemory),
-    buildings: () => seenOf('building'),
+    buildings: () => seenOf('building', teachingAt),
     cities: () => seenOf('city'),
     horses: () => seenOf('horse'),
     carriages: () => seenOf('carriage'),
@@ -211,7 +227,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     nodes: exploredNodes,
     // A Player's memory, apart from what is in sight (`CONTEXT.md`: Last seen); an NPC city has none.
     lastSeen: () =>
-      sender.npcCityId !== undefined ? [] : lastSeenOutOfSight(world, sender.userId),
+      sender.npcCityId !== undefined ? [] : lastSeenOutOfSight(world, terrain.size, sender.userId),
     directives: () => directivesFor(world, (org) => organizationLabel(world, org)),
     withMemory: ([key, value]) => {
       if (typeof key !== 'string') throw new ScriptRuntimeError('"withMemory" needs a key')
@@ -223,12 +239,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         .map(asSeen)
     },
     building: ([id]) => {
-      const b = world.buildings.find((x) => x.id === id)
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
       return b ? asSeenBuilding(b) : null
     },
     buildingAt: ([x, y]) => {
       const at = tile(x, y, 'buildingAt')
-      const b = buildingAt(world, at.x, at.y, terrain.size)
+      const b = worldIndex(world).buildingAt(at.x, at.y, terrain.size)
       return b && (ownBuilding(b) || inSight(at)) ? asSeenBuilding(b) : null
     },
     pileAt: ([x, y]) => {
@@ -237,7 +253,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     },
     outputOf: ([building]) => {
       const id = (building as Record<string, Value> | null)?.id
-      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
       if (!b || !(ownBuilding(b) || inSight(b) || lastSaw(b))) return []
       const recipes = RECIPES[b.kind]
       const goods = recipes
@@ -247,7 +263,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     },
     materialsNeeded: ([site]) => {
       const id = (site as Record<string, Value> | null)?.id
-      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
       if (!b?.site || !(ownBuilding(b) || inSight(b))) return []
       return Object.entries(materialsNeeded(b)).map(([good, units]) => ({ good, units }))
     },
@@ -280,7 +296,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = ARMY_SCRIPT_API
     forMe = { armyId: army.id }
     const members = army.memberIds.flatMap((id) => {
-      const r = world.residents.find((x) => x.id === id)
+      const r = worldIndex(world).residentById(id)
       if (!r) return []
       const defenceScriptId = r.owner === side ? r.defenceScriptId : undefined
       return [{ ...r, script: undefined, defenceScriptId, age: ageInYears(r, world.tick) }]
@@ -309,6 +325,16 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const age = ageInYears(resident, world.tick)
     me = asView(world, { ...resident, script: undefined, defenceScriptId, age })
     actions = residentActions(request, resident)
+    // At the training ground on my tile; the order checks it is one.
+    actions.teach = ([subject]) =>
+      request('teach', {
+        buildingId: buildingAt(world, resident.x, resident.y, terrain.size)?.id ?? null,
+        subject: plain(subject),
+      })
+    actions.train = () =>
+      request('train', {
+        buildingId: buildingAt(world, resident.x, resident.y, terrain.size)?.id ?? null,
+      })
     actions.doing = ([text]) => {
       const doing = doingText(text)
       if (doing === null) delete context.memory.doing
@@ -318,6 +344,10 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     actions.end = ([reason]) => {
       endReason = shortText(reason, 'end')
       ended = true
+      return null
+    }
+    actions.wait = () => {
+      waited = true
       return null
     }
     actions.log = ([text]) => {
@@ -333,7 +363,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
     queries.breedingPair = ([stable]) => {
       const id = (stable as Record<string, Value> | null)?.id
-      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
       if (!b || b.kind !== 'stable' || side === undefined || !(ownBuilding(b) || inSight(b)))
         return null
       const owner = sender.npcCityId !== undefined ? { cityId: side } : { realmId: side }
@@ -427,7 +457,14 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         : (call as (args: Value[]) => Value)
     globals[binding.name] = new NativeFunction(binding.name, answer, binding.cost)
   }
-  return { globals, requests, ended: () => ended, endReason: () => endReason, logged }
+  return {
+    globals,
+    requests,
+    ended: () => ended,
+    endReason: () => endReason,
+    waited: () => waited,
+    logged,
+  }
 }
 
 /**

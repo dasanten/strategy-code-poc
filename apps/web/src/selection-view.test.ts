@@ -118,6 +118,21 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ building: building({ kind: 'storage' }) }))).not.toContain('feedStable')
   })
 
+  it('offers teaching and training on a finished training ground on their tile, to the grown', () => {
+    const ground = building({ kind: 'trainingGround' })
+    const site = building({ kind: 'trainingGround', site: { work: 0, delivered: {} } })
+    for (const id of ['teach', 'train']) {
+      expect(ids(here({ building: ground }))).toContain(id)
+      expect(ids(here({ building: site }))).not.toContain(id)
+      // Off the ground's footprint there is no ground on their tile.
+      expect(ids(here({ building: building({ kind: 'farm' }) }))).not.toContain(id)
+      expect(ids(here({}))).not.toContain(id)
+      expect(ids(here({ building: ground, adult: false }))).not.toContain(id)
+    }
+    const teach = residentActions(here({ building: ground })).find((a) => a.id === 'teach')!
+    expect(teach.opens).toBe(true)
+  })
+
   it('offers tearing down what was built on their tile, but not a warehouse', () => {
     expect(ids(here({ building: building({ kind: 'farm' }) }))).toContain('tearDown')
     expect(ids(here({ road: building({ kind: 'road' }) }))).toContain('tearDown')

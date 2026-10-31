@@ -76,6 +76,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   smelter: 0x9a4a2f,
   mint: 0xc9a227,
   smithy: 0x4a4e57,
+  trainingGround: 0xb8925a,
   road: ROAD_COLOR,
   carriage: 0xa0703f,
 }
@@ -95,6 +96,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   smelter: 'Smelter',
   mint: 'Mint',
   smithy: 'Smithy',
+  trainingGround: 'Training ground',
   road: 'Road',
   carriage: 'Carriage',
 }

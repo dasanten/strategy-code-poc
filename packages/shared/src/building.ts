@@ -6,6 +6,7 @@ import {
   RECIPES,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
+  TRAINING_GROUND_MAX_TRAINEES,
   WORKPLACE_MAX_WORKERS,
   buildWork,
   canWork,
@@ -28,6 +29,7 @@ import {
   type ResourceNode,
   type Stock,
   type WorldState,
+  isTrainingSubject,
 } from './world.js'
 import {
   Terrain,
@@ -44,8 +46,9 @@ import {
 /**
  * Kinds of building that can be built so far: the workplaces on resource nodes, stables, smelters,
  * mints and smithies, town halls, storages, walls and gates (`CONTEXT.md`: Town hall, Storage,
- * Wall / Gate), houses and farms (`CONTEXT.md`: House, Farm), roads (`CONTEXT.md`: Road), and
- * carriages, whose site becomes a carriage (`CONTEXT.md`: Carriage).
+ * Wall / Gate), houses and farms (`CONTEXT.md`: House, Farm), training grounds (`CONTEXT.md`:
+ * Training ground), roads (`CONTEXT.md`: Road), and carriages, whose site becomes a carriage
+ * (`CONTEXT.md`: Carriage).
  */
 export const BUILDABLE: readonly BuildingKind[] = [
   'lumberCamp',
@@ -59,6 +62,7 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'smithy',
   'townHall',
   'storage',
+  'trainingGround',
   'wall',
   'gate',
   'road',
@@ -96,7 +100,8 @@ export function hasChoice(kind: BuildingKind): boolean {
 }
 /**
  * Buildable kinds that go on any passable terrain but Mountain, off any resource node
- * (`CONTEXT.md`: Where buildings go).
+ * (`CONTEXT.md`: Where buildings go): the processing workplaces, the city buildings and training
+ * grounds (`CONTEXT.md`: Training ground).
  */
 export const OFF_NODES: readonly BuildingKind[] = [
   ...PROCESSING,
@@ -105,6 +110,7 @@ export const OFF_NODES: readonly BuildingKind[] = [
   'storage',
   'wall',
   'gate',
+  'trainingGround',
 ]
 
 /** Buildable kinds that go on Plains, off any resource node: stables and farms. */
@@ -324,7 +330,7 @@ function lookupOf(terrain: TerrainMap | TerrainLookup): (x: number, y: number) =
  * (x, y) (`CONTEXT.md`: Where buildings go, Footprint), or undefined if it can: every tile of the
  * footprint passable and free of other buildings; workplaces with one tile on a resource node of
  * their kind, stables and farms wholly on Plains, smelters, mints, smithies, town halls, houses,
- * storages, walls and gates off Mountain, a house only in a city’s area (`CONTEXT.md`:
+ * storages, training grounds, walls and gates off Mountain, a house only in a city’s area (`CONTEXT.md`:
  * House); only a node’s workplace covers a node. A road goes on any passable land, Mountain too, node or not, and
  * next to a building on its tile, but one road per tile (`CONTEXT.md`: Road). A carriage site
  * goes on a tile of a finished stable or right next to one, where a carriage can stand, off any
@@ -498,6 +504,80 @@ export function workersOf<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
   return world.residents.filter(
     (r) => r.order?.kind === 'workAt' && r.order.buildingId === workplace.id && isAt(r, workplace),
   )
+}
+
+/**
+ * Who teaches at a training ground (`CONTEXT.md`: Teacher): the resident holding a teach order
+ * for it and standing on its footprint, found from residents' orders as workers are; the ground
+ * keeps no state of its own.
+ */
+export function teacherAt<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
+  ground: Building,
+  residents: readonly R[],
+  size = MAP_SIZE,
+): R | undefined {
+  return residents.find(
+    (r) => r.order?.kind === 'teach' && r.order.buildingId === ground.id && isAt(r, ground, size),
+  )
+}
+
+/**
+ * Why a resident can't start teaching `subject` at the building on their tile, or undefined if
+ * they can (`CONTEXT.md`: Teacher): it has to be a finished training ground nobody else teaches
+ * at, and they grown. A teacher there may switch to another subject.
+ */
+export function teachProblem(
+  world: WorldState,
+  resident: Resident,
+  subject: unknown,
+): string | undefined {
+  if (!canWork(resident, world.tick)) return 'children can’t teach'
+  if (!isTrainingSubject(subject)) return 'teach a stat or a skill'
+  const here = buildingAt(world, resident.x, resident.y)
+  if (!here || here.kind !== 'trainingGround') return 'there is no training ground here'
+  if (here.site) return 'it is still a construction site'
+  const o = resident.order
+  if (o?.kind === 'teach' && o.buildingId === here.id && o.subject === subject)
+    return 'already teaching here'
+  const teacher = teacherAt(here, world.residents)
+  if (teacher && teacher !== resident) {
+    const what = teacher.order?.kind === 'teach' ? teacher.order.subject : subject
+    return `${teacher.name} teaches ${capitalised(what)} here`
+  }
+  return undefined
+}
+
+const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/**
+ * Who trains at a training ground (`CONTEXT.md`: Trainee): the residents holding a train order for
+ * it and standing on its footprint, found from residents' orders as its teacher is.
+ */
+export function traineesOf<R extends Pick<Resident, 'order' | 'x' | 'y'>>(
+  ground: Building,
+  residents: readonly R[],
+  size = MAP_SIZE,
+): R[] {
+  return residents.filter(
+    (r) => r.order?.kind === 'train' && r.order.buildingId === ground.id && isAt(r, ground, size),
+  )
+}
+
+/**
+ * Why a resident can't start training at the building on their tile, or undefined if they can
+ * (`CONTEXT.md`: Trainee): it has to be a finished training ground with room for another
+ * trainee, and they grown. They need no teacher there to start: without one they wait.
+ */
+export function trainProblem(world: WorldState, resident: Resident): string | undefined {
+  if (!canWork(resident, world.tick)) return 'children can’t train'
+  const here = buildingAt(world, resident.x, resident.y)
+  if (!here || here.kind !== 'trainingGround') return 'there is no training ground here'
+  if (here.site) return 'it is still a construction site'
+  const o = resident.order
+  if (o?.kind === 'train' && o.buildingId === here.id) return 'already training here'
+  if (traineesOf(here, world.residents).length >= TRAINING_GROUND_MAX_TRAINEES)
+    return `the training ground has room for ${TRAINING_GROUND_MAX_TRAINEES} trainees`
+  return undefined
 }
 
 /**

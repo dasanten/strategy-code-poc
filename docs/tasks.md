@@ -23,7 +23,9 @@ Daniel on 2026-10-31: NPC ambitions (Epic 48, ADR 0016, `docs/proposals/npc-ambi
 ahead of Bandits.
 Agreed with Daniel on 2026-10-31, once its tickets were written: Cheaper ticks (Epic 49, the
 server-load review of the same day) comes right after NPC ambitions, ahead of everything agreed
-for after it.
+for after it. Agreed with Daniel later on 2026-10-31: then Quick wins 4 (Epic 50: the whole
+footprint workable, smooth movement on the map, horse names and a Horses drawer), Saved queues and
+repeats (51) and Training (52), in that order, all ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -77,6 +79,9 @@ I sleep.
 | 47  | [Under attack](https://github.com/dasanten/strategy-code-poc/issues/531)                      | ticketed                |
 | 48  | [NPC ambitions](https://github.com/dasanten/strategy-code-poc/issues/567)                     | ticketed                |
 | 49  | [Cheaper ticks](https://github.com/dasanten/strategy-code-poc/issues/574)                     | ticketed                |
+| 50  | [Quick wins 4](https://github.com/dasanten/strategy-code-poc/issues/582)                      | ticketed                |
+| 51  | [Saved queues and repeats](https://github.com/dasanten/strategy-code-poc/issues/588)          | ticketed                |
+| 52  | [Training](https://github.com/dasanten/strategy-code-poc/issues/592)                          | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

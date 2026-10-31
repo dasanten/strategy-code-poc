@@ -5,6 +5,7 @@ import {
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_LOG_LINES,
   SCRIPT_TILE_QUERY_COST,
+  TRAINING_GROUND_MAX_TRAINEES,
 } from './balance.js'
 import type { ScriptType, ScriptViewName } from './script-views.js'
 
@@ -21,9 +22,10 @@ import type { ScriptType, ScriptViewName } from './script-views.js'
  *   `floor` and `pickRandom` are queries too, but work only on what they are given.
  * - An **action** asks for the order of the same name for `me`, checked exactly as a UI order
  *   is. It answers `null` when requested, or why not as a string; a script can request nothing
- *   an order couldn't. `doing`, `log` and `end` ask for no order: `doing` keeps the resident's
- *   Doing line in `memory` (`CONTEXT.md`: Doing), `log` adds to their script log (Script log),
- *   `end` ends the script once this run is over.
+ *   an order couldn't. `doing`, `log`, `end` and `wait` ask for no order: `doing` keeps the
+ *   resident's Doing line in `memory` (`CONTEXT.md`: Doing), `log` adds to their script log
+ *   (Script log), `end` ends the script once this run is over, and `wait` has it skip the ticks
+ *   until the resident's order ends (Running a script, Waiting).
  *
  * `cost` is the steps one call costs on top of the 1 every evaluated node costs. `returns` is
  * what a value holds or a call answers, in terms of the script views (ADR 0011).
@@ -312,6 +314,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     `End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. With \`reason\`, short text (cut to ${DOING_MAX_LENGTH} characters), my Player’s realm log says why, like “Ana stopped Work: no workplace on her tile”. It asks for no order.`,
   ),
   action(
+    'wait',
+    [],
+    'Wait on my order: once this run is over I am not run again until it ends, is replaced or I am struck; then I run every tick again. With no order, it does nothing. It asks for no order.',
+  ),
+  action(
     'doing',
     ['text'],
     `Say what I’m doing, for my Player’s Doing line: the text (cut to ${DOING_MAX_LENGTH} characters) shows instead of the one the game derives from my task and order, until I call it again; null gives the derived one back. Kept as \`memory.doing\`; it asks for no order.`,
@@ -340,6 +347,16 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('build', ['building'], 'Lay out or join a construction site of that kind on my tile.'),
   action('tearDown', ['buildingId'], 'Tear down the building or site on my tile.'),
   action('workAt', ['makes?'], 'Work the workplace on my tile; at a smithy, say what to make.'),
+  action(
+    'teach',
+    ['subject'],
+    'Teach a stat ("strength", "endurance", "agility", "intellect") or a skill ("combat", …) at the training ground on my tile, while I stand there. One teacher per ground.',
+  ),
+  action(
+    'train',
+    [],
+    `Train at the training ground on my tile, while I stand there: I learn its subject while a teacher is there, never past the teacher. Room for ${TRAINING_GROUND_MAX_TRAINEES} trainees per ground.`,
+  ),
   action(
     'breed',
     ['stableId', 'horseIds'],

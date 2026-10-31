@@ -9,6 +9,7 @@ import {
   tileIndex,
   type ResourceNode,
   type TerrainMap,
+  wrap,
 } from '@csp/shared'
 import type { SessionUser } from './auth.js'
 import { schema, type Db } from './db/index.js'
@@ -22,6 +23,12 @@ type Viewer = Pick<SessionUser, 'id'>
  */
 export class ExploredTerrain {
   private bits = new Map<number, Uint8Array>()
+  /**
+   * Per Player, the chunks in which they explored at least one tile: kept beside the bitmap so a
+   * welcome looks them up instead of scanning every tile of the map. Scratch memory, rebuilt from
+   * the bitmap on load.
+   */
+  private chunks = new Map<number, Set<number>>()
   private dirty = new Set<number>()
 
   /** Resource nodes by chunk index; nodes never move, so this is built once. */
@@ -42,9 +49,34 @@ export class ExploredTerrain {
   static load(db: Db, terrain: TerrainMap, nodes: ResourceNode[] = []): ExploredTerrain {
     const explored = new ExploredTerrain(terrain, nodes)
     for (const row of db.select().from(schema.explored).all()) {
-      explored.bits.set(row.userId, new Uint8Array(row.data))
+      const bits = new Uint8Array(row.data)
+      explored.bits.set(row.userId, bits)
+      explored.chunks.set(row.userId, explored.chunksIn(bits))
     }
     return explored
+  }
+
+  /** The chunks with an explored tile in a bitmap: only its non-zero bytes are looked at. */
+  private chunksIn(bits: Uint8Array): Set<number> {
+    const { size } = this.terrain
+    const n = chunksAcross(size)
+    const last = size * size - 1
+    const chunkOf = (t: number) =>
+      Math.floor(Math.floor(t / size) / CHUNK_SIZE) * n + Math.floor((t % size) / CHUNK_SIZE)
+    const found = new Set<number>()
+    for (let i = 0; i < bits.length; i++) {
+      const byte = bits[i]!
+      if (byte === 0) continue
+      const first = i * 8
+      const c = chunkOf(first)
+      // On a map whose side is a whole number of bytes, a byte's eight tiles share one chunk.
+      if (c === chunkOf(Math.min(first + 7, last))) {
+        found.add(c)
+        continue
+      }
+      for (let b = 0; b < 8; b++) if (byte & (1 << b)) found.add(chunkOf(first + b))
+    }
+    return found
   }
 
   /** Writes the Players whose explored terrain changed since the last save. */
@@ -74,22 +106,38 @@ export class ExploredTerrain {
       bits = new Uint8Array(Math.ceil((size * size) / 8))
       this.bits.set(userId, bits)
     }
+    let chunks = this.chunks.get(userId)
+    if (!chunks) {
+      chunks = new Set()
+      this.chunks.set(userId, chunks)
+    }
     const n = chunksAcross(size)
     const grown = new Set<number>()
-    for (let ty = y - radius; ty <= y + radius; ty++) {
-      for (let tx = x - radius; tx <= x + radius; tx++) {
-        const dx = tx - x
-        const dy = ty - y
-        if (dx * dx + dy * dy > radius * radius) continue
-        const t = tileIndex(size, tx, ty)
+    for (let dy = -radius; dy <= radius; dy++) {
+      // The disc's row: every tile with dx² + dy² ≤ radius².
+      let w = Math.floor(Math.sqrt(radius * radius - dy * dy))
+      while (w * w + dy * dy > radius * radius) w--
+      const row = wrap(y + dy, size)
+      const chunkRow = Math.floor(row / CHUNK_SIZE) * n
+      for (let tx = x - w; tx <= x + w; ) {
+        const col = wrap(tx, size)
+        const t = row * size + col
+        const i = t >> 3
+        if (bits[i] === 0xff) {
+          // Eight tiles already explored: skip to the byte's end, or the row's if that comes first.
+          tx += Math.min(8 - (t & 7), size - col)
+          continue
+        }
         const bit = 1 << (t & 7)
-        if (bits[t >> 3]! & bit) continue
-        bits[t >> 3]! |= bit
-        const [mx, my] = [t % size, Math.floor(t / size)]
-        grown.add(Math.floor(my / CHUNK_SIZE) * n + Math.floor(mx / CHUNK_SIZE))
+        if (!(bits[i]! & bit)) {
+          bits[i]! |= bit
+          grown.add(chunkRow + Math.floor(col / CHUNK_SIZE))
+        }
+        tx++
       }
     }
     if (grown.size > 0) this.dirty.add(userId)
+    for (const c of grown) chunks.add(c)
     return grown
   }
 
@@ -162,16 +210,7 @@ export class ExploredTerrain {
 
   /** The chunks in which the Player has explored at least one tile (see `chunksAcross`). */
   exploredChunks(viewer: Viewer): number[] {
-    const { size } = this.terrain
-    const n = chunksAcross(size)
-    const found = new Set<number>()
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const c = Math.floor(y / CHUNK_SIZE) * n + Math.floor(x / CHUNK_SIZE)
-        if (!found.has(c) && this.isExplored(viewer, x, y)) found.add(c)
-      }
-    }
-    return [...found].sort((a, b) => a - b)
+    return [...(this.chunks.get(viewer.id) ?? [])].sort((a, b) => a - b)
   }
 }
 

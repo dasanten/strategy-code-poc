@@ -17,6 +17,9 @@ import {
   carryCapacity,
   stockWeight,
   ticksForAge,
+  SKILL_MAX,
+  subjectValue,
+  trainingCeiling,
 } from './balance.js'
 import { TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR, type Resident } from './world.js'
 
@@ -100,5 +103,32 @@ describe('work and Construction skill', () => {
     expect(workLearned(worker({ farming: 100 }), 'farming', 0)).toBe(0)
     expect(workLearned(worker({ farming: 100 - 1e-6 }), 'farming', 0)).toBeCloseTo(1e-6, 9)
     expect(constructionLearned(worker({ construction: 100 }), 0)).toBe(0)
+  })
+})
+
+describe('training ceilings (`CONTEXT.md`: Training)', () => {
+  const someone = (strength: [number, number], combat: number) =>
+    ({
+      stats: { strength: { base: strength[0], trained: strength[1] } },
+      skills: { combat },
+      bornAt: 0,
+    }) as unknown as Resident
+  const t = 20 * TICKS_PER_GAME_YEAR
+
+  it('stops a stat at the teacher’s value, or at the trainee’s cap if that is lower', () => {
+    const teacher = someone([14, 0], 0)
+    expect(subjectValue(someone([10, 2.5], 0), 'strength', t)).toBe(12.5)
+    // Base 10: cap 5, so 15; the teacher has 14.
+    expect(trainingCeiling(someone([10, 0], 0), teacher, 'strength', t)).toBe(14)
+    // Base 8: cap 4, so 12, under the teacher's 14.
+    expect(trainingCeiling(someone([8, 0], 0), teacher, 'strength', t)).toBe(12)
+  })
+
+  it('stops a skill at the teacher’s, never past its maximum', () => {
+    expect(subjectValue(someone([10, 0], 7), 'combat', t)).toBe(7)
+    expect(subjectValue(someone([10, 0], 7), 'mining', t)).toBe(0)
+    expect(trainingCeiling(someone([10, 0], 0), someone([10, 0], 6), 'combat', t)).toBe(6)
+    const master = someone([10, 0], 1e6)
+    expect(trainingCeiling(someone([10, 0], 0), master, 'combat', t)).toBe(SKILL_MAX.combat)
   })
 })

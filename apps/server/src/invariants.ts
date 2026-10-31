@@ -79,6 +79,7 @@ import {
   isPassableTerrain,
   buildingAt,
   isAt,
+  TRAINING_GROUND_MAX_TRAINEES,
   keptBreeding,
   besideStep,
   stepLength,
@@ -1404,6 +1405,8 @@ const ADULT_ORDERS = new Set([
   'wallLine',
   'tearDown',
   'workAt',
+  'teach',
+  'train',
   'breed',
   'drive',
 ])
@@ -1653,6 +1656,80 @@ export const wallDamageSound: Invariant = {
 }
 
 /**
+ * Teachers are sound (`CONTEXT.md`: Teacher): a teacher stands on the footprint of a finished
+ * training ground, and a ground has at most one teacher.
+ */
+export const teachersSound: Invariant = {
+  name: 'teachers-sound',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const teachers = new Map<string, string>()
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'teach') continue
+      const ground = world.buildings.find((b) => b.id === o.buildingId)
+      const other = teachers.get(o.buildingId)
+      const problem =
+        !ground || ground.kind !== 'trainingGround' || ground.site
+          ? `teaches at ${o.buildingId}, no finished training ground`
+          : !isAt(r, ground, terrain.size)
+            ? `teaches at ${ground.id} but stands off it, on (${r.x}, ${r.y})`
+            : other !== undefined
+              ? `teaches at ${ground.id}, where ${other} teaches already`
+              : undefined
+      if (problem)
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${problem}`,
+          entityIds: other === undefined ? [r.id] : [r.id, other],
+        })
+      else teachers.set(o.buildingId, r.id)
+    }
+    return out
+  },
+}
+
+/**
+ * Trainees are sound (`CONTEXT.md`: Trainee): a trainee stands on the footprint of a finished
+ * training ground, and a ground has no more than `TRAINING_GROUND_MAX_TRAINEES`. What they learn
+ * stays within its cap (`trainedWithinCap`, `skillsWithinCap`).
+ */
+export const traineesSound: Invariant = {
+  name: 'trainees-sound',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const trainees = new Map<string, string[]>()
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'train') continue
+      const ground = world.buildings.find((b) => b.id === o.buildingId)
+      const problem =
+        !ground || ground.kind !== 'trainingGround' || ground.site
+          ? `trains at ${o.buildingId}, no finished training ground`
+          : !isAt(r, ground, terrain.size)
+            ? `trains at ${ground.id} but stands off it, on (${r.x}, ${r.y})`
+            : undefined
+      if (problem)
+        out.push({
+          invariant: this.name,
+          message: `resident ${r.id} ${problem}`,
+          entityIds: [r.id],
+        })
+      else trainees.set(o.buildingId, [...(trainees.get(o.buildingId) ?? []), r.id])
+    }
+    for (const [ground, ids] of trainees) {
+      if (ids.length <= TRAINING_GROUND_MAX_TRAINEES) continue
+      out.push({
+        invariant: this.name,
+        message: `${ids.length} train at ${ground}, room for ${TRAINING_GROUND_MAX_TRAINEES}`,
+        entityIds: ids,
+      })
+    }
+    return out
+  },
+}
+
+/**
  * Climb orders are sound (`CONTEXT.md`: Walls in combat): the climber stands where they started
  * climbing, and is between 0 and 1 of the way over.
  */
@@ -1896,6 +1973,8 @@ export const worldInvariants: Invariant[] = [
   gatesSound,
   wallDamageSound,
   climbOrdersSound,
+  teachersSound,
+  traineesSound,
   tradeOrgSound,
   caravansSound,
   routeRobberiesSound,
@@ -1931,7 +2010,26 @@ export function checkInvariants(
   return invariants.flatMap((inv) => inv.check(world, terrain))
 }
 
-/** Whether this tick's invariants get checked, given the share of ticks to sample. */
+/**
+ * The world invariants a tick checks (ADR 0004). With every tick sampled, all of them; otherwise,
+ * with `round = 1 / sampleRate`, the slice whose index matches `tick % round`: every invariant
+ * still runs once per `round` ticks, and no tick runs them all.
+ */
+export function invariantsForTick(
+  tick: number,
+  sampleRate: number,
+  invariants: Invariant[] = worldInvariants,
+): Invariant[] {
+  if (sampleRate >= 1) return invariants
+  if (!(sampleRate > 0)) return []
+  const round = Math.round(1 / sampleRate)
+  return invariants.filter((_, i) => i % round === tick % round)
+}
+
+/**
+ * Whether this tick gets the checks that need its before and after (the goods tally and the
+ * script runs), given the share of ticks to sample.
+ */
 export function shouldCheckInvariants(sampleRate: number, rand: () => number = Math.random) {
   return sampleRate >= 1 || rand() < sampleRate
 }
