@@ -23,6 +23,9 @@ import {
   previewNpcTrade,
   previewTrade,
   previewTransfer,
+  onTheWay,
+  onTheWayLine,
+  sendable,
   takesTransfers,
   tradedGoods,
   tradeLists,
@@ -372,6 +375,102 @@ describe('the trade buttons', () => {
       'Can’t buy food: it won’t trade with you',
     )
     expect(tradeText('buy', 'food', zero(), false)).toBe('Can’t buy food')
+  })
+})
+
+describe('sending a trader in the inspector', () => {
+  const storage = { ...b('s1', 'storage', 'city1'), x: 10, y: 10 }
+  const size = 100
+  const r = (id: string, x: number, y: number, more: Partial<Resident> = {}) =>
+    ({
+      id,
+      name: id,
+      owner: 'realm1',
+      x,
+      y,
+      carried: {},
+      bornAt: -1e9,
+      hunger: 100,
+      health: 100,
+      order: null,
+      ...more,
+    }) as unknown as Resident
+  const carriage = (id: string, x: number, y: number) => ({
+    id,
+    realmId: 'realm1',
+    cityId: null,
+    x,
+    y,
+    horseId: null,
+    load: { iron: 5 },
+  })
+
+  it('lists the Player’s residents and driven carriages nearest first, with what each carries', () => {
+    const far = r('far', 40, 10, { carried: { coins: 50 } })
+    const near = r('near', 13, 14, { carried: { coins: 20, wood: 2 } })
+    const driver = r('driver', 20, 10)
+    const theirs = r('theirs', 11, 10, { owner: 'realm2' } as Partial<Resident>)
+    const there = r('there', 10, 10)
+    const child = r('child', 12, 10, { bornAt: 0 })
+    const list = sendable(
+      storage,
+      {
+        residents: [far, near, driver, theirs, there, child],
+        carriages: [carriage('k1', 20, 10), carriage('k2', 30, 30)],
+      },
+      'realm1',
+      size,
+      0,
+    )
+    expect(list).toEqual([
+      { residentId: 'near', name: 'near', tiles: 5, carries: { coins: 20, wood: 2 } },
+      { residentId: 'driver', name: 'driver', tiles: 10, carries: {} },
+      {
+        residentId: 'driver',
+        carriageId: 'k1',
+        name: 'carriage k1, driven by driver',
+        tiles: 10,
+        carries: { iron: 5 },
+      },
+      { residentId: 'far', name: 'far', tiles: 30, carries: { coins: 50 } },
+    ])
+  })
+
+  it('counts the way round the map edge', () => {
+    const list = sendable(
+      storage,
+      { residents: [r('a', 95, 10)], carriages: [] },
+      'realm1',
+      size,
+      0,
+    )
+    expect(list.map((s) => s.tiles)).toEqual([15])
+  })
+
+  it('finds those on the way and leaves them, and the carriage driven, out of the picker', () => {
+    const walking = r('walking', 30, 10, {
+      order: { kind: 'walkTo', target: { x: 10, y: 10 }, path: null, progress: 0 },
+    } as Partial<Resident>)
+    const driving = r('driving', 20, 10, {
+      order: { kind: 'drive', carriageId: 'k1', target: { x: 10, y: 10 }, path: null, progress: 0 },
+    } as Partial<Resident>)
+    const elsewhere = r('elsewhere', 30, 30, {
+      order: { kind: 'walkTo', target: { x: 50, y: 50 }, path: null, progress: 0 },
+    } as Partial<Resident>)
+    const seen = {
+      residents: [walking, driving, elsewhere, r('rider', 20, 10)],
+      carriages: [carriage('k1', 20, 10)],
+    }
+    expect(onTheWay(storage, seen, 'realm1', size).map((x) => x.id)).toEqual(['walking', 'driving'])
+    expect(sendable(storage, seen, 'realm1', size, 0).map((s) => s.name)).toEqual([
+      'rider',
+      'elsewhere',
+    ])
+  })
+
+  it('says who is on the way and about when they arrive', () => {
+    expect(onTheWayLine('Ann', undefined)).toBe('Ann is on the way')
+    expect(onTheWayLine('Ann', 1e6)).toMatch(/^Ann is on the way, about \d+ h \(/)
   })
 })
 
