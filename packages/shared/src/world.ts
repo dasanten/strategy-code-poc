@@ -732,9 +732,16 @@ export interface CityPlan {
   project?: CityProject
   /** Its trade run under way (`CONTEXT.md`: NPC trader); unused until the NPC trader is built. */
   trader?: CityTrader
-  /** Since when it has been full (`CONTEXT.md`: Full city); unused until Founding is built. */
+  /**
+   * Since when it has been full (`CONTEXT.md`: Full city); while its founding party is out (its
+   * residents with the `found` job), since when the party has been on its way (`CONTEXT.md`:
+   * Founding).
+   */
   fullSince?: number
-  /** The site it found for its daughter (`CONTEXT.md`: Founding); unused until Founding is built. */
+  /**
+   * The tile of the town hall it founds its daughter round (`CONTEXT.md`: Founding): found once
+   * full, and the founding party's goal once it is out.
+   */
   foundingSite?: { x: number; y: number }
 }
 

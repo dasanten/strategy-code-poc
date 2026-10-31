@@ -9,7 +9,6 @@ import {
   stockWeight,
   type CityJob,
   type ScriptMemory,
-  NPC_BUILDERS,
   OWN_FOOD,
   WALK_TICKS_PER_TILE,
   WORK_OUTPUT_PER_DAY,
@@ -38,6 +37,8 @@ import {
   cityGrows,
   cityProject,
   isBuilder,
+  noFarm,
+  npcBuilders,
   stopBuildersWhoCantGoOn,
   takePart,
 } from './npc-growth.js'
@@ -51,6 +52,7 @@ import {
   workplaceOf,
 } from './npc-plan.js'
 import { holdsBatch } from './npc-chain.js'
+import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
 import { refillSource } from './survival.js'
 import { walkTime } from './walk-time.js'
 
@@ -106,10 +108,12 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
 }
 
 /**
- * What an NPC city does each tick: plans when its pass is due (`planCity`); stops workers who
- * run low on food where there is none, carriers home with their load stored, builders stuck or
- * out of materials, breeders who are done and workers at a smelter or smithy with nothing left to
- * process, so they get their next job; moves a worker whose plan puts them elsewhere, or nowhere;
+ * What an NPC city does each tick: plans when its pass is due (`planCity`); moves its founding
+ * party to the daughter once the town hall stands (`foundDaughter`), else sends it on its way
+ * (`stepFounders`), apart from everyone else; stops workers who run low on food where there is
+ * none, carriers home with their load stored, builders stuck or out of materials (with no
+ * storage yet, everyone builds, `npcBuilders`), breeders who are done and workers at a smelter or
+ * smithy with nothing left to process, so they get their next job; moves a worker whose plan puts them elsewhere, or nowhere;
  * then gives each idle adult what comes first: a resident carrying a child stays at home; one
  * carrying materials the project needs takes them to its site; a load of goods goes into the
  * storage; they take `OWN_FOOD` from the storage before they set out; one of them breeds the
@@ -141,7 +145,21 @@ function runCity(
   const storage = world.buildings.find(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
-  const adults = people.filter((r) => canWork(r, world.tick))
+  // Its founding party (`CONTEXT.md`: Founding) moves to the daughter once the town hall stands,
+  // and goes by the founding until then, apart from the rest.
+  if (plan && foundDaughter(world, city, plan)) people = people.filter((r) => r.cityId === city.id)
+  const party = new Set(foundingParty(plan))
+  if (plan && party.size > 0) {
+    stepFounders(
+      world,
+      city,
+      plan,
+      people.filter((r) => party.has(r.id)),
+      storage,
+      size,
+    )
+  }
+  const adults = people.filter((r) => canWork(r, world.tick) && !party.has(r.id))
   const jobs = plan?.jobs ?? {}
 
   stopBuildersWhoCantGoOn(world, adults, storage)
@@ -186,7 +204,7 @@ function runCity(
 
   const home = npcHome(world, city)
   const held = new Places(people)
-  let free = NPC_BUILDERS - adults.filter(isBuilder).length
+  let free = npcBuilders(world, city) - adults.filter(isBuilder).length
   // The project, picked anew once the planned one is finished: a site search, so once a tick at most.
   let checked = false
   const project = () => {
@@ -194,7 +212,7 @@ function runCity(
     if (!checked && plan.project && projectDone(world, plan.project)) {
       const start = performance.now()
       const next =
-        cityGrows(world, city, adults) && !foodShort(world, city)
+        cityGrows(world, city, adults) && (!foodShort(world, city) || noFarm(world, city))
           ? cityProject(world, city, home, terrain)
           : undefined
       if (next) plan.project = next

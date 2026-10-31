@@ -1,7 +1,6 @@
 import {
   FOOD_PER_DAY,
   MAX_WORKERS,
-  NPC_BUILDERS,
   NPC_FOOD_SHORT_DAYS,
   NPC_PLAN_TICKS,
   RECIPES,
@@ -13,6 +12,7 @@ import {
   hasFoodSurplus,
   isArmed,
   materialsNeeded,
+  npcStorages,
   punishers,
   storedFood,
   workplaceGood,
@@ -30,8 +30,17 @@ import {
 import { caravanCrew } from './caravans.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { npcHome } from './npc-behaviour.js'
-import { cityGrows, cityProject, endPairs, isBuilder, pairAdults } from './npc-growth.js'
+import {
+  cityGrows,
+  cityProject,
+  endPairs,
+  isBuilder,
+  noFarm,
+  npcBuilders,
+  pairAdults,
+} from './npc-growth.js'
 import { chainGood, chainInput, holdsBatch, ownWorkplaces, shortGoods } from './npc-chain.js'
+import { foundingParty, planFounding } from './npc-founding.js'
 import { hash } from './residents.js'
 
 /*
@@ -76,9 +85,11 @@ export function runResidents(world: WorldState): Map<string, Resident[]> {
 
 /**
  * Whether a city's Food runs short (`CONTEXT.md`: NPC city): its storages hold less than its
- * residents eat in `NPC_FOOD_SHORT_DAYS`.
+ * residents eat in `NPC_FOOD_SHORT_DAYS`. A city with no storage yet (a daughter just founded,
+ * `CONTEXT.md`: Founding) lives on the Food its people carry and is never short, so it builds one.
  */
 export function foodShort(world: WorldState, city: City): boolean {
+  if (npcStorages(world, city).length === 0) return false
   return storedFood(world, city) < cityFoodUse(world, city, NPC_FOOD_SHORT_DAYS)
 }
 
@@ -160,7 +171,9 @@ export function workplaceOf(r: Resident): string | undefined {
  * while Food runs short workers off the farms move to farms with room. An NPC city shares out
  * the rest by its reserve (`shareOut`); for the Trade Organization's cities they build the
  * project while fewer than `NPC_BUILDERS` do, else take the first workplace with room, farms first
- * until the city has a food surplus, else are idle. Without `terrain` the city picks no project.
+ * until the city has a food surplus, else are idle. An NPC city's founding party keeps its `found`
+ * jobs, and the pass ends with the founding's part (`planFounding`). Without `terrain` the city
+ * picks no project.
  * `people` are the residents the city gives orders to (`runResidents`).
  */
 export function planCity(
@@ -171,7 +184,10 @@ export function planCity(
 ): CityPlan {
   const plan = (world.cityPlans[city.id] ??= { plannedAt: world.tick, jobs: {} })
   plan.plannedAt = world.tick
-  const adults = people.filter((r) => canWork(r, world.tick))
+  // A founding party out is the founding's business (`planFounding`), not shared out.
+  const party = new Set(foundingParty(plan))
+  const members = people.filter((r) => party.has(r.id))
+  const adults = people.filter((r) => canWork(r, world.tick) && !party.has(r.id))
   const short = foodShort(world, city)
   const grows = cityGrows(world, city, adults)
   if (grows) {
@@ -180,7 +196,9 @@ export function planCity(
   }
   const home = npcHome(world, city)
   const project =
-    grows && !short && terrain && home ? cityProject(world, city, home, terrain) : undefined
+    grows && (!short || noFarm(world, city)) && terrain && home
+      ? cityProject(world, city, home, terrain)
+      : undefined
   if (project) plan.project = project
   else delete plan.project
 
@@ -217,12 +235,17 @@ export function planCity(
     }
   }
   if (!city.tradeOrg) {
-    shareOut(world, city, adults, jobs, held, spare, plan.project, builders, short)
+    const unneeded = shareOut(world, city, adults, jobs, held, spare, plan.project, builders, short)
+    planFounding(world, city, plan, jobs, { adults, unneeded, members }, home, terrain)
     plan.jobs = jobs
     return plan
   }
   for (const r of spare) {
-    if (plan.project && builders < NPC_BUILDERS && canTakePart(world, city, r, plan.project)) {
+    if (
+      plan.project &&
+      builders < npcBuilders(world, city) &&
+      canTakePart(world, city, r, plan.project)
+    ) {
       jobs[r.id] = { kind: 'build' }
       builders++
       continue
@@ -255,9 +278,10 @@ const feeders = (residents: number) =>
  * (`CONTEXT.md`: NPC city, NPC reserve). Workers stay where they are, except that the workers of a
  * workplace that processes goods the city isn't short of become spare hands, as do farmers beyond
  * those it keeps (`farmersWanted`). Then: spare hands, and after them workers off the farms, farm
- * until it has its farmers, while a farm has room; up to `NPC_BUILDERS` build the project; the
+ * until it has its farmers, while a farm has room; up to `NPC_BUILDERS` (`npcBuilders`) build the project; the
  * rest go to the workplace of the good shortest of the reserve (`chainPlace`), filling its crew
  * before the next. A spare hand with nowhere to go is idle; a farmer let go goes back to farming.
+ * Returns the spare hands with nowhere to go, idle or back on the farm (`CONTEXT.md`: Full city).
  */
 function shareOut(
   world: WorldState,
@@ -269,7 +293,8 @@ function shareOut(
   project: CityProject | undefined,
   builders: number,
   foodShort: boolean,
-): void {
+): Resident[] {
+  const unneeded: Resident[] = []
   const own = ownWorkplaces(world, city).filter((b) => !b.site)
   const byId = new Map(own.map((b) => [b.id, b]))
   const placeOf = (r: Resident) => byId.get(jobs[r.id]?.buildingId ?? '')
@@ -312,7 +337,7 @@ function shareOut(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
   for (const r of rest) {
-    if (project && builders < NPC_BUILDERS && canTakePart(world, city, r, project)) {
+    if (project && builders < npcBuilders(world, city) && canTakePart(world, city, r, project)) {
       jobs[r.id] = { kind: 'build' }
       builders++
       continue
@@ -326,8 +351,13 @@ function shareOut(
     } else if (back && backTo && held.room(backTo) > 0) {
       jobs[r.id] = back
       held.take(backTo)
-    } else jobs[r.id] = { kind: 'idle' }
+      unneeded.push(r)
+    } else {
+      jobs[r.id] = { kind: 'idle' }
+      unneeded.push(r)
+    }
   }
+  return unneeded
 }
 
 /**

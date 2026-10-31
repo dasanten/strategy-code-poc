@@ -518,6 +518,43 @@ export const NPC_NODE_REACH = 160
 export const NPC_FARM_REACH = 48
 
 /**
+ * Game days an NPC city must have been full before it founds a daughter (`CONTEXT.md`: Full
+ * city): a game week of idle spare hands and nothing short.
+ */
+export const NPC_FULL_DAYS = 7
+
+/**
+ * Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
+ * Founding), once a game day: enough to find free Plains on most maps, cheap enough to do while
+ * it waits.
+ */
+export const NPC_FOUND_SAMPLES = 200
+
+/**
+ * How far from its home a full NPC city looks for its daughter's site, in tiles (`CONTEXT.md`:
+ * Founding): twice the usual distance between cities, about five game days' walk on Plains.
+ */
+export const NPC_FOUND_REACH = 960
+
+/**
+ * Game days of Food a founding party's member carries for their first weeks at the site
+ * (`CONTEXT.md`: Founding), besides the Food for twice the walk there.
+ */
+export const NPC_FOUND_FOOD_DAYS = 20
+
+/**
+ * Game days after setting out that a founding party whose town hall doesn't stand gives up and
+ * walks home (`CONTEXT.md`: Founding); the mother may try again once it is full again.
+ */
+export const NPC_FOUND_GIVE_UP_DAYS = 20
+
+/**
+ * The standing a daughter and its mother start at toward each other (`CONTEXT.md`: Founding):
+ * high, of `STANDING_RANGE`, fading like any standing.
+ */
+export const NPC_FOUND_STANDING = 80
+
+/**
  * What the Trade Org HQ is placed with (`CONTEXT.md`: Trade Org HQ): a round city, the largest on
  * the map, with two rings of wall around its town hall.
  */
