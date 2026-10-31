@@ -15,20 +15,21 @@ import type { Invariant } from './invariants.js'
  * as the game's Defend says by built-in orders (`react` in combat.ts).
  */
 export function defendsByScript(world: WorldState, t: Resident): boolean {
-  return (
-    commanderOf(world, t) !== null && !world.armies.some((a) => a.memberIds.includes(t.id))
-  )
+  return commanderOf(world, t) !== null && !world.armies.some((a) => a.memberIds.includes(t.id))
 }
 
 /**
  * Starts `t`'s defence script, keeping what they were doing aside; not again while one runs
- * (`CONTEXT.md`: Defence script).
+ * (`CONTEXT.md`: Defence script). It is the script their Player picked for them
+ * (`Resident.defenceScriptId`) while that Player commands them, else the Defend default of the
+ * realm commanding them (script id 0, which the runner resolves). Either runs as task `defend`.
  */
-export function startDefence(t: Resident): void {
+export function startDefence(world: WorldState, t: Resident): void {
   if (t.interrupted) return
   t.interrupted = { order: t.order, ...(t.script ? { script: t.script } : {}) }
   t.order = null
-  t.script = { scriptId: 0, task: 'defend', memory: {} }
+  const picked = commanderOf(world, t) === t.owner ? t.defenceScriptId : undefined
+  t.script = { scriptId: picked ?? 0, task: 'defend', memory: {} }
 }
 
 /**
@@ -60,6 +61,26 @@ export const interruptedSound: Invariant = {
       .map((r) => ({
         invariant: 'interrupted-runs-defence',
         message: `${r.id} has something interrupted but runs no defence script`,
+        entityIds: [r.id],
+      })),
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Defence script): a resident's picked defence script is a
+ * script id, a whole positive number.
+ */
+export const defenceScriptSound: Invariant = {
+  name: 'defence-script-sound',
+  check: (world) =>
+    world.residents
+      .filter(
+        (r) =>
+          r.defenceScriptId !== undefined &&
+          (!Number.isInteger(r.defenceScriptId) || r.defenceScriptId <= 0),
+      )
+      .map((r) => ({
+        invariant: 'defence-script-sound',
+        message: `${r.id} keeps defence script ${r.defenceScriptId}, which can't be one`,
         entityIds: [r.id],
       })),
 }

@@ -83,6 +83,12 @@ export interface Resident {
    */
   interrupted?: Interrupted
   /**
+   * The id of the Player's script this resident runs as their defence script when struck
+   * (`CONTEXT.md`: Defence script), picked on their card; absent for the game's Defend default.
+   * Only the owning Player sees it.
+   */
+  defenceScriptId?: number
+  /**
    * The values the Player picked for this resident's script parameters (`CONTEXT.md`: Script
    * parameter): by script id, then by param name, the id of the building or carriage picked.
    * Kept when the script ends, so giving the task again keeps them. Absent while none is picked.
@@ -1507,6 +1513,12 @@ export type RealmEventWhat =
   | ({ kind: 'scriptOutOfSteps'; name: string; scriptId: number; realm: boolean } & ScriptRunBy)
   /** A run-script order ended because its script was deleted from the library. */
   | ({ kind: 'scriptEnded'; name: string; scriptId: number } & ScriptRunBy)
+  /**
+   * A resident's defence script (`Resident.defenceScriptId`) couldn't run when they were struck,
+   * deleted or no longer theirs (`CONTEXT.md`: Defence script): they defend by the Defend default
+   * instead, from now on.
+   */
+  | { kind: 'defenceScriptGone'; residentId: string; name: string; scriptId: number }
   /**
    * A resident's script ended itself with `end(reason)` (`CONTEXT.md`: Script): `script` is its
    * name, `reason` the short text it gave. Not an error: one for each end, never rate-limited.

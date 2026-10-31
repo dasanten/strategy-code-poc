@@ -218,6 +218,12 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'until someone does, once that resident is gone, and for a resident of another realm that isn’t allied',
       ),
       field('struckAt', 'number', 'The tick they were last struck.', 'whenever `struckBy` is'),
+      field(
+        'defenceScript',
+        'number',
+        'The id of the script they run when struck, picked on their card.',
+        'for the Defend default, and for a resident of another Player',
+      ),
       field('bornAt', 'number', 'The tick they were born; may be before the world began.'),
       field('age', 'number', 'Their age in game years.', 'except on `me` and an army’s `members`'),
       field('lifespan', 'number', 'The age in game years at which they die of old age.'),

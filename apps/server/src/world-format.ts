@@ -16,7 +16,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 62
+export const WORLD_FORMAT_VERSION = 63
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -226,6 +226,10 @@ export const migrations: Record<number, MigrationStep> = {
   // script; `Resident.interrupted`). Blows before gave built-in orders, so no resident has
   // anything interrupted and the step leaves them as they are.
   61: (state) => state,
+  // A resident may keep a defence script the Player picked (`CONTEXT.md`: Defence script;
+  // `Resident.defenceScriptId`), absent for the Defend default. Nobody picked one before, so the
+  // step leaves every resident as they are.
+  62: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

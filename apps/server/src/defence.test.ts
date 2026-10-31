@@ -8,8 +8,9 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { attackOrder, resolveStrikes } from './combat.js'
-import { interruptedSound } from './defence.js'
+import { defenceScriptSound, interruptedSound } from './defence.js'
 import { checkInvariants } from './invariants.js'
+import type { RunnableScript } from './scripts.js'
 import { OrderQueue } from './orders.js'
 import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
@@ -32,7 +33,7 @@ const me = { userId: 7, account: { name: 'Mara', isAdmin: false } }
  * Realm r1 (Player 7) with city c1 (its town hall at (9, 3)): resident w1 standing on farm f1 at
  * (6, 6), and resident x1 of Player 8's realm r2 beside them (its Leader l2 far off).
  */
-function setup() {
+function setup(library = new Map<number, RunnableScript>()) {
   const world = createWorld(terrain)
   world.realms.push(
     { id: 'r1', userId: 7, leaderId: 'w1' },
@@ -47,7 +48,7 @@ function setup() {
   const x1 = newResident(mulberry32(2), { id: 'x1', owner: 'r2', x: 7, y: 6, tick: 0 })
   const l2 = newResident(mulberry32(3), { id: 'l2', owner: 'r2', x: 28, y: 28, tick: 0 })
   world.residents.push(r, x1, l2)
-  const scripts = defaultScripts(terrain, [me])
+  const scripts = defaultScripts(terrain, [me], library)
   const orders = new OrderQueue(scripts.kinds, terrain)
   const queues = new QueueRunner(
     { sender: (id) => (id === 7 ? me : undefined) },
@@ -79,7 +80,7 @@ function setup() {
   const gone = () => {
     world.residents = world.residents.filter((x) => x !== x1)
   }
-  return { world, r, x1, tick, until, give, strike, gone }
+  return { world, r, x1, orders, tick, until, give, strike, gone }
 }
 
 const logged = (r: { scriptLog?: { text: string }[] }) => (r.scriptLog ?? []).map((l) => l.text)
@@ -214,6 +215,110 @@ describe('the Defend default', () => {
   })
 })
 
+/** Mara's own script 750, picked as a defence script: it logs what it sees, and ends. */
+const shout = (): RunnableScript => ({
+  userId: 7,
+  name: 'Shout',
+  version: 1,
+  followsDefault: false,
+  source:
+    'param times: number = 2\nlog("shouting " + params.times + " by " + me.defenceScript)\nend("shouted")',
+})
+
+describe('a defence script picked', () => {
+  it('runs when they are struck, in place of Defend, and what it interrupted goes on after', () => {
+    const s = setup(new Map([[750, shout()]]))
+    s.give({ kind: 'task', task: 'work', workplaceId: 'f1' })
+    s.tick()
+    const picked = { kind: 'setDefenceScript', scriptId: 750, params: { times: 3 } }
+    expect(s.give(picked)).toMatchObject({ type: 'ack' })
+    s.tick()
+    expect(s.r.defenceScriptId).toBe(750)
+    expect(s.r.scriptParams?.[750]).toEqual({ times: 3 })
+    // Picking it leaves the work going.
+    expect(s.r.script?.scriptId).toBe(701)
+    expect(s.r.order).toMatchObject({ kind: 'workAt', buildingId: 'f1' })
+
+    s.strike()
+    expect(s.until(() => s.r.interrupted !== undefined)).toBe(true)
+    expect(s.r.script).toMatchObject({ scriptId: 750, task: 'defend' })
+    s.x1.order = null
+    s.tick()
+    expect(logged(s.r)).toEqual(expect.arrayContaining(['shouting 3 by 750', 'shouted']))
+    expect(s.r.interrupted).toBeUndefined()
+    expect(s.r.script?.scriptId).toBe(701)
+    expect(s.r.order).toMatchObject({ kind: 'workAt', buildingId: 'f1' })
+  })
+
+  it('cleared, or picked as Defend itself, is the Defend default again', () => {
+    const s = setup(new Map([[750, shout()]]))
+    s.r.carried.spear = 1
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.tick()
+    expect(s.r.defenceScriptId).toBe(750)
+    s.give({ kind: 'setDefenceScript', scriptId: null })
+    s.tick()
+    expect(s.r.defenceScriptId).toBeUndefined()
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.give({ kind: 'setDefenceScript', scriptId: 707 })
+    s.tick()
+    expect(s.r.defenceScriptId).toBeUndefined()
+
+    s.strike()
+    expect(s.until(() => s.r.interrupted !== undefined)).toBe(true)
+    s.tick()
+    expect(s.r.script).toMatchObject({ scriptId: 707, task: 'defend' })
+    expect(s.r.order).toMatchObject({ kind: 'attack', targetId: 'x1', defending: true })
+  })
+
+  it('deleted, falls back to the Defend default and tells the realm log once', () => {
+    const library = new Map([[750, shout()]])
+    const s = setup(library)
+    s.r.carried.spear = 1
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.tick()
+    library.delete(750)
+    s.strike()
+    expect(s.until(() => s.r.interrupted !== undefined)).toBe(true)
+    s.tick()
+    expect(s.r.script).toMatchObject({ scriptId: 707, task: 'defend' })
+    expect(s.r.order).toMatchObject({ kind: 'attack', targetId: 'x1', defending: true })
+    expect(s.r.defenceScriptId).toBeUndefined()
+    const told = () => s.world.events.filter((e) => e.kind === 'defenceScriptGone')
+    expect(told()).toMatchObject([{ residentId: 'w1', scriptId: 750 }])
+    s.tick()
+    s.tick()
+    expect(told()).toHaveLength(1)
+  })
+
+  it('is one of the Player’s own scripts, for a resident of their own', () => {
+    const theirs = { ...shout(), userId: 8 }
+    const s = setup(
+      new Map([
+        [750, shout()],
+        [751, theirs],
+      ]),
+    )
+    const pick = (o: object) => s.give({ kind: 'setDefenceScript', ...o })
+    expect(pick({ scriptId: 751 })).toMatchObject({ type: 'rejected' })
+    expect(pick({ scriptId: 750, residentId: 'x1' })).toMatchObject({ type: 'rejected' })
+    expect(pick({ scriptId: 750, params: { times: -1 } })).toMatchObject({ type: 'rejected' })
+    expect(pick({ scriptId: null, params: { times: 1 } })).toMatchObject({ type: 'rejected' })
+    // A default other than Defend may be picked too.
+    expect(pick({ scriptId: 701 })).toMatchObject({ type: 'ack' })
+  })
+
+  it('is seen by its owner only', () => {
+    const s = setup(new Map([[750, shout()]]))
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.tick()
+    const seen = (realmId: string) =>
+      entitiesInSight(s.world, terrain, realmId).find((e) => e.id === 'w1')!
+    expect(seen('r1')).toMatchObject({ defenceScriptId: 750 })
+    expect(seen('r2')).not.toHaveProperty('defenceScriptId')
+  })
+})
+
 describe('defence invariant', () => {
   it('flags something interrupted with no defence script running (ADR 0004)', () => {
     const s = setup()
@@ -223,5 +328,15 @@ describe('defence invariant', () => {
     ])
     s.r.script = { scriptId: 0, task: 'defend', memory: {} }
     expect(interruptedSound.check(s.world, terrain)).toEqual([])
+  })
+
+  it('flags a defence script that is no script id (ADR 0004)', () => {
+    const s = setup()
+    s.r.defenceScriptId = 0
+    expect(defenceScriptSound.check(s.world, terrain)).toMatchObject([
+      { invariant: 'defence-script-sound', entityIds: ['w1'] },
+    ])
+    s.r.defenceScriptId = 750
+    expect(defenceScriptSound.check(s.world, terrain)).toEqual([])
   })
 })
