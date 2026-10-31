@@ -94,6 +94,7 @@ describe('a Player’s default scripts', () => {
       ['Feed the stable (default)', 'feedStable', true],
       ['Haul (default)', 'haul', true],
       ['Tear down (default)', 'tearDown', true],
+      ['Train (default)', 'train', true],
       ['Work (default)', 'work', true],
     ])
     const work = getScript(db, mara, workId())
@@ -626,6 +627,12 @@ describe('the step budget', () => {
         r.script = { scriptId: 1, memory: { ...stable } }
       }
     }
+    const training = { groundId: 'g1' }
+    /** A finished training ground where the farm was. */
+    const grounded = (world: WorldState) => {
+      world.buildings = world.buildings.filter((b) => b.id !== 'farm')
+      world.buildings.push({ id: 'g1', kind: 'trainingGround', cityId: null, x: 3, y: 3 })
+    }
     const cases: Record<Task, Case[]> = {
       build: [
         // Starting: laying out, or turned down with the tile taken.
@@ -788,6 +795,40 @@ describe('the step budget', () => {
           prepare: (world) => {
             feeding(world, 100)
             world.residents[0]!.x = 5
+          },
+        },
+      ],
+      train: [
+        // Starting, training with a teacher there, away getting Food from the nearest of many
+        // storages, and walking back.
+        { memory: training, prepare: grounded },
+        {
+          memory: training,
+          prepare: (world) => {
+            grounded(world)
+            world.residents[0]!.order = { kind: 'train', buildingId: 'g1', learning: 'strength' }
+            world.residents[1]!.order = { kind: 'teach', buildingId: 'g1', subject: 'strength' }
+            world.residents[1]!.x = 4
+          },
+        },
+        {
+          memory: training,
+          prepare: (world) => {
+            grounded(world)
+            world.residents[0]!.order = { kind: 'train', buildingId: 'g1', learning: null }
+            world.residents[0]!.carried = {}
+            for (let i = 0; i < 10; i++) {
+              const stock = i === 9 ? { food: 100 } : { stone: 5 }
+              const at = { x: 5 + 2 * i, y: 12 }
+              world.buildings.push({ id: `s${i}`, kind: 'storage', cityId: 'c1', ...at, stock })
+            }
+          },
+        },
+        {
+          memory: training,
+          prepare: (world) => {
+            grounded(world)
+            world.residents[0]!.x = 9
           },
         },
       ],

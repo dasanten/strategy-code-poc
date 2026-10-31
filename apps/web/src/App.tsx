@@ -724,6 +724,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'task', task: 'feedStable', residentId: selected.id, stableId }
     setOrderError(await giveOrder(order, false))
   }
+  /**
+   * Gives the picked resident the Train task for the training ground they stand on: they run the
+   * Player's Train (default) script (`CONTEXT.md`: Trainee).
+   */
+  async function train(groundId: string) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'train', residentId: selected.id, groundId }
+    setOrderError(await giveOrder(order, false))
+  }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
   async function runScript(scriptId: number) {
@@ -1226,6 +1235,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             onWork={work}
             onFeedStable={feedStable}
+            onTrain={train}
             onTearDown={tearDown}
             horses={world.horses}
             onBreed={breed}

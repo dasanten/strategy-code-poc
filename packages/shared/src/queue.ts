@@ -38,12 +38,14 @@ export function runsScript(order: Pick<OrderRequest, 'kind'>): boolean {
   return order.kind === 'task' || order.kind === 'runScript'
 }
 
-/** A step that never ends on its own: working a workplace, a haul route, or feeding a stable. */
+/**
+ * A step that never ends on its own: working a workplace, a haul route, feeding a stable or
+ * training.
+ */
 export function neverEnds(order: OrderRequest): boolean {
   if (order.kind === 'workAt' || order.kind === 'haul') return true
   return (
-    order.kind === 'task' &&
-    (order.task === 'work' || order.task === 'haul' || order.task === 'feedStable')
+    order.kind === 'task' && ['work', 'haul', 'feedStable', 'train'].includes(order.task as string)
   )
 }
 

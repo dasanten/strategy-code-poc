@@ -14,6 +14,7 @@ import {
   breedingPair,
   buildingAt,
   teacherAt,
+  traineesOf,
   buildingRealm,
   directivesFor,
   materialsNeeded,
@@ -188,13 +189,17 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   }
   // A building as `building(id)` gives it: one of the side's own as it is, another's as the
   // Player sees it, its stock only when they see inside (`CONTEXT.md`: Seeing inside a storage).
-  // Who teaches what at a training ground (`CONTEXT.md`: Teacher), from residents' orders.
+  // Who teaches what and who trains at a training ground (`CONTEXT.md`: Teacher, Trainee), from
+  // residents' orders.
   const teachingAt = (id: string) => {
     const ground = world.buildings.find((b) => b.id === id)
     if (ground?.kind !== 'trainingGround') return undefined
     const teacher = teacherAt(ground, world.residents, terrain.size)
     const o = teacher?.order
-    return teacher && o?.kind === 'teach' ? { teacher: teacher.id, subject: o.subject } : undefined
+    const trainees = traineesOf(ground, world.residents, terrain.size).map((r) => r.id)
+    return teacher && o?.kind === 'teach'
+      ? { teacher: teacher.id, subject: o.subject, trainees }
+      : { trainees }
   }
   const asSeenBuilding = (b: Building) => {
     if (ownBuilding(b)) return b
@@ -325,6 +330,10 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       request('teach', {
         buildingId: buildingAt(world, resident.x, resident.y, terrain.size)?.id ?? null,
         subject: plain(subject),
+      })
+    actions.train = () =>
+      request('train', {
+        buildingId: buildingAt(world, resident.x, resident.y, terrain.size)?.id ?? null,
       })
     actions.doing = ([text]) => {
       const doing = doingText(text)

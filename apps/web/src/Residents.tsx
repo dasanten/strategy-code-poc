@@ -447,6 +447,8 @@ export function orderDoing(r: Pick<Resident, 'order' | 'riding'>, arrives?: numb
   if (o?.kind === 'workAt')
     return o.makes ? `Making ${GOOD_LABELS[o.makes].toLowerCase()}` : 'Working'
   if (o?.kind === 'teach') return `Teaching ${subjectLabel(o.subject)}`
+  if (o?.kind === 'train')
+    return o.learning ? `Training ${subjectLabel(o.learning)}` : 'Waiting to train'
   if (o?.kind === 'pay') return 'Paying for mercenaries'
   if (o?.kind === 'buyCity') return 'Buying a city'
   if (o?.kind === 'buyOff') return 'Buying off a directive'
@@ -679,6 +681,7 @@ export function GroupCard({
     mount: { kind: 'mount' },
     dismount: { kind: 'dismount' },
     feedStable: { kind: 'feedStable' },
+    train: { kind: 'train' },
     store: { kind: 'store' },
     drop: { kind: 'drop' },
     getOff: { kind: 'getOff' },
@@ -1055,6 +1058,7 @@ export function ResidentCard({
   realmId,
   onWork,
   onFeedStable,
+  onTrain,
   onTearDown,
   horses,
   onBreed,
@@ -1188,6 +1192,8 @@ export function ResidentCard({
   onWork: (makes?: Good) => void
   /** Gives the resident the Feed the stable task for the stable they stand in. */
   onFeedStable: (stableId: string) => void
+  /** Gives the resident the Train task for the training ground they stand on. */
+  onTrain: (groundId: string) => void
   /** Orders the resident to tear down the building or site on their tile. */
   onTearDown: (buildingId: string) => void
   /** Horses in sight, to pick two in the stable on the resident's tile to breed. */
@@ -1315,6 +1321,7 @@ export function ResidentCard({
     if (a.id === 'unhitch' && carriageToUnhitch) onUnhitch(carriageToUnhitch.id)
     if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
+    if (a.id === 'train' && building) onTrain(building.id)
   }
   useActionKeys(actions, act)
   const ridden = riddenHorseLine(r, horses, tick)

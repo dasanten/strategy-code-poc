@@ -5,6 +5,7 @@ import {
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_LOG_LINES,
   SCRIPT_TILE_QUERY_COST,
+  TRAINING_GROUND_MAX_TRAINEES,
 } from './balance.js'
 import type { ScriptType, ScriptViewName } from './script-views.js'
 
@@ -344,6 +345,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'teach',
     ['subject'],
     'Teach a stat ("strength", "endurance", "agility", "intellect") or a skill ("combat", …) at the training ground on my tile, while I stand there. One teacher per ground.',
+  ),
+  action(
+    'train',
+    [],
+    `Train at the training ground on my tile, while I stand there: I learn its subject while a teacher is there, never past the teacher. Room for ${TRAINING_GROUND_MAX_TRAINEES} trainees per ground.`,
   ),
   action(
     'breed',

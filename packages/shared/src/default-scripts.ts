@@ -22,7 +22,16 @@ import { FOOTPRINT } from './footprint.js'
  * The tasks that run a default script. Defend is never given: being struck starts it
  * (`CONTEXT.md`: Defence script).
  */
-export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable', 'defend'] as const
+export const TASKS = [
+  'work',
+  'build',
+  'haul',
+  'tearDown',
+  'breed',
+  'feedStable',
+  'defend',
+  'train',
+] as const
 export type Task = (typeof TASKS)[number]
 
 /**
@@ -38,6 +47,7 @@ export const TARGET_PARAMS: Partial<Readonly<Record<Task, string>>> = {
   tearDown: 'building',
   breed: 'stable',
   feedStable: 'stable',
+  train: 'ground',
 }
 
 /** The target param of a script (`TARGET_PARAMS`), if it is the default of a task with one. */
@@ -90,6 +100,12 @@ export interface TaskMemory {
    * (`TARGET_PARAMS`).
    */
   feedStable: { stableId: string }
+  /**
+   * Train: the training ground the resident stood on when given it, in the param `ground` too
+   * (`TARGET_PARAMS`), and the `subject` to learn there, if one was asked for: the default ends
+   * if the ground teaches something else.
+   */
+  train: { groundId: string; subject?: string }
 }
 
 export interface DefaultScript {
@@ -915,6 +931,99 @@ fn say(text) {
 }
 
 ${PICK_STABLE}
+
+${LOG_TEXT}
+`,
+  },
+  train: {
+    name: 'Train',
+    source: `// Train (default): train at params.ground, or while none is picked the
+// training ground I stand on when I start, kept in memory.groundId; with
+// none, or once it is gone, I end. Away from it I walk there first. With
+// memory.subject set, I end once the ground teaches something else. While
+// no teacher is there, or I have learned all the teacher can teach me, I
+// wait there. Meals come from the ground's pile on their own, without an
+// order. Below params.foodAt units of Food on me I get Food up to
+// params.foodTake at the nearest storage of my realm with Food, and come
+// back. foodAt 0 turns getting food off.
+param ground: building // the training ground; none: the one I stand on
+${FOOD_PARAMS}
+
+if (!pickGround()) { return }
+let ground = building(memory.groundId)
+// Kept for when it is out of sight.
+if (ground != null) { memory.at = {x: ground.x, y: ground.y} }
+if (memory.at == null && params.ground != null) {
+  memory.at = {x: params.ground.x, y: params.ground.y}
+}
+if (memory.at == null || memory.stuck) { return }
+if (me.order != null && me.order.kind != "train") { return } // on my way
+
+if (walkBack()) { return }
+if (ground == null) { // here, and it isn't: torn down
+  end("the training ground is gone")
+  return
+}
+if (memory.subject != null && ground.subject != null && ground.subject != memory.subject) {
+  end("the ground teaches " + ground.subject + ", not " + memory.subject)
+  return
+}
+// With no Food anywhere, I train on.
+if (getFoodIfLow(null, ground)) { return }
+if (me.order == null) {
+  let problem = train()
+  if (problem != null) { end(problem) }
+  return
+}
+if (ground.teacher == null) { doing("Waiting for a teacher") }
+else if (me.order.learning == null) { doing("Waiting: learned all I can here") }
+else { doing(null) } // the order says what I learn
+
+// Which ground I train at: the one picked, else the one I started on, kept in
+// memory.groundId. False once I end: neither is a training ground.
+fn pickGround() {
+  if (params.ground != null) {
+    if (!isGround(params.ground)) {
+      end("the " + params.ground.kind + " is no training ground")
+      return false
+    }
+    memory.groundId = params.ground.id
+  }
+  if (memory.groundId == null) {
+    let here = buildingAt(me.x, me.y)
+    if (!isGround(here)) {
+      end("no training ground on their tile")
+      return false
+    }
+    memory.groundId = here.id
+  }
+  return true
+}
+
+// A finished training ground.
+fn isGround(b) {
+  return b != null && b.kind == "trainingGround" && b.site == null
+}
+
+// Off the ground (not there yet, or back from getting food): walk to it,
+// once; with no way there I stay put. True until I am on it.
+fn walkBack() {
+  let here = buildingAt(me.x, me.y)
+  if (here != null && here.id == memory.groundId) {
+    if (memory.walked != null) { memory.walked = null }
+    return false
+  }
+  if (memory.walked == true) {
+    memory.stuck = true
+    log("no way to the training ground")
+  } else {
+    memory.walked = true
+    walkTo(memory.at.x, memory.at.y)
+  }
+  return true
+}
+
+${GET_FOOD}
 
 ${LOG_TEXT}
 `,

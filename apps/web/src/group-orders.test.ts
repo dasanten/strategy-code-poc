@@ -387,6 +387,7 @@ describe('group orders with Shift held', () => {
 describe('every resident order on the group card', () => {
   const farm: Building = { id: 'farm', kind: 'farm', cityId: null, x: 5, y: 5 }
   const stable: Building = { id: 'stable', kind: 'stable', cityId: null, x: 5, y: 5 }
+  const ground: Building = { id: 'ground', kind: 'trainingGround', cityId: null, x: 5, y: 5 }
   const carriage = { id: 'k1', realmId: 'me', cityId: null, x: 5, y: 5, horseId: null, load: {} }
   /** An adult with everything about them, so their card offers every order it has. */
   const everything = (building: Building): ResidentHere => ({
@@ -408,6 +409,7 @@ describe('every resident order on the group card', () => {
   const offered = [
     ...residentActions(everything(farm)),
     ...residentActions({ ...everything(stable), horseToRide: false, riding: true }),
+    ...residentActions(everything(ground)),
   ].map((a) => a.id)
 
   it('has a counterpart on the group card for each, or says why it goes to one resident only', () => {

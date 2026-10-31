@@ -401,6 +401,7 @@ describe('script bindings', () => {
     ['workAt()', { kind: 'workAt' }],
     ['workAt("sword")', { kind: 'workAt', makes: 'sword' }],
     ['teach("strength")', { kind: 'teach', buildingId: null, subject: 'strength' }],
+    ['train()', { kind: 'train', buildingId: null }],
     ['pair("b1")', { kind: 'pair', partnerId: 'b1' }],
     ['attack("b1")', { kind: 'attack', targetId: 'b1' }],
     ['attack("b2")', { kind: 'attack', targetId: 'b2' }],

@@ -360,6 +360,7 @@ export function stepLabel(
       if (order.task === 'tearDown') return `Tear down ${building(order.buildingId)}`
       if (order.task === 'feedStable') return `Feed ${building(order.stableId)}`
       if (order.task === 'breed') return `Breed horses at ${building(order.stableId)}`
+      if (order.task === 'train') return `Train at ${building(order.groundId)}`
       return `Haul to ${at(order)}`
   }
   return order.kind

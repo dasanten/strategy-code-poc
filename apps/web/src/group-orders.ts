@@ -72,6 +72,8 @@ export type GroupOrder =
   | { kind: 'haul'; x: number; y: number; goods: Good[]; returnGoods: Good[]; keepFood: number }
   /** Each feeds the stable they stand in (`CONTEXT.md`: Feeding the stable). */
   | { kind: 'feedStable' }
+  /** Each trains at the training ground they stand on (`CONTEXT.md`: Trainee). */
+  | { kind: 'train' }
   /** Each builds road or wall along the same line (`CONTEXT.md`: Road, Wall / Gate). */
   | {
       kind: 'line'
@@ -148,6 +150,7 @@ const ADULTS_ONLY: GroupOrder['kind'][] = [
   'work',
   'build',
   'feedStable',
+  'train',
   'line',
   'tearDown',
   'breed',
@@ -169,6 +172,13 @@ const onTile = <T extends { x: number; y: number }>(
 const besides = (a: { x: number; y: number }, b: { x: number; y: number }, size: number) =>
   Math.abs(wrapDelta(a.x, b.x, size)) + Math.abs(wrapDelta(a.y, b.y, size)) === 1
 
+/** The finished training ground a resident stands on, if they stand on one. */
+function groundOf(r: GroupResident, seen: GroupSeen, size: number) {
+  return seen.buildings?.find(
+    (b) => b.kind === 'trainingGround' && !b.site && covers(b, r.x, r.y, size),
+  )
+}
+
 /** The finished stable a resident stands in, if they stand in one. */
 function stableOf(r: GroupResident, seen: GroupSeen, size: number) {
   return seen.buildings?.find((b) => b.kind === 'stable' && !b.site && covers(b, r.x, r.y, size))
@@ -179,7 +189,7 @@ function stableOf(r: GroupResident, seen: GroupSeen, size: number) {
  * Carrying): children don't work, build or drive, and fetch and put down only Food; a partner
  * carrying a child doesn't work, build, tear down, breed or haul. Tile-bound orders go only to
  * those standing there: Work and Tear down at the building, Breed at the stable, Feed the stable
- * in one, Climb next to the wall, Drive and Haul on a carriage, Mount on a free horse's tile.
+ * in one, Train on a training ground, Climb next to the wall, Drive and Haul on a carriage, Mount on a free horse's tile.
  * Walking, attacking, running a script and stopping go to everyone. Board goes to those who could
  * board the carriage, room aside (`boarderProblem`), Get off to those aboard one. Queued (Shift
  * held), Work, Tear down and Breed also go to those away from the place, who walk there first,
@@ -219,6 +229,9 @@ export function groupSkip(
       // A rider doesn't drive (`CONTEXT.md`: Riding).
       if (order.kind === 'drive' && r.riding !== undefined) return 'dismount first to drive'
       if (onTile(r, seen.carriages).length === 0) return 'no carriage here'
+      break
+    case 'train':
+      if (!groundOf(r, seen, size)) return 'not at a training ground'
       break
     case 'feedStable':
       if (!stableOf(r, seen, size)) return 'not at a stable'
@@ -430,6 +443,9 @@ export function groupRequests(
         }
         break
       }
+      case 'train':
+        send(r, { kind: 'task', task: 'train', groundId: groundOf(r, seen, size)!.id })
+        break
       case 'feedStable':
         send(r, { kind: 'task', task: 'feedStable', stableId: stableOf(r, seen, size)!.id })
         break
@@ -535,6 +551,7 @@ export type GroupButton =
   | 'haul'
   | 'work'
   | 'feedStable'
+  | 'train'
   | 'build'
   | 'roadTo'
   | 'wallTo'
@@ -565,6 +582,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'haul', label: 'Haul route…', group: 'move' },
   { id: 'work', label: 'Work', group: 'work' },
   { id: 'feedStable', label: 'Feed the stable', group: 'work' },
+  { id: 'train', label: 'Train', group: 'work' },
   { id: 'build', label: 'Build', group: 'work' },
   { id: 'roadTo', label: 'Build road', group: 'work' },
   { id: 'wallTo', label: 'Build wall', group: 'work' },
@@ -600,6 +618,7 @@ export const GROUP_COUNTERPARTS: Record<
   haul: ['haul'],
   work: ['work'],
   feedStable: ['feedStable'],
+  train: ['train'],
   build: ['build'],
   roadTo: ['roadTo'],
   wallTo: ['wallTo'],
