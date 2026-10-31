@@ -219,6 +219,7 @@ import {
 } from './wiki-view.js'
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
+import { DEFAULT_REPEAT } from './plan-blocks.js'
 import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
@@ -599,6 +600,20 @@ export function Wiki() {
           this browser, as saved groups are: the server never sees them, and another browser has its
           own. A saved step keeps its places, so one whose building is gone from the map (torn down,
           say) is flagged in the planner; it is still given, and skipped when its turn comes.
+        </p>
+        <p>
+          To do some steps several times in a row, pick them (in a row) and press{' '}
+          <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
+          times until you type another count. The block shows its count with its steps indented
+          under it; it is picked, moved, copied, pasted, saved and removed as one,
+          <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
+          Repeat blocks are the planner's own: on a resident's card, wrapping steps opens a plan of
+          their queue that waits for <strong>Give</strong> (or Discard), and giving it, or Give to
+          all on a group's plan, makes each block that many plain copies of its steps, so the queue,
+          the server and your scripts only ever see steps. The running queue lists the copies, the
+          current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after repeats; the
+          planner counts them and won't give a plan over that, saying by how much. Loop still loops
+          the whole queue.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
