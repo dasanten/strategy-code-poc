@@ -36,7 +36,13 @@ import { foundStartingCity, realmOf, suggestedLeaderName } from './starting-city
 import { eventsFor } from './events.js'
 import { regionMapUnsound } from './region-map.js'
 import { shouldCheckInvariants } from './invariants.js'
-import { entitiesInSight, sentInsideUnseen, sentOutOfSight, type SightTracker } from './sight.js'
+import {
+  entitiesInSight,
+  sentInsideUnseen,
+  sentOutOfSight,
+  withSight,
+  type SightTracker,
+} from './sight.js'
 import type { TickReporter } from './tick.js'
 import { ClientView } from './sync.js'
 import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
@@ -126,7 +132,7 @@ interface Session {
 }
 
 /** The realms whose residents are among the entities, and the cities among them. */
-function realmsSeen(entities: SeenEntity[]): string[] {
+function realmsSeen(entities: readonly SeenEntity[]): string[] {
   return entities.flatMap((e) => {
     if (e.is === 'resident' && e.owner !== null) return [e.owner]
     return e.is === 'city' ? [e.id] : []
@@ -530,58 +536,62 @@ export function attachRealtime(
      * explored terrain grew for its Player (`explored`, from `SightTracker.update`), and its
      * Player's new realm events, and their alliance matters when those changed, and the Region map
      * when territory was worked out again or their explored terrain grew: each Player gets only
-     * their own. First, once a minute, the sockets whose session ended meanwhile are closed.
+     * their own. First, once a minute, the sockets whose session ended meanwhile are closed. What a
+     * realm sees is worked out once and shared by its sockets (`SightCache`).
      */
     broadcastTick(explored: Map<number, Set<number>> = new Map(), now = Date.now()) {
       recheckSessions(now)
-      for (const [socket, client] of clients) {
-        const inSight = entitiesInSight(world, opts.terrain, client.realmId)
-        const { changed, gone } = client.view.diff(inSight)
-        checkSent(client.realmId, changed)
-        const remembered = client.lastSeenView.diff(lastSeenOutOfSight(world, client.userId))
-        checkLastSeen(client.realmId, remembered.changed)
-        const lastSeen =
-          remembered.changed.length > 0 || remembered.gone.length > 0
-            ? { lastSeen: remembered }
-            : {}
-        const grown = [...(explored.get(client.userId) ?? [])]
-        const events = eventsFor(world, client.userId, client.lastEventSeq)
-        client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq
-        const diplomacy = diplomacyFor(world, client.realmId, realmsSeen(inSight))
-        const json = JSON.stringify(diplomacy)
-        const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
-        client.lastDiplomacy = json
-        const region = regionFor(client, grown)
-        const realm = world.realms.find((r) => r.id === client.realmId)
-        const leaderId = realm?.leaderId
-        const newLeader = leaderId !== undefined && leaderId !== client.leaderId
-        if (newLeader) client.leaderId = leaderId
-        const realmName = realm?.name ?? null
-        const named = realmName !== null && realmName !== client.realmName
-        if (named) client.realmName = realmName
-        const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
-        if (claimed) client.horseOffer = false
-        const tick = {
-          tick: world.tick,
-          changed,
-          gone,
-          ...lastSeen,
-          explored: grown,
-          events,
-          ...fresh,
-          ...(region ? { region } : {}),
-          ...(newLeader ? { leaderId } : {}),
-          ...(named ? { realmName } : {}),
-          ...(claimed ? { horseOffer: false as const } : {}),
-        }
-        send(socket, { type: 'tick', ...tick })
-        sendScriptMemory(socket, client)
-        sendScriptLogs(socket, client)
-      }
+      withSight(world, opts.terrain.size, () => sendTicks(explored))
     },
     close() {
       for (const socket of clients.keys()) socket.close()
       wss.close()
     },
+  }
+
+  /** The tick message to each socket, as `broadcastTick` says. */
+  function sendTicks(explored: Map<number, Set<number>>) {
+    for (const [socket, client] of clients) {
+      const inSight = entitiesInSight(world, opts.terrain, client.realmId)
+      const { changed, gone } = client.view.diff(inSight)
+      checkSent(client.realmId, changed)
+      const remembered = client.lastSeenView.diff(lastSeenOutOfSight(world, client.userId))
+      checkLastSeen(client.realmId, remembered.changed)
+      const lastSeen =
+        remembered.changed.length > 0 || remembered.gone.length > 0 ? { lastSeen: remembered } : {}
+      const grown = [...(explored.get(client.userId) ?? [])]
+      const events = eventsFor(world, client.userId, client.lastEventSeq)
+      client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq
+      const diplomacy = diplomacyFor(world, client.realmId, realmsSeen(inSight))
+      const json = JSON.stringify(diplomacy)
+      const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
+      client.lastDiplomacy = json
+      const region = regionFor(client, grown)
+      const realm = world.realms.find((r) => r.id === client.realmId)
+      const leaderId = realm?.leaderId
+      const newLeader = leaderId !== undefined && leaderId !== client.leaderId
+      if (newLeader) client.leaderId = leaderId
+      const realmName = realm?.name ?? null
+      const named = realmName !== null && realmName !== client.realmName
+      if (named) client.realmName = realmName
+      const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
+      if (claimed) client.horseOffer = false
+      const tick = {
+        tick: world.tick,
+        changed,
+        gone,
+        ...lastSeen,
+        explored: grown,
+        events,
+        ...fresh,
+        ...(region ? { region } : {}),
+        ...(newLeader ? { leaderId } : {}),
+        ...(named ? { realmName } : {}),
+        ...(claimed ? { horseOffer: false as const } : {}),
+      }
+      send(socket, { type: 'tick', ...tick })
+      sendScriptMemory(socket, client)
+      sendScriptLogs(socket, client)
+    }
   }
 }

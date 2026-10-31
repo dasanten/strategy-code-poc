@@ -12,7 +12,7 @@ import { buildingsBySquare, placesInSight, type SeenPlace } from './sight.js'
 export function stepLastSeen(world: WorldState, size: number): void {
   const bySquare = world.realms.length > 0 ? buildingsBySquare(world, size) : undefined
   for (const realm of world.realms) {
-    const { seen, sees } = placesInSight(world, size, realm.id, bySquare)
+    const { seen, sees } = placesInSight(world, size, realm.id, { bySquare })
     const before = world.lastSeen[realm.userId] ?? []
     if (seen.length === 0 && before.length === 0) continue
     const memory = new Map(before.map((e) => [e.id, e]))
@@ -86,7 +86,7 @@ export function lastSeenInSight(
   realmId: string,
   sent: Remembered[],
 ): InvariantViolation[] {
-  const { seen, sees } = placesInSight(world, terrain.size, realmId)
+  const { seen, sees } = placesInSight(world, terrain.size, realmId, { afresh: true })
   const inSight = new Set(seen.map((e) => e.id))
   const out = sent.filter((e) => inSight.has(e.id) || (e.is === 'building' && sees(e)))
   return out.map((e) => ({

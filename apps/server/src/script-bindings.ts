@@ -79,11 +79,6 @@ export interface ScriptContext {
   memory: ScriptObject
   /** Everything the Player sees (`entitiesInSight`); called at most once a run. */
   seen: () => readonly SeenEntity[]
-  /**
-   * Whether the Player sees a spot (`sightOf`), shared by every run of theirs this tick; worked
-   * out for this run alone without it.
-   */
-  sees?: (at: { x: number; y: number }) => boolean
   /** Whether the Player has explored a tile (`ExploredTerrain.isExplored`). */
   explored: (x: number, y: number) => boolean
   /** The order kinds actions go through; the game's own by default. */
@@ -170,7 +165,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     (sender.npcCityId === undefined ? r.owner === side : r.owner === null && r.cityId === side)
   let sees: ((at: { x: number; y: number }) => boolean) | undefined
   const inSight = (at: { x: number; y: number }) =>
-    side !== undefined && (sees ??= context.sees ?? sightOf(world, terrain.size, side))(at)
+    side !== undefined && (sees ??= sightOf(world, terrain.size, side))(at)
   // A building of one of the side's own cities, or an outpost storage of its realm, which it
   // knows of in sight or not.
   const ownBuilding = (b: Building) =>

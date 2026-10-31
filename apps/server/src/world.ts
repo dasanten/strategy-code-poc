@@ -50,6 +50,7 @@ import { runNpcScripts } from './script-runner.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
 import { stepNpcDefence } from './npc-defence.js'
 import { stepLastSeen } from './last-seen.js'
+import { newSightPhase } from './sight.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -171,6 +172,8 @@ export function stepWorld(
   timer?: Pick<TickTimer, 'time'>,
 ): StepResult {
   const time = <T>(phase: TickPhase, fn: () => T): T => (timer ? timer.time(phase, fn) : fn())
+  // What the scripts saw is gone once the world steps (`SightCache`).
+  newSightPhase(world)
   const { survival, horsesDied } = time('rest', () => {
     const survival = stepSurvival(world, terrain)
     const horsesDied = stepHorses(world, terrain)
@@ -240,6 +243,9 @@ function stepRest(
   stepStanding(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
+  // Who sees what has changed since the NPC scripts ran: Last seen and sync share the new sight
+  // (`SightCache`). Nobody moves or changes hands after this.
+  newSightPhase(world)
   stepLastSeen(world, terrain.size)
   stepRiders(world)
   stepPassengers(world)
