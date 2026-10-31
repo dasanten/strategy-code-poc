@@ -13,7 +13,9 @@ Status: decided (2026-10-18, with Daniel)
   2026-10-31 (Epic 49) the duration covers the whole tick, broadcast and save included, and comes
   with how long each phase took (orders, queues, scripts, world with its NPC planning and walking,
   invariants, territory, sight, broadcast, save), so a slow tick names its slowest phase and a
-  tick made cheaper is judged by numbers.
+  tick made cheaper is judged by numbers. It also counts how many times a side's sight was worked
+  out (`sightBuilds`): about one per realm or NPC city looking per phase, so sight worked out per
+  socket again would show.
 - **pino** writes structured JSON logs on the server for detail once Sentry points somewhere.
 - An in-game admin dashboard comes later.
 

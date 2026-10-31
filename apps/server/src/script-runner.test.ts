@@ -410,6 +410,67 @@ describe('running scripts', () => {
     expect(performance.now() - started).toBeLessThan(50)
   })
 
+  it('works out what each realm sees once per phase of a tick, for all its scripts and sockets', () => {
+    const { world, orders, runner } = setup(3)
+    const tobin = db.insert(schema.users).values({ name: 'Tobin' }).returning().get().id
+    world.realms.push({ id: 'r2', userId: tobin, leaderId: 'b0' })
+    for (let i = 0; i < 3; i++) {
+      const r = newResident(mulberry32(i + 10), {
+        id: `b${i}`,
+        owner: 'r2',
+        x: 40 + i,
+        y: 40,
+        tick: 0,
+      })
+      r.bornAt = -20 * TICKS_PER_GAME_YEAR
+      r.lifespan = 60
+      world.residents.push(r)
+    }
+    const source = 'memory.seen = residents().length + buildings().length'
+    giveScript(world, orders, createScript(db, mara, { name: 'look', source }).id, [
+      'a0',
+      'a1',
+      'a2',
+    ])
+    const theirs = createScript(db, tobin, { name: 'look', source })
+    for (const residentId of ['b0', 'b1', 'b2']) {
+      const tobinSender = { userId: tobin, account: { name: 'Tobin', isAdmin: false } }
+      orders.receive(world, tobinSender, 'q', {
+        kind: 'runScript',
+        residentId,
+        scriptId: theirs.id,
+      })
+    }
+    orders.applyAll(world)
+    const sent: Record<string, unknown[]> = { r1: [], r2: [] }
+    const reporter = {
+      invariantViolations: vi.fn(),
+      tickHealth: vi.fn(),
+      tickError: vi.fn(),
+    } satisfies TickReporter
+    const health = runTick(world, terrain, {
+      reporter,
+      scripts: runner,
+      invariantSampleRate: 1,
+      slowTickMs: 800,
+      // Three sockets of Mara's, one of Tobin's.
+      finish: () => {
+        for (const realmId of ['r1', 'r1', 'r1', 'r2'])
+          sent[realmId]!.push(entitiesInSight(world, terrain, realmId))
+      },
+    })
+    // Every script saw all six residents: sight range covers this small map.
+    for (const r of world.residents) expect(r.script?.memory).toEqual({ seen: 6 })
+    expect(reporter.invariantViolations).not.toHaveBeenCalled()
+    // Two realms, worked out once in the scripts phase and once for Last seen and sync.
+    expect(health?.sightBuilds).toBe(4)
+    expect(sent.r1![1]).toBe(sent.r1![0])
+    expect(sent.r1![2]).toBe(sent.r1![0])
+    // What went out is what each works out for themselves once the tick is over.
+    expect(sent.r1![0]).toEqual(entitiesInSight(world, terrain, 'r1'))
+    expect(sent.r2![0]).toEqual(entitiesInSight(world, terrain, 'r2'))
+  })
+
   it('shows Players which script a resident runs, not its memory', () => {
     const { world, orders } = setup()
     const s = createScript(db, mara, { name: 'role', source: 'memory.role = "miner"' })

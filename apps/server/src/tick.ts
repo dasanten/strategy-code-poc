@@ -10,6 +10,7 @@ import {
 import type { OrderQueue } from './orders.js'
 import type { QueueRunner } from './queues.js'
 import type { ScriptErrorWhere, ScriptRunner } from './script-runner.js'
+import { closeSight, openSight } from './sight.js'
 import type { Walking } from './walking.js'
 import { stepWorld } from './world.js'
 
@@ -47,6 +48,11 @@ export interface TickHealth {
   phases: Record<TickPhase, number>
   residents: number
   actions: number
+  /**
+   * How many times a side's sight was worked out this tick (`SightCache.builds`): about one per
+   * realm or NPC city looking, per phase; one per socket would show here.
+   */
+  sightBuilds: number
   /** The tick took longer than the slow-tick threshold. */
   slow: boolean
 }
@@ -135,6 +141,8 @@ export function runTick(
   try {
     timer.time('orders', () => opts.orders?.applyAll(world))
     timer.time('queues', () => opts.queues?.runAll(world))
+    // What each side sees is worked out once per phase and shared, up to the broadcast.
+    const sight = openSight(world, terrain.size)
     const check = shouldCheckInvariants(opts.invariantSampleRate, opts.rand)
     const scriptViolations = timer.time('scripts', () => opts.scripts?.runAll(world, check) ?? [])
     const before = timer.time('invariants', () => (check ? tallyGoods(world) : undefined))
@@ -161,6 +169,7 @@ export function runTick(
       phases: timer.phases,
       residents: world.residents.length,
       actions,
+      sightBuilds: sight.builds,
       slow: durationMs > opts.slowTickMs,
     }
     opts.reporter.tickHealth(world, health)
@@ -168,5 +177,7 @@ export function runTick(
   } catch (error) {
     opts.reporter.tickError(world, error)
     return undefined
+  } finally {
+    closeSight(world)
   }
 }

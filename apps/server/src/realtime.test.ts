@@ -21,7 +21,7 @@ import type { InvariantViolation } from './invariants.js'
 import { openDb, schema, type Db } from './db/index.js'
 import { OrderQueue, orderKinds, type OrderKind } from './orders.js'
 import { realmOf } from './starting-city.js'
-import { SightTracker } from './sight.js'
+import { SightTracker, closeSight, openSight } from './sight.js'
 import { dieAll } from './survival.js'
 import { SESSION_RECHECK_MS, attachRealtime, scriptMemoryFor } from './realtime.js'
 import { TerritoryTracker } from './territory.js'
@@ -29,7 +29,6 @@ import { cityTerrain } from './test-terrain.js'
 import { createWorld, stepWorld } from './world.js'
 
 const terrain = cityTerrain()
-
 
 const cleanup: (() => Promise<void> | void)[] = []
 afterEach(async () => {
@@ -45,7 +44,9 @@ async function start(
   options: {
     sessionDb?: Db
     kinds?: Record<string, OrderKind>
-  } & Partial<Pick<Parameters<typeof attachRealtime>[1], 'onError' | 'origins' | 'limits' | 'now'>> = {},
+  } & Partial<
+    Pick<Parameters<typeof attachRealtime>[1], 'onError' | 'origins' | 'limits' | 'now'>
+  > = {},
 ) {
   const opened = await openDb(':memory:')
   const app = await buildApp({
@@ -174,7 +175,9 @@ describe('realtime', () => {
     expect(await open().refused()).toBe(403)
     expect(world.realms).toEqual([])
     // The game's own domain, as configured, and whatever host the request came in at.
-    expect(await open('https://game.example.com').next('welcome')).toMatchObject({ type: 'welcome' })
+    expect(await open('https://game.example.com').next('welcome')).toMatchObject({
+      type: 'welcome',
+    })
     const own = `http://${new URL(url).host}`
     expect(await open(own).next('welcome')).toMatchObject({ type: 'welcome' })
     expect(await open('http://localhost:5173').refused()).toBe(403)
@@ -446,6 +449,28 @@ describe('realtime', () => {
     if (back.type !== 'tick') throw new Error('no tick')
     expect(back.changed.map((e) => e.id)).toContain(hall)
     expect(back.lastSeen?.gone).toContain(hall)
+    expect(violations).toEqual([])
+  })
+
+  it('works out what a realm sees once for all its sockets, and sends each tab the same', async () => {
+    const { url, token, world, realtime, violations } = await start()
+    // One after the other, so the second and third tab find the realm the first founded.
+    const tabs = []
+    for (let i = 0; i < 3; i++) {
+      const tab = connect(url, token)
+      await tab.next('welcome')
+      tabs.push(tab)
+    }
+    stepWorld(world, terrain)
+    Object.assign(world.residents[0]!, { x: world.residents[0]!.x + 1 })
+    const sight = openSight(world, terrain.size)
+    realtime.broadcastTick()
+    closeSight(world)
+    expect(sight.builds).toBe(1)
+    const [first, ...others] = await Promise.all(tabs.map((t) => t.next('tick')))
+    if (first?.type !== 'tick') throw new Error('no tick')
+    expect(first.changed.map((e) => e.id)).toContain(world.residents[0]!.id)
+    for (const tick of others) expect(tick).toEqual(first)
     expect(violations).toEqual([])
   })
 
