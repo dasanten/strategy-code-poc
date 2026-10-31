@@ -1527,13 +1527,15 @@ export function Wiki() {
           there, loyal at once; its Leader never joins. Beating its defenders is not enough on its
           own, and defenders elsewhere in the city don't stop the clock: they have to come to the
           hall. The first tick the occupation doesn't hold, it is broken and its days are lost; the
-          next one starts again from nothing. Every city is captured this way: NPC cities, Players'
-          cities, trading posts and the Trade Org HQ, whose hired mercenaries defend it. Anyone with
-          the town hall in sight sees who occupies it and the game days left: a small flag in the
-          occupier's colour on the hall, and "Occupied by …" on its tile card and in the city
-          inspector, a warning when it is your city. Out of sight it isn't shown, nor remembered in
-          Last seen. Scripts see it as <code>city.occupation</code>: who occupies a town hall in
-          sight, and the ticks left.
+          next one starts again from nothing. Your realm log says when one of your town halls is
+          occupied, by whom, and when the occupation is broken, and likewise when you occupy a town
+          hall and when your occupation is broken. Every city is captured this way: NPC cities,
+          Players' cities, trading posts and the Trade Org HQ, whose hired mercenaries defend it.
+          Anyone with the town hall in sight sees who occupies it and the game days left: a small
+          flag in the occupier's colour on the hall, and "Occupied by …" on its tile card and in the
+          city inspector, a warning when it is your city. Out of sight it isn't shown, nor
+          remembered in Last seen. Scripts see it as <code>city.occupation</code>: who occupies a
+          town hall in sight, and the ticks left.
         </p>
       </Section>
 
