@@ -11,7 +11,12 @@ import {
   trainedCap,
   type Resident,
 } from '@csp/shared'
-import { checkInvariants, shouldCheckInvariants } from './invariants.js'
+import {
+  checkInvariants,
+  invariantsForTick,
+  shouldCheckInvariants,
+  worldInvariants,
+} from './invariants.js'
 import { cityTerrain, worldWithCity } from './test-terrain.js'
 import { stepWorld } from './world.js'
 
@@ -305,5 +310,23 @@ describe('invariants', () => {
     expect(shouldCheckInvariants(0.1, () => 0.05)).toBe(true)
     expect(shouldCheckInvariants(0.1, () => 0.5)).toBe(false)
     expect(shouldCheckInvariants(0, () => 0)).toBe(false)
+  })
+})
+
+describe('invariantsForTick', () => {
+  it('runs every invariant at least once over a round, and no tick runs them all', () => {
+    const round = 10
+    const runs = new Map(worldInvariants.map((inv) => [inv, 0]))
+    for (let tick = 1234; tick < 1234 + round; tick++) {
+      const slice = invariantsForTick(tick, 1 / round)
+      expect(slice.length).toBeLessThan(worldInvariants.length)
+      for (const inv of slice) runs.set(inv, runs.get(inv)! + 1)
+    }
+    expect([...runs.values()].every((n) => n >= 1)).toBe(true)
+  })
+
+  it('runs all of them every tick when every tick is sampled, none at a rate of 0', () => {
+    expect(invariantsForTick(7, 1)).toBe(worldInvariants)
+    expect(invariantsForTick(7, 0)).toEqual([])
   })
 })

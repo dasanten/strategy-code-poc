@@ -21,7 +21,7 @@ import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
 import { Walking } from './walking.js'
 import { setScriptParamOrder } from './script-params.js'
-import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
+import { WorldSaver, loadOrCreateWorld, saveWorld } from './saves.js'
 import {
   ScriptRunner,
   armyRunScriptOrder,
@@ -109,6 +109,11 @@ const queues = new QueueRunner(scriptHost, kinds, terrain)
 const scripts = new ScriptRunner(terrain, scriptHost)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
+const saver = new WorldSaver(db, {
+  skipped: (tick, savingTick) =>
+    logger.warn({ tick, savingTick }, 'save skipped: the last one is still being written'),
+  failed: (tick, err) => logger.error({ err, tick }, 'save failed'),
+})
 // Players who haven't edited a default script run the game's current default from now on.
 syncDefaultScripts(db)
 // Players whose scripts read a field a script view dropped since the last start are told so.
@@ -143,9 +148,8 @@ const loop = setInterval(() => {
       timer.time('broadcast', () => realtime.broadcastTick(grown))
       if (world.tick % config.saveEveryTicks === 0) {
         timer.time('save', () => {
-          saveWorld(db, world)
+          saver.start(world)
           explored.save(db)
-          pruneSaves(db)
         })
       }
     },
@@ -167,7 +171,7 @@ const daily = setInterval(() => {
 async function shutdown() {
   clearInterval(loop)
   clearInterval(daily)
-  saveWorld(db, world)
+  saver.saveNow(world)
   explored.save(db)
   realtime.close()
   await app.close()

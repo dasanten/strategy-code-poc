@@ -1,4 +1,5 @@
-import { gunzipSync, gzipSync } from 'node:zlib'
+import { promisify } from 'node:util'
+import { gunzipSync, gzip, gzipSync } from 'node:zlib'
 import { desc, sql } from 'drizzle-orm'
 import type { TerrainMap, WorldState } from '@csp/shared'
 import { schema, type Db } from './db/index.js'
@@ -11,11 +12,70 @@ export const KEEP_LATEST = 20
 /** Beyond those, one save per real hour is kept for this long. */
 export const KEEP_HOURLY_FOR_S = 7 * 24 * 60 * 60
 
+const gzipAsync = promisify(gzip)
+
 export function saveWorld(db: Db, world: WorldState): void {
-  const data = gzipSync(JSON.stringify(world))
-  db.insert(schema.worldSaves)
-    .values({ tick: world.tick, version: WORLD_FORMAT_VERSION, data })
-    .run()
+  insertSave(db, world.tick, gzipSync(JSON.stringify(world)))
+}
+
+function insertSave(db: Db, tick: number, data: Buffer): void {
+  db.insert(schema.worldSaves).values({ tick, version: WORLD_FORMAT_VERSION, data }).run()
+}
+
+/** Where `WorldSaver` says what became of a save. */
+export interface SaveLog {
+  /** The save of `tick` was skipped: the one of `savingTick` is still being written. */
+  skipped(tick: number, savingTick: number): void
+  failed(tick: number, error: unknown): void
+}
+
+/**
+ * The loop's saves (ADR 0006), off the tick: the world is turned into JSON on the loop, since
+ * that needs the live world, then gzipped on the thread pool, and once that is done the row is
+ * written, tagged with the tick it was taken at, and old saves are pruned. At most one save is in
+ * flight; a save asked for while one is still running is skipped and logged. `saveNow` is the
+ * shutdown's synchronous save.
+ */
+export class WorldSaver {
+  private saving: { tick: number; done: Promise<void> } | undefined
+  private closed = false
+
+  constructor(
+    private readonly db: Db,
+    private readonly log: SaveLog,
+  ) {}
+
+  /** Starts a save of the world as it is now; false if it was skipped. */
+  start(world: WorldState): boolean {
+    if (this.closed) return false
+    if (this.saving) {
+      this.log.skipped(world.tick, this.saving.tick)
+      return false
+    }
+    const tick = world.tick
+    const done = gzipAsync(JSON.stringify(world))
+      .then((data) => {
+        // Shutdown has saved synchronously since; this older save must not land after it.
+        if (this.closed) return
+        insertSave(this.db, tick, data)
+        pruneSaves(this.db)
+      })
+      .catch((error: unknown) => this.log.failed(tick, error))
+      .finally(() => (this.saving = undefined))
+    this.saving = { tick, done }
+    return true
+  }
+
+  /** Resolves once the save in flight, if any, is written. */
+  async settled(): Promise<void> {
+    await this.saving?.done
+  }
+
+  /** Saves the world synchronously and drops any save still in flight; for shutdown. */
+  saveNow(world: WorldState): void {
+    this.closed = true
+    saveWorld(this.db, world)
+  }
 }
 
 /** The newest save as written, in whatever format it was written in. */
