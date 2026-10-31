@@ -1,15 +1,10 @@
-import {
-  NativeFunction,
-  ScriptFunction,
-  ScriptRuntimeError,
-  type ScriptObject,
-  type Value,
-} from '@csp/lang'
+import { NativeFunction, ScriptRuntimeError, type ScriptObject, type Value } from '@csp/lang'
 import {
   ARMY_SCRIPT_API,
   GOODS,
   HAUL_KEEP_FOOD,
   RECIPES,
+  SCRIPT_ACTION_VALUE_MAX,
   SCRIPT_API,
   SCRIPT_VIEWS,
   Terrain,
@@ -51,10 +46,11 @@ import {
   type WorldState,
 } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
-import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
+import { orderKindOf, orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
 import { sightOf } from './sight.js'
 import { lastSeenOutOfSight } from './last-seen.js'
+import { plainValue, type PlainValue } from './plain-value.js'
 import { paramTarget } from './script-params.js'
 import { realmOf } from './starting-city.js'
 
@@ -197,6 +193,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
     return shown ? untagged(shown) : null
   }
+  // The building as the Player remembers it (`CONTEXT.md`: Last seen); an NPC city has no memory.
+  const lastSaw = (b: Building) =>
+    sender.npcCityId !== undefined
+      ? undefined
+      : world.lastSeen[sender.userId]?.find((e) => e.id === b.id && e.is === 'building')
   let nodes: ResourceNode[] | undefined
   const exploredNodes = () => (nodes ??= world.nodes.filter((n) => context.explored(n.x, n.y)))
 
@@ -239,7 +240,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     outputOf: ([building]) => {
       const id = (building as Record<string, Value> | null)?.id
       const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
-      if (!b || !(ownBuilding(b) || inSight(b))) return []
+      if (!b || !(ownBuilding(b) || inSight(b) || lastSaw(b))) return []
       const recipes = RECIPES[b.kind]
       const goods = recipes
         ? [...new Set(recipes.flatMap((r) => Object.keys(r.output)))]
@@ -263,7 +264,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   /** Asks for an order for `me`, checked exactly as one from the UI. */
   const request = (kind: string, input: Record<string, unknown>): Value => {
     const order: OrderRequest = { kind, ...forMe, ...input }
-    const orderKind = kinds[kind]
+    const orderKind = orderKindOf(kinds, kind)
     if (!orderKind) throw new Error(`no order kind ${kind} for the script action`)
     const reason = orderKind.validate(world, sender, order, terrain)
     if (reason !== undefined) return reason
@@ -366,6 +367,11 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
   }
 
+  // A building a param names: one of the side's own as it is; another's (a workplace or site
+  // anyone may work) as the Player sees it, else as they last saw it.
+  // The view takes only its own fields, so the memory's tag and `seenAt` stay out.
+  const paramBuilding = (b: Building) => asSeenBuilding(b) ?? lastSaw(b)
+
   // Each param as what it names while that is still the side's and fits its type, or the
   // number typed for a number param, or its default while none is; else null.
   const params = Object.create(null) as ScriptObject
@@ -379,7 +385,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const carriage = target?.is === 'carriage' ? target.carriage : undefined
     params[p.name] =
       target?.is === 'building'
-        ? viewValue(target.building, { view: 'building' })
+        ? viewValue(paramBuilding(target.building), { view: 'building' })
         : viewValue(
             carriage && {
               ...carriage,
@@ -519,6 +525,8 @@ function residentActions(
       }),
     mount: ([horseId]) => request('mount', { horseId: plain(horseId) }),
     dismount: () => request('dismount', {}),
+    unhitch: ([carriage]) =>
+      request('unhitch', { carriageId: carriage == null ? null : placeId(carriage) }),
     board: ([carriageId]) => request('board', { carriageId: plain(carriageId) }),
     getOff: ([x, y]) =>
       request('getOff', (x ?? y ?? null) === null ? {} : { x: plain(x), y: plain(y) }),
@@ -640,7 +648,7 @@ function requestsSound(
         message: `${id}'s script requested ${order.kind}: ${message}`,
         entityIds: [id],
       })
-    const kind = kinds[order.kind]
+    const kind = orderKindOf(kinds, order.kind)
     if (!allowed.includes(order.kind) || !kind) {
       fail(`not an order ${who === 'army' ? 'an army' : 'a resident'} can get`)
     } else if (order[field] !== id) fail(`for another ${who}, ${String(order[field])}`)
@@ -724,17 +732,24 @@ function toValue(data: unknown): Value {
   return null
 }
 
-/** A script value as plain data for an order request; functions can't be sent. */
-function plain(value: Value | undefined): unknown {
+/**
+ * A script value as plain data for an order request, within `SCRIPT_ACTION_VALUE_MAX` characters
+ * of JSON; functions, values that hold themselves and larger values can't be sent.
+ */
+function plain(value: Value | undefined): PlainValue | undefined {
   if (value === undefined || value === null) return undefined
-  if (value instanceof NativeFunction || value instanceof ScriptFunction) {
-    throw new ScriptRuntimeError('A function can’t be passed to an action')
+  const result = plainValue(value, SCRIPT_ACTION_VALUE_MAX)
+  if (result.ok) return result.value
+  switch (result.why) {
+    case 'function':
+      throw new ScriptRuntimeError('A function can’t be passed to an action')
+    case 'cycle':
+      throw new ScriptRuntimeError('A value that holds itself can’t be passed to an action')
+    case 'size':
+      throw new ScriptRuntimeError(
+        `A value passed to an action can have at most ${SCRIPT_ACTION_VALUE_MAX} characters`,
+      )
   }
-  if (typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map(plain)
-  const out: Record<string, unknown> = {}
-  for (const [key, item] of Object.entries(value)) out[key] = plain(item)
-  return out
 }
 
 /** A place for `store` and `fetch`: its id, or the id of a thing a script holds, like a building. */

@@ -113,7 +113,7 @@ const CHILDHOOD_TICKS = ADULT_AGE * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY
  * A resident's age in game years at the given tick: each year up to `ADULT_AGE` takes
  * `CHILD_YEAR_DAYS`, later years a full game year (`CONTEXT.md`: Aging).
  */
-export function ageInYears(resident: Resident, tick: number): number {
+export function ageInYears(resident: Pick<Resident, 'bornAt'>, tick: number): number {
   const lived = tick - resident.bornAt
   if (lived <= CHILDHOOD_TICKS) return lived / (CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY)
   return ADULT_AGE + (lived - CHILDHOOD_TICKS) / TICKS_PER_GAME_YEAR
@@ -126,7 +126,7 @@ export function ticksForAge(age: number): number {
 }
 
 /** Whether a resident is grown up, so they can work, build or take any job (`CONTEXT.md`: Child). */
-export function canWork(resident: Resident, tick: number): boolean {
+export function canWork(resident: Pick<Resident, 'bornAt'>, tick: number): boolean {
   return ageInYears(resident, tick) >= ADULT_AGE
 }
 
@@ -953,12 +953,19 @@ export const CARRIAGE_HALF_LOAD = 2 / 3
 export const DELIVERY_LOAD = CARRIAGE_CAPACITY - CARAVAN_FOOD
 
 /**
- * Food a haul route keeps on board for its horse unless the Player picks another amount, in
- * units (`CONTEXT.md`: Haul route): five game days (two real hours) of the horse's eating, topped
- * up at each stop that has Food. A trip takes real time, so this keeps its real-time length;
- * rounded up to whole units.
+ * The horse's share of the Food a haul route keeps on board, in units (`CONTEXT.md`: Haul route,
+ * Refilling from a carriage): five game days (two real hours) of the horse's eating, rounded up.
+ * The driver refills from the rest of what is kept, never from this.
  */
-export const HAUL_KEEP_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
+export const HAUL_HORSE_FOOD = Math.ceil(5 * HORSE_FOOD_PER_DAY)
+
+/**
+ * Food a haul route keeps on board for its horse and its driver unless the Player picks another
+ * amount, in units (`CONTEXT.md`: Haul route, Refilling from a carriage): five game days (two
+ * real hours) of the horse's eating and the driver's, topped up at each stop that has Food. A trip
+ * takes real time, so this keeps its real-time length; rounded up to whole units.
+ */
+export const HAUL_KEEP_FOOD = Math.ceil(5 * (HORSE_FOOD_PER_DAY + FOOD_PER_DAY))
 
 /**
  * How fast a carriage crosses each terrain, relative to an unloaded resident of average Agility on
@@ -1718,6 +1725,32 @@ export const SCRIPT_STEP_BUDGET = 2000
 export const SCRIPT_MAX_CALL_DEPTH = 50
 
 /**
+ * The longest string a script may build, in characters (`CONTEXT.md`: Value limits): as much as
+ * its whole memory holds (`SCRIPT_MEMORY_MAX`), so no one string outgrows it. Past the cap the
+ * script stops with a runtime error.
+ */
+export const SCRIPT_MAX_STRING_LENGTH = 4000
+
+/**
+ * The most items a list a script builds may hold (`CONTEXT.md`: Value limits): more than a large
+ * realm has residents and buildings in sight, so a script can collect all it sees in one list.
+ */
+export const SCRIPT_MAX_LIST_LENGTH = 500
+
+/**
+ * The most keys an object a script builds may hold (`CONTEXT.md`: Value limits): plenty for a
+ * memory keyed by id or tile, far fewer than the memory could hold anyway.
+ */
+export const SCRIPT_MAX_OBJECT_KEYS = 200
+
+/** The three together, in the shape the interpreter's `run` takes (`ValueLimits` in `@csp/lang`). */
+export const SCRIPT_VALUE_LIMITS = {
+  maxStringLength: SCRIPT_MAX_STRING_LENGTH,
+  maxListLength: SCRIPT_MAX_LIST_LENGTH,
+  maxObjectKeys: SCRIPT_MAX_OBJECT_KEYS,
+}
+
+/**
  * Extra steps a script pays to ask the world something it sees as a list (`residents()`,
  * `buildings()`, `nodes()`, …), on top of the 1 every evaluated node costs (`CONTEXT.md`: Step
  * budget). Dear enough that a script keeps what it found in a variable rather than asking again.
@@ -1747,6 +1780,14 @@ export const SCRIPT_REALM_STEP_BUDGET = 20000
 export const SCRIPT_MEMORY_MAX = 4000
 
 /**
+ * The most a value a script passes to an action or `withMemory` may hold, in characters of its
+ * JSON: as much as its memory, so anything a script keeps it can also pass. Script values are
+ * shared by reference, so one built in a few steps can stand for far more than this; the check
+ * gives up as soon as it passes the limit and the call fails with a runtime error.
+ */
+export const SCRIPT_ACTION_VALUE_MAX = SCRIPT_MEMORY_MAX
+
+/**
  * The longest text a script can give `doing()` for its resident's Doing line (`CONTEXT.md`:
  * Doing), in characters after trimming; longer text is cut. One line of the resident card.
  */
@@ -1763,6 +1804,26 @@ export const SCRIPT_LOG_LINES = 20
  * or running out of steps), so a script failing every tick doesn't flood the log. A minute.
  */
 export const SCRIPT_LOG_INTERVAL = 60
+
+/**
+ * The most scripts a Player's library holds (`CONTEXT.md`: Library cap), their default scripts
+ * among them; a new script past it is refused until one is deleted. A few dozen: room for a
+ * script per task and plenty of experiments, too few to grow the database without bound.
+ */
+export const SCRIPT_LIBRARY_MAX_SCRIPTS = 40
+
+/**
+ * The most versions one script keeps (`CONTEXT.md`: Library cap); a save or reset past it is
+ * refused until old versions are deleted. A few dozen saves of history to go back to.
+ */
+export const SCRIPT_MAX_VERSIONS = 40
+
+/**
+ * Script library writes (create, save, rename, activate, reset, delete) one Player may make in a
+ * minute before the server answers 429. One a second: far more than anyone saves by hand, so
+ * only a script hammering the API ever meets it.
+ */
+export const SCRIPT_WRITES_PER_MINUTE = 60
 
 /** The most steps a queue holds (`CONTEXT.md`: Queue): plenty for a day's round. */
 export const QUEUE_MAX_STEPS = 20

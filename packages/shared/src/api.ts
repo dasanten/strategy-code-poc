@@ -41,6 +41,7 @@ export type ApiErrorCode =
   | 'script-has-errors'
   | 'default-script'
   | 'active-version'
+  | 'library-full'
 
 export interface ApiError {
   error: ApiErrorCode

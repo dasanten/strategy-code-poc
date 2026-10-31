@@ -27,6 +27,8 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Fails fast on a known advisory in a production dependency; a few seconds (ADR 0009).
+      - run: pnpm audit --prod --audit-level=moderate
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

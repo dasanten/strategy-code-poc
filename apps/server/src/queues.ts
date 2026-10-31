@@ -300,7 +300,9 @@ export class QueueRunner {
     for (let tried = 1; tried <= q.steps.length; tried++) {
       const step = q.steps[q.current]!
       const order: OrderRequest = { ...structuredClone(step.order), residentId: r.id }
-      const kind = this.kinds[order.kind]
+      // Own entries only, as `orderKindOf` (not imported: `orders.ts` imports this module): a kept
+      // step named `"constructor"` must not find a function inherited from `Object.prototype`.
+      const kind = Object.hasOwn(this.kinds, order.kind) ? this.kinds[order.kind] : undefined
       const reason = kind
         ? kind.validate(world, sender, order, this.terrain)
         : `unknown order: ${order.kind}`

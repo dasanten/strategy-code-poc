@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BUILD_MATERIALS, RECIPES, WORKPLACE_MAX_WORKERS } from './balance.js'
+import { BUILD_MATERIALS, HOUSING_ROOM, RECIPES, WORKPLACE_MAX_WORKERS } from './balance.js'
 import { BUILDING_PURPOSE, buildingInfo } from './building-info.js'
 import { FOOTPRINT } from './footprint.js'
 import type { BuildingKind } from './world.js'
@@ -14,7 +14,13 @@ describe('building descriptions', () => {
   })
 
   it('writes no numbers into the text, which come from the balance', () => {
-    for (const kind of KINDS) expect(BUILDING_PURPOSE[kind], kind).not.toMatch(/\d/)
+    const room = `room for ${HOUSING_ROOM.house} residents`
+    for (const kind of KINDS)
+      expect(BUILDING_PURPOSE[kind].replace(room, ''), kind).not.toMatch(/\d/)
+  })
+
+  it('says how many residents a house is room for (`HOUSING_ROOM`)', () => {
+    expect(BUILDING_PURPOSE.house).toContain(`room for ${HOUSING_ROOM.house} residents`)
   })
 })
 

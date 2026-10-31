@@ -6,12 +6,12 @@ import {
   type OrderRequest,
   type TerrainMap,
 } from '@csp/shared'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { attackOrder, resolveStrikes } from './combat.js'
 import { defenceScriptSound, interruptedSound } from './defence.js'
 import { checkInvariants } from './invariants.js'
 import type { RunnableScript } from './scripts.js'
-import { OrderQueue } from './orders.js'
+import { OrderQueue, orderKinds } from './orders.js'
 import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
 import { entitiesInSight } from './sight.js'
@@ -306,6 +306,34 @@ describe('a defence script picked', () => {
     expect(pick({ scriptId: null, params: { times: 1 } })).toMatchObject({ type: 'rejected' })
     // A default other than Defend may be picked too.
     expect(pick({ scriptId: 701 })).toMatchObject({ type: 'ack' })
+  })
+
+  it('ended by an error of the game’s own, hands back to what it interrupted', () => {
+    const walker = { ...shout(), source: 'walkTo(1, 1)' }
+    const s = setup(new Map([[750, walker]]))
+    s.give({ kind: 'task', task: 'work', workplaceId: 'f1' })
+    s.tick()
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.tick()
+    const work = s.r.script!
+    // walkTo's check throws while w1 defends: a native of the game's failing, not the script.
+    const walkTo = orderKinds.walkTo!
+    const validate = walkTo.validate
+    const spy = vi.spyOn(walkTo, 'validate').mockImplementation((world, sender, order, t) => {
+      if (s.r.script?.task === 'defend') throw new Error('boom')
+      return validate(world, sender, order, t)
+    })
+    try {
+      s.strike()
+      expect(s.until(() => s.r.interrupted !== undefined)).toBe(true)
+      s.x1.order = null
+      s.tick()
+    } finally {
+      spy.mockRestore()
+    }
+    expect(s.r.interrupted).toBeUndefined()
+    expect(s.r.script).toBe(work)
+    expect(s.r.order).toMatchObject({ kind: 'workAt', buildingId: 'f1' })
   })
 
   it('is seen by its owner only', () => {

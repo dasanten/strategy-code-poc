@@ -293,6 +293,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return { text: `${e.name} has grown up and can work now.`, tone: 'info' }
     case 'horseDied':
       return { text: 'A horse starved to death.', tone: 'bad' }
+    case 'horseHungry':
+      return {
+        text: `${e.name}’s horse is hungry, and ${e.name} carries no Food to spare for it.`,
+        tone: 'warn',
+      }
     case 'foaled':
       return { text: 'A foal was born in a stable.', tone: 'info' }
     case 'horsesGranted':

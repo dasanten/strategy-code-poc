@@ -221,14 +221,17 @@ let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
 
 if (!pickWorkplace()) { return }
 let workplace = building(memory.workplaceId)
-// Kept for when it is out of sight.
+// Kept for when it is out of sight; one picked out of sight is where I last saw it.
 if (workplace != null) { memory.at = {x: workplace.x, y: workplace.y} }
+if (memory.at == null && params.workplace != null) {
+  memory.at = {x: params.workplace.x, y: params.workplace.y}
+}
 if (memory.at == null || memory.stuck) { return }
 if (me.order != null && me.order.kind != "workAt") { return } // on my way
 
 if (storeLoad()) { return }
 if (walkBack()) { return }
-if (workplace == null) { // here, and it isn't: torn down, or no longer ours
+if (workplace == null) { // here, and it isn't: torn down
   end("the workplace is gone")
   return
 }
@@ -238,7 +241,9 @@ if (getFoodIfLow(params.storage, workplace)) {
   return
 }
 if (me.order == null) {
-  workAt(memory.makes)
+  if (workAt(memory.makes) != null && heldBySomeoneElse(workplace)) {
+    end("the " + workplace.kind + " is held by someone else")
+  }
   return
 }
 carryLoadOffIfFull(workplace)
@@ -267,6 +272,17 @@ fn pickWorkplace() {
 // A finished building that makes goods.
 fn isWorkplace(b) {
   return b != null && b.site == null && outputOf(b).length > 0
+}
+
+// Whether residents of another realm work it, so it has no room for me.
+fn heldBySomeoneElse(workplace) {
+  for (r of residents()) {
+    let o = r.order
+    if (r.owner != me.owner && o != null && o.kind == "workAt" && o.buildingId == workplace.id) {
+      return true
+    }
+  }
+  return false
 }
 
 // With a load picked up: store it, keeping my own food. True once I set off.
@@ -552,7 +568,7 @@ ${LOG_TEXT}
     source: `// Haul (default): drive params.carriage, or while none is picked the carriage
 // on my tile when I start, on a haul route between memory.from and memory.to:
 // memory.goods there, memory.returnGoods back, memory.keepFood Food kept on
-// board for the horse. The route comes only from the Haul order; started
+// board for the horse and me. The route comes only from the Haul order; started
 // without one I end. The built-in haul order loads, drives and unloads, again
 // and again; this starts it at memory.from.
 param carriage: storage // the carriage to drive; none: the one I stand on
@@ -674,6 +690,7 @@ fn walkBack() {
 fn startTearingDown() {
   let problem = tearDown(memory.buildingId)
   let target = building(memory.buildingId)
+  if (target == null) { target = params.building } // picked out of sight: as last seen
   if (problem == "the resident is not at that building" && target != null && !memory.walked) {
     memory.walked = true
     walkTo(target.x, target.y)

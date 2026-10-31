@@ -219,7 +219,7 @@ describe('a construction site is the realm’s that laid it out', () => {
     expect(startParamsProblem(s.world, 'r2', asBuilding, { target: 'ts' })).toBeUndefined()
     for (const id of ['ts', 'hs'])
       expect(startParamsProblem(s.world, 'r1', asBuilding, { target: id })).toBe(
-        'target: must be a building or construction site of yours',
+        'target: must be a building of yours, or a workplace or construction site you know',
       )
   })
 

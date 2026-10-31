@@ -1432,6 +1432,11 @@ export type RealmEventWhat =
   /** One of the realm's horses starved to death (`CONTEXT.md`: Horse). */
   | { kind: 'horseDied'; horseId: string }
   /**
+   * A ridden horse of the realm went hungry and its rider, `name`, carries no Food to spare for it
+   * (`CONTEXT.md`: Riding).
+   */
+  | { kind: 'horseHungry'; horseId: string; residentId: string; name: string }
+  /**
    * The one-time Horse grant (`CONTEXT.md`: Horse grant) gave the realm `horseIds`: in its stable
    * at (`x`, `y`), or, with no stable, on the ground next to the storage of `city` or next to the
    * Leader, with Food by them.
@@ -1495,8 +1500,9 @@ export type RealmEventWhat =
   | { kind: 'allianceLeader'; allianceId: string; name: string; realmId: string; realm: string }
   /**
    * A resident's or army's script stopped with an error this tick (`CONTEXT.md`: Running a
-   * script); it runs again next tick. `line` and `column` say where, when the error is in the
-   * script itself. Script events name the resident by `residentId` or the army by `armyId`.
+   * script); it runs again next tick, unless the error was the game's own (the message says so):
+   * then the script ended. `line` and `column` say where, when the error is in the script
+   * itself. Script events name the resident by `residentId` or the army by `armyId`.
    */
   | ({
       kind: 'scriptError'

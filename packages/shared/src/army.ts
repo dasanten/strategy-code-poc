@@ -1,3 +1,4 @@
+import { HAUL_HORSE_FOOD } from './balance.js'
 import { wrapDistance } from './terrain.js'
 import type { Army, Carriage, Resident, WorldState } from './world.js'
 
@@ -56,4 +57,21 @@ export function spareFood(world: Pick<WorldState, 'residents'>, carriage: Carria
   const o = driver?.order
   const keep = o?.kind === 'haul' ? o.keepFood : 0
   return Math.max(0, (carriage.load.food ?? 0) - keep)
+}
+
+/**
+ * The carriage a resident drives (a drive order or a haul route), and the Food on it they may
+ * take as its driver (`CONTEXT.md`: Refilling from a carriage): all of it, except the horse's
+ * share of what a haul route keeps on board (`HAUL_HORSE_FOOD`, at most its `keepFood`).
+ */
+export function driversFood(
+  world: Pick<WorldState, 'carriages'>,
+  driver: Resident,
+): { carriage: Carriage; food: number } | undefined {
+  const o = driver.order
+  if (o?.kind !== 'drive' && o?.kind !== 'haul') return undefined
+  const carriage = world.carriages.find((k) => k.id === o.carriageId)
+  if (!carriage) return undefined
+  const keep = o.kind === 'haul' ? Math.min(o.keepFood, HAUL_HORSE_FOOD) : 0
+  return { carriage, food: Math.max(0, (carriage.load.food ?? 0) - keep) }
 }

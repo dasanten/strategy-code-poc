@@ -8,3 +8,12 @@ engineStrict: true
 # better-sqlite3 ships prebuilt binaries for Windows, Linux and macOS, so it needs no build step.
 onlyBuiltDependencies:
   - esbuild
+
+# drizzle-kit's config loader (@esbuild-kit) pins an esbuild with a dev-server advisory
+# (GHSA-67mh-4wv8-2f99); it only uses the transform API, which is unchanged in 0.25.
+overrides:
+  'esbuild@<0.25.0': ^0.25.0
+  # @fastify/static's glob 13 and the minimatch it (and eslint) pull in have a globparts
+  # denial-of-service advisory (GHSA-g3hv-75wg-m249); @fastify/static has not moved yet.
+  'glob@<14.0.2': ^14.0.2
+  'minimatch@<11.0.1': ^11.0.1

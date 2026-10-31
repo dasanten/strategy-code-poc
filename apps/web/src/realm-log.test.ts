@@ -26,6 +26,16 @@ describe('realm log', () => {
     expect(
       describeEvent({ kind: 'grownUp', residentId: 'r3', name: 'Wren', seq: 5, ...at }),
     ).toEqual({ text: 'Wren has grown up and can work now.', tone: 'info' })
+    const horseHungry = {
+      kind: 'horseHungry',
+      horseId: 'h1',
+      residentId: 'r1',
+      name: 'Mara',
+    } as const
+    expect(describeEvent({ ...horseHungry, seq: 6, ...at })).toEqual({
+      text: 'Mara’s horse is hungry, and Mara carries no Food to spare for it.',
+      tone: 'warn',
+    })
   })
 
   it('describes a script’s trouble', () => {

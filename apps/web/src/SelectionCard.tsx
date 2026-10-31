@@ -22,6 +22,7 @@ import type { Relationship } from './theme.js'
 import {
   actionForKey,
   tileActions,
+  unhitcherOf,
   type CardAction,
   type TileCard as TileCardData,
 } from './selection-view.js'
@@ -337,6 +338,7 @@ export function TileCard({
   onOpenCity,
   onRenameCity,
   onSelectResident,
+  onUnhitch,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -359,6 +361,8 @@ export function TileCard({
   onRenameCity: (cityId: string, name: string) => void
   /** Picks one of the Player's residents, such as a carriage's passenger. */
   onSelectResident: (id: string) => void
+  /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
+  onUnhitch: (carriageId: string, residentId: string) => void
 }) {
   const actions = tileActions(card, actor, tick)
   const [open, setOpen] = useState<string | undefined>()
@@ -381,16 +385,17 @@ export function TileCard({
     >
       {card.lastSeen && (
         <ul className="sel-facts sel-past" aria-label="As last seen">
-          {card.lastSeen.lines.map((l) => (
-            <li key={l}>{l}</li>
+          {card.lastSeen.lines.map((l, i) => (
+            <li key={i}>{l}</li>
           ))}
         </ul>
       )}
       {card.lines.length > (card.lastSeen ? 0 : 1) && (
         <ul className="sel-facts">
+          {/* By place, not text: horses alike give the same line twice. */}
           {card.lines.map((l, i) =>
             i === 0 && !card.lastSeen ? null : i === card.passengers?.line ? (
-              <li key={l}>
+              <li key={i}>
                 Passengers:{' '}
                 {card.passengers.residents.map((p, j) => (
                   <Fragment key={p.id}>
@@ -407,7 +412,7 @@ export function TileCard({
                 · {card.passengers.weight}
               </li>
             ) : (
-              <li key={l}>{l}</li>
+              <li key={i}>{l}</li>
             ),
           )}
         </ul>
@@ -430,6 +435,9 @@ export function TileCard({
               onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)
             if (a.id === 'openCity' && card.city) onOpenCity(card.city.id)
+            const unhitcher = unhitcherOf(card, actor)
+            if (a.id === 'unhitch' && card.unhitch && unhitcher)
+              onUnhitch(card.unhitch.carriageId, unhitcher)
           }}
         />
       )}

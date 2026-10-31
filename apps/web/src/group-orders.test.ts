@@ -403,6 +403,7 @@ describe('every resident order on the group card', () => {
     horseToRide: true,
     carries: true,
     carriageToBoard: true,
+    carriageToUnhitch: true,
   })
   const offered = [
     ...residentActions(everything(farm)),
@@ -476,6 +477,22 @@ describe('the group card’s other orders', () => {
     const off = seenSend({ kind: 'dismount' }, rs, {})
     expect(orders(off)).toEqual([{ kind: 'dismount', residentId: 'e' }])
     expect(why(off)).toHaveLength(4)
+  })
+
+  it('unhitches a different hitched carriage each, skipping children and those without one', () => {
+    const carriages = [
+      { id: 'k1', x: 5, y: 5, horseId: 'h1' },
+      { id: 'k2', x: 5, y: 5, horseId: null },
+      { id: 'k3', x: 9, y: 9, horseId: 'h3' },
+    ]
+    const rs = [resident('a', 5, 5), resident('b', 5, 5), child('c', 9, 9), resident('d', 0, 0)]
+    const sent = seenSend({ kind: 'unhitch' }, rs, { carriages })
+    expect(orders(sent)).toEqual([{ kind: 'unhitch', carriageId: 'k1', residentId: 'a' }])
+    expect(why(sent)).toEqual([
+      ['c', 'a child'],
+      ['d', 'no hitched horse here'],
+      ['b', 'another of them unhitches the horse here'],
+    ])
   })
 
   it('makes each standing in a stable feed it; children and those elsewhere are skipped', () => {

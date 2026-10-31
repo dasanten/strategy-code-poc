@@ -1,8 +1,11 @@
-import type { Server } from 'node:http'
+import type { IncomingMessage, Server } from 'node:http'
+import { fastifyCookie } from '@fastify/cookie'
 import { WebSocket, WebSocketServer } from 'ws'
 import {
   SCRIPT_WATCH_MAX,
   SESSION_COOKIE,
+  WS_CLOSE_LOGGED_OUT,
+  WS_CLOSE_TOO_MANY_REQUESTS,
   WS_PATH,
   commanderOf,
   diplomacyFor,
@@ -23,9 +26,11 @@ import {
   type Territory,
   type WorldState,
 } from '@csp/shared'
-import { getSessionUser, type SessionUser } from './auth.js'
+import { getSessionUser, hashToken, sessionAlive, type SessionUser } from './auth.js'
+import { config } from './config.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
+import type { Logger } from './log.js'
 import type { OrderQueue } from './orders.js'
 import { foundStartingCity, realmOf, suggestedLeaderName } from './starting-city.js'
 import { eventsFor } from './events.js'
@@ -36,16 +41,88 @@ import type { TickReporter } from './tick.js'
 import { ClientView } from './sync.js'
 import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
 
-function readCookie(header: string | undefined, name: string): string | undefined {
-  for (const part of header?.split(';') ?? []) {
-    const [k, ...v] = part.trim().split('=')
-    if (k === name) return decodeURIComponent(v.join('='))
-  }
-  return undefined
+/**
+ * The session token in an upgrade request's cookie header, read as the HTTP routes read theirs
+ * (`@fastify/cookie`). A value that is not valid percent-encoding is kept as sent, so it matches
+ * no session; decoding it ourselves threw in the `upgrade` event, where nothing catches, and
+ * ended the process (#512).
+ */
+function sessionToken(header: string | undefined): string | undefined {
+  return header ? fastifyCookie.parse(header)[SESSION_COOKIE] : undefined
 }
 
 function send(socket: WebSocket, msg: ServerMessage) {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
+}
+
+/** Which browsers may open the WebSocket (`config.origins`). */
+export interface OriginPolicy {
+  /** Origins let in besides the request's own host, such as `https://game.example.com`. */
+  allowed: string[]
+  /** Whether a request without an Origin header, which no browser sends, is let in. */
+  allowMissing: boolean
+}
+
+/**
+ * Whether a WebSocket upgrade comes from a page the game may be played from: one of the allowed
+ * origins, or the request's own host, which is the game's domain as Caddy forwards it in
+ * production and the server itself in development. Any other page's socket is refused, so a
+ * site a Player's browser also has open can't play as them with their cookie.
+ */
+export function originAllowed(req: IncomingMessage, policy: OriginPolicy): boolean {
+  const origin = req.headers.origin
+  if (origin === undefined) return policy.allowMissing
+  if (policy.allowed.includes(origin)) return true
+  let host: string
+  try {
+    host = new URL(origin).host
+  } catch {
+    return false
+  }
+  return host !== '' && host === req.headers.host
+}
+
+/** What one client may do (`config.realtime`). */
+export type RealtimeLimits = typeof config.realtime
+
+/**
+ * A socket's allowance of messages: it holds up to `messageBurst` and earns `messagesPerSecond`
+ * back, each message spending one.
+ */
+class TokenBucket {
+  private tokens: number
+  private last: number
+
+  constructor(
+    private limits: Pick<RealtimeLimits, 'messageBurst' | 'messagesPerSecond'>,
+    private now: () => number,
+  ) {
+    this.tokens = limits.messageBurst
+    this.last = now()
+  }
+
+  /** Spends one for a message; false when none is left. */
+  take(): boolean {
+    const now = this.now()
+    const earned = ((now - this.last) / 1000) * this.limits.messagesPerSecond
+    this.tokens = Math.min(this.limits.messageBurst, this.tokens + earned)
+    this.last = now
+    if (this.tokens < 1) return false
+    this.tokens -= 1
+    return true
+  }
+}
+
+/**
+ * How often each client's session is checked again after the handshake, so a session that
+ * expired, or was deleted some other way than logout or a reset, ends its sockets within that.
+ */
+export const SESSION_RECHECK_MS = 60_000
+
+/** A connected socket's session: what it is closed by when the session ends. */
+interface Session {
+  tokenHash: string
+  userId: number
 }
 
 /** The realms whose residents are among the entities, and the cities among them. */
@@ -149,11 +226,53 @@ export function attachRealtime(
      * reports what is.
      */
     sightCheck?: { reporter: TickReporter; sampleRate: number; rand?: () => number }
+    /** Where an upgrade refused for an unexpected error is logged. */
+    logger?: Pick<Logger, 'error'>
+    /**
+     * Told of an error that escaped a client's message handler, such as a bug in one order kind's
+     * check (ADR 0004). The message is answered `rejected` and the socket stays open either way.
+     */
+    onError?: (error: unknown, userId: number) => void
+    /** Which browsers may connect; the server's config by default. */
+    origins?: OriginPolicy
+    /** What one client may do; the server's config by default. */
+    limits?: Partial<RealtimeLimits>
+    /** The clock the message allowance runs on, for tests. */
+    now?: () => number
   },
 ) {
   const { world } = opts
-  const users = new WeakMap<object, SessionUser>()
+  const origins = opts.origins ?? config.origins
+  const limits = { ...config.realtime, ...opts.limits }
+  const now = opts.now ?? Date.now
+  const users = new WeakMap<object, { user: SessionUser; session: Session }>()
+  /** Every connected socket, whether or not its Player has a realm yet. */
+  const sessions = new Map<WebSocket, Session>()
   const clients = new Map<WebSocket, Client>()
+  let lastSessionCheck = Date.now()
+
+  /** How many sockets an account holds open, with or without a realm (the connection cap). */
+  function socketsOf(userId: number): number {
+    let n = 0
+    for (const session of sessions.values()) if (session.userId === userId) n++
+    return n
+  }
+
+  /** Closes a socket because its session ended; the client shows the login screen. */
+  function endSession(socket: WebSocket) {
+    sessions.delete(socket)
+    clients.delete(socket)
+    socket.close(WS_CLOSE_LOGGED_OUT, 'logged out')
+  }
+
+  /** Closes the sockets whose session is gone or expired, at most once in `SESSION_RECHECK_MS`. */
+  function recheckSessions(now: number) {
+    if (now - lastSessionCheck < SESSION_RECHECK_MS) return
+    lastSessionCheck = now
+    for (const [socket, session] of sessions) {
+      if (!sessionAlive(opts.db, session.tokenHash, now)) endSession(socket)
+    }
+  }
 
   /** Reports entities about to go to a realm's Player outside their sight, on sampled ticks. */
   function checkSent(realmId: string, sent: SeenEntity[]) {
@@ -232,11 +351,25 @@ export function attachRealtime(
   const wss = new WebSocketServer({
     server,
     path: WS_PATH,
+    // A larger frame closes the socket (1009) before it is buffered whole or parsed.
+    maxPayload: limits.maxPayloadBytes,
+    // Runs in the HTTP `upgrade` event, where an uncaught error ends the process: whatever goes
+    // wrong refuses this one upgrade, and the server keeps serving the next (#512).
     verifyClient: ({ req }, done) => {
-      const user = getSessionUser(opts.db, readCookie(req.headers.cookie, SESSION_COOKIE))
-      if (!user) return done(false, 401, 'Not logged in')
-      users.set(req, user)
-      done(true)
+      try {
+        if (!originAllowed(req, origins)) return done(false, 403, 'Origin not allowed')
+        const token = sessionToken(req.headers.cookie)
+        const user = getSessionUser(opts.db, token)
+        if (!user || !token) return done(false, 401, 'Not logged in')
+        if (socketsOf(user.id) >= limits.connectionsPerUser) {
+          return done(false, 429, 'Too many connections')
+        }
+        users.set(req, { user, session: { tokenHash: hashToken(token), userId: user.id } })
+        done(true)
+      } catch (err) {
+        opts.logger?.error({ err }, 'WebSocket upgrade refused: unexpected error')
+        done(false, 400, 'Bad request')
+      }
     },
   })
 
@@ -297,8 +430,13 @@ export function attachRealtime(
   }
 
   wss.on('connection', (socket, req) => {
-    const user = users.get(req)!
+    const { user, session } = users.get(req)!
+    sessions.set(socket, session)
     const account = { name: user.name, isAdmin: user.isAdmin }
+    const allowance = new TokenBucket(limits, now)
+    // A frame over `maxPayload` (or a bad one) is an error on the socket; it closes on its own,
+    // and without a listener the error would take the server down.
+    socket.on('error', () => {})
     // A Player without a realm (first login, or after a Leader death) names it and their Leader
     // before the realm and its starting city are founded (`CONTEXT.md`: Realm name).
     const realm = realmOf(world, user.id)
@@ -307,12 +445,34 @@ export function attachRealtime(
       send(socket, { type: 'founding', account, leaderName: suggestedLeaderName(world, user.id) })
 
     socket.on('message', (raw) => {
+      if (!allowance.take()) return socket.close(WS_CLOSE_TOO_MANY_REQUESTS, 'Too many requests')
       let msg: ClientMessage
       try {
         msg = JSON.parse(String(raw)) as ClientMessage
       } catch {
         return send(socket, { type: 'rejected', requestId: '', reason: 'not JSON' })
       }
+      try {
+        handle(socket, msg)
+      } catch (error) {
+        // An exception here would otherwise escape the socket's emitter and end the process, and
+        // any logged-in Player can send any message: one bug must not take the game down.
+        opts.onError?.(error, user.id)
+        const { requestId } = (msg ?? {}) as { requestId?: unknown }
+        send(socket, {
+          type: 'rejected',
+          requestId: typeof requestId === 'string' ? requestId : '',
+          reason: 'server error',
+        })
+      }
+    })
+    socket.on('close', () => {
+      sessions.delete(socket)
+      clients.delete(socket)
+    })
+
+    /** Answers one message from a logged-in client. */
+    function handle(socket: WebSocket, msg: ClientMessage) {
       const client = clients.get(socket)
       if (msg?.type === 'found' && !client) {
         const requestId = typeof msg.requestId === 'string' ? msg.requestId : ''
@@ -327,6 +487,11 @@ export function attachRealtime(
       if (msg?.type === 'order') {
         const requestId = typeof msg.requestId === 'string' ? msg.requestId : ''
         if (!client) return send(socket, { type: 'rejected', requestId, reason: 'no realm yet' })
+        // A realm's orders waiting for the next tick are capped, so no script in a browser
+        // console can pile up more than a tick works through.
+        if (opts.orders.pendingFor(client.userId) >= limits.pendingOrdersPerRealm) {
+          return send(socket, { type: 'rejected', requestId, reason: 'too many orders waiting' })
+        }
         const sender = { userId: client.userId, account: client.account }
         send(socket, opts.orders.receive(world, sender, msg.requestId, msg.order))
       }
@@ -339,19 +504,31 @@ export function attachRealtime(
         sendScriptMemory(socket, client)
         sendScriptLogs(socket, client)
       }
-    })
-    socket.on('close', () => clients.delete(socket))
+    }
   })
 
   return {
+    /** Closes the sockets of one session: called when it is logged out. */
+    disconnectSession(tokenHash: string) {
+      for (const [socket, session] of sessions) {
+        if (session.tokenHash === tokenHash) endSession(socket)
+      }
+    },
+    /** Closes every socket of an account: called when a password reset ends all its sessions. */
+    disconnectUser(userId: number) {
+      for (const [socket, session] of sessions) {
+        if (session.userId === userId) endSession(socket)
+      }
+    },
     /**
      * Sends every client the changes in its sight since the last tick, and the chunks whose
      * explored terrain grew for its Player (`explored`, from `SightTracker.update`), and its
      * Player's new realm events, and their alliance matters when those changed, and the Region map
      * when territory was worked out again or their explored terrain grew: each Player gets only
-     * their own.
+     * their own. First, once a minute, the sockets whose session ended meanwhile are closed.
      */
-    broadcastTick(explored: Map<number, Set<number>> = new Map()) {
+    broadcastTick(explored: Map<number, Set<number>> = new Map(), now = Date.now()) {
+      recheckSessions(now)
       for (const [socket, client] of clients) {
         const inSight = entitiesInSight(world, opts.terrain, client.realmId)
         const { changed, gone } = client.view.diff(inSight)
