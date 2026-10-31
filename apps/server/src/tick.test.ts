@@ -10,6 +10,7 @@ function fakeReporter() {
     invariantViolations: vi.fn(),
     tickHealth: vi.fn(),
     tickError: vi.fn(),
+    scriptError: vi.fn(),
   } satisfies TickReporter
 }
 

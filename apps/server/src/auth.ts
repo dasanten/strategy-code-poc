@@ -16,6 +16,15 @@ const KEY_LENGTH = 64
 const DAY_MS = 24 * 60 * 60 * 1000
 export const SESSION_DAYS = 30
 
+/** Failed logins in a row for one name before that name's back-off starts. */
+export const LOGIN_FAILURES_BEFORE_BACKOFF = 5
+/** The first back-off wait; it doubles with every further failure. */
+export const LOGIN_BACKOFF_MS = 30 * 1000
+/** The longest back-off wait. */
+export const LOGIN_BACKOFF_MAX_MS = 15 * 60 * 1000
+/** How many names the back-off remembers at once; past that, the oldest entries are dropped. */
+export const LOGIN_BACKOFF_TRACKED_NAMES = 10_000
+
 /** A failure the API reports to the client as `{ error, message }`. */
 export class AuthError extends Error {
   constructor(
@@ -117,14 +126,60 @@ export async function signUp(
   })
 }
 
+/**
+ * A hash no password matches, made once with the same scrypt parameters as real ones, so a login
+ * for an unknown name does the same work as one for a known name with the wrong password.
+ */
+let dummyHash: Promise<string> | undefined
+const getDummyHash = () => (dummyHash ??= hashPassword(randomBytes(32).toString('base64')))
+
+/**
+ * Failed logins per name (lower-cased), whether or not the name exists, so the back-off tells
+ * nothing about which names exist. `until` is when the name may try again. In memory only: a
+ * restart forgets it (ADR 0005, addendum). Ordered by last failure, oldest first.
+ */
+const loginFailures = new Map<string, { failures: number; until: number }>()
+
+/** Forgets every back-off. For tests. */
+export function clearLoginBackoff(): void {
+  loginFailures.clear()
+}
+
+function noteLoginFailure(key: string, now: number): void {
+  const entry = loginFailures.get(key) ?? { failures: 0, until: 0 }
+  entry.failures += 1
+  const over = entry.failures - LOGIN_FAILURES_BEFORE_BACKOFF
+  if (over >= 0) {
+    entry.until = now + Math.min(LOGIN_BACKOFF_MS * 2 ** over, LOGIN_BACKOFF_MAX_MS)
+  }
+  loginFailures.delete(key) // re-insert, so the map stays ordered by last failure
+  loginFailures.set(key, entry)
+  for (const oldest of loginFailures.keys()) {
+    if (loginFailures.size <= LOGIN_BACKOFF_TRACKED_NAMES) break
+    loginFailures.delete(oldest)
+  }
+}
+
 export async function logIn(
   db: Db,
   input: { name: unknown; password: unknown },
+  now = Date.now(),
 ): Promise<SessionUser> {
   const wrong = new AuthError('wrong-login', 'Wrong name or password.')
   if (typeof input.name !== 'string' || typeof input.password !== 'string') throw wrong
+  const key = input.name.toLowerCase()
+  const backoff = loginFailures.get(key)
+  if (backoff && backoff.until > now) {
+    // Same message as a wrong password: the wait is per name, never a hint that the name exists.
+    throw new AuthError('rate-limited', 'Wrong name or password.')
+  }
   const user = findUserByName(db, input.name)
-  if (!user || !(await verifyPassword(input.password, user.passwordHash))) throw wrong
+  const ok = await verifyPassword(input.password, user?.passwordHash ?? (await getDummyHash()))
+  if (!user || !ok) {
+    noteLoginFailure(key, now)
+    throw wrong
+  }
+  loginFailures.delete(key)
   return toAccount(user)
 }
 

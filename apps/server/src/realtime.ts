@@ -1,4 +1,5 @@
 import type { Server } from 'node:http'
+import { fastifyCookie } from '@fastify/cookie'
 import { WebSocket, WebSocketServer } from 'ws'
 import {
   SCRIPT_WATCH_MAX,
@@ -27,6 +28,7 @@ import {
 import { getSessionUser, hashToken, sessionAlive, type SessionUser } from './auth.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
+import type { Logger } from './log.js'
 import type { OrderQueue } from './orders.js'
 import { foundStartingCity, realmOf, suggestedLeaderName } from './starting-city.js'
 import { eventsFor } from './events.js'
@@ -37,12 +39,14 @@ import type { TickReporter } from './tick.js'
 import { ClientView } from './sync.js'
 import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
 
-function readCookie(header: string | undefined, name: string): string | undefined {
-  for (const part of header?.split(';') ?? []) {
-    const [k, ...v] = part.trim().split('=')
-    if (k === name) return decodeURIComponent(v.join('='))
-  }
-  return undefined
+/**
+ * The session token in an upgrade request's cookie header, read as the HTTP routes read theirs
+ * (`@fastify/cookie`). A value that is not valid percent-encoding is kept as sent, so it matches
+ * no session; decoding it ourselves threw in the `upgrade` event, where nothing catches, and
+ * ended the process (#512).
+ */
+function sessionToken(header: string | undefined): string | undefined {
+  return header ? fastifyCookie.parse(header)[SESSION_COOKIE] : undefined
 }
 
 function send(socket: WebSocket, msg: ServerMessage) {
@@ -162,6 +166,8 @@ export function attachRealtime(
      * reports what is.
      */
     sightCheck?: { reporter: TickReporter; sampleRate: number; rand?: () => number }
+    /** Where an upgrade refused for an unexpected error is logged. */
+    logger?: Pick<Logger, 'error'>
   },
 ) {
   const { world } = opts
@@ -264,12 +270,19 @@ export function attachRealtime(
   const wss = new WebSocketServer({
     server,
     path: WS_PATH,
+    // Runs in the HTTP `upgrade` event, where an uncaught error ends the process: whatever goes
+    // wrong refuses this one upgrade, and the server keeps serving the next (#512).
     verifyClient: ({ req }, done) => {
-      const token = readCookie(req.headers.cookie, SESSION_COOKIE)
-      const user = getSessionUser(opts.db, token)
-      if (!user || !token) return done(false, 401, 'Not logged in')
-      users.set(req, { user, session: { tokenHash: hashToken(token), userId: user.id } })
-      done(true)
+      try {
+        const token = sessionToken(req.headers.cookie)
+        const user = getSessionUser(opts.db, token)
+        if (!user || !token) return done(false, 401, 'Not logged in')
+        users.set(req, { user, session: { tokenHash: hashToken(token), userId: user.id } })
+        done(true)
+      } catch (err) {
+        opts.logger?.error({ err }, 'WebSocket upgrade refused: unexpected error')
+        done(false, 400, 'Bad request')
+      }
     },
   })
 
