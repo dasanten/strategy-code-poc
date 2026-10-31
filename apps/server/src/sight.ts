@@ -536,6 +536,8 @@ export class SightCache {
   /** How many times a side's sight was worked out since the cache opened (tick health). */
   builds = 0
   private readonly sides = new Map<string, SideSight>()
+  /** What is in sight as JSON, by the frozen thing it was made from (`seenJson`). */
+  json = new WeakMap<object, string>()
 
   constructor(readonly size: number) {}
 
@@ -552,6 +554,7 @@ export class SightCache {
   /** Forgets every side's sight: the world has moved on since. */
   newPhase(): void {
     this.sides.clear()
+    this.json = new WeakMap()
   }
 }
 
@@ -583,6 +586,22 @@ export function withSight<T>(world: WorldState, size: number, fn: () => T): T {
   } finally {
     closeSight(world)
   }
+}
+
+/**
+ * Something in sight as JSON: while a sight cache is open, made once per phase and shared by
+ * everyone who asks (Last seen, and sync for every socket of a realm), so the same string comes
+ * back each time; else made for this caller alone. Only for what an open cache handed out, which
+ * nobody changes during the phase (`frozen`).
+ */
+export function seenJson(world: WorldState, e: object): string {
+  const memo = openCaches.get(world)?.json
+  let json = memo?.get(e)
+  if (json === undefined) {
+    json = JSON.stringify(e)
+    memo?.set(e, json)
+  }
+  return json
 }
 
 /** A side's sight: from the open cache, or worked out for this caller alone without one. */

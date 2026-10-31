@@ -1,6 +1,6 @@
 import type { Remembered, TerrainMap, WorldState } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
-import { buildingsBySquare, placesInSight, type SeenPlace } from './sight.js'
+import { buildingsBySquare, placesInSight, seenJson } from './sight.js'
 
 /**
  * Brings every Player's Last seen up to date with their sight (`CONTEXT.md`: Last seen): each
@@ -24,9 +24,15 @@ export function stepLastSeen(world: WorldState, size: number): void {
     for (const e of seen) {
       const was = memory.get(e.id)
       // Most of it is as it was a tick ago; anything else is copied, since what it holds is the
-      // world's own and changes in place once out of sight.
-      if (was && sameAs(e, was)) was.seenAt = world.tick
-      else memory.set(e.id, { ...copyOf(e), seenAt: world.tick })
+      // world's own and changes in place once out of sight. Compared as JSON, the same string
+      // sync sends (`seenJson`).
+      const json = seenJson(world, e)
+      if (was && jsonOf(was) === json) was.seenAt = world.tick
+      else {
+        const copy = { ...copyOf(e), seenAt: world.tick }
+        remembered.set(copy, json)
+        memory.set(e.id, copy)
+      }
     }
     const cities = new Set<string>()
     for (const e of memory.values()) {
@@ -46,25 +52,22 @@ function copyOf<T>(value: T): T {
   return out as T
 }
 
-/** Whether plain data is the same all the way down. */
-function same(a: unknown, b: unknown): boolean {
-  if (a === b) return true
-  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
-  if (Array.isArray(a)) {
-    return Array.isArray(b) && a.length === b.length && a.every((v, i) => same(v, b[i]))
+/**
+ * What each remembered building or city was as JSON when it was seen, `seenAt` aside: only
+ * `stepLastSeen` changes what it remembers, and then only `seenAt`. Scratch memory, never saved:
+ * after a restart it is made again from what is remembered.
+ */
+const remembered = new WeakMap<Remembered, string>()
+
+/** A remembered building or city as JSON, `seenAt` aside (`remembered`). */
+function jsonOf(was: Remembered): string {
+  let json = remembered.get(was)
+  if (json === undefined) {
+    // JSON leaves out what is undefined.
+    json = JSON.stringify({ ...was, seenAt: undefined })
+    remembered.set(was, json)
   }
-  const keys = Object.keys(a)
-  return keys.length === Object.keys(b).length && keys.every((k) => same(at(a, k), at(b, k)))
-}
-
-const at = (o: object, k: string) => (o as Record<string, unknown>)[k]
-
-/** Whether something seen now is what is remembered of it, `seenAt` aside. */
-function sameAs(seen: SeenPlace, was: Remembered): boolean {
-  const keys = Object.keys(seen)
-  return (
-    keys.length === Object.keys(was).length - 1 && keys.every((k) => same(at(seen, k), at(was, k)))
-  )
+  return json
 }
 
 /**
