@@ -40,11 +40,12 @@ import {
   entitiesInSight,
   sentInsideUnseen,
   sentOutOfSight,
+  seenJson,
   withSight,
   type SightTracker,
 } from './sight.js'
 import type { TickReporter } from './tick.js'
-import { ClientView } from './sync.js'
+import { ClientView, SyncRound } from './sync.js'
 import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
 
 /**
@@ -58,8 +59,15 @@ function sessionToken(header: string | undefined): string | undefined {
 }
 
 function send(socket: WebSocket, msg: ServerMessage) {
-  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
+  sendJson(socket, JSON.stringify(msg))
 }
+
+/** Sends a message already turned into JSON. */
+function sendJson(socket: WebSocket, json: string) {
+  if (socket.readyState === WebSocket.OPEN) socket.send(json)
+}
+
+type TickMessage = Extract<ServerMessage, { type: 'tick' }>
 
 /** Which browsers may open the WebSocket (`config.origins`). */
 export interface OriginPolicy {
@@ -549,11 +557,17 @@ export function attachRealtime(
     },
   }
 
-  /** The tick message to each socket, as `broadcastTick` says. */
+  /**
+   * The tick message to each socket, as `broadcastTick` says. Each entity in a realm's sight is
+   * turned into JSON once, and sockets of a realm sent the same so far share their `changed` and
+   * `gone` as one string spliced into each message (`SyncRound`).
+   */
   function sendTicks(explored: Map<number, Set<number>>) {
+    const round = new SyncRound<SeenEntity>((e) => seenJson(world, e))
     for (const [socket, client] of clients) {
       const inSight = entitiesInSight(world, opts.terrain, client.realmId)
-      const { changed, gone } = client.view.diff(inSight)
+      const diff = client.view.diff(inSight, round)
+      const { changed } = diff
       checkSent(client.realmId, changed)
       const remembered = client.lastSeenView.diff(lastSeenOutOfSight(world, client.userId))
       checkLastSeen(client.realmId, remembered.changed)
@@ -577,9 +591,8 @@ export function attachRealtime(
       const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
       if (claimed) client.horseOffer = false
       const tick = {
+        type: 'tick' as const,
         tick: world.tick,
-        changed,
-        gone,
         ...lastSeen,
         explored: grown,
         events,
@@ -589,7 +602,9 @@ export function attachRealtime(
         ...(named ? { realmName } : {}),
         ...(claimed ? { horseOffer: false as const } : {}),
       }
-      send(socket, { type: 'tick', ...tick })
+      // `changed` and `gone` go last, as the JSON the realm's sockets in step share.
+      const rest = JSON.stringify(tick satisfies Omit<TickMessage, 'changed' | 'gone'>)
+      sendJson(socket, `${rest.slice(0, -1)},${round.fragment(diff)}}`)
       sendScriptMemory(socket, client)
       sendScriptLogs(socket, client)
     }
