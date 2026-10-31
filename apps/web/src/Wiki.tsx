@@ -1528,8 +1528,12 @@ export function Wiki() {
           own, and defenders elsewhere in the city don't stop the clock: they have to come to the
           hall. The first tick the occupation doesn't hold, it is broken and its days are lost; the
           next one starts again from nothing. Every city is captured this way: NPC cities, Players'
-          cities, trading posts and the Trade Org HQ, whose hired mercenaries defend it. Scripts see
-          it as <code>city.occupation</code>: who occupies a town hall in sight, and the ticks left.
+          cities, trading posts and the Trade Org HQ, whose hired mercenaries defend it. Anyone with
+          the town hall in sight sees who occupies it and the game days left: a small flag in the
+          occupier's colour on the hall, and "Occupied by …" on its tile card and in the city
+          inspector, a warning when it is your city. Out of sight it isn't shown, nor remembered in
+          Last seen. Scripts see it as <code>city.occupation</code>: who occupies a town hall in
+          sight, and the ticks left.
         </p>
       </Section>
 

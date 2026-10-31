@@ -238,6 +238,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         (r): r is Resident => commandsSeen(world.diplomacy, world.home.realmId, r) && faresKnown(r),
       )
     : []
+  // The other realms (and NPC cities) the Player knows by name: their allies and those in sight.
+  const realms = world
+    ? [
+        ...(world.diplomacy.alliance?.members ?? []).filter(
+          (m) => m.realmId !== world.home.realmId,
+        ),
+        ...world.diplomacy.realmsInSight,
+      ]
+    : []
   const group = selectedIds.flatMap((id) => own.filter((r) => r.id === id))
   const selected = group.length === 1 ? group[0] : undefined
   // The realm's carriages someone of the group stands on, to board with the seats left on each
@@ -1034,12 +1043,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             inSight={world.residents}
             buildings={world.buildings}
             cities={world.cities}
-            realms={[
-              ...(world.diplomacy.alliance?.members ?? []).filter(
-                (m) => m.realmId !== world.home.realmId,
-              ),
-              ...world.diplomacy.realmsInSight,
-            ]}
+            realms={realms}
             sendOrder={sendOrder}
           />,
         )}
@@ -1073,7 +1077,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             residents={world.residents}
             buildings={world.buildings}
             realmId={world.home.realmId}
-            realms={world.diplomacy.realmsInSight}
+            realms={realms}
             carriages={world.carriages}
             horses={world.horses}
             tick={world.tick}
@@ -1133,6 +1137,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 residents: world.residents,
                 // A building remembered out of sight is named after its city as last seen.
                 cities: [...world.cities, ...world.lastSeen.cities],
+                realms,
                 lastSeen: { buildings: world.lastSeen.buildings, tick: world.tick },
                 tick: world.tick,
                 viewer: {

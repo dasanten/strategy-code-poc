@@ -23,6 +23,7 @@ import {
   describeBuying,
   deliveryCities,
   describeCity,
+  describeOccupation,
   npcStoragesInSight,
   previewDelivery,
   previewNpcTrade,
@@ -100,7 +101,10 @@ export function CityInspector({
   /** Called with the city opened in the list, or undefined when it is closed. */
   onOpen: (id: string | undefined) => void
 }) {
-  const views = cities.map((c) => describeCity(c, { residents, buildings }, realmId, realms))
+  const views = cities.map((c) => ({
+    ...describeCity(c, { residents, buildings }, realmId, realms),
+    occupation: describeOccupation(c, tick, realmId, realms),
+  }))
   return (
     <section className="city-inspector" aria-label="Cities in sight">
       <div className="panel-head">
@@ -118,6 +122,11 @@ export function CityInspector({
               <strong>{v.name}</strong>
               <span>{v.whose}</span>
             </button>
+            {v.occupation && (
+              <p className={`occupation${v.occupation.warning ? ' warn' : ''}`}>
+                {v.occupation.text}
+              </p>
+            )}
             {openId === v.id && (
               <p className="city-details">
                 {v.residents} {v.residents === 1 ? 'resident' : 'residents'} in sight

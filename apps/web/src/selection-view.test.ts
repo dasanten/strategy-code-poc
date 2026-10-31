@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CARRIAGE_CAPACITY,
+  OCCUPATION_GAME_DAYS,
   FOOTPRINT,
   MAP_SIZE,
   MAX_HEALTH,
@@ -440,6 +441,28 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
 const tile = (more: Partial<TileThings> = {}) => describeTile(things(more), GOOD_LABELS)
 
 describe('the card for a tile', () => {
+  it('says who occupies a town hall in sight and the game days left (`CONTEXT.md`: Occupying a town hall)', () => {
+    const hall = (cityId: string) => building({ kind: 'townHall', cityId, x: 4, y: 4 })
+    const cities = [
+      { id: 'c-me', name: 'Eastmere', realmId: 'me', occupation: { realmId: 'r2', since: 0 } },
+      { id: 'c-npc', name: 'Oakhollow', realmId: null, occupation: { realmId: 'me', since: 0 } },
+    ]
+    const realms = [{ realmId: 'r2', realm: 'Northmarch' }]
+    const mine = tile({ buildings: [hall('c-me')], cities, realms, tick: 0 })
+    expect(mine.occupation).toEqual({
+      text: `Occupied by Northmarch, ${OCCUPATION_GAME_DAYS} game days left`,
+      warning: true,
+      realmId: 'r2',
+    })
+    const theirs = tile({ buildings: [hall('c-npc')], cities, realms, tick: 0 })
+    expect(theirs.occupation).toMatchObject({ warning: false })
+    expect(theirs.occupation?.text).toMatch(/^Occupied by you,/)
+    // Not occupied, or another building of an occupied city: nothing.
+    expect(tile({ buildings: [hall('c-npc')] }).occupation).toBeUndefined()
+    const farm = building({ kind: 'farm', cityId: 'c-me' })
+    expect(tile({ buildings: [farm], cities, realms }).occupation).toBeUndefined()
+  })
+
   it('is named after a building on it, in its owner’s colour', () => {
     const card = tile({ buildings: [building({ kind: 'farm', cityId: 'c-me' })] })
     expect(card).toMatchObject({ title: 'Eastmere farm', rel: 'own', what: 'building' })

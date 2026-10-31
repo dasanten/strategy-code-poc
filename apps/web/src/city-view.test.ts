@@ -1,6 +1,9 @@
 import {
   PRICED_GOODS,
   deliveryFee,
+  OCCUPATION_GAME_DAYS,
+  OCCUPATION_TICKS,
+  TICKS_PER_GAME_DAY,
   priceFor,
   transferFee,
   transferTiles,
@@ -15,6 +18,7 @@ import {
   buildingCount,
   describeBuying,
   describeCity,
+  describeOccupation,
   deliveryCities,
   npcStoragesInSight,
   previewDelivery,
@@ -57,6 +61,33 @@ describe('city inspector', () => {
     )
     expect(describeCity(city('realm3'), none, 'realm1', realms).whose).toBe(
       'City of the realm of another Player',
+    )
+  })
+
+  it('says who occupies its town hall and the game days left, a warning for the Player’s own', () => {
+    const occupied = (realmId: string | null, by: string, since: number): City => ({
+      ...city(realmId),
+      occupation: { realmId: by, since },
+    })
+    expect(describeOccupation(city(null), 0, 'realm1', realms)).toBeUndefined()
+    expect(describeOccupation(occupied(null, 'realm2', 100), 100, 'realm1', realms)).toEqual({
+      text: `Occupied by Mara, ${OCCUPATION_GAME_DAYS} game days left`,
+      warning: false,
+      realmId: 'realm2',
+    })
+    // A part of a game day left counts as a day, down to the last one.
+    const left = (tick: number) =>
+      describeOccupation(occupied(null, 'realm1', 0), tick, 'realm1', realms)?.text
+    expect(left(1)).toBe(`Occupied by you, ${OCCUPATION_GAME_DAYS} game days left`)
+    expect(left(OCCUPATION_TICKS - TICKS_PER_GAME_DAY - 1)).toBe(
+      'Occupied by you, 2 game days left',
+    )
+    expect(left(OCCUPATION_TICKS - 1)).toBe('Occupied by you, 1 game day left')
+    expect(describeOccupation(occupied('realm1', 'realm2', 0), 0, 'realm1', realms)).toMatchObject({
+      warning: true,
+    })
+    expect(describeOccupation(occupied(null, 'realm3', 0), 0, 'realm1', realms)?.text).toMatch(
+      /^Occupied by another realm,/,
     )
   })
 

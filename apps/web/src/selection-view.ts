@@ -58,6 +58,7 @@ import {
   type Good,
   type SeenBuilding,
   type SeenCity,
+  type RealmLabel,
   FOOD_PER_DAY,
   HOUSING_ROOM,
   PROTECTION,
@@ -78,6 +79,7 @@ import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
+import { describeOccupation, type OccupationView } from './city-view.js'
 
 /**
  * What the selection card shows (ADR 0008): one of the Player's residents, or a tile of the map
@@ -506,6 +508,11 @@ export interface TileCard {
   /** A city of the Player's own whose town hall is in sight on the tile, which they may rename. */
   renameCity?: { id: string; name: string }
   /**
+   * Who occupies the town hall on the tile and how long is left, while it is in sight
+   * (`CONTEXT.md`: Occupying a town hall).
+   */
+  occupation?: OccupationView
+  /**
    * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
    * and what they saw of it then, shown apart from the lines about what is there now.
    */
@@ -544,7 +551,10 @@ export interface TileThings {
   strangers: SeenResident[]
   /** Everyone in sight, for who works where and who lives in a city. */
   residents?: SeenResident[]
-  cities: Pick<SeenCity, 'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade'>[]
+  cities: (Pick<SeenCity, 'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade'> &
+    Partial<Pick<SeenCity, 'occupation'>>)[]
+  /** The realms the Player knows by name, for who occupies a town hall. */
+  realms?: RealmLabel[]
   viewer: Viewer
   tick?: number
   /** Residents in sight working each building, by building id. */
@@ -869,6 +879,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
+      if (building.kind === 'townHall' && live && city)
+        card.occupation = describeOccupation(city, t.tick ?? 0, t.viewer.realmId, t.realms ?? [])
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))
         if (rel === 'own')
