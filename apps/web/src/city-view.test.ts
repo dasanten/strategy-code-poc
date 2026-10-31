@@ -8,6 +8,7 @@ import {
   type Building,
   type City,
   type NpcCityPrice,
+  type SeenBuilding,
   type Resident,
   type TradeLimit,
 } from '@csp/shared'
@@ -27,6 +28,7 @@ import {
   onTheWayLine,
   sendable,
   takesTransfers,
+  tradesHere,
   tradedGoods,
   tradeLists,
   tradersAt,
@@ -536,5 +538,28 @@ describe('prices from the Player’s side', () => {
         { good: 'stone', price: 3 },
       ])
     })
+  })
+})
+
+describe('linking How to trade from the inspector', () => {
+  it('links it where the panel shows trading: a warehouse, an NPC storage or a transfer', () => {
+    const post = { ...city(null), tradeOrg: 'post' as const }
+    const prices = PRICED_GOODS.map((good) => ({
+      good,
+      ...priceFor(good, 0, WAREHOUSE_FLOOR[good]),
+    }))
+    const food: NpcCityPrice = { good: 'food', stock: 30, forSale: 10, wanted: 0, buy: 1, sell: 3 }
+    const theirs = city('realm2')
+    const at = (buildings: SeenBuilding[]) => ({ cities: [post], buildings })
+    expect(tradesHere(post, at([{ ...b('w1', 'warehouse', 'city1'), prices }]), 'realm1')).toBe(
+      true,
+    )
+    expect(
+      tradesHere({ ...city(null), trade: [food] }, at([b('s1', 'storage', 'city1')]), 'realm1'),
+    ).toBe(true)
+    expect(tradesHere(theirs, at([b('s1', 'storage', 'city1')]), 'realm1')).toBe(true)
+    // An NPC city that names no prices, or the Player's own city: nothing to trade there.
+    expect(tradesHere(city(null), at([b('s1', 'storage', 'city1')]), 'realm1')).toBe(false)
+    expect(tradesHere(city('realm1'), at([b('s1', 'storage', 'city1')]), 'realm1')).toBe(false)
   })
 })

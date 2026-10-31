@@ -241,6 +241,7 @@ export const WIKI_TOPICS = [
   { id: 'work', title: 'Workplaces & output' },
   { id: 'building', title: 'Building & tearing down' },
   { id: 'transport', title: 'Carrying & transport' },
+  { id: 'how-to-trade', title: 'How to trade' },
   { id: 'trade', title: 'Trade & prices' },
   { id: 'standing', title: 'Standing & reactions' },
   { id: 'combat', title: 'Combat & walls' },
@@ -1284,6 +1285,65 @@ export function Wiki() {
           Caravans walk with {num(CARAVAN_ESCORTS)} escorts, one more for every{' '}
           {num(CARAVAN_ROBBERIES_PER_ESCORT)} robberies of their route, at most{' '}
           {num(CARAVAN_ESCORTS_MAX)}.
+        </p>
+      </Section>
+
+      <Section id="how-to-trade">
+        <p>
+          Trade happens in person: one of your residents, or a carriage of yours, stands on the tile
+          of a Trade Org warehouse (at its HQ or a trading post) or of an NPC city's storage. Click
+          the warehouse or storage on the map and press <strong>Trade here</strong>, or open its
+          city under Cities in sight. Its trade section lists what you <strong>can buy</strong>{' '}
+          there and what you <strong>can sell</strong>, with the units and the price of each. Anyone
+          with a resident in sight of it sees its prices.
+        </p>
+        <h3>Sending a trader</h3>
+        <p>
+          With nobody of yours there, the trade section offers to send someone: your residents
+          nearest first, with what each carries, or a carriage of yours. Send walks them (or drives
+          the carriage) to the tile, and the section shows them on the way. A trade moves only what
+          the trader holds, so send coins to buy and goods to sell.
+        </p>
+        <h3>Buying and selling</h3>
+        <p>
+          Once one is there, pick the trader, their hands or a carriage of yours on the tile, the
+          good and how many. The form says what they carry and the room left (a carriage holds{' '}
+          {num(CARRIAGE_CAPACITY)} kg; what a resident carries is under{' '}
+          <a href="#transport">Carrying &amp; transport</a>). Buying takes coins from the trader and
+          puts the goods in their hands or carriage; selling is the other way round. It happens at
+          once, cut down to what the trader holds, what the warehouse or storage holds and what
+          fits. A trade that won't go says why: no coins in hand, no room, none in stock, or not
+          wanted. Each unit is priced as it moves, so a big trade moves the price as it goes (see{' '}
+          <a href="#trade">Trade &amp; prices</a>).
+        </p>
+        <h3>What an NPC city buys and sells</h3>
+        <p>
+          An NPC city sells only its surplus, what its storages hold above its reserve, and buys
+          only goods it is short of, up to its reserve and with the coins in its storage. It takes
+          nothing else. Its prices come from its stock like a warehouse's, and its standing toward
+          you moves them: the better, the cheaper it sells and the more it pays. Below{' '}
+          {signed(NPC_CITY_REFUSES_STANDING)} it won't trade with you at all. Every trade raises
+          standing both ways (see <a href="#standing">Standing &amp; reactions</a>).
+        </p>
+        <h3>Delivery</h3>
+        <p>
+          At a Trade Org warehouse, instead of carrying, a caravan brings what you buy to your
+          city's storage, or fetches what you sell from it, for a fee. Pick the city under Delivery
+          in the trade form; the buttons show the fee before you order. It goes to or from a city of
+          your realm, at most {num(DELIVERY_LOAD)} kg at a time. A delivery is paid at once, goods
+          and fee, and the warehouse keeps the goods for you until a caravan brings them. A pick-up
+          is paid when the caravan collects, at the warehouse's prices of that moment, less the fee.
+          Carrying it yourself costs nothing but is at your own risk. The fees are under{' '}
+          <a href="#transport">Carrying &amp; transport</a>.
+        </p>
+        <h3>Transfer</h3>
+        <p>
+          To send goods or coins to another realm, open one of its cities under Cities in sight:
+          under Transfer, a caravan fetches them from one of your cities and brings them to that
+          city's storage, for a fee the button shows before you send. Nobody of yours needs to be at
+          a warehouse. The fee is {num(TRANSFER_FEE_FACTOR)} times a delivery's over the caravan's
+          whole way, taken from your city's storage with the goods; at most {num(DELIVERY_LOAD)} kg
+          go at a time, coins counting by their weight. The other realm doesn't have to agree.
         </p>
       </Section>
 

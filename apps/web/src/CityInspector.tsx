@@ -33,6 +33,7 @@ import {
   sendable,
   takesTransfers,
   tradedGoods,
+  tradesHere,
   tradeLists,
   tradersAt,
   tradeText,
@@ -49,6 +50,7 @@ import {
 import { GOOD_LABELS } from './Residents.js'
 import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
+import { HOW_TO_TRADE_PATH } from './wiki-view.js'
 
 /**
  * The city inspector: every city in sight (`CONTEXT.md`: City, NPC city), whose it is, and,
@@ -163,6 +165,19 @@ export function CityInspector({
                   ` · ${v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}`}
               </p>
             )}
+            {openId === v.id &&
+              tradesHere(
+                cities.find((c) => c.id === v.id)!,
+                { cities, buildings },
+                realmId,
+              ) && (
+                <p className="small trade-wiki">
+                  {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
+                  <a href={HOW_TO_TRADE_PATH} target="_blank" rel="noopener">
+                    How to trade
+                  </a>
+                </p>
+              )}
             {openId === v.id &&
               warehousesInSight(
                 cities.find((c) => c.id === v.id)!,
@@ -631,19 +646,6 @@ function Trading({
       <p className="small muted trader-holds">
         {holderText(quote.holder, picked, label, carriage?.id)}
       </p>
-      {deliveryCities.length > 0 && (
-        <label>
-          Delivery{' '}
-          <select value={cityId} onChange={(e) => setCityId(e.target.value)}>
-            <option value="">none, carry it here</option>
-            {deliveryCities.map((c) => (
-              <option key={c.id} value={c.id}>
-                to or from {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
       <label>
         Good{' '}
         <select value={picked} onChange={(e) => setGood(e.target.value as PricedGood)}>
@@ -664,6 +666,26 @@ function Trading({
           onChange={(e) => setUnits(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
         />
       </label>
+      {deliveryCities.length > 0 && (
+        <div className="trade-service" aria-label="Delivery">
+          <h3>Delivery</h3>
+          <p className="small muted">
+            A caravan brings what you buy to your city’s storage, or fetches what you sell from it,
+            for a fee.
+          </p>
+          <label>
+            City{' '}
+            <select value={cityId} onChange={(e) => setCityId(e.target.value)}>
+              <option value="">none, carry it here</option>
+              {deliveryCities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  to or from {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       <p>
         <button type="button" disabled={!canBuy} onClick={() => trade('buy')}>
           {buyText}
@@ -769,12 +791,17 @@ function Transferring({
   const quote = preview(from, good, units)
   const text =
     quote === undefined
-      ? `Send ${units} ${label} from ${from.name}`
+      ? `Send ${units} ${label} from ${from.name} (no warehouse in sight to tell the fee)`
       : quote.units > 0
         ? `Send ${quote.units} ${label} from ${from.name} for a ${quote.fee}-coin fee`
         : `${from.name} hasn’t the ${label} or the fee`
   return (
-    <div className="city-transfer" aria-label="Transfer">
+    <div className="city-transfer trade-service" aria-label="Transfer">
+      <h3>Transfer</h3>
+      <p className="small muted">
+        A caravan fetches goods or coins from one of your cities and brings them to this city, for a
+        fee.
+      </p>
       <label>
         From{' '}
         <select value={from.id} onChange={(e) => setFromId(e.target.value)}>
