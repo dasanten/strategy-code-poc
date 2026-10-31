@@ -88,7 +88,7 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
   field(
     'kind',
     'string',
-    'What it is: "townHall", "house", "storage", "warehouse", "wall", "gate", "farm", "stable", "mine", "quarry", "lumberCamp", "smelter", "mint", "smithy" or "road".',
+    'What it is: "townHall", "house", "storage", "warehouse", "wall", "gate", "farm", "stable", "mine", "quarry", "lumberCamp", "smelter", "mint", "smithy", "trainingGround" or "road".',
   ),
   field(
     'cityId',

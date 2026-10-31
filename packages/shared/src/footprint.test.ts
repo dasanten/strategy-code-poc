@@ -40,7 +40,12 @@ describe('footprints (`CONTEXT.md`: Footprint)', () => {
   it('give each kind its square', () => {
     expect([FOOTPRINT.wall, FOOTPRINT.gate, FOOTPRINT.road]).toEqual([1, 1, 1])
     expect([FOOTPRINT.house, FOOTPRINT.storage, FOOTPRINT.mine]).toEqual([2, 2, 2])
-    expect([FOOTPRINT.townHall, FOOTPRINT.warehouse, FOOTPRINT.stable]).toEqual([3, 3, 3])
+    expect([
+      FOOTPRINT.townHall,
+      FOOTPRINT.warehouse,
+      FOOTPRINT.stable,
+      FOOTPRINT.trainingGround,
+    ]).toEqual([3, 3, 3, 3])
     expect(FOOTPRINT.farm).toBe(4)
   })
 
@@ -126,6 +131,23 @@ describe('where buildings go (`CONTEXT.md`: Where buildings go)', () => {
     expect(buildProblem(w, 6, 6, 'farm', terrain)).toBeUndefined()
     expect(buildProblem(w, 9, 9, 'smithy', terrain)).toBe(
       'a smithy goes off any resource node, and not on Mountain',
+    )
+  })
+
+  it('puts a training ground on any passable land but Mountain, every tile free (`CONTEXT.md`: Training ground)', () => {
+    const w = world([storage])
+    // 3×3 from (18, 18) covers the Mountain at (20, 20); from (17, 17) it stops short of it.
+    expect(buildProblem(w, 18, 18, 'trainingGround', terrain)).toBe(
+      'a trainingGround goes off any resource node, and not on Mountain',
+    )
+    expect(buildProblem(w, 17, 17, 'trainingGround', terrain)).toBeUndefined()
+    // Forest is fine, a node under any tile is not.
+    expect(buildProblem(w, 11, 11, 'trainingGround', terrain)).toBeUndefined()
+    expect(buildProblem(w, 9, 9, 'trainingGround', terrain)).toBe(
+      'a trainingGround goes off any resource node, and not on Mountain',
+    )
+    expect(buildProblem(w, 3, 3, 'trainingGround', terrain)).toBe(
+      'there is already a building there',
     )
   })
 

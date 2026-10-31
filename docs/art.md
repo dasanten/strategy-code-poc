@@ -107,6 +107,7 @@ drawn across its footprint (see the table below); the construction sites go with
 | warehouse   | 3×3       | Big Trade Organization depot, stone, many crates, merchant feel |
 | farm        | 4×4       | Tilled field rows, a small hut at one corner                    |
 | stable      | 3×3       | Stable, paddock fence, hay                                      |
+| training-ground | 3×3   | Fenced yard, a straw target, a weapon rack, a paved ring        |
 | mine        | 2×2       | Mine entrance with timber frame, ore cart, rubble               |
 | quarry      | 2×2       | Cut stone pit with blocks and a crane                           |
 | lumber-camp | 2×2       | Log piles, a chopping block, a sawhorse                         |
