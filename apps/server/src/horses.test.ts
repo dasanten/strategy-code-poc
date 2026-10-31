@@ -31,7 +31,7 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { eventsFor } from './events.js'
-import { newHorse, stepHorses } from './horses.js'
+import { HORSE_NAMES, newHorse, stepHorses } from './horses.js'
 import { checkInvariants, horseStatsSound } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -76,6 +76,7 @@ function horse(world: WorldState, id: string, x: number, y: number, realmId: str
     y,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    name: 'Rowan',
     stats: { ...AVERAGE_HORSE_STATS },
     bornAt: 0,
   }
@@ -112,7 +113,8 @@ describe('horse hunger', () => {
     expect(Math.abs(tough - 20 * HORSE_FOOD_PER_DAY * factor)).toBeLessThanOrEqual(1)
   })
 
-  it('draws a new horse’s stats and age in their ranges', () => {
+  it('draws a new horse’s stats and age in their ranges, and a name from the pool', () => {
+    expect(HORSE_NAMES.length).toBeGreaterThanOrEqual(24)
     const tick = 3 * TICKS_PER_GAME_YEAR
     for (let seed = 0; seed < 50; seed++) {
       const h = newHorse(mulberry32(seed), {
@@ -132,6 +134,7 @@ describe('horse hunger', () => {
       expect(age).toBeGreaterThanOrEqual(HORSE_START_AGE_MIN)
       expect(age).toBeLessThanOrEqual(HORSE_START_AGE_MAX)
       expect(h).toMatchObject({ hunger: MAX_HUNGER, health: MAX_HEALTH })
+      expect(HORSE_NAMES).toContain(h.name)
     }
   })
 
@@ -171,7 +174,7 @@ describe('horse hunger', () => {
     expect(died).toEqual([h])
     expect(world.horses).toEqual([])
     expect(eventsFor(world, 7)).toEqual([
-      expect.objectContaining({ kind: 'horseDied', horseId: 'h1' }),
+      expect.objectContaining({ kind: 'horseDied', horseId: 'h1', name: 'Rowan' }),
     ])
   })
 
@@ -277,7 +280,12 @@ describe('a ridden horse (`CONTEXT.md`: Riding)', () => {
     run(world, HUNGER_DAYS)
     expect(h.hunger).toBeLessThan(HORSE_HUNGRY_SHARE * MAX_HUNGER)
     expect(horseHungry(world)).toEqual([
-      expect.objectContaining({ horseId: 'h1', residentId: 'w1', name: world.residents[0]!.name }),
+      expect.objectContaining({
+        horseId: 'h1',
+        horseName: 'Rowan',
+        residentId: 'w1',
+        name: world.residents[0]!.name,
+      }),
     ])
   })
 

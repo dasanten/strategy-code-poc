@@ -58,6 +58,7 @@ function setup(map: TerrainMap, x = 2, y = 2) {
     y,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    name: 'Rowan',
     stats: { ...AVERAGE_HORSE_STATS },
     bornAt: 0,
   }

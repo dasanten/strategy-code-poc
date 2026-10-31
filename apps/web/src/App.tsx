@@ -1150,6 +1150,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               const order = { kind: 'renameCity', residentId: world.home.leaderId, cityId, name }
               setOrderError(await giveOrder(order))
             }}
+            // The same `renameHorse` order a script's `renameHorse` requests, asked by the Leader.
+            onRenameHorse={async (horseId, name) => {
+              const order = { kind: 'renameHorse', residentId: world.home.leaderId, horseId, name }
+              setOrderError(await giveOrder(order))
+            }}
             onSelectResident={(id) => select([id])}
           />
         </CardSheet>

@@ -407,6 +407,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.',
   ),
   action(
+    'renameHorse',
+    ['horseId', 'name'],
+    'Give a horse of my realm a new name: free and at once, from anywhere, like renaming a resident. Names need not be unique.',
+  ),
+  action(
     'claimHorses',
     [],
     'Claim my Player’s Horse offer, once ever: two new horses for my realm, in its stable nearest the Leader’s city, or else by a storage or the Leader with Food by them. Free and at once; refused once claimed, or while my realm has no living Leader.',

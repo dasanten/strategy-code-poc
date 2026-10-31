@@ -15,6 +15,7 @@ import {
 } from '@csp/shared'
 import { checkInvariants } from './invariants.js'
 import { grantHorses } from './horse-grant.js'
+import { HORSE_NAMES } from './horses.js'
 import { worldWithPost } from './test-terrain.js'
 import { migrateWorld, migrations } from './world-format.js'
 
@@ -47,6 +48,7 @@ describe('the Horse grant (migration 47 → 48)', () => {
       const age = horseAgeInYears(h, migrated.tick)
       expect(age).toBeGreaterThanOrEqual(HORSE_START_AGE_MIN)
       expect(age).toBeLessThanOrEqual(HORSE_START_AGE_MAX)
+      expect(HORSE_NAMES).toContain(h.name)
     }
     expect(migrated.events.at(-1)).toMatchObject({
       kind: 'horsesGranted',

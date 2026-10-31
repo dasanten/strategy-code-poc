@@ -66,6 +66,7 @@ import {
   HORSE_GRANT_FOOD,
   HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
+  HORSE_NAME_MAX_LENGTH,
   HUNGRY_HORSE_PACE,
   HORSE_ENDURANCE_EFFECT,
   HORSE_ENDURANCE_LIMIT,
@@ -1054,6 +1055,16 @@ export function Wiki() {
           stable first, else two fed horses of your realm in it. Giving Breed horses in a stable
           fills the param; it is never kept between starts. With no stable there, or no two fed
           horses in it, Breed horses ends and your realm log says why.
+        </p>
+        <h3>Horse names</h3>
+        <p>
+          Every horse has a name, given by the game when it comes into being: in a starting city, at
+          the Trade Organization, as a foal, or from the Horse grant or offer. You can rename any
+          horse of your realm, free and at once, from anywhere: with <strong>Rename</strong> on the
+          card of the tile it stands on, or a script's <code>renameHorse(horse, name)</code>. A name
+          takes up to {num(HORSE_NAME_MAX_LENGTH)} characters and need not be unique. The name shows
+          on the tile card, the stable, the carriage it pulls, its rider's card and the realm log,
+          and scripts see it as <code>horse.name</code>.
         </p>
         <h3>Horse stats</h3>
         <p>

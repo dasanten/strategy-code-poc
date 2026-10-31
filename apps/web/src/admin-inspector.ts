@@ -241,7 +241,7 @@ export function inspectorCard(ins: AdminInspection): InspectorCard {
     }
     case 'horse':
       return card({
-        title: 'Horse',
+        title: `Horse ${ins.horse.name}`,
         rows: [
           ...HORSE_STAT_NAMES.map((s) => ({
             label: s[0]!.toUpperCase() + s.slice(1),

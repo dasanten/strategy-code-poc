@@ -24,7 +24,7 @@ import { buy, sell } from './trading.js'
 import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
 import { handOver } from './leader.js'
-import { rename, renameCity } from './renaming.js'
+import { rename, renameCity, renameHorse } from './renaming.js'
 import { claimHorses } from './horse-grant.js'
 import { queueOrders } from './queues.js'
 
@@ -105,6 +105,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     handOver,
     rename,
     renameCity,
+    renameHorse,
     claimHorses,
     ...allianceOrders,
     ...armyOrders,
@@ -170,6 +171,7 @@ export class OrderQueue {
         'handOver',
         'rename',
         'renameCity',
+        'renameHorse',
         'claimHorses',
         'setScriptParam',
         'setDefenceScript',

@@ -1,5 +1,10 @@
-import { CITY_NAME_MAX_LENGTH, REALM_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH } from './balance.js'
-import type { City, Realm, Resident } from './world.js'
+import {
+  CITY_NAME_MAX_LENGTH,
+  HORSE_NAME_MAX_LENGTH,
+  REALM_NAME_MAX_LENGTH,
+  RESIDENT_NAME_MAX_LENGTH,
+} from './balance.js'
+import type { City, Horse, Realm, Resident } from './world.js'
 
 /**
  * What is wrong with a name a Player gives, if anything: it must be text, and trimmed not empty
@@ -66,5 +71,20 @@ export function cityRenameProblem(
 ): string | undefined {
   if (!city || city.realmId !== realm.id) return 'not one of your cities'
   const bad = nameProblem(name, CITY_NAME_MAX_LENGTH)
+  return bad ? `Name: ${bad}` : undefined
+}
+
+/**
+ * Why the Player of `realm` can't rename `horse` to `name` now (`CONTEXT.md`: Renaming a horse),
+ * or undefined when they can: any horse of their realm, from anywhere, like a resident. NPC
+ * cities' horses and other realms' keep their names.
+ */
+export function horseRenameProblem(
+  realm: Pick<Realm, 'id'>,
+  horse: Pick<Horse, 'realmId'> | undefined,
+  name: unknown,
+): string | undefined {
+  if (!horse || horse.realmId !== realm.id) return 'not one of your horses'
+  const bad = nameProblem(name, HORSE_NAME_MAX_LENGTH)
   return bad ? `Name: ${bad}` : undefined
 }

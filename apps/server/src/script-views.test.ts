@@ -89,6 +89,7 @@ function setup() {
     y: 12,
     hunger: 90,
     health: 100,
+    name: 'Rowan',
     stats: { ...AVERAGE_HORSE_STATS },
     bornAt: 0,
   })

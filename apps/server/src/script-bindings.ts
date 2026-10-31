@@ -594,6 +594,8 @@ function residentActions(
       }),
     renameCity: ([cityId, name]) =>
       request('renameCity', { cityId: plain(cityId), name: plain(name) }),
+    renameHorse: ([horseId, name]) =>
+      request('renameHorse', { horseId: plain(horseId), name: plain(name) }),
     claimHorses: () => request('claimHorses', {}),
     roadLine: ([x, y]) =>
       request('roadLine', {
