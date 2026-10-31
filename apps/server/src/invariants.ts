@@ -114,6 +114,7 @@ import { horseOffersOnce } from './horse-grant.js'
 import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
+import { interruptedSound } from './defence.js'
 import { scriptLogsSound } from './script-log.js'
 
 /**
@@ -1907,6 +1908,7 @@ export const worldInvariants: Invariant[] = [
   gameDefaultFetchers,
   gameDefaultTargets,
   queuesSound,
+  interruptedSound,
   scriptLogsSound,
 ]
 

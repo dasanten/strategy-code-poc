@@ -1,4 +1,4 @@
-import { DEFAULT_SCRIPTS, TASKS, type TerrainMap, type WorldState } from '@csp/shared'
+import { DEFAULT_SCRIPTS, TASKS, type Task, type TerrainMap, type WorldState } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { ScriptRunner, runScriptOrder, taskOrder } from './script-runner.js'
@@ -10,6 +10,7 @@ import { ScriptRunner, runScriptOrder, taskOrder } from './script-runner.js'
  * by that id.
  */
 export function defaultScripts(terrain: TerrainMap, senders: OrderSender[]) {
+  const defaultScript = (userId: number, task: Task) => userId * 100 + TASKS.indexOf(task) + 1
   const host = {
     script: (id: number) => {
       const task = TASKS[(id % 100) - 1]
@@ -26,14 +27,12 @@ export function defaultScripts(terrain: TerrainMap, senders: OrderSender[]) {
     },
     sender: (userId: number) => senders.find((s) => s.userId === userId),
     explored: () => true,
+    defaultScript,
   }
   const kinds: Record<string, OrderKind> = {
     ...orderKinds,
     runScript: runScriptOrder(host),
-    task: taskOrder({
-      defaultScript: (userId, task) => userId * 100 + TASKS.indexOf(task) + 1,
-      script: host.script,
-    }),
+    task: taskOrder({ defaultScript, script: host.script }),
   }
   const runner = new ScriptRunner(terrain, host)
   return {

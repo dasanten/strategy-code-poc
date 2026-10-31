@@ -87,7 +87,7 @@ import {
   type CardSections,
   type ResidentGroup,
 } from './residents-view.js'
-import { doingLine } from './doing-view.js'
+import { doingLine, interruptedLine } from './doing-view.js'
 import {
   dropStep,
   moveStep,
@@ -523,7 +523,12 @@ export function ResidentsList({
                     title={doingLine(r, { scripts, buildings, residents: inSight })}
                   >
                     {doingLine(r, { scripts, buildings, residents: inSight })}
-                    {r.script && <small className="muted">{scriptName(r, scripts)}</small>}
+                    {r.script && (
+                      <small className="muted">
+                        {interruptedLine(r, { scripts, buildings, residents: inSight }) ??
+                          scriptName(r, scripts)}
+                      </small>
+                    )}
                   </span>
                   <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
                     <span
@@ -1247,6 +1252,13 @@ export function ResidentCard({
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
         <strong key="doing">{doingLine(r, { scripts, buildings, residents })}</strong>,
+        ...(r.interrupted
+          ? [
+              <span key="then" className="muted">
+                {interruptedLine(r, { scripts, buildings, residents })}
+              </span>,
+            ]
+          : []),
         `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
         ...(ridden ? [ridden] : []),
       ]}

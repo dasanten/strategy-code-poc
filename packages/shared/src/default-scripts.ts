@@ -9,6 +9,7 @@
  */
 import {
   BREED_FOOD,
+  DEFEND_CALM_TICKS,
   GET_FOOD_AT,
   GET_FOOD_TAKE,
   HORSE_FOOD_PER_DAY,
@@ -17,8 +18,11 @@ import {
 } from './balance.js'
 import { FOOTPRINT } from './footprint.js'
 
-/** The tasks that run a default script. */
-export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable'] as const
+/**
+ * The tasks that run a default script. Defend is never given: being struck starts it
+ * (`CONTEXT.md`: Defence script).
+ */
+export const TASKS = ['work', 'build', 'haul', 'tearDown', 'breed', 'feedStable', 'defend'] as const
 export type Task = (typeof TASKS)[number]
 
 /**
@@ -894,6 +898,88 @@ fn say(text) {
 }
 
 ${PICK_STABLE}
+
+${LOG_TEXT}
+`,
+  },
+  defend: {
+    name: 'Defend',
+    source: `// Defend (default): what I do when struck, in place of what I was doing,
+// which goes on once I end. Armed, I fight back at whoever struck me while
+// they are in sight, and end once they are dead, gone or out of sight.
+// Unarmed, I walk home to my city's town hall, and end there, or once no
+// blow has landed for calm ticks.
+let calm = ${DEFEND_CALM_TICKS} // ticks without a blow before I go back, fleeing
+
+if (armed()) {
+  fightBack()
+} else {
+  fleeHome()
+}
+
+// Whether I carry a weapon.
+fn armed() {
+  for (w of ["spear", "sword"]) {
+    let n = me.carried[w]
+    if (n != null && n > 0) { return true }
+  }
+  return false
+}
+
+// At whoever struck me, while they are in sight.
+fn fightBack() {
+  let foe = null
+  for (r of residents()) {
+    if (r.id == me.struckBy) { foe = r }
+  }
+  if (foe == null) {
+    end("the attacker is gone")
+    return
+  }
+  let o = me.order
+  if (o != null && o.kind == "attack" && o.targetId == foe.id) { return } // at it
+  let problem = attack(foe.id)
+  if (problem != null) {
+    end("can't fight back: " + problem)
+    return
+  }
+  doing("Defending: fighting back at " + foe.name)
+  log("fighting back at " + foe.name)
+}
+
+// Home to my city's town hall, until I am there or it has been calm.
+fn fleeHome() {
+  if (me.struckAt == null || tick - me.struckAt >= calm) {
+    end("no blow for a while")
+    return
+  }
+  let hall = townHall()
+  if (hall == null) {
+    end("no home to flee to")
+    return
+  }
+  let here = buildingAt(me.x, me.y)
+  if (here != null && here.id == hall.id) {
+    end("home")
+    return
+  }
+  if (me.order != null && me.order.kind == "walkTo") { return } // on my way
+  let problem = walkTo(hall.x, hall.y)
+  if (problem != null) {
+    end("can't flee home: " + problem)
+    return
+  }
+  doing("Defending: fleeing home")
+  log("fleeing home to " + placeName(hall))
+}
+
+// My city's town hall, if I see my city.
+fn townHall() {
+  for (c of cities()) {
+    if (c.id == me.cityId) { return building(c.townHallId) }
+  }
+  return null
+}
 
 ${LOG_TEXT}
 `,

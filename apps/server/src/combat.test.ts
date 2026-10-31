@@ -28,12 +28,16 @@ import { attackOrder } from './combat.js'
 import { attackOrdersSound, checkInvariants, deadLeaveLoot, type Invariant } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
+import { defaultScripts } from './test-default-scripts.js'
 import { addCity } from './test-terrain.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
 const terrain: TerrainMap = { size: 256, tiles: new Uint8Array(256 * 256).fill(Terrain.Plains) }
 const me = { userId: 7, account: { name: 'Mara', isAdmin: false } }
+const them = { userId: 8, account: { name: 'Tobin', isAdmin: false } }
+/** Struck, a Player's residents run their defence script, the Defend default. */
+const scripts = defaultScripts(terrain, [me, them])
 
 /** A world with realm r1 (Player 7, Leader a1) and realm r2 (Player 8, Leader b1). */
 function setup() {
@@ -64,10 +68,14 @@ function order(world: WorldState, queue: OrderQueue, residentId: string, targetI
   return answer.type === 'ack' ? 'ack' : (answer as { reason: string }).reason
 }
 
-/** Steps the world, keeping residents fed, and checks the combat invariants every tick. */
+/**
+ * Steps the world, keeping residents fed, after running scripts as the game does, and checks the
+ * combat invariants every tick.
+ */
 function run(world: WorldState, ticks = 1, walking?: Walking) {
   for (let i = 0; i < ticks; i++) {
     for (const r of world.residents) r.hunger = 100
+    expect(scripts.runAll(world)).toEqual([])
     stepWorld(world, terrain, walking)
     expect(checkInvariants(world, terrain, [deadLeaveLoot, attackOrdersSound])).toEqual([])
   }
@@ -221,13 +229,16 @@ describe('combat', () => {
     expect(dodged).toBeGreaterThan(0)
   })
 
-  it('an armed resident who is hit fights back', () => {
+  it('an armed resident who is hit fights back, by their defence script', () => {
     const { world, queue, b } = setup()
     b.carried = { spear: 1 }
-    b.order = { kind: 'workAt', buildingId: 'none', at: { x: 11, y: 10 }, progress: 0 }
     expect(order(world, queue, 'a1', 'b1')).toBe('ack')
     expect(untilHit(world, 'b1')).toBeDefined()
-    expect(b.order).toEqual({ ...attackOrder('a1', true, true), strike: expect.any(Number) })
+    // Idle before, they stand idle again once it ends.
+    expect(b.interrupted).toEqual({ order: null })
+    expect(b.script).toMatchObject({ task: 'defend' })
+    run(world)
+    expect(b.order).toMatchObject({ ...attackOrder('a1', true, true), strike: expect.any(Number) })
     expect(untilHit(world, 'a1')).toBeDefined()
   })
 
@@ -237,11 +248,25 @@ describe('combat', () => {
     b.cityId = 'c2'
     expect(order(world, queue, 'a1', 'b1')).toBe('ack')
     expect(untilHit(world, 'b1')).toBeDefined()
+    run(world)
     expect(b.order).toMatchObject({ kind: 'walkTo', target: { x: 30, y: 30 } })
-    expect(world.events.filter((e) => e.kind === 'fled')).toMatchObject([
-      { kind: 'fled', residentId: 'b1', userId: 8 },
-    ])
+    expect(b.script?.memory.doing).toBe('Defending: fleeing home')
     expect(untilHit(world, 'a1')).toBeUndefined()
+  })
+
+  it('a resident of an NPC city reacts by built-in orders: fighting back, or fleeing home', () => {
+    const { world, queue } = setup()
+    addCity(world, { id: 'c3', realmId: null, x: 30, y: 30 })
+    const v = resident(world, 'n1', null, 11, 10)
+    v.cityId = 'c3'
+    expect(order(world, queue, 'a1', 'n1')).toBe('ack')
+    expect(untilHit(world, 'n1')).toBeDefined()
+    expect(v.interrupted).toBeUndefined()
+    expect(v.order).toMatchObject({ kind: 'walkTo', target: { x: 30, y: 30 } })
+    v.carried = { spear: 1 }
+    v.order = null
+    expect(untilHit(world, 'n1')).toBeDefined()
+    expect(v.order).toMatchObject({ kind: 'attack', targetId: 'a1', defending: true })
   })
 
   it('a fight goes in both realm logs once', () => {
@@ -340,6 +365,7 @@ describe('allies in combat', () => {
     expect(world.crimes).toMatchObject([
       { kind: 'attack', victimOrg: 'r2', culprit: { residentId: 'a1', org: 'r1' } },
     ])
+    run(world)
     expect(b.order).toMatchObject({ kind: 'attack', targetId: 'a1', defending: true })
     expect(untilHit(world, 'a1')).toBeDefined()
     expect(world.crimes.map((c) => c.culprit.residentId)).toEqual(['a1'])
