@@ -24,6 +24,13 @@ const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
       <path d="M6 22c0-6 2.5-10 6-10s6 4 6 10z" fill="currentColor" />
     </>
   ),
+  horses: (
+    <>
+      <path d="M7 22l2-7-4-2 1-4 6-6 1 3c3 1 6 5 6 9v7" />
+      <path d="M12 3l3-1" />
+      <circle cx="10" cy="8" r="0.8" fill="currentColor" />
+    </>
+  ),
   armies: (
     <>
       <path d="M6 22V2" />
