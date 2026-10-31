@@ -521,6 +521,38 @@ describe('the group card’s other orders', () => {
     ])
   })
 
+  it('makes the first on each training ground teach there and the rest of them train', () => {
+    const site = { work: 0, delivered: {} }
+    const buildings = [
+      { id: 'g1', kind: 'trainingGround' as const, x: 10, y: 10 },
+      { id: 'g2', kind: 'trainingGround' as const, x: 20, y: 20 },
+      { id: 'g3', kind: 'trainingGround' as const, x: 30, y: 30, site },
+    ]
+    const rs = [
+      resident('a', 10, 10),
+      resident('b', 11, 11),
+      child('c', 10, 10),
+      resident('d', 20, 20),
+      resident('e', 30, 30),
+    ]
+    const teach = seenSend({ kind: 'teach', subject: 'strength' }, rs, { buildings })
+    expect(orders(teach)).toEqual([
+      { kind: 'teach', buildingId: 'g1', subject: 'strength', residentId: 'a' },
+      { kind: 'teach', buildingId: 'g2', subject: 'strength', residentId: 'd' },
+    ])
+    expect(why(teach)).toEqual([
+      ['c', 'a child'],
+      ['e', 'not at a training ground'],
+      ['b', 'A teaches there'],
+    ])
+    const train = seenSend({ kind: 'train' }, rs, { buildings })
+    expect(train.requests.map((q) => q.residentId)).toEqual(['a', 'b', 'd'])
+    expect(why(train)).toEqual([
+      ['c', 'a child'],
+      ['e', 'not at a training ground'],
+    ])
+  })
+
   it('drives and hauls with a different carriage each; riders don’t drive', () => {
     const carriages = [{ id: 'k1', x: 5, y: 5 }]
     const rs = [

@@ -18,6 +18,7 @@ import {
   type ScriptSummary,
   type StartParamValues,
   type Stock,
+  type TrainingSubject,
 } from '@csp/shared'
 import { appendRequests, storeAll } from './queue-view.js'
 import type { ActionId, OrderGroup } from './selection-view.js'
@@ -74,6 +75,11 @@ export type GroupOrder =
   | { kind: 'feedStable' }
   /** Each trains at the training ground they stand on (`CONTEXT.md`: Trainee). */
   | { kind: 'train' }
+  /**
+   * The first of them on each training ground teaches the subject there (`CONTEXT.md`: Teacher):
+   * one teacher per ground.
+   */
+  | { kind: 'teach'; subject: TrainingSubject }
   /** Each builds road or wall along the same line (`CONTEXT.md`: Road, Wall / Gate). */
   | {
       kind: 'line'
@@ -150,6 +156,7 @@ const ADULTS_ONLY: GroupOrder['kind'][] = [
   'work',
   'build',
   'feedStable',
+  'teach',
   'train',
   'line',
   'tearDown',
@@ -189,7 +196,8 @@ function stableOf(r: GroupResident, seen: GroupSeen, size: number) {
  * Carrying): children don't work, build or drive, and fetch and put down only Food; a partner
  * carrying a child doesn't work, build, tear down, breed or haul. Tile-bound orders go only to
  * those standing there: Work and Tear down at the building, Breed at the stable, Feed the stable
- * in one, Train on a training ground, Climb next to the wall, Drive and Haul on a carriage, Mount on a free horse's tile.
+ * in one, Teach and Train on a training ground, Climb next to the wall, Drive and Haul on a
+ * carriage, Mount on a free horse's tile.
  * Walking, attacking, running a script and stopping go to everyone. Board goes to those who could
  * board the carriage, room aside (`boarderProblem`), Get off to those aboard one. Queued (Shift
  * held), Work, Tear down and Breed also go to those away from the place, who walk there first,
@@ -230,6 +238,7 @@ export function groupSkip(
       if (order.kind === 'drive' && r.riding !== undefined) return 'dismount first to drive'
       if (onTile(r, seen.carriages).length === 0) return 'no carriage here'
       break
+    case 'teach':
     case 'train':
       if (!groundOf(r, seen, size)) return 'not at a training ground'
       break
@@ -299,9 +308,9 @@ function distance(r: { x: number; y: number }, t: { x: number; y: number }, size
  * who can take it (`groupSkip`). A walk-to spreads the group over distinct free tiles around the
  * target: the resident nearest it gets the nearest tile, and so on; with too few free tiles the
  * rest are skipped. Work and Build make each join the workplace or site. A horse, a carriage or
- * a pair to breed goes to one of them only: the first on its tile takes it, and the rest are
- * skipped once none is left. Board fills the carriage's seats in the group's order and skips the
- * rest, the carriage being full.
+ * a pair to breed, or teaching at a training ground, goes to one of them only: the first on its
+ * tile takes it, and the rest are skipped once none is left. Board fills the carriage's seats in
+ * the group's order and skips the rest, the carriage being full.
  *
  * Queued (Shift held), each request is appended to the resident's queue instead (`CONTEXT.md`:
  * Queue), as their own card appends it: Work, Tear down and Breed after a walk to the place,
@@ -352,6 +361,8 @@ export function groupRequests(
   let seats = order.kind === 'board' ? order.seats : 0
   // Horses and carriages handed out so far: one each.
   const taken = new Set<string>()
+  // Who of them teaches at each training ground so far, by its id.
+  const teachers = new Map<string, string>()
   const take = (r: GroupResident, things: readonly { id: string; x: number; y: number }[]) => {
     const thing = onTile(r, things).find((t) => !taken.has(t.id))
     if (thing) taken.add(thing.id)
@@ -446,6 +457,17 @@ export function groupRequests(
       case 'train':
         send(r, { kind: 'task', task: 'train', groundId: groundOf(r, seen, size)!.id })
         break
+      case 'teach': {
+        // One teacher per ground: the first of them there teaches, the rest are skipped.
+        const ground = groundOf(r, seen, size)!
+        const teacher = teachers.get(ground.id)
+        if (teacher) skip(r, `${teacher} teaches there`)
+        else {
+          teachers.set(ground.id, r.name)
+          send(r, { kind: 'teach', buildingId: ground.id, subject: order.subject })
+        }
+        break
+      }
       case 'feedStable':
         send(r, { kind: 'task', task: 'feedStable', stableId: stableOf(r, seen, size)!.id })
         break
@@ -551,6 +573,7 @@ export type GroupButton =
   | 'haul'
   | 'work'
   | 'feedStable'
+  | 'teach'
   | 'train'
   | 'build'
   | 'roadTo'
@@ -582,6 +605,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'haul', label: 'Haul route…', group: 'move' },
   { id: 'work', label: 'Work', group: 'work' },
   { id: 'feedStable', label: 'Feed the stable', group: 'work' },
+  { id: 'teach', label: 'Teach…', group: 'work' },
   { id: 'train', label: 'Train', group: 'work' },
   { id: 'build', label: 'Build', group: 'work' },
   { id: 'roadTo', label: 'Build road', group: 'work' },
@@ -618,6 +642,7 @@ export const GROUP_COUNTERPARTS: Record<
   haul: ['haul'],
   work: ['work'],
   feedStable: ['feedStable'],
+  teach: ['teach'],
   train: ['train'],
   build: ['build'],
   roadTo: ['roadTo'],
