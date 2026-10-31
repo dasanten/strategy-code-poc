@@ -14,6 +14,7 @@ import {
   breedingPair,
   buildingAt,
   buildingRealm,
+  crewTile,
   directivesFor,
   materialsNeeded,
   organizationLabel,
@@ -345,6 +346,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const time = (a: { x: number; y: number }, b: { x: number; y: number }) =>
       walkTime(world, terrain, context.explored, resident, a, b)
     queries.walkTime = ([a, b]) => time(spot(a, 'walkTime'), spot(b, 'walkTime'))
+    queries.crewTile = ([building]) => {
+      const id = (building as Record<string, Value> | null)?.id
+      const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
+      if (!b || !(ownBuilding(b) || inSight(b))) return null
+      return crewTile(world, b, resident, own, terrain.size)
+    }
     queries.storages = ([from, goods]) => {
       const wanted = goods === undefined || goods === null ? undefined : plain(goods)
       if (

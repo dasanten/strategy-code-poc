@@ -345,7 +345,9 @@ describe('Work from the UI', () => {
     const orders = queue()
     const runner = new ScriptRunner(terrain, host())
     // w1 is given Work from the UI, w2 the plain work-at order: equal residents, equal output.
+    // Each on a tile of the farm's own, so neither walks to spread out (Spreading over the footprint).
     world.residents[1]!.stats = structuredClone(world.residents[0]!.stats)
+    world.residents[1]!.x = 4
     orders.receive(world, sender(), 'a', {
       kind: 'task',
       task: 'work',

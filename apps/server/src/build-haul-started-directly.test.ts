@@ -113,9 +113,11 @@ describe('Build started directly', () => {
     s.give({ kind: 'runScript', scriptId: BUILD })
     s.give({ kind: 'runScript', scriptId: BUILD }, 'w2')
     s.tick()
+    // w1 stands on the site's footprint with nobody else of the crew: they stay on their tile
+    // (`CONTEXT.md`: Spreading over the footprint).
     expect(s.w1.script?.memory).toMatchObject({
       building: 'house',
-      at: { x: 6, y: 6 },
+      at: { x: 7, y: 7 },
       siteId: 'hs',
     })
     // Nothing to build on w2's tile: the script ends, and the realm log says why.

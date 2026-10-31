@@ -234,17 +234,17 @@ export function takenPlaces(world: WorldState, place: Building): number {
     (r) =>
       r.script?.memory.workplaceId === place.id ||
       (r.order?.kind === 'workAt' && r.order.buildingId === place.id) ||
-      (r.order?.kind === 'walkTo' && r.order.target.x === place.x && r.order.target.y === place.y),
+      (r.order?.kind === 'walkTo' && isAt(r.order.target, place)),
   ).length
 }
 
 /**
  * Puts one of the city's residents to work a workplace: they run the game's Work default for it
- * (`runNpcScripts`), which walks them there.
+ * (`runNpcScripts`), which walks them there and picks the footprint tile they stand on
+ * (`CONTEXT.md`: Spreading over the footprint).
  */
 export function putToWork(r: Resident, place: Building): void {
-  const at = { x: place.x, y: place.y }
-  r.script = { scriptId: 0, task: 'work', memory: { workplaceId: place.id, at } }
+  r.script = { scriptId: 0, task: 'work', memory: { workplaceId: place.id } }
 }
 
 /** Ends a resident's work: their order, and the Work default they run, if any. */
