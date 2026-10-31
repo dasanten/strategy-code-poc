@@ -199,6 +199,7 @@ describe('script views', () => {
       breedingPair: 'breedingPair(building("s1"))',
       storages: 'storages()',
       walkTime: 'walkTime(me, building("s1"))',
+      crewTile: 'crewTile(building("s1"))',
       tick: 'tick',
       mapSize: 'mapSize',
       random: 'random',

@@ -1,5 +1,6 @@
 import {
   FOOTPRINT,
+  isAt,
   OWN_FOOD,
   WORK_FOOD_KEPT,
   NPC_VILLAGE,
@@ -123,14 +124,11 @@ describe('NPC cities work and eat', () => {
     }
     child!.bornAt = world.tick - ticksForAge(1)
     stepNpcCities(world, terrain.size)
-    // On the Work default, which walks them there.
-    expect(adult!.script).toEqual({
-      scriptId: 0,
-      task: 'work',
-      memory: { workplaceId: farm.id, at: { x: farm.x, y: farm.y } },
-    })
+    // On the Work default, which walks them to a tile of the farm's footprint.
+    expect(adult!.script).toEqual({ scriptId: 0, task: 'work', memory: { workplaceId: farm.id } })
     runNpcScripts(world, terrain)
-    expect(adult!.order).toMatchObject({ kind: 'walkTo', target: { x: farm.x, y: farm.y } })
+    expect(adult!.order).toMatchObject({ kind: 'walkTo' })
+    expect(isAt((adult!.order as { target: { x: number; y: number } }).target, farm)).toBe(true)
     expect(child!.order).toBeNull()
   })
 
@@ -154,7 +152,8 @@ describe('NPC cities work and eat', () => {
     storageOf(world, city).stock = {}
     stepNpcCities(world, terrain.size)
     runNpcScripts(world, terrain)
-    expect(r.order).toMatchObject({ kind: 'walkTo', target: { x: farm.x, y: farm.y } })
+    expect(r.order).toMatchObject({ kind: 'walkTo' })
+    expect(isAt((r.order as { target: { x: number; y: number } }).target, farm)).toBe(true)
   })
 
   it('a Player’s city whose Leader died runs on its own, Player-only orders ended', () => {

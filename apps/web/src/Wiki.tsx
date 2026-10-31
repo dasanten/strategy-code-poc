@@ -853,11 +853,13 @@ export function Wiki() {
           does (a city's, or an outpost storage). Building goes in proportion to Strength, plus{' '}
           {pct(CONSTRUCTION_SKILL_EFFECT)} for each point of Construction (at most{' '}
           {num(CONSTRUCTION_SKILL_MAX)}, learned at {num(CONSTRUCTION_SKILL_PER_DAY)} a game day);
-          more builders finish sooner. Tearing down takes {pct(TEARDOWN_WORK_SHARE)} of the work and
-          leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a building's materials on the tile (all of an
-          unfinished site's). A road over a mountain can't be torn down while a carriage or a ridden
-          horse stands on it: the work waits until they leave. A horse left there unridden can't be
-          ridden off a road.
+          more builders finish sooner. A crew sent to work, build or breed at a building stands
+          spread over its footprint: each goes to the tile with the fewest of the crew on it, the
+          nearest on ties, and which tile they stand on changes nothing else. Tearing down takes{' '}
+          {pct(TEARDOWN_WORK_SHARE)} of the work and leaves {pct(TEARDOWN_MATERIALS_RETURNED)} of a
+          building's materials on the tile (all of an unfinished site's). A road over a mountain
+          can't be torn down while a carriage or a ridden horse stands on it: the work waits until
+          they leave. A horse left there unridden can't be ridden off a road.
         </p>
         <p>
           Tear down can be run directly too, with Run script or as a queue step: they tear down the
