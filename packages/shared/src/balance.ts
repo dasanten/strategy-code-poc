@@ -1825,8 +1825,12 @@ export const SCRIPT_MAX_VERSIONS = 40
  */
 export const SCRIPT_WRITES_PER_MINUTE = 60
 
-/** The most steps a queue holds (`CONTEXT.md`: Queue): plenty for a day's round. */
-export const QUEUE_MAX_STEPS = 20
+/**
+ * The most steps a queue holds (`CONTEXT.md`: Queue, Repeat block): a day's round, or a few steps
+ * repeated ten times over. With `QUEUE_STEP_MAX_CHARS` a full queue still fits the socket's
+ * largest frame (`realtime.maxPayloadBytes`).
+ */
+export const QUEUE_MAX_STEPS = 50
 
 /** The most a queue step's order request may hold, in characters of its JSON. */
 export const QUEUE_STEP_MAX_CHARS = 1000

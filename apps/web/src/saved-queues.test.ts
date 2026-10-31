@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { QueueStepRequest } from '@csp/shared'
-import { queueRows } from './queue-view.js'
+import { stepRow } from './queue-view.js'
+import { planRows, stepCount, unroll, withIds, type PlanItem } from './plan-blocks.js'
 import {
   SAVED_QUEUES_VERSION,
   gonePlace,
   list,
   load,
+  migrate,
   parseQueues,
   queuesKey,
   readQueues,
@@ -40,8 +42,8 @@ describe('saved queues', () => {
       { order: { kind: 'store', goods: ['stone'], to: 'b2' } },
     ])
     // Changing what was loaded leaves the saved queue as it was.
-    ;(loaded[2]!.order.goods as string[]).push('wood')
-    expect(load(queues, 'Mine run')[2]!.order.goods).toEqual(['stone'])
+    ;((loaded[2] as QueueStepRequest).order.goods as string[]).push('wood')
+    expect((load(queues, 'Mine run')[2] as QueueStepRequest).order.goods).toEqual(['stone'])
     expect(load(queues, 'Nothing here')).toEqual([])
   })
 
@@ -144,12 +146,65 @@ describe('steps whose place is gone', () => {
 
   it('flags a loaded step in the planner when its workplace was torn down', () => {
     const queues = save({}, 'Mine run', mineRun, 1000)
-    const steps = load(queues, 'Mine run').map((s, i) => ({ ...s, id: i + 1 }))
-    const q = { steps, current: -1 }
+    const steps = unroll(withIds(load(queues, 'Mine run'), 1).items)
+    const rowsOf = (lastSeen?: never[]) =>
+      steps.map((s) => stepRow({ ...s, id: s.id! }, false, { buildings: [], lastSeen }))
     // The mine (b1) is torn down: neither in sight nor last seen.
-    const rows = queueRows(q, { buildings: [], lastSeen: [{ id: 'b2', kind: 'storage' } as never] })
+    const rows = rowsOf([{ id: 'b2', kind: 'storage' } as never])
     expect(rows.map((r) => r.gone)).toEqual([undefined, 'the workplace is gone', undefined])
     // Without the last-seen map to check against, nothing is flagged.
-    expect(queueRows(q, { buildings: [] }).every((r) => r.gone === undefined)).toBe(true)
+    expect(rowsOf().every((r) => r.gone === undefined)).toBe(true)
+  })
+})
+
+describe('saved repeat blocks', () => {
+  // The epic's "Mine run" with its walk home and store wrapped in Repeat x5.
+  const repeated: PlanItem[] = [
+    mineRun[0]!,
+    mineRun[1]!,
+    { id: 7, repeat: 5, items: [{ id: 8, order: { kind: 'walkTo', x: 9, y: 3 } }, mineRun[2]!] },
+  ]
+
+  it('keeps a block as one, with its count, through storage', () => {
+    const storage = memory()
+    storeQueues(storage, 'r1', save({}, 'Mine run', repeated, 1000))
+    const loaded = load(readQueues(storage, 'r1'), 'Mine run')
+    expect(stepCount(loaded)).toBe(2 + 10)
+    expect(planRows(withIds(loaded, 1).items).map((r) => [r.kind, r.depth])).toEqual([
+      ['step', 0],
+      ['step', 0],
+      ['block', 0],
+      ['step', 1],
+      ['step', 1],
+    ])
+    expect(loaded[2]).toMatchObject({ repeat: 5 })
+    expect(JSON.stringify(loaded)).not.toContain('"id"')
+  })
+
+  it('reads the plain lists an older planner saved (version 1) as they were', () => {
+    const plain = {
+      name: 'Old run',
+      steps: [{ order: { kind: 'walkTo', x: 1, y: 1 } }],
+      savedAt: 5,
+    }
+    const text = JSON.stringify({ version: 1, queues: { 'Old run': plain } })
+    expect(parseQueues(text)).toEqual({ 'Old run': plain })
+    expect(migrate(1, { 'Old run': plain })).toEqual({ 'Old run': plain })
+    expect(migrate(SAVED_QUEUES_VERSION + 1, {})).toBeUndefined()
+    expect(SAVED_QUEUES_VERSION).toBe(2)
+  })
+
+  it('drops an entry with a block that repeats nothing or no whole number of times', () => {
+    const entry = (steps: unknown) => ({ name: 'Bad', steps, savedAt: 5 })
+    const walk = { order: { kind: 'walkTo', x: 1, y: 1 } }
+    for (const steps of [
+      [{ repeat: 2, items: [] }],
+      [{ repeat: 0, items: [walk] }],
+      [{ repeat: 1.5, items: [walk] }],
+      [{ repeat: 2, items: [{ order: 'walk' }] }],
+    ]) {
+      const text = JSON.stringify({ version: SAVED_QUEUES_VERSION, queues: { Bad: entry(steps) } })
+      expect(parseQueues(text)).toEqual({})
+    }
   })
 })

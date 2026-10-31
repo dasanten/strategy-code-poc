@@ -337,6 +337,19 @@
 .queue-step-gone {
   color: var(--ui-warn);
 }
+/* A repeat block's head (`CONTEXT.md`: Repeat block): its count; its steps follow, indented. */
+.queue-step.queue-block {
+  border-style: dashed;
+  border-left-style: solid;
+  border-left-color: var(--ui-line-strong);
+}
+.queue-block-count {
+  width: 4em;
+}
+/* How many steps the plan becomes after repeats, warned when over what a queue holds. */
+.queue-unrolled-over {
+  color: var(--ui-warn);
+}
 /* Save and Load for saved queues: the name to save under, and the list to load from. */
 .saved-queues {
   display: flex;

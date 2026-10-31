@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { QueueStepRequest } from '@csp/shared'
+import { copyItems, type PlanItem } from './plan-blocks.js'
 
 /**
  * The planner clipboard (`CONTEXT.md`: Planner clipboard): steps picked in a queue planner (tap;
@@ -9,25 +9,27 @@ import type { QueueStepRequest } from '@csp/shared'
  * sees it.
  */
 
-/** A step as the clipboard holds it: its order (places included) and duration, with no id. */
-export type ClipStep = Pick<QueueStepRequest, 'order' | 'minutes'>
+/**
+ * What the clipboard holds: steps (each its order, places included, and duration) and repeat
+ * blocks of them (`CONTEXT.md`: Repeat block), with no ids.
+ */
+export type ClipItem = PlanItem
 
-let held: readonly ClipStep[] = []
+let held: readonly ClipItem[] = []
 const listeners = new Set<() => void>()
 
-/** Puts copies of these steps on the clipboard, in place of whatever was there. */
-export function copy(steps: readonly QueueStepRequest[]): void {
-  held = steps.map(clipStep)
+/** Puts copies of these steps and blocks on the clipboard, in place of whatever was there. */
+export function copy(items: readonly PlanItem[]): void {
+  held = copyItems(items, false)
   for (const notify of listeners) notify()
 }
 
 /**
- * Fresh copies of the clipboard's steps, without ids: the planner they go into gives them new
- * ones (the server's `nextStepId` for a resident's queue, the plan's own for a group's). The
- * clipboard keeps its steps, so they can be pasted again.
+ * Fresh copies of the clipboard's steps and blocks, without ids: the planner they go into gives
+ * them new ones (`withIds`). The clipboard keeps them, so they can be pasted again.
  */
-export function paste(): QueueStepRequest[] {
-  return held.map(clipStep)
+export function paste(): PlanItem[] {
+  return copyItems(held, false)
 }
 
 export function isEmpty(): boolean {
@@ -38,14 +40,6 @@ export function isEmpty(): boolean {
 export function clear(): void {
   held = []
   for (const notify of listeners) notify()
-}
-
-/** A copy of the step as the clipboard holds it, sharing nothing with the original. */
-function clipStep(s: ClipStep): ClipStep {
-  return {
-    order: structuredClone(s.order),
-    ...(s.minutes === undefined ? {} : { minutes: s.minutes }),
-  }
 }
 
 function subscribe(listener: () => void): () => void {
@@ -79,22 +73,4 @@ export function pickStep(
   const from = Math.min(at, ...indexes)
   const to = Math.max(at, ...indexes)
   return ids.slice(from, to + 1)
-}
-
-/**
- * Where a paste goes: the index of the last picked step, after which the pasted steps are put,
- * or the last step's with none picked, so they go at the end.
- */
-export function pastePosition(ids: readonly number[], picked: readonly number[]): number {
-  const indexes = picked.map((p) => ids.indexOf(p)).filter((i) => i >= 0)
-  return indexes.length === 0 ? ids.length - 1 : Math.max(...indexes)
-}
-
-/**
- * The ids the pasted steps get, to pick them afterwards so a second paste goes after them:
- * `count` ids from the planner's `nextStepId` on, as the server (`editQueue`) and a group's plan
- * (`editPlan`) both hand them out, in the order of the steps without one.
- */
-export function pastedIds(nextStepId: number, count: number): number[] {
-  return Array.from({ length: count }, (_, i) => nextStepId + i)
 }

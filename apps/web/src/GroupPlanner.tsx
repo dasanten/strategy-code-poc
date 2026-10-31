@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react'
-import { queueStepsProblem, type Building, type ScriptSummary } from '@csp/shared'
-import { PasteSteps, QueueBlock, SavedQueueTools } from './Residents.js'
+import type { Building, ScriptSummary } from '@csp/shared'
+import { GivePlan, PasteSteps, QueueBlock, SavedQueueTools } from './Residents.js'
 import { editPlan, EMPTY_PLAN, type QueuePlan } from './queue-view.js'
 
 /**
  * The queue planner on the group card (`CONTEXT.md`: Group, Planning for a group). With no plan
  * open, Add step adds the step to each member's own queue. A plan open is a queue held in this
- * browser, edited as a resident's queue is (Add step, reorder, durations, loop); Give to all makes
- * each member's queue a copy of it. Their queues stay their own afterwards.
+ * browser, edited as a resident's queue is (Add step, reorder, durations, loop, repeat blocks);
+ * Give to all makes each member's queue a copy of it, its repeat blocks unrolled. Their queues
+ * stay their own afterwards.
  */
 export function GroupPlanner({
   plan,
@@ -49,17 +50,16 @@ export function GroupPlanner({
         {addStep}
       </>
     )
-  const problem = plan.steps.length === 0 ? 'no steps yet' : queueStepsProblem(plan.steps)
   return (
     <>
-      {plan.steps.length > 0 ? (
+      {plan.items.length > 0 ? (
         <QueueBlock
           title="Plan"
           queue={plan}
           scripts={scripts}
           buildings={buildings}
           lastSeen={lastSeen}
-          onEdit={(steps, loop) => onPlan(editPlan(plan, steps, loop))}
+          onEdit={(items, loop) => onPlan(editPlan(plan, items, loop))}
           realm={realm}
         />
       ) : (
@@ -67,28 +67,22 @@ export function GroupPlanner({
           <p className="muted small">
             Nothing planned yet. Plan steps with Add step, paste copied ones or load a saved queue.
           </p>
-          <PasteSteps onPaste={(steps) => onPlan(editPlan(plan, steps))} />
+          <PasteSteps onPaste={(items) => onPlan(editPlan(plan, items))} />
           <SavedQueueTools
             realm={realm}
             steps={[]}
-            onLoad={(steps) => onPlan(editPlan(plan, steps))}
+            onLoad={(items) => onPlan(editPlan(plan, items))}
           />
         </>
       )}
       {addStep}
-      <div className="order-buttons">
-        <button type="button" className="primary" disabled={problem !== undefined} onClick={onGive}>
-          Give to all
-        </button>
-        <button type="button" onClick={() => onPlan(undefined)}>
-          Discard plan
-        </button>
-      </div>
-      <p className="muted small">
-        {problem && plan.steps.length > 0
-          ? `Can’t give it yet: ${problem}.`
-          : 'Give to all makes each one’s queue a copy of the plan, ending what they do. One who can’t do a step skips it when its turn comes.'}
-      </p>
+      <GivePlan
+        plan={plan}
+        give="Give to all"
+        note="Give to all makes each one’s queue a copy of the plan, ending what they do. One who can’t do a step skips it when its turn comes."
+        onGive={onGive}
+        onDiscard={() => onPlan(undefined)}
+      />
     </>
   )
 }

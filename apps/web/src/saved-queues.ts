@@ -1,18 +1,22 @@
-import type { Building, OrderRequest, QueueStepRequest } from '@csp/shared'
-import type { ClipStep } from './planner-clipboard.js'
+import type { Building, OrderRequest } from '@csp/shared'
+import { copyItems, type PlanItem } from './plan-blocks.js'
 
 /**
  * Saved queues (`CONTEXT.md`: Saved queue): the planner's steps saved under a name, to load onto
  * any planner later. They are kept per browser, like saved groups, so the server never sees them.
  * Load appends copies of the steps after the planned ones; the planner gives them new ids. A saved
  * step keeps its places, and one whose place is gone is flagged (`gonePlace`) and still given: the
- * server skips it when its turn comes.
+ * server skips it when its turn comes. A repeat block is saved as one (`CONTEXT.md`: Repeat
+ * block), so a loaded "Mine run" keeps its Repeat x5.
  */
 
-/** A queue saved under a name: its steps as the clipboard holds them, and when it was saved. */
+/**
+ * A queue saved under a name: its steps and repeat blocks as the clipboard holds them (no ids),
+ * and when it was saved.
+ */
 export interface SavedQueue {
   name: string
-  steps: ClipStep[]
+  steps: PlanItem[]
   /** When it was saved, in milliseconds since 1970 (the browser's clock). */
   savedAt: number
 }
@@ -22,9 +26,9 @@ export type SavedQueues = Record<string, SavedQueue>
 
 /**
  * The shape the browser keeps them in. A later planner that saves another shape bumps it and reads
- * the old one into the new.
+ * the old one into the new (`migrate`). 1: plain steps; 2: steps and repeat blocks.
  */
-export const SAVED_QUEUES_VERSION = 1
+export const SAVED_QUEUES_VERSION = 2
 
 /** Where the browser keeps a realm's saved queues. */
 export const queuesKey = (realm: string) => `csp.queues.${realm}`
@@ -33,17 +37,20 @@ export const queuesKey = (realm: string) => `csp.queues.${realm}`
 export function save(
   queues: SavedQueues,
   name: string,
-  steps: readonly QueueStepRequest[],
+  steps: readonly PlanItem[],
   savedAt: number,
 ): SavedQueues {
   const key = name.trim()
   if (!key || steps.length === 0) return queues
-  return { ...queues, [key]: { name: key, steps: steps.map(savedStep), savedAt } }
+  return { ...queues, [key]: { name: key, steps: copyItems(steps, false), savedAt } }
 }
 
-/** Fresh copies of the steps saved under `name`, without ids; none when nothing is saved there. */
-export function load(queues: SavedQueues, name: string): QueueStepRequest[] {
-  return (queues[name]?.steps ?? []).map(savedStep)
+/**
+ * Fresh copies of the steps and blocks saved under `name`, without ids; none when nothing is
+ * saved there.
+ */
+export function load(queues: SavedQueues, name: string): PlanItem[] {
+  return copyItems(queues[name]?.steps ?? [], false)
 }
 
 /** The queues without the one saved under `name`. */
@@ -58,17 +65,10 @@ export function list(queues: SavedQueues): SavedQueue[] {
   return Object.values(queues).sort((a, b) => b.savedAt - a.savedAt || a.name.localeCompare(b.name))
 }
 
-/** A copy of the step as a saved queue holds it: order and duration, sharing nothing. */
-function savedStep(s: ClipStep): ClipStep {
-  return {
-    order: structuredClone(s.order),
-    ...(s.minutes === undefined ? {} : { minutes: s.minutes }),
-  }
-}
-
 /**
  * The saved queues read back from storage: none when it holds nothing usable, and without any
- * entry that isn't a saved queue (a step that isn't an order, a duration that isn't whole minutes).
+ * entry that isn't a saved queue (a step that isn't an order, a duration that isn't whole minutes,
+ * a block that repeats nothing). An older shape is read into this one.
  */
 export function parseQueues(text: string | null): SavedQueues {
   if (!text) return {}
@@ -78,23 +78,47 @@ export function parseQueues(text: string | null): SavedQueues {
   } catch {
     return {}
   }
-  if (!isObject(raw) || raw.version !== SAVED_QUEUES_VERSION || !isObject(raw.queues)) return {}
+  if (!isObject(raw) || !isObject(raw.queues)) return {}
+  const stored = migrate(raw.version, raw.queues)
+  if (!stored) return {}
   const queues: SavedQueues = {}
-  for (const [name, entry] of Object.entries(raw.queues)) {
+  for (const [name, entry] of Object.entries(stored)) {
     const queue = savedQueue(name, entry)
     if (queue) queues[name] = queue
   }
   return queues
 }
 
+/**
+ * The saved queues of an older shape in this one, or undefined for a shape this planner doesn't
+ * know (a later one). 1 → 2: a list of plain steps is already a list of steps and blocks.
+ */
+export function migrate(
+  version: unknown,
+  queues: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (version === 1 || version === SAVED_QUEUES_VERSION) return queues
+  return undefined
+}
+
 function savedQueue(name: string, entry: unknown): SavedQueue | undefined {
   if (!isObject(entry) || entry.name !== name || !Number.isFinite(entry.savedAt)) return undefined
   const { steps } = entry
-  if (!Array.isArray(steps) || steps.length === 0 || !steps.every(isStep)) return undefined
-  return { name, steps: steps.map(savedStep), savedAt: entry.savedAt as number }
+  if (!Array.isArray(steps) || steps.length === 0 || !steps.every(isItem)) return undefined
+  return { name, steps: copyItems(steps as PlanItem[], false), savedAt: entry.savedAt as number }
 }
 
-function isStep(s: unknown): s is ClipStep {
+function isItem(s: unknown): s is PlanItem {
+  if (isObject(s) && 'repeat' in s) {
+    const { repeat, items } = s
+    return (
+      Number.isInteger(repeat) &&
+      (repeat as number) >= 1 &&
+      Array.isArray(items) &&
+      items.length > 0 &&
+      items.every(isItem)
+    )
+  }
   if (!isObject(s) || !isObject(s.order) || typeof s.order.kind !== 'string') return false
   return s.minutes === undefined || (Number.isInteger(s.minutes) && (s.minutes as number) > 0)
 }
