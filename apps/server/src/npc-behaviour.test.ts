@@ -19,6 +19,7 @@ import { describe, expect, it } from 'vitest'
 import { checkInvariants } from './invariants.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
+import { planCity } from './npc-plan.js'
 import { mulberry32 } from './residents.js'
 import { runNpcScripts } from './script-runner.js'
 import { endRealm } from './survival.js'
@@ -116,12 +117,16 @@ describe('NPC cities work and eat', () => {
     const { world, terrain, city } = village()
     const farm = farmOf(world, city)
     const storage = storageOf(world, city)
+    // Two of them: the adult is the farmer who feeds them.
     const [adult, child] = world.residents
+    world.residents = [adult!, child!]
     for (const r of [adult!, child!]) {
       Object.assign(r, { x: storage.x, y: storage.y, order: null })
       delete r.script
     }
     child!.bornAt = world.tick - ticksForAge(1)
+    // The city decides in its planning pass (ADR 0016) and hands the jobs out in the tick.
+    planCity(world, city)
     stepNpcCities(world, terrain.size)
     // On the Work default, which walks them there.
     expect(adult!.script).toEqual({
@@ -148,10 +153,13 @@ describe('NPC cities work and eat', () => {
     delete r.script
 
     storageOf(world, city).stock = { food: 1000 }
+    planCity(world, city)
     stepNpcCities(world, terrain.size)
     expect(workersOf(world, camp)).toEqual([r])
 
     storageOf(world, city).stock = {}
+    planCity(world, city)
+    stepNpcCities(world, terrain.size)
     stepNpcCities(world, terrain.size)
     runNpcScripts(world, terrain)
     expect(r.order).toMatchObject({ kind: 'walkTo', target: { x: farm.x, y: farm.y } })

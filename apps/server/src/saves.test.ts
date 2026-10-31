@@ -136,7 +136,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(64)
+    expect(WORLD_FORMAT_VERSION).toBe(65)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -150,6 +150,15 @@ describe('world saves', () => {
     const migrated = migrateWorld(old, 39, { terrain: smallTerrain() })
     expect(migrated.lastSeen).toEqual({})
     expect(migrated.buildings).toEqual(world.buildings)
+  })
+
+  it('migrates a format 64 world: every city starts without a plan (migration 64 → 65)', () => {
+    const { world, terrain } = worldWithPost()
+    const old: Partial<typeof world> = structuredClone(world)
+    delete old.cityPlans
+    const migrated = migrateWorld(old, 64, { terrain }, migrations, 65)
+    expect(migrated).toEqual({ ...world, cityPlans: {} })
+    expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
   it('migrates a format 52 world: every Player starts with their Horse offer unclaimed (migration 52 → 53)', () => {

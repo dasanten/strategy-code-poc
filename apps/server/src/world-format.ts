@@ -16,7 +16,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 64
+export const WORLD_FORMAT_VERSION = 65
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -234,6 +234,10 @@ export const migrations: Record<number, MigrationStep> = {
   // `RunningScript.waitingSince`). No script could wait before, so every one runs every tick and
   // the step leaves them as they are.
   63: (state) => state,
+  // Cities the game runs keep a plan in the world (`CONTEXT.md`: NPC city; ADR 0016;
+  // `WorldState.cityPlans`). Every city starts without one: its first planning pass, within a
+  // game hour, fills it.
+  64: (state) => ({ ...(state as object), cityPlans: {} }),
 }
 
 export class WorldFormatError extends Error {}

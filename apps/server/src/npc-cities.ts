@@ -42,8 +42,9 @@ const footprintRadius = (kind: NpcCitySize) => (kind.size / 2 + FARM_RING) * Mat
 /**
  * Whether an NPC city of `kind` with its top-left wall tile at (x, y) fits there: its square and
  * the ring around it all Plains with nothing on them, room for its farms outside the wall, at
- * least `NPC_CITY_MIN_DISTANCE` from every city, and out of sight of every Player's resident
- * (`CONTEXT.md`: NPC city, Sight).
+ * least `NPC_CITY_MIN_DISTANCE` from every city, and, unless `outOfSight` is false (a daughter's
+ * site, `CONTEXT.md`: Founding), out of sight of every Player's resident (`CONTEXT.md`: NPC city,
+ * Sight).
  */
 export function npcSiteFits(
   world: WorldState,
@@ -52,6 +53,7 @@ export function npcSiteFits(
   x: number,
   y: number,
   ground: Ground = takenGround(world, terrain),
+  outOfSight = true,
 ): boolean {
   const size = terrain.size
   const centre = { x: x + kind.size / 2, y: y + kind.size / 2 }
@@ -61,7 +63,7 @@ export function npcSiteFits(
   }
   // No tile of it within sight of a Player's resident.
   const unseen = SIGHT_RANGE + footprintRadius(kind)
-  for (const r of world.residents) {
+  for (const r of outOfSight ? world.residents : []) {
     if (r.owner !== null && wrapDistance(size, r, centre) <= unseen) return false
   }
   for (let ty = y - FARM_RING; ty < y + kind.size + FARM_RING; ty++) {
