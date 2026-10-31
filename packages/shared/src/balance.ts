@@ -365,6 +365,13 @@ export const WALL_ENCLOSES_MAX = 160_000
 export const SIGHT_RANGE = 48
 
 /**
+ * How often each realm's Last seen is brought up to date, in ticks (`CONTEXT.md`: Last seen).
+ * Realms are staggered by their id, so about one in this many refreshes on a tick; a building
+ * that leaves sight between two refreshes is remembered as it was up to this many ticks earlier.
+ */
+export const LAST_SEEN_EVERY_TICKS = 5
+
+/**
  * NPC villages placed on a full-size map (`CONTEXT.md`: NPC city); a smaller map gets fewer, by
  * its area. Fewer are placed when the map has no room left for them.
  */

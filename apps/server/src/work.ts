@@ -27,6 +27,7 @@ import { orderedResident } from './order-sender.js'
 import type { OrderKind } from './orders.js'
 import { noteMade } from './goods-made.js'
 import { dropGoods } from './survival.js'
+import { worldIndex } from './world-index.js'
 
 /**
  * An action a resident with a work-at order requests: put a tick's work into the workplace on
@@ -95,11 +96,12 @@ export function requestWork(world: WorldState): WorkAction[] {
  */
 export function resolveWork(world: WorldState, actions: WorkAction[]): void {
   const workers = new Map<string, number>()
+  const index = worldIndex(world)
   for (const a of actions) {
-    const r = world.residents.find((x) => x.id === a.residentId)
+    const r = index.residentById(a.residentId)
     const o = r?.order
     if (!r || o?.kind !== 'workAt') continue
-    const place = world.buildings.find((b) => b.id === o.buildingId)
+    const place = index.buildingById(o.buildingId)
     const count = workers.get(o.buildingId) ?? 0
     const max = place ? (MAX_WORKERS[place.kind] ?? 0) : 0
     const good = place && workplaceGood(world, place, o.makes)

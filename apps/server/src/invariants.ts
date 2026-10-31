@@ -2001,7 +2001,26 @@ export function checkInvariants(
   return invariants.flatMap((inv) => inv.check(world, terrain))
 }
 
-/** Whether this tick's invariants get checked, given the share of ticks to sample. */
+/**
+ * The world invariants a tick checks (ADR 0004). With every tick sampled, all of them; otherwise,
+ * with `round = 1 / sampleRate`, the slice whose index matches `tick % round`: every invariant
+ * still runs once per `round` ticks, and no tick runs them all.
+ */
+export function invariantsForTick(
+  tick: number,
+  sampleRate: number,
+  invariants: Invariant[] = worldInvariants,
+): Invariant[] {
+  if (sampleRate >= 1) return invariants
+  if (!(sampleRate > 0)) return []
+  const round = Math.round(1 / sampleRate)
+  return invariants.filter((_, i) => i % round === tick % round)
+}
+
+/**
+ * Whether this tick gets the checks that need its before and after (the goods tally and the
+ * script runs), given the share of ticks to sample.
+ */
 export function shouldCheckInvariants(sampleRate: number, rand: () => number = Math.random) {
   return sampleRate >= 1 || rand() < sampleRate
 }

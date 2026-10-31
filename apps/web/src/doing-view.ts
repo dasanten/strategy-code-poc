@@ -35,22 +35,27 @@ export interface DoingOf {
  * their task and current order have them doing, "Building a house: fetching 10 wood from the
  * storage". The script's name is not part of it; the card and list show it on a line of its own.
  * A passenger with no order is "Aboard a carriage", heading where its driver among `residents`
- * drives it.
+ * drives it. While the script waits on the order (`CONTEXT.md`: Running a script, Waiting), the
+ * line ends in "· script waiting".
  */
-export function doingLine(
+export function doingLine(r: DoingOf, seen: DoingSeen): string {
+  const line = doingOfOrder(r, seen)
+  return r.script?.waiting ? `${line} · script waiting` : line
+}
+
+/** What else the Doing line is worked out from (`doingLine`). */
+interface DoingSeen {
+  scripts?: readonly ScriptSummary[]
+  buildings?: readonly Pick<Building, 'id' | 'kind'>[]
+  residents?: readonly Pick<Resident, 'order'>[]
+  /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
+  arrives?: number
+}
+
+/** The Doing line but for the script waiting (`doingLine`). */
+function doingOfOrder(
   r: DoingOf,
-  {
-    scripts = [],
-    buildings = [],
-    residents = [],
-    arrives,
-  }: {
-    scripts?: readonly ScriptSummary[]
-    buildings?: readonly Pick<Building, 'id' | 'kind'>[]
-    residents?: readonly Pick<Resident, 'order'>[]
-    /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
-    arrives?: number
-  },
+  { scripts = [], buildings = [], residents = [], arrives }: DoingSeen,
 ): string {
   if (r.script?.doing) return r.script.doing
   if (r.aboard !== undefined && !r.order) return aboardLine(r, residents)

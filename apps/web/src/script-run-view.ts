@@ -20,6 +20,14 @@ export function stepsText(run: ScriptRunSteps): string {
   return used
 }
 
+/**
+ * A waiting script's line (`CONTEXT.md`: Running a script, Waiting): "Waiting until the order
+ * ends · began 5 minutes ago".
+ */
+export function waitingText(since: number, tick: number): string {
+  return `Waiting until the order ends · began ${agoText(tick - since)}`
+}
+
 /** Where and when the error was: "Line 3, column 9 · 5 minutes ago". */
 export function errorWhen(error: ScriptRunError, tick: number): string {
   const where = error.line === undefined ? '' : `Line ${error.line}, column ${error.column} · `

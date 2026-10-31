@@ -1,5 +1,4 @@
 import {
-  commanderOf,
   commands,
   MAP_SIZE,
   QUEUE_STEP_KINDS,
@@ -20,6 +19,7 @@ import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import type { OrderKind, OrderSender } from './orders.js'
 import { realmOf } from './starting-city.js'
+import { worldIndex } from './world-index.js'
 
 /**
  * Queues (`CONTEXT.md`: Queue). The queue order gives a resident a list of steps, each an order
@@ -266,7 +266,8 @@ export class QueueRunner {
       const sender = realm && this.host.sender(realm.userId)
       // Taken into an army, they follow its orders instead.
       const inArmy = world.armies.some((a) => a.memberIds.includes(r.id))
-      if (!sender || commanderOf(world, r) !== q.realmId || inArmy) {
+      // Looked up afresh for each: a step started before may have handed someone over.
+      if (!sender || worldIndex(world).commanderOf(r) !== q.realmId || inArmy) {
         delete r.queue
         continue
       }

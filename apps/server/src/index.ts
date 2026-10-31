@@ -21,7 +21,7 @@ import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
 import { Walking } from './walking.js'
 import { setScriptParamOrder } from './script-params.js'
-import { loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
+import { WorldSaver, loadOrCreateWorld, saveWorld } from './saves.js'
 import {
   ScriptRunner,
   armyRunScriptOrder,
@@ -109,6 +109,11 @@ const queues = new QueueRunner(scriptHost, kinds, terrain)
 const scripts = new ScriptRunner(terrain, scriptHost)
 const sight = new SightTracker()
 const walking = new Walking(terrain)
+const saver = new WorldSaver(db, {
+  skipped: (tick, savingTick) =>
+    logger.warn({ tick, savingTick }, 'save skipped: the last one is still being written'),
+  failed: (tick, err) => logger.error({ err, tick }, 'save failed'),
+})
 // Players who haven't edited a default script run the game's current default from now on.
 syncDefaultScripts(db)
 // Players whose scripts read a field a script view dropped since the last start are told so.
@@ -137,15 +142,19 @@ const loop = setInterval(() => {
     walking,
     invariantSampleRate: config.invariantSampleRate,
     slowTickMs: config.slowTickMs,
+    finish: (timer) => {
+      timer.time('territory', () => territory.update(world, terrain))
+      const grown = timer.time('sight', () => sight.update(world, explored))
+      timer.time('broadcast', () => realtime.broadcastTick(grown))
+      if (world.tick % config.saveEveryTicks === 0) {
+        timer.time('save', () => {
+          saver.start(world)
+          explored.save(db)
+        })
+      }
+    },
   })
   tagWorld(world)
-  territory.update(world, terrain)
-  realtime.broadcastTick(sight.update(world, explored))
-  if (world.tick % config.saveEveryTicks === 0) {
-    saveWorld(db, world)
-    explored.save(db)
-    pruneSaves(db)
-  }
 }, TICK_MS)
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -162,7 +171,7 @@ const daily = setInterval(() => {
 async function shutdown() {
   clearInterval(loop)
   clearInterval(daily)
-  saveWorld(db, world)
+  saver.saveNow(world)
   explored.save(db)
   realtime.close()
   await app.close()
