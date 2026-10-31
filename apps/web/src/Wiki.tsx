@@ -97,6 +97,13 @@ import {
   NPC_CITY_WONT_SELL_STANDING,
   FOOD_PER_DAY,
   NPC_BUILDERS,
+  NPC_CITY_MIN_DISTANCE,
+  NPC_FOUND_FOOD_DAYS,
+  NPC_FOUND_GIVE_UP_DAYS,
+  NPC_FOUND_REACH,
+  NPC_FOUND_STANDING,
+  NPC_FULL_DAYS,
+  NPC_VILLAGE,
   NPC_NODE_REACH,
   NPC_TRADER_GIVE_UP_DAYS,
   NPC_TRADER_REACH,
@@ -626,6 +633,12 @@ export function Wiki() {
           the east side and you come back in from the west. Walking once around it on plains takes
           an average resident {duration(MAP_SIZE * plainsTicksPerTile)}. A resident sees{' '}
           {num(SIGHT_RANGE)} tiles around them.
+        </p>
+        <p>
+          The world fills in by itself: an NPC city that has grown full sends some of its people to
+          found a new village on free land up to {num(NPC_FOUND_REACH)} tiles away (see NPC cities
+          under Trade &amp; prices), which then grows like any other. Land within a realm's
+          territory is never founded on.
         </p>
       </Section>
 
@@ -1336,6 +1349,22 @@ export function Wiki() {
           to the storage. One trader at a time, and none while Food runs short or armed outsiders
           stand in its area. Nothing protects them on the way; a trader not back after{' '}
           {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
+        </p>
+        <p>
+          A city is full once it has had spare hands with nothing to do and nothing short of its
+          reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
+          materials above its reserve. A full city founds a daughter. Once a game day it looks for a
+          free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with
+          room for a village and on no realm's territory, nearest a node of a material it has none
+          of in reach. A founding party of {num(NPC_VILLAGE.residents)} adults, one of them armed,
+          sets out carrying the materials and Food for twice the walk and{' '}
+          {days(NPC_FOUND_FOOD_DAYS)} there, and builds the town hall, which founds the daughter: an
+          NPC city of its own with a name from the game. It then builds its storage, a farm and a
+          house, and once its storage holds the Wood of its reserve, its first wall, a ring{' '}
+          {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
+          a standing of {num(NPC_FOUND_STANDING)} toward each other, which fades like any other, and
+          share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
+          gives up and walks home. Trading posts and the Trade Organization's HQ never found cities.
         </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.

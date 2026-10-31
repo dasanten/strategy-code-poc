@@ -32,6 +32,7 @@ import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
 import { knownThieves } from './crimes.js'
 import { stopWork, walkTo } from './npc-behaviour.js'
+import { foundingParty } from './npc-founding.js'
 import { startWork } from './work.js'
 
 /**
@@ -167,7 +168,9 @@ function keepSoldiers(
   target: number,
   storage: Building | undefined,
 ): void {
-  const adults = people.filter((r) => canWork(r, world.tick))
+  // The armed member of a founding party goes with it (`CONTEXT.md`: Founding), not counted here.
+  const party = new Set(foundingParty(world.cityPlans[city.id]))
+  const adults = people.filter((r) => canWork(r, world.tick) && !party.has(r.id))
   const soldiers = adults.filter(isArmed)
   for (const r of soldiers) {
     if (r.order?.kind === 'workAt') stopWork(r)

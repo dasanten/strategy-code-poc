@@ -35,6 +35,10 @@ import {
   footprintTiles,
   FOOTPRINT,
   NPC_WALL_TILES_PER_TRIP,
+  NPC_BUILDERS,
+  NPC_VILLAGE,
+  npcCityStock,
+  npcReserve,
 } from '@csp/shared'
 import { hqGrows, hqHouseTile, hqProject, hqRings } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
@@ -304,6 +308,39 @@ export function nextProject(
   return want && materialsFirst(world, city, home, terrain, rings, want, new Set())
 }
 
+/** What the residents of a city carry, all together. */
+function carriedBy(world: WorldState, city: City): Stock {
+  const out: Stock = {}
+  for (const r of world.residents) {
+    if (r.cityId !== city.id) continue
+    for (const [good, n] of Object.entries(r.carried) as [Good, number][]) {
+      out[good] = (out[good] ?? 0) + n
+    }
+  }
+  return out
+}
+
+/**
+ * How many of a city's adults build at once (`CONTEXT.md`: NPC city): `NPC_BUILDERS`; an NPC city with no
+ * storage yet (a daughter, `CONTEXT.md`: Founding) lets everyone who can, since the materials are on
+ * them and there is nowhere else to put them.
+ */
+export function npcBuilders(world: WorldState, city: City): number {
+  const storage = world.buildings.some(
+    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
+  )
+  return storage || city.tradeOrg ? NPC_BUILDERS : Infinity
+}
+
+/**
+ * Whether an NPC city has no finished farm yet (a daughter, `CONTEXT.md`: Founding): it then
+ * takes on its project even while Food runs short, since only a farm ends that.
+ */
+export function noFarm(world: WorldState, city: City): boolean {
+  if (city.tradeOrg) return false
+  return !world.buildings.some((b) => b.kind === 'farm' && b.cityId === city.id && !b.site)
+}
+
 /** A project of building something. */
 type BuildProject = Extract<Project, { kind: 'build' }>
 
@@ -326,8 +363,10 @@ function materialsFirst(
   const storage = world.buildings.find(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
+  // Without a storage yet (a daughter, `CONTEXT.md`: Founding), what its people carry.
+  const have = storage || city.tradeOrg ? (storage?.stock ?? {}) : carriedBy(world, city)
   for (const [good, units] of Object.entries(need) as [Good, number][]) {
-    if ((storage?.stock?.[good] ?? 0) >= units || makes(world, city, good)) continue
+    if ((have[good] ?? 0) >= units || makes(world, city, good)) continue
     const first = chainProject(world, city, home, terrain, rings, good, seen)
     if (first) return materialsFirst(world, city, home, terrain, rings, first, seen)
   }
@@ -406,19 +445,39 @@ function wanted(
 ): Extract<Project, { kind: 'build' }> | undefined {
   const size = terrain.size
   const own = new Set(city.workplaceIds)
-  const ring = rings?.expanding ? newWall(world, home, terrain, rings) : []
+  const ring = rings?.expanding
+    ? newWall(world, home, terrain, rings)
+    : firstWall(world, city, home, terrain, rings)
   const begun = world.buildings.find(
     (b) =>
       b.site &&
       (((b.kind === 'farm' || b.kind === 'stable') && b.cityId === city.id) ||
         own.has(b.id) ||
-        (b.kind === 'house' && inCityArea(world, city, b.x, b.y, size))),
+        ((b.kind === 'house' || b.kind === 'storage') && inCityArea(world, city, b.x, b.y, size))),
   )
   const wallSite = ring.find((t) => t.site)
   const site = begun ?? wallSite?.site
   if (site) return { kind: 'build', building: site.kind, x: site.x, y: site.y }
   const at = (building: BuildingKind, t: { x: number; y: number } | undefined) =>
     t && { kind: 'build' as const, building, x: t.x, y: t.y }
+  if (!city.tradeOrg) {
+    // A daughter (`CONTEXT.md`: Founding) starts with its town hall alone.
+    const plan = rings ?? firstRing()
+    const has = (kind: BuildingKind) =>
+      world.buildings.some((b) => b.kind === kind && !b.site && b.cityId === city.id)
+    if (!has('storage')) {
+      const storage = at('storage', houseTile(world, city, home, terrain, plan, 'storage'))
+      if (storage) return storage
+    }
+    if (!has('farm')) {
+      const farm = at('farm', farmTile(world, home, terrain, plan))
+      if (farm) return farm
+    }
+    if (!has('house')) {
+      const house = at('house', houseTile(world, city, home, terrain, plan))
+      if (house) return house
+    }
+  }
   if (farmsFull(world, city)) {
     const farm = at('farm', farmTile(world, home, terrain, rings))
     if (farm) return farm
@@ -439,6 +498,38 @@ function wanted(
   }
   const next = ring.find((t) => !t.done)
   return next && { kind: 'build', building: next.kind, x: next.x, y: next.y }
+}
+
+/**
+ * Where a city without a wall puts its first (`CONTEXT.md`: Founding): a ring `NPC_VILLAGE.size / 2`
+ * tiles round its home, as a village's, with its gate south of the home.
+ */
+function firstRing(): Rings {
+  const d = Math.floor(NPC_VILLAGE.size / 2)
+  return { inner: d, outer: d, expanding: false, gate: undefined, newGate: { dx: 0, dy: d } }
+}
+
+/**
+ * The tiles of an NPC city's first wall (`CONTEXT.md`: Founding), the gate last so the way out
+ * stays open while it goes up: with no wall yet, once its storages hold the Wood of its reserve
+ * (`npcReserve`), round `firstRing`; while its only ring has no gate yet, on round that ring.
+ * None for a city whose wall has its gate, and for the Trade Organization's cities.
+ */
+function firstWall(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings | undefined,
+): WallTileState[] {
+  if (city.tradeOrg || rings?.gate || rings?.expanding) return []
+  if (!rings && (npcCityStock(world, city).wood ?? 0) < (npcReserve(world, city).wood ?? 0)) {
+    return []
+  }
+  // Its gate south of the home on this ring, not where a wall moving out would put it.
+  const ring = rings ? { ...rings, newGate: { dx: 0, dy: rings.inner } } : firstRing()
+  const tiles = newWall(world, home, terrain, ring)
+  return [...tiles.filter((t) => t.kind === 'wall'), ...tiles.filter((t) => t.kind === 'gate')]
 }
 
 /**
