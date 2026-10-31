@@ -95,5 +95,17 @@ export function createTickReporter(log: Logger): TickReporter {
   }
 }
 
+/**
+ * Reports an error that escaped a client's WebSocket message handler (ADR 0004): logged, and sent
+ * to Sentry with the Player it came from.
+ */
+export function reportClientError(log: Logger, error: unknown, userId: number): void {
+  log.error({ err: error, userId }, 'client message failed')
+  Sentry.withScope((scope) => {
+    scope.setTag('user_id', userId)
+    Sentry.captureException(error)
+  })
+}
+
 export const setupFastifyErrorHandler = Sentry.setupFastifyErrorHandler
 export const flushSentry = (timeoutMs = 2000) => Sentry.close(timeoutMs)

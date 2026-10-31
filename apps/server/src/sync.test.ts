@@ -59,4 +59,21 @@ describe('OrderQueue', () => {
     expect(queue.receive(world, account, 7, null)).toMatchObject({ type: 'rejected' })
     expect(queue.size).toBe(0)
   })
+
+  it('rejects a kind named after something inherited from Object.prototype', () => {
+    const queue = new OrderQueue({ wait })
+    const world = createWorld(terrain)
+    for (const kind of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect(queue.receive(world, account, 'r4', { kind })).toEqual({
+        type: 'rejected',
+        requestId: 'r4',
+        reason: `unknown order: ${kind}`,
+      })
+    }
+    expect(queue.receive(world, account, 'r5', { kind: 7 })).toMatchObject({
+      type: 'rejected',
+      reason: 'unknown order: 7',
+    })
+    expect(queue.size).toBe(0)
+  })
 })
