@@ -390,6 +390,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   // The city picked on the map or opened in the Cities drawer.
   const [openCityId, setOpenCityId] = useState<string>()
+  // The warehouse or storage Trade here scrolls the open city to; a new object each press.
+  const [tradeAt, setTradeAt] = useState<{ buildingId: string }>()
 
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
@@ -1103,6 +1105,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             directives={world.diplomacy.directives}
             openId={openCityId}
             onOpen={setOpenCityId}
+            scrollTo={tradeAt}
             onBuyOff={async (residentId, directiveId, carriageId) =>
               setOrderError(
                 await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
@@ -1189,8 +1192,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onSetGate={async (gateId, open) =>
               setOrderError(await giveOrder({ kind: 'setGate', gateId, open }))
             }
-            onOpenCity={(id) => {
+            onOpenCity={(id, buildingId) => {
               setOpenCityId(id)
+              setTradeAt(buildingId ? { buildingId } : undefined)
               setOpenDrawer('cities')
             }}
             // The same `renameCity` order a script's `renameCity` requests, asked by the Leader.

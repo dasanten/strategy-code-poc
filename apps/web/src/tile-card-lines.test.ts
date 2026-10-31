@@ -13,7 +13,7 @@ import {
   type Resident,
   type SeenBuilding,
 } from '@csp/shared'
-import { describeTile, tileActions, type TileThings } from './selection-view.js'
+import { describeTile, tileActions, tradesHere, type TileThings } from './selection-view.js'
 import { GOOD_LABELS } from './Residents.js'
 
 const building = (b: Partial<SeenBuilding> & Pick<SeenBuilding, 'kind'>): SeenBuilding => ({
@@ -208,15 +208,43 @@ describe('buildings on a tile’s card', () => {
       prices: [{ good: 'food' }] as SeenBuilding['prices'],
     })
     const card = tile({ buildings: [warehouse], cities })
-    expect(card.lines).toContain('Buys and sells here · prices in the city inspector')
-    expect(card.city?.id).toBe('c-post')
-    expect(tileActions(card, undefined).map((a) => [a.id, a.key])).toEqual([['openCity', 'C']])
+    expect(card.lines).toContain('Buys and sells here')
+    expect(card.tradeHere).toEqual({ cityId: 'c-post', buildingId: 'b-warehouse' })
+    expect(tileActions(card, undefined).map((a) => [a.id, a.label, a.key])).toEqual([
+      ['tradeHere', 'Trade here', 'T'],
+    ])
     const npc = tile({ buildings: [building({ kind: 'storage', cityId: 'c-npc' })], cities })
-    expect(npc.city?.id).toBe('c-npc')
+    expect(npc.tradeHere).toEqual({ cityId: 'c-npc', buildingId: 'b-storage' })
     // No prices shown to the Player (it won't trade with them): nothing to link to.
     const shut = tile({ buildings: [building({ kind: 'storage', cityId: 'c-shut' })], cities })
-    expect(shut.city).toBeUndefined()
-    expect(shut.lines.some((l) => l.includes('prices'))).toBe(false)
+    expect(shut.tradeHere).toBeUndefined()
+    expect(shut.lines).not.toContain('Buys and sells here')
+  })
+
+  it('offers Trade here only where the Player trades (`tradesHere`)', () => {
+    const food = [{ good: 'food' as const }] as NonNullable<TileThings['cities'][number]['trade']>
+    const npc = { id: 'c-npc', name: 'Oakhollow', realmId: null, trade: food }
+    const warehouse = { kind: 'warehouse' as const, prices: food as SeenBuilding['prices'] }
+    const storage = { kind: 'storage' as const }
+    const post = { id: 'c-post', name: 'Saltgate', realmId: null, tradeOrg: 'post' as const }
+    expect(tradesHere(warehouse, post)).toBe(true)
+    expect(tradesHere(storage, npc)).toBe(true)
+    // A city that refuses the Player won't trade with them, even with prices still in hand.
+    expect(tradesHere(storage, { ...npc, refuses: true })).toBe(false)
+    expect(tradesHere(storage, { id: 'c-me', name: 'Eastmere', realmId: 'me' })).toBe(false)
+    // A warehouse whose prices the Player doesn't see.
+    expect(tradesHere({ kind: 'warehouse' }, post)).toBe(false)
+  })
+
+  it('offers no Trade here on a warehouse only remembered', () => {
+    const cities = [{ id: 'c-post', name: 'Saltgate', realmId: null, tradeOrg: 'post' as const }]
+    const seen = building({
+      kind: 'warehouse',
+      cityId: 'c-post',
+      prices: [{ good: 'food' }] as SeenBuilding['prices'],
+    })
+    const card = tile({ cities, lastSeen: { buildings: [{ ...seen, seenAt: 0 }], tick: 100 } })
+    expect(card.tradeHere).toBeUndefined()
   })
 
   it('says how an own or allied city lives at its town hall, and links an own one', () => {

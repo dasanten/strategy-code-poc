@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   GOODS,
   isClosed,
@@ -82,6 +82,7 @@ export function CityInspector({
   onBuyOff,
   openId,
   onOpen,
+  scrollTo,
 }: {
   cities: SeenCity[]
   /** What the Player remembers out of sight. */
@@ -114,6 +115,11 @@ export function CityInspector({
   openId: string | undefined
   /** Called with the city opened in the list, or undefined when it is closed. */
   onOpen: (id: string | undefined) => void
+  /**
+   * The warehouse or storage of the open city to bring into view, as Trade here on its tile card
+   * asks (`CONTEXT.md`: Trade section); each new object scrolls again.
+   */
+  scrollTo?: { buildingId: string }
 }) {
   const views = cities.map((c) => describeCity(c, { residents, buildings }, realmId, realms))
   const sending = (place: WarehouseView): SendingProps => ({
@@ -124,8 +130,15 @@ export function CityInspector({
     onSend: (s) =>
       onSend({ residentId: s.residentId, carriageId: s.carriageId, x: place.x, y: place.y }),
   })
+  const list = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!scrollTo) return
+    list.current
+      ?.querySelector(`[data-trade-at="${CSS.escape(scrollTo.buildingId)}"]`)
+      ?.scrollIntoView({ block: 'start' })
+  }, [scrollTo])
   return (
-    <section className="city-inspector" aria-label="Cities in sight">
+    <section className="city-inspector" aria-label="Cities in sight" ref={list}>
       <div className="panel-head">
         <h2>Cities in sight</h2>
         <span>{views.length === 0 ? 'none' : views.length}</span>
@@ -153,7 +166,7 @@ export function CityInspector({
                 cities.find((c) => c.id === v.id)!,
                 { cities, buildings },
               ).map((w) => (
-                <div key={w.id}>
+                <div key={w.id} data-trade-at={w.id}>
                   <Prices warehouse={w} lists={tradeLists(w, { buildings })} />
                   <Trading
                     warehouse={w}
@@ -214,7 +227,7 @@ export function CityInspector({
                 cities.find((c) => c.id === v.id)!,
                 { buildings },
               ).map((s) => (
-                <div key={s.id}>
+                <div key={s.id} data-trade-at={s.id}>
                   <Prices warehouse={s} lists={tradeLists(s, { buildings })} place="Storage" />
                   <Trading
                     warehouse={s}
