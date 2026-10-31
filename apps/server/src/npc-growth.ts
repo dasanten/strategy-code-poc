@@ -5,7 +5,6 @@ import {
   NODE_GOOD,
   NODE_WORKPLACE,
   NPC_ADULTS_PER_PAIR,
-  NPC_BUILDERS,
   NPC_FARM_REACH,
   NPC_NODE_REACH,
   NPC_WALL_STEP,
@@ -26,6 +25,7 @@ import {
   type Building,
   type BuildingKind,
   type City,
+  type CityProject,
   type Good,
   type Resident,
   type Stock,
@@ -49,12 +49,12 @@ import { Ground } from './placing.js'
  * edge, puts up a new wall `NPC_WALL_STEP` tiles further out and then tears down the old one. All
  * through the orders a Player's residents take (ADR 0002). The Trade Org HQ grows this way only
  * while it is too weak, building round rings of its own (`hqProject`); trading posts never grow.
+ * The city decides all this in its planning pass (`planCity`, ADR 0016) and keeps the project in
+ * its plan; each tick it only gives its builders their part in it (`takePart`).
  */
 
-/** Something an NPC city builds or takes down next. */
-export type Project =
-  | { kind: 'build'; building: BuildingKind; x: number; y: number }
-  | { kind: 'tearDown'; building: Building }
+/** Something an NPC city builds or takes down next, as its plan keeps it. */
+export type Project = CityProject
 
 /** A tile, relative to a city's home (`npcHome`), the short way round the map. */
 interface Offset {
@@ -81,65 +81,52 @@ export interface Rings {
   newGate: Offset
 }
 
-/** Pairs, builders and the next project of an NPC city, for one tick. */
-export interface Growth {
-  /**
-   * Gives an idle adult a part in the next project; false when there is none for them. With
-   * `deliver`, only to one carrying materials its site needs: they take them there, rather than
-   * to the storage.
-   */
-  assign(r: Resident, deliver?: boolean): boolean
+/**
+ * Whether a city grows at all: an NPC city always, the Trade Organization's cities only while the
+ * HQ is too weak (`hqGrows`); trading posts never.
+ */
+export function cityGrows(world: WorldState, city: City, adults: Resident[]): boolean {
+  return !city.tradeOrg || (city.tradeOrg === 'hq' && hqGrows(world, adults))
 }
 
 /**
- * One tick of an NPC city's growth, before its idle adults get work: ends pairs with no child on
- * the way while Food runs short, pairs adults while it has a food surplus (one pair for every
- * `NPC_ADULTS_PER_PAIR` adults), and stops builders who can do no more until materials come.
- * Returns how the city gives idle adults a part in its next project, if it has one and a free
- * builder's place (`NPC_BUILDERS`).
+ * What a growing city builds or takes down next: the HQ its rings and houses (`hqProject`), an
+ * NPC city whatever it wants most (`nextProject`).
  */
-export function cityGrowth(
+export function cityProject(
   world: WorldState,
   city: City,
   home: Building,
-  adults: Resident[],
   terrain: TerrainMap,
-  short: boolean,
-): Growth | undefined {
-  // The Trade Organization's cities grow only while the HQ is too weak (`hqGrows`).
-  if (city.tradeOrg && (city.tradeOrg !== 'hq' || !hqGrows(world, adults))) return undefined
-  if (short) {
-    // A pair whose child is on the way stays together until it is born.
-    for (const r of adults) if (r.pair && !r.carrying && !partnerCarrying(world, r)) delete r.pair
-    return undefined
-  }
-  pairAdults(world, city, adults)
-  const storage = world.buildings.find(
-    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-  )
+): Project | undefined {
+  return city.tradeOrg ? hqProject(world, city, terrain) : nextProject(world, city, home, terrain)
+}
+
+/**
+ * Food runs short: the city's pairs with no child on the way end (`CONTEXT.md`: Pairing). A pair
+ * whose child is on the way stays together until it is born.
+ */
+export function endPairs(world: WorldState, adults: Resident[]): void {
+  for (const r of adults) if (r.pair && !r.carrying && !partnerCarrying(world, r)) delete r.pair
+}
+
+/**
+ * Stops a builder who can do no more at their site until materials come (`canDoMore`), so the
+ * city can give them something else to do.
+ */
+export function stopBuildersWhoCantGoOn(
+  world: WorldState,
+  adults: Resident[],
+  storage: Building | undefined,
+): void {
   for (const r of adults) {
     const o = r.order
-    const site = o?.kind === 'build' && world.buildings.find((b) => b.id === o.siteId)
+    if (o?.kind !== 'build') continue
+    const site = world.buildings.find((b) => b.id === o.siteId)
     if (site && site.site && !canDoMore(r, site, storage)) {
       r.order = null
       delete r.script
     }
-  }
-  let free = NPC_BUILDERS - adults.filter(isBuilder).length
-  if (free <= 0) return undefined
-  let project: Project | null | undefined = null
-  return {
-    assign(r, deliver = false) {
-      if (free <= 0) return false
-      if (project === null) {
-        project = city.tradeOrg
-          ? hqProject(world, city, terrain)
-          : nextProject(world, city, home, terrain)
-      }
-      if (!project || !takePart(world, r, project, storage, deliver)) return false
-      free--
-      return true
-    },
   }
 }
 
@@ -147,14 +134,14 @@ export function cityGrowth(
  * Whether a builder can still help a site: it needs work, or materials they carry or the storage
  * holds (which its Build default fetches), or they are fetching some.
  */
-function canDoMore(r: Resident, site: Building, storage: Building | undefined): boolean {
+export function canDoMore(r: Resident, site: Building, storage: Building | undefined): boolean {
   if (workNeeded(site) > 0 || r.script?.memory.fetch != null) return true
   const need = materialsNeeded(site)
   return pick(r.carried, need) !== undefined || pick(storage?.stock, need) !== undefined
 }
 
 /** Whether a resident is building (by the Build default or not), tearing down or delivering. */
-function isBuilder(r: Resident): boolean {
+export function isBuilder(r: Resident): boolean {
   const o = r.order
   return (
     (r.script?.scriptId === 0 && r.script.task === 'build') ||
@@ -178,7 +165,7 @@ function partnerCarrying(world: WorldState, r: Resident): boolean {
  * Player would (ADR 0002). Pairing stops nobody's work; only the partner who comes to carry the
  * child does.
  */
-function pairAdults(world: WorldState, city: City, adults: Resident[]): void {
+export function pairAdults(world: WorldState, city: City, adults: Resident[]): void {
   if (!hasFoodSurplus(world, city)) return
   const pairs = adults.filter((r) => r.pair).length / 2
   let wanted = Math.floor(adults.length / NPC_ADULTS_PER_PAIR) - Math.floor(pairs)
@@ -196,9 +183,10 @@ function pairAdults(world: WorldState, city: City, adults: Resident[]): void {
  * tearing down there; or building it by the game's Build default (`CONTEXT.md`: Fetching
  * materials), which walks there, delivers what they carry of its materials and fetches what is
  * missing from the storage. For a tile of wall they first take enough for a few tiles from the
- * storage. False when they can't help. With `deliver`, only bringing materials they carry.
+ * storage. False when they can't help, or the building to tear down is gone. With `deliver`, only
+ * bringing materials they carry.
  */
-function takePart(
+export function takePart(
   world: WorldState,
   r: Resident,
   project: Project,
@@ -214,7 +202,8 @@ function takePart(
     if (!carries && !wall) return false
   }
   if (project.kind === 'tearDown') {
-    const b = project.building
+    const b = world.buildings.find((x) => x.id === project.buildingId)
+    if (!b) return false
     if (!isAt(r, b)) walkTo(r, b)
     else r.order = { kind: 'tearDown', buildingId: b.id, at: { x: r.x, y: r.y } }
     return true
@@ -281,7 +270,7 @@ export function nextProject(
 ): Project | undefined {
   const rings = wallRings(world, city, home, terrain.size)
   const old = rings && oldWallToTearDown(world, city, home, terrain, rings)
-  if (old) return { kind: 'tearDown', building: old }
+  if (old) return { kind: 'tearDown', buildingId: old.id }
   const want = wanted(world, city, home, terrain, rings)
   if (!want) return undefined
   const site = buildingAt(world, want.x, want.y)

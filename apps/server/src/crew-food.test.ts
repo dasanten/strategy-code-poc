@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest'
 import { checkInvariants } from './invariants.js'
 import { putToWork, stepNpcCities } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
+import { planCity } from './npc-plan.js'
 import { mulberry32, newResident } from './residents.js'
 import { ScriptRunner, type ScriptHost } from './script-runner.js'
 import { addCity } from './test-terrain.js'
@@ -304,6 +305,8 @@ describe('setting out for a workplace in an NPC city', () => {
     world.residents = []
     const far = farCamp(world, terrain, city, { x: storage.x + 150, y: storage.y })
     const r = villager(world, city, 'a1', storage, OWN_FOOD)
+    // The city decides in its planning pass (ADR 0016) and hands the jobs out in the tick.
+    planCity(world, city, terrain)
     stepNpcCities(world, terrain.size, terrain)
     const want = setOutFood(150 * WALK_TICKS_PER_TILE)
     expect(want).toBeGreaterThan(OWN_FOOD)
@@ -323,6 +326,7 @@ describe('setting out for a workplace in an NPC city', () => {
 
     // One sent from afar walks to the storage for their Food first.
     const away = villager(world, city, 'a3', { x: storage.x - 10, y: storage.y + 10 }, OWN_FOOD)
+    planCity(world, city, terrain)
     stepNpcCities(world, terrain.size, terrain)
     expect(away.order).toMatchObject({ kind: 'walkTo', target: { x: storage.x, y: storage.y } })
     expect(away.script).toBeUndefined()
@@ -330,6 +334,7 @@ describe('setting out for a workplace in an NPC city', () => {
     // The farm next door needs no more than their own food.
     world.buildings = world.buildings.filter((b) => b.id !== far.id)
     const f = villager(world, city, 'a2', storage, OWN_FOOD)
+    planCity(world, city, terrain)
     stepNpcCities(world, terrain.size, terrain)
     expect(f.order).toBeNull()
     expect(f.script).toMatchObject({ memory: { workplaceId: farmOf(world, city).id } })

@@ -84,6 +84,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     // A new world's Players have nothing to be told of changes before it.
     scriptViewChanges: SCRIPT_VIEW_CHANGES.length,
     horseOffersClaimed: [],
+    cityPlans: {},
   }
 }
 
@@ -133,6 +134,8 @@ export function nearestFreeTile(
 export interface StepResult {
   /** Actions requested this tick. */
   actions: number
+  /** Milliseconds the game-run cities spent planning (`planCity`; ADR 0016). */
+  npcPlanMs: number
   /** Who starved and which realms ended through it this tick. */
   survival: SurvivalResult
   /** Blows struck this tick, who was killed and which realms ended through it. */
@@ -170,7 +173,7 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   stepTradeOrgArmy(world, terrain.size)
   stepNpcHire(world, terrain.size)
   stepPunishments(world, terrain.size)
-  stepNpcCities(world, terrain.size, terrain)
+  const npcPlanMs = stepNpcCities(world, terrain.size, terrain)
   runNpcScripts(world, terrain)
   const steps = walking?.requestSteps(world) ?? []
   walking?.resolve(world, steps)
@@ -227,5 +230,5 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
     purchases +
     trades +
     buyOffs
-  return { actions, survival, combat, horsesDied, aging, captures }
+  return { actions, npcPlanMs, survival, combat, horsesDied, aging, captures }
 }

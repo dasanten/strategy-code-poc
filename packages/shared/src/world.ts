@@ -685,6 +685,57 @@ export interface WorldState {
    * kept with the Player, not the realm, so a claim outlives a Leader death.
    */
   horseOffersClaimed: number[]
+  /**
+   * The plan of each city the game runs, by city id (`CONTEXT.md`: NPC city; ADR 0016): what its
+   * residents do until its next planning pass. A city without one has not planned yet.
+   */
+  cityPlans: Record<string, CityPlan>
+}
+
+/**
+ * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
+ * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
+ * (NPC trader), found its daughter (Founding), or nothing, until the next pass moves them.
+ */
+export interface CityJob {
+  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'idle'
+  /** The farm or workplace to work, for `farm` and `work`. */
+  buildingId?: string
+}
+
+/** What a game-run city builds or takes down next (`CONTEXT.md`: NPC city), as plain data. */
+export type CityProject =
+  | { kind: 'build'; building: BuildingKind; x: number; y: number }
+  | { kind: 'tearDown'; buildingId: string }
+
+/** A game-run city's trade run under way (`CONTEXT.md`: NPC trader). */
+export interface CityTrader {
+  residentId: string
+  warehouseId: string
+  sells: Stock
+  buys: Stock
+  since: number
+}
+
+/**
+ * What a city the game runs decided at its last planning pass (`CONTEXT.md`: NPC city;
+ * ADR 0016), kept in the world so a restart forgets nothing: plain serialisable data like an
+ * order's state (ADR 0002). Only the pass changes the jobs; between passes the city hands them
+ * out, and replaces its project once it is finished.
+ */
+export interface CityPlan {
+  /** The tick of the pass that made it. */
+  plannedAt: number
+  /** A job per resident of the city, by resident id. */
+  jobs: Record<string, CityJob>
+  /** What the city builds or takes down next; none when it has nothing to build. */
+  project?: CityProject
+  /** Its trade run under way (`CONTEXT.md`: NPC trader); unused until the NPC trader is built. */
+  trader?: CityTrader
+  /** Since when it has been full (`CONTEXT.md`: Full city); unused until Founding is built. */
+  fullSince?: number
+  /** The site it found for its daughter (`CONTEXT.md`: Founding); unused until Founding is built. */
+  foundingSite?: { x: number; y: number }
 }
 
 /**

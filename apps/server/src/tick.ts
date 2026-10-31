@@ -18,6 +18,8 @@ export interface TickHealth {
   durationMs: number
   residents: number
   actions: number
+  /** Milliseconds the game-run cities spent planning (ADR 0016). */
+  npcPlanMs: number
   /** The tick took longer than the slow-tick threshold. */
   slow: boolean
 }
@@ -70,7 +72,7 @@ export function runTick(
     const scriptViolations = opts.scripts?.runAll(world, check) ?? []
     const before = check ? tallyGoods(world) : undefined
     takeMade(world)
-    const { actions } = stepWorld(world, terrain, opts.walking)
+    const { actions, npcPlanMs } = stepWorld(world, terrain, opts.walking)
     if (check) {
       const violations = [
         ...scriptViolations,
@@ -85,6 +87,7 @@ export function runTick(
       durationMs,
       residents: world.residents.length,
       actions,
+      npcPlanMs,
       slow: durationMs > opts.slowTickMs,
     }
     opts.reporter.tickHealth(world, health)
