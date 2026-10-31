@@ -94,11 +94,11 @@ export function runResidents(world: WorldState): Map<string, Resident[]> {
 
 /**
  * Whether a city's Food runs short (`CONTEXT.md`: NPC city): its storages hold less than its
- * residents eat in `NPC_FOOD_SHORT_DAYS`. A city with no storage yet (a daughter just founded,
+ * residents eat in `NPC_FOOD_SHORT_DAYS`. An NPC city with no storage yet (a daughter just founded,
  * `CONTEXT.md`: Founding) lives on the Food its people carry and is never short, so it builds one.
  */
 export function foodShort(world: WorldState, city: City): boolean {
-  if (npcStorages(world, city).length === 0) return false
+  if (!city.tradeOrg && npcStorages(world, city).length === 0) return false
   return storedFood(world, city) < cityFoodUse(world, city, NPC_FOOD_SHORT_DAYS)
 }
 

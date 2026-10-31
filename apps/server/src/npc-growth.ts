@@ -321,15 +321,15 @@ function carriedBy(world: WorldState, city: City): Stock {
 }
 
 /**
- * How many of a city's adults build at once (`CONTEXT.md`: NPC city): `NPC_BUILDERS`; with no
- * storage yet (a daughter, `CONTEXT.md`: Founding), everyone who can, since the materials are on
+ * How many of a city's adults build at once (`CONTEXT.md`: NPC city): `NPC_BUILDERS`; an NPC city with no
+ * storage yet (a daughter, `CONTEXT.md`: Founding) lets everyone who can, since the materials are on
  * them and there is nowhere else to put them.
  */
 export function npcBuilders(world: WorldState, city: City): number {
   const storage = world.buildings.some(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
-  return storage ? NPC_BUILDERS : Infinity
+  return storage || city.tradeOrg ? NPC_BUILDERS : Infinity
 }
 
 /**
@@ -364,7 +364,7 @@ function materialsFirst(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
   // Without a storage yet (a daughter, `CONTEXT.md`: Founding), what its people carry.
-  const have = storage ? (storage.stock ?? {}) : carriedBy(world, city)
+  const have = storage || city.tradeOrg ? (storage?.stock ?? {}) : carriedBy(world, city)
   for (const [good, units] of Object.entries(need) as [Good, number][]) {
     if ((have[good] ?? 0) >= units || makes(world, city, good)) continue
     const first = chainProject(world, city, home, terrain, rings, good, seen)
