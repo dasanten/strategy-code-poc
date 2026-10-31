@@ -12,9 +12,9 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { NativeFunction, type ScriptObject } from '@csp/lang'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openDb, schema, type Db, type OpenDb } from './db/index.js'
-import { OrderQueue, orderKinds } from './orders.js'
+import { OrderQueue, orderKinds, type OrderKind } from './orders.js'
 import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
 import {
@@ -27,6 +27,7 @@ import {
 import { scriptLogsSound } from './script-log.js'
 import { createScript, deleteScript, runnableScript, saveScript } from './scripts.js'
 import { entitiesInSight } from './sight.js'
+import { runTick, type TickReporter } from './tick.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
 
@@ -50,8 +51,17 @@ const host = (): ScriptHost => ({
   explored: () => true,
 })
 
-/** Mara's realm r1 with `count` residents a0, a1, … side by side from (10, 10). */
-function setup(count = 1) {
+/**
+ * Mara's realm r1 with `count` residents a0, a1, … side by side from (10, 10). The runner gets
+ * `kinds` in place of the game's order kinds and `host` over the usual script host.
+ */
+function setup(
+  count = 1,
+  {
+    kinds: runnerKinds,
+    host: hostOver,
+  }: { kinds?: Record<string, OrderKind>; host?: Partial<ScriptHost> } = {},
+) {
   const world = createWorld(terrain)
   world.realms.push({ id: 'r1', userId: mara, leaderId: 'a0' })
   for (let i = 0; i < count; i++) {
@@ -68,7 +78,7 @@ function setup(count = 1) {
   }
   const kinds = { ...orderKinds, runScript: runScriptOrder(host()) }
   const orders = new OrderQueue(kinds, terrain)
-  const runner = new ScriptRunner(terrain, host())
+  const runner = new ScriptRunner(terrain, { ...host(), ...hostOver }, runnerKinds)
   return { world, kinds, orders, runner }
 }
 
@@ -417,6 +427,108 @@ describe('running scripts', () => {
     world.residents[0]!.owner = null
     runner.runAll(world)
     expect(world.residents[0]!.script).toBeUndefined()
+  })
+})
+
+describe('an error of the game’s own while running a script', () => {
+  const fakeReporter = () =>
+    ({
+      invariantViolations: vi.fn(),
+      tickHealth: vi.fn(),
+      tickError: vi.fn(),
+      scriptError: vi.fn(),
+    }) satisfies TickReporter
+
+  it('ends that one script; the next script and the world still step, and it is reported once', () => {
+    const scriptError = vi.fn()
+    // walkTo's check throws for a0 only: a native of the game's failing, not the script.
+    const walkTo = orderKinds.walkTo!
+    const kinds: Record<string, OrderKind> = {
+      ...orderKinds,
+      walkTo: {
+        ...walkTo,
+        validate(world, sender, order, t) {
+          if ((order as { residentId?: string }).residentId === 'a0') throw new Error('boom')
+          return walkTo.validate(world, sender, order, t)
+        },
+      },
+    }
+    const { world, orders, runner } = setup(2, { kinds, host: { scriptError } })
+    const s = createScript(db, mara, { name: 'walk', source: 'walkTo(12, 10)' })
+    giveScript(world, orders, s.id, ['a0', 'a1'])
+    const [a0, a1] = world.residents
+    const reporter = fakeReporter()
+    const tick = () =>
+      runTick(world, terrain, {
+        reporter,
+        scripts: runner,
+        invariantSampleRate: 1,
+        slowTickMs: 800,
+      })
+
+    tick()
+    // a0 ran first (tick 0) and failed: their script ended as with end().
+    expect(a0!.script).toBeUndefined()
+    expect(a0!.order).toBeNull()
+    // a1's script still ran, and the world still stepped.
+    expect(a1!.order?.kind).toBe('walkTo')
+    expect(world.tick).toBe(1)
+    expect(reporter.tickError).not.toHaveBeenCalled()
+    expect(reporter.invariantViolations).not.toHaveBeenCalled()
+    // Once in the realm log, with no line: the error isn't in the script.
+    expect(scriptEvents(world)).toHaveLength(1)
+    expect(scriptEvents(world)[0]).toMatchObject({
+      kind: 'scriptError',
+      residentId: 'a0',
+      name: a0!.name,
+      scriptId: s.id,
+      message: 'the game hit an error running this script, so it ended: boom',
+      tick: 0,
+    })
+    expect(scriptEvents(world)[0]).not.toHaveProperty('line')
+    // Once to monitoring, naming the script and the resident.
+    expect(scriptError).toHaveBeenCalledTimes(1)
+    expect(scriptError).toHaveBeenCalledWith(world, expect.any(Error), {
+      realmId: 'r1',
+      entityIds: ['a0'],
+      scriptId: s.id,
+    })
+
+    // The script doesn't run again, so nothing is reported again.
+    tick()
+    expect(scriptEvents(world)).toHaveLength(1)
+    expect(scriptError).toHaveBeenCalledTimes(1)
+    expect(reporter.tickError).not.toHaveBeenCalled()
+  })
+
+  it('in setting up one realm’s scripts skips them for the tick and runs the other realms’', () => {
+    const scriptError = vi.fn()
+    const bo = db.insert(schema.users).values({ name: 'Bo' }).returning().get().id
+    const sender: ScriptHost['sender'] = (userId) => {
+      if (userId === mara) throw new Error('no sender')
+      return { userId, account: { name: 'Bo', isAdmin: false } }
+    }
+    const { world, orders, runner } = setup(1, { host: { sender, scriptError } })
+    world.realms.push({ id: 'r2', userId: bo, leaderId: 'b0' })
+    const b0 = newResident(mulberry32(9), { id: 'b0', owner: 'r2', x: 20, y: 10, tick: 0 })
+    world.residents.push(b0)
+    const s = createScript(db, mara, { name: 'walk', source: 'walkTo(12, 10)' })
+    giveScript(world, orders, s.id, ['a0'])
+    const t = createScript(db, bo, { name: 'walk', source: 'walkTo(22, 10)' })
+    b0.script = { scriptId: t.id, memory: {} }
+
+    runner.runAll(world)
+    const a0 = world.residents[0]!
+    // Mara's realm skipped the tick, her script still running; Bo's ran.
+    expect(a0.order).toBeNull()
+    expect(a0.script?.scriptId).toBe(s.id)
+    expect(b0.order?.kind).toBe('walkTo')
+    expect(scriptEvents(world)).toEqual([])
+    expect(scriptError).toHaveBeenCalledTimes(1)
+    expect(scriptError).toHaveBeenCalledWith(world, expect.any(Error), {
+      realmId: 'r1',
+      entityIds: [],
+    })
   })
 })
 

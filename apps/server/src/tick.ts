@@ -8,7 +8,7 @@ import {
 } from './invariants.js'
 import type { OrderQueue } from './orders.js'
 import type { QueueRunner } from './queues.js'
-import type { ScriptRunner } from './script-runner.js'
+import type { ScriptErrorWhere, ScriptRunner } from './script-runner.js'
 import type { Walking } from './walking.js'
 import { stepWorld } from './world.js'
 
@@ -27,6 +27,12 @@ export interface TickReporter {
   invariantViolations(world: WorldState, violations: InvariantViolation[]): void
   tickHealth(world: WorldState, health: TickHealth): void
   tickError(world: WorldState, error: unknown): void
+  /**
+   * The game itself threw running a script (`ScriptHost.scriptError`): a bug in the game, not in
+   * the script. With a `scriptId`, that one script ended for `entityIds`; without one, the
+   * whole realm's scripts skipped the tick.
+   */
+  scriptError(world: WorldState, error: unknown, where: ScriptErrorWhere): void
 }
 
 export interface TickOptions {
