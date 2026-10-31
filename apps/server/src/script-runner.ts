@@ -41,6 +41,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { resumeInterrupted } from './defence.js'
 import { recordEvent } from './events.js'
 import type { InvariantViolation } from './invariants.js'
 import { npcSender, orderedResident } from './order-sender.js'
@@ -402,6 +403,8 @@ function taskProblem(
   o: Partial<TaskRequest>,
   terrain: TerrainMap | undefined,
 ): string | undefined {
+  // Being struck starts Defend (`CONTEXT.md`: Defence script); it is no task to give.
+  if ((o.task as unknown) === 'defend') return 'Defend runs when they are struck'
   if (!isTask(o.task)) return 'no such task'
   const realm = realmOf(world, sender.userId)
   const r = world.residents.find((x) => x.id === o.residentId)
@@ -496,7 +499,10 @@ export class ScriptRunner {
       const realmId = commanderOf(world, r)
       // An NPC city runs its residents' game defaults itself (`runNpcScripts`).
       if (realmId === null) {
-        if (!(r.script.task && r.script.scriptId === 0 && r.owner === null)) delete r.script
+        // Nobody runs their defence script any more: what it interrupted goes on, if anything.
+        resumeInterrupted(r)
+        if (r.script && !(r.script.task && r.script.scriptId === 0 && r.owner === null))
+          delete r.script
       } else {
         const by = { residentId: r.id }
         add(realmId, { holder: r, id: r.id, name: r.name, by, bind: by })
@@ -568,12 +574,14 @@ export class ScriptRunner {
   ): number {
     const running = r.holder.script!
     // Started on a task without a script of the Player's, a resident of theirs runs their version
-    // of its default; one the realm commands but doesn't own (hired, lent) stops.
+    // of its default; one the realm commands but doesn't own (hired, lent) stops, but for
+    // Defend: struck, they defend themselves as the realm commanding them has it.
     if (running.scriptId === 0) {
       const owned = world.residents.some((x) => x.id === r.id && x.owner === realm.id)
-      const id = running.task && owned ? this.host.defaultScript?.(realm.userId, running.task) : 0
+      const runs = owned || running.task === 'defend'
+      const id = running.task && runs ? this.host.defaultScript?.(realm.userId, running.task) : 0
       if (!id) {
-        delete r.holder.script
+        stopScript(world, r)
         return 0
       }
       running.scriptId = id
@@ -581,7 +589,7 @@ export class ScriptRunner {
     const script = this.host.script(running.scriptId)
     if (!script || script.userId !== realm.userId) {
       // Deleted, or the resident now belongs to another Player, whose script it isn't.
-      delete r.holder.script
+      stopScript(world, r)
       if (!script) {
         const { scriptId } = running
         recordEvent(world, realm.id, { kind: 'scriptEnded', ...r.by, name: r.name, scriptId })
@@ -690,13 +698,24 @@ export class ScriptRunner {
 
 /**
  * A resident's script called `end()` (`CONTEXT.md`: Running a script): it ends and they stand
- * idle; in a queue, its next step starts.
+ * idle; in a queue, its next step starts. A defence script hands back to what it interrupted
+ * (`CONTEXT.md`: Defence script).
  */
 function endScript(world: WorldState, residentId: string): void {
   const r = world.residents.find((x) => x.id === residentId)
-  if (!r) return
+  if (!r || resumeInterrupted(r)) return
   delete r.script
   r.order = null
+}
+
+/**
+ * A script that can't run any more stops; a resident's defence script hands back to what it
+ * interrupted, as on `end()`.
+ */
+function stopScript(world: WorldState, r: Runner): void {
+  const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
+  if (resident && resumeInterrupted(resident)) return
+  delete r.holder.script
 }
 
 const scriptError = (

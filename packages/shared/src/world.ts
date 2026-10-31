@@ -76,6 +76,13 @@ export interface Resident {
    */
   script?: RunningScript
   /**
+   * What the resident was doing when a blow started their defence script (`CONTEXT.md`: Defence
+   * script), kept aside while it runs as `script`: their order and the script they ran, with its
+   * memory; a queue stays in `queue` and waits. When the defence script ends they go on; a
+   * Player order given meanwhile ends both. Absent while no defence script runs.
+   */
+  interrupted?: Interrupted
+  /**
    * The values the Player picked for this resident's script parameters (`CONTEXT.md`: Script
    * parameter): by script id, then by param name, the id of the building or carriage picked.
    * Kept when the script ends, so giving the task again keeps them. Absent while none is picked.
@@ -279,9 +286,21 @@ export interface SeenScript {
  */
 export type SeenResident = Omit<
   Resident,
-  'script' | 'hunger' | 'health' | 'scriptParams' | 'scriptLog'
+  'script' | 'hunger' | 'health' | 'scriptParams' | 'scriptLog' | 'interrupted'
 > &
-  Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & { script?: SeenScript }
+  Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & {
+    script?: SeenScript
+    interrupted?: SeenInterrupted
+  }
+
+/**
+ * What a defence script interrupted, as the owning Player sees it (`Resident.interrupted`): the
+ * order and which script, for the line of what goes on once it ends.
+ */
+export interface SeenInterrupted {
+  order: ResidentOrder | null
+  script?: SeenScript
+}
 
 /**
  * Walking to a tile (`CONTEXT.md`: Order). The path is found a little at a time after the order
@@ -380,6 +399,12 @@ export interface FetchOrder {
  * store or fetch order, or until the Player orders them otherwise.
  */
 /** Who last struck a resident (`Resident.struck`): the attacker's id, and the tick. */
+/** What a defence script interrupted (`Resident.interrupted`). */
+export interface Interrupted {
+  order: ResidentOrder | null
+  script?: RunningScript
+}
+
 export interface Struck {
   by: string
   tick: number

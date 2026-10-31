@@ -319,14 +319,27 @@ export function entitiesInSight(
     // Which script a resident runs is seen; its memory stays on the server, and the values of
     // its params are shown only to the realm commanding them, all they keep (to fill in before a
     // script starts), as is the queue to the realm that gave it.
-    const { script, scriptParams, queue, ...rest } = withoutScriptLog(r)
+    // What a defence script interrupted goes on the owning Player's Doing line only, its memory
+    // never.
+    const { script, scriptParams, queue, interrupted, ...rest } = withoutScriptLog(r)
     const kept = commanderOf(world, r) === realmId ? scriptParams : undefined
     const params = script ? kept?.[script.scriptId] : undefined
+    const own = r.owner === realmId
     const shown: SeenEntity = {
       is: 'resident',
       ...rest,
       ...(kept ? { scriptParams: kept } : {}),
       ...(queue && queue.realmId === realmId ? { queue } : {}),
+      ...(interrupted && own
+        ? {
+            interrupted: {
+              order: interrupted.order,
+              ...(interrupted.script
+                ? { script: seenScript(world, interrupted.script, true) }
+                : {}),
+            },
+          }
+        : {}),
       ...(script
         ? {
             script: {

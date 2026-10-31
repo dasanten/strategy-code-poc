@@ -118,6 +118,7 @@ import {
   FOAL_STAT_SPREAD,
   BREED_FOOD,
   STABLE_FEED_DAYS,
+  DEFEND_CALM_TICKS,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
   STANDING_PER_PAID_WEEK,
@@ -1355,6 +1356,20 @@ export function Wiki() {
           {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
           {duration(CLIMB_TICKS)}, unable to dodge or strike back.
         </p>
+        <h3>Under attack</h3>
+        <p>
+          A resident of yours who is struck and lives runs their defence script,{' '}
+          <strong>Defend</strong> (one of your default scripts): armed, they fight back at whoever
+          struck them until that one is dead, gone or out of sight; unarmed, they walk home to
+          their city's town hall, and stop once there or once no blow has landed for{' '}
+          {duration(DEFEND_CALM_TICKS)}. Their card says “Defending: fighting back at Bo” or
+          “Defending: fleeing home”, with what they were doing on the line under it. What they were
+          doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
+          queue at its step, or a plain order. Struck again while defending, they keep defending; an
+          order you give them meanwhile ends both. Scripts see the last blow as{' '}
+          <code>me.struckBy</code> and <code>me.struckAt</code>. Residents of NPC cities, and in an
+          army, fight back or flee home the same way.
+        </p>
       </Section>
 
       <Section id="territory">
@@ -1424,7 +1439,7 @@ export function Wiki() {
           only you see it. Without it they show what the task and its current order have the
           resident doing, such as “Building a house: fetching 10 wood from the storage”.{' '}
           <code>end</code>: once this run is over the script ends and the resident stands idle; in a
-          queue, its next step starts. Given a reason, <code>end(reason)</code> also notes it in
+          queue, its next step starts; a defence script hands back to what it interrupted. Given a reason, <code>end(reason)</code> also notes it in
           your realm log, like “Ana stopped Work: no workplace on her tile”: short text, cut like{' '}
           <code>doing</code>’s, that only you see, for every end. <code>log</code>: adds a short
           line, cut like <code>doing</code>’s, to the resident's script log, with the game time. The
@@ -1605,7 +1620,7 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
       <Section id="examples">
         <p>
           The game's default scripts, as they are now: what residents run for a task you give them
-          on the map. Each Player has their own copy to edit in the script editor; here they are to
+          on the map, and Defend, which they run when struck. Each Player has their own copy to edit in the script editor; here they are to
           read.
         </p>
         {Object.entries(DEFAULT_SCRIPTS).map(([task, s]) => (

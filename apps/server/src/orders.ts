@@ -166,8 +166,15 @@ export class OrderQueue {
         delete r.orderEnded
       }
       // Any order that isn't a step of it ends the resident's queue, running a script too; a new
-      // queue replaces it.
-      if (r && (order.kind === 'runScript' || !keeps.includes(order.kind))) delete r.queue
+      // queue replaces it. It ends a defence script and what it interrupted too (`CONTEXT.md`:
+      // Defence script).
+      if (r && (order.kind === 'runScript' || !keeps.includes(order.kind))) {
+        delete r.queue
+        if (r.interrupted) {
+          delete r.interrupted
+          delete r.script
+        }
+      }
       if (order.kind !== 'armyRunScript') {
         const a = world.armies.find((x) => x.id === order.armyId)
         if (a) delete a.script

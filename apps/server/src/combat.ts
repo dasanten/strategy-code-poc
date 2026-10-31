@@ -31,6 +31,7 @@ import {
 } from '@csp/shared'
 import { updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime, knownThieves, organizationOf } from './crimes.js'
+import { defendsByScript, startDefence } from './defence.js'
 import { recordEvent } from './events.js'
 import { noteMade } from './goods-made.js'
 import type { OrderKind } from './orders.js'
@@ -87,7 +88,8 @@ export function attackOrder(targetId: string, started = false, defending = false
  * breaking or climbing one of its walls or gates (`CONTEXT.md`: Walls in combat). The Trade Org
  * HQ's mercenaries stand with the HQ, and its soldiers keep its inner ring clear by force, never
  * a crime (`CONTEXT.md`: Trade Org army); nor is a trading post's going after a thief it knows of
- * (`CONTEXT.md`: Trading post). `size` is the map's.
+ * (`CONTEXT.md`: Trading post). For `t` running their defence script, what it interrupted is what
+ * they are doing. `size` is the map's.
  */
 function isAggression(world: WorldState, a: Resident, t: Resident, size: number): boolean {
   if (a.order?.kind === 'attack' && a.order.defending) return false
@@ -100,7 +102,8 @@ function isAggression(world: WorldState, a: Resident, t: Resident, size: number)
   if (post && knownThieves(world, post).has(t.id)) return false
   const sides = new Set([organizationOf(a)])
   if (hq && contractOf(world, a.id)?.hirerId === TRADE_ORG) sides.add(hq.id)
-  const o = t.order
+  // Defending themselves, what they were doing before counts (`CONTEXT.md`: Defence script).
+  const o = t.interrupted ? t.interrupted.order : t.order
   const ours = (buildingId: string) => {
     const b = world.buildings.find((x) => x.id === buildingId)
     return !!b && sides.has(buildingOrganization(world, b))
@@ -144,7 +147,10 @@ export const attack: OrderKind = {
   apply(world, _sender, order) {
     const { residentId, targetId } = order as AttackRequest
     const r = world.residents.find((x) => x.id === residentId)
-    if (r) r.order = attackOrder(targetId)
+    if (!r) return
+    // A defence script going after who struck them fights back, in a fight already logged.
+    const defending = r.interrupted !== undefined && r.struck?.by === targetId
+    r.order = attackOrder(targetId, defending, defending)
   },
 }
 
@@ -195,8 +201,9 @@ export interface CombatResult {
  * (`Resident.struck`), a dodged blow too. Both learn Combat from it; the target dodges
  * it by Agility, or it lands and takes its `blowDamage` off their health, only `WALL_DEFENCE` of it
  * for a target on their own city's wall (`CONTEXT.md`: Walls in combat). A target left with no
- * health is killed and drops what they carried (`CONTEXT.md`: Loot); otherwise one who is armed
- * fights back, unless already attacking someone, and one who is not flees home. A climber can't
+ * health is killed and drops what they carried (`CONTEXT.md`: Loot); otherwise they defend
+ * themselves (`react`): a Player's resident by their defence script, which interrupts what they
+ * were doing, others fighting back when armed and fleeing home when not. A climber can't
  * defend themselves: they don't dodge, fight back or flee (`CONTEXT.md`: Walls in combat).
  * A blow at a wall or gate always lands (`breakWall`).
  */
@@ -294,11 +301,17 @@ function breakWall(world: WorldState, a: Resident, b: Building, size: number): b
 }
 
 /**
- * A resident `t` hit by `a` and still alive (`CONTEXT.md`: Combat): armed, they fight back unless
- * they are already attacking someone; unarmed, they flee home, walking to their city's town hall.
+ * A resident `t` hit by `a` and still alive (`CONTEXT.md`: Combat, Under attack): a Player's
+ * resident runs their defence script (`startDefence`). Others react as the game's Defend does, by
+ * built-in orders: armed, they fight back unless they are already attacking someone; unarmed,
+ * they flee home, walking to their city's town hall.
  */
 function react(world: WorldState, t: Resident, a: Resident): void {
   if (t.order?.kind === 'climb') return
+  if (defendsByScript(world, t)) {
+    startDefence(t)
+    return
+  }
   if (isArmed(t)) {
     if (t.order?.kind !== 'attack') t.order = attackOrder(a.id, true, true)
     return
