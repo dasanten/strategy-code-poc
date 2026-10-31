@@ -357,8 +357,8 @@ export function TileCard({
   /** Has the actor build a node's workplace with the north-west tile of its footprint `at`. */
   onBuildHere: (building: BuildingKind, at: { x: number; y: number }) => void
   onSetGate: (gateId: string, open: boolean) => void
-  /** Opens the city inspector at a city. */
-  onOpenCity: (cityId: string) => void
+  /** Opens the city inspector at a city, scrolled to one of its buildings when given. */
+  onOpenCity: (cityId: string, buildingId?: string) => void
   /** Renames a city of the Player's realm (`CONTEXT.md`: Renaming a city). */
   onRenameCity: (cityId: string, name: string) => void
   /** Renames a horse of the Player's realm (`CONTEXT.md`: Renaming a horse). */
@@ -439,6 +439,8 @@ export function TileCard({
               onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)
             if (a.id === 'openCity' && card.city) onOpenCity(card.city.id)
+            if (a.id === 'tradeHere' && card.tradeHere)
+              onOpenCity(card.tradeHere.cityId, card.tradeHere.buildingId)
             const unhitcher = unhitcherOf(card, actor)
             if (a.id === 'unhitch' && card.unhitch && unhitcher)
               onUnhitch(card.unhitch.carriageId, unhitcher)

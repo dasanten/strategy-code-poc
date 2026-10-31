@@ -178,10 +178,21 @@ export function loadOf(carriage: Carriage, capacity: number): TradeHolder {
   return { stock: carriage.load, room: capacity - stockWeight(carriage.load) }
 }
 
+/**
+ * What stops a trade short of the units wanted (`CONTEXT.md`: Trade section), from the trader's
+ * side: their coins (`coins`), the good they hold to sell (`held`), the room in their hands or on
+ * their carriage (`room`), what the other side holds for sale (`stock`) or its coins to pay
+ * (`theirCoins`), what an NPC city is short of (`unwanted`), or an NPC city that won't trade with
+ * them at all (`refused`).
+ */
+export type TradeLimit = 'coins' | 'held' | 'room' | 'stock' | 'theirCoins' | 'unwanted' | 'refused'
+
 /** What a trade moves: `units` of the good one way, `coins` the other. */
 export interface TradeQuote {
   units: number
   coins: number
+  /** What stopped it short of the units wanted; missing when it moves them all. */
+  limit?: TradeLimit
 }
 
 /**
@@ -190,8 +201,8 @@ export interface TradeQuote {
  * with that unit in it: bought at the sell price before it leaves, sold at the buy price once it
  * is in, so buying and selling back always costs coins. The trade is cut down to the units the
  * trader holds (selling) or the warehouse holds (buying), the coins the payer has, and what fits
- * in the holder's room. A warehouse doesn't sell the `owed` units it keeps for deliveries
- * (`owedBy`). Pure: nothing moves.
+ * in the holder's room, and says which of them cut it (`limit`). A warehouse doesn't sell the
+ * `owed` units it keeps for deliveries (`owedBy`). Pure: nothing moves.
  */
 export function quoteTrade(
   world: Pick<WorldState, 'cities' | 'buildings'>,
@@ -211,24 +222,32 @@ export function quoteTrade(
   const heldCoins = holder.stock.coins ?? 0
   let units = 0
   let coins = 0
+  let limit: TradeLimit | undefined
   while (units < wanted) {
     const n = units + 1
     if (side === 'sell') {
-      if (n > held) break
-      const p = priceFor(good, stock + n, floor).buy
-      const room = holder.room + n * GOOD_WEIGHT[good] - (coins + p) * GOOD_WEIGHT.coins
-      if (coins + p > coinStock || room < -1e-9) break
-      coins += p
+      if (n > held) limit = 'held'
+      else {
+        const p = priceFor(good, stock + n, floor).buy
+        const room = holder.room + n * GOOD_WEIGHT[good] - (coins + p) * GOOD_WEIGHT.coins
+        if (coins + p > coinStock) limit = 'theirCoins'
+        else if (room < -1e-9) limit = 'room'
+        else coins += p
+      }
     } else {
-      if (n > stock - owed) break
-      const p = priceFor(good, stock - units, floor).sell
-      const room = holder.room + (coins + p) * GOOD_WEIGHT.coins - n * GOOD_WEIGHT[good]
-      if (coins + p > heldCoins || room < -1e-9) break
-      coins += p
+      if (n > stock - owed) limit = 'stock'
+      else {
+        const p = priceFor(good, stock - units, floor).sell
+        const room = holder.room + (coins + p) * GOOD_WEIGHT.coins - n * GOOD_WEIGHT[good]
+        if (coins + p > heldCoins) limit = 'coins'
+        else if (room < -1e-9) limit = 'room'
+        else coins += p
+      }
     }
+    if (limit) break
     units = n
   }
-  return { units, coins }
+  return limit ? { units, coins, limit } : { units, coins }
 }
 
 /**

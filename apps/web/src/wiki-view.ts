@@ -75,6 +75,9 @@ import {
 /** Where the Wiki lives, readable logged in or not. */
 export const WIKI_PATH = '/wiki'
 
+/** The Wiki's "How to trade", linked from the trade section (`CONTEXT.md`: Trade section). */
+export const HOW_TO_TRADE_PATH = `${WIKI_PATH}#how-to-trade`
+
 /** The tick the Wiki's residents are looked at: any will do, they are young adults throughout. */
 const AT = 0
 
