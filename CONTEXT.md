@@ -42,8 +42,8 @@ The shared language of the game. Domain terms only — no implementation details
   a finished road on Mountain lets carriages and riders cross it like any road, so roads open
   mountain passes. Nobody owns a road; anyone can walk it or tear it down, except a road tile on
   Mountain while a carriage or a ridden horse stands on it, so nobody is stranded there.
-  A resident can build road along a line from their tile to another, one tile after another; the
-  line runs straight or diagonal, each tile a Step on from the one before.
+  Residents build road along a line with the Build line task (Building); the line runs straight
+  or diagonal between two tiles, each tile a Step on from the one before.
 - **Step:** a move onto one of the eight tiles around, straight or diagonal. A diagonal step is
   √2 (about 1.41) times as far as a straight one, so it takes that much longer on the same
   ground. A diagonal step can't squeeze between two corners: it is only possible when both
@@ -108,6 +108,20 @@ The shared language of the game. Domain terms only — no implementation details
   still lacks some, one of the residents building it, picked at random, fetches a load of what is
   missing from the nearest storage of their realm that holds it, delivers it to the site and goes
   back to work; only one fetches at a time. With no storage holding them, they just build.
+- **Build line:** a task for building road or wall along a line (ADR 0018). Its line (road or
+  wall, a start and an end tile the Player picks on the map) comes only from the order, like a
+  haul's route: from the card, the group card or a queue step, and started without one it ends
+  ("no line given"). The resident walks to the line themselves. Tiles that already have one, or
+  can't take one, are skipped. **A crew on one line:** residents on the same line each take the
+  nearest unfinished tile that no other of them has taken, so several tiles go up at once.
+  **Materials:** what a builder carries goes in first; lacking some for their tile, they fetch
+  from the `source` param, or else the nearest storage of their realm holding them, as much as
+  they can carry for their tile and the next unbuilt ones, and top up their own food there. With
+  none in any storage they lay out their tile's site and go on to the next; once every tile is
+  laid out or built and there is still nothing to fetch, they end, saying why ("no stone in any
+  storage"), and the sites stay for later. Its default script has Build's params (`source`,
+  `foodAt`, `foodTake`). The plain road and wall line orders, built only from what the resident
+  carries, stay in the game API for scripts.
 - **Tearing down:** anyone with residents on the tile can tear down a building or construction
   site. It takes work, less than building; part of a building's materials (all of an unfinished
   site's) are left on the tile as goods, and the tile is free again. A road on Mountain waits
@@ -300,7 +314,7 @@ The shared language of the game. Domain terms only — no implementation details
 - **Wall / Gate:** buildings of one tile each, built on any passable tile except Mountain, in
   any shape: a closed ring, an inner ring or a single stretch. Nothing forces a closed ring.
   Walls count as city buildings, so they grow the area like houses do. A wall can be built along
-  a line like a road, skipping tiles that have a wall or gate; a diagonal line closes the way,
+  a line like a road (Build line), skipping tiles that have a wall or gate; a diagonal line closes the way,
   since two wall tiles touching at a corner do (see Step).
 - **House:** a building in a city's area where a fixed number of residents live (the number is in `balance.ts` and the Wiki). A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
@@ -884,7 +898,8 @@ The shared language of the game. Domain terms only — no implementation details
   running the same script with Run script or as a queue step works like giving the task.
   Build's is `site`, a construction site to join; laying out a new one (its kind and place)
   stays the Build order's. Haul's is `carriage`; its route (where to, which goods) comes only
-  from the Haul order, so Haul started without one ends ("no route given"). The target param is
+  from the Haul order, so Haul started without one ends ("no route given"). Build line has no
+  target param: its line comes only from the order, so it ends without one too. The target param is
   never kept: each start fills it (the task order, or what the Player picks before it starts) or
   leaves it unset; the script's other params are kept as usual.
 - **Defence script:** the script a resident runs when struck: the game's **Defend** default (armed,
