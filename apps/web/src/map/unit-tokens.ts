@@ -42,7 +42,10 @@ export interface UnitWorld {
   buildings: readonly Pick<Building, 'kind' | 'x' | 'y'>[]
 }
 
-/** Where a resident's token was drawn this frame, for the selection ring. */
+/**
+ * Where a resident's or carriage's token was drawn this frame, for the selection ring and the
+ * picked residents' places (`map/places.ts`).
+ */
 export interface Spot {
   x: number
   y: number
@@ -189,7 +192,7 @@ export function drawUnits(
     )
     const aboard = k.passengerIds ?? []
     if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)
-    for (const id of aboard) spots.set(id, { x: p[0], y: p[1], r })
+    for (const id of [k.id, ...aboard]) spots.set(id, { x: p[0], y: p[1], r })
   }
 
   // People step to the lower right of a building or a cart on their tile.

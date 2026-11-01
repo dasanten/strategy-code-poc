@@ -462,6 +462,18 @@ export function Wiki() {
           button on the map), or Shift-click residents to add them or take them out.
         </p>
         <p>
+          While residents are picked, the map draws the way each of them is going, as a line ending
+          in a dot: walking, driving or hauling somewhere, storing or fetching, walking to the next
+          tile of a road or wall line, or going after someone. So a script that fetches food shows
+          its way to the storage too. A passenger’s way is the carriage’s.
+        </p>
+        <p>
+          In the same colour the map outlines the places they are set on: the buildings and
+          carriages their script’s params name, and where their order heads for (the workplace
+          they work, the site they build, the storage or carriage they store at or fetch from, both
+          stops of a haul). Only places you can see or remember are outlined.
+        </p>
+        <p>
           On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
           long-press does what right-click does. Turn on Select to make a one-finger drag box a
           group instead of panning.
@@ -1180,7 +1192,9 @@ export function Wiki() {
           work column above). One road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along
           a line that runs straight or diagonal. A wall can be built along a line the same way, past
           tiles with a wall or gate already; a diagonal wall line closes the way like a straight
-          one.
+          one. The tiles your residents' road and wall lines still have to build, running or waiting
+          in their queues, show faintly on your map, the picked residents' stronger; only you see
+          them.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
