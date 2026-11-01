@@ -468,6 +468,12 @@ export function Wiki() {
           its way to the storage too. A passenger’s way is the carriage’s.
         </p>
         <p>
+          In the same colour the map outlines the places they are set on: the buildings and
+          carriages their script’s params name, and where their order heads for (the workplace
+          they work, the site they build, the storage or carriage they store at or fetch from, both
+          stops of a haul). Only places you can see or remember are outlined.
+        </p>
+        <p>
           On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
           long-press does what right-click does. Turn on Select to make a one-finger drag box a
           group instead of panning.
