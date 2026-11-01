@@ -170,6 +170,15 @@ const SHARED: readonly ScriptBinding[] = [
       'The materials a construction site still lacks, as a list like [{good: "wood", units: 12}]; empty once it has them all, and for a finished building.',
   },
   {
+    name: 'lineTiles',
+    is: 'query',
+    params: ['line', 'from?'],
+    returns: { list: { view: 'lineTile' } },
+    cost: SCRIPT_LIST_QUERY_COST,
+    description:
+      'The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: "wall", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out.',
+  },
+  {
     name: 'terrainAt',
     is: 'query',
     params: ['x', 'y'],

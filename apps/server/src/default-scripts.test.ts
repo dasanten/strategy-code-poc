@@ -90,6 +90,7 @@ describe('a Player’s default scripts', () => {
     expect(list.map((s) => [s.name, s.task, s.followsDefault])).toEqual([
       ['Breed horses (default)', 'breed', true],
       ['Build (default)', 'build', true],
+      ['Build line (default)', 'buildLine', true],
       ['Defend (default)', 'defend', true],
       ['Feed the stable (default)', 'feedStable', true],
       ['Haul (default)', 'haul', true],
@@ -692,7 +693,38 @@ describe('the step budget', () => {
       world.buildings = world.buildings.filter((b) => b.id !== 'farm')
       world.buildings.push({ id: 'g1', kind: 'trainingGround', cityId: null, x: 3, y: 3 })
     }
+    const line = { building: 'road', from: { x: 4, y: 10 }, to: { x: 12, y: 10 } }
+    /** Road sites on every tile of `line`, w1 on the first, building it while `building`. */
+    const roadSites = (world: WorldState, building: boolean) => {
+      for (let x = 4; x <= 12; x++) {
+        const site = { delivered: {}, work: 0 }
+        world.buildings.push({ id: `rd${x}`, kind: 'road', cityId: null, x, y: 10, site })
+      }
+      const w1 = world.residents[0]!
+      ;[w1.x, w1.y] = [4, 10]
+      if (building)
+        w1.order = { kind: 'build', building: 'road', at: { x: 4, y: 10 }, siteId: 'rd4' }
+    }
     const cases: Record<Task, Case[]> = {
+      buildLine: [
+        // Starting: walking to the nearest tile.
+        { memory: { line }, prepare: () => {} },
+        // At a site lacking stone: fetching from the nearest of many storages, the farthest
+        // holding stone.
+        {
+          memory: { line, at: { x: 4, y: 10 } },
+          prepare: (world) => {
+            roadSites(world, true)
+            for (let i = 0; i < 10; i++) {
+              const stock = i === 9 ? { stone: 100 } : { wood: 5 }
+              const at = { x: 3 + i, y: 13 }
+              world.buildings.push({ id: `s${i}`, kind: 'storage', cityId: 'c1', ...at, stock })
+            }
+          },
+        },
+        // No stone anywhere and every tile laid out: looking for one, then ending.
+        { memory: { line, noStock: ['stone'] }, prepare: (world) => roadSites(world, false) },
+      ],
       build: [
         // Starting: laying out, or turned down with the tile taken.
         { memory: { building: 'stable', at: { x: 3, y: 3 } }, prepare: () => {} },

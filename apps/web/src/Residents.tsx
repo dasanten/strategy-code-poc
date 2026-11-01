@@ -297,7 +297,9 @@ const workSpan = (ticks: number) => {
  * What the map is waiting for a tile for: to walk or drive there, a haul route's other stop, or
  * the far end of a road along a line.
  */
-export type Picking = false | 'walk' | 'drive' | 'haul' | 'road' | 'wall'
+/** What the map waits for a tile for: a Build line's start, then its end (`CONTEXT.md`: Build line). */
+export type Picking =
+  false | 'walk' | 'drive' | 'haul' | 'roadFrom' | 'roadTo' | 'wallFrom' | 'wallTo'
 
 /** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
 export interface HaulSetup {
@@ -1618,9 +1620,9 @@ export function ResidentCard({
   onDriveTo: () => void
   /** Starts (or cancels) picking the other stop of a haul route carrying these goods. */
   onHaulTo: (setup: HaulSetup) => void
-  /** Starts (or cancels) picking the far end of a road to build along a line from here. */
+  /** Starts (or cancels) picking the two ends of a road to build along a line (Build line). */
   onRoadTo: () => void
-  /** Starts (or cancels) picking the far end of a wall to build along a line from here. */
+  /** Starts (or cancels) picking the two ends of a wall to build along a line (Build line). */
   onWallTo: () => void
   /** Orders the resident to stop what they are doing. */
   onStop: () => void

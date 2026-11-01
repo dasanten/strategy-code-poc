@@ -583,20 +583,21 @@ describe('the group card’s other orders', () => {
     expect(why(haul)[0]).toEqual(['f', 'carrying a child'])
   })
 
-  it('builds road or wall along one line, the same for each adult', () => {
+  it('gives each adult the Build line task with the same line, road or wall', () => {
     const line = { from: { x: 1, y: 1 }, to: { x: 5, y: 1 } }
     const rs = [resident('a', 0, 0), resident('b', 9, 9), child('c', 0, 0), carrying('d', 0, 0)]
-    const road = send({ kind: 'line', line: 'roadLine', ...line }, rs)
+    const road = send({ kind: 'line', building: 'road', ...line }, rs)
     expect(orders(road)).toEqual([
-      { kind: 'roadLine', ...line, residentId: 'a' },
-      { kind: 'roadLine', ...line, residentId: 'b' },
+      { kind: 'task', task: 'buildLine', building: 'road', ...line, residentId: 'a' },
+      { kind: 'task', task: 'buildLine', building: 'road', ...line, residentId: 'b' },
     ])
     expect(why(road)).toEqual([
       ['c', 'a child'],
       ['d', 'carrying a child'],
     ])
-    expect(orders(send({ kind: 'line', line: 'wallLine', ...line }, rs))[0]).toMatchObject({
-      kind: 'wallLine',
+    expect(orders(send({ kind: 'line', building: 'wall', ...line }, rs))[0]).toMatchObject({
+      task: 'buildLine',
+      building: 'wall',
     })
   })
 

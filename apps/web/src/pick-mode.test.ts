@@ -64,6 +64,13 @@ describe('pickPrompt', () => {
     expect(pickPrompt(target, false)).toBe('Click the storage, stable or carriage for home')
   })
 
+  it('asks for a Build line’s start, then its end', () => {
+    expect(pickPrompt({ kind: 'resident', mode: 'wallFrom' }, true)).toBe(
+      'Tap where the wall starts',
+    )
+    expect(pickPrompt({ kind: 'resident', mode: 'wallTo' }, true)).toBe('Tap where the wall ends')
+  })
+
   it('says what a group or army order waits for', () => {
     expect(pickPrompt({ kind: 'group', mode: 'work' }, true)).toBe('Tap the workplace they work')
     expect(pickPrompt({ kind: 'army', mode: 'armyWalkTo' }, false)).toBe(

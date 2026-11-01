@@ -206,6 +206,13 @@ describe('step labels', () => {
     expect(stepLabel({ kind: 'mount', horseId: 'h1' }, {})).toBe('Mount a horse')
   })
 
+  it('names a Build line step’s road or wall and both its ends', () => {
+    const line = { building: 'road', from: { x: 3, y: 4 }, to: { x: 8, y: 4 } }
+    expect(stepLabel({ kind: 'task', task: 'buildLine', ...line }, {})).toBe(
+      'Build a road line from 3, 4 to 8, 4',
+    )
+  })
+
   it('names a place out of sight as last seen', () => {
     const lastSeen = [{ id: 'm2', kind: 'mine' as const }]
     expect(stepLabel({ kind: 'task', task: 'work', workplaceId: 'm2' }, { lastSeen })).toBe(
@@ -280,6 +287,13 @@ describe('the group planner', () => {
       expect(o.loop).toBe(true)
       expect(queueStepsProblem(o.steps)).toBeUndefined()
     }
+  })
+
+  it('Give to all gives each member the same Build line, with no walk before it', () => {
+    const line = { building: 'wall', from: { x: 30, y: 10 }, to: { x: 34, y: 14 } }
+    const buildLine: OrderRequest = { kind: 'task', task: 'buildLine', ...line }
+    const requests = giveToAll(planStep(EMPTY_PLAN, buildLine), members.slice(0, 2))
+    for (const o of requests) expect(o.steps).toEqual([{ order: buildLine }])
   })
 
   it('appending to a group adds the step after each member’s own steps', () => {

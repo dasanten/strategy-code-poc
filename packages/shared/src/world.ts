@@ -1,3 +1,4 @@
+import type { BuildLine } from './building.js'
 import type { Task } from './default-scripts.js'
 import type { OrderRequest, Remembered } from './protocol.js'
 import { Terrain } from './terrain.js'
@@ -304,6 +305,11 @@ export interface SeenScript {
   task?: Task
   building?: BuildingKind
   doing?: string
+  /**
+   * The line its Build line task builds (`TaskMemory`), for the map's ghosts (`CONTEXT.md`:
+   * Planned building); only for the owning Player.
+   */
+  line?: BuildLine
   /** It waits on the resident's order (`RunningScript.waitingSince`); only for the owning Player. */
   waiting?: true
   /**
