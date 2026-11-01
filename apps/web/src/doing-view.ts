@@ -90,6 +90,7 @@ function aboardLine(
 const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   work: 'workAt',
   build: 'build',
+  buildLine: 'build',
   haul: 'haul',
   tearDown: 'tearDown',
   breed: 'breed',
@@ -111,6 +112,8 @@ function taskLine(task: Task, building: SeenScript['building']): string {
   const name = building && BUILDING_NAMES[building]
   if (task === 'work') return name ? `Working the ${name}` : 'Working'
   if (task === 'build') return name ? `Building ${article(name)} ${name}` : 'Building'
+  if (task === 'buildLine')
+    return name ? `Building ${article(name)} ${name} line` : 'Building a line'
   if (task === 'tearDown') return name ? `Tearing down the ${name}` : 'Tearing down'
   if (task === 'feedStable') return 'Feeding the stable'
   if (task === 'train') return 'Training'

@@ -3,6 +3,7 @@ import {
   ARMY_SCRIPT_API,
   GOODS,
   HAUL_KEEP_FOOD,
+  ROAD_LINE_MAX_TILES,
   RECIPES,
   SCRIPT_ACTION_VALUE_MAX,
   SCRIPT_API,
@@ -16,6 +17,9 @@ import {
   teacherAt,
   traineesOf,
   buildingRealm,
+  constructionAt,
+  lineTile,
+  roadLine,
   crewTile,
   directivesFor,
   materialsNeeded,
@@ -29,6 +33,8 @@ import {
   wrapDistance,
   type Good,
   type Building,
+  type BuildLine,
+  type LineTile,
   type OrderRequest,
   type Queue,
   type Resident,
@@ -283,6 +289,25 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       return TERRAIN_NAMES.get(terrainAt(terrain, at.x, at.y)) ?? null
     },
     distance: ([a, b]) => wrapDistance(terrain.size, spot(a, 'distance'), spot(b, 'distance')),
+    // A tile out of sight is still to build, with its site where it is one of the side's own.
+    lineTiles: ([line, from]) => {
+      const { building, from: start, to } = lineOf(line)
+      const tiles = roadLine(start, to, terrain.size)
+      if (tiles.length > ROAD_LINE_MAX_TILES) {
+        throw new ScriptRuntimeError(`"lineTiles" covers at most ${ROAD_LINE_MAX_TILES} tiles`)
+      }
+      const out = tiles.flatMap(([x, y]): LineTile[] => {
+        if (inSight({ x, y }))
+          return [lineTile(world, building, x, y, terrain)].filter((t) => t !== undefined)
+        const site = constructionAt(world, x, y, building)
+        const ownSite = site?.site && site.kind === building && ownBuilding(site)
+        return [{ x, y, siteId: ownSite ? site.id : null }]
+      })
+      if (from == null) return out
+      const near = spot(from, 'lineTiles')
+      const away = (t: LineTile) => wrapDistance(terrain.size, near, t)
+      return out.sort((a, b) => away(a) - away(b))
+    },
   }
 
   /** Asks for an order for `me`, checked exactly as one from the UI. */
@@ -780,6 +805,16 @@ function tile(x: Value | undefined, y: Value | undefined, name: string): { x: nu
     throw new ScriptRuntimeError(`"${name}" needs a tile: two whole numbers x and y`)
   }
   return { x: x as number, y: y as number }
+}
+
+/** A Build line, as the Build line task keeps it in `memory.line` (`CONTEXT.md`: Build line). */
+function lineOf(value: Value | undefined): BuildLine {
+  const v = value as Record<string, Value> | undefined
+  const building = typeof v === 'object' && v !== null && !Array.isArray(v) ? v.building : undefined
+  if (building !== 'road' && building !== 'wall') {
+    throw new ScriptRuntimeError('"lineTiles" needs a line: {building: "road" or "wall", from, to}')
+  }
+  return { building, from: spot(v!.from, 'lineTiles'), to: spot(v!.to, 'lineTiles') }
 }
 
 /** Something with `x` and `y`, such as a resident or a building. */

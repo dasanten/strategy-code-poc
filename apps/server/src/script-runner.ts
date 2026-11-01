@@ -2,7 +2,11 @@ import { parse, run, scriptParams, type Program, type ScriptObject } from '@csp/
 import {
   buildAtProblem,
   buildingAt,
+  CARRYING_A_CHILD,
   constructionAt,
+  lineToBuild,
+  roadLine,
+  ROAD_LINE_MAX_TILES,
   canWork,
   DEFAULT_SCRIPTS,
   MAP_SIZE,
@@ -21,6 +25,7 @@ import {
   SCRIPT_STEP_BUDGET,
   SCRIPT_VALUE_LIMITS,
   type BuildingKind,
+  type BuildLine,
   type City,
   type OrderRequest,
   type Realm,
@@ -292,6 +297,16 @@ interface BuildTaskRequest extends OrderRequest {
   at?: { x: number; y: number }
 }
 
+/**
+ * Build line: road or wall along the line between two picked tiles (`CONTEXT.md`: Build line),
+ * wherever the resident stands.
+ */
+interface BuildLineTaskRequest extends OrderRequest, BuildLine {
+  kind: 'task'
+  task: 'buildLine'
+  residentId: string
+}
+
 /** Breed horses: the breed order's input, at the stable the resident stands at. */
 interface BreedTaskRequest extends OrderRequest {
   kind: 'task'
@@ -304,6 +319,7 @@ interface BreedTaskRequest extends OrderRequest {
 type TaskRequest = (
   | WorkTaskRequest
   | BuildTaskRequest
+  | BuildLineTaskRequest
   | HaulTaskRequest
   | TearDownTaskRequest
   | BreedTaskRequest
@@ -358,6 +374,13 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
       const memory: TaskMemory['build'] = { building: order.building, at }
       return { ...memory }
     }
+    case 'buildLine': {
+      const { building, from, to } = order
+      const memory: TaskMemory['buildLine'] = {
+        line: { building, from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y } },
+      }
+      return { ...memory }
+    }
     case 'haul': {
       const memory: TaskMemory['haul'] = {
         carriageId: order.carriageId,
@@ -400,7 +423,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * Build as the build order on the resident's tile or the one it names, Haul as the haul order to
  * a tile, Tear down as the tear-down order, Breed horses as the breed order, Train as the train
  * order. Feed the stable starts no order of its own: the resident stands in the stable and is
- * grown up. The param values it gives are checked
+ * grown up. Build line neither (`buildLineProblem`): the resident is grown up and the line has a
+ * tile to build. The param values it gives are checked
  * against the default script's and set first (`CONTEXT.md`: Before it starts), the task's target
  * in the script's target param (`withTargetParam`, `taskTarget`).
  */
@@ -436,7 +460,8 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
  * Tear down's building, the stable of Breed horses and Feed the stable, Haul's carriage, and for
  * Build the unfinished site of its kind it joins at `at` (or the resident's tile); none while
  * Build lays out a new one, which isn't there yet. Only one of the realm's own, which a param can
- * name; another's stays in the memory alone (`TaskMemory`).
+ * name; another's stays in the memory alone (`TaskMemory`). Build line has none: its line is in
+ * the memory alone.
  */
 function taskTarget(
   world: WorldState,
@@ -444,6 +469,7 @@ function taskTarget(
   o: TaskRequest,
   r: { x: number; y: number },
 ): string | undefined {
+  if (o.task === 'buildLine') return undefined
   const [id, type] =
     o.task === 'work'
       ? [o.workplaceId, 'building' as const]
@@ -495,6 +521,7 @@ function taskProblem(
     if (stableAt(world, r.x, r.y, size)?.id !== o.stableId) return 'not standing in that stable'
     return canWork(r, world.tick) ? undefined : 'children can’t store or fetch goods'
   }
+  if (o.task === 'buildLine') return buildLineProblem(world, r!, o, terrain)
   if (o.task === 'build' && o.at !== undefined) {
     // Somewhere else: checked as the build order there, once they have walked to it.
     const at = o.at as Partial<{ x: number; y: number }> | null
@@ -511,6 +538,35 @@ function taskProblem(
   if ((problem === 'already working here' || problem === 'already training here') && !r.script)
     return undefined
   return problem
+}
+
+const isTile = (t: unknown): t is { x: number; y: number } =>
+  typeof t === 'object' &&
+  t !== null &&
+  Number.isInteger((t as { x: unknown }).x) &&
+  Number.isInteger((t as { y: unknown }).y)
+
+/**
+ * Why resident `r` can't be given Build line on its line, if they can't (`CONTEXT.md`: Build
+ * line): a grown resident with no child to carry, road or wall, between two tiles at most
+ * `ROAD_LINE_MAX_TILES` apart along the line, with a tile still to build (`lineToBuild`).
+ */
+function buildLineProblem(
+  world: WorldState,
+  r: Resident,
+  o: Partial<BuildLineTaskRequest>,
+  terrain: TerrainMap | undefined,
+): string | undefined {
+  if (!canWork(r, world.tick)) return 'children can’t build'
+  if (r.carrying) return CARRYING_A_CHILD
+  if (o.building !== 'road' && o.building !== 'wall') return 'a line is of road or wall'
+  if (!isTile(o.from) || !isTile(o.to)) return 'the line must run between two tiles'
+  const line = { building: o.building, from: o.from, to: o.to }
+  if (roadLine(line.from, line.to, terrain?.size ?? MAP_SIZE).length > ROAD_LINE_MAX_TILES)
+    return `a line covers at most ${ROAD_LINE_MAX_TILES} tiles`
+  if (lineToBuild(world, line, terrain).length === 0)
+    return `no ${o.building} to build on that line`
+  return undefined
 }
 
 /**
@@ -683,6 +739,7 @@ export class ScriptRunner {
       const taskOf = (r: Resident) =>
         ran.has(r.id) && unedited(r) ? this.host.script(r.script!.scriptId)?.task : undefined
       out.push(...defaultsHaveATarget(world, taskOf))
+      out.push(...lineBuildersOnTheirLine(world, taskOf, this.terrain.size))
     }
     return out
   }
@@ -1149,15 +1206,21 @@ const TARGET_KNOWN: Partial<
     memory: ['to', 'carriageId'],
     without: 'Haul without a route or carriage',
   },
+  buildLine: {
+    invariant: 'line-builders-have-a-line',
+    memory: ['line'],
+    without: 'Build line without a line',
+  },
 }
 
 /**
  * Invariant (ADR 0004; `CONTEXT.md`: Default script, Started directly): a resident running the
- * Work, Build or Haul default as the game ships it (`taskOf` names the task, for those that
- * count) knows its target once it has run: Work its workplace (`memory.workplaceId`), Build the
- * site's kind and place (`memory.building`, `memory.at`), Haul its route and carriage
- * (`memory.to`, `memory.carriageId`). With none picked and none on their tile, or Haul with no
- * route, it ends, so nobody runs one for longer than a tick without its target.
+ * Work, Build, Haul or Build line default as the game ships it (`taskOf` names the task, for those
+ * that count) knows its target once it has run: Work its workplace (`memory.workplaceId`), Build
+ * the site's kind and place (`memory.building`, `memory.at`), Haul its route and carriage
+ * (`memory.to`, `memory.carriageId`), Build line its line (`memory.line`). With none picked and
+ * none on their tile, or Haul or Build line with no route or line, it ends, so nobody runs one for
+ * longer than a tick without its target.
  */
 export function defaultsHaveATarget(
   world: WorldState,
@@ -1175,6 +1238,40 @@ export function defaultsHaveATarget(
       message: `${r.id} runs ${known.without}`,
       entityIds: [r.id],
     })
+  }
+  return out
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Build line): a resident running the Build line default as
+ * the game ships it (`taskOf` names the task, for those that count) builds only on their line:
+ * the tile they took (`memory.at`) and the tile their build order is on are tiles of
+ * `memory.line`. Away from it they walk there, or fetch materials or Food at a storage.
+ */
+export function lineBuildersOnTheirLine(
+  world: WorldState,
+  taskOf: (r: Resident) => Task | undefined,
+  size: number,
+): InvariantViolation[] {
+  const out: InvariantViolation[] = []
+  for (const r of world.residents) {
+    if (!r.script || taskOf(r) !== 'buildLine') continue
+    const line = r.script.memory.line as BuildLine | null | undefined
+    if (!line) continue // `defaultsHaveATarget`
+    const tiles = new Set(roadLine(line.from, line.to, size).map(([x, y]) => `${x},${y}`))
+    const took = r.script.memory.at as { x: number; y: number } | null | undefined
+    const builds = r.order?.kind === 'build' ? r.order.at : undefined
+    for (const [what, t] of [
+      ['took', took],
+      ['builds on', builds],
+    ] as const) {
+      if (!t || tiles.has(`${t.x},${t.y}`)) continue
+      out.push({
+        invariant: 'line-builders-on-their-line',
+        message: `${r.id} ${what} (${t.x}, ${t.y}), off their ${line.building} line`,
+        entityIds: [r.id],
+      })
+    }
   }
   return out
 }

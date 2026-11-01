@@ -80,6 +80,7 @@ import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
+import type { Picking } from './Residents.js'
 
 /**
  * What the selection card shows (ADR 0008): one of the Player's residents, or a tile of the map
@@ -190,7 +191,7 @@ export interface ResidentHere {
   /** Walls and gates of other realms' cities, or of none, in sight. */
   wallsInSight: number
   /** What the map is waiting for a tile for. */
-  picking: false | 'walk' | 'drive' | 'haul' | 'road' | 'wall'
+  picking: Picking
   /**
    * For one of the Player's own residents who isn't their Leader: why the Leader can't hand the
    * realm over to them now (`CONTEXT.md`: Leader handover), undefined when they can. Absent for
@@ -243,6 +244,11 @@ export function residentActions(h: ResidentHere): CardAction[] {
   })
   const picks = (mode: ResidentHere['picking'], label: string) =>
     h.picking === mode ? { label: 'Pick a tile…', active: true as const } : { label }
+  // A Build line's two ends, its start first (`CONTEXT.md`: Build line).
+  const picksLine = (start: Picking, end: Picking, label: string) =>
+    h.picking === start || h.picking === end
+      ? { label: h.picking === start ? 'Pick the start…' : 'Pick the end…', active: true as const }
+      : { label }
   // Working, building, tearing down, hauling and pairing (`CONTEXT.md`: Child, Carrying).
   const works = h.adult && !h.carrying
   const actions: CardAction[] = []
@@ -294,8 +300,8 @@ export function residentActions(h: ResidentHere): CardAction[] {
         opens: true,
       }),
     )
-    add(row('roadTo', '', picks('road', 'Build road to')))
-    add(row('wallTo', '', picks('wall', 'Build wall to')))
+    add(row('roadTo', '', picksLine('roadFrom', 'roadTo', 'Build line: road')))
+    add(row('wallTo', '', picksLine('wallFrom', 'wallTo', 'Build line: wall')))
     const torn = [h.building, h.carriageSite, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
     if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
     if (h.building?.kind === 'stable' && !h.building.site)

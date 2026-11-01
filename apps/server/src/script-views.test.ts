@@ -210,6 +210,7 @@ describe('script views', () => {
       storages: 'storages()',
       walkTime: 'walkTime(me, building("s1"))',
       crewTile: 'crewTile(building("s1"))',
+      lineTiles: 'lineTiles({building: "road", from: {x: 10, y: 12}, to: {x: 13, y: 12}}, me)',
       tick: 'tick',
       mapSize: 'mapSize',
       random: 'random',
@@ -227,7 +228,15 @@ describe('script views', () => {
     expect(ids('buildings')).toEqual(expect.arrayContaining(['s1', 's2', 's3', 'site1']))
     expect(ids('cities')).toEqual(expect.arrayContaining(['c1', 'c2', 'c3']))
     expect(ids('lastSeen')).toEqual(['far1', 'c9'])
-    for (const name of ['horses', 'carriages', 'piles', 'nodes', 'directives', 'withMemory']) {
+    for (const name of [
+      'horses',
+      'carriages',
+      'piles',
+      'nodes',
+      'directives',
+      'withMemory',
+      'lineTiles',
+    ]) {
       expect((out[name] as unknown[]).length, name).toBeGreaterThan(0)
     }
     expect(out.materialsNeeded).not.toEqual([])

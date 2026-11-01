@@ -469,9 +469,9 @@ export function Wiki() {
         </p>
         <p>
           In the same colour the map outlines the places they are set on: the buildings and
-          carriages their script’s params name, and where their order heads for (the workplace
-          they work, the site they build, the storage or carriage they store at or fetch from, both
-          stops of a haul). Only places you can see or remember are outlined.
+          carriages their script’s params name, and where their order heads for (the workplace they
+          work, the site they build, the storage or carriage they store at or fetch from, both stops
+          of a haul). Only places you can see or remember are outlined.
         </p>
         <p>
           On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
@@ -1063,6 +1063,22 @@ export function Wiki() {
           there, Build ends and your realm log says why.
         </p>
         <p>
+          <strong>Build line</strong> builds road or wall along a line: on a resident's card pick{' '}
+          <em>Build line: road</em> or <em>Build line: wall</em>, then the tile where the line
+          starts and the one where it ends, straight or diagonal, at most {num(ROAD_LINE_MAX_TILES)}{' '}
+          tiles. The resident walks to the line themselves and builds its tiles one at a time, the
+          nearest still to build first; tiles that have one already, or can't take one, are skipped.
+          What they carry goes in first. Lacking materials for their tile, they fetch them from
+          their <code>source</code>, or the nearest storage of your realm holding them, as much as
+          they can carry for this tile and the next ones, topping up their own food there too. With
+          none in any storage they lay out each tile's site and go on to the next; once the whole
+          line is laid out or built they stop, and your realm log says why (“no stone in any
+          storage”), so the line shows and can be finished later. Build line has Build's params; its
+          line comes only from the order, so run directly, with Run script or as a queue step, it
+          ends at once (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code>{' '}
+          actions, which build only with what the resident carries, stay for your scripts.
+        </p>
+        <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
           <strong>outpost storage</strong>: it belongs to the realm whose residents finished it and
           counts as a storage of your realm everywhere (Store, Fetch, carrying the output, fetching
@@ -1160,12 +1176,12 @@ export function Wiki() {
           {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work.
           It goes on any land a resident can walk, mountains too: there it takes the same materials
           but {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work, to build and to tear down (the road
-          work column above). One road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along
-          a line that runs straight or diagonal. A wall can be built along a line the same way, past
-          tiles with a wall or gate already; a diagonal wall line closes the way like a straight
-          one. The tiles your residents' road and wall lines still have to build, running or waiting
-          in their queues, show faintly on your map, the picked residents' stronger; only you see
-          them.
+          work column above). Roads are built along a line with <strong>Build line</strong> (see{' '}
+          <a href="#building">Building</a>): at most {num(ROAD_LINE_MAX_TILES)} tiles, straight or
+          diagonal. A wall is built along a line the same way, past tiles with a wall or gate
+          already; a diagonal wall line closes the way like a straight one. The tiles your
+          residents' road and wall lines still have to build, running or waiting in their queues,
+          show faintly on your map, the picked residents' stronger; only you see them.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
