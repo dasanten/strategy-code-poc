@@ -58,6 +58,7 @@ export type ScriptViewName =
   | 'directive'
   | 'directiveGoal'
   | 'material'
+  | 'lineTile'
 
 const field = (
   name: string,
@@ -689,6 +690,19 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     fields: [
       field('good', 'string', 'The good.'),
       field('units', 'number', 'How many units it lacks.'),
+    ],
+  },
+  lineTile: {
+    description: 'A tile of a Build line still to build.',
+    fields: [
+      field('x', 'number', 'From west to east.'),
+      field('y', 'number', 'From north to south.'),
+      field(
+        'siteId',
+        'string',
+        'The construction site of the line’s road or wall on it.',
+        'while none is laid out there',
+      ),
     ],
   },
 }

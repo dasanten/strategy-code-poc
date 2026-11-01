@@ -278,9 +278,11 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
   if (!own) return { scriptId: script.scriptId }
   const { memory } = script
   const id = memory.workplaceId ?? memory.buildingId
+  // Build line's kind is its line's (`TaskMemory`).
+  const kind = memory.building ?? (memory.line as { building?: unknown } | null)?.building
   const building =
-    typeof memory.building === 'string' && Object.hasOwn(FOOTPRINT, memory.building)
-      ? (memory.building as BuildingKind)
+    typeof kind === 'string' && Object.hasOwn(FOOTPRINT, kind)
+      ? (kind as BuildingKind)
       : world.buildings.find((b) => typeof id === 'string' && b.id === id)?.kind
   return {
     scriptId: script.scriptId,

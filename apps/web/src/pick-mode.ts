@@ -43,8 +43,10 @@ const RESIDENT_PROMPTS: Record<Exclude<Picking, false>, string> = {
   walk: 'where to walk',
   drive: 'where to drive the carriage',
   haul: 'where the haul route’s other stop is',
-  road: 'where the road ends',
-  wall: 'where the wall ends',
+  roadFrom: 'where the road starts',
+  roadTo: 'where the road ends',
+  wallFrom: 'where the wall starts',
+  wallTo: 'where the wall ends',
 }
 
 const GROUP_PROMPTS: Record<Exclude<GroupPicking, false>, string> = {
@@ -78,8 +80,10 @@ const PARAM_PROMPTS: Record<ScriptParam['type'], string> = {
 
 /** What picking a tile does for the picked resident, said under the banner where it needs more. */
 const RESIDENT_HINTS: Partial<Record<Exclude<Picking, false>, string>> = {
-  road: `Builds road from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the stone carried; without more, the resident waits on the next site until someone delivers it.`,
-  wall: `Builds wall from here to there, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, one after another, with the wood carried, past tiles with a wall or gate; without more, the resident waits on the next site until someone delivers it.`,
+  roadFrom: 'Then where it ends; the resident walks there and builds along the line.',
+  roadTo: `Builds road along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, fetching stone from storage; with none, the sites are laid out for later.`,
+  wallFrom: 'Then where it ends; the resident walks there and builds along the line.',
+  wallTo: `Builds wall along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, past tiles with a wall or gate, fetching wood from storage; with none, the sites are laid out for later.`,
 }
 
 /** What picking a tile does for a group, said under the banner. */

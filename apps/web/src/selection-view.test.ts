@@ -234,6 +234,15 @@ describe('the actions on a resident’s card', () => {
     expect(walk).toMatchObject({ active: true, label: 'Pick a tile…' })
   })
 
+  it('offers Build line for road and wall, picking its start and then its end', () => {
+    const line = (picking: ResidentHere['picking']) =>
+      residentActions(here({ picking })).find((a) => a.id === 'wallTo')!
+    expect(line(false)).toMatchObject({ label: 'Build line: wall' })
+    expect(line('wallFrom')).toMatchObject({ active: true, label: 'Pick the start…' })
+    expect(line('wallTo')).toMatchObject({ active: true, label: 'Pick the end…' })
+    expect(line('roadFrom')).not.toHaveProperty('active')
+  })
+
   it('offers mounting with a free horse on their tile, and dismounting while they ride', () => {
     expect(ids(here())).not.toContain('ride')
     const mount = residentActions(here({ horseToRide: true })).find((a) => a.id === 'ride')

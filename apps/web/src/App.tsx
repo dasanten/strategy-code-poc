@@ -231,6 +231,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // What the group order being picked needs besides the tile, and a line's first end.
   const [groupPickWith, setGroupPickWith] = useState<GroupPickWith>({})
   const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
+  // The start picked for the picked resident's Build line, while they pick its end.
+  const [lineFrom, setLineFrom] = useState<{ x: number; y: number }>()
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
   const [groupReport, setGroupReport] = useState<{ sent: number; of: number; skipped: Skipped[] }>()
   const [groupError, setGroupError] = useState<string>()
@@ -409,8 +411,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
    * carriage on their tile there, or, while picking a haul route's other stop, to haul between
-   * their tile and that one, or, while picking a road's or wall's far end, to build it along the
-   * line from their tile to that one (ADR 0002: the server checks it).
+   * their tile and that one, or, while picking a road's or wall's two ends, to build it along the
+   * line between them with the Build line task (ADR 0002: the server checks it).
    */
   async function goTo(x: number, y: number) {
     const mode = picking
@@ -466,10 +468,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setOrderError(await giveOrder({ ...order, x, y, ...haulSetup }))
       return
     }
-    if (mode === 'road' || mode === 'wall') {
-      const kind = mode === 'road' ? 'roadLine' : 'wallLine'
-      const from = { x: selected.x, y: selected.y }
-      setOrderError(await giveOrder({ kind, residentId: selected.id, from, to: { x, y } }))
+    if (mode === 'roadFrom' || mode === 'wallFrom') {
+      // Then the line's other end.
+      setLineFrom({ x, y })
+      setPicking(mode === 'roadFrom' ? 'roadTo' : 'wallTo')
+      return
+    }
+    if ((mode === 'roadTo' || mode === 'wallTo') && lineFrom) {
+      // The Build line task: they run the Player's Build line (default) script (`CONTEXT.md`: Build line).
+      const building = mode === 'roadTo' ? 'road' : 'wall'
+      const order = { kind: 'task', task: 'buildLine', residentId: selected.id, building }
+      setLineFrom(undefined)
+      setOrderError(await giveOrder({ ...order, from: lineFrom, to: { x, y } }))
       return
     }
     setOrderError(await giveOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
@@ -1274,8 +1284,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
             carriage={onTile(world.carriages.filter(loadKnown))}
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
-            onRoadTo={() => setPicking((p) => (p === 'road' ? false : 'road'))}
-            onWallTo={() => setPicking((p) => (p === 'wall' ? false : 'wall'))}
+            onRoadTo={() =>
+              setPicking((p) => (p === 'roadFrom' || p === 'roadTo' ? false : 'roadFrom'))
+            }
+            onWallTo={() =>
+              setPicking((p) => (p === 'wallFrom' || p === 'wallTo' ? false : 'wallFrom'))
+            }
             onHaulTo={(setup) => {
               setHaulSetup(setup)
               setPicking((p) => (p === 'haul' ? false : 'haul'))

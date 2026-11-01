@@ -17,6 +17,7 @@ import {
   STABLE_FEED_DAYS,
   WORK_FOOD_KEPT,
 } from './balance.js'
+import type { BuildLine } from './building.js'
 import { FOOTPRINT } from './footprint.js'
 
 /**
@@ -32,6 +33,7 @@ export const TASKS = [
   'feedStable',
   'defend',
   'train',
+  'buildLine',
 ] as const
 export type Task = (typeof TASKS)[number]
 
@@ -72,6 +74,12 @@ export interface TaskMemory {
    * (`TARGET_PARAMS`); started without this memory, the default takes both from that site.
    */
   build: { building: string; at: { x: number; y: number } }
+  /**
+   * Build line: the line, road or wall between two picked tiles (`CONTEXT.md`: Build line). It
+   * comes only from here, like Haul's route, so the default started without it ends. Residents
+   * given the same line keep the same `line`, so `withMemory("line", memory.line)` finds them.
+   */
+  buildLine: { line: BuildLine }
   /**
    * Haul: the carriage, the route's stops (`from` the tile the resident stood on when given it),
    * the goods going to `to` and those coming back, and the Food kept on board for the horse. The
@@ -677,6 +685,211 @@ fn goodsOf(missing) {
   let goods = []
   for (m of missing) { goods[goods.length] = m.good }
   return goods
+}
+
+${GET_FOOD}
+
+${LOG_TEXT}
+`,
+  },
+  buildLine: {
+    name: 'Build line',
+    source: `// Build line (default): build memory.line.building, road or wall, on each
+// tile of the line from memory.line.from to memory.line.to, straight or
+// diagonal, as the Build line order gives it; started without one I end.
+// Tiles that have one already, or can't take one, are skipped. I take the
+// nearest tile still to build, walk there, lay out its site or join the one
+// there, and build it. What I carry goes in first; lacking some, I fetch
+// from params.source, or the nearest storage of my realm holding them while
+// none is picked, as much as I can carry for this tile and the next ones,
+// topping my food up to params.foodTake there. With none in any storage I
+// lay out each tile's site and go on to the next; once all are laid out I
+// end, saying why. Below params.foodAt units of Food on me I get Food up to
+// params.foodTake at params.source, or the nearest storage of my realm with
+// Food, and come back. foodAt 0 turns getting food off.
+param source: storage // where materials come from; a carriage too
+${FOOD_PARAMS}
+
+if (memory.line == null) {
+  end("no line given")
+  return
+}
+if (me.order != null && me.order.kind != "build") { // on my way
+  wait()
+  return
+}
+
+let tiles = lineTiles(memory.line, me) // nearest first
+if (me.order == null) {
+  let tile = pickTile(tiles)
+  if (tile == null) {
+    endLine(tiles)
+    return
+  }
+  if (walkThere(tile)) { return }
+  // With no Food anywhere, I build on.
+  if (getFoodIfLow(params.source, me)) { return }
+  startBuilding(tile)
+  return
+}
+if (me.order.siteId == null) { return } // laid out at the end of the tick
+let site = building(me.order.siteId)
+if (site == null || bringCarried(site)) { return }
+if (getFoodIfLow(params.source, me)) { return }
+fetchMissing(site, tiles)
+
+// The tile I build next, kept in memory.at: the nearest still to build, and
+// while no storage holds materials the nearest not laid out yet. Null once
+// there is none.
+fn pickTile(tiles) {
+  for (t of tiles) {
+    if (memory.noStock == null || t.siteId == null) {
+      memory.at = {x: t.x, y: t.y}
+      return t
+    }
+  }
+  memory.at = null
+  return null
+}
+
+// No tile left to take: the line is built, or every tile left is laid out
+// and still no storage holds materials. With some there again, I go on.
+fn endLine(tiles) {
+  if (tiles.length == 0) {
+    log("the " + memory.line.building + " line is finished")
+    end()
+  } else if (materialsFrom(me, memory.noStock) != null) {
+    log("there is " + goodsNames(memory.noStock) + " again: building the laid-out sites")
+    memory.noStock = null
+  } else {
+    end("no " + goodsNames(memory.noStock) + " in any storage")
+  }
+}
+
+// Not on the tile yet: walk there, once. True until I am there; with no way
+// there I end.
+fn walkThere(tile) {
+  if (me.x == tile.x && me.y == tile.y) {
+    memory.walkedTo = null
+    return false
+  }
+  let walked = memory.walkedTo
+  if (walked != null && walked.x == tile.x && walked.y == tile.y) {
+    end("no way to " + tile.x + "," + tile.y)
+    return true
+  }
+  memory.walkedTo = {x: tile.x, y: tile.y}
+  let problem = walkTo(tile.x, tile.y)
+  if (problem == null) { wait() } // until I am there
+  else { end("can't walk to " + tile.x + "," + tile.y + ": " + problem) }
+  return true
+}
+
+// Laying out the tile's site, or joining the one there. Turned down, I end
+// saying why.
+fn startBuilding(tile) {
+  let problem = build(memory.line.building)
+  if (problem != null) {
+    end("can't build at " + tile.x + "," + tile.y + ": " + problem)
+  } else if (tile.siteId == null) {
+    log("laying out a " + memory.line.building + " at " + tile.x + "," + tile.y)
+  }
+}
+
+// What I carry of what the site lacks goes in first. True once I drop it.
+fn bringCarried(site) {
+  let needed = materialsNeeded(site)
+  let mine = carriedOf(me, needed)
+  if (mine == null) { return false }
+  drop({kind: "site", siteId: site.id}, mine)
+  log("bringing " + goodsText(mine, goodsOf(needed)) + " to the site")
+  return true
+}
+
+// Lacking materials for my tile: fetch them from params.source, or the
+// nearest storage holding them, for this tile and the next ones, as much as
+// I can carry, with my food topped up to params.foodTake. With none in any
+// storage I leave the site laid out and go on to the next tile.
+fn fetchMissing(site, tiles) {
+  let missing = materialsNeeded(site)
+  if (missing.length == 0) { return }
+  let goods = goodsOf(missing)
+  let from = materialsFrom(site, goods)
+  if (from == null) {
+    if (memory.noStock == null) {
+      log("no " + goodsNames(goods) + " in any storage: laying out the rest of the line")
+    }
+    memory.noStock = goods
+    stop()
+    return
+  }
+  memory.noStock = null
+  let load = {}
+  let topUp = foodToTake()
+  if (topUp > 0) { load.food = topUp }
+  let more = tiles.length - 1 // the next tiles still to build
+  for (m of missing) {
+    let perTile = m.units // what a tile takes: what this one lacks and has
+    let had = site.site.delivered[m.good]
+    if (had != null) { perTile = perTile + had }
+    let units = m.units + perTile * more
+    let room = fits(m.good)
+    if (units > room) { units = room }
+    load[m.good] = units
+  }
+  if (fetch(load, from.id) == null) {
+    wait() // until I have it
+    log("fetching " + goodsText(load, goods) + " at " + placeName(from))
+  }
+}
+
+// Where materials come from: params.source while it holds some of goods,
+// else, while none is picked, the nearest storage of my realm holding some.
+fn materialsFrom(near, goods) {
+  let from = params.source
+  if (from == null) {
+    let stores = storages(near, goods) // nearest first, holding some
+    if (stores.length == 0) { return null }
+    return stores[0]
+  }
+  let held = from.stock
+  if (held == null) { held = from.load } // a carriage
+  if (held == null) { return null }
+  for (g of goods) {
+    if (held[g] != null && held[g] > 0) { return from }
+  }
+  return null
+}
+
+// What someone carries of what the site lacks; null if nothing.
+fn carriedOf(r, missing) {
+  let load = null
+  for (m of missing) {
+    let n = r.carried[m.good]
+    if (n != null && n > 0) {
+      if (n > m.units) { n = m.units }
+      if (load == null) { load = {} }
+      load[m.good] = n
+    }
+  }
+  return load
+}
+
+// The goods of what the site lacks.
+fn goodsOf(missing) {
+  let goods = []
+  for (m of missing) { goods[goods.length] = m.good }
+  return goods
+}
+
+// Goods by name for my log: "stone", or "wood and stone".
+fn goodsNames(goods) {
+  let text = ""
+  for (g of goods) {
+    if (text != "") { text = text + " and " }
+    text = text + g
+  }
+  return text
 }
 
 ${GET_FOOD}
