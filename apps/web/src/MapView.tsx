@@ -528,7 +528,7 @@ export function MapView({
       drawnSpots = spots
       // Tokens still on their way, and residents at work, ask for another frame.
       if (motion.moving(now) || sways.size > 0) redraw()
-      // A ring round each selected resident; the way ahead only when there is just one.
+      // A ring round each selected resident, and the way ahead of each.
       const ids = selectedRef.current
       let rings = false
       for (const id of ids) {
@@ -538,8 +538,10 @@ export function MapView({
         rings = true
       }
       if (rings) g.stroke({ width: 2.5, color: LEADER_COLOR })
-      const selected = ids.length === 1 ? world.residents.find((u) => u.id === ids[0]) : undefined
-      if (selected) drawPath(g, cam, view, mapSize, selected, world.residents)
+      for (const id of ids) {
+        const selected = world.residents.find((u) => u.id === id)
+        if (selected) drawPath(g, cam, view, mapSize, selected, world.residents)
+      }
     }
 
     function setCam(next: Camera) {

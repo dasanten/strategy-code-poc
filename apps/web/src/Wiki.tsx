@@ -462,6 +462,12 @@ export function Wiki() {
           button on the map), or Shift-click residents to add them or take them out.
         </p>
         <p>
+          While residents are picked, the map draws the way each of them is going, as a line ending
+          in a dot: walking, driving or hauling somewhere, storing or fetching, walking to the next
+          tile of a road or wall line, or going after someone. So a script that fetches food shows
+          its way to the storage too. A passenger’s way is the carriage’s.
+        </p>
+        <p>
           On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
           long-press does what right-click does. Turn on Select to make a one-finger drag box a
           group instead of panning.
