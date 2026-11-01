@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { QueueStepRequest } from '@csp/shared'
+import { stepLine, type QueueStepRequest } from '@csp/shared'
 import { stepRow } from './queue-view.js'
 import { planRows, stepCount, unroll, withIds, type PlanItem } from './plan-blocks.js'
 import {
@@ -45,6 +45,19 @@ describe('saved queues', () => {
     ;((loaded[2] as QueueStepRequest).order.goods as string[]).push('wood')
     expect((load(queues, 'Mine run')[2] as QueueStepRequest).order.goods).toEqual(['stone'])
     expect(load(queues, 'Nothing here')).toEqual([])
+  })
+
+  it('keeps a Build line step’s two tiles through storage', () => {
+    const line = { building: 'wall', from: { x: 30, y: 10 }, to: { x: 34, y: 14 } }
+    const steps: QueueStepRequest[] = [
+      { id: 1, order: { kind: 'task', task: 'work', workplaceId: 'b1' }, minutes: 120 },
+      { id: 2, order: { kind: 'task', task: 'buildLine', ...line } },
+    ]
+    const storage = memory()
+    storeQueues(storage, 'r1', save({}, 'Wall run', steps, 1000))
+    const loaded = load(readQueues(storage, 'r1'), 'Wall run')
+    expect(loaded[1]).toEqual({ order: { kind: 'task', task: 'buildLine', ...line } })
+    expect(stepLine((loaded[1] as QueueStepRequest).order)).toEqual(line)
   })
 
   it('saves nothing with no name or no steps', () => {

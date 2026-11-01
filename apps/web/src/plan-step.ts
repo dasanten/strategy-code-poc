@@ -113,7 +113,7 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   },
   {
     id: 'road',
-    label: 'Build a road',
+    label: 'Build line: road',
     picks: [
       { pick: 'tile', prompt: 'where the road starts' },
       { pick: 'tile', prompt: 'where the road ends' },
@@ -121,7 +121,7 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   },
   {
     id: 'wall',
-    label: 'Build a wall',
+    label: 'Build line: wall',
     picks: [
       { pick: 'tile', prompt: 'where the wall starts' },
       { pick: 'tile', prompt: 'where the wall ends' },
@@ -330,7 +330,7 @@ type At = { x: number; y: number }
 /**
  * The order a planned step becomes, and the tile it acts on when it needs the resident standing
  * there; a walk there goes before it. Steps that go to their place themselves (walk, store,
- * fetch, build, a road or wall) have no `at`. Undefined while a place is still to be picked or
+ * fetch, build, a Build line) have no `at`. Undefined while a place is still to be picked or
  * the card's ask isn't answered.
  */
 export function planOrder(
@@ -369,8 +369,9 @@ export function planOrder(
       return { order: { kind: 'task', task: 'tearDown', buildingId: p.id }, at }
     case 'road':
     case 'wall': {
-      const kind = plan.kind === 'road' ? 'roadLine' : 'wallLine'
-      return { order: { kind, from: at, to: { x: q.x, y: q.y } } }
+      // The Build line task, as the card gives it; the builder walks to the line themselves.
+      const line = { building: plan.kind, from: at, to: { x: q.x, y: q.y } }
+      return { order: { kind: 'task', task: 'buildLine', ...line } }
     }
     case 'feedStable':
       return { order: { kind: 'task', task: 'feedStable', stableId: p.id }, at }

@@ -1,4 +1,5 @@
 import { QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS } from './balance.js'
+import type { BuildLine } from './building.js'
 import type { OrderRequest } from './protocol.js'
 import type { Queue } from './world.js'
 
@@ -50,6 +51,23 @@ export function neverEnds(order: OrderRequest): boolean {
   )
 }
 
+/**
+ * The line a Build line step carries (`CONTEXT.md`: Build line): road or wall and its two picked
+ * ends, as the task order gives it. Undefined for any other step, and for a Build line step
+ * without a whole line.
+ */
+export function stepLine(order: OrderRequest): BuildLine | undefined {
+  if (order.kind !== 'task' || order.task !== 'buildLine') return undefined
+  const tile = (p: unknown) => {
+    const { x, y } = (p ?? {}) as { x?: unknown; y?: unknown }
+    return Number.isInteger(x) && Number.isInteger(y) ? { x: x as number, y: y as number } : null
+  }
+  const [from, to] = [tile(order.from), tile(order.to)]
+  const { building } = order
+  if ((building !== 'road' && building !== 'wall') || !from || !to) return undefined
+  return { building, from, to }
+}
+
 /** A queue step as a request gives it: `id` names a step already in the queue being edited. */
 export interface QueueStepRequest {
   id?: number
@@ -60,7 +78,8 @@ export interface QueueStepRequest {
 /**
  * Why a list of queue steps can't be given, if it can't: each must be an order a step can be
  * (`QUEUE_STEP_KINDS`), at most `QUEUE_MAX_STEPS` of them, with a duration in whole game minutes
- * if any; one that never ends needs a duration unless it is the last.
+ * if any; one that never ends needs a duration unless it is the last. A Build line step carries
+ * its whole line (`stepLine`) and ends on its own once the line is built or laid out.
  */
 export function queueStepsProblem(steps: unknown): string | undefined {
   if (!Array.isArray(steps)) return 'the steps must be a list'
@@ -74,6 +93,8 @@ export function queueStepsProblem(steps: unknown): string | undefined {
     if (typeof order.kind !== 'string' || !QUEUE_STEP_KINDS.includes(order.kind))
       return `step ${n}: ${String(order.kind)} can't be a queue step`
     if (JSON.stringify(order).length > QUEUE_STEP_MAX_CHARS) return `step ${n} is too long`
+    if (order.kind === 'task' && order.task === 'buildLine' && !stepLine(order))
+      return `step ${n}: a Build line step needs road or wall and its two ends`
     const minutes = s!.minutes
     if (minutes !== undefined && !(Number.isInteger(minutes) && minutes > 0))
       return `step ${n}'s duration must be a whole number of minutes`

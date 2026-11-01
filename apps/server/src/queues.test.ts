@@ -344,6 +344,27 @@ describe('planning ahead', () => {
     expect(skips(s.world.events)).toEqual([])
   })
 
+  it('works for 2 hours, then builds a road line elsewhere, with no walk before it', () => {
+    // `CONTEXT.md`: Build line: a queue step whose two ends were picked on the map.
+    const s = farOff()
+    s.s1.stock!.stone = 20
+    const line = { building: 'road', from: { x: 14, y: 10 }, to: { x: 16, y: 10 } }
+    const buildLine = { order: { kind: 'task', task: 'buildLine', ...line } }
+    const work = { order: { kind: 'task', task: 'work', workplaceId: 'f1' }, minutes: 120 }
+    expect(s.reason('queue', [work, buildLine])).toBeUndefined()
+    const did: string[] = []
+    for (let i = 0; i < 20_000 && (i === 0 || s.r.queue); i++) {
+      s.tick()
+      const doing = s.r.order?.kind === 'workAt' ? 'work' : s.r.script?.memory?.line ? 'line' : ''
+      if (doing && did.at(-1) !== doing) did.push(doing)
+    }
+    expect(did).toEqual(['work', 'line'])
+    expect(s.r.queue).toBeUndefined()
+    const roads = s.world.buildings.filter((b) => b.kind === 'road' && !b.site)
+    expect(roads.map((b) => `${b.x},${b.y}`).sort()).toEqual(['14,10', '15,10', '16,10'])
+    expect(skips(s.world.events)).toEqual([])
+  })
+
   it('takes a step on another tile and skips it with a log line when it can’t start there', () => {
     const s = farOff()
     // Working f2 from (6, 6), with no walk there first.
@@ -360,6 +381,13 @@ describe('planning ahead', () => {
     expect(s.reason('queue', [walk(1, 1), walk(SIZE, 1)])).toBe('step 2: that tile is off the map')
     const road = { kind: 'roadLine', from: { x: 1, y: 1 }, to: { x: 1, y: -1 } }
     expect(s.reason('queue', [{ order: road }])).toBe('step 1: that tile is off the map')
+    const line = { kind: 'task', task: 'buildLine', building: 'wall', from: { x: 1, y: 1 } }
+    expect(s.reason('queue', [{ order: { ...line, to: { x: SIZE, y: 1 } } }])).toBe(
+      'step 1: that tile is off the map',
+    )
+    expect(s.reason('queue', [{ order: line }])).toBe(
+      'step 1: a Build line step needs road or wall and its two ends',
+    )
     expect(s.reason('queue', [{ order: { kind: 'board', carriageId: 'k9' } }])).toBe(
       'step 1: no such carriage',
     )
