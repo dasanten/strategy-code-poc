@@ -286,6 +286,94 @@ describe('moving in', () => {
   })
 })
 
+describe('relocating a group', () => {
+  /** Each of `group` told to relocate to `city` as one group, as the group card sends it. */
+  const relocateGroup = (world: WorldState, queue: OrderQueue, group: Resident[], city: City) =>
+    group.map((r) =>
+      queue.receive(world, me, `q-${r.id}`, {
+        kind: 'relocate',
+        residentId: r.id,
+        cityId: city.id,
+        group: group.map((x) => x.id),
+      }),
+    )
+  /** Three residents of the first city: Ana and two more, standing at (x, y). */
+  function threeOf(world: WorldState, ana: Resident, at: { x: number; y: number }) {
+    const group = [ana, addResident(world, 'bo', ana.cityId, at.x, at.y)]
+    group.push(addResident(world, 'cy', ana.cityId, at.x, at.y))
+    Object.assign(ana, at)
+    return group
+  }
+
+  it('turns all of them down when the city has no room for the whole group', () => {
+    const { world, first, second, queue, ana } = setup()
+    const group = threeOf(world, ana, townHallOf(world, first)!)
+    // Room for two of the three.
+    const hall = townHallOf(world, second)!
+    for (let i = 0; i < HOUSING_ROOM.house! - 2; i++)
+      addResident(world, `settler${i}`, second.id, hall.x, hall.y)
+    expect(relocateRoom(world, second)).toBe(2)
+    expect(relocateGroup(world, queue, group, second)).toEqual(
+      group.map(() => expect.objectContaining({ reason: 'free housing for 2 only' })),
+    )
+    queue.applyAll(world)
+    expect(group.every((r) => r.order?.kind !== 'relocate')).toBe(true)
+  })
+
+  it('turns all of them down when one of them carries a child or lives there', () => {
+    const { world, first, second, queue, ana } = setup()
+    const group = threeOf(world, ana, townHallOf(world, first)!)
+    carryChild(group[1]!, ana)
+    expect(relocateGroup(world, queue, group, second).map((a) => a.type)).toEqual(
+      group.map(() => 'rejected'),
+    )
+    delete group[1]!.carrying
+    group[2]!.cityId = second.id
+    expect(relocateGroup(world, queue, group, second)).toEqual(
+      group.map(() =>
+        expect.objectContaining({ reason: `${group[2]!.name} already lives in Redbank` }),
+      ),
+    )
+  })
+
+  it('turns it down for a group naming someone the sender may not order, or not naming them', () => {
+    const { world, first, second, queue, ana } = setup()
+    const hall = townHallOf(world, first)!
+    const bo = addResident(world, 'bo', first.id, hall.x, hall.y)
+    const send = (group: unknown) =>
+      order(world, queue, { kind: 'relocate', residentId: ana.id, cityId: second.id, group })
+    bo.owner = 'realm-other'
+    expect(send([ana.id, bo.id])).toMatchObject({ reason: 'not one of your residents' })
+    bo.owner = ana.owner
+    expect(send([bo.id])).toMatchObject({ reason: 'not one of your residents' })
+    expect(send([ana.id, ana.id])).toMatchObject({ reason: 'not one of your residents' })
+    expect(send('all')).toMatchObject({ reason: 'not one of your residents' })
+    expect(send([ana.id, bo.id]).type).toBe('ack')
+  })
+
+  it('moves them in while room lasts on arrival; the rest keep their city with a log line', () => {
+    const { world, terrain, first, second, queue, walking, ana } = setup()
+    // All three in its area already, so they arrive on the same tick.
+    const hall = townHallOf(world, second)!
+    const group = threeOf(world, ana, { x: hall.x - 1, y: hall.y })
+    expect(relocateGroup(world, queue, group, second).map((a) => a.type)).toEqual(
+      group.map(() => 'ack'),
+    )
+    queue.applyAll(world)
+    // Housing taken since: room for one of them is left.
+    for (let i = 0; i < HOUSING_ROOM.house! - 1; i++)
+      addResident(world, `settler${i}`, second.id, hall.x, hall.y)
+    stepWorld(world, terrain, walking)
+    expect(group.map((r) => r.cityId)).toEqual([second.id, first.id, first.id])
+    expect(group.every((r) => r.order === null)).toBe(true)
+    expect(world.events.filter((e) => e.kind === 'relocateFailed')).toMatchObject(
+      group.slice(1).map((r) => ({ name: r.name, city: 'Redbank', reason: 'no free housing' })),
+    )
+    expect(freeHousing(world, second)).toBe(0)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+})
+
 describe('failing to move in', () => {
   const failed = (world: WorldState) => world.events.filter((e) => e.kind === 'relocateFailed')
 

@@ -788,7 +788,9 @@ export function Wiki() {
           arrive the city must still have free housing and still be yours; if not, they stop, keep
           their old city and your realm log says why. Moving ends a pair, as a pair needs one city.
           A partner carrying a child can't relocate until it is born; the other partner can, and the
-          child is still born. NPC cities don't relocate anyone.
+          child is still born. NPC cities don't relocate anyone. A group relocates from the group
+          card, all of them or none: the city needs free housing for the whole group, and on arrival
+          each moves in while room lasts, anyone left over keeping their old city.
         </p>
       </Section>
 

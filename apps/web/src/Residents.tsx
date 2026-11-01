@@ -1043,6 +1043,7 @@ export function GroupCard({
   buildings,
   carriages = [],
   inSight = [],
+  cities,
   arrivesIn,
   horses = [],
   realmId,
@@ -1057,6 +1058,7 @@ export function GroupCard({
   onClose,
   planner,
   collapsed = false,
+  relocate,
 }: {
   residents: Resident[]
   scripts: ScriptSummary[]
@@ -1068,6 +1070,8 @@ export function GroupCard({
   carriages?: { carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>; seats: number }[]
   /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
   inSight?: readonly SeenResident[]
+  /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
+  cities?: readonly Pick<City, 'id' | 'name'>[]
   /** About how many ticks until a resident arrives where they walk, ride or drive (`arrivalTicks`). */
   arrivesIn?: (r: Resident) => number | undefined
   /** The queue planner (`GroupPlanner`), on the Queue tab (`CONTEXT.md`: Planning for a group). */
@@ -1093,11 +1097,16 @@ export function GroupCard({
   onClose: () => void
   /** Shrunk to its head while the map waits for a target (ADR 0012: pick mode). */
   collapsed?: boolean
+  /**
+   * The realm's cities to relocate the group to (`groupRelocateChoices`) and why they can't be
+   * told to at all, if they can't.
+   */
+  relocate?: { choices: RelocateChoice[]; problem: string | undefined }
 }) {
   const card = groupCard(residents)
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
   // The order whose panel is open under the buttons: what it needs before it goes out.
-  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed' | 'teach'>()
+  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed' | 'teach' | 'relocate'>()
   const [good, setGood] = useState<Good>('food')
   const numberParams = groupNumberParams(residents, scripts)
   const foodHint = foodParamsHint(numberParams.map((p) => p.name))
@@ -1182,7 +1191,7 @@ export function GroupCard({
           {label}
         </button>
       )
-    const opens = id as 'haul' | 'fetch' | 'breed' | 'teach'
+    const opens = id as 'haul' | 'fetch' | 'breed' | 'teach' | 'relocate'
     return (
       <button
         type="button"
@@ -1308,6 +1317,17 @@ export function GroupCard({
           </p>
         </section>
       )}
+      {tab === 'orders' && panel === 'relocate' && (
+        <GroupRelocateBlock
+          count={residents.length}
+          choices={relocate?.choices ?? []}
+          problem={relocate ? relocate.problem : 'your realm has no other city'}
+          onRelocate={(cityId) => {
+            setPanel(undefined)
+            onOrder({ kind: 'relocate', cityId })
+          }}
+        />
+      )}
       {tab === 'orders' && panel === 'haul' && (
         <HaulBlock
           adult
@@ -1357,7 +1377,13 @@ export function GroupCard({
             <li key={r.id}>
               <button type="button" onClick={() => onPick(r.id)}>
                 <strong>{r.name}</strong> ·{' '}
-                {doingLine(r, { scripts, buildings, residents: inSight, arrives: arrivesIn?.(r) })}
+                {doingLine(r, {
+                  scripts,
+                  buildings,
+                  residents: inSight,
+                  cities,
+                  arrives: arrivesIn?.(r),
+                })}
               </button>
             </li>
           ))}
@@ -3070,10 +3096,8 @@ function RelocateBlock({
   choices: RelocateChoice[]
   onRelocate: (cityId: string) => void
 }) {
-  const [cityId, setCityId] = useState('')
   const o = resident.order
   const going = o?.kind === 'relocate' ? choices.find((c) => c.id === o.cityId) : undefined
-  const picked = choices.find((c) => c.id === cityId && !c.problem)
   return (
     <section className="inspector-block" aria-label="Relocate">
       <div className="panel-head">
@@ -3085,25 +3109,75 @@ function RelocateBlock({
         {resident.name} walks there and moves in on stepping into its area, if it still has free
         housing then. Moving ends a pair.
       </p>
-      <div className="order-buttons">
-        <select aria-label="City" value={cityId} onChange={(e) => setCityId(e.target.value)}>
-          <option value="">Pick a city…</option>
-          {choices.map((c) => (
-            <option key={c.id} value={c.id} disabled={!!c.problem}>
-              {c.name} · {c.problem ?? `${c.room} free housing`}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="primary"
-          disabled={!picked}
-          onClick={() => picked && onRelocate(picked.id)}
-        >
-          Relocate
-        </button>
-      </div>
+      <CityPicker choices={choices} onRelocate={onRelocate} />
     </section>
+  )
+}
+
+/**
+ * Relocating a group from the group card (`CONTEXT.md`: Group, Relocate): the same picker, a city
+ * counting as full unless all of them fit; or why none of them can relocate.
+ */
+function GroupRelocateBlock({
+  count,
+  choices,
+  problem,
+  onRelocate,
+}: {
+  count: number
+  choices: RelocateChoice[]
+  problem: string | undefined
+  onRelocate: (cityId: string) => void
+}) {
+  return (
+    <section className="inspector-block" aria-label="Relocate">
+      <div className="panel-head">
+        <h3>Relocate</h3>
+      </div>
+      {problem ? (
+        <p className="muted small">Can’t relocate: {problem}.</p>
+      ) : (
+        <>
+          <p className="small">
+            All {count} walk there and move in on stepping into its area, while it still has free
+            housing; anyone left over keeps their old city. Moving ends a pair.
+          </p>
+          <CityPicker choices={choices} onRelocate={onRelocate} />
+        </>
+      )}
+    </section>
+  )
+}
+
+/** The realm's cities to relocate to, each with its free housing or why it can't be picked. */
+function CityPicker({
+  choices,
+  onRelocate,
+}: {
+  choices: RelocateChoice[]
+  onRelocate: (cityId: string) => void
+}) {
+  const [cityId, setCityId] = useState('')
+  const picked = choices.find((c) => c.id === cityId && !c.problem)
+  return (
+    <div className="order-buttons">
+      <select aria-label="City" value={cityId} onChange={(e) => setCityId(e.target.value)}>
+        <option value="">Pick a city…</option>
+        {choices.map((c) => (
+          <option key={c.id} value={c.id} disabled={!!c.problem}>
+            {c.name} · {c.problem ?? `${c.room} free housing`}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="primary"
+        disabled={!picked}
+        onClick={() => picked && onRelocate(picked.id)}
+      >
+        Relocate
+      </button>
+    </div>
   )
 }
 

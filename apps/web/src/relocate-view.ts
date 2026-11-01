@@ -36,25 +36,38 @@ export function knownOf<T extends { id: string }>(inSight: readonly T[], remembe
   return [...inSight, ...remembered.filter((x) => !seen.has(x.id))]
 }
 
+/** What relocating looks at of a resident told to. */
+type Relocating = Pick<Resident, 'id' | 'name' | 'owner' | 'cityId' | 'carrying'>
+
 /**
  * The realm's other cities a resident can be told to relocate to, by name, each with its free
  * housing counting those on their way and why the order can't go there, if it can't: the same
  * check the server runs (`relocateProblem`) on what the Player knows. The server checks again.
  */
-export function relocateChoices(
+export function relocateChoices(seen: RelocateSeen, realmId: string, r: Relocating) {
+  return groupRelocateChoices(seen, realmId, [r])
+}
+
+/**
+ * The same for a group on the group card (`CONTEXT.md`: Group, Relocate): the realm's cities but
+ * one they all live in, a city counting as full unless the whole group fits, and one some of them
+ * live in already refused with their name.
+ */
+export function groupRelocateChoices(
   seen: RelocateSeen,
   realmId: string,
-  r: Pick<Resident, 'id' | 'name' | 'owner' | 'cityId' | 'carrying'>,
+  residents: readonly Relocating[],
 ): RelocateChoice[] {
+  const ids = new Set(residents.map((r) => r.id))
   return seen.cities
-    .filter((c) => c.realmId === realmId && c.id !== r.cityId)
+    .filter((c) => c.realmId === realmId && !residents.every((r) => r.cityId === c.id))
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((c) => {
-      const problem = relocateProblem(seen, realmId, [r], c.id)
+      const problem = relocateProblem(seen, realmId, residents, c.id)
       return {
         id: c.id,
         name: c.name,
-        room: Math.max(0, relocateRoom(seen, c, new Set([r.id]))),
+        room: Math.max(0, relocateRoom(seen, c, ids)),
         ...(problem ? { problem } : {}),
       }
     })
@@ -71,4 +84,17 @@ export function relocateActionProblem(
   if (r.carrying) return CARRYING_A_CHILD
   if (choices.length === 0) return 'your realm has no other city'
   return undefined
+}
+
+/**
+ * The same for the group card: one of them carrying a child keeps the whole group from relocating,
+ * so the reason names them.
+ */
+export function groupRelocateActionProblem(
+  residents: readonly Pick<Resident, 'name' | 'carrying'>[],
+  choices: readonly RelocateChoice[],
+): string | undefined {
+  const carrying = residents.find((r) => r.carrying)
+  if (carrying) return `${carrying.name} is ${CARRYING_A_CHILD}`
+  return relocateActionProblem({}, choices)
 }
