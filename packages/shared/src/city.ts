@@ -193,8 +193,8 @@ const before = (p: Claim, q: Claim) =>
  * map's.
  */
 export function inCityArea(
-  world: Pick<WorldState, 'buildings'>,
-  city: City,
+  world: { buildings: readonly Building[] },
+  city: Pick<City, 'id'>,
   x: number,
   y: number,
   size: number,
@@ -219,7 +219,7 @@ export function citiesAt(
 
 /** Every tile in a city's area, as "x,y" keys on the map. */
 export function cityAreaTiles(
-  world: Pick<WorldState, 'buildings'>,
+  world: { buildings: readonly Building[] },
   city: City,
   size: number,
 ): Set<string> {
@@ -282,19 +282,28 @@ export function townHallOf(world: Pick<WorldState, 'buildings'>, city: City): Bu
 }
 
 /** The residents who live in a city, wherever they are standing. */
-export function cityResidents(world: WorldState, city: City): Resident[] {
+export function cityResidents<R extends Pick<Resident, 'cityId'>>(
+  world: { residents: readonly R[] },
+  city: Pick<City, 'id'>,
+): R[] {
   return world.residents.filter((r) => r.cityId === city.id)
 }
 
 /** How many residents a city's finished buildings house (`HOUSING_ROOM`); sites house nobody. */
-export function housingRoom(world: WorldState, city: City): number {
+export function housingRoom(
+  world: { buildings: readonly Building[] },
+  city: Pick<City, 'id'>,
+): number {
   return world.buildings
     .filter((b) => b.cityId === city.id && !b.site)
     .reduce((room, b) => room + (HOUSING_ROOM[b.kind] ?? 0), 0)
 }
 
 /** A city's free housing (`CONTEXT.md`: House): its room minus its residents. Can be below 0. */
-export function freeHousing(world: WorldState, city: City): number {
+export function freeHousing(
+  world: { buildings: readonly Building[]; residents: readonly Pick<Resident, 'cityId'>[] },
+  city: Pick<City, 'id'>,
+): number {
   return housingRoom(world, city) - cityResidents(world, city).length
 }
 

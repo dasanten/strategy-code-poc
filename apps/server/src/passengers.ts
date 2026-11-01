@@ -113,6 +113,7 @@ export const getOff: OrderKind = {
  */
 export const GETS_OFF_FIRST: readonly string[] = [
   'walkTo',
+  'relocate',
   'drive',
   'unhitch',
   'haul',

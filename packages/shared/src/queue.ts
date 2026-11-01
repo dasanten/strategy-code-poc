@@ -31,6 +31,7 @@ export const QUEUE_STEP_KINDS: readonly string[] = [
   'wallLine',
   'mount',
   'dismount',
+  'relocate',
   'task',
   'runScript',
 ]

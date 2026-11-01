@@ -101,6 +101,11 @@ export type GroupOrder =
   | { kind: 'attack'; targetId: string }
   /** Those standing next to the wall or gate climb over it. */
   | { kind: 'climb'; wall: Pick<Building, 'id' | 'x' | 'y'> }
+  /**
+   * All of them relocate to another city of the realm, or none (`CONTEXT.md`: Relocate): each
+   * one's request names the whole group, so the server checks room for all of them.
+   */
+  | { kind: 'relocate'; cityId: string }
 
 /** A storage, stable or carriage picked on the map to store at or fetch from. */
 export interface Place {
@@ -497,6 +502,9 @@ export function groupRequests(
       case 'climb':
         send(r, { kind: 'climb', wallId: order.wall.id })
         break
+      case 'relocate':
+        send(r, { kind: 'relocate', cityId: order.cityId, group: going.map((x) => x.id) })
+        break
     }
   }
   // Setting a param is no step: it is given as it is, queued or not.
@@ -591,6 +599,7 @@ export type GroupButton =
   | 'drop'
   | 'attack'
   | 'climb'
+  | 'relocate'
   | 'script'
 
 /**
@@ -608,6 +617,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'unhitch', label: 'Unhitch horses', group: 'move' },
   { id: 'drive', label: 'Drive carriages to', group: 'move' },
   { id: 'haul', label: 'Haul route…', group: 'move' },
+  { id: 'relocate', label: 'Relocate…', group: 'move' },
   { id: 'work', label: 'Work', group: 'work' },
   { id: 'feedStable', label: 'Feed the stable', group: 'work' },
   { id: 'teach', label: 'Teach…', group: 'work' },
@@ -664,4 +674,5 @@ export const GROUP_COUNTERPARTS: Record<
   pair: { none: 'pairs two residents with each other' },
   makeLeader: { none: 'the realm has one Leader' },
   rename: { none: 'names one resident' },
+  relocate: ['relocate'],
 }
