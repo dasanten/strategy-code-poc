@@ -259,8 +259,9 @@ export const migrations: Record<number, MigrationStep> = {
       for (const e of memory) if (e.is === 'city') e.occupation = null
     return world
   },
-  // Relocating (`CONTEXT.md`: Relocate), a new order kind, and the realm log's `relocateFailed`.
-  // Nobody relocated before, so the step leaves every resident and log as they are.
+  // Relocating (`CONTEXT.md`: Relocate), a new order kind and queue step, how one ended
+  // (`orderEnded` of kind "relocate"), and the realm log's `relocateFailed`. Nobody relocated
+  // before, so the step leaves every resident and log as they are.
   67: (state) => state,
 }
 

@@ -9,6 +9,7 @@ import {
   neverEnds,
   type Building,
   type BuildingKind,
+  type City,
   type Good,
   type OrderRequest,
   type Queue,
@@ -285,11 +286,15 @@ export interface QueueRow {
   gone?: string
 }
 
-/** What step labels name: the Player's scripts, the buildings in sight and those last seen. */
+/**
+ * What step labels name: the Player's scripts, the buildings in sight and those last seen, and
+ * the cities they know.
+ */
 export interface StepNames {
   scripts?: readonly Pick<ScriptSummary, 'id' | 'name'>[]
   buildings?: readonly Pick<Building, 'id' | 'kind'>[]
   lastSeen?: readonly Pick<Building, 'id' | 'kind'>[]
+  cities?: readonly Pick<City, 'id' | 'name'>[]
 }
 
 /**
@@ -325,7 +330,7 @@ export const realMinutes = (minutes: number) => realTimeOf(minutes * TICKS_PER_G
 /** What a queue step does, as the card lists it: "Work the farm", "Walk to 12, 6". */
 export function stepLabel(
   order: OrderRequest,
-  { scripts = [], buildings = [], lastSeen = [] }: StepNames,
+  { scripts = [], buildings = [], lastSeen = [], cities = [] }: StepNames,
 ): string {
   const at = (p: unknown) => {
     const { x, y } = p as { x: number; y: number }
@@ -384,6 +389,8 @@ export function stepLabel(
       return 'Dismount'
     case 'wallLine':
       return `Build a wall to ${at(order.to)}`
+    case 'relocate':
+      return `Relocate to ${cities.find((c) => c.id === order.cityId)?.name ?? 'another city'}`
     case 'runScript': {
       const script = scripts.find((s) => s.id === order.scriptId)
       return `Run ${script?.name ?? 'a script'}`

@@ -583,7 +583,8 @@ export function Wiki() {
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
           to, pick up, drop, store, fetch, drive, unhitch a horse, mount or dismount, board or get
           off a carriage, work, build, haul, feed the stable, breed horses, tear down, build a road
-          or wall line, or run one of your scripts with its params.
+          or wall line, relocate to another of your cities, or run one of your scripts with its
+          params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
@@ -789,6 +790,16 @@ export function Wiki() {
           their old city and your realm log says why. Moving ends a pair, as a pair needs one city.
           A partner carrying a child can't relocate until it is born; the other partner can, and the
           child is still born. NPC cities don't relocate anyone.
+        </p>
+        <p>
+          Relocate is a queue step too: <strong>Add step</strong> offers it, and you tap one of your
+          cities on the map or pick it from the list. Adding it only checks that the city is yours;
+          free housing is checked when its turn comes, and a step that can't start then is skipped
+          and noted in your realm log. Once they move in, the next step starts. A script relocates
+          with <code>relocate(cityId)</code>, refused for the same reasons as the order; it can{' '}
+          <code>wait()</code> on it and then read <code>me.orderEnded</code>: its{' '}
+          <code>reason</code> is null once they moved in, else why not. While on their way, their{' '}
+          <code>order</code> is <code>"relocate"</code> with the <code>cityId</code> they go to.
         </p>
       </Section>
 

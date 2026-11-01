@@ -85,7 +85,7 @@ export interface Resident {
   carried: Stock
   /** What the resident was ordered to do, as plain data; null when idle (ADR 0002). */
   order: ResidentOrder | null
-  /** How their last store or fetch order ended (`OrderEnded`); absent when none did since. */
+  /** How their last store, fetch or relocate order ended (`OrderEnded`); absent if none did since. */
   orderEnded?: OrderEnded
   /**
    * Who last struck the resident and when (`CONTEXT.md`: Combat, Under attack), a dodged blow
@@ -447,8 +447,12 @@ export interface Struck {
   tick: number
 }
 
+/**
+ * How a resident's last store, fetch or relocate order ended (`CONTEXT.md`: Store, Fetch,
+ * Relocate): `reason` is null when it was done (a relocating resident moved in), else why not.
+ */
 export interface OrderEnded {
-  kind: 'store' | 'fetch'
+  kind: 'store' | 'fetch' | 'relocate'
   tick: number
   reason: string | null
 }

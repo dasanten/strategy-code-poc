@@ -212,6 +212,14 @@ describe('step labels', () => {
       'Work the mine (as last seen)',
     )
   })
+
+  it('names the city a Relocate step goes to', () => {
+    const cities = [{ id: 'c2', name: 'Redbank' }]
+    expect(stepLabel({ kind: 'relocate', cityId: 'c2' }, { cities })).toBe('Relocate to Redbank')
+    expect(stepLabel({ kind: 'relocate', cityId: 'c9' }, { cities })).toBe(
+      'Relocate to another city',
+    )
+  })
 })
 
 describe('the group planner', () => {

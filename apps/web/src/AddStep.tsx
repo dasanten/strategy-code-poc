@@ -12,17 +12,20 @@ import { BUILDING_NAMES } from './city-view.js'
 import { GOOD_LABELS, SubjectPicker } from './Residents.js'
 import {
   makesAt,
+  nextPick,
   PLAN_STEPS,
   planAsk,
   type Plan,
   type PlanAnswer,
+  type PlanCity,
   type PlanStepId,
 } from './plan-step.js'
 
 /**
  * The queue planner's Add step on the resident card (`CONTEXT.md`: Queue, Planning ahead): a list
  * of every kind of step; one acting on a place has the map pick it first (pick mode), and one
- * that needs more (goods, what to build, a script, …) asks for it here after.
+ * that needs more (goods, what to build, a script, …) asks for it here after. A city (Relocate)
+ * can be picked on the map or from the list here.
  */
 export function AddStep({
   plan,
@@ -32,6 +35,8 @@ export function AddStep({
   scripts,
   buildKinds,
   horses,
+  cities,
+  onPickCity,
 }: {
   /** The step being planned, if one is. */
   plan: Plan | undefined
@@ -46,9 +51,43 @@ export function AddStep({
   buildKinds: readonly BuildingKind[]
   /** The realm's horses in the stable picked for Breed horses. */
   horses: readonly SeenHorse[]
+  /** The realm's cities, for a step that picks one (Relocate). */
+  cities: readonly PlanCity[]
+  /** Picks a city from the list, as a tap in its area on the map would. */
+  onPickCity: (cityId: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const ask = plan && planAsk(plan)
+  if (plan && nextPick(plan)?.pick === 'city') {
+    const label = PLAN_STEPS.find((k) => k.id === plan.kind)!.label
+    return (
+      <section className="inspector-block" aria-label="Add step">
+        <div className="panel-head">
+          <h3>Add step: {label}</h3>
+          <button type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+        {cities.length === 0 ? (
+          <p className="muted small">Your realm has no city in sight to pick.</p>
+        ) : (
+          <>
+            <p className="muted small">
+              Tap one of your cities on the map, or pick it here. Free housing is checked when the
+              step’s turn comes.
+            </p>
+            <div className="order-buttons">
+              {cities.map((c) => (
+                <button type="button" key={c.id} onClick={() => onPickCity(c.id)}>
+                  {c.name} ({c.room} free)
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+    )
+  }
   if (plan && ask) {
     const label = PLAN_STEPS.find((k) => k.id === plan.kind)!.label
     return (

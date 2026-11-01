@@ -48,6 +48,8 @@ export const relocate: OrderKind = {
     // Housing taken since is checked on arrival, where the realm log can say so.
     if (!r || !city || r.carrying) return
     const target = nearestAreaTile(world, city, r, terrain) ?? { x: r.x, y: r.y }
+    // How their last store, fetch or relocate ended goes with a new one, as a script's too.
+    delete r.orderEnded
     r.order = { kind: 'relocate', cityId: city.id, target, path: null, progress: 0 }
   },
 }
@@ -132,7 +134,16 @@ function moveIn(world: WorldState, r: Resident, city: City): void {
   if (partner?.pair?.partnerId === r.id) delete partner.pair
   delete r.pair
   r.cityId = city.id
+  endRelocating(world, r, null)
+}
+
+/**
+ * Ends a relocate order, saying how it ended (`OrderEnded`) for a script to read once it waited
+ * on it: `reason` null when they moved in, else why not.
+ */
+function endRelocating(world: WorldState, r: Resident, reason: string | null): void {
   r.order = null
+  r.orderEnded = { kind: 'relocate', tick: world.tick, reason }
 }
 
 /** A relocate order ends without moving in; the resident keeps their city, and the log says why. */
@@ -143,7 +154,7 @@ function failRelocating(
   city: string | undefined,
   reason: string,
 ): void {
-  r.order = null
+  endRelocating(world, r, reason)
   recordEvent(world, r.owner, {
     kind: 'relocateFailed',
     residentId: r.id,

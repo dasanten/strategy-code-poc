@@ -1,6 +1,7 @@
 import {
   GOODS,
   QUEUE_STEP_KINDS,
+  freeHousing,
   queueStepsProblem,
   type Building,
   type Queue,
@@ -11,8 +12,10 @@ import {
   PLAN_STEPS,
   horsesIn,
   nextPick,
+  pickCity,
   pickInto,
   planAsk,
+  planCities,
   planOrder,
   planPickAt,
   type Plan,
@@ -247,5 +250,57 @@ describe('Add step', () => {
       expect(queueStepsProblem(request.steps)).toBeUndefined()
     }
     expect(planOrder(train)!.order).toEqual({ kind: 'task', task: 'train', groundId: 'g1' })
+  })
+
+  it('relocates to a city of the realm picked on the map or from the list', () => {
+    // Redbank (c4) is realm r1's second city, with a house and one resident on the way there.
+    const hall4: Building = { id: 't4', kind: 'townHall', cityId: 'c4', x: 50, y: 50 }
+    const house4: Building = { id: 'hh4', kind: 'house', cityId: 'c4', x: 50, y: 54 }
+    const hall2: Building = { id: 't2', kind: 'townHall', cityId: 'c2', x: 40, y: 34 }
+    const rw = {
+      ...w,
+      buildings: [...w.buildings, hall4, house4, hall2],
+      cities: [...w.cities, { id: 'c4', realmId: 'r1' }],
+    }
+    const plan = (x: number, y: number) => pickInto(rw, { kind: 'relocate', picked: [] }, { x, y })
+    expect(plan(1, 1).error).toBe('no city of yours there')
+    expect(plan(41, 35).error).toBe('no city of yours there')
+    const picked = plan(52, 52)
+    expect(planAsk(picked)).toBeUndefined()
+    const { order, at } = planOrder(picked)!
+    expect(order).toEqual({ kind: 'relocate', cityId: 'c4' })
+    // It goes there itself: no walk before it.
+    expect(at).toBeUndefined()
+    const request = appendRequest(inCity, order, at)!
+    expect(request.steps).toEqual([{ order }])
+    expect(queueStepsProblem(request.steps)).toBeUndefined()
+
+    const seen = {
+      buildings: rw.buildings,
+      cities: [
+        { id: 'c4', name: 'Redbank', realmId: 'r1' },
+        { id: 'c1', name: 'Ashford', realmId: 'r1' },
+        { id: 'c2', name: 'Theirs', realmId: 'r2' },
+      ],
+      residents: [
+        {
+          id: 'w9',
+          cityId: 'c1',
+          order: {
+            kind: 'relocate',
+            cityId: 'c4',
+            target: { x: 50, y: 50 },
+            path: null,
+            progress: 0,
+          },
+        } as const,
+      ],
+    }
+    // Ashford has no town hall in sight, so only Redbank is listed, its room less the one coming.
+    const listed = planCities(seen, 'r1')
+    const room = freeHousing(seen, { id: 'c4' }) - 1
+    expect(listed).toEqual([{ id: 'c4', name: 'Redbank', room, x: 50, y: 50 }])
+    expect(room).toBeGreaterThan(0)
+    expect(planOrder(pickCity({ kind: 'relocate', picked: [] }, listed[0]!))!.order).toEqual(order)
   })
 })

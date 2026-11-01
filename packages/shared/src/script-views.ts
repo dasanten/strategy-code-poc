@@ -228,8 +228,8 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'orderEnded',
         view('orderEnded'),
-        'How their last store or fetch order ended.',
-        'until one ended, and after their next store or fetch order or an order from the UI',
+        'How their last store, fetch or relocate order ended.',
+        'until one ended, and after their next store, fetch or relocate order or an order from the UI',
       ),
       field(
         'queue',
@@ -332,9 +332,14 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn", "buyOff" or "relocate" (on their way to `cityId`, to live there).',
       ),
-      field('target', view('tile'), 'Where a walk or drive goes.', 'for other orders'),
+      field(
+        'target',
+        view('tile'),
+        'Where a walk or drive goes, or the tile of the city’s area a relocation heads for.',
+        'for other orders',
+      ),
       field(
         'at',
         view('tile'),
@@ -429,7 +434,12 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('side', 'string', 'A trade’s "buy" or "sell".', 'for other orders'),
       field('good', 'string', 'The good traded or handed in.', 'for other orders'),
       field('units', 'number', 'The units traded or handed in.', 'for other orders'),
-      field('cityId', 'string', 'The city bought, or a caravan trade’s city.', 'for other orders'),
+      field(
+        'cityId',
+        'string',
+        'The city bought, a caravan trade’s city, or the city they relocate to.',
+        'for other orders',
+      ),
       field('toCityId', 'string', 'Where handed-in goods go.', 'for other orders'),
       field('contractId', 'string', 'The mercenary contract paid.', 'for other orders'),
       field('weeks', 'number', 'The weeks paid.', 'for other orders'),
@@ -460,15 +470,15 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     ],
   },
   orderEnded: {
-    description: 'How a resident’s last store or fetch order ended.',
+    description: 'How a resident’s last store, fetch or relocate order ended.',
     fields: [
-      field('kind', 'string', 'The order: "store" or "fetch".'),
+      field('kind', 'string', 'The order: "store", "fetch" or "relocate".'),
       field('tick', 'number', 'The tick it ended.'),
       field(
         'reason',
         'string',
-        'Why it ended before it was done: "no way", "the storage is gone" or "the carriage is gone".',
-        'when it was done',
+        'Why it ended before it was done: "no way", "the storage is gone" or "the carriage is gone"; for a relocate, why they didn’t move in: "no free housing", "it is no longer your realm’s" or "the city is gone".',
+        'when it was done (a relocating resident moved in)',
       ),
     ],
   },

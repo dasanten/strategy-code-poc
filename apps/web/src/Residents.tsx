@@ -381,6 +381,7 @@ export function QueueBlock({
   scripts,
   buildings,
   lastSeen,
+  cities,
   onEdit,
   title = 'Queue',
   realm,
@@ -393,6 +394,8 @@ export function QueueBlock({
   buildings: Building[]
   /** The buildings remembered out of sight, to name steps acting there. */
   lastSeen?: Building[]
+  /** The cities the Player knows, to name where a Relocate step goes. */
+  cities?: readonly Pick<City, 'id' | 'name'>[]
   onEdit: (items: PlanItem[], loop?: boolean) => void
   title?: string
   /** The realm whose saved queues Save and Load keep (`CONTEXT.md`: Saved queue); none without. */
@@ -402,7 +405,7 @@ export function QueueBlock({
   // The steps and blocks picked for the clipboard, by id; one removed since drops out.
   const [pickedIds, setPicked] = useState<number[]>([])
   const clipboardEmpty = useClipboardEmpty()
-  const names = { scripts, buildings, lastSeen }
+  const names = { scripts, buildings, lastSeen, cities }
   const rows = planRows(q.items)
   const ids = rows.map((row) => row.id)
   const picked = pickedIds.filter((id) => ids.includes(id))
@@ -1900,6 +1903,7 @@ export function ResidentCard({
               scripts={scripts}
               buildings={buildings}
               lastSeen={lastSeen}
+              cities={cities}
               onEdit={(items, loop) => onPlanQueue(editPlan(queuePlan, items, loop))}
               realm={realmId}
             />
@@ -1919,6 +1923,7 @@ export function ResidentCard({
             scripts={scripts}
             buildings={buildings}
             lastSeen={lastSeen}
+            cities={cities}
             onEdit={onEditQueue}
             realm={realmId}
           />
