@@ -14,7 +14,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
-import { lineBuildersOnTheirLine } from './script-runner.js'
+import { lineBuildersApart, lineBuildersOnTheirLine } from './script-runner.js'
 import { seenScript } from './sight.js'
 import { defaultScripts } from './test-default-scripts.js'
 import { addCity } from './test-terrain.js'
@@ -159,6 +159,82 @@ describe('Build line', () => {
     expect(s.buildLine({ ...LINE, building: 'wall' })).toMatchObject({
       reason: 'children can’t build',
     })
+  })
+})
+
+describe('A crew on one line', () => {
+  /** A 9-tile road line, east from (10, 12) to (18, 12). */
+  const LONG: BuildLine = { building: 'road', from: { x: 10, y: 12 }, to: { x: 18, y: 12 } }
+
+  it('three residents on a 9-tile line never build the same tile, build all of it and end', () => {
+    const s = setup({ stone: 100 })
+    s.w1.carried = { food: OWN_FOOD }
+    const crew = [s.w1]
+    for (const [id, x] of [
+      ['w2', 5],
+      ['w3', 20],
+    ] as const) {
+      const r = newResident(mulberry32(crew.length + 1), { id, owner: 'r1', x, y: 20, tick: 0 })
+      r.cityId = 'c1'
+      r.stats.strength = { base: 10, trained: 0 }
+      r.carried = { food: OWN_FOOD }
+      s.world.residents.push(r)
+      crew.push(r)
+    }
+    for (const r of crew) {
+      expect(s.give({ kind: 'task', task: 'buildLine', ...LONG, residentId: r.id })).toMatchObject({
+        type: 'ack',
+      })
+    }
+    // The most of them building a tile of the line at once.
+    let atOnce = 0
+    for (let i = 0; i < 5000 && crew.some((r) => r.script || i === 0); i++) {
+      s.tick()
+      // Never two on one tile: what they took, and the tile their build order is on.
+      const took = crew.flatMap((r) => {
+        const at = r.script?.memory.at as { x: number; y: number } | null | undefined
+        return at ? [`${at.x},${at.y}`] : []
+      })
+      expect(new Set(took).size).toBe(took.length)
+      const building = crew.flatMap((r) =>
+        r.order?.kind === 'build' ? [`${r.order.at.x},${r.order.at.y}`] : [],
+      )
+      expect(new Set(building).size).toBe(building.length)
+      atOnce = Math.max(atOnce, building.length)
+    }
+    expect(crew.every((r) => !r.script)).toBe(true)
+    expect(s.roads()).toHaveLength(9)
+    expect(s.roads().every((b) => !b.site && b.y === 12 && b.x >= 10 && b.x <= 18)).toBe(true)
+    expect(atOnce).toBe(3)
+    expect(s.stopped()).toEqual([])
+    for (const r of crew) {
+      expect((r.scriptLog ?? []).map((l) => l.text)).toContain('the road line is finished')
+    }
+  })
+})
+
+describe('line-builders-apart invariant', () => {
+  it('flags two residents of a realm on one line who took the same tile', () => {
+    const s = setup()
+    const w2 = newResident(mulberry32(2), { id: 'w2', owner: 'r1', x: 4, y: 20, tick: 0 })
+    s.world.residents.push(w2)
+    s.w1.script = { scriptId: BUILD_LINE, memory: { line: LINE, at: { x: 12, y: 12 } } }
+    w2.script = { scriptId: BUILD_LINE, memory: { line: LINE, at: { x: 13, y: 12 } } }
+    expect(lineBuildersApart(s.world, () => 'buildLine')).toEqual([])
+    w2.script.memory.at = { x: 12, y: 12 }
+    expect(lineBuildersApart(s.world, () => 'buildLine')).toEqual([
+      {
+        invariant: 'line-builders-apart',
+        message: 'w1 and w2 both took (12, 12) of their road line',
+        entityIds: ['w1', 'w2'],
+      },
+    ])
+    // Another line, or another realm's resident, may take that tile.
+    w2.script.memory.line = { ...LINE, to: { x: 15, y: 12 } }
+    expect(lineBuildersApart(s.world, () => 'buildLine')).toEqual([])
+    w2.script.memory.line = LINE
+    w2.owner = 'r2'
+    expect(lineBuildersApart(s.world, () => 'buildLine')).toEqual([])
   })
 })
 

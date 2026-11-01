@@ -80,10 +80,13 @@ export type GroupOrder =
    * one teacher per ground.
    */
   | { kind: 'teach'; subject: TrainingSubject }
-  /** Each builds road or wall along the same line (`CONTEXT.md`: Road, Wall / Gate). */
+  /**
+   * Each gets the Build line task with the same line (`CONTEXT.md`: Build line), so they share it:
+   * each takes the nearest tile still to build that no other of them has taken.
+   */
   | {
       kind: 'line'
-      line: 'roadLine' | 'wallLine'
+      building: 'road' | 'wall'
       from: { x: number; y: number }
       to: { x: number; y: number }
     }
@@ -471,9 +474,11 @@ export function groupRequests(
       case 'feedStable':
         send(r, { kind: 'task', task: 'feedStable', stableId: stableOf(r, seen, size)!.id })
         break
-      case 'line':
-        send(r, { kind: order.line, from: order.from, to: order.to })
+      case 'line': {
+        const { building, from, to } = order
+        send(r, { kind: 'task', task: 'buildLine', building, from, to })
         break
+      }
       case 'tearDown':
         send(r, { kind: 'task', task: 'tearDown', buildingId: order.building.id })
         break
@@ -608,8 +613,8 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'teach', label: 'Teach…', group: 'work' },
   { id: 'train', label: 'Train', group: 'work' },
   { id: 'build', label: 'Build', group: 'work' },
-  { id: 'roadTo', label: 'Build road', group: 'work' },
-  { id: 'wallTo', label: 'Build wall', group: 'work' },
+  { id: 'roadTo', label: 'Build line: road', group: 'work' },
+  { id: 'wallTo', label: 'Build line: wall', group: 'work' },
   { id: 'tearDown', label: 'Tear down', group: 'work' },
   { id: 'breed', label: 'Breed horses…', group: 'work' },
   { id: 'store', label: 'Store', group: 'goods' },
