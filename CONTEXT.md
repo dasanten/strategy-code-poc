@@ -1003,10 +1003,25 @@ The shared language of the game. Domain terms only — no implementation details
   an army): a header that always shows (name, Doing, hunger and health, what they carry) and one
   open tab under it: Orders, Queue, Stats or Script. Orders are grouped by kind (Move, Work &
   build, Goods, Scripts), and orders they can't take right now are left out.
-- **Motion on the map:** the world moves once a tick, but the map shows it smoothly: a token that
-  changed tile glides from the old tile to the new one over the tick, and the tokens of residents
-  at work move a little on their tile, so a crew looks busy rather than frozen. Pure drawing in
-  the browser: the world and what it sends change nothing.
+- **Motion on the map:** the world moves once a tick, but the map shows it smoothly. A token on
+  its way (walking, driving, riding along a path it was sent) moves steadily along that path at
+  its current pace between ticks, across tile edges, without stopping at each tile, however many
+  ticks a step takes on that ground. When the next state disagrees (it stopped, turned or was
+  blocked) the token eases to where the world says it is. Any other token that changed tile
+  glides from the old tile to the new one over the tick, and the tokens of residents at work move
+  a little on their tile, so a crew looks busy rather than frozen. Pure drawing in the browser:
+  the world and what it sends change nothing.
+- **Way on the map:** while residents are picked (one, or each member of a group), the map draws
+  the way each is going for any order that goes along a path: walk to, drive, haul, Store, Fetch,
+  a road or wall line, going after someone. So a script that hands over to Fetch to get food
+  shows its way too. A passenger's way is the carriage's they are aboard.
+- **Places of the picked:** while residents are picked, the buildings their script's params point
+  at (workplace, storage, source, site, …) and the place their current order heads for (the
+  storage a Fetch goes to) are outlined on the map in the way's colour. Pure drawing.
+- **Planned building:** what the Player's residents are set to build but haven't laid out yet
+  shows on the map as faint ghosts: the tiles still to build of every road or wall line they are
+  on or have queued, and the footprint of every build they are ordered or queued to do. The
+  picked residents' plans are drawn stronger. Only the owning Player sees them; pure drawing.
 - **Picking a target:** an order that needs a tile or building (walk to, store at, build here)
   shrinks the card to its header and shows "Tap where …" with Cancel until the Player picks one
   on the map; then the card comes back as it was. On a phone every card is a bottom sheet (peek,

@@ -88,11 +88,13 @@ import {
   type Viewer,
 } from './map/tokens.js'
 import type { MapWorld } from './map/map-world.js'
-import { Motion, workSway } from './map/motion.js'
+import { Motion, motionTokens, workSway } from './map/motion.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
-import { roadJoins } from './map/roads.js'
+import { roadJoins, roadWidth, wallWidths } from './map/roads.js'
+import { drawPlans, plannedBuilding } from './map/plans.js'
+import { drawPlaces, pickedPlaces } from './map/places.js'
 import { inBox, pickableAt, pickables, toggled, type Point } from './map/selection.js'
 import { LONG_PRESS_MS, TAP_SLOP, longPresses, pressKind } from './map/gestures.js'
 
@@ -322,8 +324,7 @@ export function MapView({
     }
     redrawRef.current = redraw
     forgetRef.current = (chunks) => store.forget(chunks)
-    motionRef.current = (w) =>
-      motion.update([...w.residents, ...w.horses, ...w.carriages], performance.now())
+    motionRef.current = (w) => motion.update(motionTokens(w), performance.now())
     motionRef.current(worldRef.current)
 
     /** Redraws the Region map's chunks that changed, or all of them. */
@@ -503,6 +504,11 @@ export function MapView({
       drawStructures(under, g, tokens, cam, view, worldRef.current)
 
       const world = worldRef.current
+      // The Player's planned roads, walls and buildings, as ghosts (`CONTEXT.md`: Planned building).
+      if (!world.admin) {
+        const plans = plannedBuilding(world, selectedRef.current)
+        drawPlans(under, cam, view, mapSize, plans, world.buildings, relationshipColor('own'))
+      }
       const now = performance.now()
       // Residents at work sway on their tile; one gliding to the next tile does not.
       const sways = new Map<string, readonly [number, number]>()
@@ -528,7 +534,7 @@ export function MapView({
       drawnSpots = spots
       // Tokens still on their way, and residents at work, ask for another frame.
       if (motion.moving(now) || sways.size > 0) redraw()
-      // A ring round each selected resident; the way ahead only when there is just one.
+      // A ring round each selected resident, and the way ahead of each.
       const ids = selectedRef.current
       let rings = false
       for (const id of ids) {
@@ -538,8 +544,12 @@ export function MapView({
         rings = true
       }
       if (rings) g.stroke({ width: 2.5, color: LEADER_COLOR })
-      const selected = ids.length === 1 ? world.residents.find((u) => u.id === ids[0]) : undefined
-      if (selected) drawPath(g, cam, view, mapSize, selected, world.residents)
+      // What their params and orders point at (`CONTEXT.md`: Places of the picked).
+      drawPlaces(g, cam, view, mapSize, pickedPlaces(world, ids), spots)
+      for (const id of ids) {
+        const selected = world.residents.find((u) => u.id === id)
+        if (selected) drawPath(g, cam, view, mapSize, selected, world.residents)
+      }
     }
 
     function setCam(next: Camera) {
@@ -1082,7 +1092,7 @@ function drawStructures(
     buildings.filter((b) => b.kind === 'road').map((b) => [`${b.x},${b.y}`, b] as const),
   )
   const roadAt = (x: number, y: number) => roads.get(`${(x + size) % size},${(y + size) % size}`)
-  const w = Math.max(3, tile * 0.36)
+  const w = roadWidth(tile)
   const inSight = ([sx, sy]: readonly number[]) =>
     sx! > -tile && sy! > -tile && sx! < view.width + tile && sy! < view.height + tile
   for (const site of [false, true]) {
@@ -1125,8 +1135,7 @@ function drawStructures(
     buildings.filter((b) => b.kind === 'wall' || b.kind === 'gate').map((b) => `${b.x},${b.y}`),
   )
   const wallAt = (x: number, y: number) => walls.has(`${(x + size) % size},${(y + size) % size}`)
-  const edge = Math.max(3, tile * 0.34)
-  const band = Math.max(1.5, tile * 0.22)
+  const { edge, band } = wallWidths(tile)
   const lines = new Map<string, [number, number, number, number][]>()
   for (const b of buildings) {
     if (b.kind !== 'wall' && b.kind !== 'gate') continue
