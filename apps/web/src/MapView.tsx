@@ -88,7 +88,7 @@ import {
   type Viewer,
 } from './map/tokens.js'
 import type { MapWorld } from './map/map-world.js'
-import { Motion, workSway } from './map/motion.js'
+import { Motion, motionTokens, workSway } from './map/motion.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
@@ -322,8 +322,7 @@ export function MapView({
     }
     redrawRef.current = redraw
     forgetRef.current = (chunks) => store.forget(chunks)
-    motionRef.current = (w) =>
-      motion.update([...w.residents, ...w.horses, ...w.carriages], performance.now())
+    motionRef.current = (w) => motion.update(motionTokens(w), performance.now())
     motionRef.current(worldRef.current)
 
     /** Redraws the Region map's chunks that changed, or all of them. */
