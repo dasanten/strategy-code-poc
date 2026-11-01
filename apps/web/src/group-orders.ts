@@ -659,4 +659,6 @@ export const GROUP_COUNTERPARTS: Record<
   pair: { none: 'pairs two residents with each other' },
   makeLeader: { none: 'the realm has one Leader' },
   rename: { none: 'names one resident' },
+  // Groups relocate in T55.2 (`CONTEXT.md`: Relocate); until then one resident at a time.
+  relocate: { none: 'one resident at a time for now' },
 }

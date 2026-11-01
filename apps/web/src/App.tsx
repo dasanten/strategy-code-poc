@@ -116,6 +116,7 @@ import {
   nodeFit,
   type ActionId,
 } from './selection-view.js'
+import { knownOf, relocateActionProblem, relocateChoices } from './relocate-view.js'
 import { ScriptLibrary, type ScriptToOpen } from './ScriptLibrary.js'
 import { ScriptLog } from './ScriptLog.js'
 import { ScriptMemoryTree } from './ScriptMemory.js'
@@ -268,6 +269,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       )
     : []
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
+  // The cities and buildings the Player knows, in sight or remembered (`CONTEXT.md`: Last seen).
+  const knownCities = world ? knownOf(world.cities, world.lastSeen.cities) : []
+  const knownBuildings = world ? knownOf(world.buildings, world.lastSeen.buildings) : []
+  /**
+   * For one of the Player's own residents: the cities to relocate them to and why they can't be
+   * told to at all, if they can't (`CONTEXT.md`: Relocate), from what the Player knows.
+   */
+  function relocateFor(r: Resident) {
+    if (!world || r.owner !== world.home.realmId) return undefined
+    const seen = { cities: knownCities, buildings: knownBuildings, residents: world.residents }
+    const choices = relocateChoices(seen, world.home.realmId, r)
+    return { choices, problem: relocateActionProblem(r, choices) }
+  }
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
   // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
@@ -814,6 +828,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'pair', residentId: selected.id, partnerId }))
   }
+  /** Orders the picked resident to relocate to another city of the realm (`CONTEXT.md`: Relocate). */
+  async function relocate(cityId: string) {
+    if (!selected) return
+    setOrderError(await giveOrder({ kind: 'relocate', residentId: selected.id, cityId }))
+  }
   /**
    * Orders the Player's Leader to hand the realm over to the picked resident (`CONTEXT.md`:
    * Leader handover), the same `handOver` order a script's `handOver` requests.
@@ -1005,6 +1024,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             scripts={scripts}
             buildings={world.buildings}
             inSight={world.residents}
+            cities={knownCities}
             arrivesIn={arrivesIn || undefined}
             tick={world.tick}
             selectedId={selected?.id}
@@ -1268,7 +1288,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             resident={selected}
             arrivesIn={arrivesIn || undefined}
             leaderId={world.home.leaderId}
-            cityName={homeCity?.name}
+            cities={knownCities}
             tick={world.tick}
             picking={picking}
             onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
@@ -1369,6 +1389,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             leaderName={leader?.name}
             onMakeLeader={makeLeader}
+            relocate={relocateFor(selected)}
+            onRelocate={relocate}
             rename={
               selected.owner === world.home.realmId
                 ? {

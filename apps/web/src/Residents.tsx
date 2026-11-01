@@ -57,6 +57,7 @@ import {
   RESIDENT_NAME_MAX_LENGTH,
   type Building,
   type Carriage,
+  type City,
   type BuildingKind,
   type Good,
   type GoodsSpot,
@@ -104,6 +105,7 @@ import {
   type ResidentGroup,
 } from './residents-view.js'
 import { doingLine, interruptedLine } from './doing-view.js'
+import { type RelocateChoice } from './relocate-view.js'
 import {
   editPlan,
   planOf,
@@ -577,12 +579,12 @@ export function QueueBlock({
         })}
       </ol>
       <p className="muted small">
-        Drag a step or use the arrows to reorder. Working, hauling, teaching and training never end on their own, so
-        they need a duration unless they are last. Tap a step to pick it (Shift for a range), then
-        Copy; Paste puts the copies after the picked step. Repeat wraps the picked steps in a block
-        done so many times in a row; giving the queue makes it that many copies, up to{' '}
-        {QUEUE_MAX_STEPS} steps in all. Save keeps the steps in this browser under a name; Load adds
-        a saved queue’s steps at the end.
+        Drag a step or use the arrows to reorder. Working, hauling, teaching and training never end
+        on their own, so they need a duration unless they are last. Tap a step to pick it (Shift for
+        a range), then Copy; Paste puts the copies after the picked step. Repeat wraps the picked
+        steps in a block done so many times in a row; giving the queue makes it that many copies, up
+        to {QUEUE_MAX_STEPS} steps in all. Save keeps the steps in this browser under a name; Load
+        adds a saved queue’s steps at the end.
       </p>
     </section>
   )
@@ -841,13 +843,22 @@ function StepMinutes({
 /**
  * What a resident's built-in order has them doing. A rider rides where others walk (`CONTEXT.md`:
  * Riding): "Riding to 4, 5 · about 3 min (3 game hours)", or tiles to go without an
- * estimate (`arrivalTicks`).
+ * estimate (`arrivalTicks`). A relocating resident names their new city from `cities`
+ * (`CONTEXT.md`: Relocate).
  */
-export function orderDoing(r: Pick<Resident, 'order' | 'riding'>, arrives?: number): string {
+export function orderDoing(
+  r: Pick<Resident, 'order' | 'riding'>,
+  arrives?: number,
+  cities: readonly Pick<City, 'id' | 'name'>[] = [],
+): string {
   const left = (path: readonly unknown[]) =>
     arrives === undefined ? `${path.length} tiles to go` : aboutTime(arrives)
   const o = r.order
   const walking = r.riding === undefined ? 'Walking' : 'Riding'
+  if (o?.kind === 'relocate') {
+    const city = cities.find((c) => c.id === o.cityId)?.name ?? 'another city'
+    return o.path ? `Relocating to ${city} · ${left(o.path)}` : `Relocating to ${city}`
+  }
   if (o?.kind === 'walkTo') {
     if (!o.path) return `Finding a way to ${o.target.x}, ${o.target.y}`
     return `${walking} to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
@@ -912,6 +923,7 @@ export function ResidentsList({
   scripts = [],
   buildings = [],
   inSight = [],
+  cities = [],
   arrivesIn,
   selectedId,
   onSelect,
@@ -925,6 +937,8 @@ export function ResidentsList({
   buildings?: Building[]
   /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
   inSight?: readonly SeenResident[]
+  /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
+  cities?: readonly Pick<City, 'id' | 'name'>[]
   /** About how many ticks until a resident arrives where they walk, ride or drive (`arrivalTicks`). */
   arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
@@ -979,6 +993,7 @@ export function ResidentsList({
                       scripts,
                       buildings,
                       residents: inSight,
+                      cities,
                       arrives: arrivesIn?.(r),
                     })}
                   >
@@ -986,6 +1001,7 @@ export function ResidentsList({
                       scripts,
                       buildings,
                       residents: inSight,
+                      cities,
                       arrives: arrivesIn?.(r),
                     })}
                     {r.script && (
@@ -1481,7 +1497,7 @@ export function ResidentCard({
   resident: r,
   arrivesIn,
   leaderId,
-  cityName,
+  cities,
   tick,
   picking,
   onWalkTo,
@@ -1535,6 +1551,8 @@ export function ResidentCard({
   makeLeader,
   leaderName,
   onMakeLeader,
+  relocate,
+  onRelocate,
   rename,
   onRename,
   onClose,
@@ -1555,7 +1573,11 @@ export function ResidentCard({
   /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
   arrivesIn?: (r: Resident) => number | undefined
   leaderId: string
-  cityName: string | undefined
+  /**
+   * The cities the Player knows, in sight or remembered: to name the city the resident lives in
+   * and the one they relocate to.
+   */
+  cities: readonly Pick<City, 'id' | 'name'>[]
   tick: number
   /** The map is waiting for a tile to walk or drive to, or for a haul route's other stop. */
   picking: Picking
@@ -1674,6 +1696,14 @@ export function ResidentCard({
   /** Orders the Leader to hand the realm over to this resident (`CONTEXT.md`: Leader handover). */
   onMakeLeader: () => void
   /**
+   * For one of the Player's own residents: the realm's other cities to relocate them to
+   * (`relocateChoices`) and why they can't be told to at all, if they can't
+   * (`CONTEXT.md`: Relocate). Undefined for others' residents.
+   */
+  relocate?: { choices: RelocateChoice[]; problem: string | undefined }
+  /** Orders the resident to relocate to another city of the realm (`CONTEXT.md`: Relocate). */
+  onRelocate?: (cityId: string) => void
+  /**
    * For one of the Player's own residents: whether renaming them needs a realm name too (the
    * Leader of an unnamed realm). Undefined for others' residents, who can't be renamed.
    */
@@ -1753,6 +1783,7 @@ export function ResidentCard({
     wallsInSight: walls.length,
     picking,
     makeLeader,
+    ...(relocate ? { relocate: { problem: relocate.problem } } : {}),
     renamable: !!rename,
     riding: r.riding !== undefined,
     horseToRide: !!horseToRide,
@@ -1784,6 +1815,11 @@ export function ResidentCard({
   }
   useActionKeys(actions, act)
   const ridden = riddenHorseLine(r, horses, tick)
+  // The city they live in, or none (`CONTEXT.md`: Homeless).
+  const home =
+    r.cityId === null
+      ? 'Homeless'
+      : (cities.find((c) => c.id === r.cityId)?.name ?? 'a city out of sight')
   return (
     <SelectionCard
       rel={r.owner === realmId ? 'own' : 'alliance'}
@@ -1791,7 +1827,7 @@ export function ResidentCard({
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
         <strong key="doing">
-          {doingLine(r, { scripts, buildings, residents, arrives: arrivesIn?.(r) })}
+          {doingLine(r, { scripts, buildings, residents, cities, arrives: arrivesIn?.(r) })}
         </strong>,
         ...(r.interrupted
           ? [
@@ -1854,7 +1890,13 @@ export function ResidentCard({
               title="Plan"
               queue={queuePlan}
               currentId={r.queue?.steps[r.queue.current]?.id}
-              doing={doingLine(r, { scripts, buildings, residents, arrives: arrivesIn?.(r) })}
+              doing={doingLine(r, {
+                scripts,
+                buildings,
+                residents,
+                cities,
+                arrives: arrivesIn?.(r),
+              })}
               scripts={scripts}
               buildings={buildings}
               lastSeen={lastSeen}
@@ -1873,7 +1915,7 @@ export function ResidentCard({
           <QueueBlock
             queue={planOf(r.queue)}
             currentId={r.queue.steps[r.queue.current]?.id}
-            doing={doingLine(r, { scripts, buildings, residents, arrives: arrivesIn?.(r) })}
+            doing={doingLine(r, { scripts, buildings, residents, cities, arrives: arrivesIn?.(r) })}
             scripts={scripts}
             buildings={buildings}
             lastSeen={lastSeen}
@@ -2147,6 +2189,17 @@ export function ResidentCard({
               <RunScript script={r.script} scripts={scripts} onRunScript={onRunScript} />
             </section>
           )}
+          {shown === 'relocate' && relocate && onRelocate && (
+            <RelocateBlock
+              resident={r}
+              home={home}
+              choices={relocate.choices}
+              onRelocate={(cityId) => {
+                setPanel(undefined)
+                onRelocate(cityId)
+              }}
+            />
+          )}
           {shown === 'makeLeader' && makeLeader && (
             <section className="inspector-block" aria-label="Make Leader">
               <div className="panel-head">
@@ -2194,7 +2247,7 @@ export function ResidentCard({
         <>
           <ul className="sel-facts">
             <li>
-              {child ? 'Child' : 'Adult'} · {age} years{cityName ? ` · ${cityName}` : ''}
+              {child ? 'Child' : 'Adult'} · {age} years · {home}
               {r.riding ? ' · on horseback' : ''}
               {r.aboard ? ' · aboard a carriage' : ''}
             </li>
@@ -2994,6 +3047,60 @@ function PairBlock({
           onClick={() => onPair(partnerId)}
         >
           Pair
+        </button>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Relocating a resident (`CONTEXT.md`: Relocate): the realm's other cities with their free housing,
+ * counting those already on their way there; a city the order can't go to is greyed out with the
+ * reason. They walk there and move in on stepping into its area.
+ */
+function RelocateBlock({
+  resident,
+  home,
+  choices,
+  onRelocate,
+}: {
+  resident: Resident
+  /** The city they live in now, or "Homeless". */
+  home: string
+  choices: RelocateChoice[]
+  onRelocate: (cityId: string) => void
+}) {
+  const [cityId, setCityId] = useState('')
+  const o = resident.order
+  const going = o?.kind === 'relocate' ? choices.find((c) => c.id === o.cityId) : undefined
+  const picked = choices.find((c) => c.id === cityId && !c.problem)
+  return (
+    <section className="inspector-block" aria-label="Relocate">
+      <div className="panel-head">
+        <h3>Relocate</h3>
+        <span className="small muted">from {home}</span>
+      </div>
+      {going && <p className="muted small">Relocating to {going.name}.</p>}
+      <p className="small">
+        {resident.name} walks there and moves in on stepping into its area, if it still has free
+        housing then. Moving ends a pair.
+      </p>
+      <div className="order-buttons">
+        <select aria-label="City" value={cityId} onChange={(e) => setCityId(e.target.value)}>
+          <option value="">Pick a city…</option>
+          {choices.map((c) => (
+            <option key={c.id} value={c.id} disabled={!!c.problem}>
+              {c.name} · {c.problem ?? `${c.room} free housing`}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="primary"
+          disabled={!picked}
+          onClick={() => picked && onRelocate(picked.id)}
+        >
+          Relocate
         </button>
       </div>
     </section>

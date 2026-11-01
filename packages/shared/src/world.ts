@@ -645,6 +645,21 @@ export interface TrainOrder {
   learning: TrainingSubject | null
 }
 
+/**
+ * Relocating (`CONTEXT.md`: Relocate): the resident walks to their realm's city `cityId` and
+ * becomes its resident on stepping into its area. `target` is the tile of its area they head for,
+ * the nearest one when the order was given, found again if the area no longer holds it; `path`
+ * and `progress` go as for a walk.
+ */
+export interface RelocateOrder {
+  kind: 'relocate'
+  cityId: string
+  target: { x: number; y: number }
+  /** The tiles still to walk, in order; null while the path is being found. */
+  path: [number, number][] | null
+  progress: number
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -668,6 +683,7 @@ export type ResidentOrder =
   | TradeOrder
   | HandInOrder
   | BuyOffOrder
+  | RelocateOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -1710,6 +1726,19 @@ export type RealmEventWhat =
       order: string
       reason: string
       queueEnded?: true
+    }
+  /**
+   * The resident `name` relocating to `city` (`CONTEXT.md`: Relocate) couldn't move in, for
+   * `reason`: on arrival it had no free housing left or was no longer the realm's, or it was
+   * gone (and `city` with it). They keep their old city.
+   */
+  | {
+      kind: 'relocateFailed'
+      residentId: string
+      name: string
+      cityId: string
+      city?: string
+      reason: string
     }
   /**
    * A mercenary contract (`CONTEXT.md`: Mercenary contract) with the realm `other` (by its

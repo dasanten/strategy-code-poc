@@ -7,6 +7,7 @@ import { fetch, store } from './storing.js'
 import { drive, unhitch } from './driving.js'
 import { haul, stop } from './hauling.js'
 import { pair } from './pairing.js'
+import { relocate } from './relocating.js'
 import { walkTo } from './walking.js'
 import { workAt } from './work.js'
 import { teach } from './teaching.js'
@@ -90,6 +91,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     train,
     breed,
     pair,
+    relocate,
     attack,
     climb,
     mount,

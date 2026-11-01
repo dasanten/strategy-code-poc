@@ -1248,6 +1248,28 @@ export const cityResidentsInItsRealm: Invariant = {
 }
 
 /**
+ * Relocate orders hold (`CONTEXT.md`: Relocate): only a realm's resident relocates, never one
+ * carrying a child, and once in the city's area they move in or stop within the tick, so after it
+ * none names the city they live in.
+ */
+export const relocateOrdersSound: Invariant = {
+  name: 'relocate-orders-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (id: string, message: string) =>
+      out.push({ invariant: this.name, message: `resident ${id} ${message}`, entityIds: [id] })
+    for (const r of world.residents) {
+      const o = r.order
+      if (o?.kind !== 'relocate') continue
+      if (r.owner === null) fail(r.id, 'of no realm is relocating')
+      if (r.carrying) fail(r.id, 'is relocating while carrying a child')
+      if (r.cityId === o.cityId) fail(r.id, `is relocating to ${o.cityId}, where they live`)
+    }
+    return out
+  },
+}
+
+/**
  * Occupations of town halls hold (`CONTEXT.md`: Occupying a town hall, Capturing a city): none
  * has run the full `OCCUPATION_TICKS` without capturing its city, or started in the future; the
  * occupier still has armed residents on the hall; and it is never the city's own realm or an
@@ -1950,6 +1972,7 @@ export const worldInvariants: Invariant[] = [
   npcCityResidentsUnowned,
   ownersExist,
   cityResidentsInItsRealm,
+  relocateOrdersSound,
   occupationsSound,
   npcOrdersAllowed,
   npcFightsOutsiders,

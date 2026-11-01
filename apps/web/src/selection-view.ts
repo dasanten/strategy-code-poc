@@ -90,6 +90,7 @@ export type Selection = { kind: 'resident'; id: string } | { kind: 'tile'; x: nu
 /** An action the selection card offers. */
 export type ActionId =
   | 'walk'
+  | 'relocate'
   | 'stop'
   | 'ride'
   | 'board'
@@ -122,6 +123,7 @@ export type ActionId =
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
   walk: 'W',
+  relocate: 'V',
   stop: 'S',
   ride: 'M',
   board: 'K',
@@ -199,6 +201,12 @@ export interface ResidentHere {
   makeLeader?: { problem: string | undefined }
   /** One of the Player's own residents, whom they can rename (`CONTEXT.md`: Renaming a resident). */
   renamable?: boolean
+  /**
+   * For one of the Player's own residents: why they can't be told to relocate at all
+   * (`relocateActionProblem`), undefined when they can. Absent for anyone else's resident, who
+   * gets no Relocate row (`CONTEXT.md`: Relocate).
+   */
+  relocate?: { problem: string | undefined }
   /** They ride a horse, and can dismount (`CONTEXT.md`: Riding). */
   riding?: boolean
   /** They are aboard a carriage, and can get off (`CONTEXT.md`: Passenger). */
@@ -249,6 +257,12 @@ export function residentActions(h: ResidentHere): CardAction[] {
   const add = (a: CardAction) => actions.push(a)
   add(row('walk', '', picks('walk', 'Walk to')))
   if (h.busy) add(row('stop', 'Stop'))
+  // Children and homeless residents too (`CONTEXT.md`: Relocate).
+  if (h.relocate) {
+    const { problem } = h.relocate
+    const refused = problem ? { disabled: true as const, reason: problem } : {}
+    add(row('relocate', 'Relocate…', { opens: true, ...refused }))
+  }
   if (h.riding) add(row('ride', 'Dismount'))
   else if (h.horseToRide) add(row('ride', 'Mount horse'))
   // Children ride along too; a rider gets off their horse first, and the driver stays the driver
@@ -352,6 +366,7 @@ export const ORDER_GROUP_LABELS: Record<OrderGroup, string> = {
 /** Which kind each action is grouped under; an action not listed goes under Other. */
 const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   walk: 'move',
+  relocate: 'move',
   stop: 'move',
   ride: 'move',
   board: 'move',
