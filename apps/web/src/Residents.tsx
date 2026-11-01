@@ -1043,6 +1043,7 @@ export function GroupCard({
   buildings,
   carriages = [],
   inSight = [],
+  cities,
   arrivesIn,
   horses = [],
   realmId,
@@ -1069,6 +1070,8 @@ export function GroupCard({
   carriages?: { carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>; seats: number }[]
   /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
   inSight?: readonly SeenResident[]
+  /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
+  cities?: readonly Pick<City, 'id' | 'name'>[]
   /** About how many ticks until a resident arrives where they walk, ride or drive (`arrivalTicks`). */
   arrivesIn?: (r: Resident) => number | undefined
   /** The queue planner (`GroupPlanner`), on the Queue tab (`CONTEXT.md`: Planning for a group). */
@@ -1374,7 +1377,13 @@ export function GroupCard({
             <li key={r.id}>
               <button type="button" onClick={() => onPick(r.id)}>
                 <strong>{r.name}</strong> ·{' '}
-                {doingLine(r, { scripts, buildings, residents: inSight, arrives: arrivesIn?.(r) })}
+                {doingLine(r, {
+                  scripts,
+                  buildings,
+                  residents: inSight,
+                  cities,
+                  arrives: arrivesIn?.(r),
+                })}
               </button>
             </li>
           ))}

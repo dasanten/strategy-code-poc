@@ -1476,6 +1476,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           <GroupCard
             residents={group}
             relocate={relocateForGroup(group)}
+            cities={knownCities}
             scripts={scripts}
             buildings={world.buildings}
             carriages={groupCarriages}
