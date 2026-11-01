@@ -94,6 +94,7 @@ import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
 import { roadJoins, roadWidth, wallWidths } from './map/roads.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
+import { drawPlaces, pickedPlaces } from './map/places.js'
 import { inBox, pickableAt, pickables, toggled, type Point } from './map/selection.js'
 import { LONG_PRESS_MS, TAP_SLOP, longPresses, pressKind } from './map/gestures.js'
 
@@ -543,6 +544,8 @@ export function MapView({
         rings = true
       }
       if (rings) g.stroke({ width: 2.5, color: LEADER_COLOR })
+      // What their params and orders point at (`CONTEXT.md`: Places of the picked).
+      drawPlaces(g, cam, view, mapSize, pickedPlaces(world, ids), spots)
       for (const id of ids) {
         const selected = world.residents.find((u) => u.id === id)
         if (selected) drawPath(g, cam, view, mapSize, selected, world.residents)
