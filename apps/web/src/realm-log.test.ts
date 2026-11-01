@@ -36,6 +36,21 @@ describe('realm log', () => {
       text: 'Mara’s horse is hungry, and Mara carries no Food to spare for it.',
       tone: 'warn',
     })
+    // Horses have names (`CONTEXT.md`: Horse name); entries from before say "a horse".
+    expect(describeEvent({ ...horseHungry, horseName: 'Ember', seq: 6, ...at }).text).toBe(
+      'Mara’s horse Ember is hungry, and Mara carries no Food to spare for it.',
+    )
+    const starved = { kind: 'horseDied', horseId: 'h1', seq: 7, ...at } as const
+    expect(describeEvent({ ...starved, name: 'Ember' })).toEqual({
+      text: 'Your horse Ember starved to death.',
+      tone: 'bad',
+    })
+    expect(describeEvent(starved).text).toBe('A horse starved to death.')
+    const foaled = { kind: 'foaled', horseId: 'h2', stableId: 's1', seq: 8, ...at } as const
+    expect(describeEvent({ ...foaled, name: 'Flint' }).text).toBe(
+      'A foal, Flint, was born in a stable.',
+    )
+    expect(describeEvent(foaled).text).toBe('A foal was born in a stable.')
   })
 
   it('describes a script’s trouble', () => {
@@ -304,6 +319,35 @@ describe('realm log', () => {
       text: 'The realm of Mara captured Ashford and its 3 residents.',
       tone: 'bad',
     })
+  })
+
+  it('describes town halls occupied and occupations broken, to both sides', () => {
+    const hall = { cityId: 'c1', city: 'Ashford', x: 4, y: 5, seq: 9, ...at } as const
+    const places = [{ name: 'Ashford’s town hall', x: 4, y: 5 }]
+    const occupied = { ...hall, kind: 'hallOccupied', days: 10 } as const
+    expect(describeEvent({ ...occupied, other: 'Northmarch', occupier: false })).toEqual({
+      text: 'Your town hall in Ashford is occupied by the realm of Northmarch: it falls in 10 game days unless you retake it.',
+      tone: 'bad',
+      places,
+    })
+    expect(describeEvent({ ...occupied, other: null, occupier: true })).toEqual({
+      text: 'You hold the town hall of Ashford: 10 game days to capture it.',
+      tone: 'info',
+      places,
+    })
+    const broken = { ...hall, kind: 'occupationBroken' } as const
+    expect(describeEvent({ ...broken, other: 'Northmarch', occupier: false })).toEqual({
+      text: 'The occupation of your town hall in Ashford by the realm of Northmarch is broken.',
+      tone: 'info',
+      places,
+    })
+    expect(describeEvent({ ...broken, other: 'Mara', occupier: true })).toEqual({
+      text: 'Your occupation of Ashford’s town hall is broken: its days are lost.',
+      tone: 'warn',
+      places,
+    })
+    const gone = { ...broken, x: undefined, y: undefined }
+    expect(describeEvent({ ...gone, other: null, occupier: true }).places).toBeUndefined()
   })
 
   it('describes alliance events, saying which are about the Player’s own realm', () => {

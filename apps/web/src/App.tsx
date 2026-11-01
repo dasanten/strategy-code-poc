@@ -24,6 +24,7 @@ import {
   type ScriptSummary,
   type StartParamValues,
   type Stock,
+  type TrainingSubject,
   isAt,
   SHARES_A_TILE,
   targetParam,
@@ -54,12 +55,17 @@ import {
 } from './Hud.js'
 import type { Covered } from './map/camera.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
+import { groupHorses } from './horses-view.js'
+import { HorsesList } from './Horses.js'
 import { Founding } from './Founding.js'
 import {
   appendRequest,
   appendToEach,
-  editRequest,
+  editPlan,
+  EMPTY_PLAN,
+  givePlan,
   giveToAll,
+  planOf,
   planStep,
   storeAll,
   useShiftHeld,
@@ -67,6 +73,7 @@ import {
 } from './queue-view.js'
 import { AddStep } from './AddStep.js'
 import { GroupPlanner } from './GroupPlanner.js'
+import { hasBlocks, type PlanItem } from './plan-blocks.js'
 import {
   horsesIn,
   nextPick,
@@ -185,6 +192,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
+  // The horse last picked in the Horses drawer, to mark its row among others on the same tile.
+  const [pickedHorseId, setPickedHorseId] = useState<string>()
   // The resident card's open tab and panel, kept here so they stay as the Player picks others;
   // the tab is also remembered in this browser (ADR 0012).
   const [cardSections, setCardSections] = useState<CardSections<ActionId>>(() => ({
@@ -204,6 +213,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The queue planned on the group card, held here until given to all (`CONTEXT.md`: Planning
   // for a group); with none open, a step planned for a group goes onto each one's own queue.
   const [groupPlan, setGroupPlan] = useState<QueuePlan>()
+  // Plans with repeat blocks waiting to be given, by resident (`CONTEXT.md`: Repeat block): they
+  // stay while other cards are open, until given or discarded.
+  const [queuePlans, setQueuePlans] = useState<Record<string, QueuePlan>>({})
+  const planQueue = (id: string, plan: QueuePlan | undefined) =>
+    setQueuePlans((plans) => {
+      const next = { ...plans }
+      if (plan) next[id] = plan
+      else delete next[id]
+      return next
+    })
   const [starting, setStarting] = useState<Starting>()
   // The param whose value the map is waiting for: of the running script, or for the form.
   const pickingParam = paramPick ?? starting?.picking
@@ -222,6 +241,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     ? world.residents.filter(
         (r): r is Resident => commandsSeen(world.diplomacy, world.home.realmId, r) && faresKnown(r),
       )
+    : []
+  // The other realms (and NPC cities) the Player knows by name: their allies and those in sight.
+  const realms = world
+    ? [
+        ...(world.diplomacy.alliance?.members ?? []).filter(
+          (m) => m.realmId !== world.home.realmId,
+        ),
+        ...world.diplomacy.realmsInSight,
+      ]
     : []
   const group = selectedIds.flatMap((id) => own.filter((r) => r.id === id))
   const selected = group.length === 1 ? group[0] : undefined
@@ -375,6 +403,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   // The city picked on the map or opened in the Cities drawer.
   const [openCityId, setOpenCityId] = useState<string>()
+  // The warehouse or storage Trade here scrolls the open city to; a new object each press.
+  const [tradeAt, setTradeAt] = useState<{ buildingId: string }>()
 
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
@@ -473,6 +503,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (!selected) return
+    const open = queuePlans[selected.id]
+    if (open) {
+      planQueue(selected.id, planStep(open, step.order, step.at))
+      return
+    }
     const order = { ...step.order, residentId: selected.id }
     setOrderError(await sendOrder(appendRequest(selected, order, step.at) ?? order))
   }
@@ -724,6 +759,24 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'task', task: 'feedStable', residentId: selected.id, stableId }
     setOrderError(await giveOrder(order, false))
   }
+  /**
+   * Gives the picked resident the Train task for the training ground they stand on: they run the
+   * Player's Train (default) script (`CONTEXT.md`: Trainee).
+   */
+  async function train(groundId: string) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'train', residentId: selected.id, groundId }
+    setOrderError(await giveOrder(order, false))
+  }
+  /**
+   * Orders the picked resident to teach `subject` at the training ground they stand on
+   * (`CONTEXT.md`: Teacher); with Shift held it goes in their queue.
+   */
+  async function teach(buildingId: string, subject: TrainingSubject) {
+    if (!selected) return
+    const order = { kind: 'teach', residentId: selected.id, buildingId, subject }
+    setOrderError(await giveOrder(order))
+  }
   /** Orders the picked resident to stop what they are doing, such as a haul route. */
   /** Orders the picked resident to run one of the Player's scripts. */
   async function runScript(scriptId: number) {
@@ -965,6 +1018,47 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       {world &&
         drawer(
+          'horses',
+          <HorsesList
+            groups={groupHorses(
+              world.horses.filter((h) => h.realmId === world.home.realmId),
+              world.buildings,
+              world.carriages,
+              world.residents,
+              world.cities,
+            )}
+            tick={world.tick}
+            selectedId={(() => {
+              // A horse whose tile card is open, the last one picked here first, or the one the
+              // picked resident rides.
+              const shown = world.horses.filter(
+                (h) =>
+                  h.realmId === world.home.realmId &&
+                  (selectedTile
+                    ? Math.floor(h.x) === selectedTile.x && Math.floor(h.y) === selectedTile.y
+                    : selected?.riding === h.id),
+              )
+              return (shown.find((h) => h.id === pickedHorseId) ?? shown[0])?.id
+            })()}
+            onSelect={(h) => {
+              setPickedHorseId(h.id)
+              const x = Math.floor(h.x)
+              const y = Math.floor(h.y)
+              // A ridden horse shows on its rider's card; any other on its tile's card.
+              const rider = own.find((r) => r.riding === h.id)
+              if (rider) {
+                setSelectedIds([rider.id])
+                setSelectedTile(undefined)
+              } else {
+                setSelectedIds([])
+                setSelectedTile({ x, y })
+              }
+              showOnMap(x, y)
+            }}
+          />,
+        )}
+      {world &&
+        drawer(
           'armies',
           <ArmiesPanel
             armies={world.armies}
@@ -996,12 +1090,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             inSight={world.residents}
             buildings={world.buildings}
             cities={world.cities}
-            realms={[
-              ...(world.diplomacy.alliance?.members ?? []).filter(
-                (m) => m.realmId !== world.home.realmId,
-              ),
-              ...world.diplomacy.realmsInSight,
-            ]}
+            realms={realms}
             sendOrder={sendOrder}
           />,
         )}
@@ -1035,7 +1124,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             residents={world.residents}
             buildings={world.buildings}
             realmId={world.home.realmId}
-            realms={world.diplomacy.realmsInSight}
+            realms={realms}
             carriages={world.carriages}
             horses={world.horses}
             tick={world.tick}
@@ -1052,9 +1141,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onTransfer={async (transfer) =>
               setOrderError(await giveOrder({ kind: 'transfer', ...transfer }))
             }
+            onSend={async ({ residentId, carriageId, x, y }) =>
+              setOrderError(
+                await giveOrder(
+                  carriageId
+                    ? { kind: 'drive', residentId, carriageId, x, y }
+                    : { kind: 'walkTo', residentId, x, y },
+                ),
+              )
+            }
+            arrivesIn={arrivesIn || undefined}
             directives={world.diplomacy.directives}
             openId={openCityId}
             onOpen={setOpenCityId}
+            scrollTo={tradeAt}
             onBuyOff={async (residentId, directiveId, carriageId) =>
               setOrderError(
                 await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
@@ -1095,6 +1195,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 residents: world.residents,
                 // A building remembered out of sight is named after its city as last seen.
                 cities: [...world.cities, ...world.lastSeen.cities],
+                realms,
                 lastSeen: { buildings: world.lastSeen.buildings, tick: world.tick },
                 tick: world.tick,
                 viewer: {
@@ -1141,13 +1242,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onSetGate={async (gateId, open) =>
               setOrderError(await giveOrder({ kind: 'setGate', gateId, open }))
             }
-            onOpenCity={(id) => {
+            onOpenCity={(id, buildingId) => {
               setOpenCityId(id)
+              setTradeAt(buildingId ? { buildingId } : undefined)
               setOpenDrawer('cities')
             }}
             // The same `renameCity` order a script's `renameCity` requests, asked by the Leader.
             onRenameCity={async (cityId, name) => {
               const order = { kind: 'renameCity', residentId: world.home.leaderId, cityId, name }
+              setOrderError(await giveOrder(order))
+            }}
+            // The same `renameHorse` order a script's `renameHorse` requests, asked by the Leader.
+            onRenameHorse={async (horseId, name) => {
+              const order = { kind: 'renameHorse', residentId: world.home.leaderId, horseId, name }
               setOrderError(await giveOrder(order))
             }}
             onSelectResident={(id) => select([id])}
@@ -1226,6 +1333,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             onWork={work}
             onFeedStable={feedStable}
+            onTrain={train}
+            onTeach={teach}
             onTearDown={tearDown}
             horses={world.horses}
             onBreed={breed}
@@ -1300,9 +1409,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
               )
             }
-            onEditQueue={async (steps, loop) =>
-              setOrderError(await sendOrder(editRequest(selected, steps, loop)))
-            }
+            // A paste into the planner of a resident with no queue starts one; steps wrapped in
+            // a repeat block open a plan to give instead.
+            onEditQueue={async (items: PlanItem[], loop?: boolean) => {
+              if (!hasBlocks(items))
+                return setOrderError(await sendOrder(givePlan(selected, { items, loop })))
+              const from = selected.queue ? planOf(selected.queue) : EMPTY_PLAN
+              planQueue(selected.id, editPlan(from, items, loop))
+            }}
+            queuePlan={queuePlans[selected.id]}
+            onPlanQueue={(plan) => planQueue(selected.id, plan)}
+            onGivePlan={async () => {
+              const plan = queuePlans[selected.id]
+              if (!plan) return
+              planQueue(selected.id, undefined)
+              setOrderError(await sendOrder(givePlan(selected, plan)))
+            }}
             addStep={addStep(world)}
             onClose={() => {
               setSelectedIds([])
@@ -1369,6 +1491,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 addStep={addStep(world)}
                 scripts={scripts}
                 buildings={world.buildings}
+                lastSeen={world.lastSeen.buildings}
+                realm={world.home.realmId}
               />
             }
             collapsed={pick?.kind === 'group' || pick?.kind === 'plan'}

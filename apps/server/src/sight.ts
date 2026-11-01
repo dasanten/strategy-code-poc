@@ -1,7 +1,6 @@
 import {
   SIGHT_RANGE,
   cityPrice,
-  commanderOf,
   forSale,
   npcCityPrices,
   npcCityRefuses,
@@ -37,6 +36,7 @@ import {
 } from '@csp/shared'
 import type { ExploredTerrain } from './explored.js'
 import type { InvariantViolation } from './invariants.js'
+import { worldIndex } from './world-index.js'
 
 /** A spot something can be seen from or at. */
 interface Spot {
@@ -149,8 +149,9 @@ function armySeen(
  */
 function observersOf(world: WorldState, realmId: string): Spot[] {
   const members = new Set(sharingSight(world, realmId))
+  const index = worldIndex(world)
   return world.residents.filter((r) => {
-    const by = commanderOf(world, r)
+    const by = index.commanderOf(r)
     const org = r.owner ?? r.cityId
     return (org !== null && members.has(org)) || (by !== null && members.has(by))
   })
@@ -161,8 +162,7 @@ function observersOf(world: WorldState, realmId: string): Spot[] {
  * range of any of their residents or their alliance's, as `entitiesInSight` counts it.
  */
 export function sightOf(world: WorldState, size: number, side: string): (at: Spot) => boolean {
-  const eyes = eyesOf(size, observersOf(world, side))
-  return (at) => eyes.sees(at)
+  return sideSight(world, size, side).sees
 }
 
 /**
@@ -187,6 +187,7 @@ interface Insight {
 function insightOf(world: WorldState, size: number, side: string, observers: Spot[]): Insight {
   const cities = new Map(world.cities.map((c) => [c.id, c]))
   const orgs = new Set(sharingSight(world, side))
+  const index = worldIndex(world)
   // A Trade Org city sees for its Organization, as all of the Trade Org's cities are one.
   const sideCity = cities.get(side)
   if (sideCity) orgs.add(cityOrganization(sideCity))
@@ -221,7 +222,7 @@ function insightOf(world: WorldState, size: number, side: string, observers: Spo
       )
     },
     fares: (r) => {
-      const by = commanderOf(world, r)
+      const by = index.commanderOf(r)
       return ours(r.owner, r.cityId) || (by !== null && orgs.has(by))
     },
   }
@@ -270,8 +271,8 @@ function seenCarriage(world: WorldState, insight: Insight, k: Carriage): SeenCar
 /**
  * What a Player sees of the script a resident runs (`SeenScript`): which one, and for the owning
  * Player (`own`) what goes into the resident's Doing line (`CONTEXT.md`: Doing): the task, the
- * kind of building the task is about, as its memory names it (`TaskMemory`), and the text the
- * script gave `doing()`.
+ * kind of building the task is about, as its memory names it (`TaskMemory`), the text the
+ * script gave `doing()`, and whether it waits (`CONTEXT.md`: Running a script, Waiting).
  */
 export function seenScript(world: WorldState, script: RunningScript, own: boolean): SeenScript {
   if (!own) return { scriptId: script.scriptId }
@@ -286,6 +287,7 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
     ...(script.task ? { task: script.task } : {}),
     ...(building ? { building } : {}),
     ...(typeof memory.doing === 'string' && memory.doing ? { doing: memory.doing } : {}),
+    ...(script.waitingSince !== undefined ? { waiting: true as const } : {}),
   }
 }
 
@@ -299,20 +301,28 @@ export const withoutScriptLog = ({ scriptLog: _, ...rest }: Resident) => rest
  * What a realm's Player sees (`CONTEXT.md`: Sight): everything within sight range of any of
  * their residents or their alliance's, their own things included. A city counts as seen when
  * any of it is. What is inside, and how residents and horses fare, only as `CONTEXT.md` says
- * (Seeing inside a storage, Seeing how someone fares).
+ * (Seeing inside a storage, Seeing how someone fares). While a `SightCache` is open the list is
+ * shared by everyone who asks, so nobody changes it or what is in it (both are frozen).
  */
 export function entitiesInSight(
   world: WorldState,
   terrain: TerrainMap,
   realmId: string | undefined,
-): SeenEntity[] {
+): readonly SeenEntity[] {
   if (realmId === undefined) return []
-  const observers = observersOf(world, realmId)
-  if (observers.length === 0) return []
-  const size = terrain.size
-  const insight = insightOf(world, size, realmId, observers)
-  const eyes = eyesOf(size, observers)
+  return sideSight(world, terrain.size, realmId).entities()
+}
+
+/** Everything in a side's sight, as `entitiesInSight` gives it. */
+function everythingSeen(
+  world: WorldState,
+  realmId: string,
+  eyes: Eyes,
+  insight: Insight,
+  seenPlaces: readonly SeenPlace[],
+): SeenEntity[] {
   const inSight = (at: Spot) => eyes.sees(at)
+  const index = worldIndex(world)
   const out: SeenEntity[] = []
   for (const r of world.residents) {
     if (!inSight(r)) continue
@@ -323,7 +333,7 @@ export function entitiesInSight(
     // never; the defence script picked is the owning Player's to see too.
     const { script, scriptParams, queue, interrupted, defenceScriptId, ...rest } =
       withoutScriptLog(r)
-    const kept = commanderOf(world, r) === realmId ? scriptParams : undefined
+    const kept = index.commanderOf(r) === realmId ? scriptParams : undefined
     const params = script ? kept?.[script.scriptId] : undefined
     const own = r.owner === realmId
     const shown: SeenEntity = {
@@ -358,7 +368,7 @@ export function entitiesInSight(
     }
     out.push(shown)
   }
-  out.push(...places(world, realmId, eyes, insight))
+  out.push(...seenPlaces)
   for (const h of world.horses) {
     if (!inSight(h)) continue
     const shown: SeenEntity = { is: 'horse', ...h }
@@ -408,6 +418,7 @@ function places(
   const out: SeenPlace[] = []
   const seenCities = new Set<string>()
   const seenStorages = new Set<string>()
+  const seenHalls = new Set<string>()
   // Only the buildings near the observers, in the world's order, when they are sorted by square.
   const near = bySquare
     ? [...eyes.watched]
@@ -420,6 +431,7 @@ function places(
     out.push({ is: 'building', ...seenBuilding(world, insight, b) })
     if (b.cityId !== null) seenCities.add(b.cityId)
     if (b.cityId !== null && b.kind === 'storage' && !b.site) seenStorages.add(b.cityId)
+    if (b.cityId !== null && b.kind === 'townHall') seenHalls.add(b.cityId)
   }
   // An NPC city names the Player its price (`CONTEXT.md`: Buying a city), from all of it, or says
   // it won't sell to them or refuses them at all (`CONTEXT.md`: NPC city reaction). One that doesn't
@@ -445,28 +457,168 @@ function places(
               ? { trade: shownLines(npcCityPrices(world, c, realmId), insight.insideCity(c.id)) }
               : {}),
           }
-    out.push({ is: 'city', ...c, ...sale, ...refuses, ...deal })
+    // Who occupies its town hall only with the hall in sight (`CONTEXT.md`: Occupying a town hall).
+    const occupation = seenHalls.has(c.id) ? c.occupation : null
+    out.push({ is: 'city', ...c, occupation, ...sale, ...refuses, ...deal })
   }
   return out
 }
 
 /**
- * The buildings and cities a realm's Player sees, as `entitiesInSight` shows them, and whether
- * any tile of a footprint is in their sight (`CONTEXT.md`: Last seen). `bySquare`, from
- * `buildingsBySquare` this tick, saves looking at every building.
+ * The buildings and cities a realm's Player sees, as `entitiesInSight` shows them, whether any
+ * tile of a footprint is in their sight (`CONTEXT.md`: Last seen) and whether they have anyone to
+ * see through at all (`looking`). `bySquare`, from
+ * `buildingsBySquare` this tick, saves looking at every building. `afresh` works it out apart
+ * from any open `SightCache`, as an invariant should.
  */
 export function placesInSight(
   world: WorldState,
   size: number,
   realmId: string,
-  bySquare?: Map<number, number[]>,
-): { seen: SeenPlace[]; sees: (b: Placed) => boolean } {
-  const observers = observersOf(world, realmId)
-  const eyes = eyesOf(size, observers)
-  const sees = (b: Placed) => buildingSeen(eyes, b)
-  if (observers.length === 0) return { seen: [], sees }
-  const insight = insightOf(world, size, realmId, observers)
-  return { seen: places(world, realmId, eyes, insight, bySquare), sees }
+  { bySquare, afresh = false }: { bySquare?: Map<number, number[]>; afresh?: boolean } = {},
+): { seen: readonly SeenPlace[]; sees: (b: Placed) => boolean; looking: boolean } {
+  const sight = afresh ? new SideSight(world, size, realmId) : sideSight(world, size, realmId)
+  return { seen: sight.places(bySquare), sees: sight.buildingSeen, looking: sight.looking }
+}
+
+/**
+ * What one side, a realm or an NPC city, sees (`CONTEXT.md`: Sight): who it sees through and
+ * their eyes, worked out when it is made; its insight, the buildings and cities in its sight and
+ * everything in its sight, each the first time it is asked for. What it hands out is frozen.
+ */
+class SideSight {
+  private readonly observers: Spot[]
+  private readonly eyes: Eyes
+  private insight?: Insight
+  private seenPlaces?: readonly SeenPlace[]
+  private everything?: readonly SeenEntity[]
+
+  constructor(
+    private readonly world: WorldState,
+    private readonly size: number,
+    private readonly side: string,
+  ) {
+    this.observers = observersOf(world, side)
+    this.eyes = eyesOf(size, this.observers)
+  }
+
+  readonly sees = (at: Spot): boolean => this.eyes.sees(at)
+
+  /** Whether the side has anyone to see through. */
+  get looking(): boolean {
+    return this.observers.length > 0
+  }
+
+  readonly buildingSeen = (b: Placed): boolean => buildingSeen(this.eyes, b)
+
+  private insightOf(): Insight {
+    return (this.insight ??= insightOf(this.world, this.size, this.side, this.observers))
+  }
+
+  places(bySquare?: Map<number, number[]>): readonly SeenPlace[] {
+    if (this.observers.length === 0) return []
+    return (this.seenPlaces ??= frozen(
+      places(this.world, this.side, this.eyes, this.insightOf(), bySquare),
+    ))
+  }
+
+  entities(): readonly SeenEntity[] {
+    if (this.observers.length === 0) return []
+    return (this.everything ??= frozen(
+      everythingSeen(this.world, this.side, this.eyes, this.insightOf(), this.places()),
+    ))
+  }
+}
+
+/** A list and what is in it, frozen, since everyone who asks this phase shares them. */
+function frozen<T extends object>(list: T[]): readonly T[] {
+  for (const e of list) Object.freeze(e)
+  return Object.freeze(list)
+}
+
+/**
+ * What each side sees, worked out once per phase of a tick and shared by everyone who asks: the
+ * scripts, the NPC scripts, Last seen and sync (Epic 49). A tick has three phases: the scripts
+ * run before the world steps, the NPC scripts inside it, Last seen and sync once it has stepped;
+ * `newSightPhase` starts the next. Scratch memory like the pathfinder's: never saved, never world
+ * state (ADR 0006). The sight invariants work theirs out on their own.
+ */
+export class SightCache {
+  /** How many times a side's sight was worked out since the cache opened (tick health). */
+  builds = 0
+  private readonly sides = new Map<string, SideSight>()
+  /** What is in sight as JSON, by the frozen thing it was made from (`seenJson`). */
+  json = new WeakMap<object, string>()
+
+  constructor(readonly size: number) {}
+
+  side(world: WorldState, side: string): SideSight {
+    let sight = this.sides.get(side)
+    if (!sight) {
+      sight = new SideSight(world, this.size, side)
+      this.sides.set(side, sight)
+      this.builds++
+    }
+    return sight
+  }
+
+  /** Forgets every side's sight: the world has moved on since. */
+  newPhase(): void {
+    this.sides.clear()
+    this.json = new WeakMap()
+  }
+}
+
+const openCaches = new WeakMap<WorldState, SightCache>()
+
+/** Opens a sight cache for the world, in place of any open one, until `closeSight`. */
+export function openSight(world: WorldState, size: number): SightCache {
+  const cache = new SightCache(size)
+  openCaches.set(world, cache)
+  return cache
+}
+
+/** Closes the world's sight cache: from then on each caller works sight out for itself. */
+export function closeSight(world: WorldState): void {
+  openCaches.delete(world)
+}
+
+/** Starts the next phase of the world's open sight cache, if one is open (`SightCache`). */
+export function newSightPhase(world: WorldState): void {
+  openCaches.get(world)?.newPhase()
+}
+
+/** Runs `fn` with a sight cache open: the open one, or one opened for it and closed after. */
+export function withSight<T>(world: WorldState, size: number, fn: () => T): T {
+  if (openCaches.has(world)) return fn()
+  openSight(world, size)
+  try {
+    return fn()
+  } finally {
+    closeSight(world)
+  }
+}
+
+/**
+ * Something in sight as JSON: while a sight cache is open, made once per phase and shared by
+ * everyone who asks (Last seen, and sync for every socket of a realm), so the same string comes
+ * back each time; else made for this caller alone. Only for what an open cache handed out, which
+ * nobody changes during the phase (`frozen`).
+ */
+export function seenJson(world: WorldState, e: object): string {
+  const memo = openCaches.get(world)?.json
+  let json = memo?.get(e)
+  if (json === undefined) {
+    json = JSON.stringify(e)
+    memo?.set(e, json)
+  }
+  return json
+}
+
+/** A side's sight: from the open cache, or worked out for this caller alone without one. */
+function sideSight(world: WorldState, size: number, side: string): SideSight {
+  const cache = openCaches.get(world)
+  return cache?.size === size ? cache.side(world, side) : new SideSight(world, size, side)
 }
 
 /** Whether a caravan's carriage or any of its crew is in sight. */
@@ -591,8 +743,9 @@ export class SightTracker {
     }
     const grown = new Map<number, Set<number>>()
     const looking = new Set<string>()
+    const index = worldIndex(world)
     for (const r of world.residents) {
-      const by = commanderOf(world, r)
+      const by = index.commanderOf(r)
       const org = r.owner ?? r.cityId
       const viewers = [org, by === r.owner ? null : by].flatMap((id) =>
         id === null ? [] : (viewersOf.get(id) ?? []),

@@ -1,5 +1,8 @@
 import {
-  captorOf,
+  OCCUPATION_GAME_DAYS,
+  OCCUPATION_TICKS,
+  occupierOf,
+  townHallOf,
   drivenCarriageId,
   inCityArea,
   realmName,
@@ -20,18 +23,57 @@ export interface Capture {
 }
 
 /**
- * Captures every city that has a captor (`captorOf`, `CONTEXT.md`: Capturing a city), on a map
- * of `size` tiles. Runs last in the tick, once fights, deaths and dropped weapons are settled.
+ * Runs the occupations of town halls (`CONTEXT.md`: Occupying a town hall, Capturing a city), on
+ * a map of `size` tiles: one starts the tick a realm occupies a hall (`occupierOf`) with none
+ * running; the first tick another realm or nobody does, it is broken and its days are lost; held
+ * `OCCUPATION_TICKS`, the city is captured. Both realms' logs say when one starts and when it is
+ * broken (`occupationLogged`). Runs once fights, deaths and dropped weapons are
+ * settled, and before refilling, so whoever is at home in a city captured this tick refills there.
  */
 export function stepCaptures(world: WorldState, size: number): Capture[] {
   const captures: Capture[] = []
   for (const city of world.cities) {
-    const captor = captorOf(world, city, size)
-    if (captor === null || captor === city.realmId) continue
-    captures.push({ cityId: city.id, from: city.realmId, to: captor })
-    captureCity(world, city, captor, size)
+    const occupier = occupierOf(world, city, size)
+    if (city.occupation && city.occupation.realmId !== occupier) {
+      occupationLogged(world, city, city.occupation.realmId, 'occupationBroken')
+      city.occupation = null
+    }
+    if (occupier === null) continue
+    if (!city.occupation) {
+      city.occupation = { realmId: occupier, since: world.tick }
+      occupationLogged(world, city, occupier, 'hallOccupied')
+    }
+    if (world.tick - city.occupation.since < OCCUPATION_TICKS) continue
+    city.occupation = null
+    captures.push({ cityId: city.id, from: city.realmId, to: occupier })
+    captureCity(world, city, occupier, size)
   }
   return captures
+}
+
+/**
+ * The logs of the city's realm and of the realm `occupier` say its town hall is occupied by
+ * `occupier`, or that its occupation is broken (`CONTEXT.md`: Occupying a town hall). An NPC city
+ * has no log. A city that joined the occupier's realm otherwise (bought, persuaded) meanwhile
+ * just ends it, unlogged.
+ */
+function occupationLogged(
+  world: WorldState,
+  city: City,
+  occupier: string,
+  kind: 'hallOccupied' | 'occupationBroken',
+): void {
+  if (city.realmId === occupier) return
+  const hall = townHallOf(world, city)
+  const at = { cityId: city.id, city: city.name, ...(hall && { x: hall.x, y: hall.y }) }
+  // Occupying needs the hall standing (`occupierOf`), so a new occupation always has its place.
+  const what =
+    kind === 'hallOccupied'
+      ? { kind, ...at, x: hall!.x, y: hall!.y, days: OCCUPATION_GAME_DAYS }
+      : { kind, ...at }
+  const owner = city.realmId
+  recordEvent(world, occupier, { ...what, other: owner && realmName(world, owner), occupier: true })
+  recordEvent(world, owner, { ...what, other: realmName(world, occupier), occupier: false })
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CARRIAGE_CAPACITY,
+  OCCUPATION_GAME_DAYS,
   FOOTPRINT,
   MAP_SIZE,
   MAX_HEALTH,
@@ -116,6 +117,21 @@ describe('the actions on a resident’s card', () => {
     const site = building({ kind: 'stable', site: { work: 0, delivered: {} } })
     expect(ids(here({ building: site }))).not.toContain('feedStable')
     expect(ids(here({ building: building({ kind: 'storage' }) }))).not.toContain('feedStable')
+  })
+
+  it('offers teaching and training on a finished training ground on their tile, to the grown', () => {
+    const ground = building({ kind: 'trainingGround' })
+    const site = building({ kind: 'trainingGround', site: { work: 0, delivered: {} } })
+    for (const id of ['teach', 'train']) {
+      expect(ids(here({ building: ground }))).toContain(id)
+      expect(ids(here({ building: site }))).not.toContain(id)
+      // Off the ground's footprint there is no ground on their tile.
+      expect(ids(here({ building: building({ kind: 'farm' }) }))).not.toContain(id)
+      expect(ids(here({}))).not.toContain(id)
+      expect(ids(here({ building: ground, adult: false }))).not.toContain(id)
+    }
+    const teach = residentActions(here({ building: ground })).find((a) => a.id === 'teach')!
+    expect(teach.opens).toBe(true)
   })
 
   it('offers tearing down what was built on their tile, but not a warehouse', () => {
@@ -425,6 +441,28 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
 const tile = (more: Partial<TileThings> = {}) => describeTile(things(more), GOOD_LABELS)
 
 describe('the card for a tile', () => {
+  it('says who occupies a town hall in sight and the game days left (`CONTEXT.md`: Occupying a town hall)', () => {
+    const hall = (cityId: string) => building({ kind: 'townHall', cityId, x: 4, y: 4 })
+    const cities = [
+      { id: 'c-me', name: 'Eastmere', realmId: 'me', occupation: { realmId: 'r2', since: 0 } },
+      { id: 'c-npc', name: 'Oakhollow', realmId: null, occupation: { realmId: 'me', since: 0 } },
+    ]
+    const realms = [{ realmId: 'r2', realm: 'Northmarch' }]
+    const mine = tile({ buildings: [hall('c-me')], cities, realms, tick: 0 })
+    expect(mine.occupation).toEqual({
+      text: `Occupied by Northmarch, ${OCCUPATION_GAME_DAYS} game days left`,
+      warning: true,
+      realmId: 'r2',
+    })
+    const theirs = tile({ buildings: [hall('c-npc')], cities, realms, tick: 0 })
+    expect(theirs.occupation).toMatchObject({ warning: false })
+    expect(theirs.occupation?.text).toMatch(/^Occupied by you,/)
+    // Not occupied, or another building of an occupied city: nothing.
+    expect(tile({ buildings: [hall('c-npc')] }).occupation).toBeUndefined()
+    const farm = building({ kind: 'farm', cityId: 'c-me' })
+    expect(tile({ buildings: [farm], cities, realms }).occupation).toBeUndefined()
+  })
+
   it('is named after a building on it, in its owner’s colour', () => {
     const card = tile({ buildings: [building({ kind: 'farm', cityId: 'c-me' })] })
     expect(card).toMatchObject({ title: 'Eastmere farm', rel: 'own', what: 'building' })
@@ -602,6 +640,7 @@ describe('horses on the tile card', () => {
     y: 5,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    name: 'Rowan',
     stats: { speed: 12, strength: 8, endurance: 10 },
     bornAt: 0,
     ...h,
@@ -618,14 +657,14 @@ describe('horses on the tile card', () => {
   it('tells how the own carriage’s horse fares and how long the Food on board feeds it', () => {
     const fed = tile({ carriages: [{ ...carriage, load: { food: 6 } }], horses: [horse()] })
     expect(horseLine(fed.lines)).toBe(
-      'Horse: Speed 12, Strength 8, Endurance 10 · fed, healthy · Food on board for 8 game days',
+      'Horse: Rowan · Speed 12, Strength 8, Endurance 10 · fed, healthy · Food on board for 8 game days',
     )
     const hungry = tile({
       carriages: [carriage],
       horses: [horse({ hunger: 10, health: MAX_HEALTH - 5 })],
     })
     expect(horseLine(hungry.lines)).toBe(
-      'Horse: Speed 12, Strength 8, Endurance 10 · hungry, hurt · no Food on board',
+      'Horse: Rowan · Speed 12, Strength 8, Endurance 10 · hungry, hurt · no Food on board',
     )
     const starving = tile({ carriages: [carriage], horses: [horse({ hunger: 0 })] })
     expect(horseLine(starving.lines)).toContain('· starving, healthy')
@@ -641,9 +680,14 @@ describe('horses on the tile card', () => {
       horses: [unknown({ realmId: 'r-other' })],
     })
     expect(hitched.lines.find((l) => l.startsWith('Carriage'))).toBe(
+      'Carriage (another realm) · empty · pulled by Rowan',
+    )
+    expect(horseLine(hitched.lines)).toBe('Horse: Rowan · Speed 12, Strength 8, Endurance 10')
+    // With its horse out of sight, only that one is hitched.
+    const unseen = tile({ carriages: [{ ...theirs, horseId: 'h1' }] })
+    expect(unseen.lines.find((l) => l.startsWith('Carriage'))).toBe(
       'Carriage (another realm) · empty · horse hitched',
     )
-    expect(horseLine(hitched.lines)).toBe('Horse: Speed 12, Strength 8, Endurance 10')
     const bare = tile({ carriages: [{ ...theirs, horseId: null }] })
     expect(bare.lines.find((l) => l.startsWith('Carriage'))).toBe(
       'Carriage (another realm) · empty · no horse',
@@ -657,7 +701,7 @@ describe('horses on the tile card', () => {
     const ridden = horse({ id: 'h2', hunger: 10, health: MAX_HEALTH - 5 })
     const horses = [horse(), ridden]
     expect(riddenHorseLine({ riding: 'h2' }, horses, at)).toBe(
-      'Horse: Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt · eats from your spare Food',
+      'Horse: Rowan · Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt · eats from your spare Food',
     )
     expect(riddenHorseLine({}, horses, at)).toBeUndefined()
     // A horse not in sight shows nothing.
@@ -669,16 +713,16 @@ describe('horses on the tile card', () => {
     const strong = horse({ stats: { speed: 9, strength: 15, endurance: 13 }, hunger: 10 })
     const card = tile({ horses: [strong], tick: at })
     expect(card.lines).toContain(
-      '· Speed 9, Strength 15, Endurance 13 · 5 years old · hungry, healthy',
+      '· Rowan · Speed 9, Strength 15, Endurance 13 · 5 years old · hungry, healthy',
     )
     const foal = horse({ bornAt: at - 3 * TICKS_PER_GAME_DAY })
     expect(tile({ horses: [foal], tick: at }).lines).toContain(
-      '· Speed 12, Strength 8, Endurance 10 · 3 game days old · fed, healthy',
+      '· Rowan · Speed 12, Strength 8, Endurance 10 · 3 game days old · fed, healthy',
     )
     // A stranger's horse shows its stats and age, but not how it fares.
     const theirs = unknown({ realmId: 'r-other', bornAt: at - TICKS_PER_GAME_YEAR })
     expect(tile({ horses: [theirs], tick: at }).lines).toContain(
-      '· Speed 12, Strength 8, Endurance 10 · 1 year old',
+      '· Rowan · Speed 12, Strength 8, Endurance 10 · 1 year old',
     )
     // Strength 15 is 5 above average: the carriage it pulls holds a fifth more.
     const k = { ...carriage, horseId: strong.id, load: { stone: 4 } }
@@ -701,6 +745,35 @@ describe('horses on the tile card', () => {
       expect.arrayContaining(['2 horses (yours) · 1 hungry', '1 horse (another realm)']),
     )
     expect(tile({ horses: [horse()] })).toMatchObject({ title: 'Horse', what: 'horses' })
+  })
+
+  it('offers renaming the Player’s own horses on the card, by name (`CONTEXT.md`: Renaming a horse)', () => {
+    const one = tile({ horses: [horse({ name: 'Ember' })] })
+    expect(one.renameHorses).toEqual([{ id: 'h1', name: 'Ember' }])
+    expect(tileActions(one, undefined).find((a) => a.id === 'renameHorse')).toMatchObject({
+      label: 'Rename Ember…',
+      key: 'N',
+      opens: true,
+    })
+    const mixed = tile({
+      horses: [
+        horse({ id: 'h1', name: 'Ember' }),
+        horse({ id: 'h2', name: 'Flint' }),
+        unknown({ id: 'h3', realmId: 'r-other' }),
+      ],
+    })
+    // Only her own: another realm's horse keeps its name.
+    expect(mixed.renameHorses?.map((h) => h.id)).toEqual(['h1', 'h2'])
+    expect(tileActions(mixed, undefined).find((a) => a.id === 'renameHorse')?.label).toBe(
+      'Rename a horse…',
+    )
+    const theirs = tile({ horses: [unknown({ realmId: 'r-other' })] })
+    expect(theirs.renameHorses).toBeUndefined()
+    expect(tileActions(theirs, undefined).some((a) => a.id === 'renameHorse')).toBe(false)
+    // In a stable, every own horse in it can be renamed.
+    const stable = building({ kind: 'stable', cityId: 'c-me' })
+    const pair = [horse({ id: 'h1' }), horse({ id: 'h2', x: 6, y: 6 })]
+    expect(tile({ buildings: [stable], horses: pair }).renameHorses).toHaveLength(2)
     expect(tile({ horses: [horse({ x: 6 })] }).what).toBe('tile')
   })
 
@@ -748,8 +821,8 @@ describe('horses on the tile card', () => {
     const pct = Math.floor((4 / STABLE_BREED_DAYS) * 100)
     const at = paused.lines.indexOf(`Breeding paused: ${pct}% of the way to a foal`)
     expect(at).toBeGreaterThan(-1)
-    expect(paused.lines[at + 1]).toMatch(/^· Speed/)
-    expect(paused.lines[at + 2]).toMatch(/^· Speed/)
+    expect(paused.lines[at + 1]).toMatch(/^· Rowan · Speed/)
+    expect(paused.lines[at + 2]).toMatch(/^· Rowan · Speed/)
     const tended = tile({ buildings: [kept], horses: pair, residents: [breeder] })
     expect(tended.lines.some((l) => l.startsWith('Breeding paused'))).toBe(false)
     const empty = tile({ buildings: [{ ...stable, stock: {} }] })
@@ -945,7 +1018,9 @@ describe('what the build menu offers off a node, and why a kind can’t go here'
   const hall = building({ id: 'hall', kind: 'townHall', cityId: 'c1', x: 20, y: 20 })
   const seen = {
     buildings: [hall],
-    cities: [{ id: 'c1', name: 'Ashford', realmId: 'me', townHallId: 'hall' }] as City[],
+    cities: [
+      { id: 'c1', name: 'Ashford', realmId: 'me', townHallId: 'hall', occupation: null },
+    ] as City[],
   }
   const noNodes = () => undefined
 

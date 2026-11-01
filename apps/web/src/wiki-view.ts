@@ -39,6 +39,11 @@ import {
   WAREHOUSE_FLOOR,
   WORK_SKILL_MAX,
   WORK_SKILL_PER_DAY,
+  SKILL_MAX,
+  SKILL_NAMES,
+  trainedCap,
+  trainingGain,
+  type TrainingSubject,
   WORK_STRENGTH_AVERAGE,
   attackPower,
   batchWork,
@@ -69,6 +74,9 @@ import {
 
 /** Where the Wiki lives, readable logged in or not. */
 export const WIKI_PATH = '/wiki'
+
+/** The Wiki's "How to trade", linked from the trade section (`CONTEXT.md`: Trade section). */
+export const HOW_TO_TRADE_PATH = `${WIKI_PATH}#how-to-trade`
 
 /** The tick the Wiki's residents are looked at: any will do, they are young adults throughout. */
 const AT = 0
@@ -192,6 +200,27 @@ export const coinsPerMintWorkerDay = () =>
 
 /** Game days of work to take a work skill from nothing to its cap, for an average learner. */
 export const daysToWorkSkillMax = WORK_SKILL_MAX / WORK_SKILL_PER_DAY
+
+/**
+ * A teacher who knows more than anyone of everything, so that only the trainee's own cap stops
+ * their training (`CONTEXT.md`: Training).
+ */
+const MASTER = wikiResident(
+  Object.fromEntries(STAT_NAMES.map((s) => [s, 1e6])),
+  Object.fromEntries(SKILL_NAMES.map((s) => [s, 1e6])),
+)
+
+/**
+ * Game days an average learner trains to take `subject` from nothing to its cap under a teacher
+ * who knows more (`trainingGain`): a stat's trained bonus to `trainedCap`, a skill to `SKILL_MAX`.
+ */
+export function trainingDays(subject: TrainingSubject): number {
+  const full =
+    subject in AVERAGE.stats
+      ? trainedCap(AVERAGE.stats[subject as StatName].base)
+      : SKILL_MAX[subject as SkillName]
+  return full / trainingGain(AVERAGE, MASTER, subject, AT) / TICKS_PER_GAME_DAY
+}
 
 /** Game days until half of a stock of Food has gone bad. */
 export const foodHalfLifeDays = Math.log(0.5) / Math.log(1 - FOOD_SPOIL_PER_DAY)

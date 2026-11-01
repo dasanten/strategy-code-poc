@@ -1,4 +1,4 @@
-import { GOODS, HORSE_STAT_NAMES, STAT_NAMES, type SkillName } from './world.js'
+import { GOODS, HORSE_STAT_NAMES, SKILL_NAMES, STAT_NAMES } from './world.js'
 
 /**
  * Script views (`CONTEXT.md`: Script view; ADR 0011): what a script gets of each kind of thing,
@@ -47,6 +47,7 @@ export type ScriptViewName =
   | 'site'
   | 'price'
   | 'city'
+  | 'occupation'
   | 'hire'
   | 'horse'
   | 'horseStats'
@@ -68,17 +69,6 @@ const field = (
 const view = (name: ScriptViewName): ScriptType => ({ view: name })
 const listOf = (type: ScriptType): ScriptType => ({ list: type })
 
-const SKILLS: readonly SkillName[] = [
-  'mining',
-  'woodcutting',
-  'smelting',
-  'smithing',
-  'construction',
-  'farming',
-  'combat',
-  'driving',
-]
-
 const id = (what: string) => field('id', 'string', `The ${what}’s id, unique in the world.`)
 const x = field('x', 'number', 'The tile it stands on, from west to east.')
 const y = field('y', 'number', 'The tile it stands on, from north to south.')
@@ -88,7 +78,7 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
   field(
     'kind',
     'string',
-    'What it is: "townHall", "house", "storage", "warehouse", "wall", "gate", "farm", "stable", "mine", "quarry", "lumberCamp", "smelter", "mint", "smithy" or "road".',
+    'What it is: "townHall", "house", "storage", "warehouse", "wall", "gate", "farm", "stable", "mine", "quarry", "lumberCamp", "smelter", "mint", "smithy", "trainingGround" or "road".',
   ),
   field(
     'cityId',
@@ -178,6 +168,12 @@ const CITY_FIELDS: readonly ScriptField[] = [
     listOf(view('price')),
     'An NPC city’s prices to the Player, one for each good.',
     'unless a storage of the NPC city is in sight',
+  ),
+  field(
+    'occupation',
+    view('occupation'),
+    'Who occupies its town hall and how long is left before the city is captured.',
+    'unless its town hall is occupied and in sight',
   ),
 ]
 
@@ -298,7 +294,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
   },
   skills: {
     description: 'What a resident has learned by doing; a skill they haven’t learned is null (0).',
-    fields: SKILLS.map((s) =>
+    fields: SKILL_NAMES.map((s) =>
       field(s, 'number', `How far they have learned ${s}.`, 'until they start learning it'),
     ),
   },
@@ -336,7 +332,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn" or "buyOff".',
       ),
       field('target', view('tile'), 'Where a walk or drive goes.', 'for other orders'),
       field(
@@ -351,7 +347,19 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'How far into the next step or piece of work; for breeding, the ticks tended so far.',
         'for orders that have none',
       ),
-      field('buildingId', 'string', 'The building worked or torn down.', 'for other orders'),
+      field(
+        'buildingId',
+        'string',
+        'The building worked, taught or trained at, or torn down.',
+        'for other orders',
+      ),
+      field('subject', 'string', 'The stat or skill taught.', 'for other orders'),
+      field(
+        'learning',
+        'string',
+        'The stat or skill a trainee gained in on the last tick.',
+        'while a trainee waits (no teacher, or at their ceiling), and for other orders',
+      ),
       field('building', 'string', 'The kind of building being built.', 'for other orders'),
       field(
         'siteId',
@@ -498,7 +506,27 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
   },
   building: {
     description: 'A building or construction site, as the Player sees it.',
-    fields: BUILDING_FIELDS,
+    fields: [
+      ...BUILDING_FIELDS,
+      field(
+        'teacher',
+        'string',
+        'The resident teaching at a training ground.',
+        'for any other building, and while nobody teaches there',
+      ),
+      field(
+        'subject',
+        'string',
+        'The stat or skill a training ground teaches: "strength", "endurance", "agility", "intellect" or a skill such as "combat".',
+        'for any other building, and while nobody teaches there',
+      ),
+      field(
+        'trainees',
+        listOf('string'),
+        'The residents training at a training ground; empty while nobody trains there.',
+        'for any other building',
+      ),
+    ],
   },
   site: {
     description: 'How far a construction site has come.',
@@ -522,6 +550,13 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     description: 'A city, as the Player sees it.',
     fields: CITY_FIELDS,
   },
+  occupation: {
+    description: 'A realm occupying a city’s town hall.',
+    fields: [
+      field('realmId', 'string', 'The realm occupying it.'),
+      field('ticksLeft', 'number', 'Ticks it has to hold the town hall to capture the city.'),
+    ],
+  },
   hire: {
     description: 'What an NPC city would lend.',
     fields: [
@@ -533,6 +568,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     description: 'A horse, as the Player sees it.',
     fields: [
       id('horse'),
+      field('name', 'string', 'Its name, given by the game or its Player.'),
       field('realmId', 'string', 'The realm it belongs to.', 'for one of an NPC city or of nobody'),
       field('cityId', 'string', 'The NPC city it belongs to.', 'for one of a realm or of nobody'),
       x,

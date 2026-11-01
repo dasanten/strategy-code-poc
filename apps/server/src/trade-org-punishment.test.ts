@@ -9,6 +9,7 @@ import {
   Terrain,
   inCityArea,
   standingOf,
+  stockFloor,
   townHallOf,
   tradeOrgRefuses,
   warehouseKeeps,
@@ -221,6 +222,8 @@ describe('the Trade Organization punishing', () => {
   it('takes goods once the coins run out, the most worth first', () => {
     const { world, hq, walking } = setup({ coins: 30, wood: 50, iron: 40 })
     const goods = warehouseFor(world, hq, 'iron')
+    // At its floor in every good, so its own chain (`CONTEXT.md`: Trade Org HQ) leaves its Iron be.
+    goods.stock = { ...stockFloor(world, goods), ...goods.stock }
     const iron = goods.stock!.iron ?? 0
     theft(world, hq, { iron: 4 })
     run(world, walking, 4 * TICKS_PER_GAME_DAY, () => world.punishments.length === 0)

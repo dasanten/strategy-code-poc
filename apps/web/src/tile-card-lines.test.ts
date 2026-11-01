@@ -13,7 +13,7 @@ import {
   type Resident,
   type SeenBuilding,
 } from '@csp/shared'
-import { describeTile, tileActions, type TileThings } from './selection-view.js'
+import { describeTile, tileActions, tradesHere, type TileThings } from './selection-view.js'
 import { GOOD_LABELS } from './Residents.js'
 
 const building = (b: Partial<SeenBuilding> & Pick<SeenBuilding, 'kind'>): SeenBuilding => ({
@@ -136,6 +136,66 @@ describe('buildings on a tile’s card', () => {
     )
   })
 
+  it('says nobody teaches at a finished training ground yet, and nothing of the kind at its site', () => {
+    const ground = building({ kind: 'trainingGround' })
+    const lines = linesOf({ buildings: [ground] })
+    expect(lines).toContain('Nobody teaches here yet')
+    expect(lines.some((l) => l.startsWith('Makes') || l.includes('workers'))).toBe(false)
+    const site = building({ kind: 'trainingGround', site: { work: 0, delivered: {} } })
+    expect(linesOf({ buildings: [site] })).not.toContain('Nobody teaches here yet')
+  })
+
+  it('names who teaches what at a training ground, while they stand on it', () => {
+    const ground = building({ id: 'g1', kind: 'trainingGround', x: 4, y: 4 })
+    const ann = resident({
+      name: 'Ann',
+      order: { kind: 'teach', buildingId: 'g1', subject: 'strength' },
+    })
+    expect(linesOf({ buildings: [ground], residents: [ann] })).toContain('Ann teaches Strength')
+    const off = { ...ann, x: 9 }
+    expect(linesOf({ buildings: [ground], residents: [off] })).toContain('Nobody teaches here yet')
+  })
+
+  it('lists each trainee with their value, their ceiling, and whether they wait', () => {
+    const ground = building({ id: 'g1', kind: 'trainingGround', x: 4, y: 4 })
+    const tick = 30 * TICKS_PER_GAME_YEAR
+    const stats = (strength: number, trained = 0) => ({
+      strength: { base: strength, trained },
+      endurance: { base: 10, trained: 0 },
+      agility: { base: 10, trained: 0 },
+      intellect: { base: 10, trained: 0 },
+    })
+    const grown = { bornAt: 0, skills: {} }
+    const ann = resident({
+      ...grown,
+      id: 'a',
+      name: 'Ann',
+      stats: stats(14),
+      order: { kind: 'teach', buildingId: 'g1', subject: 'strength' },
+    })
+    const trainee = (id: string, name: string, s: number, t: number, learning: boolean) =>
+      resident({
+        ...grown,
+        id,
+        name,
+        stats: stats(s, t),
+        order: { kind: 'train', buildingId: 'g1', learning: learning ? 'strength' : null },
+      })
+    // Bo's cap (10 + 5) is above Ann's 14; Cy's (8 + 4) is below it, and Cy has reached it.
+    const bo = trainee('b', 'Bo', 10, 1.27, true)
+    const cy = trainee('c', 'Cy', 8, 4, false)
+    const lines = linesOf({ buildings: [ground], residents: [ann, bo, cy], tick })
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        'Ann teaches Strength',
+        'Bo trains: 11.2 of 14',
+        'Cy trains: 12 of 12, waiting',
+      ]),
+    )
+    const alone = linesOf({ buildings: [ground], residents: [cy], tick })
+    expect(alone).toEqual(expect.arrayContaining(['Nobody teaches here yet', 'Cy trains, waiting']))
+  })
+
   it('links a warehouse and a trading NPC city’s storage to their prices', () => {
     const cities = [
       { id: 'c-post', name: 'Saltgate', realmId: null, tradeOrg: 'post' as const },
@@ -148,15 +208,43 @@ describe('buildings on a tile’s card', () => {
       prices: [{ good: 'food' }] as SeenBuilding['prices'],
     })
     const card = tile({ buildings: [warehouse], cities })
-    expect(card.lines).toContain('Buys and sells here · prices in the city inspector')
-    expect(card.city?.id).toBe('c-post')
-    expect(tileActions(card, undefined).map((a) => [a.id, a.key])).toEqual([['openCity', 'C']])
+    expect(card.lines).toContain('Buys and sells here')
+    expect(card.tradeHere).toEqual({ cityId: 'c-post', buildingId: 'b-warehouse' })
+    expect(tileActions(card, undefined).map((a) => [a.id, a.label, a.key])).toEqual([
+      ['tradeHere', 'Trade here', 'T'],
+    ])
     const npc = tile({ buildings: [building({ kind: 'storage', cityId: 'c-npc' })], cities })
-    expect(npc.city?.id).toBe('c-npc')
+    expect(npc.tradeHere).toEqual({ cityId: 'c-npc', buildingId: 'b-storage' })
     // No prices shown to the Player (it won't trade with them): nothing to link to.
     const shut = tile({ buildings: [building({ kind: 'storage', cityId: 'c-shut' })], cities })
-    expect(shut.city).toBeUndefined()
-    expect(shut.lines.some((l) => l.includes('prices'))).toBe(false)
+    expect(shut.tradeHere).toBeUndefined()
+    expect(shut.lines).not.toContain('Buys and sells here')
+  })
+
+  it('offers Trade here only where the Player trades (`tradesHere`)', () => {
+    const food = [{ good: 'food' as const }] as NonNullable<TileThings['cities'][number]['trade']>
+    const npc = { id: 'c-npc', name: 'Oakhollow', realmId: null, trade: food }
+    const warehouse = { kind: 'warehouse' as const, prices: food as SeenBuilding['prices'] }
+    const storage = { kind: 'storage' as const }
+    const post = { id: 'c-post', name: 'Saltgate', realmId: null, tradeOrg: 'post' as const }
+    expect(tradesHere(warehouse, post)).toBe(true)
+    expect(tradesHere(storage, npc)).toBe(true)
+    // A city that refuses the Player won't trade with them, even with prices still in hand.
+    expect(tradesHere(storage, { ...npc, refuses: true })).toBe(false)
+    expect(tradesHere(storage, { id: 'c-me', name: 'Eastmere', realmId: 'me' })).toBe(false)
+    // A warehouse whose prices the Player doesn't see.
+    expect(tradesHere({ kind: 'warehouse' }, post)).toBe(false)
+  })
+
+  it('offers no Trade here on a warehouse only remembered', () => {
+    const cities = [{ id: 'c-post', name: 'Saltgate', realmId: null, tradeOrg: 'post' as const }]
+    const seen = building({
+      kind: 'warehouse',
+      cityId: 'c-post',
+      prices: [{ good: 'food' }] as SeenBuilding['prices'],
+    })
+    const card = tile({ cities, lastSeen: { buildings: [{ ...seen, seenAt: 0 }], tick: 100 } })
+    expect(card.tradeHere).toBeUndefined()
   })
 
   it('says how an own or allied city lives at its town hall, and links an own one', () => {

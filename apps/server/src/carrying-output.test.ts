@@ -117,7 +117,13 @@ describe('carrying the output', () => {
     storage(world, 'east', farm.x + 6, farm.y)
     storage(world, 'south', farm.x, farm.y + 7)
     // Another realm's storage, nearer still, is not theirs to fill.
-    world.cities.push({ id: 'c2', name: 'Elsewhere', realmId: 'r2', townHallId: 'none' })
+    world.cities.push({
+      id: 'c2',
+      name: 'Elsewhere',
+      realmId: 'r2',
+      townHallId: 'none',
+      occupation: null,
+    })
     world.buildings.push({ id: 'theirs', kind: 'storage', cityId: 'c2', x: farm.x + 4, y: farm.y })
     world.piles.push({ id: 'p', x: farm.x, y: farm.y, goods: { food: 100 } })
     new ScriptRunner(terrain, host()).runAll(world)
@@ -172,7 +178,7 @@ describe('carrying the output', () => {
     const w = addWorker(world, 'w1', camp)
     w.carried = {}
     // Not getting food on their own: only storing the load tops their food up.
-    w.scriptParams = { [WORK]: { foodAt: 0 } }
+    w.scriptParams = { [WORK]: { foodAt: 0, crewFood: 0 } }
     const s = storage(world, 's1', at.x + 1, at.y, { food: 50 })
     world.piles.push({ id: 'p', ...at, goods: { wood: 100 } })
     const load = unitsThatFit(w, 'wood', world.tick)
@@ -194,7 +200,13 @@ describe('carrying the output', () => {
   it('leaves the pile to grow with no finished storage of the realm', () => {
     const { world, terrain, farm } = farmWorld()
     // Only another realm's storage, and a site of theirs not yet finished.
-    world.cities.push({ id: 'c2', name: 'Elsewhere', realmId: 'r2', townHallId: 'none' })
+    world.cities.push({
+      id: 'c2',
+      name: 'Elsewhere',
+      realmId: 'r2',
+      townHallId: 'none',
+      occupation: null,
+    })
     world.buildings.push({ id: 'theirs', kind: 'storage', cityId: 'c2', x: farm.x + 4, y: farm.y })
     world.buildings.push({
       id: 'site',

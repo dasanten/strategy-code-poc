@@ -105,7 +105,13 @@ describe('params in a script', () => {
 
   it('read null for one no longer of the realm or of the wrong type', () => {
     const { world, terrain, w } = farmWorld()
-    world.cities.push({ id: 'c2', name: 'Elsewhere', realmId: 'r2', townHallId: 'none' })
+    world.cities.push({
+      id: 'c2',
+      name: 'Elsewhere',
+      realmId: 'r2',
+      townHallId: 'none',
+      occupation: null,
+    })
     world.buildings.push({ id: 'theirs', kind: 'storage', cityId: 'c2', x: 9, y: 9 })
     // The farm is no storage.
     w.scriptParams = { [SCRIPT]: { home: 'theirs', store: 'farm' } }
@@ -249,7 +255,13 @@ describe('the set-script-param order', () => {
 
   it('turns down what doesn’t fit', () => {
     const { world } = farmWorld()
-    world.cities.push({ id: 'c2', name: 'Elsewhere', realmId: 'r2', townHallId: 'none' })
+    world.cities.push({
+      id: 'c2',
+      name: 'Elsewhere',
+      realmId: 'r2',
+      townHallId: 'none',
+      occupation: null,
+    })
     world.buildings.push({ id: 'theirs', kind: 'storage', cityId: 'c2', x: 9, y: 9 })
     expect(kind.validate(world, sender, order('store', 'farm'))).toBe(
       'must be a storage, a stable or a carriage of yours',

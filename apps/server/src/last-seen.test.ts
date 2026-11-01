@@ -1,4 +1,5 @@
 import {
+  LAST_SEEN_EVERY_TICKS,
   Terrain,
   warehousePrices,
   type Realm,
@@ -7,7 +8,16 @@ import {
   footprintTiles,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { lastSeenInSight, lastSeenOutOfSight, stepLastSeen } from './last-seen.js'
+import {
+  lastSeenInSight,
+  lastSeenOnCadence,
+  lastSeenOutOfSight,
+  lastSeenRefreshedAt,
+  lastSeenTurn,
+  refreshLastSeen,
+  refreshLastSeenSoon,
+  stepLastSeen,
+} from './last-seen.js'
 import { mulberry32 } from './residents.js'
 import { entitiesInSight } from './sight.js'
 import { foundStartingCity } from './starting-city.js'
@@ -17,15 +27,15 @@ import { createWorld } from './world.js'
 
 const terrain = cityTerrain()
 
-/** Ticks on and brings Last seen up to date, as the end of `stepWorld` does. */
+/** Ticks on and brings every realm's Last seen up to date, as the end of `stepWorld` does on its turn. */
 function step(world: WorldState, map: TerrainMap = terrain) {
   world.tick++
-  stepLastSeen(world, map.size)
+  refreshLastSeen(world, map.size)
 }
 
 /** The ids a Player remembers out of their sight now. */
 const outOfSight = (world: WorldState, userId: number) =>
-  new Set(lastSeenOutOfSight(world, userId).map((e) => e.id))
+  new Set(lastSeenOutOfSight(world, terrain.size, userId).map((e) => e.id))
 
 /**
  * Mara (Player 1) and Tobin (Player 2) far apart; Tobin's scout stands near Mara's storage, and
@@ -54,7 +64,7 @@ describe('Last seen (`CONTEXT.md`)', () => {
     const seenAt = world.tick
     goHome()
     step(world)
-    const remembered = lastSeenOutOfSight(world, 2)
+    const remembered = lastSeenOutOfSight(world, terrain.size, 2)
     expect(remembered.find((e) => e.id === storage.id)).toEqual({ ...seenThen, seenAt })
     expect(remembered.find((e) => e.id === storage.id)).not.toHaveProperty('stock')
     expect(remembered.find((e) => e.id === city.id)).toMatchObject({ is: 'city', seenAt })
@@ -78,7 +88,9 @@ describe('Last seen (`CONTEXT.md`)', () => {
     step(world)
     const stock = structuredClone(storage.stock)
     for (const userId of [1, 2]) {
-      expect(lastSeenOutOfSight(world, userId).find((e) => e.id === storage.id)).toMatchObject({
+      expect(
+        lastSeenOutOfSight(world, terrain.size, userId).find((e) => e.id === storage.id),
+      ).toMatchObject({
         stock,
       })
     }
@@ -98,7 +110,7 @@ describe('Last seen (`CONTEXT.md`)', () => {
     step(world, plains)
     Object.assign(scout, { x: (warehouse.x + 300) % size })
     step(world, plains)
-    const remembered = lastSeenOutOfSight(world, 1).find((e) => e.id === warehouse.id)
+    const remembered = lastSeenOutOfSight(world, size, 1).find((e) => e.id === warehouse.id)
     expect(remembered).not.toHaveProperty('stock')
     expect(remembered?.is === 'building' && remembered.prices?.length).toBeGreaterThan(0)
     for (const line of (remembered?.is === 'building' && remembered.prices) || []) {
@@ -112,20 +124,20 @@ describe('Last seen (`CONTEXT.md`)', () => {
     step(world)
     goHome()
     step(world)
-    const before = lastSeenOutOfSight(world, 2)
+    const before = lastSeenOutOfSight(world, terrain.size, 2)
     // Out of his sight her storage fills and a house of hers is torn down.
     storage.stock = { ...storage.stock, wood: (storage.stock?.wood ?? 0) + 50 }
     const house = world.buildings.find((b) => hers().has(b.id) && b.kind === 'house')!
     world.buildings = world.buildings.filter((b) => b !== house)
     step(world)
-    expect(lastSeenOutOfSight(world, 2)).toEqual(before)
+    expect(lastSeenOutOfSight(world, terrain.size, 2)).toEqual(before)
     // His scout comes back: what is there now, and the house is forgotten.
     Object.assign(scout, back)
     step(world)
     const now = world.lastSeen[2]!
     expect(now.find((e) => e.id === house.id)).toBeUndefined()
     expect(now.find((e) => e.id === storage.id)).toMatchObject({ seenAt: world.tick })
-    expect(lastSeenOutOfSight(world, 2).some((e) => e.id === storage.id)).toBe(false)
+    expect(lastSeenOutOfSight(world, terrain.size, 2).some((e) => e.id === storage.id)).toBe(false)
   })
 
   it('keeps what was inside as it was while the world changes it in place', () => {
@@ -135,12 +147,12 @@ describe('Last seen (`CONTEXT.md`)', () => {
       Object.assign(r, { x: (r.x + 400) % terrain.size })
     }
     step(world)
-    const before = structuredClone(lastSeenOutOfSight(world, 1))
+    const before = structuredClone(lastSeenOutOfSight(world, terrain.size, 1))
     expect(before.find((e) => e.id === storage.id)).toHaveProperty('stock')
     // Out of her sight her storage's stock changes as the simulation changes it: in place.
     storage.stock!.wood = (storage.stock!.wood ?? 0) + 50
     step(world)
-    expect(lastSeenOutOfSight(world, 1)).toEqual(before)
+    expect(lastSeenOutOfSight(world, terrain.size, 1)).toEqual(before)
   })
 
   it('forgets a city once none of its buildings is remembered', () => {
@@ -205,7 +217,37 @@ describe('Last seen (`CONTEXT.md`)', () => {
     }
     goHome()
     step(world)
-    expect(lastSeenOutOfSight(world, 2).length).toBeGreaterThan(0)
+    expect(lastSeenOutOfSight(world, terrain.size, 2).length).toBeGreaterThan(0)
+  })
+
+  it('shows who occupies a town hall only while the hall is in sight, and never remembers it', () => {
+    const { world, tobin, city, scout, goHome } = twoRealms()
+    const hall = world.buildings.find((b) => b.cityId === city.id && b.kind === 'townHall')!
+    city.occupation = { realmId: tobin.id, since: world.tick }
+    const cityInSight = () =>
+      entitiesInSight(world, terrain, tobin.id).find((e) => e.id === city.id)
+    const hallInSight = () =>
+      entitiesInSight(world, terrain, tobin.id).some((e) => e.id === hall.id)
+    Object.assign(scout, { x: hall.x, y: hall.y })
+    expect(cityInSight()).toMatchObject({ occupation: { realmId: tobin.id } })
+    step(world)
+    expect(world.lastSeen[2]!.find((e) => e.id === city.id)).toMatchObject({ occupation: null })
+    // Another building of the city in sight, the hall not: the city shows, its occupation doesn't.
+    // Walks out from the hall past the city's furthest building until the hall drops out of sight.
+    const far = world.buildings
+      .filter((b) => b.cityId === city.id)
+      .reduce((a, b) => (Math.abs(b.x - hall.x) > Math.abs(a.x - hall.x) ? b : a))
+    const dir = Math.sign(far.x - hall.x) || 1
+    for (let x = far.x; hallInSight() || !cityInSight(); x += dir) {
+      Object.assign(scout, { x, y: far.y })
+      if (Math.abs(x - far.x) > 40)
+        throw new Error('found no spot seeing the city but not its hall')
+    }
+    expect(cityInSight()).toMatchObject({ occupation: null })
+    goHome()
+    step(world)
+    const remembered = lastSeenOutOfSight(world, terrain.size, 2).find((e) => e.id === city.id)
+    expect(remembered).toMatchObject({ is: 'city', occupation: null })
   })
 
   it('flags, as an invariant, Last seen sent while it is in sight', () => {
@@ -217,6 +259,151 @@ describe('Last seen (`CONTEXT.md`)', () => {
     )
     goHome()
     step(world)
-    expect(lastSeenInSight(world, terrain, tobin.id, lastSeenOutOfSight(world, 2))).toEqual([])
+    expect(
+      lastSeenInSight(world, terrain, tobin.id, lastSeenOutOfSight(world, terrain.size, 2)),
+    ).toEqual([])
+  })
+})
+
+describe('Last seen on a cadence (`CONTEXT.md`: Last seen)', () => {
+  /** Ticks on to the realm's next turn, bringing Last seen up to date as `stepWorld` does. */
+  function untilTurn(world: WorldState, realmId: string) {
+    do {
+      world.tick++
+      stepLastSeen(world, terrain.size)
+    } while (!lastSeenTurn(world, realmId))
+  }
+
+  it('comes round once every `LAST_SEEN_EVERY_TICKS` for each realm, staggered by id', () => {
+    const world = createWorld(terrain)
+    const ids = Array.from({ length: 20 }, (_, i) => `realm-${i}`)
+    const offsets = new Set<number>()
+    for (const id of ids) {
+      const turns: number[] = []
+      for (let t = 0; t < 3 * LAST_SEEN_EVERY_TICKS; t++) {
+        world.tick = t
+        if (lastSeenTurn(world, id)) turns.push(t)
+      }
+      expect(turns).toHaveLength(3)
+      expect(turns[1]! - turns[0]!).toBe(LAST_SEEN_EVERY_TICKS)
+      offsets.add(turns[0]!)
+    }
+    expect(offsets.size).toBeGreaterThan(1)
+  })
+
+  it('updates a realm’s Last seen on its turn only', () => {
+    const { world, tobin, city } = twoRealms()
+    untilTurn(world, tobin.id)
+    const refreshed = world.tick
+    expect(lastSeenRefreshedAt(world, tobin.id)).toBe(refreshed)
+    for (let i = 1; i < LAST_SEEN_EVERY_TICKS; i++) {
+      world.tick++
+      stepLastSeen(world, terrain.size)
+      expect(lastSeenRefreshedAt(world, tobin.id)).toBe(refreshed)
+      expect(world.lastSeen[2]!.find((e) => e.id === city.id)?.seenAt).toBe(refreshed)
+    }
+    world.tick++
+    stepLastSeen(world, terrain.size)
+    expect(lastSeenRefreshedAt(world, tobin.id)).toBe(refreshed + LAST_SEEN_EVERY_TICKS)
+    expect(world.lastSeen[2]!.find((e) => e.id === city.id)?.seenAt).toBe(world.tick)
+  })
+
+  it('remembers a building that leaves sight between two refreshes as it was at the last one', () => {
+    const { world, tobin, city, storage, goHome } = twoRealms()
+    untilTurn(world, tobin.id)
+    const atRefresh = entitiesInSight(world, terrain, tobin.id).find((e) => e.id === city.id)
+    const refreshed = world.tick
+    // In his sight her city is renamed, then his scout leaves before his next turn.
+    city.name = 'Ironhold'
+    world.tick++
+    stepLastSeen(world, terrain.size)
+    goHome()
+    world.tick++
+    stepLastSeen(world, terrain.size)
+    expect(lastSeenTurn(world, tobin.id)).toBe(false)
+    const remembered = lastSeenOutOfSight(world, terrain.size, 2)
+    expect(remembered.find((e) => e.id === city.id)).toEqual({ ...atRefresh, seenAt: refreshed })
+    expect(remembered.find((e) => e.id === storage.id)).toMatchObject({ seenAt: refreshed })
+  })
+
+  it('never sends what is in sight now as Last seen, refreshed or not', () => {
+    const { world, tobin, storage, scout, goHome } = twoRealms()
+    const back = { x: scout.x, y: scout.y }
+    goHome()
+    untilTurn(world, tobin.id)
+    Object.assign(scout, back)
+    untilTurn(world, tobin.id)
+    goHome()
+    untilTurn(world, tobin.id)
+    expect(outOfSight(world, 2)).toContain(storage.id)
+    // Back in sight before his next turn: it is in sight, not last seen.
+    Object.assign(scout, back)
+    world.tick++
+    stepLastSeen(world, terrain.size)
+    expect(lastSeenTurn(world, tobin.id)).toBe(false)
+    expect(outOfSight(world, 2)).not.toContain(storage.id)
+    expect(
+      lastSeenInSight(world, terrain, tobin.id, lastSeenOutOfSight(world, terrain.size, 2)),
+    ).toEqual([])
+  })
+
+  it('refreshes a fresh realm at once, one with nobody looking every tick, and on connecting', () => {
+    const { world, mara, tobin } = twoRealms()
+    while (lastSeenTurn(world, mara.id) || lastSeenTurn(world, tobin.id)) world.tick++
+    // Never refreshed since the start: both refresh off their turn.
+    expect(stepLastSeen(world, terrain.size)).toBe(2)
+    expect(lastSeenRefreshedAt(world, mara.id)).toBe(world.tick)
+    // Off their turn nobody refreshes, until a Player connects.
+    world.tick++
+    while (lastSeenTurn(world, mara.id) || lastSeenTurn(world, tobin.id)) world.tick++
+    expect(stepLastSeen(world, terrain.size)).toBe(0)
+    refreshLastSeenSoon(world, mara.id)
+    world.tick++
+    while (lastSeenTurn(world, mara.id) || lastSeenTurn(world, tobin.id)) world.tick++
+    expect(stepLastSeen(world, terrain.size)).toBe(1)
+    expect(lastSeenRefreshedAt(world, mara.id)).toBe(world.tick)
+    // Mara has nobody left to see through: she refreshes every tick until she has again.
+    const hers = world.residents.filter((r) => r.owner === mara.id)
+    world.residents = world.residents.filter((r) => r.owner !== mara.id)
+    world.tick++
+    stepLastSeen(world, terrain.size)
+    for (let i = 0; i < 3; i++) {
+      world.tick++
+      stepLastSeen(world, terrain.size)
+      expect(lastSeenRefreshedAt(world, mara.id)).toBe(world.tick)
+    }
+    world.residents.push(...hers)
+    world.tick++
+    stepLastSeen(world, terrain.size)
+    expect(lastSeenRefreshedAt(world, mara.id)).toBe(world.tick)
+    expect(world.lastSeen[1]!.some((e) => e.seenAt === world.tick)).toBe(true)
+  })
+
+  it('costs about one refresh in `LAST_SEEN_EVERY_TICKS` per realm', () => {
+    const { world } = twoRealms()
+    stepLastSeen(world, terrain.size)
+    let refreshes = 0
+    for (let i = 0; i < 4 * LAST_SEEN_EVERY_TICKS; i++) {
+      world.tick++
+      refreshes += stepLastSeen(world, terrain.size)
+    }
+    expect(refreshes).toBe(4 * world.realms.length)
+  })
+
+  it('flags, as an invariant, a realm off its cadence or remembering past its last refresh', () => {
+    const { world, mara, tobin } = twoRealms()
+    for (let i = 0; i < 3 * LAST_SEEN_EVERY_TICKS; i++) {
+      world.tick++
+      stepLastSeen(world, terrain.size)
+      for (const realm of [mara, tobin]) expect(lastSeenOnCadence(world, realm.id)).toEqual([])
+    }
+    // Its refreshes stop.
+    world.tick += LAST_SEEN_EVERY_TICKS
+    expect(lastSeenOnCadence(world, tobin.id).map((v) => v.entityIds)).toEqual([[tobin.id]])
+    // Something is remembered as of after its last refresh.
+    untilTurn(world, tobin.id)
+    const e = world.lastSeen[2]![0]!
+    e.seenAt = world.tick + 1
+    expect(lastSeenOnCadence(world, tobin.id).map((v) => v.entityIds)).toEqual([[e.id, tobin.id]])
   })
 })

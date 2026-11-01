@@ -1,6 +1,7 @@
 import { parse, run } from '@csp/lang'
 import {
   CITY_NAME_MAX_LENGTH,
+  HORSE_NAME_MAX_LENGTH,
   REALM_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
   SCRIPT_API,
@@ -13,8 +14,8 @@ import {
 import { describe, expect, it } from 'vitest'
 import { recordEvent } from './events.js'
 import { OrderQueue } from './orders.js'
-import { cityNamesWellFormed, residentNamesWellFormed } from './renaming.js'
-import { lastSeenOutOfSight, stepLastSeen } from './last-seen.js'
+import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
+import { lastSeenOutOfSight, refreshLastSeen } from './last-seen.js'
 import { bindScript } from './script-bindings.js'
 import { entitiesInSight } from './sight.js'
 import { foundStartingCity } from './starting-city.js'
@@ -217,6 +218,142 @@ describe('Renaming from a script', () => {
   })
 })
 
+describe('Renaming a horse', () => {
+  type Setup = ReturnType<typeof setup>
+  /** Renames `horseId` by hand, as the tile card does: asked by the Leader. */
+  const renameHorse = (s: Setup, horseId: string, name: unknown, sender = mara) =>
+    s.order({ kind: 'renameHorse', residentId: s.leader.id, horseId, name }, sender)
+  const ownHorses = (s: Setup) => s.world.horses.filter((h) => h.realmId === s.realm.id)
+
+  it('gives a horse of your realm the new name, trimmed, from anywhere', () => {
+    const s = setup()
+    const horse = ownHorses(s)[0]!
+    // Every horse has a name from the start (`CONTEXT.md`: Horse name).
+    expect(horse.name).toMatch(/\S/)
+    // Far from home makes no difference: the Leader asks from wherever they stand.
+    Object.assign(s.leader, { x: s.leader.x + 40, y: s.leader.y + 40 })
+    expect(renameHorse(s, horse.id, '  Old Grey  ')).toBe('ok')
+    expect(horse.name).toBe('Old Grey')
+    expect(horseNamesWellFormed.check(s.world, s.terrain)).toEqual([])
+  })
+
+  it('lets names repeat', () => {
+    const s = setup()
+    const [a, b] = ownHorses(s)
+    expect(renameHorse(s, a!.id, 'Twin')).toBe('ok')
+    expect(renameHorse(s, b!.id, 'Twin')).toBe('ok')
+    expect([a!.name, b!.name]).toEqual(['Twin', 'Twin'])
+  })
+
+  it('refuses other realms’ horses, NPC cities’ horses and bad names', () => {
+    const s = setup()
+    const horse = ownHorses(s)[0]!
+    const was = horse.name
+    const theirs = s.world.horses.find((h) => h.realmId === s.stranger.owner)!
+    expect(renameHorse(s, theirs.id, 'Mine')).toBe('not one of your horses')
+    s.world.horses.push({ ...horse, id: 'npc-horse', realmId: null, cityId: 'npc' })
+    expect(renameHorse(s, 'npc-horse', 'Mine')).toBe('not one of your horses')
+    expect(renameHorse(s, 'no-such-horse', 'Mine')).toBe('not one of your horses')
+    // Tobin can't rename Mara's horse, not even asking through his own Leader.
+    const order = {
+      kind: 'renameHorse',
+      residentId: s.stranger.id,
+      horseId: horse.id,
+      name: 'Mine',
+    }
+    expect(s.order(order, tobin)).toBe('not one of your horses')
+    expect(renameHorse(s, horse.id, '')).toBe('Name: needs a name')
+    expect(renameHorse(s, horse.id, '   ')).toBe('Name: needs a name')
+    expect(renameHorse(s, horse.id, 7)).toBe('Name: needs a name')
+    expect(renameHorse(s, horse.id, 'x'.repeat(HORSE_NAME_MAX_LENGTH + 1))).toBe(
+      `Name: at most ${HORSE_NAME_MAX_LENGTH} characters`,
+    )
+    expect(horse.name).toBe(was)
+  })
+
+  it('keeps the old name in realm log entries from before', () => {
+    const s = setup()
+    const horse = ownHorses(s)[0]!
+    const was = horse.name
+    recordEvent(s.world, s.realm.id, {
+      kind: 'foaled',
+      horseId: horse.id,
+      stableId: 's',
+      name: was,
+    })
+    expect(renameHorse(s, horse.id, 'Grey')).toBe('ok')
+    expect(s.world.events.at(-1)).toMatchObject({ kind: 'foaled', name: was })
+  })
+})
+
+describe('Renaming a horse from a script', () => {
+  it('is in the script API, does what the order does, and scripts see the name', () => {
+    expect(SCRIPT_API.some((b) => b.name === 'renameHorse' && b.is === 'action')).toBe(true)
+    const { world, terrain, realm, miner, stranger } = setup()
+    const horse = world.horses.find((h) => h.realmId === realm.id)!
+    const theirs = world.horses.find((h) => h.realmId === stranger.owner)!
+    const run1 = (source: string, residentId: string) => {
+      const memory = {}
+      const { globals, requests } = bindScript({
+        world,
+        terrain,
+        sender: mara,
+        residentId,
+        memory,
+        seen: () => entitiesInSight(world, terrain, realm.id),
+        explored: () => true,
+      })
+      run(parse(source), {
+        globals,
+        steps: 10_000,
+        maxCallDepth: SCRIPT_MAX_CALL_DEPTH,
+        limits: SCRIPT_VALUE_LIMITS,
+      })
+      return { memory: memory as { answer?: unknown }, requests }
+    }
+    const apply = (requests: OrderRequest[]) => {
+      const queue = new OrderQueue(undefined, terrain)
+      for (const r of requests) expect(queue.receive(world, mara, 'q', r).type).toBe('ack')
+      queue.applyAll(world)
+    }
+
+    const own = run1(`memory.answer = renameHorse("${horse.id}", "Grey")`, miner.id)
+    expect(own.memory.answer).toBeNull()
+    expect(own.requests).toEqual([
+      { kind: 'renameHorse', residentId: miner.id, horseId: horse.id, name: 'Grey' },
+    ])
+    apply(own.requests)
+    expect(horse.name).toBe('Grey')
+    // The horse script view carries the name (`CONTEXT.md`: Horse name).
+    const seen = run1('memory.answer = horses()', miner.id).memory.answer as {
+      id: string
+      name: string
+    }[]
+    expect(seen.find((h) => h.id === horse.id)?.name).toBe('Grey')
+
+    const refused = run1(`memory.answer = renameHorse("${theirs.id}", "Mine")`, miner.id)
+    expect(refused.memory.answer).toBe('not one of your horses')
+    expect(refused.requests).toEqual([])
+    expect(run1(`memory.answer = renameHorse("${horse.id}", "")`, miner.id).memory.answer).toBe(
+      'Name: needs a name',
+    )
+  })
+})
+
+describe('horse-names-well-formed invariant', () => {
+  it('reports an empty, untrimmed or too long name', () => {
+    const { world, terrain, realm } = setup()
+    expect(horseNamesWellFormed.check(world, terrain)).toEqual([])
+    const [a, b] = world.horses.filter((h) => h.realmId === realm.id)
+    a!.name = ' Grey'
+    b!.name = 'x'.repeat(HORSE_NAME_MAX_LENGTH + 1)
+    expect(horseNamesWellFormed.check(world, terrain).map((v) => v.entityIds)).toEqual([
+      [a!.id],
+      [b!.id],
+    ])
+  })
+})
+
 describe('resident-names-well-formed invariant', () => {
   it('reports an empty, untrimmed or too long name', () => {
     const { world, terrain, leader, miner } = setup()
@@ -310,10 +447,10 @@ describe('Renaming a city', () => {
     const homes = tobins.map((r) => ({ x: r.x, y: r.y }))
     const step = () => {
       world.tick++
-      stepLastSeen(world, terrain.size)
+      refreshLastSeen(world, terrain.size)
     }
     const remembered = () =>
-      lastSeenOutOfSight(world, tobin.userId).find((e) => e.id === city.id) as
+      lastSeenOutOfSight(world, terrain.size, tobin.userId).find((e) => e.id === city.id) as
         { name: string } | undefined
     const before = city.name
     // Tobin's people stand at Mara's town hall, then go home.

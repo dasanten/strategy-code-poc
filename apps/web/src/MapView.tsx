@@ -81,12 +81,14 @@ import {
   BadgeLayer,
   TokenLayer,
   cityRelationship,
+  realmRelationship,
   relationshipColor,
   type Leaders,
   type Tone,
   type Viewer,
 } from './map/tokens.js'
 import type { MapWorld } from './map/map-world.js'
+import { Motion, workSway } from './map/motion.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
@@ -206,6 +208,7 @@ export function MapView({
   const terrainPathRef = useRef(terrainPath)
   const overviewRef = useRef<(overview: Uint8Array | null) => void>(() => {})
   const redrawRef = useRef<() => void>(() => {})
+  const motionRef = useRef<(world: MapWorld) => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
   const regionRef = useRef<(region: RegionState | null) => void>(() => {})
   const controlsRef = useRef<{
@@ -254,6 +257,7 @@ export function MapView({
   useEffect(() => {
     worldRef.current = world
     if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
+    motionRef.current(world)
     redrawRef.current()
   }, [world])
 
@@ -277,6 +281,8 @@ export function MapView({
     const labels = new LabelLayer()
     // Where each resident's token was drawn last frame; up close each has its own figure.
     let drawnSpots = new Map<string, Spot>()
+    // Where the tokens are between ticks (`CONTEXT.md`: Motion on the map).
+    const motion = new Motion()
     // The box being dragged to select residents, from where it started to the pointer.
     let box: { from: Point; to: Point } | undefined
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
@@ -316,6 +322,9 @@ export function MapView({
     }
     redrawRef.current = redraw
     forgetRef.current = (chunks) => store.forget(chunks)
+    motionRef.current = (w) =>
+      motion.update([...w.residents, ...w.horses, ...w.carriages], performance.now())
+    motionRef.current(worldRef.current)
 
     /** Redraws the Region map's chunks that changed, or all of them. */
     function updateRegion(region: RegionState | null) {
@@ -494,8 +503,31 @@ export function MapView({
       drawStructures(under, g, tokens, cam, view, worldRef.current)
 
       const world = worldRef.current
-      const spots = drawUnits(tokens, badges, cam, view, world, viewerOf(world), leadersOf(world))
+      const now = performance.now()
+      // Residents at work sway on their tile; one gliding to the next tile does not.
+      const sways = new Map<string, readonly [number, number]>()
+      for (const r of world.residents) {
+        const sway = workSway(r, now)
+        if (sway[0] !== 0 || sway[1] !== 0) sways.set(r.id, sway)
+      }
+      const spots = drawUnits(
+        tokens,
+        badges,
+        cam,
+        view,
+        world,
+        viewerOf(world),
+        leadersOf(world),
+        (id, x, y) => {
+          const [px, py] = motion.at(id, x, y, now)
+          const sway = sways.get(id)
+          if (!sway || motion.gliding(id, now)) return [px, py]
+          return [px + sway[0], py + sway[1]]
+        },
+      )
       drawnSpots = spots
+      // Tokens still on their way, and residents at work, ask for another frame.
+      if (motion.moving(now) || sways.size > 0) redraw()
       // A ring round each selected resident; the way ahead only when there is just one.
       const ids = selectedRef.current
       let rings = false
@@ -1168,6 +1200,32 @@ function drawStructures(
         b.closed ? relationshipColor(rel) : GLYPH_COLOR,
       )
     else drawBuilding(tokens, BUILDING_ART[b.kind], cx, cy, r, rel, alpha)
+  }
+  // An occupied town hall flies a small flag in the occupier's colour in its top right corner
+  // (`CONTEXT.md`: Occupying a town hall), so it shows without opening its card. Only while the
+  // hall is in sight: the server sends no occupation otherwise.
+  for (const b of buildings) {
+    if (b.kind !== 'townHall' || b.cityId === null) continue
+    const occupier = cityById.get(b.cityId)?.occupation?.realmId
+    if (!occupier) continue
+    const side = FOOTPRINT[b.kind]
+    const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
+    const h = Math.max(14, tile * 0.7)
+    const inset = Math.max(2, tile * 0.1)
+    const [px, py] = [sx + side * tile - h * 0.6 - inset, sy + inset]
+    if (!near(px, py)) continue
+    const occupierCity = cityById.get(occupier)
+    const color = relationshipColor(
+      occupierCity ? cityRelationship(occupierCity, viewer) : realmRelationship(occupier, viewer),
+    )
+    over
+      .moveTo(px, py)
+      .lineTo(px, py + h)
+      .stroke({ width: Math.max(1.5, tile * 0.06), color: 0x0e1419, alpha: fade })
+    over
+      .poly([px, py, px + h * 0.6, py + h * 0.22, px, py + h * 0.44])
+      .fill({ color, alpha: fade })
+      .stroke({ width: 1, color: 0x0e1419, alpha: fade })
   }
   for (const p of piles) {
     // A small heap in the tile's lower corner, so a building on the tile still shows.

@@ -26,6 +26,54 @@ import { recordEvent } from './events.js'
 /** How far one unit of food fills a horse's hunger meter: a full meter holds `HUNGER_DAYS` of food. */
 const FILL_PER_FOOD = MAX_HUNGER / (HUNGER_DAYS * HORSE_FOOD_PER_DAY)
 
+/**
+ * Given names for new horses (`CONTEXT.md`: Horse name), a pool apart from the residents'
+ * (`residentName`). Only flavour: a name means nothing to the rules.
+ */
+export const HORSE_NAMES: readonly string[] = [
+  'Brisk',
+  'Chestnut',
+  'Dapple',
+  'Ember',
+  'Flint',
+  'Gale',
+  'Hazel',
+  'Juniper',
+  'Kestrel',
+  'Lark',
+  'Maple',
+  'Nimbus',
+  'Onyx',
+  'Pepper',
+  'Quill',
+  'Rowan',
+  'Sorrel',
+  'Thistle',
+  'Umber',
+  'Velvet',
+  'Willow',
+  'Zephyr',
+  'Ash',
+  'Bramble',
+  'Cinder',
+  'Dusk',
+  'Fable',
+  'Heather',
+  'Ivory',
+  'Jet',
+  'Moss',
+  'Nutmeg',
+  'Pebble',
+  'Rusty',
+  'Storm',
+  'Tansy',
+]
+
+/** A name from the game for a horse. */
+export function horseName(rand: () => number): string {
+  return HORSE_NAMES[Math.floor(rand() * HORSE_NAMES.length)]!
+}
+
 /** Whole stats for a new horse, each from `HORSE_STAT_MIN` to `HORSE_STAT_MAX` (`CONTEXT.md`: Horse stats). */
 export function drawHorseStats(rand: () => number): HorseStats {
   const between = (min: number, max: number) => min + Math.floor(rand() * (max - min + 1))
@@ -35,8 +83,9 @@ export function drawHorseStats(rand: () => number): HorseStats {
 }
 
 /**
- * A new grown horse (`CONTEXT.md`: Horse stats): drawn stats, a full hunger meter and full
- * health, aged between `HORSE_START_AGE_MIN` and `HORSE_START_AGE_MAX` game years at `tick`.
+ * A new grown horse (`CONTEXT.md`: Horse stats, Horse name): drawn stats, a name from the pool, a
+ * full hunger meter and full health, aged between `HORSE_START_AGE_MIN` and `HORSE_START_AGE_MAX`
+ * game years at `tick`.
  */
 export function newHorse(
   rand: () => number,
@@ -54,6 +103,7 @@ export function newHorse(
   const age = HORSE_START_AGE_MIN + rand() * (HORSE_START_AGE_MAX - HORSE_START_AGE_MIN)
   return {
     ...place,
+    name: horseName(rand),
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
     stats,
@@ -101,6 +151,7 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
       recordEvent(world, h.realmId, {
         kind: 'horseHungry',
         horseId: h.id,
+        horseName: h.name,
         residentId: rider.id,
         name: rider.name,
       })
@@ -114,7 +165,8 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
     world.horses = world.horses.filter((h) => !died.includes(h))
     // A carriage whose horse died stands where it is, with nothing to pull it.
     for (const k of world.carriages) if (died.some((h) => h.id === k.horseId)) k.horseId = null
-    for (const h of died) recordEvent(world, h.realmId, { kind: 'horseDied', horseId: h.id })
+    for (const h of died)
+      recordEvent(world, h.realmId, { kind: 'horseDied', horseId: h.id, name: h.name })
   }
   return died
 }

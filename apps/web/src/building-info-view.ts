@@ -1,6 +1,7 @@
 import {
   GOODS,
   TICKS_PER_GAME_DAY,
+  TRAINING_GROUND_MAX_TRAINEES,
   buildingInfo,
   footprintTiles,
   materialsNeeded,
@@ -69,6 +70,8 @@ export function buildingInfoLines(
   }
   if (info.skill) lines.push(`Teaches ${labels.skills[info.skill]}`)
   if (info.maxWorkers !== undefined) lines.push(`Up to ${info.maxWorkers} workers`)
+  if (kind === 'trainingGround')
+    lines.push(`One teacher, up to ${TRAINING_GROUND_MAX_TRAINEES} trainees`)
   lines.push(`Footprint ${info.footprint} × ${info.footprint} tiles`)
   if (site?.site) {
     const missing = goodsText(materialsNeeded(site), labels.goods)

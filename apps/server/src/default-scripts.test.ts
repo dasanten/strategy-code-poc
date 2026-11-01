@@ -94,6 +94,7 @@ describe('a Player’s default scripts', () => {
       ['Feed the stable (default)', 'feedStable', true],
       ['Haul (default)', 'haul', true],
       ['Tear down (default)', 'tearDown', true],
+      ['Train (default)', 'train', true],
       ['Work (default)', 'work', true],
     ])
     const work = getScript(db, mara, workId())
@@ -345,7 +346,9 @@ describe('Work from the UI', () => {
     const orders = queue()
     const runner = new ScriptRunner(terrain, host())
     // w1 is given Work from the UI, w2 the plain work-at order: equal residents, equal output.
+    // Each on a tile of the farm's own, so neither walks to spread out (Spreading over the footprint).
     world.residents[1]!.stats = structuredClone(world.residents[0]!.stats)
+    world.residents[1]!.x = 4
     orders.receive(world, sender(), 'a', {
       kind: 'task',
       task: 'work',
@@ -384,6 +387,7 @@ function withCarriage(world: WorldState) {
     y: 3,
     hunger: MAX_HUNGER,
     health: MAX_HEALTH,
+    name: 'Rowan',
     stats: { ...AVERAGE_HORSE_STATS },
     bornAt: 0,
   })
@@ -491,6 +495,60 @@ describe('Build a … here from a node’s card', () => {
   })
 })
 
+describe('Defaults waiting while their order runs (`CONTEXT.md`: Running a script, Waiting)', () => {
+  /**
+   * w1 given Build at a node far off, its default as shipped or as an edited copy: the ticks
+   * its script ran, until the site is laid out, and where they stand then.
+   */
+  function buildFarOff(edited: boolean) {
+    const world = farmWorld()
+    world.residents = world.residents.filter((r) => r.id === 'w1')
+    world.nodes.push({ id: 'n1', kind: 'forest', x: 13, y: 9 })
+    const corner = nodeCorner(world, terrain, world.nodes[0]!)!
+    if (edited) {
+      const id = defaultScriptId(db, mara, 'build')
+      saveScript(db, mara, id, { source: `${DEFAULT_SCRIPTS.build.source}\n// mine\n` })
+      expect(runnableScript(db, id)?.followsDefault).toBe(false)
+    }
+    const orders = queue()
+    orders.receive(world, sender(), 'q', {
+      kind: 'task',
+      task: 'build',
+      residentId: 'w1',
+      building: 'lumberCamp',
+      at: corner,
+    })
+    orders.applyAll(world)
+    const runner = new ScriptRunner(terrain, host())
+    const walking = new Walking(terrain)
+    const ran: number[] = []
+    for (let i = 0; i < 500 && !world.buildings.some((b) => b.kind === 'lumberCamp'); i++) {
+      for (const r of world.residents) r.hunger = MAX_HUNGER
+      expect(runner.runAll(world, true)).toEqual([])
+      if (runner.runs > 0) ran.push(world.tick)
+      stepWorld(world, terrain, walking)
+    }
+    return { ran, w1: world.residents[0]!, corner, tick: world.tick }
+  }
+
+  it('Build runs once to set off, not on the way, and again on arrival', () => {
+    const { ran, w1, corner, tick } = buildFarOff(false)
+    expect(w1).toMatchObject(corner)
+    expect(w1.order).toMatchObject({ kind: 'build' })
+    // Set off, arrived, laid out: the walk of many ticks between ran no script.
+    expect(tick).toBeGreaterThan(8)
+    expect(ran.length).toBeLessThanOrEqual(3)
+  })
+
+  it('an edited copy waits just like the default', () => {
+    const shipped = buildFarOff(false)
+    const edited = buildFarOff(true)
+    expect(edited.ran).toEqual(shipped.ran)
+    expect(edited.tick).toBe(shipped.tick)
+    expect(edited.w1).toMatchObject(edited.corner)
+  })
+})
+
 describe('Build for a group (`CONTEXT.md`: Group)', () => {
   it('walks each to the same tile: the first lays out the site and the others join it', () => {
     const world = farmWorld()
@@ -584,6 +642,7 @@ describe('the step budget', () => {
           y: 3,
           hunger: MAX_HUNGER,
           health: MAX_HEALTH,
+          name: 'Rowan',
           stats: { ...AVERAGE_HORSE_STATS },
           bornAt: 0,
         })
@@ -610,6 +669,7 @@ describe('the step budget', () => {
           ...at,
           hunger: 100,
           health: 100,
+          name: 'Rowan',
           stats: { ...AVERAGE_HORSE_STATS },
           bornAt: 0,
         })
@@ -625,6 +685,12 @@ describe('the step budget', () => {
         r.order = { kind: 'build', building: 'stable', at: { x: 3, y: 3 }, siteId: 'site' }
         r.script = { scriptId: 1, memory: { ...stable } }
       }
+    }
+    const training = { groundId: 'g1' }
+    /** A finished training ground where the farm was. */
+    const grounded = (world: WorldState) => {
+      world.buildings = world.buildings.filter((b) => b.id !== 'farm')
+      world.buildings.push({ id: 'g1', kind: 'trainingGround', cityId: null, x: 3, y: 3 })
     }
     const cases: Record<Task, Case[]> = {
       build: [
@@ -788,6 +854,40 @@ describe('the step budget', () => {
           prepare: (world) => {
             feeding(world, 100)
             world.residents[0]!.x = 5
+          },
+        },
+      ],
+      train: [
+        // Starting, training with a teacher there, away getting Food from the nearest of many
+        // storages, and walking back.
+        { memory: training, prepare: grounded },
+        {
+          memory: training,
+          prepare: (world) => {
+            grounded(world)
+            world.residents[0]!.order = { kind: 'train', buildingId: 'g1', learning: 'strength' }
+            world.residents[1]!.order = { kind: 'teach', buildingId: 'g1', subject: 'strength' }
+            world.residents[1]!.x = 4
+          },
+        },
+        {
+          memory: training,
+          prepare: (world) => {
+            grounded(world)
+            world.residents[0]!.order = { kind: 'train', buildingId: 'g1', learning: null }
+            world.residents[0]!.carried = {}
+            for (let i = 0; i < 10; i++) {
+              const stock = i === 9 ? { food: 100 } : { stone: 5 }
+              const at = { x: 5 + 2 * i, y: 12 }
+              world.buildings.push({ id: `s${i}`, kind: 'storage', cityId: 'c1', ...at, stock })
+            }
+          },
+        },
+        {
+          memory: training,
+          prepare: (world) => {
+            grounded(world)
+            world.residents[0]!.x = 9
           },
         },
       ],

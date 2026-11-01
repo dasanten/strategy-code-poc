@@ -365,6 +365,13 @@ export const WALL_ENCLOSES_MAX = 160_000
 export const SIGHT_RANGE = 48
 
 /**
+ * How often each realm's Last seen is brought up to date, in ticks (`CONTEXT.md`: Last seen).
+ * Realms are staggered by their id, so about one in this many refreshes on a tick; a building
+ * that leaves sight between two refreshes is remembered as it was up to this many ticks earlier.
+ */
+export const LAST_SEEN_EVERY_TICKS = 5
+
+/**
  * NPC villages placed on a full-size map (`CONTEXT.md`: NPC city); a smaller map gets fewer, by
  * its area. Fewer are placed when the map has no room left for them.
  */
@@ -398,6 +405,13 @@ export const NPC_VILLAGE: NpcCitySize = { size: 29, residents: 6, houses: 2, far
 
 /** A town: a wider square, twice the residents of a starting city, two farms. */
 export const NPC_TOWN: NpcCitySize = { size: 45, residents: 16, houses: 5, farms: 2, food: 200 }
+
+/**
+ * Game days a realm must occupy a city's town hall without a break to capture the city
+ * (`CONTEXT.md`: Capturing a city, Occupying a town hall; ADR 0017): long enough for its owner to
+ * hear of it and march back.
+ */
+export const OCCUPATION_GAME_DAYS = 10
 
 /**
  * What an NPC city asks for each resident living there when it is bought (`CONTEXT.md`: Buying a
@@ -441,6 +455,12 @@ export const WORK_FOOD_KEPT = 2
 export const NPC_SOLDIER_SHARE = 0.25
 
 /**
+ * Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
+ * a town of 16 keeps 160, what two mint workers strike in two game days (`RECIPES`).
+ */
+export const NPC_WAR_CHEST_PER_RESIDENT = 10
+
+/**
  * How near to an NPC city's gate, in tiles, an armed outsider makes it close its gates
  * (`CONTEXT.md`: NPC city): a little inside sight, so the gate shuts before they reach it.
  */
@@ -472,6 +492,13 @@ export const PAIRING_WAIT_DAYS = 10
 export const PAIRING_WAIT_TICKS = PAIRING_WAIT_DAYS * TICKS_PER_GAME_DAY
 
 /**
+ * Ticks between a game-run city's planning passes (`CONTEXT.md`: NPC city; ADR 0016): a game
+ * hour, so a city reacts to a change within a real minute. Cities are staggered by their id, so
+ * about one plans per tick.
+ */
+export const NPC_PLAN_TICKS = 60
+
+/**
  * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
  * materials to the site, building or tearing down. The others keep working.
  */
@@ -499,10 +526,60 @@ export const NPC_WALL_TILES_PER_TRIP = 4
 export const NPC_NODE_REACH = 160
 
 /**
+ * How far from its home a Trade Org warehouse may be for an NPC city to send its trader there
+ * (`CONTEXT.md`: NPC trader), in tiles: about a game day and a half's walk on plains each way.
+ */
+export const NPC_TRADER_REACH = 720
+
+/**
+ * Game days after it left that an NPC city stops waiting for its trader (`CONTEXT.md`: NPC
+ * trader): dead, robbed or stuck, they are dropped from its plan and it may send another.
+ * Several times the longest trade run (`NPC_TRADER_REACH` there and back).
+ */
+export const NPC_TRADER_GIVE_UP_DAYS = 10
+
+/**
  * How far beyond its wall an NPC city looks for Plains to lay out a new farm on, in tiles. Farms
  * go beyond where its next wall would stand.
  */
 export const NPC_FARM_REACH = 48
+
+/**
+ * Game days an NPC city must have been full before it founds a daughter (`CONTEXT.md`: Full
+ * city): a game week of idle spare hands and nothing short.
+ */
+export const NPC_FULL_DAYS = 7
+
+/**
+ * Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
+ * Founding), once a game day: enough to find free Plains on most maps, cheap enough to do while
+ * it waits.
+ */
+export const NPC_FOUND_SAMPLES = 200
+
+/**
+ * How far from its home a full NPC city looks for its daughter's site, in tiles (`CONTEXT.md`:
+ * Founding): twice the usual distance between cities, about five game days' walk on Plains.
+ */
+export const NPC_FOUND_REACH = 960
+
+/**
+ * Game days of Food a founding party's member carries for their first weeks at the site
+ * (`CONTEXT.md`: Founding), besides the Food for twice the walk there.
+ */
+export const NPC_FOUND_FOOD_DAYS = 20
+
+/**
+ * Game days after setting out that a founding party whose town hall doesn't stand gives up and
+ * walks home (`CONTEXT.md`: Founding); the mother may try again once it is full again.
+ */
+export const NPC_FOUND_GIVE_UP_DAYS = 20
+
+/**
+ * The standing a daughter and its mother start at toward each other (`CONTEXT.md`: Founding):
+ * high, of `STANDING_RANGE`, fading like any standing.
+ */
+export const NPC_FOUND_STANDING = 80
 
 /**
  * What the Trade Org HQ is placed with (`CONTEXT.md`: Trade Org HQ): a round city, the largest on
@@ -797,6 +874,31 @@ export const GET_FOOD_AT = Math.ceil(FOOD_PER_DAY)
 
 /** The default of `foodTake` in those defaults, in whole units: six game days of Food. */
 export const GET_FOOD_TAKE = Math.ceil(6 * FOOD_PER_DAY)
+
+/**
+ * The default of `crewFood` in the Work default (`CONTEXT.md`: Crew food), in whole units: the
+ * Food the workplace's pile keeps for its crew, which the carrier tops up on the way back from
+ * storing a load. About six days for a crew of six, ten for one of four, and well inside a load.
+ * 0 brings none.
+ */
+export const CREW_FOOD = 20
+
+/**
+ * Game days of work a resident an NPC city sends to a workplace sets out with Food for, on top
+ * of the walk there and back (`setOutFood`; `CONTEXT.md`: Crew food, NPC city): enough to last
+ * until the carrier's first round trip brings the crew's Food.
+ */
+export const SET_OUT_WORK_DAYS = 3
+
+/**
+ * Units of Food a resident sent to a workplace sets out with (`CONTEXT.md`: Crew food): twice a
+ * walk of `walkTicks` ticks plus `SET_OUT_WORK_DAYS` of work, at `FOOD_PER_DAY`, in whole units
+ * rounded up. Never less than their own food (`OWN_FOOD`).
+ */
+export function setOutFood(walkTicks: number): number {
+  const days = (2 * walkTicks) / TICKS_PER_GAME_DAY + SET_OUT_WORK_DAYS
+  return Math.max(OWN_FOOD, Math.ceil(days * FOOD_PER_DAY))
+}
 
 /**
  * Food a resident running the Breed horses default takes from the stable before they start, if
@@ -1258,6 +1360,12 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
   /** A farm is fields on Plains: work, but no materials, so a city can always feed itself. */
   farm: {},
   /**
+   * A training ground (`CONTEXT.md`: Training ground): a fenced yard with posts and racks on a
+   * few paving stones, so mostly Wood and a little Stone, no iron; a bit more timber than a
+   * stable, and buildable before any smelter.
+   */
+  trainingGround: { wood: 50, stone: 10 },
+  /**
    * A carriage, built at a stable (`CONTEXT.md`: Carriage): a wooden cart with iron fittings, so a
    * realm needs a smelter's iron for its second carriage.
    */
@@ -1267,10 +1375,10 @@ export const BUILD_MATERIALS: Partial<Record<BuildingKind, Stock>> = {
 /**
  * Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
  * lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
- * a mint 5, a smithy 5, a town hall 6. A tile of wooden wall takes a sixteenth of a game day, a
- * gate an eighth, a tile of road a sixteenth (a quarter of what a 40 m tile took), a house one
- * game day, a storage two and a farm half of one; a carriage two. More or stronger workers
- * finish it sooner (`buildWork`).
+ * a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable). A tile of wooden
+ * wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
+ * what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
+ * two. More or stronger workers finish it sooner (`buildWork`).
  */
 export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   lumberCamp: 2 * TICKS_PER_GAME_DAY,
@@ -1287,6 +1395,7 @@ export const BUILD_WORK: Partial<Record<BuildingKind, number>> = {
   house: TICKS_PER_GAME_DAY,
   storage: 2 * TICKS_PER_GAME_DAY,
   farm: TICKS_PER_GAME_DAY / 2,
+  trainingGround: 3 * TICKS_PER_GAME_DAY,
   carriage: 2 * TICKS_PER_GAME_DAY,
 }
 
@@ -1666,6 +1775,109 @@ export function combatLearned(resident: Resident, tick: number): number {
   return COMBAT_SKILL_PER_BLOW * (statValue(resident, 'intellect', tick) / INTELLECT_AVERAGE)
 }
 
+/** Most trainees at one training ground at a time (`CONTEXT.md`: Trainee). */
+export const TRAINING_GROUND_MAX_TRAINEES = 3
+
+/**
+ * Trained bonus a trainee of average Intellect gains in a stat each tick a teacher is there
+ * (`CONTEXT.md`: Training): an average base of 10 reaches its cap of 5 in about a game year.
+ */
+export const TRAIN_STAT_PER_TICK = 5 / TICKS_PER_GAME_YEAR
+
+/** How much faster training a skill goes than learning it by doing (`CONTEXT.md`: Training). */
+export const TRAIN_SKILL_FACTOR = 2
+
+/**
+ * The most of each skill a resident can have (`CONTEXT.md`: Skill): where it stops making them
+ * better. Training never takes a skill past it.
+ */
+export const SKILL_MAX: Readonly<Record<SkillName, number>> = {
+  mining: WORK_SKILL_MAX,
+  woodcutting: WORK_SKILL_MAX,
+  smelting: WORK_SKILL_MAX,
+  smithing: WORK_SKILL_MAX,
+  farming: WORK_SKILL_MAX,
+  construction: CONSTRUCTION_SKILL_MAX,
+  combat: COMBAT_SKILL_LIMIT / COMBAT_SKILL_EFFECT,
+  driving: DRIVING_SKILL_LIMIT / DRIVING_SKILL_EFFECT,
+}
+
+/**
+ * Each skill learned by doing, in points per game day for a learner of average Intellect. Combat
+ * is learned by blows rather than days; for training it counts as reaching its maximum in a game
+ * year, as the work skills do.
+ */
+export const SKILL_PER_DAY: Readonly<Record<SkillName, number>> = {
+  mining: WORK_SKILL_PER_DAY,
+  woodcutting: WORK_SKILL_PER_DAY,
+  smelting: WORK_SKILL_PER_DAY,
+  smithing: WORK_SKILL_PER_DAY,
+  farming: WORK_SKILL_PER_DAY,
+  construction: CONSTRUCTION_SKILL_PER_DAY,
+  combat: SKILL_MAX.combat / (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY),
+  driving: DRIVING_SKILL_PER_DAY,
+}
+
+/**
+ * What `trainee` gains in `subject` from one tick with `teacher` at the ground (`CONTEXT.md`:
+ * Training): their Intellect sets the pace, `TRAIN_STAT_PER_TICK` for a stat, `TRAIN_SKILL_FACTOR`
+ * times the by-doing rate for a skill. Never past the teacher's own effective value, nor a stat's
+ * `trainedCap` or a skill's `SKILL_MAX`; 0 at that ceiling. A stat's gain goes into its trained
+ * bonus, which old age shrinks along with the base, so the teacher's ceiling is scaled back by it.
+ */
+export function trainingGain(
+  trainee: Resident,
+  teacher: Resident,
+  subject: StatName | SkillName,
+  tick: number,
+): number {
+  const pace = statValue(trainee, 'intellect', tick) / INTELLECT_AVERAGE
+  if (subject in trainee.stats) {
+    const stat = subject as StatName
+    const { base, trained } = trainee.stats[stat]
+    const toCap = trainedCap(base) - trained
+    const toTeacher =
+      (statValue(teacher, stat, tick) - statValue(trainee, stat, tick)) / ageFactor(trainee, tick)
+    return Math.max(0, Math.min(TRAIN_STAT_PER_TICK * pace, toCap, toTeacher))
+  }
+  const skill = subject as SkillName
+  const has = trainee.skills[skill] ?? 0
+  const toTeacher = (teacher.skills[skill] ?? 0) - has
+  const perTick = (SKILL_PER_DAY[skill] / TICKS_PER_GAME_DAY) * TRAIN_SKILL_FACTOR * pace
+  return Math.max(0, Math.min(perTick, SKILL_MAX[skill] - has, toTeacher))
+}
+
+/**
+ * A resident's value in a training subject (`CONTEXT.md`: Training): a stat as it counts now
+ * (`statValue`), or a skill's points.
+ */
+export function subjectValue(
+  resident: Resident,
+  subject: StatName | SkillName,
+  tick: number,
+): number {
+  return subject in resident.stats
+    ? statValue(resident, subject as StatName, tick)
+    : (resident.skills[subject as SkillName] ?? 0)
+}
+
+/**
+ * The most `trainee` can reach in `subject` under `teacher` (`CONTEXT.md`: Training), as
+ * `subjectValue` counts it: the lower of the teacher's own value and the trainee's cap, a stat's
+ * base with its full trained bonus, or a skill's `SKILL_MAX`. `trainingGain` stops there.
+ */
+export function trainingCeiling(
+  trainee: Resident,
+  teacher: Resident,
+  subject: StatName | SkillName,
+  tick: number,
+): number {
+  const teaches = subjectValue(teacher, subject, tick)
+  if (!(subject in trainee.stats)) return Math.min(teaches, SKILL_MAX[subject as SkillName])
+  const { base } = trainee.stats[subject as StatName]
+  return Math.min(teaches, (base + trainedCap(base)) * ageFactor(trainee, tick))
+}
+
 /**
  * How many tiles further along an army's way a member may get than the one furthest behind
  * (`CONTEXT.md`: Army): one ahead waits, so the army keeps together at the pace of the slowest.
@@ -1825,8 +2037,12 @@ export const SCRIPT_MAX_VERSIONS = 40
  */
 export const SCRIPT_WRITES_PER_MINUTE = 60
 
-/** The most steps a queue holds (`CONTEXT.md`: Queue): plenty for a day's round. */
-export const QUEUE_MAX_STEPS = 20
+/**
+ * The most steps a queue holds (`CONTEXT.md`: Queue, Repeat block): a day's round, or a few steps
+ * repeated ten times over. With `QUEUE_STEP_MAX_CHARS` a full queue still fits the socket's
+ * largest frame (`realtime.maxPayloadBytes`).
+ */
+export const QUEUE_MAX_STEPS = 50
 
 /** The most a queue step's order request may hold, in characters of its JSON. */
 export const QUEUE_STEP_MAX_CHARS = 1000
@@ -1845,3 +2061,6 @@ export const RESIDENT_NAME_MAX_LENGTH = 30
 
 /** The longest name a Player may give a city of their realm, in characters after trimming. */
 export const CITY_NAME_MAX_LENGTH = 30
+
+/** The longest name a Player may give a horse of their realm, in characters after trimming (`CONTEXT.md`: Renaming a horse). */
+export const HORSE_NAME_MAX_LENGTH = 30

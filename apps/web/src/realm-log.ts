@@ -95,6 +95,38 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const from = e.other === null ? '' : ` from the realm of ${e.other}`
       return { text: `You captured ${e.city}${from}, with its ${people}.`, tone: 'info' }
     }
+    case 'hallOccupied': {
+      const days = `${e.days} game day${e.days === 1 ? '' : 's'}`
+      const places = [{ name: `${e.city}’s town hall`, x: e.x, y: e.y }]
+      return e.occupier
+        ? {
+            text: `You hold the town hall of ${e.city}: ${days} to capture it.`,
+            tone: 'info',
+            places,
+          }
+        : {
+            text: `Your town hall in ${e.city} is occupied by the realm of ${e.other}: it falls in ${days} unless you retake it.`,
+            tone: 'bad',
+            places,
+          }
+    }
+    case 'occupationBroken': {
+      const places =
+        e.x === undefined || e.y === undefined
+          ? undefined
+          : [{ name: `${e.city}’s town hall`, x: e.x, y: e.y }]
+      return e.occupier
+        ? {
+            text: `Your occupation of ${e.city}’s town hall is broken: its days are lost.`,
+            tone: 'warn',
+            ...(places && { places }),
+          }
+        : {
+            text: `The occupation of your town hall in ${e.city} by the realm of ${e.other} is broken.`,
+            tone: 'info',
+            ...(places && { places }),
+          }
+    }
     case 'cityBought': {
       const people = `${e.residents} resident${e.residents === 1 ? '' : 's'}`
       return {
@@ -292,14 +324,21 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     case 'grownUp':
       return { text: `${e.name} has grown up and can work now.`, tone: 'info' }
     case 'horseDied':
-      return { text: 'A horse starved to death.', tone: 'bad' }
+      // Entries from before horses had names (`CONTEXT.md`: Horse name) say "a horse".
+      return {
+        text: e.name ? `Your horse ${e.name} starved to death.` : 'A horse starved to death.',
+        tone: 'bad',
+      }
     case 'horseHungry':
       return {
-        text: `${e.name}’s horse is hungry, and ${e.name} carries no Food to spare for it.`,
+        text: `${e.name}’s horse${e.horseName ? ` ${e.horseName}` : ''} is hungry, and ${e.name} carries no Food to spare for it.`,
         tone: 'warn',
       }
     case 'foaled':
-      return { text: 'A foal was born in a stable.', tone: 'info' }
+      return {
+        text: e.name ? `A foal, ${e.name}, was born in a stable.` : 'A foal was born in a stable.',
+        tone: 'info',
+      }
     case 'horsesGranted':
     case 'horsesClaimed': {
       const where = {

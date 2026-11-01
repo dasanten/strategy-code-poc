@@ -111,7 +111,9 @@ describe('fetching materials', () => {
       ...AT,
       site: { delivered: { wood: 5 }, work: 0 },
     })
-    run(world, terrain, 5, undefined, () => fetchers(world).length > 0)
+    // They spread over the site's footprint as they join (`CONTEXT.md`: Spreading over the footprint).
+    const joined = () => world.residents.every((r) => r.script?.memory.siteId === 'site')
+    run(world, terrain, 60, undefined, () => joined() && fetchers(world).length > 0)
     expect(world.residents.map((r) => r.script!.memory.siteId)).toEqual(['site', 'site', 'site'])
     const [fetcher, ...more] = fetchers(world)
     expect(more).toEqual([])
@@ -151,7 +153,13 @@ describe('fetching materials', () => {
   it('just builds with no storage of the realm holding the materials', () => {
     const { world, terrain } = houseWorld()
     storage(world, 's1', AT.x + 6, AT.y, { stone: 50 })
-    world.cities.push({ id: 'c2', name: 'Elsewhere', realmId: 'r2', townHallId: 'none' })
+    world.cities.push({
+      id: 'c2',
+      name: 'Elsewhere',
+      realmId: 'r2',
+      townHallId: 'none',
+      occupation: null,
+    })
     world.buildings.push({
       id: 'theirs',
       kind: 'storage',

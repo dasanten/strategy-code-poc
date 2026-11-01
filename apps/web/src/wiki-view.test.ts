@@ -6,6 +6,7 @@ import {
   BATCHES_PER_DAY,
   BUILD_MATERIALS,
   BUILD_WORK,
+  DELIVERY_LOAD,
   FOOD_PER_DAY,
   RECIPES,
   SCRIPT_LIBRARY_MAX_SCRIPTS,
@@ -13,6 +14,8 @@ import {
   TICKS_PER_GAME_DAY,
   WAREHOUSE_BASE_PRICE,
   WORK_OUTPUT_PER_DAY,
+  GAME_DAYS_PER_YEAR,
+  TRAIN_SKILL_FACTOR,
   buildWork,
   carryCapacity,
   hungerFactor,
@@ -25,6 +28,8 @@ import {
   buildCosts,
   carriageCost,
   coinsPerMintWorkerDay,
+  daysToWorkSkillMax,
+  trainingDays,
   duration,
   goldMinersPerMintWorker,
   jobDays,
@@ -32,6 +37,8 @@ import {
   residentsPerFarmer,
   transport,
   wikiResident,
+  HOW_TO_TRADE_PATH,
+  WIKI_PATH,
 } from './wiki-view.js'
 import { WIKI_TOPICS, Wiki } from './Wiki.js'
 
@@ -153,5 +160,40 @@ describe('the Wiki’s Scripting budgets topic', () => {
     const html = render()
     expect(html).toContain(`holds at most ${SCRIPT_LIBRARY_MAX_SCRIPTS} scripts`)
     expect(html).toContain(`keeps at most ${SCRIPT_MAX_VERSIONS} versions`)
+  })
+})
+
+describe('training pace', () => {
+  it('takes an average learner a stat’s bonus to its cap in a game year, a skill twice as fast as doing', () => {
+    expect(trainingDays('strength')).toBeCloseTo(GAME_DAYS_PER_YEAR)
+    expect(trainingDays('mining')).toBeCloseTo(daysToWorkSkillMax / TRAIN_SKILL_FACTOR)
+    expect(trainingDays('combat')).toBeCloseTo(GAME_DAYS_PER_YEAR / TRAIN_SKILL_FACTOR)
+  })
+})
+
+describe('the Wiki’s How to trade topic (`CONTEXT.md`: Trade section)', () => {
+  it('is a section the trade section’s link lands on', () => {
+    const [path, anchor] = HOW_TO_TRADE_PATH.split('#')
+    expect(path).toBe(WIKI_PATH)
+    expect(WIKI_TOPICS.map((t) => t.id)).toContain(anchor)
+    const html = render()
+    expect(html).toContain(`id="${anchor}"`)
+    expect(html).toContain('How to trade')
+  })
+
+  it('covers where trade happens, sending a trader, NPC cities, delivery and transfer', () => {
+    const html = render()
+    const section = html.slice(html.indexOf('id="how-to-trade"'), html.indexOf('id="trade"'))
+    for (const heading of [
+      'Sending a trader',
+      'Buying and selling',
+      'What an NPC city buys and sells',
+      'Delivery',
+      'Transfer',
+    ]) {
+      expect(section).toContain(`<h3>${heading}</h3>`)
+    }
+    expect(section).toContain('Trade here')
+    expect(section).toContain(`at most ${DELIVERY_LOAD} kg`)
   })
 })

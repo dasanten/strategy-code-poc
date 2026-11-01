@@ -3,6 +3,7 @@ import {
   AVERAGE_HORSE_STATS,
   ARMY_SCRIPT_API,
   DEFAULT_SCRIPTS,
+  OCCUPATION_TICKS,
   SCRIPT_API,
   SCRIPT_MAX_CALL_DEPTH,
   SCRIPT_VALUE_LIMITS,
@@ -45,9 +46,9 @@ function setup() {
     world.buildings.push({ cityId: null, ...b })
   }
   world.cities.push(
-    { id: 'c1', name: 'Ashford', realmId: 'r1', townHallId: 'h1' },
-    { id: 'c2', name: 'Brill', realmId: 'r2', townHallId: 'h2' },
-    { id: 'c3', name: 'Coldwater', realmId: null, townHallId: 'h3' },
+    { id: 'c1', name: 'Ashford', realmId: 'r1', townHallId: 'h1', occupation: null },
+    { id: 'c2', name: 'Brill', realmId: 'r2', townHallId: 'h2', occupation: null },
+    { id: 'c3', name: 'Coldwater', realmId: null, townHallId: 'h3', occupation: null },
   )
   building({ id: 'h1', kind: 'townHall', cityId: 'c1', x: 12, y: 10 })
   building({ id: 's1', kind: 'storage', cityId: 'c1', x: 13, y: 10, stock: { food: 5, wood: 2 } })
@@ -89,6 +90,7 @@ function setup() {
     y: 12,
     hunger: 90,
     health: 100,
+    name: 'Rowan',
     stats: { ...AVERAGE_HORSE_STATS },
     bornAt: 0,
   })
@@ -118,7 +120,15 @@ function setup() {
   })
   world.lastSeen[7] = [
     { is: 'building', id: 'far1', kind: 'farm', cityId: 'c9', x: 200, y: 200, seenAt: 4 },
-    { is: 'city', id: 'c9', name: 'Dunmore', realmId: 'r2', townHallId: 'h9', seenAt: 4 },
+    {
+      is: 'city',
+      id: 'c9',
+      name: 'Dunmore',
+      realmId: 'r2',
+      townHallId: 'h9',
+      occupation: null,
+      seenAt: 4,
+    },
   ]
   const explored = new ExploredTerrain(terrain, world.nodes)
   explored.explore(7, 10, 10, SIGHT_RANGE)
@@ -199,6 +209,7 @@ describe('script views', () => {
       breedingPair: 'breedingPair(building("s1"))',
       storages: 'storages()',
       walkTime: 'walkTime(me, building("s1"))',
+      crewTile: 'crewTile(building("s1"))',
       tick: 'tick',
       mapSize: 'mapSize',
       random: 'random',
@@ -241,6 +252,21 @@ describe('script views', () => {
       scriptValueProblems(out[name], returnsOf(SCRIPT_API, name), name),
     )
     expect(problems).toEqual([])
+  })
+
+  it('show who occupies a town hall in sight and the ticks left, and nothing with the hall out of sight', () => {
+    const out = answers({ cities: 'cities()' }, false, (w) => {
+      for (const c of w.cities) if (c.id !== 'c1') c.occupation = { realmId: 'r1', since: 40 }
+      // Coldwater's storage is still in sight, its town hall no longer.
+      w.buildings.find((b) => b.id === 'h3')!.x = 200
+    })
+    const cities = out.cities as { id: string; occupation: unknown }[]
+    expect(Object.fromEntries(cities.map((c) => [c.id, c.occupation]))).toEqual({
+      c1: null,
+      c2: { realmId: 'r1', ticksLeft: OCCUPATION_TICKS - 10 },
+      c3: null,
+    })
+    expect(scriptValueProblems(out.cities, returnsOf(SCRIPT_API, 'cities'), 'cities')).toEqual([])
   })
 
   it('hand a script exactly its view: an undeclared field reads null, declared ones as they are', () => {

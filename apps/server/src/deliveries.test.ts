@@ -121,6 +121,11 @@ describe('caravans carrying out deliveries', () => {
     { tags: ['slow'], timeout: 120_000 },
     () => {
       const { world, terrain, warehouse, storage, city, caravan, queue } = setup()
+      // Every warehouse at its floor in every good, so the Trade Organization's own chain
+      // (`CONTEXT.md`: Trade Org HQ) forges no Iron away while the delivery is under way.
+      for (const b of world.buildings) {
+        if (b.kind === 'warehouse') b.stock = { ...stockFloor(world, b), ...b.stock }
+      }
       order(world, queue, { kind: 'buy', good: 'iron', units: 6, cityId: city.id })
       const iron = total(world, 'iron')
       const before = storage.stock!.iron ?? 0

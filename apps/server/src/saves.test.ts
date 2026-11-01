@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { backupDb, pruneBackups } from './backup.js'
 import { openDb, schema } from './db/index.js'
@@ -15,10 +15,13 @@ import {
   type TerrainMap,
 } from '@csp/shared'
 import { createAdmin } from './auth.js'
-import { KEEP_LATEST, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
+
+import { KEEP_LATEST, WorldSaver, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
+import { HORSE_NAMES } from './horses.js'
 import { checkInvariants } from './invariants.js'
+import { refreshLastSeen } from './last-seen.js'
 import { smallTerrain, worldWithCity, worldWithPost } from './test-terrain.js'
 import {
   RESET_BEFORE,
@@ -135,7 +138,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(63)
+    expect(WORLD_FORMAT_VERSION).toBe(67)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -149,6 +152,15 @@ describe('world saves', () => {
     const migrated = migrateWorld(old, 39, { terrain: smallTerrain() })
     expect(migrated.lastSeen).toEqual({})
     expect(migrated.buildings).toEqual(world.buildings)
+  })
+
+  it('migrates a format 64 world: every city starts without a plan (migration 64 → 65)', () => {
+    const { world, terrain } = worldWithPost()
+    const old: Partial<typeof world> = structuredClone(world)
+    delete old.cityPlans
+    const migrated = migrateWorld(old, 64, { terrain }, migrations, 65)
+    expect(migrated).toEqual({ ...world, cityPlans: {} })
+    expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
   it('migrates a format 52 world: every Player starts with their Horse offer unclaimed (migration 52 → 53)', () => {
@@ -362,6 +374,47 @@ describe('world saves', () => {
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
+  it('keeps a format 63 world as it is: no script waits yet (migration 63 → 64)', () => {
+    const { world, terrain } = worldWithCity()
+    const migrated = migrateWorld(structuredClone(world), 63, { terrain }, migrations, 64)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents.every((r) => r.script?.waitingSince === undefined)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('migrates a format 66 world: no city’s town hall is occupied (migration 66 → 67)', () => {
+    const { world, terrain } = worldWithPost()
+    // The Player remembers their own city, as it was before cities could be occupied.
+    refreshLastSeen(world, terrain.size)
+    const old = structuredClone(world)
+    for (const c of old.cities) delete (c as Partial<typeof c>).occupation
+    for (const e of Object.values(old.lastSeen).flat())
+      if (e.is === 'city') delete (e as Partial<typeof e>).occupation
+    const migrated = migrateWorld(old, 66, { terrain }, migrations, 67)
+    expect(migrated.cities.length).toBeGreaterThan(1)
+    expect(migrated.cities.every((c) => c.occupation === null)).toBe(true)
+    const remembered = Object.values(migrated.lastSeen).flat()
+    expect(remembered.filter((e) => e.is === 'city').length).toBeGreaterThan(0)
+    expect(migrated).toEqual(world)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('names every horse from before horses had names, alike on every server (migration 65 → 66)', () => {
+    const { world, terrain: land } = worldWithCity()
+    expect(world.horses.length).toBeGreaterThan(0)
+    // A format 65 horse: no name.
+    const old = structuredClone(world) as unknown as { horses: Record<string, unknown>[] }
+    for (const h of old.horses) delete h.name
+    const migrated = migrateWorld(structuredClone(old), 65, { terrain: land }, migrations, 66)
+    for (const h of migrated.horses) expect(HORSE_NAMES).toContain(h.name)
+    // Drawn from the seed and the horse's id, so a second run names them the same.
+    expect(migrateWorld(old, 65, { terrain: land }, migrations, 66)).toEqual(migrated)
+    expect(migrated.horses.map(({ id, x, y }) => ({ id, x, y }))).toEqual(
+      world.horses.map(({ id, x, y }) => ({ id, x, y })),
+    )
+    expect(checkInvariants(migrated, land)).toEqual([])
+  })
+
   it('keeps a format 46 world as it is: no resident has a queue yet (migration 46 → 47)', () => {
     const { world, terrain } = worldWithCity()
     const migrated = migrateWorld(structuredClone(world), 46, { terrain }, migrations, 47)
@@ -374,7 +427,7 @@ describe('world saves', () => {
     const { world, terrain } = worldWithCity()
     const old: Partial<typeof world> = { ...world }
     delete old.scriptViewChanges
-    const migrated = migrateWorld(old, 49, { terrain })
+    const migrated = migrateWorld(old, 49, { terrain }, migrations, 50)
     expect(migrated).toEqual({ ...world, scriptViewChanges: 0 })
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
@@ -543,5 +596,90 @@ describe('backups', () => {
     expect(fs.existsSync(old)).toBe(false)
     expect(fs.existsSync(backupFile)).toBe(true)
     fs.rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe('WorldSaver', () => {
+  function fakeLog() {
+    return { skipped: vi.fn(), failed: vi.fn() }
+  }
+
+  it('writes a save asynchronously that loads back to the same world', async () => {
+    const { db, close } = await openDb(':memory:')
+    const { world, terrain: map } = loadOrCreateWorld(db, counting().generate)
+    world.tick = 30
+    const log = fakeLog()
+    const saver = new WorldSaver(db, log)
+    expect(saver.start(world)).toBe(true)
+    const taken = structuredClone(world)
+    // The world goes on while the save is written; the save is the world as it was.
+    world.tick = 31
+    await saver.settled()
+    const loaded = loadOrCreateWorld(db, counting().generate)
+    expect(loaded.world).toEqual(taken)
+    expect(loaded.terrain).toEqual(map)
+    expect(db.select().from(schema.worldSaves).all().at(-1)?.tick).toBe(30)
+    expect(log.failed).not.toHaveBeenCalled()
+    close()
+  })
+
+  it('skips and logs a save asked for while one is in flight', async () => {
+    const { db, close } = await openDb(':memory:')
+    const world = createWorld(terrain, 1)
+    const log = fakeLog()
+    const saver = new WorldSaver(db, log)
+    world.tick = 30
+    expect(saver.start(world)).toBe(true)
+    world.tick = 60
+    expect(saver.start(world)).toBe(false)
+    expect(log.skipped).toHaveBeenCalledWith(60, 30)
+    await saver.settled()
+    expect(
+      db
+        .select()
+        .from(schema.worldSaves)
+        .all()
+        .map((r) => r.tick),
+    ).toEqual([30])
+    // Once it is written, the next save starts again.
+    world.tick = 90
+    expect(saver.start(world)).toBe(true)
+    await saver.settled()
+    expect(
+      db
+        .select()
+        .from(schema.worldSaves)
+        .all()
+        .map((r) => r.tick),
+    ).toEqual([30, 90])
+    close()
+  })
+
+  it('saves synchronously on shutdown, and a save still in flight does not land after it', async () => {
+    const { db, close } = await openDb(':memory:')
+    const world = createWorld(terrain, 1)
+    const saver = new WorldSaver(db, fakeLog())
+    world.tick = 30
+    saver.start(world)
+    world.tick = 45
+    saver.saveNow(world)
+    // Written before anything else runs.
+    expect(
+      db
+        .select()
+        .from(schema.worldSaves)
+        .all()
+        .map((r) => r.tick),
+    ).toEqual([45])
+    await saver.settled()
+    expect(
+      db
+        .select()
+        .from(schema.worldSaves)
+        .all()
+        .map((r) => r.tick),
+    ).toEqual([45])
+    expect(saver.start(world)).toBe(false)
+    close()
   })
 })

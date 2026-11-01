@@ -5,6 +5,7 @@ import {
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_LOG_LINES,
   SCRIPT_TILE_QUERY_COST,
+  TRAINING_GROUND_MAX_TRAINEES,
 } from './balance.js'
 import type { ScriptType, ScriptViewName } from './script-views.js'
 
@@ -21,9 +22,10 @@ import type { ScriptType, ScriptViewName } from './script-views.js'
  *   `floor` and `pickRandom` are queries too, but work only on what they are given.
  * - An **action** asks for the order of the same name for `me`, checked exactly as a UI order
  *   is. It answers `null` when requested, or why not as a string; a script can request nothing
- *   an order couldn't. `doing`, `log` and `end` ask for no order: `doing` keeps the resident's
- *   Doing line in `memory` (`CONTEXT.md`: Doing), `log` adds to their script log (Script log),
- *   `end` ends the script once this run is over.
+ *   an order couldn't. `doing`, `log`, `end` and `wait` ask for no order: `doing` keeps the
+ *   resident's Doing line in `memory` (`CONTEXT.md`: Doing), `log` adds to their script log
+ *   (Script log), `end` ends the script once this run is over, and `wait` has it skip the ticks
+ *   until the resident's order ends (Running a script, Waiting).
  *
  * `cost` is the steps one call costs on top of the 1 every evaluated node costs. `returns` is
  * what a value holds or a call answers, in terms of the script views (ADR 0011).
@@ -276,6 +278,15 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     description:
       'About how many ticks I take to walk from one thing with `x` and `y` to another: the straight way across the terrain, diagonally where it slants, roads and walls left out.',
   },
+  {
+    name: 'crewTile',
+    is: 'query',
+    params: ['building'],
+    returns: { view: 'tile' },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'Where to stand at a building I see to work, build or breed there: the tile of its footprint with the fewest of my realm’s crew on it (those holding a work-at, build or breed order there, and those on their way with the tile in their `memory.at`), the nearest to me on ties, so my own tile while it is among the fewest; null for a building I don’t see.',
+  },
 
   action('walkTo', ['x', 'y'], 'Walk to a tile.'),
   action('drive', ['carriageId', 'x', 'y'], 'Drive the carriage on my tile to a tile.'),
@@ -312,6 +323,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     `End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. With \`reason\`, short text (cut to ${DOING_MAX_LENGTH} characters), my Player’s realm log says why, like “Ana stopped Work: no workplace on her tile”. It asks for no order.`,
   ),
   action(
+    'wait',
+    [],
+    'Wait on my order: once this run is over I am not run again until it ends, is replaced or I am struck; then I run every tick again. With no order, it does nothing. It asks for no order.',
+  ),
+  action(
     'doing',
     ['text'],
     `Say what I’m doing, for my Player’s Doing line: the text (cut to ${DOING_MAX_LENGTH} characters) shows instead of the one the game derives from my task and order, until I call it again; null gives the derived one back. Kept as \`memory.doing\`; it asks for no order.`,
@@ -340,6 +356,16 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('build', ['building'], 'Lay out or join a construction site of that kind on my tile.'),
   action('tearDown', ['buildingId'], 'Tear down the building or site on my tile.'),
   action('workAt', ['makes?'], 'Work the workplace on my tile; at a smithy, say what to make.'),
+  action(
+    'teach',
+    ['subject'],
+    'Teach a stat ("strength", "endurance", "agility", "intellect") or a skill ("combat", …) at the training ground on my tile, while I stand there. One teacher per ground.',
+  ),
+  action(
+    'train',
+    [],
+    `Train at the training ground on my tile, while I stand there: I learn its subject while a teacher is there, never past the teacher. Room for ${TRAINING_GROUND_MAX_TRAINEES} trainees per ground.`,
+  ),
   action(
     'breed',
     ['stableId', 'horseIds'],
@@ -396,6 +422,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'renameCity',
     ['cityId', 'name'],
     'Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.',
+  ),
+  action(
+    'renameHorse',
+    ['horseId', 'name'],
+    'Give a horse of my realm a new name: free and at once, from anywhere, like renaming a resident. Names need not be unique.',
   ),
   action(
     'claimHorses',

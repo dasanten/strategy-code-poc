@@ -21,6 +21,10 @@ import {
   STABLE_CAPACITY,
   breedersAt,
   keptBreeding,
+  teacherAt,
+  traineesOf,
+  trainingCeiling,
+  subjectValue,
   TICKS_PER_GAME_DAY,
   WORK_OUTPUT_PER_DAY,
   WORKPLACE_SKILL,
@@ -54,6 +58,7 @@ import {
   type Good,
   type SeenBuilding,
   type SeenCity,
+  type RealmLabel,
   FOOD_PER_DAY,
   HOUSING_ROOM,
   PROTECTION,
@@ -74,6 +79,7 @@ import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
+import { describeOccupation, type OccupationView } from './city-view.js'
 
 /**
  * What the selection card shows (ADR 0008): one of the Player's residents, or a tile of the map
@@ -95,6 +101,8 @@ export type ActionId =
   | 'wallTo'
   | 'work'
   | 'feedStable'
+  | 'teach'
+  | 'train'
   | 'tearDown'
   | 'breed'
   | 'goods'
@@ -107,7 +115,9 @@ export type ActionId =
   | 'sendHere'
   | 'gate'
   | 'openCity'
+  | 'tradeHere'
   | 'renameCity'
+  | 'renameHorse'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -123,6 +133,8 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   wallTo: 'Q',
   work: 'E',
   feedStable: 'F',
+  teach: 'Y',
+  train: 'I',
   tearDown: 'T',
   breed: 'F',
   goods: 'G',
@@ -135,7 +147,9 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   sendHere: 'W',
   gate: 'O',
   openCity: 'C',
+  tradeHere: 'T',
   renameCity: 'N',
+  renameHorse: 'N',
 }
 
 /**
@@ -266,6 +280,11 @@ export function residentActions(h: ResidentHere): CardAction[] {
   if (h.adult && h.building?.kind === 'stable' && !h.building.site) {
     add(row('feedStable', 'Feed the stable'))
   }
+  // A finished training ground: teach a subject there, or train (`CONTEXT.md`: Teacher, Trainee).
+  if (h.adult && h.building?.kind === 'trainingGround' && !h.building.site) {
+    add(row('teach', 'Teach…', { opens: true }))
+    add(row('train', 'Train'))
+  }
   if (works) {
     const site = h.building?.site
       ? h.building
@@ -341,6 +360,8 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   haul: 'move',
   work: 'work',
   feedStable: 'work',
+  teach: 'work',
+  train: 'work',
   build: 'work',
   roadTo: 'work',
   wallTo: 'work',
@@ -486,10 +507,25 @@ export interface TileCard {
    * fits (`nodeFit`), if anywhere.
    */
   buildHere?: { kind: BuildingKind; at: { x: number; y: number } | undefined }
-  /** A city the card links to in the city inspector: an own town hall's, or where prices are. */
+  /** A city the card links to in the city inspector: an own town hall's. */
   city?: { id: string; label: string }
+  /**
+   * Where the Player trades on the tile (`CONTEXT.md`: Trade section): a Trade Org warehouse or an
+   * NPC city's storage whose prices they see, opened in the city panel at that building.
+   */
+  tradeHere?: { cityId: string; buildingId: string }
   /** A city of the Player's own whose town hall is in sight on the tile, which they may rename. */
   renameCity?: { id: string; name: string }
+  /**
+   * Who occupies the town hall on the tile and how long is left, while it is in sight
+   * (`CONTEXT.md`: Occupying a town hall).
+   */
+  occupation?: OccupationView
+  /**
+   * The Player's own horses the card lists (loose on the tile, or in the stable), which they may
+   * rename (`CONTEXT.md`: Renaming a horse).
+   */
+  renameHorses?: { id: string; name: string }[]
   /**
    * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
    * and what they saw of it then, shown apart from the lines about what is there now.
@@ -529,7 +565,10 @@ export interface TileThings {
   strangers: SeenResident[]
   /** Everyone in sight, for who works where and who lives in a city. */
   residents?: SeenResident[]
-  cities: Pick<SeenCity, 'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade'>[]
+  cities: (Pick<SeenCity, 'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade' | 'refuses'> &
+    Partial<Pick<SeenCity, 'occupation'>>)[]
+  /** The realms the Player knows by name, for who occupies a town hall. */
+  realms?: RealmLabel[]
   viewer: Viewer
   tick?: number
   /** Residents in sight working each building, by building id. */
@@ -592,6 +631,37 @@ const nodeKindName = (node: KnownNode) => NODE_NAMES[node.kind].replace(/ node$/
 const aOrAn = (words: string) => `${/^[aeiou]/.test(words) ? 'an' : 'a'} ${words}`
 
 const capital = (words: string) => `${words[0]!.toUpperCase()}${words.slice(1)}`
+
+/** A value in a stat or skill to a tenth, rounded down so nobody shows at a ceiling too soon. */
+const tenths = (n: number) => `${Math.floor(n * 10 + 1e-9) / 10}`
+
+/**
+ * Who teaches and trains at a training ground, among the residents in sight (`teacherAt`,
+ * `traineesOf`): "Ann teaches Strength", or "Nobody teaches here yet"; then each trainee with
+ * their value in the subject and their ceiling (`trainingCeiling`), "waiting" while they learn
+ * nothing (`CONTEXT.md`: Training).
+ */
+function trainingLines(ground: Building, t: TileThings): string[] {
+  const residents = t.residents ?? []
+  const teacher = teacherAt(ground, residents)
+  const o = teacher?.order
+  const subject = o?.kind === 'teach' ? o.subject : undefined
+  const tick = t.tick ?? 0
+  const lines = [
+    teacher && subject ? `${teacher.name} teaches ${capital(subject)}` : 'Nobody teaches here yet',
+  ]
+  for (const r of traineesOf(ground, residents)) {
+    const waiting = r.order?.kind === 'train' && r.order.learning ? '' : ', waiting'
+    if (!teacher || !subject) {
+      lines.push(`${r.name} trains${waiting}`)
+      continue
+    }
+    const has = subjectValue(r as Resident, subject, tick)
+    const ceiling = trainingCeiling(r as Resident, teacher as Resident, subject, tick)
+    lines.push(`${r.name} trains: ${tenths(has)} of ${tenths(ceiling)}${waiting}`)
+  }
+  return lines
+}
 
 /**
  * What an unbuilt resource node's card says (`CONTEXT.md`: Resource node, Workplace): what can be
@@ -670,7 +740,7 @@ export function riddenHorseLine(
   tick: number | undefined,
 ): string | undefined {
   const horse = r.riding === undefined ? undefined : horses.find((h) => h.id === r.riding)
-  return horse && `Horse: ${horseDetail(horse, tick)} · eats from your spare Food`
+  return horse && `Horse: ${horse.name} · ${horseDetail(horse, tick)} · eats from your spare Food`
 }
 
 /**
@@ -697,7 +767,7 @@ function horseLines(
     const hurt = known.filter((f) => f.health === 'hurt').length
     if (hungry > 0) parts.push(`${hungry} hungry`)
     if (hurt > 0) parts.push(`${hurt} hurt`)
-    return [parts.join(' · '), ...group.map((h) => `· ${horseDetail(h, tick)}`)]
+    return [parts.join(' · '), ...group.map((h) => `· ${h.name} · ${horseDetail(h, tick)}`)]
   })
 }
 
@@ -731,7 +801,7 @@ export function pausedBreedingLines(
       const pair = k.horseIds.map((id) => horses.find((h) => h.id === id))
       return [
         `Breeding paused: ${Math.floor((k.progress / STABLE_BREED_TICKS) * 100)}% of the way to a foal`,
-        ...pair.flatMap((h) => (h ? [`· ${horseDetail(h, tick)}`] : [])),
+        ...pair.flatMap((h) => (h ? [`· ${h.name} · ${horseDetail(h, tick)}`] : [])),
       ]
     })
 }
@@ -766,6 +836,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     stable ? covers(stable, h.x, h.y) : !hitched.has(h.id) && h.x === t.x && h.y === t.y,
   )
   const horseRel = (h: SeenHorse) => realmRelationship(h.realmId, h.cityId, t.cities, t.viewer)
+  const renameHorses = horsesHere
+    .filter((h) => h.realmId !== null && h.realmId === t.viewer.realmId)
+    .map(({ id, name }) => ({ id, name }))
   const lines: string[] = []
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
@@ -815,11 +888,16 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       }
       const makes = live && makesLine(live, t, pile, goodLabels)
       if (makes) lines.push(makes)
+      // A finished training ground teaches what its teacher set, and nothing while nobody
+      // teaches there (`CONTEXT.md`: Training ground, Teacher).
+      if (building.kind === 'trainingGround') lines.push(...trainingLines(building, t))
       if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
+      if (building.kind === 'townHall' && live && city)
+        card.occupation = describeOccupation(city, t.tick ?? 0, t.viewer.realmId, t.realms ?? [])
       if (building.kind === 'townHall' && (rel === 'own' || rel === 'alliance') && city) {
         if (live) lines.push(...townHallLines(city.id, t))
         if (rel === 'own')
@@ -827,9 +905,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         // Renaming a city (`CONTEXT.md`): from its town hall's card, while it is the Player's.
         if (rel === 'own' && live) card.renameCity = { id: city.id, name: city.name }
       }
-      if (city && sellsHere(building, city)) {
-        lines.push('Buys and sells here · prices in the city inspector')
-        card.city = { id: city.id, label: 'See its prices in the city inspector' }
+      if (live && city && tradesHere(live, city)) {
+        lines.push('Buys and sells here')
+        card.tradeHere = { cityId: city.id, buildingId: live.id }
       }
     }
     if (building.teardown) lines.push(teardownLine(building))
@@ -870,12 +948,13 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const horse = t.horses.find((h) => h.id === carriage.horseId)
     const fares = horse && horseFaresKnown(horse) ? horseFares(horse) : undefined
     const ours = rel === 'own' || rel === 'alliance'
+    // Who pulls it, by name, when the horse is in sight (`CONTEXT.md`: Horse name).
     const horseText = !carriage.horseId
       ? ours
         ? ' · no horse hitched'
         : ' · no horse'
-      : fares
-        ? ''
+      : horse
+        ? ` · pulled by ${horse.name}`
         : ' · horse hitched'
     lines.push(
       `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${load}${horseText}`,
@@ -892,7 +971,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       unhitch = { carriageId: carriage.id, residents: own.map(({ id, name }) => ({ id, name })) }
     }
     if (horse) {
-      const parts = [`Horse: ${horseDetail(horse, t.tick)}`]
+      const parts = [`Horse: ${horse.name} · ${horseDetail(horse, t.tick)}`]
       if (fares) {
         const food = carriage.load?.food ?? 0
         const days = Math.floor(food / (HORSE_FOOD_PER_DAY * horseFoodFactor(horse)) + 1e-9)
@@ -958,6 +1037,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(buildHere ? { buildHere } : {}),
     ...(passengers ? { passengers } : {}),
     ...(unhitch ? { unhitch } : {}),
+    ...(renameHorses.length > 0 ? { renameHorses } : {}),
   }
 }
 
@@ -1137,12 +1217,20 @@ function townHallLines(cityId: string, t: TileThings): string[] {
 
 /**
  * Whether the building is where the Player trades with a Trade Org warehouse or an NPC city
- * (`CONTEXT.md`: Warehouse prices, Trading with an NPC city), with prices they are shown.
+ * (`CONTEXT.md`: Warehouse prices, Trading with an NPC city, Trade section), with prices they are
+ * shown: a warehouse, or a storage of an NPC city that doesn't refuse them (`npcCityRefuses`).
  */
-function sellsHere(b: SeenBuilding, city: TileThings['cities'][number]): boolean {
+export function tradesHere(
+  b: Pick<SeenBuilding, 'kind' | 'prices'>,
+  city: TileThings['cities'][number],
+): boolean {
   if (b.kind === 'warehouse') return (b.prices?.length ?? 0) > 0
   return (
-    b.kind === 'storage' && city.realmId === null && !city.tradeOrg && (city.trade?.length ?? 0) > 0
+    b.kind === 'storage' &&
+    city.realmId === null &&
+    !city.tradeOrg &&
+    !city.refuses &&
+    (city.trade?.length ?? 0) > 0
   )
 }
 
@@ -1155,8 +1243,8 @@ function teardownLine(b: Building): string {
 
 /**
  * The actions a tile's card offers: send the resident picked last there, or have them build an
- * unbuilt node's workplace there (`buildHere`), open or close an own gate, and open the city
- * inspector at the city the card links to. Everything else a resident does on the tile is on
+ * unbuilt node's workplace there (`buildHere`), open or close an own gate, open the city
+ * inspector at the city the card links to, and trade at a warehouse or storage (`tradeHere`). Everything else a resident does on the tile is on
  * their own card once they stand there. `tick` tells whether the resident is still a child.
  */
 export function tileActions(card: TileCard, actor: Resident | undefined, tick = 0): CardAction[] {
@@ -1186,11 +1274,21 @@ export function tileActions(card: TileCard, actor: Resident | undefined, tick = 
       key: ACTION_KEYS.gate,
     })
   if (card.city) actions.push({ id: 'openCity', label: card.city.label, key: ACTION_KEYS.openCity })
+  if (card.tradeHere)
+    actions.push({ id: 'tradeHere', label: 'Trade here', key: ACTION_KEYS.tradeHere })
   if (card.renameCity)
     actions.push({
       id: 'renameCity',
       label: 'Rename the city…',
       key: ACTION_KEYS.renameCity,
+      opens: true,
+    })
+  const horses = card.renameHorses ?? []
+  if (horses.length > 0)
+    actions.push({
+      id: 'renameHorse',
+      label: horses.length === 1 ? `Rename ${horses[0]!.name}…` : 'Rename a horse…',
+      key: ACTION_KEYS.renameHorse,
       opens: true,
     })
   return actions

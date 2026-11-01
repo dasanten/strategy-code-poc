@@ -8,8 +8,9 @@ import {
   TRADING_POST,
   Terrain,
   canWork,
-  captorOf,
+  occupierOf,
   isArmed,
+  npcSoldierTarget,
   onOwnWall,
   type Building,
   type City,
@@ -23,7 +24,7 @@ import { attackOrder } from './combat.js'
 import { commitCrime } from './crimes.js'
 import { checkInvariants } from './invariants.js'
 import { foundNpcCity } from './npc-cities.js'
-import { npcSoldierTarget, stepNpcDefence } from './npc-defence.js'
+import { stepNpcDefence } from './npc-defence.js'
 import { mulberry32, newResident } from './residents.js'
 import { foundTradingPost } from './trading-posts.js'
 import { Walking } from './walking.js'
@@ -251,7 +252,7 @@ describe('Trading posts defend themselves', { timeout: 20_000 }, () => {
     const hall = buildingOf(world, city, 'townHall')
     const p = outsider(world, 'p1', hall.x, hall.y)
     p.carried.sword = 1
-    expect(captorOf(world, city, terrain.size)).toBe('r1')
+    expect(occupierOf(world, city, terrain.size)).toBe('r1')
     p.x = 140
     run(world, terrain, new Walking(terrain), 2 * TICKS_PER_GAME_DAY)
     const adults = citizens(world, city).filter((r) => canWork(r, world.tick))
@@ -259,7 +260,7 @@ describe('Trading posts defend themselves', { timeout: 20_000 }, () => {
     const soldier = adults.find(isArmed)!
     Object.assign(soldier, { x: hall.x, y: hall.y })
     Object.assign(p, { x: hall.x, y: hall.y })
-    expect(captorOf(world, city, terrain.size)).toBeNull()
+    expect(occupierOf(world, city, terrain.size)).toBeNull()
     expect(stepCaptures(world, terrain.size)).toEqual([])
     expect(citizens(world, city)).toHaveLength(TRADING_POST.residents)
   })

@@ -81,6 +81,12 @@ The shared language of the game. Domain terms only — no implementation details
   takes a load (beside their own food; a farm keeps some Food for refills) to the nearest storage
   of their realm, stores it and comes back to work; only one carries at a time. With no storage
   in reach the pile just grows.
+- **Crew food:** on the way back from storing a load, the carrier brings Food for the whole crew
+  and puts it on the workplace's pile, where the workers take their meals (Refilling at a
+  workplace). So a far-off crew keeps working while one of them walks, and nobody else goes
+  home for Food. How much they bring is a setting of the Work default (`crewFood`); 0 brings
+  none. A resident sent to a workplace sets out with Food for the walk there and the first days
+  of work, not a fixed amount, so they last until the carrier's first round trip.
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
 - **Spoilage:** Food slowly goes bad. Other goods don't.
@@ -109,7 +115,7 @@ The shared language of the game. Domain terms only — no implementation details
   can't be ridden on bare Mountain.
 - **Footprint:** the square of tiles a building or construction site covers, the same for every
   building of a kind: Wall, Gate and Road 1×1; House, Storage, Smelter, Mint, Smithy, Mine,
-  Quarry and Lumber camp 2×2; Town hall, Warehouse and Stable 3×3; Farm 4×4. A site covers its
+  Quarry and Lumber camp 2×2; Town hall, Warehouse, Stable and Training ground 3×3; Farm 4×4. A site covers its
   building's footprint from the moment it is laid out. Footprints are never turned.
 - **Where buildings go:** one building per tile: every tile of a footprint must be free and
   passable. Mines, quarries and lumber camps go with one tile of their footprint on a resource
@@ -118,7 +124,10 @@ The shared language of the game. Domain terms only — no implementation details
   including in another Organization's territory.
 - **At a building:** standing on any tile of its footprint. Wherever a rule says "on a
   building's tile", it means at the building. Laying out a site takes a resident on one tile of
-  the footprint it will cover.
+  the footprint it will cover. **Spreading over the footprint:** a resident sent to work, build or
+  breed at a building (the Work, Build and Breeding defaults) walks to the footprint tile with
+  the fewest of the crew standing on it, the nearest on ties, so a crew stands spread over the
+  building rather than on one corner. Which tile they stand on changes nothing else.
 - **A building's pile:** goods lying anywhere on a building's footprint are one pile, reached by
   anyone at the building: a workplace's output, a site's delivered materials, what a smelter
   uses. Elsewhere a pile is the goods on one tile.
@@ -143,13 +152,18 @@ The shared language of the game. Domain terms only — no implementation details
   the old rings. The world starts out with it, as far from
   every city as the map allows and out of every Player's sight; starting cities keep well away
   from it. Its own workplaces stand on the nearest node of every kind, with a smelter and a mint
-  between its rings, and the game runs it like an NPC city.
+  between its rings, and the game runs it like an NPC city: its warehouses' stock floor is its
+  reserve, and its spare hands work and build the chain for whatever is short of it (NPC city),
+  so less of its stock comes from the floor. It never founds cities and sends no trader; its
+  caravans carry its goods.
 - **Warehouse:** a Trade Org building that keeps goods like a storage, a city building of the
   storage kind. The HQ keeps its coins in one and its other goods in another, inside the inner
   ring.
 - **Trading post:** a small Trade Org city in a region, with a warehouse, so Players can trade
-  nearby. Goods move between posts and HQ by caravan. It keeps soldiers like an NPC city, armed
-  from its warehouse, so it is captured only by beating them; they fight attackers in its area,
+  nearby. Goods move between posts and HQ by caravan. Its few spare hands work and build the
+  chain for what is short of its warehouse's floor, like the HQ, but it never grows in people,
+  founds nothing and sends no trader. It keeps soldiers like an NPC city, armed
+  from its warehouse, so its town hall is occupied only by beating them; they fight attackers in its area,
   and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
   A captured post joins the captor's realm like any city and leaves the Trade Organization: its
   warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
@@ -168,15 +182,24 @@ The shared language of the game. Domain terms only — no implementation details
 - **Trading with an NPC city:** only in person, by a resident (or a carriage) on the tile of an
   NPC city's storage, exactly like trading at a warehouse: it happens at once, goods and coins
   move between the trader's hands (or carriage) and the storage, and a trade is cut down to what
-  the trader holds, what the storage holds and what fits. The city keeps a **reserve** of each
-  good: Food for some game days for all its residents, and the materials its next house and some
-  wall need. It sells only its surplus, what its storages hold above the reserve, and buys only
-  goods it is short of, up to the reserve and with the coins in its storage; other goods it
-  doesn't take. Its prices come from its own stock the way warehouse prices do (buying lower
+  the trader holds, what the storage holds and what fits. It sells only its surplus, what its
+  storages hold above its reserve (NPC reserve), and buys only goods it is short of, up to the
+  reserve and with the coins in its storage; other goods it doesn't take. Its prices come from
+  its own stock the way warehouse prices do (buying lower
   than it sells, each unit priced with its stock as it moves), then its standing toward the
   trader moves them like the city price: the better, the cheaper it sells and the more it pays.
   Anyone with a resident in sight of the storage sees its prices. A trade raises its standing
   toward the trader, like trade with the Trade Organization.
+- **Trade section:** where a city's panel shows trading, for each of its warehouses or storages
+  in sight, from the Player's side: what they **can buy** there and what they **can sell**, with
+  how many units and the price (an NPC city lists only its surplus and what it is short of, and
+  says it takes nothing else). With nobody of theirs there, it offers to **send** one of their
+  residents (nearest first, with what they carry) or carriages: a walk order to the tile, then
+  shown on the way. Once one is there, it shows what the trader carries and room left, and a
+  trade that won't go says why (no coins in hand, no room, none in stock, not wanted). Delivery
+  and Transfer each have a heading and a line saying what they do, with the fee before ordering,
+  and the section links to the Wiki's "How to trade". The tile card of a warehouse or an NPC
+  city's storage has **Trade here**, which opens it. Only the UI: the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse runs low, it tops up to a minimum at the end of
   each game day. This is the one controlled exception to "everything is physical" (see ADR 0003).
@@ -300,13 +323,20 @@ The shared language of the game. Domain terms only — no implementation details
   NPC city, in the area of that city.
 - **NPC city:** a city run by the game. Self-managed cities are NPC cities. On its own it works
   its farms and workplaces and carries the output to its storage like anyone working a workplace
-  (Carrying the output, to the nearest storage of that city; its workers take food from
-  the storage before they set out and come home for more when they run low), pairs its adults,
-  builds a house when it has a food surplus and no free housing, and puts more residents on farms (or
-  builds a farm, when every farm is full) when Food runs short. When it needs a material it has no
-  workplace for (Wood for walls and houses), it builds the matching workplace on the nearest
-  fitting resource node and works it like its other workplaces, carrying the output to its
-  storage. It never founds new cities: when it has no room left inside its wall it grows its area
+  (Carrying the output, to the nearest storage of that city; its workers set out with Food for
+  the walk and the first days, and the carrier brings the crew's Food back: Crew food), pairs its adults,
+  builds a house when it has a food surplus and no free housing, and shares its adults out:
+  soldiers by its size first; then farmers, as many as feed everyone (one farmer feeds about
+  four) and one more while it has no food surplus, building a farm when they don't fit; then at
+  most two builders while it has a project; everyone else is its **spare hands**. A worker stays
+  where they are until the city moves them. Beyond that it is driven by its
+  reserve (NPC reserve): its spare hands go to the good shortest of its reserve first; they work
+  the workplace that makes the good, or build it first on the nearest fitting resource node
+  (within a set reach of its home) and work it like its other workplaces, carrying the output to
+  its storage (Crew food). So a city builds the whole chain its land allows, one need at a time:
+  weapons short means a smithy, which wants Iron, so a smelter, which wants ore, so a mine. A
+  good with no node in reach stays short; the city buys it from its trader or a visiting trader,
+  or does without. When it has no room left inside its wall it grows its area
   by building on the edge, puts up a new wall 8 tiles further out on every side, with the gate in
   the same place, and only once every tile of the new wall is finished tears down the old one.
   Its residents stand on its walls and pass its gates as a realm's do. It keeps some soldiers by
@@ -314,6 +344,31 @@ The shared language of the game. Domain terms only — no implementation details
   gates when armed outsiders come near. A Player does the same by hand, if they want to. The world starts out with NPC villages
   and towns, on Plains, far from every starting city and from each other, and out of every
   Player's sight.
+- **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
+  some game days for all its residents; Wood and Stone for its next house and some wall; weapons
+  for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
+  chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, a mint
+  only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
+  for sale (Trading with an NPC city); whatever is below is short and drives what it works and
+  builds next (NPC city).
+- **NPC trader:** an NPC city's own trade run. Once a good's surplus makes a full load and a
+  Trade Org warehouse (HQ or trading post) lies within a set reach, one of its spare hands,
+  never a soldier, carries the load there, sells it, buys the good shortest of the reserve that
+  the city has no node for, as far as its coins and their arms allow, and walks home to the
+  storage. One trader per city at a time. Nothing protects them on the way but what they carry.
+- **Full city:** an NPC city that for a whole game week has had idle spare hands and nothing
+  short of its reserve, holds a food surplus, and holds a town hall's and a storage's materials
+  above its reserve. A full city founds a daughter (Founding).
+- **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
+  from every city, within a set reach of itself and on no realm's territory, nearest a node of
+  the good it is short of and has no node for. A **founding party** of a village's worth of
+  adults, one of them armed, each carrying a share of the materials and Food for the walk and
+  the first weeks, walks there and builds the town hall, which founds the **daughter** as an
+  ordinary NPC city with a name from the game; then its storage, a farm and a house. Its first
+  wall comes later out of its own reserve, a ring round its home. Mother and daughter are
+  independent and hold each other in high standing, which fades like any standing; neither
+  shares anything with the other. A city founds again once it is full again. Trading posts and
+  the Trade Org HQ never found cities.
 - **Integrating:** bringing a village or city into your realm, with its residents. Three ways:
   **conquer** it (capture by force), **buy** it, or **persuade** it (with high standing and
   respect it asks to join).
@@ -368,6 +423,10 @@ The shared language of the game. Domain terms only — no implementation details
   that is gone is forgotten. A city stays remembered while any of its buildings does. Things that
   move are never remembered. Like explored terrain, it grows only from sight: joining an alliance
   does not hand over what its members saw before, and leaving one keeps what was seen through it.
+  Last seen is brought up to date once every few ticks for each realm, staggered across realms
+  like NPC planning (ADR 0016), not every tick: a building that leaves sight between two refreshes
+  is remembered as it was at the last refresh, up to those few ticks earlier. What is in sight now
+  is unaffected.
 
 ## Military
 
@@ -403,8 +462,19 @@ The shared language of the game. Domain terms only — no implementation details
   (attacked until it falls, leaving part of its materials) or **climbed** (slow, and a climber
   can't defend themselves, so a defended wall is costly to climb).
 - **Loot:** when a resident dies, everything they carried drops on the ground for anyone to take.
-- **Capturing a city:** armed residents inside and no defender left fighting. The city and its
-  residents join the captor's realm, loyal at once (for now).
+- **Capturing a city:** only by occupying its town hall for a set number of game days without a
+  break (Occupying a town hall; ADR 0017). When the time is up, the city and its residents join
+  the occupier's realm, loyal at once (for now). Beating its defenders is not enough on its own.
+  Every city is captured this way: NPC cities, Players' cities, trading posts and the HQ.
+- **Occupying a town hall:** armed residents of one realm stand on a city's town hall (any of its
+  tiles), no armed resident of any other realm stands there, and no defender of the city does
+  (one on its side: its realm, an ally, or for an NPC city its own residents). An ally of the
+  occupier on the hall counts as another realm, so nobody occupies it. The occupation starts the
+  tick that holds and runs as long as it keeps holding; the first tick it doesn't, it is broken
+  and its days are lost: the next one starts again from nothing. The city goes on as before
+  meanwhile; its soldiers fight the occupiers as they fight any attacker in its area. Its realm's
+  log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
+  with the town hall in sight sees who occupies it and how long is left; scripts see it too.
 - **Mercenary contract:** one Organization rents residents to another for coins over a period.
   One side offers (residents, game days, price per game week, a storage of the lender to pay
   into), the other accepts. The residents stay in the lender's realm but take only the hirer's
@@ -549,6 +619,30 @@ The shared language of the game. Domain terms only — no implementation details
   and Construction run from 0 to 100: each point adds 1 % to output or building work, so a
   skilled resident does at most twice what an unskilled one does; an average learner takes about
   a game year to get there.
+- **Training ground:** a building where residents train (`Training`). 3×3, on any passable terrain
+  except Mountain, built like any building. Like a workplace, it has no owner: whoever teaches
+  there holds it. One ground teaches one **subject** at a time: a stat (Strength, Endurance,
+  Agility, Intellect) or a skill (Combat, Driving, Mining, …), the one its teacher set.
+- **Teacher:** a grown resident at a training ground with the **Teach** order, which names the
+  subject. A ground has one teacher at a time; a second Teach there fails. Leaving the ground or
+  taking another order ends the teaching, and the ground teaches nothing until someone teaches
+  again.
+- **Trainee:** a grown resident at a training ground with the **Train** task (default script
+  "Train"), up to a maximum per ground (a balance number). Trainees learn only while a teacher is
+  there; without one they wait.
+- **Training:** a trainee gains in the ground's subject each tick a teacher is there, only while
+  below the teacher's own effective value in it: nobody learns past their teacher. A stat's
+  trained bonus never passes its cap (Trained bonus); a skill trains toward the teacher's skill,
+  up to the skill's maximum. A trainee at the ceiling waits. The trainee's Intellect sets the
+  pace, as for learning by doing; training a skill goes faster than learning it by doing. The
+  teacher's level is only the ceiling, never the pace. The teacher gains nothing and needs no
+  skill to teach. Training costs nothing but time and food: teacher and trainees eat as usual and
+  refill at the ground as at a workplace (Refilling at a workplace); the Train default has the
+  usual food params. Nothing trained decays; only old age lowers stats.
+- **Who trains:** Players' residents, by order, queue step or script. NPC cities and the Trade
+  Organization train nobody for now; whether an NPC city puts a spare hand to teaching its
+  soldiers is a question for the reserve-driven chain (NPC city), not settled here. Scripts have
+  `teach(subject)` and `train()`; a building's script view shows its teacher, subject and trainees.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
 - **Pairing:** two adult residents of the same city set to have children (a Player order, or on
@@ -615,6 +709,16 @@ The shared language of the game. Domain terms only — no implementation details
   places them as the Horse grant does (stats, stable or storage, Food by them, realm log) and
   the notice is gone for good, also across Leader deaths. A Player with no living Leader can't
   claim until they have one again.
+- **Horse name:** every horse has a name, given by the game when it comes into being (starting
+  city, Trade Organization, foal, Horse grant) from a pool of horse names apart from the
+  residents' pool. **Renaming a horse:** the Player can rename any horse of their realm, by hand
+  or from a script, like renaming a resident: free, instant, from anywhere; names need not be
+  unique. The name shows wherever the horse shows: the tile card, the stable, the carriage it
+  pulls, its rider's card and the realm log. Scripts see it.
+- **Horses drawer:** a drawer on the tool rail, like the Residents drawer, listing the realm's
+  horses grouped by where they stand: each stable by name, hitched to a carriage, ridden, loose.
+  A row shows name, stats, age, health and hunger; tapping it centres the map on the horse and
+  picks it.
 - **Horse stats:** every horse has Speed, Strength and Endurance, and an age. Speed is how fast
   it pulls its carriage or carries a rider (`Riding`); Strength is how much the carriage it pulls
   can hold; Endurance is how much Food it needs, as a resident's Endurance is for them. New
@@ -715,7 +819,11 @@ The shared language of the game. Domain terms only — no implementation details
   **Running a script** is an order for a resident or an army: the script runs once a tick for
   each of them, with its own memory, and can request only what that resident or army could. Any
   other order ends it. A script can hand over to a built-in order for a while and take control
-  back. A script ends itself by calling `end()`: the resident stands idle, and in a queue its next
+  back. **Waiting:** a script may call `wait()`: it is not run again until its current order ends,
+  is replaced, or the resident is struck (Defence script); then it runs every tick again. The
+  game's defaults wait after every walk, store and fetch, so a resident on the move costs no
+  script run; an edited copy of a default behaves like the default. A script ends itself by
+  calling `end()`: the resident stands idle, and in a queue its next
   step starts. `end(reason)` also notes the short reason in the realm log ("Ana stopped Work: no
   workplace on her tile"). The defaults end that way when their target is missing or gone; the
   Build, Tear down and Breed horses defaults also end once the site is finished, the building is
@@ -857,6 +965,20 @@ The shared language of the game. Domain terms only — no implementation details
   and noted in the realm log; when none of them can start, the queue ends. Any order that isn't a
   step ends it. Scripts see a resident's queue (which step, and what it is) but can't start or
   change one; their `order` and `script` stay the current step's own.
+- **Saved queue:** the Player saves the planner's steps under a name, kept per browser like saved
+  groups, so the server never sees them. The planner offers Save and Load; Load appends the
+  saved steps to the planned ones. A saved step keeps its places (buildings, tiles); on Load, a
+  step whose place is gone from the last-seen map is flagged in the planner, and the server
+  skips it when its turn comes, as any step that can't start.
+- **Planner clipboard:** steps are picked in the planner (tap; Shift for a range); Copy puts
+  copies on a clipboard in the browser, Paste inserts them after the picked step, in the same
+  planner or another resident's or a group's. The clipboard survives switching cards, not
+  reloading the page.
+- **Repeat block:** in the planner, some steps in a row wrapped with a count, nestable. It is a
+  planner thing only: when the queue is given, the block becomes that many plain copies of its
+  steps, so the queue, the server and scripts see only steps. A queue holds at most so many
+  steps (a balance number); the planner says when a plan would exceed it. A running queue shows
+  the copies, the current one marked. The whole-queue loop stays as it is.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.
@@ -866,6 +988,10 @@ The shared language of the game. Domain terms only — no implementation details
   an army): a header that always shows (name, Doing, hunger and health, what they carry) and one
   open tab under it: Orders, Queue, Stats or Script. Orders are grouped by kind (Move, Work &
   build, Goods, Scripts), and orders they can't take right now are left out.
+- **Motion on the map:** the world moves once a tick, but the map shows it smoothly: a token that
+  changed tile glides from the old tile to the new one over the tick, and the tokens of residents
+  at work move a little on their tile, so a crew looks busy rather than frozen. Pure drawing in
+  the browser: the world and what it sends change nothing.
 - **Picking a target:** an order that needs a tile or building (walk to, store at, build here)
   shrinks the card to its header and shows "Tap where …" with Cancel until the Player picks one
   on the map; then the card comes back as it was. On a phone every card is a bottom sheet (peek,

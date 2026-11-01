@@ -9,6 +9,8 @@ import { haul, stop } from './hauling.js'
 import { pair } from './pairing.js'
 import { walkTo } from './walking.js'
 import { workAt } from './work.js'
+import { teach } from './teaching.js'
+import { train } from './training.js'
 import { allianceOrders } from './alliances.js'
 import { climb } from './climbing.js'
 import { dismount, mount } from './riding.js'
@@ -24,7 +26,7 @@ import { buy, sell } from './trading.js'
 import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
 import { handOver } from './leader.js'
-import { rename, renameCity } from './renaming.js'
+import { rename, renameCity, renameHorse } from './renaming.js'
 import { claimHorses } from './horse-grant.js'
 import { queueOrders } from './queues.js'
 
@@ -84,6 +86,8 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     build,
     tearDown,
     workAt,
+    teach,
+    train,
     breed,
     pair,
     attack,
@@ -105,6 +109,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     handOver,
     rename,
     renameCity,
+    renameHorse,
     claimHorses,
     ...allianceOrders,
     ...armyOrders,
@@ -170,6 +175,7 @@ export class OrderQueue {
         'handOver',
         'rename',
         'renameCity',
+        'renameHorse',
         'claimHorses',
         'setScriptParam',
         'setDefenceScript',

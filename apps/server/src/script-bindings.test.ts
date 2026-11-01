@@ -224,7 +224,7 @@ describe('script bindings', () => {
     const { world, explored } = setup()
     // Realm r2's storage, in sight of a1 but with no one of r1's at it (`CONTEXT.md`: Seeing
     // inside a storage, Seeing how someone fares).
-    world.cities.push({ id: 'c2', name: 'Elm', realmId: 'r2', townHallId: 'th2' })
+    world.cities.push({ id: 'c2', name: 'Elm', realmId: 'r2', townHallId: 'th2', occupation: null })
     world.buildings.push({
       id: 's2',
       kind: 'storage',
@@ -336,7 +336,7 @@ describe('script bindings', () => {
     const { world, explored } = setup()
     world.tick = 10
     const house = { id: 'h1', kind: 'house' as const, cityId: 'c1', x: 160, y: 160 }
-    const city = { id: 'c1', name: 'Far', realmId: 'r2', townHallId: 'h0' }
+    const city = { id: 'c1', name: 'Far', realmId: 'r2', townHallId: 'h0', occupation: null }
     world.lastSeen[7] = [
       { is: 'building', ...house, seenAt: 4 },
       { is: 'city', ...city, seenAt: 4 },
@@ -400,6 +400,8 @@ describe('script bindings', () => {
     ['breed("st", ["h1", "h2"])', { kind: 'breed', stableId: 'st', horseIds: ['h1', 'h2'] }],
     ['workAt()', { kind: 'workAt' }],
     ['workAt("sword")', { kind: 'workAt', makes: 'sword' }],
+    ['teach("strength")', { kind: 'teach', buildingId: null, subject: 'strength' }],
+    ['train()', { kind: 'train', buildingId: null }],
     ['pair("b1")', { kind: 'pair', partnerId: 'b1' }],
     ['attack("b1")', { kind: 'attack', targetId: 'b1' }],
     ['attack("b2")', { kind: 'attack', targetId: 'b2' }],
@@ -429,6 +431,7 @@ describe('script bindings', () => {
       { kind: 'rename', targetId: 'b1', name: 'Mara', realmName: 'Ironvale' },
     ],
     ['renameCity("c1", "Ironhold")', { kind: 'renameCity', cityId: 'c1', name: 'Ironhold' }],
+    ['renameHorse("h1", "Rowan")', { kind: 'renameHorse', horseId: 'h1', name: 'Rowan' }],
     ['claimHorses()', { kind: 'claimHorses' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],

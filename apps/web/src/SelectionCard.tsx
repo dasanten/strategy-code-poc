@@ -10,6 +10,7 @@ import {
 } from 'react'
 import {
   CITY_NAME_MAX_LENGTH,
+  HORSE_NAME_MAX_LENGTH,
   nameProblem,
   type Building,
   type BuildingKind,
@@ -337,6 +338,7 @@ export function TileCard({
   onSetGate,
   onOpenCity,
   onRenameCity,
+  onRenameHorse,
   onSelectResident,
   onUnhitch,
 }: {
@@ -355,10 +357,12 @@ export function TileCard({
   /** Has the actor build a node's workplace with the north-west tile of its footprint `at`. */
   onBuildHere: (building: BuildingKind, at: { x: number; y: number }) => void
   onSetGate: (gateId: string, open: boolean) => void
-  /** Opens the city inspector at a city. */
-  onOpenCity: (cityId: string) => void
+  /** Opens the city inspector at a city, scrolled to one of its buildings when given. */
+  onOpenCity: (cityId: string, buildingId?: string) => void
   /** Renames a city of the Player's realm (`CONTEXT.md`: Renaming a city). */
   onRenameCity: (cityId: string, name: string) => void
+  /** Renames a horse of the Player's realm (`CONTEXT.md`: Renaming a horse). */
+  onRenameHorse: (horseId: string, name: string) => void
   /** Picks one of the Player's residents, such as a carriage's passenger. */
   onSelectResident: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
@@ -417,6 +421,11 @@ export function TileCard({
           )}
         </ul>
       )}
+      {card.occupation && (
+        <p className={`occupation${card.occupation.warning ? ' warn' : ''}`}>
+          {card.occupation.text}
+        </p>
+      )}
       {card.what === 'building' && building && (
         <BuildingInfo
           kind={building.kind}
@@ -435,6 +444,8 @@ export function TileCard({
               onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)
             if (a.id === 'openCity' && card.city) onOpenCity(card.city.id)
+            if (a.id === 'tradeHere' && card.tradeHere)
+              onOpenCity(card.tradeHere.cityId, card.tradeHere.buildingId)
             const unhitcher = unhitcherOf(card, actor)
             if (a.id === 'unhitch' && card.unhitch && unhitcher)
               onUnhitch(card.unhitch.carriageId, unhitcher)
@@ -452,6 +463,17 @@ export function TileCard({
           }}
         />
       )}
+      {shown === 'renameHorse' && card.renameHorses && (
+        <HorseRenameBlock
+          // Starts again from the new names once the rename comes back.
+          key={card.renameHorses.map((h) => h.name).join('|')}
+          horses={card.renameHorses}
+          onRename={(horseId, name) => {
+            setOpen(undefined)
+            onRenameHorse(horseId, name)
+          }}
+        />
+      )}
       <p className="muted small" role="status">
         {orderError
           ? `Order turned down: ${orderError}`
@@ -460,6 +482,72 @@ export function TileCard({
             : 'Pick one of your residents to send them here.'}
       </p>
     </SelectionCard>
+  )
+}
+
+/**
+ * Renaming a horse (`CONTEXT.md`): a new name for one of the Player's horses on the card, picked
+ * from a list when there are several. Free and at once, like renaming a resident.
+ */
+function HorseRenameBlock({
+  horses,
+  onRename,
+}: {
+  horses: { id: string; name: string }[]
+  onRename: (horseId: string, name: string) => void
+}) {
+  const [horseId, setHorseId] = useState(horses[0]!.id)
+  const picked = horses.find((h) => h.id === horseId) ?? horses[0]!
+  const [value, setValue] = useState(picked.name)
+  const problem = nameProblem(value, HORSE_NAME_MAX_LENGTH)
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    if (problem) return
+    onRename(picked.id, value.trim())
+  }
+  return (
+    <section className="inspector-block" aria-label="Rename a horse">
+      <div className="panel-head">
+        <h3>Rename {horses.length === 1 ? picked.name : 'a horse'}</h3>
+        <span className="small muted">free, at once</span>
+      </div>
+      <form onSubmit={submit}>
+        {horses.length > 1 && (
+          <div className="order-buttons">
+            <select
+              aria-label="Horse"
+              value={picked.id}
+              onChange={(e) => {
+                const h = horses.find((x) => x.id === e.target.value)
+                if (!h) return
+                setHorseId(h.id)
+                setValue(h.name)
+              }}
+            >
+              {horses.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="order-buttons">
+          <input
+            value={value}
+            maxLength={HORSE_NAME_MAX_LENGTH}
+            aria-label="New name"
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </div>
+        {problem && <p className="small muted">{problem}</p>}
+        <div className="order-buttons">
+          <button type="submit" className="primary" disabled={!!problem}>
+            Rename
+          </button>
+        </div>
+      </form>
+    </section>
   )
 }
 

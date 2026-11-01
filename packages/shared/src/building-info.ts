@@ -40,6 +40,8 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
   smelter: 'A smelter turns iron ore into iron; not on Mountain.',
   mint: 'A mint turns gold ore into coins; not on Mountain.',
   smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain.',
+  trainingGround:
+    'A training ground is where residents train a stat or a skill under a teacher; not on Mountain. Like a workplace, nobody owns it.',
   road: 'A road: residents walk and carriages drive faster on it, on any land (slower to build on Mountain), and it can run through a gate. Nobody owns it.',
   carriage:
     'A carriage carries far more than any resident, pulled by a horse; built at a finished stable, on its tiles or right by them, and it belongs to the realm of whoever finishes it.',

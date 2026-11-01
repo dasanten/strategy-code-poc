@@ -947,6 +947,24 @@ label > select {
   background: transparent;
   font-size: 12px;
 }
+/* A horse: name and place, stats, age, health and hunger; narrow enough not to scroll. */
+.horses .residents-table {
+  min-width: 0;
+}
+.horses-row {
+  grid-template-columns: minmax(0, 2fr) 54px 22px 44px 44px;
+  gap: 6px;
+}
+.residents-row.horses-row.heading {
+  letter-spacing: 0;
+}
+.horses-row .mono {
+  white-space: nowrap;
+}
+.residents-row .doing .name {
+  display: block;
+  color: var(--ui-text);
+}
 .residents-row .mono {
   font-variant-numeric: tabular-nums;
   color: var(--ui-muted);
@@ -1247,6 +1265,20 @@ button.residents-row.selected:hover {
   padding: 0 8px;
   color: var(--ui-muted);
 }
+/* Who occupies a town hall and the game days left (`CONTEXT.md`: Occupying a town hall), on the
+   tile card and in the city inspector; a warning on the Player's own city. */
+.occupation {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ui-text);
+}
+.city-list .occupation {
+  padding: 0 8px;
+}
+.occupation.warn {
+  color: var(--ui-warn);
+}
 
 /* The script editor: the library beside a full-height editor. */
 .script-library {
@@ -1448,15 +1480,24 @@ button.residents-row.selected:hover {
 }
 .warehouse-prices {
   margin: 6px 8px 0;
-  border-collapse: collapse;
   font-size: 12px;
   color: var(--ui-text);
+}
+.warehouse-prices p {
+  margin: 4px 0 0;
+}
+.warehouse-prices-place {
+  color: var(--ui-muted);
+}
+.warehouse-prices table {
+  margin-top: 4px;
+  border-collapse: collapse;
   font-variant-numeric: tabular-nums;
 }
 .warehouse-prices caption {
   text-align: left;
   padding-bottom: 2px;
-  color: var(--ui-muted);
+  font-weight: 600;
 }
 .warehouse-prices th,
 .warehouse-prices td {

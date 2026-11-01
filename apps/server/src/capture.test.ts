@@ -1,24 +1,30 @@
 import {
   AVERAGE_HORSE_STATS,
+  OCCUPATION_GAME_DAYS,
+  OCCUPATION_TICKS,
   TICKS_PER_GAME_DAY,
   Terrain,
-  captorOf,
+  defendsCity,
+  occupationTicksLeft,
+  occupierOf,
+  realmName,
+  townHallOf,
+  type City,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { captureCity } from './capture.js'
+import { captureCity, stepCaptures } from './capture.js'
 import { routeEnd } from './caravans.js'
 import { attackOrder } from './combat.js'
 import {
   checkInvariants,
   cityResidentsInItsRealm,
-  takenCitiesCaptured,
+  occupationsSound,
   type Invariant,
 } from './invariants.js'
 import { mulberry32, newResident } from './residents.js'
 import { stepStockFloor } from './stock-floor.js'
-import { defaultScripts } from './test-default-scripts.js'
 import { addCity, worldWithPost } from './test-terrain.js'
 import { stepWorld } from './world.js'
 import { createWorld } from './world.js'
@@ -27,7 +33,7 @@ const terrain: TerrainMap = { size: 64, tiles: new Uint8Array(64 * 64).fill(Terr
 
 /**
  * A world with realm r1 (Player 7, Leader a1, far away), realm r2 (Player 8, Leader b1) and the
- * NPC city npc around (20, 20), where n1 and n2 live.
+ * NPC city npc, its town hall on (20..22, 20..22), where n1 (on the hall, unarmed) and n2 live.
  */
 function setup() {
   const world = createWorld(terrain)
@@ -73,35 +79,52 @@ function armed<T extends { carried: Record<string, number | undefined> }>(r: T):
   return r
 }
 
-/** Struck, a Player's residents run their defence script, the Defend default. */
-const scripts = defaultScripts(terrain, [
-  { userId: 7, account: { name: 'Mara', isAdmin: false } },
-  { userId: 8, account: { name: 'Tobin', isAdmin: false } },
-])
-
-/**
- * Steps the world, after running scripts as the game does, until `done` holds, at most `ticks`
- * times; answers whether it did.
- */
-function stepUntil(world: WorldState, done: () => boolean, ticks = 200): boolean {
-  for (let i = 0; i < ticks && !done(); i++) {
-    scripts.runAll(world)
-    stepWorld(world, terrain)
-  }
-  return done()
+/** One tick of the occupation step alone, so nobody walks or fights meanwhile. */
+function tick(world: WorldState) {
+  world.tick++
+  return stepCaptures(world, terrain.size)
 }
 
-const capture: Invariant[] = [cityResidentsInItsRealm, takenCitiesCaptured]
+/** `realmId` has occupied the city's town hall for all but its last tick. */
+function heldAllButOneTick(world: WorldState, city: City, realmId: string) {
+  city.occupation = { realmId, since: world.tick + 1 - OCCUPATION_TICKS }
+}
 
-describe('capturing a city', () => {
-  it('an armed resident in an NPC city with no defender captures it with its residents', () => {
+/** Two realms in one alliance. */
+function ally(world: WorldState, a: string, b: string) {
+  world.alliances.push({
+    id: 'al1',
+    name: 'North',
+    leaderId: a,
+    members: [
+      { realmId: a, joinedAt: 0, leaving: null },
+      { realmId: b, joinedAt: 0, leaving: null },
+    ],
+    invites: [],
+    army: [],
+  })
+}
+
+const occupying: Invariant[] = [cityResidentsInItsRealm, occupationsSound]
+
+describe('occupying a town hall', () => {
+  it('held the full time, captures an NPC city with its residents', () => {
     const { world, npc, n1, n2 } = setup()
     n1.order = { kind: 'walkTo', target: { x: 0, y: 0 }, path: null, progress: 0 }
     const a2 = armed(resident(world, 'a2', 'r1', 21, 21))
-    expect(captorOf(world, npc, terrain.size)).toBe('r1')
+    expect(occupierOf(world, npc, terrain.size)).toBe('r1')
+    expect(stepWorld(world, terrain).captures).toEqual([])
+    expect(npc).toMatchObject({ realmId: null, occupation: { realmId: 'r1', since: world.tick } })
+    expect(occupationTicksLeft(world, npc)).toBe(OCCUPATION_TICKS)
+    expect(checkInvariants(world, terrain)).toEqual([])
+    // The tick before the time is up it is still the NPC city's.
+    world.tick = npc.occupation!.since + OCCUPATION_TICKS - 2
+    expect(stepWorld(world, terrain).captures).toEqual([])
+    expect(occupationTicksLeft(world, npc)).toBe(1)
+    expect(npc.realmId).toBeNull()
     const step = stepWorld(world, terrain)
     expect(step.captures).toEqual([{ cityId: 'npc', from: null, to: 'r1' }])
-    expect(npc.realmId).toBe('r1')
+    expect(npc).toMatchObject({ realmId: 'r1', occupation: null })
     // Its residents join wherever they stand, loyal at once, and drop the orders they had.
     expect([n1.owner, n2.owner]).toEqual(['r1', 'r1'])
     expect(n1.order).toBeNull()
@@ -119,41 +142,221 @@ describe('capturing a city', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
-  it('needs the attacker armed and inside the city area', () => {
+  it('needs the occupier armed and on the town hall: armed elsewhere in the city is not enough', () => {
     const { world, npc } = setup()
     const a2 = resident(world, 'a2', 'r1', 21, 21)
-    resident(world, 'a3', 'r1', 28, 28).carried.sword = 1
-    stepWorld(world, terrain)
-    expect(npc.realmId).toBeNull()
+    armed(resident(world, 'a3', 'r1', 25, 25))
+    tick(world)
+    expect(npc.occupation).toBeNull()
     armed(a2)
-    stepWorld(world, terrain)
-    expect(npc.realmId).toBe('r1')
+    tick(world)
+    expect(npc.occupation).toEqual({ realmId: 'r1', since: world.tick })
+    expect(checkInvariants(world, terrain, occupying)).toEqual([])
   })
 
-  it('waits until no defender is left fighting', () => {
+  it('a defender on the town hall breaks it, and the next starts from nothing', () => {
     const { world, npc, n1 } = setup()
-    armed(n1).health = 1
-    const a2 = armed(resident(world, 'a2', 'r1', 21, 20))
-    expect(captorOf(world, npc, terrain.size)).toBeNull()
-    stepWorld(world, terrain)
-    expect(npc.realmId).toBeNull()
-    a2.order = attackOrder('n1')
-    expect(stepUntil(world, () => npc.realmId !== null)).toBe(true)
-    expect(world.residents.some((r) => r.id === 'n1')).toBe(false)
-    expect(npc.realmId).toBe('r1')
-    expect(world.events.find((e) => e.kind === 'cityCaptured')).toMatchObject({ residents: 1 })
-    expect(checkInvariants(world, terrain)).toEqual([])
+    Object.assign(n1, { x: 30, y: 20 })
+    armed(resident(world, 'a2', 'r1', 21, 21))
+    tick(world)
+    const first = world.tick
+    world.tick += 5 * TICKS_PER_GAME_DAY
+    tick(world)
+    expect(npc.occupation).toEqual({ realmId: 'r1', since: first })
+    armed(n1)
+    Object.assign(n1, { x: 20, y: 22 })
+    expect(tick(world)).toEqual([])
+    expect(npc.occupation).toBeNull()
+    n1.x = 30
+    tick(world)
+    expect(npc.occupation).toEqual({ realmId: 'r1', since: world.tick })
+    expect(occupationTicksLeft(world, npc)).toBe(OCCUPATION_TICKS)
+    expect(checkInvariants(world, terrain, occupying)).toEqual([])
   })
 
-  it('a defender who drops their weapon stops defending', () => {
+  it('defenders elsewhere in the city don’t stop the clock', () => {
     const { world, npc, n1 } = setup()
     armed(n1)
+    Object.assign(n1, { x: 25, y: 20 })
+    expect(defendsCity(world, npc, n1, terrain.size)).toBe(true)
+    armed(resident(world, 'a2', 'r1', 21, 21))
+    heldAllButOneTick(world, npc, 'r1')
+    expect(tick(world)).toEqual([{ cityId: 'npc', from: null, to: 'r1' }])
+    expect(npc.realmId).toBe('r1')
+  })
+
+  it('nobody occupies while two realms’ armed residents are on the hall, allied or not', () => {
+    const { world, npc } = setup()
     armed(resident(world, 'a2', 'r1', 21, 20))
-    stepWorld(world, terrain)
-    expect(npc.realmId).toBeNull()
-    n1.carried.sword = 0
+    const b2 = armed(resident(world, 'b2', 'r2', 20, 21))
+    tick(world)
+    expect(npc.occupation).toBeNull()
+    ally(world, 'r1', 'r2')
+    tick(world)
+    expect(npc.occupation).toBeNull()
+    b2.x = 30
+    tick(world)
+    expect(npc.occupation).toMatchObject({ realmId: 'r1' })
+  })
+
+  it('a running occupation is broken when another realm steps onto the hall', () => {
+    const { world, npc } = setup()
+    armed(resident(world, 'a2', 'r1', 21, 20))
+    heldAllButOneTick(world, npc, 'r1')
+    const b2 = armed(resident(world, 'b2', 'r2', 20, 21))
+    expect(tick(world)).toEqual([])
+    expect(npc).toMatchObject({ realmId: null, occupation: null })
+    b2.x = 30
+    tick(world)
+    expect(npc.occupation).toEqual({ realmId: 'r1', since: world.tick })
+  })
+
+  it('an ally of the city on its hall defends it; once they leave, another realm occupies it', () => {
+    const { world } = setup()
+    const city = addCity(world, { id: 'c2', realmId: 'r2', x: 40, y: 40 })
+    ally(world, 'r1', 'r2')
+    world.realms.push({ id: 'r3', userId: 9, leaderId: 'c1' })
+    resident(world, 'c1', 'r3', 5, 5)
+    const friend = armed(resident(world, 'a2', 'r1', 40, 41))
+    tick(world)
+    expect(city.occupation).toBeNull()
+    armed(resident(world, 'c3', 'r3', 41, 41))
+    tick(world)
+    expect(city.occupation).toBeNull()
+    friend.x = 10
+    tick(world)
+    expect(city.occupation).toMatchObject({ realmId: 'r3' })
+    expect(checkInvariants(world, terrain, occupying)).toEqual([])
+  })
+
+  it('an NPC city’s residents who are armed defend only their own city', () => {
+    const { world, npc } = setup()
+    addCity(world, { id: 'npc2', realmId: null, x: 30, y: 20 })
+    armed(resident(world, 'm1', null, 20, 21, 'npc2'))
+    armed(resident(world, 'a2', 'r1', 21, 20))
+    tick(world)
+    expect(npc.occupation).toMatchObject({ realmId: 'r1' })
+  })
+
+  it('nobody occupies a city whose town hall is gone', () => {
+    const { world, npc } = setup()
+    armed(resident(world, 'a2', 'r1', 21, 20))
+    world.buildings = world.buildings.filter((b) => b.id !== npc.townHallId)
+    expect(occupierOf(world, npc, terrain.size)).toBeNull()
+  })
+
+  it('the invariants catch an occupation held too long, off the hall, or by the city’s side', () => {
+    const { world, npc } = setup()
+    const a2 = armed(resident(world, 'a2', 'r1', 21, 20))
+    const names = () => checkInvariants(world, terrain, occupying).map((v) => v.invariant)
+    npc.occupation = { realmId: 'r1', since: world.tick - OCCUPATION_TICKS }
+    expect(names()).toEqual(['occupations-sound'])
+    npc.occupation.since = world.tick
+    expect(names()).toEqual([])
+    a2.x = 30
+    expect(names()).toEqual(['occupations-sound'])
+    a2.x = 21
+    npc.realmId = 'r1'
+    for (const r of world.residents) if (r.cityId === 'npc') r.owner = 'r1'
+    expect(names()).toEqual(['occupations-sound'])
+    npc.realmId = 'r2'
+    for (const r of world.residents) if (r.cityId === 'npc') r.owner = 'r2'
+    ally(world, 'r1', 'r2')
+    expect(names()).toEqual(['occupations-sound'])
+  })
+})
+
+describe('occupations in the realm log', () => {
+  /** The occupation events in the world's logs, as (Player, kind, other, occupier). */
+  const logged = (world: WorldState) =>
+    world.events
+      .filter((e) => e.kind === 'hallOccupied' || e.kind === 'occupationBroken')
+      .map((e) => [e.userId, e.kind, 'other' in e ? e.other : '', 'occupier' in e && e.occupier])
+
+  it('an NPC city has no log: only the occupier hears it is occupied and broken', () => {
+    const { world, npc, n1 } = setup()
+    Object.assign(n1, { x: 30, y: 20 })
+    armed(resident(world, 'a2', 'r1', 21, 21))
+    tick(world)
+    const hall = townHallOf(world, npc)!
+    expect(world.events.find((e) => e.kind === 'hallOccupied')).toMatchObject({
+      userId: 7,
+      tick: world.tick,
+      cityId: 'npc',
+      city: 'Dunmere',
+      other: null,
+      occupier: true,
+      days: OCCUPATION_GAME_DAYS,
+      x: hall.x,
+      y: hall.y,
+    })
+    tick(world)
+    expect(logged(world)).toEqual([[7, 'hallOccupied', null, true]])
+    armed(n1)
+    Object.assign(n1, { x: 20, y: 22 })
+    tick(world)
+    expect(world.events.at(-1)).toMatchObject({
+      userId: 7,
+      kind: 'occupationBroken',
+      cityId: 'npc',
+      x: hall.x,
+      y: hall.y,
+    })
+    expect(logged(world)).toEqual([
+      [7, 'hallOccupied', null, true],
+      [7, 'occupationBroken', null, true],
+    ])
+  })
+
+  it('a Player’s city: both realms hear it, by each other’s name, and a new occupier is both', () => {
+    const { world } = setup()
+    world.realms.push({ id: 'r3', userId: 9, leaderId: 'c1', name: 'Northmarch' })
+    resident(world, 'c1', 'r3', 5, 5)
+    addCity(world, { id: 'c2', realmId: 'r2', x: 40, y: 40 })
+    const a2 = armed(resident(world, 'a2', 'r1', 40, 41))
+    tick(world)
+    const r1 = realmName(world, 'r1')
+    const r2 = realmName(world, 'r2')
+    expect(logged(world)).toEqual([
+      [7, 'hallOccupied', r2, true],
+      [8, 'hallOccupied', r1, false],
+    ])
+    // r1 leaves the hall the tick r3 steps onto it: one occupation broken, the next started.
+    world.events = []
+    a2.x = 10
+    armed(resident(world, 'c3', 'r3', 41, 41))
+    tick(world)
+    expect(logged(world)).toEqual([
+      [7, 'occupationBroken', r2, true],
+      [8, 'occupationBroken', r1, false],
+      [9, 'hallOccupied', r2, true],
+      [8, 'hallOccupied', 'Northmarch', false],
+    ])
+  })
+
+  it('a capture ends the occupation without a break in the logs', () => {
+    const { world, npc } = setup()
+    armed(resident(world, 'a2', 'r1', 21, 20))
+    heldAllButOneTick(world, npc, 'r1')
+    tick(world)
+    expect(npc.realmId).toBe('r1')
+    tick(world)
+    expect(world.events.map((e) => e.kind)).toEqual(['cityCaptured'])
+  })
+})
+
+describe('capturing a city', () => {
+  it('its occupiers, at home there now, refill from its storage the tick it is captured', () => {
+    const { world, npc } = setup()
+    const food = { food: 50 }
+    world.buildings.push({ id: 's1', kind: 'storage', cityId: 'npc', x: 24, y: 20, stock: food })
+    const a2 = resident(world, 'a2', 'r1', 21, 20)
+    a2.carried = { sword: 1 }
+    heldAllButOneTick(world, npc, 'r1')
     stepWorld(world, terrain)
     expect(npc.realmId).toBe('r1')
+    expect(a2.carried.food).toBeGreaterThan(0)
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 
   it('takes an NPC city with its own horses and carriages, not those of another NPC city', () => {
@@ -167,6 +370,7 @@ describe('capturing a city', () => {
       y: 21,
       hunger: 100,
       health: 100,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })
@@ -181,6 +385,7 @@ describe('capturing a city', () => {
       load: {},
     })
     armed(resident(world, 'a2', 'r1', 21, 20))
+    heldAllButOneTick(world, npc, 'r1')
     stepWorld(world, terrain)
     expect(npc.realmId).toBe('r1')
     expect(world.horses.map((h) => [h.realmId, h.cityId])).toEqual([
@@ -211,6 +416,7 @@ describe('capturing a city', () => {
       y: 40,
       hunger: 100,
       health: 100,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })
@@ -222,6 +428,7 @@ describe('capturing a city', () => {
       y: 40,
       hunger: 100,
       health: 100,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })
@@ -243,8 +450,9 @@ describe('capturing a city', () => {
       horseId: null,
       load: {},
     })
-    const a2 = armed(resident(world, 'a2', 'r1', 43, 39))
+    const a2 = armed(resident(world, 'a2', 'r1', 42, 42))
     a2.order = attackOrder('b2')
+    heldAllButOneTick(world, city, 'r1')
     stepWorld(world, terrain)
     expect(city.realmId).toBe('r1')
     expect([b2.owner, b3.owner]).toEqual(['r1', 'r1'])
@@ -267,79 +475,18 @@ describe('capturing a city', () => {
 
   it('a pair with the Leader ends when the city is captured', () => {
     const { world } = setup()
-    addCity(world, { id: 'c2', realmId: 'r2', x: 40, y: 40 })
+    const city = addCity(world, { id: 'c2', realmId: 'r2', x: 40, y: 40 })
     const leader = world.residents.find((r) => r.id === 'b1')!
     Object.assign(leader, { cityId: 'c2' })
     const b2 = resident(world, 'b2', 'r2', 41, 41, 'c2')
     leader.pair = { partnerId: 'b2', since: 0 }
     b2.pair = { partnerId: 'b1', since: 0 }
     armed(resident(world, 'a2', 'r1', 40, 40))
+    heldAllButOneTick(world, city, 'r1')
     stepWorld(world, terrain)
+    expect(city.realmId).toBe('r1')
     expect([leader.pair, b2.pair]).toEqual([undefined, undefined])
     expect(checkInvariants(world, terrain)).toEqual([])
-  })
-
-  it('nobody captures while two realms’ armed residents are inside', () => {
-    const { world, npc } = setup()
-    armed(resident(world, 'a2', 'r1', 21, 20))
-    const b2 = armed(resident(world, 'b2', 'r2', 19, 20))
-    stepWorld(world, terrain)
-    expect(npc.realmId).toBeNull()
-    b2.x = 30
-    stepWorld(world, terrain)
-    expect(npc.realmId).toBe('r1')
-  })
-
-  it('an ally neither captures nor lets the city fall while armed inside', () => {
-    const { world } = setup()
-    const city = addCity(world, { id: 'c2', realmId: 'r2', x: 40, y: 40 })
-    world.alliances.push({
-      id: 'al1',
-      name: 'North',
-      leaderId: 'r1',
-      members: [
-        { realmId: 'r1', joinedAt: 0, leaving: null },
-        { realmId: 'r2', joinedAt: 0, leaving: null },
-      ],
-      invites: [],
-      army: [],
-    })
-    world.realms.push({ id: 'r3', userId: 9, leaderId: 'c1' })
-    resident(world, 'c1', 'r3', 5, 5)
-    const ally = armed(resident(world, 'a2', 'r1', 40, 41))
-    stepWorld(world, terrain)
-    expect(city.realmId).toBe('r2')
-    armed(resident(world, 'c3', 'r3', 41, 41))
-    stepWorld(world, terrain)
-    expect(city.realmId).toBe('r2')
-    ally.x = 10
-    stepWorld(world, terrain)
-    expect(city.realmId).toBe('r3')
-  })
-
-  it('an NPC city’s residents who are armed defend only their own city', () => {
-    const { world, npc } = setup()
-    addCity(world, { id: 'npc2', realmId: null, x: 30, y: 20 })
-    armed(resident(world, 'm1', null, 20, 21, 'npc2'))
-    armed(resident(world, 'a2', 'r1', 21, 20))
-    stepWorld(world, terrain)
-    expect(npc.realmId).toBe('r1')
-  })
-
-  it('the invariants catch a city left standing taken and residents in the wrong realm', () => {
-    const { world, npc, n2 } = setup()
-    armed(resident(world, 'a2', 'r1', 21, 20))
-    expect(checkInvariants(world, terrain, capture).map((v) => v.invariant)).toEqual([
-      'taken-cities-captured',
-    ])
-    npc.realmId = 'r1'
-    expect(checkInvariants(world, terrain, capture).map((v) => v.invariant)).toEqual([
-      'city-residents-in-its-realm',
-      'city-residents-in-its-realm',
-    ])
-    for (const r of world.residents) if (r.cityId === 'npc') r.owner = 'r1'
-    expect(n2.owner).toBe('r1')
-    expect(checkInvariants(world, terrain, capture)).toEqual([])
   })
 })
 
@@ -377,5 +524,22 @@ describe('Capturing a trading post', () => {
     stepStockFloor(world)
     expect(warehouse.stock).toEqual({})
     expect(checkInvariants(world, land)).toEqual([])
+  })
+
+  it('occupying its town hall the full time captures it and it leaves the Trade Organization', () => {
+    const { world, terrain: land, post } = worldWithPost()
+    const realm = world.realms[0]!
+    const hall = townHallOf(world, post)!
+    // Its own residents stand clear of the hall.
+    for (const r of world.residents) if (r.cityId === post.id) Object.assign(r, { x: hall.x - 3 })
+    const r = world.residents.find((x) => x.owner === realm.id)!
+    armed(Object.assign(r, { x: hall.x + 1, y: hall.y + 1 }))
+    expect(occupierOf(world, post, land.size)).toBe(realm.id)
+    heldAllButOneTick(world, post, realm.id)
+    world.tick++
+    expect(stepCaptures(world, land.size)).toEqual([{ cityId: post.id, from: null, to: realm.id }])
+    expect(post).toMatchObject({ realmId: realm.id, occupation: null })
+    expect(post.tradeOrg).toBeUndefined()
+    expect(world.caravans.some((c) => c.postId === post.id)).toBe(false)
   })
 })

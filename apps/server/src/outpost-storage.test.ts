@@ -154,6 +154,7 @@ describe('an outpost storage', () => {
       y: 10,
       hunger: MAX_HUNGER,
       health: MAX_HEALTH,
+      name: 'Rowan',
       stats: { ...AVERAGE_HORSE_STATS },
       bornAt: 0,
     })

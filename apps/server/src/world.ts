@@ -20,11 +20,14 @@ import { requestStoring } from './storing.js'
 import { requestHauling } from './hauling.js'
 import { requestRoadMaterials } from './road-line.js'
 import type { Walking } from './walking.js'
+import type { TickPhase, TickTimer } from './tick.js'
 import { stepSpoilage } from './spoilage.js'
 import { stepStockFloor } from './stock-floor.js'
 import { stepRefill, stepSurvival, type SurvivalResult } from './survival.js'
 import { stepAging, type AgingResult } from './aging.js'
 import { requestWork, resolveWork } from './work.js'
+import { stepTeaching } from './teaching.js'
+import { stepTraining } from './training.js'
 import { requestBirths, resolveBirths } from './pairing.js'
 import { stepAlliances } from './alliances.js'
 import { requestClimbing, resolveClimbing } from './climbing.js'
@@ -49,6 +52,7 @@ import { runNpcScripts } from './script-runner.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
 import { stepNpcDefence } from './npc-defence.js'
 import { stepLastSeen } from './last-seen.js'
+import { newSightPhase } from './sight.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -84,6 +88,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     // A new world's Players have nothing to be told of changes before it.
     scriptViewChanges: SCRIPT_VIEW_CHANGES.length,
     horseOffersClaimed: [],
+    cityPlans: {},
   }
 }
 
@@ -133,6 +138,8 @@ export function nearestFreeTile(
 export interface StepResult {
   /** Actions requested this tick. */
   actions: number
+  /** Milliseconds the game-run cities spent planning (`planCity`; ADR 0016). */
+  npcPlanMs: number
   /** Who starved and which realms ended through it this tick. */
   survival: SurvivalResult
   /** Blows struck this tick, who was killed and which realms ended through it. */
@@ -143,6 +150,8 @@ export interface StepResult {
   aging: AgingResult
   /** Cities captured as the tick ended (`CONTEXT.md`: Capturing a city). */
   captures: Capture[]
+  /** The NPC cities' residents' scripts that ran this tick (`runNpcScripts`), for tick health. */
+  npcScriptRuns: number
 }
 
 /**
@@ -151,29 +160,75 @@ export interface StepResult {
  * putting down goods, store, fetch, haul routes' and road orders' included, then paying for mercenary contracts, then buying NPC cities, then trading at Trade Org warehouses, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then residents breeding horses, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
- * whose delay ran out take effect; then residents at
- * home, at their workplace or in an army by a carriage who run low on food take meals there; cities with a captor change
- * realm (`stepCaptures`); admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
+ * whose delay ran out take effect; occupations of town halls run, and a city held long enough
+ * changes realm (`stepCaptures`); then residents at
+ * home, at their workplace or in an army by a carriage who run low on food take meals there, those of
+ * a city captured this tick too; admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
  * (`stepContracts`); standing drifts toward neutral (`stepStanding`); armies
- * lose members who are gone and give the rest their orders for the next tick; last, riders who
+ * lose members who are gone and give the rest their orders for the next tick; the realms whose
+ * turn it is bring their Last seen up to date (`stepLastSeen`); last, riders who
  * lost their horse get off it (`stepRiders`), and passengers who lost their carriage get off
  * (`stepPassengers`). Without `walking`
- * nobody moves.
+ * nobody moves. With a `timer`, the NPC planning (`npc`), the walking (`walking`), Last seen
+ * (`lastSeen`) and all the rest (`rest`) are timed as the parts of the tick's `world` phase
+ * (ADR 0004).
  */
-export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walking): StepResult {
-  const survival = stepSurvival(world, terrain)
-  const horsesDied = stepHorses(world, terrain)
-  stepSpoilage(world)
-  stepStockFloor(world)
-  stepCaravans(world, terrain.size)
-  stepNpcDefence(world, terrain.size)
-  stepTradeOrgArmy(world, terrain.size)
-  stepNpcHire(world, terrain.size)
-  stepPunishments(world, terrain.size)
-  stepNpcCities(world, terrain.size, terrain)
-  runNpcScripts(world, terrain)
-  const steps = walking?.requestSteps(world) ?? []
-  walking?.resolve(world, steps)
+export function stepWorld(
+  world: WorldState,
+  terrain: TerrainMap,
+  walking?: Walking,
+  timer?: Pick<TickTimer, 'time'>,
+): StepResult {
+  const time = <T>(phase: TickPhase, fn: () => T): T => (timer ? timer.time(phase, fn) : fn())
+  // What the scripts saw is gone once the world steps (`SightCache`).
+  newSightPhase(world)
+  const { survival, horsesDied } = time('rest', () => {
+    const survival = stepSurvival(world, terrain)
+    const horsesDied = stepHorses(world, terrain)
+    stepSpoilage(world)
+    stepStockFloor(world)
+    return { survival, horsesDied }
+  })
+  let npcPlanMs = 0
+  const npcScriptRuns = time('npc', () => {
+    stepCaravans(world, terrain.size)
+    stepNpcDefence(world, terrain.size)
+    stepTradeOrgArmy(world, terrain.size)
+    stepNpcHire(world, terrain.size)
+    stepPunishments(world, terrain.size)
+    npcPlanMs = stepNpcCities(world, terrain.size, terrain)
+    return runNpcScripts(world, terrain)
+  })
+  const steps = time('walking', () => {
+    const steps = walking?.requestSteps(world) ?? []
+    walking?.resolve(world, steps)
+    return steps
+  })
+  const result = time('rest', () => stepRest(world, terrain, steps, survival, horsesDied))
+  time('lastSeen', () => {
+    // Who sees what has changed since the NPC scripts ran: Last seen and sync share the new sight
+    // (`SightCache`). Nobody moves or changes hands after this.
+    newSightPhase(world)
+    stepLastSeen(world, terrain.size)
+  })
+  time('rest', () => {
+    stepRiders(world)
+    stepPassengers(world)
+  })
+  return { ...result, npcScriptRuns, npcPlanMs }
+}
+
+/**
+ * The rest of `stepWorld` once the residents walked: everything else they do, then the tick turns,
+ * up to Last seen.
+ */
+function stepRest(
+  world: WorldState,
+  terrain: TerrainMap,
+  steps: unknown[],
+  survival: SurvivalResult,
+  horsesDied: Horse[],
+): Omit<StepResult, 'npcScriptRuns' | 'npcPlanMs'> {
   const strikes = requestStrikes(world, terrain.size)
   const combat = resolveStrikes(world, strikes, terrain.size)
   const climbs = requestClimbing(world)
@@ -195,6 +250,8 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   resolveTearingDown(world, teardowns, terrain)
   const work = requestWork(world)
   resolveWork(world, work)
+  stepTeaching(world, terrain.size)
+  stepTraining(world, terrain.size)
   const breeding = requestBreeding(world)
   resolveBreeding(world, breeding, terrain.size)
   const births = requestBirths(world)
@@ -202,17 +259,14 @@ export function stepWorld(world: WorldState, terrain: TerrainMap, walking?: Walk
   world.tick++
   const aging = stepAging(world, terrain.size)
   stepAlliances(world)
-  stepRefill(world, terrain.size)
   const captures = stepCaptures(world, terrain.size)
+  stepRefill(world, terrain.size)
   stepDirectives(world)
   stepCrimes(world, terrain.size)
   stepContracts(world)
   stepStanding(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
-  stepLastSeen(world, terrain.size)
-  stepRiders(world)
-  stepPassengers(world)
   const actions =
     steps.length +
     strikes.length +

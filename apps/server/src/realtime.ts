@@ -36,10 +36,22 @@ import { foundStartingCity, realmOf, suggestedLeaderName } from './starting-city
 import { eventsFor } from './events.js'
 import { regionMapUnsound } from './region-map.js'
 import { shouldCheckInvariants } from './invariants.js'
-import { entitiesInSight, sentInsideUnseen, sentOutOfSight, type SightTracker } from './sight.js'
+import {
+  entitiesInSight,
+  sentInsideUnseen,
+  sentOutOfSight,
+  seenJson,
+  withSight,
+  type SightTracker,
+} from './sight.js'
 import type { TickReporter } from './tick.js'
-import { ClientView } from './sync.js'
-import { lastSeenInSight, lastSeenOutOfSight } from './last-seen.js'
+import { ClientView, SyncRound } from './sync.js'
+import {
+  lastSeenInSight,
+  lastSeenOnCadence,
+  lastSeenOutOfSight,
+  refreshLastSeenSoon,
+} from './last-seen.js'
 
 /**
  * The session token in an upgrade request's cookie header, read as the HTTP routes read theirs
@@ -52,8 +64,15 @@ function sessionToken(header: string | undefined): string | undefined {
 }
 
 function send(socket: WebSocket, msg: ServerMessage) {
-  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
+  sendJson(socket, JSON.stringify(msg))
 }
+
+/** Sends a message already turned into JSON. */
+function sendJson(socket: WebSocket, json: string) {
+  if (socket.readyState === WebSocket.OPEN) socket.send(json)
+}
+
+type TickMessage = Extract<ServerMessage, { type: 'tick' }>
 
 /** Which browsers may open the WebSocket (`config.origins`). */
 export interface OriginPolicy {
@@ -126,7 +145,7 @@ interface Session {
 }
 
 /** The realms whose residents are among the entities, and the cities among them. */
-function realmsSeen(entities: SeenEntity[]): string[] {
+function realmsSeen(entities: readonly SeenEntity[]): string[] {
   return entities.flatMap((e) => {
     if (e.is === 'resident' && e.owner !== null) return [e.owner]
     return e.is === 'city' ? [e.id] : []
@@ -155,13 +174,18 @@ export function scriptMemoryFor(
 
 /**
  * How the script a resident or army runs last ran, for the realm running it (`CONTEXT.md`:
- * Debugging a script): its last runtime error and the steps it used; null as `scriptMemoryFor`.
+ * Debugging a script): its last runtime error, the steps it used and since when it waits
+ * (Running a script, Waiting); null as `scriptMemoryFor`.
  */
 export function scriptRunFor(world: WorldState, realmId: string, id: string): ScriptRunSeen | null {
   const running = runningScriptFor(world, realmId, id)
   if (!running) return null
-  const { lastError, lastRun } = running
-  return { ...(lastError ? { lastError } : {}), ...(lastRun ? { lastRun } : {}) }
+  const { lastError, lastRun, waitingSince } = running
+  return {
+    ...(lastError ? { lastError } : {}),
+    ...(lastRun ? { lastRun } : {}),
+    ...(waitingSince !== undefined ? { waitingSince } : {}),
+  }
 }
 
 /**
@@ -285,11 +309,17 @@ export function attachRealtime(
     if (violations.length > 0) check.reporter.invariantViolations(world, violations)
   }
 
-  /** Reports Last seen about to go to a realm's Player that is in their sight, as `checkSent`. */
+  /**
+   * Reports Last seen about to go to a realm's Player that is in their sight, or that is off its
+   * cadence, as `checkSent`.
+   */
   function checkLastSeen(realmId: string, sent: Remembered[]) {
     const check = opts.sightCheck
-    if (!check || sent.length === 0 || !shouldCheckInvariants(check.sampleRate, check.rand)) return
-    const violations = lastSeenInSight(world, opts.terrain, realmId, sent)
+    if (!check || !shouldCheckInvariants(check.sampleRate, check.rand)) return
+    const violations = [
+      ...(sent.length > 0 ? lastSeenInSight(world, opts.terrain, realmId, sent) : []),
+      ...lastSeenOnCadence(world, realmId),
+    ]
     if (violations.length > 0) check.reporter.invariantViolations(world, violations)
   }
 
@@ -400,8 +430,12 @@ export function attachRealtime(
     const [cx, cy] = [start.x, start.y]
     const entities = client.view.initial(entitiesInSight(world, opts.terrain, realm.id))
     checkSent(realm.id, entities)
-    const lastSeen = client.lastSeenView.initial(lastSeenOutOfSight(world, user.id))
+    const lastSeen = client.lastSeenView.initial(
+      lastSeenOutOfSight(world, opts.terrain.size, user.id),
+    )
     checkLastSeen(realm.id, lastSeen)
+    // Their map is fresh from the next tick, not when the realm's turn comes round.
+    refreshLastSeenSoon(world, realm.id)
     const events = eventsFor(world, user.id)
     client.lastEventSeq = events.at(-1)?.seq ?? 0
     const diplomacy = diplomacyFor(world, realm.id, realmsSeen(entities))
@@ -525,58 +559,71 @@ export function attachRealtime(
      * explored terrain grew for its Player (`explored`, from `SightTracker.update`), and its
      * Player's new realm events, and their alliance matters when those changed, and the Region map
      * when territory was worked out again or their explored terrain grew: each Player gets only
-     * their own. First, once a minute, the sockets whose session ended meanwhile are closed.
+     * their own. First, once a minute, the sockets whose session ended meanwhile are closed. What a
+     * realm sees is worked out once and shared by its sockets (`SightCache`).
      */
     broadcastTick(explored: Map<number, Set<number>> = new Map(), now = Date.now()) {
       recheckSessions(now)
-      for (const [socket, client] of clients) {
-        const inSight = entitiesInSight(world, opts.terrain, client.realmId)
-        const { changed, gone } = client.view.diff(inSight)
-        checkSent(client.realmId, changed)
-        const remembered = client.lastSeenView.diff(lastSeenOutOfSight(world, client.userId))
-        checkLastSeen(client.realmId, remembered.changed)
-        const lastSeen =
-          remembered.changed.length > 0 || remembered.gone.length > 0
-            ? { lastSeen: remembered }
-            : {}
-        const grown = [...(explored.get(client.userId) ?? [])]
-        const events = eventsFor(world, client.userId, client.lastEventSeq)
-        client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq
-        const diplomacy = diplomacyFor(world, client.realmId, realmsSeen(inSight))
-        const json = JSON.stringify(diplomacy)
-        const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
-        client.lastDiplomacy = json
-        const region = regionFor(client, grown)
-        const realm = world.realms.find((r) => r.id === client.realmId)
-        const leaderId = realm?.leaderId
-        const newLeader = leaderId !== undefined && leaderId !== client.leaderId
-        if (newLeader) client.leaderId = leaderId
-        const realmName = realm?.name ?? null
-        const named = realmName !== null && realmName !== client.realmName
-        if (named) client.realmName = realmName
-        const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
-        if (claimed) client.horseOffer = false
-        const tick = {
-          tick: world.tick,
-          changed,
-          gone,
-          ...lastSeen,
-          explored: grown,
-          events,
-          ...fresh,
-          ...(region ? { region } : {}),
-          ...(newLeader ? { leaderId } : {}),
-          ...(named ? { realmName } : {}),
-          ...(claimed ? { horseOffer: false as const } : {}),
-        }
-        send(socket, { type: 'tick', ...tick })
-        sendScriptMemory(socket, client)
-        sendScriptLogs(socket, client)
-      }
+      withSight(world, opts.terrain.size, () => sendTicks(explored))
     },
     close() {
       for (const socket of clients.keys()) socket.close()
       wss.close()
     },
+  }
+
+  /**
+   * The tick message to each socket, as `broadcastTick` says. Each entity in a realm's sight is
+   * turned into JSON once, and sockets of a realm sent the same so far share their `changed` and
+   * `gone` as one string spliced into each message (`SyncRound`).
+   */
+  function sendTicks(explored: Map<number, Set<number>>) {
+    const round = new SyncRound<SeenEntity>((e) => seenJson(world, e))
+    for (const [socket, client] of clients) {
+      const inSight = entitiesInSight(world, opts.terrain, client.realmId)
+      const diff = client.view.diff(inSight, round)
+      const { changed } = diff
+      checkSent(client.realmId, changed)
+      const remembered = client.lastSeenView.diff(
+        lastSeenOutOfSight(world, opts.terrain.size, client.userId),
+      )
+      checkLastSeen(client.realmId, remembered.changed)
+      const lastSeen =
+        remembered.changed.length > 0 || remembered.gone.length > 0 ? { lastSeen: remembered } : {}
+      const grown = [...(explored.get(client.userId) ?? [])]
+      const events = eventsFor(world, client.userId, client.lastEventSeq)
+      client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq
+      const diplomacy = diplomacyFor(world, client.realmId, realmsSeen(inSight))
+      const json = JSON.stringify(diplomacy)
+      const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
+      client.lastDiplomacy = json
+      const region = regionFor(client, grown)
+      const realm = world.realms.find((r) => r.id === client.realmId)
+      const leaderId = realm?.leaderId
+      const newLeader = leaderId !== undefined && leaderId !== client.leaderId
+      if (newLeader) client.leaderId = leaderId
+      const realmName = realm?.name ?? null
+      const named = realmName !== null && realmName !== client.realmName
+      if (named) client.realmName = realmName
+      const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
+      if (claimed) client.horseOffer = false
+      const tick = {
+        type: 'tick' as const,
+        tick: world.tick,
+        ...lastSeen,
+        explored: grown,
+        events,
+        ...fresh,
+        ...(region ? { region } : {}),
+        ...(newLeader ? { leaderId } : {}),
+        ...(named ? { realmName } : {}),
+        ...(claimed ? { horseOffer: false as const } : {}),
+      }
+      // `changed` and `gone` go last, as the JSON the realm's sockets in step share.
+      const rest = JSON.stringify(tick satisfies Omit<TickMessage, 'changed' | 'gone'>)
+      sendJson(socket, `${rest.slice(0, -1)},${round.fragment(diff)}}`)
+      sendScriptMemory(socket, client)
+      sendScriptLogs(socket, client)
+    }
   }
 }

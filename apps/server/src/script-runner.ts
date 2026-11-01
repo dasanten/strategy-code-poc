@@ -5,11 +5,11 @@ import {
   constructionAt,
   canWork,
   DEFAULT_SCRIPTS,
-  commanderOf,
   MAP_SIZE,
   stableAt,
   commands,
   isTask,
+  isTrainingSubject,
   keptPair,
   type Good,
   type Task,
@@ -25,11 +25,11 @@ import {
   type OrderRequest,
   type Realm,
   type Resident,
+  type ResidentOrder,
   type RealmEventWhat,
   type RunningScript,
   type ScriptMemory,
   type ScriptRunBy,
-  type SeenEntity,
   type StartParamValues,
   type TerrainMap,
   type WorldState,
@@ -56,8 +56,9 @@ import {
   startParamsProblem,
   withTargetParam,
 } from './script-params.js'
-import { entitiesInSight, sightOf } from './sight.js'
+import { entitiesInSight, withSight } from './sight.js'
 import { realmOf } from './starting-city.js'
+import { worldIndex } from './world-index.js'
 
 /**
  * Running a script as a resident's or an army's order (`CONTEXT.md`: Running a script, Memory,
@@ -267,6 +268,18 @@ interface FeedStableTaskRequest extends OrderRequest {
   stableId: string
 }
 
+/**
+ * Train: the training ground the resident stands on (`CONTEXT.md`: Trainee), and the subject
+ * they mean to learn there, if any.
+ */
+interface TrainTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'train'
+  residentId: string
+  groundId: string
+  subject?: string
+}
+
 interface BuildTaskRequest extends OrderRequest {
   kind: 'task'
   task: 'build'
@@ -295,6 +308,7 @@ type TaskRequest = (
   | TearDownTaskRequest
   | BreedTaskRequest
   | FeedStableTaskRequest
+  | TrainTaskRequest
 ) &
   TaskParams
 
@@ -310,6 +324,7 @@ function asOrder(o: Partial<TaskRequest>): OrderRequest {
   if (o.task === 'breed')
     return { kind: 'breed', residentId, stableId: o.stableId, horseIds: o.horseIds }
   if (o.task === 'build') return { kind: 'build', residentId, building: o.building }
+  if (o.task === 'train') return { kind: 'train', residentId, buildingId: o.groundId }
   return { kind: 'workAt', residentId, makes: (o as Partial<WorkTaskRequest>).makes }
 }
 
@@ -365,6 +380,11 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
       }
       return { ...memory }
     }
+    case 'train': {
+      const memory: TaskMemory['train'] = { groundId: order.groundId }
+      if (order.subject !== undefined) memory.subject = order.subject
+      return { ...memory }
+    }
     case 'feedStable': {
       const memory: TaskMemory['feedStable'] = { stableId: order.stableId }
       return { ...memory }
@@ -377,9 +397,10 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
  * runs the Player's version of the task's default script, from a memory holding the task's
  * target (`TaskMemory`). It ends whatever the resident was doing. Each task is checked as the
  * built-in order its script starts: Work for the workplace the resident stands on as work-at,
- * Build as the build order on the resident's tile or the one it names, Haul as the haul order to a tile, Tear down as
- * the tear-down order, Breed horses as the breed order. Feed the stable starts no order of its
- * own: the resident stands in the stable and is grown up. The param values it gives are checked
+ * Build as the build order on the resident's tile or the one it names, Haul as the haul order to
+ * a tile, Tear down as the tear-down order, Breed horses as the breed order, Train as the train
+ * order. Feed the stable starts no order of its own: the resident stands in the stable and is
+ * grown up. The param values it gives are checked
  * against the default script's and set first (`CONTEXT.md`: Before it starts), the task's target
  * in the script's target param (`withTargetParam`, `taskTarget`).
  */
@@ -428,11 +449,13 @@ function taskTarget(
       ? [o.workplaceId, 'building' as const]
       : o.task === 'tearDown'
         ? [o.buildingId, 'building' as const]
-        : o.task === 'breed' || o.task === 'feedStable'
-          ? [o.stableId, 'storage' as const]
-          : o.task === 'haul'
-            ? [o.carriageId, 'storage' as const]
-            : [buildSite(world, o, r), 'building' as const]
+        : o.task === 'train'
+          ? [o.groundId, 'building' as const]
+          : o.task === 'breed' || o.task === 'feedStable'
+            ? [o.stableId, 'storage' as const]
+            : o.task === 'haul'
+              ? [o.carriageId, 'storage' as const]
+              : [buildSite(world, o, r), 'building' as const]
   if (id === undefined) return undefined
   return paramTarget(world, realmId, type, id) ? id : undefined
 }
@@ -479,11 +502,14 @@ function taskProblem(
       return 'the target must be a tile'
     return buildAtProblem(world, r!, o.building, at as { x: number; y: number }, terrain)
   }
+  if (o.task === 'train' && o.subject !== undefined && !isTrainingSubject(o.subject))
+    return 'train a stat or a skill'
   const built = asOrder(withKeptPair(world, o, realm.id))
   const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)
   // Working there by a bare work-at order, as the starting residents do, they can still be
   // given the task; already running it there, they can't.
-  if (problem === 'already working here' && !r.script) return undefined
+  if ((problem === 'already working here' || problem === 'already training here') && !r.script)
+    return undefined
   return problem
 }
 
@@ -511,6 +537,64 @@ export function armyRunScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind 
   }
 }
 
+/**
+ * The order each waiting script waits on (`RunningScript.waitingSince`), by identity: a replaced
+ * order is another object. Scratch memory, never saved: after a restart a waiting script runs
+ * once more and waits again.
+ */
+const waitingOn = new WeakMap<RunningScript, ResidentOrder>()
+
+/**
+ * Whether resident `r`'s script waits this tick (`CONTEXT.md`: Running a script, Waiting): it
+ * called `wait()` and the order it waits on still runs, unreplaced, and no blow struck them since.
+ * Otherwise its wait is over and it runs every tick again.
+ */
+function waits(r: Resident): boolean {
+  const running = r.script
+  if (running?.waitingSince === undefined) return false
+  const struck = r.struck !== undefined && r.struck.tick >= running.waitingSince
+  if (r.order !== null && waitingOn.get(running) === r.order && !struck) return true
+  delete running.waitingSince
+  return false
+}
+
+/**
+ * After a run that called `wait()`, resident `r`'s script waits on the order they have now that
+ * its requests are applied; with none, or with its script ended or replaced, it does nothing.
+ */
+function startWaiting(world: WorldState, r: Resident | undefined, running: RunningScript): void {
+  if (!r || r.script !== running || r.order === null) return
+  running.waitingSince = world.tick
+  waitingOn.set(running, r.order)
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Running a script, Waiting): once scripts have run, every
+ * waiting script of `residents` has an order to wait on, the one it called `wait()` with, and
+ * began waiting no later than now: no script waits past its order's end.
+ */
+export function waitingSound(
+  world: WorldState,
+  residents: readonly Resident[],
+): InvariantViolation[] {
+  const out: InvariantViolation[] = []
+  for (const r of residents) {
+    const since = r.script?.waitingSince
+    if (since === undefined) continue
+    const fail = (message: string) =>
+      out.push({
+        invariant: 'waiting-has-an-order',
+        message: `${r.id} ${message}`,
+        entityIds: [r.id],
+      })
+    if (r.order === null) fail('waits with no order')
+    else if (waitingOn.has(r.script!) && waitingOn.get(r.script!) !== r.order)
+      fail('waits past the end of the order it waited on')
+    if (since > world.tick) fail(`began waiting at tick ${since}, after ${world.tick}`)
+  }
+  return out
+}
+
 /** A resident or an army running a script. */
 interface Runner {
   /** Where the running script is kept: the resident or the army. */
@@ -526,6 +610,11 @@ interface Runner {
 /** Runs every resident's and army's script once a tick. Keeps parsed scripts between ticks. */
 export class ScriptRunner {
   private programs = new Map<number, { source: string; program: Program }>()
+  /**
+   * The scripts that ran the last `runAll`, waiting ones and those the realm's budget skipped
+   * left out: for tick health (ADR 0004).
+   */
+  runs = 0
 
   constructor(
     private terrain: TerrainMap,
@@ -544,11 +633,14 @@ export class ScriptRunner {
     const byRealm = new Map<string, Runner[]>()
     const add = (realmId: string, runner: Runner) =>
       byRealm.set(realmId, [...(byRealm.get(realmId) ?? []), runner])
+    const index = worldIndex(world)
+    // The residents whose scripts the realms run, waiting or not.
+    const commanded: Resident[] = []
     for (const r of world.residents) {
       if (!r.script) continue
       // A script runs for the realm the resident takes orders from (`CONTEXT.md`: Alliance army);
       // a resident of no realm has no Player to run a script for.
-      const realmId = commanderOf(world, r)
+      const realmId = index.commanderOf(r)
       // An NPC city runs its residents' game defaults itself (`runNpcScripts`).
       if (realmId === null) {
         // Nobody runs their defence script any more: what it interrupted goes on, if anything.
@@ -556,6 +648,8 @@ export class ScriptRunner {
         if (r.script && !(r.script.task && r.script.scriptId === 0 && r.owner === null))
           delete r.script
       } else {
+        commanded.push(r)
+        if (waits(r)) continue
         const by = { residentId: r.id }
         add(realmId, { holder: r, id: r.id, name: r.name, by, bind: by })
       }
@@ -568,17 +662,21 @@ export class ScriptRunner {
     const used = new Map<number, { source: string; program: Program }>()
     // Those whose script ran this tick, not skipped for the realm's budget.
     const ran = new Set<string>()
-    for (const realm of world.realms) {
-      // A bug of the game's in one realm's scripts never stops the other realms' or the tick.
-      try {
-        this.runRealm(world, realm, byRealm.get(realm.id), used, ran, check ? out : undefined)
-      } catch (error) {
-        this.host.scriptError?.(world, error, { realmId: realm.id, entityIds: [] })
+    withSight(world, this.terrain.size, () => {
+      for (const realm of world.realms) {
+        // A bug of the game's in one realm's scripts never stops the other realms' or the tick.
+        try {
+          this.runRealm(world, realm, byRealm.get(realm.id), used, ran, check ? out : undefined)
+        } catch (error) {
+          this.host.scriptError?.(world, error, { realmId: realm.id, entityIds: [] })
+        }
       }
-    }
+    })
     this.programs = used
+    this.runs = ran.size
     if (check) {
       out.push(...runningScriptsSound(world), ...scriptParamsSound(world))
+      out.push(...waitingSound(world, commanded))
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
@@ -600,9 +698,8 @@ export class ScriptRunner {
   ): void {
     const sender = this.host.sender(realm.userId)
     if (!running || !sender) return
-    let seen: SeenEntity[] | undefined
-    const seenOnce = () => (seen ??= entitiesInSight(world, this.terrain, realm.id))
-    const sees = seesOnce(world, this.terrain, realm.id)
+    // Worked out once for the realm this phase and shared (`SightCache`, opened by `runAll`).
+    const seen = () => entitiesInSight(world, this.terrain, realm.id)
     let left = SCRIPT_REALM_STEP_BUDGET
     const first = world.tick % running.length
     for (let i = 0; i < running.length; i++) {
@@ -617,16 +714,7 @@ export class ScriptRunner {
       ran.add(r.id)
       const steps = Math.min(SCRIPT_STEP_BUDGET, left)
       try {
-        left -= this.runOne(
-          world,
-          realm,
-          sender,
-          r,
-          steps,
-          { seen: seenOnce, sees },
-          used,
-          violations,
-        )
+        left -= this.runOne(world, realm, sender, r, steps, { seen }, used, violations)
       } catch (error) {
         // The game's own bug, not the script's: it ends this one script and the tick goes on.
         left -= steps
@@ -661,7 +749,7 @@ export class ScriptRunner {
     sender: OrderSender,
     r: Runner,
     steps: number,
-    { seen, sees }: Pick<ScriptContext, 'seen' | 'sees'>,
+    { seen }: Pick<ScriptContext, 'seen'>,
     used: Map<number, { source: string; program: Program }>,
     violations: InvariantViolation[] | undefined,
   ): number {
@@ -697,7 +785,7 @@ export class ScriptRunner {
         scriptId,
       })
       running.scriptId = 0
-      return this.runOne(world, realm, sender, r, steps, { seen, sees }, used, violations)
+      return this.runOne(world, realm, sender, r, steps, { seen }, used, violations)
     }
     if (!script || script.userId !== realm.userId) {
       // Deleted, or the resident now belongs to another Player, whose script it isn't.
@@ -730,7 +818,6 @@ export class ScriptRunner {
       memory,
       params,
       seen,
-      sees,
       explored: (x, y) => this.host.explored(realm.userId, x, y),
       kinds: this.kinds,
     })
@@ -785,6 +872,7 @@ export class ScriptRunner {
       }
       return result.steps
     }
+    if (bound.waited()) startWaiting(world, resident, running)
 
     const failed = (message: string, line?: number, column?: number) => {
       const where = line === undefined ? {} : { line, column }
@@ -948,14 +1036,15 @@ const gamePrograms = new Map<string, Program>()
  * An NPC city's residents run the game's default of their task (`CONTEXT.md`: NPC city, Default
  * script; ADR 0009), through the same interpreter and game API as a Player's scripts, with the
  * city as the sender: it sees what its residents see, explored or not, and has no realm budget.
- * What they request is applied at once, as a Player's scripts' requests are. Run after
- * `stepNpcCities` has put them to work.
+ * What they request is applied at once, as a Player's scripts' requests are; one that waits
+ * (`CONTEXT.md`: Running a script, Waiting) skips the tick. Run after `stepNpcCities` has put
+ * them to work. Returns how many scripts ran, for tick health.
  */
 export function runNpcScripts(
   world: WorldState,
   terrain: TerrainMap,
   kinds: Record<string, OrderKind> = orderKinds,
-): void {
+): number {
   const npc = new Map(world.cities.filter((c) => c.realmId === null).map((c) => [c.id, c]))
   const byCity = new Map<City, Resident[]>()
   for (const r of world.residents) {
@@ -965,24 +1054,30 @@ export function runNpcScripts(
     list.push(r)
     byCity.set(city, list)
   }
-  for (const [city, people] of byCity) runCityScripts(world, terrain, city, people, kinds)
+  return withSight(world, terrain.size, () => {
+    let runs = 0
+    for (const [city, people] of byCity) runs += runCityScripts(world, terrain, city, people, kinds)
+    return runs
+  })
 }
 
+/** Runs one NPC city's residents' scripts; returns how many ran. */
 function runCityScripts(
   world: WorldState,
   terrain: TerrainMap,
   city: City,
   people: readonly Resident[],
   kinds: Record<string, OrderKind>,
-): void {
+): number {
   const sender = npcSender(city)
-  let seen: SeenEntity[] | undefined
-  const seenOnce = () => (seen ??= entitiesInSight(world, terrain, city.id))
-  const sees = seesOnce(world, terrain, city.id)
+  // Worked out once for the city this phase and shared (`SightCache`, opened by `runNpcScripts`).
+  const seen = () => entitiesInSight(world, terrain, city.id)
+  let runs = 0
   for (const r of people) {
     const running = r.script
     // Its script may have ended this tick; a resident lent out is run by the hirer.
-    if (!running?.task || !orderedResident(world, sender, r.id)) continue
+    if (!running?.task || !orderedResident(world, sender, r.id) || waits(r)) continue
+    runs++
     const { source } = DEFAULT_SCRIPTS[running.task]
     let program = gamePrograms.get(source)
     if (!program) gamePrograms.set(source, (program = parse(source)))
@@ -993,8 +1088,7 @@ function runCityScripts(
       sender,
       residentId: r.id,
       memory,
-      seen: seenOnce,
-      sees,
+      seen,
       explored: () => true,
       kinds,
       // Nobody picks values for an NPC city: its defaults fall back on their own.
@@ -1013,9 +1107,11 @@ function runCityScripts(
       endScript(world, r.id)
       continue
     }
+    if (bound.waited()) startWaiting(world, r, running)
     const kept = keepMemory(memory)
     if (typeof kept !== 'string' && r.script === running) running.memory = kept
   }
+  return runs
 }
 
 /**
@@ -1119,10 +1215,4 @@ function oneAwayAtATime(
     byKey.set(at, ids)
   }
   return [...byKey].filter(([, ids]) => ids.length > 1)
-}
-
-/** What a realm or an NPC city sees (`sightOf`), worked out once when first asked. */
-function seesOnce(world: WorldState, terrain: TerrainMap, side: string) {
-  let sight: ((at: { x: number; y: number }) => boolean) | undefined
-  return (at: { x: number; y: number }) => (sight ??= sightOf(world, terrain.size, side))(at)
 }

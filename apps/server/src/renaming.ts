@@ -1,7 +1,9 @@
 import {
   CITY_NAME_MAX_LENGTH,
+  HORSE_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
   cityRenameProblem,
+  horseRenameProblem,
   nameProblem,
   renameProblem,
   type OrderRequest,
@@ -101,6 +103,48 @@ export const renameCity: OrderKind = {
   },
 }
 
+/*
+ * Renaming a horse (`CONTEXT.md`: Renaming a horse) works like renaming a resident: any horse of
+ * the Player's realm, from anywhere, free and at once. The horse keeps whatever it is doing.
+ */
+
+/** The input of a horse rename order: `horseId` gets `name`; `residentId` is who asked. */
+interface RenameHorseRequest extends OrderRequest {
+  kind: 'renameHorse'
+  residentId: string
+  horseId: string
+  name: string
+}
+
+function horseProblem(
+  world: WorldState,
+  sender: OrderSender,
+  order: OrderRequest,
+): string | undefined {
+  const realm = realmOf(world, sender.userId)
+  if (!realm) return 'you have no realm'
+  const o = order as Partial<RenameHorseRequest>
+  const asker = world.residents.find((r) => r.id === o.residentId)
+  if (!asker || asker.owner !== realm.id) return 'not one of your residents'
+  return horseRenameProblem(
+    realm,
+    world.horses.find((h) => h.id === o.horseId),
+    o.name,
+  )
+}
+
+/** The horse rename order: the horse of the Player's realm takes the new name, trimmed. */
+export const renameHorse: OrderKind = {
+  validate(world, sender, order) {
+    return horseProblem(world, sender, order)
+  },
+  apply(world, sender, order) {
+    if (horseProblem(world, sender, order)) return
+    const { horseId, name } = order as RenameHorseRequest
+    world.horses.find((h) => h.id === horseId)!.name = name.trim()
+  },
+}
+
 /**
  * Invariant (ADR 0004; `CONTEXT.md`: Renaming a city): every city's name is trimmed, not empty
  * and at most `CITY_NAME_MAX_LENGTH`.
@@ -115,6 +159,26 @@ export const cityNamesWellFormed: Invariant = {
         (c.name !== c.name.trim() ? 'not trimmed' : undefined)
       if (p) {
         out.push({ invariant: this.name, message: `city ${c.id}'s name: ${p}`, entityIds: [c.id] })
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Horse name, Renaming a horse): every horse's name is trimmed,
+ * not empty and at most `HORSE_NAME_MAX_LENGTH`.
+ */
+export const horseNamesWellFormed: Invariant = {
+  name: 'horse-names-well-formed',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const h of world.horses) {
+      const p =
+        nameProblem(h.name, HORSE_NAME_MAX_LENGTH) ??
+        (h.name !== h.name.trim() ? 'not trimmed' : undefined)
+      if (p) {
+        out.push({ invariant: this.name, message: `horse ${h.id}'s name: ${p}`, entityIds: [h.id] })
       }
     }
     return out
