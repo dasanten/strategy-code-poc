@@ -136,7 +136,8 @@ export class Places {
       const id = workplaceOf(r)
       if (id !== undefined) this.byWorkplace.set(id, (this.byWorkplace.get(id) ?? 0) + 1)
       const o = r.order
-      if (o?.kind === 'walkTo') {
+      // One working it by the Work default and walking back to its tile holds one place, not two.
+      if (id === undefined && o?.kind === 'walkTo') {
         const key = `${o.target.x},${o.target.y}`
         this.byTile.set(key, (this.byTile.get(key) ?? 0) + 1)
       }
@@ -244,7 +245,7 @@ export function planCity(
       }
     }
   }
-  const unneeded = shareOut(world, city, adults, jobs, held, spare, plan.project, builders, short)
+  const unneeded = shareOut(world, city, adults, jobs, held, spare, plan, builders, short)
   // The Trade Organization sends no trader (`tradeOrgSendsNoOne`) and founds nothing.
   if (!city.tradeOrg && !trader) {
     planTrader(world, city, plan, adults, jobs, short, terrain?.size ?? MAP_SIZE)
@@ -278,7 +279,9 @@ const feeders = (residents: number) =>
  * needs them), as do farmers beyond those it keeps (`farmersWanted`). Then: spare hands, and after them workers off the farms, farm
  * until it has its farmers, while a farm has room; up to `NPC_BUILDERS` (`npcBuilders`) build the project; the
  * rest go to the workplace of the good shortest of the reserve (`chainPlace`), filling its crew
- * before the next. A spare hand with nowhere to go is idle; a farmer let go goes back to farming.
+ * before the next. A spare hand with nowhere to go is idle; a farmer let go goes back to farming,
+ * and one the last pass put to work who is between jobs now (a carrier home with the load stored:
+ * `CONTEXT.md`, Carrying the output) goes back to that workplace.
  * Returns the spare hands with nowhere to go, idle or back on the farm (`CONTEXT.md`: Full city).
  */
 function shareOut(
@@ -288,10 +291,11 @@ function shareOut(
   jobs: Record<string, CityJob>,
   held: Places,
   spare: Resident[],
-  project: CityProject | undefined,
+  plan: CityPlan,
   builders: number,
   foodShort: boolean,
 ): Resident[] {
+  const project = plan.project
   const unneeded: Resident[] = []
   const own = ownWorkplaces(world, city).filter((b) => !b.site)
   const byId = new Map(own.map((b) => [b.id, b]))
@@ -313,6 +317,13 @@ function shareOut(
     const place = placeOf(r)
     const good = place && place.kind !== 'farm' && chainGood(world, place)
     if (good && !shortOf.has(good)) release(r, true)
+  }
+  // A worker stays where they are until the city moves them: one the last pass put to work who
+  // has no workplace now (a carrier freed at the storage) goes back there when nothing else needs them.
+  for (const r of spare) {
+    const before = plan.jobs[r.id]
+    if (!before || kept.has(r.id) || !byId.has(before.buildingId ?? '')) continue
+    if (before.kind === 'work' || before.kind === 'farm') kept.set(r.id, before)
   }
   const wanted = farmersWanted(world, city)
   const farmers = adults.filter((r) => jobs[r.id]?.kind === 'farm')
