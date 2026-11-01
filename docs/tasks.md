@@ -28,7 +28,8 @@ footprint workable, smooth movement on the map, horse names and a Horses drawer)
 repeats (51) and Training (52), in that order, all ahead of Bandits. Agreed with Daniel later on
 2026-10-31: then Clear trading (Epic 53: the trade section explains itself) and Holding the town
 hall (54, ADR 0017: a city is captured by occupying its town hall for some game days), in that
-order, both ahead of Bandits.
+order, both ahead of Bandits. Agreed with Daniel on 2026-11-01: Relocating (Epic 55: a Player moves
+residents to another city of their realm) next, ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -87,6 +88,7 @@ I sleep.
 | 52  | [Training](https://github.com/dasanten/strategy-code-poc/issues/592)                          | ticketed                |
 | 53  | [Clear trading](https://github.com/dasanten/strategy-code-poc/issues/631)                     | ticketed                |
 | 54  | [Holding the town hall](https://github.com/dasanten/strategy-code-poc/issues/632)             | ticketed                |
+| 55  | [Relocating](https://github.com/dasanten/strategy-code-poc/issues/652)                        | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

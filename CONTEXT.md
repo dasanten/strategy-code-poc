@@ -289,7 +289,8 @@ The shared language of the game. Domain terms only — no implementation details
   renames it. Others learn a new name only by sight (see Last seen).
 - **Town hall:** the building that makes a city. Building one founds a new city, belonging to the
   realm whose residents finished it. Tearing it down dissolves the city: its buildings and
-  residents stay where they are, and its residents are homeless.
+  residents stay where they are, and its residents are homeless (a Player can Relocate
+  theirs).
 - **City building:** a town hall, house, storage, wall or gate (and later ones of their kind);
   not farms, workplaces or stables. It is part of a city when it lies within a short distance of
   the city's town hall or of another building already part of that city, so a city grows outward
@@ -601,6 +602,19 @@ The shared language of the game. Domain terms only — no implementation details
 - **Resident:** a person living in the world. Has stats, skills, health, hunger and an age.
   Needs food or dies; dies of old age eventually. Lives in one city, wherever they are standing.
   _Avoid:_ unit (old code term).
+- **Homeless:** a resident who lives in no city (their town hall was torn down, or they were
+  left behind when their city changed hands). They have no home to refill at and can't pair
+  until they Relocate.
+- **Relocate:** a Player order (UI, queue step or script, `relocate(cityId)`) for any resident of
+  their realm, the Leader, children and homeless ones included, naming another city of the same
+  realm. The resident walks there and becomes its resident on stepping into its area, at once if
+  already in it; like any order it replaces the current one. It can be given only while the city
+  has free housing for them, counting residents already relocating there; a group needs room
+  for all of them. A partner who is Carrying can't be told to relocate until the child is born.
+  On arrival, the city must still have free housing and still be the realm's: if not, the order
+  ends, they keep their old city and the realm log says why (in a group, each moves in while room
+  lasts). Moving to another city ends a pair (Pairing needs one city). NPC cities don't relocate
+  residents, besides sending a founding party to a daughter city.
 - **Renaming a resident:** the Player can rename any resident of their realm, their Leader
   included, by hand or from a script: free, instant, from anywhere. Names need not be unique.
   Renaming the Leader never renames the realm (see Realm name). The realm log keeps the names
