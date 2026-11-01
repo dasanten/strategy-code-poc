@@ -740,6 +740,7 @@ export class ScriptRunner {
         ran.has(r.id) && unedited(r) ? this.host.script(r.script!.scriptId)?.task : undefined
       out.push(...defaultsHaveATarget(world, taskOf))
       out.push(...lineBuildersOnTheirLine(world, taskOf, this.terrain.size))
+      out.push(...lineBuildersApart(world, taskOf))
     }
     return out
   }
@@ -1272,6 +1273,40 @@ export function lineBuildersOnTheirLine(
         entityIds: [r.id],
       })
     }
+  }
+  return out
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Build line, a crew on one line): residents of one realm
+ * running the Build line default as the game ships it (`taskOf`) on the same line never take the
+ * same tile (`memory.at`), so no two of them build it.
+ */
+export function lineBuildersApart(
+  world: WorldState,
+  taskOf: (r: Resident) => Task | undefined,
+): InvariantViolation[] {
+  const out: InvariantViolation[] = []
+  // Who took each tile, by realm, line and tile.
+  const took = new Map<string, string>()
+  for (const r of world.residents) {
+    if (!r.script || taskOf(r) !== 'buildLine') continue
+    const { line, at } = r.script.memory as {
+      line?: BuildLine | null
+      at?: { x: number; y: number } | null
+    }
+    if (!line || !at) continue
+    const key = `${r.owner ?? r.cityId}|${JSON.stringify(line)}|${at.x},${at.y}`
+    const other = took.get(key)
+    if (other === undefined) {
+      took.set(key, r.id)
+      continue
+    }
+    out.push({
+      invariant: 'line-builders-apart',
+      message: `${other} and ${r.id} both took (${at.x}, ${at.y}) of their ${line.building} line`,
+      entityIds: [other, r.id],
+    })
   }
   return out
 }

@@ -698,11 +698,13 @@ ${LOG_TEXT}
 // tile of the line from memory.line.from to memory.line.to, straight or
 // diagonal, as the Build line order gives it; started without one I end.
 // Tiles that have one already, or can't take one, are skipped. I take the
-// nearest tile still to build, walk there, lay out its site or join the one
-// there, and build it. What I carry goes in first; lacking some, I fetch
-// from params.source, or the nearest storage of my realm holding them while
-// none is picked, as much as I can carry for this tile and the next ones,
-// topping my food up to params.foodTake there. With none in any storage I
+// nearest tile still to build that no other of us on this line has taken,
+// walk there, lay out its site or join the one there, and build it; with
+// every tile left taken I wait for the others to finish the line. What I
+// carry goes in first; lacking some, I fetch from params.source, or the
+// nearest storage of my realm holding them while none is picked, as much as
+// I can carry for this tile and my share of the next ones, topping my food
+// up to params.foodTake there. With none in any storage I
 // lay out each tile's site and go on to the next; once all are laid out I
 // end, saying why. Below params.foodAt units of Food on me I get Food up to
 // params.foodTake at params.source, or the nearest storage of my realm with
@@ -720,12 +722,15 @@ if (me.order != null && me.order.kind != "build") { // on my way
 }
 
 let tiles = lineTiles(memory.line, me) // nearest first
+let crew = withMemory("line", memory.line) // all of us on this line, me too
+let taken = takenByOthers(crew)
 if (me.order == null) {
-  let tile = pickTile(tiles)
+  let tile = pickTile(tiles, taken)
   if (tile == null) {
     endLine(tiles)
     return
   }
+  memory.waiting = null
   if (walkThere(tile)) { return }
   // With no Food anywhere, I build on.
   if (getFoodIfLow(params.source, me)) { return }
@@ -736,14 +741,24 @@ if (me.order.siteId == null) { return } // laid out at the end of the tick
 let site = building(me.order.siteId)
 if (site == null || bringCarried(site)) { return }
 if (getFoodIfLow(params.source, me)) { return }
-fetchMissing(site, tiles)
+fetchMissing(site, tiles, crew, taken)
 
-// The tile I build next, kept in memory.at: the nearest still to build, and
-// while no storage holds materials the nearest not laid out yet. Null once
-// there is none.
-fn pickTile(tiles) {
+// The tiles others of us on this line have taken, by "x,y".
+fn takenByOthers(crew) {
+  let taken = {}
+  for (r of crew) {
+    let at = r.script.memory.at
+    if (r.id != me.id && at != null) { taken[at.x + "," + at.y] = true }
+  }
+  return taken
+}
+
+// The tile I build next, kept in memory.at: the nearest still to build that
+// no other of us has taken, and while no storage holds materials the nearest
+// not laid out yet. Null once there is none.
+fn pickTile(tiles, taken) {
   for (t of tiles) {
-    if (memory.noStock == null || t.siteId == null) {
+    if ((memory.noStock == null || t.siteId == null) && taken[t.x + "," + t.y] == null) {
       memory.at = {x: t.x, y: t.y}
       return t
     }
@@ -752,12 +767,19 @@ fn pickTile(tiles) {
   return null
 }
 
-// No tile left to take: the line is built, or every tile left is laid out
-// and still no storage holds materials. With some there again, I go on.
+// No tile left to take: the line is built, every tile left is taken by
+// others of us, or every tile left is laid out and still no storage holds
+// materials. With others building the rest I wait for them to finish it;
+// with materials there again, I go on.
 fn endLine(tiles) {
   if (tiles.length == 0) {
     log("the " + memory.line.building + " line is finished")
     end()
+  } else if (memory.noStock == null) {
+    if (memory.waiting == null) {
+      log("the rest of the line is taken: waiting for it to be finished")
+      memory.waiting = true
+    }
   } else if (materialsFrom(me, memory.noStock) != null) {
     log("there is " + goodsNames(memory.noStock) + " again: building the laid-out sites")
     memory.noStock = null
@@ -807,10 +829,11 @@ fn bringCarried(site) {
 }
 
 // Lacking materials for my tile: fetch them from params.source, or the
-// nearest storage holding them, for this tile and the next ones, as much as
-// I can carry, with my food topped up to params.foodTake. With none in any
-// storage I leave the site laid out and go on to the next tile.
-fn fetchMissing(site, tiles) {
+// nearest storage holding them, for this tile and my share of the next ones
+// nobody has taken, as much as I can carry, with my food topped up to
+// params.foodTake. With none in any storage I leave the site laid out and go
+// on to the next tile.
+fn fetchMissing(site, tiles, crew, taken) {
   let missing = materialsNeeded(site)
   if (missing.length == 0) { return }
   let goods = goodsOf(missing)
@@ -827,7 +850,12 @@ fn fetchMissing(site, tiles) {
   let load = {}
   let topUp = foodToTake()
   if (topUp > 0) { load.food = topUp }
-  let more = tiles.length - 1 // the next tiles still to build
+  // My share of the next tiles still to build that no other of us has taken.
+  let free = 0
+  for (t of tiles) {
+    if (taken[t.x + "," + t.y] == null) { free = free + 1 }
+  }
+  let more = floor((free - 1) / crew.length)
   for (m of missing) {
     let perTile = m.units // what a tile takes: what this one lacks and has
     let had = site.site.delivered[m.good]

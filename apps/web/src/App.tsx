@@ -606,9 +606,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       case 'wallTo':
         if (!groupLineFrom) return
         setGroupLineFrom(undefined)
+        // Each gets the Build line task with the same line, so they share it (`CONTEXT.md`: Build line).
         return sendGroup({
           kind: 'line',
-          line: mode === 'roadTo' ? 'roadLine' : 'wallLine',
+          building: mode === 'roadTo' ? 'road' : 'wall',
           from: groupLineFrom,
           to: { x, y },
         })

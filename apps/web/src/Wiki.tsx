@@ -551,9 +551,10 @@ export function Wiki() {
             of them there who isn't breeding yet tends the pair. Pick two more for the next.
           </li>
           <li>
-            <strong>Build road</strong> and <strong>Build wall</strong>: pick where the line starts
-            and ends; they all build along it. <strong>Tear down</strong>: pick a building; those
-            standing at it tear it down.
+            <strong>Build line: road</strong> and <strong>Build line: wall</strong>: pick where the
+            line starts and ends; each gets Build line with that line, and they share it (see
+            Building). <strong>Tear down</strong>: pick a building; those standing at it tear it
+            down.
           </li>
           <li>
             <strong>Attack</strong>: pick a resident of another realm, or a wall or gate, for them
@@ -1080,6 +1081,12 @@ export function Wiki() {
           its line comes only from the order, so run directly or with Run script it ends at once
           (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code>{' '}
           actions, which build only with what the resident carries, stay for your scripts.
+        </p>
+        <p>
+          <strong>A crew on one line:</strong> residents on the same line, from the group card or
+          given it one by one, each take the nearest tile still to build that no other of them has
+          taken, so several tiles go up at once; each fetches their own materials. With every tile
+          left taken by the others, a builder waits, and they all stop once the line is finished.
         </p>
         <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
