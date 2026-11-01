@@ -24,6 +24,7 @@ import { describe, expect, it } from 'vitest'
 import { checkInvariants } from './invariants.js'
 import { putToWork, stepNpcCities } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
+import { shortGoods } from './npc-chain.js'
 import { planCity } from './npc-plan.js'
 import { mulberry32, newResident } from './residents.js'
 import { ScriptRunner, type ScriptHost } from './script-runner.js'
@@ -367,6 +368,32 @@ describe('setting out for a workplace in an NPC city', () => {
     stepNpcCities(world, terrain.size, terrain)
     expect(stays.script?.memory.carry).toEqual(stored(CREW_FOOD))
     expect(freed.script?.memory.carry).toBeUndefined()
+  })
+
+  it('a carrier freed at home goes back to the far camp, though the city has Wood enough', () => {
+    const { world, terrain, city } = village(256)
+    const storage = storageOf(world, city)
+    storage.stock = { food: 200, wood: 1000 }
+    const camp = farCamp(world, terrain, city, { x: storage.x + 100, y: storage.y })
+    const crew = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6'].map((id) =>
+      villager(world, city, id, camp, OWN_FOOD),
+    )
+    for (const r of crew) putToWork(r, camp)
+    const working = { kind: 'work', buildingId: camp.id }
+    // Planned without the terrain, the city picks no project to send spare hands to.
+    planCity(world, city)
+    expect(shortGoods(world, city)).not.toContain('wood')
+    for (const r of crew) expect(world.cityPlans[city.id]!.jobs[r.id]).toEqual(working)
+    // One of the crew walks back to the camp's own tile by the Work default, with the crew's
+    // Food: one place at the camp, not two. Another is home with the load stored, free, and
+    // between jobs when the next pass comes (Carrying the output): the city never moved them.
+    const [back, freed] = crew as [Resident, Resident]
+    const walk = { kind: 'walkTo' as const, target: { x: camp.x, y: camp.y }, path: null }
+    Object.assign(back, { x: storage.x, y: storage.y, order: { ...walk, progress: 0 } })
+    Object.assign(freed, { x: storage.x, y: storage.y, order: null })
+    delete freed.script
+    const plan = planCity(world, city)
+    for (const r of crew) expect(plan.jobs[r.id]).toEqual(working)
   })
 
   it(
