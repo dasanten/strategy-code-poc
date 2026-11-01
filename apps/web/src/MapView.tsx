@@ -504,7 +504,7 @@ export function MapView({
       drawStructures(under, g, tokens, cam, view, worldRef.current)
 
       const world = worldRef.current
-      // The Player's planned roads and walls, as ghosts (`CONTEXT.md`: Planned building).
+      // The Player's planned roads, walls and buildings, as ghosts (`CONTEXT.md`: Planned building).
       if (!world.admin) {
         const plans = plannedBuilding(world, selectedRef.current)
         drawPlans(under, cam, view, mapSize, plans, world.buildings, relationshipColor('own'))

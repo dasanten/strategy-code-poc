@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LineOrder, Queue } from '@csp/shared'
-import { plannedBuilding, plannedLines } from './plans.js'
+import { plannedBuilding, plannedBuilds, plannedLines } from './plans.js'
 
 const size = 100
 const home = { realmId: 'me' }
@@ -133,5 +133,78 @@ describe('the lines a resident is on or has queued', () => {
     expect(
       plannedLines({ order: null, queue: queue([{ kind: 'walkTo' }, ...steps]) }, size),
     ).toEqual([])
+  })
+})
+
+describe('the Player’s planned buildings', () => {
+  const buildOrder = (building: string, x: number, y: number, siteId: string | null = null) => ({
+    kind: 'build',
+    building,
+    at: { x, y },
+    siteId,
+  })
+  const buildStep = (building: string, x: number, y: number) => ({
+    kind: 'task',
+    task: 'build',
+    building,
+    at: { x, y },
+  })
+  const footprints = (plans: ReturnType<typeof plannedBuilding>) =>
+    plans.footprints.map((f) => `${f.kind}:${f.x},${f.y}${f.strong ? '!' : ''}`).sort()
+
+  it('ghosts the footprint of a Build step waiting in the queue, and of the current one', () => {
+    const steps = [{ kind: 'walkTo', x: 1, y: 1 }, buildStep('house', 10, 12)]
+    const waiting = resident('a', { queue: queue(steps) })
+    const running = resident('b', { queue: queue([buildStep('farm', 20, 20)]) })
+    const plans = plannedBuilding({ residents: [waiting, running], buildings: [], home, map }, [])
+    expect(footprints(plans)).toEqual(['farm:20,20', 'house:10,12'])
+  })
+
+  it('ghosts the footprint of a Build order not laid out yet, and none once it has a site', () => {
+    const ordered = resident('a', { order: buildOrder('storage', 5, 5) })
+    const onSite = resident('b', { order: buildOrder('mine', 9, 9, 's1') })
+    const plans = plannedBuilding({ residents: [ordered, onSite], buildings: [], home, map }, [])
+    expect(footprints(plans)).toEqual(['storage:5,5'])
+  })
+
+  it('drops the ghost once a site or building of that kind stands there', () => {
+    const r = resident('a', {
+      queue: queue([buildStep('house', 10, 12), buildStep('house', 3, 3)]),
+    })
+    const buildings = [
+      { kind: 'house', x: 10, y: 12 },
+      // Another kind on the tile is no house: the house is still to build.
+      { kind: 'storage', x: 3, y: 3 },
+    ] as const
+    expect(footprints(plannedBuilding({ residents: [r], buildings, home, map }, []))).toEqual([
+      'house:3,3',
+    ])
+  })
+
+  it('draws the picked residents’ builds strong, a build planned twice once', () => {
+    const a = resident('a', { order: buildOrder('house', 4, 4) })
+    const b = resident('b', { queue: queue([buildStep('house', 4, 4)]) })
+    const other = { ...resident('x', { order: buildOrder('farm', 1, 1) }), owner: 'them' }
+    const plans = plannedBuilding({ residents: [a, b, other], buildings: [], home, map }, ['b'])
+    expect(footprints(plans)).toEqual(['house:4,4!'])
+  })
+
+  it('makes a single road or wall build a tile of the planned lines', () => {
+    const r = resident('a', { queue: queue([buildStep('road', 2, 2), buildStep('wall', 3, 2)]) })
+    const plans = plannedBuilding({ residents: [r], buildings: [], home, map }, [])
+    expect(plans.footprints).toEqual([])
+    expect(keys(plans)).toEqual(['road:2,2', 'wall:3,2'])
+  })
+
+  it('keeps a Build order a defence script interrupted, and skips steps with no kind or place', () => {
+    const interrupted = { order: buildOrder('smithy', 7, 7) }
+    const steps = [
+      { kind: 'task', task: 'build', building: 'house' },
+      { kind: 'task', task: 'build', building: 'castle', at: { x: 1, y: 1 } },
+      { kind: 'task', task: 'work', at: { x: 1, y: 1 } },
+    ]
+    expect(plannedBuilds({ order: null, interrupted, queue: queue(steps) } as never)).toEqual([
+      { kind: 'smithy', x: 7, y: 7 },
+    ])
   })
 })

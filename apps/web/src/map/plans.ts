@@ -1,9 +1,11 @@
 import type { Graphics } from 'pixi.js'
 import {
+  FOOTPRINT,
   LINE_BUILDING,
   isLineOrder,
   roadLine,
   type Building,
+  type BuildingKind,
   type OrderRequest,
   type SeenResident,
 } from '@csp/shared'
@@ -22,6 +24,14 @@ export interface GhostTile {
   strong: boolean
 }
 
+/** A build of the Player's not laid out yet: its kind and north-west tile; `strong` as above. */
+export interface GhostFootprint {
+  x: number
+  y: number
+  kind: BuildingKind
+  strong: boolean
+}
+
 /**
  * What the Player's residents are set to build but haven't laid out yet (`CONTEXT.md`: Planned
  * building), drawn as faint ghosts on the map.
@@ -29,6 +39,8 @@ export interface GhostTile {
 export interface Plans {
   /** Tiles still to build of their road and wall lines, running or queued. */
   lines: GhostTile[]
+  /** Footprints of the other builds they are ordered or queued to do. */
+  footprints: GhostFootprint[]
 }
 
 /** How strongly a ghost is drawn: faint, or a picked resident's. */
@@ -77,6 +89,41 @@ function queuedLine(order: OrderRequest, size: number) {
   return { kind: LINE_BUILDING[order.kind], tiles: roadLine(from, to, size) }
 }
 
+/**
+ * The builds a resident is ordered or queued to do, each with the north-west tile of its
+ * footprint: a Build order that has no site yet (or the one a defence script interrupted), and
+ * the queue's Build steps, the current one too, since its task walks there first and its order
+ * shows no place until the site is laid out.
+ */
+export function plannedBuilds(
+  r: Pick<SeenResident, 'order' | 'queue' | 'interrupted'>,
+): { kind: BuildingKind; x: number; y: number }[] {
+  const out: { kind: BuildingKind; x: number; y: number }[] = []
+  for (const o of [r.order, r.interrupted?.order]) {
+    if (o?.kind === 'build' && o.siteId === null) out.push({ kind: o.building, ...o.at })
+  }
+  const q = r.queue
+  if (q) {
+    const waiting = [...q.steps.slice(q.current), ...(q.loop ? q.steps.slice(0, q.current) : [])]
+    for (const { order } of waiting) {
+      const build = queuedBuild(order)
+      if (build) out.push(build)
+    }
+  }
+  return out
+}
+
+/** A queue step's build, a Build task's or order's, if it names its kind and place. */
+function queuedBuild(order: OrderRequest) {
+  const isBuild = order.kind === 'build' || (order.kind === 'task' && order.task === 'build')
+  const { building, at } = order
+  if (!isBuild || !isKind(building) || !isTile(at)) return undefined
+  return { kind: building, x: at.x, y: at.y }
+}
+
+const isKind = (k: unknown): k is BuildingKind =>
+  typeof k === 'string' && Object.hasOwn(FOOTPRINT, k)
+
 const isTile = (t: unknown): t is { x: number; y: number } =>
   typeof t === 'object' &&
   t !== null &&
@@ -86,36 +133,46 @@ const isTile = (t: unknown): t is { x: number; y: number } =>
 /**
  * The Player's planned building (`CONTEXT.md`: Planned building): the tiles of their residents'
  * lines that have no site or finished building of the line's kind yet (a wall line passes over a
- * gate too), each once, strong if any picked resident plans it.
+ * gate too), and the footprints of their builds with no site or finished building of that kind
+ * there yet, each once, strong if any picked resident plans it. A single road or wall build is
+ * a tile of a line, so it joins the ones beside it.
  */
 export function plannedBuilding(world: Planners, picked: readonly string[]): Plans {
   const { size } = world.map
   const built = new Set<string>()
   for (const b of world.buildings) {
-    if (b.kind === 'road') built.add(`road:${b.x},${b.y}`)
-    if (b.kind === 'wall' || b.kind === 'gate') built.add(`wall:${b.x},${b.y}`)
+    built.add(`${b.kind}:${b.x},${b.y}`)
+    if (b.kind === 'gate') built.add(`wall:${b.x},${b.y}`)
   }
-  const ghosts = new Map<string, GhostTile>()
+  const lines = new Map<string, GhostTile>()
+  const footprints = new Map<string, GhostFootprint>()
+  const add = <G extends GhostTile | GhostFootprint>(to: Map<string, G>, ghost: G) => {
+    const key = `${ghost.kind}:${ghost.x},${ghost.y}`
+    if (built.has(key)) return
+    const had = to.get(key)
+    if (!had) to.set(key, ghost)
+    else if (ghost.strong) had.strong = true
+  }
   for (const r of world.residents) {
     if (r.owner !== world.home.realmId) continue
     const strong = picked.includes(r.id)
     for (const { kind, tiles } of plannedLines(r, size)) {
-      for (const [x, y] of tiles) {
-        const key = `${kind}:${x},${y}`
-        if (built.has(key)) continue
-        const had = ghosts.get(key)
-        if (!had) ghosts.set(key, { x, y, kind, strong })
-        else if (strong) had.strong = true
-      }
+      for (const [x, y] of tiles) add(lines, { x, y, kind, strong })
+    }
+    for (const { kind, x, y } of plannedBuilds(r)) {
+      if (kind === 'road' || kind === 'wall') add(lines, { x, y, kind, strong })
+      else add(footprints, { x, y, kind, strong })
     }
   }
-  return { lines: [...ghosts.values()] }
+  return { lines: [...lines.values()], footprints: [...footprints.values()] }
 }
 
 /**
  * Draws the Player's plans as ghosts under the tokens: road tiles as a faint road band, wall
  * tiles as a faint wall in `wallColour`, each joined to the ghosts and finished ones beside it
- * the way a road or wall is (`roads.ts`), so a ring shows whole and fills in as it is built.
+ * the way a road or wall is (`roads.ts`), so a ring shows whole and fills in as it is built; and
+ * each planned footprint as a faint square in `wallColour`, the Player's own, the way a
+ * building's plate is drawn.
  */
 export function drawPlans(
   g: Graphics,
@@ -127,6 +184,23 @@ export function drawPlans(
   wallColour: number,
 ) {
   const tile = cam.scale
+  for (const strength of ['faint', 'strong'] as const) {
+    const alpha = GHOST_ALPHA[strength]
+    const inset = tile * 0.08
+    const squares: number[][] = []
+    for (const f of plans.footprints) {
+      if (f.strong !== (strength === 'strong')) continue
+      const side = FOOTPRINT[f.kind] * tile
+      const [sx, sy] = tileToScreen(cam, view, size, f.x, f.y)
+      if (sx + side < 0 || sy + side < 0 || sx > view.width || sy > view.height) continue
+      squares.push([sx + inset, sy + inset, side - 2 * inset, side - 2 * inset])
+    }
+    if (squares.length === 0) continue
+    for (const [x, y, w, h] of squares) g.rect(x!, y!, w!, h!)
+    g.fill({ color: wallColour, alpha: alpha * 0.35 })
+    for (const [x, y, w, h] of squares) g.rect(x!, y!, w!, h!)
+    g.stroke({ width: Math.max(1.5, tile * 0.06), color: wallColour, alpha })
+  }
   const at = (x: number, y: number) => `${(x + size) % size},${(y + size) % size}`
   const centre = (x: number, y: number) => tileToScreen(cam, view, size, x + 0.5, y + 0.5)
   const near = ([sx, sy]: readonly number[]) =>
