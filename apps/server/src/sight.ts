@@ -19,6 +19,7 @@ import {
   type Army,
   type Building,
   type BuildingKind,
+  type BuildLine,
   type RunningScript,
   type SeenScript,
   type Carriage,
@@ -279,7 +280,8 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
   const { memory } = script
   const id = memory.workplaceId ?? memory.buildingId
   // Build line's kind is its line's (`TaskMemory`).
-  const kind = memory.building ?? (memory.line as { building?: unknown } | null)?.building
+  const line = buildLineOf(memory.line)
+  const kind = memory.building ?? line?.building
   const building =
     typeof kind === 'string' && Object.hasOwn(FOOTPRINT, kind)
       ? (kind as BuildingKind)
@@ -289,8 +291,21 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
     ...(script.task ? { task: script.task } : {}),
     ...(building ? { building } : {}),
     ...(typeof memory.doing === 'string' && memory.doing ? { doing: memory.doing } : {}),
+    ...(line ? { line } : {}),
     ...(script.waitingSince !== undefined ? { waiting: true as const } : {}),
   }
+}
+
+/** A Build line task's line from its memory (`TaskMemory`), copied, if it holds one. */
+function buildLineOf(line: unknown): BuildLine | undefined {
+  const l = line as Partial<Record<keyof BuildLine, unknown>> | null | undefined
+  const tile = (t: unknown) => {
+    const { x, y } = (t ?? {}) as { x?: unknown; y?: unknown }
+    return Number.isInteger(x) && Number.isInteger(y) ? { x: x as number, y: y as number } : null
+  }
+  const [from, to] = [tile(l?.from), tile(l?.to)]
+  if ((l?.building !== 'road' && l?.building !== 'wall') || !from || !to) return undefined
+  return { building: l.building, from, to }
 }
 
 /**

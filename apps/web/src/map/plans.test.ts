@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { LineOrder, Queue } from '@csp/shared'
+import type { BuildLine, LineOrder, Queue, SeenScript } from '@csp/shared'
 import { plannedBuilding, plannedBuilds, plannedLines } from './plans.js'
 
 const size = 100
@@ -205,6 +205,90 @@ describe('the Player’s planned buildings', () => {
     ]
     expect(plannedBuilds({ order: null, interrupted, queue: queue(steps) } as never)).toEqual([
       { kind: 'smithy', x: 7, y: 7 },
+    ])
+  })
+})
+
+describe('the Player’s planned Build lines', () => {
+  const buildLine = (building: string, from: [number, number], to: [number, number]) => ({
+    building,
+    from: { x: from[0], y: from[1] },
+    to: { x: to[0], y: to[1] },
+  })
+  const running = (line: ReturnType<typeof buildLine>): SeenScript => ({
+    scriptId: 0,
+    task: 'buildLine',
+    building: line.building as BuildLine['building'],
+    line: line as BuildLine,
+  })
+
+  it('ghosts the tiles of a running Build line task, from its line’s two ends', () => {
+    const r = resident('a', { script: running(buildLine('wall', [3, 4], [5, 4])) })
+    expect(keys(plannedBuilding({ residents: [r], buildings: [], home, map }, []))).toEqual([
+      'wall:3,4',
+      'wall:4,4',
+      'wall:5,4',
+    ])
+  })
+
+  it('drops the tiles the crew has laid out or built, the picked one’s strong', () => {
+    const line = buildLine('wall', [3, 4], [6, 4])
+    const [a, b] = [
+      resident('a', { script: running(line) }),
+      resident('b', { script: running(line) }),
+    ]
+    const buildings = [
+      { kind: 'wall', x: 3, y: 4 },
+      { kind: 'wall', x: 5, y: 4 },
+    ] as const
+    expect(keys(plannedBuilding({ residents: [a, b], buildings, home, map }, ['b']))).toEqual([
+      'wall:4,4!',
+      'wall:6,4!',
+    ])
+  })
+
+  it('ghosts a Build line step waiting in the queue, and not the running one twice', () => {
+    const steps = [
+      { kind: 'task', task: 'buildLine', ...buildLine('road', [1, 1], [2, 1]) },
+      { kind: 'task', task: 'buildLine', ...buildLine('wall', [10, 10], [11, 11]) },
+    ]
+    const r = resident('a', {
+      script: running(buildLine('road', [1, 1], [2, 1])),
+      queue: queue(steps),
+    })
+    expect(plannedLines(r, size)).toEqual([
+      {
+        kind: 'road',
+        tiles: [
+          [1, 1],
+          [2, 1],
+        ],
+      },
+      {
+        kind: 'wall',
+        tiles: [
+          [10, 10],
+          [11, 11],
+        ],
+      },
+    ])
+  })
+
+  it('keeps a Build line a defence script interrupted, and skips steps with no kind or ends', () => {
+    const interrupted = { order: null, script: running(buildLine('road', [7, 7], [7, 8])) }
+    const steps = [
+      { kind: 'walkTo' },
+      { kind: 'task', task: 'buildLine', ...buildLine('house', [1, 1], [2, 1]) },
+      { kind: 'task', task: 'buildLine', building: 'wall', from: { x: 1, y: 1 } },
+    ]
+    expect(plannedLines({ order: null, interrupted, queue: queue(steps) } as never, size)).toEqual([
+      {
+        kind: 'road',
+        tiles: [
+          [7, 7],
+          [7, 8],
+        ],
+      },
     ])
   })
 })
