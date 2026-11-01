@@ -752,3 +752,44 @@ export const LINE_BUILDING: Record<LineOrder['kind'], 'road' | 'wall'> = {
 export function isLineOrder(o: ResidentOrder | null | undefined): o is LineOrder {
   return o?.kind === 'roadLine' || o?.kind === 'wallLine'
 }
+
+/**
+ * A Build line (`CONTEXT.md`: Build line; ADR 0018): road or wall from the `from` tile to the `to`
+ * tile, straight or diagonal along `roadLine`. The Build line task keeps it as `memory.line`, so
+ * it is a type, not an interface: plain data a script memory can hold.
+ */
+export type BuildLine = {
+  building: 'road' | 'wall'
+  from: { x: number; y: number }
+  to: { x: number; y: number }
+}
+
+/** A tile of a Build line still to build, with its construction site once one is laid out. */
+export interface LineTile {
+  x: number
+  y: number
+  siteId: string | null
+}
+
+/**
+ * Tile (x, y) of a line of `building` as still to build (`CONTEXT.md`: Build line): with the
+ * unfinished site of that kind on it, or none where one can be laid out. Undefined where the tile
+ * has one already (a road, or a wall or gate) or can't take one, so the line skips it.
+ */
+export function lineTile(
+  world: WorldState,
+  building: BuildLine['building'],
+  x: number,
+  y: number,
+  terrain?: TerrainMap | TerrainLookup,
+): LineTile | undefined {
+  const here = constructionAt(world, x, y, building)
+  if (here?.site && here.kind === building) return { x, y, siteId: here.id }
+  return buildProblem(world, x, y, building, terrain) ? undefined : { x, y, siteId: null }
+}
+
+/** The tiles of a Build line still to build (`lineTile`), from its start to its end. */
+export function lineToBuild(world: WorldState, line: BuildLine, terrain?: TerrainMap): LineTile[] {
+  const tiles = roadLine(line.from, line.to, terrain?.size ?? MAP_SIZE)
+  return tiles.flatMap(([x, y]) => lineTile(world, line.building, x, y, terrain) ?? [])
+}

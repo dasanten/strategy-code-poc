@@ -431,6 +431,7 @@ describe('script bindings', () => {
       { kind: 'rename', targetId: 'b1', name: 'Mara', realmName: 'Ironvale' },
     ],
     ['renameCity("c1", "Ironhold")', { kind: 'renameCity', cityId: 'c1', name: 'Ironhold' }],
+    ['relocate("c1")', { kind: 'relocate', cityId: 'c1' }],
     ['renameHorse("h1", "Rowan")', { kind: 'renameHorse', horseId: 'h1', name: 'Rowan' }],
     ['claimHorses()', { kind: 'claimHorses' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
@@ -595,6 +596,49 @@ describe('invariant: a script can request nothing an order couldn’t', () => {
       { ...orderKinds, stop: never },
     )
     expect(found).toHaveLength(1)
+  })
+})
+
+describe('lineTiles', () => {
+  const tiles = (world: WorldState, explored: ExploredTerrain, call: string) => {
+    const { result, memory } = runAs(world, explored, `memory.tiles = ${call}`)
+    expect(result.status).toBe('done')
+    return memory.tiles
+  }
+
+  it('lists the tiles still to build, sites with their id, nearest first with `from`', () => {
+    const { world, explored } = setup()
+    // A road on (9, 12), a road site on (12, 12); b1's tile (11, 10) is no matter to a road.
+    world.buildings.push({ id: 'rd', kind: 'road', cityId: null, x: 9, y: 12 })
+    const site = { delivered: {}, work: 0 }
+    world.buildings.push({ id: 'rs', kind: 'road', cityId: null, x: 12, y: 12, site })
+    const line = '{building: "road", from: {x: 8, y: 12}, to: {x: 12, y: 12}}'
+    expect(tiles(world, explored, `lineTiles(${line})`)).toEqual([
+      { x: 8, y: 12, siteId: null },
+      { x: 10, y: 12, siteId: null },
+      { x: 11, y: 12, siteId: null },
+      { x: 12, y: 12, siteId: 'rs' },
+    ])
+    const near = tiles(world, explored, `lineTiles(${line}, {x: 12, y: 13})`) as { x: number }[]
+    expect(near.map((t) => t.x)).toEqual([12, 11, 10, 8])
+  })
+
+  it('lists a tile out of sight as still to build, whatever is on it', () => {
+    const { world, explored } = setup()
+    world.buildings.push({ id: 'far', kind: 'wall', cityId: null, x: 151, y: 150 })
+    const line = '{building: "wall", from: {x: 150, y: 150}, to: {x: 152, y: 150}}'
+    expect(tiles(world, explored, `lineTiles(${line})`)).toEqual([
+      { x: 150, y: 150, siteId: null },
+      { x: 151, y: 150, siteId: null },
+      { x: 152, y: 150, siteId: null },
+    ])
+  })
+
+  it('needs a line of road or wall', () => {
+    const { world, explored } = setup()
+    const line = '{building: "house", from: {x: 8, y: 12}, to: {x: 12, y: 12}}'
+    const { result } = runAs(world, explored, `lineTiles(${line})`)
+    expect(result).toMatchObject({ status: 'error' })
   })
 })
 

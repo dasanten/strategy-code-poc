@@ -6,6 +6,7 @@ import {
   tileIndex,
   type ArrivalWorld,
   type Building,
+  type City,
   type GoodsPlace,
   type GoodsWanted,
   type Resident,
@@ -48,6 +49,8 @@ interface DoingSeen {
   scripts?: readonly ScriptSummary[]
   buildings?: readonly Pick<Building, 'id' | 'kind'>[]
   residents?: readonly Pick<Resident, 'order'>[]
+  /** The cities the Player knows, to name where a resident relocates to (`CONTEXT.md`: Relocate). */
+  cities?: readonly Pick<City, 'id' | 'name'>[]
   /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
   arrives?: number
 }
@@ -55,23 +58,25 @@ interface DoingSeen {
 /** The Doing line but for the script waiting (`doingLine`). */
 function doingOfOrder(
   r: DoingOf,
-  { scripts = [], buildings = [], residents = [], arrives }: DoingSeen,
+  { scripts = [], buildings = [], residents = [], cities = [], arrives }: DoingSeen,
 ): string {
   if (r.script?.doing) return r.script.doing
   if (r.aboard !== undefined && !r.order) return aboardLine(r, residents)
   if (r.carrying && !r.order) return 'Carrying a child'
   const task = r.script && taskOf(r.script, scripts)
   const step = stepLine(r.order, buildings)
-  if (!task) return step ?? orderDoing(r, arrives)
+  if (!task) return step ?? orderDoing(r, arrives, cities)
   const what = taskLine(task, r.script!.building)
   const o = r.order
   // The task's own order says no more than the task does, but where a haul route is, what a
   // trainee learns and what a smithy makes.
   if (o && o.kind === TASK_ORDER[task]) {
-    if (o.kind === 'haul' || o.kind === 'train') return orderDoing(r, arrives)
-    return o.kind === 'workAt' && o.makes ? `${what}: ${lower(orderDoing(r, arrives))}` : what
+    if (o.kind === 'haul' || o.kind === 'train') return orderDoing(r, arrives, cities)
+    return o.kind === 'workAt' && o.makes
+      ? `${what}: ${lower(orderDoing(r, arrives, cities))}`
+      : what
   }
-  return `${what}: ${o ? lower(step ?? orderDoing(r, arrives)) : 'waiting'}`
+  return `${what}: ${o ? lower(step ?? orderDoing(r, arrives, cities)) : 'waiting'}`
 }
 
 /**
@@ -90,6 +95,7 @@ function aboardLine(
 const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   work: 'workAt',
   build: 'build',
+  buildLine: 'build',
   haul: 'haul',
   tearDown: 'tearDown',
   breed: 'breed',
@@ -111,6 +117,8 @@ function taskLine(task: Task, building: SeenScript['building']): string {
   const name = building && BUILDING_NAMES[building]
   if (task === 'work') return name ? `Working the ${name}` : 'Working'
   if (task === 'build') return name ? `Building ${article(name)} ${name}` : 'Building'
+  if (task === 'buildLine')
+    return name ? `Building ${article(name)} ${name} line` : 'Building a line'
   if (task === 'tearDown') return name ? `Tearing down the ${name}` : 'Tearing down'
   if (task === 'feedStable') return 'Feeding the stable'
   if (task === 'train') return 'Training'

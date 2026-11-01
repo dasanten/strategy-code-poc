@@ -28,6 +28,7 @@ const scripts = [
   summary(6, 'feedStable'),
   summary(7, 'breed'),
   summary(8, 'train'),
+  summary(9, 'buildLine'),
   summary(5, null),
 ]
 const buildings: Pick<Building, 'id' | 'kind'>[] = [
@@ -74,6 +75,21 @@ const haul: ResidentOrder = {
 const line = (r: DoingOf) => doingLine(r, { scripts, buildings })
 
 describe('doingLine', () => {
+  it('names the city a resident relocates to (`CONTEXT.md`: Relocate)', () => {
+    const order: ResidentOrder = {
+      kind: 'relocate',
+      cityId: 'c2',
+      target: at,
+      path: null,
+      progress: 0,
+    }
+    const cities = [{ id: 'c2', name: 'Redbank' }]
+    expect(doingLine({ order }, { cities })).toBe('Relocating to Redbank')
+    const walking = { ...order, path: [[4, 5]] as [number, number][] }
+    expect(doingLine({ order: walking }, { cities })).toBe('Relocating to Redbank · 1 tiles to go')
+    expect(doingLine({ order }, {})).toBe('Relocating to another city')
+  })
+
   it('says what a teacher teaches (`CONTEXT.md`: Teacher)', () => {
     const teach = (subject: 'strength' | 'combat'): ResidentOrder => ({
       kind: 'teach',
@@ -124,6 +140,16 @@ describe('doingLine', () => {
     )
     expect(line({ order: build, script: { scriptId: 2, building: 'lumberCamp' } })).toBe(
       'Building a lumber camp',
+    )
+    // Build line: the line's road or wall (`CONTEXT.md`: Build line).
+    const liner = { scriptId: 9, building: 'wall' as const }
+    const wall: ResidentOrder = { ...build, building: 'wall' }
+    expect(line({ order: wall, script: liner })).toBe('Building a wall line')
+    expect(line({ order: walk, script: liner })).toBe(
+      'Building a wall line: walking to 4, 5 · 1 tiles to go',
+    )
+    expect(line({ order: fetch, script: liner })).toBe(
+      'Building a wall line: fetching 10 wood and 4 stone from the storage',
     )
     expect(line({ order: tearDown, script: { scriptId: 4, building: 'farm' } })).toBe(
       'Tearing down the farm',

@@ -30,6 +30,7 @@ import {
   type LineOrder,
   type StoreOrder,
   type FetchOrder,
+  type RelocateOrder,
   type TerrainMap,
   type WalkOrder,
   type WallMap,
@@ -93,17 +94,25 @@ export const walkTo: OrderKind = {
 
 /**
  * A walk-to or drive order, a haul route driving to its next stop, an attack order going after
- * its target, or a road order walking to its next tile: all go along a path.
+ * its target, a road order walking to its next tile, or a relocate order: all go along a path.
  */
 type MoveOrder =
-  WalkOrder | DriveOrder | HaulOrder | AttackOrder | LineOrder | StoreOrder | FetchOrder
+  | WalkOrder
+  | DriveOrder
+  | HaulOrder
+  | AttackOrder
+  | LineOrder
+  | StoreOrder
+  | FetchOrder
+  | RelocateOrder
 
 function moveOrder(r: Resident): MoveOrder | undefined {
   const o = r.order
   if (o?.kind === 'haul') return o.phase === 'driving' ? o : undefined
   if (isLineOrder(o)) return o.phase === 'walking' ? o : undefined
   if (o?.kind === 'store' || o?.kind === 'fetch') return o.phase === 'walking' ? o : undefined
-  return o?.kind === 'walkTo' || o?.kind === 'drive' || o?.kind === 'attack' ? o : undefined
+  const moving = o?.kind === 'walkTo' || o?.kind === 'drive' || o?.kind === 'attack'
+  return moving || o?.kind === 'relocate' ? o : undefined
 }
 
 /**
@@ -126,7 +135,9 @@ function searchKey(world: WorldState, r: Resident, o: MoveOrder): string {
 }
 
 /** Not driving a carriage: walking, or riding a horse. */
-function onFoot(o: MoveOrder): o is WalkOrder | AttackOrder | LineOrder | StoreOrder | FetchOrder {
+function onFoot(
+  o: MoveOrder,
+): o is WalkOrder | AttackOrder | LineOrder | StoreOrder | FetchOrder | RelocateOrder {
   return o.kind !== 'drive' && o.kind !== 'haul'
 }
 
@@ -185,10 +196,11 @@ function followHolds(
 
 /**
  * A moving order got there: a walk or drive is done, a haul route starts on its stop, an attack
- * order waits for contact or its target's next move, a road order builds on its tile.
+ * order waits for contact or its target's next move, a road order builds on its tile, a relocate
+ * order waits to move in (`stepRelocating`).
  */
 function arrive(r: Resident, o: MoveOrder): void {
-  if (o.kind === 'attack') {
+  if (o.kind === 'attack' || o.kind === 'relocate') {
     o.path = null
     o.progress = 0
     return

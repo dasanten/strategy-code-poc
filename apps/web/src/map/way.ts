@@ -7,16 +7,25 @@ export interface Way {
   path: readonly (readonly [number, number])[] | null
 }
 
-/** Where the selected resident is walking, driving or going after someone, and the way there. */
+/**
+ * Where a picked resident is going along a path, and the way there (`CONTEXT.md`: Way on the
+ * map): walking, driving, hauling, storing, fetching, walking to a road or wall line's next tile,
+ * or going after someone.
+ */
 export function wayAhead(r: Pick<SeenResident, 'order'>): Way | undefined {
   const o = r.order
   if (o?.kind === 'walkTo' || o?.kind === 'drive') return o
   if (o?.kind === 'haul' && o.phase === 'driving')
     return { target: o.stop === 'from' ? o.from : o.to, path: o.path }
-  // Going after a resident: the way ends where they were when it was found; none once in contact.
-  const last = o?.kind === 'attack' ? o.path?.at(-1) : undefined
-  if (o?.kind === 'attack' && last) return { target: { x: last[0], y: last[1] }, path: o.path }
-  return undefined
+  const next = (o?.kind === 'roadLine' || o?.kind === 'wallLine') && o.phase === 'walking'
+  if (next && o.tiles[0]) return { target: { x: o.tiles[0][0], y: o.tiles[0][1] }, path: o.path }
+  // Storing or fetching: the way ends on the tile of the storage or carriage it was found to;
+  // going after a resident, where they were when it was found. None while it is being found, nor
+  // once there (putting, taking) or in contact.
+  const walking = (o?.kind === 'store' || o?.kind === 'fetch') && o.phase === 'walking'
+  const along = walking || o?.kind === 'attack' ? o.path : null
+  const last = along?.at(-1)
+  return last && { target: { x: last[0], y: last[1] }, path: along }
 }
 
 /**

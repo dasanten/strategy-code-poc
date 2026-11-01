@@ -77,8 +77,10 @@ import { hasBlocks, type PlanItem } from './plan-blocks.js'
 import {
   horsesIn,
   nextPick,
+  pickCity,
   pickInto,
   planAsk,
+  planCities,
   planOrder,
   type Plan,
   type PlanAnswer,
@@ -116,6 +118,13 @@ import {
   nodeFit,
   type ActionId,
 } from './selection-view.js'
+import {
+  groupRelocateActionProblem,
+  groupRelocateChoices,
+  knownOf,
+  relocateActionProblem,
+  relocateChoices,
+} from './relocate-view.js'
 import { ScriptLibrary, type ScriptToOpen } from './ScriptLibrary.js'
 import { ScriptLog } from './ScriptLog.js'
 import { ScriptMemoryTree } from './ScriptMemory.js'
@@ -231,6 +240,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // What the group order being picked needs besides the tile, and a line's first end.
   const [groupPickWith, setGroupPickWith] = useState<GroupPickWith>({})
   const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
+  // The start picked for the picked resident's Build line, while they pick its end.
+  const [lineFrom, setLineFrom] = useState<{ x: number; y: number }>()
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
   const [groupReport, setGroupReport] = useState<{ sent: number; of: number; skipped: Skipped[] }>()
   const [groupError, setGroupError] = useState<string>()
@@ -268,6 +279,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       )
     : []
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
+  // The cities and buildings the Player knows, in sight or remembered (`CONTEXT.md`: Last seen).
+  const knownCities = world ? knownOf(world.cities, world.lastSeen.cities) : []
+  const knownBuildings = world ? knownOf(world.buildings, world.lastSeen.buildings) : []
+  /**
+   * For one of the Player's own residents: the cities to relocate them to and why they can't be
+   * told to at all, if they can't (`CONTEXT.md`: Relocate), from what the Player knows.
+   */
+  function relocateFor(r: Resident) {
+    if (!world || r.owner !== world.home.realmId) return undefined
+    const seen = { cities: knownCities, buildings: knownBuildings, residents: world.residents }
+    const choices = relocateChoices(seen, world.home.realmId, r)
+    return { choices, problem: relocateActionProblem(r, choices) }
+  }
+  /** The same for the group picked, all of them or none (`CONTEXT.md`: Group, Relocate). */
+  function relocateForGroup(rs: Resident[]) {
+    if (!world) return undefined
+    const seen = { cities: knownCities, buildings: knownBuildings, residents: world.residents }
+    const choices = groupRelocateChoices(seen, world.home.realmId, rs)
+    return { choices, problem: groupRelocateActionProblem(rs, choices) }
+  }
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
   // A script to open in the library, such as the one a resident's task runs; `at` reopens it.
@@ -311,6 +342,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     paramPick: pickingParam,
     plan,
   })
+  // A step picking a city keeps the card open: it lists the realm's cities to pick from too.
+  const picksCity = plan !== undefined && nextPick(plan)?.pick === 'city'
   /** Leaves pick mode without giving the order; the card comes back as it was. */
   const cancelPick = useCallback(() => {
     setPicking(false)
@@ -409,8 +442,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
    * carriage on their tile there, or, while picking a haul route's other stop, to haul between
-   * their tile and that one, or, while picking a road's or wall's far end, to build it along the
-   * line from their tile to that one (ADR 0002: the server checks it).
+   * their tile and that one, or, while picking a road's or wall's two ends, to build it along the
+   * line between them with the Build line task (ADR 0002: the server checks it).
    */
   async function goTo(x: number, y: number) {
     const mode = picking
@@ -466,10 +499,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setOrderError(await giveOrder({ ...order, x, y, ...haulSetup }))
       return
     }
-    if (mode === 'road' || mode === 'wall') {
-      const kind = mode === 'road' ? 'roadLine' : 'wallLine'
-      const from = { x: selected.x, y: selected.y }
-      setOrderError(await giveOrder({ kind, residentId: selected.id, from, to: { x, y } }))
+    if (mode === 'roadFrom' || mode === 'wallFrom') {
+      // Then the line's other end.
+      setLineFrom({ x, y })
+      setPicking(mode === 'roadFrom' ? 'roadTo' : 'wallTo')
+      return
+    }
+    if ((mode === 'roadTo' || mode === 'wallTo') && lineFrom) {
+      // The Build line task: they run the Player's Build line (default) script (`CONTEXT.md`: Build line).
+      const building = mode === 'roadTo' ? 'road' : 'wall'
+      const order = { kind: 'task', task: 'buildLine', residentId: selected.id, building }
+      setLineFrom(undefined)
+      setOrderError(await giveOrder({ ...order, from: lineFrom, to: { x, y } }))
       return
     }
     setOrderError(await giveOrder({ kind: 'walkTo', residentId: selected.id, x, y }))
@@ -513,6 +554,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
+    const seen = { cities: knownCities, buildings: knownBuildings, residents: w.residents }
+    const cities = plan && nextPick(plan)?.pick === 'city' ? planCities(seen, w.home.realmId) : []
     return (
       <AddStep
         plan={plan}
@@ -526,6 +569,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             : []
         }
         horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
+        cities={cities}
+        onPickCity={(cityId) => {
+          const city = cities.find((c) => c.id === cityId)
+          if (plan && city) void addPlanned(pickCity(plan, city))
+        }}
       />
     )
   }
@@ -596,9 +644,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       case 'wallTo':
         if (!groupLineFrom) return
         setGroupLineFrom(undefined)
+        // Each gets the Build line task with the same line, so they share it (`CONTEXT.md`: Build line).
         return sendGroup({
           kind: 'line',
-          line: mode === 'roadTo' ? 'roadLine' : 'wallLine',
+          building: mode === 'roadTo' ? 'road' : 'wall',
           from: groupLineFrom,
           to: { x, y },
         })
@@ -814,6 +863,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'pair', residentId: selected.id, partnerId }))
   }
+  /** Orders the picked resident to relocate to another city of the realm (`CONTEXT.md`: Relocate). */
+  async function relocate(cityId: string) {
+    if (!selected) return
+    setOrderError(await giveOrder({ kind: 'relocate', residentId: selected.id, cityId }))
+  }
   /**
    * Orders the Player's Leader to hand the realm over to the picked resident (`CONTEXT.md`:
    * Leader handover), the same `handOver` order a script's `handOver` requests.
@@ -1005,6 +1059,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             scripts={scripts}
             buildings={world.buildings}
             inSight={world.residents}
+            cities={knownCities}
             arrivesIn={arrivesIn || undefined}
             tick={world.tick}
             selectedId={selected?.id}
@@ -1268,14 +1323,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             resident={selected}
             arrivesIn={arrivesIn || undefined}
             leaderId={world.home.leaderId}
-            cityName={homeCity?.name}
+            cities={knownCities}
             tick={world.tick}
             picking={picking}
             onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
             carriage={onTile(world.carriages.filter(loadKnown))}
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
-            onRoadTo={() => setPicking((p) => (p === 'road' ? false : 'road'))}
-            onWallTo={() => setPicking((p) => (p === 'wall' ? false : 'wall'))}
+            onRoadTo={() =>
+              setPicking((p) => (p === 'roadFrom' || p === 'roadTo' ? false : 'roadFrom'))
+            }
+            onWallTo={() =>
+              setPicking((p) => (p === 'wallFrom' || p === 'wallTo' ? false : 'wallFrom'))
+            }
             onHaulTo={(setup) => {
               setHaulSetup(setup)
               setPicking((p) => (p === 'haul' ? false : 'haul'))
@@ -1369,6 +1428,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             leaderName={leader?.name}
             onMakeLeader={makeLeader}
+            relocate={relocateFor(selected)}
+            onRelocate={relocate}
             rename={
               selected.owner === world.home.realmId
                 ? {
@@ -1432,7 +1493,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setParamPick(undefined)
               setPlan(undefined)
             }}
-            collapsed={pick !== undefined && pick.kind !== 'army'}
+            collapsed={pick !== undefined && pick.kind !== 'army' && !picksCity}
           />
         </CardSheet>
       )}
@@ -1440,6 +1501,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}>
           <GroupCard
             residents={group}
+            relocate={relocateForGroup(group)}
+            cities={knownCities}
             scripts={scripts}
             buildings={world.buildings}
             carriages={groupCarriages}
@@ -1495,7 +1558,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 realm={world.home.realmId}
               />
             }
-            collapsed={pick?.kind === 'group' || pick?.kind === 'plan'}
+            collapsed={pick?.kind === 'group' || (pick?.kind === 'plan' && !picksCity)}
           />
         </CardSheet>
       )}

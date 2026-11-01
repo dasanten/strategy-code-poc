@@ -462,6 +462,18 @@ export function Wiki() {
           button on the map), or Shift-click residents to add them or take them out.
         </p>
         <p>
+          While residents are picked, the map draws the way each of them is going, as a line ending
+          in a dot: walking, driving or hauling somewhere, storing or fetching, walking to the next
+          tile of a road or wall line, or going after someone. So a script that fetches food shows
+          its way to the storage too. A passenger’s way is the carriage’s.
+        </p>
+        <p>
+          In the same colour the map outlines the places they are set on: the buildings and
+          carriages their script’s params name, and where their order heads for (the workplace they
+          work, the site they build, the storage or carriage they store at or fetch from, both stops
+          of a haul). Only places you can see or remember are outlined.
+        </p>
+        <p>
           On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
           long-press does what right-click does. Turn on Select to make a one-finger drag box a
           group instead of panning.
@@ -539,9 +551,10 @@ export function Wiki() {
             of them there who isn't breeding yet tends the pair. Pick two more for the next.
           </li>
           <li>
-            <strong>Build road</strong> and <strong>Build wall</strong>: pick where the line starts
-            and ends; they all build along it. <strong>Tear down</strong>: pick a building; those
-            standing at it tear it down.
+            <strong>Build line: road</strong> and <strong>Build line: wall</strong>: pick where the
+            line starts and ends; each gets Build line with that line, and they share it (see
+            Building). <strong>Tear down</strong>: pick a building; those standing at it tear it
+            down.
           </li>
           <li>
             <strong>Attack</strong>: pick a resident of another realm, or a wall or gate, for them
@@ -582,8 +595,9 @@ export function Wiki() {
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
           to, pick up, drop, store, fetch, drive, unhitch a horse, mount or dismount, board or get
-          off a carriage, work, build, haul, feed the stable, breed horses, tear down, build a road
-          or wall line, or run one of your scripts with its params.
+          off a carriage, work, build, haul, feed the stable, breed horses, tear down, Build line
+          (road or wall), relocate to another of your cities, or run one of your scripts with its
+          params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
@@ -773,6 +787,34 @@ export function Wiki() {
           {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents (a site holds
           nobody yet), and a city's free housing is the room of its houses minus its residents.
           Health runs up to {num(MAX_HEALTH)}.
+        </p>
+        <p>
+          A resident lives in one city, wherever they stand. One who lives in none is{' '}
+          <b>homeless</b>: their town hall was torn down, or they were away when their city changed
+          hands. A homeless resident has no home to refill at and can't pair.
+        </p>
+        <p>
+          <b>Relocate</b> moves any resident of your realm, your Leader, children and homeless ones
+          too, to another of your cities: pick it on their card. They walk there and become its
+          resident on stepping into its area, at once if they are already in it. You can give the
+          order only while the city has free housing for them, counting residents already relocating
+          there, so the picker shows each city's free housing and greys out a full one. When they
+          arrive the city must still have free housing and still be yours; if not, they stop, keep
+          their old city and your realm log says why. Moving ends a pair, as a pair needs one city.
+          A partner carrying a child can't relocate until it is born; the other partner can, and the
+          child is still born. NPC cities don't relocate anyone. A group relocates from the group
+          card, all of them or none: the city needs free housing for the whole group, and on arrival
+          each moves in while room lasts, anyone left over keeping their old city.
+        </p>
+        <p>
+          Relocate is a queue step too: <strong>Add step</strong> offers it, and you tap one of your
+          cities on the map or pick it from the list. Adding it only checks that the city is yours;
+          free housing is checked when its turn comes, and a step that can't start then is skipped
+          and noted in your realm log. Once they move in, the next step starts. A script relocates
+          with <code>relocate(cityId)</code>, refused for the same reasons as the order; it can{' '}
+          <code>wait()</code> on it and then read <code>me.orderEnded</code>: its{' '}
+          <code>reason</code> is null once they moved in, else why not. While on their way, their{' '}
+          <code>order</code> is <code>"relocate"</code> with the <code>cityId</code> they go to.
         </p>
       </Section>
 
@@ -1051,6 +1093,31 @@ export function Wiki() {
           there, Build ends and your realm log says why.
         </p>
         <p>
+          <strong>Build line</strong> builds road or wall along a line: on a resident's card pick{' '}
+          <em>Build line: road</em> or <em>Build line: wall</em>, then the tile where the line
+          starts and the one where it ends, straight or diagonal, at most {num(ROAD_LINE_MAX_TILES)}{' '}
+          tiles. The resident walks to the line themselves and builds its tiles one at a time, the
+          nearest still to build first; tiles that have one already, or can't take one, are skipped.
+          What they carry goes in first. Lacking materials for their tile, they fetch them from
+          their <code>source</code>, or the nearest storage of your realm holding them, as much as
+          they can carry for this tile and the next ones, topping up their own food there too. With
+          none in any storage they lay out each tile's site and go on to the next; once the whole
+          line is laid out or built they stop, and your realm log says why (“no stone in any
+          storage”), so the line shows and can be finished later. In the queue planner,{' '}
+          <strong>Add step</strong> offers Build line too: pick both ends on the map. No walk goes
+          before it, since the builder walks to the line, and it ends on its own, so it needs no
+          duration; a saved queue or a copied step keeps both tiles. Build line has Build's params;
+          its line comes only from the order, so run directly or with Run script it ends at once
+          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code>{' '}
+          actions, which build only with what the resident carries, stay for your scripts.
+        </p>
+        <p>
+          <strong>A crew on one line:</strong> residents on the same line, from the group card or
+          given it one by one, each take the nearest tile still to build that no other of them has
+          taken, so several tiles go up at once; each fetches their own materials. With every tile
+          left taken by the others, a builder waits, and they all stop once the line is finished.
+        </p>
+        <p>
           A storage in a city's area is that city's storage. One outside any city is an{' '}
           <strong>outpost storage</strong>: it belongs to the realm whose residents finished it and
           counts as a storage of your realm everywhere (Store, Fetch, carrying the output, fetching
@@ -1148,10 +1215,12 @@ export function Wiki() {
           {duration(buildCosts().find((b) => b.kind === 'road')!.buildTicks)} of one builder's work.
           It goes on any land a resident can walk, mountains too: there it takes the same materials
           but {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work, to build and to tear down (the road
-          work column above). One road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along
-          a line that runs straight or diagonal. A wall can be built along a line the same way, past
-          tiles with a wall or gate already; a diagonal wall line closes the way like a straight
-          one.
+          work column above). Roads are built along a line with <strong>Build line</strong> (see{' '}
+          <a href="#building">Building</a>): at most {num(ROAD_LINE_MAX_TILES)} tiles, straight or
+          diagonal. A wall is built along a line the same way, past tiles with a wall or gate
+          already; a diagonal wall line closes the way like a straight one. The tiles your
+          residents' road and wall lines still have to build, running or waiting in their queues,
+          show faintly on your map, the picked residents' stronger; only you see them.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the

@@ -7,8 +7,10 @@ import {
   TICKS_PER_GAME_HOUR,
   canWork,
   neverEnds,
+  stepLine,
   type Building,
   type BuildingKind,
+  type City,
   type Good,
   type OrderRequest,
   type Queue,
@@ -230,7 +232,8 @@ function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
 function actsHere(order: OrderRequest): boolean {
   if (['pickUp', 'drop', 'drive', 'mount', 'board', 'unhitch', 'teach'].includes(order.kind))
     return true
-  if (order.kind !== 'task') return false
+  // A Build line walks to its line itself (`CONTEXT.md`: Build line).
+  if (order.kind !== 'task' || order.task === 'buildLine') return false
   // A Build task laid out somewhere else (`at`) walks there itself.
   return order.task !== 'build' || order.at === undefined
 }
@@ -285,11 +288,15 @@ export interface QueueRow {
   gone?: string
 }
 
-/** What step labels name: the Player's scripts, the buildings in sight and those last seen. */
+/**
+ * What step labels name: the Player's scripts, the buildings in sight and those last seen, and
+ * the cities they know.
+ */
 export interface StepNames {
   scripts?: readonly Pick<ScriptSummary, 'id' | 'name'>[]
   buildings?: readonly Pick<Building, 'id' | 'kind'>[]
   lastSeen?: readonly Pick<Building, 'id' | 'kind'>[]
+  cities?: readonly Pick<City, 'id' | 'name'>[]
 }
 
 /**
@@ -325,7 +332,7 @@ export const realMinutes = (minutes: number) => realTimeOf(minutes * TICKS_PER_G
 /** What a queue step does, as the card lists it: "Work the farm", "Walk to 12, 6". */
 export function stepLabel(
   order: OrderRequest,
-  { scripts = [], buildings = [], lastSeen = [] }: StepNames,
+  { scripts = [], buildings = [], lastSeen = [], cities = [] }: StepNames,
 ): string {
   const at = (p: unknown) => {
     const { x, y } = p as { x: number; y: number }
@@ -384,6 +391,8 @@ export function stepLabel(
       return 'Dismount'
     case 'wallLine':
       return `Build a wall to ${at(order.to)}`
+    case 'relocate':
+      return `Relocate to ${cities.find((c) => c.id === order.cityId)?.name ?? 'another city'}`
     case 'runScript': {
       const script = scripts.find((s) => s.id === order.scriptId)
       return `Run ${script?.name ?? 'a script'}`
@@ -398,6 +407,11 @@ export function stepLabel(
       if (order.task === 'feedStable') return `Feed ${building(order.stableId)}`
       if (order.task === 'breed') return `Breed horses at ${building(order.stableId)}`
       if (order.task === 'train') return `Train at ${building(order.groundId)}`
+      if (order.task === 'buildLine') {
+        const line = stepLine(order)
+        if (!line) return 'Build a line'
+        return `Build a ${line.building} line from ${at(line.from)} to ${at(line.to)}`
+      }
       return `Haul to ${at(order)}`
   }
   return order.kind

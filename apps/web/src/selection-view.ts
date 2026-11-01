@@ -80,6 +80,7 @@ import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
+import type { Picking } from './Residents.js'
 
 /**
  * What the selection card shows (ADR 0008): one of the Player's residents, or a tile of the map
@@ -90,6 +91,7 @@ export type Selection = { kind: 'resident'; id: string } | { kind: 'tile'; x: nu
 /** An action the selection card offers. */
 export type ActionId =
   | 'walk'
+  | 'relocate'
   | 'stop'
   | 'ride'
   | 'board'
@@ -122,6 +124,7 @@ export type ActionId =
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
   walk: 'W',
+  relocate: 'V',
   stop: 'S',
   ride: 'M',
   board: 'K',
@@ -190,7 +193,7 @@ export interface ResidentHere {
   /** Walls and gates of other realms' cities, or of none, in sight. */
   wallsInSight: number
   /** What the map is waiting for a tile for. */
-  picking: false | 'walk' | 'drive' | 'haul' | 'road' | 'wall'
+  picking: Picking
   /**
    * For one of the Player's own residents who isn't their Leader: why the Leader can't hand the
    * realm over to them now (`CONTEXT.md`: Leader handover), undefined when they can. Absent for
@@ -199,6 +202,12 @@ export interface ResidentHere {
   makeLeader?: { problem: string | undefined }
   /** One of the Player's own residents, whom they can rename (`CONTEXT.md`: Renaming a resident). */
   renamable?: boolean
+  /**
+   * For one of the Player's own residents: why they can't be told to relocate at all
+   * (`relocateActionProblem`), undefined when they can. Absent for anyone else's resident, who
+   * gets no Relocate row (`CONTEXT.md`: Relocate).
+   */
+  relocate?: { problem: string | undefined }
   /** They ride a horse, and can dismount (`CONTEXT.md`: Riding). */
   riding?: boolean
   /** They are aboard a carriage, and can get off (`CONTEXT.md`: Passenger). */
@@ -243,12 +252,23 @@ export function residentActions(h: ResidentHere): CardAction[] {
   })
   const picks = (mode: ResidentHere['picking'], label: string) =>
     h.picking === mode ? { label: 'Pick a tile…', active: true as const } : { label }
+  // A Build line's two ends, its start first (`CONTEXT.md`: Build line).
+  const picksLine = (start: Picking, end: Picking, label: string) =>
+    h.picking === start || h.picking === end
+      ? { label: h.picking === start ? 'Pick the start…' : 'Pick the end…', active: true as const }
+      : { label }
   // Working, building, tearing down, hauling and pairing (`CONTEXT.md`: Child, Carrying).
   const works = h.adult && !h.carrying
   const actions: CardAction[] = []
   const add = (a: CardAction) => actions.push(a)
   add(row('walk', '', picks('walk', 'Walk to')))
   if (h.busy) add(row('stop', 'Stop'))
+  // Children and homeless residents too (`CONTEXT.md`: Relocate).
+  if (h.relocate) {
+    const { problem } = h.relocate
+    const refused = problem ? { disabled: true as const, reason: problem } : {}
+    add(row('relocate', 'Relocate…', { opens: true, ...refused }))
+  }
   if (h.riding) add(row('ride', 'Dismount'))
   else if (h.horseToRide) add(row('ride', 'Mount horse'))
   // Children ride along too; a rider gets off their horse first, and the driver stays the driver
@@ -294,8 +314,8 @@ export function residentActions(h: ResidentHere): CardAction[] {
         opens: true,
       }),
     )
-    add(row('roadTo', '', picks('road', 'Build road to')))
-    add(row('wallTo', '', picks('wall', 'Build wall to')))
+    add(row('roadTo', '', picksLine('roadFrom', 'roadTo', 'Build line: road')))
+    add(row('wallTo', '', picksLine('wallFrom', 'wallTo', 'Build line: wall')))
     const torn = [h.building, h.carriageSite, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
     if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
     if (h.building?.kind === 'stable' && !h.building.site)
@@ -352,6 +372,7 @@ export const ORDER_GROUP_LABELS: Record<OrderGroup, string> = {
 /** Which kind each action is grouped under; an action not listed goes under Other. */
 const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   walk: 'move',
+  relocate: 'move',
   stop: 'move',
   ride: 'move',
   board: 'move',

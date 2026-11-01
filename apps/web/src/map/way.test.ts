@@ -15,6 +15,41 @@ describe('the selected resident’s way ahead', () => {
     expect(wayAhead({ order: null } as never)).toBeUndefined()
   })
 
+  it('is the way to the storage or carriage while storing or fetching, none once there', () => {
+    const walking = { phase: 'walking', goods: { food: null }, path: [[3, 4], [3, 5]], progress: 0 }
+    const store = { kind: 'store', to: { kind: 'storage', storageId: 's1' }, ...walking }
+    const fetch = { kind: 'fetch', from: { kind: 'carriage', carriageId: 'k1' }, ...walking }
+    for (const order of [store, fetch]) {
+      expect(wayAhead({ order } as never)).toEqual({ target: { x: 3, y: 5 }, path: walking.path })
+      // While the path is being found there is no way yet.
+      expect(wayAhead({ order: { ...order, path: null } } as never)).toBeUndefined()
+    }
+    expect(wayAhead({ order: { ...store, phase: 'putting', path: null } } as never)).toBeUndefined()
+    expect(wayAhead({ order: { ...store, phase: 'refilling', path: null } } as never)).toBeUndefined()
+    expect(wayAhead({ order: { ...fetch, phase: 'taking', path: null } } as never)).toBeUndefined()
+  })
+
+  it('is the way to the next tile of a road or wall line while walking, none while building', () => {
+    for (const kind of ['roadLine', 'wallLine'] as const) {
+      const order: ResidentOrder = {
+        kind,
+        tiles: [[7, 2], [8, 2]],
+        phase: 'walking',
+        path: [[6, 2], [7, 2]],
+        progress: 0,
+        siteId: null,
+      }
+      expect(wayAhead({ order })).toEqual({ target: { x: 7, y: 2 }, path: order.path })
+      // The target shows while the path is being found.
+      expect(wayAhead({ order: { ...order, path: null } })).toEqual({
+        target: { x: 7, y: 2 },
+        path: null,
+      })
+      const building = { ...order, phase: 'building', path: null, siteId: 'b1' } as const
+      expect(wayAhead({ order: building })).toBeUndefined()
+    }
+  })
+
   it('is the carriage’s for a passenger: the way its driver drives it', () => {
     const order: ResidentOrder = {
       kind: 'drive',

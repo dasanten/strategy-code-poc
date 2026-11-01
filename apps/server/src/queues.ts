@@ -74,9 +74,10 @@ function isTile(p: unknown): p is { x: unknown; y: unknown } {
 /**
  * Why a step can't make sense wherever the resident stands when its turn comes (`CONTEXT.md`:
  * Queue, Planning ahead): a tile it names is off the map, a carriage or horse it names isn't
- * there, or isn't the realm's. A building it names that is gone passes: the step is skipped
- * when its turn comes. Everything else, such as
- * standing on the right tile or carrying the goods, is checked when the step starts.
+ * there, or isn't the realm's, or the city a relocate names isn't the realm's. A building it
+ * names that is gone passes: the step is skipped when its turn comes. Everything else, such as
+ * standing on the right tile, carrying the goods or a city's free housing, is checked when the
+ * step starts.
  */
 export function stepPlaceProblem(
   world: WorldState,
@@ -110,6 +111,10 @@ export function stepPlaceProblem(
     const horse = world.horses.find((h) => h.id === id)
     if (!horse) return 'no such horse'
     if (horse.realmId !== realmId) return 'not a horse of your realm'
+  }
+  if (order.kind === 'relocate') {
+    const city = world.cities.find((c) => c.id === order.cityId)
+    if (city?.realmId !== realmId) return 'not a city of your realm'
   }
   return undefined
 }
@@ -334,10 +339,14 @@ function next(r: Resident, q: Queue): boolean {
   return true
 }
 
-/** Why the step that started at `startedAt` ended in a failure: a store or fetch ending early. */
+/**
+ * Why the step that started at `startedAt` ended in a failure: a store or fetch ending early. A
+ * relocate that didn't move in is left out: the realm log already says why (`relocateFailed`).
+ */
 function failureOf(r: Resident, startedAt: number): string | undefined {
   const ended = r.orderEnded
-  return ended && ended.tick >= startedAt && ended.reason !== null ? ended.reason : undefined
+  if (!ended || ended.kind === 'relocate') return undefined
+  return ended.tick >= startedAt && ended.reason !== null ? ended.reason : undefined
 }
 
 function skipped(world: WorldState, r: Resident, q: Queue, reason: string, queueEnded = false) {
