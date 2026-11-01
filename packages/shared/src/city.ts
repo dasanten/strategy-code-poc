@@ -194,7 +194,7 @@ const before = (p: Claim, q: Claim) =>
  */
 export function inCityArea(
   world: { buildings: readonly Building[] },
-  city: City,
+  city: Pick<City, 'id'>,
   x: number,
   y: number,
   size: number,

@@ -113,9 +113,7 @@ describe('script bindings', () => {
         !(k in persuasionOrders) &&
         !(k in queueOrders) &&
         k !== 'setGate' &&
-        k !== 'transfer' &&
-        // A script's `relocate(cityId)` comes with T55.3 (`CONTEXT.md`: Relocate).
-        k !== 'relocate',
+        k !== 'transfer',
     )
     expect([...SCRIPT_ORDER_KINDS].sort()).toEqual(residentOrders.sort())
   })
@@ -433,6 +431,7 @@ describe('script bindings', () => {
       { kind: 'rename', targetId: 'b1', name: 'Mara', realmName: 'Ironvale' },
     ],
     ['renameCity("c1", "Ironhold")', { kind: 'renameCity', cityId: 'c1', name: 'Ironhold' }],
+    ['relocate("c1")', { kind: 'relocate', cityId: 'c1' }],
     ['renameHorse("h1", "Rowan")', { kind: 'renameHorse', horseId: 'h1', name: 'Rowan' }],
     ['claimHorses()', { kind: 'claimHorses' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],

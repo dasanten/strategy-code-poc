@@ -3,8 +3,11 @@ import {
   MAX_WORKERS,
   RECIPES,
   buildingRealm,
+  inCityArea,
   isAt,
   recipeGood,
+  relocateRoom,
+  type RelocateWorld,
   type Building,
   type BuildingKind,
   type Carriage,
@@ -37,6 +40,7 @@ export type PlanPick =
   | 'ground'
   | 'carriage'
   | 'horse'
+  | 'city'
 
 /** What a planned step asks for on the card once its places are picked. */
 export type PlanAsk = 'goods' | 'buildingKind' | 'makes' | 'horses' | 'haul' | 'script' | 'subject'
@@ -63,6 +67,7 @@ export type PlanStepId =
   | 'board'
   | 'getOff'
   | 'unhitch'
+  | 'relocate'
   | 'runScript'
 
 /** One kind of step Add step offers. */
@@ -180,6 +185,11 @@ export const PLAN_STEPS: readonly PlanKind[] = [
       { pick: 'tile', prompt: 'where the haul route’s other stop is' },
     ],
     ask: 'haul',
+  },
+  {
+    id: 'relocate',
+    label: 'Relocate',
+    picks: [{ pick: 'city', prompt: 'the city of yours to relocate to' }],
   },
   { id: 'runScript', label: 'Run script', picks: [], ask: 'script' },
 ]
@@ -302,7 +312,51 @@ export function planPickAt(
       const h = w.horses.find((x) => x.x === at.x && x.y === at.y && x.realmId === w.realmId)
       return h ? { ...tile, id: h.id } : 'no horse of yours there'
     }
+    case 'city': {
+      // Its area as known, in sight or as last seen (`CONTEXT.md`: City area).
+      const known = { buildings: [...w.buildings, ...w.lastSeen] }
+      const c = w.cities.find(
+        (x) => x.realmId === w.realmId && inCityArea(known, x, at.x, at.y, w.size),
+      )
+      return c ? { ...tile, id: c.id } : 'no city of yours there'
+    }
   }
+}
+
+/** A city of the realm as Add step lists it to pick (Relocate): its town hall's tile, if known. */
+export interface PlanCity {
+  id: string
+  name: string
+  /** Its free housing, less the residents already relocating there (`relocateRoom`). */
+  room: number
+  x: number
+  y: number
+}
+
+/**
+ * The realm's cities the Player knows, by name, for Add step to list for a step that picks a city
+ * (Relocate), each with its free housing as now: only a hint, as it is checked when the step's
+ * turn comes (`CONTEXT.md`: Relocate). One whose town hall is unknown is left out.
+ */
+export function planCities(seen: RelocateWorld, realmId: string): PlanCity[] {
+  return seen.cities
+    .filter((c) => c.realmId === realmId)
+    .flatMap((c) => {
+      const hall = seen.buildings.find((b) => b.cityId === c.id && b.kind === 'townHall')
+      if (!hall) return []
+      const room = Math.max(0, relocateRoom(seen, c))
+      return [{ id: c.id, name: c.name, room, x: hall.x, y: hall.y }]
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * The plan with a city of the realm picked from Add step's list instead of on the map, for a
+ * step that picks a city next (Relocate), at its town hall's tile.
+ */
+export function pickCity(plan: Plan, city: Pick<PlanCity, 'id' | 'x' | 'y'>): Plan {
+  if (nextPick(plan)?.pick !== 'city') return plan
+  return { kind: plan.kind, picked: [...plan.picked, { x: city.x, y: city.y, id: city.id }] }
 }
 
 /** The plan with a tap on the map picked into it, or why the tap picked nothing. */
@@ -330,8 +384,8 @@ type At = { x: number; y: number }
 /**
  * The order a planned step becomes, and the tile it acts on when it needs the resident standing
  * there; a walk there goes before it. Steps that go to their place themselves (walk, store,
- * fetch, build, a road or wall) have no `at`. Undefined while a place is still to be picked or
- * the card's ask isn't answered.
+ * fetch, build, a road or wall, relocate) have no `at`. Undefined while a place is still to be
+ * picked or the card's ask isn't answered.
  */
 export function planOrder(
   plan: Plan,
@@ -398,6 +452,8 @@ export function planOrder(
       const order = { kind: 'task', task: 'haul', carriageId: p.id, x: q.x, y: q.y, ...setup }
       return { order, at }
     }
+    case 'relocate':
+      return { order: { kind: 'relocate', cityId: p.id } }
     case 'runScript':
       return { order: { kind: 'runScript', scriptId: a?.ask === 'script' ? a.scriptId : null } }
   }

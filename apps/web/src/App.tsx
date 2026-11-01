@@ -77,8 +77,10 @@ import { hasBlocks, type PlanItem } from './plan-blocks.js'
 import {
   horsesIn,
   nextPick,
+  pickCity,
   pickInto,
   planAsk,
+  planCities,
   planOrder,
   type Plan,
   type PlanAnswer,
@@ -338,6 +340,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     paramPick: pickingParam,
     plan,
   })
+  // A step picking a city keeps the card open: it lists the realm's cities to pick from too.
+  const picksCity = plan !== undefined && nextPick(plan)?.pick === 'city'
   /** Leaves pick mode without giving the order; the card comes back as it was. */
   const cancelPick = useCallback(() => {
     setPicking(false)
@@ -540,6 +544,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
+    const seen = { cities: knownCities, buildings: knownBuildings, residents: w.residents }
+    const cities = plan && nextPick(plan)?.pick === 'city' ? planCities(seen, w.home.realmId) : []
     return (
       <AddStep
         plan={plan}
@@ -553,6 +559,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             : []
         }
         horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
+        cities={cities}
+        onPickCity={(cityId) => {
+          const city = cities.find((c) => c.id === cityId)
+          if (plan && city) void addPlanned(pickCity(plan, city))
+        }}
       />
     )
   }
@@ -1467,7 +1478,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setParamPick(undefined)
               setPlan(undefined)
             }}
-            collapsed={pick !== undefined && pick.kind !== 'army'}
+            collapsed={pick !== undefined && pick.kind !== 'army' && !picksCity}
           />
         </CardSheet>
       )}
@@ -1532,7 +1543,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 realm={world.home.realmId}
               />
             }
-            collapsed={pick?.kind === 'group' || pick?.kind === 'plan'}
+            collapsed={pick?.kind === 'group' || (pick?.kind === 'plan' && !picksCity)}
           />
         </CardSheet>
       )}

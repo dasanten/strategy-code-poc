@@ -424,6 +424,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.',
   ),
   action(
+    'relocate',
+    ['cityId'],
+    'Walk to `cityId`, another city of my realm, and become its resident on stepping into its area, at once if I stand in it already: refused unless it has free housing for me, counting residents already relocating there, or while I carry a child. My order is "relocate" until done; then `me.orderEnded` says how it ended: reason null once I moved in, else why not ("no free housing", "it is no longer your realm’s" or "the city is gone"), and I keep my old city.',
+  ),
+  action(
     'renameHorse',
     ['horseId', 'name'],
     'Give a horse of my realm a new name: free and at once, from anywhere, like renaming a resident. Names need not be unique.',
