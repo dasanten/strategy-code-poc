@@ -400,6 +400,7 @@ describe('every resident order on the group card', () => {
     wallsInSight: 1,
     picking: false,
     makeLeader: { problem: undefined },
+    relocate: { problem: undefined },
     renamable: true,
     horseToRide: true,
     carries: true,
@@ -489,7 +490,9 @@ describe('the group card’s other orders', () => {
     ]
     const rs = [resident('a', 5, 5), resident('b', 5, 5), child('c', 9, 9), resident('d', 0, 0)]
     const sent = seenSend({ kind: 'unhitch' }, rs, { carriages })
-    expect(orders(sent)).toEqual([{ kind: 'unhitch', carriageId: 'k1', residentId: 'a' }])
+    expect(sent.requests.map((q) => q.order)).toEqual([
+      { kind: 'unhitch', carriageId: 'k1', residentId: 'a' },
+    ])
     expect(why(sent)).toEqual([
       ['c', 'a child'],
       ['d', 'no hitched horse here'],
@@ -684,5 +687,21 @@ describe('the group card’s other orders', () => {
       { kind: 'climb', wallId: 'w1', residentId: 'c' },
     ])
     expect(why(climb)).toEqual([['b', 'not next to the wall']])
+  })
+})
+
+describe('relocating a group', () => {
+  it('sends each of them the order naming the whole group, children and the homeless too', () => {
+    const rs = [resident('a', 4, 5), child('b', 9, 9), resident('c', 1, 1, { cityId: 'home' })]
+    const sent = send({ kind: 'relocate', cityId: 'far' }, rs)
+    expect(sent.skipped).toEqual([])
+    expect(sent.requests.map((q) => q.order)).toEqual(
+      ['a', 'b', 'c'].map((id) => ({
+        kind: 'relocate',
+        cityId: 'far',
+        group: ['a', 'b', 'c'],
+        residentId: id,
+      })),
+    )
   })
 })

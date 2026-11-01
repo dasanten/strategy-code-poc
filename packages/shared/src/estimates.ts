@@ -60,11 +60,14 @@ export interface ArrivalWorld {
 export function arrivalTicks(world: ArrivalWorld, r: Resident): number | undefined {
   const o = r.order
   const moving =
-    o?.kind === 'walkTo' || o?.kind === 'drive' || (o?.kind === 'haul' && o.phase === 'driving')
+    o?.kind === 'walkTo' ||
+    o?.kind === 'relocate' ||
+    o?.kind === 'drive' ||
+    (o?.kind === 'haul' && o.phase === 'driving')
   if (!moving || !o.path) return undefined
   const slowest = walkSpeed(r, Terrain.Mountain, world.tick)
   let pace: (g: Terrain) => number
-  if (o.kind === 'walkTo') {
+  if (o.kind === 'walkTo' || o.kind === 'relocate') {
     const horse = horseRidden(world, r)
     pace = horse
       ? (g) => rideSpeed(r, { stats: horse.stats, hunger: horse.hunger ?? MAX_HUNGER }, g)

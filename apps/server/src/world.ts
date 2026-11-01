@@ -53,6 +53,7 @@ import { placeCaravans, stepCaravans } from './caravans.js'
 import { stepNpcDefence } from './npc-defence.js'
 import { stepLastSeen } from './last-seen.js'
 import { newSightPhase } from './sight.js'
+import { stepRelocating } from './relocating.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -229,6 +230,8 @@ function stepRest(
   survival: SurvivalResult,
   horsesDied: Horse[],
 ): Omit<StepResult, 'npcScriptRuns' | 'npcPlanMs'> {
+  // Relocating residents who stepped into their new city's area move in (`CONTEXT.md`: Relocate).
+  stepRelocating(world, terrain)
   const strikes = requestStrikes(world, terrain.size)
   const combat = resolveStrikes(world, strikes, terrain.size)
   const climbs = requestClimbing(world)
