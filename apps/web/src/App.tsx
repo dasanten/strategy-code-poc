@@ -116,7 +116,13 @@ import {
   nodeFit,
   type ActionId,
 } from './selection-view.js'
-import { knownOf, relocateActionProblem, relocateChoices } from './relocate-view.js'
+import {
+  groupRelocateActionProblem,
+  groupRelocateChoices,
+  knownOf,
+  relocateActionProblem,
+  relocateChoices,
+} from './relocate-view.js'
 import { ScriptLibrary, type ScriptToOpen } from './ScriptLibrary.js'
 import { ScriptLog } from './ScriptLog.js'
 import { ScriptMemoryTree } from './ScriptMemory.js'
@@ -281,6 +287,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const seen = { cities: knownCities, buildings: knownBuildings, residents: world.residents }
     const choices = relocateChoices(seen, world.home.realmId, r)
     return { choices, problem: relocateActionProblem(r, choices) }
+  }
+  /** The same for the group picked, all of them or none (`CONTEXT.md`: Group, Relocate). */
+  function relocateForGroup(rs: Resident[]) {
+    if (!world) return undefined
+    const seen = { cities: knownCities, buildings: knownBuildings, residents: world.residents }
+    const choices = groupRelocateChoices(seen, world.home.realmId, rs)
+    return { choices, problem: groupRelocateActionProblem(rs, choices) }
   }
   // The script library's list, shared with the resident inspector's run-script order.
   const [scripts, setScripts] = useState<ScriptSummary[]>([])
@@ -1462,6 +1475,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}>
           <GroupCard
             residents={group}
+            relocate={relocateForGroup(group)}
             scripts={scripts}
             buildings={world.buildings}
             carriages={groupCarriages}

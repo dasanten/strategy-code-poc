@@ -6,7 +6,13 @@ import {
   type Resident,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { knownOf, relocateActionProblem, relocateChoices } from './relocate-view.js'
+import {
+  groupRelocateActionProblem,
+  groupRelocateChoices,
+  knownOf,
+  relocateActionProblem,
+  relocateChoices,
+} from './relocate-view.js'
 
 const city = (id: string, name: string, realmId: string | null = 'me'): City => ({
   id,
@@ -86,5 +92,52 @@ describe('relocate choices', () => {
     const seen = [city('a', 'Now')]
     const remembered = [city('a', 'Then'), city('b', 'Away')]
     expect(knownOf(seen, remembered).map((c) => c.name)).toEqual(['Now', 'Away'])
+  })
+})
+
+describe('relocate choices for a group', () => {
+  const cities = [city('home', 'Ashford'), city('roomy', 'Brightwater')]
+  const buildings = [house('h2', 'roomy')]
+  const group = [ana, { ...ana, id: 'bo', name: 'Bo' }, { ...ana, id: 'cy', name: 'Cy' }]
+
+  it('counts a city as full unless the whole group fits, with those relocating there', () => {
+    const fits = { cities, buildings, residents: living(room - 3, 'roomy', 'r') }
+    expect(groupRelocateChoices(fits, 'me', group)).toEqual([
+      { id: 'roomy', name: 'Brightwater', room: 3 },
+    ])
+    const going = {
+      id: 'g',
+      cityId: 'home',
+      order: {
+        kind: 'relocate' as const,
+        cityId: 'roomy',
+        target: { x: 0, y: 0 },
+        path: null,
+        progress: 0,
+      },
+    }
+    const seen = { ...fits, residents: [...fits.residents, going] }
+    expect(groupRelocateChoices(seen, 'me', group)).toEqual([
+      { id: 'roomy', name: 'Brightwater', room: 2, problem: 'free housing for 2 only' },
+    ])
+  })
+
+  it('names one of them who lives there already, and lists a city only some of them live in', () => {
+    const split = [group[0]!, { ...group[1]!, cityId: 'roomy' }, group[2]!]
+    const choices = groupRelocateChoices({ cities, buildings, residents: [] }, 'me', split)
+    expect(choices.map((c) => [c.id, c.problem])).toEqual([
+      ['home', 'Ana already lives in Ashford'],
+      ['roomy', 'Bo already lives in Brightwater'],
+    ])
+  })
+
+  it('turns the action off for the group when one of them carries a child, naming them', () => {
+    const choices = groupRelocateChoices({ cities, buildings, residents: [] }, 'me', group)
+    expect(groupRelocateActionProblem(group, choices)).toBeUndefined()
+    const carrying = { ...group[1]!, carrying: {} as NonNullable<Resident['carrying']> }
+    expect(groupRelocateActionProblem([group[0]!, carrying], choices)).toBe(
+      `Bo is ${CARRYING_A_CHILD}`,
+    )
+    expect(groupRelocateActionProblem(group, [])).toBe('your realm has no other city')
   })
 })

@@ -16,30 +16,37 @@ import {
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import { orderedResident } from './order-sender.js'
-import type { OrderKind } from './orders.js'
+import type { OrderKind, OrderSender } from './orders.js'
 import { realmOf } from './starting-city.js'
 
-/** The input of a relocate order: which resident, and the realm's city they move to. */
+/**
+ * The input of a relocate order: which resident, and the realm's city they move to. Given to a
+ * group, each of them gets one naming the whole `group` (`CONTEXT.md`: Group, Relocate).
+ */
 interface RelocateRequest extends OrderRequest {
   kind: 'relocate'
   residentId: string
   cityId: string
+  /** The ids of the group they relocate with, their own among them. */
+  group?: string[]
 }
 
 /**
  * The relocate order (`CONTEXT.md`: Relocate): a resident of the Player's realm walks to another
  * of its cities and moves in on stepping into its area (`stepRelocating`). It can be given only as
  * `relocateProblem` allows, free housing counting the residents already on their way there; an
- * NPC city relocates nobody. It only sets the resident's order, heading for the nearest tile of
- * the city's area.
+ * NPC city relocates nobody. Given to a group, each one's order is checked for all of them, so the
+ * city needs room for the whole group and none goes when one of them can't. It only sets the
+ * resident's order, heading for the nearest tile of the city's area.
  */
 export const relocate: OrderKind = {
   validate(world, sender, order) {
     const o = order as Partial<RelocateRequest>
     const realm = sender.npcCityId === undefined ? realmOf(world, sender.userId) : undefined
     const r = orderedResident(world, sender, o.residentId)
-    if (!realm || !r) return 'not one of your residents'
-    return relocateProblem(world, realm.id, [r], o.cityId)
+    const group = r && groupOf(world, sender, r, o.group)
+    if (!realm || !group) return 'not one of your residents'
+    return relocateProblem(world, realm.id, group, o.cityId)
   },
   apply(world, _sender, order, terrain) {
     const { residentId, cityId } = order as RelocateRequest
@@ -50,6 +57,22 @@ export const relocate: OrderKind = {
     const target = nearestAreaTile(world, city, r, terrain) ?? { x: r.x, y: r.y }
     r.order = { kind: 'relocate', cityId: city.id, target, path: null, progress: 0 }
   },
+}
+
+/**
+ * The residents a relocate order is checked for: `r` alone, or the group named, which must hold
+ * `r` and only residents the sender may order, each once. Undefined when it doesn't.
+ */
+function groupOf(
+  world: WorldState,
+  sender: OrderSender,
+  r: Resident,
+  ids: unknown,
+): Resident[] | undefined {
+  if (ids === undefined) return [r]
+  if (!Array.isArray(ids) || !ids.includes(r.id) || new Set(ids).size !== ids.length) return
+  const group = ids.map((id) => orderedResident(world, sender, id))
+  return group.every((x) => x !== undefined) ? group : undefined
 }
 
 /**
