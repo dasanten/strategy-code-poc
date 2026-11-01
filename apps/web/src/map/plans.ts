@@ -48,7 +48,10 @@ export const GHOST_ALPHA = { faint: 0.3, strong: 0.65 } as const
 
 /** Who the plans are of, and what already stands. */
 interface Planners {
-  residents: readonly Pick<SeenResident, 'id' | 'owner' | 'order' | 'queue' | 'interrupted'>[]
+  residents: readonly Pick<
+    SeenResident,
+    'id' | 'owner' | 'order' | 'queue' | 'interrupted' | 'script'
+  >[]
   buildings: readonly Pick<Building, 'kind' | 'x' | 'y'>[]
   home: { realmId: string }
   map: { size: number }
@@ -56,16 +59,20 @@ interface Planners {
 
 /**
  * The lines a resident is on or has queued, each with its tiles in order: the running road or
- * wall line (or the one a defence script interrupted, which goes on after it), then those of the
- * queue's steps still waiting, after the current one and, in a looping queue, before it too.
+ * wall line and Build line task (or the ones a defence script interrupted, which go on after it),
+ * then those of the queue's steps still waiting, after the current one and, in a looping queue,
+ * before it too.
  */
 export function plannedLines(
-  r: Pick<SeenResident, 'order' | 'queue' | 'interrupted'>,
+  r: Pick<SeenResident, 'order' | 'queue' | 'interrupted' | 'script'>,
   size: number,
 ): { kind: LineBuilding; tiles: readonly (readonly [number, number])[] }[] {
   const out: { kind: LineBuilding; tiles: readonly (readonly [number, number])[] }[] = []
   for (const o of [r.order, r.interrupted?.order]) {
     if (isLineOrder(o)) out.push({ kind: LINE_BUILDING[o.kind], tiles: o.tiles })
+  }
+  for (const s of [r.script, r.interrupted?.script]) {
+    if (s?.line) out.push({ kind: s.line.building, tiles: roadLine(s.line.from, s.line.to, size) })
   }
   const q = r.queue
   if (q) {
@@ -81,13 +88,23 @@ export function plannedLines(
   return out
 }
 
-/** A queue step's line, from its two end tiles (`roadLine` in `@csp/shared`), if it is one. */
+/**
+ * A queue step's line, from its two end tiles (`roadLine` in `@csp/shared`), if it is one: a road
+ * or wall line order, or a Build line task of road or wall.
+ */
 function queuedLine(order: OrderRequest, size: number) {
-  if (order.kind !== 'roadLine' && order.kind !== 'wallLine') return undefined
+  const kind =
+    order.kind === 'roadLine' || order.kind === 'wallLine'
+      ? LINE_BUILDING[order.kind]
+      : order.kind === 'task' && order.task === 'buildLine' && isLineKind(order.building)
+        ? order.building
+        : undefined
   const { from, to } = order
-  if (!isTile(from) || !isTile(to)) return undefined
-  return { kind: LINE_BUILDING[order.kind], tiles: roadLine(from, to, size) }
+  if (!kind || !isTile(from) || !isTile(to)) return undefined
+  return { kind, tiles: roadLine(from, to, size) }
 }
+
+const isLineKind = (k: unknown): k is LineBuilding => k === 'road' || k === 'wall'
 
 /**
  * The builds a resident is ordered or queued to do, each with the north-west tile of its
