@@ -446,4 +446,19 @@ describe('seenScript', () => {
     expect(scripts.get(stranger!.id)).toEqual({ scriptId: 4 })
     expect(seenScript(world, stranger!.script, true)).toEqual({ scriptId: 4, doing: 'Secret' })
   })
+
+  it('shows the owning Player the line a Build line task builds, for the map’s ghosts', () => {
+    const { world } = worldWithCity()
+    const line = { building: 'wall', from: { x: 3, y: 4 }, to: { x: 6, y: 4 } }
+    const script = { scriptId: 0, task: 'buildLine' as const, memory: { line } }
+    expect(seenScript(world, script, true)).toEqual({
+      scriptId: 0,
+      task: 'buildLine',
+      building: 'wall',
+      line,
+    })
+    expect(seenScript(world, script, false)).toEqual({ scriptId: 0 })
+    const broken = { ...script, memory: { line: { building: 'house', from: line.from } } }
+    expect(seenScript(world, broken, true)).not.toHaveProperty('line')
+  })
 })
