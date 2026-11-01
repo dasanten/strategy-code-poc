@@ -594,8 +594,8 @@ export function Wiki() {
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
           to, pick up, drop, store, fetch, drive, unhitch a horse, mount or dismount, board or get
-          off a carriage, work, build, haul, feed the stable, breed horses, tear down, build a road
-          or wall line, or run one of your scripts with its params.
+          off a carriage, work, build, haul, feed the stable, breed horses, tear down, Build line
+          (road or wall), or run one of your scripts with its params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
@@ -1073,9 +1073,12 @@ export function Wiki() {
           they can carry for this tile and the next ones, topping up their own food there too. With
           none in any storage they lay out each tile's site and go on to the next; once the whole
           line is laid out or built they stop, and your realm log says why (“no stone in any
-          storage”), so the line shows and can be finished later. Build line has Build's params; its
-          line comes only from the order, so run directly, with Run script or as a queue step, it
-          ends at once (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code>{' '}
+          storage”), so the line shows and can be finished later. In the queue planner,{' '}
+          <strong>Add step</strong> offers Build line too: pick both ends on the map. No walk goes
+          before it, since the builder walks to the line, and it ends on its own, so it needs no
+          duration; a saved queue or a copied step keeps both tiles. Build line has Build's params;
+          its line comes only from the order, so run directly or with Run script it ends at once
+          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code>{' '}
           actions, which build only with what the resident carries, stay for your scripts.
         </p>
         <p>

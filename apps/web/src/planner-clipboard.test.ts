@@ -40,6 +40,12 @@ describe('planner clipboard', () => {
     expect(isEmpty()).toBe(true)
   })
 
+  it('keeps a Build line step’s two tiles', () => {
+    const line = { building: 'road', from: { x: 3, y: 4 }, to: { x: 8, y: 4 } }
+    copy(queueOf({ order: { kind: 'task', task: 'buildLine', ...line } }).steps)
+    expect(paste()).toEqual([{ order: { kind: 'task', task: 'buildLine', ...line } }])
+  })
+
   it('pastes equal steps with no ids, places and durations kept', () => {
     copy(q.steps)
     const pasted = paste()

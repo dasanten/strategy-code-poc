@@ -2,6 +2,7 @@ import {
   GOODS,
   QUEUE_STEP_KINDS,
   queueStepsProblem,
+  stepLine,
   type Building,
   type Queue,
   type QueueStepRequest,
@@ -103,9 +104,27 @@ describe('Add step', () => {
         return planOrder(plan, ask && answers[ask])!.order.kind
       }),
     )
-    // Working, building, tearing down and hauling are planned as tasks, as the card gives them.
-    const asTasks = ['build', 'tearDown', 'workAt', 'haul']
+    // Working, building, tearing down, hauling and lines are planned as tasks, as the card gives them.
+    const asTasks = ['build', 'tearDown', 'workAt', 'haul', 'roadLine', 'wallLine']
     expect([...kinds].sort()).toEqual(QUEUE_STEP_KINDS.filter((k) => !asTasks.includes(k)).sort())
+  })
+
+  it('plans a Build line from its two picked ends, with no walk before it', () => {
+    const plan = planned('wall', [30, 10], [34, 14])
+    expect(nextPick(plan)).toBeUndefined()
+    expect(planAsk(plan)).toBeUndefined()
+    const { order, at } = planOrder(plan)!
+    expect(at).toBeUndefined()
+    const line = { building: 'wall', from: { x: 30, y: 10 }, to: { x: 34, y: 14 } }
+    expect(order).toEqual({ kind: 'task', task: 'buildLine', ...line })
+    expect(stepLine(order)).toEqual(line)
+    const request = appendRequest(inCity, order, at)!
+    expect(request.steps).toEqual([{ order }])
+    expect(queueStepsProblem(request.steps)).toBeUndefined()
+    // Ending on its own, it may go before other steps without a duration.
+    expect(queueStepsProblem([{ order }, { order: { kind: 'walkTo', x: 1, y: 1 } }])).toBe(
+      undefined,
+    )
   })
 
   it('puts a walk to a workplace elsewhere before working it', () => {
