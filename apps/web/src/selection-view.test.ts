@@ -281,6 +281,7 @@ describe('the actions on a resident’s card', () => {
       othersInSight: 1,
       wallsInSight: 1,
       makeLeader: { problem: undefined },
+      relocate: { problem: undefined },
       renamable: true,
       horseToRide: true,
       carriageToBoard: true,
@@ -296,6 +297,25 @@ describe('the actions on a resident’s card', () => {
     )
     expect(make).toMatchObject({ label: 'Make Leader…', key: 'L', opens: true })
     expect(make?.disabled).toBeUndefined()
+  })
+
+  it('offers Relocate for an own resident, a child too, off with the reason when it can’t go', () => {
+    expect(ids(here())).not.toContain('relocate')
+    const a = residentActions(here({ adult: false, relocate: { problem: undefined } }))
+    expect(a.find((x) => x.id === 'relocate')).toMatchObject({
+      label: 'Relocate…',
+      key: 'V',
+      opens: true,
+    })
+    const problem = 'carrying a child'
+    expect(
+      residentActions(here({ relocate: { problem } })).find((x) => x.id === 'relocate'),
+    ).toMatchObject({ disabled: true, reason: problem })
+    expect(
+      groupOrders(a)
+        .find((g) => g.group === 'move')
+        ?.actions.map((x) => x.id),
+    ).toContain('relocate')
   })
 
   it('offers Rename only for an own resident', () => {

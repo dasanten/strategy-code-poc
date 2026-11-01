@@ -426,6 +426,14 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'warn',
       }
     }
+    case 'relocateFailed':
+      return {
+        text:
+          e.city === undefined
+            ? `${e.name} couldn’t relocate: ${e.reason}.`
+            : `${e.name} couldn’t move in to ${e.city}: ${e.reason}.`,
+        tone: 'warn',
+      }
     case 'contract': {
       const them = e.other === TRADE_ORG_NAME ? e.other : `the realm of ${e.other}`
       const n = e.residents === 1 ? '1 mercenary' : `${e.residents} mercenaries`

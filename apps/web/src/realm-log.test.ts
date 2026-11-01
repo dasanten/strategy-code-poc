@@ -5,6 +5,16 @@ import { appendEvents, describeDelivery, describeEvent, realmEnded } from './rea
 const at = { tick: 7, userId: 1 }
 
 describe('realm log', () => {
+  it('says why a resident couldn’t move in (`CONTEXT.md`: Relocate)', () => {
+    const failed = { kind: 'relocateFailed', residentId: 'r1', name: 'Ana', cityId: 'c2' } as const
+    expect(
+      describeEvent({ ...failed, city: 'Ironford', reason: 'no free housing', seq: 1, ...at }),
+    ).toEqual({ text: 'Ana couldn’t move in to Ironford: no free housing.', tone: 'warn' })
+    expect(describeEvent({ ...failed, reason: 'the city is gone', seq: 2, ...at }).text).toBe(
+      'Ana couldn’t relocate: the city is gone.',
+    )
+  })
+
   it('describes each kind of event', () => {
     const died = { kind: 'died', residentId: 'r1', name: 'Mara', seq: 2, ...at } as const
     expect(

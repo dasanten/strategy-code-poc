@@ -74,6 +74,21 @@ const haul: ResidentOrder = {
 const line = (r: DoingOf) => doingLine(r, { scripts, buildings })
 
 describe('doingLine', () => {
+  it('names the city a resident relocates to (`CONTEXT.md`: Relocate)', () => {
+    const order: ResidentOrder = {
+      kind: 'relocate',
+      cityId: 'c2',
+      target: at,
+      path: null,
+      progress: 0,
+    }
+    const cities = [{ id: 'c2', name: 'Redbank' }]
+    expect(doingLine({ order }, { cities })).toBe('Relocating to Redbank')
+    const walking = { ...order, path: [[4, 5]] as [number, number][] }
+    expect(doingLine({ order: walking }, { cities })).toBe('Relocating to Redbank · 1 tiles to go')
+    expect(doingLine({ order }, {})).toBe('Relocating to another city')
+  })
+
   it('says what a teacher teaches (`CONTEXT.md`: Teacher)', () => {
     const teach = (subject: 'strength' | 'combat'): ResidentOrder => ({
       kind: 'teach',

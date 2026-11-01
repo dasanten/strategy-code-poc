@@ -113,7 +113,9 @@ describe('script bindings', () => {
         !(k in persuasionOrders) &&
         !(k in queueOrders) &&
         k !== 'setGate' &&
-        k !== 'transfer',
+        k !== 'transfer' &&
+        // A script's `relocate(cityId)` comes with T55.3 (`CONTEXT.md`: Relocate).
+        k !== 'relocate',
     )
     expect([...SCRIPT_ORDER_KINDS].sort()).toEqual(residentOrders.sort())
   })

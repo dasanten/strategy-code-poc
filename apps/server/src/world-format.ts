@@ -18,7 +18,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 67
+export const WORLD_FORMAT_VERSION = 68
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -259,6 +259,9 @@ export const migrations: Record<number, MigrationStep> = {
       for (const e of memory) if (e.is === 'city') e.occupation = null
     return world
   },
+  // Relocating (`CONTEXT.md`: Relocate), a new order kind, and the realm log's `relocateFailed`.
+  // Nobody relocated before, so the step leaves every resident and log as they are.
+  67: (state) => state,
 }
 
 export class WorldFormatError extends Error {}
