@@ -92,7 +92,8 @@ import { Motion, motionTokens, workSway } from './map/motion.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
-import { roadJoins } from './map/roads.js'
+import { roadJoins, roadWidth, wallWidths } from './map/roads.js'
+import { drawPlans, plannedBuilding } from './map/plans.js'
 import { inBox, pickableAt, pickables, toggled, type Point } from './map/selection.js'
 import { LONG_PRESS_MS, TAP_SLOP, longPresses, pressKind } from './map/gestures.js'
 
@@ -502,6 +503,11 @@ export function MapView({
       drawStructures(under, g, tokens, cam, view, worldRef.current)
 
       const world = worldRef.current
+      // The Player's planned roads and walls, as ghosts (`CONTEXT.md`: Planned building).
+      if (!world.admin) {
+        const plans = plannedBuilding(world, selectedRef.current)
+        drawPlans(under, cam, view, mapSize, plans, world.buildings, relationshipColor('own'))
+      }
       const now = performance.now()
       // Residents at work sway on their tile; one gliding to the next tile does not.
       const sways = new Map<string, readonly [number, number]>()
@@ -1083,7 +1089,7 @@ function drawStructures(
     buildings.filter((b) => b.kind === 'road').map((b) => [`${b.x},${b.y}`, b] as const),
   )
   const roadAt = (x: number, y: number) => roads.get(`${(x + size) % size},${(y + size) % size}`)
-  const w = Math.max(3, tile * 0.36)
+  const w = roadWidth(tile)
   const inSight = ([sx, sy]: readonly number[]) =>
     sx! > -tile && sy! > -tile && sx! < view.width + tile && sy! < view.height + tile
   for (const site of [false, true]) {
@@ -1126,8 +1132,7 @@ function drawStructures(
     buildings.filter((b) => b.kind === 'wall' || b.kind === 'gate').map((b) => `${b.x},${b.y}`),
   )
   const wallAt = (x: number, y: number) => walls.has(`${(x + size) % size},${(y + size) % size}`)
-  const edge = Math.max(3, tile * 0.34)
-  const band = Math.max(1.5, tile * 0.22)
+  const { edge, band } = wallWidths(tile)
   const lines = new Map<string, [number, number, number, number][]>()
   for (const b of buildings) {
     if (b.kind !== 'wall' && b.kind !== 'gate') continue

@@ -1157,7 +1157,9 @@ export function Wiki() {
           work column above). One road order covers at most {num(ROAD_LINE_MAX_TILES)} tiles, along
           a line that runs straight or diagonal. A wall can be built along a line the same way, past
           tiles with a wall or gate already; a diagonal wall line closes the way like a straight
-          one.
+          one. The tiles your residents' road and wall lines still have to build, running or waiting
+          in their queues, show faintly on your map, the picked residents' stronger; only you see
+          them.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
