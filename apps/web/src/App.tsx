@@ -96,6 +96,7 @@ import { isWikiPath, pageFor } from './pages.js'
 import { Wiki } from './Wiki.js'
 import { RealmLog } from './RealmLog.js'
 import { realmEnded } from './realm-log.js'
+import { isNewRealm } from './map/legend.js'
 import {
   GOOD_LABELS,
   GroupCard,
@@ -1008,6 +1009,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onPickTile={goTo}
             onNodesLoaded={onNodesLoaded}
             onTerrainLoaded={onTerrainLoaded}
+            newRealm={isNewRealm(world.events, world.tick)}
             focus={focus}
           />
         ) : (
@@ -1015,7 +1017,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       </section>
       <TopBar
-        realm={account.name}
+        realm={world ? (world.home.realmName ?? leader?.name) : undefined}
+        account={account.name}
         cityName={homeCity?.name}
         tick={world?.tick}
         status={status}
@@ -1036,6 +1039,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
           cityName={homeCity?.name}
           leader={leader?.name}
+          account={account.name}
           onLogout={logout}
         />
       ) : (

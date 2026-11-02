@@ -479,6 +479,16 @@ export function Wiki() {
           group instead of panning.
         </p>
         <p>
+          The map has three zoom tiers: far shows terrain, territory and one emblem per city; middle
+          adds buildings, nodes and residents; close shows each figure. Far out territory is filled
+          in its owner’s colour, nearer in only its borders are drawn; the Region map button fills
+          it at every zoom. The readout bottom right names the terrain, the tile and the tier under
+          the pointer. Above it the minimap shows the terrain you explored, your cities, your
+          residents and carriages away from them, and the cities you know, with the part on screen
+          as a rectangle; click it to look there. The minimap and the legend fold to buttons, and
+          your browser remembers how you left them.
+        </p>
+        <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
           header, half the screen or all of it; a tap on the handle goes one step up. While an order
           waits for a target the card drops to its header. The menu button at the top left opens the
@@ -1108,8 +1118,8 @@ export function Wiki() {
           before it, since the builder walks to the line, and it ends on its own, so it needs no
           duration; a saved queue or a copied step keeps both tiles. Build line has Build's params;
           its line comes only from the order, so run directly or with Run script it ends at once
-          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code>{' '}
-          actions, which build only with what the resident carries, stay for your scripts.
+          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code> actions,
+          which build only with what the resident carries, stay for your scripts.
         </p>
         <p>
           <strong>A crew on one line:</strong> residents on the same line, from the group card or
@@ -1808,6 +1818,11 @@ export function Wiki() {
           reaches {num(TERRITORY_REACH_PER_ROOT)} tiles times the square root of its strength, at
           most {num(TERRITORY_MAX_REACH)} tiles, fading with distance; where two overlap, the
           stronger wins.
+        </p>
+        <p>
+          The Region map shows territory over all the terrain you explored, one colour per
+          Organization (an alliance’s members share one). Zoomed far out it is filled in; at the
+          middle and close zoom only its borders show, unless the Region map button is on.
         </p>
         <table>
           <thead>

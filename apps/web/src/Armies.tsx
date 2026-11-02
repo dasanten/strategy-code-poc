@@ -235,6 +235,7 @@ export function ArmiesPanel({
               script={a.script}
               scripts={scripts}
               label={`Script for ${a.name} to run`}
+              of={a.id}
               onRunScript={(scriptId) => order({ kind: 'armyRunScript', armyId: a.id, scriptId })}
             />
             {a.script && scriptMemory?.(a.id)}

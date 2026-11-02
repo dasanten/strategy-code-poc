@@ -487,3 +487,15 @@ button.card-list-row:hover {
 .card-food .meter {
   margin-bottom: 4px;
 }
+/* An order's panel, open right under the row that opened it. */
+.sel-panel-under {
+  margin: 2px 0 8px;
+  scroll-margin: 12px;
+}
+.sel-actions button[aria-expanded='true'] {
+  border-left-width: 3px;
+}
+/* Run script's button keeps its label on one line beside the picker. */
+.run-script .order-buttons button {
+  white-space: nowrap;
+}

@@ -255,13 +255,17 @@ export function CardTabs<T extends string>({
   )
 }
 
-/** The card's actions as rows, each with its key; a row that opens a panel shows it pressed. */
+/**
+ * The card's actions as rows, each with its key; a row that opens a panel shows it pressed, and
+ * `panel` opens right under it, scrolled into view when it opens.
+ */
 export function ActionRows({
   actions,
   open,
   onAction,
   label = 'Actions',
   keys = true,
+  panel,
 }: {
   actions: CardAction[]
   /** The action whose panel is open, if any. */
@@ -270,6 +274,8 @@ export function ActionRows({
   label?: string
   /** Whether the rows run on their keys; off where the card listens for all its actions itself. */
   keys?: boolean
+  /** The open action's panel, shown under its row. */
+  panel?: ReactNode
 }) {
   useActionKeys(keys ? actions : [], onAction)
   return (
@@ -277,28 +283,44 @@ export function ActionRows({
       {actions.map((a) => {
         const on = a.active || (a.opens && open === a.id)
         return (
-          <button
-            type="button"
-            key={a.id}
-            className={on ? 'on' : ''}
-            aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
-            aria-keyshortcuts={a.key}
-            disabled={a.disabled}
-            onClick={() => onAction(a)}
-          >
-            <kbd>{a.key}</kbd>
-            <span>
-              {a.label}
-              {a.reason && <span className="sel-reason">{a.reason}</span>}
-            </span>
-            {a.opens && (
-              <span className="sel-more" aria-hidden="true">
-                {on ? '▾' : '▸'}
+          <Fragment key={a.id}>
+            <button
+              type="button"
+              className={on ? 'on' : ''}
+              aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
+              aria-expanded={a.opens ? open === a.id : undefined}
+              aria-keyshortcuts={a.key}
+              disabled={a.disabled}
+              onClick={() => onAction(a)}
+            >
+              <kbd>{a.key}</kbd>
+              <span>
+                {a.label}
+                {a.reason && <span className="sel-reason">{a.reason}</span>}
               </span>
-            )}
-          </button>
+              {a.opens && (
+                <span className="sel-more" aria-hidden="true">
+                  {on ? '▾' : '▸'}
+                </span>
+              )}
+            </button>
+            {a.opens && open === a.id && panel && <PanelUnder>{panel}</PanelUnder>}
+          </Fragment>
         )
       })}
+    </div>
+  )
+}
+
+/** An order's panel under the row that opened it, scrolled into view as it opens. */
+export function PanelUnder({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+  }, [])
+  return (
+    <div className="sel-panel-under" ref={ref}>
+      {children}
     </div>
   )
 }

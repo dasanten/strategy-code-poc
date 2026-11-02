@@ -216,6 +216,23 @@ export function groupCard<R extends Pick<Resident, 'name'>>(
   }
 }
 
+/** How many of the residents are busy (with an order or a script) and how many idle. */
+export function busyAndIdle(residents: readonly Pick<Resident, 'order' | 'script'>[]): {
+  busy: number
+  idle: number
+} {
+  const idle = residents.filter((r) => !r.order && !r.script).length
+  return { busy: residents.length - idle, idle }
+}
+
+/** The Residents drawer's head: "8 residents · 7 busy · 1 idle". */
+export function residentsCount(residents: readonly Pick<Resident, 'order' | 'script'>[]): string {
+  if (residents.length === 0) return 'No residents'
+  const { busy, idle } = busyAndIdle(residents)
+  const all = residents.length === 1 ? '1 resident' : `${residents.length} residents`
+  return `${all} · ${busy} busy · ${idle} idle`
+}
+
 /**
  * What the group card's Script tab says the residents run: one line per script, most run first,
  * then how many run none. `scripts` holds each resident's script name, undefined for none.
