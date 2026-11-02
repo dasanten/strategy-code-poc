@@ -198,10 +198,7 @@ export function ArmiesPanel({
             <div className="sel-order-group">
               <h3>Army</h3>
               <div className="order-buttons" aria-label="Army">
-                <button
-                  type="button"
-                  onClick={() => order({ kind: 'disbandArmy', armyId: a.id })}
-                >
+                <button type="button" onClick={() => order({ kind: 'disbandArmy', armyId: a.id })}>
                   Disband
                 </button>
               </div>
@@ -237,6 +234,7 @@ export function ArmiesPanel({
               script={a.script}
               scripts={scripts}
               label={`Script for ${a.name} to run`}
+              of={a.id}
               onRunScript={(scriptId) => order({ kind: 'armyRunScript', armyId: a.id, scriptId })}
             />
             {a.script && scriptMemory?.(a.id)}
@@ -249,7 +247,6 @@ export function ArmiesPanel({
   return (
     <section className="alliance-panel" aria-label="Armies">
       <div className="panel-head">
-        <h2>Armies</h2>
         <span>{armies.length === 0 ? 'none' : armies.length}</span>
       </div>
       {armies.length > 0 && (
