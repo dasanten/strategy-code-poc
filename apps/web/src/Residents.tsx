@@ -92,7 +92,6 @@ import {
   busyAndIdle,
   CARD_TAB_LABELS,
   CARD_TABS,
-  carriedShort,
   carryLine,
   GROUP_TABS,
   groupCard,
@@ -108,6 +107,8 @@ import {
   type ResidentGroup,
   type ResidentLines,
 } from './residents-view.js'
+import { GOOD_LABELS, carriedItems } from './goods-grid.js'
+import { GoodsGrid } from './GoodsGrid.js'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
 import { type RelocateChoice } from './relocate-view.js'
 import {
@@ -190,20 +191,7 @@ import {
   type CardAction,
 } from './selection-view.js'
 
-/** Good names as the UI shows them. */
-export const GOOD_LABELS: Record<Good, string> = {
-  food: 'Food',
-  wood: 'Wood',
-  stone: 'Stone',
-  ironOre: 'Iron ore',
-  iron: 'Iron',
-  goldOre: 'Gold ore',
-  coins: 'Coins',
-  spear: 'Spear',
-  sword: 'Sword',
-  shield: 'Shield',
-  armour: 'Armour',
-}
+export { GOOD_LABELS }
 
 /** A weight in kg, to one decimal (coins weigh little). */
 const kg = (weight: number) => `${Math.round(weight * 10) / 10} kg`
@@ -2222,7 +2210,10 @@ export function ResidentCard({
               </span>,
             ]
           : []),
-        `${carriedShort(r.carried, GOOD_LABELS)} · ${carryLine(stockWeight(r.carried), carryCapacity(r, tick))}`,
+        <div key="carried" className="carried-line">
+          <GoodsGrid label="Carried" {...carriedItems(r.carried)} />
+          <span className="mono">{carryLine(stockWeight(r.carried), carryCapacity(r, tick))}</span>
+        </div>,
         ...(ridden ? [ridden] : []),
       ]}
       head={

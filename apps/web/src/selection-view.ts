@@ -656,6 +656,11 @@ export interface TileCard {
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
   /**
+   * The carriage's load, for the goods grid, when the Player sees inside it (`CONTEXT.md`: Seeing
+   * inside a storage, Goods on cards).
+   */
+  load?: Stock
+  /**
    * Who and what the tile holds, as rows under the card's lines: the horses in a stable or on the
    * tile, a workplace's workers, the goods in a storage.
    */
@@ -1090,6 +1095,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   let buildHere: TileCard['buildHere']
   let passengers: TileCard['passengers']
   let unhitch: TileCard['unhitch']
+  let load: TileCard['load']
   if (building) {
     const city = cityOf(building)
     // An outpost storage goes by its own realm (`CONTEXT.md`: Outpost storage).
@@ -1190,7 +1196,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     // Its load only when the Player sees inside (`CONTEXT.md`: Seeing inside a storage), its
     // passengers counted in.
     const capacity = carriageCapacity(t, carriage)
-    const load = carriage.load
+    load = carriage.load
+    const loadText = carriage.load
       ? `${Math.round(stockWeight(carriage.load) + people)} / ${Math.round(capacity)} kg`
       : LOAD_LEVEL_NAMES[carriage.loadLevel]
     // How its horse fares only for the Player's own and allies' (`CONTEXT.md`: Seeing how someone fares).
@@ -1206,7 +1213,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         ? ` · pulled by ${horse.name}`
         : ' · horse hitched'
     lines.push(
-      `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${load}${horseText}`,
+      `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${loadText}${horseText}`,
     )
     if (aboard.length > 0) {
       const weight = `${Math.round(people)} kg of it people`
@@ -1286,6 +1293,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(buildHere ? { buildHere } : {}),
     ...(passengers ? { passengers } : {}),
     ...(unhitch ? { unhitch } : {}),
+    ...(load ? { load } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
