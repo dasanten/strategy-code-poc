@@ -6,7 +6,12 @@ import { describe, expect, it } from 'vitest'
 import { scriptWarnings } from './script-editor.js'
 import { paramNote } from './script-params-view.js'
 import { WIKI_TOPICS, Wiki } from './Wiki.js'
-import { PARAM_COMMENT_EXAMPLE, PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import {
+  PARAM_CHOICE_EXAMPLE,
+  PARAM_COMMENT_EXAMPLE,
+  PARAM_DEFAULT_EXAMPLE,
+  SCRIPT_LANGUAGE,
+} from './wiki-scripting.js'
 
 const examples = SCRIPT_LANGUAGE.filter((r) => r.example).map((r) => [r.title, r.example!])
 
@@ -44,6 +49,15 @@ describe('the Wiki’s Script parameters topic', () => {
     ])
     const html = renderToStaticMarkup(createElement(Wiki))
     expect(html).toContain('The comment at the end of a <code>param</code> line is what the card')
+  })
+
+  it('shows a choice and a waypoint param, without syntax errors or warnings', () => {
+    expect(checkScript(PARAM_CHOICE_EXAMPLE)).toEqual([])
+    expect(scriptWarnings(PARAM_CHOICE_EXAMPLE, false)).toEqual([])
+    expect(scriptParams(PARAM_CHOICE_EXAMPLE).map((p) => p.type)).toEqual(['choice', 'waypoint'])
+    const html = renderToStaticMarkup(createElement(Wiki))
+    expect(html).toContain('param toward: choice(north, east, south, west) = north')
+    expect(html).toContain('<td><code>waypoint</code></td>')
   })
 })
 

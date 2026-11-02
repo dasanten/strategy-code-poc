@@ -8,6 +8,7 @@ import {
   type ScriptParam,
   type ScriptParamType,
   type ScriptParamValue,
+  type Waypoint,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 
@@ -27,6 +28,8 @@ export interface ParamWorld {
   realmId: string
   /** The map's size, for footprints across its edge. */
   size: number
+  /** The Player's waypoints (`CONTEXT.md`: Waypoint), which a `waypoint` param picks; none without. */
+  waypoints?: readonly Waypoint[]
 }
 
 /** The buildings a storage param may name besides carriages: those a store or fetch goes to. */
@@ -48,14 +51,19 @@ function buildingFits(w: ParamWorld, type: ScriptParamType, b: Building): boolea
 
 /**
  * What a tap on the tile picks for a param of `type`: the building there that fits, in sight or
- * else as last seen, or for a storage param one of the realm's carriages there; why nothing, as a
- * string.
+ * else as last seen, or for a storage param one of the realm's carriages there, or for a waypoint
+ * param the Player's waypoint there; why nothing, as a string.
  */
 export function paramPickAt(
   w: ParamWorld,
   type: ScriptParamType,
   at: { x: number; y: number },
 ): { id: string } | string {
+  if (type === 'number' || type === 'choice') return 'typed or chosen in its field, not picked'
+  if (type === 'waypoint') {
+    const wp = w.waypoints?.find((x) => x.x === at.x && x.y === at.y)
+    return wp ? { id: wp.id } : 'pick one of your waypoints'
+  }
   const on = (list: readonly Building[]) =>
     list.find((x) => x.kind !== 'road' && isAt(at, x, w.size))
   const b = on(w.buildings) ?? on(w.lastSeen)
@@ -69,12 +77,15 @@ export function paramPickAt(
 }
 
 /**
- * How the card names a picked value: the building or carriage and where, "(last seen)" when the
- * building is remembered out of sight; null when it is neither in sight nor remembered.
+ * How the card names a picked value: the building, carriage or waypoint and where, "(last seen)"
+ * when the building is remembered out of sight; null when it is neither in sight nor remembered,
+ * or a waypoint that was removed.
  */
 export function paramValueLabel(w: ParamWorld, id: string): string | null {
   const name = (b: Building) =>
     `${b.site ? 'Site: ' : ''}${BUILDING_NAMES[b.kind]} at ${b.x}, ${b.y}`
+  const wp = w.waypoints?.find((x) => x.id === id)
+  if (wp) return waypointLabel(wp)
   const b = w.buildings.find((x) => x.id === id)
   if (b) return name(b)
   const was = w.lastSeen.find((x) => x.id === id)
@@ -83,6 +94,10 @@ export function paramValueLabel(w: ParamWorld, id: string): string | null {
   if (k) return `Carriage at ${k.x}, ${k.y}`
   return null
 }
+
+/** How a waypoint is named in a param field or its list: "Pass at 12, 40". */
+export const waypointLabel = (wp: Pick<Waypoint, 'name' | 'x' | 'y'>) =>
+  `${wp.name} at ${wp.x}, ${wp.y}`
 
 /**
  * What a param's `//` comment says (`CONTEXT.md`: Script parameter): what it is for, and after
@@ -100,10 +115,10 @@ export function paramNote(description: string | undefined): { purpose?: string; 
 
 /**
  * What a param field shows as the value the script uses (`CONTEXT.md`: Script parameter): the one
- * picked, else what the script uses with it unset. A number's default ("1, the default"); a
- * default script's target param the one on the resident's tile ("Farm at 10, 5, on their tile");
- * any other what its comment says after "none:", else "none picked". `set` is whether the
- * Player picked it.
+ * picked, else what the script uses with it unset. A number's or choice's default ("1, the
+ * default"); a default script's target param the one on the resident's tile ("Farm at 10, 5, on
+ * their tile"); any other what its comment says after "none:", else "none picked". `set` is
+ * whether the Player picked it.
  */
 export function effectiveParam(
   p: Pick<ScriptParam, 'name' | 'type' | 'default' | 'description'>,
@@ -117,11 +132,13 @@ export function effectiveParam(
     onTile?: string | null
   },
 ): { text: string; set: boolean } {
-  if (p.type === 'number') {
-    if (typeof value === 'number') return { text: String(value), set: true }
+  if (p.type === 'number' || p.type === 'choice') {
+    const typed = p.type === 'number' ? typeof value === 'number' : typeof value === 'string'
+    if (typed) return { text: String(value), set: true }
     if (p.default !== undefined) return { text: `${p.default}, the default`, set: false }
   } else if (typeof value === 'string') {
-    return { text: at.label(value) ?? 'out of sight', set: true }
+    const gone = p.type === 'waypoint' ? 'removed' : 'out of sight'
+    return { text: at.label(value) ?? gone, set: true }
   } else if (p.name === at.target && at.onTile !== undefined) {
     return {
       text: at.onTile === null ? 'none on their tile' : `${at.onTile}, on their tile`,

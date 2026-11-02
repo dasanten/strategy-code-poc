@@ -139,3 +139,36 @@ describe('what a param would be on a tile', () => {
     expect(paramOnTile(world(), 'storage', { x: 10, y: 5 })).toBeNull()
   })
 })
+
+describe('choice and waypoint params', () => {
+  const label = (id: string) => paramValueLabel(withWaypoints(), id)
+  const withWaypoints = (): ParamWorld => ({
+    ...world(),
+    waypoints: [{ id: 'wp1', name: 'Pass', x: 12, y: 40 }],
+  })
+
+  it('picks the Player’s waypoint on its tile for a waypoint param, and names it', () => {
+    expect(paramPickAt(withWaypoints(), 'waypoint', { x: 12, y: 40 })).toEqual({ id: 'wp1' })
+    expect(paramPickAt(withWaypoints(), 'waypoint', { x: 10, y: 5 })).toBe(
+      'pick one of your waypoints',
+    )
+    expect(paramPickAt(world(), 'waypoint', { x: 12, y: 40 })).toBe('pick one of your waypoints')
+    expect(label('wp1')).toBe('Pass at 12, 40')
+  })
+
+  it('says the word chosen, else a choice’s default', () => {
+    const toward = { name: 'toward', type: 'choice' as const, choices: ['north', 'south'] }
+    expect(effectiveParam(toward, 'south', { label })).toEqual({ text: 'south', set: true })
+    expect(effectiveParam({ ...toward, default: 'north' }, undefined, { label })).toEqual({
+      text: 'north, the default',
+      set: false,
+    })
+    expect(effectiveParam(toward, undefined, { label }).text).toBe('none picked')
+  })
+
+  it('names the waypoint picked, or says it was removed', () => {
+    const to = { name: 'to', type: 'waypoint' as const }
+    expect(effectiveParam(to, 'wp1', { label })).toEqual({ text: 'Pass at 12, 40', set: true })
+    expect(effectiveParam(to, 'wp9', { label }).text).toBe('removed')
+  })
+})

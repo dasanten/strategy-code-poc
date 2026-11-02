@@ -142,3 +142,12 @@ if (memory.done >= params.rounds) { end() }`
 export const PARAM_COMMENT_EXAMPLE = `param storage: storage // where the wood goes; none: I keep it
 param rounds: number = 5 // loads to carry before I stop
 if (params.storage != null) { store(["wood"], params.storage) }`
+
+/**
+ * The Script parameters topic's example of a `choice` param with a default and a `waypoint`
+ * param, picked from lists.
+ */
+export const PARAM_CHOICE_EXAMPLE = `param toward: choice(north, east, south, west) = north // which way to look
+param to: waypoint // where to go; none: I stay
+log("looking " + params.toward)
+if (params.to != null) { walkTo(params.to.x, params.to.y) }`

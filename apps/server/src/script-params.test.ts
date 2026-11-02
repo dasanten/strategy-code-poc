@@ -307,7 +307,7 @@ describe('the set-script-param order', () => {
       expect(numbers.validate(world, sender, order('take', 'farm'))).toBe(
         'must be a whole number of zero or more',
       )
-      expect(numbers.validate(world, sender, typed('home', 3))).toBe('takes no number')
+      expect(numbers.validate(world, sender, typed('home', 3))).toBe('takes no number or word')
     })
   })
 
@@ -331,6 +331,131 @@ describe('the set-script-param order', () => {
     queue.applyAll(world)
     expect(world.residents[0]!.script?.scriptId).toBe(SCRIPT)
     expect(world.residents[0]!.scriptParams).toEqual({ [SCRIPT]: { home: 'farm' } })
+  })
+})
+
+describe('choice and waypoint params', () => {
+  const sender = { userId: MARA, account: { name: 'Mara', isAdmin: false } }
+  const SOURCE = `param toward: choice(north, east, south, west) = north
+param pace: choice(slow, fast)
+param to: waypoint
+memory.toward = params.toward
+memory.pace = params.pace
+memory.to = params.to
+`
+  const source = { value: SOURCE }
+  const kind = setScriptParamOrder({ script: () => ({ userId: MARA, source: source.value }) })
+  const set = (name: string, picked: { value: unknown } | { targetId: unknown }) => ({
+    kind: 'setScriptParam',
+    residentId: 'w1',
+    scriptId: SCRIPT,
+    name,
+    ...picked,
+  })
+
+  /** The farm world with Mara's waypoint "Pass" and another Player's "Theirs". */
+  function waypointWorld() {
+    const got = farmWorld()
+    got.world.waypoints = {
+      [MARA]: [{ id: 'wp1', name: 'Pass', x: 3, y: 4 }],
+      2: [{ id: 'wp2', name: 'Theirs', x: 9, y: 9 }],
+    }
+    return got
+  }
+
+  /** Validates and applies a set-script-param order, as the order queue does. */
+  function give(world: WorldState, order: object) {
+    expect(kind.validate(world, sender, order)).toBeUndefined()
+    kind.apply(world, sender, order)
+  }
+
+  it('read a choice’s default or null while unset, the word picked, and the default once cleared', () => {
+    source.value = SOURCE
+    const { world, terrain, w } = waypointWorld()
+    const runner = new ScriptRunner(terrain, host(source))
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory).toMatchObject({ toward: 'north', pace: null, to: null })
+
+    give(world, set('toward', { value: 'west' }))
+    give(world, set('pace', { value: 'fast' }))
+    expect(w.scriptParams).toEqual({ [SCRIPT]: { toward: 'west', pace: 'fast' } })
+    expect(scriptParamsSound(world)).toEqual([])
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory).toMatchObject({ toward: 'west', pace: 'fast' })
+
+    give(world, set('toward', { targetId: null }))
+    expect(runner.runAll(world, true)).toEqual([])
+    expect(w.script!.memory.toward).toBe('north')
+  })
+
+  it('read a waypoint param as the waypoint picked, null while unset', () => {
+    source.value = SOURCE
+    const { world, terrain, w } = waypointWorld()
+    give(world, set('to', { targetId: 'wp1' }))
+    expect(new ScriptRunner(terrain, host(source)).runAll(world, true)).toEqual([])
+    expect(w.script!.memory.to).toEqual({ id: 'wp1', name: 'Pass', x: 3, y: 4 })
+    expect(w.scriptParams).toEqual({ [SCRIPT]: { to: 'wp1' } })
+  })
+
+  it('read a removed waypoint as unset, and drop it', () => {
+    source.value = SOURCE
+    const { world, terrain, w } = waypointWorld()
+    w.scriptParams = { [SCRIPT]: { to: 'wp1', pace: 'slow' } }
+    world.waypoints[MARA] = []
+    expect(new ScriptRunner(terrain, host(source)).runAll(world, true)).toEqual([])
+    expect(w.script!.memory.to).toBeNull()
+    expect(w.scriptParams).toEqual({ [SCRIPT]: { pace: 'slow' } })
+  })
+
+  it('keep a word while the script still lists it, and drop it once it doesn’t', () => {
+    const { world, terrain, w } = waypointWorld()
+    w.scriptParams = { [SCRIPT]: { toward: 'west', pace: 'fast' } }
+    source.value = SOURCE.replace('choice(north, east, south, west)', 'choice(north, south)')
+    expect(new ScriptRunner(terrain, host(source)).runAll(world, true)).toEqual([])
+    expect(w.script!.memory).toMatchObject({ toward: 'north', pace: 'fast' })
+    expect(w.scriptParams).toEqual({ [SCRIPT]: { pace: 'fast' } })
+    source.value = SOURCE
+  })
+
+  it('turn down a word not listed, another Player’s waypoint or anything else', () => {
+    source.value = SOURCE
+    const { world } = waypointWorld()
+    const check = (order: object) => kind.validate(world, sender, order)
+    for (const value of ['up', 'North', 3, null, undefined])
+      expect(check(set('toward', { value }))).toBe('must be one of north, east, south, west')
+    expect(check(set('toward', { targetId: 'wp1' }))).toBe('takes a word, not a pick')
+    for (const targetId of ['wp2', 'farm', 'nowhere', 7])
+      expect(check(set('to', { targetId }))).toBe('must be one of your waypoints')
+    expect(check(set('to', { value: 'wp1' }))).toBe('takes no number or word')
+  })
+
+  it('are set by the order starting the script, and turned down there when they don’t fit', () => {
+    source.value = SOURCE
+    const { world, terrain, w } = waypointWorld()
+    const kinds = { ...orderKinds, runScript: runScriptOrder(host(source)) }
+    const run = (params: unknown) => ({
+      kind: 'runScript',
+      residentId: 'w1',
+      scriptId: SCRIPT,
+      params,
+    })
+    const queue = new OrderQueue(kinds, terrain)
+    expect(queue.receive(world, sender, 'a', run({ toward: 'up' }))).toMatchObject({
+      type: 'rejected',
+      reason: 'toward: must be one of north, east, south, west',
+    })
+    expect(kinds.runScript.validate(world, sender, run({ to: 'wp2' }))).toBe(
+      'to: must be one of your waypoints',
+    )
+    expect(queue.receive(world, sender, 'b', run({ toward: 'east', to: 'wp1' }))).toEqual({
+      type: 'ack',
+      requestId: 'b',
+    })
+    queue.applyAll(world)
+    expect(new ScriptRunner(terrain, host(source)).runAll(world, true)).toEqual([])
+    expect(w.script!.memory).toMatchObject({ toward: 'east', to: { id: 'wp1', name: 'Pass' } })
+    expect(w.scriptParams).toEqual({ [SCRIPT]: { toward: 'east', to: 'wp1' } })
+    expect(scriptParamsSound(world)).toEqual([])
   })
 })
 

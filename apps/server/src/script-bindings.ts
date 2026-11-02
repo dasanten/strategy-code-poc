@@ -55,7 +55,7 @@ import { hash, mulberry32 } from './residents.js'
 import { sightOf } from './sight.js'
 import { lastSeenOutOfSight } from './last-seen.js'
 import { plainValue, type PlainValue } from './plain-value.js'
-import { paramTarget } from './script-params.js'
+import { paramTarget, paramWaypoint } from './script-params.js'
 import { realmOf } from './starting-city.js'
 import { walkTime } from './walk-time.js'
 
@@ -93,13 +93,14 @@ export interface ScriptContext {
   /** The order kinds actions go through; the game's own by default. */
   kinds?: Record<string, OrderKind>
   /**
-   * The script's `param` lines with the id or number picked for each (`paramValues`); `params`
-   * holds nothing without it.
+   * The script's `param` lines with the id, number or word picked for each (`paramValues`);
+   * `params` holds nothing without it.
    */
   params?: readonly {
     name: string
     type: ScriptParamType
-    default?: number
+    choices?: readonly string[]
+    default?: number | string
     value?: ScriptParamValue
   }[]
 }
@@ -446,14 +447,24 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   const paramBuilding = (b: Building) => asSeenBuilding(b) ?? lastSaw(b)
 
   // Each param as what it names while that is still the side's and fits its type, or the
-  // number typed for a number param, or its default while none is; else null.
+  // number typed for a number param, or the word picked for a choice param, or its default while
+  // none is; else null. A waypoint param reads as the waypoint, while its Player still has it.
   const params = Object.create(null) as ScriptObject
   for (const p of context.params ?? []) {
     if (p.type === 'number') {
       params[p.name] = typeof p.value === 'number' ? p.value : (p.default ?? null)
       continue
     }
+    if (p.type === 'choice') {
+      const word = typeof p.value === 'string' && p.choices?.includes(p.value) ? p.value : undefined
+      params[p.name] = word ?? p.default ?? null
+      continue
+    }
     const id = typeof p.value === 'string' ? p.value : undefined
+    if (p.type === 'waypoint') {
+      params[p.name] = viewValue(id === undefined ? null : paramWaypoint(world, side, id), 'any')
+      continue
+    }
     const target = id === undefined ? undefined : paramTarget(world, side, p.type, id)
     const carriage = target?.is === 'carriage' ? target.carriage : undefined
     params[p.name] =

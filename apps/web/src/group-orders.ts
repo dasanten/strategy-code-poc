@@ -557,7 +557,7 @@ export function groupNumberParams(
       const seen = byName.get(p.name) ?? { scriptIds: [], defaults: [] }
       byName.set(p.name, {
         scriptIds: [...seen.scriptIds, s.id],
-        defaults: [...seen.defaults, p.default],
+        defaults: [...seen.defaults, typeof p.default === 'number' ? p.default : undefined],
       })
     }
   }
