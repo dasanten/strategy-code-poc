@@ -31,6 +31,8 @@ import {
   passengersOf,
   workplaceGood,
   wrapDistance,
+  addWaypointProblem,
+  removeWaypointProblem,
   type Good,
   type Building,
   type BuildLine,
@@ -47,6 +49,7 @@ import {
   type ScriptType,
   type SeenEntity,
   type TerrainMap,
+  type Waypoint,
   type WorldState,
 } from '@csp/shared'
 import type { InvariantViolation } from './invariants.js'
@@ -58,6 +61,7 @@ import { plainValue, type PlainValue } from './plain-value.js'
 import { paramTarget } from './script-params.js'
 import { realmOf } from './starting-city.js'
 import { walkTime } from './walk-time.js'
+import { waypointsOf } from './waypoints.js'
 
 /** Re-exported for the callers that reckon walks like scripts do. */
 export { walkTime } from './walk-time.js'
@@ -137,6 +141,8 @@ export const ARMY_SCRIPT_ORDERS: Readonly<Record<string, string>> = {
   attack: 'armyAttack',
   follow: 'armyFollow',
   stop: 'armyStop',
+  addWaypoint: 'addWaypoint',
+  removeWaypoint: 'removeWaypoint',
 }
 
 /** The order kinds an army's script can request: one per action in `ARMY_SCRIPT_API`. */
@@ -438,6 +444,28 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       }
       return storages
     }
+  }
+
+  // The Player's waypoints (`CONTEXT.md`: Waypoint), for residents' and armies' scripts alike.
+  // Requests are applied only after the run, so the cap counts the waypoints the run added, and
+  // one it removed can't be removed again; the room a removal makes is there from the next run.
+  const pending = (kind: string) => requests.filter((r) => r.kind === kind)
+  queries.waypoints = () =>
+    sender.npcCityId !== undefined ? [] : waypointsOf(world, sender.userId)
+  actions.addWaypoint = ([x, y, name]) => {
+    const input = { x: plain(x), y: plain(y), name: plain(name) }
+    const added = pending('addWaypoint').map((): Waypoint => ({ id: '', name: '', x: 0, y: 0 }))
+    const held = [...waypointsOf(world, sender.userId), ...added]
+    return (
+      addWaypointProblem(held, input.x, input.y, input.name, terrain.size) ??
+      request('addWaypoint', input)
+    )
+  }
+  actions.removeWaypoint = ([waypoint]) => {
+    const waypointId = waypoint == null ? null : placeId(waypoint)
+    const removed = new Set(pending('removeWaypoint').map((r) => r.waypointId))
+    const held = waypointsOf(world, sender.userId).filter((w) => !removed.has(w.id))
+    return removeWaypointProblem(held, waypointId) ?? request('removeWaypoint', { waypointId })
   }
 
   // A building a param names: one of the side's own as it is; another's (a workplace or site

@@ -220,6 +220,14 @@ describe('step labels', () => {
     )
   })
 
+  it('names the waypoint a step at its tile goes to', () => {
+    const waypoints = [{ name: 'Pass', x: 12, y: 6 }]
+    expect(stepLabel({ kind: 'walkTo', x: 12, y: 6 }, { waypoints })).toBe('Walk to Pass (12, 6)')
+    expect(stepLabel({ kind: 'walkTo', x: 12, y: 7 }, { waypoints })).toBe('Walk to 12, 7')
+    // A removed waypoint leaves the step where it was: its tile.
+    expect(stepLabel({ kind: 'walkTo', x: 12, y: 6 }, {})).toBe('Walk to 12, 6')
+  })
+
   it('names the city a Relocate step goes to', () => {
     const cities = [{ id: 'c2', name: 'Redbank' }]
     expect(stepLabel({ kind: 'relocate', cityId: 'c2' }, { cities })).toBe('Relocate to Redbank')

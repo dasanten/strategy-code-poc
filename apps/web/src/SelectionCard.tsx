@@ -257,13 +257,15 @@ export function CardSheet({
  * The banner over the map while an order waits for its target (ADR 0012; `CONTEXT.md`: Picking a
  * target): what to pick, what is under the pointer and what the pick would do there (or else
  * more on what picking does), and Cancel, which Escape does too. On a touch screen, once a tap
- * has shown the preview, Confirm picks that tile.
+ * has shown the preview, Confirm picks that tile. Waypoints opens the drawer to pick one of the
+ * Player's waypoints instead (`CONTEXT.md`: Waypoint).
  */
 export function PickBanner({
   prompt,
   hint,
   under,
   onConfirm,
+  onWaypoints,
   onCancel,
 }: {
   prompt: string
@@ -272,6 +274,8 @@ export function PickBanner({
   under?: string
   /** Picks the tile previewed by a tap, on a touch screen. */
   onConfirm?: () => void
+  /** Opens the Waypoints drawer; absent while the Player holds none or it is open. */
+  onWaypoints?: () => void
   onCancel: () => void
 }) {
   const line = under ?? hint
@@ -284,6 +288,11 @@ export function PickBanner({
       {onConfirm && (
         <button type="button" className="primary" onClick={onConfirm}>
           Confirm
+        </button>
+      )}
+      {onWaypoints && (
+        <button type="button" onClick={onWaypoints}>
+          Waypoints
         </button>
       )}
       <button type="button" onClick={onCancel}>

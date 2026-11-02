@@ -157,18 +157,22 @@ export function TileMenu({
 
 /**
  * The Waypoints drawer (`CONTEXT.md`: Waypoint): the Player's waypoints, oldest first, each with
- * where it is. Its name centres the map on it; Rename and Remove act on it at once.
+ * where it is. Its name centres the map on it; Rename and Remove act on it at once. While an
+ * order waits for a place (`CONTEXT.md`: Picking a target), Pick gives it the waypoint's tile.
  */
 export function WaypointsPanel({
   waypoints,
   onCentre,
   onRename,
   onRemove,
+  onPick,
 }: {
   waypoints: readonly Waypoint[]
   onCentre: (w: Waypoint) => void
   onRename: (w: Waypoint, name: string) => Promise<string | undefined>
   onRemove: (w: Waypoint) => Promise<string | undefined>
+  /** Picks the waypoint as the place the order waits for; absent while none waits. */
+  onPick?: (w: Waypoint) => void
 }) {
   const [renaming, setRenaming] = useState<string>()
   const [error, setError] = useState<string>()
@@ -180,6 +184,9 @@ export function WaypointsPanel({
           No waypoints yet. Right-click a tile on the map, or long-press it on a touch screen, to
           add one.
         </p>
+      )}
+      {onPick && waypoints.length > 0 && (
+        <p className="small muted">Pick a waypoint for the place the order waits for.</p>
       )}
       {error && (
         <p className="small muted" role="status">
@@ -199,6 +206,16 @@ export function WaypointsPanel({
                 <span className="name">{w.name}</span>
                 <small className="muted">{waypointPlace(w)}</small>
               </button>
+              {onPick && (
+                <button
+                  type="button"
+                  className="primary"
+                  aria-label={`Pick ${w.name}`}
+                  onClick={() => onPick(w)}
+                >
+                  Pick
+                </button>
+              )}
               <button
                 type="button"
                 aria-pressed={renaming === w.id}
