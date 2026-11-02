@@ -762,7 +762,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       case 'work': {
         const workplace = world.buildings.find(
           (b) =>
-            b.kind !== 'road' && !b.site && covers(b, x, y) && MAX_WORKERS[b.kind] !== undefined,
+            // A site of a workplace too: Work builds it first (`CONTEXT.md`: Working a site).
+            b.kind !== 'road' && covers(b, x, y) && MAX_WORKERS[b.kind] !== undefined,
         )
         if (!workplace) return fail('no workplace there')
         // What a smithy makes is picked for each worker on their own card.

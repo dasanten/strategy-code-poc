@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ResidentOrder } from '@csp/shared'
 import type { Camera } from './camera.js'
-import { selectedWay, wayAhead, wayInView, type Way } from './way.js'
+import { selectedWay, wayAhead, wayInView, wayLine, type Way } from './way.js'
 
 const view = { width: 800, height: 600 }
 const size = 1440
@@ -16,7 +16,15 @@ describe('the selected resident’s way ahead', () => {
   })
 
   it('is the way to the storage or carriage while storing or fetching, none once there', () => {
-    const walking = { phase: 'walking', goods: { food: null }, path: [[3, 4], [3, 5]], progress: 0 }
+    const walking = {
+      phase: 'walking',
+      goods: { food: null },
+      path: [
+        [3, 4],
+        [3, 5],
+      ],
+      progress: 0,
+    }
     const store = { kind: 'store', to: { kind: 'storage', storageId: 's1' }, ...walking }
     const fetch = { kind: 'fetch', from: { kind: 'carriage', carriageId: 'k1' }, ...walking }
     for (const order of [store, fetch]) {
@@ -25,7 +33,9 @@ describe('the selected resident’s way ahead', () => {
       expect(wayAhead({ order: { ...order, path: null } } as never)).toBeUndefined()
     }
     expect(wayAhead({ order: { ...store, phase: 'putting', path: null } } as never)).toBeUndefined()
-    expect(wayAhead({ order: { ...store, phase: 'refilling', path: null } } as never)).toBeUndefined()
+    expect(
+      wayAhead({ order: { ...store, phase: 'refilling', path: null } } as never),
+    ).toBeUndefined()
     expect(wayAhead({ order: { ...fetch, phase: 'taking', path: null } } as never)).toBeUndefined()
   })
 
@@ -33,9 +43,15 @@ describe('the selected resident’s way ahead', () => {
     for (const kind of ['roadLine', 'wallLine'] as const) {
       const order: ResidentOrder = {
         kind,
-        tiles: [[7, 2], [8, 2]],
+        tiles: [
+          [7, 2],
+          [8, 2],
+        ],
         phase: 'walking',
-        path: [[6, 2], [7, 2]],
+        path: [
+          [6, 2],
+          [7, 2],
+        ],
         progress: 0,
         siteId: null,
       }
@@ -69,7 +85,13 @@ describe('the selected resident’s way ahead', () => {
   })
 
   it('is drawn while its resident is on screen', () => {
-    const way: Way = { target: { x: 110, y: 100 }, path: [[105, 100], [110, 100]] }
+    const way: Way = {
+      target: { x: 110, y: 100 },
+      path: [
+        [105, 100],
+        [110, 100],
+      ],
+    }
     expect(wayInView(cam, view, size, { x: 100, y: 100 }, way)).toBe(true)
   })
 
@@ -80,7 +102,14 @@ describe('the selected resident’s way ahead', () => {
     const into: Way = { target: { x: 100, y: 100 }, path }
     expect(wayInView(cam, view, size, { x: 40, y: 100 }, into)).toBe(true)
     // Walking straight across the screen from one side to the other, both ends off screen.
-    const across: Way = { target: { x: 160, y: 100 }, path: [[40, 100], [100, 100], [160, 100]] }
+    const across: Way = {
+      target: { x: 160, y: 100 },
+      path: [
+        [40, 100],
+        [100, 100],
+        [160, 100],
+      ],
+    }
     expect(wayInView(cam, view, size, { x: 40, y: 100 }, across)).toBe(true)
     // Only the target dot is in view (no path yet).
     const dot: Way = { target: { x: 100, y: 100 }, path: null }
@@ -88,7 +117,13 @@ describe('the selected resident’s way ahead', () => {
   })
 
   it('is skipped when none of it is in view', () => {
-    const way: Way = { target: { x: 300, y: 300 }, path: [[250, 250], [300, 300]] }
+    const way: Way = {
+      target: { x: 300, y: 300 },
+      path: [
+        [250, 250],
+        [300, 300],
+      ],
+    }
     expect(wayInView(cam, view, size, { x: 200, y: 200 }, way)).toBe(false)
     const dot: Way = { target: { x: 300, y: 300 }, path: null }
     expect(wayInView(cam, view, size, { x: 100, y: 100 }, dot)).toBe(false)
@@ -99,5 +134,58 @@ describe('the selected resident’s way ahead', () => {
     const west: Camera = { x: 10, y: 100, scale: 10 }
     const way: Way = { target: { x: 1430, y: 100 }, path: [[1430, 100]] }
     expect(wayInView(west, view, size, { x: 1400, y: 100 }, way)).toBe(true)
+  })
+})
+
+describe('a way’s line on screen', () => {
+  // The far tier: 2 pixels per tile, the view centred on tile (100, 100).
+  const far: Camera = { x: 100.5, y: 100.5, scale: 2 }
+
+  it('runs far out from the resident along the path, its end on the target', () => {
+    const way: Way = {
+      target: { x: 103, y: 101 },
+      path: [
+        [101, 100],
+        [102, 101],
+        [103, 101],
+      ],
+    }
+    expect(wayLine(far, view, size, { x: 100, y: 100 }, way)).toEqual({
+      lines: [
+        [
+          [400, 300],
+          [402, 300],
+          [404, 302],
+          [406, 302],
+        ],
+      ],
+      end: [406, 302],
+    })
+  })
+
+  it('breaks where a step crosses the map’s join', () => {
+    const edge: Camera = { x: 0.5, y: 100.5, scale: 2 }
+    const way: Way = {
+      target: { x: 1, y: 100 },
+      path: [
+        [1438, 100],
+        [1439, 100],
+        [0, 100],
+        [1, 100],
+      ],
+    }
+    // Centred on the join, both sides are near: the line runs straight across it.
+    expect(wayLine(edge, view, size, { x: 1437, y: 100 }, way).lines).toHaveLength(1)
+    // Centred far from it, the far side shows on the other edge of the view: the line breaks.
+    const off: Camera = { x: 720, y: 100.5, scale: 2 }
+    expect(wayLine(off, view, size, { x: 1437, y: 100 }, way).lines).toHaveLength(2)
+  })
+
+  it('is only its end once in contact', () => {
+    const way: Way = { target: { x: 101, y: 100 }, path: null }
+    expect(wayLine(far, view, size, { x: 100, y: 100 }, way)).toEqual({
+      lines: [],
+      end: [402, 300],
+    })
   })
 })

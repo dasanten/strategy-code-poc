@@ -67,3 +67,39 @@ export function wayInView(
   }
   return x1 >= -MARGIN && y1 >= -MARGIN && x0 <= view.width + MARGIN && y0 <= view.height + MARGIN
 }
+
+/** A way as drawn on screen: its line, split where a step crosses the map's join, and its end. */
+export interface WayLine {
+  lines: (readonly [number, number])[][]
+  end: readonly [number, number]
+}
+
+/**
+ * Where a way shows on screen, from the resident's tile along the path to the target, at any zoom
+ * tier. A step across the map's join shows up far away on screen, so the line breaks there rather
+ * than running across the map.
+ */
+export function wayLine(
+  cam: Camera,
+  view: Size,
+  size: number,
+  from: { x: number; y: number },
+  way: Way,
+): WayLine {
+  const at = (x: number, y: number) => tileToScreen(cam, view, size, x + 0.5, y + 0.5)
+  const lines: (readonly [number, number])[][] = []
+  if (way.path) {
+    let line = [at(from.x, from.y)]
+    for (const [x, y] of way.path) {
+      const [px, py] = line.at(-1)!
+      const next = at(x, y)
+      if (Math.hypot(next[0] - px, next[1] - py) >= cam.scale * 1.5) {
+        if (line.length > 1) lines.push(line)
+        line = []
+      }
+      line.push(next)
+    }
+    if (line.length > 1) lines.push(line)
+  }
+  return { lines, end: at(way.target.x, way.target.y) }
+}
