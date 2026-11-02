@@ -72,6 +72,7 @@ import {
   type Stock,
   type SeenResident,
   type SeenHorse,
+  type Waypoint,
   FOAL_STAT_SPREAD,
   STABLE_BREED_DAYS,
   STABLE_BREED_TICKS,
@@ -401,6 +402,7 @@ export function QueueBlock({
   scripts,
   buildings,
   lastSeen,
+  waypoints,
   cities,
   onEdit,
   title = 'Queue',
@@ -414,6 +416,8 @@ export function QueueBlock({
   buildings: Building[]
   /** The buildings remembered out of sight, to name steps acting there. */
   lastSeen?: Building[]
+  /** The Player's waypoints, to name steps at one (`CONTEXT.md`: Waypoint). */
+  waypoints?: readonly Waypoint[]
   /** The cities the Player knows, to name where a Relocate step goes. */
   cities?: readonly Pick<City, 'id' | 'name'>[]
   onEdit: (items: PlanItem[], loop?: boolean) => void
@@ -425,7 +429,7 @@ export function QueueBlock({
   // The steps and blocks picked for the clipboard, by id; one removed since drops out.
   const [pickedIds, setPicked] = useState<number[]>([])
   const clipboardEmpty = useClipboardEmpty()
-  const names = { scripts, buildings, lastSeen, cities }
+  const names = { scripts, buildings, lastSeen, cities, waypoints }
   const rows = planRows(q.items)
   const ids = rows.map((row) => row.id)
   const picked = pickedIds.filter((id) => ids.includes(id))
@@ -1634,6 +1638,7 @@ export function ResidentCard({
   scripts,
   buildings = [],
   lastSeen,
+  waypoints,
   onRunScript,
   onSetDefenceScript,
   onEditScript,
@@ -1708,6 +1713,8 @@ export function ResidentCard({
   buildings?: Building[]
   /** The buildings remembered out of sight, to name queue steps acting there. */
   lastSeen?: Building[]
+  /** The Player's waypoints, to name steps at one (`CONTEXT.md`: Waypoint). */
+  waypoints?: readonly Waypoint[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
   onRunScript: (scriptId: number) => void
   /**
@@ -2287,6 +2294,7 @@ export function ResidentCard({
               scripts={scripts}
               buildings={buildings}
               lastSeen={lastSeen}
+              waypoints={waypoints}
               cities={cities}
               onEdit={(items, loop) => onPlanQueue(editPlan(queuePlan, items, loop))}
               realm={realmId}
@@ -2307,6 +2315,7 @@ export function ResidentCard({
             scripts={scripts}
             buildings={buildings}
             lastSeen={lastSeen}
+            waypoints={waypoints}
             cities={cities}
             onEdit={onEditQueue}
             realm={realmId}

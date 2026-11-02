@@ -130,6 +130,7 @@ function setup() {
       seenAt: 4,
     },
   ]
+  world.waypoints[7] = [{ id: 'wp1', name: 'Pass', x: 40, y: 3 }]
   const explored = new ExploredTerrain(terrain, world.nodes)
   explored.explore(7, 10, 10, SIGHT_RANGE)
   return { world, explored }
@@ -195,6 +196,7 @@ describe('script views', () => {
       nodes: 'nodes()',
       lastSeen: 'lastSeen()',
       directives: 'directives()',
+      waypoints: 'waypoints()',
       withMemory: 'withMemory("role", "gatherer")',
       building: 'building("s1")',
       buildingAt: 'buildingAt(13, 10)',
@@ -234,6 +236,7 @@ describe('script views', () => {
       'piles',
       'nodes',
       'directives',
+      'waypoints',
       'withMemory',
       'lineTiles',
     ]) {

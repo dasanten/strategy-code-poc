@@ -6,6 +6,8 @@ import {
   SCRIPT_LOG_LINES,
   SCRIPT_TILE_QUERY_COST,
   TRAINING_GROUND_MAX_TRAINEES,
+  WAYPOINTS_MAX,
+  WAYPOINT_NAME_MAX_LENGTH,
 } from './balance.js'
 import type { ScriptType, ScriptViewName } from './script-views.js'
 
@@ -119,6 +121,11 @@ const SHARED: readonly ScriptBinding[] = [
     'The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).',
   ),
   list(
+    'waypoints',
+    'waypoint',
+    'My Player’s waypoints, oldest first: the named markers they put on the map, which only they see.',
+  ),
+  list(
     'withMemory',
     'resident',
     'My realm’s residents running a script whose `memory[key]` is `value`, as `residents()` shows them, with their `script.memory`.',
@@ -212,6 +219,23 @@ const SHARED: readonly ScriptBinding[] = [
     description:
       'One item of a list, picked with `random`, so every script picking from the same list this tick picks the same; null for an empty list.',
   },
+]
+
+/**
+ * The actions every script gets for its Player's waypoints (`CONTEXT.md`: Waypoint): the orders
+ * of the same name, free and at once, which leave the script running.
+ */
+const WAYPOINT_ACTIONS: readonly ScriptBinding[] = [
+  action(
+    'addWaypoint',
+    ['x', 'y', 'name'],
+    `Put a waypoint named \`name\` on tile (x, y) for my Player, after those they hold: free and at once, from anywhere. Refused once they hold ${WAYPOINTS_MAX}, counting those this run added (one removed makes room from the next run), or for a name longer than ${WAYPOINT_NAME_MAX_LENGTH} characters.`,
+  ),
+  action(
+    'removeWaypoint',
+    ['waypoint'],
+    'Remove one of my Player’s waypoints, by it or its id: free and at once.',
+  ),
 ]
 
 /**
@@ -479,6 +503,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     ['x', 'y'],
     'Build wall on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped.',
   ),
+  ...WAYPOINT_ACTIONS,
 ]
 
 /**
@@ -498,4 +523,5 @@ export const ARMY_SCRIPT_API: readonly ScriptBinding[] = [
   action('attack', ['targetId'], 'The army goes after a resident of another realm in sight.'),
   action('follow', ['targetId'], 'The army keeps in contact with a resident in sight.'),
   action('stop', [], 'The army stops: its order ends.'),
+  ...WAYPOINT_ACTIONS,
 ]

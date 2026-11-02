@@ -781,6 +781,19 @@ export function Wiki() {
           you, not your realm, so they are still there if your Leader dies and you found a new
           realm.
         </p>
+        <p>
+          A waypoint is a place like a tile. While an order waits for where to go or act (Walk to on
+          a resident or group card, a place for a step in the queue planner), click a waypoint’s pin
+          on the map, or open the Waypoints drawer from the banner and press Pick beside it: the
+          order gets the waypoint’s tile. A queue step keeps that tile, so it still goes there if
+          you remove the waypoint later, and the queue names the waypoint while it is there.
+        </p>
+        <p>
+          Scripts see your waypoints with <code>waypoints()</code> and can put one down with{' '}
+          <code>addWaypoint(x, y, name)</code> or take one away with{' '}
+          <code>removeWaypoint(waypoint)</code>, free and at once, without stopping the script. The
+          same cap counts there too.
+        </p>
       </Section>
 
       <Section id="terrain">

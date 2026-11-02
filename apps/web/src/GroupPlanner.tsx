@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Building, ScriptSummary } from '@csp/shared'
+import type { Building, ScriptSummary, Waypoint } from '@csp/shared'
 import { GivePlan, PasteSteps, QueueBlock, SavedQueueTools } from './Residents.js'
 import { editPlan, EMPTY_PLAN, type QueuePlan } from './queue-view.js'
 
@@ -18,6 +18,7 @@ export function GroupPlanner({
   scripts,
   buildings,
   lastSeen,
+  waypoints,
   realm,
 }: {
   /** The plan open, if one is. */
@@ -32,6 +33,8 @@ export function GroupPlanner({
   buildings: Building[]
   /** The buildings remembered out of sight, to name steps and flag those whose place is gone. */
   lastSeen: Building[]
+  /** The Player's waypoints, to name steps at one. */
+  waypoints?: readonly Waypoint[]
   /** The Player's realm, whose saved queues Save and Load keep (`CONTEXT.md`: Saved queue). */
   realm: string
 }) {
@@ -59,6 +62,7 @@ export function GroupPlanner({
           scripts={scripts}
           buildings={buildings}
           lastSeen={lastSeen}
+          waypoints={waypoints}
           onEdit={(items, loop) => onPlan(editPlan(plan, items, loop))}
           realm={realm}
         />

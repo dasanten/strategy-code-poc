@@ -262,7 +262,7 @@ describe('an army’s script', () => {
 })
 
 describe('army script bindings', () => {
-  it('bind every name in the army script API, and every army order but forming and disbanding', () => {
+  it('bind every name in the army script API, every army order but forming and disbanding, and adding and removing waypoints', () => {
     const { world } = setup()
     const { globals } = bindScript({
       world,
@@ -275,7 +275,9 @@ describe('army script bindings', () => {
     })
     expect(Object.keys(globals).sort()).toEqual(ARMY_SCRIPT_API.map((b) => b.name).sort())
     const commands = Object.keys(armyOrders).filter((k) => k !== 'formArmy' && k !== 'disbandArmy')
-    expect([...ARMY_SCRIPT_ORDER_KINDS].sort()).toEqual(commands.sort())
+    expect([...ARMY_SCRIPT_ORDER_KINDS].sort()).toEqual(
+      [...commands, 'addWaypoint', 'removeWaypoint'].sort(),
+    )
   })
 
   it('invariant: an army’s script requests only its own army orders', () => {

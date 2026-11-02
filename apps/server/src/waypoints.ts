@@ -48,11 +48,13 @@ interface RemoveWaypointRequest extends OrderRequest {
 
 /**
  * The add order: the Player gets a new waypoint with the name trimmed, after those they hold.
- * Turned down past `WAYPOINTS_MAX`, also when orders waiting for the same tick filled the cap.
+ * Turned down past `WAYPOINTS_MAX`, also when orders waiting for the same tick filled the cap,
+ * and for an NPC city's default script, which has no Player to hold it.
  */
 export const addWaypoint: OrderKind = {
   validate(world, sender, order, terrain) {
     const o = order as Partial<AddWaypointRequest>
+    if (sender.npcCityId !== undefined) return 'only a Player holds waypoints'
     if (!terrain) return 'no map to put a waypoint on'
     return addWaypointProblem(waypointsOf(world, sender.userId), o.x, o.y, o.name, terrain.size)
   },

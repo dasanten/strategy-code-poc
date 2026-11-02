@@ -1307,6 +1307,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onCentre={(w) => showOnMap(w.x, w.y)}
             onRename={(w, name) => sendOrder({ kind: 'renameWaypoint', waypointId: w.id, name })}
             onRemove={(w) => sendOrder({ kind: 'removeWaypoint', waypointId: w.id })}
+            // A waypoint is a place like a tile: picked, it is its tile (`CONTEXT.md`: Waypoint).
+            onPick={pick ? (w) => pickTile(w.x, w.y) : undefined}
           />,
         )}
       {world &&
@@ -1444,6 +1446,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               hint={pickHint(pick)}
               under={pick.kind === 'plan' && pick.error ? undefined : preview?.label}
               onConfirm={pickAt?.tapped ? () => pickTile(pickAt.x, pickAt.y) : undefined}
+              onWaypoints={
+                world && world.waypoints.length > 0 && openDrawer !== 'waypoints'
+                  ? () => setOpenDrawer('waypoints')
+                  : undefined
+              }
               onCancel={cancelPick}
             />
           ) : kind === 'horseOffer' ? (
@@ -1618,6 +1625,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             scripts={scripts}
             buildings={world.buildings}
             lastSeen={world.lastSeen.buildings}
+            waypoints={world.waypoints}
             onRunScript={runScript}
             onSetDefenceScript={setDefenceScript}
             onEditScript={(id) => openScript(id)}
@@ -1839,6 +1847,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 scripts={scripts}
                 buildings={world.buildings}
                 lastSeen={world.lastSeen.buildings}
+                waypoints={world.waypoints}
                 realm={world.home.realmId}
               />
             }

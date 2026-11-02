@@ -93,6 +93,7 @@ import {
   farMarkers,
   type CityEmblem,
 } from './map/far.js'
+import { PIN_HEIGHT, PIN_RADIUS, pinAt } from './map/pins.js'
 import { LabelLayer } from './map/labels.js'
 import { destroyAtlas, loadAtlas, type Atlas } from './map/atlas.js'
 import {
@@ -885,7 +886,16 @@ export function MapView({
       })
       pointer = { x: sx, y: sy }
       updateHover()
-      pointTo(pickingRef.current ? { x: wx, y: wy } : undefined)
+      pointTo(pickingRef.current ? pickedTile(sx, sy, wx, wy) : undefined)
+    }
+
+    /**
+     * The tile a click at a screen point picks while picking: the waypoint's whose pin it falls on
+     * (`CONTEXT.md`: Waypoint, a place like a tile), else the tile under it.
+     */
+    function pickedTile(sx: number, sy: number, tx: number, ty: number) {
+      const pinned = pinAt(worldRef.current.waypoints ?? [], cam, size(), mapSize, sx, sy)
+      return pinned ? { x: pinned.x, y: pinned.y } : { x: wrap(tx, mapSize), y: wrap(ty, mapSize) }
     }
 
     // The tile last said to be under the hovering pointer while picking (`onPointerTile`).
@@ -1034,8 +1044,8 @@ export function MapView({
         if (e.button === 2)
           return onPickTileRef.current?.(tx, ty, undefined, { x: e.clientX, y: e.clientY })
         if (pickingRef.current) {
-          const [wx, wy] = [wrap(tx, mapSize), wrap(ty, mapSize)]
-          return onPickTileRef.current?.(wx, wy, { touch: e.pointerType === 'touch' })
+          const at = pickedTile(p.x, p.y, tx, ty)
+          return onPickTileRef.current?.(at.x, at.y, { touch: e.pointerType === 'touch' })
         }
         // Far out, a click picks the city whose emblem it falls on.
         if (zoomTier(cam.scale) === 'far') {
@@ -1314,10 +1324,6 @@ const MINIMAP_DOT_RADIUS: Record<MinimapDot['kind'], number> = {
   home: 4.5,
   waypoint: 3.5,
 }
-
-/** A waypoint's pin on the map (`drawWaypoints`): its head's radius and how far above its point. */
-const PIN_RADIUS = 7
-const PIN_HEIGHT = 16
 
 function Legend() {
   const terrains = [
