@@ -140,9 +140,12 @@ function switchWorkers(
   const index = worldIndex(world)
   const stale = (s: RunningScript | undefined) =>
     s?.settingsFrom === buildingId && s.scriptId !== scriptId
+  // As giving Work writes it: what a smithy's worker makes kept, and a workplace still being
+  // built in `siteId` too (`CONTEXT.md`: Working a site).
+  const site = index.buildingById(buildingId)?.site ? { siteId: buildingId } : {}
   const workMemory = (s: RunningScript): TaskMemory['work'] => {
     const { makes } = s.memory
-    return { workplaceId: buildingId, ...(typeof makes === 'string' ? { makes } : {}) }
+    return { workplaceId: buildingId, ...(typeof makes === 'string' ? { makes } : {}), ...site }
   }
   // The workplace in `workplace`, as giving Work there fills it, while the realm may name it.
   const target = paramTarget(world, realmId, 'building', buildingId) ? buildingId : undefined

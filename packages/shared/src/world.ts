@@ -343,6 +343,11 @@ export interface SeenScript {
   /** It waits on the resident's order (`RunningScript.waitingSince`); only for the owning Player. */
   waiting?: true
   /**
+   * Work's workplace is still a construction site, which it builds first (`CONTEXT.md`: Working a
+   * site); only for the owning Player.
+   */
+  site?: true
+  /**
    * The workplace whose settings it runs by (`RunningScript.settingsFrom`); only for the owning
    * Player. Its params then read their values from there unless picked for the resident.
    */

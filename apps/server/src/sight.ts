@@ -273,7 +273,8 @@ function seenCarriage(world: WorldState, insight: Insight, k: Carriage): SeenCar
  * What a Player sees of the script a resident runs (`SeenScript`): which one, and for the owning
  * Player (`own`) what goes into the resident's Doing line (`CONTEXT.md`: Doing): the task, the
  * kind of building the task is about, as its memory names it (`TaskMemory`), the text the
- * script gave `doing()`, and whether it waits (`CONTEXT.md`: Running a script, Waiting).
+ * script gave `doing()`, whether it waits (`CONTEXT.md`: Running a script, Waiting), and whether
+ * Work's workplace is still a construction site it builds first (`CONTEXT.md`: Working a site).
  */
 export function seenScript(world: WorldState, script: RunningScript, own: boolean): SeenScript {
   if (!own) return { scriptId: script.scriptId }
@@ -282,10 +283,11 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
   // Build line's kind is its line's (`TaskMemory`).
   const line = buildLineOf(memory.line)
   const kind = memory.building ?? line?.building
+  const target = world.buildings.find((b) => typeof id === 'string' && b.id === id)
   const building =
     typeof kind === 'string' && Object.hasOwn(FOOTPRINT, kind)
       ? (kind as BuildingKind)
-      : world.buildings.find((b) => typeof id === 'string' && b.id === id)?.kind
+      : target?.kind
   return {
     scriptId: script.scriptId,
     ...(script.task ? { task: script.task } : {}),
@@ -293,6 +295,7 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
     ...(typeof memory.doing === 'string' && memory.doing ? { doing: memory.doing } : {}),
     ...(line ? { line } : {}),
     ...(script.waitingSince !== undefined ? { waiting: true as const } : {}),
+    ...(memory.workplaceId === target?.id && target?.site ? { site: true as const } : {}),
     ...(script.settingsFrom !== undefined ? { settingsFrom: script.settingsFrom } : {}),
   }
 }

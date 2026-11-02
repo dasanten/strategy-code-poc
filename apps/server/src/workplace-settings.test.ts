@@ -7,6 +7,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { scriptParams } from '@csp/lang'
 import { describe, expect, it } from 'vitest'
 
 import { OrderQueue, orderKinds } from './orders.js'
@@ -19,6 +20,7 @@ import { addCity } from './test-terrain.js'
 import {
   setWorkSettingsOrder,
   stepWorkplaceSettings,
+  withWorkSettings,
   workplaceSettingsSound,
 } from './workplace-settings.js'
 import { createWorld, stepWorld } from './world.js'
@@ -415,6 +417,35 @@ describe('working by Workplace settings', () => {
     m1.script = { scriptId: 14, memory: {}, settingsFrom: 'farm' }
     send(world, terrain, [mara, order({ params: { foodTake: 2 } })])
     expect(m1.script.scriptId).toBe(14)
+  })
+
+  it('switching at a workplace still being built keeps building it first', () => {
+    const { world, terrain, m1 } = crew()
+    world.buildings.find((b) => b.id === 'farm')!.site = { delivered: {}, work: 0 }
+    m1.script = { scriptId: 14, memory: { workplaceId: 'farm' }, settingsFrom: 'farm' }
+    send(world, terrain, [mara, order({ scriptId: 11 })])
+    expect(m1.script.memory).toEqual({ workplaceId: 'farm', siteId: 'farm' })
+  })
+
+  it('covers the Work default’s output, input and food storages', () => {
+    const { world, terrain } = twoRealms()
+    world.buildings.push({ id: 's3', kind: 'storage', cityId: 'c1', x: 14, y: 6, stock: {} })
+    const values = { storage: 's1', output: 's3', input: 's1', food: 's3', foodTake: 4 }
+    expect(send(world, terrain, [mara, order({ params: values })])).toEqual([])
+    const declared = scriptParams(DEFAULT_SCRIPTS.work.source)
+    // Their own `food` overrides the workplace's; the rest read the workplace's.
+    const own = declared.map((p) => (p.name === 'food' ? { ...p, value: 's1' } : p))
+    const read = withWorkSettings(own, 'farm', world.workplaceSettings.r1?.farm)
+    expect(Object.fromEntries(read.map((p) => [p.name, p.value]))).toEqual({
+      workplace: 'farm',
+      storage: 's1',
+      output: 's3',
+      input: 's1',
+      food: 's1',
+      foodAt: undefined,
+      foodTake: 4,
+      crewFood: undefined,
+    })
   })
 
   it('keeps what a smithy’s worker makes when the work script switches', () => {

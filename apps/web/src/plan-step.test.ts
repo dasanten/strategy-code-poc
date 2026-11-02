@@ -198,6 +198,15 @@ describe('Add step', () => {
     expect(planOrder(planned('build', [48, 30]))?.order).toMatchObject({ building: 'quarry' })
   })
 
+  it('picks a workplace still being built for Work, which builds it first', () => {
+    // `CONTEXT.md`: Working a site.
+    expect(planOrder(planned('work', [50, 9]))).toEqual({
+      order: { kind: 'task', task: 'work', workplaceId: 'm1' },
+      at: { x: 50, y: 9 },
+    })
+    expect(planOrder(planned('work', [48, 30]))?.order).toMatchObject({ workplaceId: 'q1' })
+  })
+
   it('asks for what more a step needs once its places are picked', () => {
     expect(planAsk(planned('fetch', [12, 6]))).toBe('goods')
     expect(planAsk(planned('build', [9, 9]))).toBe('buildingKind')
