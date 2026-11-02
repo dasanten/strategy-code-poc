@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { formatGameTime } from '@csp/shared'
+import { formatGameTime, type FirstDay } from '@csp/shared'
 import {
   DRAWERS,
   DRAWER_WIDTH,
@@ -12,7 +12,7 @@ import {
   type OpenDrawer,
 } from './hud-view.js'
 import { groupSentLine, type Skipped } from './group-orders.js'
-import { laneSpot, skippedByWhy } from './notices-view.js'
+import { firstDayView, laneSpot, skippedByWhy } from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
 import { WIKI_PATH } from './wiki-view.js'
 
@@ -142,6 +142,7 @@ export function TopBar({
   goods,
   leader,
   onLogout,
+  onWiki,
 }: {
   realm: string
   cityName?: string
@@ -150,6 +151,8 @@ export function TopBar({
   goods?: Record<KeyGood, number>
   leader?: string
   onLogout: () => void
+  /** The Wiki link was followed (`CONTEXT.md`: First day). */
+  onWiki?: () => void
 }) {
   return (
     <header className="hud-top">
@@ -187,7 +190,7 @@ export function TopBar({
       )}
       <span className="hud-sep" />
       {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
-      <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener">
+      <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener" onClick={onWiki}>
         Wiki
       </a>
       <button type="button" className="hud-logout" onClick={onLogout}>
@@ -235,6 +238,7 @@ export function PhoneMenu({
   cityName,
   leader,
   onLogout,
+  onWiki,
 }: {
   open: OpenDrawer
   onToggle: (id: DrawerId) => void
@@ -242,6 +246,8 @@ export function PhoneMenu({
   cityName?: string
   leader?: string
   onLogout: () => void
+  /** The Wiki link was followed (`CONTEXT.md`: First day). */
+  onWiki?: () => void
 }) {
   const [shown, setShown] = useState(false)
   useEffect(() => {
@@ -301,7 +307,13 @@ export function PhoneMenu({
               </span>
             )}
             <div className="hud-menu-links">
-              <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener">
+              <a
+                className="hud-wiki"
+                href={WIKI_PATH}
+                target="_blank"
+                rel="noopener"
+                onClick={onWiki}
+              >
                 Wiki
               </a>
               <button type="button" className="hud-logout" onClick={onLogout}>
@@ -600,6 +612,63 @@ export function GroupReportNotice({
       </span>
       <button type="button" aria-label="Dismiss the group order's report" onClick={onDismiss}>
         OK
+      </button>
+    </aside>
+  )
+}
+
+/**
+ * The first-day card in the lane, under the Horse offer (`CONTEXT.md`: First day): a new realm's
+ * checklist, each line ticked once the game sees it done, with ✕ to dismiss it for good. On a
+ * phone it is one line: how far along, and the first line still to do.
+ */
+export function FirstDayCard({
+  card,
+  onWiki,
+  onDismiss,
+}: {
+  card: FirstDay
+  onWiki: () => void
+  onDismiss: () => void
+}) {
+  const { lines, next, ticked } = firstDayView(card)
+  return (
+    <aside className="notice first-day" aria-label="First day">
+      <div className="notice-text">
+        <strong>First day</strong>{' '}
+        <span className="first-day-count">
+          {ticked} of {lines.length}
+        </span>
+        <ul>
+          {lines.map((l) => (
+            <li
+              key={l.line}
+              className={l.done ? 'done' : l.line === next ? 'next' : undefined}
+              aria-label={l.done ? `${l.label}: done` : undefined}
+            >
+              <span className="first-day-tick" aria-hidden="true">
+                {l.done ? '✓' : '○'}
+              </span>{' '}
+              {l.line === 'openWiki' ? (
+                // A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki).
+                <a href={WIKI_PATH} target="_blank" rel="noopener" onClick={onWiki}>
+                  {l.label}
+                </a>
+              ) : (
+                l.label
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <button
+        type="button"
+        className="first-day-dismiss"
+        aria-label="Don't show again"
+        title="Don't show again"
+        onClick={onDismiss}
+      >
+        ✕
       </button>
     </aside>
   )

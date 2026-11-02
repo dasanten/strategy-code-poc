@@ -13,6 +13,8 @@ import {
   ADMIN_TERRAIN_OVERVIEW_PATH,
   ADMIN_TERRITORY_PATH,
   ADMIN_WORLD_PATH,
+  FIRST_DAY_DISMISS_PATH,
+  FIRST_DAY_PATH,
   SCRIPT_WRITES_PER_MINUTE,
   SESSION_COOKIE,
   type Account,
@@ -22,6 +24,7 @@ import {
   type MapInfo,
   type TerrainMap,
   type WorldState,
+  isClientFirstDayLine,
 } from '@csp/shared'
 import { LANGUAGE_VERSION } from '@csp/lang'
 import {
@@ -54,6 +57,7 @@ import {
   setDirectivePrice,
 } from './directives.js'
 import type { ExploredTerrain } from './explored.js'
+import { dismissFirstDay, markFirstDay, readFirstDay } from './first-day.js'
 import type { Logger } from './log.js'
 import {
   activateVersion,
@@ -195,6 +199,21 @@ export async function buildApp(opts: AppOptions) {
   app.get('/api/me', async (req, reply) => {
     if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
     return publicAccount(req.user)
+  })
+
+  // The first-day card (`CONTEXT.md`: First day): the lines only the client sees done, picking a
+  // resident and opening the Wiki, and dismissing it. Claiming and giving orders the server sees.
+  app.post(FIRST_DAY_PATH, async (req, reply) => {
+    if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
+    const { line } = body(req)
+    if (!isClientFirstDayLine(line)) {
+      return fail(reply, 'invalid-input', 'That line is not one the client ticks.')
+    }
+    return markFirstDay(db, req.user.id, line) ?? readFirstDay(db, req.user.id)
+  })
+  app.post(FIRST_DAY_DISMISS_PATH, async (req, reply) => {
+    if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
+    return dismissFirstDay(db, req.user.id)
   })
 
   // Explored terrain, one chunk at a time (ADR 0006); unexplored chunks are refused.
