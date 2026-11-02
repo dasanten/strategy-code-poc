@@ -488,7 +488,15 @@ function Prices({
 }
 
 /** One side of the prices: per good, the units (where known) and the price of each in coins. */
-function PriceList({ title, lines, none }: { title: string; lines: TradeLine[]; none: string }) {
+export function PriceList({
+  title,
+  lines,
+  none,
+}: {
+  title: string
+  lines: TradeLine[]
+  none: string
+}) {
   if (lines.length === 0) {
     return (
       <p className="small">

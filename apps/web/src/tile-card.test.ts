@@ -5,6 +5,7 @@ import { MAX_HEALTH, MAX_HUNGER, type Building, type Horse } from '@csp/shared'
 import { describeTile } from './selection-view.js'
 import { GOOD_LABELS } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
+import { PriceList } from './CityInspector.js'
 
 const stable: Building = { id: 'b-stable', kind: 'stable', cityId: 'c-me', x: 5, y: 5 }
 // Three foals of one pair, born together: their lines on the card read the same.
@@ -89,5 +90,87 @@ describe('the tile card of a stable', () => {
     expect(html.match(/aria-label="Health 100%"/g)).toHaveLength(3)
     expect(html.match(/aria-label="Hunger 100%"/g)).toHaveLength(3)
     expect(html).toContain('Speed 12, Strength 8, Endurance 10 · 0 game days old')
+  })
+})
+
+/** The goods cells a rendering shows, each as "Name: amount". */
+const cells = (html: string) =>
+  [...html.matchAll(/class="goods-cell[^"]*" aria-label="([^"]+)"/g)].map((m) => m[1])
+
+describe('inventories on the tile card (`CONTEXT.md`: Goods on cards)', () => {
+  const card = (things: Partial<Parameters<typeof describeTile>[0]>, building?: Building) =>
+    renderToStaticMarkup(
+      createElement(TileCard, {
+        ...props,
+        building,
+        card: describeTile(
+          {
+            ...{
+              x: 5,
+              y: 5,
+              buildings: [],
+              carriages: [],
+              horses: [],
+              piles: [],
+              node: undefined,
+              strangers: [],
+              cities: [{ id: 'c-me', name: 'Eastmere', realmId: 'me' }],
+              viewer: { realmId: 'me', allies: new Set<string>() },
+              workers: () => 0,
+              tick: 0,
+            },
+            ...things,
+          },
+          GOOD_LABELS,
+        ),
+      }),
+    )
+
+  it('shows a storage’s goods and a pile as grid items, not words', () => {
+    const storage: Building = {
+      id: 'b-storage',
+      kind: 'storage',
+      cityId: 'c-me',
+      x: 5,
+      y: 5,
+      stock: { wood: 12, food: 3 },
+    }
+    const html = card(
+      { buildings: [storage], piles: [{ id: 'p', x: 5, y: 5, goods: { stone: 4 } }] },
+      storage,
+    )
+    expect(cells(html)).toEqual(['Food: 3', 'Wood: 12', 'Stone: 4'])
+    expect(html).not.toMatch(/12 wood|4 stone/)
+  })
+
+  it('shows a site’s delivered and still-needed materials as grid items', () => {
+    const site: Building = {
+      id: 'b-mine',
+      kind: 'mine',
+      cityId: 'c-me',
+      x: 5,
+      y: 5,
+      site: { work: 0, delivered: { wood: 10 } },
+    }
+    const html = card({ buildings: [site] }, site)
+    expect(cells(html)).toEqual(['Wood: 10', 'Wood: 30', 'Stone: 20'])
+    expect(html).toContain('Still needs')
+  })
+})
+
+describe('trade prices (`CONTEXT.md`: Goods on cards)', () => {
+  it('give each good its icon beside its name', () => {
+    const html = renderToStaticMarkup(
+      createElement(PriceList, {
+        title: 'You can buy',
+        lines: [
+          { good: 'food', units: 5, price: 2 },
+          { good: 'iron', price: 9 },
+        ],
+        none: 'Nothing.',
+      }),
+    )
+    expect(html.match(/class="good-label"><span class="good-icon"/g)).toHaveLength(2)
+    expect(html).toContain('Iron')
   })
 })
