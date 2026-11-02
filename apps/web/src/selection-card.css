@@ -443,8 +443,8 @@
   font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
-/* Who and what a tile holds (`CardList`): its horses, workers or goods as rows, meters on the
-   right as the resident card has them; a row the Player can open is a button. */
+/* Who and what a tile holds (`CardList`): its horses or workers as rows, meters on the right as
+   the resident card has them, a row the Player can open is a button; its goods as the goods grid. */
 .card-list {
   display: grid;
   gap: 2px;

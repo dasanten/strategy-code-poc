@@ -540,6 +540,9 @@ export function TileCard({
           ))}
         </ul>
       )}
+      {card.lastSeen?.lists.map((list, i) => (
+        <CardListBlock key={i} list={list} past onOpen={() => {}} />
+      ))}
       {card.lines.length > (card.lastSeen ? 0 : 1) && (
         <ul className="sel-facts">
           {/* By place, not text: horses alike give the same line twice. */}
@@ -663,18 +666,31 @@ const capital = (words: string) => `${words.charAt(0).toUpperCase()}${words.slic
 
 /**
  * A list on the tile card (`CardList`): its title with the count on the right, a heading over the
- * meters, then its rows. A row the Player can open is a button.
+ * meters, then its rows. A row the Player can open is a button. An inventory shows as the goods
+ * grid instead of rows (`CONTEXT.md`: Goods on cards). `past` for what the Player last saw.
  */
-function CardListBlock({ list, onOpen }: { list: CardList; onOpen: (row: CardRow) => void }) {
-  const amounts = list.rows.some((r) => r.amount !== undefined)
-  const columns = `minmax(0, 1fr)${amounts ? ' auto' : ''}${' 56px'.repeat(list.meters.length)}`
+function CardListBlock({
+  list,
+  past,
+  onOpen,
+}: {
+  list: CardList
+  past?: boolean
+  onOpen: (row: CardRow) => void
+}) {
+  const columns = `minmax(0, 1fr)${' 56px'.repeat(list.meters.length)}`
   return (
-    <section className="card-list" aria-label={list.title}>
+    <section className={`card-list${past ? ' sel-past' : ''}`} aria-label={list.title}>
       <div className="panel-head">
         <h3>{list.title}</h3>
         <span className="small muted">{list.count}</span>
       </div>
-      {list.rows.length === 0 && list.empty && <p className="muted small">{list.empty}</p>}
+      {list.goods && (
+        <GoodsGrid label={list.title} items={goodsItems(list.goods)} empty={list.empty} />
+      )}
+      {!list.goods && list.rows.length === 0 && list.empty && (
+        <p className="muted small">{list.empty}</p>
+      )}
       {list.rows.length > 0 && list.meters.length > 0 && (
         <div
           className="card-list-row heading"
@@ -694,7 +710,6 @@ function CardListBlock({ list, onOpen }: { list: CardList; onOpen: (row: CardRow
               <span>{row.name}</span>
               {row.detail && <small className="muted">{row.detail}</small>}
             </span>
-            {amounts && <span className="mono">{row.amount}</span>}
             {list.meters.map((m, i) => (
               <Meter key={m} label={m} share={row.shares?.[i]} />
             ))}
