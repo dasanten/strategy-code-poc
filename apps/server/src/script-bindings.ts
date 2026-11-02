@@ -589,6 +589,8 @@ function residentActions(
       request('breed', { stableId: plain(stableId), horseIds: plain(horseIds) }),
     pair: ([partnerId]) => request('pair', { partnerId: plain(partnerId) }),
     attack: ([targetId]) => request('attack', { targetId: plain(targetId) }),
+    feed: ([residentId, units]) =>
+      request('feed', { targetId: plain(residentId), units: plain(units) }),
     climb: ([wallId]) => request('climb', { wallId: plain(wallId) }),
     pay: ([contractId, weeks]) =>
       request('pay', { contractId: plain(contractId), weeks: plain(weeks) }),

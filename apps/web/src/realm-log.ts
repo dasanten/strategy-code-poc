@@ -37,6 +37,8 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         text: `${e.name} is Down from hunger: ${timeLeft(e.until - e.tick)}.`,
         tone: 'bad',
       }
+    case 'woke':
+      return { text: `${e.by} fed ${e.name}, who is awake again at low health.`, tone: 'info' }
     case 'died': {
       const how = {
         starved: 'starved to death',

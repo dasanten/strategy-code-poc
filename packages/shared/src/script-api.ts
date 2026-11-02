@@ -391,6 +391,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     ['targetId'],
     'Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls.',
   ),
+  action(
+    'feed',
+    ['residentId', 'units'],
+    'Feed a resident who is Down, of any realm, on or next to my tile: put up to that many units of the Food in my hands into theirs. They eat at once and wake at low health.',
+  ),
   action('climb', ['wallId'], 'Climb over the wall or gate of another realm next to me.'),
   action(
     'pay',

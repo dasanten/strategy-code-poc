@@ -559,6 +559,23 @@ describe('the rows of a card that stays open', () => {
     expect(rows.every((a) => a.disabled && a.reason === DOWN_NO_ORDERS)).toBe(true)
   })
 
+  it('offer Feed with someone Down nearby, greyed for a child or without Food (`CONTEXT.md`: Reviving)', () => {
+    const feed = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'feed')
+    expect(feed(here({ downNear: 1, carriesFood: true }))).toEqual({
+      id: 'feed',
+      label: 'Feed…',
+      key: ACTION_KEYS.feed,
+      opens: true,
+    })
+    expect(feed(here({ downNear: 1 }))).toMatchObject({ disabled: true, reason: 'no Food in hand' })
+    expect(feed(here({ downNear: 1, carriesFood: true, adult: false }))).toMatchObject({
+      disabled: true,
+      reason: 'children can’t feed others',
+    })
+    expect(feed(here({ carriesFood: true }))).toBeUndefined()
+    expect(residentOrders(here()).missing.feed).toBe('nobody Down nearby')
+  })
+
   it('say why for every order a resident card can leave out', () => {
     const offered = new Set(ids(residentActions(here())))
     const { missing } = residentOrders(here())
@@ -1163,6 +1180,30 @@ describe('the actions on a tile’s card', () => {
     expect(tile({ carriages: [carriage], residents: [kid], tick }).unhitch).toBeUndefined()
     const bare = tile({ carriages: [{ ...carriage, horseId: null }], residents, tick })
     expect(bare.unhitch).toBeUndefined()
+  })
+
+  it('lists someone Down on it and offers the resident picked last to Feed them', () => {
+    const tick = 100 * TICKS_PER_GAME_YEAR
+    const ana = { id: 'ana', name: 'Ana', owner: 'them', cityId: null, x: 5, y: 5, carried: {} }
+    const down = { ...ana, down: true as const } as unknown as SeenResident
+    const card = tile({ strangers: [down], residents: [down], tick })
+    expect(card.lines).toContain('Ana · Another realm · Down')
+    expect(card.downHere).toEqual([{ id: 'ana', name: 'Ana', x: 5, y: 5, down: true }])
+    const feeder = (more: object) =>
+      ({ id: 'r1', name: 'Ada', x: 6, y: 5, bornAt: 0, carried: { food: 2 }, ...more }) as Resident
+    const feed = (r: Resident) => tileActions(card, r, tick, 64).find((a) => a.id === 'feed')
+    expect(feed(feeder({}))).toEqual({
+      id: 'feed',
+      label: 'Feed Ana…',
+      key: ACTION_KEYS.feed,
+      opens: true,
+    })
+    expect(feed(feeder({ x: 9 }))).toMatchObject({
+      disabled: true,
+      reason: 'stand on or next to their tile to feed them',
+    })
+    expect(feed(feeder({ carried: {} }))).toMatchObject({ reason: 'no Food in hand' })
+    expect(tileActions(card, undefined).some((a) => a.id === 'feed')).toBe(false)
   })
 
   it('shows what someone Down on it carries, for the realm’s residents there to take', () => {

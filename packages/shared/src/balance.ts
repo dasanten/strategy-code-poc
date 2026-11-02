@@ -939,6 +939,18 @@ export const STARVE_DAYS = 2
  */
 export const DOWN_DAYS = 60
 
+/**
+ * The health a Down resident wakes with once fed (`CONTEXT.md`: Reviving), of `MAX_HEALTH`: low,
+ * coming back while their hunger meter isn't empty.
+ */
+export const WAKE_HEALTH = 10
+
+/**
+ * Units of Food the Feed row suggests giving (`CONTEXT.md`: Reviving): one eaten at once to wake,
+ * one more to go on with, about four game days of eating.
+ */
+export const FEED_UNITS = 2
+
 /** Game days a fed resident takes to heal from no health back to full. */
 export const HEAL_DAYS = 3
 

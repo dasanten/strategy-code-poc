@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   aboutTime,
   isDown,
+  inContact,
   bornIn,
   foalLeft,
   grownIn,
@@ -16,6 +17,7 @@ import {
   CARRIAGE_CAPACITY,
   CARRYING_DAYS,
   GOODS,
+  FEED_UNITS,
   HAUL_KEEP_FOOD,
   buildMenu,
   buildingWork,
@@ -176,6 +178,7 @@ import { labelled } from './name-labels.js'
 import {
   ActionRows,
   CardTabs,
+  FeedBlock,
   SelectionCard,
   useActionKeys,
   useEscapeClosesPanel,
@@ -905,6 +908,7 @@ export function orderDoing(
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
+  if (o?.kind === 'feed') return 'Feeding someone Down'
   if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
   if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
@@ -1189,7 +1193,10 @@ export function GroupCard({
   const card = groupCard(tick === undefined ? residents : labelled(residents, tick, cities))
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
   // The order whose panel is open under the rows: what it needs before it goes out.
-  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed' | 'teach' | 'relocate' | 'board'>()
+  const [panel, setPanel] = useState<
+    'haul' | 'fetch' | 'breed' | 'teach' | 'relocate' | 'board' | 'feed'
+  >()
+  const [feedUnits, setFeedUnits] = useState(FEED_UNITS)
   const [good, setGood] = useState<Good>('food')
   const numberParams = groupNumberParams(residents, scripts)
   const foodHint = foodParamsHint(numberParams.map((p) => p.name))
@@ -1288,6 +1295,35 @@ export function GroupCard({
             ))}
           </div>
           <p className="muted small">Those standing on the carriage board it, until it is full.</p>
+        </section>
+      )}
+      {shown === 'feed' && (
+        <section className="inspector-block" aria-label="Feed">
+          <div className="order-buttons">
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={feedUnits}
+              aria-label="Units of Food each"
+              onChange={(e) => setFeedUnits(Number(e.target.value))}
+            />
+            <button
+              type="button"
+              className="primary"
+              disabled={!Number.isInteger(feedUnits) || feedUnits < 1}
+              onClick={() => {
+                setPanel(undefined)
+                onOrder({ kind: 'feed', units: feedUnits })
+              }}
+            >
+              Feed
+            </button>
+          </div>
+          <p className="muted small">
+            Each with Food in hand next to someone Down feeds them, one for each one Down: a unit is
+            eaten at once and wakes them at low health.
+          </p>
         </section>
       )}
       {shown === 'fetch' && (
@@ -1619,6 +1655,7 @@ export function ResidentCard({
   others,
   mapSize,
   onAttack,
+  onFeed,
   walls,
   onClimb,
   carriage,
@@ -1773,6 +1810,8 @@ export function ResidentCard({
   mapSize: number
   /** Orders the resident to attack another realm's resident, or to break a wall or gate. */
   onAttack: (targetId: string) => void
+  /** Orders the resident to Feed someone Down next to them (`CONTEXT.md`: Reviving). */
+  onFeed?: (targetId: string, units: number) => void
   /** Finished walls and gates in sight of other realms' cities, or of none. */
   walls: Building[]
   /** Orders the resident to climb over a wall or gate next to them. */
@@ -1857,6 +1896,10 @@ export function ResidentCard({
   const roadSite = road?.site ? road : undefined
   const atRoadSite: GoodsSpot = { kind: 'site', siteId: roadSite?.id ?? '' }
   const roadNeeded = roadSite ? materialsNeeded(roadSite) : {}
+  // Anyone in sight Down on or next to their tile, of any realm, to Feed (`CONTEXT.md`: Reviving).
+  const downNear = [...residents, ...others].filter(
+    (x) => x.id !== r.id && isDown(x) && inContact(mapSize, r, x),
+  )
   const atCarriageSite: GoodsSpot = { kind: 'site', siteId: carriageSite?.id ?? '' }
   const carriageNeeded = carriageSite ? materialsNeeded(carriageSite) : {}
   // Anyone Down on their tile, whose goods they can take as from a pile (`CONTEXT.md`: Down).
@@ -1891,6 +1934,8 @@ export function ResidentCard({
     carrying: !!r.carrying,
     carries: carried.length > 0,
     down: isDown(r),
+    downNear: downNear.length,
+    carriesFood: (r.carried.food ?? 0) > 0,
     downCarrying: downHere.map((d) => d.carried),
   })
   // Each row keeps its slot while the card is open (ADR 0019).
@@ -2152,6 +2197,16 @@ export function ResidentCard({
       )}
       {shown === 'pair' && (
         <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
+      )}
+      {shown === 'feed' && onFeed && (
+        <FeedBlock
+          targets={downNear}
+          food={r.carried.food ?? 0}
+          onFeed={(targetId, units) => {
+            setPanel(undefined)
+            onFeed(targetId, units)
+          }}
+        />
       )}
       {shown === 'attack' && (
         <AttackBlock
