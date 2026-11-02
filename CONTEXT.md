@@ -633,6 +633,12 @@ The shared language of the game. Domain terms only — no implementation details
   included, by hand or from a script: free, instant, from anywhere. Names need not be unique.
   Renaming the Leader never renames the realm (see Realm name). The realm log keeps the names
   things had when they happened.
+- **Game-given names:** a name the game gives a resident (a starting city, a birth, a founding
+  party, integration) is one no living resident of that realm has, an NPC city counting as a
+  realm; a name the game gives a city is one no city in the world has. When the game's list of
+  names runs dry it adds a numeral ("Edda II") rather than repeating one. Renaming stays free and
+  may make duplicates. Names given before this rule stay as they are; a list that holds two
+  residents of one name tells them apart by age and, with several cities, by city.
 - **Stats:** Strength, Endurance, Agility, Intellect. Each has a **base value** and a
   **trained bonus**; the effective value is both together.
   - Strength: carry capacity, mining output, melee damage.
@@ -1041,3 +1047,12 @@ The shared language of the game. Domain terms only — no implementation details
   on the map; then the card comes back as it was. On a phone every card is a bottom sheet (peek,
   half, full), one finger pans, pinch zooms, a tap picks, a long-press does what right-click does,
   and a Select toggle makes a drag pick a group.
+- **Minimap:** a small map bottom right of the screen (ADR 0008): the Player's explored terrain
+  at a glance with their home city, their other cities, their residents and carriages away from
+  home and the cities they know (Last seen), each a dot in its relationship colour, and the
+  current view as a rectangle; a click centres the map there. It folds to a button, remembered
+  per browser, and is folded on a phone.
+- **Region map:** the map's territory overlay (one colour per Organization, ADR 0008). It is
+  the far zoom tier's look and comes on there by itself; at the middle and close tiers only
+  territory borders are drawn, so the terrain stays readable. The Region map button forces the
+  overlay on at any tier and shows that it is on.
