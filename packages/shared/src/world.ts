@@ -233,6 +233,25 @@ export interface ScriptLogLine {
 export type ScriptParamValue = string | number
 
 /**
+ * A realm's own settings for one workplace, or construction site of a workplace kind
+ * (`CONTEXT.md`: Workplace settings; ADR 0020): its work script and values for that script's
+ * params, set on the building's card. Other realms never see them.
+ */
+export interface WorkplaceSettings {
+  /**
+   * The work script: one of the Player's scripts that declares `param workplace: building`.
+   * Absent for the Work default.
+   */
+  scriptId?: number
+  /**
+   * Values for the work script's params by name, kept as a resident's are
+   * (`Resident.scriptParams`); never `workplace`, which is the building itself. Absent while none
+   * is set.
+   */
+  params?: { [name: string]: ScriptParamValue }
+}
+
+/**
  * The param values an order starting a script gives (`CONTEXT.md`: Script parameter, Before it
  * starts), by name: what is picked or typed for each, or null to clear it back to its default.
  * A param left out keeps its value.
@@ -777,6 +796,11 @@ export interface WorldState {
    * residents do until its next planning pass. A city without one has not planned yet.
    */
   cityPlans: Record<string, CityPlan>
+  /**
+   * Each realm's Workplace settings (`CONTEXT.md`), by realm id, then by the workplace's or
+   * site's building id. A realm with none set has no entry; NPC cities keep none.
+   */
+  workplaceSettings: Record<string, Record<string, WorkplaceSettings>>
 }
 
 /**

@@ -444,6 +444,14 @@ export function nodeCorner(
 /** Most workers each kind of workplace takes, for the kinds residents can work so far. */
 export const MAX_WORKERS: Partial<Record<BuildingKind, number>> = WORKPLACE_MAX_WORKERS
 
+/**
+ * Whether a realm can keep Workplace settings for the building (`CONTEXT.md`: Workplace
+ * settings): a workplace, or a construction site of a workplace kind.
+ */
+export function takesWorkSettings(b: Pick<Building, 'kind'>): boolean {
+  return WORKPLACE_MAX_WORKERS[b.kind] !== undefined
+}
+
 /** The good each kind of node yields once worked (`CONTEXT.md`: Resource node). */
 export const NODE_GOOD: Record<ResourceKind, Good> = {
   forest: 'wood',

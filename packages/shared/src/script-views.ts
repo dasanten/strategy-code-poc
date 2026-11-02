@@ -59,6 +59,7 @@ export type ScriptViewName =
   | 'directiveGoal'
   | 'material'
   | 'lineTile'
+  | 'workSettings'
 
 const field = (
   name: string,
@@ -536,6 +537,28 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         listOf('string'),
         'The residents training at a training ground; empty while nobody trains there.',
         'for any other building',
+      ),
+      field(
+        'workSettings',
+        view('workSettings'),
+        'My realm’s Workplace settings for a workplace, or a construction site of a workplace kind, set on its card; never another realm’s.',
+        'for any other building, and while my realm has set none there',
+      ),
+    ],
+  },
+  workSettings: {
+    description: 'How my realm has a workplace worked (Workplace settings).',
+    fields: [
+      field(
+        'scriptId',
+        'number',
+        'The work script: one of my Player’s scripts declaring `param workplace: building`.',
+        'for the Work default',
+      ),
+      field(
+        'params',
+        'any',
+        'Values set for the work script’s params, by name: a building’s or carriage’s id, or a number, like {storage: "b12", foodTake: 5}; a param not set is left out.',
       ),
     ],
   },

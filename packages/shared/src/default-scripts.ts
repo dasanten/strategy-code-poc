@@ -19,6 +19,7 @@ import {
 } from './balance.js'
 import type { BuildLine } from './building.js'
 import { FOOTPRINT } from './footprint.js'
+import type { ScriptParam } from './script-api.js'
 
 /**
  * The tasks that run a default script. Defend is never given: being struck starts it
@@ -56,6 +57,17 @@ export const TARGET_PARAMS: Partial<Readonly<Record<Task, string>>> = {
 /** The target param of a script (`TARGET_PARAMS`), if it is the default of a task with one. */
 export function targetParam(script: { task?: Task | null }): string | undefined {
   return script.task ? TARGET_PARAMS[script.task] : undefined
+}
+
+/** The param a work script is given its workplace in: the Work default's target param. */
+export const WORKPLACE_PARAM = 'workplace'
+
+/**
+ * Whether a script's `param` lines make it a work script (`CONTEXT.md`: Workplace settings): it
+ * declares `param workplace: building`, as the Work default does.
+ */
+export function isWorkScript(params: readonly Pick<ScriptParam, 'name' | 'type'>[]): boolean {
+  return params.some((p) => p.name === WORKPLACE_PARAM && p.type === 'building')
 }
 
 /** What giving a task from the UI writes into the script's memory. */

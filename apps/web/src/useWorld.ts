@@ -22,6 +22,7 @@ import {
   type ScriptMemory,
   type ScriptRunSeen,
   type ServerMessage,
+  type WorkplaceSettings,
 } from '@csp/shared'
 import { api } from './api.js'
 import { appendEvents } from './realm-log.js'
@@ -70,6 +71,8 @@ export interface ClientWorld {
   horseOffer: boolean
   /** The Player's first-day card (`CONTEXT.md`: First day). */
   firstDay: FirstDay
+  /** The realm's Workplace settings (`CONTEXT.md`), by building id. */
+  workSettings: Readonly<Record<string, WorkplaceSettings>>
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -166,6 +169,7 @@ export function useWorld(onLoggedOut: () => void) {
             region: msg.region && applyRegionMap(null, msg.region, msg.map.size),
             horseOffer: msg.horseOffer,
             firstDay: msg.firstDay,
+            workSettings: msg.workSettings,
             ...byKind(entities.values()),
             lastSeen: lastSeenByKind(remembered.values()),
           })
@@ -217,6 +221,7 @@ export function useWorld(onLoggedOut: () => void) {
               diplomacy,
               region,
               horseOffer: msg.horseOffer ?? w.horseOffer,
+              workSettings: msg.workSettings ?? w.workSettings,
             }
           })
         }

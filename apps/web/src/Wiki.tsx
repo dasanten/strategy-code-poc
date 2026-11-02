@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import {
   PARAM_DESCRIPTIONS,
+  WORKPLACE_PARAM,
   QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_MAX_STEPS,
   SCRIPT_PARAM_TYPES,
@@ -844,8 +845,8 @@ export function Wiki() {
           realm of its own); a name it gives a city is one no city in the world has. Once its list
           of names runs dry it adds a numeral, as in “Edda II”. Renaming is free: you can rename any
           resident or city of your realm, and your names may repeat. Names from before this rule
-          stay as they were, so where a list holds two residents of one name it adds their age,
-          and their city when they live in different ones.
+          stay as they were, so where a list holds two residents of one name it adds their age, and
+          their city when they live in different ones.
         </p>
         <p>
           A resident lives in one city, wherever they stand. One who lives in none is{' '}
@@ -2091,6 +2092,34 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             workplace's pile keeps for the crew, which the carrier tops up on the way back from the
             storage.
           </li>
+        </ul>
+        <h3>Workplace settings</h3>
+        <p>
+          How a workplace is worked belongs to the workplace, not to each worker. On the card of a
+          workplace, or of a construction site of one, open Work settings: pick its work script and
+          set that script's params there, once for the whole crew.
+        </p>
+        <ul>
+          <li>
+            The work script is your Work default, or any script of yours that declares{' '}
+            <code>param {WORKPLACE_PARAM}: building</code>. Switching to another one starts its
+            values over.
+          </li>
+          <li>
+            Each of its params but <code>{WORKPLACE_PARAM}</code>, which is the workplace itself,
+            has a field as on a resident's card: pick it on the map or type a number, and clear it.
+            Each shows its comment and the value it uses.
+          </li>
+          <li>
+            You can set them for any workplace your realm knows: your own, or anyone's in sight or
+            last seen. Two realms working the same farm each keep their own, and neither sees the
+            other's. NPC cities keep none.
+          </li>
+          <li>
+            Your scripts read them on a building as <code>workSettings</code>: the work script's id
+            (<code>null</code> for the Work default) and the values set by name.
+          </li>
+          <li>Settings of a workplace that is gone go with it.</li>
         </ul>
       </Section>
 
