@@ -10,6 +10,8 @@ const MAX_IN_FLIGHT = 6
  */
 export class ChunkStore {
   private chunks = new Map<number, TerrainChunk>()
+  /** Loaded chunks whose explored terrain grew: kept until their newer copy arrives. */
+  private outdated = new Set<number>()
   private queue: number[] = []
   private inFlight = 0
   private stopped = false
@@ -30,14 +32,25 @@ export class ChunkStore {
   /** Asks for the given chunks, most wanted first; drops earlier wishes that weren't started. */
   want(indices: number[]): void {
     const explored = this.explored()
-    this.queue = indices.filter((i) => explored.has(i) && !this.chunks.has(i))
+    this.queue = indices.filter(
+      (i) => explored.has(i) && (!this.chunks.has(i) || this.outdated.has(i)),
+    )
     this.pump()
   }
 
-  /** Drops loaded copies of these chunks, so the next `want` loads them again. */
+  /**
+   * The explored chunks among these that are not here yet, so the map has nothing to draw there:
+   * it shows them as loading. A chunk loading again after `forget` keeps its older copy meanwhile.
+   */
+  waiting(indices: readonly number[]): number[] {
+    const explored = this.explored()
+    return indices.filter((i) => explored.has(i) && !this.chunks.has(i))
+  }
+
+  /** Marks these chunks as outdated, so the next `want` loads them again. */
   forget(indices: readonly number[]): void {
     for (const i of indices) {
-      this.chunks.delete(i)
+      if (this.chunks.has(i)) this.outdated.add(i)
       this.requested.delete(i)
     }
   }
@@ -62,6 +75,7 @@ export class ChunkStore {
           if (this.stopped) return
           const chunk = decodeChunk(cx, cy, new Uint8Array(buf))
           this.chunks.set(index, chunk)
+          this.outdated.delete(index)
           this.onLoaded(chunk)
         })
         .catch(() => this.requested.delete(index))

@@ -1,4 +1,5 @@
 import { CHUNK_SIZE, chunksAcross, type RegionHolder, type RegionMap } from '@csp/shared'
+import type { ZoomTier } from './camera.js'
 
 /** An Organization on the Region map, without its tiles. */
 export type RegionHolderInfo = Omit<RegionHolder, 'tiles'>
@@ -163,4 +164,88 @@ export function regionGroups(state: RegionState): RegionGroup[] {
   }
   for (const g of groups.values()) g.members.sort((a, b) => a.localeCompare(b))
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * How the Region map shows (`CONTEXT.md`: Region map): filled territory in the far tier, only
+ * its borders at the middle and close tiers so the terrain stays readable, and filled at any tier
+ * while the Region map button forces it on. The admin map shows territory only when toggled on.
+ */
+export type RegionLook = 'fill' | 'borders' | 'none'
+
+export function regionLook(tier: ZoomTier, forced: boolean, admin = false): RegionLook {
+  if (forced) return 'fill'
+  if (admin) return 'none'
+  return tier === 'far' ? 'fill' : 'borders'
+}
+
+/**
+ * A stretch of territory border along tile edges, in tiles from its chunk's top left corner,
+ * from (x0, y0) to (x1, y1). (nx, ny) points into the holder's tiles, so two holders meeting on
+ * an edge can each draw their line on their own side of it.
+ */
+export interface BorderRun {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+  nx: number
+  ny: number
+}
+
+/** The four sides of a tile: the neighbour across it, and the edge as two corners. */
+const SIDES = [
+  { dx: 0, dy: -1, from: [0, 0], to: [1, 0] },
+  { dx: 0, dy: 1, from: [0, 1], to: [1, 1] },
+  { dx: -1, dy: 0, from: [0, 0], to: [0, 1] },
+  { dx: 1, dy: 0, from: [1, 0], to: [1, 1] },
+] as const
+
+/**
+ * One chunk's territory borders, by colour: each held tile's edges where the tile across is held
+ * by someone else or by nobody, joined into runs along a row or column.
+ */
+export function regionBorders(
+  state: RegionState,
+  size: number,
+  cx: number,
+  cy: number,
+): Map<number, BorderRun[]> {
+  const out = new Map<number, BorderRun[]>()
+  const owner = (x: number, y: number) =>
+    state.owners.get((((y % size) + size) % size) * size + (((x % size) + size) % size))
+  for (const side of SIDES) {
+    // Runs go along x for top and bottom edges, along y for left and right ones.
+    const alongX = side.dy !== 0
+    for (let a = 0; a < CHUNK_SIZE; a++) {
+      let open: { run: BorderRun; holder: string } | undefined
+      for (let b = 0; b < CHUNK_SIZE; b++) {
+        const [dx, dy] = alongX ? [b, a] : [a, b]
+        const [x, y] = [cx * CHUNK_SIZE + dx, cy * CHUNK_SIZE + dy]
+        const id = x < size && y < size ? state.owners.get(y * size + x) : undefined
+        const edge = id !== undefined && owner(x + side.dx, y + side.dy) !== id
+        if (edge && open && open.holder === id) {
+          open.run.x1 = dx + side.to[0]
+          open.run.y1 = dy + side.to[1]
+          continue
+        }
+        open = undefined
+        if (!edge) continue
+        const run: BorderRun = {
+          x0: dx + side.from[0],
+          y0: dy + side.from[1],
+          x1: dx + side.to[0],
+          y1: dy + side.to[1],
+          nx: 0 - side.dx,
+          ny: 0 - side.dy,
+        }
+        const colour = regionColour(colourKey(state.holders.get(id)!))
+        const runs = out.get(colour) ?? []
+        runs.push(run)
+        out.set(colour, runs)
+        open = { run, holder: id }
+      }
+    }
+  }
+  return out
 }

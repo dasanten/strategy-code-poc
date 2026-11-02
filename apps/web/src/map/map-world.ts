@@ -21,7 +21,7 @@ export interface MapWorld {
   exploredChunks: ReadonlySet<number>
   grownChunks: readonly number[]
   /** Whose realm is "own", its Leader, and where the view centres. */
-  home: { realmId: string; leaderId: string | null; x: number; y: number }
+  home: { realmId: string; leaderId: string | null; cityId?: string | null; x: number; y: number }
   residents: SeenResident[]
   cities: SeenCity[]
   buildings: Building[]

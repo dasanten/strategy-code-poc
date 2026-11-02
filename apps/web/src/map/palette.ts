@@ -21,8 +21,11 @@ export const TERRAIN_COLORS: Record<number, number> = {
 export const TERRAIN_MARK_COLOR = 0x1f3d17
 export const TERRAIN_MARK_ALPHA = 0.5
 
-/** Map background, behind terrain not loaded yet. */
+/** Map background, where nothing is explored. */
 export const VOID_COLOR = hex(THEME.terrain.void)
+
+/** Explored chunks on screen that haven't loaded yet (`ChunkStore.waiting`). */
+export const LOADING_COLOR = hex(THEME.terrain.loading)
 
 /** Who a token belongs to, seen from the Player (ADR 0008), as 0xRRGGBB. */
 export const RELATIONSHIP_COLORS = Object.fromEntries(

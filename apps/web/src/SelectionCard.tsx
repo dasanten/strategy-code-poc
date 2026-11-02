@@ -28,9 +28,12 @@ import {
   tileActions,
   unhitcherOf,
   type CardAction,
+  type CardList,
+  type CardRow,
   type OrderGroup,
   type TileCard as TileCardData,
 } from './selection-view.js'
+import { Meter, meterClass, pct } from './Horses.js'
 import { SHEET_OPENS_AT, nextSheet, snapSheet, stepSheet, type SheetHeight } from './sheet-view.js'
 import './selection-card.css'
 
@@ -162,6 +165,20 @@ export function CardSheet({
   const [dragged, setDragged] = useState<number>()
   const press = useRef<{ y: number; from: number; moved: boolean }>(undefined)
   const ref = useRef<HTMLDivElement>(null)
+  // The map's buttons and readout sit above the sheet: its height goes to the screen as `--sheet-h`.
+  useEffect(() => {
+    const sheet = ref.current
+    const screen = sheet?.parentElement
+    if (!sheet || !screen) return
+    const observer = new ResizeObserver(() =>
+      screen.style.setProperty('--sheet-h', `${sheet.offsetHeight}px`),
+    )
+    observer.observe(sheet)
+    return () => {
+      observer.disconnect()
+      screen.style.removeProperty('--sheet-h')
+    }
+  }, [phone])
   if (!phone)
     return (
       <div className="game-selection" hidden={hidden}>
@@ -297,8 +314,9 @@ export function CardTabs<T extends string>({
 }
 
 /**
- * The card's actions as rows, each with its key; a row that opens a panel shows it pressed. Each
- * row is a button named by its label, a greyed row's reason its description.
+ * The card's actions as rows, each with its key; a row that opens a panel shows it pressed, and
+ * `panel` opens right under it, scrolled into view when it opens. Each row is a button named by
+ * its label, a greyed row's reason its description.
  */
 export function ActionRows<Id extends string>({
   actions,
@@ -306,6 +324,7 @@ export function ActionRows<Id extends string>({
   onAction,
   label = 'Actions',
   keys = true,
+  panel,
 }: {
   actions: CardAction<Id>[]
   /** The action whose panel is open, if any. */
@@ -314,6 +333,8 @@ export function ActionRows<Id extends string>({
   label?: string
   /** Whether the rows run on their keys; off where the card listens for all its actions itself. */
   keys?: boolean
+  /** The open action's panel, shown under its row. */
+  panel?: ReactNode
 }) {
   useActionKeys(keys ? actions : [], onAction)
   const ids = useId()
@@ -323,34 +344,50 @@ export function ActionRows<Id extends string>({
         const on = a.active || (a.opens && open === a.id)
         const why = `${ids}-${a.id}`
         return (
-          <button
-            type="button"
-            key={a.id}
-            className={on ? 'on' : ''}
-            aria-label={a.label}
-            aria-describedby={a.reason ? why : undefined}
-            aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
-            aria-keyshortcuts={a.key}
-            disabled={a.disabled}
-            onClick={() => onAction(a)}
-          >
-            <kbd>{a.key}</kbd>
-            <span>
-              {a.label}
-              {a.reason && (
-                <span className="sel-reason" id={why}>
-                  {a.reason}
+          <Fragment key={a.id}>
+            <button
+              type="button"
+              className={on ? 'on' : ''}
+              aria-label={a.label}
+              aria-describedby={a.reason ? why : undefined}
+              aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
+              aria-expanded={a.opens ? open === a.id : undefined}
+              aria-keyshortcuts={a.key}
+              disabled={a.disabled}
+              onClick={() => onAction(a)}
+            >
+              <kbd>{a.key}</kbd>
+              <span>
+                {a.label}
+                {a.reason && (
+                  <span className="sel-reason" id={why}>
+                    {a.reason}
+                  </span>
+                )}
+              </span>
+              {a.opens && (
+                <span className="sel-more" aria-hidden="true">
+                  {on ? '▾' : '▸'}
                 </span>
               )}
-            </span>
-            {a.opens && (
-              <span className="sel-more" aria-hidden="true">
-                {on ? '▾' : '▸'}
-              </span>
-            )}
-          </button>
+            </button>
+            {a.opens && open === a.id && panel && <PanelUnder>{panel}</PanelUnder>}
+          </Fragment>
         )
       })}
+    </div>
+  )
+}
+
+/** An order's panel under the row that opened it, scrolled into view as it opens. */
+export function PanelUnder({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+  }, [])
+  return (
+    <div className="sel-panel-under" ref={ref}>
+      {children}
     </div>
   )
 }
@@ -443,6 +480,7 @@ export function TileCard({
   onRenameCity,
   onRenameHorse,
   onSelectResident,
+  onOpenHorse,
   onUnhitch,
 }: {
   card: TileCardData
@@ -468,6 +506,8 @@ export function TileCard({
   onRenameHorse: (horseId: string, name: string) => void
   /** Picks one of the Player's residents, such as a carriage's passenger. */
   onSelectResident: (id: string) => void
+  /** Shows one of the Player's horses in the Horses drawer. */
+  onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
 }) {
@@ -525,6 +565,28 @@ export function TileCard({
           )}
         </ul>
       )}
+      {card.stableFood && (
+        <div className="vital card-food">
+          <div className="vital-head">
+            <span className="muted">Food</span>
+            <span className="mono">{card.stableFood.units}</span>
+          </div>
+          <span className="meter big" aria-label={`Food ${pct(card.stableFood.share)}`}>
+            <span
+              className={meterClass(card.stableFood.share)}
+              style={{ width: pct(card.stableFood.share) }}
+            />
+          </span>
+          <span className="small muted">{capital(card.stableFood.lasts)}</span>
+        </div>
+      )}
+      {card.lists?.map((list, i) => (
+        <CardListBlock
+          key={i}
+          list={list}
+          onOpen={(row) => (row.opens === 'horse' ? onOpenHorse(row.id) : onSelectResident(row.id))}
+        />
+      ))}
       {card.occupation && (
         <p className={`occupation${card.occupation.warning ? ' warn' : ''}`}>
           {card.occupation.text}
@@ -586,6 +648,69 @@ export function TileCard({
             : 'Pick one of your residents to send them here.'}
       </p>
     </SelectionCard>
+  )
+}
+
+const capital = (words: string) => `${words.charAt(0).toUpperCase()}${words.slice(1)}`
+
+/**
+ * A list on the tile card (`CardList`): its title with the count on the right, a heading over the
+ * meters, then its rows. A row the Player can open is a button.
+ */
+function CardListBlock({ list, onOpen }: { list: CardList; onOpen: (row: CardRow) => void }) {
+  const amounts = list.rows.some((r) => r.amount !== undefined)
+  const columns = `minmax(0, 1fr)${amounts ? ' auto' : ''}${' 56px'.repeat(list.meters.length)}`
+  return (
+    <section className="card-list" aria-label={list.title}>
+      <div className="panel-head">
+        <h3>{list.title}</h3>
+        <span className="small muted">{list.count}</span>
+      </div>
+      {list.rows.length === 0 && list.empty && <p className="muted small">{list.empty}</p>}
+      {list.rows.length > 0 && list.meters.length > 0 && (
+        <div
+          className="card-list-row heading"
+          style={{ gridTemplateColumns: columns }}
+          aria-hidden="true"
+        >
+          <span />
+          {list.meters.map((m) => (
+            <span key={m}>{m}</span>
+          ))}
+        </div>
+      )}
+      {list.rows.map((row) => {
+        const cells = (
+          <>
+            <span className="card-list-name">
+              <span>{row.name}</span>
+              {row.detail && <small className="muted">{row.detail}</small>}
+            </span>
+            {amounts && <span className="mono">{row.amount}</span>}
+            {list.meters.map((m, i) => (
+              <Meter key={m} label={m} share={row.shares?.[i]} />
+            ))}
+          </>
+        )
+        const style = { gridTemplateColumns: columns }
+        return row.opens ? (
+          <button
+            type="button"
+            key={row.id}
+            className="card-list-row"
+            style={style}
+            aria-label={`${row.name}: ${row.opens === 'horse' ? 'show in the Horses drawer' : 'open their card'}`}
+            onClick={() => onOpen(row)}
+          >
+            {cells}
+          </button>
+        ) : (
+          <div key={row.id} className="card-list-row" style={style}>
+            {cells}
+          </div>
+        )
+      })}
+    </section>
   )
 }
 

@@ -1,0 +1,227 @@
+import { describe, expect, it } from 'vitest'
+import {
+  CHUNK_SIZE,
+  Terrain,
+  UNEXPLORED,
+  chunksAcross,
+  type Building,
+  type BuildingKind,
+  type City,
+  type SeenCarriage,
+  type SeenResident,
+} from '@csp/shared'
+import type { MapWorld } from './map-world.js'
+import {
+  MINIMAP_MIN_SPAN,
+  minimapDots,
+  minimapFrame,
+  minimapOpenAtStart,
+  minimapPixels,
+  minimapToTile,
+  minimapView,
+  rememberMinimapOpen,
+  tileToMinimap,
+} from './minimap.js'
+import { TERRAIN_COLORS } from './palette.js'
+
+const size = 256
+const across = chunksAcross(size)
+const viewer = { realmId: 'me', allies: new Set(['ally']) }
+
+const building = (
+  id: string,
+  kind: BuildingKind,
+  x: number,
+  y: number,
+  cityId: string | null = null,
+): Building => ({ id, kind, cityId, x, y })
+const city = (id: string, realmId: string | null, extra: Partial<City> = {}): City => ({
+  id,
+  name: id,
+  realmId,
+  townHallId: `${id}-hall`,
+  occupation: null,
+  ...extra,
+})
+const resident = (id: string, owner: string | null, x: number, y: number) =>
+  ({ id, owner, cityId: null, x, y, carried: {}, order: null }) as unknown as SeenResident
+const carriage = (id: string, realmId: string | null, x: number, y: number) =>
+  ({ id, realmId, cityId: null, x, y, horseId: null, load: {} }) as SeenCarriage
+
+/** A world seen from realm `me`, home at (40, 40), with a city of each relationship. */
+function world(more: Partial<MapWorld> = {}): MapWorld {
+  return {
+    map: { size },
+    exploredChunks: new Set([0]),
+    grownChunks: [],
+    home: { realmId: 'me', leaderId: null, cityId: 'home', x: 40, y: 40 },
+    residents: [],
+    cities: [
+      city('home', 'me'),
+      city('second', 'me'),
+      city('allied', 'ally'),
+      city('rival', 'them'),
+      city('village', null),
+      city('post', null, { tradeOrg: 'post' }),
+    ],
+    buildings: [
+      building('home-hall', 'townHall', 40, 40, 'home'),
+      building('second-hall', 'townHall', 90, 40, 'second'),
+      building('allied-hall', 'townHall', 40, 90, 'allied'),
+      building('rival-hall', 'townHall', 90, 90, 'rival'),
+      building('village-hall', 'townHall', 140, 40, 'village'),
+      building('post-hall', 'townHall', 140, 90, 'post'),
+    ],
+    horses: [],
+    carriages: [],
+    piles: [],
+    armies: [],
+    caravans: [],
+    lastSeen: { cities: [], buildings: [] },
+    diplomacy: {},
+    region: null,
+    ...more,
+  }
+}
+
+describe('minimap frame', () => {
+  it('spans at least MINIMAP_MIN_SPAN tiles around a small explored circle', () => {
+    const frame = minimapFrame([0], { x: 16, y: 16 }, size)
+    expect(frame).toEqual({ x: 16, y: 16, span: MINIMAP_MIN_SPAN })
+  })
+
+  it('takes in every explored chunk, also across the map’s joined sides', () => {
+    // Home at the top left corner; explored chunks on both sides of the join.
+    const last = across - 1
+    const explored = [0, 1, 2, 3, last, last * across, last * across + last]
+    const frame = minimapFrame(explored, { x: 5, y: 5 }, size)
+    // Four chunks east of the join and one west of it, plus a margin on each side.
+    expect(frame.span).toBe(5 * CHUNK_SIZE + 16)
+    expect(frame.x).toBe(48)
+    expect(frame.y).toBe(0)
+  })
+
+  it('never spans more than the whole map', () => {
+    const all = Array.from({ length: across * across }, (_, i) => i)
+    expect(minimapFrame(all, { x: 0, y: 0 }, size).span).toBe(size)
+  })
+})
+
+describe('minimap mapping', () => {
+  const frame = { x: 100, y: 50, span: 100 }
+  const side = 200
+
+  it('puts the frame’s centre in the middle and its corner at the top left', () => {
+    expect(tileToMinimap(frame, size, side, 100, 50)).toEqual([100, 100])
+    expect(tileToMinimap(frame, size, side, 50, 0)).toEqual([0, 0])
+  })
+
+  it('maps a click back to the tile under it, across the join', () => {
+    expect(minimapToTile(frame, size, side, 100, 100)).toEqual({ x: 100, y: 50 })
+    expect(minimapToTile(frame, size, side, 0, 0)).toEqual({ x: 50, y: 0 })
+    // The top rows lie past the map's top side, so they wrap to its bottom.
+    expect(minimapToTile(frame, size, side, 100, -2)).toEqual({ x: 100, y: size - 1 })
+    const tile = { x: 73, y: 21 }
+    const [px, py] = tileToMinimap(frame, size, side, tile.x + 0.5, tile.y + 0.5)
+    expect(minimapToTile(frame, size, side, px, py)).toEqual(tile)
+  })
+
+  it('draws the view as a rectangle around the camera', () => {
+    const rect = minimapView(
+      frame,
+      size,
+      side,
+      { x: 100, y: 50, scale: 10 },
+      {
+        width: 400,
+        height: 200,
+      },
+    )
+    // 40 × 20 tiles on screen, at 2 minimap pixels a tile.
+    expect(rect).toEqual({ x: 60, y: 80, width: 80, height: 40 })
+  })
+})
+
+describe('minimap terrain', () => {
+  it('colours explored tiles and leaves the rest clear', () => {
+    const frame = { x: 2, y: 2, span: 4 }
+    const pixels = minimapPixels(frame, size, 4, (x, y) =>
+      x === 0 && y === 0 ? Terrain.Forest : x === 1 && y === 0 ? UNEXPLORED : undefined,
+    )
+    const c = TERRAIN_COLORS[Terrain.Forest]!
+    expect([...pixels.slice(0, 4)]).toEqual([c >> 16, (c >> 8) & 0xff, c & 0xff, 255])
+    expect(pixels[7]).toBe(0)
+    expect(pixels[11]).toBe(0)
+  })
+})
+
+describe('minimap dots', () => {
+  it('marks the home city and every known city in its relationship colour', () => {
+    const dots = minimapDots(world(), viewer)
+    const cities = dots.filter((d) => d.kind === 'city' || d.kind === 'home')
+    expect(cities.map((d) => [d.kind, d.x, d.y, d.rel])).toEqual([
+      ['city', 90, 40, 'own'],
+      ['city', 40, 90, 'alliance'],
+      ['city', 90, 90, 'other'],
+      ['city', 140, 40, 'npc'],
+      ['city', 140, 90, 'trade'],
+      ['home', 40, 40, 'own'],
+    ])
+  })
+
+  it('includes cities only remembered, faded', () => {
+    const lastSeen = {
+      cities: [city('far', 'them')],
+      buildings: [building('far-hall', 'townHall', 200, 200, 'far')],
+    }
+    const dot = minimapDots(world({ lastSeen }), viewer).find((d) => d.x === 200)
+    expect(dot).toEqual({ kind: 'city', x: 200, y: 200, rel: 'other', remembered: true })
+  })
+
+  it('shows the Player’s residents and carriages away from their cities, not others’', () => {
+    const dots = minimapDots(
+      world({
+        residents: [
+          resident('home-bound', 'me', 41, 41),
+          resident('scout', 'me', 60, 60),
+          resident('stranger', 'them', 61, 61),
+        ],
+        carriages: [carriage('on-road', 'me', 65, 40), carriage('theirs', 'them', 66, 40)],
+      }),
+      viewer,
+    )
+    const away = dots.filter((d) => d.kind === 'resident' || d.kind === 'carriage')
+    expect(away).toEqual([
+      { kind: 'resident', x: 60, y: 60, rel: 'own' },
+      { kind: 'carriage', x: 65, y: 40, rel: 'own' },
+    ])
+    // Residents first, so cities are drawn over them.
+    expect(dots[0]!.kind).toBe('resident')
+    expect(dots.at(-1)!.kind).toBe('home')
+  })
+})
+
+describe('minimap folding', () => {
+  const store = (v: string | null) => () => ({ getItem: () => v })
+
+  it('starts open, but folded on a phone', () => {
+    expect(minimapOpenAtStart(false, store(null))).toBe(true)
+    expect(minimapOpenAtStart(true, store(null))).toBe(false)
+  })
+
+  it('starts as the Player left it in this browser', () => {
+    expect(minimapOpenAtStart(false, store('0'))).toBe(false)
+    expect(minimapOpenAtStart(true, store('1'))).toBe(true)
+    let saved = ''
+    rememberMinimapOpen(false, () => ({ setItem: (_k: string, v: string) => (saved = v) }))
+    expect(saved).toBe('0')
+  })
+
+  it('starts as a fresh browser would when storage is off', () => {
+    const off = () => {
+      throw new Error('no storage')
+    }
+    expect(minimapOpenAtStart(true, off)).toBe(false)
+    expect(() => rememberMinimapOpen(true, off)).not.toThrow()
+  })
+})

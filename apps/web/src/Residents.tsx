@@ -89,6 +89,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  busyAndIdle,
   CARD_TAB_LABELS,
   CARD_TABS,
   carriedShort,
@@ -97,14 +98,17 @@ import {
   groupCard,
   rememberedTabOf,
   rememberTabOf,
+  residentLines,
+  residentsCount,
   scriptsRun,
   statLine,
   TAB_LABELS,
   type GroupTab,
   type CardSections,
   type ResidentGroup,
+  type ResidentLines,
 } from './residents-view.js'
-import { doingLine, interruptedLine } from './doing-view.js'
+import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
 import { type RelocateChoice } from './relocate-view.js'
 import {
   editPlan,
@@ -157,9 +161,17 @@ import {
 } from './group-orders.js'
 import { GROUP_HINTS } from './pick-mode.js'
 import { NumberField, foodParamsHint } from './ScriptParams.js'
-import { defenceChoices, groupDefenceScript } from './script-run-view.js'
+import {
+  defenceChoices,
+  groupDefenceScript,
+  rememberLastScript,
+  rememberedLastScript,
+  runScriptPick,
+} from './script-run-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
+import { PanelHead } from './drawer-head.js'
+import { labelled } from './name-labels.js'
 import {
   ActionRows,
   CardTabs,
@@ -925,7 +937,8 @@ export function orderDoing(
 /**
  * The Player's residents, one row each under the city they live in (see `groupResidents`); click
  * a row to inspect that resident and show them on the map. Picking one elsewhere, such as on the
- * map, scrolls their row into view.
+ * map, scrolls their row into view. On a phone each row is two lines instead of the table's
+ * columns (`residentLines`).
  */
 export function ResidentsList({
   groups,
@@ -938,6 +951,7 @@ export function ResidentsList({
   arrivesIn,
   selectedId,
   onSelect,
+  phone = false,
 }: {
   groups: ResidentGroup<Resident>[]
   leaderId: string
@@ -954,6 +968,8 @@ export function ResidentsList({
   arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
   onSelect: (id: string) => void
+  /** Rows of two lines each, for a phone's narrow screen. */
+  phone?: boolean
 }) {
   const tableRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -963,81 +979,128 @@ export function ResidentsList({
     row?.closest('.residents-group')?.firstElementChild?.scrollIntoView({ block: 'nearest' })
     row?.scrollIntoView({ block: 'nearest' })
   }, [selectedId])
-  const count = groups.reduce((n, g) => n + g.residents.length, 0)
   return (
     <section className="residents" aria-label="Residents">
-      <div className="panel-head">
-        <h2>Residents</h2>
-        <span>{count} in sight</span>
-      </div>
+      <PanelHead title="Residents">{residentsCount(groups.flatMap((g) => g.residents))}</PanelHead>
       <div className="residents-scroll">
-        <div className="residents-table" ref={tableRef}>
-          <div className="residents-row heading" aria-hidden="true">
-            <span>Name</span>
-            <span>Age</span>
-            <span>Doing</span>
-            <span>Hunger</span>
-            <span>Carrying</span>
-          </div>
+        <div className={`residents-table${phone ? ' lines' : ''}`} ref={tableRef}>
+          {!phone && (
+            <div className="residents-row heading" aria-hidden="true">
+              <span>Name</span>
+              <span>Age</span>
+              <span>Doing</span>
+              <span>Hunger</span>
+              <span>Carrying</span>
+            </div>
+          )}
           {groups.map((g) => (
             <div className="residents-group" key={g.key} role="group" aria-label={g.label}>
               <h3>
                 {g.label} <span>· {g.residents.length}</span>
               </h3>
-              {g.residents.map((r) => (
-                <button
-                  type="button"
-                  key={r.id}
-                  data-resident={r.id}
-                  className={`residents-row${r.id === selectedId ? ' selected' : ''}`}
-                  aria-pressed={r.id === selectedId}
-                  onClick={() => onSelect(r.id)}
-                >
-                  <span className="name">
-                    {r.name}
-                    {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
-                  </span>
-                  <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
-                  <span
-                    className="doing"
-                    title={doingLine(r, {
-                      scripts,
-                      buildings,
-                      residents: inSight,
-                      cities,
-                      arrives: arrivesIn?.(r),
-                    })}
-                  >
-                    {doingLine(r, {
-                      scripts,
-                      buildings,
-                      residents: inSight,
-                      cities,
-                      arrives: arrivesIn?.(r),
-                    })}
-                    {r.script && (
-                      <small className="muted">
-                        {interruptedLine(r, { scripts, buildings, residents: inSight }) ??
-                          scriptName(r, scripts)}
-                      </small>
-                    )}
-                  </span>
-                  <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
-                    <span
-                      className={meterClass(r.hunger / MAX_HUNGER)}
-                      style={{ width: pct(r.hunger / MAX_HUNGER) }}
+              {g.residents.map((r) => {
+                if (phone) {
+                  return (
+                    <ResidentLinesRow
+                      key={r.id}
+                      lines={residentLines(r, {
+                        leaderId,
+                        tick,
+                        doing: doingLine(r, {
+                          scripts,
+                          buildings,
+                          residents: inSight,
+                          cities,
+                          arrives: arrivesIn?.(r),
+                        }),
+                      })}
+                      id={r.id}
+                      selected={r.id === selectedId}
+                      onSelect={onSelect}
                     />
-                  </span>
-                  <span className="mono">
-                    {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
-                  </span>
-                </button>
-              ))}
+                  )
+                }
+                const under =
+                  interruptedLine(r, { scripts, buildings, residents: inSight }) ??
+                  scriptLine(r, scripts)
+                return (
+                  <button
+                    type="button"
+                    key={r.id}
+                    data-resident={r.id}
+                    className={`residents-row${r.id === selectedId ? ' selected' : ''}`}
+                    aria-pressed={r.id === selectedId}
+                    onClick={() => onSelect(r.id)}
+                  >
+                    <span className="name">
+                      {r.name}
+                      {r.id === leaderId && <small className="leader-mark">Leader</small>}
+                    </span>
+                    <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
+                    <span className="doing">
+                      {doingLine(r, {
+                        scripts,
+                        buildings,
+                        residents: inSight,
+                        cities,
+                        arrives: arrivesIn?.(r),
+                      })}
+                      {under && <small className="muted">{under}</small>}
+                    </span>
+                    <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
+                      <span
+                        className={meterClass(r.hunger / MAX_HUNGER)}
+                        style={{ width: pct(r.hunger / MAX_HUNGER) }}
+                      />
+                    </span>
+                    <span className="mono">
+                      {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           ))}
         </div>
       </div>
     </section>
+  )
+}
+
+/** A resident's row on a phone: name, Leader mark and age, then Doing with the hunger meter. */
+function ResidentLinesRow({
+  id,
+  lines,
+  selected,
+  onSelect,
+}: {
+  id: string
+  lines: ResidentLines
+  selected: boolean
+  onSelect: (id: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      data-resident={id}
+      className={`residents-row lines${selected ? ' selected' : ''}`}
+      aria-pressed={selected}
+      onClick={() => onSelect(id)}
+    >
+      <span className="line">
+        <span className="name">
+          {lines.name}
+          {lines.leader && <span className="leader-mark"> · Leader</span>}
+        </span>
+        <span className="mono">{lines.age}</span>
+      </span>
+      <span className="line">
+        <span className="doing">{lines.doing}</span>
+        <span className="meter" aria-label={`Hunger ${pct(lines.fed)} fed`}>
+          <span className={meterClass(lines.fed)} style={{ width: pct(lines.fed) }} />
+        </span>
+      </span>
+    </button>
   )
 }
 
@@ -1120,7 +1183,8 @@ export function GroupCard({
   /** Tiles along each side of the map. */
   mapSize?: number
 }) {
-  const card = groupCard(residents)
+  // Two of one name are told apart by age and city (`CONTEXT.md`: Game-given names).
+  const card = groupCard(tick === undefined ? residents : labelled(residents, tick, cities))
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
   // The order whose panel is open under the rows: what it needs before it goes out.
   const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed' | 'teach' | 'relocate' | 'board'>()
@@ -1201,36 +1265,11 @@ export function GroupCard({
   const stables = buildings.filter(
     (b) => b.kind === 'stable' && !b.site && residents.some((r) => isAt(r, b)),
   )
-  const idle = residents.filter((r) => !r.order && !r.script).length
-  return (
-    <SelectionCard
-      rel="own"
-      title={card.title}
-      lines={[
-        card.names,
-        <strong key="doing">
-          {idle === residents.length ? 'All idle' : `${residents.length - idle} busy, ${idle} idle`}
-        </strong>,
-      ]}
-      onClose={onClose}
-      collapsed={collapsed}
-    >
-      <CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
-
-      {tab === 'orders' &&
-        rowGroups(rows, groupButtonGroup).map((g) => (
-          <div className="sel-order-group" key={g.group}>
-            <h3>{g.label}</h3>
-            <ActionRows
-              actions={g.actions}
-              open={shown}
-              onAction={act}
-              label={g.label}
-              keys={false}
-            />
-          </div>
-        ))}
-      {tab === 'orders' && shown === 'board' && (
+  const { busy, idle } = busyAndIdle(residents)
+  // The open order's panel, right under the row that opened it (`ActionRows`).
+  const openPanel = shown && (
+    <>
+      {shown === 'board' && (
         <section className="inspector-block" aria-label="Board carriage">
           <div className="order-buttons">
             {carriages.map(({ carriage, seats }) => (
@@ -1249,6 +1288,119 @@ export function GroupCard({
           <p className="muted small">Those standing on the carriage board it, until it is full.</p>
         </section>
       )}
+      {shown === 'fetch' && (
+        <section className="inspector-block" aria-label="Fetch">
+          <div className="order-buttons">
+            <select
+              aria-label="Good to fetch"
+              value={good}
+              onChange={(e) => setGood(e.target.value as Good)}
+            >
+              {GOODS.map((g) => (
+                <option key={g} value={g}>
+                  {GOOD_LABELS[g]}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={() => onOrder({ kind: 'fetch', good })}>
+              Fetch
+            </button>
+            <button
+              type="button"
+              aria-pressed={picking === 'fetchFrom'}
+              onClick={() => toggle('fetchFrom', { good })}
+            >
+              Fetch from…
+            </button>
+          </div>
+          <p className="muted small">
+            Each fetches as much as fits from the nearest storage or carriage holding it, or from
+            the storage, stable or carriage picked on the map.
+          </p>
+        </section>
+      )}
+      {shown === 'relocate' && (
+        <GroupRelocateBlock
+          count={residents.length}
+          choices={relocate?.choices ?? []}
+          problem={relocate ? relocate.problem : 'your realm has no other city'}
+          onRelocate={(cityId) => {
+            setPanel(undefined)
+            onOrder({ kind: 'relocate', cityId })
+          }}
+        />
+      )}
+      {shown === 'haul' && (
+        <HaulBlock
+          adult
+          onRoute={false}
+          picking={picking === 'haul'}
+          onHaulTo={(haul) => toggle('haul', { haul })}
+        />
+      )}
+      {shown === 'teach' && (
+        <section className="inspector-block" aria-label="Teach">
+          <div className="panel-head">
+            <h3>Teach</h3>
+          </div>
+          <SubjectPicker action="Teach" onPick={(subject) => onOrder({ kind: 'teach', subject })} />
+          <p className="muted small">
+            The first of them on each training ground teaches it there; one teacher per ground.
+          </p>
+        </section>
+      )}
+      {shown === 'breed' && (
+        <section className="inspector-block" aria-label="Breed horses">
+          <div className="panel-head">
+            <h3>Breed horses</h3>
+          </div>
+          {stables.length === 0 && (
+            <p className="muted small">None of them stands in a finished stable.</p>
+          )}
+          {stables.map((s) => (
+            <GroupBreed
+              key={s.id}
+              stable={s}
+              horses={horsesIn(horses, s).filter((h) => h.realmId === realmId)}
+              tick={tick ?? 0}
+              onBreed={(horseIds) => onOrder({ kind: 'breed', stable: s, horseIds })}
+            />
+          ))}
+          <p className="muted small">
+            One of them standing there who isn’t breeding yet tends the two; pick two more for the
+            next one.
+          </p>
+        </section>
+      )}
+    </>
+  )
+  return (
+    <SelectionCard
+      rel="own"
+      title={card.title}
+      lines={[
+        card.names,
+        <strong key="doing">{busy === 0 ? 'All idle' : `${busy} busy, ${idle} idle`}</strong>,
+      ]}
+      onClose={onClose}
+      collapsed={collapsed}
+    >
+      <CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
+
+      {tab === 'orders' &&
+        rowGroups(rows, groupButtonGroup).map((g) => (
+          <div className="sel-order-group" key={g.group}>
+            <h3>{g.label}</h3>
+            <ActionRows
+              actions={g.actions}
+              open={shown}
+              onAction={act}
+              label={g.label}
+              keys={false}
+              panel={openPanel || undefined}
+            />
+          </div>
+        ))}
       {tab === 'orders' && buildAt && !picking && (
         <section className="inspector-block" aria-label="Build">
           <div className="panel-head">
@@ -1292,90 +1444,6 @@ export function GroupCard({
           )}
           <p className="muted small">
             Each walks there; the first lays out the site and the others join it.
-          </p>
-        </section>
-      )}
-      {tab === 'orders' && shown === 'fetch' && (
-        <section className="inspector-block" aria-label="Fetch">
-          <div className="order-buttons">
-            <select
-              aria-label="Good to fetch"
-              value={good}
-              onChange={(e) => setGood(e.target.value as Good)}
-            >
-              {GOODS.map((g) => (
-                <option key={g} value={g}>
-                  {GOOD_LABELS[g]}
-                </option>
-              ))}
-            </select>
-            <button type="button" onClick={() => onOrder({ kind: 'fetch', good })}>
-              Fetch
-            </button>
-            <button
-              type="button"
-              aria-pressed={picking === 'fetchFrom'}
-              onClick={() => toggle('fetchFrom', { good })}
-            >
-              Fetch from…
-            </button>
-          </div>
-          <p className="muted small">
-            Each fetches as much as fits from the nearest storage or carriage holding it, or from
-            the storage, stable or carriage picked on the map.
-          </p>
-        </section>
-      )}
-      {tab === 'orders' && shown === 'relocate' && (
-        <GroupRelocateBlock
-          count={residents.length}
-          choices={relocate?.choices ?? []}
-          problem={relocate ? relocate.problem : 'your realm has no other city'}
-          onRelocate={(cityId) => {
-            setPanel(undefined)
-            onOrder({ kind: 'relocate', cityId })
-          }}
-        />
-      )}
-      {tab === 'orders' && shown === 'haul' && (
-        <HaulBlock
-          adult
-          onRoute={false}
-          picking={picking === 'haul'}
-          onHaulTo={(haul) => toggle('haul', { haul })}
-        />
-      )}
-      {tab === 'orders' && shown === 'teach' && (
-        <section className="inspector-block" aria-label="Teach">
-          <div className="panel-head">
-            <h3>Teach</h3>
-          </div>
-          <SubjectPicker action="Teach" onPick={(subject) => onOrder({ kind: 'teach', subject })} />
-          <p className="muted small">
-            The first of them on each training ground teaches it there; one teacher per ground.
-          </p>
-        </section>
-      )}
-      {tab === 'orders' && shown === 'breed' && (
-        <section className="inspector-block" aria-label="Breed horses">
-          <div className="panel-head">
-            <h3>Breed horses</h3>
-          </div>
-          {stables.length === 0 && (
-            <p className="muted small">None of them stands in a finished stable.</p>
-          )}
-          {stables.map((s) => (
-            <GroupBreed
-              key={s.id}
-              stable={s}
-              horses={horsesIn(horses, s).filter((h) => h.realmId === realmId)}
-              tick={tick ?? 0}
-              onBreed={(horseIds) => onOrder({ kind: 'breed', stable: s, horseIds })}
-            />
-          ))}
-          <p className="muted small">
-            One of them standing there who isn’t breeding yet tends the two; pick two more for the
-            next one.
           </p>
         </section>
       )}
@@ -1838,12 +1906,306 @@ export function ResidentCard({
     if (a.id === 'train' && building) onTrain(building.id)
   }
   useActionKeys(rows, act)
+  // Run script later starts on the script they were last seen running (`runScriptPick`).
+  const running = r.script?.scriptId
+  useEffect(() => {
+    if (running) rememberLastScript(r.id, running)
+  }, [r.id, running])
   const ridden = riddenHorseLine(r, horses, tick)
+  // The script they run, or what they go on with after their defence script, under Doing.
+  const under = interruptedLine(r, { scripts, buildings, residents }) ?? scriptLine(r, scripts)
   // The city they live in, or none (`CONTEXT.md`: Homeless).
   const home =
     r.cityId === null
       ? 'Homeless'
       : (cities.find((c) => c.id === r.cityId)?.name ?? 'a city out of sight')
+  // The open order's panel, right under the row that opened it (`ActionRows`).
+  const openPanel = shown && (
+    <div className="sel-panel">
+      {shown === 'haul' && carriage && (
+        <HaulBlock
+          adult={!child}
+          onRoute={r.order?.kind === 'haul'}
+          picking={picking === 'haul'}
+          onHaulTo={onHaulTo}
+        />
+      )}
+      {shown === 'work' && (
+        <WorkBlock
+          resident={r}
+          tick={tick}
+          building={building}
+          node={node}
+          workers={workers}
+          holders={holders}
+          realmId={realmId}
+          onWork={onWork}
+        />
+      )}
+      {shown === 'build' && (
+        <>
+          <BuildBlock
+            resident={r}
+            tick={tick}
+            building={building}
+            node={node}
+            at={at}
+            buildProblem={buildProblem}
+            onBuild={onBuild}
+          />
+          <CarriageBlock
+            resident={r}
+            tick={tick}
+            building={building}
+            carriageSite={carriageSite}
+            at={at}
+            buildProblem={buildProblem}
+            onBuild={onBuild}
+          />
+          <RoadBlock
+            resident={r}
+            tick={tick}
+            road={road}
+            terrain={terrain}
+            at={at}
+            onBuild={onBuild}
+          />
+        </>
+      )}
+      {shown === 'tearDown' && (
+        <>
+          <TearDownBlock
+            resident={r}
+            tick={tick}
+            building={building}
+            at={at}
+            onTearDown={onTearDown}
+          />
+          <TearDownBlock
+            resident={r}
+            tick={tick}
+            building={carriageSite}
+            at={at}
+            onTearDown={onTearDown}
+          />
+          <TearDownBlock
+            resident={r}
+            tick={tick}
+            building={road}
+            at={{ ...at, terrain }}
+            onTearDown={onTearDown}
+          />
+        </>
+      )}
+      {shown === 'teach' && building && (
+        <TeachBlock
+          resident={r}
+          ground={building}
+          residents={residents}
+          mapSize={mapSize}
+          onTeach={(subject) => onTeach(building.id, subject)}
+        />
+      )}
+      {shown === 'breed' && building && (
+        <BreedBlock
+          resident={r}
+          tick={tick}
+          stable={building}
+          horses={horses}
+          residents={residents}
+          realmId={realmId}
+          onBreed={onBreed}
+        />
+      )}
+      {shown === 'goods' && (
+        <>
+          <section className="inspector-block" aria-label="Carrying">
+            <div className="panel-head">
+              <h3>Carrying</h3>
+              <span className="mono small">
+                {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
+              </span>
+            </div>
+            {carried.length === 0 && (
+              <p className="muted small">
+                Nothing. Residents eat only what they carry; at home they take meals from storage.
+              </p>
+            )}
+            {onStore && carried.length > 0 && (
+              <div className="order-buttons">
+                <button type="button" onClick={onStore}>
+                  Store all
+                </button>
+                <span className="muted small">at the nearest storage, keeping their own Food</span>
+              </div>
+            )}
+            {carried.map(([good, units]) => (
+              <GoodsRow
+                key={good}
+                good={good}
+                units={units}
+                byDefault={putAwayUnits(good, units)}
+                disabled={refused(good)}
+                actions={[
+                  { label: 'Drop', spot: ground },
+                  ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
+                  ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
+                  ...((carriageNeeded[good] ?? 0) > 0
+                    ? [{ label: 'Deliver to carriage site', spot: atCarriageSite }]
+                    : []),
+                  ...((roadNeeded[good] ?? 0) > 0
+                    ? [{ label: 'Deliver to road', spot: atRoadSite }]
+                    : []),
+                  ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
+                ]}
+                onAct={onDrop}
+              />
+            ))}
+          </section>
+          {(pile || storage || site || carriageSite || roadSite || carriage) && (
+            <section className="inspector-block" aria-label="On this tile">
+              <div className="panel-head">
+                <h3>Here</h3>
+                <span className="small muted">takes as much as fits</span>
+              </div>
+              <TileGoods
+                title="On the ground"
+                stock={pile?.goods}
+                spot={ground}
+                onPickUp={onPickUp}
+                refused={refused}
+              />
+              {storage && (
+                <TileGoods
+                  title={storage.kind === 'stable' ? 'In the stable' : 'In the storage'}
+                  stock={storage.stock}
+                  spot={inStorage}
+                  onPickUp={onPickUp}
+                  refused={refused}
+                />
+              )}
+              {site && (
+                <TileGoods
+                  title="Delivered to the site"
+                  stock={site.site!.delivered}
+                  spot={atSite}
+                  onPickUp={onPickUp}
+                  refused={refused}
+                />
+              )}
+              {carriageSite && (
+                <TileGoods
+                  title="Delivered to the carriage site"
+                  stock={carriageSite.site!.delivered}
+                  spot={atCarriageSite}
+                  onPickUp={onPickUp}
+                  refused={refused}
+                />
+              )}
+              {roadSite && (
+                <TileGoods
+                  title="Delivered to the road site"
+                  stock={roadSite.site!.delivered}
+                  spot={atRoadSite}
+                  onPickUp={onPickUp}
+                  refused={refused}
+                />
+              )}
+              {carriage && (
+                <TileGoods
+                  title={`On the carriage · ${kg(stockWeight(carriage.load))} / ${kg(CARRIAGE_CAPACITY)}${carriage.horseId ? '' : ' · no horse hitched'}`}
+                  stock={carriage.load}
+                  spot={onCarriage}
+                  onPickUp={onPickUp}
+                  refused={refused}
+                />
+              )}
+            </section>
+          )}
+        </>
+      )}
+      {shown === 'pair' && (
+        <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
+      )}
+      {shown === 'attack' && (
+        <AttackBlock
+          resident={r}
+          others={others}
+          walls={walls}
+          mapSize={mapSize}
+          onAttack={onAttack}
+        />
+      )}
+      {shown === 'walls' && (
+        <WallsBlock
+          resident={r}
+          walls={walls}
+          mapSize={mapSize}
+          onBreak={onAttack}
+          onClimb={onClimb}
+        />
+      )}
+      {shown === 'script' && (
+        <section className="inspector-block" aria-label="Run script">
+          <div className="panel-head">
+            <h3>Run script</h3>
+          </div>
+          <RunScript script={r.script} scripts={scripts} onRunScript={onRunScript} of={r.id} />
+        </section>
+      )}
+      {shown === 'relocate' && relocate && onRelocate && (
+        <RelocateBlock
+          resident={r}
+          home={home}
+          choices={relocate.choices}
+          onRelocate={(cityId) => {
+            setPanel(undefined)
+            onRelocate(cityId)
+          }}
+        />
+      )}
+      {shown === 'makeLeader' && makeLeader && (
+        <section className="inspector-block" aria-label="Make Leader">
+          <div className="panel-head">
+            <h3>Make Leader</h3>
+          </div>
+          <p className="small">
+            Hand your realm to {r.name}? {leaderName ?? 'Your Leader'} stays on as an ordinary
+            resident.
+          </p>
+          {makeLeader.problem && <p className="muted small">{makeLeader.problem}.</p>}
+          <div className="order-buttons">
+            <button
+              type="button"
+              className="primary"
+              disabled={!!makeLeader.problem}
+              onClick={() => {
+                setPanel(undefined)
+                onMakeLeader()
+              }}
+            >
+              Make {r.name} Leader
+            </button>
+            <button type="button" onClick={() => setPanel(undefined)}>
+              Cancel
+            </button>
+          </div>
+        </section>
+      )}
+      {shown === 'rename' && rename && (
+        <RenameBlock
+          // Starts again from the new name once the rename comes back.
+          key={r.name}
+          resident={r}
+          needsRealmName={rename.needsRealmName}
+          onRename={(name, realmName) => {
+            setPanel(undefined)
+            onRename(name, realmName)
+          }}
+        />
+      )}
+    </div>
+  )
   return (
     <SelectionCard
       rel={r.owner === realmId ? 'own' : 'alliance'}
@@ -1853,10 +2215,10 @@ export function ResidentCard({
         <strong key="doing">
           {doingLine(r, { scripts, buildings, residents, cities, arrives: arrivesIn?.(r) })}
         </strong>,
-        ...(r.interrupted
+        ...(under
           ? [
-              <span key="then" className="muted">
-                {interruptedLine(r, { scripts, buildings, residents })}
+              <span key="under" className="muted">
+                {under}
               </span>,
             ]
           : []),
@@ -1904,6 +2266,7 @@ export function ResidentCard({
               onAction={act}
               label={g.label}
               keys={false}
+              panel={openPanel || undefined}
             />
           </div>
         ))}
@@ -1972,303 +2335,21 @@ export function ResidentCard({
           </>
         ) : (
           <>
-            <p className="muted small">
-              Runs no script. Give them one with Run script under Orders.
-            </p>
+            <p className="muted small">Runs no script.</p>
+            {actions.some((a) => a.id === 'script') && (
+              <div className="order-buttons">
+                <button
+                  type="button"
+                  onClick={() => onSections({ ...sections, tab: 'orders', panel: 'script' })}
+                >
+                  Run script…
+                </button>
+              </div>
+            )}
             {defenceScript}
             {scriptLog}
           </>
         ))}
-      {tab === 'orders' && shown && (
-        <div className="sel-panel">
-          {shown === 'haul' && carriage && (
-            <HaulBlock
-              adult={!child}
-              onRoute={r.order?.kind === 'haul'}
-              picking={picking === 'haul'}
-              onHaulTo={onHaulTo}
-            />
-          )}
-          {shown === 'work' && (
-            <WorkBlock
-              resident={r}
-              tick={tick}
-              building={building}
-              node={node}
-              workers={workers}
-              holders={holders}
-              realmId={realmId}
-              onWork={onWork}
-            />
-          )}
-          {shown === 'build' && (
-            <>
-              <BuildBlock
-                resident={r}
-                tick={tick}
-                building={building}
-                node={node}
-                at={at}
-                buildProblem={buildProblem}
-                onBuild={onBuild}
-              />
-              <CarriageBlock
-                resident={r}
-                tick={tick}
-                building={building}
-                carriageSite={carriageSite}
-                at={at}
-                buildProblem={buildProblem}
-                onBuild={onBuild}
-              />
-              <RoadBlock
-                resident={r}
-                tick={tick}
-                road={road}
-                terrain={terrain}
-                at={at}
-                onBuild={onBuild}
-              />
-            </>
-          )}
-          {shown === 'tearDown' && (
-            <>
-              <TearDownBlock
-                resident={r}
-                tick={tick}
-                building={building}
-                at={at}
-                onTearDown={onTearDown}
-              />
-              <TearDownBlock
-                resident={r}
-                tick={tick}
-                building={carriageSite}
-                at={at}
-                onTearDown={onTearDown}
-              />
-              <TearDownBlock
-                resident={r}
-                tick={tick}
-                building={road}
-                at={{ ...at, terrain }}
-                onTearDown={onTearDown}
-              />
-            </>
-          )}
-          {shown === 'teach' && building && (
-            <TeachBlock
-              resident={r}
-              ground={building}
-              residents={residents}
-              mapSize={mapSize}
-              onTeach={(subject) => onTeach(building.id, subject)}
-            />
-          )}
-          {shown === 'breed' && building && (
-            <BreedBlock
-              resident={r}
-              tick={tick}
-              stable={building}
-              horses={horses}
-              residents={residents}
-              realmId={realmId}
-              onBreed={onBreed}
-            />
-          )}
-          {shown === 'goods' && (
-            <>
-              <section className="inspector-block" aria-label="Carrying">
-                <div className="panel-head">
-                  <h3>Carrying</h3>
-                  <span className="mono small">
-                    {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
-                  </span>
-                </div>
-                {carried.length === 0 && (
-                  <p className="muted small">
-                    Nothing. Residents eat only what they carry; at home they take meals from
-                    storage.
-                  </p>
-                )}
-                {onStore && carried.length > 0 && (
-                  <div className="order-buttons">
-                    <button type="button" onClick={onStore}>
-                      Store all
-                    </button>
-                    <span className="muted small">
-                      at the nearest storage, keeping their own Food
-                    </span>
-                  </div>
-                )}
-                {carried.map(([good, units]) => (
-                  <GoodsRow
-                    key={good}
-                    good={good}
-                    units={units}
-                    byDefault={putAwayUnits(good, units)}
-                    disabled={refused(good)}
-                    actions={[
-                      { label: 'Drop', spot: ground },
-                      ...(storage ? [{ label: 'Store', spot: inStorage }] : []),
-                      ...((needed[good] ?? 0) > 0 ? [{ label: 'Deliver', spot: atSite }] : []),
-                      ...((carriageNeeded[good] ?? 0) > 0
-                        ? [{ label: 'Deliver to carriage site', spot: atCarriageSite }]
-                        : []),
-                      ...((roadNeeded[good] ?? 0) > 0
-                        ? [{ label: 'Deliver to road', spot: atRoadSite }]
-                        : []),
-                      ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
-                    ]}
-                    onAct={onDrop}
-                  />
-                ))}
-              </section>
-              {(pile || storage || site || carriageSite || roadSite || carriage) && (
-                <section className="inspector-block" aria-label="On this tile">
-                  <div className="panel-head">
-                    <h3>Here</h3>
-                    <span className="small muted">takes as much as fits</span>
-                  </div>
-                  <TileGoods
-                    title="On the ground"
-                    stock={pile?.goods}
-                    spot={ground}
-                    onPickUp={onPickUp}
-                    refused={refused}
-                  />
-                  {storage && (
-                    <TileGoods
-                      title={storage.kind === 'stable' ? 'In the stable' : 'In the storage'}
-                      stock={storage.stock}
-                      spot={inStorage}
-                      onPickUp={onPickUp}
-                      refused={refused}
-                    />
-                  )}
-                  {site && (
-                    <TileGoods
-                      title="Delivered to the site"
-                      stock={site.site!.delivered}
-                      spot={atSite}
-                      onPickUp={onPickUp}
-                      refused={refused}
-                    />
-                  )}
-                  {carriageSite && (
-                    <TileGoods
-                      title="Delivered to the carriage site"
-                      stock={carriageSite.site!.delivered}
-                      spot={atCarriageSite}
-                      onPickUp={onPickUp}
-                      refused={refused}
-                    />
-                  )}
-                  {roadSite && (
-                    <TileGoods
-                      title="Delivered to the road site"
-                      stock={roadSite.site!.delivered}
-                      spot={atRoadSite}
-                      onPickUp={onPickUp}
-                      refused={refused}
-                    />
-                  )}
-                  {carriage && (
-                    <TileGoods
-                      title={`On the carriage · ${kg(stockWeight(carriage.load))} / ${kg(CARRIAGE_CAPACITY)}${carriage.horseId ? '' : ' · no horse hitched'}`}
-                      stock={carriage.load}
-                      spot={onCarriage}
-                      onPickUp={onPickUp}
-                      refused={refused}
-                    />
-                  )}
-                </section>
-              )}
-            </>
-          )}
-          {shown === 'pair' && (
-            <PairBlock resident={r} tick={tick} residents={residents} onPair={onPair} />
-          )}
-          {shown === 'attack' && (
-            <AttackBlock
-              resident={r}
-              others={others}
-              walls={walls}
-              mapSize={mapSize}
-              onAttack={onAttack}
-            />
-          )}
-          {shown === 'walls' && (
-            <WallsBlock
-              resident={r}
-              walls={walls}
-              mapSize={mapSize}
-              onBreak={onAttack}
-              onClimb={onClimb}
-            />
-          )}
-          {shown === 'script' && (
-            <section className="inspector-block" aria-label="Run script">
-              <div className="panel-head">
-                <h3>Run script</h3>
-              </div>
-              <RunScript script={r.script} scripts={scripts} onRunScript={onRunScript} />
-            </section>
-          )}
-          {shown === 'relocate' && relocate && onRelocate && (
-            <RelocateBlock
-              resident={r}
-              home={home}
-              choices={relocate.choices}
-              onRelocate={(cityId) => {
-                setPanel(undefined)
-                onRelocate(cityId)
-              }}
-            />
-          )}
-          {shown === 'makeLeader' && makeLeader && (
-            <section className="inspector-block" aria-label="Make Leader">
-              <div className="panel-head">
-                <h3>Make Leader</h3>
-              </div>
-              <p className="small">
-                Hand your realm to {r.name}? {leaderName ?? 'Your Leader'} stays on as an ordinary
-                resident.
-              </p>
-              {makeLeader.problem && <p className="muted small">{makeLeader.problem}.</p>}
-              <div className="order-buttons">
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={!!makeLeader.problem}
-                  onClick={() => {
-                    setPanel(undefined)
-                    onMakeLeader()
-                  }}
-                >
-                  Make {r.name} Leader
-                </button>
-                <button type="button" onClick={() => setPanel(undefined)}>
-                  Cancel
-                </button>
-              </div>
-            </section>
-          )}
-          {shown === 'rename' && rename && (
-            <RenameBlock
-              // Starts again from the new name once the rename comes back.
-              key={r.name}
-              resident={r}
-              needsRealmName={rename.needsRealmName}
-              onRename={(name, realmName) => {
-                setPanel(undefined)
-                onRename(name, realmName)
-              }}
-            />
-          )}
-        </div>
-      )}
-
       {tab === 'stats' && (
         <>
           <ul className="sel-facts">
@@ -3031,8 +3112,12 @@ function PairBlock({
   if (!canWork(resident, tick) || resident.cityId === null) return null
   const o = resident.pair
   const partner = o ? residents.find((x) => x.id === o.partnerId) : undefined
-  const choices = residents.filter(
-    (x) => x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick) && !x.carrying,
+  const choices = labelled(
+    residents.filter(
+      (x) =>
+        x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick) && !x.carrying,
+    ),
+    tick,
   )
   const wait = o ? pairingTicksLeft(o.since, tick) : 0
   const expecting = resident.carrying || partner?.carrying
@@ -3564,23 +3649,30 @@ export function DefenceScript({
 /**
  * Gives a resident or an army the run-script order with one of the Player's scripts
  * (`CONTEXT.md`: Running a script). Only scripts with an active version can run; any other
- * order ends it.
+ * order ends it. The picker starts on the script they run now or last ran (`runScriptPick`).
  */
 export function RunScript({
   script,
   scripts,
   onRunScript,
   label = 'Script to run',
+  of,
 }: {
   /** The script the resident or army runs now, if any. */
   script: { scriptId: number } | undefined
   scripts: ScriptSummary[]
   onRunScript: (scriptId: number) => void
   label?: string
+  /** The resident's or army's id, to start on the script they last ran. */
+  of?: string
 }) {
   const runnable = scripts.filter((s) => s.activeVersion !== null)
   const [picked, setPicked] = useState<number>()
-  const scriptId = runnable.some((s) => s.id === picked) ? picked : runnable[0]?.id
+  const scriptId = runScriptPick(runnable, {
+    picked,
+    running: script?.scriptId,
+    last: of === undefined ? undefined : rememberedLastScript(of),
+  })
   const running = script && scripts.find((s) => s.id === script.scriptId)
   return (
     <div className="run-script">
@@ -3596,9 +3688,14 @@ export function RunScript({
         <div className="order-buttons">
           <select
             aria-label={label}
-            value={scriptId}
+            value={scriptId ?? ''}
             onChange={(e) => setPicked(Number(e.target.value))}
           >
+            {scriptId === undefined && (
+              <option value="" disabled>
+                Pick a script…
+              </option>
+            )}
             {runnable.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -3608,7 +3705,11 @@ export function RunScript({
           <button
             type="button"
             disabled={scriptId === undefined}
-            onClick={() => scriptId !== undefined && onRunScript(scriptId)}
+            onClick={() => {
+              if (scriptId === undefined) return
+              if (of !== undefined) rememberLastScript(of, scriptId)
+              onRunScript(scriptId)
+            }}
           >
             Run script
           </button>

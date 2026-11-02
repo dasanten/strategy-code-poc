@@ -65,6 +65,11 @@ export function isTrainingSubject(x: unknown): x is TrainingSubject {
 export interface Resident {
   id: string
   name: string
+  /**
+   * Set while `name` is the one the game gave them (`CONTEXT.md`: Game-given names), unique in
+   * their realm when given; a rename drops it. Absent for names from before that rule.
+   */
+  gameName?: true
   /** The realm the resident belongs to; null for one of an NPC city (`cityId`) or of nobody. */
   owner: string | null
   /** The city the resident lives in (`CONTEXT.md`: City, House); null for one of no city. */
@@ -1893,6 +1898,11 @@ export interface AllianceMember {
 export interface City {
   id: string
   name: string
+  /**
+   * Set while `name` is the one the game gave it (`CONTEXT.md`: Game-given names), unique in the
+   * world when given; a rename drops it. Absent for names from before that rule.
+   */
+  gameName?: true
   /** The realm it belongs to; null for an NPC city (`CONTEXT.md`: NPC city). */
   realmId: string | null
   /** The town hall that makes it a city (`CONTEXT.md`: Town hall). */

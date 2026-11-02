@@ -9,6 +9,7 @@ import {
   type SeenResident,
   type SeenCarriage,
 } from '@csp/shared'
+import { PanelHead } from './drawer-head.js'
 import { relationshipClass } from './theme.js'
 
 /**
@@ -53,10 +54,7 @@ export function AlliancePanel({
   if (!alliance) {
     return (
       <section className="alliance-panel" aria-label="Alliance">
-        <div className="panel-head">
-          <h2>Alliance</h2>
-          <span>none</span>
-        </div>
+        <PanelHead title="Alliance">none</PanelHead>
         {invitations.length > 0 && (
           <ul className="alliance-list">
             {invitations.map((inv) => (
@@ -105,12 +103,11 @@ export function AlliancePanel({
 
   return (
     <section className="alliance-panel" aria-label="Alliance">
-      <div className="panel-head">
-        <h2>{alliance.name}</h2>
-        <span>
-          {alliance.members.length === 1 ? '1 member' : `${alliance.members.length} members`}
-        </span>
-      </div>
+      {/* In the drawer its name joins the count, right of the drawer's title. */}
+      <PanelHead title={alliance.name}>
+        {alliance.name} ·{' '}
+        {alliance.members.length === 1 ? '1 member' : `${alliance.members.length} members`}
+      </PanelHead>
       <ul className="alliance-list">
         {alliance.members.map((m) => (
           <li

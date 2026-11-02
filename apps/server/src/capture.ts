@@ -13,6 +13,7 @@ import {
 } from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
 import { recordEvent } from './events.js'
+import { residentNamesTaken, uniqueName } from './names.js'
 
 /** A city that changed realm by capture this tick. */
 export interface Capture {
@@ -83,7 +84,8 @@ function occupationLogged(
  * captured: one who lived there stays in their realm and is homeless. Those who join drop the
  * orders their former owner gave them, and their pair unless the partner joins too; whoever else
  * drove a carriage that joins stops driving it, and nobody keeps attacking their own realm. Both
- * realms' logs show it.
+ * realms' logs show it. One who joins with a name from the game that the realm already has gets a
+ * numeral added (`CONTEXT.md`: Game-given names).
  */
 export function captureCity(world: WorldState, city: City, captor: string, size: number): void {
   const from = city.realmId
@@ -103,9 +105,12 @@ export function joinRealm(world: WorldState, city: City, captor: string, size: n
   const leaders = new Set(world.realms.map((r) => r.leaderId))
   const joining = world.residents.filter((r) => r.cityId === city.id && !leaders.has(r.id))
   const joined = new Set(joining.map((r) => r.id))
+  const names = residentNamesTaken(world, captor, null)
   for (const r of world.residents) {
     if (r.cityId !== city.id) continue
     if (joined.has(r.id)) {
+      if (r.gameName) r.name = uniqueName(r.name, names)
+      names.add(r.name)
       r.owner = captor
       r.order = null
       if (r.pair && !joined.has(r.pair.partnerId)) delete r.pair

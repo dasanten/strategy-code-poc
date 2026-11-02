@@ -83,6 +83,37 @@ describe('param lines', () => {
     expect(scriptParams('param a: building\nlet = 1')).toEqual([])
   })
 
+  it('are listed by scriptParams with the comment at the end of their line', () => {
+    const source = [
+      'param workplace: building // the workplace to work; none: the one I stand on',
+      'param foodAt: number = 3; //   get Food below this  ',
+      'param bare: storage',
+      'param empty: storage //',
+      'let s = "// no param comment"',
+    ].join('\n')
+    expect(scriptParams(source)).toEqual([
+      {
+        name: 'workplace',
+        type: 'building',
+        description: 'the workplace to work; none: the one I stand on',
+        line: 1,
+        column: 1,
+      },
+      {
+        name: 'foodAt',
+        type: 'number',
+        default: 3,
+        description: 'get Food below this',
+        line: 2,
+        column: 1,
+      },
+      { name: 'bare', type: 'storage', line: 3, column: 1 },
+      { name: 'empty', type: 'storage', line: 4, column: 1 },
+    ])
+    // A string before any `//` on the line: the slashes may be in it, so no comment.
+    expect(scriptParams('param a: building; let s = "x // y"')[0]).not.toHaveProperty('description')
+  })
+
   it('read as params.name, whatever the host gives', () => {
     const memory: Record<string, never> = {}
     const program = parse('param a: building\nmemory.seen = params.a')

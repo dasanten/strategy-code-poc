@@ -61,3 +61,48 @@ export function groupDefenceScript(
   const picked = new Set(residents.map((r) => r.defenceScriptId ?? null))
   return picked.size === 1 ? [...picked][0] : undefined
 }
+
+/**
+ * The script Run script starts on: the one the Player picked, else the one the resident or army
+ * runs now, else the one this browser last saw them run; each only while it can run. Undefined
+ * leaves the picker on "Pick a script…" and Run disabled, rather than on whichever script comes
+ * first.
+ */
+export function runScriptPick(
+  runnable: readonly Pick<ScriptSummary, 'id'>[],
+  { picked, running, last }: { picked?: number; running?: number; last?: number },
+): number | undefined {
+  return [picked, running, last].find((id) => runnable.some((s) => s.id === id))
+}
+
+/** Where the browser keeps the script each resident or army was last seen running, by id. */
+const LAST_SCRIPT_KEY = 'csp.lastScript'
+
+/** The script this browser last saw this resident or army run (or gave them), if any. */
+export function rememberedLastScript(
+  id: string,
+  storage: () => Pick<Storage, 'getItem'> = () => localStorage,
+): number | undefined {
+  try {
+    const last: unknown = JSON.parse(storage().getItem(LAST_SCRIPT_KEY) ?? '{}')?.[id]
+    return typeof last === 'number' ? last : undefined
+  } catch {
+    // Storage can be off (a private window) or hold something else; then nothing is known.
+    return undefined
+  }
+}
+
+/** Remembers the script a resident or army runs, if the browser lets us. */
+export function rememberLastScript(
+  id: string,
+  scriptId: number,
+  storage: () => Pick<Storage, 'getItem' | 'setItem'> = () => localStorage,
+): void {
+  try {
+    const all: unknown = JSON.parse(storage().getItem(LAST_SCRIPT_KEY) ?? '{}')
+    const kept = all && typeof all === 'object' ? all : {}
+    storage().setItem(LAST_SCRIPT_KEY, JSON.stringify({ ...kept, [id]: scriptId }))
+  } catch {
+    // Not remembered: Run script then starts on "Pick a script…".
+  }
+}

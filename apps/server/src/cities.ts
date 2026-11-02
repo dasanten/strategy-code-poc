@@ -5,6 +5,7 @@ import {
   type City,
   type WorldState,
 } from '@csp/shared'
+import { cityNamesTaken, uniqueName } from './names.js'
 import { hash } from './residents.js'
 
 /** City names. Only flavour, like resident names. */
@@ -32,6 +33,18 @@ export const CITY_NAMES = [
 ]
 
 /**
+ * The name the game gives a new city (`CONTEXT.md`: Game-given names): `drawn`, one of
+ * `CITY_NAMES`, or if a city of the world has it the next one none has, or with a numeral once
+ * the list runs dry; marked as the game's.
+ */
+export function givenCityName(
+  world: Pick<WorldState, 'cities'>,
+  drawn: string,
+): Pick<City, 'name' | 'gameName'> {
+  return { name: uniqueName(drawn, cityNamesTaken(world), CITY_NAMES), gameName: true }
+}
+
+/**
  * Brings every building's city up to date with where the buildings stand (`cityMembership`):
  * each finished city building belongs to the city whose chain it is part of, or to none. A farm
  * or stable keeps the city it was laid out for while that city exists. A storage a city takes in
@@ -57,13 +70,13 @@ export function updateCityMembership(world: WorldState, size: number): void {
 /**
  * Founds a city around a town hall just finished (`CONTEXT.md`: Town hall), belonging to the
  * realm whose resident finished it. Its name is drawn from its id, so a world always names it the
- * same way.
+ * same way, and is one no other city has (`givenCityName`).
  */
 export function foundCity(world: WorldState, hall: Building, realmId: string | null): City {
   const id = `city${world.nextId++}`
   const city: City = {
     id,
-    name: CITY_NAMES[hash(`${world.seed}:${id}`) % CITY_NAMES.length]!,
+    ...givenCityName(world, CITY_NAMES[hash(`${world.seed}:${id}`) % CITY_NAMES.length]!),
     realmId,
     townHallId: hall.id,
     occupation: null,
