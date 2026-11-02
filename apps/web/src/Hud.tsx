@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { formatGameTime } from '@csp/shared'
+import { DrawerStatus } from './drawer-head.js'
 import {
   DRAWERS,
   DRAWER_WIDTH,
@@ -348,6 +349,8 @@ export function Drawer({
   children: ReactNode
 }) {
   const label = DRAWERS.find((d) => d.id === id)!.label
+  // Where the panel's head puts its count, right of the title (`PanelHead`).
+  const [status, setStatus] = useState<HTMLElement | null>(null)
   return (
     <section
       className={`hud-drawer${isWide(id) ? ' wide' : ''}`}
@@ -356,11 +359,12 @@ export function Drawer({
     >
       <div className="hud-drawer-head">
         <h2>{label}</h2>
+        <span className="hud-drawer-status" ref={setStatus} />
         <button type="button" onClick={onClose} aria-label={`Close ${label}`}>
           ✕
         </button>
       </div>
-      {children}
+      <DrawerStatus.Provider value={status}>{children}</DrawerStatus.Provider>
     </section>
   )
 }

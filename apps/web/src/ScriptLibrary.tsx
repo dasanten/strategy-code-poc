@@ -16,6 +16,14 @@ import {
   versionStatus,
   type DiffLine,
 } from './script-editor.js'
+import {
+  EMPTY_SCRIPT,
+  SCRIPT_HELP_LINKS,
+  templateChoices,
+  templateName,
+  templateSource,
+  type TemplateChoice,
+} from './script-templates.js'
 
 /** How a default script stands against the game's default (`CONTEXT.md`: Default script). */
 const DEFAULT_STATUS: Record<ReturnType<typeof defaultStatus>, string> = {
@@ -26,9 +34,24 @@ const DEFAULT_STATUS: Record<ReturnType<typeof defaultStatus>, string> = {
 
 const DIFF_CLASS: Record<DiffLine['op'], string> = { ' ': '', '-': 'removed', '+': 'added' }
 
-const STARTER = `// Runs once a tick for each resident or army running it.
-if (memory.role == null) { memory.role = "gatherer" }
-`
+const TEMPLATE_GROUPS: readonly TemplateChoice['group'][] = [
+  'Start',
+  'Your default scripts',
+  'Example scripts (Wiki)',
+]
+
+/** The Wiki's Script language and Game API sections, each in a new tab. */
+function HelpLinks() {
+  return (
+    <span className="script-help small">
+      {SCRIPT_HELP_LINKS.map((l) => (
+        <a key={l.href} href={l.href} target="_blank" rel="noreferrer">
+          {l.label}
+        </a>
+      ))}
+    </span>
+  )
+}
 
 /** What the editor holds: its source and a key that changes whenever other source is opened. */
 interface Opened {
@@ -74,9 +97,11 @@ export function ScriptLibrary({
     [onScripts],
   )
   const [script, setScript] = useState<ScriptDetail>()
-  const [opened, setOpened] = useState<Opened>({ key: 'new', source: STARTER })
-  const [draft, setDraft] = useState(STARTER)
+  const [opened, setOpened] = useState<Opened>({ key: 'new', source: EMPTY_SCRIPT })
+  const [draft, setDraft] = useState(EMPTY_SCRIPT)
   const [newName, setNewName] = useState('')
+  /** The template a new script starts from (`templateChoices`), by its value. */
+  const [template, setTemplate] = useState('empty')
   const [rename, setRename] = useState<string>()
   const [message, setMessage] = useState<string>()
   const [error, setError] = useState<string>()
@@ -142,9 +167,32 @@ export function ScriptLibrary({
 
   function startNew() {
     setScript(undefined)
-    setOpened({ key: `new-${Date.now()}`, source: STARTER })
-    setDraft(STARTER)
+    setTemplate('empty')
+    setNewName('')
+    setOpened({ key: `new-${Date.now()}`, source: EMPTY_SCRIPT })
+    setDraft(EMPTY_SCRIPT)
     setMessage(undefined)
+  }
+
+  /** Starts the new script over from a template, its name prefilled from it. */
+  async function startFrom(choice: TemplateChoice) {
+    const t = choice.template
+    let source = templateSource(t)
+    if (source === undefined && t.kind === 'mine') {
+      const detail = await act(() => api.script(t.scriptId))
+      if (!detail) return
+      const active = detail.versions.find((v) => v.version === detail.activeVersion)
+      source = (active ?? detail.versions.at(-1))?.source ?? ''
+    }
+    setTemplate(choice.value)
+    setNewName(
+      templateName(
+        t,
+        scripts.map((s) => s.name),
+      ),
+    )
+    setOpened({ key: `new-${choice.value}-${Date.now()}`, source: source ?? '' })
+    setDraft(source ?? '')
   }
 
   async function create(e: FormEvent) {
@@ -218,6 +266,7 @@ export function ScriptLibrary({
   const errors = checkScript(draft)
   const warnings = scriptWarnings(draft, script?.task != null)
   const unsaved = script ? hasUnsavedChanges(script.versions, draft) : true
+  const choices = templateChoices(scripts)
 
   return (
     <section className="script-library" aria-label="Scripts">
@@ -313,6 +362,7 @@ export function ScriptLibrary({
                     : `version ${script.activeVersion} active`}
                 </span>
                 {script.task && <span>{DEFAULT_STATUS[defaultStatus(script)]}</span>}
+                <HelpLinks />
                 <span className="spacer" />
                 {script.task ? (
                   // A default script can't be renamed or deleted, only reset.
@@ -347,6 +397,28 @@ export function ScriptLibrary({
           </div>
         ) : (
           <form className="script-head" onSubmit={create}>
+            <label className="script-template">
+              <span className="small">Start from</span>
+              <select
+                value={template}
+                onChange={(e) => {
+                  const choice = choices.find((c) => c.value === e.target.value)
+                  if (choice) void startFrom(choice)
+                }}
+              >
+                {TEMPLATE_GROUPS.map((group) => (
+                  <optgroup key={group} label={group}>
+                    {choices
+                      .filter((c) => c.group === group)
+                      .map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
             <input
               aria-label="Script name"
               placeholder="Name"
@@ -357,6 +429,7 @@ export function ScriptLibrary({
             <button type="submit" className="primary" disabled={newName.trim() === ''}>
               Create
             </button>
+            <HelpLinks />
           </form>
         )}
 

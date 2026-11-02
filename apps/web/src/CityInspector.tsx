@@ -52,6 +52,7 @@ import { GOOD_LABELS } from './Residents.js'
 import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
 import { HOW_TO_TRADE_PATH } from './wiki-view.js'
+import { PanelHead } from './drawer-head.js'
 
 /**
  * The city inspector: every city in sight (`CONTEXT.md`: City, NPC city), whose it is, and,
@@ -147,10 +148,9 @@ export function CityInspector({
   }, [scrollTo])
   return (
     <section className="city-inspector" aria-label="Cities in sight" ref={list}>
-      <div className="panel-head">
-        <h2>Cities in sight</h2>
-        <span>{views.length === 0 ? 'none' : views.length}</span>
-      </div>
+      <PanelHead title="Cities in sight">
+        {views.length === 0 ? 'none in sight' : `${views.length} in sight`}
+      </PanelHead>
       <ul className="city-list">
         {views.map((v) => (
           <li key={v.id}>
