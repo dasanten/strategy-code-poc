@@ -1,6 +1,7 @@
 import {
   BUILD_MATERIALS,
   aboutTime,
+  isDown,
   bornIn,
   foalLeft,
   grownIn,
@@ -1882,6 +1883,7 @@ export function ResidentCard({
     carriageToUnhitch: !!carriageToUnhitch,
     carrying: !!r.carrying,
     carries: carried.length > 0,
+    down: isDown(r),
   })
   // Each row keeps its slot while the card is open (ADR 0019).
   const rows = useKeptRows(actions, missing, orderGroupOf)
@@ -2213,7 +2215,14 @@ export function ResidentCard({
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
         <strong key="doing">
-          {doingLine(r, { scripts, buildings, residents, cities, arrives: arrivesIn?.(r) })}
+          {doingLine(r, {
+            scripts,
+            buildings,
+            residents,
+            cities,
+            arrives: arrivesIn?.(r),
+            tick,
+          })}
         </strong>,
         ...(under
           ? [

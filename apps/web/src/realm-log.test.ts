@@ -26,6 +26,16 @@ describe('realm log', () => {
     expect(describeEvent({ ...died, cause: 'starved', leader: true }).text).toBe(
       'Your Leader Mara starved to death. Your realm has ended.',
     )
+    expect(
+      describeEvent({
+        kind: 'down',
+        residentId: 'r2',
+        name: 'Ana',
+        until: 7 + 23 * 3600,
+        seq: 6,
+        ...at,
+      }),
+    ).toEqual({ text: 'Ana is Down from hunger: about 23 h (58 game days) left.', tone: 'bad' })
     expect(describeEvent({ kind: 'foodSpoiled', units: 4, seq: 3, ...at }).text).toBe(
       '4 Food spoiled.',
     )

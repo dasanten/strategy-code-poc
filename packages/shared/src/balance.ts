@@ -916,12 +916,18 @@ export const MEAL_UNITS = 1
 /**
  * Game days a full hunger meter lasts without eating, at average Endurance. A unit of food fills
  * two thirds of it, so a fed resident's meter never drops below a third. With `STARVE_DAYS`, a
- * resident dies about 5 game days (2 real hours) after their last meal.
+ * resident goes Down about 5 game days (2 real hours) after their last meal.
  */
 export const HUNGER_DAYS = 3
 
-/** Game days an empty hunger meter takes to cost a resident all their health. */
+/** Game days an empty hunger meter takes to cost a resident all their health and put them Down. */
 export const STARVE_DAYS = 2
+
+/**
+ * Game days a resident lies Down before they die of hunger, unless revived (`CONTEXT.md`: Down):
+ * one real day, the window in which a Player can notice and act (ADR 0021).
+ */
+export const DOWN_DAYS = 60
 
 /** Game days a fed resident takes to heal from no health back to full. */
 export const HEAL_DAYS = 3

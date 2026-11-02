@@ -97,7 +97,8 @@ export const leadersServeNoOne: Invariant = {
           message: `realm ${realm.id}'s Leader ${leader.id} ${p}`,
           entityIds: [realm.id, leader.id],
         })
-      if (leader.health <= 0) fail('is dead')
+      // Down is not dead: a Leader who is Down still leads (`CONTEXT.md`: Down).
+      if (leader.health <= 0 && leader.downUntil === undefined) fail('is dead')
       if (!canWork(leader, world.tick)) fail('is a child')
       const serves = servesOthers(world, leader.id)
       if (serves === 'contract') fail('is rented out by a mercenary contract')

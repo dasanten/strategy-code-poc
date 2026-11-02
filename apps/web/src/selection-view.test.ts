@@ -53,6 +53,7 @@ import {
   orderGroupOf,
   residentActions,
   residentOrders,
+  DOWN_NO_ORDERS,
   riddenHorseLine,
   rowGroups,
   tileActions,
@@ -531,6 +532,16 @@ describe('the rows of a card that stays open', () => {
     const drive = keepRows(kept, actions, missing, orderGroupOf).find((a) => a.id === 'drive')
     expect(drive).toMatchObject({ disabled: true, reason: 'no carriage here' })
     expect(drive?.active).toBeUndefined()
+  })
+
+  it('offer someone Down no orders, and say why on a card left open (`CONTEXT.md`: Down)', () => {
+    const { actions, missing } = residentOrders(here({ down: true, carries: true }))
+    expect(actions).toEqual([])
+    expect(missing.walk).toBe(DOWN_NO_ORDERS)
+    const kept = keepRows(undefined, residentActions(here()), {}, orderGroupOf)
+    const rows = keepRows(kept, actions, missing, orderGroupOf)
+    expect(rows.length).toBe(kept.length)
+    expect(rows.every((a) => a.disabled && a.reason === DOWN_NO_ORDERS)).toBe(true)
   })
 
   it('say why for every order a resident card can leave out', () => {

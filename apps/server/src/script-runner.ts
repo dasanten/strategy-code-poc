@@ -38,6 +38,7 @@ import {
   type StartParamValues,
   type TerrainMap,
   type WorldState,
+  isDown,
 } from '@csp/shared'
 import { resumeInterrupted } from './defence.js'
 import { recordEvent } from './events.js'
@@ -694,6 +695,12 @@ export class ScriptRunner {
     const commanded: Resident[] = []
     for (const r of world.residents) {
       if (!r.script) continue
+      // Down, they run nothing (`CONTEXT.md`: Down).
+      if (isDown(r)) {
+        delete r.script
+        delete r.interrupted
+        continue
+      }
       // A script runs for the realm the resident takes orders from (`CONTEXT.md`: Alliance army);
       // a resident of no realm has no Player to run a script for.
       const realmId = index.commanderOf(r)
@@ -1107,7 +1114,8 @@ export function runNpcScripts(
   const byCity = new Map<City, Resident[]>()
   for (const r of world.residents) {
     const city = r.cityId === null ? undefined : npc.get(r.cityId)
-    if (!city || r.owner !== null || r.script?.scriptId !== 0 || !r.script.task) continue
+    if (!city || r.owner !== null || r.script?.scriptId !== 0 || !r.script.task || isDown(r))
+      continue
     const list = byCity.get(city) ?? []
     list.push(r)
     byCity.set(city, list)

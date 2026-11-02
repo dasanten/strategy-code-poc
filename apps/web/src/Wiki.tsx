@@ -53,6 +53,7 @@ import {
   DRIVING_SKILL_LIMIT,
   DRIVING_SKILL_PER_DAY,
   STARVE_DAYS,
+  DOWN_DAYS,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
   GET_FOOD_AT,
@@ -844,8 +845,8 @@ export function Wiki() {
           realm of its own); a name it gives a city is one no city in the world has. Once its list
           of names runs dry it adds a numeral, as in “Edda II”. Renaming is free: you can rename any
           resident or city of your realm, and your names may repeat. Names from before this rule
-          stay as they were, so where a list holds two residents of one name it adds their age,
-          and their city when they live in different ones.
+          stay as they were, so where a list holds two residents of one name it adds their age, and
+          their city when they live in different ones.
         </p>
         <p>
           A resident lives in one city, wherever they stand. One who lives in none is{' '}
@@ -951,9 +952,17 @@ export function Wiki() {
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
-          health in {days(STARVE_DAYS)}, so a resident without food dies{' '}
-          {days(HUNGER_DAYS + STARVE_DAYS)} after their last meal. Fed again, they heal from nothing
-          to full in {days(HEAL_DAYS)}.
+          health in {days(STARVE_DAYS)}, so a resident without food goes <b>Down</b>{' '}
+          {days(HUNGER_DAYS + STARVE_DAYS)} after their last meal. Fed again before that, they heal
+          from nothing to full in {days(HEAL_DAYS)}.
+        </p>
+        <p>
+          Down, a resident lies unconscious on their tile for {days(DOWN_DAYS)}: their order, script
+          and queue end, they get off any horse or carriage and leave their army, take no orders,
+          don't eat and lose no more health. Anyone in sight sees that they are Down: their token
+          lies on its side, and their own Player's card says how long is left. When the time is up
+          they die of hunger. Only hunger puts a resident Down: wounds kill as before, and a Leader
+          who is Down still leads. The realm log says when one goes Down and when one dies.
         </p>
         <p>
           Food spoils: {pct(FOOD_SPOIL_PER_DAY)} of every stock goes bad each game day, half of it

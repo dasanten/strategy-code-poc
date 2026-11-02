@@ -149,6 +149,20 @@ export interface Resident {
    * aboard one. Not an order: they move with the carriage and don't walk on their own.
    */
   aboard?: string
+  /**
+   * Set while the resident is Down (`CONTEXT.md`: Down): the tick at which they die of hunger
+   * unless revived. Down, they have no order, script or queue, and their health stays at 0.
+   * Absent while they are not Down.
+   */
+  downUntil?: number
+}
+
+/**
+ * Whether a resident is Down (`CONTEXT.md`: Down), lying unconscious and doing nothing: from the
+ * world, or as a Player sees them (`SeenResident.down`).
+ */
+export function isDown(r: { downUntil?: number; down?: true }): boolean {
+  return r.downUntil !== undefined || r.down === true
 }
 
 /**
@@ -339,6 +353,11 @@ export type SeenResident = Omit<
   Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & {
     script?: SeenScript
     interrupted?: SeenInterrupted
+    /**
+     * Set while they are Down (`CONTEXT.md`: Down), which anyone in sight sees; when it ends
+     * (`downUntil`) is seen only with their hunger and health.
+     */
+    down?: true
   }
 
 /**
@@ -1274,6 +1293,11 @@ export type DeathCause = 'starved' | 'oldAge' | 'killed'
 export type RealmEventWhat =
   /** A resident's hunger meter ran empty: they have nothing to eat and lose health. */
   | { kind: 'hungry'; residentId: string; name: string }
+  /**
+   * Hunger used up a resident's health and they went Down (`CONTEXT.md`: Down): unless revived,
+   * they die of hunger at tick `until`.
+   */
+  | { kind: 'down'; residentId: string; name: string; until: number }
   /** A resident died; `leader` when it was the Leader, whose death ended the realm. */
   | {
       kind: 'died'

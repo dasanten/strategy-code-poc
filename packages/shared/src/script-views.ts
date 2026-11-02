@@ -209,6 +209,17 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'for a resident of another realm that isn’t allied',
       ),
       field(
+        'down',
+        'boolean',
+        'Whether they are Down: lying unconscious from hunger, doing nothing and taking no orders.',
+      ),
+      field(
+        'downUntil',
+        'number',
+        'The tick at which they die of hunger unless revived.',
+        'unless they are Down, and for a resident of another realm that isn’t allied',
+      ),
+      field(
         'struckBy',
         'string',
         'The id of the resident who last struck them, a dodged blow too.',
