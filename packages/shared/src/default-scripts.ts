@@ -212,17 +212,6 @@ fn foodToTake() {
 }`
 
 /**
- * Where Food comes from (`CONTEXT.md`: Getting food, Crew food), for the defaults that declare
- * `param food: storage`: `foodFrom(main)` is `food` while picked, else `main`, the script's main
- * storage or source; null with neither.
- */
-const FOOD_FROM = `// Where Food comes from: params.food, else main (null: the nearest with Food).
-fn foodFrom(main) {
-  if (params.food != null) { return params.food }
-  return main
-}`
-
-/**
  * Bringing a construction site its materials (`CONTEXT.md`: Construction site), shared by the
  * Build default and the Work default building its workplace first (`CONTEXT.md`: Working a
  * site), which keep the site in `memory.siteId` and declare `FOOD_PARAMS`. `bringCarried(site)`
@@ -404,9 +393,8 @@ if (workplace == null) { // here, and it isn't: torn down
   return
 }
 // With Food on the pile my meals come from there; with none anywhere, I work on.
-let food = me.carried.food
-if (food == null) { food = 0 }
-if (food < params.foodAt && !pileHoldsFood(workplace) && getFoodIfLow(foodFrom(params.storage), workplace)) {
+let food = me.carried.food || 0
+if (food < params.foodAt && !pileHoldsFood(workplace) && getFoodIfLow(params.food || params.storage, workplace)) {
   memory.food = {walked: false}
   return
 }
@@ -485,7 +473,7 @@ fn buildFirst(site) {
   if (memory.fetch != null) { memory.fetch = null } // back with it
   if (bringCarried(site)) { return true }
   // With no Food anywhere, I build on.
-  if (getFoodIfLow(foodFrom(params.storage), site)) {
+  if (getFoodIfLow(params.food || params.storage, site)) {
     memory.food = {walked: false}
     return true
   }
@@ -541,7 +529,7 @@ fn bringCrewFood(carry) {
   let fit = fits("food")
   if (units > fit) { units = fit }
   if (units < 1) { return false }
-  let from = foodFrom(params.storage)
+  let from = params.food || params.storage
   if (from == null || !holdsFood(from)) {
     from = null
     let stores = storages(me, ["food"]) // nearest first, holding some
@@ -597,8 +585,7 @@ fn walkBack() {
 fn carryLoadOffIfFull(workplace) {
   let found = fullLoad(workplace)
   if (found == null) { return }
-  let to = params.output
-  if (to == null) { to = params.storage }
+  let to = params.output || params.storage
   if (to == null) {
     let stores = storages(workplace) // nearest first
     if (stores.length == 0) { return } // none in reach: the pile grows
@@ -673,7 +660,6 @@ ${BUILD_MATERIALS}
 
 ${GET_FOOD}
 
-${FOOD_FROM}
 
 ${LOG_TEXT}
 `,
@@ -711,7 +697,7 @@ spreadOut(site)
 if (walkBack()) { return }
 if (site != null && bringCarried(site)) { return }
 // With no Food anywhere, I build on.
-if (getFoodIfLow(foodFrom(params.source), me)) {
+if (getFoodIfLow(params.food || params.source, me)) {
   memory.food = {walked: false}
   return
 }
@@ -801,7 +787,6 @@ ${BUILD_MATERIALS}
 
 ${GET_FOOD}
 
-${FOOD_FROM}
 
 ${LOG_TEXT}
 `,
@@ -849,14 +834,14 @@ if (me.order == null) {
   memory.waiting = null
   if (walkThere(tile)) { return }
   // With no Food anywhere, I build on.
-  if (getFoodIfLow(foodFrom(params.source), me)) { return }
+  if (getFoodIfLow(params.food || params.source, me)) { return }
   startBuilding(tile)
   return
 }
 if (me.order.siteId == null) { return } // laid out at the end of the tick
 let site = building(me.order.siteId)
 if (site == null || bringCarried(site)) { return }
-if (getFoodIfLow(foodFrom(params.source), me)) { return }
+if (getFoodIfLow(params.food || params.source, me)) { return }
 fetchMissing(site, tiles, crew, taken)
 
 // The tiles others of us on this line have taken, by "x,y".
@@ -1038,7 +1023,6 @@ fn goodsNames(goods) {
 
 ${GET_FOOD}
 
-${FOOD_FROM}
 
 ${LOG_TEXT}
 `,
@@ -1128,7 +1112,7 @@ if (walkBack()) { return }
 // With no Food anywhere, I tear down on.
 let x = me.x
 let y = me.y
-if (getFoodIfLow(foodFrom(params.source), me)) {
+if (getFoodIfLow(params.food || params.source, me)) {
   memory.food = {walked: false, x: x, y: y}
   return
 }
@@ -1192,7 +1176,6 @@ fn startTearingDown() {
 
 ${GET_FOOD}
 
-${FOOD_FROM}
 
 ${LOG_TEXT}
 `,
