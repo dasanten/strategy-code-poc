@@ -483,9 +483,21 @@ export function Wiki() {
           of a haul). Only places you can see or remember are outlined.
         </p>
         <p>
+          An order that needs a place (walk to, drive to, a road or wall line, where to build, the
+          storage to store at) shrinks the card to its header and a banner says what to pick. Where
+          the card was stays dead until you pick, so a click there gives no order by accident.
+          Before you click, the map shows under the pointer what the pick would do: the way there,
+          with about when they arrive; the line of a road or wall and how many tiles it has, red
+          when it is too long; a workplace’s footprint on a resource node, red where it doesn’t fit,
+          or the site they would join; or the building a Store, Fetch or Work would use. The banner
+          names what is under the pointer. Escape or Cancel gives no order.
+        </p>
+        <p>
           On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
           long-press does what right-click does. Turn on Select to make a one-finger drag box a
-          group instead of panning.
+          group instead of panning. While picking a place, the first tap shows the preview there and
+          the banner gains Confirm: press it, or tap the same tile again, to give the order; a tap
+          elsewhere moves the preview.
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
