@@ -610,12 +610,12 @@ button.card-list-row:hover {
   color: var(--ui-muted);
 }
 .card-rows dd {
-  display: grid;
   margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .card-rows dd small {
+  display: block;
   font-size: 0.72rem;
 }
 .card-rows button.link {
