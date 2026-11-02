@@ -54,6 +54,7 @@ import { stepNpcDefence } from './npc-defence.js'
 import { stepLastSeen } from './last-seen.js'
 import { newSightPhase } from './sight.js'
 import { stepRelocating } from './relocating.js'
+import { stepWorkplaceSettings } from './workplace-settings.js'
 
 /**
  * A new world: terrain's resource nodes and nobody yet. Each Player gets a realm and starting
@@ -90,6 +91,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     scriptViewChanges: SCRIPT_VIEW_CHANGES.length,
     horseOffersClaimed: [],
     cityPlans: {},
+    workplaceSettings: {},
   }
 }
 
@@ -166,7 +168,8 @@ export interface StepResult {
  * home, at their workplace or in an army by a carriage who run low on food take meals there, those of
  * a city captured this tick too; admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
  * (`stepContracts`); standing drifts toward neutral (`stepStanding`); armies
- * lose members who are gone and give the rest their orders for the next tick; the realms whose
+ * lose members who are gone and give the rest their orders for the next tick; Workplace settings
+ * of what is gone are dropped (`stepWorkplaceSettings`); the realms whose
  * turn it is bring their Last seen up to date (`stepLastSeen`); last, riders who
  * lost their horse get off it (`stepRiders`), and passengers who lost their carriage get off
  * (`stepPassengers`). Without `walking`
@@ -270,6 +273,8 @@ function stepRest(
   stepStanding(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
+  // Workplace settings of buildings and realms that went this tick go with them.
+  stepWorkplaceSettings(world)
   const actions =
     steps.length +
     strikes.length +

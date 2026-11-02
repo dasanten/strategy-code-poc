@@ -29,6 +29,7 @@ import {
   type TrainingSubject,
   isAt,
   SHARES_A_TILE,
+  takesWorkSettings,
   targetParam,
   covers,
   type SeenResident,
@@ -155,6 +156,7 @@ import { ScriptLog } from './ScriptLog.js'
 import { ScriptMemoryTree } from './ScriptMemory.js'
 import { ScriptRunInfo } from './ScriptRun.js'
 import { ScriptParamFields, StartParamsForm } from './ScriptParams.js'
+import { WorkSettings } from './WorkSettings.js'
 import {
   groupStartValues,
   startedScript,
@@ -268,6 +270,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The param of the picked resident's script whose value the map is waiting for (`CONTEXT.md`:
   // Script parameter).
   const [paramPick, setParamPick] = useState<ScriptParam>()
+  // The param of a workplace's Work settings whose value the map is waiting for (`CONTEXT.md`:
+  // Workplace settings).
+  const [workPick, setWorkPick] = useState<{ buildingId: string; param: ScriptParam }>()
   // The step being planned with the queue planner's Add step (`CONTEXT.md`: Queue, Planning
   // ahead): the map picks its places, then the card asks for what more it needs.
   const [plan, setPlan] = useState<Plan>()
@@ -285,8 +290,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return next
     })
   const [starting, setStarting] = useState<Starting>()
-  // The param whose value the map is waiting for: of the running script, or for the form.
-  const pickingParam = paramPick ?? starting?.picking
+  // The param whose value the map is waiting for: of the running script, for the form, or of a
+  // workplace's Work settings.
+  const pickingParam = paramPick ?? starting?.picking ?? workPick?.param
   // A group order waiting for a tile, the tile picked to build on, and what the last one did.
   const [groupPicking, setGroupPicking] = useState<GroupPicking>(false)
   // What the group order being picked needs besides the tile, and a line's first end.
@@ -408,6 +414,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     paramPick: pickingParam,
     plan,
   })
+  // The building the tile card is about: in sight, or as last seen.
+  const tileBuilding =
+    world && selectedTile
+      ? [...world.buildings, ...world.lastSeen.buildings].find(
+          (b) => !SHARES_A_TILE.includes(b.kind) && covers(b, selectedTile.x, selectedTile.y),
+        )
+      : undefined
   // A step picking a city keeps the card open: it lists the realm's cities to pick from too.
   const picksCity = plan !== undefined && nextPick(plan)?.pick === 'city'
   // A new pick (or none) previews nothing until the pointer or a tap shows where.
@@ -431,6 +444,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setGroupPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setWorkPick(undefined)
     setPlan(undefined)
     setStarting((s) => s && { ...s, picking: undefined })
   }, [])
@@ -505,6 +519,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setPicking(false)
     setArmyPick(undefined)
     setParamPick(undefined)
+    setWorkPick(undefined)
     setPlan(undefined)
     setGroupPlan(undefined)
     setStarting(undefined)
@@ -579,6 +594,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       const picked = paramPickAt(paramWorld(world), paramPick.type, { x, y })
       if (typeof picked === 'string') setOrderError(picked)
       else await setScriptParam(paramPick.name, picked.id)
+      return
+    }
+    if (workPick) {
+      setWorkPick(undefined)
+      if (!world) return
+      const picked = paramPickAt(paramWorld(world), workPick.param.type, { x, y })
+      if (typeof picked === 'string') setOrderError(picked)
+      else await setWorkSettings(workPick.buildingId, { [workPick.param.name]: picked.id })
       return
     }
     if (armyPick) {
@@ -957,6 +980,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, ...value }
     setOrderError(await giveOrder(order))
   }
+  /**
+   * Changes the realm's Work settings for a workplace (`CONTEXT.md`: Workplace settings): its
+   * work script, null for the Work default, or values for its params, null clearing one.
+   */
+  async function setWorkSettings(
+    buildingId: string,
+    params?: StartParamValues,
+    scriptId?: number | null,
+  ) {
+    const order = { kind: 'setWorkSettings', buildingId, params, scriptId }
+    setOrderError(await sendOrder(order))
+  }
   async function stop() {
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'stop', residentId: selected.id }))
@@ -1152,6 +1187,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPicking(false)
               setArmyPick(undefined)
               setParamPick(undefined)
+              setWorkPick(undefined)
               setPlan(undefined)
               setOrderError(undefined)
             }}
@@ -1439,7 +1475,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       </NoticeLane>
       {world && selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={false} hidden={cardHidden(openDrawer)}>
+        <CardSheet
+          phone={phone}
+          pinnedPeek={workPick !== undefined}
+          hidden={cardHidden(openDrawer)}
+        >
           <TileCard
             card={describeTile(
               {
@@ -1474,9 +1514,36 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               GOOD_LABELS,
             )}
             tick={world.tick}
-            building={[...world.buildings, ...world.lastSeen.buildings].find(
-              (b) => !SHARES_A_TILE.includes(b.kind) && covers(b, selectedTile.x, selectedTile.y),
-            )}
+            building={tileBuilding}
+            workSettings={
+              tileBuilding &&
+              takesWorkSettings(tileBuilding) && (
+                <WorkSettings
+                  scripts={scripts}
+                  settings={world.workSettings[tileBuilding.id]}
+                  label={(id) => paramValueLabel(paramWorld(world), id)}
+                  picking={
+                    workPick?.buildingId === tileBuilding.id ? workPick.param.name : undefined
+                  }
+                  onScript={(scriptId) =>
+                    void setWorkSettings(tileBuilding.id, undefined, scriptId)
+                  }
+                  onPick={(param) => {
+                    setPicking(false)
+                    setParamPick(undefined)
+                    setWorkPick((now) =>
+                      now?.buildingId === tileBuilding.id && now.param.name === param.name
+                        ? undefined
+                        : { buildingId: tileBuilding.id, param },
+                    )
+                  }}
+                  onNumber={(name, value) =>
+                    void setWorkSettings(tileBuilding.id, { [name]: value })
+                  }
+                  onClear={(name) => void setWorkSettings(tileBuilding.id, { [name]: null })}
+                />
+              )
+            }
             nodeKind={nodeAt?.(selectedTile.x, selectedTile.y)?.kind}
             buildingNode={buildingNodeKind(
               world.buildings.find(
@@ -1487,7 +1554,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             actor={selected}
             onUnhitch={(carriageId, residentId) => void unhitch(carriageId, residentId)}
             orderError={orderError}
-            onClose={() => setSelectedTile(undefined)}
+            onClose={() => {
+              setSelectedTile(undefined)
+              setWorkPick(undefined)
+            }}
             onSendHere={async () => {
               if (!selected) return
               const order = { kind: 'walkTo', residentId: selected.id, ...selectedTile }
