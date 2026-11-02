@@ -504,3 +504,86 @@ button.card-list-row:hover {
 .run-script .order-buttons button {
   white-space: nowrap;
 }
+/* The goods grid (`CONTEXT.md`: Goods on cards): icon and amount per good, the name on hover or
+   long-press; a resident's own food apart at the end. */
+.goods-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.goods-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 4px;
+  border-radius: 6px;
+  background: var(--ui-raised);
+  color: var(--ui-text);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.goods-own {
+  margin-left: 6px;
+  background: none;
+  outline: 1px dashed var(--ui-muted);
+  outline-offset: -1px;
+}
+.goods-own.warn {
+  color: var(--ui-warn);
+  outline-color: var(--ui-warn);
+}
+.goods-own-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-muted);
+}
+.goods-name {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ui-ink);
+  color: var(--ui-text);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.goods-cell.named .goods-name {
+  display: block;
+}
+@media (hover: hover) {
+  .goods-cell:hover .goods-name {
+    display: block;
+  }
+}
+/* The resident card's header line: what they carry, then its weight against what they can. */
+.carried-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+}
+/* An inventory on the tile card, such as a carriage's load, under a small heading. */
+.card-goods {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

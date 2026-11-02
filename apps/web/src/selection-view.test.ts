@@ -696,6 +696,8 @@ describe('the card for a tile', () => {
 
   it('shows a carriage, a pile and a node when there is no building', () => {
     expect(tile({ carriages: [carriage] })).toMatchObject({ what: 'carriage', rel: 'own' })
+    // Its load for the goods grid (`CONTEXT.md`: Goods on cards).
+    expect(tile({ carriages: [carriage] }).load).toEqual(carriage.load)
     expect(tile({ piles: [pile] })).toMatchObject({ what: 'pile' })
     expect(tile({ piles: [pile] }).lines).toContain('On the ground: 4 stone')
     const node = { kind: 'ironOre' as const, x: 5, y: 5 }
@@ -764,6 +766,7 @@ describe('the card for a tile', () => {
       carriages: [theirs],
     })
     expect(card.lists).toBeUndefined()
+    expect(card.load).toBeUndefined()
     expect(card.lines.find((l) => l.startsWith('Carriage'))).toContain('· half loaded')
     expect(card.lines.find((l) => l.startsWith('Carriage'))).not.toContain('kg')
   })

@@ -20,6 +20,8 @@ import {
   type ResourceKind,
 } from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
+import { GoodsGrid } from './GoodsGrid.js'
+import { goodsItems } from './goods-grid.js'
 import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
@@ -564,6 +566,12 @@ export function TileCard({
             ),
           )}
         </ul>
+      )}
+      {card.load && (
+        <div className="card-goods">
+          <span className="muted small">Load</span>
+          <GoodsGrid label="Load" items={goodsItems(card.load)} empty="Empty" />
+        </div>
       )}
       {card.stableFood && (
         <div className="vital card-food">

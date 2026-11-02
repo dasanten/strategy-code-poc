@@ -1950,3 +1950,15 @@ button.residents-row.selected:hover {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* A good's icon beside its name in the wiki's goods table (`CONTEXT.md`: Goods on cards). */
+.wiki-good {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.wiki-good .good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
