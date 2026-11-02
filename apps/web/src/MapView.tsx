@@ -95,11 +95,22 @@ import { drawUnits, type Spot } from './map/unit-tokens.js'
 import { roadJoins, roadWidth, wallWidths } from './map/roads.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
-import { inBox, pickableAt, pickables, toggled, type Point } from './map/selection.js'
+import {
+  inBox,
+  mapPickAt,
+  pickKey,
+  pickables,
+  toggled,
+  type MapPick,
+  type Point,
+} from './map/selection.js'
 import { LONG_PRESS_MS, TAP_SLOP, longPresses, pressKind } from './map/gestures.js'
 
 /** No residents selected. */
 const NONE: readonly string[] = []
+
+/** How strongly the hover outline tints what a click would pick, so it shows on its own colour. */
+const HOVER_FILL = 0.18
 
 /** Starting zoom, in screen pixels per tile. */
 const START_SCALE = 12
@@ -287,6 +298,10 @@ export function MapView({
     const motion = new Motion()
     // The box being dragged to select residents, from where it started to the pointer.
     let box: { from: Point; to: Point } | undefined
+    // Where a mouse or pen hovers, to outline what a click there would pick (a touch never hovers),
+    // and what that was when last drawn.
+    let pointer: Point | undefined
+    let hoverKey = ''
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
     let cam: Camera = startRef.current ?? { ...homeCentre(worldRef.current), scale: START_SCALE }
     let disposed = false
@@ -465,6 +480,85 @@ export function MapView({
         if (e.id === selectedCityRef.current)
           g.circle(sx, sy, r + 6).stroke({ width: 2.5, color: 0xffffff })
       }
+      // The city a click would pick, outlined in its relationship colour.
+      const hovered = cityUnder()
+      if (hovered) {
+        const [sx, sy] = tileToScreen(cam, view, mapSize, hovered.x + 0.5, hovered.y + 0.5)
+        g.circle(sx, sy, EMBLEM_RADIUS[hovered.size] + 10).stroke({
+          width: 2,
+          color: relationshipColor(hovered.rel),
+        })
+      }
+    }
+
+    /** The city emblem under the hovering pointer in the far tier, if any. */
+    function cityUnder(): CityEmblem | undefined {
+      if (!pointer || pickingRef.current) return undefined
+      const w = worldRef.current
+      const emblems = [...emblemsOf(w), ...lastSeenEmblemsOf(w)]
+      return emblemAt(emblems, cam, size(), mapSize, pointer.x, pointer.y)
+    }
+
+    /** What a click at a point on screen picks below the far tier (`map/selection.ts`). */
+    function pickUnder(p: Point): MapPick {
+      const [tx, ty] = screenToTile(cam, size(), mapSize, p.x, p.y).map(Math.floor) as [
+        number,
+        number,
+      ]
+      const w = worldRef.current
+      return mapPickAt(ownOnScreen(), p.x, p.y, tx, ty, {
+        realmId: w.home.realmId,
+        size: mapSize,
+        residents: w.residents,
+        buildings: [...w.buildings, ...(w.lastSeen?.buildings ?? [])],
+        carriages: w.carriages,
+        horses: w.horses,
+      })
+    }
+
+    /**
+     * Outlines what a click under the hovering pointer would pick (`CONTEXT.md`: Picking on the
+     * map), in its relationship colour: the resident's token, each token of a stack, a building's
+     * footprint, a carriage's or horse's token, or else the tile. Nothing while a target is picked.
+     */
+    function drawHover(g: Graphics, view: Size) {
+      if (!pointer || pickingRef.current) return
+      const world = worldRef.current
+      const pick = pickUnder(pointer)
+      const own = relationshipColor('own')
+      const ring = (spots: Iterable<Spot | undefined>, color: number) => {
+        let any = false
+        for (const s of new Set(spots)) {
+          if (!s) continue
+          g.circle(s.x, s.y, s.r * 1.55)
+          any = true
+        }
+        // A stroke with nothing drawn since the last one paints the last one's shapes again.
+        if (any) g.fill({ color, alpha: HOVER_FILL }).stroke({ width: 2, color })
+      }
+      if (pick.kind !== 'tile') {
+        const ids = pick.kind === 'resident' ? [pick.id] : pick.ids
+        return ring(
+          ids.map((id) => drawnSpots.get(id)),
+          own,
+        )
+      }
+      const on = pick.on
+      if (on && on.kind !== 'building') return ring([drawnSpots.get(on.id)], own)
+      let [x, y, side, color] = [pick.x, pick.y, 1, GLYPH_COLOR]
+      if (on) {
+        const b = on.building
+        const cities = [...world.cities, ...(world.lastSeen?.cities ?? [])]
+        const city = cities.find((c) => c.id === b.cityId)
+        ;[x, y, side] = [b.x, b.y, FOOTPRINT[b.kind]]
+        color = relationshipColor(cityRelationship(city, viewerOf(world)))
+      }
+      const [sx, sy] = tileToScreen(cam, view, mapSize, x, y)
+      const out = Math.max(2, cam.scale * 0.08)
+      const w = side * cam.scale
+      g.roundRect(sx - out, sy - out, w + 2 * out, w + 2 * out, out)
+        .fill({ color, alpha: HOVER_FILL })
+        .stroke({ width: 2, color, join: 'round' })
     }
 
     function drawMiddle(g: Graphics, cam: Camera, view: Size, onScreen: number[]) {
@@ -550,6 +644,7 @@ export function MapView({
         const selected = world.residents.find((u) => u.id === id)
         if (selected) drawPath(g, cam, view, mapSize, selected, world.residents)
       }
+      drawHover(g, view)
     }
 
     function setCam(next: Camera) {
@@ -582,6 +677,20 @@ export function MapView({
           : undefined,
         caravan: caravanAt(caravanParts(worldRef.current.caravans), worldRef.current, wx, wy),
       })
+      pointer = { x: sx, y: sy }
+      updateHover()
+    }
+
+    /** Redraws the hover outline when what a click under the pointer would pick changed. */
+    function updateHover() {
+      let key = ''
+      if (pointer && !pickingRef.current) {
+        key =
+          zoomTier(cam.scale) === 'far' ? `c:${cityUnder()?.id ?? ''}` : pickKey(pickUnder(pointer))
+      }
+      if (key === hoverKey) return
+      hoverKey = key
+      redraw()
     }
 
     // Pointer input: one pointer pans, two pinch-zoom; works for mouse, pen and touch alike. With
@@ -630,6 +739,9 @@ export function MapView({
         longPressed = false
       }
       pointers.set(e.pointerId, local(e))
+      // No hover outline while pressed: it comes back when the pointer next hovers.
+      pointer = undefined
+      updateHover()
       pressedAt = local(e)
       pressedTime = performance.now()
       dragged = 0
@@ -689,8 +801,8 @@ export function MapView({
         }
         return
       }
-      // A press that hardly moved is a click: while picking it picks the tile, otherwise it
-      // picks the own resident under it, or else the tile. A right-click always picks the tile.
+      // A press that hardly moved is a click: while picking it picks the tile, otherwise what the
+      // picking rule says is under it (`pickUnder`). A right-click always picks the tile.
       // A touch held still picks the tile when let go, should the long-press timer not have fired.
       const kind = pressKind(press(), longPresses(e.pointerType))
       if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && kind === 'long-press') {
@@ -715,14 +827,18 @@ export function MapView({
           if (city) onSelectCityRef.current?.(city.id)
           return
         }
-        const id = pickableAt(ownOnScreen(), p.x, p.y)
+        const pick = pickUnder(p)
         const many = onSelectManyRef.current
-        // Shift-click adds an own resident to the selection or takes them out, and does nothing
-        // elsewhere. A plain click elsewhere picks the tile, which drops a group.
+        // Shift-click adds an own resident (or stack) to the selection or takes them out, and
+        // does nothing elsewhere. A plain click on a tile opens its card, which drops a group.
         if (e.shiftKey && many) {
-          if (id) many(toggled(selectedRef.current, id))
-        } else if (id) onSelectRef.current?.(id)
-        else onSelectTileRef.current?.(tx, ty)
+          if (pick.kind === 'resident') many(toggled(selectedRef.current, pick.id))
+          if (pick.kind === 'group') many(toggled(selectedRef.current, pick.ids))
+        } else if (pick.kind === 'resident') onSelectRef.current?.(pick.id)
+        else if (pick.kind === 'group') {
+          if (many) many(pick.ids)
+          else onSelectRef.current?.(pick.ids[0]!)
+        } else onSelectTileRef.current?.(pick.x, pick.y)
       }
     }
 
@@ -770,7 +886,11 @@ export function MapView({
       app.canvas.addEventListener('pointerup', onUp)
       app.canvas.addEventListener('pointercancel', onUp)
       app.canvas.addEventListener('lostpointercapture', onUp)
-      app.canvas.addEventListener('pointerleave', () => setHover(null))
+      app.canvas.addEventListener('pointerleave', () => {
+        setHover(null)
+        pointer = undefined
+        updateHover()
+      })
       app.canvas.addEventListener('wheel', onWheel, { passive: false })
       app.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
       app.renderer.on('resize', () => {

@@ -456,6 +456,16 @@ export function Wiki() {
           card, then the open drawer.
         </p>
         <p>
+          What a click picks on a tile goes in this order, at every zoom: one of your residents
+          there, then a building, then the bare tile, each showing its card. A carriage of yours, or
+          a horse of yours nobody rides, counts like a building. A click on a stack of your
+          residents (a token with a count, or the +N badge up close) picks them all as a group; its
+          card’s Members tab picks one of them. A stack with someone else’s residents in it opens
+          the tile card instead, which lists them all. With a mouse, what a click would pick is
+          outlined while you hover over it, in its owner’s colour; on a touch screen a tap picks by
+          the same order.
+        </p>
+        <p>
           The card and the residents list say what each resident is doing. Walking, riding or
           driving somewhere, they also say about when they arrive, and the card’s meters and
           countdowns (building, tearing down, breeding, carrying, pairing, growing up) say about how
