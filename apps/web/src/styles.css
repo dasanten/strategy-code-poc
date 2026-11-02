@@ -34,7 +34,7 @@ body {
 /* The map's own controls clear the top bar and the rail. */
 .game-map .map-buttons {
   left: calc(var(--rail-w) + 12px);
-  top: calc(var(--top-h) + 12px);
+  top: calc(var(--top-h) + var(--lane-h, 0px) + 12px);
 }
 .game-map .map-legend {
   left: calc(var(--rail-w) + 12px);
@@ -180,7 +180,8 @@ button.hud-logout {
 }
 .hud-drawer {
   position: absolute;
-  top: var(--top-h);
+  /* Below the notice lane while it is a band across the screen (`NoticeLane`). */
+  top: calc(var(--top-h) + var(--lane-h, 0px));
   left: var(--rail-w);
   bottom: 0;
   z-index: 2;
@@ -206,7 +207,7 @@ button.hud-logout {
 /* The drag handle on the open drawer's right edge (`DrawerEdge`), over the drawer's border. */
 .hud-drawer-edge {
   position: absolute;
-  top: var(--top-h);
+  top: calc(var(--top-h) + var(--lane-h, 0px));
   bottom: 0;
   left: calc(var(--rail-w) + min(var(--drawer-w, 380px), 100vw - var(--rail-w)) - 4px);
   z-index: 3;
@@ -1605,14 +1606,31 @@ button.residents-row.selected:hover {
   font-size: 12px;
   color: var(--ui-muted);
 }
-/* The Horse offer's notice (`HorseOfferNotice`), centred under the top bar. */
-.hud-offer {
+/* The lane every notice shows in (`NoticeLane`; `CONTEXT.md`: Notices): one stack under the top
+   bar, centred over the map between the open drawer and the card, its edges set inline. As a
+   band across the screen it sets `--lane-h`, and the drawers and the card start below it. */
+.notice-lane {
   position: absolute;
   top: calc(var(--top-h) + 10px);
-  left: calc(50% + var(--rail-w) / 2);
-  transform: translateX(-50%);
+  left: calc(var(--rail-w) + 12px);
+  right: 12px;
   z-index: 3;
-  max-width: calc(100vw - var(--rail-w) - 24px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.notice-lane.band {
+  top: calc(var(--top-h) + 6px);
+}
+.notice-lane:empty {
+  display: none;
+}
+/* A notice (the Horse offer, the pick banner, a group order's report): text, then its button. */
+.notice {
+  pointer-events: auto;
+  max-width: min(560px, 100%);
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -1624,11 +1642,27 @@ button.residents-row.selected:hover {
   border-left: 3px solid var(--rel-own);
   border-radius: 8px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  color: var(--ui-text);
+  font-family: var(--font-ui);
 }
-.hud-offer button {
+.notice-text {
+  min-width: 0;
+}
+.notice button {
+  flex: none;
   padding: 3px 12px;
   font-weight: 600;
 }
+.notice.group-report.skipped {
+  border-left-color: var(--ui-warn);
+}
 .hud-offer-refused {
   color: var(--ui-bad);
+}
+/* On a phone every notice is one line, its button at the end; the whole text is its title. */
+.game.phone .notice-text {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }

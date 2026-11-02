@@ -46,7 +46,9 @@ import {
   CentredDialog,
   Drawer,
   DrawerEdge,
+  GroupReportNotice,
   HorseOfferNotice,
+  NoticeLane,
   PhoneMenu,
   ToolRail,
   TopBar,
@@ -54,6 +56,7 @@ import {
   useEscapeCloses,
 } from './Hud.js'
 import type { Covered } from './map/camera.js'
+import { cardHidden, laneNotices } from './notices-view.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { groupHorses } from './horses-view.js'
 import { HorsesList } from './Horses.js'
@@ -1023,12 +1026,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         leader={leader?.name}
         onLogout={logout}
       />
-      {world?.horseOffer && (
-        <HorseOfferNotice
-          horses={HORSE_GRANT_HORSES}
-          onClaim={() => sendOrder({ kind: 'claimHorses' })}
-        />
-      )}
       {phone ? (
         <PhoneMenu
           open={openDrawer}
@@ -1230,11 +1227,37 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />,
         )}
       <DrawerEdge open={openDrawer} />
-      {pick && (
-        <PickBanner prompt={pickPrompt(pick, touch)} hint={pickHint(pick)} onCancel={cancelPick} />
-      )}
+      {/* Every notice in one lane under the top bar (`CONTEXT.md`: Notices). */}
+      <NoticeLane phone={phone}>
+        {laneNotices({
+          pick: pick !== undefined,
+          horseOffer: world?.horseOffer,
+          groupReport: groupReport !== undefined,
+        }).map((kind) =>
+          kind === 'pick' && pick ? (
+            <PickBanner
+              key={kind}
+              prompt={pickPrompt(pick, touch)}
+              hint={pickHint(pick)}
+              onCancel={cancelPick}
+            />
+          ) : kind === 'horseOffer' ? (
+            <HorseOfferNotice
+              key={kind}
+              horses={HORSE_GRANT_HORSES}
+              onClaim={() => sendOrder({ kind: 'claimHorses' })}
+            />
+          ) : kind === 'groupReport' && groupReport ? (
+            <GroupReportNotice
+              key={kind}
+              report={groupReport}
+              onDismiss={() => setGroupReport(undefined)}
+            />
+          ) : null,
+        )}
+      </NoticeLane>
       {world && selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={false}>
+        <CardSheet phone={phone} pinnedPeek={false} hidden={cardHidden(openDrawer)}>
           <TileCard
             card={describeTile(
               {
@@ -1317,7 +1340,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && selected && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={pick !== undefined && pick.kind !== 'army'}>
+        <CardSheet
+          phone={phone}
+          pinnedPeek={pick !== undefined && pick.kind !== 'army'}
+          hidden={cardHidden(openDrawer)}
+        >
           <ResidentCard
             key={selected.id}
             resident={selected}
@@ -1498,7 +1525,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && group.length > 1 && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}>
+        <CardSheet
+          phone={phone}
+          pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}
+          hidden={cardHidden(openDrawer)}
+        >
           <GroupCard
             residents={group}
             relocate={relocateForGroup(group)}
@@ -1542,7 +1573,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onOrder={(order) =>
               void sendGroup(order, order.kind !== 'setDefenceScript' && shift.current)
             }
-            report={groupReport}
             orderError={groupError}
             onPick={(id) => select([id])}
             onClose={() => select([])}
