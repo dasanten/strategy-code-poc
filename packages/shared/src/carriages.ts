@@ -22,6 +22,7 @@ import {
   type Resident,
   type Stock,
   type WorldState,
+  isDown,
 } from './world.js'
 
 /** World queries about carriages (ADR 0002: the game API orders and scripts share). */
@@ -61,7 +62,7 @@ export function carriagesAt(world: WorldState, x: number, y: number): Carriage[]
 }
 
 /** What of a horse the carriage queries need: all a Player sees of any horse (`SeenHorse`). */
-export type CarriageHorse = Omit<Horse, 'hunger' | 'health'>
+export type CarriageHorse = Omit<Horse, 'hunger' | 'health'> & { down?: true }
 
 /** What of a carriage the queries about its horse need: all a Player sees of any carriage. */
 export type CarriagePlace = Pick<Carriage, 'horseId' | 'x' | 'y' | 'realmId' | 'cityId'>
@@ -78,7 +79,8 @@ export function carriagePulledBy<K extends Pick<Carriage, 'horseId'>>(
  * The horse that pulls a carriage once it is driven (`CONTEXT.md`: Carriage): the one hitched to
  * it, or else a horse of the carriage's realm (or NPC city) on its tile that pulls no other carriage, which is
  * hitched when the carriage first moves. A horse somebody rides is never hitched (`CONTEXT.md`:
- * Riding), as far as `residents` tell. Undefined when there is none.
+ * Riding), as far as `residents` tell, nor one that is Down (`CONTEXT.md`: Down). Undefined when
+ * there is none.
  */
 export function horseFor<H extends CarriageHorse>(
   world: {
@@ -96,6 +98,7 @@ export function horseFor<H extends CarriageHorse>(
       h.realmId === carriage.realmId &&
       h.cityId === carriage.cityId &&
       !carriagePulledBy(world, h) &&
+      !isDown(h) &&
       !world.residents?.some((r) => r.riding === h.id),
   )
 }
@@ -123,7 +126,7 @@ export function haulStopSpot(world: WorldState, x: number, y: number): GoodsSpot
 /**
  * Why a resident can't drive a carriage now, or undefined when they can (`CONTEXT.md`:
  * Carriage): they must be grown up, on foot (`CONTEXT.md`: Riding) and on its tile, it must have
- * a horse to pull it, and nobody else may be driving it.
+ * a horse to pull it that isn't Down (`CONTEXT.md`: Down), and nobody else may be driving it.
  */
 export function driveProblem(
   world: WorldState,
@@ -139,6 +142,7 @@ export function driveProblem(
   if (!horse || horse.x !== carriage.x || horse.y !== carriage.y) {
     return 'no horse here to pull that carriage'
   }
+  if (isDown(horse)) return 'its horse is Down'
   const driver = driverOf(world, carriage)
   if (driver && driver !== resident) return 'someone else is driving that carriage'
   return undefined

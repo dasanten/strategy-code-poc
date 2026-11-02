@@ -239,6 +239,12 @@ export const HORSE_REACH = 1
 export const HORSE_HUNGRY_SHARE = 0.25
 
 /**
+ * Health a Down horse wakes with once it has eaten (`CONTEXT.md`: Reviving): low, out of
+ * `MAX_HEALTH`, so a fed horse takes most of `HEAL_DAYS` to be well again.
+ */
+export const HORSE_WAKE_HEALTH = 20
+
+/**
  * Game days of Food for the horses standing in it that the Feed the stable task keeps in a stable
  * (`CONTEXT.md`: Feeding the stable): `HORSE_FOOD_PER_DAY` for each, this many days. Below it the
  * resident fetches more. Written into the default's source, where a Player can change it.

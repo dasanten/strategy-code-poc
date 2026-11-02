@@ -7,6 +7,7 @@ import {
   holdersOf,
   carriageOfResident,
   horseOfResident,
+  isDown,
   riderOf,
   seatsLeft,
   KEEPS_GOODS,
@@ -1561,7 +1562,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             horseToRide={onTile(
               world.horses.filter(
                 (h) =>
-                  horseOfResident(h, selected) && !carriagePulledBy(world, h) && !riderOf(world, h),
+                  horseOfResident(h, selected) &&
+                  !carriagePulledBy(world, h) &&
+                  !riderOf(world, h) &&
+                  !isDown(h),
               ),
             )}
             onRide={ride}

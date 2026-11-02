@@ -81,6 +81,7 @@ import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
+import { horseDownLine } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
 import type { Picking } from './Residents.js'
@@ -183,6 +184,8 @@ export interface ResidentHere {
   /** They belong to a city, so they can pair. */
   inCity: boolean
   carriage?: Carriage
+  /** The horse hitched to that carriage is Down (`CONTEXT.md`: Down), so it can't be driven. */
+  carriageHorseDown?: boolean
   pile?: Pile
   storage?: Building
   /** The building or construction site on their tile, not a road. */
@@ -252,6 +255,9 @@ export function residentActions(h: ResidentHere): CardAction[] {
   return residentOrders(h).actions
 }
 
+/** Why a carriage whose horse is Down can't be driven (`CONTEXT.md`: Down). */
+export const HORSE_DOWN_NO_DRIVE = 'its horse is Down'
+
 /** Why a Down resident's card offers no orders (`CONTEXT.md`: Down). */
 export const DOWN_NO_ORDERS = 'Down: takes no orders'
 
@@ -318,10 +324,16 @@ function ordersOffered(h: ResidentHere): {
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
   if (h.carriage && h.adult) {
-    // A rider doesn't drive (`CONTEXT.md`: Riding).
-    const riding = h.riding ? { disabled: true as const, reason: 'dismount first to drive' } : {}
-    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...riding }))
-    if (!h.carrying) {
+    // A rider doesn't drive (`CONTEXT.md`: Riding), and a Down horse pulls nothing (Down).
+    const refused = (reason: string) => ({ disabled: true as const, reason })
+    const unable = h.riding
+      ? refused('dismount first to drive')
+      : h.carriageHorseDown
+        ? refused(HORSE_DOWN_NO_DRIVE)
+        : {}
+    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...unable }))
+    if (h.carriageHorseDown) miss('haul', HORSE_DOWN_NO_DRIVE)
+    else if (!h.carrying) {
       const label = h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…'
       add(row('haul', label, { opens: true }))
     } else miss('haul', CARRYING_A_CHILD)
@@ -893,11 +905,13 @@ export function horseAgeText(h: SeenHorse, tick: number): string {
 
 /**
  * A horse's stats and age, and how it fares where the Player knows it (`CONTEXT.md`: Horse stats,
- * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
+ * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy",
+ * or for a Down horse that it is Down and how long it has left (`horseDownLine`).
  */
 export function horseDetail(h: SeenHorse, tick: number | undefined): string {
   const parts = [horseStatsText(h, tick)]
-  if (horseFaresKnown(h)) {
+  if (isDown(h)) parts.push(horseDownLine(h, tick))
+  else if (horseFaresKnown(h)) {
     const fares = horseFares(h)
     parts.push(`${fares.hunger}, ${fares.health}`)
   }
@@ -928,7 +942,8 @@ export function riddenHorseLine(
 
 /**
  * Lists for horses standing together, one per owner: "Horses (yours)" with "2 · 1 hungry" on the
- * right, then a row for each with its stats and age (`horseStatsText`) and its health and hunger
+ * right, then a row for each with its stats and age (`horseStatsText`), led for a Down horse by
+ * that it is Down and how long it has left (`horseDownLine`), and its health and hunger
  * meters where the Player knows how it fares (`CONTEXT.md`: Seeing how someone fares). A click on
  * one of the Player's own opens it in the Horses drawer.
  */
@@ -946,9 +961,14 @@ function horseLists(
     const r = rel(group[0]!)
     const owner = r ? RELATIONSHIP_NAMES[r].toLowerCase() : 'nobody’s'
     const parts = [`${group.length}`]
-    const known = group.filter(horseFaresKnown).map(horseFares)
+    const down = group.filter(isDown).length
+    const known = group
+      .filter(horseFaresKnown)
+      .filter((h) => !isDown(h))
+      .map(horseFares)
     const hungry = known.filter((f) => f.hunger !== 'fed').length
     const hurt = known.filter((f) => f.health === 'hurt').length
+    if (down > 0) parts.push(`${down} Down`)
     if (hungry > 0) parts.push(`${hungry} hungry`)
     if (hurt > 0) parts.push(`${hurt} hurt`)
     return {
@@ -960,7 +980,9 @@ function horseLists(
         return {
           id: h.id,
           name: h.name,
-          detail: horseStatsText(h, tick),
+          detail: isDown(h)
+            ? `${horseDownLine(h, tick)} · ${horseStatsText(h, tick)}`
+            : horseStatsText(h, tick),
           ...(shares ? { shares } : {}),
           ...(r === 'own' ? { opens: 'horse' as const } : {}),
         }
