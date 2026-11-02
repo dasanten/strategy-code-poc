@@ -985,7 +985,9 @@ describe('horses on the tile card', () => {
     expect(card.lists?.[0]?.rows[1]?.detail).toBe(
       `Down from hunger: ${timeLeft(23 * 3600)} · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
     )
-    const { downUntil: _, ...seen } = unknown({ ...down, realmId: 'r-other' })
+    // As sight sends a stranger's Down horse: Down, but not when it dies.
+    const seen = unknown({ ...down, realmId: 'r-other' })
+    delete seen.downUntil
     const theirs = tile({ horses: [{ ...seen, down: true }], tick })
     expect(theirs.lists?.[0]?.rows[0]?.detail).toMatch(/^Down from hunger · Speed 12/)
     // Hitched, the carriage's horse line says so too.
