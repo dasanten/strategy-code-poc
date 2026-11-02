@@ -3,6 +3,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
   type FormEvent,
@@ -22,9 +23,11 @@ import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
   actionForKey,
+  keepRows,
   tileActions,
   unhitcherOf,
   type CardAction,
+  type OrderGroup,
   type TileCard as TileCardData,
 } from './selection-view.js'
 import { SHEET_OPENS_AT, nextSheet, snapSheet, stepSheet, type SheetHeight } from './sheet-view.js'
@@ -252,32 +255,39 @@ export function CardTabs<T extends string>({
   )
 }
 
-/** The card's actions as rows, each with its key; a row that opens a panel shows it pressed. */
-export function ActionRows({
+/**
+ * The card's actions as rows, each with its key; a row that opens a panel shows it pressed. Each
+ * row is a button named by its label, a greyed row's reason its description.
+ */
+export function ActionRows<Id extends string>({
   actions,
   open,
   onAction,
   label = 'Actions',
   keys = true,
 }: {
-  actions: CardAction[]
+  actions: CardAction<Id>[]
   /** The action whose panel is open, if any. */
   open: string | undefined
-  onAction: (a: CardAction) => void
+  onAction: (a: CardAction<Id>) => void
   label?: string
   /** Whether the rows run on their keys; off where the card listens for all its actions itself. */
   keys?: boolean
 }) {
   useActionKeys(keys ? actions : [], onAction)
+  const ids = useId()
   return (
     <div className="sel-actions" role="group" aria-label={label}>
       {actions.map((a) => {
         const on = a.active || (a.opens && open === a.id)
+        const why = `${ids}-${a.id}`
         return (
           <button
             type="button"
             key={a.id}
             className={on ? 'on' : ''}
+            aria-label={a.label}
+            aria-describedby={a.reason ? why : undefined}
             aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
             aria-keyshortcuts={a.key}
             disabled={a.disabled}
@@ -286,7 +296,11 @@ export function ActionRows({
             <kbd>{a.key}</kbd>
             <span>
               {a.label}
-              {a.reason && <span className="sel-reason">{a.reason}</span>}
+              {a.reason && (
+                <span className="sel-reason" id={why}>
+                  {a.reason}
+                </span>
+              )}
             </span>
             {a.opens && (
               <span className="sel-more" aria-hidden="true">
@@ -300,8 +314,51 @@ export function ActionRows({
   )
 }
 
+/**
+ * The rows a card shows while it stays open (`keepRows`, ADR 0019): each keeps its slot until
+ * the card goes, so a card for something else picked starts sorted afresh.
+ */
+export function useKeptRows<Id extends string>(
+  fresh: readonly CardAction<Id>[],
+  missing: Partial<Record<Id, string>>,
+  groupOf: (id: Id) => OrderGroup,
+): CardAction<Id>[] {
+  const kept = useRef<CardAction<Id>[]>(undefined)
+  // Keeping the rows again from what it kept gives the same rows, however often React renders.
+  const rows = keepRows(kept.current, fresh, missing, groupOf)
+  kept.current = rows
+  return rows
+}
+
+/**
+ * What closes each panel open on the shown card, the one opened last at the end, which the
+ * game's Escape calls before it leaves the card (`escapeStep`). One card shows at a time.
+ */
+const openPanels = new Set<() => void>()
+
+/** Lets Escape close a card's panel while it is open (`closeOpenPanel`). */
+export function useEscapeClosesPanel(open: boolean, close: () => void) {
+  const latest = useRef(close)
+  latest.current = close
+  useEffect(() => {
+    if (!open) return
+    const closer = () => latest.current()
+    openPanels.add(closer)
+    return () => void openPanels.delete(closer)
+  }, [open])
+}
+
+/** Whether a panel is open on the shown card (`useEscapeClosesPanel`). */
+export const panelOpen = () => openPanels.size > 0
+
+/** Closes the panel opened last on the shown card, if one is open. */
+export const closeOpenPanel = () => [...openPanels].at(-1)?.()
+
 /** Runs an action on its key, unless the Player is typing somewhere or holds a modifier. */
-export function useActionKeys(actions: CardAction[], onAction: (a: CardAction) => void) {
+export function useActionKeys<Id extends string>(
+  actions: readonly CardAction<Id>[],
+  onAction: (a: CardAction<Id>) => void,
+) {
   const latest = useRef({ actions, onAction })
   latest.current = { actions, onAction }
   useEffect(() => {
@@ -371,6 +428,7 @@ export function TileCard({
   const actions = tileActions(card, actor, tick)
   const [open, setOpen] = useState<string | undefined>()
   const shown = actions.some((a) => a.id === open) ? open : undefined
+  useEscapeClosesPanel(shown !== undefined, () => setOpen(undefined))
   const icon =
     card.what === 'building' && building
       ? BUILDING_ART[building.kind]
