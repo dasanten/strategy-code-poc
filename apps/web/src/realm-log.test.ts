@@ -69,6 +69,11 @@ describe('realm log', () => {
       tone: 'bad',
     })
     expect(describeEvent(starved).text).toBe('A horse starved to death.')
+    const down = { kind: 'horseDown', horseId: 'h1', name: 'Ember', until: 7 + 23 * 3600 } as const
+    expect(describeEvent({ ...down, seq: 7, ...at })).toEqual({
+      text: 'Your horse Ember is Down from hunger: about 23 h (58 game days) left. Put Food down by it.',
+      tone: 'bad',
+    })
     const foaled = { kind: 'foaled', horseId: 'h2', stableId: 's1', seq: 8, ...at } as const
     expect(describeEvent({ ...foaled, name: 'Flint' }).text).toBe(
       'A foal, Flint, was born in a stable.',
@@ -415,6 +420,10 @@ describe('realm log', () => {
       text: 'A witness got home: Vex of the realm of Ada stole 5 Food, 2 Iron Ore at (4, 5).',
       tone: 'bad',
     })
+    // Taken from someone Down (`CONTEXT.md`: Down).
+    expect(
+      describeEvent({ ...crime, crime: 'theft', goods: { stone: 3 }, victim: 'Ana' }).text,
+    ).toBe('A witness got home: Vex of the realm of Ada stole 3 Stone from Ana at (4, 5).')
     expect(describeEvent({ ...crime, crime: 'killing', victim: 'Mara' }).text).toBe(
       'A witness got home: Vex of the realm of Ada killed Mara at (4, 5).',
     )

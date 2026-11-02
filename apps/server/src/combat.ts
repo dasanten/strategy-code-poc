@@ -28,6 +28,7 @@ import {
   type Resident,
   type WorldState,
   isAt,
+  isDown,
 } from '@csp/shared'
 import { updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime, knownThieves, organizationOf } from './crimes.js'
@@ -196,7 +197,7 @@ export interface CombatResult {
 
 /**
  * Resolves blows (ADR 0002), one after another (`CONTEXT.md`: Combat), on a map of `size` tiles.
- * A blow is struck only by a living attacker still attacking a living target in contact. The
+ * A blow is struck only by a living attacker still attacking a living or Down target in contact. The
  * first blow of a fight goes in both realms' logs. The target keeps who struck them and when
  * (`Resident.struck`), a dodged blow too. Both learn Combat from it; the target dodges
  * it by Agility, or it lands and takes its `blowDamage` off their health, only `WALL_DEFENCE` of it
@@ -204,7 +205,8 @@ export interface CombatResult {
  * health is killed and drops what they carried (`CONTEXT.md`: Loot); otherwise they defend
  * themselves (`react`): a Player's resident by their defence script, which interrupts what they
  * were doing, others fighting back when armed and fleeing home when not. A climber can't
- * defend themselves: they don't dodge, fight back or flee (`CONTEXT.md`: Walls in combat).
+ * defend themselves: they don't dodge, fight back or flee (`CONTEXT.md`: Walls in combat). Nor
+ * can someone Down, so the first blow at them kills (`CONTEXT.md`: Down).
  * A blow at a wall or gate always lands (`breakWall`).
  */
 export function resolveStrikes(
@@ -228,7 +230,9 @@ export function resolveStrikes(
       continue
     }
     const t = target
-    if (t.health <= 0) continue
+    // Someone Down has no health left but is there to be killed (`CONTEXT.md`: Down).
+    const down = isDown(t)
+    if (t.health <= 0 && !down) continue
     blows++
     if (!o.started) {
       o.started = true
@@ -258,7 +262,7 @@ export function resolveStrikes(
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
     const roll = mulberry32(hash(`${world.seed}:${world.tick}:${a.id}:strike`))()
     const climbing = t.order?.kind === 'climb'
-    if (!climbing && roll < dodgeChance(t, world.tick)) continue
+    if (!down && !climbing && roll < dodgeChance(t, world.tick)) continue
     const cover = onOwnWall(world, t) ? WALL_DEFENCE : 1
     t.health = Math.max(0, t.health - blowDamage(a, t, world.tick) * cover)
     if (t.health <= 0) {

@@ -27,6 +27,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   buildMenu,
   ticksForAge,
+  timeLeft,
   footprintTiles,
   type Building,
   type Carriage,
@@ -54,6 +55,7 @@ import {
   residentActions,
   residentOrders,
   DOWN_NO_ORDERS,
+  HORSE_DOWN_NO_DRIVE,
   riddenHorseLine,
   rowGroups,
   tileActions,
@@ -168,6 +170,9 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ carries: true }))).toContain('goods')
     expect(ids(here({ pile }))).toContain('goods')
     expect(ids(here({ pile: { ...pile, goods: {} } }))).not.toContain('goods')
+    // What someone Down on the tile carries (`CONTEXT.md`: Down).
+    expect(ids(here({ downCarrying: [{ stone: 2 }] }))).toContain('goods')
+    expect(ids(here({ adult: false, downCarrying: [{ stone: 2 }] }))).not.toContain('goods')
     expect(ids(here({ storage: building({ kind: 'storage', stock: { food: 2 } }) }))).toContain(
       'goods',
     )
@@ -532,6 +537,16 @@ describe('the rows of a card that stays open', () => {
     const drive = keepRows(kept, actions, missing, orderGroupOf).find((a) => a.id === 'drive')
     expect(drive).toMatchObject({ disabled: true, reason: 'no carriage here' })
     expect(drive?.active).toBeUndefined()
+  })
+
+  it('grey Drive and leave out Haul route for a carriage whose horse is Down (`CONTEXT.md`: Down)', () => {
+    const { actions, missing } = residentOrders(here({ carriage, carriageHorseDown: true }))
+    expect(actions.find((a) => a.id === 'drive')).toMatchObject({
+      disabled: true,
+      reason: HORSE_DOWN_NO_DRIVE,
+    })
+    expect(actions.some((a) => a.id === 'haul')).toBe(false)
+    expect(missing.haul).toBe(HORSE_DOWN_NO_DRIVE)
   })
 
   it('offer someone Down no orders, and say why on a card left open (`CONTEXT.md`: Down)', () => {
@@ -982,6 +997,24 @@ describe('horses on the tile card', () => {
     expect(tile({ horses: [horse()] })).toMatchObject({ title: 'Horse', what: 'horses' })
   })
 
+  it('says a Down horse is Down, how long it has left only for the Player’s own (`CONTEXT.md`: Down)', () => {
+    const tick = 1000
+    const down = horse({ id: 'h2', hunger: 0, health: 0, downUntil: tick + 23 * 3600 })
+    const card = tile({ horses: [horse(), { ...down, down: true }], tick })
+    expect(card.lists?.[0]).toMatchObject({ title: 'Horses (yours)', count: '2 · 1 Down' })
+    expect(card.lists?.[0]?.rows[1]?.detail).toBe(
+      `Down from hunger: ${timeLeft(23 * 3600)} · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
+    )
+    // As sight sends a stranger's Down horse: Down, but not when it dies.
+    const seen = unknown({ ...down, realmId: 'r-other' })
+    delete seen.downUntil
+    const theirs = tile({ horses: [{ ...seen, down: true }], tick })
+    expect(theirs.lists?.[0]?.rows[0]?.detail).toMatch(/^Down from hunger · Speed 12/)
+    // Hitched, the carriage's horse line says so too.
+    const hitched = tile({ carriages: [{ ...carriage, horseId: 'h2' }], horses: [down], tick })
+    expect(horseLine(hitched.lines)).toContain(`· Down from hunger: ${timeLeft(23 * 3600)}`)
+  })
+
   it('offers renaming the Player’s own horses on the card, by name (`CONTEXT.md`: Renaming a horse)', () => {
     const one = tile({ horses: [horse({ name: 'Ember' })] })
     expect(one.renameHorses).toEqual([{ id: 'h1', name: 'Ember' }])
@@ -1171,6 +1204,27 @@ describe('the actions on a tile’s card', () => {
     })
     expect(feed(feeder({ carried: {} }))).toMatchObject({ reason: 'no Food in hand' })
     expect(tileActions(card, undefined).some((a) => a.id === 'feed')).toBe(false)
+  })
+
+  it('shows what someone Down on it carries, for the realm’s residents there to take', () => {
+    const at = (id: string, more: object = {}) =>
+      ({ id, name: id, owner: 'me', cityId: null, x: 5, y: 5, carried: {}, ...more }) as Resident
+    const ana = at('ana', { owner: 'them', down: true, carried: { stone: 3, food: 0 } })
+    const empty = at('cid', { down: true })
+    const ada = at('ada')
+    const lying = at('bo', { down: true })
+    const away = at('away', { x: 6 })
+    const stranger = at('st', { owner: 'them' })
+    const residents = [ana, empty, ada, lying, away, stranger]
+    const card = tile({ residents, strangers: [ana, stranger] })
+    // Someone Down carrying nothing is left out; nobody Down takes anything, nor anyone off the
+    // tile or of another realm.
+    expect(card.downGoods).toEqual([
+      { residentId: 'ana', name: 'ana', goods: { stone: 3, food: 0 }, takers: [ada] },
+    ])
+    expect(card.lines).toContain('2 residents of other realms · 1 Down')
+    expect(tile({ residents: [ana], strangers: [ana] }).lines[0]).toBe('ana · Another realm · Down')
+    expect(tile({ residents: [ada] }).downGoods).toBeUndefined()
   })
 
   it('sends the resident picked last there', () => {

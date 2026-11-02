@@ -137,7 +137,11 @@ export const CHILD_GOODS: readonly Good[] = ['food']
  * Whether a resident may pick up, put down, Fetch or Store these goods: anyone grown up, a child
  * only `CHILD_GOODS` (`CONTEXT.md`: Child).
  */
-export function canHandle(resident: Resident, tick: number, goods: readonly string[]): boolean {
+export function canHandle(
+  resident: Pick<Resident, 'bornAt'>,
+  tick: number,
+  goods: readonly string[],
+): boolean {
   return (
     canWork(resident, tick) || goods.every((g) => (CHILD_GOODS as readonly string[]).includes(g))
   )
@@ -237,6 +241,12 @@ export const HORSE_REACH = 1
  * at 0 it is starving.
  */
 export const HORSE_HUNGRY_SHARE = 0.25
+
+/**
+ * Health a Down horse wakes with once it has eaten (`CONTEXT.md`: Reviving): low, out of
+ * `MAX_HEALTH`, so a fed horse takes most of `HEAL_DAYS` to be well again.
+ */
+export const HORSE_WAKE_HEALTH = 20
 
 /**
  * Game days of Food for the horses standing in it that the Feed the stable task keeps in a stable

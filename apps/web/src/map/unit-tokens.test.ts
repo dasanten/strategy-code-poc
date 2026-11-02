@@ -32,9 +32,10 @@ const resident = (
 
 /**
  * Draws the residents at a zoom and returns every sprite placed, in drawing order; `where` puts
- * tokens on their way between tiles (`Motion`), by default in place.
+ * tokens on their way between tiles (`Motion`), by default in place. `loose` horses stand on
+ * their own, besides the riders'.
  */
-function draw(residents: SeenResident[], scale: number, where?: Where) {
+function draw(residents: SeenResident[], scale: number, where?: Where, loose: object[] = []) {
   const placed: Placed[] = []
   const tokens = {
     place: (
@@ -51,9 +52,12 @@ function draw(residents: SeenResident[], scale: number, where?: Where) {
   const world: UnitWorld = {
     map: { size: 64 },
     residents,
-    horses: residents.flatMap((r) =>
-      r.riding ? [{ id: r.riding, realmId: r.owner, cityId: null, x: r.x, y: r.y }] : [],
-    ) as unknown as UnitWorld['horses'],
+    horses: [
+      ...residents.flatMap((r) =>
+        r.riding ? [{ id: r.riding, realmId: r.owner, cityId: null, x: r.x, y: r.y }] : [],
+      ),
+      ...loose,
+    ] as unknown as UnitWorld['horses'],
     carriages: [],
     armies: [],
     caravans: [],
@@ -81,6 +85,19 @@ describe('drawUnits: Down (CONTEXT.md: Down)', () => {
       const figure = placed.find((p) => p.file === PERSON)!
       expect(figure.rotation, `${scale}`).toBe(-Math.PI / 2)
     }
+  })
+
+  it('lays a Down horse on its side, and keeps a standing one upright', () => {
+    const loose = (id: string, more: object = {}) => ({
+      id,
+      realmId: 'r1',
+      cityId: null,
+      x: 12,
+      y: 10,
+      ...more,
+    })
+    const { placed } = draw([], CLOSE, undefined, [loose('h1', { down: true }), loose('h2')])
+    expect(horses(placed).map((p) => p.rotation)).toEqual([-Math.PI / 2, undefined])
   })
 
   it('keeps standing figures upright, and a group token upright unless all of them are Down', () => {

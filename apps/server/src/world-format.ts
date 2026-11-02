@@ -271,6 +271,10 @@ export const migrations: Record<number, MigrationStep> = {
   // `Resident.downUntil`), with the realm log's `down`. Nobody was Down before: a resident
   // whose health ran out died at once. So the step leaves every resident and log as they are.
   69: (state) => state,
+  // Hunger puts a horse Down too (`CONTEXT.md`: Down, Reviving; `Horse.downUntil`), with the
+  // realm log's `horseDown`. No horse was Down before: one whose health ran out died at once.
+  // So the step leaves every horse and log as they are.
+  70: (state) => state,
   // Feeding revives a Down resident (`CONTEXT.md`: Reviving), a new order kind and queue step,
   // with the realm log's `woke`. Nobody fed anyone before, so the step leaves every resident,
   // queue and log as they are.

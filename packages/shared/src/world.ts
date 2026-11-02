@@ -158,8 +158,8 @@ export interface Resident {
 }
 
 /**
- * Whether a resident is Down (`CONTEXT.md`: Down), lying unconscious and doing nothing: from the
- * world, or as a Player sees them (`SeenResident.down`).
+ * Whether a resident or horse is Down (`CONTEXT.md`: Down), lying unconscious and doing nothing:
+ * from the world, or as a Player sees them (`SeenResident.down`, `SeenHorse.down`).
  */
 export function isDown(r: { downUntil?: number; down?: true }): boolean {
   return r.downUntil !== undefined || r.down === true
@@ -386,14 +386,16 @@ export interface WalkOrder {
 
 /**
  * A place on the resident's own tile that goods are taken from or put: the pile on the ground,
- * a storage standing there, the materials delivered to a construction site there, or the load
- * of a carriage standing there.
+ * a storage standing there, the materials delivered to a construction site there, the load
+ * of a carriage standing there, or what a Down resident lying there carries (only taken from,
+ * `CONTEXT.md`: Down).
  */
 export type GoodsSpot =
   | { kind: 'ground' }
   | { kind: 'storage'; storageId: string }
   | { kind: 'site'; siteId: string }
   | { kind: 'carriage'; carriageId: string }
+  | { kind: 'resident'; residentId: string }
 
 /**
  * Picking up goods on the resident's tile (`CONTEXT.md`: Core rule, whatever isn't protected can
@@ -1656,6 +1658,11 @@ export type RealmEventWhat =
    */
   | { kind: 'horseDied'; horseId: string; name?: string }
   /**
+   * A horse of the realm went Down from hunger (`CONTEXT.md`: Down): unless it eats Food in
+   * reach, it dies at tick `until`.
+   */
+  | { kind: 'horseDown'; horseId: string; name: string; until: number }
+  /**
    * A ridden horse of the realm, `horseName`, went hungry and its rider, `name`, carries no Food
    * to spare for it (`CONTEXT.md`: Riding). Entries from before horses had names have no `horseName`.
    */
@@ -2102,6 +2109,12 @@ export interface Horse {
   stats: HorseStats
   /** The tick it was born; its age is counted from it (`horseAgeInYears`). */
   bornAt: number
+  /**
+   * Set while the horse is Down (`CONTEXT.md`: Down, Reviving): the tick at which it dies of
+   * hunger unless it eats Food in reach first. Down, it stands still, nobody rides it, and its
+   * hunger and health stay at 0. Absent while it is not Down.
+   */
+  downUntil?: number
 }
 
 /** A horse-drawn cart (`CONTEXT.md`: Carriage). */

@@ -438,6 +438,15 @@ describe('world saves', () => {
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
+  it('keeps a format 70 world as it is: no horse is Down yet (migration 70 → 71)', () => {
+    const { world, terrain } = worldWithCity()
+    expect(world.horses.length).toBeGreaterThan(0)
+    const migrated = migrateWorld(structuredClone(world), 70, { terrain }, migrations, 71)
+    expect(migrated).toEqual(world)
+    expect(migrated.horses.every((h) => h.downUntil === undefined && h.health > 0)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
   it('names every horse from before horses had names, alike on every server (migration 65 → 66)', () => {
     const { world, terrain: land } = worldWithCity()
     expect(world.horses.length).toBeGreaterThan(0)

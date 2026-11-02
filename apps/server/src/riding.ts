@@ -2,6 +2,7 @@ import {
   carriagePulledBy,
   horseOfResident,
   horseRidden,
+  isDown,
   mountProblem,
   type OrderRequest,
   type Resident,
@@ -81,8 +82,8 @@ export const dismount: OrderKind = {
 }
 
 /**
- * Ends riding that can't go on (`CONTEXT.md`: Riding), at the end of each tick: the horse died, is
- * no longer the rider's realm's, was hitched, or has another rider, or the rider left it behind,
+ * Ends riding that can't go on (`CONTEXT.md`: Riding), at the end of each tick: the horse died or
+ * is Down, is no longer the rider's realm's, was hitched, or has another rider, or the rider left it behind,
  * as by climbing over a wall. The horse stays where it is.
  */
 export function stepRiders(world: WorldState): void {
@@ -95,6 +96,7 @@ export function stepRiders(world: WorldState): void {
       !horse ||
       !together ||
       !horseOfResident(horse, r) ||
+      isDown(horse) ||
       carriagePulledBy(world, horse) ||
       ridden.has(horse.id)
     ) {

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   BUILDABLE,
-  isDown,
   firstDayShown,
   type ClientFirstDayLine,
   carriagePulledBy,
   holdersOf,
   carriageOfResident,
   horseOfResident,
+  isDown,
   riderOf,
   seatsLeft,
   KEEPS_GOODS,
@@ -1497,6 +1497,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onUnhitch={(carriageId, residentId) => void unhitch(carriageId, residentId)}
             mapSize={world.map.size}
             onFeed={(targetId, units) => void feed(targetId, units)}
+            onPickUp={async (residentId, spot, goods) =>
+              setOrderError(await giveOrder({ kind: 'pickUp', residentId, spot, goods }))
+            }
             orderError={orderError}
             onClose={() => setSelectedTile(undefined)}
             onSendHere={async () => {
@@ -1572,7 +1575,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             horseToRide={onTile(
               world.horses.filter(
                 (h) =>
-                  horseOfResident(h, selected) && !carriagePulledBy(world, h) && !riderOf(world, h),
+                  horseOfResident(h, selected) &&
+                  !carriagePulledBy(world, h) &&
+                  !riderOf(world, h) &&
+                  !isDown(h),
               ),
             )}
             onRide={ride}
