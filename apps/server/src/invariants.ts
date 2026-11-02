@@ -89,6 +89,7 @@ import {
 } from '@csp/shared'
 import { tallyGoods } from './goods-made.js'
 import { downDoNothing, refillSource, refillTarget } from './survival.js'
+import { horsesDownLieStill } from './horses.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
@@ -1993,6 +1994,7 @@ export const worldInvariants: Invariant[] = [
   territorySound,
   deadLeaveLoot,
   downDoNothing,
+  horsesDownLieStill,
   attackOrdersSound,
   armiesSound,
   contractsSound,

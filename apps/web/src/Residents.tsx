@@ -1864,6 +1864,7 @@ export function ResidentCard({
     busy: !!(r.order || r.script),
     inCity: r.cityId !== null,
     carriage,
+    carriageHorseDown: horses.some((h) => h.id === carriage?.horseId && isDown(h)),
     pile,
     storage,
     building,

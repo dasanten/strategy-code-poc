@@ -65,7 +65,7 @@ export type Where = (id: string, x: number, y: number) => readonly [number, numb
 /** Every token in place: the map between ticks when nothing moves. */
 export const inPlace: Where = (_id, x, y) => [x, y]
 
-/** How far a Down resident's figure is turned: lying on its side (`CONTEXT.md`: Down). */
+/** How far a Down resident's or horse's figure is turned: lying on its side (`CONTEXT.md`: Down). */
 const LYING = -Math.PI / 2
 
 /**
@@ -176,7 +176,9 @@ export function drawUnits(
     const p = at(...where(h.id, h.x, h.y), busy ? -0.28 : 0, busy ? -0.28 : 0)
     if (!near(p)) continue
     const r = unitRadius('horse', tile)
-    drawUnit(tokens, UNIT_ART.horse, ...p, r, entityRelationship(h, viewer, known))
+    // A Down horse lies down (`CONTEXT.md`: Down).
+    const rel = entityRelationship(h, viewer, known)
+    drawUnit(tokens, UNIT_ART.horse, ...p, r, rel, isDown(h))
     spots.set(h.id, { x: p[0], y: p[1], r })
   }
 

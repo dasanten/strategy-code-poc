@@ -4,6 +4,7 @@ import {
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   ticksForAge,
+  timeLeft,
   type SeenHorse,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
@@ -42,6 +43,16 @@ describe('groupHorses', () => {
           { horse: h('b', 11, 11), place: 'In the stable' },
         ],
       },
+    ])
+  })
+
+  it('says first that a horse is Down, with the time left where it is known (`CONTEXT.md`: Down)', () => {
+    const down = { ...h('a', 10, 10), downUntil: 100 + 23 * 3600 }
+    const seen = { ...h('b', 3, 3), down: true as const }
+    const groups = groupHorses([down, seen], [stable('s', 10, 10)], [], [], cities, 100)
+    expect(groups.flatMap((g) => g.rows.map((r) => r.place))).toEqual([
+      `Down from hunger: ${timeLeft(23 * 3600)} · In the stable`,
+      'Down from hunger · Loose at 3, 3',
     ])
   })
 

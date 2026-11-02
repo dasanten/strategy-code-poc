@@ -27,6 +27,7 @@ import {
   WORK_OUTPUT_PER_DAY,
   buildMenu,
   ticksForAge,
+  timeLeft,
   footprintTiles,
   type Building,
   type Carriage,
@@ -54,6 +55,7 @@ import {
   residentActions,
   residentOrders,
   DOWN_NO_ORDERS,
+  HORSE_DOWN_NO_DRIVE,
   riddenHorseLine,
   rowGroups,
   tileActions,
@@ -534,6 +536,16 @@ describe('the rows of a card that stays open', () => {
     expect(drive?.active).toBeUndefined()
   })
 
+  it('grey Drive and leave out Haul route for a carriage whose horse is Down (`CONTEXT.md`: Down)', () => {
+    const { actions, missing } = residentOrders(here({ carriage, carriageHorseDown: true }))
+    expect(actions.find((a) => a.id === 'drive')).toMatchObject({
+      disabled: true,
+      reason: HORSE_DOWN_NO_DRIVE,
+    })
+    expect(actions.some((a) => a.id === 'haul')).toBe(false)
+    expect(missing.haul).toBe(HORSE_DOWN_NO_DRIVE)
+  })
+
   it('offer someone Down no orders, and say why on a card left open (`CONTEXT.md`: Down)', () => {
     const { actions, missing } = residentOrders(here({ down: true, carries: true }))
     expect(actions).toEqual([])
@@ -963,6 +975,22 @@ describe('horses on the tile card', () => {
       { title: 'Horse (another realm)', count: '1' },
     ])
     expect(tile({ horses: [horse()] })).toMatchObject({ title: 'Horse', what: 'horses' })
+  })
+
+  it('says a Down horse is Down, how long it has left only for the Player’s own (`CONTEXT.md`: Down)', () => {
+    const tick = 1000
+    const down = horse({ id: 'h2', hunger: 0, health: 0, downUntil: tick + 23 * 3600 })
+    const card = tile({ horses: [horse(), { ...down, down: true }], tick })
+    expect(card.lists?.[0]).toMatchObject({ title: 'Horses (yours)', count: '2 · 1 Down' })
+    expect(card.lists?.[0]?.rows[1]?.detail).toBe(
+      `Down from hunger: ${timeLeft(23 * 3600)} · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
+    )
+    const { downUntil: _, ...seen } = unknown({ ...down, realmId: 'r-other' })
+    const theirs = tile({ horses: [{ ...seen, down: true }], tick })
+    expect(theirs.lists?.[0]?.rows[0]?.detail).toMatch(/^Down from hunger · Speed 12/)
+    // Hitched, the carriage's horse line says so too.
+    const hitched = tile({ carriages: [{ ...carriage, horseId: 'h2' }], horses: [down], tick })
+    expect(horseLine(hitched.lines)).toContain(`· Down from hunger: ${timeLeft(23 * 3600)}`)
   })
 
   it('offers renaming the Player’s own horses on the card, by name (`CONTEXT.md`: Renaming a horse)', () => {

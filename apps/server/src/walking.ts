@@ -9,6 +9,7 @@ import {
   groundAt,
   horseFor,
   horseRidden,
+  isDown,
   passengersOf,
   isPassableTerrain,
   mayStep,
@@ -319,10 +320,11 @@ export class Walking {
       }
       if (!onFoot(o)) {
         // The horse sets the pace (`CONTEXT.md`: Horse stats). Without one the step goes at
-        // once, so resolving it ends the order.
+        // once, so resolving it ends the order, as it does when the horse is Down (`CONTEXT.md`:
+        // Down): the carriage stands where it is.
         const carriage = index.carriageById(o.carriageId)
         const horse = carriage && horseFor(world, carriage)
-        if (!horse) {
+        if (!horse || isDown(horse)) {
           const to = { x: next[0], y: next[1] }
           steps.push({ kind: 'step', residentId: r.id, to, carriageId: o.carriageId })
           continue
@@ -440,7 +442,7 @@ export class Walking {
         const horse = carriage && horseFor(world, carriage)
         const together =
           carriage?.x === r.x && carriage.y === r.y && horse?.x === r.x && horse.y === r.y
-        if (!carriage || !horse || !together) {
+        if (!carriage || !horse || !together || isDown(horse)) {
           r.order = null
           continue
         }
@@ -467,7 +469,13 @@ export class Walking {
         // A rider who got off, or a path found on foot that leads where a horse can't go, finds
         // a new way (`CONTEXT.md`: Riding).
         const horse = r.riding === step.horseId ? horseRidden(world, r) : undefined
-        if (!horse || horse.x !== r.x || horse.y !== r.y || !carriageCanEnter(ground)) {
+        if (
+          !horse ||
+          isDown(horse) ||
+          horse.x !== r.x ||
+          horse.y !== r.y ||
+          !carriageCanEnter(ground)
+        ) {
           const o = moveOrder(r)
           if (o) {
             o.path = null

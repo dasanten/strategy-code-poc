@@ -140,7 +140,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(70)
+    expect(WORLD_FORMAT_VERSION).toBe(71)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -427,6 +427,15 @@ describe('world saves', () => {
     const migrated = migrateWorld(structuredClone(world), 69, { terrain }, migrations, 70)
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.downUntil === undefined && r.health > 0)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps a format 70 world as it is: no horse is Down yet (migration 70 → 71)', () => {
+    const { world, terrain } = worldWithCity()
+    expect(world.horses.length).toBeGreaterThan(0)
+    const migrated = migrateWorld(structuredClone(world), 70, { terrain }, migrations, 71)
+    expect(migrated).toEqual(world)
+    expect(migrated.horses.every((h) => h.downUntil === undefined && h.health > 0)).toBe(true)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
