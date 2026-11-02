@@ -1,11 +1,16 @@
 import {
+  MAX_HEALTH,
+  MAX_HUNGER,
+  TICKS_PER_GAME_DAY,
   drivenCarriageId,
+  horseAgeInYears,
   isAt,
   type Building,
   type Carriage,
   type City,
   type Horse,
   type Resident,
+  type SeenHorse,
 } from '@csp/shared'
 import { nameLabels } from './name-labels.js'
 
@@ -95,4 +100,40 @@ export function groupHorses<H extends Pick<Horse, 'id' | 'x' | 'y'>>(
     }
   }
   return groups.filter((g) => g.rows.length > 0)
+}
+
+/** A horse's row in the Horses drawer on a phone (`horseLines`). */
+export interface HorseLines {
+  /** First line: its name, age and Speed/Strength/Endurance. */
+  name: string
+  age: string
+  stats: string
+  /** Second line: where it stands, with health and hunger meters at its end. */
+  place: string
+  /** Health and how fed it is, 0 to 1, or undefined where the Player doesn't know. */
+  health?: number
+  fed?: number
+}
+
+/**
+ * A horse's row in the Horses drawer on a phone (ADR 0012), laid out like a resident's: two lines
+ * in place of the table's columns, "Zephyr · 3 years · 12/8/10" and where it stands with its
+ * health and hunger meters at the end.
+ */
+export function horseLines({ horse: h, place }: HorseRow<SeenHorse>, tick: number): HorseLines {
+  const years = Math.floor(horseAgeInYears(h, tick))
+  const days = Math.max(0, Math.floor((tick - h.bornAt) / TICKS_PER_GAME_DAY))
+  const share = (n: number | undefined, max: number) =>
+    n === undefined ? undefined : Math.max(0, Math.min(1, n / max))
+  return {
+    name: h.name,
+    age:
+      years >= 1
+        ? `${years} ${years === 1 ? 'year' : 'years'}`
+        : `${days} game ${days === 1 ? 'day' : 'days'}`,
+    stats: `${h.stats.speed}/${h.stats.strength}/${h.stats.endurance}`,
+    place,
+    health: share(h.health, MAX_HEALTH),
+    fed: share(h.hunger, MAX_HUNGER),
+  }
 }

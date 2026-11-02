@@ -1081,6 +1081,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             cities={knownCities}
             arrivesIn={arrivesIn || undefined}
             tick={world.tick}
+            phone={phone}
             selectedId={selected?.id}
             onSelect={(id) => {
               setSelectedIds([id])
@@ -1103,6 +1104,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               world.tick,
             )}
             tick={world.tick}
+            phone={phone}
             selectedId={(() => {
               // A horse whose tile card is open, the last one picked here first, or the one the
               // picked resident rides.

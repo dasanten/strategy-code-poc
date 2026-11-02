@@ -98,6 +98,7 @@ import {
   groupCard,
   rememberedTabOf,
   rememberTabOf,
+  residentLines,
   residentsCount,
   scriptsRun,
   statLine,
@@ -105,6 +106,7 @@ import {
   type GroupTab,
   type CardSections,
   type ResidentGroup,
+  type ResidentLines,
 } from './residents-view.js'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
 import { type RelocateChoice } from './relocate-view.js'
@@ -929,7 +931,8 @@ export function orderDoing(
 /**
  * The Player's residents, one row each under the city they live in (see `groupResidents`); click
  * a row to inspect that resident and show them on the map. Picking one elsewhere, such as on the
- * map, scrolls their row into view.
+ * map, scrolls their row into view. On a phone each row is two lines instead of the table's
+ * columns (`residentLines`).
  */
 export function ResidentsList({
   groups,
@@ -942,6 +945,7 @@ export function ResidentsList({
   arrivesIn,
   selectedId,
   onSelect,
+  phone = false,
 }: {
   groups: ResidentGroup<Resident>[]
   leaderId: string
@@ -958,6 +962,8 @@ export function ResidentsList({
   arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
   onSelect: (id: string) => void
+  /** Rows of two lines each, for a phone's narrow screen. */
+  phone?: boolean
 }) {
   const tableRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -971,20 +977,43 @@ export function ResidentsList({
     <section className="residents" aria-label="Residents">
       <PanelHead title="Residents">{residentsCount(groups.flatMap((g) => g.residents))}</PanelHead>
       <div className="residents-scroll">
-        <div className="residents-table" ref={tableRef}>
-          <div className="residents-row heading" aria-hidden="true">
-            <span>Name</span>
-            <span>Age</span>
-            <span>Doing</span>
-            <span>Hunger</span>
-            <span>Carrying</span>
-          </div>
+        <div className={`residents-table${phone ? ' lines' : ''}`} ref={tableRef}>
+          {!phone && (
+            <div className="residents-row heading" aria-hidden="true">
+              <span>Name</span>
+              <span>Age</span>
+              <span>Doing</span>
+              <span>Hunger</span>
+              <span>Carrying</span>
+            </div>
+          )}
           {groups.map((g) => (
             <div className="residents-group" key={g.key} role="group" aria-label={g.label}>
               <h3>
                 {g.label} <span>· {g.residents.length}</span>
               </h3>
               {g.residents.map((r) => {
+                if (phone) {
+                  return (
+                    <ResidentLinesRow
+                      key={r.id}
+                      lines={residentLines(r, {
+                        leaderId,
+                        tick,
+                        doing: doingLine(r, {
+                          scripts,
+                          buildings,
+                          residents: inSight,
+                          cities,
+                          arrives: arrivesIn?.(r),
+                        }),
+                      })}
+                      id={r.id}
+                      selected={r.id === selectedId}
+                      onSelect={onSelect}
+                    />
+                  )
+                }
                 const under =
                   interruptedLine(r, { scripts, buildings, residents: inSight }) ??
                   scriptLine(r, scripts)
@@ -1029,6 +1058,43 @@ export function ResidentsList({
         </div>
       </div>
     </section>
+  )
+}
+
+/** A resident's row on a phone: name, Leader mark and age, then Doing with the hunger meter. */
+function ResidentLinesRow({
+  id,
+  lines,
+  selected,
+  onSelect,
+}: {
+  id: string
+  lines: ResidentLines
+  selected: boolean
+  onSelect: (id: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      data-resident={id}
+      className={`residents-row lines${selected ? ' selected' : ''}`}
+      aria-pressed={selected}
+      onClick={() => onSelect(id)}
+    >
+      <span className="line">
+        <span className="name">
+          {lines.name}
+          {lines.leader && <span className="leader-mark"> · Leader</span>}
+        </span>
+        <span className="mono">{lines.age}</span>
+      </span>
+      <span className="line">
+        <span className="doing">{lines.doing}</span>
+        <span className="meter" aria-label={`Hunger ${pct(lines.fed)} fed`}>
+          <span className={meterClass(lines.fed)} style={{ width: pct(lines.fed) }} />
+        </span>
+      </span>
+    </button>
   )
 }
 

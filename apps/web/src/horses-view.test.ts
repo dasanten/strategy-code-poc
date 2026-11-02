@@ -1,6 +1,13 @@
-import { TICKS_PER_GAME_YEAR, ticksForAge } from '@csp/shared'
+import {
+  MAX_HEALTH,
+  MAX_HUNGER,
+  TICKS_PER_GAME_DAY,
+  TICKS_PER_GAME_YEAR,
+  ticksForAge,
+  type SeenHorse,
+} from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { groupHorses } from './horses-view.js'
+import { groupHorses, horseLines } from './horses-view.js'
 
 const h = (id: string, x: number, y: number) => ({ id, x, y })
 // Stables are 2 by 2 (`FOOTPRINT`); the one at 10, 10 covers 10–11.
@@ -128,5 +135,44 @@ describe('groupHorses', () => {
 
   it('is empty without horses', () => {
     expect(groupHorses([], [stable('s', 0, 0)], [], [], cities)).toEqual([])
+  })
+})
+
+describe('horseLines', () => {
+  const zephyr = {
+    id: 'z',
+    name: 'Zephyr',
+    realmId: 'me',
+    cityId: null,
+    x: 10,
+    y: 10,
+    bornAt: 0,
+    stats: { speed: 12, strength: 8, endurance: 10 },
+    hunger: MAX_HUNGER / 2,
+    health: MAX_HEALTH,
+  } as SeenHorse
+
+  it('reads name, age and stats on the first line, place and meters on the second', () => {
+    expect(horseLines({ horse: zephyr, place: 'In the stable' }, 3 * TICKS_PER_GAME_YEAR)).toEqual({
+      name: 'Zephyr',
+      age: '3 years',
+      stats: '12/8/10',
+      place: 'In the stable',
+      health: 1,
+      fed: 0.5,
+    })
+  })
+
+  it('gives a foal its age in game days', () => {
+    const lines = horseLines({ horse: zephyr, place: 'Loose at 1, 2' }, 2 * TICKS_PER_GAME_DAY)
+    expect(lines.age).toBe('2 game days')
+  })
+
+  it('leaves the meters out where the Player doesn’t know how the horse fares', () => {
+    const unknown = { ...zephyr, hunger: undefined, health: undefined }
+    const lines = horseLines({ horse: unknown, place: 'Ridden by Ann' }, TICKS_PER_GAME_YEAR)
+    expect(lines.age).toBe('1 year')
+    expect(lines.health).toBeUndefined()
+    expect(lines.fed).toBeUndefined()
   })
 })
