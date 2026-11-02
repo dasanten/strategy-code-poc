@@ -14,6 +14,7 @@ import {
   type Stat,
   type StatName,
 } from '@csp/shared'
+import { uniqueName } from './names.js'
 
 /** Small seeded PRNG, so the same seed always makes the same residents. */
 export function mulberry32(seed: number): () => number {
@@ -27,7 +28,7 @@ export function mulberry32(seed: number): () => number {
 }
 
 /** Given names for new residents. Only flavour: a name means nothing to the rules. */
-const NAMES = [
+export const RESIDENT_NAMES: readonly string[] = [
   'Mara',
   'Tobin',
   'Corwin',
@@ -60,9 +61,22 @@ const NAMES = [
   'Jutta',
 ]
 
-/** A name from the game for a resident. */
+/** A name from the game's list for a resident, drawn with `rand`. */
 export function residentName(rand: () => number): string {
-  return NAMES[Math.floor(rand() * NAMES.length)]!
+  return RESIDENT_NAMES[Math.floor(rand() * RESIDENT_NAMES.length)]!
+}
+
+/**
+ * The name the game gives a new resident, drawn with `rand` (`CONTEXT.md`: Game-given names):
+ * with `taken`, the names of their realm's living residents (`residentNamesTaken`), one it
+ * doesn't hold, which it then holds too, marked as the game's. Without, the bare draw.
+ */
+function givenName(rand: () => number, taken?: Set<string>): Pick<Resident, 'name' | 'gameName'> {
+  const drawn = residentName(rand)
+  if (!taken) return { name: drawn }
+  const name = uniqueName(drawn, taken, RESIDENT_NAMES)
+  taken.add(name)
+  return { name, gameName: true }
 }
 
 /** A lifespan in game years between `LIFESPAN_MIN` and `LIFESPAN_MAX` (`CONTEXT.md`: Aging). */
@@ -76,7 +90,8 @@ const between = (rand: () => number, min: number, max: number) =>
 /**
  * A new adult resident with random base stats, nothing trained or learned yet, full health and
  * a full hunger meter, aged between `START_AGE_MIN` and `START_AGE_MAX` at `tick`, with a
- * lifespan between `LIFESPAN_MIN` and `LIFESPAN_MAX`.
+ * lifespan between `LIFESPAN_MIN` and `LIFESPAN_MAX`. Its name is one `taken` doesn't hold
+ * (`givenName`).
  */
 export function newResident(
   rand: () => number,
@@ -88,17 +103,18 @@ export function newResident(
     y: number
     tick: number
   },
+  taken?: Set<string>,
 ): Resident {
   const stats = Object.fromEntries(
     STAT_NAMES.map((s) => [s, { base: between(rand, STAT_BASE_MIN, STAT_BASE_MAX), trained: 0 }]),
   ) as Record<StatName, Stat>
   const age = START_AGE_MIN + rand() * (START_AGE_MAX - START_AGE_MIN)
   const { tick, cityId = null, ...place } = fields
-  const name = NAMES[Math.floor(rand() * NAMES.length)]!
+  const name = givenName(rand, taken)
   return {
     ...place,
     cityId,
-    name,
+    ...name,
     stats,
     skills: {},
     health: MAX_HEALTH,
@@ -119,7 +135,7 @@ export function baseStats(r: Resident): Record<StatName, number> {
  * A child of two parents, given by their base stats, born at `tick` (`CONTEXT.md`: Child): each base stat is the parents'
  * average, rounded, plus a whole random amount of at most `CHILD_STAT_SPREAD` either way, and at
  * least 1. Nothing trained or learned, since neither is inherited; full health and hunger meter;
- * a lifespan between `LIFESPAN_MIN` and `LIFESPAN_MAX`.
+ * a lifespan between `LIFESPAN_MIN` and `LIFESPAN_MAX`; a name `taken` doesn't hold (`givenName`).
  */
 export function newChild(
   rand: () => number,
@@ -132,6 +148,7 @@ export function newChild(
     y: number
     tick: number
   },
+  taken?: Set<string>,
 ): Resident {
   const [a, b] = parents
   const stats = Object.fromEntries(
@@ -144,7 +161,7 @@ export function newChild(
   const { tick, ...place } = fields
   return {
     ...place,
-    name: NAMES[Math.floor(rand() * NAMES.length)]!,
+    ...givenName(rand, taken),
     stats,
     skills: {},
     health: MAX_HEALTH,

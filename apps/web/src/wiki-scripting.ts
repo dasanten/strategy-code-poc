@@ -134,3 +134,11 @@ export const PARAM_DEFAULT_EXAMPLE = `param rounds: number = 5
 if (memory.done == null) { memory.done = 0 }
 memory.done = memory.done + 1
 if (memory.done >= params.rounds) { end() }`
+
+/**
+ * The Script parameters topic's example of param comments: what each is for, and after "none:"
+ * what the script uses while none is picked, as the card shows them.
+ */
+export const PARAM_COMMENT_EXAMPLE = `param storage: storage // where the wood goes; none: I keep it
+param rounds: number = 5 // loads to carry before I stop
+if (params.storage != null) { store(["wood"], params.storage) }`

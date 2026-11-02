@@ -44,6 +44,19 @@ export function doingLine(r: DoingOf, seen: DoingSeen): string {
   return r.script?.waiting ? `${line} · script waiting` : line
 }
 
+/**
+ * The small line under the Doing line naming the script a resident runs (`CONTEXT.md`: Doing):
+ * the script's name, left out when it is the default script of their task, which the Doing line
+ * already says ("Working the farm" alone). Undefined while they run no script.
+ */
+export function scriptLine(
+  r: { script?: SeenScript },
+  scripts: readonly ScriptSummary[],
+): string | undefined {
+  if (!r.script || taskOf(r.script, scripts)) return undefined
+  return scripts.find((s) => s.id === r.script!.scriptId)?.name ?? 'a script'
+}
+
 /** What else the Doing line is worked out from (`doingLine`). */
 interface DoingSeen {
   scripts?: readonly ScriptSummary[]

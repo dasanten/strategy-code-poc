@@ -9,10 +9,21 @@ import {
   type OrderRequest,
   type RealmLabel,
   type Resident,
+  type ScriptSummary,
+  ageInYears,
   isAt,
   type SeenResident,
 } from '@csp/shared'
-import { contractStatus, sideName } from './contract-view.js'
+import {
+  contractStatus,
+  offerSummary,
+  sideName,
+  storageName,
+  type OfferSide,
+} from './contract-view.js'
+import { doingLine } from './doing-view.js'
+import { PanelHead } from './drawer-head.js'
+import { labelled, nameLabels } from './name-labels.js'
 
 /**
  * Mercenary contracts (`CONTEXT.md`: Mercenary contract): offer some of your residents for hire
@@ -31,6 +42,8 @@ export function ContractsPanel({
   buildings,
   cities,
   realms,
+  scripts,
+  tick,
   sendOrder,
 }: {
   contracts: ContractView[]
@@ -44,6 +57,10 @@ export function ContractsPanel({
   cities: SeenCity[]
   /** Realms the Player could make a contract with. */
   realms: RealmLabel[]
+  /** The Player's scripts, for the residents' Doing lines. */
+  scripts: ScriptSummary[]
+  /** Now, for the ages that tell residents of one name apart (`nameLabels`). */
+  tick: number
   sendOrder: (order: OrderRequest) => Promise<string | undefined>
 }) {
   const [hiring, setHiring] = useState(false)
@@ -61,12 +78,14 @@ export function ContractsPanel({
   const npcCities = cities.filter((c) => c.hire !== undefined)
   const npc = hiring ? npcCities.find((c) => c.id === other) : undefined
   const lenderId = hiring ? other : realmId
-  const candidates =
+  const candidates: SeenResident[] =
     tradeOrg || npc
       ? []
       : hiring
         ? inSight.filter((r) => r.owner === other)
         : own.filter((r) => r.owner === realmId)
+  // Each row shows age and city; the summary line tells two of one name apart the same way.
+  const candidateNames = nameLabels(candidates, tick, cities)
   const storages = buildings.filter(
     (b) =>
       b.kind === (tradeOrg ? 'warehouse' : 'storage') &&
@@ -77,6 +96,25 @@ export function ContractsPanel({
           (tradeOrg ? c.tradeOrg !== undefined : npc ? c.id === npc.id : c.realmId === lenderId),
       ),
   )
+
+  const side: OfferSide | undefined = !other
+    ? undefined
+    : tradeOrg
+      ? { kind: 'tradeOrg' }
+      : npc
+        ? { kind: 'npcCity', name: npc.name }
+        : { kind: 'realm', name: realms.find((r) => r.realmId === other)?.realm ?? other }
+  const storage = storages.find((b) => b.id === storageId)
+  const summary = offerSummary({
+    hiring,
+    side,
+    residents: candidates.filter((r) => chosen.has(r.id)).map((r) => candidateNames.get(r.id)!),
+    count: tradeOrg ? soldiers : count,
+    days,
+    pricePerWeek: price,
+    storage: storage && storageName(storage, cities, storages),
+  })
+  const cityName = (r: SeenResident) => cities.find((c) => c.id === r.cityId)?.name
 
   async function offer(e: FormEvent) {
     e.preventDefault()
@@ -106,10 +144,9 @@ export function ContractsPanel({
 
   return (
     <section className="alliance-panel" aria-label="Mercenary contracts">
-      <div className="panel-head">
-        <h2>Mercenaries</h2>
-        <span>{contracts.length === 0 ? 'none' : contracts.length}</span>
-      </div>
+      <PanelHead title="Mercenaries">
+        {contracts.length === 0 ? 'none' : contracts.length}
+      </PanelHead>
       {contracts.length > 0 && (
         <ul className="alliance-list">
           {contracts.map((c) => {
@@ -118,14 +155,21 @@ export function ContractsPanel({
             const offered = c.startedAt === null
             const theirOffer =
               offered && (c.offeredBy === 'lender' ? c.lender : c.hirer).realmId !== realmId
-            const payers =
+            const payers = labelled(
               !lender && !offered && c.paidWeeks < c.weeks && c.storage
                 ? own.filter(
                     (r) =>
                       isAt(r, { kind: 'storage', ...c.storage! }) &&
                       (r.carried.coins ?? 0) >= c.pricePerWeek,
                   )
-                : []
+                : [],
+              tick,
+            )
+            const rented = nameLabels(
+              inSight.filter((r) => c.residents.some((x) => x.id === r.id)),
+              tick,
+              cities,
+            )
             return (
               <li key={c.id} className="army">
                 <span>
@@ -133,7 +177,7 @@ export function ContractsPanel({
                     {lender ? 'Rented to' : 'Hired from'} {sideName(otherSide, cities)}
                   </strong>
                   <br />
-                  {c.residents.map((r) => r.name).join(', ')}
+                  {c.residents.map((r) => rented.get(r.id) ?? r.name).join(', ')}
                   <br />
                   <span className="muted small">
                     {c.days} days at {c.pricePerWeek} Coins a week, paid into the{' '}
@@ -176,19 +220,24 @@ export function ContractsPanel({
           })}
         </ul>
       )}
-      <form onSubmit={offer}>
-        <fieldset className="army-members">
-          <legend>{hiring ? 'Ask to hire' : 'Offer for hire'}</legend>
-          <label>
-            <input type="radio" checked={!hiring} onChange={() => switchMode(false)} />
-            Rent out mine
-          </label>
-          <label>
-            <input type="radio" checked={hiring} onChange={() => switchMode(true)} />
-            Hire theirs
-          </label>
+      <form className="contract-form" onSubmit={offer} aria-label="New contract">
+        <h3>{hiring ? 'Ask to hire' : 'Offer for hire'}</h3>
+        <div className="contract-field" role="radiogroup" aria-label="What">
+          <span className="contract-label">What</span>
+          <span className="contract-choice">
+            <label>
+              <input type="radio" checked={!hiring} onChange={() => switchMode(false)} />
+              Rent out mine
+            </label>
+            <label>
+              <input type="radio" checked={hiring} onChange={() => switchMode(true)} />
+              Hire theirs
+            </label>
+          </span>
+        </div>
+        <label className="contract-field">
+          <span className="contract-label">{hiring ? 'From' : 'To'}</span>
           <select
-            aria-label="Realm"
             value={other}
             onChange={(e) => {
               setOther(e.target.value)
@@ -198,7 +247,7 @@ export function ContractsPanel({
               }
             }}
           >
-            <option value="">Pick a realm…</option>
+            <option value="">{hiring ? 'Hire from…' : 'Rent out to…'}</option>
             {hiring && <option value={TRADE_ORG}>The Trade Organization</option>}
             {realms.map((r) => (
               <option key={r.realmId} value={r.realmId}>
@@ -212,9 +261,11 @@ export function ContractsPanel({
                 </option>
               ))}
           </select>
-          {tradeOrg && (
-            <label>
-              Soldiers{' '}
+        </label>
+        {tradeOrg && (
+          <label className="contract-field">
+            <span className="contract-label">Soldiers</span>
+            <span>
               <input
                 type="number"
                 min={1}
@@ -224,11 +275,13 @@ export function ContractsPanel({
               <span className="muted small">
                 at least {TRADE_ORG_ARMY.pricePerSoldierWeek} Coins a week each
               </span>
-            </label>
-          )}
-          {npc && (
-            <label>
-              Residents{' '}
+            </span>
+          </label>
+        )}
+        {npc && (
+          <label className="contract-field">
+            <span className="contract-label">Residents</span>
+            <span>
               <input
                 type="number"
                 min={1}
@@ -240,50 +293,85 @@ export function ContractsPanel({
                 it can spare {npc.hire!.spare}, at least {npc.hire!.pricePerResidentWeek} Coins a
                 week each
               </span>
-            </label>
-          )}
-          {candidates.map((r) => (
-            <label key={r.id}>
-              <input type="checkbox" checked={chosen.has(r.id)} onChange={() => toggle(r.id)} />
-              {r.name}
-            </label>
-          ))}
-          <label>
-            Days{' '}
+            </span>
+          </label>
+        )}
+        {!tradeOrg && !npc && (
+          <div className="contract-field">
+            <span className="contract-label">Residents</span>
+            {candidates.length === 0 ? (
+              <span className="muted small">
+                {hiring ? (other ? 'None of theirs in sight' : 'Pick whom to hire from') : 'None'}
+              </span>
+            ) : (
+              <ul className="contract-residents" aria-label="Residents">
+                {candidates.map((r) => (
+                  <li key={r.id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={chosen.has(r.id)}
+                        onChange={() => toggle(r.id)}
+                      />
+                      <span className="contract-resident">
+                        <span>
+                          {r.name}{' '}
+                          <span className="muted small">
+                            · {Math.floor(ageInYears(r, tick))}
+                            {cityName(r) ? ` · ${cityName(r)}` : ''}
+                          </span>
+                        </span>
+                        <small className="muted">
+                          {doingLine(r, { scripts, buildings, residents: inSight, cities })}
+                        </small>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        <label className="contract-field">
+          <span className="contract-label">For</span>
+          <span>
             <input
               type="number"
               min={1}
               max={CONTRACT_MAX_DAYS}
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Coins a week{' '}
+            />{' '}
+            game days
+          </span>
+        </label>
+        <label className="contract-field">
+          <span className="contract-label">Price</span>
+          <span>
             <input
               type="number"
               min={1}
               value={price}
               onChange={(e) => setPrice(Number(e.target.value))}
-            />
-          </label>
-          <select
-            aria-label="Storage to pay into"
-            value={storageId}
-            onChange={(e) => setStorageId(e.target.value)}
-          >
+            />{' '}
+            Coins a week
+          </span>
+        </label>
+        <label className="contract-field">
+          <span className="contract-label">Paid into</span>
+          <select value={storageId} onChange={(e) => setStorageId(e.target.value)}>
             <option value="">Pay into the {tradeOrg ? 'warehouse' : 'storage'}…</option>
             {storages.map((b) => (
               <option key={b.id} value={b.id}>
-                {tradeOrg ? 'Warehouse' : 'Storage'} at {b.x}, {b.y}
+                {storageName(b, cities, storages)}
               </option>
             ))}
           </select>
-        </fieldset>
-        <button
-          type="submit"
-          disabled={(!tradeOrg && !npc && chosen.size === 0) || !other || !storageId}
-        >
+        </label>
+        <p className="contract-summary" aria-live="polite">
+          {summary.text}
+        </p>
+        <button type="submit" className="primary" disabled={!summary.complete}>
           {hiring ? 'Ask' : 'Offer'}
         </button>
       </form>

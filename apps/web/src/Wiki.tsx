@@ -248,7 +248,7 @@ import {
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
 import { DEFAULT_REPEAT } from './plan-blocks.js'
-import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import { PARAM_COMMENT_EXAMPLE, PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
@@ -479,10 +479,27 @@ export function Wiki() {
           group instead of panning.
         </p>
         <p>
+          The map has three zoom tiers: far shows terrain, territory and one emblem per city; middle
+          adds buildings, nodes and residents; close shows each figure. Far out territory is filled
+          in its owner’s colour, nearer in only its borders are drawn; the Region map button fills
+          it at every zoom. The readout bottom right names the terrain, the tile and the tier under
+          the pointer. Above it the minimap shows the terrain you explored, your cities, your
+          residents and carriages away from them, and the cities you know, with the part on screen
+          as a rectangle; click it to look there. The minimap and the legend fold to buttons, and
+          your browser remembers how you left them.
+        </p>
+        <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
           header, half the screen or all of it; a tap on the handle goes one step up. While an order
           waits for a target the card drops to its header. The menu button at the top left opens the
-          drawers, your goods, the wiki and Log out.
+          drawers, your goods, the wiki and Log out. The map’s buttons (Centre, Select, Region map)
+          sit in one row at the bottom left, just above the card; zoom by pinching. The Residents
+          and Horses drawers show each one in two lines: name and age, then what they are doing (or
+          where the horse is) with their meters.
+        </p>
+        <p>
+          Terrain you have explored loads as you look at it. Until it is here it shows grey, and the
+          line at the bottom right says “Loading the map…”; dark is terrain you haven’t explored.
         </p>
         <table>
           <thead>
@@ -787,6 +804,15 @@ export function Wiki() {
           {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents (a site holds
           nobody yet), and a city's free housing is the room of its houses minus its residents.
           Health runs up to {num(MAX_HEALTH)}.
+        </p>
+        <p>
+          <b>Names.</b> A name the game gives a resident, in a starting city, at birth or when they
+          join your realm, is one no living resident of that realm has (an NPC city counts as a
+          realm of its own); a name it gives a city is one no city in the world has. Once its list
+          of names runs dry it adds a numeral, as in “Edda II”. Renaming is free: you can rename any
+          resident or city of your realm, and your names may repeat. Names from before this rule
+          stay as they were, so where a list holds two residents of one name it adds their age,
+          and their city when they live in different ones.
         </p>
         <p>
           A resident lives in one city, wherever they stand. One who lives in none is{' '}
@@ -1108,8 +1134,8 @@ export function Wiki() {
           before it, since the builder walks to the line, and it ends on its own, so it needs no
           duration; a saved queue or a copied step keeps both tiles. Build line has Build's params;
           its line comes only from the order, so run directly or with Run script it ends at once
-          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code>{' '}
-          actions, which build only with what the resident carries, stay for your scripts.
+          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code> actions,
+          which build only with what the resident carries, stay for your scripts.
         </p>
         <p>
           <strong>A crew on one line:</strong> residents on the same line, from the group card or
@@ -1809,6 +1835,11 @@ export function Wiki() {
           most {num(TERRITORY_MAX_REACH)} tiles, fading with distance; where two overlap, the
           stronger wins.
         </p>
+        <p>
+          The Region map shows territory over all the terrain you explored, one colour per
+          Organization (an alliance’s members share one). Zoomed far out it is filled in; at the
+          middle and close zoom only its borders show, unless the Region map button is on.
+        </p>
         <table>
           <thead>
             <tr>
@@ -1971,6 +2002,16 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
             number of zero or more and press Enter. Neither stops the script.
+          </li>
+          <li>
+            The comment at the end of a <code>param</code> line is what the card shows: what the
+            param is for, and after <code>none:</code> what the script uses while none is picked.
+            Each field says the value the script uses: the one picked, else a <code>number</code>{' '}
+            param's default, a default script's target the one on their tile, or what the comment
+            says after <code>none:</code>.
+            <pre>
+              <code>{PARAM_COMMENT_EXAMPLE}</code>
+            </pre>
           </li>
           <li>
             A group's card sets a <code>number</code> param for each of them running a script with

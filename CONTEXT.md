@@ -633,6 +633,12 @@ The shared language of the game. Domain terms only — no implementation details
   included, by hand or from a script: free, instant, from anywhere. Names need not be unique.
   Renaming the Leader never renames the realm (see Realm name). The realm log keeps the names
   things had when they happened.
+- **Game-given names:** a name the game gives a resident (a starting city, a birth, a founding
+  party, integration) is one no living resident of that realm has, an NPC city counting as a
+  realm; a name the game gives a city is one no city in the world has. When the game's list of
+  names runs dry it adds a numeral ("Edda II") rather than repeating one. Renaming stays free and
+  may make duplicates. Names given before this rule stay as they are; a list that holds two
+  residents of one name tells them apart by age and, with several cities, by city.
 - **Stats:** Strength, Endurance, Agility, Intellect. Each has a **base value** and a
   **trained bonus**; the effective value is both together.
   - Strength: carry capacity, mining output, melee damage.
@@ -880,7 +886,11 @@ The shared language of the game. Domain terms only — no implementation details
   first shows those params, filled with the resident's kept values or the defaults; Start gives
   the order with them. A script without params starts at once. The resident card shows one field
   for each param of the script the resident runs, picked on the map and cleared with a button;
-  picking one doesn't end the script. The Work default declares `storage` (where the output goes) and the Build default
+  picking one doesn't end the script. **Param comment:** the `//` comment at the end of a `param`
+  line says what the param is for and, after `none:`, what the script uses while none is picked;
+  each field shows it and the value the script uses: the one picked, else a `number` param's
+  default, a default script's target the one on the resident's tile, or what the comment says
+  after `none:`. The Work default declares `storage` (where the output goes) and the Build default
   `source` (where materials come from, a carriage too), each falling back to the nearest storage
   while unset; a source picked that holds none of what the site lacks is left alone, and they
   just build. Work, Build and Tear down also declare the `number` params `foodAt` and `foodTake`
@@ -928,7 +938,9 @@ The shared language of the game. Domain terms only — no implementation details
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
-  run is named on a small line of its own. A script can say it itself with `doing(text)`: short
+  run is named on a small line of its own, left out when it is their task's own default script
+  ("Working the farm" alone). Long lines wrap rather than being cut off. A script can say it
+  itself with `doing(text)`: short
   text, kept in its memory, that shows instead until the script says something else or stops.
   **Estimates:** the Doing line and every meter or countdown that shows progress also say about
   how long is left, in real time with game time in brackets ("about 3 min (half a game day)"),
@@ -1041,3 +1053,12 @@ The shared language of the game. Domain terms only — no implementation details
   on the map; then the card comes back as it was. On a phone every card is a bottom sheet (peek,
   half, full), one finger pans, pinch zooms, a tap picks, a long-press does what right-click does,
   and a Select toggle makes a drag pick a group.
+- **Minimap:** a small map bottom right of the screen (ADR 0008): the Player's explored terrain
+  at a glance with their home city, their other cities, their residents and carriages away from
+  home and the cities they know (Last seen), each a dot in its relationship colour, and the
+  current view as a rectangle; a click centres the map there. It folds to a button, remembered
+  per browser, and is folded on a phone.
+- **Region map:** the map's territory overlay (one colour per Organization, ADR 0008). It is
+  the far zoom tier's look and comes on there by itself; at the middle and close tiers only
+  territory borders are drawn, so the terrain stays readable. The Region map button forces the
+  overlay on at any tier and shows that it is on.

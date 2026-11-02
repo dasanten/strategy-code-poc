@@ -4,6 +4,9 @@ import {
   defenceChoices,
   errorWhen,
   groupDefenceScript,
+  rememberLastScript,
+  rememberedLastScript,
+  runScriptPick,
   stepsText,
   waitingText,
 } from './script-run-view.js'
@@ -76,5 +79,43 @@ describe('the Defence script picker', () => {
     expect(groupDefenceScript([{}, { defenceScriptId: undefined }])).toBeNull()
     expect(groupDefenceScript([{ defenceScriptId: 3 }, { defenceScriptId: 3 }])).toBe(3)
     expect(groupDefenceScript([{ defenceScriptId: 3 }, {}])).toBeUndefined()
+  })
+})
+
+describe('Run script’s starting pick', () => {
+  const runnable = [{ id: 1 }, { id: 2 }, { id: 3 }]
+  it('starts on what the resident runs, else what they last ran, else nothing', () => {
+    expect(runScriptPick(runnable, { running: 2, last: 3 })).toBe(2)
+    expect(runScriptPick(runnable, { last: 3 })).toBe(3)
+    expect(runScriptPick(runnable, {})).toBeUndefined()
+    expect(runScriptPick(runnable, { picked: 1, running: 2 })).toBe(1)
+  })
+
+  it('skips a script that can no longer run', () => {
+    expect(runScriptPick(runnable, { running: 9, last: 3 })).toBe(3)
+    expect(runScriptPick(runnable, { last: 9 })).toBeUndefined()
+  })
+
+  it('remembers the last script run for each resident in the browser', () => {
+    const kept = new Map<string, string>()
+    const storage = () => ({
+      getItem: (k: string) => kept.get(k) ?? null,
+      setItem: (k: string, v: string) => void kept.set(k, v),
+    })
+    expect(rememberedLastScript('r1', storage)).toBeUndefined()
+    rememberLastScript('r1', 4, storage)
+    rememberLastScript('r2', 5, storage)
+    expect(rememberedLastScript('r1', storage)).toBe(4)
+    expect(rememberedLastScript('r2', storage)).toBe(5)
+    const off = () => ({
+      getItem: () => {
+        throw new Error('off')
+      },
+      setItem: () => {
+        throw new Error('off')
+      },
+    })
+    expect(() => rememberLastScript('r1', 4, off)).not.toThrow()
+    expect(rememberedLastScript('r1', off)).toBeUndefined()
   })
 })

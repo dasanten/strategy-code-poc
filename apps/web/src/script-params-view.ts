@@ -5,7 +5,9 @@ import {
   type Building,
   type Carriage,
   type City,
+  type ScriptParam,
   type ScriptParamType,
+  type ScriptParamValue,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 
@@ -80,4 +82,61 @@ export function paramValueLabel(w: ParamWorld, id: string): string | null {
   const k = w.carriages.find((x) => x.id === id)
   if (k) return `Carriage at ${k.x}, ${k.y}`
   return null
+}
+
+/**
+ * What a param's `//` comment says (`CONTEXT.md`: Script parameter): what it is for, and after
+ * "none:" what the script uses while none is picked. "where the output goes; none: the nearest
+ * storage of my realm" is for "where the output goes", unset "the nearest storage of my realm".
+ */
+export function paramNote(description: string | undefined): { purpose?: string; unset?: string } {
+  if (!description) return {}
+  const m = /^(.*?)[;,]?\s*\bnone:\s*(.*)$/.exec(description)
+  if (!m) return { purpose: description }
+  const purpose = m[1]!.trim()
+  const unset = m[2]!.trim()
+  return { ...(purpose && { purpose }), ...(unset && { unset }) }
+}
+
+/**
+ * What a param field shows as the value the script uses (`CONTEXT.md`: Script parameter): the one
+ * picked, else what the script uses with it unset. A number's default ("1, the default"); a
+ * default script's target param the one on the resident's tile ("Farm at 10, 5, on their tile");
+ * any other what its comment says after "none:", else "none picked". `set` is whether the
+ * Player picked it.
+ */
+export function effectiveParam(
+  p: Pick<ScriptParam, 'name' | 'type' | 'default' | 'description'>,
+  value: ScriptParamValue | undefined,
+  at: {
+    /** How a picked value is named; null when it is out of sight. */
+    label: (id: string) => string | null
+    /** The script's target param (`targetParam`), which unset is the one they stand on. */
+    target?: string
+    /** For the target param, what on their tile it would be, named; null for nothing that fits. */
+    onTile?: string | null
+  },
+): { text: string; set: boolean } {
+  if (p.type === 'number') {
+    if (typeof value === 'number') return { text: String(value), set: true }
+    if (p.default !== undefined) return { text: `${p.default}, the default`, set: false }
+  } else if (typeof value === 'string') {
+    return { text: at.label(value) ?? 'out of sight', set: true }
+  } else if (p.name === at.target && at.onTile !== undefined) {
+    return {
+      text: at.onTile === null ? 'none on their tile' : `${at.onTile}, on their tile`,
+      set: false,
+    }
+  }
+  return { text: paramNote(p.description).unset ?? 'none picked', set: false }
+}
+
+/** What a param of `type` would be on the tile, named (`paramValueLabel`); null for nothing that fits. */
+export function paramOnTile(
+  w: ParamWorld,
+  type: ScriptParamType,
+  at: { x: number; y: number },
+): string | null {
+  const got = paramPickAt(w, type, at)
+  return typeof got === 'string' ? null : paramValueLabel(w, got.id)
 }

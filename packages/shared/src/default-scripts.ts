@@ -245,7 +245,7 @@ export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
 // too. foodAt 0 turns getting food off. At the workplace we stand spread over
 // its footprint.
 param workplace: building // the workplace to work; none: the one I stand on
-param storage: storage // where the output goes
+param storage: storage // where the output goes; none: the nearest storage of my realm
 ${FOOD_PARAMS}
 param crewFood: number = ${CREW_FOOD} // Food the pile keeps for the crew's meals; 0 none
 let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
@@ -501,7 +501,7 @@ ${LOG_TEXT}
 // food up to foodTake too. foodAt 0 turns getting food off. At the site we
 // stand spread over its footprint.
 param site: building // the construction site to join; none: the one I stand on
-param source: storage // where materials come from; a carriage too
+param source: storage // where materials come from; a carriage too; none: the nearest storage holding some
 ${FOOD_PARAMS}
 
 if (!pickSite()) { return }
@@ -709,7 +709,7 @@ ${LOG_TEXT}
 // end, saying why. Below params.foodAt units of Food on me I get Food up to
 // params.foodTake at params.source, or the nearest storage of my realm with
 // Food, and come back. foodAt 0 turns getting food off.
-param source: storage // where materials come from; a carriage too
+param source: storage // where materials come from; a carriage too; none: the nearest storage holding some
 ${FOOD_PARAMS}
 
 if (memory.line == null) {
@@ -996,7 +996,7 @@ fn logLeg() {
 // params.foodTake at params.source, or the nearest storage of my realm with
 // Food, and come back. foodAt 0 turns it off.
 param building: building // the building or site to tear down; none: the one I stand on
-param source: storage // where Food comes from; a carriage too
+param source: storage // where Food comes from; a carriage too; none: the nearest storage with Food
 ${FOOD_PARAMS}
 
 if (memory.stuck) { return }
@@ -1188,7 +1188,7 @@ ${LOG_TEXT}
 // the nearest storage of my realm with Food while none is picked, and store
 // it in the stable; otherwise I wait there.
 param stable: storage // the stable to feed; none: the one I stand in
-param source: storage // where the Food comes from; a carriage too
+param source: storage // where the Food comes from; a carriage too; none: the nearest storage with Food
 let days = ${STABLE_FEED_DAYS} // game days of Food to keep
 let perHorse = ${HORSE_FOOD_PER_DAY} // Food a horse eats a game day
 let side = ${FOOTPRINT.stable} // tiles along each side of a stable

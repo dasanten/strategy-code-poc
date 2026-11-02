@@ -245,6 +245,11 @@ export interface ScriptParam {
   type: ScriptParamType
   /** A `number` param's default (`param name: number = 3`), read while none is set. */
   default?: number
+  /**
+   * The `//` comment at the end of its line: what the param is for, and after "none:" what the
+   * script uses while none is picked (`CONTEXT.md`: Script parameter). The resident card shows it.
+   */
+  description?: string
 }
 
 /** The game API of a resident's script. */

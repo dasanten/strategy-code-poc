@@ -1,12 +1,18 @@
 import {
+  MAX_HEALTH,
+  MAX_HUNGER,
+  TICKS_PER_GAME_DAY,
   drivenCarriageId,
+  horseAgeInYears,
   isAt,
   type Building,
   type Carriage,
   type City,
   type Horse,
   type Resident,
+  type SeenHorse,
 } from '@csp/shared'
+import { nameLabels } from './name-labels.js'
 
 /** One horse of the Horses drawer and where it stands, in words. */
 export interface HorseRow<H> {
@@ -29,15 +35,25 @@ export interface HorseGroup<H> {
  * hitched to a carriage (`carriage.horseId`), one somebody rides, and the rest loose. Stables come
  * first, by name ("Stable, Oakford", with its corner when the city has more than one), then
  * Hitched, Ridden and Loose. Empty groups are left out; horses keep the order they came in, so rows
- * don't jump.
+ * don't jump. With `tick`, riders and drivers of one name are told apart (`nameLabels`).
  */
 export function groupHorses<H extends Pick<Horse, 'id' | 'x' | 'y'>>(
   horses: readonly H[],
   buildings: readonly Pick<Building, 'id' | 'kind' | 'x' | 'y' | 'cityId'>[],
   carriages: readonly Pick<Carriage, 'id' | 'horseId'>[],
-  residents: readonly Pick<Resident, 'id' | 'name' | 'riding' | 'order'>[],
+  residents: readonly Pick<Resident, 'id' | 'name' | 'riding' | 'order' | 'bornAt' | 'cityId'>[],
   cities: readonly Pick<City, 'id' | 'name'>[] = [],
+  tick?: number,
 ): HorseGroup<H>[] {
+  const labels =
+    tick === undefined
+      ? undefined
+      : nameLabels(
+          residents.filter((r) => r.riding !== undefined || drivenCarriageId(r) !== undefined),
+          tick,
+          cities,
+        )
+  const nameOf = (r: (typeof residents)[number]) => labels?.get(r.id) ?? r.name
   const stables = buildings.filter((b) => b.kind === 'stable')
   const cityName = (b: (typeof stables)[number]) => cities.find((c) => c.id === b.cityId)?.name
   const stableLabel = (b: (typeof stables)[number]) => {
@@ -63,10 +79,10 @@ export function groupHorses<H extends Pick<Horse, 'id' | 'x' | 'y'>>(
     const rider = residents.find((r) => r.riding === h.id)
     const pulling = carriage
       ? driver
-        ? `Pulling the carriage ${driver.name} drives`
+        ? `Pulling the carriage ${nameOf(driver)} drives`
         : 'Hitched to a carriage nobody drives'
       : undefined
-    const ridden = rider ? `Ridden by ${rider.name}` : undefined
+    const ridden = rider ? `Ridden by ${nameOf(rider)}` : undefined
     const stable = stables.find((b) => isAt(h, b))
     if (stable) {
       const also = pulling ?? ridden
@@ -84,4 +100,40 @@ export function groupHorses<H extends Pick<Horse, 'id' | 'x' | 'y'>>(
     }
   }
   return groups.filter((g) => g.rows.length > 0)
+}
+
+/** A horse's row in the Horses drawer on a phone (`horseLines`). */
+export interface HorseLines {
+  /** First line: its name, age and Speed/Strength/Endurance. */
+  name: string
+  age: string
+  stats: string
+  /** Second line: where it stands, with health and hunger meters at its end. */
+  place: string
+  /** Health and how fed it is, 0 to 1, or undefined where the Player doesn't know. */
+  health?: number
+  fed?: number
+}
+
+/**
+ * A horse's row in the Horses drawer on a phone (ADR 0012), laid out like a resident's: two lines
+ * in place of the table's columns, "Zephyr · 3 years · 12/8/10" and where it stands with its
+ * health and hunger meters at the end.
+ */
+export function horseLines({ horse: h, place }: HorseRow<SeenHorse>, tick: number): HorseLines {
+  const years = Math.floor(horseAgeInYears(h, tick))
+  const days = Math.max(0, Math.floor((tick - h.bornAt) / TICKS_PER_GAME_DAY))
+  const share = (n: number | undefined, max: number) =>
+    n === undefined ? undefined : Math.max(0, Math.min(1, n / max))
+  return {
+    name: h.name,
+    age:
+      years >= 1
+        ? `${years} ${years === 1 ? 'year' : 'years'}`
+        : `${days} game ${days === 1 ? 'day' : 'days'}`,
+    stats: `${h.stats.speed}/${h.stats.strength}/${h.stats.endurance}`,
+    place,
+    health: share(h.health, MAX_HEALTH),
+    fed: share(h.hunger, MAX_HUNGER),
+  }
 }

@@ -40,6 +40,7 @@ import { deliveryRobbed, releaseDelivery, runDelivery, takeOnDelivery } from './
 import { releaseTransfer, runTransfer, takeOnTransfer, transferRobbed } from './transfers.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { newHorse } from './horses.js'
+import { residentNamesTaken } from './names.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
 import { hqLayout, tradeOrgHq } from './trade-org.js'
@@ -146,15 +147,13 @@ export function placeCaravans(world: WorldState): Caravan[] {
     )
     const carriageId = newId(world, 'carriage')
     world.carriages.push({ id: carriageId, realmId: null, cityId: hq.id, x, y, horseId, load: {} })
+    const names = residentNamesTaken(world, null, hq.id)
     const crew = Array.from({ length: 1 + CARAVAN_ESCORTS }, () => {
-      const r = newResident(rand, {
-        id: newId(world, 'r'),
-        owner: null,
-        cityId: hq.id,
-        x,
-        y,
-        tick: world.tick,
-      })
+      const r = newResident(
+        rand,
+        { id: newId(world, 'r'), owner: null, cityId: hq.id, x, y, tick: world.tick },
+        names,
+      )
       r.carried = { food: START_CARRIED_FOOD }
       return r
     })

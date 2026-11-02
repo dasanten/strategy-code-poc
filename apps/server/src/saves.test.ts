@@ -117,8 +117,10 @@ describe('world saves', () => {
     const { world: v37, terrain: land, post } = worldWithPost()
     const realm = v37.realms[0]!
     const warehouse = v37.buildings.find((b) => b.cityId === post.id && b.kind === 'warehouse')!
-    // Captured the old way: the realm's, but still a Trade Org post with its caravan.
+    // Captured the old way: the realm's, but still a Trade Org post with its caravan. A format 37
+    // world marks no name as the game's.
     post.realmId = realm.id
+    for (const r of v37.residents) delete r.gameName
     for (const r of v37.residents) if (r.cityId === post.id) r.owner = realm.id
     v37.routeRobberies[post.id] = 2
     const v38 = migrateWorld(structuredClone(v37), 37, { terrain: land }, migrations, 38)
@@ -138,7 +140,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(68)
+    expect(WORLD_FORMAT_VERSION).toBe(69)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -404,6 +406,19 @@ describe('world saves', () => {
     const migrated = migrateWorld(structuredClone(world), 67, { terrain }, migrations, 68)
     expect(migrated).toEqual(world)
     expect(migrated.residents.every((r) => r.order?.kind !== 'relocate')).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps a format 68 world’s names, duplicates too (migration 68 → 69)', () => {
+    const { world, terrain } = worldWithCity()
+    // A format 68 world: no name is marked as the game's, and two residents share one.
+    for (const r of world.residents) delete r.gameName
+    for (const c of world.cities) delete c.gameName
+    const [a, b] = world.residents
+    a!.name = 'Edda'
+    b!.name = 'Edda'
+    const migrated = migrateWorld(structuredClone(world), 68, { terrain }, migrations, 69)
+    expect(migrated).toEqual(world)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

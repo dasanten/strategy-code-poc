@@ -12,6 +12,7 @@ import {
   standingRelationship,
   standingWord,
 } from './standing-view.js'
+import { PanelHead } from './drawer-head.js'
 import { relationshipClass } from './theme.js'
 
 /**
@@ -35,9 +36,7 @@ export function StandingPanel({
   const order = async (o: OrderRequest) => setError(await sendOrder(o))
   return (
     <section className="alliance-panel" aria-label="Standing">
-      <div className="panel-head">
-        <h2>Standing</h2>
-      </div>
+      <PanelHead title="Standing" />
       {joinRequests.length > 0 && (
         <ul className="alliance-list" aria-label="Cities asking to join">
           {joinRequests.map((q) => (
