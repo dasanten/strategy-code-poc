@@ -1,5 +1,6 @@
 import type { Account } from './api.js'
 import type { Diplomacy } from './alliance.js'
+import type { FirstDay } from './first-day.js'
 import type { RegionMap } from './region-map.js'
 import type { LoadLevel } from './carriages.js'
 import type { NpcCityPrice } from './npc-trade.js'
@@ -145,6 +146,8 @@ export type ServerMessage =
       region: RegionMap | null
       /** Whether the Player may still claim their Horse offer (`CONTEXT.md`: Horse offer). */
       horseOffer: boolean
+      /** The Player's first-day card (`CONTEXT.md`: First day). */
+      firstDay: FirstDay
     }
   /**
    * Every tick: entities in sight that changed, ids that left sight, the Player's Last seen out
@@ -189,6 +192,11 @@ export type ServerMessage =
    * tick. Only for the Player owning the resident; null for anyone else's, or an army.
    */
   | { type: 'scriptLog'; id: string; lines: ScriptLogLine[] | null }
+  /**
+   * The Player's first-day card, to every tab of theirs, when an order of theirs ticked one of
+   * its lines (`CONTEXT.md`: First day).
+   */
+  | { type: 'firstDay'; firstDay: FirstDay }
   | { type: 'ack'; requestId: string }
   | { type: 'rejected'; requestId: string; reason: string }
 

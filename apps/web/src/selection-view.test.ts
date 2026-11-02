@@ -41,16 +41,24 @@ import {
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 import {
+  ACTION_KEYS,
   actionForKey,
   buildHereProblem,
   describeTile,
+  escapeStep,
+  keepRows,
   makeLeaderProblem,
   nodeFit,
   groupOrders,
+  orderGroupOf,
   residentActions,
+  residentOrders,
   riddenHorseLine,
+  rowGroups,
   tileActions,
   unhitcherOf,
+  type ActionId,
+  type CardAction,
   type ResidentHere,
   type TileThings,
 } from './selection-view.js'
@@ -452,6 +460,105 @@ describe('the Orders tab', () => {
       'Move',
       'Scripts',
     ])
+  })
+})
+
+describe('the rows of a card that stays open', () => {
+  const farm = building({ kind: 'farm' })
+  /** The rows after the card showed `before` and the resident is now as `now` says. */
+  const keep = (before: ResidentHere | undefined, now: ResidentHere) => {
+    const kept = before && keepRows(undefined, residentActions(before), {}, orderGroupOf)
+    const { actions, missing } = residentOrders(now)
+    return keepRows(kept, actions, missing, orderGroupOf)
+  }
+  const ids = (rows: CardAction[]) => rows.map((a) => a.id)
+
+  it('are sorted afresh, by kind, when nothing is kept: something else was picked', () => {
+    const rows = keep(undefined, here({ building: farm, busy: true }))
+    expect(ids(rows)).toEqual(
+      groupOrders(residentActions(here({ building: farm, busy: true }))).flatMap((g) =>
+        ids(g.actions),
+      ),
+    )
+    expect(ids(rows).at(-1)).toBe('pair')
+  })
+
+  it('keep an order that stops being possible in its slot, greyed with why', () => {
+    // At the farm and working; then they walk off it.
+    const before = here({ building: farm, busy: true })
+    const rows = keep(before, here({ busy: true }))
+    expect(ids(rows)).toEqual(ids(keep(undefined, before)))
+    expect(rows.find((a) => a.id === 'work')).toMatchObject({
+      label: 'Work at the farm…',
+      disabled: true,
+      reason: 'not on a workplace',
+    })
+    // A greyed row runs on no key.
+    expect(actionForKey(rows, 'e')).toBeUndefined()
+    expect(actionForKey(rows, 'w')?.id).toBe('walk')
+  })
+
+  it('add an order that becomes possible at the end of its kind', () => {
+    const before = here()
+    const rows = keep(before, here({ busy: true, building: farm }))
+    expect(rowGroups(rows, orderGroupOf).map((g) => [g.group, ids(g.actions)])).toEqual([
+      ['move', ['walk', 'stop']],
+      ['work', ['build', 'roadTo', 'wallTo', 'work', 'tearDown']],
+      ['scripts', ['script']],
+      ['other', ['pair']],
+    ])
+  })
+
+  it('put a kind that comes up while open below the others, so no row moves', () => {
+    const before = here()
+    const rows = keep(before, here({ carries: true }))
+    const groups = rowGroups(rows, orderGroupOf).map((g) => g.group)
+    expect(groups).toEqual(['move', 'work', 'scripts', 'other', 'goods'])
+    expect(ids(rows).slice(0, -1)).toEqual(ids(keep(undefined, before)))
+  })
+
+  it('keep a slot through a change of label, and drop pick mode from a greyed row', () => {
+    const riding = keep(here({ horseToRide: true }), here({ riding: true }))
+    expect(riding.find((a) => a.id === 'ride')?.label).toBe('Dismount')
+    const kept = keepRows(
+      undefined,
+      residentActions(here({ carriage, picking: 'drive' })),
+      {},
+      orderGroupOf,
+    )
+    expect(kept.find((a) => a.id === 'drive')?.active).toBe(true)
+    const { actions, missing } = residentOrders(here())
+    const drive = keepRows(kept, actions, missing, orderGroupOf).find((a) => a.id === 'drive')
+    expect(drive).toMatchObject({ disabled: true, reason: 'no carriage here' })
+    expect(drive?.active).toBeUndefined()
+  })
+
+  it('say why for every order a resident card can leave out', () => {
+    const offered = new Set(ids(residentActions(here())))
+    const { missing } = residentOrders(here())
+    for (const id of Object.keys(ACTION_KEYS) as ActionId[]) {
+      if (offered.has(id)) continue
+      // The tile card's actions and the own resident's orders never come and go on a card.
+      if (['sendHere', 'gate', 'openCity', 'tradeHere', 'renameCity', 'renameHorse'].includes(id))
+        continue
+      if (['relocate', 'makeLeader', 'rename'].includes(id)) continue
+      expect(missing[id], id).toBeTruthy()
+    }
+    expect(residentOrders(here({ adult: false })).missing.work).toBe('children can’t work')
+    expect(residentOrders(here({ carrying: true })).missing.build).toBe('carrying a child')
+    expect(residentOrders(here({ inCity: false })).missing.pair).toBe('homeless')
+  })
+})
+
+describe('Escape', () => {
+  it('leaves the top-most thing first: pick mode, a panel, the tile card, the card, the drawer', () => {
+    const all = { pick: true, panel: true, tile: true, card: true, drawer: true }
+    expect(escapeStep(all)).toBe('pick')
+    expect(escapeStep({ ...all, pick: false })).toBe('panel')
+    expect(escapeStep({ ...all, pick: false, panel: false })).toBe('tile')
+    expect(escapeStep({ card: true, drawer: true })).toBe('card')
+    expect(escapeStep({ drawer: true })).toBe('drawer')
+    expect(escapeStep({})).toBeUndefined()
   })
 })
 

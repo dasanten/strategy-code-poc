@@ -444,7 +444,26 @@ export function Wiki() {
       <Section id="controls">
         <p>
           Click one of your residents on the map to pick them and open their card. Each action on
-          the card shows its letter key; press it to run the action. Escape drops what is picked.
+          the card shows its letter key; press it to run the action. The card opens with the orders
+          they can take. While it stays open, each row stays where it is: an order that stops being
+          possible (they walk off the farm they worked) stays in its place, greyed out, saying why,
+          and one that becomes possible is added at the end of its group. The rows are sorted afresh
+          once you pick something else. A group’s card has the same rows and keys.
+        </p>
+        <p>
+          Escape leaves the top-most thing first: picking a target on the map, then a panel open on
+          the card (Build, Goods, Run script, …), then a tile’s card, then the resident’s or group’s
+          card, then the open drawer.
+        </p>
+        <p>
+          What a click picks on a tile goes in this order, at every zoom: one of your residents
+          there, then a building, then the bare tile, each showing its card. A carriage of yours, or
+          a horse of yours nobody rides, counts like a building. A click on a stack of your
+          residents (a token with a count, or the +N badge up close) picks them all as a group; its
+          card’s Members tab picks one of them. A stack with someone else’s residents in it opens
+          the tile card instead, which lists them all. With a mouse, what a click would pick is
+          outlined while you hover over it, in its owner’s colour; on a touch screen a tap picks by
+          the same order.
         </p>
         <p>
           The card and the residents list say what each resident is doing. Walking, riding or
@@ -474,9 +493,21 @@ export function Wiki() {
           of a haul). Only places you can see or remember are outlined.
         </p>
         <p>
+          An order that needs a place (walk to, drive to, a road or wall line, where to build, the
+          storage to store at) shrinks the card to its header and a banner says what to pick. Where
+          the card was stays dead until you pick, so a click there gives no order by accident.
+          Before you click, the map shows under the pointer what the pick would do: the way there,
+          with about when they arrive; the line of a road or wall and how many tiles it has, red
+          when it is too long; a workplace’s footprint on a resource node, red where it doesn’t fit,
+          or the site they would join; or the building a Store, Fetch or Work would use. The banner
+          names what is under the pointer. Escape or Cancel gives no order.
+        </p>
+        <p>
           On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
           long-press does what right-click does. Turn on Select to make a one-finger drag box a
-          group instead of panning.
+          group instead of panning. While picking a place, the first tap shows the preview there and
+          the banner gains Confirm: press it, or tap the same tile again, to give the order; a tap
+          elsewhere moves the preview.
         </p>
         <p>
           The map has three zoom tiers: far shows terrain, territory and one emblem per city; middle
@@ -536,7 +567,9 @@ export function Wiki() {
           With several picked, the group card gives each of them the same order, just as their own
           cards would. Every order a resident's card has is on it, but pairing, making Leader and
           renaming, which are about one resident. Nothing ties them together afterwards; each goes
-          on alone.
+          on alone. The card shows the orders some of them can take where they stand, as rows with
+          the same keys as on a resident's card; while it stays open, an order none of them can take
+          any more stays greyed out, saying why (“nobody stands on a carriage of your realm”).
         </p>
         <ul>
           <li>
@@ -578,17 +611,17 @@ export function Wiki() {
             all to attack. <strong>Climb a wall</strong>: those next to the one picked climb over.
           </li>
           <li>
-            <strong>Board carriage</strong> (one for each carriage of your realm some of them stand
-            on) puts those on its tile aboard, in the group's order, until it is full;{' '}
+            <strong>Board carriage</strong> (with several carriages of your realm where some of them
+            stand, pick one) puts those on its tile aboard, in the group's order, until it is full;{' '}
             <strong>Get off</strong> gets every passenger among them off. See Passengers.
           </li>
         </ul>
         <p>
-          Those who can't take an order are skipped, and the card says who and why: children don't
-          work, build or drive, and store, fetch or put down only Food; a partner carrying a child
-          doesn't work, build, tear down, breed or haul; orders bound to a place go only to those
-          standing there; Board skips those not on the carriage's tile, the driver, riders and, once
-          it is full, the rest.
+          Those who can't take an order are skipped, and a notice under the top bar says who and
+          why: children don't work, build or drive, and store, fetch or put down only Food; a
+          partner carrying a child doesn't work, build, tear down, breed or haul; orders bound to a
+          place go only to those standing there; Board skips those not on the carriage's tile, the
+          driver, riders and, once it is full, the rest.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
@@ -1383,11 +1416,11 @@ export function Wiki() {
         </p>
         <p>
           The group card boards everyone of the group standing on the carriage at once, until it is
-          full, and says who was skipped and why; its Get off gets them all off. Board and Get off
-          are queue steps too: Board ends once they are aboard and Get off once they are off, so put
-          a step that waits for the stop between them (a script that calls <code>end()</code> once
-          they are there), e.g. board, wait, get off, work. A Board step whose carriage has left
-          their tile by its turn is skipped.
+          full, and a notice says who was skipped and why; its Get off gets them all off. Board and
+          Get off are queue steps too: Board ends once they are aboard and Get off once they are
+          off, so put a step that waits for the stop between them (a script that calls{' '}
+          <code>end()</code> once they are there), e.g. board, wait, get off, work. A Board step
+          whose carriage has left their tile by its turn is skipped.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}

@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   BUILDABLE,
+  firstDayShown,
+  type ClientFirstDayLine,
   carriagePulledBy,
   holdersOf,
   carriageOfResident,
@@ -32,6 +34,9 @@ import {
   type SeenResident,
   HORSE_GRANT_HORSES,
   UNEXPLORED,
+  Terrain,
+  roadTiles,
+  tileIndex,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
@@ -46,7 +51,10 @@ import {
   CentredDialog,
   Drawer,
   DrawerEdge,
+  FirstDayCard,
+  GroupReportNotice,
   HorseOfferNotice,
+  NoticeLane,
   PhoneMenu,
   ToolRail,
   TopBar,
@@ -54,6 +62,7 @@ import {
   useEscapeCloses,
 } from './Hud.js'
 import type { Covered } from './map/camera.js'
+import { cardHidden, laneNotices } from './notices-view.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { groupHorses } from './horses-view.js'
 import { HorsesList } from './Horses.js'
@@ -88,7 +97,13 @@ import {
   type PlanWorld,
 } from './plan-step.js'
 import { useSavedGroups } from './saved-groups.js'
-import { groupRequests, type GroupOrder, type Place, type Skipped } from './group-orders.js'
+import {
+  groupRequests,
+  type GroupOrder,
+  type GroupSeen,
+  type Place,
+  type Skipped,
+} from './group-orders.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
@@ -108,13 +123,22 @@ import {
   type Picking,
 } from './Residents.js'
 import { arrivalOf } from './doing-view.js'
-import { CardSheet, PickBanner, TileCard } from './SelectionCard.js'
-import { pickHint, pickPrompt, pickTarget, useMediaQuery, useTouchScreen } from './pick-mode.js'
+import { CardSheet, PickBanner, TileCard, closeOpenPanel, panelOpen } from './SelectionCard.js'
+import {
+  pickHint,
+  pickPrompt,
+  pickTap,
+  pickTarget,
+  useMediaQuery,
+  useTouchScreen,
+} from './pick-mode.js'
+import { pickPreview, previewPickOf, type PreviewWorld } from './pick-preview.js'
 import { PHONE_QUERY } from './sheet-view.js'
 import { buildingNodeKind } from './building-info-view.js'
 import {
   buildHereProblem,
   describeTile,
+  escapeStep,
   makeLeaderProblem,
   nodeFit,
   type ActionId,
@@ -210,10 +234,22 @@ function Pages() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, founding, status, sendOrder, found, memories, runs, scriptLogs, watchScript } =
-    useWorld(onLoggedOut)
+  const {
+    world,
+    founding,
+    status,
+    sendOrder,
+    found,
+    memories,
+    runs,
+    scriptLogs,
+    watchScript,
+    setFirstDay,
+  } = useWorld(onLoggedOut)
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  // The first-day lines reported and not turned down, so each goes out once (`reportFirstDay`).
+  const firstDayReported = useRef(new Set<ClientFirstDayLine>())
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
@@ -258,6 +294,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
   // The start picked for the picked resident's Build line, while they pick its end.
   const [lineFrom, setLineFrom] = useState<{ x: number; y: number }>()
+  // Where a pick is previewed: the tile under the pointer, or the one tapped on a touch screen.
+  const [pickAt, setPickAt] = useState<{ x: number; y: number; tapped?: boolean }>()
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
   const [groupReport, setGroupReport] = useState<{ sent: number; of: number; skipped: Skipped[] }>()
   const [groupError, setGroupError] = useState<string>()
@@ -294,6 +332,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           : [],
       )
     : []
+  // What group orders need of what the Player sees (`GroupSeen`).
+  const groupSeen: GroupSeen = world
+    ? {
+        // Free horses of the realm, to mount (`CONTEXT.md`: Riding).
+        horses: world.horses.filter(
+          (h) =>
+            h.realmId === world.home.realmId && !carriagePulledBy(world, h) && !riderOf(world, h),
+        ),
+        carriages: world.carriages.filter((k) => k.realmId === world.home.realmId),
+        buildings: world.buildings,
+      }
+    : {}
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The cities and buildings the Player knows, in sight or remembered (`CONTEXT.md`: Last seen).
   const knownCities = world ? knownOf(world.cities, world.lastSeen.cities) : []
@@ -360,6 +410,21 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   })
   // A step picking a city keeps the card open: it lists the realm's cities to pick from too.
   const picksCity = plan !== undefined && nextPick(plan)?.pick === 'city'
+  // A new pick (or none) previews nothing until the pointer or a tap shows where.
+  const pickKey = pick ? pickPrompt(pick, false) : ''
+  useEffect(() => setPickAt(undefined), [pickKey])
+  /**
+   * A tile clicked or tapped while picking (`pickTap`): a click picks it; a tap on a touch screen
+   * previews it first, and a second tap there or Confirm picks it.
+   */
+  const pickTile = (x: number, y: number, tap?: { touch: boolean }) => {
+    if (tap && pick) {
+      const next = pickTap(pickAt?.tapped ? pickAt : undefined, { x, y }, tap.touch)
+      if ('preview' in next) return setPickAt({ ...next.preview, tapped: true })
+    }
+    setPickAt(undefined)
+    void goTo(x, y)
+  }
   /** Leaves pick mode without giving the order; the card comes back as it was. */
   const cancelPick = useCallback(() => {
     setPicking(false)
@@ -369,32 +434,41 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setPlan(undefined)
     setStarting((s) => s && { ...s, picking: undefined })
   }, [])
-  // Escape leaves pick mode first; with no drawer open, it then drops the selection.
+  // Escape leaves the top-most thing first: pick mode, an open panel (the form before a script
+  // starts among them), the tile card, the resident or group card, then the drawer. A card
+  // hidden behind the wide drawer is passed over, so Escape closes the drawer in front of it.
+  const shownCard = !cardHidden(openDrawer)
   const anySelected = selectedIds.length > 0
   const picked = pick !== undefined
   const formOpen = starting !== undefined
+  const tileOpen = selectedTile !== undefined
   useEffect(() => {
-    if (!picked && !formOpen && (openDrawer || !anySelected)) return
     const onKey = (e: KeyboardEvent) => {
       const typing =
         e.target instanceof Element && e.target.closest('input, textarea, select, .cm-editor')
       if (e.key !== 'Escape' || typing) return
-      if (picked) {
-        // Ahead of the drawer's own Escape, which would close it too.
-        e.stopImmediatePropagation()
-        return cancelPick()
+      const step = escapeStep({
+        pick: picked,
+        panel: formOpen || (shownCard && panelOpen()),
+        tile: shownCard && tileOpen,
+        card: shownCard && anySelected,
+      })
+      // With nothing else open, the drawer's own Escape closes it.
+      if (!step) return
+      // Ahead of the drawer's own Escape, which would close it too.
+      e.stopImmediatePropagation()
+      if (step === 'pick') return cancelPick()
+      if (step === 'panel') {
+        if (formOpen) return setStarting(undefined)
+        return closeOpenPanel()
       }
-      // The form before a script starts is cancelled first.
-      if (formOpen) {
-        e.stopImmediatePropagation()
-        return setStarting(undefined)
-      }
+      if (step === 'tile') return setSelectedTile(undefined)
       setSelectedIds([])
       setPicking(false)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [openDrawer, anySelected, picked, formOpen, cancelPick])
+  }, [anySelected, picked, formOpen, tileOpen, shownCard, cancelPick])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
@@ -403,6 +477,27 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setFocus({ ...toShow, cover: shown })
   }, [toShow, closeDrawer])
   const showOnMap = (x: number, y: number) => setToShow({ x, y })
+  /**
+   * Reports a first-day line only the client sees done, once, while the card shows
+   * (`CONTEXT.md`: First day); the server ticks the others itself.
+   */
+  const reportFirstDay = (line: ClientFirstDayLine) => {
+    const card = world?.firstDay
+    if (!card || !firstDayShown(card) || card.done.includes(line)) return
+    if (firstDayReported.current.has(line)) return
+    firstDayReported.current.add(line)
+    api.firstDayDone(line).then(setFirstDay, () => firstDayReported.current.delete(line))
+  }
+  // Picking a resident, however it happened: on the map, in a list, a saved group.
+  const residentPicked = selectedIds.length > 0
+  useEffect(() => {
+    if (residentPicked) reportFirstDay('pickResident')
+  })
+  /** Hides the first-day card at once; the server keeps it dismissed for good. */
+  const dismissFirstDay = () => {
+    if (world) setFirstDay({ ...world.firstDay, dismissed: true })
+    api.dismissFirstDay().then(setFirstDay, () => {})
+  }
   /** Picks residents on the map: one shows their card, several a group card. */
   const select = (ids: string[]) => {
     setSelectedIds(ids)
@@ -732,20 +827,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
     }
     // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue).
-    const realmId = world.home.realmId
     const { requests, skipped } = groupRequests(order, group, {
       tick: world.tick,
       size,
       free,
       queued,
-      seen: {
-        // Free horses of the realm, to mount (`CONTEXT.md`: Riding).
-        horses: world.horses.filter(
-          (h) => h.realmId === realmId && !carriagePulledBy(world, h) && !riderOf(world, h),
-        ),
-        carriages: world.carriages.filter((k) => k.realmId === realmId),
-        buildings: world.buildings,
-      },
+      seen: groupSeen,
     })
     if (order.kind === 'build') setGroupBuildAt(undefined)
     await sendToGroup(
@@ -971,6 +1058,65 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     selected && world?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && isAt(selected, b))
   const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
   const carriageSiteHere = onTile(world?.buildings.filter((b) => b.kind === 'carriage'))
+  // What the pick waiting for a tile would do under the pointer, or at the tile tapped on a touch
+  // screen (`CONTEXT.md`: Picking a target).
+  const preview = (() => {
+    if (!world || !pick || !pickAt) return undefined
+    const size = world.map.size
+    const roads = roadTiles(world, size)
+    // A way doesn't cross a wall, nor a gate unless it is the realm's own or an ally's, or open
+    // (`CONTEXT.md`: Wall, Gate); climbing onto the realm's own walls is left out.
+    const allies = new Set(world.diplomacy.alliance?.members.map((m) => m.realmId))
+    allies.add(world.home.realmId)
+    const blocked = new Set(
+      knownBuildings
+        .filter((b) => isWallOrGate(b))
+        .filter((b) => {
+          const realmId = world.cities.find((c) => c.id === b.cityId)?.realmId
+          return b.kind === 'wall' || (b.closed && !(realmId && allies.has(realmId)))
+        })
+        .map((b) => tileIndex(size, b.x, b.y)),
+    )
+    const seen: PreviewWorld = {
+      blocked: (x, y) => blocked.has(tileIndex(size, x, y)),
+      ...planWorld(world),
+      cityNames: knownCities,
+      ground: (x, y) => {
+        if (roads.has(tileIndex(size, x, y))) return Terrain.Road
+        const t = terrainAt?.(x, y)
+        return t === undefined || t === UNEXPLORED ? undefined : (t as Terrain)
+      },
+      nodeAt: (x, y) => nodeAt?.(x, y),
+      buildProblem: (kind, x, y) =>
+        buildHereProblem(kind, x, y, world, (nx, ny) => nodeAt?.(nx, ny), {
+          size,
+          at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED,
+        }),
+    }
+    const what = previewPickOf(pick, {
+      lineFrom: group.length > 1 ? groupLineFrom : lineFrom,
+      plan,
+    })
+    // A drive or haul goes from those standing on a carriage of the realm.
+    const carriageAt = (r: Resident) =>
+      world.carriages.find((k) => k.x === r.x && k.y === r.y && k.realmId === world.home.realmId)
+    const going = what.kind === 'way' && what.goer === 'carriage'
+    const goers = group
+      .filter((r) => !going || carriageAt(r))
+      .map((r) => ({
+        from: r,
+        ticks: (path: readonly (readonly [number, number])[], goer: 'foot' | 'carriage') => {
+          const way = { target: pickAt, path: path.map(([x, y]) => [x, y] as [number, number]) }
+          const carriage = carriageAt(r)
+          const order =
+            goer === 'carriage' && carriage
+              ? { kind: 'drive' as const, carriageId: carriage.id, ...way, progress: 0 }
+              : { kind: 'walkTo' as const, ...way, progress: 0 }
+          return arrivesIn?.({ ...r, order })
+        },
+      }))
+    return pickPreview(what, pickAt, seen, goers)
+  })()
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -1021,7 +1167,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               pick?.kind === 'plan' ||
               (group.length > 1 && groupPicking !== false)
             }
-            onPickTile={goTo}
+            onPickTile={pickTile}
+            preview={preview}
+            // A tile tapped stays previewed until another is tapped.
+            onPointerTile={(tile) => setPickAt((at) => (at?.tapped ? at : tile))}
             onNodesLoaded={onNodesLoaded}
             onTerrainLoaded={onTerrainLoaded}
             newRealm={isNewRealm(world.events, world.tick)}
@@ -1040,13 +1189,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
         leader={leader?.name}
         onLogout={logout}
+        onWiki={() => reportFirstDay('openWiki')}
       />
-      {world?.horseOffer && (
-        <HorseOfferNotice
-          horses={HORSE_GRANT_HORSES}
-          onClaim={() => sendOrder({ kind: 'claimHorses' })}
-        />
-      )}
       {phone ? (
         <PhoneMenu
           open={openDrawer}
@@ -1056,6 +1200,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           leader={leader?.name}
           account={account.name}
           onLogout={logout}
+          onWiki={() => reportFirstDay('openWiki')}
         />
       ) : (
         <ToolRail
@@ -1254,11 +1399,47 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />,
         )}
       <DrawerEdge open={openDrawer} />
-      {pick && (
-        <PickBanner prompt={pickPrompt(pick, touch)} hint={pickHint(pick)} onCancel={cancelPick} />
-      )}
+      {/* Every notice in one lane under the top bar (`CONTEXT.md`: Notices). */}
+      <NoticeLane phone={phone}>
+        {laneNotices({
+          pick: pick !== undefined,
+          horseOffer: world?.horseOffer,
+          firstDay: world !== null && firstDayShown(world.firstDay),
+          groupReport: groupReport !== undefined,
+        }).map((kind) =>
+          kind === 'pick' && pick ? (
+            <PickBanner
+              key={kind}
+              prompt={pickPrompt(pick, touch)}
+              hint={pickHint(pick)}
+              under={pick.kind === 'plan' && pick.error ? undefined : preview?.label}
+              onConfirm={pickAt?.tapped ? () => pickTile(pickAt.x, pickAt.y) : undefined}
+              onCancel={cancelPick}
+            />
+          ) : kind === 'horseOffer' ? (
+            <HorseOfferNotice
+              key={kind}
+              horses={HORSE_GRANT_HORSES}
+              onClaim={() => sendOrder({ kind: 'claimHorses' })}
+            />
+          ) : kind === 'firstDay' && world ? (
+            <FirstDayCard
+              key={kind}
+              card={world.firstDay}
+              onWiki={() => reportFirstDay('openWiki')}
+              onDismiss={dismissFirstDay}
+            />
+          ) : kind === 'groupReport' && groupReport ? (
+            <GroupReportNotice
+              key={kind}
+              report={groupReport}
+              onDismiss={() => setGroupReport(undefined)}
+            />
+          ) : null,
+        )}
+      </NoticeLane>
       {world && selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={false}>
+        <CardSheet phone={phone} pinnedPeek={false} hidden={cardHidden(openDrawer)}>
           <TileCard
             card={describeTile(
               {
@@ -1333,7 +1514,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }}
             // The same `renameHorse` order a script's `renameHorse` requests, asked by the Leader.
             onRenameHorse={async (horseId, name) => {
-              const order = { kind: 'renameHorse', residentId: world.home.leaderId, horseId, name }
+              const order = {
+                kind: 'renameHorse',
+                residentId: world.home.leaderId,
+                horseId,
+                name,
+              }
               setOrderError(await giveOrder(order))
             }}
             onSelectResident={(id) => select([id])}
@@ -1345,7 +1531,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && selected && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={pick !== undefined && pick.kind !== 'army'}>
+        <CardSheet
+          phone={phone}
+          pinnedPeek={pick !== undefined && pick.kind !== 'army'}
+          hidden={cardHidden(openDrawer)}
+        >
           <ResidentCard
             key={selected.id}
             resident={selected}
@@ -1534,9 +1724,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CardSheet>
       )}
       {world && group.length > 1 && !selectedTile && (
-        <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}>
+        <CardSheet
+          phone={phone}
+          pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}
+          hidden={cardHidden(openDrawer)}
+        >
           <GroupCard
+            // Another group picked starts a card sorted afresh (ADR 0019).
+            key={selectedIds.join()}
             residents={group}
+            seen={groupSeen}
+            mapSize={world.map.size}
             relocate={relocateForGroup(group)}
             cities={knownCities}
             scripts={scripts}
@@ -1578,7 +1776,6 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onOrder={(order) =>
               void sendGroup(order, order.kind !== 'setDefenceScript' && shift.current)
             }
-            report={groupReport}
             orderError={groupError}
             onPick={(id) => select([id])}
             onClose={() => select([])}

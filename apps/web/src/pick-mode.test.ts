@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pickPrompt, pickTarget } from './pick-mode.js'
+import { pickPrompt, pickTap, pickTarget } from './pick-mode.js'
 import type { Plan } from './plan-step.js'
 
 const none = {
@@ -76,5 +76,22 @@ describe('pickPrompt', () => {
     expect(pickPrompt({ kind: 'army', mode: 'armyWalkTo' }, false)).toBe(
       'Click where the army marches',
     )
+  })
+})
+
+describe('a click or tap while picking', () => {
+  const tile = { x: 4, y: 5 }
+
+  it('picks at once with a mouse, the preview having shown under the pointer', () => {
+    expect(pickTap(undefined, tile, false)).toEqual({ pick: tile })
+  })
+
+  it('previews the first tap on a touch screen, and moves the preview with a tap elsewhere', () => {
+    expect(pickTap(undefined, tile, true)).toEqual({ preview: tile })
+    expect(pickTap(tile, { x: 9, y: 9 }, true)).toEqual({ preview: { x: 9, y: 9 } })
+  })
+
+  it('picks the tile previewed on a second tap there', () => {
+    expect(pickTap(tile, { ...tile }, true)).toEqual({ pick: tile })
   })
 })

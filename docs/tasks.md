@@ -32,7 +32,11 @@ order, both ahead of Bandits. Agreed with Daniel on 2026-11-01: Relocating (Epic
 residents to another city of their realm) next, ahead of Bandits. Agreed with Daniel later on
 2026-11-01: Seeing the plan (Epic 56: every way, steady motion, the picked residents' places and
 planned building on the map) runs alongside Relocating (55), then Build line (57, ADR 0018: road
-and wall lines as a task for a crew), both ahead of Bandits.
+and wall lines as a task for a crew), both ahead of Bandits. Agreed with Daniel on 2026-11-02,
+from the UX review of that day: Clearer play (Epic 58, ADR 0019: order rows keep their slot,
+predictable picking, previewed picks, one lane for notices, a first-day card), then Clearer
+screens (59: unique game-given names, the minimap, structured cards and forms, the phone layout,
+scripting entry), both ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -80,20 +84,22 @@ I sleep.
 | 41  | [Scripts started directly](https://github.com/dasanten/strategy-code-poc/issues/450)            | ticketed                |
 | 42  | [Script debugging](https://github.com/dasanten/strategy-code-poc/issues/451)                    | ticketed                |
 | 43  | [Script library tidy-up](https://github.com/dasanten/strategy-code-poc/issues/452)              | ticketed                |
-| 44  | [Server hardening](https://github.com/dasanten/strategy-code-poc/issues/511)                  | ticketed                |
-| 45  | [Quick wins 3](https://github.com/dasanten/strategy-code-poc/issues/522)                      | ticketed                |
-| 46  | [Horses and food](https://github.com/dasanten/strategy-code-poc/issues/527)                   | ticketed                |
-| 47  | [Under attack](https://github.com/dasanten/strategy-code-poc/issues/531)                      | ticketed                |
-| 48  | [NPC ambitions](https://github.com/dasanten/strategy-code-poc/issues/567)                     | ticketed                |
-| 49  | [Cheaper ticks](https://github.com/dasanten/strategy-code-poc/issues/574)                     | ticketed                |
-| 50  | [Quick wins 4](https://github.com/dasanten/strategy-code-poc/issues/582)                      | ticketed                |
-| 51  | [Saved queues and repeats](https://github.com/dasanten/strategy-code-poc/issues/588)          | ticketed                |
-| 52  | [Training](https://github.com/dasanten/strategy-code-poc/issues/592)                          | ticketed                |
-| 53  | [Clear trading](https://github.com/dasanten/strategy-code-poc/issues/631)                     | ticketed                |
-| 54  | [Holding the town hall](https://github.com/dasanten/strategy-code-poc/issues/632)             | ticketed                |
-| 55  | [Relocating](https://github.com/dasanten/strategy-code-poc/issues/652)                        | ticketed                |
-| 56  | [Seeing the plan](https://github.com/dasanten/strategy-code-poc/issues/659)                   | ticketed                |
-| 57  | [Build line](https://github.com/dasanten/strategy-code-poc/issues/660)                        | ticketed                |
+| 44  | [Server hardening](https://github.com/dasanten/strategy-code-poc/issues/511)                    | ticketed                |
+| 45  | [Quick wins 3](https://github.com/dasanten/strategy-code-poc/issues/522)                        | ticketed                |
+| 46  | [Horses and food](https://github.com/dasanten/strategy-code-poc/issues/527)                     | ticketed                |
+| 47  | [Under attack](https://github.com/dasanten/strategy-code-poc/issues/531)                        | ticketed                |
+| 48  | [NPC ambitions](https://github.com/dasanten/strategy-code-poc/issues/567)                       | ticketed                |
+| 49  | [Cheaper ticks](https://github.com/dasanten/strategy-code-poc/issues/574)                       | ticketed                |
+| 50  | [Quick wins 4](https://github.com/dasanten/strategy-code-poc/issues/582)                        | ticketed                |
+| 51  | [Saved queues and repeats](https://github.com/dasanten/strategy-code-poc/issues/588)            | ticketed                |
+| 52  | [Training](https://github.com/dasanten/strategy-code-poc/issues/592)                            | ticketed                |
+| 53  | [Clear trading](https://github.com/dasanten/strategy-code-poc/issues/631)                       | ticketed                |
+| 54  | [Holding the town hall](https://github.com/dasanten/strategy-code-poc/issues/632)               | ticketed                |
+| 55  | [Relocating](https://github.com/dasanten/strategy-code-poc/issues/652)                          | ticketed                |
+| 56  | [Seeing the plan](https://github.com/dasanten/strategy-code-poc/issues/659)                     | ticketed                |
+| 57  | [Build line](https://github.com/dasanten/strategy-code-poc/issues/660)                          | ticketed                |
+| 58  | [Clearer play](https://github.com/dasanten/strategy-code-poc/issues/687)                        | ticketed                |
+| 59  | [Clearer screens](https://github.com/dasanten/strategy-code-poc/issues/693)                     | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

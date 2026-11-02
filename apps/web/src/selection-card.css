@@ -2,47 +2,37 @@
    its left edge in the relationship colour of what is selected, actions as rows with keys. */
 .game-selection {
   position: absolute;
-  top: calc(var(--top-h) + 12px);
+  /* Below the notice lane while it is a band across the screen (`NoticeLane`). */
+  top: calc(var(--top-h) + var(--lane-h, 0px) + 12px);
   right: 12px;
   z-index: 1;
   width: min(360px, calc(100vw - var(--rail-w) - 24px));
-  max-height: calc(100% - var(--top-h) - 24px);
+  max-height: calc(100% - var(--top-h) - var(--lane-h, 0px) - 24px);
   overflow: auto;
   border-radius: 10px;
 }
-/* Pick mode (ADR 0012): a banner at the top of the map says what to pick, with Cancel. */
-.pick-banner {
-  position: absolute;
-  top: calc(var(--top-h) + 12px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 3;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  width: max-content;
-  max-width: min(520px, calc(100vw - var(--rail-w) - 24px));
-  padding: 8px 8px 8px 14px;
-  background: var(--ui-panel);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--ui-line-strong);
-  border-radius: 10px;
-  color: var(--ui-text);
-  font-family: var(--font-ui);
+/* Hidden behind the wide drawer (`cardHidden`), as it was until the drawer closes. */
+.game-selection[hidden] {
+  display: none;
+}
+/* Pick mode (ADR 0012): a notice in the lane says what to pick, with Cancel; while it shows
+   it replaces the other notices (`laneNotices`). */
+.notice.pick-banner {
+  border-left-color: var(--ui-live);
 }
 .pick-banner-text {
   display: grid;
   gap: 2px;
-  min-width: 0;
 }
 .pick-banner-text .small {
   color: var(--ui-muted);
 }
-.pick-banner button {
-  flex: none;
+/* One line on a phone: what to pick, then the hint after it. */
+.game.phone .pick-banner-text {
+  display: block;
 }
-.game.phone .pick-banner {
-  max-width: calc(100vw - 24px);
+.game.phone .pick-banner-text .small::before {
+  content: ' — ';
 }
 /* On a phone the card is a bottom sheet (ADR 0012, `CardSheet`): peek shows just its header,
    half and full fixed heights; a drag sets the height inline until it settles. */
@@ -52,7 +42,7 @@
   right: 0;
   bottom: 0;
   width: auto;
-  max-height: calc(100% - var(--top-h));
+  max-height: calc(100% - var(--top-h) - var(--lane-h, 0px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -62,7 +52,7 @@
   height: 50%;
 }
 .game-selection.sheet-full {
-  height: calc(100% - var(--top-h));
+  height: calc(100% - var(--top-h) - var(--lane-h, 0px));
 }
 .sheet-handle {
   flex: none;
@@ -105,6 +95,21 @@
   border-radius: 10px;
   color: var(--ui-text);
   font-family: var(--font-ui);
+}
+/* Shrunk while the map waits for a target: the room the card took stays, lightly drawn, and
+   swallows clicks so none lands on the map by accident (`CONTEXT.md`: Picking a target). */
+.inspector.sel-card.sel-shrunk {
+  background: color-mix(in srgb, var(--ui-panel) 45%, transparent);
+  border-style: dashed;
+}
+.sel-dead {
+  flex: 1 1 auto;
+  border-radius: 6px;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 10px,
+    color-mix(in srgb, var(--ui-text) 5%, transparent) 10px 20px
+  );
 }
 .sel-head {
   display: flex;

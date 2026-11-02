@@ -15,6 +15,12 @@ export const users = sqliteTable(
     /** `scrypt$<salt>$<hash>`; empty means the account cannot log in. */
     passwordHash: text('password_hash').notNull().default(''),
     isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+    /**
+     * The first-day card's lines the Player ticked, comma-separated, and whether they dismissed
+     * it (`CONTEXT.md`: First day). Kept per Player, not in the world, so it outlasts a Leader.
+     */
+    firstDayDone: text('first_day_done').notNull().default(''),
+    firstDayDismissed: integer('first_day_dismissed', { mode: 'boolean' }).notNull().default(false),
     createdAt: createdAt(),
   },
   // Names are unique regardless of case, so "Mara" and "mara" can't both exist.
