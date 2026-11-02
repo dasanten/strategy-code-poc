@@ -32,6 +32,9 @@ import {
   type SeenResident,
   HORSE_GRANT_HORSES,
   UNEXPLORED,
+  Terrain,
+  roadTiles,
+  tileIndex,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
@@ -117,7 +120,15 @@ import {
 } from './Residents.js'
 import { arrivalOf } from './doing-view.js'
 import { CardSheet, PickBanner, TileCard, closeOpenPanel, panelOpen } from './SelectionCard.js'
-import { pickHint, pickPrompt, pickTarget, useMediaQuery, useTouchScreen } from './pick-mode.js'
+import {
+  pickHint,
+  pickPrompt,
+  pickTap,
+  pickTarget,
+  useMediaQuery,
+  useTouchScreen,
+} from './pick-mode.js'
+import { pickPreview, previewPickOf, type PreviewWorld } from './pick-preview.js'
 import { PHONE_QUERY } from './sheet-view.js'
 import { buildingNodeKind } from './building-info-view.js'
 import {
@@ -252,6 +263,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
   // The start picked for the picked resident's Build line, while they pick its end.
   const [lineFrom, setLineFrom] = useState<{ x: number; y: number }>()
+  // Where a pick is previewed: the tile under the pointer, or the one tapped on a touch screen.
+  const [pickAt, setPickAt] = useState<{ x: number; y: number; tapped?: boolean }>()
   const [groupBuildAt, setGroupBuildAt] = useState<{ x: number; y: number }>()
   const [groupReport, setGroupReport] = useState<{ sent: number; of: number; skipped: Skipped[] }>()
   const [groupError, setGroupError] = useState<string>()
@@ -366,6 +379,21 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   })
   // A step picking a city keeps the card open: it lists the realm's cities to pick from too.
   const picksCity = plan !== undefined && nextPick(plan)?.pick === 'city'
+  // A new pick (or none) previews nothing until the pointer or a tap shows where.
+  const pickKey = pick ? pickPrompt(pick, false) : ''
+  useEffect(() => setPickAt(undefined), [pickKey])
+  /**
+   * A tile clicked or tapped while picking (`pickTap`): a click picks it; a tap on a touch screen
+   * previews it first, and a second tap there or Confirm picks it.
+   */
+  const pickTile = (x: number, y: number, tap?: { touch: boolean }) => {
+    if (tap && pick) {
+      const next = pickTap(pickAt?.tapped ? pickAt : undefined, { x, y }, tap.touch)
+      if ('preview' in next) return setPickAt({ ...next.preview, tapped: true })
+    }
+    setPickAt(undefined)
+    void goTo(x, y)
+  }
   /** Leaves pick mode without giving the order; the card comes back as it was. */
   const cancelPick = useCallback(() => {
     setPicking(false)
@@ -978,6 +1006,65 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     selected && world?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && isAt(selected, b))
   const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
   const carriageSiteHere = onTile(world?.buildings.filter((b) => b.kind === 'carriage'))
+  // What the pick waiting for a tile would do under the pointer, or at the tile tapped on a touch
+  // screen (`CONTEXT.md`: Picking a target).
+  const preview = (() => {
+    if (!world || !pick || !pickAt) return undefined
+    const size = world.map.size
+    const roads = roadTiles(world, size)
+    // A way doesn't cross a wall, nor a gate unless it is the realm's own or an ally's, or open
+    // (`CONTEXT.md`: Wall, Gate); climbing onto the realm's own walls is left out.
+    const allies = new Set(world.diplomacy.alliance?.members.map((m) => m.realmId))
+    allies.add(world.home.realmId)
+    const blocked = new Set(
+      knownBuildings
+        .filter((b) => isWallOrGate(b))
+        .filter((b) => {
+          const realmId = world.cities.find((c) => c.id === b.cityId)?.realmId
+          return b.kind === 'wall' || (b.closed && !(realmId && allies.has(realmId)))
+        })
+        .map((b) => tileIndex(size, b.x, b.y)),
+    )
+    const seen: PreviewWorld = {
+      blocked: (x, y) => blocked.has(tileIndex(size, x, y)),
+      ...planWorld(world),
+      cityNames: knownCities,
+      ground: (x, y) => {
+        if (roads.has(tileIndex(size, x, y))) return Terrain.Road
+        const t = terrainAt?.(x, y)
+        return t === undefined || t === UNEXPLORED ? undefined : (t as Terrain)
+      },
+      nodeAt: (x, y) => nodeAt?.(x, y),
+      buildProblem: (kind, x, y) =>
+        buildHereProblem(kind, x, y, world, (nx, ny) => nodeAt?.(nx, ny), {
+          size,
+          at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED,
+        }),
+    }
+    const what = previewPickOf(pick, {
+      lineFrom: group.length > 1 ? groupLineFrom : lineFrom,
+      plan,
+    })
+    // A drive or haul goes from those standing on a carriage of the realm.
+    const carriageAt = (r: Resident) =>
+      world.carriages.find((k) => k.x === r.x && k.y === r.y && k.realmId === world.home.realmId)
+    const going = what.kind === 'way' && what.goer === 'carriage'
+    const goers = group
+      .filter((r) => !going || carriageAt(r))
+      .map((r) => ({
+        from: r,
+        ticks: (path: readonly (readonly [number, number])[], goer: 'foot' | 'carriage') => {
+          const way = { target: pickAt, path: path.map(([x, y]) => [x, y] as [number, number]) }
+          const carriage = carriageAt(r)
+          const order =
+            goer === 'carriage' && carriage
+              ? { kind: 'drive' as const, carriageId: carriage.id, ...way, progress: 0 }
+              : { kind: 'walkTo' as const, ...way, progress: 0 }
+          return arrivesIn?.({ ...r, order })
+        },
+      }))
+    return pickPreview(what, pickAt, seen, goers)
+  })()
 
   async function logout() {
     await api.logout().catch(() => {})
@@ -1028,7 +1115,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               pick?.kind === 'plan' ||
               (group.length > 1 && groupPicking !== false)
             }
-            onPickTile={goTo}
+            onPickTile={pickTile}
+            preview={preview}
+            // A tile tapped stays previewed until another is tapped.
+            onPointerTile={(tile) => setPickAt((at) => (at?.tapped ? at : tile))}
             onNodesLoaded={onNodesLoaded}
             onTerrainLoaded={onTerrainLoaded}
             focus={focus}
@@ -1259,6 +1349,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               key={kind}
               prompt={pickPrompt(pick, touch)}
               hint={pickHint(pick)}
+              under={pick.kind === 'plan' && pick.error ? undefined : preview?.label}
+              onConfirm={pickAt?.tapped ? () => pickTile(pickAt.x, pickAt.y) : undefined}
               onCancel={cancelPick}
             />
           ) : kind === 'horseOffer' ? (
