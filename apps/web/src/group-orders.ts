@@ -567,7 +567,7 @@ export function groupNumberParams(
   })
 }
 
-/** The line the group card shows once an order went out: how many it went to. */
+/** The line a group order's report notice shows once it went out: how many it went to. */
 export function groupSentLine(sent: number, of: number): string {
   if (sent === 0) return 'Nobody could take that order.'
   return sent === of ? `Sent to all ${of}.` : `Sent to ${sent} of ${of}.`

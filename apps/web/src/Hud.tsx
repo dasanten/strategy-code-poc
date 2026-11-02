@@ -11,6 +11,8 @@ import {
   type KeyGood,
   type OpenDrawer,
 } from './hud-view.js'
+import { groupSentLine, type Skipped } from './group-orders.js'
+import { laneSpot, skippedByWhy } from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
 import { WIKI_PATH } from './wiki-view.js'
 
@@ -435,8 +437,10 @@ export function DrawerEdge({ open }: { open: OpenDrawer }) {
  * the right, 0 for each that isn't showing. The map fills the window, so screen edges measure it.
  */
 export function mapCovered(): { left: number; right: number } {
-  // A bottom sheet covers the bottom of the map, not its right side.
-  const card = document.querySelector('.game-selection:not(.sheet)')?.getBoundingClientRect()
+  // A bottom sheet covers the bottom of the map, not its right side; a hidden card none of it.
+  const card = document
+    .querySelector('.game-selection:not(.sheet):not([hidden])')
+    ?.getBoundingClientRect()
   return {
     left: document.querySelector('.hud-drawer:not([hidden])')?.getBoundingClientRect().right ?? 0,
     right: card ? window.innerWidth - card.left : 0,
@@ -493,13 +497,109 @@ export function HorseOfferNotice({
     if (reason) setBusy(false)
   }
   return (
-    <aside className="hud-offer" role="status">
-      <span>
+    <aside className="notice hud-offer" role="status">
+      <span className="notice-text">
         {NUMBER_WORDS[horses] ?? horses} horses are waiting for you
         {refused && <span className="hud-offer-refused"> — {refused}</span>}
       </span>
       <button type="button" disabled={busy} onClick={() => void claim()}>
         Claim
+      </button>
+    </aside>
+  )
+}
+
+/** The gap, in pixels, above and below the lane while it is a band across the screen. */
+const BAND_PAD = 6
+
+/**
+ * The lane under the top bar every notice shows in (`CONTEXT.md`: Notices): one stack, centred
+ * over the map between the open drawer and the card and never over either (`laneSpot`). While it
+ * is a band across the screen (on a phone, or with too little map between them) it sets
+ * `--lane-h` on the game, and the drawers and the card start below it.
+ */
+export function NoticeLane({ phone, children }: { phone: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [spot, setSpot] = useState<{ left: number; right: number; band: boolean }>()
+  const watch = useRef<ResizeObserver>(undefined)
+  const place = useRef(() => {})
+  place.current = () => {
+    const lane = ref.current
+    const game = lane?.closest<HTMLElement>('.game')
+    if (!lane || !game) return
+    const rail = parseFloat(getComputedStyle(game).getPropertyValue('--rail-w')) || 0
+    const next = laneSpot(window.innerWidth, rail, mapCovered(), phone)
+    setSpot((was) =>
+      was && was.left === next.left && was.right === next.right && was.band === next.band
+        ? was
+        : next,
+    )
+    const height = next.band && lane.offsetHeight ? lane.offsetHeight + 2 * BAND_PAD : 0
+    game.style.setProperty('--lane-h', `${height}px`)
+  }
+  useEffect(() => {
+    const lane = ref.current
+    const again = () => place.current()
+    watch.current = new ResizeObserver(again)
+    window.addEventListener('resize', again)
+    return () => {
+      watch.current?.disconnect()
+      window.removeEventListener('resize', again)
+      lane?.closest<HTMLElement>('.game')?.style.removeProperty('--lane-h')
+    }
+  }, [])
+  // Drawers, cards and notices come and go with the game's renders, and so the lane's; a drawer
+  // dragged wider or a notice growing shows only in their sizes.
+  useLayoutEffect(() => {
+    place.current()
+    const lane = ref.current
+    const w = watch.current
+    if (!lane || !w) return
+    w.disconnect()
+    w.observe(lane)
+    for (const el of document.querySelectorAll('.hud-drawer, .game-selection')) w.observe(el)
+  })
+  return (
+    <div
+      ref={ref}
+      className={`notice-lane${spot?.band ? ' band' : ''}`}
+      style={spot && { left: spot.left, right: spot.right }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
+ * A group order's report in the lane (`CONTEXT.md`: Group, Notices): how many it went to and who
+ * was skipped or turned down and why, until the Player dismisses it or gives the next order.
+ */
+export function GroupReportNotice({
+  report,
+  onDismiss,
+}: {
+  report: { sent: number; of: number; skipped: Skipped[] }
+  onDismiss: () => void
+}) {
+  const sent = groupSentLine(report.sent, report.of)
+  const skipped = skippedByWhy(report.skipped)
+  return (
+    <aside
+      className={`notice group-report${skipped.length ? ' skipped' : ''}`}
+      role="status"
+      aria-label="Last group order"
+      title={[sent, ...skipped.map((s) => `Skipped ${s.names.join(', ')}: ${s.why}`)].join('\n')}
+    >
+      <span className="notice-text">
+        {sent}
+        {skipped.map((s) => (
+          <span key={s.why}>
+            {' · '}Skipped <strong>{s.names.join(', ')}</strong>: {s.why}
+          </span>
+        ))}
+      </span>
+      <button type="button" aria-label="Dismiss the group order's report" onClick={onDismiss}>
+        OK
       </button>
     </aside>
   )

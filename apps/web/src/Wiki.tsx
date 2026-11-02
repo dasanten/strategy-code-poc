@@ -588,11 +588,11 @@ export function Wiki() {
           </li>
         </ul>
         <p>
-          Those who can't take an order are skipped, and the card says who and why: children don't
-          work, build or drive, and store, fetch or put down only Food; a partner carrying a child
-          doesn't work, build, tear down, breed or haul; orders bound to a place go only to those
-          standing there; Board skips those not on the carriage's tile, the driver, riders and, once
-          it is full, the rest.
+          Those who can't take an order are skipped, and a notice under the top bar says who and
+          why: children don't work, build or drive, and store, fetch or put down only Food; a
+          partner carrying a child doesn't work, build, tear down, breed or haul; orders bound to a
+          place go only to those standing there; Board skips those not on the carriage's tile, the
+          driver, riders and, once it is full, the rest.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
@@ -1378,11 +1378,11 @@ export function Wiki() {
         </p>
         <p>
           The group card boards everyone of the group standing on the carriage at once, until it is
-          full, and says who was skipped and why; its Get off gets them all off. Board and Get off
-          are queue steps too: Board ends once they are aboard and Get off once they are off, so put
-          a step that waits for the stop between them (a script that calls <code>end()</code> once
-          they are there), e.g. board, wait, get off, work. A Board step whose carriage has left
-          their tile by its turn is skipped.
+          full, and a notice says who was skipped and why; its Get off gets them all off. Board and
+          Get off are queue steps too: Board ends once they are aboard and Get off once they are
+          off, so put a step that waits for the stop between them (a script that calls{' '}
+          <code>end()</code> once they are there), e.g. board, wait, get off, work. A Board step
+          whose carriage has left their tile by its turn is skipped.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}

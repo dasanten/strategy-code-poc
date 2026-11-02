@@ -151,11 +151,9 @@ import {
   groupButtonGroup,
   groupNumberParams,
   groupRows,
-  groupSentLine,
   type GroupButton,
   type GroupOrder,
   type GroupSeen,
-  type Skipped,
 } from './group-orders.js'
 import { GROUP_HINTS } from './pick-mode.js'
 import { NumberField, foodParamsHint } from './ScriptParams.js'
@@ -1065,7 +1063,6 @@ export function GroupCard({
   onPicking,
   buildAt,
   onOrder,
-  report,
   orderError,
   onPick,
   onClose,
@@ -1104,8 +1101,6 @@ export function GroupCard({
   buildAt: GroupBuildTile | undefined
   /** Gives each resident of the group the order (`CONTEXT.md`: Group). */
   onOrder: (order: GroupOrder) => void
-  /** What the last group order did: how many it went to, and who was skipped and why. */
-  report: { sent: number; of: number; skipped: Skipped[] } | undefined
   /** Why the last group order couldn't go out at all, such as no workplace on the tile. */
   orderError: string | undefined
   onPick: (id: string) => void
@@ -1469,20 +1464,6 @@ export function GroupCard({
               ? `${GROUP_PICKING_HINTS[picking]} Tap a tile on the map.`
               : 'Right-click the map to walk them there. Hold Shift with any order to queue it.'}
         </p>
-      )}
-      {report && (
-        <div className="small" aria-label="Last group order">
-          <p>{groupSentLine(report.sent, report.of)}</p>
-          {report.skipped.length > 0 && (
-            <ul className="sel-facts">
-              {report.skipped.map((s) => (
-                <li key={s.id}>
-                  Skipped <strong>{s.name}</strong>: {s.why}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       )}
     </SelectionCard>
   )
