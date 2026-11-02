@@ -485,7 +485,8 @@ export function Wiki() {
           While residents are picked, the map draws the way each of them is going, as a line ending
           in a dot: walking, driving or hauling somewhere, storing or fetching, walking to the next
           tile of a road or wall line, or going after someone. So a script that fetches food shows
-          its way to the storage too. A passenger’s way is the carriage’s.
+          its way to the storage too. A passenger’s way is the carriage’s. Ways show at every zoom;
+          far out as a thin line with a ringed dot at its end.
         </p>
         <p>
           In the same colour the map outlines the places they are set on: the buildings and
@@ -511,14 +512,15 @@ export function Wiki() {
           elsewhere moves the preview.
         </p>
         <p>
-          The map has three zoom tiers: far shows terrain, territory and one emblem per city; middle
-          adds buildings, nodes and residents; close shows each figure. Far out territory is filled
-          in its owner’s colour, nearer in only its borders are drawn; the Region map button fills
-          it at every zoom. The readout bottom right names the terrain, the tile and the tier under
-          the pointer. Above it the minimap shows the terrain you explored, your cities, your
-          residents and carriages away from them, and the cities you know, with the part on screen
-          as a rectangle; click it to look there. The minimap and the legend fold to buttons, and
-          your browser remembers how you left them.
+          The map has three zoom tiers: far shows terrain, territory, the finished roads you see or
+          last saw as thin lines, and one emblem per city; middle adds buildings, nodes and
+          residents; close shows each figure. Far out territory is filled in its owner’s colour,
+          nearer in only its borders are drawn; the Region map button fills it at every zoom. The
+          readout bottom right names the terrain, the tile and the tier under the pointer. Above it
+          the minimap shows the terrain you explored, your cities, your residents and carriages away
+          from them, and the cities you know, with the part on screen as a rectangle; click it to
+          look there. The minimap and the legend fold to buttons, and your browser remembers how you
+          left them.
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
@@ -992,6 +994,12 @@ export function Wiki() {
           there. The workplace can be anyone's you know, out of sight too: they walk to where you
           last saw it. With no workplace there, once theirs is gone, or when they find it held by
           another realm's workers with no room left, Work ends and your realm log says why.
+        </p>
+        <p>
+          Work on a workplace that is still a construction site builds it first, as Build would,
+          with materials from the nearest storage of your realm that holds them, and once it is
+          finished they work it without another order. Pick the site for Work on the card or as a
+          queue step.
         </p>
         <table>
           <thead>
