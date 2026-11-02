@@ -131,9 +131,13 @@ export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: num
   )
 }
 
-/** The thin bar along the top: realm, game clock, connection, home city goods, Leader. */
+/**
+ * The thin bar along the top: the realm's name and home city, game clock, connection, home city
+ * goods, Leader, and the Player's account by Log out.
+ */
 export function TopBar({
   realm,
+  account,
   cityName,
   tick,
   status,
@@ -141,7 +145,9 @@ export function TopBar({
   leader,
   onLogout,
 }: {
-  realm: string
+  /** The realm's name (`CONTEXT.md`: Realm name), once the world has come. */
+  realm?: string
+  account: string
   cityName?: string
   tick?: number
   status: ConnectionStatus
@@ -151,8 +157,13 @@ export function TopBar({
 }) {
   return (
     <header className="hud-top">
-      <b title="Your realm">{realm}</b>
-      {cityName && <span className="hud-muted">{cityName}</span>}
+      {realm && <b title="Your realm">{realm}</b>}
+      {cityName && (
+        <span className="hud-muted" title="Your home city">
+          {realm && '· '}
+          {cityName}
+        </span>
+      )}
       <span className="hud-sep" />
       {tick !== undefined && (
         <span
@@ -188,6 +199,9 @@ export function TopBar({
       <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener">
         Wiki
       </a>
+      <span className="hud-muted" title="Your account">
+        {account}
+      </span>
       <button type="button" className="hud-logout" onClick={onLogout}>
         Log out
       </button>
@@ -232,6 +246,7 @@ export function PhoneMenu({
   goods,
   cityName,
   leader,
+  account,
   onLogout,
 }: {
   open: OpenDrawer
@@ -239,6 +254,7 @@ export function PhoneMenu({
   goods?: Record<KeyGood, number>
   cityName?: string
   leader?: string
+  account: string
   onLogout: () => void
 }) {
   const [shown, setShown] = useState(false)
@@ -302,6 +318,9 @@ export function PhoneMenu({
               <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener">
                 Wiki
               </a>
+              <span className="hud-account" title="Your account">
+                {account}
+              </span>
               <button type="button" className="hud-logout" onClick={onLogout}>
                 Log out
               </button>

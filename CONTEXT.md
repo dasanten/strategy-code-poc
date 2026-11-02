@@ -934,7 +934,9 @@ The shared language of the game. Domain terms only — no implementation details
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
-  run is named on a small line of its own. A script can say it itself with `doing(text)`: short
+  run is named on a small line of its own, left out when it is their task's own default script
+  ("Working the farm" alone). Long lines wrap rather than being cut off. A script can say it
+  itself with `doing(text)`: short
   text, kept in its memory, that shows instead until the script says something else or stops.
   **Estimates:** the Doing line and every meter or countdown that shows progress also say about
   how long is left, in real time with game time in brackets ("about 3 min (half a game day)"),

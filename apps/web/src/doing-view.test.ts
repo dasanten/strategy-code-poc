@@ -9,7 +9,7 @@ import {
   type ScriptSummary,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { arrivalOf, doingLine, interruptedLine, type DoingOf } from './doing-view.js'
+import { arrivalOf, doingLine, interruptedLine, scriptLine, type DoingOf } from './doing-view.js'
 
 const summary = (id: number, task: ScriptSummary['task']): ScriptSummary => ({
   id,
@@ -291,6 +291,21 @@ describe('doingLine', () => {
     expect(soon({ order: walk, script: { scriptId: 1, building: 'mine' } }, 180)).toBe(
       'Working the mine: walking to 4, 5 · about 3 min (3 game hours)',
     )
+  })
+})
+
+describe('scriptLine', () => {
+  it('leaves out the default script of the task, which the Doing line already says', () => {
+    const working: DoingOf = { order: work, script: { scriptId: 1, building: 'farm' } }
+    expect(doingLine(working, { scripts, buildings })).toBe('Working the farm')
+    expect(scriptLine(working, scripts)).toBeUndefined()
+    expect(scriptLine({ script: { scriptId: 0, task: 'work' } }, scripts)).toBeUndefined()
+  })
+
+  it('names any other script, and nothing while none runs', () => {
+    expect(scriptLine({ script: { scriptId: 5 } }, scripts)).toBe('Mine')
+    expect(scriptLine({ script: { scriptId: 99 } }, scripts)).toBe('a script')
+    expect(scriptLine({}, scripts)).toBeUndefined()
   })
 })
 
