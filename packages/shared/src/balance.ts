@@ -137,7 +137,11 @@ export const CHILD_GOODS: readonly Good[] = ['food']
  * Whether a resident may pick up, put down, Fetch or Store these goods: anyone grown up, a child
  * only `CHILD_GOODS` (`CONTEXT.md`: Child).
  */
-export function canHandle(resident: Resident, tick: number, goods: readonly string[]): boolean {
+export function canHandle(
+  resident: Pick<Resident, 'bornAt'>,
+  tick: number,
+  goods: readonly string[],
+): boolean {
   return (
     canWork(resident, tick) || goods.every((g) => (CHILD_GOODS as readonly string[]).includes(g))
   )

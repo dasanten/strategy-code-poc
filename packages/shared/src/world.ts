@@ -386,14 +386,16 @@ export interface WalkOrder {
 
 /**
  * A place on the resident's own tile that goods are taken from or put: the pile on the ground,
- * a storage standing there, the materials delivered to a construction site there, or the load
- * of a carriage standing there.
+ * a storage standing there, the materials delivered to a construction site there, the load
+ * of a carriage standing there, or what a Down resident lying there carries (only taken from,
+ * `CONTEXT.md`: Down).
  */
 export type GoodsSpot =
   | { kind: 'ground' }
   | { kind: 'storage'; storageId: string }
   | { kind: 'site'; siteId: string }
   | { kind: 'carriage'; carriageId: string }
+  | { kind: 'resident'; residentId: string }
 
 /**
  * Picking up goods on the resident's tile (`CONTEXT.md`: Core rule, whatever isn't protected can

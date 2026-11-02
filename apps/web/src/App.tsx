@@ -1486,6 +1486,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             )}
             actor={selected}
             onUnhitch={(carriageId, residentId) => void unhitch(carriageId, residentId)}
+            onPickUp={async (residentId, spot, goods) =>
+              setOrderError(await giveOrder({ kind: 'pickUp', residentId, spot, goods }))
+            }
             orderError={orderError}
             onClose={() => setSelectedTile(undefined)}
             onSendHere={async () => {

@@ -960,7 +960,9 @@ export function Wiki() {
           Down, a resident lies unconscious on their tile for {days(DOWN_DAYS)}: their order, script
           and queue end, they get off any horse or carriage and leave their army, take no orders,
           don't eat and lose no more health. Anyone in sight sees that they are Down: their token
-          lies on its side, and their own Player's card says how long is left. When the time is up
+          lies on its side, and their own Player's card says how long is left. Down is not safe:
+          anyone on their tile can pick up what they carry, as from a pile (from another realm's
+          resident that is theft), and a blow kills them, as they can't dodge. When the time is up
           they die of hunger. Only hunger puts a resident Down: wounds kill as before, and a Leader
           who is Down still leads. The realm log says when one goes Down and when one dies.
         </p>
@@ -1706,7 +1708,8 @@ export function Wiki() {
           lowers the victim's standing toward the culprit; standing drifts back toward neutral by{' '}
           {num(STANDING_DRIFT_PER_DAY)} a game day. A crime is remembered for{' '}
           {days(CRIME_MEMORY_DAYS)} after the news stops spreading. Taking from or tearing down
-          another realm's outpost storage counts the same as its city storage.
+          another realm's outpost storage counts the same as its city storage, and taking what
+          another realm's Down resident carries is theft too.
         </p>
         <table>
           <thead>

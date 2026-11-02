@@ -9,6 +9,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
+import { attackOrder, resolveStrikes } from './combat.js'
 import { eventsFor } from './events.js'
 import { checkInvariants, deadLeaveLoot } from './invariants.js'
 import { leadersServeNoOne } from './leader.js'
@@ -228,5 +229,104 @@ describe('Down (`CONTEXT.md`: Down)', () => {
       'resident a2 is Down but has a walkTo order',
       `resident a2 is Down but has health ${MAX_HEALTH}`,
     ])
+  })
+})
+
+describe('Down is not safe (`CONTEXT.md`: Down, Crime)', () => {
+  const tobin = { userId: 8, account: { name: 'Tobin', isAdmin: false } }
+  const fromAna = { kind: 'resident', residentId: 'a2' } as const
+
+  it('lets one of the same realm on the tile take what they carry, as from a pile', () => {
+    const { world, leader, ana, queue } = setup()
+    ana.carried = { stone: 3, food: 2 }
+    goDown(world, ana)
+    Object.assign(leader, { x: ana.x, y: ana.y })
+    const order = { kind: 'pickUp', residentId: 'a1', spot: fromAna, goods: { stone: 2 } }
+    expect(queue.receive(world, me, 'p', order).type).toBe('ack')
+    queue.applyAll(world)
+    run(world, 1, [ana])
+    expect(leader.carried).toMatchObject({ stone: 2 })
+    expect(ana.carried).toEqual({ stone: 1, food: 2 })
+    expect(world.crimes).toEqual([])
+  })
+
+  it('makes taking from another realm’s Down resident theft', () => {
+    const { world, ana, b, queue } = setup()
+    ana.carried = { stone: 3 }
+    goDown(world, ana)
+    Object.assign(b, { x: ana.x, y: ana.y })
+    const order = { kind: 'pickUp', residentId: 'b1', spot: fromAna, goods: { stone: 5 } }
+    expect(queue.receive(world, tobin, 'p', order).type).toBe('ack')
+    queue.applyAll(world)
+    run(world, 1, [ana])
+    expect(b.carried).toMatchObject({ stone: 3 })
+    expect(ana.carried).toEqual({})
+    expect(world.crimes).toEqual([
+      expect.objectContaining({
+        kind: 'theft',
+        victimOrg: 'r1',
+        victim: { residentId: 'a2', name: 'Ana' },
+        goods: { stone: 3 },
+        culprit: expect.objectContaining({ residentId: 'b1', org: 'r2' }),
+      }),
+    ])
+    // Lying unconscious, Ana saw nothing; the Leader next to her did.
+    expect(world.crimes[0]!.witnesses).toEqual(['a1'])
+  })
+
+  it('refuses taking from someone not Down or not on the tile, and putting goods on them', () => {
+    const { world, leader, ana, b, queue } = setup()
+    ana.carried = { stone: 3 }
+    leader.carried = { wood: 1 }
+    const take = (residentId: string, sender = me) =>
+      queue.receive(world, sender, 't', {
+        kind: 'pickUp',
+        residentId,
+        spot: fromAna,
+        goods: { stone: 1 },
+      })
+    Object.assign(leader, { x: ana.x, y: ana.y })
+    expect(take('a1')).toMatchObject({
+      type: 'rejected',
+      reason: 'nobody of that id lies Down on the resident’s tile',
+    })
+    goDown(world, ana)
+    // b1 stands next to Ana, not on her tile.
+    expect(take('b1', tobin)).toMatchObject({ type: 'rejected' })
+    const put = queue.receive(world, me, 'd', {
+      kind: 'drop',
+      residentId: 'a1',
+      spot: fromAna,
+      goods: { wood: 1 },
+    })
+    expect(put).toMatchObject({ type: 'rejected', reason: 'goods can’t be put down on a resident' })
+    expect(b.carried).toEqual({})
+  })
+
+  it('kills them with the first blow: lying Down, they can’t dodge', () => {
+    const { world, ana, b } = setup()
+    goDown(world, ana)
+    // However nimble, someone Down doesn't dodge.
+    ana.stats.agility = { base: 100, trained: 0 }
+    Object.assign(b, { x: ana.x, y: ana.y, order: attackOrder(ana.id) })
+    const { died } = resolveStrikes(world, [{ attackerId: b.id, targetId: ana.id }], terrain.size)
+    expect(died).toEqual([ana])
+    expect(world.residents).not.toContain(ana)
+  })
+
+  it('dies like anyone when attacked: killed, a crime, leaving what they carried', () => {
+    const { world, ana, b, queue } = setup()
+    ana.carried = { stone: 3 }
+    goDown(world, ana)
+    queue.receive(world, tobin, 'a', { kind: 'attack', residentId: b.id, targetId: ana.id })
+    queue.applyAll(world)
+    for (let t = 0; t < 100 && world.residents.includes(ana); t++) run(world, 1, [ana])
+    expect(world.residents).not.toContain(ana)
+    expect(eventsFor(world, 7)).toContainEqual(
+      expect.objectContaining({ kind: 'died', residentId: 'a2', cause: 'killed', by: b.name }),
+    )
+    expect(world.crimes.map((c) => c.kind)).toEqual(['attack', 'killing'])
+    expect(world.piles).toEqual([expect.objectContaining({ x: 10, y: 11, goods: { stone: 3 } })])
+    expect(b.order).toBeNull()
   })
 })

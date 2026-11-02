@@ -412,6 +412,10 @@ describe('realm log', () => {
       text: 'A witness got home: Vex of the realm of Ada stole 5 Food, 2 Iron Ore at (4, 5).',
       tone: 'bad',
     })
+    // Taken from someone Down (`CONTEXT.md`: Down).
+    expect(
+      describeEvent({ ...crime, crime: 'theft', goods: { stone: 3 }, victim: 'Ana' }).text,
+    ).toBe('A witness got home: Vex of the realm of Ada stole 3 Stone from Ana at (4, 5).')
     expect(describeEvent({ ...crime, crime: 'killing', victim: 'Mara' }).text).toBe(
       'A witness got home: Vex of the realm of Ada killed Mara at (4, 5).',
     )

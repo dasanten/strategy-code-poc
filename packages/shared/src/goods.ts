@@ -1,7 +1,16 @@
 import { GOOD_WEIGHT, OWN_FOOD, carryCapacity, stockWeight } from './balance.js'
 import { KEEPS_GOODS, pileTile } from './building.js'
 import { covers } from './footprint.js'
-import type { Building, Good, GoodsSpot, Pile, Resident, Stock, WorldState } from './world.js'
+import {
+  isDown,
+  type Building,
+  type Good,
+  type GoodsSpot,
+  type Pile,
+  type Resident,
+  type Stock,
+  type WorldState,
+} from './world.js'
 
 /** World queries about where goods are (ADR 0002: the game API orders and scripts share). */
 
@@ -37,8 +46,9 @@ export function siteAt(
 
 /**
  * The goods at a spot reached from the tile (x, y): the pile's, the storage's, the materials
- * delivered to the construction site or the carriage's load. Undefined when the spot is not
- * there: no pile on the ground, no such storage or site there, or no such carriage on that tile.
+ * delivered to the construction site, the carriage's load or what a Down resident carries.
+ * Undefined when the spot is not there: no pile on the ground, no such storage or site there, no
+ * such carriage on that tile, or nobody of that id lying Down on it.
  */
 export function goodsAtSpot(
   world: WorldState,
@@ -54,9 +64,24 @@ export function goodsAtSpot(
   if (spot.kind === 'site') {
     return siteAt(world, x, y, spot.siteId)?.site!.delivered
   }
+  if (spot.kind === 'resident') return downOn(world, x, y, spot.residentId)?.carried
   const storage = storageAt(world, x, y)
   if (!storage || storage.id !== spot.storageId) return undefined
   return storage.stock ?? {}
+}
+
+/**
+ * The resident `residentId` if they lie Down on the tile (x, y): anyone there can take what they
+ * carry, as from a pile (`CONTEXT.md`: Down).
+ */
+export function downOn(
+  world: WorldState,
+  x: number,
+  y: number,
+  residentId: string,
+): Resident | undefined {
+  const r = world.residents.find((d) => d.id === residentId)
+  return r && isDown(r) && r.x === x && r.y === y ? r : undefined
 }
 
 /** How many more whole units of a good fit in what the resident carries, at the given tick. */

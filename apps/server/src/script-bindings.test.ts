@@ -387,6 +387,10 @@ describe('script bindings', () => {
       { kind: 'pickUp', spot: { kind: 'ground' }, goods: { iron: 2 } },
     ],
     [
+      'pickUp({ kind: "resident", residentId: "a9" }, { food: 2 })',
+      { kind: 'pickUp', spot: { kind: 'resident', residentId: 'a9' }, goods: { food: 2 } },
+    ],
+    [
       'drop({ kind: "ground" }, { food: 1 })',
       { kind: 'drop', spot: { kind: 'ground' }, goods: { food: 1 } },
     ],

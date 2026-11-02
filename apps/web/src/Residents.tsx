@@ -1859,6 +1859,11 @@ export function ResidentCard({
   const roadNeeded = roadSite ? materialsNeeded(roadSite) : {}
   const atCarriageSite: GoodsSpot = { kind: 'site', siteId: carriageSite?.id ?? '' }
   const carriageNeeded = carriageSite ? materialsNeeded(carriageSite) : {}
+  // Anyone Down on their tile, whose goods they can take as from a pile (`CONTEXT.md`: Down).
+  const downHere = [...residents, ...others].filter(
+    (d) =>
+      d.id !== r.id && isDown(d) && d.x === r.x && d.y === r.y && goodsIn(d.carried).length > 0,
+  )
   const { actions, missing } = residentOrders({
     adult: !child,
     busy: !!(r.order || r.script),
@@ -1885,6 +1890,7 @@ export function ResidentCard({
     carrying: !!r.carrying,
     carries: carried.length > 0,
     down: isDown(r),
+    downCarrying: downHere.map((d) => d.carried),
   })
   // Each row keeps its slot while the card is open (ADR 0019).
   const rows = useKeptRows(actions, missing, orderGroupOf)
@@ -2065,7 +2071,13 @@ export function ResidentCard({
               />
             ))}
           </section>
-          {(pile || storage || site || carriageSite || roadSite || carriage) && (
+          {(pile ||
+            storage ||
+            site ||
+            carriageSite ||
+            roadSite ||
+            carriage ||
+            downHere.length > 0) && (
             <section className="inspector-block" aria-label="On this tile">
               <div className="panel-head">
                 <h3>Here</h3>
@@ -2123,6 +2135,16 @@ export function ResidentCard({
                   refused={refused}
                 />
               )}
+              {downHere.map((d) => (
+                <TileGoods
+                  key={d.id}
+                  title={`Carried by ${d.name}, Down`}
+                  stock={d.carried}
+                  spot={{ kind: 'resident', residentId: d.id }}
+                  onPickUp={onPickUp}
+                  refused={refused}
+                />
+              ))}
             </section>
           )}
         </>
@@ -3483,7 +3505,7 @@ function AttackBlock({
 }
 
 /** Goods at one spot on the resident's tile, each with a button to pick it up. */
-function TileGoods({
+export function TileGoods({
   title,
   stock,
   spot,
