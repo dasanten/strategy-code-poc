@@ -122,6 +122,7 @@ export type ActionId =
   | 'tradeHere'
   | 'renameCity'
   | 'renameHorse'
+  | 'addWaypoint'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -155,6 +156,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   tradeHere: 'T',
   renameCity: 'N',
   renameHorse: 'N',
+  addWaypoint: 'J',
 }
 
 /**
@@ -1542,6 +1544,13 @@ export function tileActions(card: TileCard, actor: Resident | undefined, tick = 
       key: ACTION_KEYS.renameHorse,
       opens: true,
     })
+  // Any tile can carry a waypoint (`CONTEXT.md`: Waypoint).
+  actions.push({
+    id: 'addWaypoint',
+    label: 'Add waypoint…',
+    key: ACTION_KEYS.addWaypoint,
+    opens: true,
+  })
   return actions
 }
 

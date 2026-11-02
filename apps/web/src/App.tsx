@@ -37,6 +37,7 @@ import {
   Terrain,
   roadTiles,
   tileIndex,
+  wrap,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
@@ -44,6 +45,7 @@ import { commandsSeen } from './alliance-army.js'
 import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { ContractsPanel } from './Contracts.js'
 import { StandingPanel } from './Standing.js'
+import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { keyGoods, showBeside, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
@@ -253,6 +255,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
+  // The map's tile menu (`CONTEXT.md`: Waypoint): the tile right-clicked or long-pressed with
+  // nothing else to do there, and where in the window it was pressed.
+  const [tileMenu, setTileMenu] = useState<{ x: number; y: number; at: { x: number; y: number } }>()
+  const closeTileMenu = useCallback(() => setTileMenu(undefined), [])
   // The horse last picked in the Horses drawer, to mark its row among others on the same tile.
   const [pickedHorseId, setPickedHorseId] = useState<string>()
   // The resident card's open tab and panel, kept here so they stay as the Player picks others;
@@ -415,9 +421,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   useEffect(() => setPickAt(undefined), [pickKey])
   /**
    * A tile clicked or tapped while picking (`pickTap`): a click picks it; a tap on a touch screen
-   * previews it first, and a second tap there or Confirm picks it.
+   * previews it first, and a second tap there or Confirm picks it. A right-click or long-press
+   * (`pressed`) with nothing picked and nobody to send opens the tile menu there instead.
    */
-  const pickTile = (x: number, y: number, tap?: { touch: boolean }) => {
+  const pickTile = (
+    x: number,
+    y: number,
+    tap?: { touch: boolean },
+    pressed?: { x: number; y: number },
+  ) => {
+    if (pressed && world && !pick && !starting?.picking && !selected && group.length <= 1) {
+      const size = world.map.size
+      setSelectedTile(undefined)
+      return setTileMenu({ x: wrap(x, size), y: wrap(y, size), at: pressed })
+    }
     if (tap && pick) {
       const next = pickTap(pickAt?.tapped ? pickAt : undefined, { x, y }, tap.touch)
       if ('preview' in next) return setPickAt({ ...next.preview, tapped: true })
@@ -1281,6 +1298,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       {world &&
         drawer(
+          'waypoints',
+          <WaypointsPanel
+            waypoints={world.waypoints}
+            onCentre={(w) => showOnMap(w.x, w.y)}
+            onRename={(w, name) => sendOrder({ kind: 'renameWaypoint', waypointId: w.id, name })}
+            onRemove={(w) => sendOrder({ kind: 'removeWaypoint', waypointId: w.id })}
+          />,
+        )}
+      {world &&
+        drawer(
           'armies',
           <ArmiesPanel
             armies={world.armies}
@@ -1438,6 +1465,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           ) : null,
         )}
       </NoticeLane>
+      {world && tileMenu && (
+        <TileMenu
+          at={tileMenu.at}
+          tile={tileMenu}
+          held={world.waypoints}
+          size={world.map.size}
+          onAdd={(name) => sendOrder({ kind: 'addWaypoint', x: tileMenu.x, y: tileMenu.y, name })}
+          onClose={closeTileMenu}
+        />
+      )}
       {world && selectedTile && (
         <CardSheet phone={phone} pinnedPeek={false} hidden={cardHidden(openDrawer)}>
           <TileCard
@@ -1527,6 +1564,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPickedHorseId(id)
               setOpenDrawer('horses')
             }}
+            tile={selectedTile}
+            waypoints={world.waypoints}
+            mapSize={world.map.size}
+            onAddWaypoint={(name) => sendOrder({ kind: 'addWaypoint', ...selectedTile, name })}
           />
         </CardSheet>
       )}

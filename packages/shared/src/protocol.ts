@@ -18,6 +18,7 @@ import type {
   SeenArmy,
   SeenCaravan,
   SeenResident,
+  Waypoint,
 } from './world.js'
 
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
@@ -146,6 +147,8 @@ export type ServerMessage =
       region: RegionMap | null
       /** Whether the Player may still claim their Horse offer (`CONTEXT.md`: Horse offer). */
       horseOffer: boolean
+      /** The Player's waypoints, oldest first (`CONTEXT.md`: Waypoint). */
+      waypoints: Waypoint[]
       /** The Player's first-day card (`CONTEXT.md`: First day). */
       firstDay: FirstDay
     }
@@ -158,7 +161,8 @@ export type ServerMessage =
    * again (all of it) or their explored terrain grew (the grown chunks), and the realm's Leader
    * when the Player handed the realm to another (`CONTEXT.md`: Leader handover), and the
    * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer: false` once
-   * they claimed their Horse offer (`CONTEXT.md`: Horse offer).
+   * they claimed their Horse offer (`CONTEXT.md`: Horse offer), and all their waypoints when
+   * they changed (`CONTEXT.md`: Waypoint).
    */
   | {
       type: 'tick'
@@ -173,6 +177,7 @@ export type ServerMessage =
       leaderId?: string
       realmName?: string
       horseOffer?: false
+      waypoints?: Waypoint[]
     }
   /**
    * The memory of the script run by a resident or army whose Script tab the Player has open

@@ -856,6 +856,33 @@ describe('realtime', () => {
     expect(await again.next('welcome')).toMatchObject({ horseOffer: false })
   })
 
+  it('sends each Player only their own waypoints, on connect and when they change (Waypoint)', async () => {
+    const { url, token, db, userId, world, realtime } = await start()
+    const other = await signUp(db, {
+      name: 'Mara',
+      password: 'mara password',
+      inviteCode: createInviteCode(db, userId),
+    })
+    const pass = { id: 'wp1', name: 'Pass', x: 3, y: 4 }
+    world.waypoints[userId] = [pass]
+    const daniel = connect(url, token)
+    const mara = connect(url, createSession(db, other.id))
+    expect(await daniel.next('welcome')).toMatchObject({ waypoints: [pass] })
+    expect(await mara.next('welcome')).toMatchObject({ waypoints: [] })
+    realtime.broadcastTick()
+    expect(await daniel.next('tick')).not.toHaveProperty('waypoints')
+    expect(await mara.next('tick')).not.toHaveProperty('waypoints')
+
+    world.waypoints[userId]![0]!.name = 'High pass'
+    realtime.broadcastTick()
+    expect(await daniel.next('tick')).toMatchObject({ waypoints: [{ ...pass, name: 'High pass' }] })
+    expect(await mara.next('tick')).not.toHaveProperty('waypoints')
+
+    delete world.waypoints[userId]
+    realtime.broadcastTick()
+    expect(await daniel.next('tick')).toMatchObject({ waypoints: [] })
+  })
+
   it('ticks the first-day card as the Player claims their horses and gives an order, in every tab', async () => {
     // The test's order queue has no map to place horses on: any claim is taken here.
     const claimHorses: OrderKind = { validate: () => undefined, apply() {} }

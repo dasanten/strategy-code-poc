@@ -199,6 +199,19 @@ describe('minimap dots', () => {
     expect(dots[0]!.kind).toBe('resident')
     expect(dots.at(-1)!.kind).toBe('home')
   })
+
+  it('marks the Player’s waypoints, over everything else (Waypoint)', () => {
+    const waypoints = [
+      { id: 'wp1', name: 'Pass', x: 70, y: 20 },
+      // On their home city, still drawn over its dot.
+      { id: 'wp2', name: 'Home', x: 40, y: 40 },
+    ]
+    const dots = minimapDots(world({ waypoints }), viewer)
+    expect(dots.slice(-2)).toEqual([
+      { kind: 'waypoint', x: 70, y: 20, rel: 'own' },
+      { kind: 'waypoint', x: 40, y: 40, rel: 'own' },
+    ])
+  })
 })
 
 describe('minimap folding', () => {

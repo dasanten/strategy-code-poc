@@ -135,8 +135,8 @@ export function minimapPixels(
   return out
 }
 
-/** What a dot on the minimap stands for; drawn in this order, the home city on top. */
-export type MinimapDotKind = 'resident' | 'carriage' | 'city' | 'home'
+/** What a dot on the minimap stands for; drawn in this order, the Player's waypoints on top. */
+export type MinimapDotKind = 'resident' | 'carriage' | 'city' | 'home' | 'waypoint'
 
 export interface MinimapDot {
   kind: MinimapDotKind
@@ -147,12 +147,18 @@ export interface MinimapDot {
   remembered?: boolean
 }
 
-const DOT_ORDER: Record<MinimapDotKind, number> = { resident: 0, carriage: 1, city: 2, home: 3 }
+const DOT_ORDER: Record<MinimapDotKind, number> = {
+  resident: 0,
+  carriage: 1,
+  city: 2,
+  home: 3,
+  waypoint: 4,
+}
 
 /**
  * The minimap's dots (`CONTEXT.md`: Minimap): every city the Player knows, in sight or last seen,
  * in its relationship colour with their home city marked, and their residents and carriages
- * outside the areas of their cities.
+ * outside the areas of their cities, and their waypoints on top (`CONTEXT.md`: Waypoint).
  */
 export function minimapDots(world: MapWorld, viewer: Viewer): MinimapDot[] {
   const size = world.map.size
@@ -187,6 +193,9 @@ export function minimapDots(world: MapWorld, viewer: Viewer): MinimapDot[] {
   for (const k of world.carriages) {
     if (k.realmId === viewer.realmId && away(k))
       out.push({ kind: 'carriage', x: k.x, y: k.y, rel: 'own' })
+  }
+  for (const w of world.waypoints ?? []) {
+    out.push({ kind: 'waypoint', x: w.x, y: w.y, rel: 'own' })
   }
   return out.sort((a, b) => DOT_ORDER[a.kind] - DOT_ORDER[b.kind])
 }

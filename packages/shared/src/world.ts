@@ -773,6 +773,12 @@ export interface WorldState {
    */
   horseOffersClaimed: number[]
   /**
+   * Each Player's waypoints by their account id, oldest first (`CONTEXT.md`: Waypoint): kept with
+   * the Player, not the realm, so they outlive a Leader death. A Player with none may have no
+   * entry.
+   */
+  waypoints: Record<number, Waypoint[]>
+  /**
    * The plan of each city the game runs, by city id (`CONTEXT.md`: NPC city; ADR 0016): what its
    * residents do until its next planning pass. A city without one has not planned yet.
    */
@@ -1784,6 +1790,17 @@ export type RealmEvent = RealmEventWhat & {
   tick: number
   /** The Player's account. */
   userId: number
+}
+
+/**
+ * A named marker a Player put on a tile (`CONTEXT.md`: Waypoint), seen only by that Player and
+ * kept with them, not their realm.
+ */
+export interface Waypoint {
+  id: string
+  name: string
+  x: number
+  y: number
 }
 
 /** Goods lying on the ground on one tile, for anyone to take (`CONTEXT.md`: Pile). */

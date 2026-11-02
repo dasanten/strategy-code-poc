@@ -19,6 +19,7 @@ describe('drawers', () => {
     for (const tool of [
       'Residents',
       'Horses',
+      'Waypoints',
       'Armies',
       'Contracts',
       'Alliance',

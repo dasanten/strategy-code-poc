@@ -7,6 +7,7 @@ import type {
   SeenCarriage,
   SeenHorse,
   SeenResident,
+  Waypoint,
 } from '@csp/shared'
 import type { CityEmblem, FarMarker } from './far.js'
 import type { RegionState } from './region.js'
@@ -35,6 +36,8 @@ export interface MapWorld {
    * faded; none on the admin map.
    */
   lastSeen?: { cities: SeenCity[]; buildings: Building[] }
+  /** The Player's waypoints (`CONTEXT.md`: Waypoint), drawn at every tier; none on the admin map. */
+  waypoints?: readonly Waypoint[]
   diplomacy: { alliance?: { members: readonly { realmId: string }[] } | null }
   region: RegionState | null
   /** Set on the admin map, which looks at the world as nobody's (`CONTEXT.md`: admin map). */
