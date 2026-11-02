@@ -694,6 +694,17 @@ export interface RelocateOrder {
   progress: number
 }
 
+/**
+ * Feeding (`CONTEXT.md`: Reviving): the resident puts up to `units` of the Food in their hands
+ * into those of `targetId`, a Down resident on or next to their tile, who eats at once and wakes.
+ * Done within the tick.
+ */
+export interface FeedOrder {
+  kind: 'feed'
+  targetId: string
+  units: number
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -718,6 +729,7 @@ export type ResidentOrder =
   | HandInOrder
   | BuyOffOrder
   | RelocateOrder
+  | FeedOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -1298,6 +1310,11 @@ export type RealmEventWhat =
    * they die of hunger at tick `until`.
    */
   | { kind: 'down'; residentId: string; name: string; until: number }
+  /**
+   * A Down resident woke up at low health (`CONTEXT.md`: Reviving): `by`, a resident of any
+   * realm, fed them.
+   */
+  | { kind: 'woke'; residentId: string; name: string; by: string }
   /** A resident died; `leader` when it was the Leader, whose death ended the realm. */
   | {
       kind: 'died'

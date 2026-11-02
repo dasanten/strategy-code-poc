@@ -138,6 +138,7 @@ export const GETS_OFF_FIRST: readonly string[] = [
   'handIn',
   'transfer',
   'buyOff',
+  'feed',
 ]
 
 /** An order kind that first gets the ordered resident off their carriage (`GETS_OFF_FIRST`). */

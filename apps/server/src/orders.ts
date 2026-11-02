@@ -37,6 +37,7 @@ import { handOver } from './leader.js'
 import { rename, renameCity, renameHorse } from './renaming.js'
 import { claimHorses } from './horse-grant.js'
 import { queueOrders } from './queues.js'
+import { feed } from './reviving.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -120,6 +121,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     renameCity,
     renameHorse,
     claimHorses,
+    feed,
     ...allianceOrders,
     ...armyOrders,
     ...contractOrders,

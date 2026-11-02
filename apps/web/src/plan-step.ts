@@ -1,4 +1,5 @@
 import {
+  FEED_UNITS,
   GOODS,
   MAX_WORKERS,
   RECIPES,
@@ -41,9 +42,11 @@ export type PlanPick =
   | 'carriage'
   | 'horse'
   | 'city'
+  | 'down'
 
 /** What a planned step asks for on the card once its places are picked. */
-export type PlanAsk = 'goods' | 'buildingKind' | 'makes' | 'horses' | 'haul' | 'script' | 'subject'
+export type PlanAsk =
+  'goods' | 'buildingKind' | 'makes' | 'horses' | 'haul' | 'script' | 'subject' | 'units'
 
 export type PlanStepId =
   | 'walk'
@@ -68,6 +71,7 @@ export type PlanStepId =
   | 'getOff'
   | 'unhitch'
   | 'relocate'
+  | 'feed'
   | 'runScript'
 
 /** One kind of step Add step offers. */
@@ -178,6 +182,12 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     ask: 'goods',
   },
   {
+    id: 'feed',
+    label: 'Feed someone Down',
+    picks: [{ pick: 'down', prompt: 'the resident lying Down to feed' }],
+    ask: 'units',
+  },
+  {
     id: 'haul',
     label: 'Haul route',
     picks: [
@@ -249,6 +259,8 @@ export interface PlanWorld {
   cities: readonly Pick<City, 'id' | 'realmId'>[]
   realmId: string
   size: number
+  /** Residents in sight who are Down, of any realm, to Feed (`CONTEXT.md`: Reviving). */
+  down?: readonly { id: string; x: number; y: number }[]
 }
 
 /**
@@ -320,6 +332,10 @@ export function planPickAt(
       )
       return c ? { ...tile, id: c.id } : 'no city of yours there'
     }
+    case 'down': {
+      const r = w.down?.find((x) => x.x === at.x && x.y === at.y)
+      return r ? { ...tile, id: r.id } : 'nobody Down there'
+    }
   }
 }
 
@@ -377,6 +393,7 @@ export type PlanAnswer =
   | { ask: 'haul'; setup: HaulSetup }
   | { ask: 'script'; scriptId: number }
   | { ask: 'subject'; subject: TrainingSubject }
+  | { ask: 'units'; units: number }
 
 /** Where a step acts, for the walk put before it (`appendRequest`'s `at`). */
 type At = { x: number; y: number }
@@ -455,6 +472,11 @@ export function planOrder(
     }
     case 'relocate':
       return { order: { kind: 'relocate', cityId: p.id } }
+    case 'feed': {
+      // A walk to their tile goes first.
+      const units = a?.ask === 'units' ? a.units : FEED_UNITS
+      return { order: { kind: 'feed', targetId: p.id, units }, at }
+    }
     case 'runScript':
       return { order: { kind: 'runScript', scriptId: a?.ask === 'script' ? a.scriptId : null } }
   }

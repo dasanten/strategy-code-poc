@@ -14,6 +14,7 @@ import {
   MAX_HUNGER,
   STARVE_DAYS,
   DOWN_DAYS,
+  WAKE_HEALTH,
   TICKS_PER_GAME_DAY,
   TRADE_ORG,
   contractOf,
@@ -123,6 +124,21 @@ export function goDown(world: WorldState, r: Resident): void {
   recordEvent(world, r.owner, { kind: 'down', residentId: r.id, name: r.name, until: r.downUntil })
 }
 
+/**
+ * Wakes a Down resident (`CONTEXT.md`: Reviving) who has Food in their hands: they eat a unit at
+ * once, so their hunger meter isn't empty, and stand idle at `WAKE_HEALTH`. Their Player's realm
+ * log says so, with `by`, who fed them. Returns whether they woke.
+ */
+export function wake(world: WorldState, r: Resident, by: string): boolean {
+  if (r.downUntil === undefined || (r.carried.food ?? 0) < 1) return false
+  take(r.carried, 'food', 1)
+  r.hunger = Math.min(MAX_HUNGER, r.hunger + FILL_PER_FOOD)
+  r.health = WAKE_HEALTH
+  delete r.downUntil
+  recordEvent(world, r.owner, { kind: 'woke', residentId: r.id, name: r.name, by })
+  return true
+}
+
 /** Ends whatever a resident was doing: their order, script, queue and defence script. */
 function holdStill(r: Resident): void {
   r.order = null
@@ -165,6 +181,35 @@ export const downDoNothing: Invariant = {
       return problems.map((p) => ({
         invariant: this.name,
         message: `resident ${r.id} is Down but ${p}`,
+        entityIds: [r.id],
+      }))
+    })
+  },
+}
+
+/**
+ * Woken, they are fed and alive (`CONTEXT.md`: Reviving): a resident who woke in the tick just
+ * stepped is no longer Down, has health above zero and a hunger meter that isn't empty. Anyone
+ * else at no health who isn't Down is `deadLeaveLoot`'s.
+ */
+export const awakeAlive: Invariant = {
+  name: 'awake-alive',
+  check(world) {
+    const wokeIds = new Set(
+      world.events.flatMap((e) =>
+        e.kind === 'woke' && e.tick >= world.tick - 1 ? [e.residentId] : [],
+      ),
+    )
+    return world.residents.flatMap((r) => {
+      if (!wokeIds.has(r.id)) return []
+      const problems = [
+        r.downUntil !== undefined && 'woke but is still Down',
+        r.health <= 0 && `woke with health ${r.health}`,
+        r.hunger <= 0 && 'woke with an empty hunger meter',
+      ].filter((p): p is string => typeof p === 'string')
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `resident ${r.id} ${p}`,
         entityIds: [r.id],
       }))
     })

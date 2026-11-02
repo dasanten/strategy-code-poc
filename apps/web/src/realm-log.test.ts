@@ -36,6 +36,9 @@ describe('realm log', () => {
         ...at,
       }),
     ).toEqual({ text: 'Ana is Down from hunger: about 23 h (58 game days) left.', tone: 'bad' })
+    expect(
+      describeEvent({ kind: 'woke', residentId: 'r2', name: 'Ana', by: 'Ben', seq: 7, ...at }).text,
+    ).toBe('Ben fed Ana, who is awake again at low health.')
     expect(describeEvent({ kind: 'foodSpoiled', units: 4, seq: 3, ...at }).text).toBe(
       '4 Food spoiled.',
     )

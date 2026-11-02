@@ -11,6 +11,10 @@ import {
   PASSENGER_WEIGHT,
   carriageCapacity,
   isDown,
+  feedProblem,
+  MAP_SIZE,
+  NO_CHILD_FEEDS,
+  NO_FOOD_TO_FEED,
   horseAgeInYears,
   horseFoodFactor,
   MAX_HEALTH,
@@ -113,6 +117,7 @@ export type ActionId =
   | 'goods'
   | 'pair'
   | 'attack'
+  | 'feed'
   | 'walls'
   | 'script'
   | 'makeLeader'
@@ -146,6 +151,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   goods: 'G',
   pair: 'P',
   attack: 'A',
+  feed: 'O',
   walls: 'C',
   script: 'X',
   makeLeader: 'L',
@@ -229,6 +235,10 @@ export interface ResidentHere {
   carries?: boolean
   /** They are Down (`CONTEXT.md`: Down) and take no orders. */
   down?: boolean
+  /** Others in sight who are Down on or next to their tile, whom they could Feed (`CONTEXT.md`: Reviving). */
+  downNear?: number
+  /** They have Food in their hands, to Feed someone Down with. */
+  carriesFood?: boolean
 }
 
 /**
@@ -371,6 +381,11 @@ function ordersOffered(h: ResidentHere): {
   if (h.carries || goodsOnTile(h, h.adult ? GOODS : CHILD_GOODS)) {
     add(row('goods', 'Goods…', { opens: true }))
   } else miss('goods', 'nothing carried or here to pick up')
+  // Anyone Down nearby, of any realm (`CONTEXT.md`: Reviving).
+  if (h.downNear) {
+    const reason = !h.adult ? NO_CHILD_FEEDS : !h.carriesFood ? NO_FOOD_TO_FEED : undefined
+    add(row('feed', 'Feed…', { opens: true, ...(reason ? { disabled: true, reason } : {}) }))
+  } else miss('feed', 'nobody Down nearby')
   if (works && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   else miss('pair', works ? 'homeless' : unfit('pair'))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
@@ -439,6 +454,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   tearDown: 'work',
   breed: 'work',
   goods: 'goods',
+  feed: 'goods',
   script: 'scripts',
 }
 
@@ -653,6 +669,11 @@ export interface TileCard {
    * rename (`CONTEXT.md`: Renaming a horse).
    */
   renameHorses?: { id: string; name: string }[]
+  /**
+   * Residents in sight lying Down on the tile, of any realm, whom the resident picked last may
+   * Feed (`CONTEXT.md`: Reviving).
+   */
+  downHere?: { id: string; name: string; x: number; y: number; down: true }[]
   /**
    * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
    * and what they saw of it then, shown apart from the lines about what is there now.
@@ -1276,10 +1297,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (t.strangers.length === 1) {
       const gear = gearText(r, goodLabels)
       lines.push(
-        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${gear ? ` · ${gear}` : ''}`,
+        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${gear ? ` · ${gear}` : ''}${isDown(r) ? ' · Down' : ''}`,
       )
     } else lines.push(...strangersLines(t.strangers))
   }
+  // Anyone Down here, own or not, for the Feed row (`CONTEXT.md`: Reviving).
+  const downHere = here(t.residents ?? t.strangers)
+    .filter((r) => isDown(r))
+    .map((r) => ({ id: r.id, name: r.name, x: r.x, y: r.y, down: true as const }))
   if (!stable && horsesHere.length > 0) {
     card ??= {
       title: horsesHere.length === 1 ? 'Horse' : `${horsesHere.length} horses`,
@@ -1305,6 +1330,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(passengers ? { passengers } : {}),
     ...(unhitch ? { unhitch } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
+    ...(downHere.length > 0 ? { downHere } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
   }
@@ -1515,13 +1541,32 @@ function teardownLine(b: Building): string {
 /**
  * The actions a tile's card offers: send the resident picked last there, or have them build an
  * unbuilt node's workplace there (`buildHere`), open or close an own gate, open the city
- * inspector at the city the card links to, and trade at a warehouse or storage (`tradeHere`). Everything else a resident does on the tile is on
- * their own card once they stand there. `tick` tells whether the resident is still a child.
+ * inspector at the city the card links to, and trade at a warehouse or storage (`tradeHere`), and
+ * have them Feed someone Down there (`downHere`), greyed with the reason while they can't
+ * (`feedProblem`). Everything else a resident does on the tile is on
+ * their own card once they stand there. `tick` tells whether the resident is still a child;
+ * `size` is the map's.
  */
-export function tileActions(card: TileCard, actor: Resident | undefined, tick = 0): CardAction[] {
+export function tileActions(
+  card: TileCard,
+  actor: Resident | undefined,
+  tick = 0,
+  size = MAP_SIZE,
+): CardAction[] {
   const actions: CardAction[] = []
   if (actor)
     actions.push({ id: 'sendHere', label: `Send ${actor.name} here`, key: ACTION_KEYS.sendHere })
+  const down = card.downHere?.filter((r) => r.id !== actor?.id) ?? []
+  if (actor && down.length > 0) {
+    const reason = feedProblem(actor, down[0], tick, size)
+    actions.push({
+      id: 'feed',
+      label: down.length === 1 ? `Feed ${down[0]!.name}…` : 'Feed someone Down…',
+      key: ACTION_KEYS.feed,
+      opens: true,
+      ...(reason ? { disabled: true as const, reason } : {}),
+    })
+  }
   if (actor && card.buildHere) {
     const name = BUILDING_NAMES[card.buildHere.kind].toLowerCase()
     const reason = !card.buildHere.at

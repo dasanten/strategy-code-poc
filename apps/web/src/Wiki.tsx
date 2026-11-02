@@ -54,6 +54,8 @@ import {
   DRIVING_SKILL_PER_DAY,
   STARVE_DAYS,
   DOWN_DAYS,
+  FEED_UNITS,
+  WAKE_HEALTH,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
   GET_FOOD_AT,
@@ -962,7 +964,16 @@ export function Wiki() {
           don't eat and lose no more health. Anyone in sight sees that they are Down: their token
           lies on its side, and their own Player's card says how long is left. When the time is up
           they die of hunger. Only hunger puts a resident Down: wounds kill as before, and a Leader
-          who is Down still leads. The realm log says when one goes Down and when one dies.
+          who is Down still leads. The realm log says when one goes Down, wakes or dies.
+        </p>
+        <p>
+          <b>Reviving:</b> any grown resident of any realm on or next to a Down resident's tile can{' '}
+          <b>Feed</b> them: the Feed row on their card (or on the Down resident's tile card), a
+          queue step, or <code>feed(residentId, units)</code> in a script. It puts up to that many
+          units of the Food in their own hands into the Down resident's ({num(FEED_UNITS)} unless
+          set). One unit is eaten at once, and they wake idle with {num(WAKE_HEALTH)} of{' '}
+          {num(MAX_HEALTH)} health, which comes back while their hunger meter isn't empty; the rest
+          stays in their hands to eat later.
         </p>
         <p>
           Food spoils: {pct(FOOD_SPOIL_PER_DAY)} of every stock goes bad each game day, half of it

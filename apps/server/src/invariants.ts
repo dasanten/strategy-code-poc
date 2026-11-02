@@ -88,7 +88,7 @@ import {
   tileIndex,
 } from '@csp/shared'
 import { tallyGoods } from './goods-made.js'
-import { downDoNothing, refillSource, refillTarget } from './survival.js'
+import { awakeAlive, downDoNothing, refillSource, refillTarget } from './survival.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
@@ -1443,6 +1443,7 @@ const ADULT_ORDERS = new Set([
   'train',
   'breed',
   'drive',
+  'feed',
 ])
 
 /** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
@@ -1993,6 +1994,7 @@ export const worldInvariants: Invariant[] = [
   territorySound,
   deadLeaveLoot,
   downDoNothing,
+  awakeAlive,
   attackOrdersSound,
   armiesSound,
   contractsSound,
