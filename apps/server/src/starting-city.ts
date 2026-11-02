@@ -26,7 +26,7 @@ import {
   CITY_BUILDING_REACH,
   footprintKeys,
 } from '@csp/shared'
-import { CITY_NAMES, updateCityMembership } from './cities.js'
+import { CITY_NAMES, givenCityName, updateCityMembership } from './cities.js'
 import { recordEvent } from './events.js'
 import { newHorse } from './horses.js'
 import { mulberry32, newResident, residentName } from './residents.js'
@@ -262,7 +262,7 @@ export function foundStartingCity(
   const square = startCity(x, y)
   const city: City = {
     id: newId(world, 'city'),
-    name: CITY_NAMES[Math.floor(rand() * CITY_NAMES.length)]!,
+    ...givenCityName(world, CITY_NAMES[Math.floor(rand() * CITY_NAMES.length)]!),
     realmId,
     townHallId: '',
     occupation: null,
@@ -299,15 +299,16 @@ export function foundStartingCity(
   buildings.push(farm, { ...building('stable', sx, sy), stock: { food: START_STABLE_FOOD } })
 
   // Everyone starts on the farm, working it, with a little food on them; the first is the Leader.
-  const residents = Array.from({ length: START_RESIDENTS }, () => {
-    const r = newResident(rand, {
-      id: newId(world, 'r'),
-      owner: realmId,
-      cityId: city.id,
-      x: fx,
-      y: fy,
-      tick: world.tick,
-    })
+  // Each gets a name none of the others has, nor the one the Player gave the Leader
+  // (`CONTEXT.md`: Game-given names).
+  const leaderName = names?.leaderName.trim()
+  const taken = new Set(leaderName === undefined ? [] : [leaderName])
+  const residents = Array.from({ length: START_RESIDENTS }, (_, i) => {
+    const r = newResident(
+      rand,
+      { id: newId(world, 'r'), owner: realmId, cityId: city.id, x: fx, y: fy, tick: world.tick },
+      i === 0 && leaderName !== undefined ? undefined : taken,
+    )
     r.carried = { food: START_CARRIED_FOOD }
     r.order = { kind: 'workAt', buildingId: farm.id, at: { x: fx, y: fy }, progress: 0 }
     // By the Work default (`CONTEXT.md`: Carrying the output), the Player's version from the
@@ -318,7 +319,7 @@ export function foundStartingCity(
   const realm: Realm = { id: realmId, userId, leaderId: residents[0]!.id }
   if (names) {
     realm.name = names.realmName.trim()
-    residents[0]!.name = names.leaderName.trim()
+    residents[0]!.name = leaderName!
   }
 
   world.realms.push(realm)

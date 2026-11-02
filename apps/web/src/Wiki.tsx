@@ -789,6 +789,15 @@ export function Wiki() {
           Health runs up to {num(MAX_HEALTH)}.
         </p>
         <p>
+          <b>Names.</b> A name the game gives a resident, in a starting city, at birth or when they
+          join your realm, is one no living resident of that realm has (an NPC city counts as a
+          realm of its own); a name it gives a city is one no city in the world has. Once its list
+          of names runs dry it adds a numeral, as in “Edda II”. Renaming is free: you can rename any
+          resident or city of your realm, and your names may repeat. Names from before this rule
+          stay as they were, so where a list holds two residents of one name it adds their age,
+          and their city when they live in different ones.
+        </p>
+        <p>
           A resident lives in one city, wherever they stand. One who lives in none is{' '}
           <b>homeless</b>: their town hall was torn down, or they were away when their city changed
           hands. A homeless resident has no home to refill at and can't pair.

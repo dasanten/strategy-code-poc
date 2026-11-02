@@ -1081,6 +1081,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               world.carriages,
               world.residents,
               world.cities,
+              world.tick,
             )}
             tick={world.tick}
             selectedId={(() => {
@@ -1146,6 +1147,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             buildings={world.buildings}
             cities={world.cities}
             realms={realms}
+            tick={world.tick}
             sendOrder={sendOrder}
           />,
         )}

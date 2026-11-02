@@ -1,3 +1,4 @@
+import { TICKS_PER_GAME_YEAR, ticksForAge } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { groupHorses } from './horses-view.js'
 
@@ -14,7 +15,7 @@ const cities = [
   { id: 'c1', name: 'Oakford' },
   { id: 'c2', name: 'Ashby' },
 ]
-const ann = { id: 'ann', name: 'Ann', riding: undefined, order: null }
+const ann = { id: 'ann', name: 'Ann', riding: undefined, order: null, bornAt: 0, cityId: 'c1' }
 
 describe('groupHorses', () => {
   it('puts a horse on a stable’s footprint under that stable, anywhere on it', () => {
@@ -59,15 +60,29 @@ describe('groupHorses', () => {
   })
 
   it('says who rides a ridden horse, and leaves the rest loose', () => {
-    const groups = groupHorses(
-      [h('a', 3.5, 3.2), h('b', 7, 8)],
-      [],
-      [],
-      [{ ...ann, riding: 'a' }],
-    )
+    const groups = groupHorses([h('a', 3.5, 3.2), h('b', 7, 8)], [], [], [{ ...ann, riding: 'a' }])
     expect(groups.map((g) => [g.key, g.rows.map((r) => r.place)])).toEqual([
       ['ridden', ['Ridden by Ann']],
       ['loose', ['Loose at 7, 8']],
+    ])
+  })
+
+  it('tells two riders of one name apart by age, and their city when they live apart', () => {
+    const tick = 30 * TICKS_PER_GAME_YEAR
+    const groups = groupHorses(
+      [h('a', 3, 3), h('b', 7, 8)],
+      [],
+      [],
+      [
+        { ...ann, riding: 'a', bornAt: tick - ticksForAge(24) },
+        { ...ann, id: 'ann2', riding: 'b', cityId: 'c2', bornAt: tick - ticksForAge(30) },
+      ],
+      cities,
+      tick,
+    )
+    expect(groups[0]!.rows.map((r) => r.place)).toEqual([
+      'Ridden by Ann (24, Oakford)',
+      'Ridden by Ann (30, Ashby)',
     ])
   })
 
@@ -87,7 +102,12 @@ describe('groupHorses', () => {
   it('orders stables by name, then Hitched, Ridden, Loose, leaving empty groups out', () => {
     const groups = groupHorses(
       [h('loose', 50, 50), h('o2', 30, 30), h('o1', 20, 20), h('ash', 40, 40), h('hit', 60, 60)],
-      [stable('o1', 20, 20), stable('o2', 30, 30), stable('ash', 40, 40, 'c2'), stable('empty', 0, 0, 'c2')],
+      [
+        stable('o1', 20, 20),
+        stable('o2', 30, 30),
+        stable('ash', 40, 40, 'c2'),
+        stable('empty', 0, 0, 'c2'),
+      ],
       [{ id: 'k', horseId: 'hit' }],
       [],
       cities,

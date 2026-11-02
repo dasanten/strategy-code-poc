@@ -13,6 +13,7 @@ import {
   type SeenResident,
 } from '@csp/shared'
 import { contractStatus, sideName } from './contract-view.js'
+import { labelled, nameLabels } from './name-labels.js'
 
 /**
  * Mercenary contracts (`CONTEXT.md`: Mercenary contract): offer some of your residents for hire
@@ -31,6 +32,7 @@ export function ContractsPanel({
   buildings,
   cities,
   realms,
+  tick,
   sendOrder,
 }: {
   contracts: ContractView[]
@@ -44,6 +46,8 @@ export function ContractsPanel({
   cities: SeenCity[]
   /** Realms the Player could make a contract with. */
   realms: RealmLabel[]
+  /** Now, for the ages that tell residents of one name apart (`nameLabels`). */
+  tick: number
   sendOrder: (order: OrderRequest) => Promise<string | undefined>
 }) {
   const [hiring, setHiring] = useState(false)
@@ -61,12 +65,15 @@ export function ContractsPanel({
   const npcCities = cities.filter((c) => c.hire !== undefined)
   const npc = hiring ? npcCities.find((c) => c.id === other) : undefined
   const lenderId = hiring ? other : realmId
-  const candidates =
+  const candidates = labelled<SeenResident>(
     tradeOrg || npc
       ? []
       : hiring
         ? inSight.filter((r) => r.owner === other)
-        : own.filter((r) => r.owner === realmId)
+        : own.filter((r) => r.owner === realmId),
+    tick,
+    cities,
+  )
   const storages = buildings.filter(
     (b) =>
       b.kind === (tradeOrg ? 'warehouse' : 'storage') &&
@@ -118,14 +125,21 @@ export function ContractsPanel({
             const offered = c.startedAt === null
             const theirOffer =
               offered && (c.offeredBy === 'lender' ? c.lender : c.hirer).realmId !== realmId
-            const payers =
+            const payers = labelled(
               !lender && !offered && c.paidWeeks < c.weeks && c.storage
                 ? own.filter(
                     (r) =>
                       isAt(r, { kind: 'storage', ...c.storage! }) &&
                       (r.carried.coins ?? 0) >= c.pricePerWeek,
                   )
-                : []
+                : [],
+              tick,
+            )
+            const rented = nameLabels(
+              inSight.filter((r) => c.residents.some((x) => x.id === r.id)),
+              tick,
+              cities,
+            )
             return (
               <li key={c.id} className="army">
                 <span>
@@ -133,7 +147,7 @@ export function ContractsPanel({
                     {lender ? 'Rented to' : 'Hired from'} {sideName(otherSide, cities)}
                   </strong>
                   <br />
-                  {c.residents.map((r) => r.name).join(', ')}
+                  {c.residents.map((r) => rented.get(r.id) ?? r.name).join(', ')}
                   <br />
                   <span className="muted small">
                     {c.days} days at {c.pricePerWeek} Coins a week, paid into the{' '}

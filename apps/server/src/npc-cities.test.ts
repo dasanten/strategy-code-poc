@@ -104,6 +104,11 @@ describe('placeNpcCities (through generateWorld)', () => {
     }
   })
 
+  it('names every city apart, the Trade Org HQ’s too (`CONTEXT.md`: Game-given names)', () => {
+    const cityNames = world.cities.map((c) => c.name)
+    expect(new Set(cityNames).size).toBe(cityNames.length)
+  })
+
   it('places the same cities for the same world', () => {
     expect(generateWorld(terrain)).toEqual(world)
   })
