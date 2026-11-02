@@ -994,6 +994,12 @@ export function Wiki() {
           last saw it. With no workplace there, once theirs is gone, or when they find it held by
           another realm's workers with no room left, Work ends and your realm log says why.
         </p>
+        <p>
+          Work on a workplace that is still a construction site builds it first, as Build would,
+          with materials from the nearest storage of your realm that holds them, and once it is
+          finished they work it without another order. Pick the site for Work on the card or as a
+          queue step.
+        </p>
         <table>
           <thead>
             <tr>
