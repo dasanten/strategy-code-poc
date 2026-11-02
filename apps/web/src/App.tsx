@@ -139,7 +139,7 @@ import {
   startValuesValid,
   type StartValues,
 } from './start-params.js'
-import { paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
+import { paramOnTile, paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
 
@@ -163,6 +163,21 @@ function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): P
   const { buildings, carriages, cities } = world
   const [lastSeen, realmId] = [world.lastSeen.buildings, world.home.realmId]
   return { buildings, lastSeen, carriages, cities, realmId, size: world.map.size }
+}
+
+/**
+ * For a default script's target param (`targetParam`), what it would be on the resident's tile,
+ * which the script uses while none is picked; undefined for a script without one.
+ */
+function targetOnTile(
+  world: NonNullable<ReturnType<typeof useWorld>['world']>,
+  script: ScriptSummary | undefined,
+  at: { x: number; y: number },
+): string | null | undefined {
+  const name = script && targetParam(script)
+  const param = script?.params.find((p) => p.name === name)
+  if (!param || param.type === 'number') return undefined
+  return paramOnTile(paramWorld(world), param.type, at)
 }
 
 /** What the queue planner's map picks need of the world (`plan-step`). */
@@ -1451,6 +1466,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   // As seen: the values picked for the script they run come with it.
                   values={world.residents.find((r) => r.id === selected.id)?.script?.params ?? {}}
                   label={(id) => paramValueLabel(paramWorld(world), id)}
+                  target={targetParam(
+                    scripts.find((s) => s.id === selected.script!.scriptId) ?? {},
+                  )}
+                  onTile={targetOnTile(
+                    world,
+                    scripts.find((s) => s.id === selected.script!.scriptId),
+                    selected,
+                  )}
                   picking={paramPick?.name}
                   onPick={(p) => {
                     setPicking(false)

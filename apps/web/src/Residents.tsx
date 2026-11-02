@@ -1979,9 +1979,17 @@ export function ResidentCard({
           </>
         ) : (
           <>
-            <p className="muted small">
-              Runs no script. Give them one with Run script under Orders.
-            </p>
+            <p className="muted small">Runs no script.</p>
+            {actions.some((a) => a.id === 'script') && (
+              <div className="order-buttons">
+                <button
+                  type="button"
+                  onClick={() => onSections({ ...sections, tab: 'orders', panel: 'script' })}
+                >
+                  Run script…
+                </button>
+              </div>
+            )}
             {defenceScript}
             {scriptLog}
           </>
