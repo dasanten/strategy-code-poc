@@ -1256,10 +1256,13 @@ export function Wiki() {
         <p>
           Cards show goods as these icons, each with its amount; hover over one, or press and hold
           it on a phone, for its name. That goes for every inventory: what a resident carries, a
-          carriage's load, a storage's or stable's goods, a pile, and a construction site's
-          materials (what was delivered and what it still needs); a trade's prices name each good
+          carriage's load, a storage's or stable's goods and a pile; a trade's prices name each good
           beside its icon. On a resident's card their own food (up to {num(OWN_FOOD)} Food) shows
-          apart at the end, marked <em>own</em>.
+          apart at the end, marked <em>own</em>. A construction site's card shows its work done as a
+          bar with about how long is left at the pace of those building it, then a row per material:
+          what was delivered against what it needs, with a small bar. A workplace's card shows its
+          pile and its crew, one row each with what they are doing: working, carrying a load,
+          fetching, or on the way.
         </p>
         <h3>Moving goods, per game hour</h3>
         <table>

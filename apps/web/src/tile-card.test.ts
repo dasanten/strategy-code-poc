@@ -1,7 +1,7 @@
 import { createElement, isValidElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { MAX_HEALTH, MAX_HUNGER, type Building, type Horse } from '@csp/shared'
+import { MAX_HEALTH, MAX_HUNGER, type Building, type Horse, type SeenResident } from '@csp/shared'
 import { describeTile } from './selection-view.js'
 import { GOOD_LABELS } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
@@ -143,7 +143,7 @@ describe('inventories on the tile card (`CONTEXT.md`: Goods on cards)', () => {
     expect(html).not.toMatch(/12 wood|4 stone/)
   })
 
-  it('shows a site’s delivered and still-needed materials as grid items', () => {
+  it('shows a site’s work as a meter and a have/need row with a bar per material', () => {
     const site: Building = {
       id: 'b-mine',
       kind: 'mine',
@@ -153,8 +153,26 @@ describe('inventories on the tile card (`CONTEXT.md`: Goods on cards)', () => {
       site: { work: 0, delivered: { wood: 10 } },
     }
     const html = card({ buildings: [site] }, site)
-    expect(cells(html)).toEqual(['Wood: 10', 'Wood: 30', 'Stone: 20'])
-    expect(html).toContain('Still needs')
+    expect(html).toContain('aria-label="Work 0%"')
+    expect(html).toContain('Nobody is building')
+    const rows = [...html.matchAll(/<li aria-label="([^"]+)"><span class="good-icon"/g)]
+    expect(rows.map((m) => m[1])).toEqual(['Wood: 10 / 40', 'Stone: 0 / 20'])
+    expect(html).toContain('width:25%')
+    expect(cells(html)).toEqual([])
+  })
+
+  it('shows a workplace’s crew as rows saying what each is doing', () => {
+    const farm: Building = { id: 'b-farm', kind: 'farm', cityId: 'c-me', x: 5, y: 5 }
+    const ana = {
+      id: 'ana',
+      name: 'Ana',
+      owner: 'me',
+      cityId: 'c-me',
+      order: { kind: 'workAt', buildingId: farm.id },
+    } as unknown as SeenResident
+    const html = card({ buildings: [farm], residents: [ana], workers: () => 1 }, farm)
+    expect(html).toContain('<h3>Crew</h3>')
+    expect(html).toMatch(/<span>Ana<\/span><small class="muted">Working<\/small>/)
   })
 })
 

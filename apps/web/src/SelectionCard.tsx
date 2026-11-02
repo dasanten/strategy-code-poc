@@ -20,8 +20,8 @@ import {
   type ResourceKind,
 } from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
-import { GoodsGrid } from './GoodsGrid.js'
-import { goodsItems } from './goods-grid.js'
+import { GoodIcon, GoodsGrid } from './GoodsGrid.js'
+import { GOOD_LABELS, goodsItems } from './goods-grid.js'
 import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
@@ -35,6 +35,7 @@ import {
   type CardRow,
   type NamedResident,
   type OrderGroup,
+  type SiteView,
   type TileCard as TileCardData,
 } from './selection-view.js'
 import { Meter, meterClass, pct } from './Horses.js'
@@ -542,6 +543,9 @@ export function TileCard({
           ))}
         </ul>
       )}
+      {card.lastSeen?.sites?.map((site, i) => (
+        <SiteBlock key={i} site={site} past />
+      ))}
       {card.lastSeen?.lists.map((list, i) => (
         <CardListBlock key={i} list={list} past onOpen={() => {}} />
       ))}
@@ -551,6 +555,9 @@ export function TileCard({
           {card.lines.map((l, i) => (i === 0 && !card.lastSeen ? null : <li key={i}>{l}</li>))}
         </ul>
       )}
+      {card.sites?.map((site, i) => (
+        <SiteBlock key={i} site={site} />
+      ))}
       {card.carriage && (
         <CarriageBlock
           carriage={card.carriage}
@@ -647,6 +654,55 @@ export function TileCard({
 }
 
 const capital = (words: string) => `${words.charAt(0).toUpperCase()}${words.slice(1)}`
+
+/**
+ * A construction site on the tile card (`SiteView`): its work done as a meter with how long is
+ * left, then a row per material, its icon and name with what was delivered against what it
+ * needs and a small bar. `past` for what the Player last saw.
+ */
+function SiteBlock({ site, past }: { site: SiteView; past?: boolean }) {
+  const { work, materials } = site
+  return (
+    <section
+      className={`card-site${past ? ' sel-past' : ''}`}
+      aria-label={site.title ?? 'Construction site'}
+    >
+      {site.title && (
+        <div className="panel-head">
+          <h3>{site.title}</h3>
+        </div>
+      )}
+      <div className="vital card-work">
+        <div className="vital-head">
+          <span className="muted">Work</span>
+          <span className="mono">{work.text}</span>
+        </div>
+        <span className="meter big" aria-label={`Work ${work.text}`}>
+          <span className="ok" style={{ width: pct(work.share) }} />
+        </span>
+        {work.left && <span className="small muted">{capital(work.left)}</span>}
+      </div>
+      {materials.length === 0 ? (
+        <p className="muted small">Needs no materials, only work</p>
+      ) : (
+        <ul className="site-materials" aria-label="Materials">
+          {materials.map(({ good, have, need }) => (
+            <li key={good} aria-label={`${GOOD_LABELS[good]}: ${have} / ${need}`}>
+              <GoodIcon good={good} />
+              <span className="site-material-name">{GOOD_LABELS[good]}</span>
+              <span className="mono">
+                {have} / {need}
+              </span>
+              <span className="meter" aria-hidden="true">
+                <span className={have >= need ? 'ok' : 'mid'} style={{ width: pct(have / need) }} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
 
 /**
  * A carriage on the tile card (`CarriageView`) as labelled rows: its load as a bar over its

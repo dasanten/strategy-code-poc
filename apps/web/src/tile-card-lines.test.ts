@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BUILD_MATERIALS,
   BUILD_WORK,
   FOOD_PER_DAY,
+  GOODS,
   HOUSING_ROOM,
   MOUNTAIN_ROAD_WORK_FACTOR,
   TICKS_PER_GAME_YEAR,
@@ -9,6 +11,7 @@ import {
   UNEXPLORED,
   hungerFactor,
   teardownWork,
+  type Good,
   type Pile,
   type Resident,
   type SeenBuilding,
@@ -89,32 +92,44 @@ describe('the terrain on a tile’s card', () => {
 })
 
 describe('buildings on a tile’s card', () => {
-  it('shows what a construction site has and still needs as goods grids', () => {
-    const mine = (delivered: SeenBuilding['stock'] & object) =>
-      building({ kind: 'mine', site: { work: 0, delivered } })
-    const half = tile({ buildings: [mine({ wood: 10 })] })
-    expect(half.lists?.map(({ title, goods }) => ({ title, goods }))).toEqual([
-      { title: 'Delivered', goods: { wood: 10 } },
-      { title: 'Still needs', goods: { wood: 30, stone: 20 } },
+  it('shows what a construction site has against what it needs, per good', () => {
+    const mine = (delivered: SeenBuilding['stock'] & object, work = 0) =>
+      building({ kind: 'mine', site: { work, delivered } })
+    const half = tile({ buildings: [mine({ wood: 10 }, (BUILD_WORK.mine ?? 0) / 2)] })
+    expect(half.sites).toEqual([
+      {
+        work: { text: '50%', share: 0.5 },
+        materials: [
+          { good: 'wood', have: 10, need: 40 },
+          { good: 'stone', have: 0, need: 20 },
+        ],
+      },
     ])
-    expect(half.lines.some((l) => l.includes('wood'))).toBe(false)
+    expect(half.lines.some((l) => /wood|work done|delivered/.test(l))).toBe(false)
+    expect(half.lists).toBeUndefined()
     const full = tile({ buildings: [mine({ wood: 40, stone: 20 })] })
-    expect(full.lines).toContain('All materials delivered')
-    expect(full.lists?.map((l) => l.title)).toEqual(['Delivered'])
-    expect(tile({ buildings: [mine({})] }).lists?.[0]).toMatchObject({ empty: 'Nothing yet' })
+    expect(full.sites?.[0]?.materials.every((m) => m.have === m.need)).toBe(true)
     const farm = tile({ buildings: [building({ kind: 'farm', site: { work: 0, delivered: {} } })] })
-    expect(farm.lines).toContain('Needs no materials, only work')
-    expect(farm.lists).toBeUndefined()
+    expect(farm.sites?.[0]?.materials).toEqual([])
   })
 
-  it('shows a carriage site’s materials apart from its stable', () => {
+  it('shows a carriage site under a head of its own on its stable’s card', () => {
     const stable = building({ kind: 'stable', cityId: 'c-me', stock: {} })
     const carriage = building({ id: 'k', kind: 'carriage', site: { work: 0, delivered: {} } })
     const card = tile({ buildings: [stable, carriage] })
-    expect(card.lines).toContain('Carriage site · 0% of the work done')
-    expect(card.lists?.map((l) => l.title)).toEqual(
-      expect.arrayContaining(['Carriage: delivered', 'Carriage: still needs']),
+    expect(card.title).toBe('Eastmere stable')
+    expect(card.sites).toEqual([
+      expect.objectContaining({ title: 'Carriage site', work: { text: '0%', share: 0 } }),
+    ])
+    expect(card.sites?.[0]?.materials.map((m) => m.good)).toEqual(
+      Object.keys(BUILD_MATERIALS.carriage ?? {}).sort(
+        (a, b) => GOODS.indexOf(a as Good) - GOODS.indexOf(b as Good),
+      ),
     )
+    // On a card of its own, the card's head names it.
+    const alone = tile({ buildings: [carriage] })
+    expect(alone.title).toBe('Carriage site')
+    expect(alone.sites?.[0]?.title).toBeUndefined()
   })
 
   it('says what a workplace makes, and shows its pile as a goods grid', () => {
