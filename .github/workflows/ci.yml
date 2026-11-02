@@ -18,7 +18,10 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: on ubuntu-26.04 the same tests ran about twice as slow, so the
+    # timing budgets and 30 s test timeouts failed (main, 2026-11-01). Move up only after a run on
+    # the new image shows the suite about as fast as on this one.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -38,7 +41,7 @@ jobs:
   image:
     needs: check
     if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
@@ -69,7 +72,7 @@ jobs:
   deploy:
     needs: image
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     concurrency: deploy
     permissions:
       contents: read
