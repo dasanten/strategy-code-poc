@@ -143,3 +143,19 @@ export function pickPrompt(target: PickTarget, touch: boolean): string {
   if (target.kind === 'plan') return `${verb} ${target.prompt}`
   return `${verb} ${PARAM_PROMPTS[target.param.type]} for ${target.param.name}`
 }
+
+/**
+ * What a click or tap on a tile does while picking (`CONTEXT.md`: Picking a target): a click
+ * picks it at once, the preview having shown under the pointer before. A touch screen has no
+ * pointer to hover, so a tap previews the tile instead, and a tap elsewhere moves the preview;
+ * Confirm on the banner, or a second tap on the tile previewed, picks it.
+ */
+export function pickTap(
+  previewed: { x: number; y: number } | undefined,
+  tile: { x: number; y: number },
+  touch: boolean,
+): { pick: { x: number; y: number } } | { preview: { x: number; y: number } } {
+  if (!touch) return { pick: tile }
+  if (previewed && previewed.x === tile.x && previewed.y === tile.y) return { pick: tile }
+  return { preview: tile }
+}

@@ -95,6 +95,8 @@ import { drawUnits, type Spot } from './map/unit-tokens.js'
 import { roadJoins, roadWidth, wallWidths } from './map/roads.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
+import { drawPickPreview } from './map/preview-draw.js'
+import type { PickPreview } from './pick-preview.js'
 import {
   inBox,
   mapPickAt,
@@ -150,6 +152,8 @@ export function MapView({
   onSelectCity,
   picking = false,
   onPickTile,
+  preview,
+  onPointerTile,
   onNodesLoaded,
   onTerrainLoaded,
   focus,
@@ -176,8 +180,15 @@ export function MapView({
   onSelectCity?: (id: string) => void
   /** Waiting for a tile: the next click picks one instead of selecting. */
   picking?: boolean
-  /** Called with a tile picked by click (while `picking`) or by right-click. */
-  onPickTile?: (x: number, y: number) => void
+  /**
+   * Called with a tile picked by click (while `picking`) or by right-click or long-press; a click
+   * while picking says whether it was a finger's tap.
+   */
+  onPickTile?: (x: number, y: number, tap?: { touch: boolean }) => void
+  /** What the pick waiting for a tile would do there, drawn while `picking` (`pickPreview`). */
+  preview?: PickPreview
+  /** Called while `picking` with the tile a mouse or pen hovers over, undefined once off the map. */
+  onPointerTile?: (tile: { x: number; y: number } | undefined) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
   onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
   /** Called as terrain chunks load, with a lookup of a tile's explored terrain. */
@@ -211,6 +222,9 @@ export function MapView({
   pickingRef.current = picking
   const onPickTileRef = useRef(onPickTile)
   onPickTileRef.current = onPickTile
+  const previewRef = useRef(preview)
+  const onPointerTileRef = useRef(onPointerTile)
+  onPointerTileRef.current = onPointerTile
   const onNodesLoadedRef = useRef(onNodesLoaded)
   onNodesLoadedRef.current = onNodesLoaded
   const onTerrainLoadedRef = useRef(onTerrainLoaded)
@@ -266,6 +280,11 @@ export function MapView({
     selectedCityRef.current = selectedCityId
     redrawRef.current()
   }, [selectedCityId])
+
+  useEffect(() => {
+    previewRef.current = picking ? preview : undefined
+    redrawRef.current()
+  }, [preview, picking])
 
   useEffect(() => {
     worldRef.current = world
@@ -644,6 +663,8 @@ export function MapView({
         const selected = world.residents.find((u) => u.id === id)
         if (selected) drawPath(g, cam, view, mapSize, selected, world.residents)
       }
+      // What the pick waiting for a tile would do under the pointer (`CONTEXT.md`: Picking a target).
+      if (previewRef.current) drawPickPreview(g, cam, view, mapSize, previewRef.current)
       drawHover(g, view)
     }
 
@@ -679,6 +700,16 @@ export function MapView({
       })
       pointer = { x: sx, y: sy }
       updateHover()
+      pointTo(pickingRef.current ? { x: wx, y: wy } : undefined)
+    }
+
+    // The tile last said to be under the hovering pointer while picking (`onPointerTile`).
+    let pointedAt = ''
+    function pointTo(tile: { x: number; y: number } | undefined) {
+      const key = tile ? `${tile.x},${tile.y}` : ''
+      if (key === pointedAt) return
+      pointedAt = key
+      onPointerTileRef.current?.(tile)
     }
 
     /** Redraws the hover outline when what a click under the pointer would pick changed. */
@@ -814,9 +845,10 @@ export function MapView({
           number,
           number,
         ]
-        if (pickingRef.current || e.button === 2) {
-          onPickTileRef.current?.(tx, ty)
-          return
+        if (e.button === 2) return onPickTileRef.current?.(tx, ty)
+        if (pickingRef.current) {
+          const [wx, wy] = [wrap(tx, mapSize), wrap(ty, mapSize)]
+          return onPickTileRef.current?.(wx, wy, { touch: e.pointerType === 'touch' })
         }
         // Far out, a click picks the city whose emblem it falls on.
         if (zoomTier(cam.scale) === 'far') {
@@ -888,6 +920,7 @@ export function MapView({
       app.canvas.addEventListener('lostpointercapture', onUp)
       app.canvas.addEventListener('pointerleave', () => {
         setHover(null)
+        pointTo(undefined)
         pointer = undefined
         updateHover()
       })

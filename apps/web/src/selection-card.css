@@ -96,6 +96,21 @@
   color: var(--ui-text);
   font-family: var(--font-ui);
 }
+/* Shrunk while the map waits for a target: the room the card took stays, lightly drawn, and
+   swallows clicks so none lands on the map by accident (`CONTEXT.md`: Picking a target). */
+.inspector.sel-card.sel-shrunk {
+  background: color-mix(in srgb, var(--ui-panel) 45%, transparent);
+  border-style: dashed;
+}
+.sel-dead {
+  flex: 1 1 auto;
+  border-radius: 6px;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 10px,
+    color-mix(in srgb, var(--ui-text) 5%, transparent) 10px 20px
+  );
+}
 .sel-head {
   display: flex;
   gap: 10px;

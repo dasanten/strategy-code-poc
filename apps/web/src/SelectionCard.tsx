@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -66,11 +67,24 @@ export function SelectionCard({
   const colour = rel
     ? `var(--rel-${rel.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)})`
     : undefined
+  // How tall the card was before it shrank: while shrunk, the room it took stays dead, so a click
+  // there gives no order by accident (`CONTEXT.md`: Picking a target). A bottom sheet at peek
+  // shows the map instead; a tap there only previews.
+  const ref = useRef<HTMLElement>(null)
+  const tall = useRef(0)
+  useLayoutEffect(() => {
+    if (!collapsed && !peek && ref.current) tall.current = ref.current.offsetHeight
+  })
+  const dead = collapsed && !peek && tall.current > 0
   return (
     <aside
-      className="inspector sel-card"
+      ref={ref}
+      className={`inspector sel-card${dead ? ' sel-shrunk' : ''}`}
       aria-label="Selection"
-      style={colour ? { borderLeftColor: colour } : undefined}
+      style={{
+        ...(colour ? { borderLeftColor: colour } : {}),
+        ...(dead ? { minHeight: tall.current } : {}),
+      }}
     >
       <div className="sel-head">
         {icon && ART_FILES[icon] && (
@@ -104,6 +118,7 @@ export function SelectionCard({
       </div>
       {head}
       {!collapsed && !peek && children}
+      {dead && <div className="sel-dead" aria-hidden="true" />}
     </aside>
   )
 }
@@ -220,23 +235,37 @@ export function CardSheet({
 
 /**
  * The banner over the map while an order waits for its target (ADR 0012; `CONTEXT.md`: Picking a
- * target): what to pick, and Cancel, which Escape does too.
+ * target): what to pick, what is under the pointer and what the pick would do there (or else
+ * more on what picking does), and Cancel, which Escape does too. On a touch screen, once a tap
+ * has shown the preview, Confirm picks that tile.
  */
 export function PickBanner({
   prompt,
   hint,
+  under,
+  onConfirm,
   onCancel,
 }: {
   prompt: string
   hint?: string
+  /** What is under the pointer, or the tile tapped, and what the pick would do there. */
+  under?: string
+  /** Picks the tile previewed by a tap, on a touch screen. */
+  onConfirm?: () => void
   onCancel: () => void
 }) {
+  const line = under ?? hint
   return (
     <div className="notice pick-banner" role="status" title={hint ? `${prompt}\n${hint}` : prompt}>
       <div className="notice-text pick-banner-text">
         <strong>{prompt}</strong>
-        {hint && <span className="small">{hint}</span>}
+        {line && <span className="small">{line}</span>}
       </div>
+      {onConfirm && (
+        <button type="button" className="primary" onClick={onConfirm}>
+          Confirm
+        </button>
+      )}
       <button type="button" onClick={onCancel}>
         Cancel
       </button>
