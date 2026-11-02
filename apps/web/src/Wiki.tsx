@@ -937,20 +937,23 @@ export function Wiki() {
         <p>
           Far from home, a resident working, building or tearing down goes and gets food on their
           own. Below <code>foodAt</code> units of Food on them ({num(GET_FOOD_AT)} unless you set it
-          on their card), they walk to their storage (or the nearest one of your realm with Food),
-          take Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and go back.
-          Whenever they are at a storage anyway, their own food is topped up to{' '}
-          <code>foodTake</code> instead of {num(OWN_FOOD)}. With <code>foodAt</code> set to 0 they
-          don't go on their own and rely on refilling.
+          on their card), they walk to their <code>food</code> storage, else their main storage (
+          <code>storage</code> for Work, <code>source</code> for Build, Build line and Tear down),
+          else the nearest one of your realm with Food, take Food up to <code>foodTake</code> (
+          {num(GET_FOOD_TAKE)} unless set) and go back. Whenever they are at a storage anyway, their
+          own food is topped up to <code>foodTake</code> instead of {num(OWN_FOOD)}. With{' '}
+          <code>foodAt</code> set to 0 they don't go on their own and rely on refilling.
         </p>
         <p>
           A crew at a far workplace is fed by its carrier: the worker who carries a load to the
           storage brings back the Food the workplace's pile lacks of <code>crewFood</code> (
-          {num(CREW_FOOD)} unless set) and puts it on the pile, where the crew takes its meals, so
-          nobody else leaves for Food while the pile holds some. A farm's pile keeps its own Food
-          instead. <code>crewFood</code> 0 brings none. A resident an NPC city sends to a workplace
-          sets out with Food for the walk there and back plus {days(SET_OUT_WORK_DAYS)} of work, not
-          a fixed amount, so they last until the carrier's first round trip.
+          {num(CREW_FOOD)} unless set), from their <code>food</code> storage, else their{' '}
+          <code>storage</code>, else the nearest one with Food, and puts it on the pile, where the
+          crew takes its meals, so nobody else leaves for Food while the pile holds some. A farm's
+          pile keeps its own Food instead. <code>crewFood</code> 0 brings none. A resident an NPC
+          city sends to a workplace sets out with Food for the walk there and back plus{' '}
+          {days(SET_OUT_WORK_DAYS)} of work, not a fixed amount, so they last until the carrier's
+          first round trip.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -974,17 +977,25 @@ export function Wiki() {
         <p>
           Workers make goods in proportion to their Strength, plus {pct(WORK_SKILL_EFFECT)} for each
           point of the workplace's skill. Output lands in the workplace's pile; one worker at a time
-          carries a full load to the nearest storage of their realm.
+          carries a full load to their <code>output</code> storage, else their <code>storage</code>,
+          else the nearest storage of their realm.
+        </p>
+        <p>
+          Work's params on the card: <code>storage</code> is the main storage, used for the output,
+          the inputs and Food alike. <code>output</code> (where the output goes), <code>input</code>{' '}
+          (where inputs come from) and <code>food</code> (where Food comes from) each take its place
+          for that one use when picked; unset, they use <code>storage</code>, and with that unset
+          too, the nearest storage of your realm.
         </p>
         <p>
           A worker who carries less Food than <code>foodAt</code> ({num(GET_FOOD_AT)} unless set)
-          leaves work for their <code>storage</code>, or the nearest storage of your realm with
-          Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes
-          back. With no Food anywhere they work on. Carrying a load tops their food up to{' '}
-          <code>foodTake</code> too, and the carrier brings back what the workplace's pile lacks of{' '}
-          <code>crewFood</code> ({num(CREW_FOOD)} unless set) for the crew's meals, so a worker with
-          Food on the pile stays. <code>foodAt</code> 0 turns getting food off,{' '}
-          <code>crewFood</code> 0 the crew's Food.
+          leaves work for their <code>food</code> storage, else their <code>storage</code>, else the
+          nearest storage of your realm with Food, takes Food up to <code>foodTake</code> (
+          {num(GET_FOOD_TAKE)} unless set) and comes back. With no Food anywhere they work on.
+          Carrying a load tops their food up to <code>foodTake</code> too, and the carrier brings
+          back what the workplace's pile lacks of <code>crewFood</code> ({num(CREW_FOOD)} unless
+          set) for the crew's meals, so a worker with Food on the pile stays. <code>foodAt</code> 0
+          turns getting food off, <code>crewFood</code> 0 the crew's Food.
         </p>
         <p>
           Work can be run directly too, with Run script or as a queue step: they work the workplace
@@ -1146,11 +1157,11 @@ export function Wiki() {
         </p>
         <p>
           A resident building or tearing down who carries less Food than <code>foodAt</code> (
-          {num(GET_FOOD_AT)} unless set) goes to their <code>source</code>, or the nearest storage
-          of your realm with Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)}{' '}
-          unless set) and comes back to the site. With no Food anywhere they work on. Fetching
-          materials tops their food up to <code>foodTake</code> too, before the materials.{' '}
-          <code>foodAt</code> 0 turns this off.
+          {num(GET_FOOD_AT)} unless set) goes to their <code>food</code> storage, else their{' '}
+          <code>source</code>, else the nearest storage of your realm with Food, takes Food up to{' '}
+          <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes back to the site. With
+          no Food anywhere they work on. Fetching materials tops their food up to{' '}
+          <code>foodTake</code> too, before the materials. <code>foodAt</code> 0 turns this off.
         </p>
         <p>
           Build can be run directly too, with Run script or as a queue step: they join the
@@ -2083,20 +2094,23 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             The Work default has <code>workplace</code>: the workplace to work, the one they stand
             on while none is picked; it is never kept between starts, so the form before it starts
             shows it empty, and giving Work on a workplace fills it without asking. It also has{' '}
-            <code>storage</code>: where the output goes. The Build default has <code>site</code>:
-            the construction site to join; and <code>source</code>: where materials come from, a
-            carriage too. Unset, each uses the nearest storage; a source picked that holds none of
-            what the site lacks is left alone, and they just build. The Haul default has{' '}
-            <code>carriage</code>: the carriage to drive. The Tear down default has{' '}
-            <code>building</code>, the Breed horses and Feed the stable defaults <code>stable</code>
-            . Like Work's <code>workplace</code>, each of these is the one they stand on while none
-            is picked, never kept between starts, and filled by giving the task. Feed the stable
-            also has <code>source</code>: where the Food comes from. The Tear down default has{' '}
-            <code>source</code>: where Food comes from. The Work, Build and Tear down defaults also
-            have the <code>number</code> params <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0
-            turns it off) and <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food,
-            in units of Food (a resident eats about {num(foodEatenPerDay())} a game day). Work also
-            has <code>crewFood</code> (default {num(CREW_FOOD)}; 0 brings none): the Food the
+            <code>storage</code>: the main storage, for the output, inputs and Food; and{' '}
+            <code>output</code>, <code>input</code> and <code>food</code>, each taking its place for
+            that one use when picked. The Build default has <code>site</code>: the construction site
+            to join; and <code>source</code>: where materials come from, a carriage too. Unset, each
+            uses the nearest storage; a source picked that holds none of what the site lacks is left
+            alone, and they just build. The Haul default has <code>carriage</code>: the carriage to
+            drive. The Tear down default has <code>building</code>, the Breed horses and Feed the
+            stable defaults <code>stable</code>. Like Work's <code>workplace</code>, each of these
+            is the one they stand on while none is picked, never kept between starts, and filled by
+            giving the task. Feed the stable also has <code>source</code>: where the Food comes
+            from. The Tear down default has <code>source</code>: where Food comes from. The Build,
+            Build line and Tear down defaults also have <code>food</code>: where Food comes from,
+            their <code>source</code> while none is picked. The Work, Build and Tear down defaults
+            also have the <code>number</code> params <code>foodAt</code> (default {num(GET_FOOD_AT)}
+            ; 0 turns it off) and <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting
+            food, in units of Food (a resident eats about {num(foodEatenPerDay())} a game day). Work
+            also has <code>crewFood</code> (default {num(CREW_FOOD)}; 0 brings none): the Food the
             workplace's pile keeps for the crew, which the carrier tops up on the way back from the
             storage.
           </li>
