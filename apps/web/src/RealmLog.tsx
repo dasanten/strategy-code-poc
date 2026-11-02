@@ -1,5 +1,6 @@
 import { formatGameTime, type DeliveryView, type RealmEvent } from '@csp/shared'
 import { describeDelivery, describeEvent, type EventPlace } from './realm-log.js'
+import { PanelHead } from './drawer-head.js'
 
 /**
  * What happened in the Player's realm, newest first: hunger, deaths, spoilage. A place an event
@@ -20,9 +21,9 @@ export function RealmLog({
 }) {
   return (
     <section className="realm-log" aria-label="Realm log">
-      <div className="panel-head">
-        <span>{events.length === 0 ? 'nothing yet' : `${events.length} events`}</span>
-      </div>
+      <PanelHead title="Realm log">
+        {events.length === 0 ? 'nothing yet' : `${events.length} events`}
+      </PanelHead>
       {deliveries.length > 0 && (
         <ul className="realm-log-list" aria-label="Open deliveries">
           {deliveries.map((d) => (

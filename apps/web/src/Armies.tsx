@@ -20,6 +20,7 @@ import {
   type ArmyTab,
 } from './residents-view.js'
 import { CardTabs, SelectionCard } from './SelectionCard.js'
+import { PanelHead } from './drawer-head.js'
 import { relationshipClass } from './theme.js'
 
 /** An army order that needs a tile, picked on the map. */
@@ -246,9 +247,7 @@ export function ArmiesPanel({
 
   return (
     <section className="alliance-panel" aria-label="Armies">
-      <div className="panel-head">
-        <span>{armies.length === 0 ? 'none' : armies.length}</span>
-      </div>
+      <PanelHead title="Armies">{armies.length === 0 ? 'none' : armies.length}</PanelHead>
       {armies.length > 0 && (
         <ul className="alliance-list">
           {armies.map((a) => (

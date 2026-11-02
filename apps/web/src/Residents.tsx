@@ -170,6 +170,7 @@ import {
 } from './script-run-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
+import { PanelHead } from './drawer-head.js'
 import { ActionRows, CardTabs, PanelUnder, SelectionCard, useActionKeys } from './SelectionCard.js'
 import {
   horseDetail,
@@ -973,10 +974,7 @@ export function ResidentsList({
   }, [selectedId])
   return (
     <section className="residents" aria-label="Residents">
-      {/* The drawer's own heading names it; its head only counts. */}
-      <div className="panel-head">
-        <span>{residentsCount(groups.flatMap((g) => g.residents))}</span>
-      </div>
+      <PanelHead title="Residents">{residentsCount(groups.flatMap((g) => g.residents))}</PanelHead>
       <div className="residents-scroll">
         <div className={`residents-table${phone ? ' lines' : ''}`} ref={tableRef}>
           {!phone && (
@@ -2342,9 +2340,17 @@ export function ResidentCard({
           </>
         ) : (
           <>
-            <p className="muted small">
-              Runs no script. Give them one with Run script under Orders.
-            </p>
+            <p className="muted small">Runs no script.</p>
+            {actions.some((a) => a.id === 'script') && (
+              <div className="order-buttons">
+                <button
+                  type="button"
+                  onClick={() => onSections({ ...sections, tab: 'orders', panel: 'script' })}
+                >
+                  Run script…
+                </button>
+              </div>
+            )}
             {defenceScript}
             {scriptLog}
           </>

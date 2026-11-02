@@ -532,13 +532,15 @@ function viewFields(
     // `params`: the script's own `param` lines, from its top alone, as the rest may not parse
     // while the Player types.
     return scriptParams(paramLines(source)).map((p) => {
+      // The comment on its line first: the script's own word on what it is for.
+      const holds =
+        p.default === undefined
+          ? PARAM_DESCRIPTIONS[p.type]
+          : `${PARAM_DESCRIPTIONS[p.type]} ${p.default} while none is set.`
       const field: ScriptField = {
         name: p.name,
         type: p.type === 'building' ? { view: 'building' } : 'any',
-        description:
-          p.default === undefined
-            ? PARAM_DESCRIPTIONS[p.type]
-            : `${PARAM_DESCRIPTIONS[p.type]} ${p.default} while none is set.`,
+        description: p.description ? `${p.description}\n${holds}` : holds,
         ...(p.default === undefined && {
           nullWhen: 'while none is picked, or the one picked is gone or no longer of my realm',
         }),

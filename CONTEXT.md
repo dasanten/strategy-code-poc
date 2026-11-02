@@ -886,7 +886,11 @@ The shared language of the game. Domain terms only — no implementation details
   first shows those params, filled with the resident's kept values or the defaults; Start gives
   the order with them. A script without params starts at once. The resident card shows one field
   for each param of the script the resident runs, picked on the map and cleared with a button;
-  picking one doesn't end the script. The Work default declares `storage` (where the output goes) and the Build default
+  picking one doesn't end the script. **Param comment:** the `//` comment at the end of a `param`
+  line says what the param is for and, after `none:`, what the script uses while none is picked;
+  each field shows it and the value the script uses: the one picked, else a `number` param's
+  default, a default script's target the one on the resident's tile, or what the comment says
+  after `none:`. The Work default declares `storage` (where the output goes) and the Build default
   `source` (where materials come from, a carriage too), each falling back to the nearest storage
   while unset; a source picked that holds none of what the site lacks is left alone, and they
   just build. Work, Build and Tear down also declare the `number` params `foodAt` and `foodTake`

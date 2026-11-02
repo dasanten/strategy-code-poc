@@ -248,7 +248,7 @@ import {
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
 import { DEFAULT_REPEAT } from './plan-blocks.js'
-import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import { PARAM_COMMENT_EXAMPLE, PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
@@ -1993,6 +1993,16 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
             number of zero or more and press Enter. Neither stops the script.
+          </li>
+          <li>
+            The comment at the end of a <code>param</code> line is what the card shows: what the
+            param is for, and after <code>none:</code> what the script uses while none is picked.
+            Each field says the value the script uses: the one picked, else a <code>number</code>{' '}
+            param's default, a default script's target the one on their tile, or what the comment
+            says after <code>none:</code>.
+            <pre>
+              <code>{PARAM_COMMENT_EXAMPLE}</code>
+            </pre>
           </li>
           <li>
             A group's card sets a <code>number</code> param for each of them running a script with
