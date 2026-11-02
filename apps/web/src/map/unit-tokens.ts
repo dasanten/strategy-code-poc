@@ -1,5 +1,6 @@
 import {
   SHARES_A_TILE,
+  isDown,
   type Army,
   type Building,
   type SeenCaravan,
@@ -64,9 +65,13 @@ export type Where = (id: string, x: number, y: number) => readonly [number, numb
 /** Every token in place: the map between ticks when nothing moves. */
 export const inPlace: Where = (_id, x, y) => [x, y]
 
+/** How far a Down resident's figure is turned: lying on its side (`CONTEXT.md`: Down). */
+const LYING = -Math.PI / 2
+
 /**
  * A unit as a token (ADR 0008): a dark round badge, the ring and glyph in the relationship
- * colour. The art's circle has a radius of 11 in its 24-unit box.
+ * colour. The art's circle has a radius of 11 in its 24-unit box. A `lying` figure, someone
+ * Down (`CONTEXT.md`: Down), lies on its side.
  */
 function drawUnit(
   tokens: TokenLayer,
@@ -75,19 +80,21 @@ function drawUnit(
   y: number,
   r: number,
   rel: Tone | undefined,
+  lying = false,
 ) {
   const color = relationshipColor(rel)
   const base = (r * 24) / 11
+  const turn = lying ? LYING : 0
   const painted = PAINTED_UNIT_ART[file]
   if (painted !== undefined) {
     // Painted art (`docs/art.md`): the figure inside a ring in the relationship colour.
     tokens.place(BASE_ART.roundRing, x, y, base, color)
-    tokens.place(paintedCell(painted), x, y, r * 1.7)
+    tokens.place(paintedCell(painted), x, y, r * 1.7, 0xffffff, 1, turn)
     return
   }
   tokens.place(BASE_ART.round, x, y, base)
   tokens.place(BASE_ART.roundRing, x, y, base, color)
-  tokens.place(file, x, y, r * 1.2, color)
+  tokens.place(file, x, y, r * 1.2, color, 1, turn)
 }
 
 /**
@@ -107,7 +114,7 @@ function drawMount(tokens: TokenLayer, rider: Spot, rel: Tone | undefined) {
 /**
  * Residents, carriages, horses, Trade Org caravans and armies at middle zoom and closer
  * (ADR 0008): residents on one tile as one token with a count, coloured by the largest group,
- * or up close as single figures with their activity (`drawFigures`);
+ * or up close as single figures with their activity (`drawFigures`); someone Down lies down;
  * an army as a banner with its soldier count; carts and caravans, a cart's passengers inside it
  * as a count; horses not hitched to a cart,
  * and a ridden one as a horse token under its rider (in a group token, under the group).
@@ -233,6 +240,7 @@ export function drawUnits(
         leaders,
         activityOf: (id) => residentActivity(byId.get(id)!),
         rides: (id) => byId.get(id)?.riding !== undefined,
+        lies: (id) => isDown(byId.get(id) ?? {}),
         spots,
       })
       continue
@@ -242,7 +250,10 @@ export function drawUnits(
     if (!near([spot.x, spot.y])) continue
     const rider = g.ids.find((id) => byId.get(id)?.riding !== undefined)
     if (rider !== undefined) drawMount(tokens, spot, rels.get(rider))
-    drawUnit(tokens, g.leader ? UNIT_ART.leader : UNIT_ART.person, spot.x, spot.y, spot.r, g.rel)
+    // A token for residents who are all Down lies down too (`CONTEXT.md`: Down).
+    const lying = g.ids.every((id) => isDown(byId.get(id) ?? {}))
+    const file = g.leader ? UNIT_ART.leader : UNIT_ART.person
+    drawUnit(tokens, file, spot.x, spot.y, spot.r, g.rel, lying)
     if (g.ids.length > 1) badge(`×${g.ids.length}`, spot.x, spot.y, spot.r)
     for (const id of g.ids) spots.set(id, spot)
   }
@@ -269,6 +280,7 @@ function drawFigures(
     leaders: Leaders
     activityOf: (id: string) => Activity | undefined
     rides: (id: string) => boolean
+    lies: (id: string) => boolean
     spots: Map<string, Spot>
   },
 ) {
@@ -279,7 +291,7 @@ function drawFigures(
     const rel = of.relOf(f.id)
     const leader = isLeader(of.leaders, f.id)
     if (of.rides(f.id)) drawMount(tokens, { x, y, r }, rel)
-    drawUnit(tokens, leader ? UNIT_ART.leader : UNIT_ART.person, x, y, r, rel)
+    drawUnit(tokens, leader ? UNIT_ART.leader : UNIT_ART.person, x, y, r, rel, of.lies(f.id))
     of.spots.set(f.id, { x, y, r })
     const activity = of.activityOf(f.id)
     if (activity && tile >= ACTIVITY_SCALE) {

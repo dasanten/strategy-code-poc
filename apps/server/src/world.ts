@@ -23,7 +23,7 @@ import type { Walking } from './walking.js'
 import type { TickPhase, TickTimer } from './tick.js'
 import { stepSpoilage } from './spoilage.js'
 import { stepStockFloor } from './stock-floor.js'
-import { stepRefill, stepSurvival, type SurvivalResult } from './survival.js'
+import { keepDownStill, stepRefill, stepSurvival, type SurvivalResult } from './survival.js'
 import { stepAging, type AgingResult } from './aging.js'
 import { requestWork, resolveWork } from './work.js'
 import { stepTeaching } from './teaching.js'
@@ -169,7 +169,7 @@ export interface StepResult {
  * lose members who are gone and give the rest their orders for the next tick; the realms whose
  * turn it is bring their Last seen up to date (`stepLastSeen`); last, riders who
  * lost their horse get off it (`stepRiders`), and passengers who lost their carriage get off
- * (`stepPassengers`). Without `walking`
+ * (`stepPassengers`), and whatever anyone Down was given ends (`keepDownStill`). Without `walking`
  * nobody moves. With a `timer`, the NPC planning (`npc`), the walking (`walking`), Last seen
  * (`lastSeen`) and all the rest (`rest`) are timed as the parts of the tick's `world` phase
  * (ADR 0004).
@@ -198,7 +198,10 @@ export function stepWorld(
     stepNpcHire(world, terrain.size)
     stepPunishments(world, terrain.size)
     npcPlanMs = stepNpcCities(world, terrain.size, terrain)
-    return runNpcScripts(world, terrain)
+    const runs = runNpcScripts(world, terrain)
+    // Whatever the game's own cities gave someone Down ends before they act on it.
+    keepDownStill(world)
+    return runs
   })
   const steps = time('walking', () => {
     const steps = walking?.requestSteps(world) ?? []
@@ -215,6 +218,8 @@ export function stepWorld(
   time('rest', () => {
     stepRiders(world)
     stepPassengers(world)
+    // A fight or an army may have given someone Down an order; it ends with the tick.
+    keepDownStill(world)
   })
   return { ...result, npcScriptRuns, npcPlanMs }
 }

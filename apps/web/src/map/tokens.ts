@@ -93,8 +93,19 @@ export class TokenLayer {
     this.used = 0
   }
 
-  /** One art file (`art.ts`) centred at a screen point, `size` pixels across, tinted. */
-  place(file: string, x: number, y: number, size: number, tint = 0xffffff, alpha = 1) {
+  /**
+   * One art file (`art.ts`) centred at a screen point, `size` pixels across, tinted, turned by
+   * `rotation` radians.
+   */
+  place(
+    file: string,
+    x: number,
+    y: number,
+    size: number,
+    tint = 0xffffff,
+    alpha = 1,
+    rotation = 0,
+  ) {
     const texture = this.atlas?.get(file)
     if (!texture) return
     let sprite = this.sprites[this.used]
@@ -109,6 +120,7 @@ export class TokenLayer {
     sprite.width = sprite.height = size
     sprite.tint = tint
     sprite.alpha = alpha
+    sprite.rotation = rotation
     sprite.visible = true
   }
 

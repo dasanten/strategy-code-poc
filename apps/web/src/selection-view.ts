@@ -10,6 +10,7 @@ import {
   HORSE_HUNGRY_SHARE,
   PASSENGER_WEIGHT,
   carriageCapacity,
+  isDown,
   horseAgeInYears,
   horseFoodFactor,
   MAX_HEALTH,
@@ -226,6 +227,8 @@ export interface ResidentHere {
   carrying?: boolean
   /** They carry goods, so there is something to drop or store. */
   carries?: boolean
+  /** They are Down (`CONTEXT.md`: Down) and take no orders. */
+  down?: boolean
 }
 
 /**
@@ -249,11 +252,26 @@ export function residentActions(h: ResidentHere): CardAction[] {
   return residentOrders(h).actions
 }
 
+/** Why a Down resident's card offers no orders (`CONTEXT.md`: Down). */
+export const DOWN_NO_ORDERS = 'Down: takes no orders'
+
 /**
  * The actions a resident's card offers (`residentActions`), and why each order left out can't be
- * given now: the reason its row shows greyed while the card stays open (ADR 0019).
+ * given now: the reason its row shows greyed while the card stays open (ADR 0019). Someone Down
+ * gets none (`CONTEXT.md`: Down).
  */
 export function residentOrders(h: ResidentHere): {
+  actions: CardAction[]
+  missing: Partial<Record<ActionId, string>>
+} {
+  const orders = ordersOffered(h)
+  if (!h.down) return orders
+  const ids = [...orders.actions.map((a) => a.id), ...(Object.keys(orders.missing) as ActionId[])]
+  return { actions: [], missing: Object.fromEntries(ids.map((id) => [id, DOWN_NO_ORDERS])) }
+}
+
+/** The orders a resident's card offers while they aren't Down (`residentOrders`). */
+function ordersOffered(h: ResidentHere): {
   actions: CardAction[]
   missing: Partial<Record<ActionId, string>>
 } {
@@ -1425,8 +1443,10 @@ function strangersLines(strangers: SeenResident[]): string[] {
   })
   if (rest.length > 0) {
     const n = armed(rest)
+    // Anyone in sight sees who is Down (`CONTEXT.md`: Down).
+    const down = rest.filter((r) => isDown(r)).length
     lines.push(
-      `${plural(rest.length, 'resident', 'residents')} of other realms${n > 0 ? ` · ${n} armed` : ''}`,
+      `${plural(rest.length, 'resident', 'residents')} of other realms${n > 0 ? ` · ${n} armed` : ''}${down > 0 ? ` · ${down} Down` : ''}`,
     )
   }
   return lines

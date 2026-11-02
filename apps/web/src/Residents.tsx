@@ -1,6 +1,7 @@
 import {
   BUILD_MATERIALS,
   aboutTime,
+  isDown,
   bornIn,
   foalLeft,
   grownIn,
@@ -184,6 +185,7 @@ import {
   horseDetail,
   orderGroupOf,
   residentOrders,
+  DOWN_NO_ORDERS,
   rowGroups,
   riddenHorseLine,
   type ActionId,
@@ -1882,6 +1884,7 @@ export function ResidentCard({
     carriageToUnhitch: !!carriageToUnhitch,
     carrying: !!r.carrying,
     carries: carried.length > 0,
+    down: isDown(r),
   })
   // Each row keeps its slot while the card is open (ADR 0019).
   const rows = useKeptRows(actions, missing, orderGroupOf)
@@ -2213,7 +2216,14 @@ export function ResidentCard({
       badge={r.id === leaderId ? 'Leader' : undefined}
       lines={[
         <strong key="doing">
-          {doingLine(r, { scripts, buildings, residents, cities, arrives: arrivesIn?.(r) })}
+          {doingLine(r, {
+            scripts,
+            buildings,
+            residents,
+            cities,
+            arrives: arrivesIn?.(r),
+            tick,
+          })}
         </strong>,
         ...(under
           ? [
@@ -2400,7 +2410,9 @@ export function ResidentCard({
         <p className="muted small" role="status">
           {orderError
             ? `Order turned down: ${orderError}`
-            : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
+            : isDown(r)
+              ? `${DOWN_NO_ORDERS}.`
+              : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
         </p>
       )}
     </SelectionCard>

@@ -378,10 +378,13 @@ function everythingSeen(
           }
         : {}),
     }
+    // Anyone in sight sees that they are Down; when it ends goes with how they fare.
+    if (r.downUntil !== undefined) shown.down = true
     if (!insight.fares(r)) {
       delete shown.hunger
       delete shown.health
       delete shown.struck
+      delete shown.downUntil
     }
     out.push(shown)
   }
@@ -713,7 +716,11 @@ export function sentInsideUnseen(
         return hasStock(e.trade) && !insight.insideCity(e.id)
       case 'resident': {
         const r = byId(world.residents, e.id)
-        const told = e.hunger !== undefined || e.health !== undefined || e.struck !== undefined
+        const told =
+          e.hunger !== undefined ||
+          e.health !== undefined ||
+          e.struck !== undefined ||
+          e.downUntil !== undefined
         return told && !(r && insight.fares(r))
       }
       case 'horse': {

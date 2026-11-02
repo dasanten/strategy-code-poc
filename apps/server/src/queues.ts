@@ -12,6 +12,7 @@ import {
   type Resident,
   type TerrainMap,
   type WorldState,
+  isDown,
 } from '@csp/shared'
 import { leaveArmies } from './armies.js'
 import { carriageOrganization } from './crimes.js'
@@ -272,7 +273,8 @@ export class QueueRunner {
       // Taken into an army, they follow its orders instead.
       const inArmy = world.armies.some((a) => a.memberIds.includes(r.id))
       // Looked up afresh for each: a step started before may have handed someone over.
-      if (!sender || worldIndex(world).commanderOf(r) !== q.realmId || inArmy) {
+      // Down, they do nothing (`CONTEXT.md`: Down).
+      if (!sender || worldIndex(world).commanderOf(r) !== q.realmId || inArmy || isDown(r)) {
         delete r.queue
         continue
       }

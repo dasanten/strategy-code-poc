@@ -1,4 +1,10 @@
-import { REALM_LOG_LENGTH, TRADE_ORG_NAME, type DeliveryView, type RealmEvent } from '@csp/shared'
+import {
+  REALM_LOG_LENGTH,
+  TRADE_ORG_NAME,
+  timeLeft,
+  type DeliveryView,
+  type RealmEvent,
+} from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
 
 /** How bad an event is, for its colour in the log. */
@@ -26,6 +32,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
   switch (e.kind) {
     case 'hungry':
       return { text: `${e.name} has nothing to eat and is starving.`, tone: 'warn' }
+    case 'down':
+      return {
+        text: `${e.name} is Down from hunger: ${timeLeft(e.until - e.tick)}.`,
+        tone: 'bad',
+      }
     case 'died': {
       const how = {
         starved: 'starved to death',
