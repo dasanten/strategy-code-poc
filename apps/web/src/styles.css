@@ -400,8 +400,13 @@ button.hud-logout {
 }
 .hud-menu-links {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 6px 10px 2px;
+}
+.hud-menu-links .hud-account {
+  margin-left: auto;
+  color: var(--ui-muted);
 }
 
 /* ---------- Admin page ---------- */
@@ -934,7 +939,7 @@ label > select {
 }
 .residents-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) 26px minmax(0, 1.5fr) 48px 76px;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 2fr) 44px 76px;
   gap: 8px;
   align-items: center;
   min-height: 34px;
@@ -990,27 +995,27 @@ button.residents-row.selected:hover {
 .residents-row .name {
   font-weight: 600;
 }
+/* Names wrap rather than cut off; the Leader is marked on a small line under theirs. */
 .residents-row .name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+.residents-row .leader-mark {
+  display: block;
+  font-size: 11px;
 }
 .leader-mark {
   font-weight: 400;
   color: var(--rel-own);
 }
+/* Doing wraps rather than cut off. */
 .residents-row .doing {
   color: var(--ui-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
-/* The script they run, under their Doing line. */
+/* The script they run, on a line of its own under their Doing line. */
 .residents-row .doing small {
   display: block;
   font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .meter {
   display: block;
