@@ -3,6 +3,8 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -22,11 +24,16 @@ import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
   actionForKey,
+  keepRows,
   tileActions,
   unhitcherOf,
   type CardAction,
+  type CardList,
+  type CardRow,
+  type OrderGroup,
   type TileCard as TileCardData,
 } from './selection-view.js'
+import { Meter, meterClass, pct } from './Horses.js'
 import { SHEET_OPENS_AT, nextSheet, snapSheet, stepSheet, type SheetHeight } from './sheet-view.js'
 import './selection-card.css'
 
@@ -63,11 +70,24 @@ export function SelectionCard({
   const colour = rel
     ? `var(--rel-${rel.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)})`
     : undefined
+  // How tall the card was before it shrank: while shrunk, the room it took stays dead, so a click
+  // there gives no order by accident (`CONTEXT.md`: Picking a target). A bottom sheet at peek
+  // shows the map instead; a tap there only previews.
+  const ref = useRef<HTMLElement>(null)
+  const tall = useRef(0)
+  useLayoutEffect(() => {
+    if (!collapsed && !peek && ref.current) tall.current = ref.current.offsetHeight
+  })
+  const dead = collapsed && !peek && tall.current > 0
   return (
     <aside
-      className="inspector sel-card"
+      ref={ref}
+      className={`inspector sel-card${dead ? ' sel-shrunk' : ''}`}
       aria-label="Selection"
-      style={colour ? { borderLeftColor: colour } : undefined}
+      style={{
+        ...(colour ? { borderLeftColor: colour } : {}),
+        ...(dead ? { minHeight: tall.current } : {}),
+      }}
     >
       <div className="sel-head">
         {icon && ART_FILES[icon] && (
@@ -101,12 +121,16 @@ export function SelectionCard({
       </div>
       {head}
       {!collapsed && !peek && children}
+      {dead && <div className="sel-dead" aria-hidden="true" />}
     </aside>
   )
 }
 
 /** Whether the card is in a bottom sheet dropped to its header, so only the header shows. */
 const SheetPeek = createContext(false)
+
+/** Whether the card is hidden behind the wide drawer (`cardHidden`), its keys off with it. */
+const CardHidden = createContext(false)
 
 const SHEET_LABELS: Record<SheetHeight, string> = {
   peek: 'header only',
@@ -121,16 +145,19 @@ const DRAG_SLOP = 6
  * Where the selection card sits over the map: docked top right on a desktop, a bottom sheet on a
  * phone (ADR 0012). The sheet opens at half; dragging its handle moves it between peek (just the
  * header), half and full, and a tap goes one height up. Pick mode drops it to peek, and it comes
- * back to where it was once the target is picked.
+ * back to where it was once the target is picked. A hidden card keeps all that until it shows.
  */
 export function CardSheet({
   phone,
   pinnedPeek,
+  hidden = false,
   children,
 }: {
   phone: boolean
   /** Held at peek while the map waits for a target for this card. */
   pinnedPeek: boolean
+  /** Hidden behind the wide drawer (`cardHidden`). */
+  hidden?: boolean
   children: ReactNode
 }) {
   const [height, setHeight] = useState<SheetHeight>(SHEET_OPENS_AT)
@@ -138,7 +165,26 @@ export function CardSheet({
   const [dragged, setDragged] = useState<number>()
   const press = useRef<{ y: number; from: number; moved: boolean }>(undefined)
   const ref = useRef<HTMLDivElement>(null)
-  if (!phone) return <div className="game-selection">{children}</div>
+  // The map's buttons and readout sit above the sheet: its height goes to the screen as `--sheet-h`.
+  useEffect(() => {
+    const sheet = ref.current
+    const screen = sheet?.parentElement
+    if (!sheet || !screen) return
+    const observer = new ResizeObserver(() =>
+      screen.style.setProperty('--sheet-h', `${sheet.offsetHeight}px`),
+    )
+    observer.observe(sheet)
+    return () => {
+      observer.disconnect()
+      screen.style.removeProperty('--sheet-h')
+    }
+  }, [phone])
+  if (!phone)
+    return (
+      <div className="game-selection" hidden={hidden}>
+        <CardHidden.Provider value={hidden}>{children}</CardHidden.Provider>
+      </div>
+    )
   const shown = pinnedPeek ? 'peek' : height
   const screen = () => ref.current?.parentElement?.clientHeight ?? window.innerHeight
   const settle = (to: SheetHeight) => {
@@ -150,6 +196,7 @@ export function CardSheet({
       ref={ref}
       className={`game-selection sheet sheet-${dragged === undefined ? shown : 'dragged'}`}
       style={dragged === undefined ? undefined : { height: dragged }}
+      hidden={hidden}
     >
       <button
         type="button"
@@ -197,7 +244,7 @@ export function CardSheet({
         <span aria-hidden="true" />
       </button>
       <SheetPeek.Provider value={dragged === undefined && shown === 'peek'}>
-        {children}
+        <CardHidden.Provider value={hidden}>{children}</CardHidden.Provider>
       </SheetPeek.Provider>
     </div>
   )
@@ -205,23 +252,37 @@ export function CardSheet({
 
 /**
  * The banner over the map while an order waits for its target (ADR 0012; `CONTEXT.md`: Picking a
- * target): what to pick, and Cancel, which Escape does too.
+ * target): what to pick, what is under the pointer and what the pick would do there (or else
+ * more on what picking does), and Cancel, which Escape does too. On a touch screen, once a tap
+ * has shown the preview, Confirm picks that tile.
  */
 export function PickBanner({
   prompt,
   hint,
+  under,
+  onConfirm,
   onCancel,
 }: {
   prompt: string
   hint?: string
+  /** What is under the pointer, or the tile tapped, and what the pick would do there. */
+  under?: string
+  /** Picks the tile previewed by a tap, on a touch screen. */
+  onConfirm?: () => void
   onCancel: () => void
 }) {
+  const line = under ?? hint
   return (
-    <div className="pick-banner" role="status">
-      <div className="pick-banner-text">
+    <div className="notice pick-banner" role="status" title={hint ? `${prompt}\n${hint}` : prompt}>
+      <div className="notice-text pick-banner-text">
         <strong>{prompt}</strong>
-        {hint && <span className="small">{hint}</span>}
+        {line && <span className="small">{line}</span>}
       </div>
+      {onConfirm && (
+        <button type="button" className="primary" onClick={onConfirm}>
+          Confirm
+        </button>
+      )}
       <button type="button" onClick={onCancel}>
         Cancel
       </button>
@@ -252,60 +313,139 @@ export function CardTabs<T extends string>({
   )
 }
 
-/** The card's actions as rows, each with its key; a row that opens a panel shows it pressed. */
-export function ActionRows({
+/**
+ * The card's actions as rows, each with its key; a row that opens a panel shows it pressed, and
+ * `panel` opens right under it, scrolled into view when it opens. Each row is a button named by
+ * its label, a greyed row's reason its description.
+ */
+export function ActionRows<Id extends string>({
   actions,
   open,
   onAction,
   label = 'Actions',
   keys = true,
+  panel,
 }: {
-  actions: CardAction[]
+  actions: CardAction<Id>[]
   /** The action whose panel is open, if any. */
   open: string | undefined
-  onAction: (a: CardAction) => void
+  onAction: (a: CardAction<Id>) => void
   label?: string
   /** Whether the rows run on their keys; off where the card listens for all its actions itself. */
   keys?: boolean
+  /** The open action's panel, shown under its row. */
+  panel?: ReactNode
 }) {
   useActionKeys(keys ? actions : [], onAction)
+  const ids = useId()
   return (
     <div className="sel-actions" role="group" aria-label={label}>
       {actions.map((a) => {
         const on = a.active || (a.opens && open === a.id)
+        const why = `${ids}-${a.id}`
         return (
-          <button
-            type="button"
-            key={a.id}
-            className={on ? 'on' : ''}
-            aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
-            aria-keyshortcuts={a.key}
-            disabled={a.disabled}
-            onClick={() => onAction(a)}
-          >
-            <kbd>{a.key}</kbd>
-            <span>
-              {a.label}
-              {a.reason && <span className="sel-reason">{a.reason}</span>}
-            </span>
-            {a.opens && (
-              <span className="sel-more" aria-hidden="true">
-                {on ? '▾' : '▸'}
+          <Fragment key={a.id}>
+            <button
+              type="button"
+              className={on ? 'on' : ''}
+              aria-label={a.label}
+              aria-describedby={a.reason ? why : undefined}
+              aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
+              aria-expanded={a.opens ? open === a.id : undefined}
+              aria-keyshortcuts={a.key}
+              disabled={a.disabled}
+              onClick={() => onAction(a)}
+            >
+              <kbd>{a.key}</kbd>
+              <span>
+                {a.label}
+                {a.reason && (
+                  <span className="sel-reason" id={why}>
+                    {a.reason}
+                  </span>
+                )}
               </span>
-            )}
-          </button>
+              {a.opens && (
+                <span className="sel-more" aria-hidden="true">
+                  {on ? '▾' : '▸'}
+                </span>
+              )}
+            </button>
+            {a.opens && open === a.id && panel && <PanelUnder>{panel}</PanelUnder>}
+          </Fragment>
         )
       })}
     </div>
   )
 }
 
-/** Runs an action on its key, unless the Player is typing somewhere or holds a modifier. */
-export function useActionKeys(actions: CardAction[], onAction: (a: CardAction) => void) {
-  const latest = useRef({ actions, onAction })
-  latest.current = { actions, onAction }
+/** An order's panel under the row that opened it, scrolled into view as it opens. */
+export function PanelUnder({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+  }, [])
+  return (
+    <div className="sel-panel-under" ref={ref}>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * The rows a card shows while it stays open (`keepRows`, ADR 0019): each keeps its slot until
+ * the card goes, so a card for something else picked starts sorted afresh.
+ */
+export function useKeptRows<Id extends string>(
+  fresh: readonly CardAction<Id>[],
+  missing: Partial<Record<Id, string>>,
+  groupOf: (id: Id) => OrderGroup,
+): CardAction<Id>[] {
+  const kept = useRef<CardAction<Id>[]>(undefined)
+  // Keeping the rows again from what it kept gives the same rows, however often React renders.
+  const rows = keepRows(kept.current, fresh, missing, groupOf)
+  kept.current = rows
+  return rows
+}
+
+/**
+ * What closes each panel open on the shown card, the one opened last at the end, which the
+ * game's Escape calls before it leaves the card (`escapeStep`). One card shows at a time.
+ */
+const openPanels = new Set<() => void>()
+
+/** Lets Escape close a card's panel while it is open (`closeOpenPanel`). */
+export function useEscapeClosesPanel(open: boolean, close: () => void) {
+  const latest = useRef(close)
+  latest.current = close
+  useEffect(() => {
+    if (!open) return
+    const closer = () => latest.current()
+    openPanels.add(closer)
+    return () => void openPanels.delete(closer)
+  }, [open])
+}
+
+/** Whether a panel is open on the shown card (`useEscapeClosesPanel`). */
+export const panelOpen = () => openPanels.size > 0
+
+/** Closes the panel opened last on the shown card, if one is open. */
+export const closeOpenPanel = () => [...openPanels].at(-1)?.()
+
+/**
+ * Runs an action on its key, unless the Player is typing somewhere or holds a modifier, or the
+ * card is hidden.
+ */
+export function useActionKeys<Id extends string>(
+  actions: readonly CardAction<Id>[],
+  onAction: (a: CardAction<Id>) => void,
+) {
+  const hidden = useContext(CardHidden)
+  const latest = useRef({ actions, onAction, hidden })
+  latest.current = { actions, onAction, hidden }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (latest.current.hidden) return
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
       const typing =
         e.target instanceof Element && e.target.closest('input, textarea, select, .cm-editor')
@@ -340,6 +480,7 @@ export function TileCard({
   onRenameCity,
   onRenameHorse,
   onSelectResident,
+  onOpenHorse,
   onUnhitch,
 }: {
   card: TileCardData
@@ -365,12 +506,15 @@ export function TileCard({
   onRenameHorse: (horseId: string, name: string) => void
   /** Picks one of the Player's residents, such as a carriage's passenger. */
   onSelectResident: (id: string) => void
+  /** Shows one of the Player's horses in the Horses drawer. */
+  onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
 }) {
   const actions = tileActions(card, actor, tick)
   const [open, setOpen] = useState<string | undefined>()
   const shown = actions.some((a) => a.id === open) ? open : undefined
+  useEscapeClosesPanel(shown !== undefined, () => setOpen(undefined))
   const icon =
     card.what === 'building' && building
       ? BUILDING_ART[building.kind]
@@ -421,6 +565,28 @@ export function TileCard({
           )}
         </ul>
       )}
+      {card.stableFood && (
+        <div className="vital card-food">
+          <div className="vital-head">
+            <span className="muted">Food</span>
+            <span className="mono">{card.stableFood.units}</span>
+          </div>
+          <span className="meter big" aria-label={`Food ${pct(card.stableFood.share)}`}>
+            <span
+              className={meterClass(card.stableFood.share)}
+              style={{ width: pct(card.stableFood.share) }}
+            />
+          </span>
+          <span className="small muted">{capital(card.stableFood.lasts)}</span>
+        </div>
+      )}
+      {card.lists?.map((list, i) => (
+        <CardListBlock
+          key={i}
+          list={list}
+          onOpen={(row) => (row.opens === 'horse' ? onOpenHorse(row.id) : onSelectResident(row.id))}
+        />
+      ))}
       {card.occupation && (
         <p className={`occupation${card.occupation.warning ? ' warn' : ''}`}>
           {card.occupation.text}
@@ -482,6 +648,69 @@ export function TileCard({
             : 'Pick one of your residents to send them here.'}
       </p>
     </SelectionCard>
+  )
+}
+
+const capital = (words: string) => `${words.charAt(0).toUpperCase()}${words.slice(1)}`
+
+/**
+ * A list on the tile card (`CardList`): its title with the count on the right, a heading over the
+ * meters, then its rows. A row the Player can open is a button.
+ */
+function CardListBlock({ list, onOpen }: { list: CardList; onOpen: (row: CardRow) => void }) {
+  const amounts = list.rows.some((r) => r.amount !== undefined)
+  const columns = `minmax(0, 1fr)${amounts ? ' auto' : ''}${' 56px'.repeat(list.meters.length)}`
+  return (
+    <section className="card-list" aria-label={list.title}>
+      <div className="panel-head">
+        <h3>{list.title}</h3>
+        <span className="small muted">{list.count}</span>
+      </div>
+      {list.rows.length === 0 && list.empty && <p className="muted small">{list.empty}</p>}
+      {list.rows.length > 0 && list.meters.length > 0 && (
+        <div
+          className="card-list-row heading"
+          style={{ gridTemplateColumns: columns }}
+          aria-hidden="true"
+        >
+          <span />
+          {list.meters.map((m) => (
+            <span key={m}>{m}</span>
+          ))}
+        </div>
+      )}
+      {list.rows.map((row) => {
+        const cells = (
+          <>
+            <span className="card-list-name">
+              <span>{row.name}</span>
+              {row.detail && <small className="muted">{row.detail}</small>}
+            </span>
+            {amounts && <span className="mono">{row.amount}</span>}
+            {list.meters.map((m, i) => (
+              <Meter key={m} label={m} share={row.shares?.[i]} />
+            ))}
+          </>
+        )
+        const style = { gridTemplateColumns: columns }
+        return row.opens ? (
+          <button
+            type="button"
+            key={row.id}
+            className="card-list-row"
+            style={style}
+            aria-label={`${row.name}: ${row.opens === 'horse' ? 'show in the Horses drawer' : 'open their card'}`}
+            onClick={() => onOpen(row)}
+          >
+            {cells}
+          </button>
+        ) : (
+          <div key={row.id} className="card-list-row" style={style}>
+            {cells}
+          </div>
+        )
+      })}
+    </section>
   )
 }
 

@@ -633,6 +633,12 @@ The shared language of the game. Domain terms only — no implementation details
   included, by hand or from a script: free, instant, from anywhere. Names need not be unique.
   Renaming the Leader never renames the realm (see Realm name). The realm log keeps the names
   things had when they happened.
+- **Game-given names:** a name the game gives a resident (a starting city, a birth, a founding
+  party, integration) is one no living resident of that realm has, an NPC city counting as a
+  realm; a name the game gives a city is one no city in the world has. When the game's list of
+  names runs dry it adds a numeral ("Edda II") rather than repeating one. Renaming stays free and
+  may make duplicates. Names given before this rule stay as they are; a list that holds two
+  residents of one name tells them apart by age and, with several cities, by city.
 - **Stats:** Strength, Endurance, Agility, Intellect. Each has a **base value** and a
   **trained bonus**; the effective value is both together.
   - Strength: carry capacity, mining output, melee damage.
@@ -880,7 +886,11 @@ The shared language of the game. Domain terms only — no implementation details
   first shows those params, filled with the resident's kept values or the defaults; Start gives
   the order with them. A script without params starts at once. The resident card shows one field
   for each param of the script the resident runs, picked on the map and cleared with a button;
-  picking one doesn't end the script. The Work default declares `storage` (where the output goes) and the Build default
+  picking one doesn't end the script. **Param comment:** the `//` comment at the end of a `param`
+  line says what the param is for and, after `none:`, what the script uses while none is picked;
+  each field shows it and the value the script uses: the one picked, else a `number` param's
+  default, a default script's target the one on the resident's tile, or what the comment says
+  after `none:`. The Work default declares `storage` (where the output goes) and the Build default
   `source` (where materials come from, a carriage too), each falling back to the nearest storage
   while unset; a source picked that holds none of what the site lacks is left alone, and they
   just build. Work, Build and Tear down also declare the `number` params `foodAt` and `foodTake`
@@ -928,7 +938,9 @@ The shared language of the game. Domain terms only — no implementation details
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
-  run is named on a small line of its own. A script can say it itself with `doing(text)`: short
+  run is named on a small line of its own, left out when it is their task's own default script
+  ("Working the farm" alone). Long lines wrap rather than being cut off. A script can say it
+  itself with `doing(text)`: short
   text, kept in its memory, that shows instead until the script says something else or stops.
   **Estimates:** the Doing line and every meter or countdown that shows progress also say about
   how long is left, in real time with game time in brackets ("about 3 min (half a game day)"),
@@ -1016,7 +1028,11 @@ The shared language of the game. Domain terms only — no implementation details
 - **Resident card:** what the UI shows for a picked resident (and, laid out the same, a group or
   an army): a header that always shows (name, Doing, hunger and health, what they carry) and one
   open tab under it: Orders, Queue, Stats or Script. Orders are grouped by kind (Move, Work &
-  build, Goods, Scripts), and orders they can't take right now are left out.
+  build, Goods, Scripts). The card opens with only the orders they can take; while it stays open
+  each row keeps its slot: an order that stops being possible greys out saying why, one that
+  becomes possible is added at the end of its group, and the rows are sorted afresh only when
+  something else is picked (ADR 0019). A group card has the same rows, with the group's own
+  reasons.
 - **Motion on the map:** the world moves once a tick, but the map shows it smoothly. A token on
   its way (walking, driving, riding along a path it was sent) moves steadily along that path at
   its current pace between ticks, across tile edges, without stopping at each tile, however many
@@ -1040,4 +1056,32 @@ The shared language of the game. Domain terms only — no implementation details
   shrinks the card to its header and shows "Tap where …" with Cancel until the Player picks one
   on the map; then the card comes back as it was. On a phone every card is a bottom sheet (peek,
   half, full), one finger pans, pinch zooms, a tap picks, a long-press does what right-click does,
-  and a Select toggle makes a drag pick a group.
+  and a Select toggle makes a drag pick a group. While the card is shrunk, the room it took
+  stays dead: a click there does nothing. Before the pick, the map previews under the pointer
+  what it would do: the way of a walk, drive or ride with its arrival estimate, the line of a road
+  or wall with its tile count, the footprint of a building (marked where it doesn't fit), or the
+  building a Store, Fetch or Work would use. On a touch screen the first tap shows the preview
+  and the banner gains Confirm; a tap elsewhere moves the preview. Escape leaves the top-most
+  thing first: pick mode, then an open panel on the card, then a tile card, then the card, then
+  the drawer.
+- **Picking on the map:** what a click (or tap) picks on a tile, in this order: a resident of the
+  Player's, then a building (a carriage or horse of the Player's with nobody on it counts as
+  one), then the bare tile. A click on a stack of the Player's residents picks them all as a
+  group; a stack with others' residents shows the tile card, which lists them. With a pointer,
+  what a click would pick is outlined on hover.
+- **Notices:** what the HUD tells the Player unasked (the Horse offer, the pick banner, a group
+  order's report, the first-day card) shows in one lane under the top bar, over the map and never
+  over a drawer or card. While the pick banner shows it replaces the others; they come back after.
+- **First day:** a new realm's HUD shows a checklist card: claim the Horse offer, pick a
+  resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;
+  the card goes for good once all are ticked or the Player dismisses it. Kept per Player, not per
+  realm: a Player who dismissed it never sees it again, also after a Leader death.
+- **Minimap:** a small map bottom right of the screen (ADR 0008): the Player's explored terrain
+  at a glance with their home city, their other cities, their residents and carriages away from
+  home and the cities they know (Last seen), each a dot in its relationship colour, and the
+  current view as a rectangle; a click centres the map there. It folds to a button, remembered
+  per browser, and is folded on a phone.
+- **Region map:** the map's territory overlay (one colour per Organization, ADR 0008). It is
+  the far zoom tier's look and comes on there by itself; at the middle and close tiers only
+  territory borders are drawn, so the terrain stays readable. The Region map button forces the
+  overlay on at any tier and shows that it is on.

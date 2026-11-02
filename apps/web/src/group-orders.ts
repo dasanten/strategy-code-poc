@@ -21,7 +21,7 @@ import {
   type TrainingSubject,
 } from '@csp/shared'
 import { appendRequests, storeAll } from './queue-view.js'
-import type { ActionId, OrderGroup } from './selection-view.js'
+import { ACTION_KEYS, type ActionId, type CardAction, type OrderGroup } from './selection-view.js'
 
 /**
  * One command for a group (`CONTEXT.md`: Group): the orders the group card offers, each sent to
@@ -567,7 +567,7 @@ export function groupNumberParams(
   })
 }
 
-/** The line the group card shows once an order went out: how many it went to. */
+/** The line a group order's report notice shows once it went out: how many it went to. */
 export function groupSentLine(sent: number, of: number): string {
   if (sent === 0) return 'Nobody could take that order.'
   return sent === of ? `Sent to all ${of}.` : `Sent to ${sent} of ${of}.`
@@ -603,9 +603,9 @@ export type GroupButton =
   | 'script'
 
 /**
- * The group card's order buttons, in the order it shows them, under the same kinds as a
- * resident card's (ADR 0012). All of them always show: each goes to those who can take it. Board
- * shows once for each carriage of the realm some of them stand on, and greyed out with none.
+ * The group card's orders, in the order it shows them, under the same kinds as a resident
+ * card's (ADR 0012). The card shows those some of them can take (`groupRows`); each goes to
+ * those who can take it.
  */
 export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: OrderGroup }[] = [
   { id: 'walk', label: 'Walk to', group: 'move' },
@@ -675,4 +675,153 @@ export const GROUP_COUNTERPARTS: Record<
   makeLeader: { none: 'the realm has one Leader' },
   rename: { none: 'names one resident' },
   relocate: ['relocate'],
+}
+
+/**
+ * The key that runs each of the group card's orders: the resident card's key for the same order
+ * (`GROUP_COUNTERPARTS`), and keys of their own for the Goods orders a resident gives in a panel.
+ */
+export const GROUP_KEYS: Record<GroupButton, string> = {
+  walk: ACTION_KEYS.walk,
+  stop: ACTION_KEYS.stop,
+  mount: ACTION_KEYS.ride,
+  dismount: ACTION_KEYS.ride,
+  board: ACTION_KEYS.board,
+  getOff: ACTION_KEYS.board,
+  unhitch: ACTION_KEYS.unhitch,
+  drive: ACTION_KEYS.drive,
+  haul: ACTION_KEYS.haul,
+  relocate: ACTION_KEYS.relocate,
+  work: ACTION_KEYS.work,
+  feedStable: ACTION_KEYS.feedStable,
+  teach: ACTION_KEYS.teach,
+  train: ACTION_KEYS.train,
+  build: ACTION_KEYS.build,
+  roadTo: ACTION_KEYS.roadTo,
+  wallTo: ACTION_KEYS.wallTo,
+  tearDown: ACTION_KEYS.tearDown,
+  breed: ACTION_KEYS.breed,
+  store: ACTION_KEYS.goods,
+  storeAt: 'Z',
+  fetch: 'J',
+  // Put down.
+  drop: 'P',
+  script: ACTION_KEYS.script,
+  attack: ACTION_KEYS.attack,
+  climb: ACTION_KEYS.walls,
+}
+
+/** The kind each of the group card's orders is grouped under (`GROUP_BUTTONS`). */
+export const groupButtonGroup = (id: GroupButton): OrderGroup =>
+  GROUP_BUTTONS.find((b) => b.id === id)?.group ?? 'other'
+
+/** The group card's orders that open a panel below the rows with what they need. */
+const GROUP_PANELS: readonly GroupButton[] = ['haul', 'relocate', 'teach', 'breed', 'fetch']
+
+/** What the group card's rows need to know about the group and where they stand. */
+export interface GroupHere {
+  residents: readonly GroupResident[]
+  tick: number
+  size: number
+  seen: GroupSeen
+  /** How many carriages of the realm some of them stand on, to board (`CONTEXT.md`: Passenger). */
+  carriages: number
+  /** Why they can't be told to relocate at all, if they can't (`CONTEXT.md`: Relocate). */
+  relocateProblem: string | undefined
+}
+
+/** A reason one of the group can't take an order (`groupSkip`), said of the whole group. */
+const GROUP_REASONS: Record<string, string> = {
+  'a child': 'they are all children',
+  [CARRYING_A_CHILD]: 'they all carry a child',
+  'already riding': 'they all ride already',
+  'no free horse here': 'no free horse where they stand',
+  'not riding': 'none of them rides',
+  'no hitched horse here': 'no hitched horse where they stand',
+  'no carriage here': 'nobody stands on a carriage of your realm',
+  'dismount first to drive': 'dismount first to drive',
+  'not at a training ground': 'none of them is on a training ground',
+  'not at a stable': 'none of them is in a stable',
+  'carries nothing': 'none of them carries anything',
+  'not aboard': 'none of them is aboard a carriage',
+}
+
+/**
+ * Why none of the group can take an order, from why each can't: what keeps the grown ones who
+ * carry no child from it, when there are any, as that is what the Player can change.
+ */
+function groupReason(whys: readonly string[]): string {
+  const unfit = (w: string) => w === 'a child' || w === CARRYING_A_CHILD
+  const why =
+    whys.find((w) => !unfit(w)) ??
+    (whys.every((w) => w === whys[0]) ? whys[0] : 'they are children or carry one')
+  return why === undefined ? 'nobody picked' : (GROUP_REASONS[why] ?? why)
+}
+
+/**
+ * The orders the group card offers, in the order it shows them (`GROUP_BUTTONS`), those that
+ * some of them can take now (`groupSkip`), and why each order left out can't be given: the
+ * reason its row shows greyed while the card stays open (ADR 0019). Walking, running a script,
+ * attacking, climbing and fetching are always offered: the target picked tells who can.
+ */
+export function groupRows(h: GroupHere): {
+  actions: CardAction<GroupButton>[]
+  missing: Partial<Record<GroupButton, string>>
+} {
+  const actions: CardAction<GroupButton>[] = []
+  const missing: Partial<Record<GroupButton, string>> = {}
+  const somewhere = { id: '', kind: 'farm' as const, x: 0, y: 0 }
+  // An order like the one the button gives, its target aside: queued, the place is not checked.
+  const like: Partial<Record<GroupButton, { order: GroupOrder; queued?: true }>> = {
+    mount: { order: { kind: 'mount' } },
+    dismount: { order: { kind: 'dismount' } },
+    getOff: { order: { kind: 'getOff' } },
+    unhitch: { order: { kind: 'unhitch' } },
+    drive: { order: { kind: 'drive', x: 0, y: 0 } },
+    haul: {
+      order: { kind: 'haul', x: 0, y: 0, goods: [], returnGoods: [], keepFood: 0 },
+    },
+    work: { order: { kind: 'work', workplace: somewhere, name: '' }, queued: true },
+    feedStable: { order: { kind: 'feedStable' } },
+    teach: { order: { kind: 'train' } },
+    train: { order: { kind: 'train' } },
+    build: { order: { kind: 'build', building: 'farm', at: somewhere }, queued: true },
+    roadTo: { order: { kind: 'line', building: 'road', from: somewhere, to: somewhere } },
+    wallTo: { order: { kind: 'line', building: 'wall', from: somewhere, to: somewhere } },
+    tearDown: { order: { kind: 'tearDown', building: somewhere, name: '' }, queued: true },
+    breed: {
+      order: { kind: 'breed', stable: somewhere, horseIds: ['', ''] },
+      queued: true,
+    },
+    store: { order: { kind: 'store' } },
+    storeAt: { order: { kind: 'store' } },
+    drop: { order: { kind: 'drop' } },
+  }
+  for (const { id, label } of GROUP_BUTTONS) {
+    const row: CardAction<GroupButton> = {
+      id,
+      label,
+      key: GROUP_KEYS[id],
+      ...(GROUP_PANELS.includes(id) ? { opens: true as const } : {}),
+    }
+    const whys = h.residents.map((r) => {
+      const l = like[id]
+      const why = l && groupSkip(l.order, r, h.tick, h.size, l.queued, h.seen)
+      // Breeding goes to one standing in a stable (`CONTEXT.md`: Breeding).
+      if (!why && id === 'breed' && !stableOf(r, h.seen, h.size)) return 'not at a stable'
+      return why
+    })
+    if (id === 'stop' && !h.residents.some((r) => r.order || r.script))
+      missing.stop = 'none of them has an order'
+    else if (id === 'board' && h.carriages === 0)
+      missing.board = 'nobody stands on a carriage of your realm'
+    else if (whys.length > 0 && whys.every((w) => w !== undefined))
+      missing[id] = groupReason(whys as string[])
+    else if (id === 'board' && h.carriages > 1)
+      actions.push({ ...row, label: 'Board carriage…', opens: true })
+    else if (id === 'relocate' && h.relocateProblem)
+      actions.push({ ...row, disabled: true, reason: h.relocateProblem })
+    else actions.push(row)
+  }
+  return { actions, missing }
 }

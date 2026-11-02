@@ -8,6 +8,7 @@ import {
   type SeenCarriage,
   type SeenCity,
   type Diplomacy,
+  type FirstDay,
   type SeenHorse,
   type MapInfo,
   type OrderRequest,
@@ -67,6 +68,8 @@ export interface ClientWorld {
   region: RegionState | null
   /** Whether the Player may still claim their Horse offer (`CONTEXT.md`: Horse offer). */
   horseOffer: boolean
+  /** The Player's first-day card (`CONTEXT.md`: First day). */
+  firstDay: FirstDay
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -162,6 +165,7 @@ export function useWorld(onLoggedOut: () => void) {
             diplomacy: msg.diplomacy,
             region: msg.region && applyRegionMap(null, msg.region, msg.map.size),
             horseOffer: msg.horseOffer,
+            firstDay: msg.firstDay,
             ...byKind(entities.values()),
             lastSeen: lastSeenByKind(remembered.values()),
           })
@@ -175,6 +179,8 @@ export function useWorld(onLoggedOut: () => void) {
         } else if (msg.type === 'scriptLog') {
           if (!watched.current.has(msg.id)) return
           setScriptLogs((m) => new Map(m).set(msg.id, msg.lines))
+        } else if (msg.type === 'firstDay') {
+          setWorld((w) => w && { ...w, firstDay: msg.firstDay })
         } else if (msg.type === 'ack' || msg.type === 'rejected') {
           const answer = answers.current.get(msg.requestId)
           answers.current.delete(msg.requestId)
@@ -304,5 +310,21 @@ export function useWorld(onLoggedOut: () => void) {
     })
   }, [])
 
-  return { world, founding, status, sendOrder, found, memories, runs, scriptLogs, watchScript }
+  /** Takes the first-day card the server answered a request with (`api.firstDayDone`). */
+  const setFirstDay = useCallback((firstDay: FirstDay) => {
+    setWorld((w) => w && { ...w, firstDay })
+  }, [])
+
+  return {
+    world,
+    founding,
+    status,
+    sendOrder,
+    found,
+    memories,
+    runs,
+    scriptLogs,
+    watchScript,
+    setFirstDay,
+  }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { formatGameTime } from '@csp/shared'
+import { formatGameTime, type FirstDay } from '@csp/shared'
+import { DrawerStatus } from './drawer-head.js'
 import {
   DRAWERS,
   DRAWER_WIDTH,
@@ -11,6 +12,8 @@ import {
   type KeyGood,
   type OpenDrawer,
 } from './hud-view.js'
+import { groupSentLine, type Skipped } from './group-orders.js'
+import { firstDayView, laneSpot, skippedByWhy } from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
 import { WIKI_PATH } from './wiki-view.js'
 
@@ -131,28 +134,42 @@ export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: num
   )
 }
 
-/** The thin bar along the top: realm, game clock, connection, home city goods, Leader. */
+/**
+ * The thin bar along the top: the realm's name and home city, game clock, connection, home city
+ * goods, Leader, and the Player's account by Log out.
+ */
 export function TopBar({
   realm,
+  account,
   cityName,
   tick,
   status,
   goods,
   leader,
   onLogout,
+  onWiki,
 }: {
-  realm: string
+  /** The realm's name (`CONTEXT.md`: Realm name), once the world has come. */
+  realm?: string
+  account: string
   cityName?: string
   tick?: number
   status: ConnectionStatus
   goods?: Record<KeyGood, number>
   leader?: string
   onLogout: () => void
+  /** The Wiki link was followed (`CONTEXT.md`: First day). */
+  onWiki?: () => void
 }) {
   return (
     <header className="hud-top">
-      <b title="Your realm">{realm}</b>
-      {cityName && <span className="hud-muted">{cityName}</span>}
+      {realm && <b title="Your realm">{realm}</b>}
+      {cityName && (
+        <span className="hud-muted" title="Your home city">
+          {realm && '· '}
+          {cityName}
+        </span>
+      )}
       <span className="hud-sep" />
       {tick !== undefined && (
         <span
@@ -185,9 +202,12 @@ export function TopBar({
       )}
       <span className="hud-sep" />
       {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
-      <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener">
+      <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener" onClick={onWiki}>
         Wiki
       </a>
+      <span className="hud-muted" title="Your account">
+        {account}
+      </span>
       <button type="button" className="hud-logout" onClick={onLogout}>
         Log out
       </button>
@@ -232,14 +252,19 @@ export function PhoneMenu({
   goods,
   cityName,
   leader,
+  account,
   onLogout,
+  onWiki,
 }: {
   open: OpenDrawer
   onToggle: (id: DrawerId) => void
   goods?: Record<KeyGood, number>
   cityName?: string
   leader?: string
+  account: string
   onLogout: () => void
+  /** The Wiki link was followed (`CONTEXT.md`: First day). */
+  onWiki?: () => void
 }) {
   const [shown, setShown] = useState(false)
   useEffect(() => {
@@ -299,9 +324,18 @@ export function PhoneMenu({
               </span>
             )}
             <div className="hud-menu-links">
-              <a className="hud-wiki" href={WIKI_PATH} target="_blank" rel="noopener">
+              <a
+                className="hud-wiki"
+                href={WIKI_PATH}
+                target="_blank"
+                rel="noopener"
+                onClick={onWiki}
+              >
                 Wiki
               </a>
+              <span className="hud-account" title="Your account">
+                {account}
+              </span>
               <button type="button" className="hud-logout" onClick={onLogout}>
                 Log out
               </button>
@@ -329,6 +363,8 @@ export function Drawer({
   children: ReactNode
 }) {
   const label = DRAWERS.find((d) => d.id === id)!.label
+  // Where the panel's head puts its count, right of the title (`PanelHead`).
+  const [status, setStatus] = useState<HTMLElement | null>(null)
   return (
     <section
       className={`hud-drawer${isWide(id) ? ' wide' : ''}`}
@@ -337,11 +373,12 @@ export function Drawer({
     >
       <div className="hud-drawer-head">
         <h2>{label}</h2>
+        <span className="hud-drawer-status" ref={setStatus} />
         <button type="button" onClick={onClose} aria-label={`Close ${label}`}>
           ✕
         </button>
       </div>
-      {children}
+      <DrawerStatus.Provider value={status}>{children}</DrawerStatus.Provider>
     </section>
   )
 }
@@ -435,8 +472,10 @@ export function DrawerEdge({ open }: { open: OpenDrawer }) {
  * the right, 0 for each that isn't showing. The map fills the window, so screen edges measure it.
  */
 export function mapCovered(): { left: number; right: number } {
-  // A bottom sheet covers the bottom of the map, not its right side.
-  const card = document.querySelector('.game-selection:not(.sheet)')?.getBoundingClientRect()
+  // A bottom sheet covers the bottom of the map, not its right side; a hidden card none of it.
+  const card = document
+    .querySelector('.game-selection:not(.sheet):not([hidden])')
+    ?.getBoundingClientRect()
   return {
     left: document.querySelector('.hud-drawer:not([hidden])')?.getBoundingClientRect().right ?? 0,
     right: card ? window.innerWidth - card.left : 0,
@@ -493,13 +532,166 @@ export function HorseOfferNotice({
     if (reason) setBusy(false)
   }
   return (
-    <aside className="hud-offer" role="status">
-      <span>
+    <aside className="notice hud-offer" role="status">
+      <span className="notice-text">
         {NUMBER_WORDS[horses] ?? horses} horses are waiting for you
         {refused && <span className="hud-offer-refused"> — {refused}</span>}
       </span>
       <button type="button" disabled={busy} onClick={() => void claim()}>
         Claim
+      </button>
+    </aside>
+  )
+}
+
+/** The gap, in pixels, above and below the lane while it is a band across the screen. */
+const BAND_PAD = 6
+
+/**
+ * The lane under the top bar every notice shows in (`CONTEXT.md`: Notices): one stack, centred
+ * over the map between the open drawer and the card and never over either (`laneSpot`). While it
+ * is a band across the screen (on a phone, or with too little map between them) it sets
+ * `--lane-h` on the game, and the drawers and the card start below it.
+ */
+export function NoticeLane({ phone, children }: { phone: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [spot, setSpot] = useState<{ left: number; right: number; band: boolean }>()
+  const watch = useRef<ResizeObserver>(undefined)
+  const place = useRef(() => {})
+  place.current = () => {
+    const lane = ref.current
+    const game = lane?.closest<HTMLElement>('.game')
+    if (!lane || !game) return
+    const rail = parseFloat(getComputedStyle(game).getPropertyValue('--rail-w')) || 0
+    const next = laneSpot(window.innerWidth, rail, mapCovered(), phone)
+    setSpot((was) =>
+      was && was.left === next.left && was.right === next.right && was.band === next.band
+        ? was
+        : next,
+    )
+    const height = next.band && lane.offsetHeight ? lane.offsetHeight + 2 * BAND_PAD : 0
+    game.style.setProperty('--lane-h', `${height}px`)
+  }
+  useEffect(() => {
+    const lane = ref.current
+    const again = () => place.current()
+    watch.current = new ResizeObserver(again)
+    window.addEventListener('resize', again)
+    return () => {
+      watch.current?.disconnect()
+      window.removeEventListener('resize', again)
+      lane?.closest<HTMLElement>('.game')?.style.removeProperty('--lane-h')
+    }
+  }, [])
+  // Drawers, cards and notices come and go with the game's renders, and so the lane's; a drawer
+  // dragged wider or a notice growing shows only in their sizes.
+  useLayoutEffect(() => {
+    place.current()
+    const lane = ref.current
+    const w = watch.current
+    if (!lane || !w) return
+    w.disconnect()
+    w.observe(lane)
+    for (const el of document.querySelectorAll('.hud-drawer, .game-selection')) w.observe(el)
+  })
+  return (
+    <div
+      ref={ref}
+      className={`notice-lane${spot?.band ? ' band' : ''}`}
+      style={spot && { left: spot.left, right: spot.right }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
+ * A group order's report in the lane (`CONTEXT.md`: Group, Notices): how many it went to and who
+ * was skipped or turned down and why, until the Player dismisses it or gives the next order.
+ */
+export function GroupReportNotice({
+  report,
+  onDismiss,
+}: {
+  report: { sent: number; of: number; skipped: Skipped[] }
+  onDismiss: () => void
+}) {
+  const sent = groupSentLine(report.sent, report.of)
+  const skipped = skippedByWhy(report.skipped)
+  return (
+    <aside
+      className={`notice group-report${skipped.length ? ' skipped' : ''}`}
+      role="status"
+      aria-label="Last group order"
+      title={[sent, ...skipped.map((s) => `Skipped ${s.names.join(', ')}: ${s.why}`)].join('\n')}
+    >
+      <span className="notice-text">
+        {sent}
+        {skipped.map((s) => (
+          <span key={s.why}>
+            {' · '}Skipped <strong>{s.names.join(', ')}</strong>: {s.why}
+          </span>
+        ))}
+      </span>
+      <button type="button" aria-label="Dismiss the group order's report" onClick={onDismiss}>
+        OK
+      </button>
+    </aside>
+  )
+}
+
+/**
+ * The first-day card in the lane, under the Horse offer (`CONTEXT.md`: First day): a new realm's
+ * checklist, each line ticked once the game sees it done, with ✕ to dismiss it for good. On a
+ * phone it is one line: how far along, and the first line still to do.
+ */
+export function FirstDayCard({
+  card,
+  onWiki,
+  onDismiss,
+}: {
+  card: FirstDay
+  onWiki: () => void
+  onDismiss: () => void
+}) {
+  const { lines, next, ticked } = firstDayView(card)
+  return (
+    <aside className="notice first-day" aria-label="First day">
+      <div className="notice-text">
+        <strong>First day</strong>{' '}
+        <span className="first-day-count">
+          {ticked} of {lines.length}
+        </span>
+        <ul>
+          {lines.map((l) => (
+            <li
+              key={l.line}
+              className={l.done ? 'done' : l.line === next ? 'next' : undefined}
+              aria-label={l.done ? `${l.label}: done` : undefined}
+            >
+              <span className="first-day-tick" aria-hidden="true">
+                {l.done ? '✓' : '○'}
+              </span>{' '}
+              {l.line === 'openWiki' ? (
+                // A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki).
+                <a href={WIKI_PATH} target="_blank" rel="noopener" onClick={onWiki}>
+                  {l.label}
+                </a>
+              ) : (
+                l.label
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <button
+        type="button"
+        className="first-day-dismiss"
+        aria-label="Don't show again"
+        title="Don't show again"
+        onClick={onDismiss}
+      >
+        ✕
       </button>
     </aside>
   )

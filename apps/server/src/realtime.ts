@@ -14,6 +14,7 @@ import {
   townHallOf,
   type Account,
   type ClientMessage,
+  type OrderRequest,
   type Realm,
   type RegionMap,
   type Remembered,
@@ -30,6 +31,7 @@ import { getSessionUser, hashToken, sessionAlive, type SessionUser } from './aut
 import { config } from './config.js'
 import type { Db } from './db/index.js'
 import type { ExploredTerrain } from './explored.js'
+import { firstDayLineOf, markFirstDay, readFirstDay } from './first-day.js'
 import type { Logger } from './log.js'
 import type { OrderQueue } from './orders.js'
 import { foundStartingCity, realmOf, suggestedLeaderName } from './starting-city.js'
@@ -460,7 +462,21 @@ export function attachRealtime(
       diplomacy,
       region: regionFor(client, []) ?? null,
       horseOffer: client.horseOffer,
+      firstDay: readFirstDay(opts.db, user.id),
     })
+  }
+
+  /**
+   * Ticks the first-day line an accepted order of the Player's ticks, if any, and tells every
+   * tab of theirs when that changed their card (`CONTEXT.md`: First day).
+   */
+  function tickFirstDayFor(userId: number, order: OrderRequest) {
+    const line = firstDayLineOf(order)
+    const firstDay = line && markFirstDay(opts.db, userId, line)
+    if (!firstDay) return
+    for (const [socket, client] of clients) {
+      if (client.userId === userId) send(socket, { type: 'firstDay', firstDay })
+    }
   }
 
   wss.on('connection', (socket, req) => {
@@ -527,7 +543,10 @@ export function attachRealtime(
           return send(socket, { type: 'rejected', requestId, reason: 'too many orders waiting' })
         }
         const sender = { userId: client.userId, account: client.account }
-        send(socket, opts.orders.receive(world, sender, msg.requestId, msg.order))
+        const answer = opts.orders.receive(world, sender, msg.requestId, msg.order)
+        send(socket, answer)
+        // Accepted, so it is an order request.
+        if (answer.type === 'ack') tickFirstDayFor(client.userId, msg.order)
       }
       if (msg?.type === 'watch' && client && Array.isArray(msg.ids)) {
         const ids = msg.ids.filter((id) => typeof id === 'string').slice(0, SCRIPT_WATCH_MAX)

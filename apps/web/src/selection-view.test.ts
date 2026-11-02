@@ -9,6 +9,11 @@ import {
   MAX_WORKERS,
   STABLE_BREED_DAYS,
   STABLE_CAPACITY,
+  STABLE_FEED_DAYS,
+  GOODS,
+  HORSE_FOOD_PER_DAY,
+  horseFoodFactor,
+  type Good,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   BUILD_MATERIALS,
@@ -36,16 +41,24 @@ import {
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 import {
+  ACTION_KEYS,
   actionForKey,
   buildHereProblem,
   describeTile,
+  escapeStep,
+  keepRows,
   makeLeaderProblem,
   nodeFit,
   groupOrders,
+  orderGroupOf,
   residentActions,
+  residentOrders,
   riddenHorseLine,
+  rowGroups,
   tileActions,
   unhitcherOf,
+  type ActionId,
+  type CardAction,
   type ResidentHere,
   type TileThings,
 } from './selection-view.js'
@@ -450,6 +463,105 @@ describe('the Orders tab', () => {
   })
 })
 
+describe('the rows of a card that stays open', () => {
+  const farm = building({ kind: 'farm' })
+  /** The rows after the card showed `before` and the resident is now as `now` says. */
+  const keep = (before: ResidentHere | undefined, now: ResidentHere) => {
+    const kept = before && keepRows(undefined, residentActions(before), {}, orderGroupOf)
+    const { actions, missing } = residentOrders(now)
+    return keepRows(kept, actions, missing, orderGroupOf)
+  }
+  const ids = (rows: CardAction[]) => rows.map((a) => a.id)
+
+  it('are sorted afresh, by kind, when nothing is kept: something else was picked', () => {
+    const rows = keep(undefined, here({ building: farm, busy: true }))
+    expect(ids(rows)).toEqual(
+      groupOrders(residentActions(here({ building: farm, busy: true }))).flatMap((g) =>
+        ids(g.actions),
+      ),
+    )
+    expect(ids(rows).at(-1)).toBe('pair')
+  })
+
+  it('keep an order that stops being possible in its slot, greyed with why', () => {
+    // At the farm and working; then they walk off it.
+    const before = here({ building: farm, busy: true })
+    const rows = keep(before, here({ busy: true }))
+    expect(ids(rows)).toEqual(ids(keep(undefined, before)))
+    expect(rows.find((a) => a.id === 'work')).toMatchObject({
+      label: 'Work at the farm…',
+      disabled: true,
+      reason: 'not on a workplace',
+    })
+    // A greyed row runs on no key.
+    expect(actionForKey(rows, 'e')).toBeUndefined()
+    expect(actionForKey(rows, 'w')?.id).toBe('walk')
+  })
+
+  it('add an order that becomes possible at the end of its kind', () => {
+    const before = here()
+    const rows = keep(before, here({ busy: true, building: farm }))
+    expect(rowGroups(rows, orderGroupOf).map((g) => [g.group, ids(g.actions)])).toEqual([
+      ['move', ['walk', 'stop']],
+      ['work', ['build', 'roadTo', 'wallTo', 'work', 'tearDown']],
+      ['scripts', ['script']],
+      ['other', ['pair']],
+    ])
+  })
+
+  it('put a kind that comes up while open below the others, so no row moves', () => {
+    const before = here()
+    const rows = keep(before, here({ carries: true }))
+    const groups = rowGroups(rows, orderGroupOf).map((g) => g.group)
+    expect(groups).toEqual(['move', 'work', 'scripts', 'other', 'goods'])
+    expect(ids(rows).slice(0, -1)).toEqual(ids(keep(undefined, before)))
+  })
+
+  it('keep a slot through a change of label, and drop pick mode from a greyed row', () => {
+    const riding = keep(here({ horseToRide: true }), here({ riding: true }))
+    expect(riding.find((a) => a.id === 'ride')?.label).toBe('Dismount')
+    const kept = keepRows(
+      undefined,
+      residentActions(here({ carriage, picking: 'drive' })),
+      {},
+      orderGroupOf,
+    )
+    expect(kept.find((a) => a.id === 'drive')?.active).toBe(true)
+    const { actions, missing } = residentOrders(here())
+    const drive = keepRows(kept, actions, missing, orderGroupOf).find((a) => a.id === 'drive')
+    expect(drive).toMatchObject({ disabled: true, reason: 'no carriage here' })
+    expect(drive?.active).toBeUndefined()
+  })
+
+  it('say why for every order a resident card can leave out', () => {
+    const offered = new Set(ids(residentActions(here())))
+    const { missing } = residentOrders(here())
+    for (const id of Object.keys(ACTION_KEYS) as ActionId[]) {
+      if (offered.has(id)) continue
+      // The tile card's actions and the own resident's orders never come and go on a card.
+      if (['sendHere', 'gate', 'openCity', 'tradeHere', 'renameCity', 'renameHorse'].includes(id))
+        continue
+      if (['relocate', 'makeLeader', 'rename'].includes(id)) continue
+      expect(missing[id], id).toBeTruthy()
+    }
+    expect(residentOrders(here({ adult: false })).missing.work).toBe('children can’t work')
+    expect(residentOrders(here({ carrying: true })).missing.build).toBe('carrying a child')
+    expect(residentOrders(here({ inCity: false })).missing.pair).toBe('homeless')
+  })
+})
+
+describe('Escape', () => {
+  it('leaves the top-most thing first: pick mode, a panel, the tile card, the card, the drawer', () => {
+    const all = { pick: true, panel: true, tile: true, card: true, drawer: true }
+    expect(escapeStep(all)).toBe('pick')
+    expect(escapeStep({ ...all, pick: false })).toBe('panel')
+    expect(escapeStep({ ...all, pick: false, panel: false })).toBe('tile')
+    expect(escapeStep({ card: true, drawer: true })).toBe('card')
+    expect(escapeStep({ drawer: true })).toBe('drawer')
+    expect(escapeStep({})).toBeUndefined()
+  })
+})
+
 const things = (more: Partial<TileThings> = {}): TileThings => ({
   x: 5,
   y: 5,
@@ -495,21 +607,81 @@ describe('the card for a tile', () => {
   it('is named after a building on it, in its owner’s colour', () => {
     const card = tile({ buildings: [building({ kind: 'farm', cityId: 'c-me' })] })
     expect(card).toMatchObject({ title: 'Eastmere farm', rel: 'own', what: 'building' })
-    expect(card.lines).toContain(`1 / ${MAX_WORKERS.farm} workers`)
+    expect(card.lists?.[0]).toMatchObject({ title: 'Workers', count: `1 / ${MAX_WORKERS.farm}` })
+  })
+
+  it('lists a farm’s workers in sight as rows with their meters, the Player’s own to open', () => {
+    const farm = building({ kind: 'farm', cityId: 'c-me' })
+    const working = { kind: 'workAt', buildingId: farm.id }
+    const ana = {
+      id: 'ana',
+      name: 'Ana',
+      owner: 'me',
+      cityId: 'c-me',
+      order: working,
+      health: MAX_HEALTH,
+      hunger: MAX_HUNGER / 2,
+    } as unknown as SeenResident
+    // As sight sends another realm's worker: without how they fare.
+    const cid = { id: 'cid', name: 'Cid', owner: 'them', cityId: null, carried: {}, order: working }
+    const idle = { ...ana, id: 'bo', name: 'Bo', order: null }
+    const card = tile({
+      buildings: [farm],
+      residents: [ana, cid as unknown as SeenResident, idle],
+      strangers: [cid as unknown as SeenResident],
+      workers: () => 2,
+    })
+    expect(card.lists).toEqual([
+      {
+        title: 'Workers',
+        count: `2 / ${MAX_WORKERS.farm}`,
+        empty: 'Nobody works here',
+        meters: ['Health', 'Hunger'],
+        rows: [
+          { id: 'ana', name: 'Ana', shares: [1, 0.5], opens: 'resident' },
+          { id: 'cid', name: 'Cid', detail: 'Another realm' },
+        ],
+      },
+    ])
+    // Nobody at it: an empty list.
+    const none = tile({ buildings: [farm], workers: () => 0 })
+    expect(none.lists?.[0]).toMatchObject({ count: `0 / ${MAX_WORKERS.farm}`, rows: [] })
+    expect(card.lines.some((l) => l.includes('workers'))).toBe(false)
+  })
+
+  it('lists a storage’s goods as the Goods panel does, and what they weigh', () => {
+    const storage = building({ kind: 'storage', cityId: 'c-me', stock: { wood: 5, food: 3 } })
+    const card = tile({ buildings: [storage] })
+    expect(card.lists).toEqual([
+      {
+        title: 'Goods',
+        count: `${Math.round(stockWeight({ wood: 5, food: 3 }))} kg`,
+        empty: 'Nothing in it',
+        meters: [],
+        rows: [
+          { id: 'food', name: GOOD_LABELS.food, amount: 3 },
+          { id: 'wood', name: GOOD_LABELS.wood, amount: 5 },
+        ].sort((a, b) => GOODS.indexOf(a.id as Good) - GOODS.indexOf(b.id as Good)),
+      },
+    ])
+    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
+    const empty = tile({ buildings: [{ ...storage, stock: {} }] })
+    expect(empty.lists?.[0]).toMatchObject({ title: 'Goods', rows: [] })
   })
 
   it('names an outpost storage’s realm (`CONTEXT.md`: Outpost storage)', () => {
     const mine = building({ kind: 'storage', realmId: 'me', stock: { food: 3 } })
     expect(tile({ buildings: [mine] })).toMatchObject({ title: 'Outpost storage', rel: 'own' })
-    expect(tile({ buildings: [mine] }).lines).toEqual(
-      expect.arrayContaining(['Yours', 'Holds 3 food']),
-    )
+    expect(tile({ buildings: [mine] }).lines).toContain('Yours')
+    expect(tile({ buildings: [mine] }).lists?.[0]?.rows).toEqual([
+      { id: 'food', name: 'Food', amount: 3 },
+    ])
     // As sight sends another realm's: without what it holds.
     const theirs = building({ kind: 'storage', realmId: 'r-other' })
     const card = tile({ buildings: [theirs] })
     expect(card).toMatchObject({ title: 'Outpost storage', rel: 'otherRealm' })
     expect(card.lines).toContain('Another realm')
-    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
+    expect(card.lists).toBeUndefined()
     expect(tile({ buildings: [building({ kind: 'storage' })] }).lines).toContain('Nobody’s')
   })
 
@@ -570,9 +742,8 @@ describe('the card for a tile', () => {
       piles: [pile],
     })
     expect(card.what).toBe('building')
-    expect(card.lines).toEqual(
-      expect.arrayContaining(['Holds 3 food', 'On the ground: 4 stone', 'Tile 5, 5']),
-    )
+    expect(card.lines).toEqual(expect.arrayContaining(['On the ground: 4 stone', 'Tile 5, 5']))
+    expect(card.lists?.map((l) => l.title)).toEqual(['Goods'])
     expect(card.lines.some((l) => l.startsWith('Carriage'))).toBe(true)
   })
 
@@ -592,7 +763,7 @@ describe('the card for a tile', () => {
       buildings: [building({ kind: 'storage', cityId: 'c-other' })],
       carriages: [theirs],
     })
-    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
+    expect(card.lists).toBeUndefined()
     expect(card.lines.find((l) => l.startsWith('Carriage'))).toContain('· half loaded')
     expect(card.lines.find((l) => l.startsWith('Carriage'))).not.toContain('kg')
   })
@@ -629,7 +800,7 @@ describe('the card for a tile', () => {
     })
     const card = tile({ x: 0, y: 0, buildings: [b] })
     expect(card.what).toBe('building')
-    expect(card.lines).toContain('Holds 3 food')
+    expect(card.lists?.[0]?.rows).toEqual([{ id: 'food', name: 'Food', amount: 3 }])
   })
 
   it('shows strangers on it in their realm’s colour', () => {
@@ -741,18 +912,24 @@ describe('horses on the tile card', () => {
     const at = 5 * TICKS_PER_GAME_YEAR + 100
     const strong = horse({ stats: { speed: 9, strength: 15, endurance: 13 }, hunger: 10 })
     const card = tile({ horses: [strong], tick: at })
-    expect(card.lines).toContain(
-      '· Rowan · Speed 9, Strength 15, Endurance 13 · 5 years old · hungry, healthy',
-    )
+    expect(card.lists?.[0]?.rows).toEqual([
+      {
+        id: 'h1',
+        name: 'Rowan',
+        detail: 'Speed 9, Strength 15, Endurance 13 · 5 years old',
+        shares: [1, 10 / MAX_HUNGER],
+        opens: 'horse',
+      },
+    ])
     const foal = horse({ bornAt: at - 3 * TICKS_PER_GAME_DAY })
-    expect(tile({ horses: [foal], tick: at }).lines).toContain(
-      '· Rowan · Speed 12, Strength 8, Endurance 10 · 3 game days old · fed, healthy',
+    expect(tile({ horses: [foal], tick: at }).lists?.[0]?.rows[0]?.detail).toBe(
+      'Speed 12, Strength 8, Endurance 10 · 3 game days old',
     )
-    // A stranger's horse shows its stats and age, but not how it fares.
+    // A stranger's horse shows its stats and age, but not how it fares, and isn't in the drawer.
     const theirs = unknown({ realmId: 'r-other', bornAt: at - TICKS_PER_GAME_YEAR })
-    expect(tile({ horses: [theirs], tick: at }).lines).toContain(
-      '· Rowan · Speed 12, Strength 8, Endurance 10 · 1 year old',
-    )
+    expect(tile({ horses: [theirs], tick: at }).lists?.[0]?.rows).toEqual([
+      { id: 'h1', name: 'Rowan', detail: 'Speed 12, Strength 8, Endurance 10 · 1 year old' },
+    ])
     // Strength 15 is 5 above average: the carriage it pulls holds a fifth more.
     const k = { ...carriage, horseId: strong.id, load: { stone: 4 } }
     const pulled = tile({ carriages: [k], horses: [strong], tick: at })
@@ -770,9 +947,10 @@ describe('horses on the tile card', () => {
       ],
     })
     expect(card).toMatchObject({ title: '3 horses', what: 'horses', rel: 'own' })
-    expect(card.lines).toEqual(
-      expect.arrayContaining(['2 horses (yours) · 1 hungry', '1 horse (another realm)']),
-    )
+    expect(card.lists?.map(({ title, count }) => ({ title, count }))).toEqual([
+      { title: 'Horses (yours)', count: '2 · 1 hungry' },
+      { title: 'Horse (another realm)', count: '1' },
+    ])
     expect(tile({ horses: [horse()] })).toMatchObject({ title: 'Horse', what: 'horses' })
   })
 
@@ -832,12 +1010,30 @@ describe('horses on the tile card', () => {
     expect(card.what).toBe('building')
     expect(card.lines).toEqual(
       expect.arrayContaining([
-        '2 horses (yours)',
         `Room for ${STABLE_CAPACITY - 2} more horses`,
-        'Holds 30 food',
         `Breeding: a foal in about ${STABLE_BREED_DAYS - 3} game days`,
       ]),
     )
+    // Its horses as rows with meters, each to open in the Horses drawer.
+    expect(card.lists).toEqual([
+      expect.objectContaining({
+        title: 'Horses (yours)',
+        count: '2',
+        meters: ['Health', 'Hunger'],
+        rows: [
+          expect.objectContaining({ id: 'h1', shares: [1, 1], opens: 'horse' }),
+          expect.objectContaining({ id: 'h2', shares: [1, 1], opens: 'horse' }),
+        ],
+      }),
+    ])
+    // Its Food as a meter of how long it lasts them, full at what Feed the stable keeps.
+    const perDay = 2 * HORSE_FOOD_PER_DAY * horseFoodFactor(pair[0]!)
+    expect(card.stableFood).toEqual({
+      units: 30,
+      share: Math.min(1, 30 / perDay / STABLE_FEED_DAYS),
+      lasts: `about ${Math.floor(30 / perDay)} game days for its horses`,
+    })
+    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
     // Fed horses alone breed no foal.
     const alone = tile({ buildings: [stable], horses: pair })
     expect(alone.lines.some((l) => l.startsWith('Breeding'))).toBe(false)
@@ -869,9 +1065,18 @@ describe('horses on the tile card', () => {
         unknown({ id: 'h2', realmId: 'r-other' }),
       ],
     })
-    expect(card.lines.some((l) => l.startsWith('Holds'))).toBe(false)
+    expect(card.stableFood).toBeUndefined()
     expect(card.lines.some((l) => l.startsWith('Breeding'))).toBe(false)
-    expect(card.lines).toContain('2 horses (another realm)')
+    expect(card.lists).toEqual([
+      expect.objectContaining({
+        title: 'Horses (another realm)',
+        count: '2',
+        rows: [
+          expect.not.objectContaining({ shares: expect.anything() }),
+          expect.not.objectContaining({ shares: expect.anything() }),
+        ],
+      }),
+    ])
   })
 })
 

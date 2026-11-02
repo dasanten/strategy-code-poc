@@ -166,3 +166,26 @@ describe('mountSpot', () => {
     expect(m.y).toBeGreaterThan(100)
   })
 })
+
+describe('drawUnits: stacks to pick (CONTEXT.md: Picking on the map)', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f']
+  const six = ids.map((id) => resident(id, 'r1'))
+
+  it('a token for several stands for all of them; a lone one for nobody else', () => {
+    const { spots } = draw(six, MIDDLE)
+    for (const id of ids) expect(spots.get(id)!.stack).toEqual(ids)
+    expect(draw([resident('a', 'r1')], MIDDLE).spots.get('a')!.stack).toBeUndefined()
+  })
+
+  it('up close each figure is just them, and the "+N" badge stands for the whole tile', () => {
+    const { spots } = draw(six, CLOSE)
+    const stacked = ids.filter((id) => spots.get(id)!.stack !== undefined)
+    expect(stacked).toHaveLength(3)
+    for (const id of stacked) expect(spots.get(id)!.stack).toEqual(ids)
+  })
+
+  it('a ridden horse has no token of its own to pick: it shows under its rider', () => {
+    const { spots } = draw([resident('a', 'r1', { riding: 'h' })], MIDDLE)
+    expect(spots.has('h')).toBe(false)
+  })
+})

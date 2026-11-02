@@ -39,10 +39,28 @@ import {
   holderAt,
   holderLabel,
   regionChunkPixels,
+  regionBorders,
   regionChunks,
   regionGroups,
+  regionLook,
+  type BorderRun,
   type RegionState,
 } from './map/region.js'
+import {
+  MINIMAP_SIDE,
+  minimapDots,
+  minimapFrame,
+  minimapOpenAtStart,
+  minimapPixels,
+  minimapToTile,
+  minimapView,
+  rememberMinimapOpen,
+  tileToMinimap,
+  type MinimapDot,
+  type MinimapFrame,
+} from './map/minimap.js'
+import { legendOpenAtStart, readoutText, rememberLegendOpen, type Hover } from './map/legend.js'
+import { PHONE_QUERY } from './sheet-view.js'
 import {
   NODE_COLORS,
   NODE_NAMES,
@@ -53,6 +71,7 @@ import {
   ROAD_COLOR,
   TERRAIN_COLORS,
   TERRAIN_NAMES,
+  LOADING_COLOR,
   VOID_COLOR,
   css,
 } from './map/palette.js'
@@ -95,26 +114,27 @@ import { drawUnits, type Spot } from './map/unit-tokens.js'
 import { roadJoins, roadWidth, wallWidths } from './map/roads.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
-import { inBox, pickableAt, pickables, toggled, type Point } from './map/selection.js'
+import { drawPickPreview } from './map/preview-draw.js'
+import type { PickPreview } from './pick-preview.js'
+import {
+  inBox,
+  mapPickAt,
+  pickKey,
+  pickables,
+  toggled,
+  type MapPick,
+  type Point,
+} from './map/selection.js'
 import { LONG_PRESS_MS, TAP_SLOP, longPresses, pressKind } from './map/gestures.js'
 
 /** No residents selected. */
 const NONE: readonly string[] = []
 
+/** How strongly the hover outline tints what a click would pick, so it shows on its own colour. */
+const HOVER_FILL = 0.18
+
 /** Starting zoom, in screen pixels per tile. */
 const START_SCALE = 12
-
-/** What the pointer is over, for the readout. */
-interface Hover {
-  x: number
-  y: number
-  terrain: string
-  node?: string
-  /** Who holds the tile on the Region map, when it is explored. */
-  holder?: string
-  /** A Trade Org caravan stands there (`CONTEXT.md`: Caravan). */
-  caravan?: boolean
-}
 
 /** What the map shows: the terrain, or territory over it (`CONTEXT.md`: Region map). */
 type MapMode = 'terrain' | 'region'
@@ -128,6 +148,8 @@ type MapMode = 'terrain' | 'region'
  * does, and the Select button makes a drag box residents (T33.5).
  * The admin map (`world.admin`) draws the whole world the same way, coloured by Organization, with
  * its far tier from the terrain overview and territory only when toggled on.
+ * Territory fills the far tier and shows as borders nearer in (`regionLook`). Bottom right a
+ * minimap shows the Player's explored terrain; the legend and the minimap fold to buttons.
  */
 export function MapView({
   world,
@@ -139,12 +161,15 @@ export function MapView({
   onSelectCity,
   picking = false,
   onPickTile,
+  preview,
+  onPointerTile,
   onNodesLoaded,
   onTerrainLoaded,
   focus,
   terrainPath,
   start,
   onView,
+  newRealm = false,
 }: {
   world: MapWorld
   /** The residents shown with a ring; the way ahead shows when there is just one. */
@@ -165,8 +190,15 @@ export function MapView({
   onSelectCity?: (id: string) => void
   /** Waiting for a tile: the next click picks one instead of selecting. */
   picking?: boolean
-  /** Called with a tile picked by click (while `picking`) or by right-click. */
-  onPickTile?: (x: number, y: number) => void
+  /**
+   * Called with a tile picked by click (while `picking`) or by right-click or long-press; a click
+   * while picking says whether it was a finger's tap.
+   */
+  onPickTile?: (x: number, y: number, tap?: { touch: boolean }) => void
+  /** What the pick waiting for a tile would do there, drawn while `picking` (`pickPreview`). */
+  preview?: PickPreview
+  /** Called while `picking` with the tile a mouse or pen hovers over, undefined once off the map. */
+  onPointerTile?: (tile: { x: number; y: number } | undefined) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
   onNodesLoaded?: (nodeAt: (x: number, y: number) => KnownNode | undefined) => void
   /** Called as terrain chunks load, with a lookup of a tile's explored terrain. */
@@ -183,6 +215,8 @@ export function MapView({
   start?: Camera
   /** Called with the camera and the screen's size whenever the view moves or resizes. */
   onView?: (cam: Camera, view: Size) => void
+  /** The Player's realm is new (`isNewRealm`): the legend opens unless they folded it here. */
+  newRealm?: boolean
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef(world)
@@ -200,6 +234,9 @@ export function MapView({
   pickingRef.current = picking
   const onPickTileRef = useRef(onPickTile)
   onPickTileRef.current = onPickTile
+  const previewRef = useRef(preview)
+  const onPointerTileRef = useRef(onPointerTile)
+  onPointerTileRef.current = onPointerTile
   const onNodesLoadedRef = useRef(onNodesLoaded)
   onNodesLoadedRef.current = onNodesLoaded
   const onTerrainLoadedRef = useRef(onTerrainLoaded)
@@ -226,13 +263,29 @@ export function MapView({
   const [boxMode, setBoxMode] = useState(false)
   const boxModeRef = useRef(boxMode)
   boxModeRef.current = boxMode
+  // Explored terrain on screen is still on its way: the readout says so in its place.
+  const [loading, setLoading] = useState(false)
   const mapSize = world.map.size
   const admin = world.admin !== undefined
+  const realmId = world.home.realmId
+  const [legendOpen, setLegendOpen] = useState(() => legendOpenAtStart(realmId, newRealm))
+  // The minimap starts folded on a phone; the admin map, the whole world at once, has none.
+  const [minimapOpen, setMinimapOpen] = useState(() =>
+    minimapOpenAtStart(window.matchMedia?.(PHONE_QUERY).matches ?? false),
+  )
+  const minimapRef = useRef<HTMLCanvasElement>(null)
+  const minimapOpenRef = useRef(minimapOpen)
+  const minimapAtRef = useRef<(px: number, py: number) => void>(() => {})
 
   useEffect(() => {
     modeRef.current = mode
     redrawRef.current()
   }, [mode])
+
+  useEffect(() => {
+    minimapOpenRef.current = minimapOpen
+    redrawRef.current()
+  }, [minimapOpen])
 
   useEffect(() => {
     if (focus) controlsRef.current?.goTo(focus.x, focus.y, focus.scale, focus.cover)
@@ -257,6 +310,11 @@ export function MapView({
   }, [selectedCityId])
 
   useEffect(() => {
+    previewRef.current = picking ? preview : undefined
+    redrawRef.current()
+  }, [preview, picking])
+
+  useEffect(() => {
     worldRef.current = world
     if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
     motionRef.current(world)
@@ -269,9 +327,20 @@ export function MapView({
     const app = new Application()
     const nodes: KnownNode[][] = []
     const terrainLayer = new TerrainLayer(mapSize, (i) => worldRef.current.exploredChunks.has(i))
+    // Explored chunks on screen that haven't loaded yet, a neutral grey so they don't read as
+    // unexplored.
+    const waiting = new Graphics()
     // The Region map: territory over the terrain, one small texture per chunk like the terrain.
     const regionSprites = new Map<number, Sprite>()
     const regionLayer = new Container()
+    // Nearer in, only territory borders (`regionLook`), worked out per chunk when first on screen.
+    const borderLayer = new Graphics()
+    const borders = new Map<number, Map<number, BorderRun[]>>()
+    // The minimap: its frame, its terrain as a picture made again when chunks load, and its dots.
+    let miniFrame: MinimapFrame | undefined
+    let miniExplored: ReadonlySet<number> | undefined
+    let miniTerrain: HTMLCanvasElement | undefined
+    let miniDots: { world: MapWorld; dots: MinimapDot[] } | undefined
     // The admin map's far terrain: the overview, repeated so the map's sides join.
     let overviewSprite: TilingSprite | undefined
     // Under the tokens: grid, city areas, roads and walls; over them: piles, carts and residents.
@@ -287,6 +356,10 @@ export function MapView({
     const motion = new Motion()
     // The box being dragged to select residents, from where it started to the pointer.
     let box: { from: Point; to: Point } | undefined
+    // Where a mouse or pen hovers, to outline what a click there would pick (a touch never hovers),
+    // and what that was when last drawn.
+    let pointer: Point | undefined
+    let hoverKey = ''
     const size = (): Size => ({ width: app.screen.width, height: app.screen.height })
     let cam: Camera = startRef.current ?? { ...homeCentre(worldRef.current), scale: START_SCALE }
     let disposed = false
@@ -310,6 +383,7 @@ export function MapView({
               (y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)
             ],
         )
+        miniTerrain = undefined
         redraw()
       },
       terrainPathRef.current,
@@ -330,6 +404,7 @@ export function MapView({
     /** Redraws the Region map's chunks that changed, or all of them. */
     function updateRegion(region: RegionState | null) {
       if (!ready) return
+      borders.clear()
       const redo = region?.changed ?? [
         ...new Set([...regionSprites.keys(), ...(region ? regionChunks(region, mapSize) : [])]),
       ]
@@ -384,8 +459,15 @@ export function MapView({
       const fromOverview = far && admin !== undefined
       const onScreen = fromOverview ? [] : visibleChunks(cam, view, mapSize)
       const shown = new Set(onScreen)
-      // Far out, territory always shows (ADR 0008: far tier); on the admin map only when toggled.
-      regionLayer.visible = modeRef.current === 'region' || (far && !admin)
+      // Far out, territory fills (ADR 0008: far tier), nearer in only its borders show; on the
+      // admin map only when toggled.
+      const look = regionLook(
+        zoomTier(cam.scale),
+        modeRef.current === 'region',
+        admin !== undefined,
+      )
+      regionLayer.visible = look === 'fill'
+      drawBorders(look === 'borders' ? onScreen : [], view)
       terrainLayer.container.visible = !fromOverview
       if (overviewSprite) {
         overviewSprite.visible = fromOverview
@@ -406,8 +488,112 @@ export function MapView({
           wrapDelta(cam.x, ((i % across) + 0.5) * CHUNK_SIZE, mapSize),
           wrapDelta(cam.y, (Math.floor(i / across) + 0.5) * CHUNK_SIZE, mapSize),
         )
-      store.want([...onScreen].sort((a, b) => away(a) - away(b)))
+      // The minimap's chunks load after those on screen.
+      const forMinimap =
+        minimapOpenRef.current && !admin
+          ? [...worldRef.current.exploredChunks].filter((i) => !shown.has(i))
+          : []
+      store.want([...[...onScreen].sort((a, b) => away(a) - away(b)), ...forMinimap])
+      const notHere = store.waiting(onScreen)
+      waiting.clear()
+      for (const i of notHere) {
+        const [sx, sy] = chunkToScreen(cam, view, mapSize, i % across, Math.floor(i / across))
+        waiting.rect(sx, sy, CHUNK_SIZE * cam.scale, CHUNK_SIZE * cam.scale)
+      }
+      if (notHere.length > 0) waiting.fill(LOADING_COLOR)
+      setLoading(notHere.length > 0)
       drawOverlay(overlay, cam, view, onScreen)
+      drawMinimap(view)
+    }
+
+    /** Territory borders over the chunks given, each holder's line on its own side of the edge. */
+    function drawBorders(chunks: readonly number[], view: Size) {
+      borderLayer.clear()
+      const region = worldRef.current.region
+      if (!region) return
+      const width = cam.scale >= CLOSE_SCALE ? 3 : 2
+      const inset = width / 2
+      for (const i of chunks) {
+        const [cx, cy] = [i % across, Math.floor(i / across)]
+        let runs = borders.get(i)
+        if (!runs) borders.set(i, (runs = regionBorders(region, mapSize, cx, cy)))
+        if (runs.size === 0) continue
+        const [ox, oy] = chunkToScreen(cam, view, mapSize, cx, cy)
+        const s = cam.scale
+        for (const [colour, list] of runs) {
+          for (const r of list) {
+            borderLayer
+              .moveTo(ox + r.x0 * s + r.nx * inset, oy + r.y0 * s + r.ny * inset)
+              .lineTo(ox + r.x1 * s + r.nx * inset, oy + r.y1 * s + r.ny * inset)
+          }
+          borderLayer.stroke({ width, color: colour, cap: 'square' })
+        }
+      }
+    }
+
+    /** The minimap (`map/minimap.ts`): explored terrain, dots and the view's rectangle. */
+    function drawMinimap(view: Size) {
+      const canvas = minimapRef.current
+      const world = worldRef.current
+      const ctx = canvas?.getContext('2d')
+      if (!canvas || !ctx || world.admin) return
+      if (world.exploredChunks !== miniExplored || !miniFrame) {
+        miniExplored = world.exploredChunks
+        miniFrame = minimapFrame(miniExplored, world.home, mapSize)
+        miniTerrain = undefined
+      }
+      const frame = miniFrame
+      if (!miniTerrain) {
+        const res = Math.min(MINIMAP_SIDE, Math.ceil(frame.span))
+        miniTerrain = document.createElement('canvas')
+        miniTerrain.width = miniTerrain.height = res
+        const pixels = minimapPixels(
+          frame,
+          mapSize,
+          res,
+          (x, y) =>
+            store.get(Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE))?.tiles[
+              (y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)
+            ],
+        )
+        miniTerrain.getContext('2d')?.putImageData(new ImageData(pixels, res, res), 0, 0)
+      }
+      if (miniDots?.world !== world) miniDots = { world, dots: minimapDots(world, viewerOf(world)) }
+      const dpr = window.devicePixelRatio || 1
+      const px = Math.round(MINIMAP_SIDE * dpr)
+      if (canvas.width !== px) canvas.width = canvas.height = px
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.clearRect(0, 0, px, px)
+      ctx.imageSmoothingEnabled = false
+      ctx.drawImage(miniTerrain, 0, 0, px, px)
+      ctx.scale(dpr, dpr)
+      const side = MINIMAP_SIDE
+      for (const d of miniDots.dots) {
+        const [x, y] = tileToMinimap(frame, mapSize, side, d.x + 0.5, d.y + 0.5)
+        const r = MINIMAP_DOT_RADIUS[d.kind]
+        ctx.globalAlpha = d.remembered ? LAST_SEEN_FADE + 0.2 : 1
+        ctx.beginPath()
+        if (d.kind === 'carriage') ctx.rect(x - r, y - r, 2 * r, 2 * r)
+        else ctx.arc(x, y, r, 0, Math.PI * 2)
+        ctx.fillStyle = css(relationshipColor(d.rel))
+        ctx.fill()
+        if (d.kind !== 'resident') {
+          ctx.lineWidth = d.kind === 'home' ? 2 : 1
+          ctx.strokeStyle = d.kind === 'home' ? '#ffffff' : '#0e1419'
+          ctx.stroke()
+        }
+      }
+      ctx.globalAlpha = 1
+      const rect = minimapView(frame, mapSize, side, cam, view)
+      ctx.lineWidth = 1.5
+      ctx.strokeStyle = '#ffffff'
+      ctx.strokeRect(rect.x, rect.y, rect.width, rect.height)
+    }
+
+    minimapAtRef.current = (px, py) => {
+      if (!miniFrame) return
+      const t = minimapToTile(miniFrame, mapSize, MINIMAP_SIDE, px, py)
+      setCam({ ...cam, x: t.x + 0.5, y: t.y + 0.5 })
     }
 
     /** The overview fills the screen, its map's top left corner where tile (0, 0) appears. */
@@ -465,6 +651,85 @@ export function MapView({
         if (e.id === selectedCityRef.current)
           g.circle(sx, sy, r + 6).stroke({ width: 2.5, color: 0xffffff })
       }
+      // The city a click would pick, outlined in its relationship colour.
+      const hovered = cityUnder()
+      if (hovered) {
+        const [sx, sy] = tileToScreen(cam, view, mapSize, hovered.x + 0.5, hovered.y + 0.5)
+        g.circle(sx, sy, EMBLEM_RADIUS[hovered.size] + 10).stroke({
+          width: 2,
+          color: relationshipColor(hovered.rel),
+        })
+      }
+    }
+
+    /** The city emblem under the hovering pointer in the far tier, if any. */
+    function cityUnder(): CityEmblem | undefined {
+      if (!pointer || pickingRef.current) return undefined
+      const w = worldRef.current
+      const emblems = [...emblemsOf(w), ...lastSeenEmblemsOf(w)]
+      return emblemAt(emblems, cam, size(), mapSize, pointer.x, pointer.y)
+    }
+
+    /** What a click at a point on screen picks below the far tier (`map/selection.ts`). */
+    function pickUnder(p: Point): MapPick {
+      const [tx, ty] = screenToTile(cam, size(), mapSize, p.x, p.y).map(Math.floor) as [
+        number,
+        number,
+      ]
+      const w = worldRef.current
+      return mapPickAt(ownOnScreen(), p.x, p.y, tx, ty, {
+        realmId: w.home.realmId,
+        size: mapSize,
+        residents: w.residents,
+        buildings: [...w.buildings, ...(w.lastSeen?.buildings ?? [])],
+        carriages: w.carriages,
+        horses: w.horses,
+      })
+    }
+
+    /**
+     * Outlines what a click under the hovering pointer would pick (`CONTEXT.md`: Picking on the
+     * map), in its relationship colour: the resident's token, each token of a stack, a building's
+     * footprint, a carriage's or horse's token, or else the tile. Nothing while a target is picked.
+     */
+    function drawHover(g: Graphics, view: Size) {
+      if (!pointer || pickingRef.current) return
+      const world = worldRef.current
+      const pick = pickUnder(pointer)
+      const own = relationshipColor('own')
+      const ring = (spots: Iterable<Spot | undefined>, color: number) => {
+        let any = false
+        for (const s of new Set(spots)) {
+          if (!s) continue
+          g.circle(s.x, s.y, s.r * 1.55)
+          any = true
+        }
+        // A stroke with nothing drawn since the last one paints the last one's shapes again.
+        if (any) g.fill({ color, alpha: HOVER_FILL }).stroke({ width: 2, color })
+      }
+      if (pick.kind !== 'tile') {
+        const ids = pick.kind === 'resident' ? [pick.id] : pick.ids
+        return ring(
+          ids.map((id) => drawnSpots.get(id)),
+          own,
+        )
+      }
+      const on = pick.on
+      if (on && on.kind !== 'building') return ring([drawnSpots.get(on.id)], own)
+      let [x, y, side, color] = [pick.x, pick.y, 1, GLYPH_COLOR]
+      if (on) {
+        const b = on.building
+        const cities = [...world.cities, ...(world.lastSeen?.cities ?? [])]
+        const city = cities.find((c) => c.id === b.cityId)
+        ;[x, y, side] = [b.x, b.y, FOOTPRINT[b.kind]]
+        color = relationshipColor(cityRelationship(city, viewerOf(world)))
+      }
+      const [sx, sy] = tileToScreen(cam, view, mapSize, x, y)
+      const out = Math.max(2, cam.scale * 0.08)
+      const w = side * cam.scale
+      g.roundRect(sx - out, sy - out, w + 2 * out, w + 2 * out, out)
+        .fill({ color, alpha: HOVER_FILL })
+        .stroke({ width: 2, color, join: 'round' })
     }
 
     function drawMiddle(g: Graphics, cam: Camera, view: Size, onScreen: number[]) {
@@ -550,6 +815,9 @@ export function MapView({
         const selected = world.residents.find((u) => u.id === id)
         if (selected) drawPath(g, cam, view, mapSize, selected, world.residents)
       }
+      // What the pick waiting for a tile would do under the pointer (`CONTEXT.md`: Picking a target).
+      if (previewRef.current) drawPickPreview(g, cam, view, mapSize, previewRef.current)
+      drawHover(g, view)
     }
 
     function setCam(next: Camera) {
@@ -582,6 +850,30 @@ export function MapView({
           : undefined,
         caravan: caravanAt(caravanParts(worldRef.current.caravans), worldRef.current, wx, wy),
       })
+      pointer = { x: sx, y: sy }
+      updateHover()
+      pointTo(pickingRef.current ? { x: wx, y: wy } : undefined)
+    }
+
+    // The tile last said to be under the hovering pointer while picking (`onPointerTile`).
+    let pointedAt = ''
+    function pointTo(tile: { x: number; y: number } | undefined) {
+      const key = tile ? `${tile.x},${tile.y}` : ''
+      if (key === pointedAt) return
+      pointedAt = key
+      onPointerTileRef.current?.(tile)
+    }
+
+    /** Redraws the hover outline when what a click under the pointer would pick changed. */
+    function updateHover() {
+      let key = ''
+      if (pointer && !pickingRef.current) {
+        key =
+          zoomTier(cam.scale) === 'far' ? `c:${cityUnder()?.id ?? ''}` : pickKey(pickUnder(pointer))
+      }
+      if (key === hoverKey) return
+      hoverKey = key
+      redraw()
     }
 
     // Pointer input: one pointer pans, two pinch-zoom; works for mouse, pen and touch alike. With
@@ -630,6 +922,9 @@ export function MapView({
         longPressed = false
       }
       pointers.set(e.pointerId, local(e))
+      // No hover outline while pressed: it comes back when the pointer next hovers.
+      pointer = undefined
+      updateHover()
       pressedAt = local(e)
       pressedTime = performance.now()
       dragged = 0
@@ -689,8 +984,8 @@ export function MapView({
         }
         return
       }
-      // A press that hardly moved is a click: while picking it picks the tile, otherwise it
-      // picks the own resident under it, or else the tile. A right-click always picks the tile.
+      // A press that hardly moved is a click: while picking it picks the tile, otherwise what the
+      // picking rule says is under it (`pickUnder`). A right-click always picks the tile.
       // A touch held still picks the tile when let go, should the long-press timer not have fired.
       const kind = pressKind(press(), longPresses(e.pointerType))
       if (wasPressed && e.type === 'pointerup' && pointers.size === 0 && kind === 'long-press') {
@@ -702,9 +997,10 @@ export function MapView({
           number,
           number,
         ]
-        if (pickingRef.current || e.button === 2) {
-          onPickTileRef.current?.(tx, ty)
-          return
+        if (e.button === 2) return onPickTileRef.current?.(tx, ty)
+        if (pickingRef.current) {
+          const [wx, wy] = [wrap(tx, mapSize), wrap(ty, mapSize)]
+          return onPickTileRef.current?.(wx, wy, { touch: e.pointerType === 'touch' })
         }
         // Far out, a click picks the city whose emblem it falls on.
         if (zoomTier(cam.scale) === 'far') {
@@ -715,14 +1011,18 @@ export function MapView({
           if (city) onSelectCityRef.current?.(city.id)
           return
         }
-        const id = pickableAt(ownOnScreen(), p.x, p.y)
+        const pick = pickUnder(p)
         const many = onSelectManyRef.current
-        // Shift-click adds an own resident to the selection or takes them out, and does nothing
-        // elsewhere. A plain click elsewhere picks the tile, which drops a group.
+        // Shift-click adds an own resident (or stack) to the selection or takes them out, and
+        // does nothing elsewhere. A plain click on a tile opens its card, which drops a group.
         if (e.shiftKey && many) {
-          if (id) many(toggled(selectedRef.current, id))
-        } else if (id) onSelectRef.current?.(id)
-        else onSelectTileRef.current?.(tx, ty)
+          if (pick.kind === 'resident') many(toggled(selectedRef.current, pick.id))
+          if (pick.kind === 'group') many(toggled(selectedRef.current, pick.ids))
+        } else if (pick.kind === 'resident') onSelectRef.current?.(pick.id)
+        else if (pick.kind === 'group') {
+          if (many) many(pick.ids)
+          else onSelectRef.current?.(pick.ids[0]!)
+        } else onSelectTileRef.current?.(pick.x, pick.y)
       }
     }
 
@@ -770,7 +1070,12 @@ export function MapView({
       app.canvas.addEventListener('pointerup', onUp)
       app.canvas.addEventListener('pointercancel', onUp)
       app.canvas.addEventListener('lostpointercapture', onUp)
-      app.canvas.addEventListener('pointerleave', () => setHover(null))
+      app.canvas.addEventListener('pointerleave', () => {
+        setHover(null)
+        pointTo(undefined)
+        pointer = undefined
+        updateHover()
+      })
       app.canvas.addEventListener('wheel', onWheel, { passive: false })
       app.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
       app.renderer.on('resize', () => {
@@ -778,8 +1083,10 @@ export function MapView({
         redraw()
       })
       app.stage.addChild(
+        waiting,
         terrainLayer.container,
         regionLayer,
+        borderLayer,
         under,
         tokens.container,
         overlay,
@@ -818,17 +1125,37 @@ export function MapView({
     }
   }, [mapSize])
 
+  const tier = zoomTier(scale)
+  const look = regionLook(tier, mode === 'region', admin)
+  const toggleLegend = (open: boolean) => {
+    setLegendOpen(open)
+    rememberLegendOpen(realmId, open)
+  }
+  const toggleMinimap = (open: boolean) => {
+    setMinimapOpen(open)
+    rememberMinimapOpen(open)
+  }
+  const minimapAt = (e: React.PointerEvent<HTMLCanvasElement>) =>
+    minimapAtRef.current(...minimapPoint(e))
+
   return (
     <div className="map-view">
       <div ref={hostRef} className="map" aria-label="World map" role="img" />
+      {/* On a phone zoom is pinch only: the zoom buttons hide and the rest sit in a row. */}
       <div className="map-buttons">
-        <button type="button" aria-label="Zoom in" onClick={() => controlsRef.current?.zoom(1.5)}>
+        <button
+          type="button"
+          className="zoom"
+          aria-label="Zoom in"
+          onClick={() => controlsRef.current?.zoom(1.5)}
+        >
           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
             <path d="M9 3v12M3 9h12" />
           </svg>
         </button>
         <button
           type="button"
+          className="zoom"
           aria-label="Zoom out"
           onClick={() => controlsRef.current?.zoom(1 / 1.5)}
         >
@@ -865,7 +1192,10 @@ export function MapView({
           type="button"
           aria-label={admin ? 'Territory' : 'Region map'}
           aria-pressed={mode === 'region'}
-          title={admin ? 'Territory' : 'Region map'}
+          title={
+            (admin ? 'Territory' : 'Region map') +
+            (mode === 'region' ? ': on at every zoom' : ': territory over the terrain')
+          }
           onClick={() => setMode(mode === 'region' ? 'terrain' : 'region')}
         >
           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
@@ -873,17 +1203,80 @@ export function MapView({
           </svg>
         </button>
       </div>
-      {mode === 'region' ? <RegionLegend region={world.region} /> : <Legend />}
-      <div className="map-readout">
-        {hover
-          ? `Tile ${hover.x}, ${hover.y} · ${hover.terrain}${hover.node ? ` · ${hover.node}` : ''}` +
-            (hover.caravan ? ' · Trade Org caravan' : '') +
-            (mode === 'region' && hover.holder ? ` · ${hover.holder}` : '')
-          : 'Tile –'}
-        {` · zoom ${Math.round((scale / START_SCALE) * 100)}%`}
+      {legendOpen ? (
+        <div className="map-legend-panel">
+          <button
+            type="button"
+            className="map-fold"
+            aria-label="Fold the legend"
+            onClick={() => toggleLegend(false)}
+          >
+            ×
+          </button>
+          {look === 'fill' ? <RegionLegend region={world.region} /> : <Legend />}
+        </div>
+      ) : (
+        <button type="button" className="map-legend-button" onClick={() => toggleLegend(true)}>
+          Legend
+        </button>
+      )}
+      <div className="map-corner">
+        {!admin &&
+          (minimapOpen ? (
+            <div className="minimap">
+              <canvas
+                ref={minimapRef}
+                aria-label="Minimap: click to centre the map there"
+                style={{ width: MINIMAP_SIDE, height: MINIMAP_SIDE }}
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  minimapAt(e)
+                }}
+                onPointerMove={(e) => {
+                  if (e.currentTarget.hasPointerCapture(e.pointerId)) minimapAt(e)
+                }}
+              />
+              <button
+                type="button"
+                className="map-fold"
+                aria-label="Fold the minimap"
+                onClick={() => toggleMinimap(false)}
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="minimap-button" onClick={() => toggleMinimap(true)}>
+              Minimap
+            </button>
+          ))}
+        {loading ? (
+          <div className="map-readout" role="status">
+            Loading the map…
+          </div>
+        ) : (
+          <div className="map-readout">{readoutText(hover, tier, look !== 'none')}</div>
+        )}
       </div>
     </div>
   )
+}
+
+/** A spot on the minimap pressed or dragged over, as pixels from its top left corner. */
+function minimapPoint(e: React.PointerEvent<HTMLCanvasElement>): [number, number] {
+  const box = e.currentTarget.getBoundingClientRect()
+  return [
+    ((e.clientX - box.left) / box.width) * MINIMAP_SIDE,
+    ((e.clientY - box.top) / box.height) * MINIMAP_SIDE,
+  ]
+}
+
+/** Dot radii on the minimap, in CSS pixels. */
+const MINIMAP_DOT_RADIUS: Record<MinimapDot['kind'], number> = {
+  resident: 1.5,
+  carriage: 2.5,
+  city: 3,
+  home: 4.5,
 }
 
 function Legend() {

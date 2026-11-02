@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   BUILDABLE,
+  CARRYING_A_CHILD,
   CHILD_GOODS,
   SHARES_A_TILE,
   GOODS,
@@ -19,6 +20,7 @@ import {
   RECIPES,
   STABLE_BREED_TICKS,
   STABLE_CAPACITY,
+  STABLE_FEED_DAYS,
   breedersAt,
   keptBreeding,
   teacherAt,
@@ -159,8 +161,8 @@ export const ACTION_KEYS: Record<ActionId, string> = {
  * One row of actions on the card. An action either acts at once (or starts picking a tile on the
  * map) or `opens` a panel below the rows with what it needs: goods, a partner, a target, a script.
  */
-export interface CardAction {
-  id: ActionId
+export interface CardAction<Id extends string = ActionId> {
+  id: Id
   label: string
   key: string
   opens?: true
@@ -244,6 +246,17 @@ export function isWorkable(building: Building | undefined, node: KnownNode | und
  * Goods with nothing carried and nothing on their tile to pick up (for a child: no Food).
  */
 export function residentActions(h: ResidentHere): CardAction[] {
+  return residentOrders(h).actions
+}
+
+/**
+ * The actions a resident's card offers (`residentActions`), and why each order left out can't be
+ * given now: the reason its row shows greyed while the card stays open (ADR 0019).
+ */
+export function residentOrders(h: ResidentHere): {
+  actions: CardAction[]
+  missing: Partial<Record<ActionId, string>>
+} {
   const row = (id: ActionId, label: string, more: Partial<CardAction> = {}): CardAction => ({
     id,
     label,
@@ -259,10 +272,14 @@ export function residentActions(h: ResidentHere): CardAction[] {
       : { label }
   // Working, building, tearing down, hauling and pairing (`CONTEXT.md`: Child, Carrying).
   const works = h.adult && !h.carrying
+  const unfit = (doing: string) => (!h.adult ? `children can’t ${doing}` : CARRYING_A_CHILD)
   const actions: CardAction[] = []
+  const missing: Partial<Record<ActionId, string>> = {}
   const add = (a: CardAction) => actions.push(a)
+  const miss = (id: ActionId, why: string) => (missing[id] ??= why)
   add(row('walk', '', picks('walk', 'Walk to')))
   if (h.busy) add(row('stop', 'Stop'))
+  else miss('stop', 'nothing to stop')
   // Children and homeless residents too (`CONTEXT.md`: Relocate).
   if (h.relocate) {
     const { problem } = h.relocate
@@ -271,6 +288,7 @@ export function residentActions(h: ResidentHere): CardAction[] {
   }
   if (h.riding) add(row('ride', 'Dismount'))
   else if (h.horseToRide) add(row('ride', 'Mount horse'))
+  else miss('ride', 'no free horse here')
   // Children ride along too; a rider gets off their horse first, and the driver stays the driver
   // (`CONTEXT.md`: Passenger).
   if (h.aboard) add(row('board', 'Get off'))
@@ -278,8 +296,9 @@ export function residentActions(h: ResidentHere): CardAction[] {
     const reason = h.driving ? 'the driver can’t board' : h.riding ? 'dismount first to board' : ''
     const refused = reason ? { disabled: true as const, reason } : {}
     add(row('board', 'Board carriage', refused))
-  }
+  } else miss('board', 'no carriage of yours here')
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
+  else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
   if (h.carriage && h.adult) {
     // A rider doesn't drive (`CONTEXT.md`: Riding).
     const riding = h.riding ? { disabled: true as const, reason: 'dismount first to drive' } : {}
@@ -287,7 +306,10 @@ export function residentActions(h: ResidentHere): CardAction[] {
     if (!h.carrying) {
       const label = h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…'
       add(row('haul', label, { opens: true }))
-    }
+    } else miss('haul', CARRYING_A_CHILD)
+  } else {
+    miss('drive', h.carriage ? 'children can’t drive' : 'no carriage here')
+    miss('haul', h.carriage ? 'children can’t drive' : 'no carriage here')
   }
   if (works && isWorkable(h.building, h.node)) {
     add(
@@ -295,15 +317,18 @@ export function residentActions(h: ResidentHere): CardAction[] {
         opens: true,
       }),
     )
-  }
+  } else miss('work', works ? 'not on a workplace' : unfit('work'))
+  const stable = h.building?.kind === 'stable' && !h.building.site
   // A finished stable: keep Food in it for its horses (`CONTEXT.md`: Feeding the stable).
-  if (h.adult && h.building?.kind === 'stable' && !h.building.site) {
-    add(row('feedStable', 'Feed the stable'))
-  }
+  if (h.adult && stable) add(row('feedStable', 'Feed the stable'))
+  else miss('feedStable', h.adult ? 'not in a stable' : 'children can’t work')
   // A finished training ground: teach a subject there, or train (`CONTEXT.md`: Teacher, Trainee).
   if (h.adult && h.building?.kind === 'trainingGround' && !h.building.site) {
     add(row('teach', 'Teach…', { opens: true }))
     add(row('train', 'Train'))
+  } else {
+    miss('teach', h.adult ? 'not on a training ground' : 'children can’t teach')
+    miss('train', h.adult ? 'not on a training ground' : 'children can’t train')
   }
   if (works) {
     const site = h.building?.site
@@ -318,15 +343,22 @@ export function residentActions(h: ResidentHere): CardAction[] {
     add(row('wallTo', '', picksLine('wallFrom', 'wallTo', 'Build line: wall')))
     const torn = [h.building, h.carriageSite, h.road].filter((b) => b && BUILDABLE.includes(b.kind))
     if (torn.length > 0) add(row('tearDown', 'Tear down…', { opens: true }))
-    if (h.building?.kind === 'stable' && !h.building.site)
-      add(row('breed', 'Breed horses…', { opens: true }))
+    else miss('tearDown', 'nothing to tear down here')
+    if (stable) add(row('breed', 'Breed horses…', { opens: true }))
+    else miss('breed', 'not in a stable')
+  } else {
+    for (const id of ['build', 'roadTo', 'wallTo', 'tearDown'] as const) miss(id, unfit('build'))
+    miss('breed', unfit('breed horses'))
   }
   if (h.carries || goodsOnTile(h, h.adult ? GOODS : CHILD_GOODS)) {
     add(row('goods', 'Goods…', { opens: true }))
-  }
+  } else miss('goods', 'nothing carried or here to pick up')
   if (works && h.inCity) add(row('pair', 'Pair…', { opens: true }))
+  else miss('pair', works ? 'homeless' : unfit('pair'))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
+  else miss('attack', 'nobody in sight to attack')
   if (h.wallsInSight > 0) add(row('walls', 'Break or climb a wall…', { opens: true }))
+  else miss('walls', 'no wall in sight')
   add(row('script', 'Run script…', { opens: true }))
   if (h.makeLeader) {
     const { problem } = h.makeLeader
@@ -338,7 +370,7 @@ export function residentActions(h: ResidentHere): CardAction[] {
     )
   }
   if (h.renamable) add(row('rename', 'Rename…', { opens: true }))
-  return actions
+  return { actions, missing }
 }
 
 /**
@@ -392,17 +424,73 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   script: 'scripts',
 }
 
+/** The kind a resident's order is grouped under on the Orders tab. */
+export const orderGroupOf = (id: ActionId): OrderGroup => ORDER_GROUP[id] ?? 'other'
+
+/** A card's rows as a fresh card shows them: by kind in the kinds' order, as listed within each. */
+export function sortRows<Id extends string>(
+  rows: readonly CardAction<Id>[],
+  groupOf: (id: Id) => OrderGroup,
+): CardAction<Id>[] {
+  const kinds = Object.keys(ORDER_GROUP_LABELS)
+  const rank = (a: CardAction<Id>) => kinds.indexOf(groupOf(a.id))
+  return [...rows].sort((a, b) => rank(a) - rank(b))
+}
+
+/**
+ * A card's rows by kind for the Orders tab, each kind where its first row is, so a kind that
+ * comes up while the card is open goes below the others.
+ */
+export function rowGroups<Id extends string>(
+  rows: readonly CardAction<Id>[],
+  groupOf: (id: Id) => OrderGroup,
+): { group: OrderGroup; label: string; actions: CardAction<Id>[] }[] {
+  const groups: { group: OrderGroup; label: string; actions: CardAction<Id>[] }[] = []
+  for (const a of rows) {
+    const group = groupOf(a.id)
+    let g = groups.find((x) => x.group === group)
+    if (!g) groups.push((g = { group, label: ORDER_GROUP_LABELS[group], actions: [] }))
+    g.actions.push(a)
+  }
+  return groups
+}
+
 /** A resident's actions by kind for the Orders tab, in the kinds' order, empty kinds left out. */
 export function groupOrders(
   actions: CardAction[],
 ): { group: OrderGroup; label: string; actions: CardAction[] }[] {
-  return (Object.keys(ORDER_GROUP_LABELS) as OrderGroup[])
-    .map((group) => ({
-      group,
-      label: ORDER_GROUP_LABELS[group],
-      actions: actions.filter((a) => (ORDER_GROUP[a.id] ?? 'other') === group),
-    }))
-    .filter((g) => g.actions.length > 0)
+  return rowGroups(sortRows(actions, orderGroupOf), orderGroupOf)
+}
+
+/**
+ * The rows a card shows while it stays open (ADR 0019), from the rows it showed last (`kept`,
+ * none when something else was just picked) and the orders it offers now (`fresh`). Each row
+ * keeps its slot: an order no longer offered stays, greyed, with why (`missing`); a newly
+ * offered one goes at the end of its kind, a new kind below the others. With nothing kept the
+ * rows are sorted afresh (`sortRows`).
+ */
+export function keepRows<Id extends string>(
+  kept: readonly CardAction<Id>[] | undefined,
+  fresh: readonly CardAction<Id>[],
+  missing: Partial<Record<Id, string>>,
+  groupOf: (id: Id) => OrderGroup,
+): CardAction<Id>[] {
+  if (!kept) return sortRows(fresh, groupOf)
+  const rows = kept.map((k): CardAction<Id> => {
+    const now = fresh.find((a) => a.id === k.id)
+    if (now) return now
+    const was = { ...k, disabled: true as const, reason: missing[k.id] ?? 'not now' }
+    // No longer waiting for a tile: the order can't be given.
+    delete was.active
+    return was
+  })
+  for (const a of fresh) {
+    if (rows.some((r) => r.id === a.id)) continue
+    const group = groupOf(a.id)
+    const last = rows.findLastIndex((r) => groupOf(r.id) === group)
+    rows.splice(last < 0 ? rows.length : last + 1, 0, a)
+  }
+  return rows
 }
 
 /** What the Player knows that the handover check needs: their diplomacy and what is in sight. */
@@ -567,7 +655,58 @@ export interface TileCard {
    * unhitch the horse (`unhitchProblem`), when there are any (`CONTEXT.md`: Hitched horse).
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
+  /**
+   * Who and what the tile holds, as rows under the card's lines: the horses in a stable or on the
+   * tile, a workplace's workers, the goods in a storage.
+   */
+  lists?: CardList[]
+  /**
+   * How long the Food in a stable lasts the horses standing in it, a meter full at the days of Food
+   * the Feed the stable task keeps there (`CONTEXT.md`: Feeding the stable).
+   */
+  stableFood?: { units: number; share: number; lasts: string }
 }
+
+/** A list of rows on the tile card (`TileCard.lists`), its head with a count on the right. */
+export interface CardList {
+  title: string
+  /** On the right of the title: "2 · 1 hungry", "7 / 10". */
+  count: string
+  /** What shows with no rows. */
+  empty?: string
+  /** The meters each row has, by name, as the resident card shows them: Health, Hunger. */
+  meters: readonly string[]
+  rows: CardRow[]
+}
+
+/** One row of a `CardList`: a horse, a worker or a good. */
+export interface CardRow {
+  id: string
+  name: string
+  /** Under the name: a horse's stats and age, whose a worker is. */
+  detail?: string
+  /** How much of a good. */
+  amount?: number
+  /**
+   * Each of the list's meters filled to this share, undefined where the Player doesn't know how
+   * they fare (`CONTEXT.md`: Seeing how someone fares).
+   */
+  shares?: number[]
+  /**
+   * What a click on the row opens: the card of one of the Player's residents, or one of their
+   * horses in the Horses drawer.
+   */
+  opens?: 'resident' | 'horse'
+}
+
+/** The meters a horse's or a resident's row has, as the Horses drawer and the resident card. */
+const FARES_METERS = ['Health', 'Hunger'] as const
+
+/** The meters' shares for someone whose health and hunger the Player knows. */
+const faresShares = (x: { health?: number; hunger?: number }) =>
+  x.health === undefined || x.hunger === undefined
+    ? undefined
+    : [x.health / MAX_HEALTH, x.hunger / MAX_HUNGER]
 
 /** What the Player sees on a tile, for the tile card. */
 export interface TileThings {
@@ -739,14 +878,19 @@ export function horseAgeText(h: SeenHorse, tick: number): string {
  * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
  */
 export function horseDetail(h: SeenHorse, tick: number | undefined): string {
-  const { speed, strength, endurance } = h.stats
-  const parts = [`Speed ${speed}, Strength ${strength}, Endurance ${endurance}`]
-  if (tick !== undefined) parts.push(horseAgeText(h, tick))
+  const parts = [horseStatsText(h, tick)]
   if (horseFaresKnown(h)) {
     const fares = horseFares(h)
     parts.push(`${fares.hunger}, ${fares.health}`)
   }
   return parts.join(' · ')
+}
+
+/** A horse's stats and age: "Speed 12, Strength 8, Endurance 10 · 5 years old". */
+function horseStatsText(h: SeenHorse, tick: number | undefined): string {
+  const { speed, strength, endurance } = h.stats
+  const stats = `Speed ${speed}, Strength ${strength}, Endurance ${endurance}`
+  return tick === undefined ? stats : `${stats} · ${horseAgeText(h, tick)}`
 }
 
 /**
@@ -765,31 +909,110 @@ export function riddenHorseLine(
 }
 
 /**
- * Lines for horses standing together, one per owner: "2 horses (yours) · 1 hungry", then one for
- * each of them (`horseDetail`). How they fare only for those the Player knows it of (`CONTEXT.md`:
- * Seeing how someone fares).
+ * Lists for horses standing together, one per owner: "Horses (yours)" with "2 · 1 hungry" on the
+ * right, then a row for each with its stats and age (`horseStatsText`) and its health and hunger
+ * meters where the Player knows how it fares (`CONTEXT.md`: Seeing how someone fares). A click on
+ * one of the Player's own opens it in the Horses drawer.
  */
-function horseLines(
+function horseLists(
   horses: SeenHorse[],
   rel: (h: SeenHorse) => Relationship | undefined,
   tick: number | undefined,
-): string[] {
+): CardList[] {
   const groups = new Map<string, SeenHorse[]>()
   for (const h of horses) {
     const key = `${h.realmId}/${h.cityId}`
     groups.set(key, [...(groups.get(key) ?? []), h])
   }
-  return [...groups.values()].flatMap((group) => {
+  return [...groups.values()].map((group) => {
     const r = rel(group[0]!)
     const owner = r ? RELATIONSHIP_NAMES[r].toLowerCase() : 'nobody’s'
-    const parts = [`${group.length} ${group.length === 1 ? 'horse' : 'horses'} (${owner})`]
+    const parts = [`${group.length}`]
     const known = group.filter(horseFaresKnown).map(horseFares)
     const hungry = known.filter((f) => f.hunger !== 'fed').length
     const hurt = known.filter((f) => f.health === 'hurt').length
     if (hungry > 0) parts.push(`${hungry} hungry`)
     if (hurt > 0) parts.push(`${hurt} hurt`)
-    return [parts.join(' · '), ...group.map((h) => `· ${h.name} · ${horseDetail(h, tick)}`)]
+    return {
+      title: `${group.length === 1 ? 'Horse' : 'Horses'} (${owner})`,
+      count: parts.join(' · '),
+      meters: FARES_METERS,
+      rows: group.map((h) => {
+        const shares = faresShares(h)
+        return {
+          id: h.id,
+          name: h.name,
+          detail: horseStatsText(h, tick),
+          ...(shares ? { shares } : {}),
+          ...(r === 'own' ? { opens: 'horse' as const } : {}),
+        }
+      }),
+    }
   })
+}
+
+/**
+ * A workplace's workers in sight (`CONTEXT.md`: Workplace): "Workers" with "7 / 10" on the right,
+ * then a row for each with their health and hunger where the Player knows them. A click on one of
+ * the Player's own opens their card.
+ */
+function workerList(b: Building, max: number, t: TileThings): CardList {
+  const working = (t.residents ?? []).filter(
+    (r) => r.order?.kind === 'workAt' && r.order.buildingId === b.id,
+  )
+  return {
+    title: 'Workers',
+    count: `${t.workers(b)} / ${max}`,
+    empty: 'Nobody works here',
+    meters: FARES_METERS,
+    rows: working.map((r) => {
+      const stranger = t.strangers.some((s) => s.id === r.id)
+      const rel = stranger ? realmRelationship(r.owner, r.cityId, t.cities, t.viewer) : 'own'
+      const shares = faresShares(r)
+      return {
+        id: r.id,
+        name: r.name,
+        ...(stranger ? { detail: rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s' } : {}),
+        ...(shares ? { shares } : {}),
+        ...(stranger ? {} : { opens: 'resident' as const }),
+      }
+    }),
+  }
+}
+
+/** A storage's goods, one row each as the Goods panel lists them, and what they weigh. */
+function goodsList(stock: Stock, labels: Record<string, string>): CardList {
+  return {
+    title: 'Goods',
+    count: `${Math.round(stockWeight(stock))} kg`,
+    empty: 'Nothing in it',
+    meters: [],
+    rows: GOODS.filter((g) => (stock[g] ?? 0) > 0).map((g) => ({
+      id: g,
+      name: labels[g]!,
+      amount: stock[g]!,
+    })),
+  }
+}
+
+/**
+ * How long a stable's Food lasts the horses standing in it (`CONTEXT.md`: Feeding the stable):
+ * "about 6 game days for its horses", a meter full at `STABLE_FEED_DAYS`.
+ */
+export function stableFoodMeter(
+  food: number,
+  horses: readonly SeenHorse[],
+): NonNullable<TileCard['stableFood']> {
+  const perDay = horses.reduce((n, h) => n + HORSE_FOOD_PER_DAY * horseFoodFactor(h), 0)
+  if (perDay <= 0) return { units: food, share: food > 0 ? 1 : 0, lasts: 'no horses in it to feed' }
+  const days = Math.floor(food / perDay + 1e-9)
+  const lasts =
+    days < 1 ? 'less than a game day' : `about ${days} game ${days === 1 ? 'day' : 'days'}`
+  return {
+    units: food,
+    share: Math.min(1, food / perDay / STABLE_FEED_DAYS),
+    lasts: `${lasts} for its horses`,
+  }
 }
 
 /**
@@ -861,6 +1084,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     .filter((h) => h.realmId !== null && h.realmId === t.viewer.realmId)
     .map(({ id, name }) => ({ id, name }))
   const lines: string[] = []
+  const lists: CardList[] = []
+  let stableFood: TileCard['stableFood']
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
   let passengers: TileCard['passengers']
@@ -890,7 +1115,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       lines.push(stillNeeded(building, goodLabels))
     } else {
       const max = MAX_WORKERS[building.kind]
-      if (max !== undefined && live) lines.push(`${t.workers(live)} / ${max} workers`)
+      if (max !== undefined && live) lists.push(workerList(live, max, t))
       // A house's room (`CONTEXT.md`: House), and how its city is housed where the Player may know.
       const room = HOUSING_ROOM[building.kind]
       if (room !== undefined) {
@@ -900,11 +1125,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         )
       }
       if (stable) {
-        lines.push(
-          ...(horsesHere.length > 0
-            ? horseLines(horsesHere, horseRel, t.tick)
-            : ['No horses in it']),
-        )
+        if (horsesHere.length === 0) lines.push('No horses in it')
+        lists.push(...horseLists(horsesHere, horseRel, t.tick))
         lines.push(`Room for ${Math.max(0, STABLE_CAPACITY - horsesHere.length)} more horses`)
       }
       const makes = live && makesLine(live, t, pile, goodLabels)
@@ -912,7 +1134,13 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       // A finished training ground teaches what its teacher set, and nothing while nobody
       // teaches there (`CONTEXT.md`: Training ground, Teacher).
       if (building.kind === 'trainingGround') lines.push(...trainingLines(building, t))
-      if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
+      // What is inside a building in sight as rows, a stable's Food as a meter; as last seen, a line.
+      if (building.stock && !live) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
+      else if (building.stock && stable) {
+        stableFood = stableFoodMeter(building.stock.food ?? 0, horsesHere)
+        const rest: Stock = { ...building.stock, food: 0 }
+        if (GOODS.some((g) => (rest[g] ?? 0) > 0)) lists.push(goodsList(rest, goodLabels))
+      } else if (building.stock) lists.push(goodsList(building.stock, goodLabels))
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
@@ -1040,7 +1268,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       rel: horseRel(horsesHere[0]!),
       what: 'horses',
     }
-    lines.push(...horseLines(horsesHere, horseRel, t.tick))
+    lists.push(...horseLists(horsesHere, horseRel, t.tick))
   }
   const terrain = terrainLine(t.terrain, road)
   if (road) {
@@ -1059,6 +1287,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(passengers ? { passengers } : {}),
     ...(unhitch ? { unhitch } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
+    ...(lists.length > 0 ? { lists } : {}),
+    ...(stableFood ? { stableFood } : {}),
   }
 }
 
@@ -1328,7 +1558,24 @@ export function unhitcherOf(card: TileCard, actor: { id: string } | undefined): 
  * The action a key press runs, if one of the shown actions has that key and can run. Keys typed
  * into a field never run actions.
  */
-export function actionForKey(actions: CardAction[], key: string): CardAction | undefined {
+export function actionForKey<Id extends string>(
+  actions: readonly CardAction<Id>[],
+  key: string,
+): CardAction<Id> | undefined {
   const k = key.toUpperCase()
   return actions.find((a) => a.key === k && !a.disabled)
+}
+
+/**
+ * What Escape leaves, top-most first (`CONTEXT.md`: Picking a target): pick mode, an open panel
+ * on the card (an order's, or the form before a script starts), the tile card, the resident or
+ * group card, then the drawer.
+ */
+export type EscapeStep = 'pick' | 'panel' | 'tile' | 'card' | 'drawer'
+
+const ESCAPE_ORDER: readonly EscapeStep[] = ['pick', 'panel', 'tile', 'card', 'drawer']
+
+/** The top-most of what is open, which Escape leaves; undefined with nothing open. */
+export function escapeStep(open: Partial<Record<EscapeStep, boolean>>): EscapeStep | undefined {
+  return ESCAPE_ORDER.find((s) => open[s])
 }

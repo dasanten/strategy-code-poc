@@ -248,7 +248,7 @@ import {
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
 import { DEFAULT_REPEAT } from './plan-blocks.js'
-import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import { PARAM_COMMENT_EXAMPLE, PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
@@ -444,7 +444,26 @@ export function Wiki() {
       <Section id="controls">
         <p>
           Click one of your residents on the map to pick them and open their card. Each action on
-          the card shows its letter key; press it to run the action. Escape drops what is picked.
+          the card shows its letter key; press it to run the action. The card opens with the orders
+          they can take. While it stays open, each row stays where it is: an order that stops being
+          possible (they walk off the farm they worked) stays in its place, greyed out, saying why,
+          and one that becomes possible is added at the end of its group. The rows are sorted afresh
+          once you pick something else. A group’s card has the same rows and keys.
+        </p>
+        <p>
+          Escape leaves the top-most thing first: picking a target on the map, then a panel open on
+          the card (Build, Goods, Run script, …), then a tile’s card, then the resident’s or group’s
+          card, then the open drawer.
+        </p>
+        <p>
+          What a click picks on a tile goes in this order, at every zoom: one of your residents
+          there, then a building, then the bare tile, each showing its card. A carriage of yours, or
+          a horse of yours nobody rides, counts like a building. A click on a stack of your
+          residents (a token with a count, or the +N badge up close) picks them all as a group; its
+          card’s Members tab picks one of them. A stack with someone else’s residents in it opens
+          the tile card instead, which lists them all. With a mouse, what a click would pick is
+          outlined while you hover over it, in its owner’s colour; on a touch screen a tap picks by
+          the same order.
         </p>
         <p>
           The card and the residents list say what each resident is doing. Walking, riding or
@@ -474,15 +493,44 @@ export function Wiki() {
           of a haul). Only places you can see or remember are outlined.
         </p>
         <p>
+          An order that needs a place (walk to, drive to, a road or wall line, where to build, the
+          storage to store at) shrinks the card to its header and a banner says what to pick. Where
+          the card was stays dead until you pick, so a click there gives no order by accident.
+          Before you click, the map shows under the pointer what the pick would do: the way there,
+          with about when they arrive; the line of a road or wall and how many tiles it has, red
+          when it is too long; a workplace’s footprint on a resource node, red where it doesn’t fit,
+          or the site they would join; or the building a Store, Fetch or Work would use. The banner
+          names what is under the pointer. Escape or Cancel gives no order.
+        </p>
+        <p>
           On a touch screen one finger pans the map, two fingers pinch to zoom, and a tap picks. A
           long-press does what right-click does. Turn on Select to make a one-finger drag box a
-          group instead of panning.
+          group instead of panning. While picking a place, the first tap shows the preview there and
+          the banner gains Confirm: press it, or tap the same tile again, to give the order; a tap
+          elsewhere moves the preview.
+        </p>
+        <p>
+          The map has three zoom tiers: far shows terrain, territory and one emblem per city; middle
+          adds buildings, nodes and residents; close shows each figure. Far out territory is filled
+          in its owner’s colour, nearer in only its borders are drawn; the Region map button fills
+          it at every zoom. The readout bottom right names the terrain, the tile and the tier under
+          the pointer. Above it the minimap shows the terrain you explored, your cities, your
+          residents and carriages away from them, and the cities you know, with the part on screen
+          as a rectangle; click it to look there. The minimap and the legend fold to buttons, and
+          your browser remembers how you left them.
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
           header, half the screen or all of it; a tap on the handle goes one step up. While an order
           waits for a target the card drops to its header. The menu button at the top left opens the
-          drawers, your goods, the wiki and Log out.
+          drawers, your goods, the wiki and Log out. The map’s buttons (Centre, Select, Region map)
+          sit in one row at the bottom left, just above the card; zoom by pinching. The Residents
+          and Horses drawers show each one in two lines: name and age, then what they are doing (or
+          where the horse is) with their meters.
+        </p>
+        <p>
+          Terrain you have explored loads as you look at it. Until it is here it shows grey, and the
+          line at the bottom right says “Loading the map…”; dark is terrain you haven’t explored.
         </p>
         <table>
           <thead>
@@ -519,7 +567,9 @@ export function Wiki() {
           With several picked, the group card gives each of them the same order, just as their own
           cards would. Every order a resident's card has is on it, but pairing, making Leader and
           renaming, which are about one resident. Nothing ties them together afterwards; each goes
-          on alone.
+          on alone. The card shows the orders some of them can take where they stand, as rows with
+          the same keys as on a resident's card; while it stays open, an order none of them can take
+          any more stays greyed out, saying why (“nobody stands on a carriage of your realm”).
         </p>
         <ul>
           <li>
@@ -561,17 +611,17 @@ export function Wiki() {
             all to attack. <strong>Climb a wall</strong>: those next to the one picked climb over.
           </li>
           <li>
-            <strong>Board carriage</strong> (one for each carriage of your realm some of them stand
-            on) puts those on its tile aboard, in the group's order, until it is full;{' '}
+            <strong>Board carriage</strong> (with several carriages of your realm where some of them
+            stand, pick one) puts those on its tile aboard, in the group's order, until it is full;{' '}
             <strong>Get off</strong> gets every passenger among them off. See Passengers.
           </li>
         </ul>
         <p>
-          Those who can't take an order are skipped, and the card says who and why: children don't
-          work, build or drive, and store, fetch or put down only Food; a partner carrying a child
-          doesn't work, build, tear down, breed or haul; orders bound to a place go only to those
-          standing there; Board skips those not on the carriage's tile, the driver, riders and, once
-          it is full, the rest.
+          Those who can't take an order are skipped, and a notice under the top bar says who and
+          why: children don't work, build or drive, and store, fetch or put down only Food; a
+          partner carrying a child doesn't work, build, tear down, breed or haul; orders bound to a
+          place go only to those standing there; Board skips those not on the carriage's tile, the
+          driver, riders and, once it is full, the rest.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
@@ -787,6 +837,15 @@ export function Wiki() {
           {num(LIFESPAN_MAX)}. A house holds {num(HOUSING_ROOM.house ?? 0)} residents (a site holds
           nobody yet), and a city's free housing is the room of its houses minus its residents.
           Health runs up to {num(MAX_HEALTH)}.
+        </p>
+        <p>
+          <b>Names.</b> A name the game gives a resident, in a starting city, at birth or when they
+          join your realm, is one no living resident of that realm has (an NPC city counts as a
+          realm of its own); a name it gives a city is one no city in the world has. Once its list
+          of names runs dry it adds a numeral, as in “Edda II”. Renaming is free: you can rename any
+          resident or city of your realm, and your names may repeat. Names from before this rule
+          stay as they were, so where a list holds two residents of one name it adds their age,
+          and their city when they live in different ones.
         </p>
         <p>
           A resident lives in one city, wherever they stand. One who lives in none is{' '}
@@ -1108,8 +1167,8 @@ export function Wiki() {
           before it, since the builder walks to the line, and it ends on its own, so it needs no
           duration; a saved queue or a copied step keeps both tiles. Build line has Build's params;
           its line comes only from the order, so run directly or with Run script it ends at once
-          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code>{' '}
-          actions, which build only with what the resident carries, stay for your scripts.
+          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code> actions,
+          which build only with what the resident carries, stay for your scripts.
         </p>
         <p>
           <strong>A crew on one line:</strong> residents on the same line, from the group card or
@@ -1357,11 +1416,11 @@ export function Wiki() {
         </p>
         <p>
           The group card boards everyone of the group standing on the carriage at once, until it is
-          full, and says who was skipped and why; its Get off gets them all off. Board and Get off
-          are queue steps too: Board ends once they are aboard and Get off once they are off, so put
-          a step that waits for the stop between them (a script that calls <code>end()</code> once
-          they are there), e.g. board, wait, get off, work. A Board step whose carriage has left
-          their tile by its turn is skipped.
+          full, and a notice says who was skipped and why; its Get off gets them all off. Board and
+          Get off are queue steps too: Board ends once they are aboard and Get off once they are
+          off, so put a step that waits for the stop between them (a script that calls{' '}
+          <code>end()</code> once they are there), e.g. board, wait, get off, work. A Board step
+          whose carriage has left their tile by its turn is skipped.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}
@@ -1809,6 +1868,11 @@ export function Wiki() {
           most {num(TERRITORY_MAX_REACH)} tiles, fading with distance; where two overlap, the
           stronger wins.
         </p>
+        <p>
+          The Region map shows territory over all the terrain you explored, one colour per
+          Organization (an alliance’s members share one). Zoomed far out it is filled in; at the
+          middle and close zoom only its borders show, unless the Region map button is on.
+        </p>
         <table>
           <thead>
             <tr>
@@ -1971,6 +2035,16 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
             number of zero or more and press Enter. Neither stops the script.
+          </li>
+          <li>
+            The comment at the end of a <code>param</code> line is what the card shows: what the
+            param is for, and after <code>none:</code> what the script uses while none is picked.
+            Each field says the value the script uses: the one picked, else a <code>number</code>{' '}
+            param's default, a default script's target the one on their tile, or what the comment
+            says after <code>none:</code>.
+            <pre>
+              <code>{PARAM_COMMENT_EXAMPLE}</code>
+            </pre>
           </li>
           <li>
             A group's card sets a <code>number</code> param for each of them running a script with
