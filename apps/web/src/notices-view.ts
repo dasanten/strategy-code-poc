@@ -1,3 +1,4 @@
+import { FIRST_DAY_LINES, type FirstDay, type FirstDayLine } from '@csp/shared'
 import { isWide, type OpenDrawer } from './hud-view.js'
 
 /**
@@ -5,7 +6,7 @@ import { isWide, type OpenDrawer } from './hud-view.js'
  * banner, in the order they stack. Lasting ones come first and passing ones after, so a notice
  * that comes and goes never moves a button the Player is aiming at.
  */
-export const NOTICE_ORDER = ['horseOffer', 'groupReport'] as const
+export const NOTICE_ORDER = ['horseOffer', 'firstDay', 'groupReport'] as const
 
 /** A notice in the lane: the pick banner or one of `NOTICE_ORDER`. */
 export type NoticeKind = 'pick' | (typeof NOTICE_ORDER)[number]
@@ -63,4 +64,33 @@ export function skippedByWhy(skipped: readonly { name: string; why: string }[]):
   const byWhy = new Map<string, string[]>()
   for (const s of skipped) byWhy.set(s.why, [...(byWhy.get(s.why) ?? []), s.name])
   return [...byWhy].map(([why, names]) => ({ names, why }))
+}
+
+/** What each line of the first-day card says (`CONTEXT.md`: First day). */
+export const FIRST_DAY_LABELS: Record<FirstDayLine, string> = {
+  claimHorses: 'Claim the Horse offer',
+  pickResident: 'Pick a resident',
+  giveOrder: 'Give them an order',
+  openWiki: 'Open the Wiki',
+}
+
+/**
+ * The first-day card's lines in its order, each ticked or not, and the first one not ticked yet,
+ * which a phone shows alone.
+ */
+export function firstDayView(card: FirstDay): {
+  lines: { line: FirstDayLine; label: string; done: boolean }[]
+  next: FirstDayLine | undefined
+  ticked: number
+} {
+  const lines = FIRST_DAY_LINES.map((line) => ({
+    line,
+    label: FIRST_DAY_LABELS[line],
+    done: card.done.includes(line),
+  }))
+  return {
+    lines,
+    next: lines.find((l) => !l.done)?.line,
+    ticked: lines.filter((l) => l.done).length,
+  }
 }

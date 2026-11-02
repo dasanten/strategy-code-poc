@@ -17,6 +17,7 @@ import { buildApp } from './app.js'
 import { createAdmin, createInviteCode, createSession, signUp } from './auth.js'
 import { recordEvent } from './events.js'
 import { ExploredTerrain } from './explored.js'
+import { dismissFirstDay } from './first-day.js'
 import type { InvariantViolation } from './invariants.js'
 import { openDb, schema, type Db } from './db/index.js'
 import { OrderQueue, orderKinds, type OrderKind } from './orders.js'
@@ -853,6 +854,59 @@ describe('realtime', () => {
     expect(await next('tick')).not.toHaveProperty('horseOffer')
     const again = connect(url, token)
     expect(await again.next('welcome')).toMatchObject({ horseOffer: false })
+  })
+
+  it('ticks the first-day card as the Player claims their horses and gives an order, in every tab', async () => {
+    // The test's order queue has no map to place horses on: any claim is taken here.
+    const claimHorses: OrderKind = { validate: () => undefined, apply() {} }
+    const { url, token, world, userId } = await start({ kinds: { ...orderKinds, claimHorses } })
+    const first = connect(url, token)
+    expect(await first.next('welcome')).toMatchObject({ firstDay: { done: [], dismissed: false } })
+    const second = connect(url, token)
+    await second.next('welcome')
+
+    first.socket.send(
+      JSON.stringify({ type: 'order', requestId: 'c', order: { kind: 'claimHorses' } }),
+    )
+    await first.next('ack')
+    const claimed = { type: 'firstDay', firstDay: { done: ['claimHorses'], dismissed: false } }
+    expect(await first.next('firstDay')).toEqual(claimed)
+    expect(await second.next('firstDay')).toEqual(claimed)
+
+    // A turned-down order ticks nothing; an accepted one for a resident ticks giving an order.
+    const resident = world.residents.find((r) => r.owner === realmOf(world, userId)!.id)!
+    const walk = { kind: 'walkTo', residentId: resident.id, x: resident.x + 1, y: resident.y }
+    first.socket.send(JSON.stringify({ type: 'order', requestId: 'x', order: { kind: 'fly' } }))
+    await first.next('rejected')
+    first.socket.send(JSON.stringify({ type: 'order', requestId: 'w', order: walk }))
+    await first.next('ack')
+    expect(await first.next('firstDay')).toMatchObject({
+      firstDay: { done: ['claimHorses', 'giveOrder'] },
+    })
+    // Ticked already, the next order says nothing more.
+    first.socket.send(JSON.stringify({ type: 'order', requestId: 'w2', order: walk }))
+    await first.next('ack')
+    // Anything it sent would come before the answer to the next message.
+    first.socket.send(JSON.stringify({ type: 'order', requestId: 'y', order: { kind: 'fly' } }))
+    await first.next('rejected')
+    expect(first.messages.filter((m) => m.type === 'firstDay')).toEqual([])
+  })
+
+  it('keeps the first-day card per Player, dismissed also after a Leader death', async () => {
+    const { url, token, userId, world, db } = await start()
+    const first = connect(url, token)
+    await first.next('welcome')
+    dismissFirstDay(db, userId)
+    const realm = realmOf(world, userId)!
+    const leader = world.residents.find((r) => r.id === realm.leaderId)!
+    dieAll(world, [leader], 'killed', terrain.size, new Map())
+    first.socket.close()
+
+    const again = connect(url, token, { realmName: 'Ashford', leaderName: 'Odo' })
+    await again.next('founding')
+    const welcome = await again.next('welcome')
+    expect(realmOf(world, userId)!.id).not.toBe(realm.id)
+    expect(welcome).toMatchObject({ firstDay: { done: [], dismissed: true } })
   })
 
   it('sends the Player their alliance matters on connect, and again only when they change', async () => {

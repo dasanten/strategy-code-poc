@@ -57,6 +57,13 @@
       "when": 1793313910670,
       "tag": "0007_script_version_counter",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793634119752,
+      "tag": "0008_first_day",
+      "breakpoints": true
     }
   ]
 }

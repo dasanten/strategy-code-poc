@@ -1899,6 +1899,50 @@ button.residents-row.selected:hover {
 .hud-offer-refused {
   color: var(--ui-bad);
 }
+/* The first-day card (`FirstDayCard`): a checklist, ticked lines muted, ✕ at the top right. */
+.notice.first-day {
+  align-items: flex-start;
+}
+.first-day-count {
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+.first-day ul {
+  margin: 4px 0 2px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+.first-day li.done {
+  color: var(--ui-muted);
+  text-decoration: line-through;
+}
+.first-day li.done .first-day-tick {
+  color: var(--ui-live);
+}
+.first-day li.done a {
+  color: inherit;
+}
+.notice .first-day-dismiss {
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-muted);
+  font-weight: 400;
+}
+/* One line on a phone: how far along, then only the first line still to do. */
+.game.phone .first-day ul,
+.game.phone .first-day li {
+  display: inline;
+  margin: 0;
+}
+.game.phone .first-day li:not(.next) {
+  display: none;
+}
+.game.phone .first-day ul::before {
+  content: ' · ';
+}
 /* On a phone every notice is one line, its button at the end; the whole text is its title. */
 .game.phone .notice-text {
   flex: 1;

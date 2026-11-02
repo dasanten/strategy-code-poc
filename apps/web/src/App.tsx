@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   BUILDABLE,
+  firstDayShown,
+  type ClientFirstDayLine,
   carriagePulledBy,
   holdersOf,
   carriageOfResident,
@@ -49,6 +51,7 @@ import {
   CentredDialog,
   Drawer,
   DrawerEdge,
+  FirstDayCard,
   GroupReportNotice,
   HorseOfferNotice,
   NoticeLane,
@@ -231,10 +234,22 @@ function Pages() {
 }
 
 function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
-  const { world, founding, status, sendOrder, found, memories, runs, scriptLogs, watchScript } =
-    useWorld(onLoggedOut)
+  const {
+    world,
+    founding,
+    status,
+    sendOrder,
+    found,
+    memories,
+    runs,
+    scriptLogs,
+    watchScript,
+    setFirstDay,
+  } = useWorld(onLoggedOut)
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  // The first-day lines reported and not turned down, so each goes out once (`reportFirstDay`).
+  const firstDayReported = useRef(new Set<ClientFirstDayLine>())
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
@@ -462,6 +477,27 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setFocus({ ...toShow, cover: shown })
   }, [toShow, closeDrawer])
   const showOnMap = (x: number, y: number) => setToShow({ x, y })
+  /**
+   * Reports a first-day line only the client sees done, once, while the card shows
+   * (`CONTEXT.md`: First day); the server ticks the others itself.
+   */
+  const reportFirstDay = (line: ClientFirstDayLine) => {
+    const card = world?.firstDay
+    if (!card || !firstDayShown(card) || card.done.includes(line)) return
+    if (firstDayReported.current.has(line)) return
+    firstDayReported.current.add(line)
+    api.firstDayDone(line).then(setFirstDay, () => firstDayReported.current.delete(line))
+  }
+  // Picking a resident, however it happened: on the map, in a list, a saved group.
+  const residentPicked = selectedIds.length > 0
+  useEffect(() => {
+    if (residentPicked) reportFirstDay('pickResident')
+  })
+  /** Hides the first-day card at once; the server keeps it dismissed for good. */
+  const dismissFirstDay = () => {
+    if (world) setFirstDay({ ...world.firstDay, dismissed: true })
+    api.dismissFirstDay().then(setFirstDay, () => {})
+  }
   /** Picks residents on the map: one shows their card, several a group card. */
   const select = (ids: string[]) => {
     setSelectedIds(ids)
@@ -1153,6 +1189,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
         leader={leader?.name}
         onLogout={logout}
+        onWiki={() => reportFirstDay('openWiki')}
       />
       {phone ? (
         <PhoneMenu
@@ -1163,6 +1200,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           leader={leader?.name}
           account={account.name}
           onLogout={logout}
+          onWiki={() => reportFirstDay('openWiki')}
         />
       ) : (
         <ToolRail
@@ -1366,6 +1404,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         {laneNotices({
           pick: pick !== undefined,
           horseOffer: world?.horseOffer,
+          firstDay: world !== null && firstDayShown(world.firstDay),
           groupReport: groupReport !== undefined,
         }).map((kind) =>
           kind === 'pick' && pick ? (
@@ -1382,6 +1421,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               key={kind}
               horses={HORSE_GRANT_HORSES}
               onClaim={() => sendOrder({ kind: 'claimHorses' })}
+            />
+          ) : kind === 'firstDay' && world ? (
+            <FirstDayCard
+              key={kind}
+              card={world.firstDay}
+              onWiki={() => reportFirstDay('openWiki')}
+              onDismiss={dismissFirstDay}
             />
           ) : kind === 'groupReport' && groupReport ? (
             <GroupReportNotice

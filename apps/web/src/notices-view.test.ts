@@ -4,6 +4,7 @@ import {
   MIN_LANE_WIDTH,
   NOTICE_ORDER,
   cardHidden,
+  firstDayView,
   laneNotices,
   laneSpot,
   skippedByWhy,
@@ -35,6 +36,15 @@ describe('the notice lane', () => {
 
   it('keeps the lasting Horse offer above a passing group report', () => {
     expect(NOTICE_ORDER.indexOf('horseOffer')).toBeLessThan(NOTICE_ORDER.indexOf('groupReport'))
+  })
+
+  it('puts the first-day card under the Horse offer, above a group report', () => {
+    expect(laneNotices({ groupReport: true, firstDay: true, horseOffer: true })).toEqual([
+      'horseOffer',
+      'firstDay',
+      'groupReport',
+    ])
+    expect(laneNotices({ firstDay: true, pick: true })).toEqual(['pick'])
   })
 })
 
@@ -107,5 +117,25 @@ describe('a group order’s report', () => {
 
   it('has nothing to say when nobody was skipped', () => {
     expect(skippedByWhy([])).toEqual([])
+  })
+})
+
+describe('the first-day card’s lines', () => {
+  it('lists every line in the card’s order, none ticked for a new Player', () => {
+    const view = firstDayView({ done: [], dismissed: false })
+    expect(view.lines.map((l) => l.label)).toEqual([
+      'Claim the Horse offer',
+      'Pick a resident',
+      'Give them an order',
+      'Open the Wiki',
+    ])
+    expect(view.lines.every((l) => !l.done)).toBe(true)
+    expect(view).toMatchObject({ next: 'claimHorses', ticked: 0 })
+  })
+
+  it('ticks each line done, and names the first one still to do', () => {
+    const view = firstDayView({ done: ['claimHorses', 'openWiki'], dismissed: false })
+    expect(view.lines.filter((l) => l.done).map((l) => l.line)).toEqual(['claimHorses', 'openWiki'])
+    expect(view).toMatchObject({ next: 'pickResident', ticked: 2 })
   })
 })
