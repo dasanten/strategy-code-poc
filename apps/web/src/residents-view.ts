@@ -1,6 +1,8 @@
 import {
+  MAX_HUNGER,
   PAIRING_WAIT_TICKS,
   TICKS_PER_GAME_DAY,
+  ageInYears,
   type City,
   type Diplomacy,
   type Good,
@@ -68,6 +70,37 @@ export function groupResidents<R extends Pick<Resident, 'id' | 'cityId'>>(
     else group.residents.push(r)
   }
   return groups.filter((g) => g.residents.length > 0)
+}
+
+/** A resident's row in the Residents drawer on a phone (`residentLines`). */
+export interface ResidentLines {
+  /** First line: their name, the Leader mark after it, and their age. */
+  name: string
+  leader: boolean
+  age: string
+  /** Second line: what they are doing, with a hunger meter at its end. */
+  doing: string
+  /** How fed they are, 0 to 1, for the meter. */
+  fed: number
+}
+
+/**
+ * A resident's row in the Residents drawer on a phone (ADR 0012): two lines in place of the
+ * table's columns, "Edda · Leader · 34 years" and their Doing line (`doingLine`) with the hunger
+ * meter at its end.
+ */
+export function residentLines(
+  r: Pick<Resident, 'id' | 'name' | 'bornAt' | 'hunger'>,
+  { leaderId, tick, doing }: { leaderId: string; tick: number; doing: string },
+): ResidentLines {
+  const years = Math.floor(ageInYears(r, tick))
+  return {
+    name: r.name,
+    leader: r.id === leaderId,
+    age: `${years} ${years === 1 ? 'year' : 'years'}`,
+    doing,
+    fed: Math.max(0, Math.min(1, r.hunger / MAX_HUNGER)),
+  }
 }
 
 /**

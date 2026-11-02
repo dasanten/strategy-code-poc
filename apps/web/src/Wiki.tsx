@@ -482,7 +482,14 @@ export function Wiki() {
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
           header, half the screen or all of it; a tap on the handle goes one step up. While an order
           waits for a target the card drops to its header. The menu button at the top left opens the
-          drawers, your goods, the wiki and Log out.
+          drawers, your goods, the wiki and Log out. The map’s buttons (Centre, Select, Region map)
+          sit in one row at the bottom left, just above the card; zoom by pinching. The Residents
+          and Horses drawers show each one in two lines: name and age, then what they are doing (or
+          where the horse is) with their meters.
+        </p>
+        <p>
+          Terrain you have explored loads as you look at it. Until it is here it shows grey, and the
+          line at the bottom right says “Loading the map…”; dark is terrain you haven’t explored.
         </p>
         <table>
           <thead>
@@ -1108,8 +1115,8 @@ export function Wiki() {
           before it, since the builder walks to the line, and it ends on its own, so it needs no
           duration; a saved queue or a copied step keeps both tiles. Build line has Build's params;
           its line comes only from the order, so run directly or with Run script it ends at once
-          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code>{' '}
-          actions, which build only with what the resident carries, stay for your scripts.
+          (“no line given”). The plain <code>roadLine</code> and <code>wallLine</code> actions,
+          which build only with what the resident carries, stay for your scripts.
         </p>
         <p>
           <strong>A crew on one line:</strong> residents on the same line, from the group card or

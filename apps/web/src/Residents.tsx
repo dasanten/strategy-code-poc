@@ -97,12 +97,14 @@ import {
   groupCard,
   rememberedTabOf,
   rememberTabOf,
+  residentLines,
   scriptsRun,
   statLine,
   TAB_LABELS,
   type GroupTab,
   type CardSections,
   type ResidentGroup,
+  type ResidentLines,
 } from './residents-view.js'
 import { doingLine, interruptedLine } from './doing-view.js'
 import { type RelocateChoice } from './relocate-view.js'
@@ -919,7 +921,8 @@ export function orderDoing(
 /**
  * The Player's residents, one row each under the city they live in (see `groupResidents`); click
  * a row to inspect that resident and show them on the map. Picking one elsewhere, such as on the
- * map, scrolls their row into view.
+ * map, scrolls their row into view. On a phone each row is two lines instead of the table's
+ * columns (`residentLines`).
  */
 export function ResidentsList({
   groups,
@@ -932,6 +935,7 @@ export function ResidentsList({
   arrivesIn,
   selectedId,
   onSelect,
+  phone = false,
 }: {
   groups: ResidentGroup<Resident>[]
   leaderId: string
@@ -948,6 +952,8 @@ export function ResidentsList({
   arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
   onSelect: (id: string) => void
+  /** Rows of two lines each, for a phone's narrow screen. */
+  phone?: boolean
 }) {
   const tableRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -965,73 +971,132 @@ export function ResidentsList({
         <span>{count} in sight</span>
       </div>
       <div className="residents-scroll">
-        <div className="residents-table" ref={tableRef}>
-          <div className="residents-row heading" aria-hidden="true">
-            <span>Name</span>
-            <span>Age</span>
-            <span>Doing</span>
-            <span>Hunger</span>
-            <span>Carrying</span>
-          </div>
+        <div className={`residents-table${phone ? ' lines' : ''}`} ref={tableRef}>
+          {!phone && (
+            <div className="residents-row heading" aria-hidden="true">
+              <span>Name</span>
+              <span>Age</span>
+              <span>Doing</span>
+              <span>Hunger</span>
+              <span>Carrying</span>
+            </div>
+          )}
           {groups.map((g) => (
             <div className="residents-group" key={g.key} role="group" aria-label={g.label}>
               <h3>
                 {g.label} <span>· {g.residents.length}</span>
               </h3>
-              {g.residents.map((r) => (
-                <button
-                  type="button"
-                  key={r.id}
-                  data-resident={r.id}
-                  className={`residents-row${r.id === selectedId ? ' selected' : ''}`}
-                  aria-pressed={r.id === selectedId}
-                  onClick={() => onSelect(r.id)}
-                >
-                  <span className="name">
-                    {r.name}
-                    {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
-                  </span>
-                  <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
-                  <span
-                    className="doing"
-                    title={doingLine(r, {
-                      scripts,
-                      buildings,
-                      residents: inSight,
-                      cities,
-                      arrives: arrivesIn?.(r),
+              {g.residents.map((r) =>
+                phone ? (
+                  <ResidentLinesRow
+                    key={r.id}
+                    lines={residentLines(r, {
+                      leaderId,
+                      tick,
+                      doing: doingLine(r, {
+                        scripts,
+                        buildings,
+                        residents: inSight,
+                        cities,
+                        arrives: arrivesIn?.(r),
+                      }),
                     })}
+                    id={r.id}
+                    selected={r.id === selectedId}
+                    onSelect={onSelect}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    key={r.id}
+                    data-resident={r.id}
+                    className={`residents-row${r.id === selectedId ? ' selected' : ''}`}
+                    aria-pressed={r.id === selectedId}
+                    onClick={() => onSelect(r.id)}
                   >
-                    {doingLine(r, {
-                      scripts,
-                      buildings,
-                      residents: inSight,
-                      cities,
-                      arrives: arrivesIn?.(r),
-                    })}
-                    {r.script && (
-                      <small className="muted">
-                        {interruptedLine(r, { scripts, buildings, residents: inSight }) ??
-                          scriptName(r, scripts)}
-                      </small>
-                    )}
-                  </span>
-                  <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
+                    <span className="name">
+                      {r.name}
+                      {r.id === leaderId && <span className="leader-mark"> · Leader</span>}
+                    </span>
+                    <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
                     <span
-                      className={meterClass(r.hunger / MAX_HUNGER)}
-                      style={{ width: pct(r.hunger / MAX_HUNGER) }}
-                    />
-                  </span>
-                  <span className="mono">
-                    {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
-                  </span>
-                </button>
-              ))}
+                      className="doing"
+                      title={doingLine(r, {
+                        scripts,
+                        buildings,
+                        residents: inSight,
+                        cities,
+                        arrives: arrivesIn?.(r),
+                      })}
+                    >
+                      {doingLine(r, {
+                        scripts,
+                        buildings,
+                        residents: inSight,
+                        cities,
+                        arrives: arrivesIn?.(r),
+                      })}
+                      {r.script && (
+                        <small className="muted">
+                          {interruptedLine(r, { scripts, buildings, residents: inSight }) ??
+                            scriptName(r, scripts)}
+                        </small>
+                      )}
+                    </span>
+                    <span className="meter" aria-label={`Hunger ${pct(r.hunger / MAX_HUNGER)} fed`}>
+                      <span
+                        className={meterClass(r.hunger / MAX_HUNGER)}
+                        style={{ width: pct(r.hunger / MAX_HUNGER) }}
+                      />
+                    </span>
+                    <span className="mono">
+                      {carryLine(stockWeight(r.carried), carryCapacity(r, tick))}
+                    </span>
+                  </button>
+                ),
+              )}
             </div>
           ))}
         </div>
       </div>
     </section>
+  )
+}
+
+/** A resident's row on a phone: name, Leader mark and age, then Doing with the hunger meter. */
+function ResidentLinesRow({
+  id,
+  lines,
+  selected,
+  onSelect,
+}: {
+  id: string
+  lines: ResidentLines
+  selected: boolean
+  onSelect: (id: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      data-resident={id}
+      className={`residents-row lines${selected ? ' selected' : ''}`}
+      aria-pressed={selected}
+      onClick={() => onSelect(id)}
+    >
+      <span className="line">
+        <span className="name">
+          {lines.name}
+          {lines.leader && <span className="leader-mark"> · Leader</span>}
+        </span>
+        <span className="mono">{lines.age}</span>
+      </span>
+      <span className="line">
+        <span className="doing">{lines.doing}</span>
+        <span className="meter" aria-label={`Hunger ${pct(lines.fed)} fed`}>
+          <span className={meterClass(lines.fed)} style={{ width: pct(lines.fed) }} />
+        </span>
+      </span>
+    </button>
   )
 }
 

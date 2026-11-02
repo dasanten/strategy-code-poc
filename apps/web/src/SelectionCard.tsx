@@ -138,6 +138,20 @@ export function CardSheet({
   const [dragged, setDragged] = useState<number>()
   const press = useRef<{ y: number; from: number; moved: boolean }>(undefined)
   const ref = useRef<HTMLDivElement>(null)
+  // The map's buttons and readout sit above the sheet: its height goes to the screen as `--sheet-h`.
+  useEffect(() => {
+    const sheet = ref.current
+    const screen = sheet?.parentElement
+    if (!sheet || !screen) return
+    const observer = new ResizeObserver(() =>
+      screen.style.setProperty('--sheet-h', `${sheet.offsetHeight}px`),
+    )
+    observer.observe(sheet)
+    return () => {
+      observer.disconnect()
+      screen.style.removeProperty('--sheet-h')
+    }
+  }, [phone])
   if (!phone) return <div className="game-selection">{children}</div>
   const shown = pinnedPeek ? 'peek' : height
   const screen = () => ref.current?.parentElement?.clientHeight ?? window.innerHeight
