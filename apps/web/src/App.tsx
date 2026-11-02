@@ -96,6 +96,7 @@ import { isWikiPath, pageFor } from './pages.js'
 import { Wiki } from './Wiki.js'
 import { RealmLog } from './RealmLog.js'
 import { realmEnded } from './realm-log.js'
+import { isNewRealm } from './map/legend.js'
 import {
   GOOD_LABELS,
   GroupCard,
@@ -1008,6 +1009,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onPickTile={goTo}
             onNodesLoaded={onNodesLoaded}
             onTerrainLoaded={onTerrainLoaded}
+            newRealm={isNewRealm(world.events, world.tick)}
             focus={focus}
           />
         ) : (
