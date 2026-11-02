@@ -55,6 +55,14 @@ describe('the way a pick previews', () => {
     for (const [x, y] of path) expect(ground(x, y)).toBe(Terrain.Road)
   })
 
+  it('goes round a wall to its gate', () => {
+    // A wall all along x = 2, its gate at y = 4.
+    const blocked = (x: number, y: number) => x === 2 && y !== 4
+    const path = previewPath(SIZE, { x: 0, y: 0 }, { x: 4, y: 0 }, groundOf([]), 'foot', blocked)
+    expect(path).toContainEqual([2, 4])
+    for (const [x, y] of path) expect(blocked(x, y)).toBe(false)
+  })
+
   it('runs straight over unexplored ground, which counts as plains', () => {
     const ground = groundOf(['?????', '?????'])
     expect(previewPath(SIZE, { x: 0, y: 0 }, { x: 4, y: 0 }, ground)).toHaveLength(4)

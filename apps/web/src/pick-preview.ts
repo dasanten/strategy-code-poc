@@ -98,6 +98,8 @@ export interface PreviewWorld extends PlanWorld {
   cityNames: readonly { id: string; name: string }[]
   /** What is underfoot as the Player knows it: a road where one is built, undefined unexplored. */
   ground: (x: number, y: number) => Terrain | undefined
+  /** Whether a way may not step onto a tile: a wall, or a gate shut to the realm. */
+  blocked?: (x: number, y: number) => boolean
   /** The known resource node on a tile. */
   nodeAt: (x: number, y: number) => KnownNode | undefined
   /** Why a building of `kind` can't be laid out from (x, y) (`buildHereProblem`). */
@@ -144,9 +146,10 @@ export function pickPreview(
   const base = { at, ways: [], label: here }
   switch (pick.kind) {
     case 'way': {
-      const ways = goers
-        .slice(0, PREVIEW_WAYS)
-        .map((g) => ({ from: g.from, path: previewPath(w.size, g.from, at, w.ground, pick.goer) }))
+      const ways = goers.slice(0, PREVIEW_WAYS).map((g) => ({
+        from: g.from,
+        path: previewPath(w.size, g.from, at, w.ground, pick.goer, w.blocked),
+      }))
       const first = ways[0]
       if (!first) return base
       const ticks = goers[0]!.ticks?.(first.path, pick.goer)

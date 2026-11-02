@@ -26,8 +26,9 @@ export const PREVIEW_SEARCH_TILES = 20_000
  * the time each tile takes to cross (`TERRAIN_SPEED`, `CARRIAGE_SPEED`; a road wherever one is
  * built), a diagonal step `DIAGONAL_STEP` times as long and never cutting a corner. `ground`
  * gives undefined where unexplored, which counts as Plains, so the way runs straight there.
- * Walls are left out. When no way is found within `PREVIEW_SEARCH_TILES` tiles, a straight line.
- * The tiles to go, without `from`, as the server's paths are.
+ * `blocked` tiles can't be stepped onto: walls, and gates shut to the one going. When no way is
+ * found within `PREVIEW_SEARCH_TILES` tiles, a straight line. The tiles to go, without `from`,
+ * as the server's paths are.
  */
 export function previewPath(
   size: number,
@@ -35,10 +36,12 @@ export function previewPath(
   to: { x: number; y: number },
   ground: (x: number, y: number) => Terrain | undefined,
   goer: Goer = 'foot',
+  blocked: (x: number, y: number) => boolean = () => false,
 ): Point[] {
   const speeds: Partial<Record<number, number>> =
     goer === 'carriage' ? CARRIAGE_SPEED : TERRAIN_SPEED
   const cost = (x: number, y: number) => {
+    if (blocked(x, y)) return Infinity
     const speed = speeds[ground(x, y) ?? Terrain.Plains]
     return speed ? 1 / speed : Infinity
   }

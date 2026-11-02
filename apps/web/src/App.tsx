@@ -1007,7 +1007,21 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!world || !pick || !pickAt) return undefined
     const size = world.map.size
     const roads = roadTiles(world, size)
+    // A way doesn't cross a wall, nor a gate unless it is the realm's own or an ally's, or open
+    // (`CONTEXT.md`: Wall, Gate); climbing onto the realm's own walls is left out.
+    const allies = new Set(world.diplomacy.alliance?.members.map((m) => m.realmId))
+    allies.add(world.home.realmId)
+    const blocked = new Set(
+      knownBuildings
+        .filter((b) => isWallOrGate(b))
+        .filter((b) => {
+          const realmId = world.cities.find((c) => c.id === b.cityId)?.realmId
+          return b.kind === 'wall' || (b.closed && !(realmId && allies.has(realmId)))
+        })
+        .map((b) => tileIndex(size, b.x, b.y)),
+    )
     const seen: PreviewWorld = {
+      blocked: (x, y) => blocked.has(tileIndex(size, x, y)),
       ...planWorld(world),
       cityNames: knownCities,
       ground: (x, y) => {
