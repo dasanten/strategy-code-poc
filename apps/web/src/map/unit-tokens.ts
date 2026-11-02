@@ -43,13 +43,16 @@ export interface UnitWorld {
 }
 
 /**
- * Where a resident's or carriage's token was drawn this frame, for the selection ring and the
- * picked residents' places (`map/places.ts`).
+ * Where a resident's, carriage's or loose horse's token was drawn this frame, for the selection
+ * ring, the picked residents' places (`map/places.ts`) and what a click picks
+ * (`map/selection.ts`). `stack` is the residents behind a token that stands for several: a group
+ * token with a count, a "+N" badge (for everyone on its tile), an army banner.
  */
 export interface Spot {
   x: number
   y: number
   r: number
+  stack?: readonly string[]
 }
 
 /**
@@ -155,6 +158,7 @@ export function drawUnits(
     return [mx / ids.length, my / ids.length]
   }
 
+  const spots = new Map<string, Spot>()
   // Horses standing free; a hitched one moves with its cart and shows as the cart, a ridden one
   // with its rider.
   const hitched = new Set(world.carriages.map((k) => k.horseId))
@@ -164,16 +168,11 @@ export function drawUnits(
     const busy = built.has(key(h)) || carted.has(key(h)) || peopled.has(key(h))
     const p = at(...where(h.id, h.x, h.y), busy ? -0.28 : 0, busy ? -0.28 : 0)
     if (!near(p)) continue
-    drawUnit(
-      tokens,
-      UNIT_ART.horse,
-      ...p,
-      unitRadius('horse', tile),
-      entityRelationship(h, viewer, known),
-    )
+    const r = unitRadius('horse', tile)
+    drawUnit(tokens, UNIT_ART.horse, ...p, r, entityRelationship(h, viewer, known))
+    spots.set(h.id, { x: p[0], y: p[1], r })
   }
 
-  const spots = new Map<string, Spot>()
   // Passengers ride inside their carriage (`CONTEXT.md`: Passenger): its badge counts them, and
   // they are found at it.
   const passengers = new Set(world.carriages.flatMap((k) => k.passengerIds ?? []))
@@ -205,7 +204,8 @@ export function drawUnits(
   const banners = armyBanners(world.armies, world.residents)
   const armyById = new Map(world.armies.map((a) => [a.id, a]))
   for (const b of banners) {
-    const spot = place(b, meanOf(b.under, b.x, b.y), unitRadius('army', tile))
+    const spot: Spot = place(b, meanOf(b.under, b.x, b.y), unitRadius('army', tile))
+    if (b.under.length > 1) spot.stack = b.under
     if (!near([spot.x, spot.y])) continue
     const army = armyById.get(b.armyId)!
     drawUnit(tokens, UNIT_ART.army, spot.x, spot.y, spot.r, entityRelationship(army, viewer, known))
@@ -237,7 +237,8 @@ export function drawUnits(
       })
       continue
     }
-    const spot = place(g, pos, unitRadius('residents', tile))
+    const spot: Spot = place(g, pos, unitRadius('residents', tile))
+    if (g.ids.length > 1) spot.stack = g.ids
     if (!near([spot.x, spot.y])) continue
     const rider = g.ids.find((id) => byId.get(id)?.riding !== undefined)
     if (rider !== undefined) drawMount(tokens, spot, rels.get(rider))
@@ -290,6 +291,8 @@ function drawFigures(
   if (more) {
     const [x, y] = at(more.dx, more.dy)
     badges.place(`+${more.ids.length}`, x, y, Math.max(8, tile * 0.22))
-    for (const id of more.ids) of.spots.set(id, { x, y, r })
+    // The badge stands for the tile's whole stack: a click on it picks them all.
+    const spot = { x, y, r, stack: g.ids }
+    for (const id of more.ids) of.spots.set(id, spot)
   }
 }
