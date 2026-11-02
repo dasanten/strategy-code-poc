@@ -187,9 +187,9 @@ interface Starting {
 
 /** What the resident card's script param fields need of the world (`script-params-view`). */
 function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): ParamWorld {
-  const { buildings, carriages, cities } = world
+  const { buildings, carriages, cities, waypoints } = world
   const [lastSeen, realmId] = [world.lastSeen.buildings, world.home.realmId]
-  return { buildings, lastSeen, carriages, cities, realmId, size: world.map.size }
+  return { buildings, lastSeen, carriages, cities, realmId, size: world.map.size, waypoints }
 }
 
 /**
@@ -595,7 +595,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       if (!world) return
       const picked = paramPickAt(paramWorld(world), paramPick.type, { x, y })
       if (typeof picked === 'string') setOrderError(picked)
-      else await setScriptParam(paramPick.name, picked.id)
+      else await setScriptParam(paramPick.name, { targetId: picked.id })
       return
     }
     if (armyPick) {
@@ -963,15 +963,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await giveOrder(order, false))
   }
   /**
-   * Picks, or clears with null, the value of a param of the script the picked resident runs
-   * (`CONTEXT.md`: Script parameter): the building or carriage's id, or the number typed for a
-   * number param. It leaves the script running.
+   * Picks, or clears with a null `targetId`, the value of a param of the script the picked
+   * resident runs (`CONTEXT.md`: Script parameter): the building, carriage or waypoint's id, or
+   * the number typed for a number param or the word chosen for a choice param. It leaves the
+   * script running.
    */
-  async function setScriptParam(name: string, picked: string | number | null) {
+  async function setScriptParam(
+    name: string,
+    picked: { targetId: string | null } | { value: number | string },
+  ) {
     if (!selected?.script) return
     const { scriptId } = selected.script
-    const value = typeof picked === 'number' ? { value: picked } : { targetId: picked }
-    const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, ...value }
+    const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, ...picked }
     setOrderError(await giveOrder(order))
   }
   async function stop() {
@@ -1718,13 +1721,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                     scripts.find((s) => s.id === selected.script!.scriptId),
                     selected,
                   )}
+                  waypoints={world.waypoints}
                   picking={paramPick?.name}
                   onPick={(p) => {
                     setPicking(false)
                     setParamPick((now) => (now?.name === p.name ? undefined : p))
                   }}
-                  onNumber={(name, value) => void setScriptParam(name, value)}
-                  onClear={(name) => void setScriptParam(name, null)}
+                  onNumber={(name, value) => void setScriptParam(name, { value })}
+                  onChoose={(p, value) =>
+                    void setScriptParam(
+                      p.name,
+                      p.type === 'choice' ? { value } : { targetId: value },
+                    )
+                  }
+                  onClear={(name) => void setScriptParam(name, { targetId: null })}
                 />
               )
             }
@@ -1843,6 +1853,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           target={targetParam(starting.script)}
           values={starting.values}
           label={(id) => paramValueLabel(paramWorld(world), id)}
+          waypoints={world.waypoints}
           canStart={startValuesValid(starting.params, starting.values)}
           error={starting.error}
           onPick={(p) => {

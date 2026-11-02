@@ -15,18 +15,21 @@ export interface Program {
 
 /**
  * `param name: type`: a value the Player picks for whoever runs the script, read as
- * `params.name`. A `number` param may declare a default, `param name: number = 3`, that it
- * reads while none is set.
+ * `params.name`. A `number` param may declare a default, `param name: number = 3`, and a
+ * `choice` param one of its words, `param toward: choice(north, south) = north`, that it reads
+ * while none is set.
  */
 export interface ParamDeclaration extends Position {
   name: string
   type: ParamType
-  /** The `= n` of a `number` param: a whole number of zero or more. */
-  default?: number
+  /** The words a `choice` param is one of, in the order its line lists them. */
+  choices?: string[]
+  /** The `= n` of a `number` param, a whole number of zero or more, or a `choice` param's word. */
+  default?: number | string
 }
 
 /** What a `param` can hold. */
-export const PARAM_TYPES = ['building', 'storage', 'number'] as const
+export const PARAM_TYPES = ['building', 'storage', 'number', 'choice', 'waypoint'] as const
 export type ParamType = (typeof PARAM_TYPES)[number]
 
 export type Statement =

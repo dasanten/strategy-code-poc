@@ -250,7 +250,12 @@ import {
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
 import { DEFAULT_REPEAT } from './plan-blocks.js'
-import { PARAM_COMMENT_EXAMPLE, PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import {
+  PARAM_CHOICE_EXAMPLE,
+  PARAM_COMMENT_EXAMPLE,
+  PARAM_DEFAULT_EXAMPLE,
+  SCRIPT_LANGUAGE,
+} from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
@@ -2054,7 +2059,9 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
-            number of zero or more and press Enter. Neither stops the script.
+            number of zero or more and press Enter. A <code>choice</code> param has a list of its
+            words, and a <code>waypoint</code> param a list of your waypoints (or pick its marker on
+            the map); the first entry in either list leaves it unset. None of them stops the script.
           </li>
           <li>
             The comment at the end of a <code>param</code> line is what the card shows: what the
@@ -2079,15 +2086,29 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             know, in sight or last seen; out of sight the card names it with "(last seen)" and the
             script reads it as you last saw it. A param reads <code>null</code> while none is
             picked, and once the one picked is gone or no longer one it may name. A{' '}
-            <code>number</code> param reads the number typed, or <code>null</code> while unset.
+            <code>number</code> param reads the number typed, or <code>null</code> while unset. A{' '}
+            <code>choice</code> param reads the word picked as a string; a word the script no longer
+            lists is dropped. A <code>waypoint</code> param reads the waypoint, with its{' '}
+            <code>id</code>, <code>name</code>, <code>x</code> and <code>y</code>; once you remove
+            the waypoint it reads as unset.
           </li>
           <li>
             A <code>number</code> param may have a default: <code>= n</code> after its type, a whole
             number of zero or more. Unset, it reads the default; the number typed wins over it, and
             clearing the field goes back to it. Its field shows the default while unset. A{' '}
-            <code>building</code> or <code>storage</code> param can't have one.
+            <code>choice</code> param may have one too, one of its words: <code>= north</code> after
+            its list. A <code>building</code>, <code>storage</code> or <code>waypoint</code> param
+            can't have one.
             <pre>
               <code>{PARAM_DEFAULT_EXAMPLE}</code>
+            </pre>
+          </li>
+          <li>
+            A <code>choice</code> param lists the words it can be in brackets after its type, each
+            once; a default that is not one of them is a syntax error. A <code>waypoint</code> param
+            is one of your waypoints.
+            <pre>
+              <code>{PARAM_CHOICE_EXAMPLE}</code>
             </pre>
           </li>
           <li>

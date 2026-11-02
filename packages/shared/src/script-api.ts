@@ -219,12 +219,15 @@ const SHARED: readonly ScriptBinding[] = [
  * at the top of a script, read as `params.name`, picked per resident on their card. The same
  * types as `PARAM_TYPES` in `@csp/lang`.
  */
-export const SCRIPT_PARAM_TYPES = ['building', 'storage', 'number'] as const
+export const SCRIPT_PARAM_TYPES = ['building', 'storage', 'number', 'choice', 'waypoint'] as const
 export type ScriptParamType = (typeof SCRIPT_PARAM_TYPES)[number]
 
 export function isScriptParamType(value: unknown): value is ScriptParamType {
   return (SCRIPT_PARAM_TYPES as readonly unknown[]).includes(value)
 }
+
+/** The param types whose value is picked on the map: one building, carriage or waypoint. */
+export type PickedParamType = Exclude<ScriptParamType, 'number' | 'choice'>
 
 /** What each param type accepts, for the Wiki and the editor. */
 export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
@@ -232,6 +235,10 @@ export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
     'One of my realm’s buildings, or a workplace or construction site of anyone’s I know: in sight, or as last seen.',
   storage: 'One of my realm’s storages or stables, or one of its carriages.',
   number: 'A whole number of zero or more, typed in; `= n` after the type gives it a default.',
+  choice:
+    'One of the words its line lists, `choice(north, east, south, west)`, picked from a list and read as that word; `= north` after the list gives it a default.',
+  waypoint:
+    'One of my waypoints, picked from a list or on the map, read as its `id`, `name`, `x` and `y`; unset once it is removed.',
 }
 
 /** Whether a value fits a `number` param: a whole number of zero or more. */
@@ -239,12 +246,22 @@ export function isParamNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
+/** Whether a value fits a `choice` param: one of the words its line lists. */
+export function isParamChoice(param: Pick<ScriptParam, 'choices'>, value: unknown): boolean {
+  return typeof value === 'string' && (param.choices?.includes(value) ?? false)
+}
+
 /** A script's `param` line. */
 export interface ScriptParam {
   name: string
   type: ScriptParamType
-  /** A `number` param's default (`param name: number = 3`), read while none is set. */
-  default?: number
+  /** The words a `choice` param is one of (`param toward: choice(north, south)`), in order. */
+  choices?: string[]
+  /**
+   * A `number` param's default (`param name: number = 3`), or a `choice` param's word
+   * (`= north`), read while none is set.
+   */
+  default?: number | string
   /**
    * The `//` comment at the end of its line: what the param is for, and after "none:" what the
    * script uses while none is picked (`CONTEXT.md`: Script parameter). The resident card shows it.
