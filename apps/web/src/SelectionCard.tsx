@@ -18,6 +18,7 @@ import {
   type BuildingKind,
   type Resident,
   type ResourceKind,
+  type Waypoint,
 } from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
 import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
@@ -34,6 +35,8 @@ import {
   type TileCard as TileCardData,
 } from './selection-view.js'
 import { Meter, meterClass, pct } from './Horses.js'
+import { WaypointNameForm, addProblem } from './Waypoints.js'
+import { suggestedWaypointName } from './waypoints-view.js'
 import { SHEET_OPENS_AT, nextSheet, snapSheet, stepSheet, type SheetHeight } from './sheet-view.js'
 import './selection-card.css'
 
@@ -482,6 +485,10 @@ export function TileCard({
   onSelectResident,
   onOpenHorse,
   onUnhitch,
+  tile,
+  waypoints,
+  mapSize,
+  onAddWaypoint,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -510,6 +517,13 @@ export function TileCard({
   onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
+  /** The tile the card is for. */
+  tile: { x: number; y: number }
+  /** The Player's waypoints, for a new one's name and the cap (`CONTEXT.md`: Waypoint). */
+  waypoints: readonly Waypoint[]
+  mapSize: number
+  /** Puts a waypoint named `name` on the tile; resolves with why it was turned down, if it was. */
+  onAddWaypoint: (name: string) => Promise<string | undefined>
 }) {
   const actions = tileActions(card, actor, tick)
   const [open, setOpen] = useState<string | undefined>()
@@ -639,6 +653,26 @@ export function TileCard({
             onRenameHorse(horseId, name)
           }}
         />
+      )}
+      {shown === 'addWaypoint' && (
+        <section className="inspector-block" aria-label="Add a waypoint">
+          <div className="panel-head">
+            <h3>Add a waypoint here</h3>
+            <span className="small muted">only you see it</span>
+          </div>
+          <WaypointNameForm
+            // Starts again for the next one once a waypoint is added.
+            key={waypoints.length}
+            initial={suggestedWaypointName(waypoints)}
+            submitLabel="Add waypoint"
+            problem={addProblem(waypoints, tile.x, tile.y, mapSize)}
+            onSubmit={async (name) => {
+              const turnedDown = await onAddWaypoint(name)
+              if (!turnedDown) setOpen(undefined)
+              return turnedDown
+            }}
+          />
+        </section>
       )}
       <p className="muted small" role="status">
         {orderError

@@ -2064,3 +2064,12 @@ export const CITY_NAME_MAX_LENGTH = 30
 
 /** The longest name a Player may give a horse of their realm, in characters after trimming (`CONTEXT.md`: Renaming a horse). */
 export const HORSE_NAME_MAX_LENGTH = 30
+
+/** The longest name a Player may give a waypoint, in characters after trimming (`CONTEXT.md`: Waypoint). */
+export const WAYPOINT_NAME_MAX_LENGTH = 30
+
+/**
+ * The most waypoints a Player holds (`CONTEXT.md`: Waypoint): enough to mark passes, nodes and
+ * meeting points across a wide realm, few enough that the drawer and the map stay readable.
+ */
+export const WAYPOINTS_MAX = 50

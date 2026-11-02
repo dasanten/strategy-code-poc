@@ -69,6 +69,8 @@ import {
   HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
   HORSE_NAME_MAX_LENGTH,
+  WAYPOINTS_MAX,
+  WAYPOINT_NAME_MAX_LENGTH,
   HUNGRY_HORSE_PACE,
   HORSE_ENDURANCE_EFFECT,
   HORSE_ENDURANCE_LIMIT,
@@ -256,6 +258,7 @@ export const WIKI_TOPICS = [
   { id: 'controls', title: 'Controls' },
   { id: 'queues', title: 'Queues' },
   { id: 'time', title: 'Time & map' },
+  { id: 'waypoints', title: 'Waypoints' },
   { id: 'terrain', title: 'Terrain & walking' },
   { id: 'residents', title: 'Residents & stats' },
   { id: 'training', title: 'Training' },
@@ -758,6 +761,23 @@ export function Wiki() {
         </p>
       </Section>
 
+      <Section id="waypoints">
+        <p>
+          A waypoint is a named marker you put on a tile: a mountain pass, a node you mean to come
+          back to, where your residents meet. Right-click a tile on the map, or long-press it on a
+          touch screen, while no resident is picked and choose Add waypoint here; the card of any
+          tile you click has Add waypoint too. Only you see your waypoints: on the map at every
+          zoom, on the minimap, and in the Waypoints drawer on the tool rail, where you can rename
+          one, centre the map on it or remove it. All of that is free and at once.
+        </p>
+        <p>
+          You hold at most {num(WAYPOINTS_MAX)} waypoints, each with a name of up to{' '}
+          {num(WAYPOINT_NAME_MAX_LENGTH)} characters that need not be unique. They are kept with
+          you, not your realm, so they are still there if your Leader dies and you found a new
+          realm.
+        </p>
+      </Section>
+
       <Section id="terrain">
         <p>
           An unloaded average resident walks a plains tile in {duration(WALK_TICKS_PER_TILE)}.
@@ -844,8 +864,8 @@ export function Wiki() {
           realm of its own); a name it gives a city is one no city in the world has. Once its list
           of names runs dry it adds a numeral, as in “Edda II”. Renaming is free: you can rename any
           resident or city of your realm, and your names may repeat. Names from before this rule
-          stay as they were, so where a list holds two residents of one name it adds their age,
-          and their city when they live in different ones.
+          stay as they were, so where a list holds two residents of one name it adds their age, and
+          their city when they live in different ones.
         </p>
         <p>
           A resident lives in one city, wherever they stand. One who lives in none is{' '}

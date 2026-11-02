@@ -7,6 +7,7 @@ import type { Building, Good } from '@csp/shared'
 export const DRAWERS = [
   { id: 'residents', label: 'Residents' },
   { id: 'horses', label: 'Horses' },
+  { id: 'waypoints', label: 'Waypoints' },
   { id: 'armies', label: 'Armies' },
   { id: 'contracts', label: 'Contracts' },
   { id: 'alliance', label: 'Alliance' },

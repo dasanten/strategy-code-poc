@@ -1950,3 +1950,75 @@ button.residents-row.selected:hover {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* ---------- Waypoints (`CONTEXT.md`: Waypoint) ---------- */
+/* The map's tile menu, at the point right-clicked or long-pressed. */
+.tile-menu {
+  position: fixed;
+  z-index: 7;
+  width: min(260px, calc(100vw - 16px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--ui-panel);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--ui-line);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+.tile-menu h3 {
+  margin: 0;
+  font-size: 13px;
+}
+.waypoint-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.waypoint-form input {
+  flex: 1;
+  min-width: 0;
+}
+.waypoint-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+}
+.waypoint-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ui-line);
+}
+.waypoint-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.waypoint-head > button:not(.waypoint-name) {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.waypoint-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.waypoint-name .name {
+  font-weight: 600;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}

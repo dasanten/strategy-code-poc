@@ -117,6 +117,7 @@ import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
+import { waypointsSound } from './waypoints.js'
 import { cityGameNamesUnique, gameNamesUnique } from './names.js'
 import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
 import { readWanted } from './storing.js'
@@ -1953,6 +1954,7 @@ export const worldInvariants: Invariant[] = [
   gameNamesUnique,
   cityGameNamesUnique,
   horseOffersOnce,
+  waypointsSound,
   buildingsInPlace,
   citiesFromBuildings,
   outpostStorageRealms,
