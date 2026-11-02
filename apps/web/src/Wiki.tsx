@@ -1223,6 +1223,13 @@ export function Wiki() {
           there until it is next driven, when a free horse of the realm standing with it is hitched
           again. A carriage whose horse dies waits the same way.
         </p>
+        <p>
+          A carriage's card shows its load as a bar against what it holds (its passengers counted
+          in) over its goods, its driver and passengers by name, the haul route it drives as “first
+          stop → second stop” with the leg it is on and about when it arrives, and its horse with
+          its health and hunger and how long the Food on board feeds it. Another realm's carriage
+          shows only how heavily it is loaded, and its horse without how it fares.
+        </p>
         <table>
           <thead>
             <tr>

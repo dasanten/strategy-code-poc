@@ -54,6 +54,9 @@ import {
   type MercenaryContract,
   type SeenResident,
   type SeenCarriage,
+  type HaulOrder,
+  aboutTime,
+  drivenCarriageId,
   type LoadLevel,
   type Horse,
   type SeenHorse,
@@ -641,26 +644,13 @@ export interface TileCard {
    * the lines and lists about what is there now.
    */
   lastSeen?: { when: string; lines: string[]; lists: CardList[] }
-  /**
-   * The carriage's passengers (`CONTEXT.md`: Passenger), written out on `lines[line]`: each by
-   * name, a link that picks them when they are the Player's to command (`pick`), and what they
-   * weigh together of what it holds.
-   */
-  passengers?: {
-    line: number
-    residents: { id: string; name: string; pick: boolean }[]
-    weight: string
-  }
+  /** The carriage on the tile, as rows and meters (`CONTEXT.md`: Goods on cards). */
+  carriage?: CarriageView
   /**
    * The carriage on the tile with a horse hitched, and the Player's residents on it who may
    * unhitch the horse (`unhitchProblem`), when there are any (`CONTEXT.md`: Hitched horse).
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
-  /**
-   * The carriage's load, for the goods grid, when the Player sees inside it (`CONTEXT.md`: Seeing
-   * inside a storage, Goods on cards).
-   */
-  load?: Stock
   /**
    * Who and what the tile holds, under the card's lines: the horses in a stable or on the tile and
    * a workplace's workers as rows; the goods in a storage, a pile and a site's materials as goods
@@ -672,6 +662,43 @@ export interface TileCard {
    * the Feed the stable task keeps there (`CONTEXT.md`: Feeding the stable).
    */
   stableFood?: { units: number; share: number; lasts: string }
+}
+
+/** Someone the card names, a link that picks them when they are the Player's to command. */
+export interface NamedResident {
+  id: string
+  name: string
+  pick: boolean
+}
+
+/**
+ * A carriage on the tile card (`CONTEXT.md`: Goods on cards): its load against what it holds, its
+ * horse with hunger, its driver and passengers, and its haul route. Only what the Player may see
+ * (`CONTEXT.md`: Seeing inside a storage, Seeing how someone fares).
+ */
+export interface CarriageView {
+  /** Its section's head: "Carriage (yours)". */
+  title: string
+  /**
+   * How full it is: "40 / 60 kg" with the share for a meter when the Player sees inside, else
+   * only how heavily it is loaded ("half loaded"), with no meter.
+   */
+  load: { text: string; share?: number }
+  /** What it holds, for the goods grid, when the Player sees inside. */
+  goods?: Stock
+  /** Its horse as a row of its own, with health and hunger where the Player knows them. */
+  horse?: CardList
+  /** Said instead of a horse row: "No horse hitched", or "Horse hitched" with it out of sight. */
+  noHorse?: string
+  driver?: NamedResident
+  /** Its passengers in sight, and what they weigh of what it holds: "160 kg of it people". */
+  passengers?: { residents: NamedResident[]; weight: string }
+  /**
+   * The haul route its driver drives, when that driver is the Player's (`CONTEXT.md`: Haul route,
+   * Estimates): "Eastmere storage → Eastmere mine", and the leg it is on or what it does at a
+   * stop: "Leg 1 of 2 · about 3 min (3 game hours)", "Loading at Eastmere storage".
+   */
+  route?: { stops: string; leg: string }
 }
 
 /** A list of rows on the tile card (`TileCard.lists`), its head with a count on the right. */
@@ -740,6 +767,13 @@ export interface TileThings {
   tick?: number
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
+  /**
+   * About how many ticks until one of the Player's residents arrives where they drive
+   * (`arrivalTicks`), for a haul route's leg.
+   */
+  arrivesIn?: (r: SeenResident) => number | undefined
+  /** The armies the Player knows, by name, for a haul route to one (`CONTEXT.md`: Supply line). */
+  armies?: readonly { id: string; name: string }[]
   /** The buildings the Player remembers out of sight, and the tick now (`CONTEXT.md`: Last seen). */
   lastSeen?: { buildings: LastSeenBuilding[]; tick: number }
   /** Where the node's workplace fits on what the Player knows (`nodeFit`), if anywhere. */
@@ -1093,9 +1127,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   let stableFood: TileCard['stableFood']
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
-  let passengers: TileCard['passengers']
   let unhitch: TileCard['unhitch']
-  let load: TileCard['load']
+  let carriageView: CarriageView | undefined
   if (building) {
     const city = cityOf(building)
     // An outpost storage goes by its own realm (`CONTEXT.md`: Outpost storage).
@@ -1186,58 +1219,17 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
-    card ??= { title: 'Carriage', rel, what: 'carriage' }
-    // Its passengers, as many as are in sight (they are on its tile, `CONTEXT.md`: Passenger).
-    const aboard = (carriage.passengerIds ?? []).flatMap((id) => {
-      const r = t.residents?.find((x) => x.id === id)
-      return r ? [{ id, name: r.name, pick: !t.strangers.some((s) => s.id === id) }] : []
-    })
-    const people = aboard.length * PASSENGER_WEIGHT
-    // Its load only when the Player sees inside (`CONTEXT.md`: Seeing inside a storage), its
-    // passengers counted in.
-    const capacity = carriageCapacity(t, carriage)
-    load = carriage.load
-    const loadText = carriage.load
-      ? `${Math.round(stockWeight(carriage.load) + people)} / ${Math.round(capacity)} kg`
-      : LOAD_LEVEL_NAMES[carriage.loadLevel]
-    // How its horse fares only for the Player's own and allies' (`CONTEXT.md`: Seeing how someone fares).
-    const horse = t.horses.find((h) => h.id === carriage.horseId)
-    const fares = horse && horseFaresKnown(horse) ? horseFares(horse) : undefined
-    const ours = rel === 'own' || rel === 'alliance'
-    // Who pulls it, by name, when the horse is in sight (`CONTEXT.md`: Horse name).
-    const horseText = !carriage.horseId
-      ? ours
-        ? ' · no horse hitched'
-        : ' · no horse'
-      : horse
-        ? ` · pulled by ${horse.name}`
-        : ' · horse hitched'
-    lines.push(
-      `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${loadText}${horseText}`,
-    )
-    if (aboard.length > 0) {
-      const weight = `${Math.round(people)} kg of it people`
-      passengers = { line: lines.length, residents: aboard, weight }
-      lines.push(`Passengers: ${aboard.map((p) => p.name).join(', ')} · ${weight}`)
+    // On a card of its own, its owner is the card's first line, as a building's.
+    if (!card) {
+      card = { title: 'Carriage', rel, what: 'carriage' }
+      lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
     }
+    carriageView = describeCarriage(carriage, rel, t)
     const own = (t.residents ?? []).filter(
       (r) => !t.strangers.some((s) => s.id === r.id) && !unhitchProblem(r, carriage, t.tick ?? 0),
     )
     if (own.length > 0) {
       unhitch = { carriageId: carriage.id, residents: own.map(({ id, name }) => ({ id, name })) }
-    }
-    if (horse) {
-      const parts = [`Horse: ${horse.name} · ${horseDetail(horse, t.tick)}`]
-      if (fares) {
-        const food = carriage.load?.food ?? 0
-        const days = Math.floor(food / (HORSE_FOOD_PER_DAY * horseFoodFactor(horse)) + 1e-9)
-        const feeds =
-          days <= 0
-            ? 'Food on board for less than a game day'
-            : `Food on board for ${days} game ${days === 1 ? 'day' : 'days'}`
-        parts.push(food > 0 ? feeds : 'no Food on board')
-      }
-      lines.push(parts.join(' · '))
     }
   }
   if (pile) {
@@ -1292,13 +1284,135 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     }),
     lines,
     ...(buildHere ? { buildHere } : {}),
-    ...(passengers ? { passengers } : {}),
+    ...(carriageView ? { carriage: carriageView } : {}),
     ...(unhitch ? { unhitch } : {}),
-    ...(load ? { load } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
   }
+}
+
+/**
+ * A carriage as rows and meters (`CONTEXT.md`: Goods on cards): its load against what it holds,
+ * its passengers counted in, and its goods, when the Player sees inside, else only how heavily it
+ * is loaded (`CONTEXT.md`: Seeing inside a storage); its horse as a row with its meters where the
+ * Player knows how it fares, and how long the Food on board feeds it; its driver and passengers in
+ * sight by name; and the haul route its driver drives, when the driver is the Player's.
+ */
+export function describeCarriage(
+  carriage: SeenCarriage,
+  rel: Relationship | undefined,
+  t: TileThings,
+): CarriageView {
+  const pick = (r: SeenResident): NamedResident => ({
+    id: r.id,
+    name: r.name,
+    pick: !t.strangers.some((s) => s.id === r.id),
+  })
+  // Its passengers, as many as are in sight (they are on its tile, `CONTEXT.md`: Passenger).
+  const aboard = (carriage.passengerIds ?? []).flatMap((id) => {
+    const r = t.residents?.find((x) => x.id === id)
+    return r ? [pick(r)] : []
+  })
+  const people = aboard.length * PASSENGER_WEIGHT
+  const capacity = carriageCapacity(t, carriage)
+  const weight = carriage.load ? stockWeight(carriage.load) + people : 0
+  const load = carriage.load
+    ? { text: `${Math.round(weight)} / ${Math.round(capacity)} kg`, share: weight / capacity }
+    : { text: capital(LOAD_LEVEL_NAMES[carriage.loadLevel]) }
+  const view: CarriageView = {
+    title: `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''}`,
+    load,
+    ...(carriage.load ? { goods: carriage.load } : {}),
+  }
+  // Who pulls it, by name, when the horse is in sight (`CONTEXT.md`: Horse name), and how it
+  // fares only for the Player's own and allies' (`CONTEXT.md`: Seeing how someone fares).
+  const horse = t.horses.find((h) => h.id === carriage.horseId)
+  if (horse) {
+    const shares = faresShares(horse)
+    let count = ''
+    if (horseFaresKnown(horse)) {
+      const food = carriage.load?.food ?? 0
+      const days = Math.floor(food / (HORSE_FOOD_PER_DAY * horseFoodFactor(horse)) + 1e-9)
+      count =
+        food <= 0
+          ? 'No Food on board'
+          : days <= 0
+            ? 'Food on board for less than a game day'
+            : `Food on board for ${days} game ${days === 1 ? 'day' : 'days'}`
+    }
+    view.horse = {
+      title: 'Horse',
+      count,
+      meters: FARES_METERS,
+      rows: [
+        {
+          id: horse.id,
+          name: horse.name,
+          detail: horseStatsText(horse, t.tick),
+          ...(shares ? { shares } : {}),
+          ...(rel === 'own' ? { opens: 'horse' as const } : {}),
+        },
+      ],
+    }
+  } else {
+    const ours = rel === 'own' || rel === 'alliance'
+    view.noHorse = carriage.horseId ? 'Horse hitched' : ours ? 'No horse hitched' : 'No horse'
+  }
+  const driver = t.residents?.find((r) => drivenCarriageId(r) === carriage.id)
+  if (driver) view.driver = pick(driver)
+  if (aboard.length > 0) {
+    view.passengers = { residents: aboard, weight: `${Math.round(people)} kg of it people` }
+  }
+  // A route as the Doing line says it, only for the Player's own driver (`CONTEXT.md`: Doing).
+  const o = driver?.order
+  if (driver && view.driver?.pick && o?.kind === 'haul') view.route = haulRoute(driver, o, t)
+  return view
+}
+
+/**
+ * A haul route's stops by name and where along it the carriage is (`CONTEXT.md`: Haul route,
+ * Estimates): leg 1 drives to the second stop, leg 2 back to the first, each with about when it
+ * arrives; at a stop, what is done there.
+ */
+function haulRoute(driver: SeenResident, o: HaulOrder, t: TileThings): CarriageView['route'] {
+  const from = stopName(o.from, t)
+  const to = o.toArmy
+    ? (t.armies?.find((a) => a.id === o.toArmy)?.name ?? 'the army')
+    : stopName(o.to, t)
+  const at = o.stop === 'from' ? from : to
+  let leg: string
+  if (o.phase === 'loading') {
+    const both = o.returnGoods.length > 0
+    leg = both
+      ? `Unloading and loading at ${at}`
+      : o.stop === 'from'
+        ? `Loading at ${at}`
+        : `Unloading at ${at}`
+  } else {
+    const ticks = o.path ? t.arrivesIn?.(driver) : undefined
+    const left = !o.path
+      ? 'finding the way'
+      : ticks === undefined
+        ? `${o.path.length} tiles to go`
+        : aboutTime(ticks)
+    leg = `Leg ${o.stop === 'to' ? 1 : 2} of 2 · ${left}`
+  }
+  return { stops: `${from} → ${to}`, leg }
+}
+
+/**
+ * A haul route's stop by what stands there, as its card is named: "Eastmere storage", "Outpost
+ * storage", "Mine"; else by its tile: "12, 40".
+ */
+function stopName(at: { x: number; y: number }, t: TileThings): string {
+  const b = t.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && covers(b, at.x, at.y))
+  if (!b) return `${at.x}, ${at.y}`
+  const name = BUILDING_NAMES[b.kind]
+  const city = t.cities.find((c) => c.id === b.cityId)
+  if (b.site) return `${name} site`
+  if (city) return `${city.name} ${name.toLowerCase()}`
+  return isOutpostStorage(b) ? `Outpost ${name.toLowerCase()}` : name
 }
 
 /**

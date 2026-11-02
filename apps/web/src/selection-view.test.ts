@@ -14,6 +14,8 @@ import {
   horseFoodFactor,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
+  TICKS_PER_GAME_HOUR,
+  aboutTime,
   BUILD_MATERIALS,
   BUILD_WORK,
   NODE_GOOD,
@@ -32,6 +34,7 @@ import {
   type ContractView,
   type Diplomacy,
   type Horse,
+  type HaulOrder,
   type Pile,
   type Resident,
   type SeenResident,
@@ -690,7 +693,7 @@ describe('the card for a tile', () => {
   it('shows a carriage, a pile and a node when there is no building', () => {
     expect(tile({ carriages: [carriage] })).toMatchObject({ what: 'carriage', rel: 'own' })
     // Its load for the goods grid (`CONTEXT.md`: Goods on cards).
-    expect(tile({ carriages: [carriage] }).load).toEqual(carriage.load)
+    expect(tile({ carriages: [carriage] }).carriage?.goods).toEqual(carriage.load)
     expect(tile({ piles: [pile] })).toMatchObject({ what: 'pile' })
     expect(tile({ piles: [pile] }).lists).toEqual([
       {
@@ -706,19 +709,20 @@ describe('the card for a tile', () => {
     expect(tile({ node })).toMatchObject({ what: 'node', title: 'Iron ore node' })
   })
 
-  it('lists a carriage’s passengers under its load, and how much of it is people', () => {
+  it('lists a carriage’s passengers, its load counting them in', () => {
     const ana = { id: 'ana', name: 'Ana' } as SeenResident
     const bo = { id: 'bo', name: 'Bo' } as SeenResident
     const cid = { id: 'cid', name: 'Cid', owner: 'them', cityId: null, carried: {} } as Resident
     const k = { ...carriage, passengerIds: ['ana', 'bo', 'cid'] }
     const card = tile({ carriages: [k], residents: [ana, bo, cid], strangers: [cid] })
     const people = 3 * PASSENGER_WEIGHT
-    const weight = Math.round(stockWeight(carriage.load) + people)
-    expect(card.lines[0]).toContain(`${weight} / ${CARRIAGE_CAPACITY} kg`)
-    expect(card.lines[1]).toBe(`Passengers: Ana, Bo, Cid · ${people} kg of it people`)
+    const weight = stockWeight(carriage.load) + people
+    expect(card.carriage?.load).toEqual({
+      text: `${Math.round(weight)} / ${CARRIAGE_CAPACITY} kg`,
+      share: weight / CARRIAGE_CAPACITY,
+    })
     // Each a link to pick them, but the stranger.
-    expect(card.passengers).toEqual({
-      line: 1,
+    expect(card.carriage?.passengers).toEqual({
       residents: [
         { id: 'ana', name: 'Ana', pick: true },
         { id: 'bo', name: 'Bo', pick: true },
@@ -726,17 +730,10 @@ describe('the card for a tile', () => {
       ],
       weight: `${people} kg of it people`,
     })
-    // Under a building's card it follows the carriage's line there.
-    const under = tile({
-      buildings: [building({ kind: 'farm', cityId: 'c-me' })],
-      carriages: [k],
-      residents: [ana],
-    })
-    const at = under.lines.findIndex((l) => l.startsWith('Carriage'))
-    expect(under.passengers?.line).toBe(at + 1)
-    expect(under.lines[at + 1]).toBe(`Passengers: Ana · ${PASSENGER_WEIGHT} kg of it people`)
-    // None aboard: no line, no list.
-    expect(tile({ carriages: [carriage] }).passengers).toBeUndefined()
+    // No sentence about it any more (`CONTEXT.md`: Goods on cards).
+    expect(card.lines.some((l) => l.startsWith('Passengers') || l.includes(' kg'))).toBe(false)
+    // None aboard: no row.
+    expect(tile({ carriages: [carriage] }).carriage?.passengers).toBeUndefined()
   })
 
   it('lists everything on the tile under the building it is named after', () => {
@@ -748,7 +745,9 @@ describe('the card for a tile', () => {
     expect(card.what).toBe('building')
     expect(card.lines).toContain('Tile 5, 5')
     expect(card.lists?.map((l) => l.title)).toEqual(['Goods', 'Pile'])
-    expect(card.lines.some((l) => l.startsWith('Carriage'))).toBe(true)
+    // The carriage as a section of its own, named with its owner.
+    expect(card.carriage?.title).toBe('Carriage (yours)')
+    expect(card.lines.some((l) => l.startsWith('Carriage'))).toBe(false)
   })
 
   it('says only how heavily loaded a carriage is, and nothing of what a storage holds, when it can’t see inside', () => {
@@ -768,9 +767,12 @@ describe('the card for a tile', () => {
       carriages: [theirs],
     })
     expect(card.lists).toBeUndefined()
-    expect(card.load).toBeUndefined()
-    expect(card.lines.find((l) => l.startsWith('Carriage'))).toContain('· half loaded')
-    expect(card.lines.find((l) => l.startsWith('Carriage'))).not.toContain('kg')
+    expect(card.carriage).toMatchObject({
+      title: 'Carriage (another realm)',
+      load: { text: 'Half loaded' },
+    })
+    expect(card.carriage?.load.share).toBeUndefined()
+    expect(card.carriage?.goods).toBeUndefined()
   })
 
   it('ignores what stands on other tiles', () => {
@@ -861,48 +863,58 @@ describe('horses on the tile card', () => {
     delete seen.health
     return seen
   }
-  const horseLine = (lines: string[]) => lines.find((l) => l.startsWith('Horse:'))
-
-  it('tells how the own carriage’s horse fares and how long the Food on board feeds it', () => {
+  it('shows the own carriage’s horse as a row with its meters, and how long the Food on board feeds it', () => {
     const fed = tile({ carriages: [{ ...carriage, load: { food: 6 } }], horses: [horse()] })
-    expect(horseLine(fed.lines)).toBe(
-      'Horse: Rowan · Speed 12, Strength 8, Endurance 10 · fed, healthy · Food on board for 8 game days',
-    )
+    expect(fed.carriage?.horse).toEqual({
+      title: 'Horse',
+      count: 'Food on board for 8 game days',
+      meters: ['Health', 'Hunger'],
+      rows: [
+        {
+          id: 'h1',
+          name: 'Rowan',
+          detail: 'Speed 12, Strength 8, Endurance 10',
+          shares: [1, 1],
+          opens: 'horse',
+        },
+      ],
+    })
     const hungry = tile({
       carriages: [carriage],
       horses: [horse({ hunger: 10, health: MAX_HEALTH - 5 })],
     })
-    expect(horseLine(hungry.lines)).toBe(
-      'Horse: Rowan · Speed 12, Strength 8, Endurance 10 · hungry, hurt · no Food on board',
-    )
-    const starving = tile({ carriages: [carriage], horses: [horse({ hunger: 0 })] })
-    expect(horseLine(starving.lines)).toContain('· starving, healthy')
+    expect(hungry.carriage?.horse).toMatchObject({ count: 'No Food on board' })
+    expect(hungry.carriage?.horse?.rows[0]?.shares).toEqual([
+      (MAX_HEALTH - 5) / MAX_HEALTH,
+      10 / MAX_HUNGER,
+    ])
+    const crumbs = tile({ carriages: [{ ...carriage, load: { food: 0.1 } }], horses: [horse()] })
+    expect(crumbs.carriage?.horse?.count).toBe('Food on board for less than a game day')
     // A hitched horse is not a loose one.
-    expect(fed.lines.some((l) => l.includes('1 horse ('))).toBe(false)
+    expect(fed.lists).toBeUndefined()
   })
 
-  it('says only whether a stranger’s carriage has a horse, and its horse’s stats', () => {
+  it('shows a stranger’s carriage’s horse without how it fares, or only whether it has one', () => {
     const { id, x, y } = carriage
     const theirs = { id, x, y, realmId: 'r-other', cityId: null, loadLevel: 'empty' as const }
     const hitched = tile({
       carriages: [{ ...theirs, horseId: 'h1' }],
       horses: [unknown({ realmId: 'r-other' })],
     })
-    expect(hitched.lines.find((l) => l.startsWith('Carriage'))).toBe(
-      'Carriage (another realm) · empty · pulled by Rowan',
-    )
-    expect(horseLine(hitched.lines)).toBe('Horse: Rowan · Speed 12, Strength 8, Endurance 10')
+    expect(hitched.carriage?.horse).toEqual({
+      title: 'Horse',
+      count: '',
+      meters: ['Health', 'Hunger'],
+      rows: [{ id: 'h1', name: 'Rowan', detail: 'Speed 12, Strength 8, Endurance 10' }],
+    })
     // With its horse out of sight, only that one is hitched.
     const unseen = tile({ carriages: [{ ...theirs, horseId: 'h1' }] })
-    expect(unseen.lines.find((l) => l.startsWith('Carriage'))).toBe(
-      'Carriage (another realm) · empty · horse hitched',
-    )
+    expect(unseen.carriage).toMatchObject({ noHorse: 'Horse hitched' })
+    expect(unseen.carriage?.horse).toBeUndefined()
     const bare = tile({ carriages: [{ ...theirs, horseId: null }] })
-    expect(bare.lines.find((l) => l.startsWith('Carriage'))).toBe(
-      'Carriage (another realm) · empty · no horse',
-    )
+    expect(bare.carriage?.noHorse).toBe('No horse')
     const mine = tile({ carriages: [{ ...carriage, horseId: null }] })
-    expect(mine.lines.find((l) => l.startsWith('Carriage'))).toContain('· no horse hitched')
+    expect(mine.carriage?.noHorse).toBe('No horse hitched')
   })
 
   it('lists a rider’s horse on their card with its stats, age and how it fares', () => {
@@ -942,9 +954,7 @@ describe('horses on the tile card', () => {
     // Strength 15 is 5 above average: the carriage it pulls holds a fifth more.
     const k = { ...carriage, horseId: strong.id, load: { stone: 4 } }
     const pulled = tile({ carriages: [k], horses: [strong], tick: at })
-    expect(pulled.lines.find((l) => l.startsWith('Carriage'))).toContain(
-      `/ ${CARRIAGE_CAPACITY * 1.2} kg`,
-    )
+    expect(pulled.carriage?.load.text).toContain(`/ ${CARRIAGE_CAPACITY * 1.2} kg`)
   })
 
   it('counts loose horses on a tile, how they fare only for the Player’s own, and is named after them', () => {
@@ -1331,5 +1341,113 @@ describe('Build a … here on a node’s card', () => {
   it('isn’t offered on a node built over', () => {
     const camp = building({ kind: 'lumberCamp' })
     expect(build(tile({ node, buildings: [camp], nodeFit: { x: 5, y: 5 } }), adult)).toBeUndefined()
+  })
+})
+
+describe('a carriage on the tile card (`CONTEXT.md`: Goods on cards)', () => {
+  const storage = building({ id: 'b-store', kind: 'storage', cityId: 'c-me', x: 1, y: 1 })
+  const route = (more: Partial<HaulOrder> = {}): HaulOrder => ({
+    kind: 'haul',
+    carriageId: carriage.id,
+    from: { x: 1, y: 1 },
+    to: { x: 20, y: 20 },
+    goods: ['stone'],
+    returnGoods: [],
+    keepFood: 2,
+    stop: 'to',
+    phase: 'driving',
+    path: [
+      [6, 6],
+      [7, 7],
+    ],
+    progress: 0,
+    moving: null,
+    ...more,
+  })
+  const ana = (order: HaulOrder | null) =>
+    ({ id: 'ana', name: 'Ana', x: 5, y: 5, order }) as SeenResident
+
+  it('names its owner on its own card, and only its section otherwise', () => {
+    const card = tile({ carriages: [carriage] })
+    expect(card.lines[0]).toBe('Yours')
+    expect(card.carriage?.title).toBe('Carriage (yours)')
+  })
+
+  it('shows its driver, the haul route by its stops, the leg it is on and when it arrives', () => {
+    const r = ana(route())
+    const card = tile({
+      carriages: [carriage],
+      buildings: [storage],
+      residents: [r],
+      arrivesIn: (x) => (x.id === 'ana' ? 3 * TICKS_PER_GAME_HOUR : undefined),
+    })
+    expect(card.carriage?.driver).toEqual({ id: 'ana', name: 'Ana', pick: true })
+    expect(card.carriage?.route).toEqual({
+      stops: 'Eastmere storage → 20, 20',
+      leg: `Leg 1 of 2 · ${aboutTime(3 * TICKS_PER_GAME_HOUR)}`,
+    })
+    // Back to the first stop, the second leg; without an estimate, the tiles to go.
+    const back = tile({
+      carriages: [carriage],
+      buildings: [storage],
+      residents: [ana(route({ stop: 'from' }))],
+    })
+    expect(back.carriage?.route?.leg).toBe('Leg 2 of 2 · 2 tiles to go')
+    const finding = tile({ carriages: [carriage], residents: [ana(route({ path: null }))] })
+    expect(finding.carriage?.route?.leg).toBe('Leg 1 of 2 · finding the way')
+  })
+
+  it('says what is done at a stop, and names an army the route supplies', () => {
+    const at = (more: Partial<HaulOrder>) =>
+      tile({ carriages: [carriage], buildings: [storage], residents: [ana(route(more))] }).carriage
+        ?.route?.leg
+    expect(at({ stop: 'from', phase: 'loading' })).toBe('Loading at Eastmere storage')
+    expect(at({ stop: 'to', phase: 'loading' })).toBe('Unloading at 20, 20')
+    expect(at({ stop: 'to', phase: 'loading', returnGoods: ['food'] })).toBe(
+      'Unloading and loading at 20, 20',
+    )
+    const army = tile({
+      carriages: [carriage],
+      residents: [ana(route({ toArmy: 'a1' }))],
+      armies: [{ id: 'a1', name: 'Vanguard' }],
+    })
+    expect(army.carriage?.route?.stops).toBe('1, 1 → Vanguard')
+  })
+
+  it('has no driver or route standing idle', () => {
+    const card = tile({ carriages: [carriage], residents: [ana(null)] })
+    expect(card.carriage?.driver).toBeUndefined()
+    expect(card.carriage?.route).toBeUndefined()
+    // Someone else's order on another carriage doesn't make them its driver.
+    const other = tile({ carriages: [carriage], residents: [ana(route({ carriageId: 'k9' }))] })
+    expect(other.carriage?.driver).toBeUndefined()
+  })
+
+  it('shows another realm’s carriage only by how heavily it is loaded, its driver by name, no route', () => {
+    const { id, x, y, horseId } = carriage
+    const theirs = {
+      id,
+      x,
+      y,
+      horseId,
+      realmId: 'r-other',
+      cityId: null,
+      loadLevel: 'heavy' as const,
+    }
+    const cid = {
+      ...ana(route()),
+      id: 'cid',
+      name: 'Cid',
+      owner: 'r-other',
+      carried: {},
+    } as SeenResident
+    const card = tile({ carriages: [theirs], residents: [cid], strangers: [cid] })
+    expect(card.lines[0]).toBe('Another realm')
+    expect(card.carriage).toEqual({
+      title: 'Carriage (another realm)',
+      load: { text: 'Heavily loaded' },
+      noHorse: 'Horse hitched',
+      driver: { id: 'cid', name: 'Cid', pick: false },
+    })
   })
 })

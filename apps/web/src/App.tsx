@@ -1463,6 +1463,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
                 },
                 workers: (b) => workersHere(world.residents, b),
+                // A haul route's arrival only for the Player's own driver.
+                arrivesIn: (r) => {
+                  const mine = own.find((o) => o.id === r.id)
+                  return mine && arrivesIn ? arrivesIn(mine) : undefined
+                },
+                armies: world.armies,
                 nodeFit: (() => {
                   const node = nodeAt?.(selectedTile.x, selectedTile.y)
                   if (!node || !terrainAt) return undefined
