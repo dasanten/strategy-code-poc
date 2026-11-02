@@ -148,11 +148,13 @@ import {
   type SavedQueues,
 } from './saved-queues.js'
 import {
-  GROUP_BUTTONS,
+  groupButtonGroup,
   groupNumberParams,
+  groupRows,
   groupSentLine,
   type GroupButton,
   type GroupOrder,
+  type GroupSeen,
   type Skipped,
 } from './group-orders.js'
 import { GROUP_HINTS } from './pick-mode.js'
@@ -160,16 +162,22 @@ import { NumberField, foodParamsHint } from './ScriptParams.js'
 import { defenceChoices, groupDefenceScript } from './script-run-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
-import { ActionRows, CardTabs, SelectionCard, useActionKeys } from './SelectionCard.js'
+import {
+  ActionRows,
+  CardTabs,
+  SelectionCard,
+  useActionKeys,
+  useEscapeClosesPanel,
+  useKeptRows,
+} from './SelectionCard.js'
 import {
   horseDetail,
-  groupOrders,
-  residentActions,
-  ORDER_GROUP_LABELS,
+  orderGroupOf,
+  residentOrders,
+  rowGroups,
   riddenHorseLine,
   type ActionId,
   type CardAction,
-  type OrderGroup,
 } from './selection-view.js'
 
 /** Good names as the UI shows them. */
@@ -1038,7 +1046,7 @@ export function ResidentsList({
 /**
  * The selection card for several of the Player's residents picked at once on the map (ADR 0012;
  * `CONTEXT.md`: Group, Resident card): a header with how many and who, then one open tab. Orders
- * gives each of them the same order, grouped by kind as on a resident card (`GROUP_BUTTONS`), each
+ * gives each of them the same order, in rows as on a resident card (`groupRows`), each
  * to those who can take it; Queue plans a queue to give them all; Members lists what each is doing,
  * a click picking just that one; Script says what they run and gives them all one.
  */
@@ -1064,6 +1072,8 @@ export function GroupCard({
   planner,
   collapsed = false,
   relocate,
+  seen = {},
+  mapSize,
 }: {
   residents: Resident[]
   scripts: ScriptSummary[]
@@ -1107,11 +1117,18 @@ export function GroupCard({
    * told to at all, if they can't.
    */
   relocate?: { choices: RelocateChoice[]; problem: string | undefined }
+  /**
+   * The realm's free horses and carriages and the buildings in sight, to tell which orders some
+   * of them can take where they stand (`groupRows`).
+   */
+  seen?: GroupSeen
+  /** Tiles along each side of the map. */
+  mapSize?: number
 }) {
   const card = groupCard(residents)
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
-  // The order whose panel is open under the buttons: what it needs before it goes out.
-  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed' | 'teach' | 'relocate'>()
+  // The order whose panel is open under the rows: what it needs before it goes out.
+  const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed' | 'teach' | 'relocate' | 'board'>()
   const [good, setGood] = useState<Good>('food')
   const numberParams = groupNumberParams(residents, scripts)
   const foodHint = foodParamsHint(numberParams.map((p) => p.name))
@@ -1150,67 +1167,41 @@ export function GroupCard({
     getOff: { kind: 'getOff' },
     unhitch: { kind: 'unhitch' },
   }
-  const orderButton = (id: GroupButton, label: string) => {
-    // One Board button for each carriage some of them stand on; with none, nobody can board.
-    if (id === 'board') {
-      if (carriages.length === 0)
-        return (
-          <button
-            type="button"
-            key={id}
-            disabled
-            title="none of them stands on a carriage of your realm"
-          >
-            {label}
-          </button>
-        )
-      return carriages.map(({ carriage, seats }) => (
-        <button
-          type="button"
-          key={`${id}-${carriage.id}`}
-          onClick={() => onOrder({ kind: 'board', carriage, seats })}
-        >
-          {label}
-          {carriages.length > 1 ? ` at ${carriage.x}, ${carriage.y}` : ''}
-        </button>
-      ))
+  const { actions, missing } = groupRows({
+    residents,
+    tick: tick ?? 0,
+    size: mapSize ?? 0,
+    seen,
+    carriages: carriages.length,
+    relocateProblem: relocate ? relocate.problem : 'your realm has no other city',
+  })
+  // Each row keeps its slot while the card is open (ADR 0019); a row picking a tile shows it.
+  const rows = useKeptRows(actions, missing, groupButtonGroup).map((a) => {
+    const p = picks[a.id]
+    return p && picked === p ? { ...a, active: true as const } : a
+  })
+  const shown = actions.some((a) => a.id === panel) ? panel : undefined
+  useEscapeClosesPanel(tab === 'orders' && (shown !== undefined || (!!buildAt && !picking)), () => {
+    setPanel(undefined)
+    if (buildAt) onPicking(false)
+  })
+  const act = (a: CardAction<GroupButton>) => {
+    if (tab !== 'orders' && a.id !== 'script') showTab('orders')
+    // With one carriage to board it boards that; with several, a panel lists them.
+    if (a.id === 'board' && carriages.length === 1) {
+      const { carriage, seats } = carriages[0]!
+      return onOrder({ kind: 'board', carriage, seats })
     }
-    const p = picks[id]
-    if (p) {
-      return (
-        <button type="button" key={id} aria-pressed={picked === p} onClick={() => toggle(p)}>
-          {label}
-        </button>
-      )
-    }
-    const order = at_once[id]
-    if (order)
-      return (
-        <button type="button" key={id} onClick={() => onOrder(order)}>
-          {label}
-        </button>
-      )
-    if (id === 'script')
-      return (
-        <button type="button" key={id} onClick={() => showTab('script')}>
-          {label}
-        </button>
-      )
-    const opens = id as 'haul' | 'fetch' | 'breed' | 'teach' | 'relocate'
-    return (
-      <button
-        type="button"
-        key={id}
-        aria-pressed={panel === opens}
-        onClick={() => {
-          onPicking(false)
-          setPanel(panel === opens ? undefined : opens)
-        }}
-      >
-        {label}
-      </button>
-    )
+    const p = picks[a.id]
+    if (p) return toggle(p)
+    const order = at_once[a.id]
+    if (order) return onOrder(order)
+    if (a.id === 'script') return showTab('script')
+    const opens = a.id as NonNullable<typeof panel>
+    onPicking(false)
+    setPanel(shown === opens ? undefined : opens)
   }
+  useActionKeys(rows, act)
   // The finished stables some of them stand in, to breed horses in.
   const stables = buildings.filter(
     (b) => b.kind === 'stable' && !b.site && residents.some((r) => isAt(r, b)),
@@ -1232,19 +1223,37 @@ export function GroupCard({
       <CardTabs tabs={GROUP_TABS} labels={TAB_LABELS} tab={tab} onTab={showTab} />
 
       {tab === 'orders' &&
-        (Object.keys(ORDER_GROUP_LABELS) as OrderGroup[]).map((g) => {
-          const buttons = GROUP_BUTTONS.filter((b) => b.group === g)
-          if (buttons.length === 0) return null
-          const label = ORDER_GROUP_LABELS[g]
-          return (
-            <div className="sel-order-group" key={g}>
-              <h3>{label}</h3>
-              <div className="order-buttons" aria-label={label}>
-                {buttons.map((b) => orderButton(b.id, b.label))}
-              </div>
-            </div>
-          )
-        })}
+        rowGroups(rows, groupButtonGroup).map((g) => (
+          <div className="sel-order-group" key={g.group}>
+            <h3>{g.label}</h3>
+            <ActionRows
+              actions={g.actions}
+              open={shown}
+              onAction={act}
+              label={g.label}
+              keys={false}
+            />
+          </div>
+        ))}
+      {tab === 'orders' && shown === 'board' && (
+        <section className="inspector-block" aria-label="Board carriage">
+          <div className="order-buttons">
+            {carriages.map(({ carriage, seats }) => (
+              <button
+                type="button"
+                key={carriage.id}
+                onClick={() => {
+                  setPanel(undefined)
+                  onOrder({ kind: 'board', carriage, seats })
+                }}
+              >
+                Board at {carriage.x}, {carriage.y}
+              </button>
+            ))}
+          </div>
+          <p className="muted small">Those standing on the carriage board it, until it is full.</p>
+        </section>
+      )}
       {tab === 'orders' && buildAt && !picking && (
         <section className="inspector-block" aria-label="Build">
           <div className="panel-head">
@@ -1291,7 +1300,7 @@ export function GroupCard({
           </p>
         </section>
       )}
-      {tab === 'orders' && panel === 'fetch' && (
+      {tab === 'orders' && shown === 'fetch' && (
         <section className="inspector-block" aria-label="Fetch">
           <div className="order-buttons">
             <select
@@ -1322,7 +1331,7 @@ export function GroupCard({
           </p>
         </section>
       )}
-      {tab === 'orders' && panel === 'relocate' && (
+      {tab === 'orders' && shown === 'relocate' && (
         <GroupRelocateBlock
           count={residents.length}
           choices={relocate?.choices ?? []}
@@ -1333,7 +1342,7 @@ export function GroupCard({
           }}
         />
       )}
-      {tab === 'orders' && panel === 'haul' && (
+      {tab === 'orders' && shown === 'haul' && (
         <HaulBlock
           adult
           onRoute={false}
@@ -1341,7 +1350,7 @@ export function GroupCard({
           onHaulTo={(haul) => toggle('haul', { haul })}
         />
       )}
-      {tab === 'orders' && panel === 'teach' && (
+      {tab === 'orders' && shown === 'teach' && (
         <section className="inspector-block" aria-label="Teach">
           <div className="panel-head">
             <h3>Teach</h3>
@@ -1352,7 +1361,7 @@ export function GroupCard({
           </p>
         </section>
       )}
-      {tab === 'orders' && panel === 'breed' && (
+      {tab === 'orders' && shown === 'breed' && (
         <section className="inspector-block" aria-label="Breed horses">
           <div className="panel-head">
             <h3>Breed horses</h3>
@@ -1799,7 +1808,7 @@ export function ResidentCard({
   const roadNeeded = roadSite ? materialsNeeded(roadSite) : {}
   const atCarriageSite: GoodsSpot = { kind: 'site', siteId: carriageSite?.id ?? '' }
   const carriageNeeded = carriageSite ? materialsNeeded(carriageSite) : {}
-  const actions = residentActions({
+  const { actions, missing } = residentOrders({
     adult: !child,
     busy: !!(r.order || r.script),
     inCity: r.cityId !== null,
@@ -1825,8 +1834,11 @@ export function ResidentCard({
     carrying: !!r.carrying,
     carries: carried.length > 0,
   })
+  // Each row keeps its slot while the card is open (ADR 0019).
+  const rows = useKeptRows(actions, missing, orderGroupOf)
   const tab = sections.tab
   const shown = actions.some((a) => a.id === sections.panel) ? sections.panel : undefined
+  useEscapeClosesPanel(tab === 'orders' && shown !== undefined, () => setPanel(undefined))
   const act = (a: CardAction) => {
     // An order's key opens its panel from any tab, on the Orders tab.
     if (a.opens) {
@@ -1844,7 +1856,7 @@ export function ResidentCard({
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
     if (a.id === 'train' && building) onTrain(building.id)
   }
-  useActionKeys(actions, act)
+  useActionKeys(rows, act)
   const ridden = riddenHorseLine(r, horses, tick)
   // The city they live in, or none (`CONTEXT.md`: Homeless).
   const home =
@@ -1902,7 +1914,7 @@ export function ResidentCard({
       </div>
 
       {tab === 'orders' &&
-        groupOrders(actions).map((g) => (
+        rowGroups(rows, orderGroupOf).map((g) => (
           <div className="sel-order-group" key={g.group}>
             <h3>{g.label}</h3>
             <ActionRows

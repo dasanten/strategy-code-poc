@@ -88,7 +88,13 @@ import {
   type PlanWorld,
 } from './plan-step.js'
 import { useSavedGroups } from './saved-groups.js'
-import { groupRequests, type GroupOrder, type Place, type Skipped } from './group-orders.js'
+import {
+  groupRequests,
+  type GroupOrder,
+  type GroupSeen,
+  type Place,
+  type Skipped,
+} from './group-orders.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { Login } from './Login.js'
 import { MapView } from './MapView.js'
@@ -107,13 +113,14 @@ import {
   type Picking,
 } from './Residents.js'
 import { arrivalOf } from './doing-view.js'
-import { CardSheet, PickBanner, TileCard } from './SelectionCard.js'
+import { CardSheet, PickBanner, TileCard, closeOpenPanel, panelOpen } from './SelectionCard.js'
 import { pickHint, pickPrompt, pickTarget, useMediaQuery, useTouchScreen } from './pick-mode.js'
 import { PHONE_QUERY } from './sheet-view.js'
 import { buildingNodeKind } from './building-info-view.js'
 import {
   buildHereProblem,
   describeTile,
+  escapeStep,
   makeLeaderProblem,
   nodeFit,
   type ActionId,
@@ -278,6 +285,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           : [],
       )
     : []
+  // What group orders need of what the Player sees (`GroupSeen`).
+  const groupSeen: GroupSeen = world
+    ? {
+        // Free horses of the realm, to mount (`CONTEXT.md`: Riding).
+        horses: world.horses.filter(
+          (h) =>
+            h.realmId === world.home.realmId && !carriagePulledBy(world, h) && !riderOf(world, h),
+        ),
+        carriages: world.carriages.filter((k) => k.realmId === world.home.realmId),
+        buildings: world.buildings,
+      }
+    : {}
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
   // The cities and buildings the Player knows, in sight or remembered (`CONTEXT.md`: Last seen).
   const knownCities = world ? knownOf(world.cities, world.lastSeen.cities) : []
@@ -353,32 +372,39 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setPlan(undefined)
     setStarting((s) => s && { ...s, picking: undefined })
   }, [])
-  // Escape leaves pick mode first; with no drawer open, it then drops the selection.
+  // Escape leaves the top-most thing first: pick mode, an open panel (the form before a script
+  // starts among them), the tile card, the resident or group card, then the drawer.
   const anySelected = selectedIds.length > 0
   const picked = pick !== undefined
   const formOpen = starting !== undefined
+  const tileOpen = selectedTile !== undefined
   useEffect(() => {
-    if (!picked && !formOpen && (openDrawer || !anySelected)) return
     const onKey = (e: KeyboardEvent) => {
       const typing =
         e.target instanceof Element && e.target.closest('input, textarea, select, .cm-editor')
       if (e.key !== 'Escape' || typing) return
-      if (picked) {
-        // Ahead of the drawer's own Escape, which would close it too.
-        e.stopImmediatePropagation()
-        return cancelPick()
+      const step = escapeStep({
+        pick: picked,
+        panel: formOpen || panelOpen(),
+        tile: tileOpen,
+        card: anySelected,
+      })
+      // With nothing else open, the drawer's own Escape closes it.
+      if (!step) return
+      // Ahead of the drawer's own Escape, which would close it too.
+      e.stopImmediatePropagation()
+      if (step === 'pick') return cancelPick()
+      if (step === 'panel') {
+        if (formOpen) return setStarting(undefined)
+        return closeOpenPanel()
       }
-      // The form before a script starts is cancelled first.
-      if (formOpen) {
-        e.stopImmediatePropagation()
-        return setStarting(undefined)
-      }
+      if (step === 'tile') return setSelectedTile(undefined)
       setSelectedIds([])
       setPicking(false)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [openDrawer, anySelected, picked, formOpen, cancelPick])
+  }, [anySelected, picked, formOpen, tileOpen, cancelPick])
   useLayoutEffect(() => {
     if (!toShow) return
     const covered = mapCovered()
@@ -716,20 +742,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return !world.residents.some((r) => r.x === x && r.y === y && !inGroup.has(r.id))
     }
     // With Shift held, each one's queue gets the order appended (`CONTEXT.md`: Queue).
-    const realmId = world.home.realmId
     const { requests, skipped } = groupRequests(order, group, {
       tick: world.tick,
       size,
       free,
       queued,
-      seen: {
-        // Free horses of the realm, to mount (`CONTEXT.md`: Riding).
-        horses: world.horses.filter(
-          (h) => h.realmId === realmId && !carriagePulledBy(world, h) && !riderOf(world, h),
-        ),
-        carriages: world.carriages.filter((k) => k.realmId === realmId),
-        buildings: world.buildings,
-      },
+      seen: groupSeen,
     })
     if (order.kind === 'build') setGroupBuildAt(undefined)
     await sendToGroup(
@@ -1309,7 +1327,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }}
             // The same `renameHorse` order a script's `renameHorse` requests, asked by the Leader.
             onRenameHorse={async (horseId, name) => {
-              const order = { kind: 'renameHorse', residentId: world.home.leaderId, horseId, name }
+              const order = {
+                kind: 'renameHorse',
+                residentId: world.home.leaderId,
+                horseId,
+                name,
+              }
               setOrderError(await giveOrder(order))
             }}
             onSelectResident={(id) => select([id])}
@@ -1500,7 +1523,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       {world && group.length > 1 && !selectedTile && (
         <CardSheet phone={phone} pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}>
           <GroupCard
+            // Another group picked starts a card sorted afresh (ADR 0019).
+            key={selectedIds.join()}
             residents={group}
+            seen={groupSeen}
+            mapSize={world.map.size}
             relocate={relocateForGroup(group)}
             cities={knownCities}
             scripts={scripts}
