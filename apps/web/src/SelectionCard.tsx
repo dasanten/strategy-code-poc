@@ -30,8 +30,10 @@ import {
   tileActions,
   unhitcherOf,
   type CardAction,
+  type CarriageView,
   type CardList,
   type CardRow,
+  type NamedResident,
   type OrderGroup,
   type TileCard as TileCardData,
 } from './selection-view.js'
@@ -543,35 +545,17 @@ export function TileCard({
       {card.lines.length > (card.lastSeen ? 0 : 1) && (
         <ul className="sel-facts">
           {/* By place, not text: horses alike give the same line twice. */}
-          {card.lines.map((l, i) =>
-            i === 0 && !card.lastSeen ? null : i === card.passengers?.line ? (
-              <li key={i}>
-                Passengers:{' '}
-                {card.passengers.residents.map((p, j) => (
-                  <Fragment key={p.id}>
-                    {j > 0 && ', '}
-                    {p.pick ? (
-                      <button type="button" className="link" onClick={() => onSelectResident(p.id)}>
-                        {p.name}
-                      </button>
-                    ) : (
-                      p.name
-                    )}
-                  </Fragment>
-                ))}{' '}
-                · {card.passengers.weight}
-              </li>
-            ) : (
-              <li key={i}>{l}</li>
-            ),
-          )}
+          {card.lines.map((l, i) => (i === 0 && !card.lastSeen ? null : <li key={i}>{l}</li>))}
         </ul>
       )}
-      {card.load && (
-        <div className="card-goods">
-          <span className="muted small">Load</span>
-          <GoodsGrid label="Load" items={goodsItems(card.load)} empty="Empty" />
-        </div>
+      {card.carriage && (
+        <CarriageBlock
+          carriage={card.carriage}
+          // On its own card the card's head already names it.
+          head={card.what !== 'carriage'}
+          onSelectResident={onSelectResident}
+          onOpenHorse={onOpenHorse}
+        />
       )}
       {card.stableFood && (
         <div className="vital card-food">
@@ -660,6 +644,97 @@ export function TileCard({
 }
 
 const capital = (words: string) => `${words.charAt(0).toUpperCase()}${words.slice(1)}`
+
+/**
+ * A carriage on the tile card (`CarriageView`) as labelled rows: its load as a bar over its
+ * goods grid, its driver, passengers and route, then its horse as a row with its meters. Names
+ * of the Player's residents pick them.
+ */
+function CarriageBlock({
+  carriage,
+  head,
+  onSelectResident,
+  onOpenHorse,
+}: {
+  carriage: CarriageView
+  /** Its own heading, under a building's card. */
+  head: boolean
+  onSelectResident: (id: string) => void
+  onOpenHorse: (id: string) => void
+}) {
+  const name = (r: NamedResident) =>
+    r.pick ? (
+      <button type="button" className="link" onClick={() => onSelectResident(r.id)}>
+        {r.name}
+      </button>
+    ) : (
+      r.name
+    )
+  const { load, driver, passengers, route } = carriage
+  return (
+    <section className="card-carriage" aria-label={carriage.title}>
+      {head && (
+        <div className="panel-head">
+          <h3>{carriage.title}</h3>
+        </div>
+      )}
+      <div className="vital card-load">
+        <div className="vital-head">
+          <span className="muted">Load</span>
+          <span className="mono">{load.text}</span>
+        </div>
+        {load.share !== undefined && (
+          <span className="meter big" aria-label={`Load ${pct(load.share)}`}>
+            <span className="ok" style={{ width: pct(load.share) }} />
+          </span>
+        )}
+      </div>
+      {carriage.goods && (
+        <GoodsGrid label="Load" items={goodsItems(carriage.goods)} empty="Empty" />
+      )}
+      <dl className="card-rows">
+        {driver && (
+          <>
+            <dt>Driver</dt>
+            <dd>{name(driver)}</dd>
+          </>
+        )}
+        {passengers && (
+          <>
+            <dt>Passengers</dt>
+            <dd>
+              {passengers.residents.map((p, j) => (
+                <Fragment key={p.id}>
+                  {j > 0 && ', '}
+                  {name(p)}
+                </Fragment>
+              ))}{' '}
+              <span className="muted">· {passengers.weight}</span>
+            </dd>
+          </>
+        )}
+        {route && (
+          <>
+            <dt>Route</dt>
+            <dd>
+              {route.stops}
+              <small className="muted">{route.leg}</small>
+            </dd>
+          </>
+        )}
+        {carriage.noHorse && (
+          <>
+            <dt>Horse</dt>
+            <dd>{carriage.noHorse}</dd>
+          </>
+        )}
+      </dl>
+      {carriage.horse && (
+        <CardListBlock list={carriage.horse} onOpen={(row) => onOpenHorse(row.id)} />
+      )}
+    </section>
+  )
+}
 
 /**
  * A list on the tile card (`CardList`): its title with the count on the right, a heading over the
