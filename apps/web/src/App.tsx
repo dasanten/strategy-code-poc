@@ -159,6 +159,8 @@ import { ScriptParamFields, StartParamsForm } from './ScriptParams.js'
 import { WorkSettings } from './WorkSettings.js'
 import {
   groupStartValues,
+  isWorkTask,
+  overrideParamValues,
   startedScript,
   startFormParams,
   startParamValues,
@@ -180,6 +182,11 @@ interface Starting {
   /** The params the form shows (`startFormParams`). */
   params: ScriptParam[]
   values: StartValues
+  /**
+   * For Work, what the form started with, the workplace's settings (`CONTEXT.md`: Workplace
+   * settings): Start gives only what was changed from it, the resident's overrides.
+   */
+  base?: StartValues
   picking?: ScriptParam
   error?: string
   start: (params: StartParamValues) => Promise<void>
@@ -543,16 +550,23 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * (`CONTEXT.md`: Queue). Orders that can't be queue steps are given as they are. An order
    * starting a script that declares params first shows the form for them (`CONTEXT.md`: Before
    * it starts), filled with the resident's kept values or the defaults; Start gives it with them.
+   * Work runs the workplace's work script, the form filled with its settings (`CONTEXT.md`:
+   * Workplace settings).
    */
   const giveOrder = (order: OrderRequest, queued = shift.current): Promise<string | undefined> => {
     const r = own.find((x) => x.id === order.residentId)
-    const script = order.params === undefined ? startedScript(order, scripts) : undefined
+    const settings = world?.workSettings ?? {}
+    const script = order.params === undefined ? startedScript(order, scripts, settings) : undefined
     const params = script ? startFormParams(order, script) : []
     if (script && params.length > 0) {
+      const values = isWorkTask(order)
+        ? startValues(params, settings[order.workplaceId as string]?.params)
+        : startValues(params, r?.scriptParams?.[script.id], targetParam(script))
       setStarting({
         script,
         params,
-        values: startValues(params, r?.scriptParams?.[script.id], targetParam(script)),
+        values,
+        ...(isWorkTask(order) ? { base: values } : {}),
         start: async (params) => setOrderError(await giveOrder({ ...order, params }, queued)),
       })
       return Promise.resolve(undefined)
@@ -817,7 +831,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * Gives each resident of the group the same order request (ADR 0002), skipping those who
    * can't take it, and says on the card who was skipped or turned down and why. One starting a
    * script that declares params first shows the form for them, once for all (`CONTEXT.md`:
-   * Before it starts), filled with the values all of them keep or the defaults.
+   * Before it starts), filled with the values all of them keep or the defaults; for Work with
+   * the workplace's settings (`CONTEXT.md`: Workplace settings).
    */
   async function sendGroup(order: GroupOrder, queued = shift.current) {
     if (!world) return
@@ -828,14 +843,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           ? { kind: 'task', task: order.kind }
           : undefined
     const given = 'params' in order && order.params !== undefined
-    const script = starts && !given ? startedScript(starts, scripts) : undefined
-    const params = script ? startFormParams(starts!, script) : []
+    const workplaceId = order.kind === 'work' ? order.workplace.id : undefined
+    const startsAt = starts && workplaceId !== undefined ? { ...starts, workplaceId } : starts
+    const script =
+      startsAt && !given ? startedScript(startsAt, scripts, world.workSettings) : undefined
+    const params = script ? startFormParams(startsAt!, script) : []
     if (script && params.length > 0) {
       const kept = group.map((r) => r.scriptParams?.[script.id])
+      const values =
+        workplaceId === undefined
+          ? groupStartValues(params, kept, targetParam(script))
+          : startValues(params, world.workSettings[workplaceId]?.params)
       setStarting({
         script,
         params,
-        values: groupStartValues(params, kept, targetParam(script)),
+        values,
+        ...(workplaceId === undefined ? {} : { base: values }),
         start: (params) => sendGroup({ ...order, params } as GroupOrder, queued),
       })
       return
@@ -1738,6 +1761,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   params={scripts.find((s) => s.id === selected.script!.scriptId)?.params ?? []}
                   // As seen: the values picked for the script they run come with it.
                   values={world.residents.find((r) => r.id === selected.id)?.script?.params ?? {}}
+                  // Working by a workplace's settings, what they don't override reads its values.
+                  workplace={(() => {
+                    const from = world.residents.find((r) => r.id === selected.id)?.script
+                      ?.settingsFrom
+                    return from === undefined ? undefined : (world.workSettings[from]?.params ?? {})
+                  })()}
                   label={(id) => paramValueLabel(paramWorld(world), id)}
                   target={targetParam(
                     scripts.find((s) => s.id === selected.script!.scriptId) ?? {},
@@ -1871,6 +1900,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           params={starting.params}
           target={targetParam(starting.script)}
           values={starting.values}
+          fromWorkplace={starting.base !== undefined}
           label={(id) => paramValueLabel(paramWorld(world), id)}
           canStart={startValuesValid(starting.params, starting.values)}
           error={starting.error}
@@ -1884,7 +1914,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           }
           onStart={() => {
             setStarting(undefined)
-            void starting.start(startParamValues(starting.params, starting.values))
+            const { params, values, base } = starting
+            void starting.start(
+              base ? overrideParamValues(params, base, values) : startParamValues(params, values),
+            )
           }}
           onCancel={() => setStarting(undefined)}
         />

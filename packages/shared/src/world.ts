@@ -277,6 +277,12 @@ export interface RunningScript {
   task?: Task
   /** What the script kept between ticks, at most `SCRIPT_MEMORY_MAX` characters of JSON. */
   memory: ScriptMemory
+  /**
+   * The workplace whose Workplace settings it runs by (`CONTEXT.md`), given Work there: its
+   * params read the resident's own values (their overrides), else the settings of the realm
+   * commanding them, else the script's defaults. Absent for a script given otherwise.
+   */
+  settingsFrom?: string
   /** The tick its last error went into the realm log; errors are logged rate-limited. */
   errorLoggedAt?: number
   /** The tick its last out-of-steps warning went into the realm log. */
@@ -336,6 +342,11 @@ export interface SeenScript {
   line?: BuildLine
   /** It waits on the resident's order (`RunningScript.waitingSince`); only for the owning Player. */
   waiting?: true
+  /**
+   * The workplace whose settings it runs by (`RunningScript.settingsFrom`); only for the owning
+   * Player. Its params then read their values from there unless picked for the resident.
+   */
+  settingsFrom?: string
   /**
    * The values picked for its params, by name (`Resident.scriptParams`); only for the realm
    * running it.

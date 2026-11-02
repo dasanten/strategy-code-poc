@@ -2103,7 +2103,8 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>
             The work script is your Work default, or any script of yours that declares{' '}
             <code>param {WORKPLACE_PARAM}: building</code>. Switching to another one starts its
-            values over.
+            values over, and everyone working there by the settings switches to it, as if given Work
+            again.
           </li>
           <li>
             Each of its params but <code>{WORKPLACE_PARAM}</code>, which is the workplace itself,
@@ -2120,6 +2121,30 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             (<code>null</code> for the Work default) and the values set by name.
           </li>
           <li>Settings of a workplace that is gone go with it.</li>
+        </ul>
+        <h4>Working by the settings</h4>
+        <ul>
+          <li>
+            Giving a resident Work at a workplace, from their card, a group card or a queue step,
+            runs its work script. The form before it starts is filled with the workplace's values.
+          </li>
+          <li>
+            A value you change in that form becomes that resident's own, an override. What they kept
+            for that script before doesn't carry over.
+          </li>
+          <li>
+            While they work there, each param reads their override, else the workplace's value, else
+            the script's default. Their card says which: a value "from the workplace", or "their
+            own" with a button back to the workplace's.
+          </li>
+          <li>
+            Changing a value on the workplace's card reaches everyone working there without an
+            override at once, from their next use of it.
+          </li>
+          <li>
+            A script you give by hand with Run script stays the resident's own choice and reads only
+            their own values.
+          </li>
         </ul>
       </Section>
 

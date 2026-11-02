@@ -293,6 +293,7 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
     ...(typeof memory.doing === 'string' && memory.doing ? { doing: memory.doing } : {}),
     ...(line ? { line } : {}),
     ...(script.waitingSince !== undefined ? { waiting: true as const } : {}),
+    ...(script.settingsFrom !== undefined ? { settingsFrom: script.settingsFrom } : {}),
   }
 }
 
