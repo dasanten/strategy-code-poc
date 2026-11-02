@@ -44,8 +44,9 @@ function problem(world: WorldState, sender: OrderSender, order: OrderRequest): s
 }
 
 /**
- * The rename order: the resident takes the new name, trimmed; renaming the Leader of an unnamed
- * realm names the realm too. Renaming the Leader never renames a named realm.
+ * The rename order: the resident takes the new name, trimmed, which is no longer the game's
+ * (`Resident.gameName`); renaming the Leader of an unnamed realm names the realm too. Renaming the
+ * Leader never renames a named realm.
  */
 export const rename: OrderKind = {
   validate(world, sender, order) {
@@ -56,6 +57,7 @@ export const rename: OrderKind = {
     const { targetId, name, realmName } = order as RenameRequest
     const realm = realmOf(world, sender.userId)!
     const target = world.residents.find((r) => r.id === targetId)!
+    if (target.name !== name.trim()) delete target.gameName
     target.name = name.trim()
     if (target.id === realm.leaderId && !realm.name) realm.name = realmName!.trim()
   },
@@ -91,7 +93,10 @@ function cityProblem(
   )
 }
 
-/** The city rename order: the city of the Player's realm takes the new name, trimmed. */
+/**
+ * The city rename order: the city of the Player's realm takes the new name, trimmed, which is no
+ * longer the game's (`City.gameName`).
+ */
 export const renameCity: OrderKind = {
   validate(world, sender, order) {
     return cityProblem(world, sender, order)
@@ -99,7 +104,9 @@ export const renameCity: OrderKind = {
   apply(world, sender, order) {
     if (cityProblem(world, sender, order)) return
     const { cityId, name } = order as RenameCityRequest
-    world.cities.find((c) => c.id === cityId)!.name = name.trim()
+    const city = world.cities.find((c) => c.id === cityId)!
+    if (city.name !== name.trim()) delete city.gameName
+    city.name = name.trim()
   },
 }
 

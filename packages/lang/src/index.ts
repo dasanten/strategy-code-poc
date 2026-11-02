@@ -58,14 +58,35 @@ export function checkNames(source: string, env: CheckEnv): CheckResult {
   return checkProgram(program, env)
 }
 
-/** A script's `param` lines; none for a script with a syntax error. */
-export function scriptParams(source: string): ParamDeclaration[] {
+/** A `param` line with the comment at its end, if it has one. */
+export interface ParamInfo extends ParamDeclaration {
+  /** The `//` comment at the end of the line, without the slashes (`CONTEXT.md`: Script parameter). */
+  description?: string
+}
+
+/**
+ * A script's `param` lines, each with the `//` comment at its end; none for a script with a
+ * syntax error.
+ */
+export function scriptParams(source: string): ParamInfo[] {
   try {
-    return parse(source).params
+    const lines = source.split('\n')
+    return parse(source).params.map((p) => {
+      const description = paramComment(lines[p.line - 1] ?? '')
+      return description ? { ...p, description } : p
+    })
   } catch (error) {
     if (error instanceof ScriptSyntaxError) return []
     throw error
   }
+}
+
+/**
+ * The comment at the end of a `param` line. A param line holds no string, so its first `//` starts
+ * the comment; a line that goes on with a quote before it is left without one.
+ */
+function paramComment(line: string): string | undefined {
+  return /^[^"/]*\/\/(.*)$/.exec(line)?.[1]?.trim() || undefined
 }
 
 /** Checks a script for syntax errors. The parser stops at the first one, so there is at most one. */
