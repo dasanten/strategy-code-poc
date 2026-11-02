@@ -168,6 +168,7 @@ import {
 } from './script-run-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
+import { PanelHead } from './drawer-head.js'
 import { ActionRows, CardTabs, PanelUnder, SelectionCard, useActionKeys } from './SelectionCard.js'
 import {
   horseDetail,
@@ -967,10 +968,7 @@ export function ResidentsList({
   }, [selectedId])
   return (
     <section className="residents" aria-label="Residents">
-      {/* The drawer's own heading names it; its head only counts. */}
-      <div className="panel-head">
-        <span>{residentsCount(groups.flatMap((g) => g.residents))}</span>
-      </div>
+      <PanelHead title="Residents">{residentsCount(groups.flatMap((g) => g.residents))}</PanelHead>
       <div className="residents-scroll">
         <div className="residents-table" ref={tableRef}>
           <div className="residents-row heading" aria-hidden="true">

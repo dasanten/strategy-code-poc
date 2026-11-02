@@ -1150,6 +1150,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             buildings={world.buildings}
             cities={world.cities}
             realms={realms}
+            scripts={scripts}
+            tick={world.tick}
             sendOrder={sendOrder}
           />,
         )}
@@ -1317,6 +1319,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOrderError(await giveOrder(order))
             }}
             onSelectResident={(id) => select([id])}
+            onOpenHorse={(id) => {
+              setPickedHorseId(id)
+              setOpenDrawer('horses')
+            }}
           />
         </CardSheet>
       )}
