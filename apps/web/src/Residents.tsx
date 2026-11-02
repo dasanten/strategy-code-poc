@@ -185,6 +185,7 @@ import {
   horseDetail,
   orderGroupOf,
   residentOrders,
+  DOWN_NO_ORDERS,
   rowGroups,
   riddenHorseLine,
   type ActionId,
@@ -2409,7 +2410,9 @@ export function ResidentCard({
         <p className="muted small" role="status">
           {orderError
             ? `Order turned down: ${orderError}`
-            : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
+            : isDown(r)
+              ? `${DOWN_NO_ORDERS}.`
+              : 'Right-click the map to walk there. Hold Shift with any order to queue it.'}
         </p>
       )}
     </SelectionCard>
