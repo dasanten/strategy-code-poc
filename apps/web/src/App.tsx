@@ -1101,6 +1101,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               world.carriages,
               world.residents,
               world.cities,
+              world.tick,
             )}
             tick={world.tick}
             phone={phone}

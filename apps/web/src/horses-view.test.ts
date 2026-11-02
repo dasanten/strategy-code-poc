@@ -3,6 +3,7 @@ import {
   MAX_HUNGER,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
+  ticksForAge,
   type SeenHorse,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
@@ -21,7 +22,7 @@ const cities = [
   { id: 'c1', name: 'Oakford' },
   { id: 'c2', name: 'Ashby' },
 ]
-const ann = { id: 'ann', name: 'Ann', riding: undefined, order: null }
+const ann = { id: 'ann', name: 'Ann', riding: undefined, order: null, bornAt: 0, cityId: 'c1' }
 
 describe('groupHorses', () => {
   it('puts a horse on a stable’s footprint under that stable, anywhere on it', () => {
@@ -70,6 +71,25 @@ describe('groupHorses', () => {
     expect(groups.map((g) => [g.key, g.rows.map((r) => r.place)])).toEqual([
       ['ridden', ['Ridden by Ann']],
       ['loose', ['Loose at 7, 8']],
+    ])
+  })
+
+  it('tells two riders of one name apart by age, and their city when they live apart', () => {
+    const tick = 30 * TICKS_PER_GAME_YEAR
+    const groups = groupHorses(
+      [h('a', 3, 3), h('b', 7, 8)],
+      [],
+      [],
+      [
+        { ...ann, riding: 'a', bornAt: tick - ticksForAge(24) },
+        { ...ann, id: 'ann2', riding: 'b', cityId: 'c2', bornAt: tick - ticksForAge(30) },
+      ],
+      cities,
+      tick,
+    )
+    expect(groups[0]!.rows.map((r) => r.place)).toEqual([
+      'Ridden by Ann (24, Oakford)',
+      'Ridden by Ann (30, Ashby)',
     ])
   })
 

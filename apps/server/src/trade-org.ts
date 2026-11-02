@@ -19,7 +19,7 @@ import {
   footprintKeys,
   FOOTPRINT,
 } from '@csp/shared'
-import { CITY_NAMES, updateCityMembership } from './cities.js'
+import { CITY_NAMES, givenCityName, updateCityMembership } from './cities.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { Ground } from './placing.js'
 import { FARM_RING, newId, residentTiles } from './starting-city.js'
@@ -294,7 +294,7 @@ export function foundTradeOrgHq(
   const id = newId(world, 'city')
   const city: City = {
     id,
-    name: CITY_NAMES[hash(`${world.seed}:${id}`) % CITY_NAMES.length]!,
+    ...givenCityName(world, CITY_NAMES[hash(`${world.seed}:${id}`) % CITY_NAMES.length]!),
     realmId: null,
     townHallId: '',
     occupation: null,
@@ -346,16 +346,21 @@ export function foundTradeOrgHq(
     city.workplaceIds.push(b.id)
     world.buildings.push(b)
   }
+  const names = new Set<string>()
   const residents = Array.from({ length: TRADE_ORG_HQ.residents }, (_, i) => {
     const farm = farms[i % farms.length]!
-    const r = newResident(rand, {
-      id: newId(world, 'r'),
-      owner: null,
-      cityId: city.id,
-      x: farm.x,
-      y: farm.y,
-      tick: world.tick,
-    })
+    const r = newResident(
+      rand,
+      {
+        id: newId(world, 'r'),
+        owner: null,
+        cityId: city.id,
+        x: farm.x,
+        y: farm.y,
+        tick: world.tick,
+      },
+      names,
+    )
     r.carried = { food: START_CARRIED_FOOD }
     r.order = { kind: 'workAt', buildingId: farm.id, at: { x: farm.x, y: farm.y }, progress: 0 }
     r.script = { scriptId: 0, task: 'work', memory: { workplaceId: farm.id } }

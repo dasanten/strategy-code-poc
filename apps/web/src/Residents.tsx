@@ -171,6 +171,7 @@ import {
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
 import { PanelHead } from './drawer-head.js'
+import { labelled } from './name-labels.js'
 import { ActionRows, CardTabs, PanelUnder, SelectionCard, useActionKeys } from './SelectionCard.js'
 import {
   horseDetail,
@@ -1170,7 +1171,8 @@ export function GroupCard({
    */
   relocate?: { choices: RelocateChoice[]; problem: string | undefined }
 }) {
-  const card = groupCard(residents)
+  // Two of one name are told apart by age and city (`CONTEXT.md`: Game-given names).
+  const card = groupCard(tick === undefined ? residents : labelled(residents, tick, cities))
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
   // The order whose panel is open under the buttons: what it needs before it goes out.
   const [panel, setPanel] = useState<'haul' | 'fetch' | 'breed' | 'teach' | 'relocate'>()
@@ -3117,8 +3119,12 @@ function PairBlock({
   if (!canWork(resident, tick) || resident.cityId === null) return null
   const o = resident.pair
   const partner = o ? residents.find((x) => x.id === o.partnerId) : undefined
-  const choices = residents.filter(
-    (x) => x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick) && !x.carrying,
+  const choices = labelled(
+    residents.filter(
+      (x) =>
+        x.id !== resident.id && x.cityId === resident.cityId && canWork(x, tick) && !x.carrying,
+    ),
+    tick,
   )
   const wait = o ? pairingTicksLeft(o.since, tick) : 0
   const expecting = resident.carrying || partner?.carrying

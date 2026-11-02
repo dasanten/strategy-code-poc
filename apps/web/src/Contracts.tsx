@@ -23,6 +23,7 @@ import {
 } from './contract-view.js'
 import { doingLine } from './doing-view.js'
 import { PanelHead } from './drawer-head.js'
+import { labelled, nameLabels } from './name-labels.js'
 
 /**
  * Mercenary contracts (`CONTEXT.md`: Mercenary contract): offer some of your residents for hire
@@ -58,6 +59,7 @@ export function ContractsPanel({
   realms: RealmLabel[]
   /** The Player's scripts, for the residents' Doing lines. */
   scripts: ScriptSummary[]
+  /** Now, for the ages that tell residents of one name apart (`nameLabels`). */
   tick: number
   sendOrder: (order: OrderRequest) => Promise<string | undefined>
 }) {
@@ -76,12 +78,14 @@ export function ContractsPanel({
   const npcCities = cities.filter((c) => c.hire !== undefined)
   const npc = hiring ? npcCities.find((c) => c.id === other) : undefined
   const lenderId = hiring ? other : realmId
-  const candidates =
+  const candidates: SeenResident[] =
     tradeOrg || npc
       ? []
       : hiring
         ? inSight.filter((r) => r.owner === other)
         : own.filter((r) => r.owner === realmId)
+  // Each row shows age and city; the summary line tells two of one name apart the same way.
+  const candidateNames = nameLabels(candidates, tick, cities)
   const storages = buildings.filter(
     (b) =>
       b.kind === (tradeOrg ? 'warehouse' : 'storage') &&
@@ -104,7 +108,7 @@ export function ContractsPanel({
   const summary = offerSummary({
     hiring,
     side,
-    residents: candidates.filter((r) => chosen.has(r.id)).map((r) => r.name),
+    residents: candidates.filter((r) => chosen.has(r.id)).map((r) => candidateNames.get(r.id)!),
     count: tradeOrg ? soldiers : count,
     days,
     pricePerWeek: price,
@@ -151,14 +155,21 @@ export function ContractsPanel({
             const offered = c.startedAt === null
             const theirOffer =
               offered && (c.offeredBy === 'lender' ? c.lender : c.hirer).realmId !== realmId
-            const payers =
+            const payers = labelled(
               !lender && !offered && c.paidWeeks < c.weeks && c.storage
                 ? own.filter(
                     (r) =>
                       isAt(r, { kind: 'storage', ...c.storage! }) &&
                       (r.carried.coins ?? 0) >= c.pricePerWeek,
                   )
-                : []
+                : [],
+              tick,
+            )
+            const rented = nameLabels(
+              inSight.filter((r) => c.residents.some((x) => x.id === r.id)),
+              tick,
+              cities,
+            )
             return (
               <li key={c.id} className="army">
                 <span>
@@ -166,7 +177,7 @@ export function ContractsPanel({
                     {lender ? 'Rented to' : 'Hired from'} {sideName(otherSide, cities)}
                   </strong>
                   <br />
-                  {c.residents.map((r) => r.name).join(', ')}
+                  {c.residents.map((r) => rented.get(r.id) ?? r.name).join(', ')}
                   <br />
                   <span className="muted small">
                     {c.days} days at {c.pricePerWeek} Coins a week, paid into the{' '}
