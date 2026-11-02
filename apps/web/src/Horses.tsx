@@ -48,7 +48,6 @@ export function HorsesList({
   return (
     <section className="residents horses" aria-label="Horses">
       <div className="panel-head">
-        <h2>Horses</h2>
         <span>{count === 1 ? '1 horse' : `${count} horses`}</span>
       </div>
       {count === 0 && <p className="muted">Your realm has no horses.</p>}

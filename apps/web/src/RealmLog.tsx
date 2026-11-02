@@ -21,7 +21,6 @@ export function RealmLog({
   return (
     <section className="realm-log" aria-label="Realm log">
       <div className="panel-head">
-        <h2>Realm log</h2>
         <span>{events.length === 0 ? 'nothing yet' : `${events.length} events`}</span>
       </div>
       {deliveries.length > 0 && (

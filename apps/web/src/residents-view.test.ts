@@ -16,6 +16,7 @@ import {
   groupResidents,
   pairingDaysLeft,
   residentLines,
+  residentsCount,
   ARMY_TABS,
   GROUP_TABS,
   rememberTab,
@@ -97,6 +98,20 @@ describe('Residents drawer groups', () => {
 
   it('takes a resident of a city that is not the Player’s as homeless', () => {
     expect(shape(groupResidents([r('a', 'x')], options))).toEqual([['Homeless', ['a']]])
+  })
+})
+
+describe('Residents drawer head', () => {
+  const walk = { kind: 'walkTo' as const, target: { x: 1, y: 1 }, path: null, progress: 0 }
+  it('counts residents, busy and idle', () => {
+    const busy = { order: walk }
+    const scripted = { order: null, script: { scriptId: 1 } }
+    const idle = { order: null }
+    expect(residentsCount([busy, busy, busy, busy, busy, busy, scripted, idle])).toBe(
+      '8 residents · 7 busy · 1 idle',
+    )
+    expect(residentsCount([idle])).toBe('1 resident · 0 busy · 1 idle')
+    expect(residentsCount([])).toBe('No residents')
   })
 })
 
