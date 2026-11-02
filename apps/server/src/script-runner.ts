@@ -307,6 +307,13 @@ interface BuildLineTaskRequest extends OrderRequest, BuildLine {
   residentId: string
 }
 
+/** Explore: wherever the resident stands; where to go is in its params (`CONTEXT.md`: Explore). */
+interface ExploreTaskRequest extends OrderRequest {
+  kind: 'task'
+  task: 'explore'
+  residentId: string
+}
+
 /** Breed horses: the breed order's input, at the stable the resident stands at. */
 interface BreedTaskRequest extends OrderRequest {
   kind: 'task'
@@ -325,6 +332,7 @@ type TaskRequest = (
   | BreedTaskRequest
   | FeedStableTaskRequest
   | TrainTaskRequest
+  | ExploreTaskRequest
 ) &
   TaskParams
 
@@ -412,6 +420,8 @@ function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemo
       const memory: TaskMemory['feedStable'] = { stableId: order.stableId }
       return { ...memory }
     }
+    case 'explore':
+      return {}
   }
 }
 
@@ -469,7 +479,7 @@ function taskTarget(
   o: TaskRequest,
   r: { x: number; y: number },
 ): string | undefined {
-  if (o.task === 'buildLine') return undefined
+  if (o.task === 'buildLine' || o.task === 'explore') return undefined
   const [id, type] =
     o.task === 'work'
       ? [o.workplaceId, 'building' as const]
@@ -522,6 +532,8 @@ function taskProblem(
     return canWork(r, world.tick) ? undefined : 'children can’t store or fetch goods'
   }
   if (o.task === 'buildLine') return buildLineProblem(world, r!, o, terrain)
+  // No order of its own: they walk and fetch Food (`CONTEXT.md`: Explore).
+  if (o.task === 'explore') return canWork(r, world.tick) ? undefined : 'children can’t explore'
   if (o.task === 'build' && o.at !== undefined) {
     // Somewhere else: checked as the build order there, once they have walked to it.
     const at = o.at as Partial<{ x: number; y: number }> | null

@@ -70,6 +70,9 @@ import {
   HORSE_HUNGRY_SHARE,
   HORSE_NAME_MAX_LENGTH,
   WAYPOINTS_MAX,
+  EXPLORE_FOOD_MARGIN,
+  EXPLORE_SKIP_RANGE,
+  EXPLORED_EDGE_RANGE,
   WAYPOINT_NAME_MAX_LENGTH,
   HUNGRY_HORSE_PACE,
   HORSE_ENDURANCE_EFFECT,
@@ -264,6 +267,7 @@ export const WIKI_TOPICS = [
   { id: 'queues', title: 'Queues' },
   { id: 'time', title: 'Time & map' },
   { id: 'waypoints', title: 'Waypoints' },
+  { id: 'exploring', title: 'Exploring' },
   { id: 'terrain', title: 'Terrain & walking' },
   { id: 'residents', title: 'Residents & stats' },
   { id: 'training', title: 'Training' },
@@ -793,6 +797,38 @@ export function Wiki() {
           <code>addWaypoint(x, y, name)</code> or take one away with{' '}
           <code>removeWaypoint(waypoint)</code>, free and at once, without stopping the script. The
           same cap counts there too.
+        </p>
+      </Section>
+
+      <Section id="exploring">
+        <p>
+          Give a grown resident <strong>Explore</strong> on their card, on foot or riding, and they
+          go into the unknown on their own. Before they start, pick <code>toward</code>, a compass
+          direction, or a <code>waypoint</code> to head for instead; with neither they take the
+          nearest unexplored land first. <code>food</code> is where they refill; with none picked,
+          the nearest storage of your realm with Food.
+        </p>
+        <p>
+          They set out with as much Food as they can carry and walk to the edge of what you have
+          explored, that way: the nearest tile you have explored that they can go onto, beside one
+          you haven't, within 45° of the direction. Standing there they see {num(SIGHT_RANGE)} tiles
+          past it, and walk on to the next edge. A rider looks only where their horse can go.
+        </p>
+        <p>
+          Before each way out they check that the Food on them covers it and the way back to where
+          they refill, plus {num(EXPLORE_FOOD_MARGIN)} units to spare (their own food and one more).
+          A walker eats {num(FOOD_PER_DAY)} Food a game day, more on hills and mountains; riding,
+          their horse eats {num(HORSE_FOOD_PER_DAY)} a day too, from the Food they carry. Once it no
+          longer covers it they turn back, refill, and go back out to where they turned if a full
+          load still covers that way and back; otherwise they head for the nearest edge from there.
+        </p>
+        <p>
+          Land they can see but find no way to, across a lake, say, they leave out from then on,
+          with the edge within {num(EXPLORE_SKIP_RANGE)} tiles of it. With no edge within{' '}
+          {num(EXPLORED_EDGE_RANGE)} tiles, or none their Food takes them to and back even with a
+          full load, they walk back to where they refill and end, and your realm log says why.
+          Scripts find the edge with <code>exploredEdge(from, toward, skip)</code> and the Food a
+          way takes with <code>wayFood(a, b)</code>.
         </p>
       </Section>
 

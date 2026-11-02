@@ -1,5 +1,7 @@
 import {
   DOING_MAX_LENGTH,
+  EXPLORED_EDGE_RANGE,
+  EXPLORE_SKIP_RANGE,
   SCRIPT_ACTION_COST,
   SCRIPT_HELPER_COST,
   SCRIPT_LIST_QUERY_COST,
@@ -332,6 +334,23 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     cost: SCRIPT_LIST_QUERY_COST,
     description:
       'About how many ticks I take to walk from one thing with `x` and `y` to another: the straight way across the terrain, diagonally where it slants, roads and walls left out.',
+  },
+  {
+    name: 'wayFood',
+    is: 'query',
+    params: ['a', 'b'],
+    returns: 'number',
+    cost: SCRIPT_LIST_QUERY_COST,
+    description:
+      'About how many units of Food I eat on the way from one thing with `x` and `y` to another, the way `walkTime` reckons it, at what each tile’s terrain costs me; riding, my horse’s too, which it eats from the Food I carry.',
+  },
+  {
+    name: 'exploredEdge',
+    is: 'query',
+    params: ['from', 'toward?', 'skip?'],
+    returns: { view: 'tile' },
+    cost: SCRIPT_LIST_QUERY_COST,
+    description: `The nearest tile to \`from\`, something with \`x\` and \`y\`, at the edge of my Player’s explored terrain: one they explored that I can go onto now (riding, one my horse can), beside one they haven’t. With \`toward\`, a compass direction ("north", "northeast", "east", "southeast", "south", "southwest", "west" or "northwest"), only tiles that way from \`from\`, at most 45° off it, the straightest first. With \`skip\`, a list of things with \`x\` and \`y\`, none within ${EXPLORE_SKIP_RANGE} tiles of them. Null with none within ${EXPLORED_EDGE_RANGE} tiles.`,
   },
   {
     name: 'crewTile',

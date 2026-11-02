@@ -95,8 +95,8 @@ const here = (more: Partial<ResidentHere> = {}): ResidentHere => ({
 const ids = (h: ResidentHere) => residentActions(h).map((a) => a.id)
 
 describe('the actions on a resident’s card', () => {
-  it('offers walking, building, a road, a wall, pairing and scripts to an idle adult on open ground', () => {
-    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'wallTo', 'pair', 'script'])
+  it('offers walking, exploring, building, a road, a wall, pairing and scripts to an idle adult on open ground', () => {
+    expect(ids(here())).toEqual(['walk', 'explore', 'build', 'roadTo', 'wallTo', 'pair', 'script'])
   })
 
   it('offers stop only while they have an order or run a script', () => {
@@ -221,7 +221,7 @@ describe('the actions on a resident’s card', () => {
       carries: true,
       building: building({ kind: 'farm' }),
     })
-    expect(ids(carrying)).toEqual(['walk', 'drive', 'goods', 'script'])
+    expect(ids(carrying)).toEqual(['walk', 'drive', 'explore', 'goods', 'script'])
   })
 
   it('shows a grown resident every order that fits their tile', () => {
@@ -230,6 +230,7 @@ describe('the actions on a resident’s card', () => {
       'walk',
       'drive',
       'haul',
+      'explore',
       'feedStable',
       'build',
       'roadTo',
@@ -437,7 +438,7 @@ describe('keys', () => {
     expect(actionForKey(a, 'w')?.id).toBe('walk')
     expect(actionForKey(a, 'W')?.id).toBe('walk')
     expect(actionForKey(a, 'd')).toBeUndefined()
-    expect(actionForKey(a, 'z')).toBeUndefined()
+    expect(actionForKey(a, 'j')).toBeUndefined()
   })
 })
 
@@ -447,7 +448,7 @@ describe('the Orders tab', () => {
       here({ busy: true, carriage, carries: true, othersInSight: 1, renamable: true }),
     )
     expect(groupOrders(a).map((g) => [g.label, g.actions.map((x) => x.id)])).toEqual([
-      ['Move', ['walk', 'stop', 'drive', 'haul']],
+      ['Move', ['walk', 'stop', 'drive', 'haul', 'explore']],
       ['Work & build', ['build', 'roadTo', 'wallTo']],
       ['Goods', ['goods']],
       ['Scripts', ['script']],
@@ -502,7 +503,7 @@ describe('the rows of a card that stays open', () => {
     const before = here()
     const rows = keep(before, here({ busy: true, building: farm }))
     expect(rowGroups(rows, orderGroupOf).map((g) => [g.group, ids(g.actions)])).toEqual([
-      ['move', ['walk', 'stop']],
+      ['move', ['walk', 'explore', 'stop']],
       ['work', ['build', 'roadTo', 'wallTo', 'work', 'tearDown']],
       ['scripts', ['script']],
       ['other', ['pair']],

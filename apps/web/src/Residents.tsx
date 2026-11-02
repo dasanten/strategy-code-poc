@@ -1225,6 +1225,7 @@ export function GroupCard({
     dismount: { kind: 'dismount' },
     feedStable: { kind: 'feedStable' },
     train: { kind: 'train' },
+    explore: { kind: 'explore' },
     store: { kind: 'store' },
     drop: { kind: 'drop' },
     getOff: { kind: 'getOff' },
@@ -1612,6 +1613,7 @@ export function ResidentCard({
   onWork,
   onFeedStable,
   onTrain,
+  onExplore,
   onTeach,
   onTearDown,
   horses,
@@ -1760,6 +1762,8 @@ export function ResidentCard({
   onFeedStable: (stableId: string) => void
   /** Gives the resident the Train task for the training ground they stand on. */
   onTrain: (groundId: string) => void
+  /** Gives the resident the Explore task. */
+  onExplore: () => void
   /** Orders the resident to teach `subject` at the training ground they stand on. */
   onTeach: (groundId: string, subject: TrainingSubject) => void
   /** Orders the resident to tear down the building or site on their tile. */
@@ -1911,6 +1915,7 @@ export function ResidentCard({
     if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
     if (a.id === 'train' && building) onTrain(building.id)
+    if (a.id === 'explore') onExplore()
   }
   useActionKeys(rows, act)
   // Run script later starts on the script they were last seen running (`runScriptPick`).

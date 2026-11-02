@@ -981,7 +981,7 @@ The shared language of the game. Domain terms only — no implementation details
   where they turned. Once a node of the kind `find` asks for comes into sight that none of the
   Player's waypoints marks, they put a waypoint on it named after it ("Gold ore node"), note it in
   the realm log, walk back to the storage and end. Without `find` they go on until stopped. With
-  no unexplored tile left in reach, they end saying so.
+  no unexplored tile left in reach, they walk back to the storage and end saying so.
 - **Defence script:** the script a resident runs when struck: the game's **Defend** default (armed,
   attack the attacker until they are dead, gone or out of sight; unarmed, walk home to the town
   hall; it ends once no blow has landed for a while) unless the Player picked one of their own

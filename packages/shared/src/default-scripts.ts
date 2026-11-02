@@ -11,6 +11,7 @@ import {
   BREED_FOOD,
   CREW_FOOD,
   DEFEND_CALM_TICKS,
+  EXPLORE_FOOD_MARGIN,
   GET_FOOD_AT,
   GET_FOOD_TAKE,
   HORSE_FOOD_PER_DAY,
@@ -34,6 +35,7 @@ export const TASKS = [
   'defend',
   'train',
   'buildLine',
+  'explore',
 ] as const
 export type Task = (typeof TASKS)[number]
 
@@ -115,6 +117,8 @@ export interface TaskMemory {
    * if the ground teaches something else.
    */
   train: { groundId: string; subject?: string }
+  /** Explore: nothing; where to go and refill is in its params (`CONTEXT.md`: Explore). */
+  explore: Record<string, never>
 }
 
 export interface DefaultScript {
@@ -1393,6 +1397,177 @@ fn walkBack() {
 }
 
 ${GET_FOOD}
+
+${LOG_TEXT}
+`,
+  },
+  explore: {
+    name: 'Explore',
+    source: `// Explore (default): go into the unknown. I walk to the edge of what my
+// Player has explored, the nearest tile first: toward params.toward, or the
+// nearest to params.waypoint; with neither, the nearest to me. Standing
+// there I see past it. I set out with as much Food as I can carry, from
+// params.food while it holds Food, else the nearest storage of my realm
+// with Food. Before each way out I check the Food on me covers it and the
+// way back to that storage, plus margin units; riding, my horse eats from
+// it too. Once it doesn't, I turn back, refill there and go back out to
+// where I turned. With no edge left in reach, I walk back there and end.
+param toward: choice(north, northeast, east, southeast, south, southwest, west, northwest) // the way to go; none: the nearest unexplored tiles first
+param waypoint: waypoint // a waypoint to head for instead; none: toward
+param food: storage // where to refill; a carriage too; none: the nearest storage with Food
+let margin = ${EXPLORE_FOOD_MARGIN} // units of Food kept beyond the way back
+let skipMax = 10 // tiles with no way there that I keep leaving out
+
+if (me.order != null) { // on my way
+  wait()
+  return
+}
+if (memory.ending != null) { // back where I refill
+  end(memory.ending)
+  return
+}
+if (memory.skip == null) { memory.skip = [] }
+if (memory.fetching != null) {
+  if (!refilled()) { return }
+} else if (memory.target != null) {
+  arrived()
+}
+let from = foodFrom()
+if (from == null) {
+  end("no Food to explore with")
+  return
+}
+if (memory.turnedAt != null && goBackOut(from)) { return }
+let edge = nextEdge()
+if (edge == null) {
+  endBack("nothing unexplored in reach", from)
+} else if (memory.out != true && memory.full != true && fits("food") >= 1) {
+  turnBack(from) // setting out
+} else if (covers(edge, from)) {
+  walkOut(edge)
+} else if (memory.full == true) { // refilled, and still short
+  endBack("nothing unexplored in reach of the Food I can carry", from)
+} else {
+  turnBack(from)
+}
+
+// The edge to walk to next, leaving out tiles I found no way to.
+fn nextEdge() {
+  if (params.waypoint != null) { return exploredEdge(params.waypoint, null, memory.skip) }
+  return exploredEdge(me, params.toward, memory.skip)
+}
+
+// Whether the Food on me covers the way to a tile and from there back to
+// where I refill, plus margin.
+fn covers(to, from) {
+  return foodOnMe() >= wayFood(me, to) + wayFood(to, from) + margin
+}
+
+fn walkOut(edge) {
+  let problem = walkTo(edge.x, edge.y)
+  if (problem != null) {
+    end("can't walk out: " + problem)
+    return
+  }
+  memory.target = {x: edge.x, y: edge.y}
+  memory.out = true
+  memory.full = null
+  wait() // until I am there
+}
+
+// Fetch as much Food as fits where I refill: setting out, or turning back
+// once I have been out.
+fn turnBack(from) {
+  let units = fits("food")
+  let problem = fetch(["food"], from.id) // as much as fits
+  if (problem != null) {
+    end("can't fetch Food: " + problem)
+    return
+  }
+  memory.fetching = true
+  if (memory.out == true) {
+    memory.turnedAt = {x: me.x, y: me.y}
+    log("turning back with " + floor(foodOnMe()) + " Food to " + placeName(from))
+  } else {
+    log("setting out: fetching " + units + " Food at " + placeName(from))
+  }
+  wait() // until I have it
+}
+
+// Done: back where I refill first, so I never end out in the wild, then
+// end saying why.
+fn endBack(reason, from) {
+  let here = buildingAt(me.x, me.y)
+  let there = (here != null && here.id == from.id) || (me.x == from.x && me.y == from.y)
+  if (there || walkTo(from.x, from.y) != null) {
+    end(reason)
+    return
+  }
+  memory.ending = reason
+  log("done: walking back to " + placeName(from))
+  wait() // until I am there
+}
+
+// Back from fetching Food: false once I end, as I couldn't.
+fn refilled() {
+  memory.fetching = null
+  let ended = me.orderEnded
+  if (ended != null && ended.kind == "fetch" && ended.reason != null) {
+    end("can't refill: " + ended.reason)
+    return false
+  }
+  memory.full = true
+  return true
+}
+
+// Refilled: back out to where I turned, while the Food on me covers it.
+// True once I set off; otherwise I explore from here.
+fn goBackOut(from) {
+  let at = memory.turnedAt
+  memory.turnedAt = null
+  if ((me.x == at.x && me.y == at.y) || !covers(at, from)) { return false }
+  if (walkTo(at.x, at.y) != null) { return false }
+  memory.target = {x: at.x, y: at.y}
+  memory.full = null
+  log("going back out to " + at.x + "," + at.y)
+  wait() // until I am there
+  return true
+}
+
+// My walk out ended. Short of the tile there was no way there: I leave it,
+// and the tiles near it, out from now on.
+fn arrived() {
+  let t = memory.target
+  memory.target = null
+  if (me.x == t.x && me.y == t.y) { return }
+  let i = memory.skipNext
+  if (i == null) { i = 0 }
+  memory.skip[i] = {x: t.x, y: t.y}
+  memory.skipNext = (i + 1) % skipMax
+  log("no way to " + t.x + "," + t.y + ": leaving it out")
+}
+
+// Where I refill: params.food while it holds Food, else the nearest storage
+// of my realm with Food; null with none.
+fn foodFrom() {
+  if (params.food != null && holdsFood(params.food)) { return params.food }
+  let stores = storages(me, ["food"]) // nearest first, holding some
+  if (stores.length > 0) { return stores[0] }
+  return null
+}
+
+// Whether a storage, or a carriage, holds a whole unit of Food to fetch.
+fn holdsFood(at) {
+  let held = at.stock
+  if (held == null) { held = at.load } // a carriage
+  return held != null && held.food != null && held.food >= 1
+}
+
+fn foodOnMe() {
+  let food = me.carried.food
+  if (food == null) { return 0 }
+  return food
+}
 
 ${LOG_TEXT}
 `,

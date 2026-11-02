@@ -411,6 +411,7 @@ export function stepLabel(
       if (order.task === 'feedStable') return `Feed ${building(order.stableId)}`
       if (order.task === 'breed') return `Breed horses at ${building(order.stableId)}`
       if (order.task === 'train') return `Train at ${building(order.groundId)}`
+      if (order.task === 'explore') return 'Explore'
       if (order.task === 'buildLine') {
         const line = stepLine(order)
         if (!line) return 'Build a line'
