@@ -2,13 +2,15 @@ import { MAX_HEALTH, MAX_HUNGER, horseAgeInYears, type SeenHorse } from '@csp/sh
 import { useEffect, useRef } from 'react'
 import type { HorseGroup } from './horses-view.js'
 import { horseAgeText } from './selection-view.js'
+import { PanelHead } from './drawer-head.js'
 
 /** Meter colour by how full it is, as in the Residents drawer: low a warning, half a caution. */
-const meterClass = (share: number) => (share < 0.25 ? 'low' : share < 0.5 ? 'mid' : 'ok')
+export const meterClass = (share: number) => (share < 0.25 ? 'low' : share < 0.5 ? 'mid' : 'ok')
 
-const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
+export const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
 
-function Meter({ label, share }: { label: string; share: number | undefined }) {
+/** A small meter, "?" where the Player doesn't know the value. */
+export function Meter({ label, share }: { label: string; share: number | undefined }) {
   if (share === undefined) return <span className="muted">?</span>
   return (
     <span className="meter" aria-label={`${label} ${pct(share)}`}>
@@ -44,10 +46,7 @@ export function HorsesList({
   const count = groups.reduce((n, g) => n + g.rows.length, 0)
   return (
     <section className="residents horses" aria-label="Horses">
-      <div className="panel-head">
-        <h2>Horses</h2>
-        <span>{count === 1 ? '1 horse' : `${count} horses`}</span>
-      </div>
+      <PanelHead title="Horses">{count === 1 ? '1 horse' : `${count} horses`}</PanelHead>
       {count === 0 && <p className="muted">Your realm has no horses.</p>}
       <div className="residents-scroll">
         <div className="residents-table" ref={tableRef}>

@@ -20,6 +20,7 @@ import {
   type ArmyTab,
 } from './residents-view.js'
 import { CardTabs, SelectionCard } from './SelectionCard.js'
+import { PanelHead } from './drawer-head.js'
 import { relationshipClass } from './theme.js'
 
 /** An army order that needs a tile, picked on the map. */
@@ -198,10 +199,7 @@ export function ArmiesPanel({
             <div className="sel-order-group">
               <h3>Army</h3>
               <div className="order-buttons" aria-label="Army">
-                <button
-                  type="button"
-                  onClick={() => order({ kind: 'disbandArmy', armyId: a.id })}
-                >
+                <button type="button" onClick={() => order({ kind: 'disbandArmy', armyId: a.id })}>
                   Disband
                 </button>
               </div>
@@ -248,10 +246,7 @@ export function ArmiesPanel({
 
   return (
     <section className="alliance-panel" aria-label="Armies">
-      <div className="panel-head">
-        <h2>Armies</h2>
-        <span>{armies.length === 0 ? 'none' : armies.length}</span>
-      </div>
+      <PanelHead title="Armies">{armies.length === 0 ? 'none' : armies.length}</PanelHead>
       {armies.length > 0 && (
         <ul className="alliance-list">
           {armies.map((a) => (

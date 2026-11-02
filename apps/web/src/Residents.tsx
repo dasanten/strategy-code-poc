@@ -161,6 +161,7 @@ import { defenceChoices, groupDefenceScript } from './script-run-view.js'
 import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
 import { ActionRows, CardTabs, SelectionCard, useActionKeys } from './SelectionCard.js'
+import { PanelHead } from './drawer-head.js'
 import {
   horseDetail,
   groupOrders,
@@ -960,10 +961,7 @@ export function ResidentsList({
   const count = groups.reduce((n, g) => n + g.residents.length, 0)
   return (
     <section className="residents" aria-label="Residents">
-      <div className="panel-head">
-        <h2>Residents</h2>
-        <span>{count} in sight</span>
-      </div>
+      <PanelHead title="Residents">{count} in sight</PanelHead>
       <div className="residents-scroll">
         <div className="residents-table" ref={tableRef}>
           <div className="residents-row heading" aria-hidden="true">

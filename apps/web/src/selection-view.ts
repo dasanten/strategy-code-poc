@@ -19,6 +19,7 @@ import {
   RECIPES,
   STABLE_BREED_TICKS,
   STABLE_CAPACITY,
+  STABLE_FEED_DAYS,
   breedersAt,
   keptBreeding,
   teacherAt,
@@ -567,7 +568,58 @@ export interface TileCard {
    * unhitch the horse (`unhitchProblem`), when there are any (`CONTEXT.md`: Hitched horse).
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
+  /**
+   * Who and what the tile holds, as rows under the card's lines: the horses in a stable or on the
+   * tile, a workplace's workers, the goods in a storage.
+   */
+  lists?: CardList[]
+  /**
+   * How long the Food in a stable lasts the horses standing in it, a meter full at the days of Food
+   * the Feed the stable task keeps there (`CONTEXT.md`: Feeding the stable).
+   */
+  stableFood?: { units: number; share: number; lasts: string }
 }
+
+/** A list of rows on the tile card (`TileCard.lists`), its head with a count on the right. */
+export interface CardList {
+  title: string
+  /** On the right of the title: "2 · 1 hungry", "7 / 10". */
+  count: string
+  /** What shows with no rows. */
+  empty?: string
+  /** The meters each row has, by name, as the resident card shows them: Health, Hunger. */
+  meters: readonly string[]
+  rows: CardRow[]
+}
+
+/** One row of a `CardList`: a horse, a worker or a good. */
+export interface CardRow {
+  id: string
+  name: string
+  /** Under the name: a horse's stats and age, whose a worker is. */
+  detail?: string
+  /** How much of a good. */
+  amount?: number
+  /**
+   * Each of the list's meters filled to this share, undefined where the Player doesn't know how
+   * they fare (`CONTEXT.md`: Seeing how someone fares).
+   */
+  shares?: number[]
+  /**
+   * What a click on the row opens: the card of one of the Player's residents, or one of their
+   * horses in the Horses drawer.
+   */
+  opens?: 'resident' | 'horse'
+}
+
+/** The meters a horse's or a resident's row has, as the Horses drawer and the resident card. */
+const FARES_METERS = ['Health', 'Hunger'] as const
+
+/** The meters' shares for someone whose health and hunger the Player knows. */
+const faresShares = (x: { health?: number; hunger?: number }) =>
+  x.health === undefined || x.hunger === undefined
+    ? undefined
+    : [x.health / MAX_HEALTH, x.hunger / MAX_HUNGER]
 
 /** What the Player sees on a tile, for the tile card. */
 export interface TileThings {
@@ -739,14 +791,19 @@ export function horseAgeText(h: SeenHorse, tick: number): string {
  * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
  */
 export function horseDetail(h: SeenHorse, tick: number | undefined): string {
-  const { speed, strength, endurance } = h.stats
-  const parts = [`Speed ${speed}, Strength ${strength}, Endurance ${endurance}`]
-  if (tick !== undefined) parts.push(horseAgeText(h, tick))
+  const parts = [horseStatsText(h, tick)]
   if (horseFaresKnown(h)) {
     const fares = horseFares(h)
     parts.push(`${fares.hunger}, ${fares.health}`)
   }
   return parts.join(' · ')
+}
+
+/** A horse's stats and age: "Speed 12, Strength 8, Endurance 10 · 5 years old". */
+function horseStatsText(h: SeenHorse, tick: number | undefined): string {
+  const { speed, strength, endurance } = h.stats
+  const stats = `Speed ${speed}, Strength ${strength}, Endurance ${endurance}`
+  return tick === undefined ? stats : `${stats} · ${horseAgeText(h, tick)}`
 }
 
 /**
@@ -765,31 +822,110 @@ export function riddenHorseLine(
 }
 
 /**
- * Lines for horses standing together, one per owner: "2 horses (yours) · 1 hungry", then one for
- * each of them (`horseDetail`). How they fare only for those the Player knows it of (`CONTEXT.md`:
- * Seeing how someone fares).
+ * Lists for horses standing together, one per owner: "Horses (yours)" with "2 · 1 hungry" on the
+ * right, then a row for each with its stats and age (`horseStatsText`) and its health and hunger
+ * meters where the Player knows how it fares (`CONTEXT.md`: Seeing how someone fares). A click on
+ * one of the Player's own opens it in the Horses drawer.
  */
-function horseLines(
+function horseLists(
   horses: SeenHorse[],
   rel: (h: SeenHorse) => Relationship | undefined,
   tick: number | undefined,
-): string[] {
+): CardList[] {
   const groups = new Map<string, SeenHorse[]>()
   for (const h of horses) {
     const key = `${h.realmId}/${h.cityId}`
     groups.set(key, [...(groups.get(key) ?? []), h])
   }
-  return [...groups.values()].flatMap((group) => {
+  return [...groups.values()].map((group) => {
     const r = rel(group[0]!)
     const owner = r ? RELATIONSHIP_NAMES[r].toLowerCase() : 'nobody’s'
-    const parts = [`${group.length} ${group.length === 1 ? 'horse' : 'horses'} (${owner})`]
+    const parts = [`${group.length}`]
     const known = group.filter(horseFaresKnown).map(horseFares)
     const hungry = known.filter((f) => f.hunger !== 'fed').length
     const hurt = known.filter((f) => f.health === 'hurt').length
     if (hungry > 0) parts.push(`${hungry} hungry`)
     if (hurt > 0) parts.push(`${hurt} hurt`)
-    return [parts.join(' · '), ...group.map((h) => `· ${h.name} · ${horseDetail(h, tick)}`)]
+    return {
+      title: `${group.length === 1 ? 'Horse' : 'Horses'} (${owner})`,
+      count: parts.join(' · '),
+      meters: FARES_METERS,
+      rows: group.map((h) => {
+        const shares = faresShares(h)
+        return {
+          id: h.id,
+          name: h.name,
+          detail: horseStatsText(h, tick),
+          ...(shares ? { shares } : {}),
+          ...(r === 'own' ? { opens: 'horse' as const } : {}),
+        }
+      }),
+    }
   })
+}
+
+/**
+ * A workplace's workers in sight (`CONTEXT.md`: Workplace): "Workers" with "7 / 10" on the right,
+ * then a row for each with their health and hunger where the Player knows them. A click on one of
+ * the Player's own opens their card.
+ */
+function workerList(b: Building, max: number, t: TileThings): CardList {
+  const working = (t.residents ?? []).filter(
+    (r) => r.order?.kind === 'workAt' && r.order.buildingId === b.id,
+  )
+  return {
+    title: 'Workers',
+    count: `${t.workers(b)} / ${max}`,
+    empty: 'Nobody works here',
+    meters: FARES_METERS,
+    rows: working.map((r) => {
+      const stranger = t.strangers.some((s) => s.id === r.id)
+      const rel = stranger ? realmRelationship(r.owner, r.cityId, t.cities, t.viewer) : 'own'
+      const shares = faresShares(r)
+      return {
+        id: r.id,
+        name: r.name,
+        ...(stranger ? { detail: rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s' } : {}),
+        ...(shares ? { shares } : {}),
+        ...(stranger ? {} : { opens: 'resident' as const }),
+      }
+    }),
+  }
+}
+
+/** A storage's goods, one row each as the Goods panel lists them, and what they weigh. */
+function goodsList(stock: Stock, labels: Record<string, string>): CardList {
+  return {
+    title: 'Goods',
+    count: `${Math.round(stockWeight(stock))} kg`,
+    empty: 'Nothing in it',
+    meters: [],
+    rows: GOODS.filter((g) => (stock[g] ?? 0) > 0).map((g) => ({
+      id: g,
+      name: labels[g]!,
+      amount: stock[g]!,
+    })),
+  }
+}
+
+/**
+ * How long a stable's Food lasts the horses standing in it (`CONTEXT.md`: Feeding the stable):
+ * "about 6 game days for its horses", a meter full at `STABLE_FEED_DAYS`.
+ */
+export function stableFoodMeter(
+  food: number,
+  horses: readonly SeenHorse[],
+): NonNullable<TileCard['stableFood']> {
+  const perDay = horses.reduce((n, h) => n + HORSE_FOOD_PER_DAY * horseFoodFactor(h), 0)
+  if (perDay <= 0) return { units: food, share: food > 0 ? 1 : 0, lasts: 'no horses in it to feed' }
+  const days = Math.floor(food / perDay + 1e-9)
+  const lasts =
+    days < 1 ? 'less than a game day' : `about ${days} game ${days === 1 ? 'day' : 'days'}`
+  return {
+    units: food,
+    share: Math.min(1, food / perDay / STABLE_FEED_DAYS),
+    lasts: `${lasts} for its horses`,
+  }
 }
 
 /**
@@ -861,6 +997,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     .filter((h) => h.realmId !== null && h.realmId === t.viewer.realmId)
     .map(({ id, name }) => ({ id, name }))
   const lines: string[] = []
+  const lists: CardList[] = []
+  let stableFood: TileCard['stableFood']
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
   let passengers: TileCard['passengers']
@@ -890,7 +1028,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       lines.push(stillNeeded(building, goodLabels))
     } else {
       const max = MAX_WORKERS[building.kind]
-      if (max !== undefined && live) lines.push(`${t.workers(live)} / ${max} workers`)
+      if (max !== undefined && live) lists.push(workerList(live, max, t))
       // A house's room (`CONTEXT.md`: House), and how its city is housed where the Player may know.
       const room = HOUSING_ROOM[building.kind]
       if (room !== undefined) {
@@ -900,11 +1038,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         )
       }
       if (stable) {
-        lines.push(
-          ...(horsesHere.length > 0
-            ? horseLines(horsesHere, horseRel, t.tick)
-            : ['No horses in it']),
-        )
+        if (horsesHere.length === 0) lines.push('No horses in it')
+        lists.push(...horseLists(horsesHere, horseRel, t.tick))
         lines.push(`Room for ${Math.max(0, STABLE_CAPACITY - horsesHere.length)} more horses`)
       }
       const makes = live && makesLine(live, t, pile, goodLabels)
@@ -912,7 +1047,13 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       // A finished training ground teaches what its teacher set, and nothing while nobody
       // teaches there (`CONTEXT.md`: Training ground, Teacher).
       if (building.kind === 'trainingGround') lines.push(...trainingLines(building, t))
-      if (building.stock) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
+      // What is inside a building in sight as rows, a stable's Food as a meter; as last seen, a line.
+      if (building.stock && !live) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
+      else if (building.stock && stable) {
+        stableFood = stableFoodMeter(building.stock.food ?? 0, horsesHere)
+        const rest: Stock = { ...building.stock, food: 0 }
+        if (GOODS.some((g) => (rest[g] ?? 0) > 0)) lists.push(goodsList(rest, goodLabels))
+      } else if (building.stock) lists.push(goodsList(building.stock, goodLabels))
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
@@ -1040,7 +1181,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       rel: horseRel(horsesHere[0]!),
       what: 'horses',
     }
-    lines.push(...horseLines(horsesHere, horseRel, t.tick))
+    lists.push(...horseLists(horsesHere, horseRel, t.tick))
   }
   const terrain = terrainLine(t.terrain, road)
   if (road) {
@@ -1059,6 +1200,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(passengers ? { passengers } : {}),
     ...(unhitch ? { unhitch } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
+    ...(lists.length > 0 ? { lists } : {}),
+    ...(stableFood ? { stableFood } : {}),
   }
 }
 
