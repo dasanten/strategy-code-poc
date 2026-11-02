@@ -1,7 +1,9 @@
 import {
+  MAX_HUNGER,
   PAIRING_WAIT_DAYS,
   PAIRING_WAIT_TICKS,
   TICKS_PER_GAME_DAY,
+  ticksForAge,
   type ContractView,
   type Diplomacy,
 } from '@csp/shared'
@@ -13,6 +15,7 @@ import {
   groupCard,
   groupResidents,
   pairingDaysLeft,
+  residentLines,
   residentsCount,
   ARMY_TABS,
   GROUP_TABS,
@@ -252,5 +255,31 @@ describe('a stat on the Stats tab', () => {
     expect(statLine(10, 2.3456, 5)).toBe('10 + 2.3 (5)')
     expect(statLine(10, 4.99, 5)).toBe('10 + 4.9 (5)')
     expect(statLine(10, 5, 5)).toBe('10 + 5 (5)')
+  })
+})
+
+describe('residentLines', () => {
+  const edda = { id: 'edda', name: 'Edda', bornAt: 0, hunger: MAX_HUNGER * 0.4 }
+  const tick = ticksForAge(34) + 5
+
+  it('reads name, Leader mark and age on the first line, Doing and hunger on the second', () => {
+    expect(residentLines(edda, { leaderId: 'edda', tick, doing: 'Working the field' })).toEqual({
+      name: 'Edda',
+      leader: true,
+      age: '34 years',
+      doing: 'Working the field',
+      fed: 0.4,
+    })
+  })
+
+  it('marks only the Leader, and says "1 year" for a one-year-old', () => {
+    const lines = residentLines(edda, { leaderId: 'ann', tick: ticksForAge(1), doing: 'Idle' })
+    expect(lines.leader).toBe(false)
+    expect(lines.age).toBe('1 year')
+  })
+
+  it('keeps the hunger meter between empty and full', () => {
+    const starving = { ...edda, hunger: -3 }
+    expect(residentLines(starving, { leaderId: 'x', tick, doing: 'Idle' }).fed).toBe(0)
   })
 })

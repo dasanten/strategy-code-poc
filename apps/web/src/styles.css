@@ -315,10 +315,49 @@ button.hud-logout {
   padding-left: 54px;
   overflow: hidden;
 }
+/* The realm's name gives way first: it ends in an ellipsis while the clock stays whole. */
 .game.phone .hud-top b {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
+}
+.game.phone .hud-top .hud-clock,
+.game.phone .hud-top .hud-status {
+  flex: none;
+  white-space: nowrap;
+}
+/* The map's buttons in one row at the bottom left, above the card's sheet (`--sheet-h`); zoom is
+   pinch only. The Legend button ends the row and its panel opens above it; the minimap button and
+   the readout (or the loading line) sit bottom right. */
+.game.phone .map-buttons {
+  top: auto;
+  left: 12px;
+  bottom: calc(var(--sheet-h, 0px) + 12px);
+  flex-direction: row;
+}
+.game.phone .map-buttons .zoom {
+  display: none;
+}
+.game.phone .map-legend-button {
+  left: calc(12px + 3 * 44px + 3 * 6px);
+  bottom: calc(var(--sheet-h, 0px) + 12px);
+  height: 44px;
+}
+.game.phone .map-legend-panel {
+  bottom: calc(var(--sheet-h, 0px) + 12px + 44px + 6px);
+}
+.game.phone .map-corner {
+  bottom: calc(var(--sheet-h, 0px) + 12px);
+}
+/* An open minimap clears the row of buttons beside the readout. */
+.game.phone .minimap {
+  margin-bottom: 16px;
+}
+.game.phone .map-readout {
+  max-width: calc(100vw - 260px);
+  white-space: normal;
 }
 .game.phone .hud-top .hud-goods,
 .game.phone .hud-top .hud-leader,
@@ -758,6 +797,13 @@ label > select {
   background: #1a1e22;
   border-color: #2c333a;
 }
+/* A toggle that is on (Select, Region map) is filled, so its state shows at a glance. */
+.map-buttons button[aria-pressed='true'],
+.map-buttons button[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--rel-own);
+  border-color: var(--rel-own);
+  color: var(--ui-ink);
+}
 .map-buttons svg {
   fill: none;
   stroke: currentColor;
@@ -856,11 +902,6 @@ label > select {
 .minimap-button {
   background: var(--ui-bar);
   border-color: var(--ui-line);
-}
-.map-buttons button[aria-pressed='true'] {
-  background: var(--rel-own);
-  border-color: var(--rel-own);
-  color: var(--ui-ink);
 }
 /* On a phone the legend is one column, clear of the minimap and readout bottom right. */
 @media (max-width: 640px) {
@@ -1087,6 +1128,45 @@ button.residents-row.selected:hover {
 .residents-row .doing small {
   display: block;
   font-size: 11px;
+}
+/* On a phone a row is two lines instead of columns (`residentLines`, `horseLines`): name and
+   age, then Doing (or where a horse is) with the meters at its end. Doing wraps, never cut. */
+.residents-table.lines {
+  min-width: 0;
+}
+.residents-row.lines {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 6px 8px;
+}
+.residents-row.lines .line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.residents-row.lines .name,
+.residents-row.lines .doing {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.residents-row.lines .doing {
+  white-space: normal;
+}
+/* The Leader mark stays on the name's line, not under it as in the table. */
+.residents-row.lines .leader-mark {
+  display: inline;
+  font-size: inherit;
+}
+.residents-row.lines .mono,
+.residents-row.lines .muted {
+  flex: none;
+}
+.residents-row.lines .meter {
+  flex: none;
+  width: 44px;
 }
 .meter {
   display: block;

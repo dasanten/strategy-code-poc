@@ -71,6 +71,7 @@ import {
   ROAD_COLOR,
   TERRAIN_COLORS,
   TERRAIN_NAMES,
+  LOADING_COLOR,
   VOID_COLOR,
   css,
 } from './map/palette.js'
@@ -237,6 +238,8 @@ export function MapView({
   const [boxMode, setBoxMode] = useState(false)
   const boxModeRef = useRef(boxMode)
   boxModeRef.current = boxMode
+  // Explored terrain on screen is still on its way: the readout says so in its place.
+  const [loading, setLoading] = useState(false)
   const mapSize = world.map.size
   const admin = world.admin !== undefined
   const realmId = world.home.realmId
@@ -294,6 +297,9 @@ export function MapView({
     const app = new Application()
     const nodes: KnownNode[][] = []
     const terrainLayer = new TerrainLayer(mapSize, (i) => worldRef.current.exploredChunks.has(i))
+    // Explored chunks on screen that haven't loaded yet, a neutral grey so they don't read as
+    // unexplored.
+    const waiting = new Graphics()
     // The Region map: territory over the terrain, one small texture per chunk like the terrain.
     const regionSprites = new Map<number, Sprite>()
     const regionLayer = new Container()
@@ -454,6 +460,14 @@ export function MapView({
           ? [...worldRef.current.exploredChunks].filter((i) => !shown.has(i))
           : []
       store.want([...[...onScreen].sort((a, b) => away(a) - away(b)), ...forMinimap])
+      const notHere = store.waiting(onScreen)
+      waiting.clear()
+      for (const i of notHere) {
+        const [sx, sy] = chunkToScreen(cam, view, mapSize, i % across, Math.floor(i / across))
+        waiting.rect(sx, sy, CHUNK_SIZE * cam.scale, CHUNK_SIZE * cam.scale)
+      }
+      if (notHere.length > 0) waiting.fill(LOADING_COLOR)
+      setLoading(notHere.length > 0)
       drawOverlay(overlay, cam, view, onScreen)
       drawMinimap(view)
     }
@@ -916,6 +930,7 @@ export function MapView({
         redraw()
       })
       app.stage.addChild(
+        waiting,
         terrainLayer.container,
         regionLayer,
         borderLayer,
@@ -973,14 +988,21 @@ export function MapView({
   return (
     <div className="map-view">
       <div ref={hostRef} className="map" aria-label="World map" role="img" />
+      {/* On a phone zoom is pinch only: the zoom buttons hide and the rest sit in a row. */}
       <div className="map-buttons">
-        <button type="button" aria-label="Zoom in" onClick={() => controlsRef.current?.zoom(1.5)}>
+        <button
+          type="button"
+          className="zoom"
+          aria-label="Zoom in"
+          onClick={() => controlsRef.current?.zoom(1.5)}
+        >
           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18">
             <path d="M9 3v12M3 9h12" />
           </svg>
         </button>
         <button
           type="button"
+          className="zoom"
           aria-label="Zoom out"
           onClick={() => controlsRef.current?.zoom(1 / 1.5)}
         >
@@ -1075,7 +1097,13 @@ export function MapView({
               Minimap
             </button>
           ))}
-        <div className="map-readout">{readoutText(hover, tier, look !== 'none')}</div>
+        {loading ? (
+          <div className="map-readout" role="status">
+            Loading the map…
+          </div>
+        ) : (
+          <div className="map-readout">{readoutText(hover, tier, look !== 'none')}</div>
+        )}
       </div>
     </div>
   )

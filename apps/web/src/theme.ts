@@ -49,7 +49,9 @@ export const THEME = {
     sea: '#2f80c6',
     road: '#e8cf97',
     unexplored: '#1a1e22',
-    /** Behind terrain not loaded yet. */
+    /** Explored terrain on its way from the server: a neutral grey, not unexplored black. */
+    loading: '#565d63',
+    /** Behind the map, where nothing is explored. */
     void: '#0b0d0f',
   },
 } as const
