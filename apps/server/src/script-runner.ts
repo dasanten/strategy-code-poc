@@ -35,6 +35,8 @@ import {
   type RealmEventWhat,
   type RunningScript,
   type ScriptMemory,
+  type ScriptParam,
+  type ScriptParamValue,
   type ScriptRunBy,
   type StartParamValues,
   type TerrainMap,
@@ -65,6 +67,12 @@ import {
 import { entitiesInSight, withSight } from './sight.js'
 import { realmOf } from './starting-city.js'
 import { worldIndex } from './world-index.js'
+import {
+  startWorkBySettings,
+  withWorkSettings,
+  workScriptId,
+  workSettingsOf,
+} from './workplace-settings.js'
 
 /**
  * Running a script as a resident's or an army's order (`CONTEXT.md`: Running a script, Memory,
@@ -228,8 +236,33 @@ export function setDefenceScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKi
 export interface DefaultScriptHost {
   /** The id of the Player's version of the task's default script, made if they have none. */
   defaultScript(userId: number, task: Task): number
-  /** The script's active version, to check the param values a task gives against. */
-  script?(scriptId: number): Pick<RunnableScript, 'source'> | undefined
+  /**
+   * The script's Player and active version, to check the param values a task gives against and
+   * to find a workplace's work script (`workScriptId`).
+   */
+  script?(scriptId: number): Pick<RunnableScript, 'userId' | 'source' | 'task'> | undefined
+}
+
+/**
+ * The script a task runs for the Player: Work at a workplace their realm keeps settings for runs
+ * its work script (`CONTEXT.md`: Workplace settings, `workScriptId`), any other task the
+ * Player's version of its default script.
+ */
+function taskScriptId(
+  host: DefaultScriptHost,
+  world: WorldState,
+  sender: OrderSender,
+  o: Partial<TaskRequest>,
+): number {
+  const realm = sender.npcCityId === undefined ? realmOf(world, sender.userId) : undefined
+  if (o.task !== 'work' || !realm || !host.script || typeof o.workplaceId !== 'string')
+    return host.defaultScript(sender.userId, o.task!)
+  const settings = workSettingsOf(world, realm.id, o.workplaceId)
+  return workScriptId(
+    { script: host.script, defaultScript: host.defaultScript },
+    sender.userId,
+    settings,
+  )
 }
 
 /** What every task order may carry besides its target. */
@@ -444,7 +477,7 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       if (problem !== undefined || o.params === undefined) return problem
       if (!host.script) return 'the task takes no params'
       const realm = realmOf(world, sender.userId)!
-      const scriptId = host.defaultScript(sender.userId, o.task!)
+      const scriptId = taskScriptId(host, world, sender, o)
       return paramsProblem({ script: host.script }, world, realm.id, scriptId, o.params)
     },
     apply(world, sender, order) {
@@ -452,8 +485,14 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       const o = withKeptPair(world, order as TaskRequest, realmId) as TaskRequest
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!r) return
+      const scriptId = taskScriptId(host, world, sender, o)
+      if (o.task === 'work' && realmId !== undefined && sender.npcCityId === undefined) {
+        // Work at a workplace runs by its settings (`CONTEXT.md`: Workplace settings).
+        const memory = taskMemory(world, o, r) as TaskMemory['work']
+        startWorkBySettings(r, scriptId, memory, o.params, taskTarget(world, realmId, o, r))
+        return
+      }
       r.order = null
-      const scriptId = host.defaultScript(sender.userId, o.task)
       r.script = { scriptId, memory: taskMemory(world, o, r) }
       const source = host.script?.(scriptId)?.source
       const script = source === undefined ? undefined : { source, task: o.task }
@@ -891,7 +930,21 @@ export class ScriptRunner {
     const memory = structuredClone(running.memory) as ScriptObject
     // A resident's picked param values; an army's params are never picked.
     const declared = parsed.program.params
-    const params = resident ? paramValues(world, resident, running.scriptId, declared) : declared
+    const picked: readonly (ScriptParam & { value?: ScriptParamValue })[] = resident
+      ? paramValues(world, resident, running.scriptId, declared)
+      : declared
+    // Working by a workplace's settings, what isn't picked for them reads the workplace's.
+    const params =
+      running.settingsFrom === undefined
+        ? picked
+        : withWorkSettings(
+            picked,
+            running.settingsFrom,
+            workSettingsOf(world, realm.id, running.settingsFrom),
+          )
+    if (violations && running.settingsFrom !== undefined) {
+      violations.push(...runsWorkScript(this.host, world, realm, r.id, running))
+    }
     const bound = bindScript({
       world,
       terrain: this.terrain,
@@ -1002,6 +1055,32 @@ function stopScript(world: WorldState, r: Runner): void {
   const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
   if (resident && resumeInterrupted(resident)) return
   delete r.holder.script
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Workplace settings): a resident working by a workplace's
+ * settings runs its current work script (`workScriptId`): the one the realm's settings name,
+ * while it is still one of the Player's work scripts, else the Player's Work default. One the
+ * settings name that stopped being a work script may still run: nobody is switched off it.
+ */
+function runsWorkScript(
+  host: Pick<ScriptHost, 'script' | 'defaultScript'>,
+  world: WorldState,
+  realm: Realm,
+  residentId: string,
+  running: RunningScript,
+): InvariantViolation[] {
+  const settings = workSettingsOf(world, realm.id, running.settingsFrom!)
+  if (!host.defaultScript || running.scriptId === settings?.scriptId) return []
+  const work = { script: host.script, defaultScript: host.defaultScript }
+  if (running.scriptId === workScriptId(work, realm.userId, settings)) return []
+  return [
+    {
+      invariant: 'works-by-work-script',
+      message: `${residentId} works ${running.settingsFrom} by its settings but runs script ${running.scriptId}`,
+      entityIds: [residentId, running.settingsFrom!],
+    },
+  ]
 }
 
 /** What an error of the game's own says, short enough for the realm log. */

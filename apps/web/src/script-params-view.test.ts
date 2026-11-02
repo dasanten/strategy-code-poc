@@ -131,6 +131,26 @@ describe('a param field’s effective value', () => {
       'none picked',
     )
   })
+
+  it('says the workplace’s value while working by its settings, unless picked for them', () => {
+    expect(effectiveParam(param('foodTake'), undefined, { label, workplace: 4 })).toEqual({
+      text: '4, from the workplace',
+      set: false,
+    })
+    expect(effectiveParam(param('storage'), undefined, { label, workplace: 'farm' })).toEqual({
+      text: 'Farm at 10, 5, from the workplace',
+      set: false,
+    })
+    // Their own value, an override, wins.
+    expect(effectiveParam(param('foodTake'), 2, { label, workplace: 4 })).toEqual({
+      text: '2',
+      set: true,
+    })
+    // A workplace value of another type, from another work script, isn't read.
+    expect(effectiveParam(param('foodTake'), undefined, { label, workplace: 'farm' }).text).toMatch(
+      /the default$/,
+    )
+  })
 })
 
 describe('what a param would be on a tile', () => {
