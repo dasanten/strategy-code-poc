@@ -981,6 +981,14 @@ export function Wiki() {
           else the nearest storage of their realm.
         </p>
         <p>
+          A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
+          its pile. Once they lack the input for a batch (Iron ore, Gold ore, or the Iron and Wood
+          of what a smith makes), one worker at a time, picked at random, fetches a load of what is
+          missing from their <code>input</code> storage, else their <code>storage</code>, else the
+          nearest storage of their realm holding it, puts it on the pile and goes back to work; not
+          while someone carries the output. With none anywhere they stand idle.
+        </p>
+        <p>
           Work's params on the card: <code>storage</code> is the main storage, used for the output,
           the inputs and Food alike. <code>output</code> (where the output goes), <code>input</code>{' '}
           (where inputs come from) and <code>food</code> (where Food comes from) each take its place
@@ -1647,10 +1655,10 @@ export function Wiki() {
           So it builds the whole chain its land allows, from the node up: weapons short wants a
           smithy, which wants Iron, so a smelter, which wants Iron ore, so a mine first, and the
           Wood and Stone the mine is built of before that. A smelter or smithy is worked only while
-          the storage holds the input for a batch, which its workers take with them; once the city
-          isn't short of what it makes, they stop. A good with no node in reach stays short: a
-          village with no ore in reach forges no weapons, and a mint is built only with Gold ore in
-          reach.
+          the storage holds the input for a batch, which its workers take with them, and one of them
+          fetches more when it runs out, as yours do; once the city isn't short of what it makes,
+          they stop. A good with no node in reach stays short: a village with no ore in reach forges
+          no weapons, and a mint is built only with Gold ore in reach.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
