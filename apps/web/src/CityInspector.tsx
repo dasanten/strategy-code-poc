@@ -49,6 +49,7 @@ import {
   type WarehouseView,
 } from './city-view.js'
 import { GOOD_LABELS } from './Residents.js'
+import { GoodIcon } from './GoodsGrid.js'
 import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
 import { HOW_TO_TRADE_PATH } from './wiki-view.js'
@@ -487,7 +488,15 @@ function Prices({
 }
 
 /** One side of the prices: per good, the units (where known) and the price of each in coins. */
-function PriceList({ title, lines, none }: { title: string; lines: TradeLine[]; none: string }) {
+export function PriceList({
+  title,
+  lines,
+  none,
+}: {
+  title: string
+  lines: TradeLine[]
+  none: string
+}) {
   if (lines.length === 0) {
     return (
       <p className="small">
@@ -509,7 +518,12 @@ function PriceList({ title, lines, none }: { title: string; lines: TradeLine[]; 
       <tbody>
         {lines.map((l) => (
           <tr key={l.good}>
-            <th scope="row">{GOOD_LABELS[l.good]}</th>
+            <th scope="row">
+              <span className="good-label">
+                <GoodIcon good={l.good} />
+                {GOOD_LABELS[l.good]}
+              </span>
+            </th>
             {units && <td>{l.units ?? ''}</td>}
             <td>{l.price}</td>
           </tr>

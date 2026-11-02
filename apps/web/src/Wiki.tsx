@@ -1236,7 +1236,7 @@ export function Wiki() {
               <th>Goods</th>
               {(Object.keys(GOOD_WEIGHT) as Good[]).map((g) => (
                 <th key={g}>
-                  <span className="wiki-good">
+                  <span className="good-label">
                     <GoodIcon good={g} />
                     {goodName(g)}
                   </span>
@@ -1255,8 +1255,11 @@ export function Wiki() {
         </table>
         <p>
           Cards show goods as these icons, each with its amount; hover over one, or press and hold
-          it on a phone, for its name. On a resident's card their own food (up to {num(OWN_FOOD)}{' '}
-          Food) shows apart at the end, marked <em>own</em>.
+          it on a phone, for its name. That goes for every inventory: what a resident carries, a
+          carriage's load, a storage's or stable's goods, a pile, and a construction site's
+          materials (what was delivered and what it still needs); a trade's prices name each good
+          beside its icon. On a resident's card their own food (up to {num(OWN_FOOD)} Food) shows
+          apart at the end, marked <em>own</em>.
         </p>
         <h3>Moving goods, per game hour</h3>
         <table>

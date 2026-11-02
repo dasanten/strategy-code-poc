@@ -640,9 +640,10 @@ export interface TileCard {
   renameHorses?: { id: string; name: string }[]
   /**
    * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
-   * and what they saw of it then, shown apart from the lines about what is there now.
+   * and what they saw of it then (what it held, a site's materials, as lists), shown apart from
+   * the lines and lists about what is there now.
    */
-  lastSeen?: { when: string; lines: string[] }
+  lastSeen?: { when: string; lines: string[]; lists: CardList[] }
   /** The carriage on the tile, as rows and meters (`CONTEXT.md`: Goods on cards). */
   carriage?: CarriageView
   /**
@@ -651,8 +652,9 @@ export interface TileCard {
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
   /**
-   * Who and what the tile holds, as rows under the card's lines: the horses in a stable or on the
-   * tile, a workplace's workers, the goods in a storage.
+   * Who and what the tile holds, under the card's lines: the horses in a stable or on the tile and
+   * a workplace's workers as rows; the goods in a storage, a pile and a site's materials as goods
+   * grids.
    */
   lists?: CardList[]
   /**
@@ -704,21 +706,21 @@ export interface CardList {
   title: string
   /** On the right of the title: "2 · 1 hungry", "7 / 10". */
   count: string
-  /** What shows with no rows. */
+  /** What shows with no rows (or no goods). */
   empty?: string
   /** The meters each row has, by name, as the resident card shows them: Health, Hunger. */
   meters: readonly string[]
   rows: CardRow[]
+  /** An inventory, shown as the goods grid in place of rows (`CONTEXT.md`: Goods on cards). */
+  goods?: Stock
 }
 
-/** One row of a `CardList`: a horse, a worker or a good. */
+/** One row of a `CardList`: a horse or a worker. */
 export interface CardRow {
   id: string
   name: string
   /** Under the name: a horse's stats and age, whose a worker is. */
   detail?: string
-  /** How much of a good. */
-  amount?: number
   /**
    * Each of the list's meters filled to this share, undefined where the Player doesn't know how
    * they fare (`CONTEXT.md`: Seeing how someone fares).
@@ -1019,19 +1021,17 @@ function workerList(b: Building, max: number, t: TileThings): CardList {
   }
 }
 
-/** A storage's goods, one row each as the Goods panel lists them, and what they weigh. */
-function goodsList(stock: Stock, labels: Record<string, string>): CardList {
-  return {
-    title: 'Goods',
-    count: `${Math.round(stockWeight(stock))} kg`,
-    empty: 'Nothing in it',
-    meters: [],
-    rows: GOODS.filter((g) => (stock[g] ?? 0) > 0).map((g) => ({
-      id: g,
-      name: labels[g]!,
-      amount: stock[g]!,
-    })),
-  }
+/**
+ * An inventory on the card as the goods grid (`CONTEXT.md`: Goods on cards): a storage's goods, a
+ * pile, a site's materials; by default with what they weigh on the right.
+ */
+function goodsList(
+  title: string,
+  stock: Stock,
+  empty: string,
+  count = `${Math.round(stockWeight(stock))} kg`,
+): CardList {
+  return { title, count, empty, meters: [], rows: [], goods: stock }
 }
 
 /**
@@ -1148,10 +1148,10 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (building.site) {
       const work = BUILD_WORK[building.kind] ?? 0
       const done = work > 0 ? Math.floor((building.site.work / work) * 100) : 100
-      lines.push(
-        `${done}% of the work done · delivered ${goodsText(building.site.delivered, goodLabels)}`,
-      )
-      lines.push(stillNeeded(building, goodLabels))
+      lines.push(`${done}% of the work done`)
+      lists.push(...siteLists(building))
+      const left = stillNeededLine(building)
+      if (left) lines.push(left)
     } else {
       const max = MAX_WORKERS[building.kind]
       if (max !== undefined && live) lists.push(workerList(live, max, t))
@@ -1168,18 +1168,17 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         lists.push(...horseLists(horsesHere, horseRel, t.tick))
         lines.push(`Room for ${Math.max(0, STABLE_CAPACITY - horsesHere.length)} more horses`)
       }
-      const makes = live && makesLine(live, t, pile, goodLabels)
+      const makes = live && makesLine(live, t, goodLabels)
       if (makes) lines.push(makes)
       // A finished training ground teaches what its teacher set, and nothing while nobody
       // teaches there (`CONTEXT.md`: Training ground, Teacher).
       if (building.kind === 'trainingGround') lines.push(...trainingLines(building, t))
-      // What is inside a building in sight as rows, a stable's Food as a meter; as last seen, a line.
-      if (building.stock && !live) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
-      else if (building.stock && stable) {
+      // What is inside a building as the goods grid, a stable's Food as a meter.
+      if (building.stock && stable) {
         stableFood = stableFoodMeter(building.stock.food ?? 0, horsesHere)
         const rest: Stock = { ...building.stock, food: 0 }
-        if (GOODS.some((g) => (rest[g] ?? 0) > 0)) lists.push(goodsList(rest, goodLabels))
-      } else if (building.stock) lists.push(goodsList(building.stock, goodLabels))
+        if (GOODS.some((g) => (rest[g] ?? 0) > 0)) lists.push(goodsList('Goods', rest, ''))
+      } else if (building.stock) lists.push(goodsList('Goods', building.stock, 'Nothing in it'))
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
@@ -1203,6 +1202,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       card.lastSeen = {
         when: lastSeenText(remembered.seenAt, t.lastSeen.tick),
         lines: lines.splice(0),
+        lists: lists.splice(0),
       }
     }
   }
@@ -1211,10 +1211,10 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     card ??= { title: 'Carriage site', what: 'building' }
     const work = BUILD_WORK.carriage ?? 0
     const done = work > 0 ? Math.floor((carriageSite.site.work / work) * 100) : 100
-    lines.push(
-      `Carriage site · ${done}% of the work done · delivered ${goodsText(carriageSite.site.delivered, goodLabels)}`,
-    )
-    lines.push(stillNeeded(carriageSite, goodLabels))
+    lines.push(`Carriage site · ${done}% of the work done`)
+    lists.push(...siteLists(carriageSite, 'Carriage'))
+    const left = stillNeededLine(carriageSite)
+    if (left) lines.push(`Carriage site · ${left.toLowerCase()}`)
     if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
   }
   if (carriage) {
@@ -1234,7 +1234,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   }
   if (pile) {
     card ??= { title: 'Goods on the ground', what: 'pile' }
-    lines.push(`On the ground: ${goodsText(pile.goods, goodLabels)}`)
+    // At a building it is the building's pile (`CONTEXT.md`: A building's pile).
+    lists.push(goodsList(building ? 'Pile' : 'On the ground', pile.goods, 'Nothing'))
   }
   if (t.node) {
     const kindName = nodeKindName(t.node)
@@ -1452,32 +1453,44 @@ function terrainLine(terrain: number | undefined, road: Building | undefined): s
 }
 
 /** What a construction site still lacks of its materials (`CONTEXT.md`: Construction site). */
-function stillNeeded(site: Building, labels: Record<string, string>): string {
-  const needs = BUILD_MATERIALS[site.kind] ?? {}
-  if (Object.keys(needs).length === 0) return 'Needs no materials, only work'
+function stillNeededLine(site: Building): string | undefined {
+  if (Object.keys(BUILD_MATERIALS[site.kind] ?? {}).length === 0)
+    return 'Needs no materials, only work'
+  return Object.keys(materialsLeft(site)).length === 0 ? 'All materials delivered' : undefined
+}
+
+/** What a construction site still needs of each of its materials. */
+function materialsLeft(site: Building): Stock {
   const left: Stock = {}
-  for (const [good, units] of Object.entries(needs) as [Good, number][]) {
+  const needs = Object.entries(BUILD_MATERIALS[site.kind] ?? {}) as [Good, number][]
+  for (const [good, units] of needs) {
     const missing = units - (site.site?.delivered[good] ?? 0)
     if (missing > 0) left[good] = missing
   }
-  return Object.keys(left).length === 0
-    ? 'All materials delivered'
-    : `Still needs ${goodsText(left, labels)}`
+  return left
 }
 
 /**
- * What a workplace makes and how much of it lies in its pile (`CONTEXT.md`: Workplace); at a
- * smithy, what its workers in sight are making (`CONTEXT.md`: Smithy).
+ * A construction site's materials as goods grids (`CONTEXT.md`: Goods on cards): what was
+ * delivered, and what it still needs while it needs any. `of` names whose site it is ("Carriage").
  */
-function makesLine(
-  b: Building,
-  t: TileThings,
-  pile: Pile | undefined,
-  labels: Record<string, string>,
-): string | undefined {
+function siteLists(site: Building, of?: string): CardList[] {
+  if (Object.keys(BUILD_MATERIALS[site.kind] ?? {}).length === 0) return []
+  const title = (t: string) => (of ? `${of}: ${t.toLowerCase()}` : t)
+  const left = materialsLeft(site)
+  const delivered = goodsList(title('Delivered'), site.site?.delivered ?? {}, 'Nothing yet', '')
+  return Object.keys(left).length === 0
+    ? [delivered]
+    : [delivered, goodsList(title('Still needs'), left, '', '')]
+}
+
+/**
+ * What a workplace makes (`CONTEXT.md`: Workplace); at a smithy, what its workers in sight are
+ * making (`CONTEXT.md`: Smithy). Its pile shows as a goods grid of its own.
+ */
+function makesLine(b: Building, t: TileThings, labels: Record<string, string>): string | undefined {
   if (MAX_WORKERS[b.kind] === undefined || !WORKPLACE_SKILL[b.kind]) return undefined
   const label = (g: Good) => labels[g]!.toLowerCase()
-  const inPile = (g: Good) => pile?.goods[g] ?? 0
   if ((RECIPES[b.kind]?.length ?? 0) > 1) {
     const making = new Map<Good, number>()
     for (const r of t.residents ?? []) {
@@ -1486,12 +1499,9 @@ function makesLine(
       const recipe = recipeFor(b.kind, o.makes)
       if (recipe) making.set(recipeGood(recipe), (making.get(recipeGood(recipe)) ?? 0) + 1)
     }
-    const made = RECIPES[b.kind]!.map(recipeGood)
-    const piled = made.filter((g) => inPile(g) > 0).map((g) => `${inPile(g)} ${label(g)}`)
-    const pileText = ` · in its pile: ${piled.length > 0 ? piled.join(', ') : 'nothing made'}`
-    if (making.size === 0) return `Makes weapons and armour, nobody at it${pileText}`
+    if (making.size === 0) return 'Makes weapons and armour, nobody at it'
     const list = [...making].map(([g, n]) => `${label(g)} (${n})`).join(', ')
-    return `Its workers make ${list}${pileText}`
+    return `Its workers make ${list}`
   }
   const node =
     NODE_WORKPLACE_KINDS.has(b.kind) && t.nodeAt
@@ -1503,7 +1513,7 @@ function makesLine(
   const good: Good | undefined =
     b.kind === 'farm' ? 'food' : node ? NODE_GOOD[node.kind] : recipe && recipeGood(recipe)
   if (!good) return undefined
-  return `Makes ${label(good)} · ${inPile(good)} in its pile`
+  return `Makes ${label(good)}`
 }
 
 /** The kinds of workplace built on a resource node. */

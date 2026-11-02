@@ -89,31 +89,44 @@ describe('the terrain on a tile’s card', () => {
 })
 
 describe('buildings on a tile’s card', () => {
-  it('says what a construction site still needs', () => {
+  it('shows what a construction site has and still needs as goods grids', () => {
     const mine = (delivered: SeenBuilding['stock'] & object) =>
       building({ kind: 'mine', site: { work: 0, delivered } })
-    expect(linesOf({ buildings: [mine({ wood: 10 })] })).toContain('Still needs 30 wood, 20 stone')
-    expect(linesOf({ buildings: [mine({ wood: 40, stone: 20 })] })).toContain(
-      'All materials delivered',
-    )
-    const farm = building({ kind: 'farm', site: { work: 0, delivered: {} } })
-    expect(linesOf({ buildings: [farm] })).toContain('Needs no materials, only work')
+    const half = tile({ buildings: [mine({ wood: 10 })] })
+    expect(half.lists?.map(({ title, goods }) => ({ title, goods }))).toEqual([
+      { title: 'Delivered', goods: { wood: 10 } },
+      { title: 'Still needs', goods: { wood: 30, stone: 20 } },
+    ])
+    expect(half.lines.some((l) => l.includes('wood'))).toBe(false)
+    const full = tile({ buildings: [mine({ wood: 40, stone: 20 })] })
+    expect(full.lines).toContain('All materials delivered')
+    expect(full.lists?.map((l) => l.title)).toEqual(['Delivered'])
+    expect(tile({ buildings: [mine({})] }).lists?.[0]).toMatchObject({ empty: 'Nothing yet' })
+    const farm = tile({ buildings: [building({ kind: 'farm', site: { work: 0, delivered: {} } })] })
+    expect(farm.lines).toContain('Needs no materials, only work')
+    expect(farm.lists).toBeUndefined()
   })
 
-  it('says what a workplace makes and how much lies in its pile', () => {
-    const farm = building({ kind: 'farm', cityId: 'c-me' })
-    expect(linesOf({ buildings: [farm], piles: [pile({ food: 7 })] })).toContain(
-      'Makes food · 7 in its pile',
+  it('shows a carriage site’s materials apart from its stable', () => {
+    const stable = building({ kind: 'stable', cityId: 'c-me', stock: {} })
+    const carriage = building({ id: 'k', kind: 'carriage', site: { work: 0, delivered: {} } })
+    const card = tile({ buildings: [stable, carriage] })
+    expect(card.lines).toContain('Carriage site · 0% of the work done')
+    expect(card.lists?.map((l) => l.title)).toEqual(
+      expect.arrayContaining(['Carriage: delivered', 'Carriage: still needs']),
     )
+  })
+
+  it('says what a workplace makes, and shows its pile as a goods grid', () => {
+    const farm = building({ kind: 'farm', cityId: 'c-me' })
+    const card = tile({ buildings: [farm], piles: [pile({ food: 7 })] })
+    expect(card.lines).toContain('Makes food')
+    expect(card.lists?.find((l) => l.title === 'Pile')?.goods).toEqual({ food: 7 })
     // A mine's node lies on one tile of its footprint, not necessarily the one clicked.
     const nodeAt = (x: number, y: number) =>
       x === 6 && y === 6 ? { kind: 'goldOre' as const, x, y } : undefined
-    expect(linesOf({ buildings: [building({ kind: 'mine' })], nodeAt })).toContain(
-      'Makes gold ore · 0 in its pile',
-    )
-    expect(linesOf({ buildings: [building({ kind: 'smelter' })] })).toContain(
-      'Makes iron · 0 in its pile',
-    )
+    expect(linesOf({ buildings: [building({ kind: 'mine' })], nodeAt })).toContain('Makes gold ore')
+    expect(linesOf({ buildings: [building({ kind: 'smelter' })] })).toContain('Makes iron')
     const house = linesOf({ buildings: [building({ kind: 'house', cityId: 'c-me' })] })
     expect(house.some((l) => l.startsWith('Makes'))).toBe(false)
   })
@@ -130,10 +143,9 @@ describe('buildings on a tile’s card', () => {
       residents: [at('a', 'sword'), at('b', 'sword'), at('c', 'shield')],
       piles: [pile({ sword: 3, iron: 5 })],
     })
-    expect(card.lines).toContain('Its workers make sword (2), shield (1) · in its pile: 3 sword')
-    expect(linesOf({ buildings: [smithy] })).toContain(
-      'Makes weapons and armour, nobody at it · in its pile: nothing made',
-    )
+    expect(card.lines).toContain('Its workers make sword (2), shield (1)')
+    expect(card.lists?.find((l) => l.title === 'Pile')?.goods).toEqual({ sword: 3, iron: 5 })
+    expect(linesOf({ buildings: [smithy] })).toContain('Makes weapons and armour, nobody at it')
   })
 
   it('says nobody teaches at a finished training ground yet, and nothing of the kind at its site', () => {
