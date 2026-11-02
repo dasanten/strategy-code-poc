@@ -230,6 +230,8 @@ export interface ResidentHere {
   carrying?: boolean
   /** They carry goods, so there is something to drop or store. */
   carries?: boolean
+  /** What anyone Down on their tile carries, which they can take (`CONTEXT.md`: Down). */
+  downCarrying?: Stock[]
   /** They are Down (`CONTEXT.md`: Down) and take no orders. */
   down?: boolean
 }
@@ -405,7 +407,7 @@ function ordersOffered(h: ResidentHere): {
 
 /**
  * Whether there are some of `goods` on a resident's tile to pick up: on the ground, stored, at a
- * site or on a carriage.
+ * site, on a carriage or carried by someone Down there.
  */
 function goodsOnTile(h: ResidentHere, goods: readonly Good[]): boolean {
   const some = (stock: Stock | undefined) => !!stock && goods.some((g) => (stock[g] ?? 0) > 0)
@@ -415,7 +417,8 @@ function goodsOnTile(h: ResidentHere, goods: readonly Good[]): boolean {
     some(h.building?.site?.delivered) ||
     some(h.carriageSite?.site?.delivered) ||
     some(h.road?.site?.delivered) ||
-    some(h.carriage?.load)
+    some(h.carriage?.load) ||
+    (h.downCarrying ?? []).some(some)
   )
 }
 
@@ -685,6 +688,11 @@ export interface TileCard {
    * unhitch the horse (`unhitchProblem`), when there are any (`CONTEXT.md`: Hitched horse).
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
+  /**
+   * Each Down resident on the tile who carries anything, with what they carry, and the Player's
+   * residents on the tile who may take it, as from a pile (`CONTEXT.md`: Down).
+   */
+  downGoods?: { residentId: string; name: string; goods: Stock; takers: SeenResident[] }[]
   /**
    * Who and what the tile holds, as rows under the card's lines: the horses in a stable or on the
    * tile, a workplace's workers, the goods in a storage.
@@ -1298,7 +1306,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (t.strangers.length === 1) {
       const gear = gearText(r, goodLabels)
       lines.push(
-        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${gear ? ` · ${gear}` : ''}`,
+        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${isDown(r) ? ' · Down' : ''}${gear ? ` · ${gear}` : ''}`,
       )
     } else lines.push(...strangersLines(t.strangers))
   }
@@ -1317,6 +1325,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
   lines.push(`Tile ${t.x}, ${t.y}`)
+  // Anyone on a Down resident's tile can take what they carry (`CONTEXT.md`: Down).
+  const onTile = here(t.residents ?? [])
+  const takers = onTile.filter((r) => !isDown(r) && !t.strangers.some((s) => s.id === r.id))
+  const downGoods = onTile
+    .filter((r) => isDown(r) && Object.values(r.carried).some((n) => n > 0))
+    .map((r) => ({ residentId: r.id, name: r.name, goods: r.carried, takers }))
   return {
     ...(card ?? {
       title: road && !road.site ? 'Road' : (groundName(t.terrain) ?? 'Open ground'),
@@ -1326,6 +1340,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(buildHere ? { buildHere } : {}),
     ...(passengers ? { passengers } : {}),
     ...(unhitch ? { unhitch } : {}),
+    ...(downGoods.length > 0 ? { downGoods } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),

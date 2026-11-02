@@ -59,7 +59,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         )
         .join(', ')
       const did = {
-        theft: `stole ${goods || 'goods'}`,
+        theft: `stole ${goods || 'goods'}${e.victim ? ` from ${e.victim}` : ''}`,
         attack: `attacked ${e.victim ?? 'one of your residents'}`,
         killing: `killed ${e.victim ?? 'one of your residents'}`,
         tearDown: `tore down your ${e.building ? BUILDING_NAMES[e.building] : 'building'}`,

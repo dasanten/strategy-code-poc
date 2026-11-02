@@ -170,6 +170,9 @@ describe('the actions on a resident’s card', () => {
     expect(ids(here({ carries: true }))).toContain('goods')
     expect(ids(here({ pile }))).toContain('goods')
     expect(ids(here({ pile: { ...pile, goods: {} } }))).not.toContain('goods')
+    // What someone Down on the tile carries (`CONTEXT.md`: Down).
+    expect(ids(here({ downCarrying: [{ stone: 2 }] }))).toContain('goods')
+    expect(ids(here({ adult: false, downCarrying: [{ stone: 2 }] }))).not.toContain('goods')
     expect(ids(here({ storage: building({ kind: 'storage', stock: { food: 2 } }) }))).toContain(
       'goods',
     )
@@ -1160,6 +1163,27 @@ describe('the actions on a tile’s card', () => {
     expect(tile({ carriages: [carriage], residents: [kid], tick }).unhitch).toBeUndefined()
     const bare = tile({ carriages: [{ ...carriage, horseId: null }], residents, tick })
     expect(bare.unhitch).toBeUndefined()
+  })
+
+  it('shows what someone Down on it carries, for the realm’s residents there to take', () => {
+    const at = (id: string, more: object = {}) =>
+      ({ id, name: id, owner: 'me', cityId: null, x: 5, y: 5, carried: {}, ...more }) as Resident
+    const ana = at('ana', { owner: 'them', down: true, carried: { stone: 3, food: 0 } })
+    const empty = at('cid', { down: true })
+    const ada = at('ada')
+    const lying = at('bo', { down: true })
+    const away = at('away', { x: 6 })
+    const stranger = at('st', { owner: 'them' })
+    const residents = [ana, empty, ada, lying, away, stranger]
+    const card = tile({ residents, strangers: [ana, stranger] })
+    // Someone Down carrying nothing is left out; nobody Down takes anything, nor anyone off the
+    // tile or of another realm.
+    expect(card.downGoods).toEqual([
+      { residentId: 'ana', name: 'ana', goods: { stone: 3, food: 0 }, takers: [ada] },
+    ])
+    expect(card.lines).toContain('2 residents of other realms · 1 Down')
+    expect(tile({ residents: [ana], strangers: [ana] }).lines[0]).toBe('ana · Another realm · Down')
+    expect(tile({ residents: [ada] }).downGoods).toBeUndefined()
   })
 
   it('sends the resident picked last there', () => {

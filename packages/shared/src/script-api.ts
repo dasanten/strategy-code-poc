@@ -354,7 +354,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'pickUp',
     ['spot', 'goods'],
-    'Take goods from a spot on my tile: {kind: "ground"}, {kind: "storage", storageId}, {kind: "site", siteId} or {kind: "carriage", carriageId}; goods like {food: 3}.',
+    'Take goods from a spot on my tile: {kind: "ground"}, {kind: "storage", storageId}, {kind: "site", siteId}, {kind: "carriage", carriageId} or a Down resident lying there, {kind: "resident", residentId}; goods like {food: 3}.',
   ),
   action('drop', ['spot', 'goods'], 'Put carried goods down at a spot on my tile.'),
   action(

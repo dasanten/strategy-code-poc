@@ -13,13 +13,17 @@ import {
 import {
   CITY_NAME_MAX_LENGTH,
   HORSE_NAME_MAX_LENGTH,
+  canHandle,
   nameProblem,
   type Building,
   type BuildingKind,
+  type GoodsSpot,
   type Resident,
   type ResourceKind,
+  type Stock,
 } from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
+import { TileGoods } from './Residents.js'
 import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
@@ -482,6 +486,7 @@ export function TileCard({
   onSelectResident,
   onOpenHorse,
   onUnhitch,
+  onPickUp,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -510,6 +515,8 @@ export function TileCard({
   onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
+  /** Orders one of the Player's residents to take goods from a spot on their tile. */
+  onPickUp: (residentId: string, from: GoodsSpot, goods: Stock) => void
 }) {
   const actions = tileActions(card, actor, tick)
   const [open, setOpen] = useState<string | undefined>()
@@ -587,6 +594,26 @@ export function TileCard({
           onOpen={(row) => (row.opens === 'horse' ? onOpenHorse(row.id) : onSelectResident(row.id))}
         />
       ))}
+      {card.downGoods?.map((d) => {
+        // The resident picked last takes it when they are on the tile, else the first one there.
+        const taker = d.takers.find((r) => r.id === actor?.id) ?? d.takers[0]
+        return (
+          <section
+            key={d.residentId}
+            className="inspector-block"
+            aria-label={`Carried by ${d.name}`}
+          >
+            <TileGoods
+              title={`Carried by ${d.name}, Down${taker ? ` · ${taker.name} picks up` : ''}`}
+              stock={d.goods}
+              spot={{ kind: 'resident', residentId: d.residentId }}
+              onPickUp={(from, goods) => taker && onPickUp(taker.id, from, goods)}
+              refused={(good) => !taker || !canHandle(taker, tick, [good])}
+            />
+            {!taker && <p className="muted small">Anyone of yours on this tile can pick it up.</p>}
+          </section>
+        )
+      })}
       {card.occupation && (
         <p className={`occupation${card.occupation.warning ? ' warn' : ''}`}>
           {card.occupation.text}
