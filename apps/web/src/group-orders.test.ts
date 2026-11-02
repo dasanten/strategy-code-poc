@@ -6,21 +6,31 @@ import {
   QUEUE_DEFAULT_STEP_MINUTES,
   TICKS_PER_GAME_YEAR,
   type Building,
+  type Resident,
   type Stock,
 } from '@csp/shared'
 import {
   GROUP_BUTTONS,
   GROUP_COUNTERPARTS,
+  GROUP_KEYS,
   groupNumberParams,
   groupRequests,
+  groupRows,
   groupSentLine,
   spreadTiles,
+  type GroupHere,
   type GroupOrder,
   type GroupSeen,
   type ResidentOrderId,
 } from './group-orders.js'
 import { GroupCard } from './Residents.js'
-import { ORDER_GROUP_LABELS, residentActions, type ResidentHere } from './selection-view.js'
+import {
+  ACTION_KEYS,
+  ORDER_GROUP_LABELS,
+  residentActions,
+  type ActionId,
+  type ResidentHere,
+} from './selection-view.js'
 
 const TICK = 100 * TICKS_PER_GAME_YEAR
 const SIZE = 64
@@ -426,10 +436,15 @@ describe('every resident order on the group card', () => {
     expect(oneOnly.map(([id]) => id).sort()).toEqual(['makeLeader', 'pair', 'rename'])
   })
 
-  it('shows every one of its buttons on the Orders tab, under the resident card’s kinds', () => {
+  it('shows its orders as rows named by their labels, with keys, under the resident card’s kinds', () => {
     const html = renderToStaticMarkup(
       createElement(GroupCard, {
-        residents: [],
+        residents: everyOrder.residents as unknown as Resident[],
+        seen: everyOrder.seen,
+        mapSize: SIZE,
+        tick: TICK,
+        carriages: [{ carriage: k1, seats: 2 }],
+        relocate: { choices: [], problem: undefined },
         scripts: [],
         buildings: [],
         picking: false,
@@ -441,9 +456,112 @@ describe('every resident order on the group card', () => {
         onClose: () => {},
       }),
     )
-    for (const b of GROUP_BUTTONS) expect(html).toContain(`>${b.label}</button>`)
+    for (const b of GROUP_BUTTONS) {
+      expect(html).toContain(`aria-label="${b.label}"`)
+      expect(html).toContain(`aria-keyshortcuts="${GROUP_KEYS[b.id]}"><kbd>${GROUP_KEYS[b.id]}`)
+    }
     for (const g of new Set(GROUP_BUTTONS.map((b) => b.group)))
       expect(html).toContain(`<h3>${ORDER_GROUP_LABELS[g].replace('&', '&amp;')}</h3>`)
+    expect(html).not.toContain('order-buttons')
+  })
+})
+
+/**
+ * A group with something for every order of the group card: A rides and works, in a stable,
+ * carrying wood; B is aboard carriage k1, on a training ground; C stands at k1, whose horse is
+ * hitched, beside a free horse.
+ */
+const everyOrder = {
+  residents: [
+    resident('a', 5, 5, { riding: 'h0', order: { kind: 'workAt' }, carried: { wood: 2 } }),
+    resident('b', 20, 20, { aboard: 'k1' }),
+    resident('c', 4, 4),
+  ],
+  seen: {
+    horses: [{ id: 'h2', x: 4, y: 4 }],
+    carriages: [{ id: 'k1', x: 4, y: 4, horseId: 'h1' }],
+    buildings: [
+      { id: 'stable', kind: 'stable', x: 5, y: 5 },
+      { id: 'ground', kind: 'trainingGround', x: 20, y: 20 },
+    ],
+  } satisfies GroupSeen,
+}
+
+describe('the group card’s rows', () => {
+  const here = (residents: ReturnType<typeof resident>[], more: Partial<GroupHere> = {}) => ({
+    residents,
+    tick: TICK,
+    size: SIZE,
+    seen: {},
+    carriages: 0,
+    relocateProblem: undefined,
+    ...more,
+  })
+  const rows = (h: GroupHere) => groupRows(h).actions.map((a) => a.id)
+
+  it('offers every order when some of them can take each', () => {
+    const h = here(everyOrder.residents, { seen: everyOrder.seen, carriages: 1 })
+    expect(rows(h)).toEqual(GROUP_BUTTONS.map((b) => b.id))
+    expect(groupRows(h).missing).toEqual({})
+  })
+
+  it('leaves out what nobody of an idle group on open ground can do, saying why', () => {
+    const { actions, missing } = groupRows(here([resident('a', 0, 0), resident('b', 1, 1)]))
+    const ids = actions.map((a) => a.id)
+    for (const id of ['stop', 'dismount', 'getOff', 'unhitch', 'board', 'mount'] as const)
+      expect(ids).not.toContain(id)
+    expect(ids).toEqual(expect.arrayContaining(['walk', 'work', 'build', 'script', 'fetch']))
+    expect(missing).toMatchObject({
+      stop: 'none of them has an order',
+      board: 'nobody stands on a carriage of your realm',
+      dismount: 'none of them rides',
+      getOff: 'none of them is aboard a carriage',
+      unhitch: 'no hitched horse where they stand',
+      mount: 'no free horse where they stand',
+      drive: 'nobody stands on a carriage of your realm',
+      feedStable: 'none of them is in a stable',
+      breed: 'none of them is in a stable',
+      train: 'none of them is on a training ground',
+      store: 'none of them carries anything',
+    })
+  })
+
+  it('says what keeps the grown ones from an order, over the children', () => {
+    const { missing } = groupRows(here([child('a', 0, 0), resident('b', 1, 1)]))
+    expect(missing.feedStable).toBe('none of them is in a stable')
+    const kids = groupRows(here([child('a', 0, 0), child('b', 1, 1)])).missing
+    expect(kids.work).toBe('they are all children')
+    const mixed = groupRows(here([child('a', 0, 0), carrying('b', 1, 1)])).missing
+    expect(mixed.build).toBe('they are children or carry one')
+  })
+
+  it('boards at once with one carriage, and opens a list to pick from with several', () => {
+    const one = groupRows(here([resident('a', 4, 4)], { carriages: 1 })).actions
+    expect(one.find((a) => a.id === 'board')).toEqual({
+      id: 'board',
+      label: 'Board carriage',
+      key: 'K',
+    })
+    const two = groupRows(here([resident('a', 4, 4)], { carriages: 2 })).actions
+    expect(two.find((a) => a.id === 'board')).toMatchObject({
+      label: 'Board carriage…',
+      opens: true,
+    })
+  })
+
+  it('greys Relocate out with why when they can’t relocate at all', () => {
+    const { actions } = groupRows(here([resident('a', 0, 0)], { relocateProblem: 'no room' }))
+    expect(actions.find((a) => a.id === 'relocate')).toMatchObject({
+      disabled: true,
+      reason: 'no room',
+    })
+  })
+
+  it('gives each order the resident card’s key for it', () => {
+    for (const [id, counterpart] of Object.entries(GROUP_COUNTERPARTS)) {
+      if ('none' in counterpart || id === 'goods' || id === 'walls') continue
+      for (const b of counterpart) expect(GROUP_KEYS[b], b).toBe(ACTION_KEYS[id as ActionId])
+    }
   })
 })
 

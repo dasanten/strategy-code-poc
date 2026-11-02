@@ -444,7 +444,16 @@ export function Wiki() {
       <Section id="controls">
         <p>
           Click one of your residents on the map to pick them and open their card. Each action on
-          the card shows its letter key; press it to run the action. Escape drops what is picked.
+          the card shows its letter key; press it to run the action. The card opens with the orders
+          they can take. While it stays open, each row stays where it is: an order that stops being
+          possible (they walk off the farm they worked) stays in its place, greyed out, saying why,
+          and one that becomes possible is added at the end of its group. The rows are sorted afresh
+          once you pick something else. A group’s card has the same rows and keys.
+        </p>
+        <p>
+          Escape leaves the top-most thing first: picking a target on the map, then a panel open on
+          the card (Build, Goods, Run script, …), then a tile’s card, then the resident’s or group’s
+          card, then the open drawer.
         </p>
         <p>
           The card and the residents list say what each resident is doing. Walking, riding or
@@ -519,7 +528,9 @@ export function Wiki() {
           With several picked, the group card gives each of them the same order, just as their own
           cards would. Every order a resident's card has is on it, but pairing, making Leader and
           renaming, which are about one resident. Nothing ties them together afterwards; each goes
-          on alone.
+          on alone. The card shows the orders some of them can take where they stand, as rows with
+          the same keys as on a resident's card; while it stays open, an order none of them can take
+          any more stays greyed out, saying why (“nobody stands on a carriage of your realm”).
         </p>
         <ul>
           <li>
@@ -561,8 +572,8 @@ export function Wiki() {
             all to attack. <strong>Climb a wall</strong>: those next to the one picked climb over.
           </li>
           <li>
-            <strong>Board carriage</strong> (one for each carriage of your realm some of them stand
-            on) puts those on its tile aboard, in the group's order, until it is full;{' '}
+            <strong>Board carriage</strong> (with several carriages of your realm where some of them
+            stand, pick one) puts those on its tile aboard, in the group's order, until it is full;{' '}
             <strong>Get off</strong> gets every passenger among them off. See Passengers.
           </li>
         </ul>
