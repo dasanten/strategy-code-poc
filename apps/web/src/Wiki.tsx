@@ -456,6 +456,16 @@ export function Wiki() {
           card, then the open drawer.
         </p>
         <p>
+          What a click picks on a tile goes in this order, at every zoom: one of your residents
+          there, then a building, then the bare tile, each showing its card. A carriage of yours, or
+          a horse of yours nobody rides, counts like a building. A click on a stack of your
+          residents (a token with a count, or the +N badge up close) picks them all as a group; its
+          card’s Members tab picks one of them. A stack with someone else’s residents in it opens
+          the tile card instead, which lists them all. With a mouse, what a click would pick is
+          outlined while you hover over it, in its owner’s colour; on a touch screen a tap picks by
+          the same order.
+        </p>
+        <p>
           The card and the residents list say what each resident is doing. Walking, riding or
           driving somewhere, they also say about when they arrive, and the card’s meters and
           countdowns (building, tearing down, breeding, carrying, pairing, growing up) say about how
@@ -590,11 +600,11 @@ export function Wiki() {
           </li>
         </ul>
         <p>
-          Those who can't take an order are skipped, and the card says who and why: children don't
-          work, build or drive, and store, fetch or put down only Food; a partner carrying a child
-          doesn't work, build, tear down, breed or haul; orders bound to a place go only to those
-          standing there; Board skips those not on the carriage's tile, the driver, riders and, once
-          it is full, the rest.
+          Those who can't take an order are skipped, and a notice under the top bar says who and
+          why: children don't work, build or drive, and store, fetch or put down only Food; a
+          partner carrying a child doesn't work, build, tear down, breed or haul; orders bound to a
+          place go only to those standing there; Board skips those not on the carriage's tile, the
+          driver, riders and, once it is full, the rest.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while giving a group order to add it to the end of each one's queue
@@ -1380,11 +1390,11 @@ export function Wiki() {
         </p>
         <p>
           The group card boards everyone of the group standing on the carriage at once, until it is
-          full, and says who was skipped and why; its Get off gets them all off. Board and Get off
-          are queue steps too: Board ends once they are aboard and Get off once they are off, so put
-          a step that waits for the stop between them (a script that calls <code>end()</code> once
-          they are there), e.g. board, wait, get off, work. A Board step whose carriage has left
-          their tile by its turn is skipped.
+          full, and a notice says who was skipped and why; its Get off gets them all off. Board and
+          Get off are queue steps too: Board ends once they are aboard and Get off once they are
+          off, so put a step that waits for the stop between them (a script that calls{' '}
+          <code>end()</code> once they are there), e.g. board, wait, get off, work. A Board step
+          whose carriage has left their tile by its turn is skipped.
         </p>
         <p>
           A resident given <strong>Feed the stable</strong> in a stable keeps Food there for{' '}

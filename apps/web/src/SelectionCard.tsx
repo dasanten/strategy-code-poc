@@ -126,6 +126,9 @@ export function SelectionCard({
 /** Whether the card is in a bottom sheet dropped to its header, so only the header shows. */
 const SheetPeek = createContext(false)
 
+/** Whether the card is hidden behind the wide drawer (`cardHidden`), its keys off with it. */
+const CardHidden = createContext(false)
+
 const SHEET_LABELS: Record<SheetHeight, string> = {
   peek: 'header only',
   half: 'half the screen',
@@ -139,16 +142,19 @@ const DRAG_SLOP = 6
  * Where the selection card sits over the map: docked top right on a desktop, a bottom sheet on a
  * phone (ADR 0012). The sheet opens at half; dragging its handle moves it between peek (just the
  * header), half and full, and a tap goes one height up. Pick mode drops it to peek, and it comes
- * back to where it was once the target is picked.
+ * back to where it was once the target is picked. A hidden card keeps all that until it shows.
  */
 export function CardSheet({
   phone,
   pinnedPeek,
+  hidden = false,
   children,
 }: {
   phone: boolean
   /** Held at peek while the map waits for a target for this card. */
   pinnedPeek: boolean
+  /** Hidden behind the wide drawer (`cardHidden`). */
+  hidden?: boolean
   children: ReactNode
 }) {
   const [height, setHeight] = useState<SheetHeight>(SHEET_OPENS_AT)
@@ -156,7 +162,12 @@ export function CardSheet({
   const [dragged, setDragged] = useState<number>()
   const press = useRef<{ y: number; from: number; moved: boolean }>(undefined)
   const ref = useRef<HTMLDivElement>(null)
-  if (!phone) return <div className="game-selection">{children}</div>
+  if (!phone)
+    return (
+      <div className="game-selection" hidden={hidden}>
+        <CardHidden.Provider value={hidden}>{children}</CardHidden.Provider>
+      </div>
+    )
   const shown = pinnedPeek ? 'peek' : height
   const screen = () => ref.current?.parentElement?.clientHeight ?? window.innerHeight
   const settle = (to: SheetHeight) => {
@@ -168,6 +179,7 @@ export function CardSheet({
       ref={ref}
       className={`game-selection sheet sheet-${dragged === undefined ? shown : 'dragged'}`}
       style={dragged === undefined ? undefined : { height: dragged }}
+      hidden={hidden}
     >
       <button
         type="button"
@@ -215,7 +227,7 @@ export function CardSheet({
         <span aria-hidden="true" />
       </button>
       <SheetPeek.Provider value={dragged === undefined && shown === 'peek'}>
-        {children}
+        <CardHidden.Provider value={hidden}>{children}</CardHidden.Provider>
       </SheetPeek.Provider>
     </div>
   )
@@ -244,8 +256,8 @@ export function PickBanner({
 }) {
   const line = under ?? hint
   return (
-    <div className="pick-banner" role="status">
-      <div className="pick-banner-text">
+    <div className="notice pick-banner" role="status" title={hint ? `${prompt}\n${hint}` : prompt}>
+      <div className="notice-text pick-banner-text">
         <strong>{prompt}</strong>
         {line && <span className="small">{line}</span>}
       </div>
@@ -383,15 +395,20 @@ export const panelOpen = () => openPanels.size > 0
 /** Closes the panel opened last on the shown card, if one is open. */
 export const closeOpenPanel = () => [...openPanels].at(-1)?.()
 
-/** Runs an action on its key, unless the Player is typing somewhere or holds a modifier. */
+/**
+ * Runs an action on its key, unless the Player is typing somewhere or holds a modifier, or the
+ * card is hidden.
+ */
 export function useActionKeys<Id extends string>(
   actions: readonly CardAction<Id>[],
   onAction: (a: CardAction<Id>) => void,
 ) {
-  const latest = useRef({ actions, onAction })
-  latest.current = { actions, onAction }
+  const hidden = useContext(CardHidden)
+  const latest = useRef({ actions, onAction, hidden })
+  latest.current = { actions, onAction, hidden }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (latest.current.hidden) return
       if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
       const typing =
         e.target instanceof Element && e.target.closest('input, textarea, select, .cm-editor')

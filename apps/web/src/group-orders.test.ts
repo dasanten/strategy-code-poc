@@ -451,7 +451,6 @@ describe('every resident order on the group card', () => {
         onPicking: () => {},
         buildAt: undefined,
         onOrder: () => {},
-        report: undefined,
         orderError: undefined,
         onPick: () => {},
         onClose: () => {},
