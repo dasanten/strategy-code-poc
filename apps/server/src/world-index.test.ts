@@ -116,7 +116,7 @@ describe('worldIndex', () => {
       expect(index.roads(size)).toEqual(roadTiles(world, size))
       expect(index.roads(size).size).toBeGreaterThan(0)
     }
-  })
+  }, 120_000) // Three busy worlds: about 19 s on a dev machine, over 30 s on a CI runner.
 
   it('is the same index while nothing it reads has changed', () => {
     const world = busyWorld(terrain, 4)
