@@ -1413,7 +1413,7 @@ ${LOG_TEXT}
 // it too. Once it doesn't, I turn back, refill there and go back out to
 // where I turned. With no edge left in reach, I walk back there and end.
 param toward: choice(north, northeast, east, southeast, south, southwest, west, northwest) // the way to go; none: the nearest unexplored tiles first
-param waypoint: waypoint // a waypoint to head for instead; none: toward
+param waypoint: waypoint // a waypoint to head for instead; none: go by toward
 param food: storage // where to refill; a carriage too; none: the nearest storage with Food
 let margin = ${EXPLORE_FOOD_MARGIN} // units of Food kept beyond the way back
 let skipMax = 10 // tiles with no way there that I keep leaving out
