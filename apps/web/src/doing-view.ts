@@ -79,11 +79,13 @@ function doingOfOrder(
   const task = r.script && taskOf(r.script, scripts)
   const step = stepLine(r.order, buildings)
   if (!task) return step ?? orderDoing(r, arrives, cities)
-  const what = taskLine(task, r.script!.building)
+  const what = taskLine(task, r.script!.building, r.script!.site)
   const o = r.order
+  // Building the workplace first, Work's own order is building (`CONTEXT.md`: Working a site).
+  const own = task === 'work' && r.script!.site ? 'build' : TASK_ORDER[task]
   // The task's own order says no more than the task does, but where a haul route is, what a
   // trainee learns and what a smithy makes.
-  if (o && o.kind === TASK_ORDER[task]) {
+  if (o && o.kind === own) {
     if (o.kind === 'haul' || o.kind === 'train') return orderDoing(r, arrives, cities)
     return o.kind === 'workAt' && o.makes
       ? `${what}: ${lower(orderDoing(r, arrives, cities))}`
@@ -125,9 +127,14 @@ function taskOf(script: SeenScript, scripts: readonly ScriptSummary[]): Task | u
   return script.task ?? scripts.find((s) => s.id === script.scriptId)?.task ?? undefined
 }
 
-/** "Working the farm", "Building a house", "Tearing down the mine", "Breeding horses". */
-function taskLine(task: Task, building: SeenScript['building']): string {
+/**
+ * "Working the farm", "Building the farm (to work it)" while Work builds its workplace first
+ * (`site`), "Building a house", "Tearing down the mine", "Breeding horses".
+ */
+function taskLine(task: Task, building: SeenScript['building'], site?: true): string {
   const name = building && BUILDING_NAMES[building]
+  if (task === 'work' && site)
+    return name ? `Building the ${name} (to work it)` : 'Building (to work it)'
   if (task === 'work') return name ? `Working the ${name}` : 'Working'
   if (task === 'build') return name ? `Building ${article(name)} ${name}` : 'Building'
   if (task === 'buildLine')

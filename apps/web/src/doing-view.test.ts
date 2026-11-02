@@ -183,6 +183,18 @@ describe('doingLine', () => {
     )
   })
 
+  it('says Work builds its workplace first while it is still a site', () => {
+    // `CONTEXT.md`: Working a site.
+    const first = { scriptId: 0, task: 'work', building: 'farm', site: true } as const
+    expect(line({ order: build, script: first })).toBe('Building the farm (to work it)')
+    expect(line({ order: { ...fetch, goods: { wood: 10 } }, script: first })).toBe(
+      'Building the farm (to work it): fetching 10 wood from the storage',
+    )
+    expect(line({ order: work, script: { scriptId: 0, task: 'work', building: 'farm' } })).toBe(
+      'Working the farm',
+    )
+  })
+
   it('takes the task from the server when the script is none of the Player’s', () => {
     expect(line({ order: work, script: { scriptId: 0, task: 'work', building: 'farm' } })).toBe(
       'Working the farm',
