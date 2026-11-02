@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Terrain } from '@csp/shared'
-import { RELATIONSHIP_COLORS, TERRAIN_COLORS, VOID_COLOR } from './map/palette.js'
+import { LOADING_COLOR, RELATIONSHIP_COLORS, TERRAIN_COLORS, VOID_COLOR } from './map/palette.js'
 import { THEME, applyTheme, cssVariables, hex, relationshipClass } from './theme.js'
 
 describe('theme', () => {
@@ -16,6 +16,7 @@ describe('theme', () => {
     expect(RELATIONSHIP_COLORS.tradeOrg).toBe(hex(vars['--rel-trade-org']!))
     expect(TERRAIN_COLORS[Terrain.Sea]).toBe(hex(vars['--terrain-sea']!))
     expect(VOID_COLOR).toBe(hex(vars['--terrain-void']!))
+    expect(LOADING_COLOR).toBe(hex(vars['--terrain-loading']!))
   })
 
   it('has a CSS variable for every relationship colour', () => {

@@ -1,5 +1,6 @@
 import type { ScriptParam, ScriptParamType, ScriptParamValue } from '@csp/shared'
 import { useRef } from 'react'
+import { effectiveParam, paramNote } from './script-params-view.js'
 import { foodEatenPerDay, num } from './wiki-view.js'
 
 /**
@@ -17,16 +18,32 @@ const PICK_HINTS: Record<Exclude<ScriptParamType, 'number'>, string> = {
   storage: 'a storage, a stable or a carriage of yours',
 }
 
+/** A param's name and type, and what its comment says it is for on a line under its row. */
+function ParamName({ param }: { param: ScriptParam }) {
+  const { purpose } = paramNote(param.description)
+  return (
+    <>
+      <span className="small">
+        <strong>{param.name}</strong> <span className="muted">({param.type})</span>
+      </span>
+      {purpose && <span className="muted small param-purpose">{purpose}</span>}
+    </>
+  )
+}
+
 /**
  * One field for each `param` line of the script a resident runs (`CONTEXT.md`: Script
- * parameter): what is picked for them, a button to pick it on the map, filtered by the param's
- * type, and one to clear it; a number field for a `number` param, set once typed. Shown on the
- * resident card under the script they run.
+ * parameter): the value the script uses (`effectiveParam`), a button to pick it on the map,
+ * filtered by the param's type, and one to clear it; a number field for a `number` param, set
+ * once typed. Each says what it is for from its comment. Shown on the resident card under the
+ * script they run.
  */
 export function ScriptParamFields({
   params,
   values,
   label,
+  target,
+  onTile,
   picking,
   onPick,
   onNumber,
@@ -38,6 +55,10 @@ export function ScriptParamFields({
   values: Readonly<Record<string, ScriptParamValue>>
   /** How a picked value is named; null when it is out of sight. */
   label: (id: string) => string | null
+  /** The script's target param (`targetParam`), which unset is the one they stand on. */
+  target?: string
+  /** What the target param would be on their tile, named; null for nothing that fits. */
+  onTile?: string | null
   /** The param whose value the map is waiting for, if any. */
   picking: string | undefined
   /** Starts (or cancels) picking a param's value on the map. */
@@ -54,22 +75,27 @@ export function ScriptParamFields({
     <div className="script-params" aria-label="Script parameters">
       {params.map((p) => {
         const value = values[p.name]
+        const uses = effectiveParam(p, value, { label, target, onTile })
+        const shown = (
+          <span className={uses.set ? 'small' : 'muted small'} aria-label={`${p.name} uses`}>
+            {uses.text}
+          </span>
+        )
         if (p.type === 'number') {
           const n = typeof value === 'number' ? value : undefined
           return (
             <div key={p.name} className="goods-row">
-              <span className="small">
-                <strong>{p.name}</strong> <span className="muted">(number)</span>
-              </span>
-              <NumberField
-                // A new value from the server starts the field over.
-                key={n ?? 'unset'}
-                name={p.name}
-                value={n}
-                fallback={p.default}
-                onSet={(v) => (v === undefined ? onClear(p.name) : onNumber(p.name, v))}
-              />
+              <ParamName param={p} />
+              {shown}
               <span className="buttons">
+                <NumberField
+                  // A new value from the server starts the field over.
+                  key={n ?? 'unset'}
+                  name={p.name}
+                  value={n}
+                  fallback={p.default}
+                  onSet={(v) => (v === undefined ? onClear(p.name) : onNumber(p.name, v))}
+                />
                 <button type="button" onClick={() => onClear(p.name)} disabled={n === undefined}>
                   Clear
                 </button>
@@ -78,13 +104,10 @@ export function ScriptParamFields({
           )
         }
         const id = typeof value === 'string' ? value : undefined
-        const shown = id === undefined ? 'none picked' : (label(id) ?? 'out of sight')
         return (
           <div key={p.name} className="goods-row">
-            <span className="small">
-              <strong>{p.name}</strong> <span className="muted">({p.type})</span>
-            </span>
-            <span className={id === undefined ? 'muted small' : 'small'}>{shown}</span>
+            <ParamName param={p} />
+            {shown}
             <span className="buttons">
               <button type="button" aria-pressed={picking === p.name} onClick={() => onPick(p)}>
                 {picking === p.name ? 'Cancel' : 'Pick'}
@@ -214,9 +237,7 @@ export function StartParamsForm({
               const n = typeof value === 'number' ? value : undefined
               return (
                 <label key={p.name} className="goods-row">
-                  <span className="small">
-                    <strong>{p.name}</strong> <span className="muted">(number)</span>
-                  </span>
+                  <ParamName param={p} />
                   <input
                     type="number"
                     inputMode="numeric"
@@ -236,13 +257,14 @@ export function StartParamsForm({
               )
             }
             const id = typeof value === 'string' ? value : undefined
-            const none = p.name === target ? 'the one they stand on' : 'none picked'
+            const none =
+              p.name === target
+                ? 'the one they stand on'
+                : (paramNote(p.description).unset ?? 'none picked')
             const shown = id === undefined ? none : (label(id) ?? 'out of sight')
             return (
               <div key={p.name} className="goods-row">
-                <span className="small">
-                  <strong>{p.name}</strong> <span className="muted">({p.type})</span>
-                </span>
+                <ParamName param={p} />
                 <span className={id === undefined ? 'muted small' : 'small'}>{shown}</span>
                 <span className="buttons">
                   <button type="button" onClick={() => onPick(p)}>

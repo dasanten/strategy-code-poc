@@ -52,6 +52,7 @@ const props = {
   onRenameCity: () => {},
   onRenameHorse: () => {},
   onSelectResident: () => {},
+  onOpenHorse: () => {},
   onUnhitch: () => {},
 }
 
@@ -77,8 +78,16 @@ describe('the tile card of a stable', () => {
         return tree
       }),
     )
-    expect(html).toContain('3 horses (yours)')
-    expect(html.match(/<li>· Rowan · Speed/g)).toHaveLength(3)
+    expect(html).toContain('Horses (yours)')
+    expect(html.match(/<span>Rowan<\/span>/g)).toHaveLength(3)
     expect(sharedKeys(tree)).toEqual([])
+  })
+
+  it('shows each horse as a row with health and hunger meters, a button to open it', () => {
+    const html = renderToStaticMarkup(createElement(TileCard, props))
+    expect(html.match(/<button[^>]*class="card-list-row"/g)).toHaveLength(3)
+    expect(html.match(/aria-label="Health 100%"/g)).toHaveLength(3)
+    expect(html.match(/aria-label="Hunger 100%"/g)).toHaveLength(3)
+    expect(html).toContain('Speed 12, Strength 8, Endurance 10 · 0 game days old')
   })
 })

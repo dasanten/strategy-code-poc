@@ -13,6 +13,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { recordEvent } from './events.js'
+import { residentNamesTaken } from './names.js'
 import type { OrderKind } from './orders.js'
 import { baseStats, hash, mulberry32, newChild } from './residents.js'
 import { newId, realmOf } from './starting-city.js'
@@ -174,6 +175,7 @@ function giveBirth(world: WorldState, parentId: string): Resident | undefined {
     mulberry32(hash(`${world.seed}:${id}`)),
     [baseStats(parent), carrying.partnerBase],
     { id, owner: parent.owner, cityId: parent.cityId, x: parent.x, y: parent.y, tick: world.tick },
+    residentNamesTaken(world, parent.owner, parent.cityId),
   )
   world.residents.push(child)
   delete parent.carrying

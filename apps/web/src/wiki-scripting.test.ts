@@ -1,11 +1,12 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { checkScript } from '@csp/lang'
+import { checkScript, scriptParams } from '@csp/lang'
 import { ARMY_SCRIPT_API, DEFAULT_SCRIPTS, SCRIPT_API, SCRIPT_VIEWS } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { scriptWarnings } from './script-editor.js'
+import { paramNote } from './script-params-view.js'
 import { WIKI_TOPICS, Wiki } from './Wiki.js'
-import { PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import { PARAM_COMMENT_EXAMPLE, PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
 
 const examples = SCRIPT_LANGUAGE.filter((r) => r.example).map((r) => [r.title, r.example!])
 
@@ -32,6 +33,17 @@ describe('the Wiki’s Script parameters topic', () => {
     expect(scriptWarnings(PARAM_DEFAULT_EXAMPLE, false)).toEqual([])
     const html = renderToStaticMarkup(createElement(Wiki))
     expect(html).toContain('param rounds: number = 5')
+  })
+
+  it('shows param comments, which the card shows, without syntax errors or warnings', () => {
+    expect(checkScript(PARAM_COMMENT_EXAMPLE)).toEqual([])
+    expect(scriptWarnings(PARAM_COMMENT_EXAMPLE, false)).toEqual([])
+    expect(scriptParams(PARAM_COMMENT_EXAMPLE).map((p) => paramNote(p.description))).toEqual([
+      { purpose: 'where the wood goes', unset: 'I keep it' },
+      { purpose: 'loads to carry before I stop' },
+    ])
+    const html = renderToStaticMarkup(createElement(Wiki))
+    expect(html).toContain('The comment at the end of a <code>param</code> line is what the card')
   })
 })
 

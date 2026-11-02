@@ -443,3 +443,64 @@
   font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
+/* Who and what a tile holds (`CardList`): its horses, workers or goods as rows, meters on the
+   right as the resident card has them; a row the Player can open is a button. */
+.card-list {
+  display: grid;
+  gap: 2px;
+}
+.card-list .panel-head h3 {
+  margin: 0;
+}
+.card-list-row {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+}
+button.card-list-row {
+  background: var(--ui-raised);
+  cursor: pointer;
+}
+button.card-list-row:hover {
+  background: var(--ui-raised-hover);
+}
+.card-list-row.heading {
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+.card-list-name {
+  display: grid;
+  min-width: 0;
+}
+.card-list-name small {
+  font-size: 0.72rem;
+}
+.card-food .meter {
+  margin-bottom: 4px;
+}
+/* An order's panel, open right under the row that opened it. */
+.sel-panel-under {
+  margin: 2px 0 8px;
+  scroll-margin: 12px;
+}
+.sel-actions button[aria-expanded='true'] {
+  border-left-width: 3px;
+}
+/* Run script's button keeps its label on one line beside the picker. */
+.run-script .order-buttons button {
+  white-space: nowrap;
+}

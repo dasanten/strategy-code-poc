@@ -368,6 +368,14 @@ describe('field completions', () => {
     )
     expect(fieldHover('memory.hunger', 9, { defaultScript: true })).toBeNull()
   })
+
+  it('show a param’s own comment on hover, before what its type holds', () => {
+    const source = 'param storage: storage // where the output goes\nlet a = params.storage'
+    const hover = fieldHover(source, source.lastIndexOf('storage') + 2, {
+      defaultScript: false,
+    })
+    expect(hover?.text.split('\n').slice(0, 2)).toEqual(['storage: any', 'where the output goes'])
+  })
 })
 
 function nameCompletionsOf(marked: string) {
