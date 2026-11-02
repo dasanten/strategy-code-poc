@@ -1539,7 +1539,8 @@ button.residents-row.selected:hover {
 }
 /* The Contracts form (`CONTEXT.md`: Mercenary contract): one field a line, its label on the left,
    the residents as a list with their Doing, and the offer as it will read under them. */
-.contract-form {
+.contract-form,
+.hud-drawer form.contract-form {
   display: grid;
   gap: 8px;
   margin: 8px 0;
@@ -1586,6 +1587,9 @@ button.residents-row.selected:hover {
 .contract-resident {
   display: grid;
   min-width: 0;
+}
+.contract-form > button {
+  justify-self: start;
 }
 .contract-summary {
   margin: 4px 0 0;
