@@ -1952,6 +1952,7 @@ button.residents-row.selected:hover {
 }
 /* A good's icon beside its name in the wiki's goods table (`CONTEXT.md`: Goods on cards). */
 .wiki-good {
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 4px;
