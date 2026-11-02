@@ -1223,6 +1223,16 @@ button.residents-row.selected:hover {
   gap: 8px;
   align-items: center;
 }
+/* A script param: its name and what it is for, the value the script uses, the field's buttons. */
+.script-params .goods-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  margin: 4px 0;
+}
+/* Under the row, across it: the rest of the row fills the first line. */
+.param-purpose {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
 .goods-row .buttons {
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -1431,6 +1441,16 @@ button.residents-row.selected:hover {
 }
 .script-head strong {
   font-size: 15px;
+}
+.script-template {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.script-help {
+  display: flex;
+  gap: 10px;
 }
 .script-head > span {
   color: var(--ui-muted);
