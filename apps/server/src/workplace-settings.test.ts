@@ -7,16 +7,20 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { scriptParams } from '@csp/lang'
 import { describe, expect, it } from 'vitest'
 
 import { OrderQueue, orderKinds } from './orders.js'
+import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
-import { ScriptRunner, type ScriptHost } from './script-runner.js'
+import { setScriptParamOrder } from './script-params.js'
+import { ScriptRunner, runScriptOrder, taskOrder, type ScriptHost } from './script-runner.js'
 import type { RunnableScript } from './scripts.js'
 import { addCity } from './test-terrain.js'
 import {
   setWorkSettingsOrder,
   stepWorkplaceSettings,
+  withWorkSettings,
   workplaceSettingsSound,
 } from './workplace-settings.js'
 import { createWorld, stepWorld } from './world.js'
@@ -36,6 +40,14 @@ param take: number = 3
 memory.done = true
 `
 const READS = 'memory.settings = building("farm").workSettings\n'
+/** A work script noting what its params read. */
+const NOTES = `param workplace: building
+param out: storage // where the output goes
+param take: number = 3
+memory.take = params.take
+if (params.out == null) { memory.out = null } else { memory.out = params.out.id }
+if (params.workplace == null) { memory.at = null } else { memory.at = params.workplace.id }
+`
 
 /** Each Player's scripts: their Work default, a work script, one that isn't, and one reading. */
 const SCRIPTS: Record<number, RunnableScript> = {
@@ -56,6 +68,7 @@ const SCRIPTS: Record<number, RunnableScript> = {
     source: 'param home: building\n',
   },
   13: { userId: MARA, name: 'Reads', version: 1, followsDefault: false, source: READS },
+  14: { userId: MARA, name: 'Notes', version: 1, followsDefault: false, source: NOTES },
   20: {
     userId: BO,
     name: 'Work',
@@ -117,7 +130,15 @@ function twoRealms(): { world: WorldState; terrain: TerrainMap; farm: Building }
 }
 
 function queue(terrain: TerrainMap) {
-  return new OrderQueue({ ...orderKinds, setWorkSettings: setWorkSettingsOrder(host) }, terrain)
+  return new OrderQueue({ ...orderKinds, ...kinds }, terrain)
+}
+
+/** The order kinds working by Workplace settings goes through, with the game's host. */
+const kinds = {
+  setWorkSettings: setWorkSettingsOrder(host),
+  setScriptParam: setScriptParamOrder(host),
+  runScript: runScriptOrder(host),
+  task: taskOrder(host),
 }
 
 const order = (fields: Record<string, unknown>): OrderRequest => ({
@@ -270,6 +291,207 @@ describe('the set-work-settings order', () => {
     m.script = { scriptId: 13, memory: {} }
     send(world, terrain, [mara, order({ params: { foodTake: 2 } })])
     expect(m.script).toEqual({ scriptId: 13, memory: {} })
+  })
+})
+
+/** The Work task for a resident at the farm, with values changed in the form before it starts. */
+const work = (residentId: string, params?: Record<string, unknown>): OrderRequest => ({
+  kind: 'task',
+  task: 'work',
+  residentId,
+  workplaceId: 'farm',
+  ...(params ? { params } : {}),
+})
+
+/** Mara's three residents at the farm, m1 to m3, the farm worked by Notes. */
+function crew() {
+  const { world, terrain, farm } = twoRealms()
+  resident(world, 'm2', 'r1', 'c1', farm)
+  resident(world, 'm3', 'r1', 'c1', farm)
+  const [m1, m2, m3] = ['m1', 'm2', 'm3'].map((id) => world.residents.find((r) => r.id === id)!)
+  send(world, terrain, [mara, order({ scriptId: 14, params: { out: 's1', take: 5 } })])
+  const runner = new ScriptRunner(terrain, host)
+  /** What each resident's script read the tick it ran, by id. */
+  const reads = () => {
+    expect(runner.runAll(world, true)).toEqual([])
+    return Object.fromEntries(
+      world.residents
+        .filter((r) => r.script)
+        .map((r) => {
+          const { take, out, at } = r.script!.memory
+          return [r.id, { take, out, at }]
+        }),
+    )
+  }
+  return { world, terrain, m1: m1!, m2: m2!, m3: m3!, reads }
+}
+
+describe('working by Workplace settings', () => {
+  it('reads the resident’s override, else the workplace’s setting, else the default', () => {
+    const { world, terrain, m1, m2, reads } = crew()
+    expect(send(world, terrain, [mara, work('m1', { take: 2 })], [mara, work('m2')])).toEqual([])
+    const byFarm = { scriptId: 14, memory: { workplaceId: 'farm' }, settingsFrom: 'farm' }
+    expect(m1.script).toEqual(byFarm)
+    expect(m1.scriptParams).toEqual({ 14: { workplace: 'farm', take: 2 } })
+    expect(m2.scriptParams).toEqual({ 14: { workplace: 'farm' } })
+    expect(reads()).toEqual({
+      m1: { take: 2, out: 's1', at: 'farm' },
+      m2: { take: 5, out: 's1', at: 'farm' },
+    })
+    send(world, terrain, [mara, order({ params: { take: null } })])
+    expect(reads()).toMatchObject({ m1: { take: 2 }, m2: { take: 3 } })
+  })
+
+  it('runs the Work default without settings, and switches once the farm gets a work script', () => {
+    const { world, terrain } = twoRealms()
+    const m1 = world.residents.find((r) => r.id === 'm1')!
+    send(world, terrain, [mara, work('m1')])
+    const byFarm = { scriptId: 10, memory: { workplaceId: 'farm' }, settingsFrom: 'farm' }
+    expect(m1.script).toEqual(byFarm)
+    send(world, terrain, [mara, order({ scriptId: 14 })])
+    expect(m1.script).toEqual({ ...byFarm, scriptId: 14 })
+  })
+
+  it('drops the values kept for the work script before; the form’s changes are all they keep', () => {
+    const { world, terrain, m1, reads } = crew()
+    m1.scriptParams = { 14: { take: 9, out: 's1' }, 13: { x: 1 } }
+    send(world, terrain, [mara, work('m1', { take: 4, out: null, workplace: 'farm' })])
+    expect(m1.scriptParams).toEqual({ 14: { workplace: 'farm', take: 4 }, 13: { x: 1 } })
+    expect(reads()).toEqual({ m1: { take: 4, out: 's1', at: 'farm' } })
+  })
+
+  it('a changed setting reaches at once everyone working there without an override', () => {
+    const { world, terrain, reads } = crew()
+    send(world, terrain, [mara, work('m1', { take: 2 })], [mara, work('m2')], [mara, work('m3')])
+    reads()
+    send(world, terrain, [mara, order({ params: { take: 7, out: null } })])
+    expect(reads()).toEqual({
+      m1: { take: 2, out: null, at: 'farm' },
+      m2: { take: 7, out: null, at: 'farm' },
+      m3: { take: 7, out: null, at: 'farm' },
+    })
+  })
+
+  it('clearing an override goes back to the workplace’s value', () => {
+    const { world, terrain, m1, reads } = crew()
+    send(world, terrain, [mara, work('m1', { take: 2 })])
+    expect(reads()).toMatchObject({ m1: { take: 2 } })
+    const clear = { kind: 'setScriptParam', residentId: 'm1', scriptId: 14, name: 'take' }
+    expect(send(world, terrain, [mara, { ...clear, targetId: null }])).toEqual([])
+    expect(m1.scriptParams).toEqual({ 14: { workplace: 'farm' } })
+    expect(reads()).toMatchObject({ m1: { take: 5 } })
+    // An override set on the card holds against the workplace's.
+    send(world, terrain, [mara, { ...clear, value: 1 }], [mara, order({ params: { take: 8 } })])
+    expect(reads()).toMatchObject({ m1: { take: 1 } })
+  })
+
+  it('switching the work script switches everyone working there by it, as if given Work again', () => {
+    const { world, terrain, m1, m2, m3 } = crew()
+    send(world, terrain, [mara, work('m1', { take: 2 })], [mara, work('m2')])
+    // m3 runs the same script by hand: their own choice.
+    send(world, terrain, [mara, { kind: 'runScript', residentId: 'm3', scriptId: 14 }])
+    m1.order = { kind: 'workAt', buildingId: 'farm', at: { x: m1.x, y: m1.y }, progress: 0 }
+    m1.script!.memory.done = true
+    // m2 defends themselves meanwhile; the work goes on as the new script once they hand back.
+    m2.interrupted = { order: null, script: m2.script }
+    m2.script = { scriptId: 13, memory: {} }
+    m2.scriptParams = { 11: { take: 6 } }
+
+    send(world, terrain, [mara, order({ scriptId: 11 })])
+    const byFarm = { scriptId: 11, memory: { workplaceId: 'farm' }, settingsFrom: 'farm' }
+    expect(m1.script).toEqual(byFarm)
+    expect(m1.order).toBeNull()
+    expect(m1.scriptParams).toEqual({
+      14: { workplace: 'farm', take: 2 },
+      11: { workplace: 'farm' },
+    })
+    expect(m2.interrupted?.script).toEqual(byFarm)
+    expect(m2.script).toEqual({ scriptId: 13, memory: {} })
+    expect(m2.scriptParams).toEqual({ 11: { workplace: 'farm' } })
+    expect(m3.script).toEqual({ scriptId: 14, memory: {} })
+
+    send(world, terrain, [mara, order({ scriptId: null })])
+    expect(m1.script?.scriptId).toBe(10)
+    expect(m2.interrupted?.script?.scriptId).toBe(10)
+    // Setting values alone switches nobody.
+    m1.script = { scriptId: 14, memory: {}, settingsFrom: 'farm' }
+    send(world, terrain, [mara, order({ params: { foodTake: 2 } })])
+    expect(m1.script.scriptId).toBe(14)
+  })
+
+  it('switching at a workplace still being built keeps building it first', () => {
+    const { world, terrain, m1 } = crew()
+    world.buildings.find((b) => b.id === 'farm')!.site = { delivered: {}, work: 0 }
+    m1.script = { scriptId: 14, memory: { workplaceId: 'farm' }, settingsFrom: 'farm' }
+    send(world, terrain, [mara, order({ scriptId: 11 })])
+    expect(m1.script.memory).toEqual({ workplaceId: 'farm', siteId: 'farm' })
+  })
+
+  it('covers the Work default’s output, input and food storages', () => {
+    const { world, terrain } = twoRealms()
+    world.buildings.push({ id: 's3', kind: 'storage', cityId: 'c1', x: 14, y: 6, stock: {} })
+    const values = { storage: 's1', output: 's3', input: 's1', food: 's3', foodTake: 4 }
+    expect(send(world, terrain, [mara, order({ params: values })])).toEqual([])
+    const declared = scriptParams(DEFAULT_SCRIPTS.work.source)
+    // Their own `food` overrides the workplace's; the rest read the workplace's.
+    const own = declared.map((p) => (p.name === 'food' ? { ...p, value: 's1' } : p))
+    const read = withWorkSettings(own, 'farm', world.workplaceSettings.r1?.farm)
+    expect(Object.fromEntries(read.map((p) => [p.name, p.value]))).toEqual({
+      workplace: 'farm',
+      storage: 's1',
+      output: 's3',
+      input: 's1',
+      food: 's1',
+      foodAt: undefined,
+      foodTake: 4,
+      crewFood: undefined,
+    })
+  })
+
+  it('keeps what a smithy’s worker makes when the work script switches', () => {
+    const { world, terrain, m1 } = crew()
+    const memory = { workplaceId: 'farm', makes: 'sword' }
+    m1.script = { scriptId: 14, memory, settingsFrom: 'farm' }
+    send(world, terrain, [mara, order({ scriptId: 11 })])
+    expect(m1.script.memory).toEqual(memory)
+  })
+
+  it('checks the form’s values against the workplace’s work script', () => {
+    const { world, terrain } = crew()
+    expect(send(world, terrain, [mara, work('m1', { take: 2, foodTake: 1 })])).toEqual([
+      'foodTake: the script has no such param',
+    ])
+  })
+
+  it('a queue step giving Work there runs by the settings', () => {
+    const { world, terrain, m1, reads } = crew()
+    const step = { kind: 'task', task: 'work', workplaceId: 'farm', params: { take: 1 } }
+    m1.queue = {
+      realmId: 'r1',
+      steps: [{ id: 1, order: step }],
+      current: 0,
+      startedAt: null,
+      loop: false,
+      nextStepId: 2,
+    }
+    new QueueRunner(host, { ...orderKinds, ...kinds }, terrain).runAll(world)
+    const byFarm = { scriptId: 14, memory: { workplaceId: 'farm' }, settingsFrom: 'farm' }
+    expect(m1.script).toEqual(byFarm)
+    expect(reads()).toEqual({ m1: { take: 1, out: 's1', at: 'farm' } })
+  })
+
+  it('Bo’s settings for the same farm never reach Mara’s workers', () => {
+    const { world, terrain, reads } = crew()
+    send(world, terrain, [mara, work('m1')], [bo, order({ params: { foodTake: 6 } })])
+    expect(reads()).toEqual({ m1: { take: 5, out: 's1', at: 'farm' } })
+  })
+
+  it('flags a resident working by settings who runs another than the work script', () => {
+    const { world, terrain, m1 } = crew()
+    send(world, terrain, [mara, work('m1')])
+    m1.script = { scriptId: 11, memory: { workplaceId: 'farm' }, settingsFrom: 'farm' }
+    const violations = new ScriptRunner(terrain, host).runAll(world, true)
+    expect(violations.map((v) => v.invariant)).toEqual(['works-by-work-script'])
   })
 })
 

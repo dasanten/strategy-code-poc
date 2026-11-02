@@ -2,6 +2,7 @@ import type { ScriptParam, ScriptSummary } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
   groupStartValues,
+  overrideParamValues,
   startedScript,
   startFormParams,
   startParamValues,
@@ -23,6 +24,39 @@ const summary = (id: number, task: ScriptSummary['task']): ScriptSummary => ({
   task,
   followsDefault: task !== null,
   params: PARAMS,
+})
+
+describe('the form before Work starts', () => {
+  const work = (id: number, params: ScriptParam[]) => ({ ...summary(id, null), params })
+  const notes = work(3, [{ name: 'workplace', type: 'building' }, ...PARAMS])
+  const home = work(4, [{ name: 'home', type: 'building' }])
+  const scripts = [summary(1, null), summary(2, 'work'), notes, home]
+  const at = { kind: 'task', task: 'work', workplaceId: 'farm' }
+
+  it('starts the workplace’s work script, else the Work default', () => {
+    expect(startedScript(at, scripts, { farm: { scriptId: 3 } })?.id).toBe(3)
+    expect(startedScript(at, scripts, { mine: { scriptId: 3 } })?.id).toBe(2)
+    expect(startedScript(at, scripts)?.id).toBe(2)
+    // One that is no work script any more, or gone, isn't run.
+    expect(startedScript(at, scripts, { farm: { scriptId: 4 } })?.id).toBe(2)
+    expect(startedScript(at, scripts, { farm: { scriptId: 9 } })?.id).toBe(2)
+  })
+
+  it('never shows workplace, which Work fills', () => {
+    expect(startFormParams(at, notes).map((p) => p.name)).toEqual(['storage', 'rounds', 'take'])
+  })
+
+  it('is filled with the workplace’s values, and gives only what the Player changed', () => {
+    const base = startValues(PARAMS, { storage: 's1', take: 4 })
+    expect(base).toEqual({ storage: 's1', rounds: 5, take: 4 })
+    expect(overrideParamValues(PARAMS, base, base)).toEqual({})
+    expect(overrideParamValues(PARAMS, base, { ...base, take: 2, rounds: 6 })).toEqual({
+      take: 2,
+      rounds: 6,
+    })
+    // Emptied, it reads the workplace's value: nothing of their own.
+    expect(overrideParamValues(PARAMS, base, { ...base, storage: undefined })).toEqual({})
+  })
 })
 
 describe('the form before a script starts', () => {

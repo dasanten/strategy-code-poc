@@ -18,7 +18,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 70
+export const WORLD_FORMAT_VERSION = 71
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -270,6 +270,10 @@ export const migrations: Record<number, MigrationStep> = {
   // A realm keeps Workplace settings (`CONTEXT.md`; ADR 0020; `WorldState.workplaceSettings`).
   // None were set before, so every realm starts with none.
   69: (state) => ({ ...(state as object), workplaceSettings: {} }),
+  // Work runs by the workplace's settings (`CONTEXT.md`: Workplace settings), marked by
+  // `RunningScript.settingsFrom`. Scripts running from before were given without settings, so
+  // they stay the residents' own, unmarked: the step leaves every resident as they are.
+  70: (state) => state,
 }
 
 export class WorldFormatError extends Error {}
