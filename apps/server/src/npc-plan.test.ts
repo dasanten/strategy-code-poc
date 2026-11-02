@@ -21,9 +21,11 @@ import { FOREST, fillHouses, storageOf, village } from './npc-growth.fixture.js'
 
 /**
  * The budget for the game-run cities' planning, in milliseconds per tick, averaged over a game
- * hour (ADR 0016; ADR 0004): a smoke check against a regression, not a hard gate. First pick 5 ms.
+ * hour (ADR 0016; ADR 0004): a smoke check against a regression, not a hard gate. It measures
+ * about 3 ms on a dev machine but 4–6.5 ms on a CI runner, whose cores the other test files share,
+ * so 5 ms failed there at random; 10 ms still catches planning that gets twice as slow.
  */
-const PLAN_BUDGET_MS = 5
+const PLAN_BUDGET_MS = 10
 
 /** An open map of Plains, `size` tiles along each side. */
 const plains = (size: number): TerrainMap => ({
@@ -182,7 +184,7 @@ describe('cities plan once a game hour', () => {
     let ms = 0
     for (let t = 0; t < 2 * NPC_PLAN_TICKS; t++) ms += stepWorld(world, terrain, walking).npcPlanMs
     expect(ms / (2 * NPC_PLAN_TICKS)).toBeLessThan(PLAN_BUDGET_MS)
-  }, 60_000)
+  }, 120_000)
 
   it('drops the plan of a city the game no longer runs', () => {
     const { world, terrain, city } = village()
