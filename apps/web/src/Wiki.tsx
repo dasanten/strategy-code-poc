@@ -212,6 +212,7 @@ import {
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 import { GOOD_LABELS } from './Residents.js'
+import { GoodIcon } from './GoodsGrid.js'
 import {
   AVERAGE,
   AVERAGE_CARRY,
@@ -1253,12 +1254,24 @@ export function Wiki() {
           there until it is next driven, when a free horse of the realm standing with it is hitched
           again. A carriage whose horse dies waits the same way.
         </p>
+        <p>
+          A carriage's card shows its load as a bar against what it holds (its passengers counted
+          in) over its goods, its driver and passengers by name, the haul route it drives as “first
+          stop → second stop” with the leg it is on and about when it arrives, and its horse with
+          its health and hunger and how long the Food on board feeds it. Another realm's carriage
+          shows only how heavily it is loaded, and its horse without how it fares.
+        </p>
         <table>
           <thead>
             <tr>
               <th>Goods</th>
               {(Object.keys(GOOD_WEIGHT) as Good[]).map((g) => (
-                <th key={g}>{goodName(g)}</th>
+                <th key={g}>
+                  <span className="good-label">
+                    <GoodIcon good={g} />
+                    {goodName(g)}
+                  </span>
+                </th>
               ))}
             </tr>
           </thead>
@@ -1271,6 +1284,17 @@ export function Wiki() {
             </tr>
           </tbody>
         </table>
+        <p>
+          Cards show goods as these icons, each with its amount; hover over one, or press and hold
+          it on a phone, for its name. That goes for every inventory: what a resident carries, a
+          carriage's load, a storage's or stable's goods and a pile; a trade's prices name each good
+          beside its icon. On a resident's card their own food (up to {num(OWN_FOOD)} Food) shows
+          apart at the end, marked <em>own</em>. A construction site's card shows its work done as a
+          bar with about how long is left at the pace of those building it, then a row per material:
+          what was delivered against what it needs, with a small bar. A workplace's card shows its
+          pile and its crew, one row each with what they are doing: working, carrying a load,
+          fetching, or on the way.
+        </p>
         <h3>Moving goods, per game hour</h3>
         <table>
           <thead>

@@ -24,6 +24,8 @@ import {
   type Stock,
 } from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
+import { GoodIcon, GoodsGrid } from './GoodsGrid.js'
+import { GOOD_LABELS, goodsItems } from './goods-grid.js'
 import { TileGoods } from './Residents.js'
 import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
@@ -33,9 +35,12 @@ import {
   tileActions,
   unhitcherOf,
   type CardAction,
+  type CarriageView,
   type CardList,
   type CardRow,
+  type NamedResident,
   type OrderGroup,
+  type SiteView,
   type TileCard as TileCardData,
 } from './selection-view.js'
 import { Meter, meterClass, pct } from './Horses.js'
@@ -552,32 +557,29 @@ export function TileCard({
           ))}
         </ul>
       )}
+      {card.lastSeen?.sites?.map((site, i) => (
+        <SiteBlock key={i} site={site} past />
+      ))}
+      {card.lastSeen?.lists.map((list, i) => (
+        <CardListBlock key={i} list={list} past onOpen={() => {}} />
+      ))}
       {card.lines.length > (card.lastSeen ? 0 : 1) && (
         <ul className="sel-facts">
           {/* By place, not text: horses alike give the same line twice. */}
-          {card.lines.map((l, i) =>
-            i === 0 && !card.lastSeen ? null : i === card.passengers?.line ? (
-              <li key={i}>
-                Passengers:{' '}
-                {card.passengers.residents.map((p, j) => (
-                  <Fragment key={p.id}>
-                    {j > 0 && ', '}
-                    {p.pick ? (
-                      <button type="button" className="link" onClick={() => onSelectResident(p.id)}>
-                        {p.name}
-                      </button>
-                    ) : (
-                      p.name
-                    )}
-                  </Fragment>
-                ))}{' '}
-                · {card.passengers.weight}
-              </li>
-            ) : (
-              <li key={i}>{l}</li>
-            ),
-          )}
+          {card.lines.map((l, i) => (i === 0 && !card.lastSeen ? null : <li key={i}>{l}</li>))}
         </ul>
+      )}
+      {card.sites?.map((site, i) => (
+        <SiteBlock key={i} site={site} />
+      ))}
+      {card.carriage && (
+        <CarriageBlock
+          carriage={card.carriage}
+          // On its own card the card's head already names it.
+          head={card.what !== 'carriage'}
+          onSelectResident={onSelectResident}
+          onOpenHorse={onOpenHorse}
+        />
       )}
       {card.stableFood && (
         <div className="vital card-food">
@@ -698,19 +700,172 @@ export function TileCard({
 const capital = (words: string) => `${words.charAt(0).toUpperCase()}${words.slice(1)}`
 
 /**
- * A list on the tile card (`CardList`): its title with the count on the right, a heading over the
- * meters, then its rows. A row the Player can open is a button.
+ * A construction site on the tile card (`SiteView`): its work done as a meter with how long is
+ * left, then a row per material, its icon and name with what was delivered against what it
+ * needs and a small bar. `past` for what the Player last saw.
  */
-function CardListBlock({ list, onOpen }: { list: CardList; onOpen: (row: CardRow) => void }) {
-  const amounts = list.rows.some((r) => r.amount !== undefined)
-  const columns = `minmax(0, 1fr)${amounts ? ' auto' : ''}${' 56px'.repeat(list.meters.length)}`
+function SiteBlock({ site, past }: { site: SiteView; past?: boolean }) {
+  const { work, materials } = site
   return (
-    <section className="card-list" aria-label={list.title}>
+    <section
+      className={`card-site${past ? ' sel-past' : ''}`}
+      aria-label={site.title ?? 'Construction site'}
+    >
+      {site.title && (
+        <div className="panel-head">
+          <h3>{site.title}</h3>
+        </div>
+      )}
+      <div className="vital card-work">
+        <div className="vital-head">
+          <span className="muted">Work</span>
+          <span className="mono">{work.text}</span>
+        </div>
+        <span className="meter big" aria-label={`Work ${work.text}`}>
+          <span className="ok" style={{ width: pct(work.share) }} />
+        </span>
+        {work.left && <span className="small muted">{capital(work.left)}</span>}
+      </div>
+      {materials.length === 0 ? (
+        <p className="muted small">Needs no materials, only work</p>
+      ) : (
+        <ul className="site-materials" aria-label="Materials">
+          {materials.map(({ good, have, need }) => (
+            <li key={good} aria-label={`${GOOD_LABELS[good]}: ${have} / ${need}`}>
+              <GoodIcon good={good} />
+              <span className="site-material-name">{GOOD_LABELS[good]}</span>
+              <span className="mono">
+                {have} / {need}
+              </span>
+              <span className="meter" aria-hidden="true">
+                <span className={have >= need ? 'ok' : 'mid'} style={{ width: pct(have / need) }} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/**
+ * A carriage on the tile card (`CarriageView`) as labelled rows: its load as a bar over its
+ * goods grid, its driver, passengers and route, then its horse as a row with its meters. Names
+ * of the Player's residents pick them.
+ */
+function CarriageBlock({
+  carriage,
+  head,
+  onSelectResident,
+  onOpenHorse,
+}: {
+  carriage: CarriageView
+  /** Its own heading, under a building's card. */
+  head: boolean
+  onSelectResident: (id: string) => void
+  onOpenHorse: (id: string) => void
+}) {
+  const name = (r: NamedResident) =>
+    r.pick ? (
+      <button type="button" className="link" onClick={() => onSelectResident(r.id)}>
+        {r.name}
+      </button>
+    ) : (
+      r.name
+    )
+  const { load, driver, passengers, route } = carriage
+  return (
+    <section className="card-carriage" aria-label={carriage.title}>
+      {head && (
+        <div className="panel-head">
+          <h3>{carriage.title}</h3>
+        </div>
+      )}
+      <div className="vital card-load">
+        <div className="vital-head">
+          <span className="muted">Load</span>
+          <span className="mono">{load.text}</span>
+        </div>
+        {load.share !== undefined && (
+          <span className="meter big" aria-label={`Load ${pct(load.share)}`}>
+            <span className="ok" style={{ width: pct(load.share) }} />
+          </span>
+        )}
+      </div>
+      {carriage.goods && (
+        <GoodsGrid label="Load" items={goodsItems(carriage.goods)} empty="Empty" />
+      )}
+      <dl className="card-rows">
+        {driver && (
+          <>
+            <dt>Driver</dt>
+            <dd>{name(driver)}</dd>
+          </>
+        )}
+        {passengers && (
+          <>
+            <dt>Passengers</dt>
+            <dd>
+              {passengers.residents.map((p, j) => (
+                <Fragment key={p.id}>
+                  {j > 0 && ', '}
+                  {name(p)}
+                </Fragment>
+              ))}{' '}
+              <span className="muted">· {passengers.weight}</span>
+            </dd>
+          </>
+        )}
+        {route && (
+          <>
+            <dt>Route</dt>
+            <dd>
+              {route.stops}
+              <small className="muted">{route.leg}</small>
+            </dd>
+          </>
+        )}
+        {carriage.noHorse && (
+          <>
+            <dt>Horse</dt>
+            <dd>{carriage.noHorse}</dd>
+          </>
+        )}
+      </dl>
+      {carriage.horse && (
+        <CardListBlock list={carriage.horse} onOpen={(row) => onOpenHorse(row.id)} />
+      )}
+    </section>
+  )
+}
+
+/**
+ * A list on the tile card (`CardList`): its title with the count on the right, a heading over the
+ * meters, then its rows. A row the Player can open is a button. An inventory shows as the goods
+ * grid instead of rows (`CONTEXT.md`: Goods on cards). `past` for what the Player last saw.
+ */
+function CardListBlock({
+  list,
+  past,
+  onOpen,
+}: {
+  list: CardList
+  past?: boolean
+  onOpen: (row: CardRow) => void
+}) {
+  const columns = `minmax(0, 1fr)${' 56px'.repeat(list.meters.length)}`
+  return (
+    <section className={`card-list${past ? ' sel-past' : ''}`} aria-label={list.title}>
       <div className="panel-head">
         <h3>{list.title}</h3>
         <span className="small muted">{list.count}</span>
       </div>
-      {list.rows.length === 0 && list.empty && <p className="muted small">{list.empty}</p>}
+      {list.goods && (
+        <GoodsGrid label={list.title} items={goodsItems(list.goods)} empty={list.empty} />
+      )}
+      {!list.goods && list.rows.length === 0 && list.empty && (
+        <p className="muted small">{list.empty}</p>
+      )}
       {list.rows.length > 0 && list.meters.length > 0 && (
         <div
           className="card-list-row heading"
@@ -730,7 +885,6 @@ function CardListBlock({ list, onOpen }: { list: CardList; onOpen: (row: CardRow
               <span>{row.name}</span>
               {row.detail && <small className="muted">{row.detail}</small>}
             </span>
-            {amounts && <span className="mono">{row.amount}</span>}
             {list.meters.map((m, i) => (
               <Meter key={m} label={m} share={row.shares?.[i]} />
             ))}
