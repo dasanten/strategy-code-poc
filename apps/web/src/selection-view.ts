@@ -55,6 +55,8 @@ import {
   type SeenResident,
   type SeenCarriage,
   type HaulOrder,
+  type GoodsPlace,
+  type GoodsWanted,
   aboutTime,
   drivenCarriageId,
   workLeft,
@@ -1067,6 +1069,80 @@ function crewDoing(r: SeenResident, b: Building, labels: Record<string, string>)
 }
 
 /**
+ * Who of the Player's own residents is on the way to a storage or stable (`CONTEXT.md`: Goods on
+ * cards): walking there to store or fetch, getting food there, or driving a haul route's carriage
+ * to it as the next stop; each with what for and about when they arrive, soonest first. Undefined
+ * while nobody is.
+ */
+export function onTheWayList(
+  b: Building,
+  t: TileThings,
+  goodLabels: Record<string, string>,
+): CardList | undefined {
+  const label = (g: string) => (goodLabels[g] ?? g).toLowerCase()
+  const named = (goods: readonly Good[]) => goods.map(label).join(', ')
+  // "10 wood, stone": units where the order names them.
+  const wanted = (goods: GoodsWanted) =>
+    Object.entries(goods)
+      .map(([g, n]) => (n == null ? label(g) : `${n} ${label(g)}`))
+      .join(', ')
+  const coming = (t.residents ?? []).flatMap((r) => {
+    if (t.strangers.some((s) => s.id === r.id)) return []
+    const o = r.order
+    let what: string | undefined
+    let path: readonly unknown[] | null = null
+    if (o?.kind === 'store' && o.phase === 'walking' && storageIs(o.to, b)) {
+      what = `Store · ${wanted(o.goods)}`
+      path = o.path
+    } else if (o?.kind === 'fetch' && o.phase === 'walking' && storageIs(o.from, b)) {
+      // Getting food hands over to Fetch for Food alone (`CONTEXT.md`: Getting food).
+      const food = Object.keys(o.goods).every((g) => g === 'food')
+      what = food ? 'Getting food' : `Fetch · ${wanted(o.goods)}`
+      path = o.path
+    } else if (o?.kind === 'haul' && o.phase === 'driving' && covers(b, o[o.stop].x, o[o.stop].y)) {
+      // At `to` the hauled goods come off and the return goods go on; at `from` the other way.
+      const [brings, takes] = o.stop === 'to' ? [o.goods, o.returnGoods] : [o.returnGoods, o.goods]
+      what = [
+        'Haul',
+        ...(brings.length > 0 ? [`brings ${named(brings)}`] : []),
+        ...(takes.length > 0 ? [`takes ${named(takes)}`] : []),
+      ].join(' · ')
+      path = o.path
+    }
+    if (!what) return []
+    const ticks = path ? t.arrivesIn?.(r) : undefined
+    return [{ r, what, ticks, eta: wayLeft(path, ticks) }]
+  })
+  if (coming.length === 0) return undefined
+  coming.sort((x, y) => (x.ticks ?? Infinity) - (y.ticks ?? Infinity))
+  return {
+    title: 'On the way',
+    count: `${coming.length}`,
+    meters: [],
+    rows: coming.map(({ r, what, eta }) => ({
+      id: r.id,
+      name: r.name,
+      detail: `${what} · ${eta}`,
+      opens: 'resident' as const,
+    })),
+  }
+}
+
+/** Whether a store or fetch order's place is the storage or stable `b`. */
+function storageIs(place: GoodsPlace, b: Building): boolean {
+  return place.kind === 'storage' && place.storageId === b.id
+}
+
+/**
+ * How much of a way is left (`CONTEXT.md`: Estimates): about when they arrive, else how many
+ * tiles there are still to go, or that the way is still being found.
+ */
+function wayLeft(path: readonly unknown[] | null, ticks: number | undefined): string {
+  if (!path) return 'finding the way'
+  return ticks === undefined ? `${path.length} tiles to go` : aboutTime(ticks)
+}
+
+/**
  * An inventory on the card as the goods grid (`CONTEXT.md`: Goods on cards): a storage's goods, a
  * pile, a site's materials; by default with what they weigh on the right.
  */
@@ -1219,6 +1295,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         const rest: Stock = { ...building.stock, food: 0 }
         if (GOODS.some((g) => (rest[g] ?? 0) > 0)) lists.push(goodsList('Goods', rest, ''))
       } else if (building.stock) lists.push(goodsList('Goods', building.stock, 'Nothing in it'))
+      const coming = live?.stock && onTheWayList(live, t, goodLabels)
+      if (coming) lists.push(coming)
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
@@ -1430,12 +1508,7 @@ function haulRoute(driver: SeenResident, o: HaulOrder, t: TileThings): CarriageV
         : `Unloading at ${at}`
   } else {
     const ticks = o.path ? t.arrivesIn?.(driver) : undefined
-    const left = !o.path
-      ? 'finding the way'
-      : ticks === undefined
-        ? `${o.path.length} tiles to go`
-        : aboutTime(ticks)
-    leg = `Leg ${o.stop === 'to' ? 1 : 2} of 2 · ${left}`
+    leg = `Leg ${o.stop === 'to' ? 1 : 2} of 2 · ${wayLeft(o.path, ticks)}`
   }
   return { stops: `${from} → ${to}`, leg }
 }

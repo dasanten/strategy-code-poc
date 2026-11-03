@@ -397,6 +397,163 @@ describe('buildings on a tile’s card', () => {
   })
 })
 
+describe('who is on the way to a storage or stable (CONTEXT.md: Goods on cards)', () => {
+  const storage = building({ kind: 'storage', cityId: 'c-me', stock: { wood: 3 } })
+  const place = { kind: 'storage' as const, storageId: storage.id }
+  const way: [number, number][] = [
+    [6, 5],
+    [5, 5],
+  ]
+  const ben = resident({
+    id: 'ben',
+    name: 'Ben',
+    owner: 'me',
+    order: {
+      kind: 'store',
+      goods: { wood: null },
+      to: place,
+      phase: 'walking',
+      path: way,
+      progress: 0,
+    },
+  })
+  const cara = resident({
+    id: 'cara',
+    name: 'Cara',
+    owner: 'me',
+    order: {
+      kind: 'fetch',
+      goods: { stone: 10 },
+      from: place,
+      phase: 'walking',
+      path: way,
+      progress: 0,
+    },
+  })
+  const onTheWay = (residents: Resident[], more: Partial<TileThings> = {}) =>
+    tile({
+      buildings: [storage],
+      residents,
+      strangers: residents.filter((r) => r.owner !== 'me'),
+      arrivesIn: (r) => (r.id === 'ben' ? 300 : r.id === 'cara' ? 60 : undefined),
+      ...more,
+    }).lists?.find((l) => l.title === 'On the way')
+
+  it('lists the Player’s residents storing and fetching there, soonest first, to pick', () => {
+    const list = onTheWay([ben, cara])!
+    expect(list.count).toBe('2')
+    expect(list.rows.map((r) => [r.name, r.detail, r.opens])).toEqual([
+      ['Cara', 'Fetch · 10 stone · about 1 min (a game hour)', 'resident'],
+      ['Ben', 'Store · wood · about 5 min (5 game hours)', 'resident'],
+    ])
+  })
+
+  it('says Getting food for a fetch of Food alone, and tiles or the search without an estimate', () => {
+    const hungry = resident({
+      id: 'dag',
+      name: 'Dag',
+      owner: 'me',
+      order: {
+        kind: 'fetch',
+        goods: { food: 6 },
+        from: place,
+        phase: 'walking',
+        path: way,
+        progress: 0,
+      },
+    })
+    const lost = resident({
+      id: 'eli',
+      name: 'Eli',
+      owner: 'me',
+      order: {
+        kind: 'store',
+        goods: { iron: 2 },
+        to: place,
+        phase: 'walking',
+        path: null,
+        progress: 0,
+      },
+    })
+    expect(onTheWay([hungry, lost])!.rows.map((r) => r.detail)).toEqual([
+      'Getting food · 2 tiles to go',
+      'Store · 2 iron · finding the way',
+    ])
+  })
+
+  it('lists a haul route’s driver heading there, with what the carriage brings and takes', () => {
+    const haul = (stop: 'from' | 'to', phase: 'driving' | 'loading') =>
+      resident({
+        id: `fen-${stop}`,
+        name: 'Fen',
+        owner: 'me',
+        order: {
+          kind: 'haul',
+          carriageId: 'k1',
+          from: { x: 5, y: 5 },
+          to: { x: 20, y: 20 },
+          goods: ['wood'],
+          returnGoods: ['iron'],
+          keepFood: 0,
+          stop,
+          phase,
+          path: way,
+          progress: 0,
+          moving: null,
+        },
+      })
+    expect(onTheWay([haul('from', 'driving')])!.rows[0]!.detail).toBe(
+      'Haul · brings iron · takes wood · 2 tiles to go',
+    )
+    // Driving to the other stop, or loading here already, is not on the way.
+    expect(onTheWay([haul('to', 'driving'), haul('from', 'loading')])).toBeUndefined()
+  })
+
+  it('leaves out strangers, those there already, and those going elsewhere', () => {
+    const stranger = { ...ben, id: 'x', owner: 'them' }
+    const there = resident({
+      id: 'gil',
+      owner: 'me',
+      order: { kind: 'store', goods: {}, to: place, phase: 'putting', path: null, progress: 0 },
+    })
+    const elsewhere = resident({
+      id: 'hal',
+      owner: 'me',
+      order: {
+        kind: 'store',
+        goods: {},
+        to: { kind: 'storage', storageId: 'other' },
+        phase: 'walking',
+        path: way,
+        progress: 0,
+      },
+    })
+    expect(onTheWay([stranger, there, elsewhere])).toBeUndefined()
+  })
+
+  it('lists who comes to a stable too, not to another building', () => {
+    const stable = building({ kind: 'stable', cityId: 'c-me', stock: { food: 0 } })
+    const feeding = resident({
+      id: 'ida',
+      name: 'Ida',
+      owner: 'me',
+      order: {
+        kind: 'store',
+        goods: { food: 10 },
+        to: { kind: 'storage', storageId: stable.id },
+        phase: 'walking',
+        path: way,
+        progress: 0,
+      },
+    })
+    expect(onTheWay([feeding], { buildings: [stable] })!.rows[0]!.detail).toBe(
+      'Store · 10 food · 2 tiles to go',
+    )
+    const house = building({ kind: 'house', cityId: 'c-me', id: stable.id })
+    expect(onTheWay([feeding], { buildings: [house] })).toBeUndefined()
+  })
+})
+
 describe('strangers on a tile’s card', () => {
   it('says which weapons and armour a stranger carries, and nothing else they carry', () => {
     const armed = resident({ carried: { sword: 1, shield: 1, food: 3, coins: 50 } })
