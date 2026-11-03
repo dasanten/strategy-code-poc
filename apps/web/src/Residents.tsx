@@ -1,6 +1,7 @@
 import {
   BUILD_MATERIALS,
   aboutTime,
+  horseFull,
   isDown,
   inContact,
   bornIn,
@@ -900,7 +901,7 @@ export function orderDoing(
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
-  if (o?.kind === 'feed') return 'Feeding someone Down'
+  if (o?.kind === 'feed') return 'Feeding'
   if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
   if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
@@ -1314,8 +1315,9 @@ export function GroupCard({
             </button>
           </div>
           <p className="muted small">
-            Each with Food in hand next to someone Down feeds them, one for each one Down: a unit is
-            eaten at once and wakes them at low health.
+            Each with Food in hand next to someone Down or a horse that isn’t full feeds them, one
+            for each: someone Down eats a unit at once and wakes at low health, a horse eats until
+            it is full.
           </p>
         </section>
       )}
@@ -1809,7 +1811,7 @@ export function ResidentCard({
   mapSize: number
   /** Orders the resident to attack another realm's resident, or to break a wall or gate. */
   onAttack: (targetId: string) => void
-  /** Orders the resident to Feed someone Down next to them (`CONTEXT.md`: Reviving). */
+  /** Orders the resident to Feed someone Down or a horse next to them. */
   onFeed?: (targetId: string, units: number) => void
   /** Finished walls and gates in sight of other realms' cities, or of none. */
   walls: Building[]
@@ -1895,10 +1897,16 @@ export function ResidentCard({
   const roadSite = road?.site ? road : undefined
   const atRoadSite: GoodsSpot = { kind: 'site', siteId: roadSite?.id ?? '' }
   const roadNeeded = roadSite ? materialsNeeded(roadSite) : {}
-  // Anyone in sight Down on or next to their tile, of any realm, to Feed (`CONTEXT.md`: Reviving).
-  const downNear = [...residents, ...others].filter(
-    (x) => x.id !== r.id && isDown(x) && inContact(mapSize, r, x),
-  )
+  // Anyone in sight Down on or next to their tile, and any horse there that isn't full, of any
+  // realm, to Feed (`CONTEXT.md`: Reviving, Feeding a horse).
+  const toFeedNear = [
+    ...[...residents, ...others].filter(
+      (x) => x.id !== r.id && isDown(x) && inContact(mapSize, r, x),
+    ),
+    ...horses
+      .filter((h) => !horseFull(h) && inContact(mapSize, r, h))
+      .map((h) => ({ id: h.id, name: h.name, horse: true as const })),
+  ]
   const atCarriageSite: GoodsSpot = { kind: 'site', siteId: carriageSite?.id ?? '' }
   const carriageNeeded = carriageSite ? materialsNeeded(carriageSite) : {}
   // Anyone Down on their tile, whose goods they can take as from a pile (`CONTEXT.md`: Down).
@@ -1933,7 +1941,7 @@ export function ResidentCard({
     carrying: !!r.carrying,
     carries: carried.length > 0,
     down: isDown(r),
-    downNear: downNear.length,
+    toFeedNear: toFeedNear.length,
     carriesFood: (r.carried.food ?? 0) > 0,
     downCarrying: downHere.map((d) => d.carried),
   })
@@ -2200,7 +2208,7 @@ export function ResidentCard({
       )}
       {shown === 'feed' && onFeed && (
         <FeedBlock
-          targets={downNear}
+          targets={toFeedNear}
           food={r.carried.food ?? 0}
           onFeed={(targetId, units) => {
             setPanel(undefined)

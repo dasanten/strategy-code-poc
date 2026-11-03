@@ -1,4 +1,5 @@
 import {
+  HORSE_HUNGRY_SHARE,
   MAX_HEALTH,
   MAX_HUNGER,
   TICKS_PER_GAME_DAY,
@@ -16,13 +17,32 @@ import {
 } from '@csp/shared'
 import { nameLabels } from './name-labels.js'
 
+/** What a horse's card and row say can be done for it (`CONTEXT.md`: Feeding a horse). */
+export const FEED_HORSE_HINT = 'a resident with Food can Feed it'
+
 /**
  * A Down horse in words (`CONTEXT.md`: Down, Reviving): "Down from hunger: about 23 h left",
- * the time left when it is seen (`downUntil`) and `tick` is given.
+ * the time left when it is seen (`downUntil`) and `tick` is given, and that it can be Fed.
  */
 export function horseDownLine(h: { downUntil?: number }, tick?: number): string {
-  if (h.downUntil === undefined || tick === undefined) return 'Down from hunger'
-  return `Down from hunger: ${timeLeft(h.downUntil - tick)}`
+  const down =
+    h.downUntil === undefined || tick === undefined
+      ? 'Down from hunger'
+      : `Down from hunger: ${timeLeft(h.downUntil - tick)}`
+  return `${down} · ${FEED_HORSE_HINT}`
+}
+
+/**
+ * What a horse needs, for its row where it says so first: that it is Down (`horseDownLine`), or
+ * hungry where the Player knows how it fares, and that it can be Fed. Undefined for a fed one.
+ */
+export function horseNeed(
+  h: { downUntil?: number; down?: true; hunger?: number },
+  tick?: number,
+): string | undefined {
+  if (isDown(h)) return horseDownLine(h, tick)
+  if (h.hunger === undefined || h.hunger >= HORSE_HUNGRY_SHARE * MAX_HUNGER) return undefined
+  return `${h.hunger <= 0 ? 'Starving' : 'Hungry'} · ${FEED_HORSE_HINT}`
 }
 
 /** One horse of the Horses drawer and where it stands, in words. */
@@ -30,7 +50,7 @@ export interface HorseRow<H> {
   horse: H
   /**
    * "Pulling the carriage Ann drives", "Ridden by Ann", "In the stable", "Loose at 12, 40"; for
-   * a Down horse first that it is Down and how long it has left (`horseDownLine`).
+   * a Down or hungry horse first that it is, and that it can be Fed (`horseNeed`).
    */
   place: string
 }
@@ -49,11 +69,11 @@ export interface HorseGroup<H> {
  * hitched to a carriage (`carriage.horseId`), one somebody rides, and the rest loose. Stables come
  * first, by name ("Stable, Oakford", with its corner when the city has more than one), then
  * Hitched, Ridden and Loose. Empty groups are left out; horses keep the order they came in, so rows
- * don't jump. With `tick`, riders and drivers of one name are told apart (`nameLabels`). A Down
- * horse's place says first that it is Down (`horseDownLine`).
+ * don't jump. With `tick`, riders and drivers of one name are told apart (`nameLabels`). A Down or
+ * hungry horse's place says so first (`horseNeed`).
  */
 export function groupHorses<
-  H extends Pick<Horse, 'id' | 'x' | 'y' | 'downUntil'> & { down?: true },
+  H extends Pick<Horse, 'id' | 'x' | 'y' | 'downUntil'> & { down?: true; hunger?: number },
 >(
   horses: readonly H[],
   buildings: readonly Pick<Building, 'id' | 'kind' | 'x' | 'y' | 'cityId'>[],
@@ -101,10 +121,8 @@ export function groupHorses<
       : undefined
     const ridden = rider ? `Ridden by ${nameOf(rider)}` : undefined
     const stable = stables.find((b) => isAt(h, b))
-    const row = (place: string) => ({
-      horse: h,
-      place: isDown(h) ? `${horseDownLine(h, tick)} · ${place}` : place,
-    })
+    const need = horseNeed(h, tick)
+    const row = (place: string) => ({ horse: h, place: need ? `${need} · ${place}` : place })
     if (stable) {
       const also = pulling ?? ridden
       group(stable.id).rows.push(row(also ? `In the stable · ${also}` : 'In the stable'))

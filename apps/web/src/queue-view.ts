@@ -400,7 +400,7 @@ export function stepLabel(
     case 'relocate':
       return `Relocate to ${cities.find((c) => c.id === order.cityId)?.name ?? 'another city'}`
     case 'feed':
-      return `Feed someone Down: ${String(order.units)} Food`
+      return `Feed: ${String(order.units)} Food`
     case 'runScript': {
       const script = scripts.find((s) => s.id === order.scriptId)
       return `Run ${script?.name ?? 'a script'}`

@@ -1063,7 +1063,7 @@ export function Wiki() {
         <p>
           <b>Reviving:</b> any grown resident of any realm on or next to a Down resident's tile can{' '}
           <b>Feed</b> them: the Feed row on their card (or on the Down resident's tile card), a
-          queue step, or <code>feed(residentId, units)</code> in a script. It puts up to that many
+          queue step, or <code>feed(targetId, units)</code> in a script. It puts up to that many
           units of the Food in their own hands into the Down resident's ({num(FEED_UNITS)} unless
           set). One unit is eaten at once, and they wake idle with {num(WAKE_HEALTH)} of{' '}
           {num(MAX_HEALTH)} health, which comes back while their hunger meter isn't empty; the rest
@@ -1458,12 +1458,23 @@ export function Wiki() {
           {days(HUNGER_DAYS + STARVE_DAYS)} after its last meal and lies there for {days(DOWN_DAYS)}
           . Down, it doesn't move: its rider is on foot again, and the carriage it pulls stands
           where it is, its drive or haul route ending; nobody can mount or drive it. It still eats
-          Food in reach, so put Food down on its tile or right next to it (horses have no inventory:
-          Food in someone's hands doesn't count). Once it has eaten, it gets up with{' '}
-          {num(HORSE_WAKE_HEALTH)} health of {num(MAX_HEALTH)} and heals from there. When the time
-          is up first, it dies. Its token lies on its side, the Horses drawer, the stable and the
-          tile card say it is Down and how long is left, and your realm log says when one of your
-          horses goes Down and when one dies.
+          Food in reach, so put Food down on its tile or right next to it, or Feed it (below). Once
+          it has eaten, it gets up with {num(HORSE_WAKE_HEALTH)} health of {num(MAX_HEALTH)} and
+          heals from there. When the time is up first, it dies. Its token lies on its side, the
+          Horses drawer, the stable and the tile card say it is Down and how long is left, and your
+          realm log says when one of your horses goes Down and when one dies.
+        </p>
+        <h3>Feeding a horse</h3>
+        <p>
+          Any grown resident of any realm on or next to a horse's tile can <b>Feed</b> it, whoever's
+          it is and Down or not, as long as it isn't full: the Feed row on their card (or on the
+          horse's tile card), a queue step, or <code>feed(targetId, units)</code> in a script.
+          Horses have no inventory, so it eats from their hands at once, a whole unit at a time,
+          until its hunger meter is full, up to the units asked for ({num(FEED_UNITS)} unless set);
+          the rest stays with them. A full meter holds {num(HUNGER_DAYS * HORSE_FOOD_PER_DAY)}{' '}
+          units. Feeding another realm's horse is no crime. Another realm's horse doesn't show how
+          it fares, so the card offers it unless it is known to be full, and the order says so if it
+          is.
         </p>
         <h3>Breeding</h3>
         <p>
