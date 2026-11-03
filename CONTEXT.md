@@ -1159,8 +1159,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Picking on the map:** what a click (or tap) picks on a tile, in this order: a resident of the
   Player's, then a building (a carriage or horse of the Player's with nobody on it counts as
   one), then the bare tile. A click on a stack of the Player's residents picks them all as a
-  group; a stack with others' residents shows the tile card, which lists them. With a pointer,
-  what a click would pick is outlined on hover.
+  group; a stack with others' residents shows the tile card, which lists them. A click beside
+  their tokens on a tile with another realm's carriage shows the tile card too, where it can be
+  driven off (Stealing a carriage or horse). With a pointer, what a click would pick is outlined
+  on hover.
 - **Notices:** what the HUD tells the Player unasked (the Horse offer, the pick banner, a group
   order's report, the first-day card) shows in one lane under the top bar, over the map and never
   over a drawer or card. While the pick banner shows it replaces the others; they come back after.

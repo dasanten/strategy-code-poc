@@ -141,7 +141,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(76)
+    expect(WORLD_FORMAT_VERSION).toBe(77)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -518,6 +518,13 @@ describe('world saves', () => {
     expect(owner('ofTheRealm')).toEqual([realm.id, null])
     // The Trade Organization keeps its own.
     expect(migrated.horses.filter((h) => hqHorses.includes(h.id))).toEqual(before)
+  })
+
+  it('leaves crimes and logs as they are for stealing carriages (migration 76 → 77)', () => {
+    const { world, terrain } = worldWithCity()
+    const migrated = migrateWorld(structuredClone(world), 76, { terrain }, migrations, 77)
+    expect(migrated).toEqual(world)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
   it('names every horse from before horses had names, alike on every server (migration 65 → 66)', () => {

@@ -86,7 +86,10 @@ import {
   besideStep,
   stepLength,
   tileIndex,
+  carriageCommanderOf,
+  commanderOf,
 } from '@csp/shared'
+import { carriageOrganization, organizationOf } from './crimes.js'
 import { tallyGoods } from './goods-made.js'
 import { awakeAlive, downDoNothing, refillSource, refillTarget } from './survival.js'
 import { horsesDownLieStill } from './horses.js'
@@ -1013,7 +1016,9 @@ export const passengersAboard: Invariant = {
 
 /**
  * After a tick, a driver stands on the carriage they drive, which exists, and is grown up; no
- * carriage has two drivers (`CONTEXT.md`: Carriage, `Walking.resolve` moves them together).
+ * carriage has two drivers (`CONTEXT.md`: Carriage, `Walking.resolve` moves them together), and
+ * nobody drives a carriage of another organization unless they command it (`CONTEXT.md`: Stealing
+ * a carriage or horse: taking it makes it theirs first; Alliance army, Mercenary contract).
  */
 export const driversOnCarriages: Invariant = {
   name: 'drivers-on-carriages',
@@ -1032,6 +1037,13 @@ export const driversOnCarriages: Invariant = {
       const k = world.carriages.find((c) => c.id === id)
       if (!k) fail(`drives ${id}, which doesn't exist`)
       else if (k.x !== r.x || k.y !== r.y) fail(`drives ${k.id} but isn't on its tile`)
+      if (
+        k &&
+        organizationOf(r) !== carriageOrganization(k) &&
+        commanderOf(world, r) !== carriageCommanderOf(world, k)
+      ) {
+        fail(`drives ${k.id} of another organization without commanding it`)
+      }
       if (!canWork(r, world.tick)) fail('drives as a child')
       const other = driven.get(id)
       if (other) fail(`drives ${id} together with ${other}`)

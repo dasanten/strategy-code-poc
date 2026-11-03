@@ -18,7 +18,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 76
+export const WORLD_FORMAT_VERSION = 77
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -305,6 +305,10 @@ export const migrations: Record<number, MigrationStep> = {
     }
     return world
   },
+  // Stealing a carriage (`CONTEXT.md`: Stealing a carriage or horse) adds `carriage` and `horse` to
+  // a crime and its `crimeKnown`, and the realm log's `transportGone` and `transportTaken`. Nothing
+  // was stolen that way before, so the step leaves every crime and log as they are.
+  76: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

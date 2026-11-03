@@ -12,6 +12,7 @@ import {
   carriageCapacityWith,
   stockWeight,
 } from './balance.js'
+import { guardedBy, type GuardResident } from './city.js'
 import { storageAt } from './goods.js'
 import {
   type Caravan,
@@ -110,7 +111,10 @@ export function drivenCarriageId(resident: Pick<Resident, 'order'>): string | un
 }
 
 /** The resident driving a carriage, if anyone is (`DriveOrder`, `HaulOrder`). */
-export function driverOf(world: WorldState, carriage: Carriage): Resident | undefined {
+export function driverOf<R extends Pick<Resident, 'order'>>(
+  world: { residents: readonly R[] },
+  carriage: Pick<Carriage, 'id'>,
+): R | undefined {
   return world.residents.find((r) => drivenCarriageId(r) === carriage.id)
 }
 
@@ -128,10 +132,15 @@ export function haulStopSpot(world: WorldState, x: number, y: number): GoodsSpot
  * Carriage): they must be grown up, on foot (`CONTEXT.md`: Riding) and on its tile, it must have
  * a horse to pull it that isn't Down (`CONTEXT.md`: Down), and nobody else may be driving it.
  */
-export function driveProblem(
-  world: WorldState,
-  resident: Resident,
-  carriage: Carriage,
+export function driveProblem<R extends Pick<Resident, 'order' | 'riding' | 'x' | 'y' | 'bornAt'>>(
+  world: {
+    tick: number
+    residents: readonly R[]
+    horses: readonly CarriageHorse[]
+    carriages: readonly CarriagePlace[]
+  },
+  resident: R,
+  carriage: CarriagePlace & Pick<Carriage, 'id'>,
 ): string | undefined {
   if (!canWork(resident, world.tick)) return 'children can’t drive'
   if (resident.riding !== undefined) return 'dismount first to drive'
@@ -146,6 +155,67 @@ export function driveProblem(
   const driver = driverOf(world, carriage)
   if (driver && driver !== resident) return 'someone else is driving that carriage'
   return undefined
+}
+
+/** What of a resident the stealing checks look at: all a Player sees of anyone in sight. */
+export type StealingResident = GuardResident &
+  Pick<Resident, 'id' | 'x' | 'y' | 'owner' | 'cityId' | 'bornAt' | 'order' | 'riding' | 'aboard'>
+
+/**
+ * Why a resident can't take the carriage or horse `thing` of another organization for the realm
+ * `realmId` now, what has them all in common (`CONTEXT.md`: Stealing a carriage or horse): they
+ * must be grown up and on its tile, and it mustn't be guarded: an armed resident of its owner
+ * stands on the tile and none of the thief's realm does, the thief themselves included. `what`
+ * names the thing in the reason.
+ */
+export function takeProblem<R extends StealingResident>(
+  world: { tick: number; residents: readonly R[] },
+  thief: R,
+  thing: Pick<Carriage, 'x' | 'y' | 'realmId' | 'cityId'>,
+  realmId: string,
+  what: 'carriage' | 'horse',
+): string | undefined {
+  if (!canWork(thief, world.tick)) return 'children can’t steal'
+  if (thing.x !== thief.x || thing.y !== thief.y) {
+    return `that ${what} is not on the resident’s tile`
+  }
+  const guarded = guardedBy(
+    world.residents,
+    (r) => r.x === thing.x && r.y === thing.y,
+    (r) => carriageOfResident(thing, r),
+    (r) => r.id === thief.id || r.owner === realmId,
+  )
+  return guarded ? `an armed resident guards that ${what}` : undefined
+}
+
+/**
+ * Why a resident can't drive off in another organization's carriage for the realm `realmId` now,
+ * or undefined when they can (`CONTEXT.md`: Stealing a carriage or horse): nobody may drive it or
+ * be aboard, it mustn't be guarded (`takeProblem`), and they must be able to drive it as if it
+ * were their realm's already, so with its hitched horse or a free one of that realm on its tile.
+ * A caravan's carriage can't be taken yet.
+ */
+export function driveOffProblem<R extends StealingResident>(
+  world: {
+    tick: number
+    residents: readonly R[]
+    horses: readonly CarriageHorse[]
+    carriages: readonly CarriagePlace[]
+    caravans: readonly Pick<Caravan, 'carriageId'>[]
+  },
+  thief: R,
+  carriage: CarriagePlace & Pick<Carriage, 'id'>,
+  realmId: string,
+): string | undefined {
+  if (world.caravans.some((c) => c.carriageId === carriage.id)) {
+    return 'a caravan’s carriage can’t be driven off'
+  }
+  if (driverOf(world, carriage)) return 'someone is driving that carriage'
+  if (passengersOf(world, carriage).length > 0) return 'someone is aboard that carriage'
+  return (
+    takeProblem(world, thief, carriage, realmId, 'carriage') ??
+    driveProblem(world, thief, { ...carriage, realmId, cityId: null })
+  )
 }
 
 /**

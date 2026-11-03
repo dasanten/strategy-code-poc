@@ -77,6 +77,8 @@ import {
   WAYPOINTS_MAX,
   EXPLORE_FOOD_MARGIN,
   EXPLORE_SKIP_RANGE,
+  CARRIAGE_STOLEN_WORTH,
+  HORSE_STOLEN_WORTH,
   EXPLORED_EDGE_RANGE,
   WAYPOINT_NAME_MAX_LENGTH,
   HUNGRY_HORSE_PACE,
@@ -1359,6 +1361,19 @@ export function Wiki() {
           again. A carriage whose horse dies waits the same way.
         </p>
         <p>
+          A grown resident on the tile of another realm's or city's carriage can steal it: its card,
+          or the resident's, offers <strong>Drive off (theft)</strong>, and a script's{' '}
+          <code>drive</code> naming that carriage does the same. The carriage joins your realm at
+          once, with its load and hitched horse; with no horse hitched, a free horse of yours on the
+          tile pulls it. It can't be taken while someone drives it or anyone is aboard, nor while an
+          armed resident of its owner stands on the tile and none of your realm does. A caravan's
+          carriage can't be driven off. Nothing that picks a carriage by itself ever does this, and
+          a queue step keeps to your own carriages, as do hauling and group orders. Its owner's
+          realm log says at once that it is gone and where it was last; who took it they learn only
+          from a witness (see Standing). One that belongs to nobody is simply yours. A carriage
+          handed over to an alliance army is its commander's to drive, which is no theft.
+        </p>
+        <p>
           A carriage's card shows its load as a bar against what it holds (its passengers counted
           in) over its goods, its driver and passengers by name, the haul route it drives as “first
           stop → second stop” with the leg it is on and about when it arrives, and its horse with
@@ -1881,7 +1896,10 @@ export function Wiki() {
           {num(STANDING_DRIFT_PER_DAY)} a game day. A crime is remembered for{' '}
           {days(CRIME_MEMORY_DAYS)} after the news stops spreading. Taking from or tearing down
           another realm's outpost storage counts the same as its city storage, and taking what
-          another realm's Down resident carries is theft too.
+          another realm's Down resident carries is theft too. So is driving off in another's
+          carriage (see Transport): one theft, worth {num(CARRIAGE_STOLEN_WORTH)} coins for the
+          carriage, {num(HORSE_STOLEN_WORTH)} for its horse, and the load. Taking back what was
+          stolen from you is theft like any other.
         </p>
         <table>
           <thead>
@@ -1926,7 +1944,7 @@ export function Wiki() {
             you; below {signed(TRADE_ORG_PUNISHES_BELOW)} its army (up to{' '}
             {num(TRADE_ORG_PUNISH.soldiers)} soldiers) comes to take {num(TRADE_ORG_PUNISH.times)}{' '}
             times what it lost, giving up after {days(TRADE_ORG_PUNISH.giveUpDays)}. Besides stolen
-            goods it counts{' '}
+            goods, carriages and horses it counts{' '}
             {(Object.entries(TRADE_ORG_LOSS) as [CrimeKind, number][])
               .map(([c, n]) => `${CRIME_NAMES[c].toLowerCase()} as ${num(n)} coins`)
               .join(', ')}

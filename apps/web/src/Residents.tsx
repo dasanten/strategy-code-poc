@@ -312,7 +312,7 @@ const workSpan = (ticks: number) => {
  */
 /** What the map waits for a tile for: a Build line's start, then its end (`CONTEXT.md`: Build line). */
 export type Picking =
-  false | 'walk' | 'drive' | 'haul' | 'roadFrom' | 'roadTo' | 'wallFrom' | 'wallTo'
+  false | 'walk' | 'drive' | 'driveOff' | 'haul' | 'roadFrom' | 'roadTo' | 'wallFrom' | 'wallTo'
 
 /** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
 export interface HaulSetup {
@@ -1655,7 +1655,10 @@ export function ResidentCard({
   walls,
   onClimb,
   carriage,
+  carriageTheirs,
   onDriveTo,
+  driveOff,
+  onDriveOff,
   onHaulTo,
   onRoadTo,
   onWallTo,
@@ -1710,8 +1713,17 @@ export function ResidentCard({
   onWalkTo: () => void
   /** A carriage on the resident's tile, if one is in sight. */
   carriage: Carriage | undefined
+  /** That carriage is another organization's, not theirs to drive or haul with. */
+  carriageTheirs?: boolean
   /** Starts (or cancels) picking a tile to drive the carriage to. */
   onDriveTo: () => void
+  /**
+   * Another organization's carriage on the resident's tile, and why it can't be taken now, if so
+   * (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  driveOff?: { problem: string | undefined }
+  /** Starts (or cancels) picking a tile to drive that carriage off to. */
+  onDriveOff?: () => void
   /** Starts (or cancels) picking the other stop of a haul route carrying these goods. */
   onHaulTo: (setup: HaulSetup) => void
   /** Starts (or cancels) picking the two ends of a road to build along a line (Build line). */
@@ -1920,6 +1932,8 @@ export function ResidentCard({
     inCity: r.cityId !== null,
     carriage,
     carriageHorseDown: horses.some((h) => h.id === carriage?.horseId && isDown(h)),
+    ...(carriageTheirs ? { carriageTheirs } : {}),
+    ...(driveOff ? { driveOff } : {}),
     pile,
     storage,
     building,
@@ -1958,6 +1972,7 @@ export function ResidentCard({
     }
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
+    if (a.id === 'driveOff') onDriveOff?.()
     if (a.id === 'roadTo') onRoadTo()
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()

@@ -3,7 +3,9 @@ import {
   MAP_SIZE,
   OWN_FOOD,
   canHandle,
+  commanderOf,
   covers,
+  stealsCarriage,
   putAwayUnits,
   wrapDistance,
   type FetchOrder,
@@ -311,6 +313,18 @@ export function endOrder(world: WorldState, r: Resident, reason: string | null):
 }
 
 /**
+ * Whether the carriage a Player's resident stores at or fetches from was stolen since the order
+ * was given (`CONTEXT.md`: Stealing a carriage or horse): they don't go on to fill it for the thief,
+ * nor by accident steal from it.
+ */
+function carriageLost(world: WorldState, r: Resident, place: GoodsPlace): boolean {
+  if (place.kind !== 'carriage') return false
+  const k = worldIndex(world).carriageById(place.carriageId)
+  const by = commanderOf(world, r)
+  return k !== undefined && by !== null && stealsCarriage(world, by, k)
+}
+
+/**
  * Requests this tick's take and put actions from store and fetch orders at their place. An order
  * whose place is gone ends; one whose resident isn't at its place (a carriage moved on) walks
  * there again.
@@ -321,7 +335,7 @@ export function requestStoring(world: WorldState): CarryAction[] {
     const o = r.order
     if (o?.kind !== 'store' && o?.kind !== 'fetch') continue
     const place = placeOf(o)
-    if (!placeTile(world, place)) {
+    if (!placeTile(world, place) || carriageLost(world, r, place)) {
       endOrder(world, r, place.kind === 'carriage' ? 'the carriage is gone' : 'the storage is gone')
       continue
     }
