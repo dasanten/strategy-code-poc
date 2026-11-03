@@ -363,7 +363,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'pickUp',
     ['spot', 'goods'],
-    'Take goods from a spot on my tile: {kind: "ground"}, {kind: "storage", storageId}, {kind: "site", siteId} or {kind: "carriage", carriageId}; goods like {food: 3}.',
+    'Take goods from a spot on my tile: {kind: "ground"}, {kind: "storage", storageId}, {kind: "site", siteId}, {kind: "carriage", carriageId} or a Down resident lying there, {kind: "resident", residentId}; goods like {food: 3}.',
   ),
   action('drop', ['spot', 'goods'], 'Put carried goods down at a spot on my tile.'),
   action(
@@ -399,6 +399,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'attack',
     ['targetId'],
     'Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls.',
+  ),
+  action(
+    'feed',
+    ['residentId', 'units'],
+    'Feed a resident who is Down, of any realm, on or next to my tile: put up to that many units of the Food in my hands into theirs. They eat at once and wake at low health.',
   ),
   action('climb', ['wallId'], 'Climb over the wall or gate of another realm next to me.'),
   action(

@@ -2,6 +2,8 @@ import {
   Terrain,
   UNEXPLORED,
   arrivalTicks,
+  isDown,
+  timeLeft,
   roadTiles,
   tileIndex,
   type ArrivalWorld,
@@ -29,6 +31,9 @@ export interface DoingOf {
   script?: SeenScript
   /** The carriage they are aboard (`CONTEXT.md`: Passenger), which shows while they have no order. */
   aboard?: string
+  /** Down (`CONTEXT.md`: Down): from the world, or as a Player sees them. */
+  down?: true
+  downUntil?: number
 }
 
 /**
@@ -57,6 +62,15 @@ export function scriptLine(
   return scripts.find((s) => s.id === r.script!.scriptId)?.name ?? 'a script'
 }
 
+/**
+ * What someone Down is doing (`CONTEXT.md`: Down): lying Down from hunger, with about how long
+ * is left before they die when that is seen (`downUntil`) and `tick` is given.
+ */
+export function downLine(r: { downUntil?: number }, tick?: number): string {
+  if (r.downUntil === undefined || tick === undefined) return 'Down from hunger'
+  return `Down from hunger: ${timeLeft(r.downUntil - tick)}`
+}
+
 /** What else the Doing line is worked out from (`doingLine`). */
 interface DoingSeen {
   scripts?: readonly ScriptSummary[]
@@ -66,13 +80,16 @@ interface DoingSeen {
   cities?: readonly Pick<City, 'id' | 'name'>[]
   /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
   arrives?: number
+  /** The world's tick, to say how long someone Down has left. */
+  tick?: number
 }
 
 /** The Doing line but for the script waiting (`doingLine`). */
 function doingOfOrder(
   r: DoingOf,
-  { scripts = [], buildings = [], residents = [], cities = [], arrives }: DoingSeen,
+  { scripts = [], buildings = [], residents = [], cities = [], arrives, tick }: DoingSeen,
 ): string {
+  if (isDown(r)) return downLine(r, tick)
   if (r.script?.doing) return r.script.doing
   if (r.aboard !== undefined && !r.order) return aboardLine(r, residents)
   if (r.carrying && !r.order) return 'Carrying a child'

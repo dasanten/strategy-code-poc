@@ -1,4 +1,11 @@
-import type { Account, OrderRequest, ServerMessage, TerrainMap, WorldState } from '@csp/shared'
+import {
+  isDown,
+  type Account,
+  type OrderRequest,
+  type ServerMessage,
+  type TerrainMap,
+  type WorldState,
+} from '@csp/shared'
 import { build } from './building.js'
 import { tearDown } from './teardown.js'
 import { breed } from './breeding.js'
@@ -30,6 +37,7 @@ import { handOver } from './leader.js'
 import { rename, renameCity, renameHorse } from './renaming.js'
 import { claimHorses } from './horse-grant.js'
 import { queueOrders } from './queues.js'
+import { feed } from './reviving.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -113,6 +121,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     renameCity,
     renameHorse,
     claimHorses,
+    feed,
     ...allianceOrders,
     ...armyOrders,
     ...contractOrders,
@@ -120,6 +129,17 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     ...queueOrders,
   }).map(([name, kind]) => [name, GETS_OFF_FIRST.includes(name) ? getsOffFirst(kind) : kind]),
 )
+
+/**
+ * Why an order can't be given: a resident it is for is Down (`CONTEXT.md`: Down) and takes no
+ * orders. Undefined when none is.
+ */
+export function downProblem(world: WorldState, order: OrderRequest): string | undefined {
+  const ids: unknown[] = [order.residentId]
+  if (Array.isArray(order.residentIds)) ids.push(...(order.residentIds as unknown[]))
+  const down = world.residents.find((r) => isDown(r) && ids.includes(r.id))
+  return down && `${down.name} is Down and takes no orders`
+}
 
 interface Pending {
   sender: OrderSender
@@ -152,7 +172,7 @@ export class OrderQueue {
     if (!kind) {
       return { type: 'rejected', requestId: id, reason: `unknown order: ${String(req.kind)}` }
     }
-    const reason = kind.validate(world, sender, req, this.terrain)
+    const reason = downProblem(world, req) ?? kind.validate(world, sender, req, this.terrain)
     if (reason) return { type: 'rejected', requestId: id, reason }
     this.pending.push({ sender, order: req })
     return { type: 'ack', requestId: id }
@@ -166,6 +186,8 @@ export class OrderQueue {
     const batch = this.pending
     this.pending = []
     for (const { sender, order } of batch) {
+      // Gone Down since the order came, they no longer take it.
+      if (downProblem(world, order)) continue
       // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
       // script). Pairing, the Leader handover, renaming and claiming the Horse offer change
       // nobody's order, so they leave scripts running too, as do picking a param value and a

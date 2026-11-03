@@ -140,7 +140,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(71)
+    expect(WORLD_FORMAT_VERSION).toBe(74)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -422,25 +422,50 @@ describe('world saves', () => {
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
-  it('gives every realm no Workplace settings (migration 69 → 70)', () => {
+  it('keeps a format 69 world as it is: nobody is Down yet (migration 69 → 70)', () => {
+    const { world, terrain } = worldWithCity()
+    const migrated = migrateWorld(structuredClone(world), 69, { terrain }, migrations, 70)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents.every((r) => r.downUntil === undefined && r.health > 0)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps a format 71 world as it is: nobody fed anyone yet (migration 71 → 72)', () => {
+    const { world, terrain } = worldWithCity()
+    const migrated = migrateWorld(structuredClone(world), 71, { terrain }, migrations, 72)
+    expect(migrated).toEqual(world)
+    expect(migrated.residents.every((r) => r.order?.kind !== 'feed')).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('keeps a format 70 world as it is: no horse is Down yet (migration 70 → 71)', () => {
+    const { world, terrain } = worldWithCity()
+    expect(world.horses.length).toBeGreaterThan(0)
+    const migrated = migrateWorld(structuredClone(world), 70, { terrain }, migrations, 71)
+    expect(migrated).toEqual(world)
+    expect(migrated.horses.every((h) => h.downUntil === undefined && h.health > 0)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('gives every realm no Workplace settings (migration 72 → 73)', () => {
     const { world, terrain } = worldWithCity()
     expect(world.realms.length).toBeGreaterThan(0)
-    // A format 69 world: no Workplace settings at all.
+    // A format 72 world: no Workplace settings at all.
     const old = structuredClone(world) as Partial<typeof world>
     delete old.workplaceSettings
-    const migrated = migrateWorld(old, 69, { terrain }, migrations, 70)
+    const migrated = migrateWorld(old, 72, { terrain }, migrations, 73)
     expect(migrated.workplaceSettings).toEqual({})
     expect(migrated).toEqual(world)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
-  it('leaves every running script its resident’s own (migration 70 → 71)', () => {
+  it('leaves every running script its resident’s own (migration 73 → 74)', () => {
     const { world, terrain } = worldWithCity()
-    // A format 70 world: a resident working a farm by the Work default, given before settings.
+    // A format 73 world: a resident working a farm by the Work default, given before settings.
     const r = world.residents[0]!
     r.script = { scriptId: 4, memory: { workplaceId: 'farm' } }
     r.scriptParams = { 4: { foodTake: 2 } }
-    const migrated = migrateWorld(structuredClone(world), 70, { terrain }, migrations, 71)
+    const migrated = migrateWorld(structuredClone(world), 73, { terrain }, migrations, 74)
     expect(migrated).toEqual(world)
     expect(migrated.residents[0]!.script?.settingsFrom).toBeUndefined()
     expect(checkInvariants(migrated, terrain)).toEqual([])

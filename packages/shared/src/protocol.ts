@@ -68,8 +68,15 @@ export type Shown<P extends { stock: number }> = Omit<P, 'stock'> & { stock?: nu
  */
 export type SeenBuilding = Building & { prices?: Shown<WarehousePrice>[] }
 
-/** A horse as Players see it: its hunger and health only for its own realm and allies. */
-export type SeenHorse = Omit<Horse, 'hunger' | 'health'> & Partial<Pick<Horse, 'hunger' | 'health'>>
+/**
+ * A horse as Players see it: its hunger and health, and when it dies if it is Down, only for its
+ * own realm and allies.
+ */
+export type SeenHorse = Omit<Horse, 'hunger' | 'health' | 'downUntil'> &
+  Partial<Pick<Horse, 'hunger' | 'health' | 'downUntil'>> & {
+    /** Set while it is Down (`CONTEXT.md`: Down), which anyone in sight sees. */
+    down?: true
+  }
 
 /**
  * A carriage as Players see it (`CONTEXT.md`: Seeing inside a storage): how heavily it is loaded,

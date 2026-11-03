@@ -10,6 +10,11 @@ import {
   HORSE_HUNGRY_SHARE,
   PASSENGER_WEIGHT,
   carriageCapacity,
+  isDown,
+  feedProblem,
+  MAP_SIZE,
+  NO_CHILD_FEEDS,
+  NO_FOOD_TO_FEED,
   horseAgeInYears,
   horseFoodFactor,
   MAX_HEALTH,
@@ -80,6 +85,7 @@ import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
+import { horseDownLine } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
 import type { Picking } from './Residents.js'
@@ -112,6 +118,7 @@ export type ActionId =
   | 'goods'
   | 'pair'
   | 'attack'
+  | 'feed'
   | 'walls'
   | 'script'
   | 'makeLeader'
@@ -145,6 +152,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   goods: 'G',
   pair: 'P',
   attack: 'A',
+  feed: 'O',
   walls: 'C',
   script: 'X',
   makeLeader: 'L',
@@ -182,6 +190,8 @@ export interface ResidentHere {
   /** They belong to a city, so they can pair. */
   inCity: boolean
   carriage?: Carriage
+  /** The horse hitched to that carriage is Down (`CONTEXT.md`: Down), so it can't be driven. */
+  carriageHorseDown?: boolean
   pile?: Pile
   storage?: Building
   /** The building or construction site on their tile, not a road. */
@@ -226,6 +236,14 @@ export interface ResidentHere {
   carrying?: boolean
   /** They carry goods, so there is something to drop or store. */
   carries?: boolean
+  /** What anyone Down on their tile carries, which they can take (`CONTEXT.md`: Down). */
+  downCarrying?: Stock[]
+  /** They are Down (`CONTEXT.md`: Down) and take no orders. */
+  down?: boolean
+  /** Others in sight who are Down on or next to their tile, whom they could Feed (`CONTEXT.md`: Reviving). */
+  downNear?: number
+  /** They have Food in their hands, to Feed someone Down with. */
+  carriesFood?: boolean
 }
 
 /**
@@ -249,11 +267,29 @@ export function residentActions(h: ResidentHere): CardAction[] {
   return residentOrders(h).actions
 }
 
+/** Why a carriage whose horse is Down can't be driven (`CONTEXT.md`: Down). */
+export const HORSE_DOWN_NO_DRIVE = 'its horse is Down'
+
+/** Why a Down resident's card offers no orders (`CONTEXT.md`: Down). */
+export const DOWN_NO_ORDERS = 'Down: takes no orders'
+
 /**
  * The actions a resident's card offers (`residentActions`), and why each order left out can't be
- * given now: the reason its row shows greyed while the card stays open (ADR 0019).
+ * given now: the reason its row shows greyed while the card stays open (ADR 0019). Someone Down
+ * gets none (`CONTEXT.md`: Down).
  */
 export function residentOrders(h: ResidentHere): {
+  actions: CardAction[]
+  missing: Partial<Record<ActionId, string>>
+} {
+  const orders = ordersOffered(h)
+  if (!h.down) return orders
+  const ids = [...orders.actions.map((a) => a.id), ...(Object.keys(orders.missing) as ActionId[])]
+  return { actions: [], missing: Object.fromEntries(ids.map((id) => [id, DOWN_NO_ORDERS])) }
+}
+
+/** The orders a resident's card offers while they aren't Down (`residentOrders`). */
+function ordersOffered(h: ResidentHere): {
   actions: CardAction[]
   missing: Partial<Record<ActionId, string>>
 } {
@@ -300,10 +336,16 @@ export function residentOrders(h: ResidentHere): {
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
   if (h.carriage && h.adult) {
-    // A rider doesn't drive (`CONTEXT.md`: Riding).
-    const riding = h.riding ? { disabled: true as const, reason: 'dismount first to drive' } : {}
-    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...riding }))
-    if (!h.carrying) {
+    // A rider doesn't drive (`CONTEXT.md`: Riding), and a Down horse pulls nothing (Down).
+    const refused = (reason: string) => ({ disabled: true as const, reason })
+    const unable = h.riding
+      ? refused('dismount first to drive')
+      : h.carriageHorseDown
+        ? refused(HORSE_DOWN_NO_DRIVE)
+        : {}
+    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...unable }))
+    if (h.carriageHorseDown) miss('haul', HORSE_DOWN_NO_DRIVE)
+    else if (!h.carrying) {
       const label = h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…'
       add(row('haul', label, { opens: true }))
     } else miss('haul', CARRYING_A_CHILD)
@@ -353,6 +395,11 @@ export function residentOrders(h: ResidentHere): {
   if (h.carries || goodsOnTile(h, h.adult ? GOODS : CHILD_GOODS)) {
     add(row('goods', 'Goods…', { opens: true }))
   } else miss('goods', 'nothing carried or here to pick up')
+  // Anyone Down nearby, of any realm (`CONTEXT.md`: Reviving).
+  if (h.downNear) {
+    const reason = !h.adult ? NO_CHILD_FEEDS : !h.carriesFood ? NO_FOOD_TO_FEED : undefined
+    add(row('feed', 'Feed…', { opens: true, ...(reason ? { disabled: true, reason } : {}) }))
+  } else miss('feed', 'nobody Down nearby')
   if (works && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   else miss('pair', works ? 'homeless' : unfit('pair'))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
@@ -375,7 +422,7 @@ export function residentOrders(h: ResidentHere): {
 
 /**
  * Whether there are some of `goods` on a resident's tile to pick up: on the ground, stored, at a
- * site or on a carriage.
+ * site, on a carriage or carried by someone Down there.
  */
 function goodsOnTile(h: ResidentHere, goods: readonly Good[]): boolean {
   const some = (stock: Stock | undefined) => !!stock && goods.some((g) => (stock[g] ?? 0) > 0)
@@ -385,7 +432,8 @@ function goodsOnTile(h: ResidentHere, goods: readonly Good[]): boolean {
     some(h.building?.site?.delivered) ||
     some(h.carriageSite?.site?.delivered) ||
     some(h.road?.site?.delivered) ||
-    some(h.carriage?.load)
+    some(h.carriage?.load) ||
+    (h.downCarrying ?? []).some(some)
   )
 }
 
@@ -421,6 +469,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   tearDown: 'work',
   breed: 'work',
   goods: 'goods',
+  feed: 'goods',
   script: 'scripts',
 }
 
@@ -636,6 +685,11 @@ export interface TileCard {
    */
   renameHorses?: { id: string; name: string }[]
   /**
+   * Residents in sight lying Down on the tile, of any realm, whom the resident picked last may
+   * Feed (`CONTEXT.md`: Reviving).
+   */
+  downHere?: { id: string; name: string; x: number; y: number; down: true }[]
+  /**
    * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
    * and what they saw of it then, shown apart from the lines about what is there now.
    */
@@ -655,6 +709,11 @@ export interface TileCard {
    * unhitch the horse (`unhitchProblem`), when there are any (`CONTEXT.md`: Hitched horse).
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
+  /**
+   * Each Down resident on the tile who carries anything, with what they carry, and the Player's
+   * residents on the tile who may take it, as from a pile (`CONTEXT.md`: Down).
+   */
+  downGoods?: { residentId: string; name: string; goods: Stock; takers: SeenResident[] }[]
   /**
    * Who and what the tile holds, as rows under the card's lines: the horses in a stable or on the
    * tile, a workplace's workers, the goods in a storage.
@@ -875,11 +934,13 @@ export function horseAgeText(h: SeenHorse, tick: number): string {
 
 /**
  * A horse's stats and age, and how it fares where the Player knows it (`CONTEXT.md`: Horse stats,
- * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
+ * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy",
+ * or for a Down horse that it is Down and how long it has left (`horseDownLine`).
  */
 export function horseDetail(h: SeenHorse, tick: number | undefined): string {
   const parts = [horseStatsText(h, tick)]
-  if (horseFaresKnown(h)) {
+  if (isDown(h)) parts.push(horseDownLine(h, tick))
+  else if (horseFaresKnown(h)) {
     const fares = horseFares(h)
     parts.push(`${fares.hunger}, ${fares.health}`)
   }
@@ -910,7 +971,8 @@ export function riddenHorseLine(
 
 /**
  * Lists for horses standing together, one per owner: "Horses (yours)" with "2 · 1 hungry" on the
- * right, then a row for each with its stats and age (`horseStatsText`) and its health and hunger
+ * right, then a row for each with its stats and age (`horseStatsText`), led for a Down horse by
+ * that it is Down and how long it has left (`horseDownLine`), and its health and hunger
  * meters where the Player knows how it fares (`CONTEXT.md`: Seeing how someone fares). A click on
  * one of the Player's own opens it in the Horses drawer.
  */
@@ -928,9 +990,14 @@ function horseLists(
     const r = rel(group[0]!)
     const owner = r ? RELATIONSHIP_NAMES[r].toLowerCase() : 'nobody’s'
     const parts = [`${group.length}`]
-    const known = group.filter(horseFaresKnown).map(horseFares)
+    const down = group.filter(isDown).length
+    const known = group
+      .filter(horseFaresKnown)
+      .filter((h) => !isDown(h))
+      .map(horseFares)
     const hungry = known.filter((f) => f.hunger !== 'fed').length
     const hurt = known.filter((f) => f.health === 'hurt').length
+    if (down > 0) parts.push(`${down} Down`)
     if (hungry > 0) parts.push(`${hungry} hungry`)
     if (hurt > 0) parts.push(`${hurt} hurt`)
     return {
@@ -942,7 +1009,9 @@ function horseLists(
         return {
           id: h.id,
           name: h.name,
-          detail: horseStatsText(h, tick),
+          detail: isDown(h)
+            ? `${horseDownLine(h, tick)} · ${horseStatsText(h, tick)}`
+            : horseStatsText(h, tick),
           ...(shares ? { shares } : {}),
           ...(r === 'own' ? { opens: 'horse' as const } : {}),
         }
@@ -1258,10 +1327,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (t.strangers.length === 1) {
       const gear = gearText(r, goodLabels)
       lines.push(
-        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${gear ? ` · ${gear}` : ''}`,
+        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${isDown(r) ? ' · Down' : ''}${gear ? ` · ${gear}` : ''}`,
       )
     } else lines.push(...strangersLines(t.strangers))
   }
+  // Anyone Down here, own or not, for the Feed row (`CONTEXT.md`: Reviving).
+  const downHere = here(t.residents ?? t.strangers)
+    .filter((r) => isDown(r))
+    .map((r) => ({ id: r.id, name: r.name, x: r.x, y: r.y, down: true as const }))
   if (!stable && horsesHere.length > 0) {
     card ??= {
       title: horsesHere.length === 1 ? 'Horse' : `${horsesHere.length} horses`,
@@ -1277,6 +1350,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
   lines.push(`Tile ${t.x}, ${t.y}`)
+  // Anyone on a Down resident's tile can take what they carry (`CONTEXT.md`: Down).
+  const onTile = here(t.residents ?? [])
+  const takers = onTile.filter((r) => !isDown(r) && !t.strangers.some((s) => s.id === r.id))
+  const downGoods = onTile
+    .filter((r) => isDown(r) && Object.values(r.carried).some((n) => n > 0))
+    .map((r) => ({ residentId: r.id, name: r.name, goods: r.carried, takers }))
   return {
     ...(card ?? {
       title: road && !road.site ? 'Road' : (groundName(t.terrain) ?? 'Open ground'),
@@ -1286,7 +1365,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(buildHere ? { buildHere } : {}),
     ...(passengers ? { passengers } : {}),
     ...(unhitch ? { unhitch } : {}),
+    ...(downGoods.length > 0 ? { downGoods } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
+    ...(downHere.length > 0 ? { downHere } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
   }
@@ -1425,8 +1506,10 @@ function strangersLines(strangers: SeenResident[]): string[] {
   })
   if (rest.length > 0) {
     const n = armed(rest)
+    // Anyone in sight sees who is Down (`CONTEXT.md`: Down).
+    const down = rest.filter((r) => isDown(r)).length
     lines.push(
-      `${plural(rest.length, 'resident', 'residents')} of other realms${n > 0 ? ` · ${n} armed` : ''}`,
+      `${plural(rest.length, 'resident', 'residents')} of other realms${n > 0 ? ` · ${n} armed` : ''}${down > 0 ? ` · ${down} Down` : ''}`,
     )
   }
   return lines
@@ -1495,13 +1578,32 @@ function teardownLine(b: Building): string {
 /**
  * The actions a tile's card offers: send the resident picked last there, or have them build an
  * unbuilt node's workplace there (`buildHere`), open or close an own gate, open the city
- * inspector at the city the card links to, and trade at a warehouse or storage (`tradeHere`). Everything else a resident does on the tile is on
- * their own card once they stand there. `tick` tells whether the resident is still a child.
+ * inspector at the city the card links to, and trade at a warehouse or storage (`tradeHere`), and
+ * have them Feed someone Down there (`downHere`), greyed with the reason while they can't
+ * (`feedProblem`). Everything else a resident does on the tile is on
+ * their own card once they stand there. `tick` tells whether the resident is still a child;
+ * `size` is the map's.
  */
-export function tileActions(card: TileCard, actor: Resident | undefined, tick = 0): CardAction[] {
+export function tileActions(
+  card: TileCard,
+  actor: Resident | undefined,
+  tick = 0,
+  size = MAP_SIZE,
+): CardAction[] {
   const actions: CardAction[] = []
   if (actor)
     actions.push({ id: 'sendHere', label: `Send ${actor.name} here`, key: ACTION_KEYS.sendHere })
+  const down = card.downHere?.filter((r) => r.id !== actor?.id) ?? []
+  if (actor && down.length > 0) {
+    const reason = feedProblem(actor, down[0], tick, size)
+    actions.push({
+      id: 'feed',
+      label: down.length === 1 ? `Feed ${down[0]!.name}…` : 'Feed someone Down…',
+      key: ACTION_KEYS.feed,
+      opens: true,
+      ...(reason ? { disabled: true as const, reason } : {}),
+    })
+  }
   if (actor && card.buildHere) {
     const name = BUILDING_NAMES[card.buildHere.kind].toLowerCase()
     const reason = !card.buildHere.at

@@ -18,7 +18,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 71
+export const WORLD_FORMAT_VERSION = 74
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -267,13 +267,25 @@ export const migrations: Record<number, MigrationStep> = {
   // resident or city. Names from before stay as they are, duplicates too, and carry no mark, so
   // the step leaves every resident and city as they are.
   68: (state) => state,
+  // Hunger puts a resident Down before it kills (`CONTEXT.md`: Down; ADR 0021;
+  // `Resident.downUntil`), with the realm log's `down`. Nobody was Down before: a resident
+  // whose health ran out died at once. So the step leaves every resident and log as they are.
+  69: (state) => state,
+  // Hunger puts a horse Down too (`CONTEXT.md`: Down, Reviving; `Horse.downUntil`), with the
+  // realm log's `horseDown`. No horse was Down before: one whose health ran out died at once.
+  // So the step leaves every horse and log as they are.
+  70: (state) => state,
+  // Feeding revives a Down resident (`CONTEXT.md`: Reviving), a new order kind and queue step,
+  // with the realm log's `woke`. Nobody fed anyone before, so the step leaves every resident,
+  // queue and log as they are.
+  71: (state) => state,
   // A realm keeps Workplace settings (`CONTEXT.md`; ADR 0020; `WorldState.workplaceSettings`).
   // None were set before, so every realm starts with none.
-  69: (state) => ({ ...(state as object), workplaceSettings: {} }),
+  72: (state) => ({ ...(state as object), workplaceSettings: {} }),
   // Work runs by the workplace's settings (`CONTEXT.md`: Workplace settings), marked by
   // `RunningScript.settingsFrom`. Scripts running from before were given without settings, so
   // they stay the residents' own, unmarked: the step leaves every resident as they are.
-  70: (state) => state,
+  73: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

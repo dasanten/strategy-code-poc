@@ -230,7 +230,9 @@ function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
 
 /** Orders that act on the tile they are given for (by the card, their own): they only start there. */
 function actsHere(order: OrderRequest): boolean {
-  if (['pickUp', 'drop', 'drive', 'mount', 'board', 'unhitch', 'teach'].includes(order.kind))
+  if (
+    ['pickUp', 'drop', 'drive', 'mount', 'board', 'unhitch', 'teach', 'feed'].includes(order.kind)
+  )
     return true
   // A Build line walks to its line itself (`CONTEXT.md`: Build line).
   if (order.kind !== 'task' || order.task === 'buildLine') return false
@@ -393,6 +395,8 @@ export function stepLabel(
       return `Build a wall to ${at(order.to)}`
     case 'relocate':
       return `Relocate to ${cities.find((c) => c.id === order.cityId)?.name ?? 'another city'}`
+    case 'feed':
+      return `Feed someone Down: ${String(order.units)} Food`
     case 'runScript': {
       const script = scripts.find((s) => s.id === order.scriptId)
       return `Run ${script?.name ?? 'a script'}`

@@ -10,6 +10,7 @@ import {
   SCRIPT_VIEWS,
   Terrain,
   DOING_MAX_LENGTH,
+  isDown,
   ageInYears,
   occupationTicksLeft,
   breedingPair,
@@ -615,6 +616,8 @@ function residentActions(
       request('breed', { stableId: plain(stableId), horseIds: plain(horseIds) }),
     pair: ([partnerId]) => request('pair', { partnerId: plain(partnerId) }),
     attack: ([targetId]) => request('attack', { targetId: plain(targetId) }),
+    feed: ([residentId, units]) =>
+      request('feed', { targetId: plain(residentId), units: plain(units) }),
     climb: ([wallId]) => request('climb', { wallId: plain(wallId) }),
     pay: ([contractId, weeks]) =>
       request('pay', { contractId: plain(contractId), weeks: plain(weeks) }),
@@ -731,9 +734,10 @@ function requestsSound(
 }
 
 /**
- * A resident as its script view shows it: its queue as `queueView`, not its steps, and who last
+ * A resident as its script view shows it: its queue as `queueView`, not its steps, who last
  * struck them as `struckBy` and `struckAt`, while that attacker is still there (`CONTEXT.md`:
- * Combat, Under attack). Anything else passes as it is.
+ * Combat, Under attack), and whether they are Down (`CONTEXT.md`: Down) as `down`. Anything
+ * else passes as it is.
  */
 function asView(world: WorldState, r: object): object {
   const { queue, struck, defenceScriptId } = r as {
@@ -743,6 +747,7 @@ function asView(world: WorldState, r: object): object {
   }
   return {
     ...r,
+    down: isDown(r as { downUntil?: number; down?: true }),
     ...(queue ? { queue: queueView(queue) } : {}),
     ...(struck ? struckView(world, struck) : {}),
     ...(defenceScriptId !== undefined ? { defenceScript: defenceScriptId } : {}),

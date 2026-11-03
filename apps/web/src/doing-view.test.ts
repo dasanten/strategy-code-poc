@@ -75,6 +75,15 @@ const haul: ResidentOrder = {
 const line = (r: DoingOf) => doingLine(r, { scripts, buildings })
 
 describe('doingLine', () => {
+  it('says someone is Down, and how long is left when that is seen (`CONTEXT.md`: Down)', () => {
+    const until = 5000 + 23 * 3600
+    expect(doingLine({ order: null, downUntil: until }, { tick: 5000 })).toBe(
+      'Down from hunger: about 23 h (58 game days) left',
+    )
+    // Another realm's resident: Down is seen, when it ends isn't.
+    expect(doingLine({ order: null, down: true }, { tick: 5000 })).toBe('Down from hunger')
+  })
+
   it('names the city a resident relocates to (`CONTEXT.md`: Relocate)', () => {
     const order: ResidentOrder = {
       kind: 'relocate',

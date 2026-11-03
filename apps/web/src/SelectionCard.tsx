@@ -12,14 +12,19 @@ import {
 } from 'react'
 import {
   CITY_NAME_MAX_LENGTH,
+  FEED_UNITS,
   HORSE_NAME_MAX_LENGTH,
+  canHandle,
   nameProblem,
   type Building,
   type BuildingKind,
+  type GoodsSpot,
   type Resident,
   type ResourceKind,
+  type Stock,
 } from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
+import { TileGoods } from './Residents.js'
 import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
@@ -483,6 +488,9 @@ export function TileCard({
   onOpenHorse,
   onUnhitch,
   workSettings,
+  mapSize,
+  onFeed,
+  onPickUp,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -513,8 +521,14 @@ export function TileCard({
   onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
+  /** Tiles along each side of the map, to tell who is next to whom. */
+  mapSize?: number
+  /** Orders the actor to Feed someone Down on the tile (`CONTEXT.md`: Reviving). */
+  onFeed?: (targetId: string, units: number) => void
+  /** Orders one of the Player's residents to take goods from a spot on their tile. */
+  onPickUp: (residentId: string, from: GoodsSpot, goods: Stock) => void
 }) {
-  const actions = tileActions(card, actor, tick)
+  const actions = tileActions(card, actor, tick, mapSize)
   const [open, setOpen] = useState<string | undefined>()
   const shown = actions.some((a) => a.id === open) ? open : undefined
   useEscapeClosesPanel(shown !== undefined, () => setOpen(undefined))
@@ -590,6 +604,26 @@ export function TileCard({
           onOpen={(row) => (row.opens === 'horse' ? onOpenHorse(row.id) : onSelectResident(row.id))}
         />
       ))}
+      {card.downGoods?.map((d) => {
+        // The resident picked last takes it when they are on the tile, else the first one there.
+        const taker = d.takers.find((r) => r.id === actor?.id) ?? d.takers[0]
+        return (
+          <section
+            key={d.residentId}
+            className="inspector-block"
+            aria-label={`Carried by ${d.name}`}
+          >
+            <TileGoods
+              title={`Carried by ${d.name}, Down${taker ? ` · ${taker.name} picks up` : ''}`}
+              stock={d.goods}
+              spot={{ kind: 'resident', residentId: d.residentId }}
+              onPickUp={(from, goods) => taker && onPickUp(taker.id, from, goods)}
+              refused={(good) => !taker || !canHandle(taker, tick, [good])}
+            />
+            {!taker && <p className="muted small">Anyone of yours on this tile can pick it up.</p>}
+          </section>
+        )
+      })}
       {card.occupation && (
         <p className={`occupation${card.occupation.warning ? ' warn' : ''}`}>
           {card.occupation.text}
@@ -630,6 +664,16 @@ export function TileCard({
           onRename={(name) => {
             setOpen(undefined)
             onRenameCity(card.renameCity!.id, name)
+          }}
+        />
+      )}
+      {shown === 'feed' && actor && card.downHere && onFeed && (
+        <FeedBlock
+          targets={card.downHere.filter((r) => r.id !== actor.id)}
+          food={actor.carried.food ?? 0}
+          onFeed={(targetId, units) => {
+            setOpen(undefined)
+            onFeed(targetId, units)
           }}
         />
       )}
@@ -820,6 +864,70 @@ function CityRenameBlock({ name, onRename }: { name: string; onRename: (name: st
             Rename
           </button>
         </div>
+      </form>
+    </section>
+  )
+}
+
+/**
+ * Feeding someone Down (`CONTEXT.md`: Reviving): whom, when there is more than one, and how many
+ * units of the Food in the resident's hands to put in theirs; they eat at once and wake.
+ */
+export function FeedBlock({
+  targets,
+  food,
+  onFeed,
+}: {
+  targets: { id: string; name: string }[]
+  /** The Food in the feeding resident's hands. */
+  food: number
+  onFeed: (targetId: string, units: number) => void
+}) {
+  const [targetId, setTargetId] = useState(targets[0]?.id ?? '')
+  const [units, setUnits] = useState(Math.max(1, Math.min(FEED_UNITS, food)))
+  const target = targets.find((t) => t.id === targetId) ?? targets[0]
+  const fine = !!target && Number.isInteger(units) && units >= 1 && units <= food
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    if (fine) onFeed(target.id, units)
+  }
+  return (
+    <section className="inspector-block" aria-label="Feed">
+      <div className="panel-head">
+        <h3>Feed</h3>
+        <span className="small muted">{food} Food in hand</span>
+      </div>
+      <form onSubmit={submit}>
+        <div className="order-buttons">
+          {targets.length > 1 && (
+            <select
+              aria-label="Whom to feed"
+              value={target?.id ?? ''}
+              onChange={(e) => setTargetId(e.target.value)}
+            >
+              {targets.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <input
+            type="number"
+            min={1}
+            max={food}
+            step={1}
+            value={units}
+            aria-label="Units of Food"
+            onChange={(e) => setUnits(Number(e.target.value))}
+          />
+          <button type="submit" className="primary" disabled={!fine}>
+            {targets.length > 1 ? 'Feed' : `Feed ${target?.name}`}
+          </button>
+        </div>
+        <p className="small muted">
+          One unit is eaten at once and wakes them at low health; the rest goes in their hands.
+        </p>
       </form>
     </section>
   )

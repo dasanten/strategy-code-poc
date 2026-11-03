@@ -149,7 +149,7 @@ describe('pick-up order', () => {
     expect(reason(pick({ goods: { gems: 1 } }))).toBe('goods must be whole units of known goods')
     expect(reason(pick({ goods: {} }))).toBe('goods must be whole units of known goods')
     expect(reason(pick({ spot: { kind: 'roof' }, goods: { food: 1 } }))).toBe(
-      'the spot must be the ground, a storage, a construction site or a carriage',
+      'the spot must be the ground, a storage, a construction site, a carriage or a Down resident',
     )
     expect(reason(pick({ spot: { kind: 'storage', storageId: 's9' }, goods: { food: 1 } }))).toBe(
       'the resident is not at that storage',
