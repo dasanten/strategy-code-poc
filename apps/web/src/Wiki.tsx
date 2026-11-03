@@ -1488,7 +1488,8 @@ export function Wiki() {
           it is and Down or not, as long as it isn't full: the Feed row on their card (or on the
           horse's tile card), a queue step, or <code>feed(targetId, units)</code> in a script.
           Horses have no inventory, so it eats from their hands at once, a whole unit at a time,
-          until its hunger meter is full, up to the units asked for ({num(FEED_UNITS)} unless set);
+          until its hunger meter has no room for another whole unit, which is what full means here,
+          so no Food is wasted. It eats up to the units asked for ({num(FEED_UNITS)} unless set);
           the rest stays with them. A full meter holds {num(HUNGER_DAYS * HORSE_FOOD_PER_DAY)}{' '}
           units. Feeding another realm's horse is no crime. Another realm's horse doesn't show how
           it fares, so the card offers it unless it is known to be full, and the order says so if it

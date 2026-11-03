@@ -1,4 +1,4 @@
-import { MAX_HUNGER, canWork } from './balance.js'
+import { HORSE_FILL_PER_FOOD, MAX_HUNGER, canWork } from './balance.js'
 import { inContact } from './combat.js'
 import { isDown, type Resident } from './world.js'
 
@@ -65,9 +65,12 @@ export function feedProblem(
   return feederProblem(feeder, target, tick, size, 'stand on or next to their tile to feed them')
 }
 
-/** Whether a horse's hunger meter is known to be full, so it can't be Fed. */
+/**
+ * Whether a horse is known to be full, so it can't be Fed: its hunger meter has no room for a whole
+ * unit of Food, as when it eats on its own (`CONTEXT.md`: Feeding a horse).
+ */
 export function horseFull(horse: Pick<FedHorse, 'hunger'>): boolean {
-  return horse.hunger !== undefined && horse.hunger >= MAX_HUNGER
+  return horse.hunger !== undefined && horse.hunger > MAX_HUNGER - HORSE_FILL_PER_FOOD
 }
 
 /**

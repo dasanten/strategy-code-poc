@@ -844,9 +844,10 @@ The shared language of the game. Domain terms only — no implementation details
   skilled driver goes faster. Driving off in another organization's carriage steals it (Stealing
   a carriage or horse).
 - **Feeding a horse:** a grown resident of any realm on or next to a horse's tile can **Feed** it
-  (an order, queue step or script), any horse that isn't full, Down or not. It eats Food from
-  their hands until its hunger meter is full, up to the units asked for; the rest stays with
-  them. A Down horse wakes as under Reviving.
+  (an order, queue step or script), any horse that isn't full, Down or not. Full means its hunger
+  meter has no room for a whole unit, as when it eats on its own, so no Food is wasted. It eats
+  Food from their hands until then, up to the units asked for; the rest stays with them. A Down
+  horse wakes as under Reviving.
 - **Hitched horse:** the one horse that pulls a carriage. A horse of the carriage's realm standing
   with it is hitched when the carriage is first driven (another's is stolen by that: Stealing a
   carriage or horse), and stays hitched until **unhitched**: a grown resident of the carriage's realm standing on its
