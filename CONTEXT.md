@@ -270,7 +270,9 @@ The shared language of the game. Domain terms only — no implementation details
   caravan is robbed when anyone not of the Trade Organization takes goods off its carriage; what
   was taken of a delivery goes again with the next caravan, and coins taken from a caravan on a
   pick-up are fetched again, so the seller is paid in full. Each route counts how often it was
-  robbed.
+  robbed. Stealing the carriage itself (Stealing a carriage or horse) robs the caravan the same
+  way, its whole load counting as taken, and the Trade Organization replaces the carriage and
+  horse out of its own stock.
 - **Self-interest:** the Trade Organization defends only itself and whoever hires it. It is not a
   world police. It punishes anyone who steals from it, whoever they are.
 - **Admin directive:** an admin orders the Trade Organization to weaken a Player or
@@ -393,6 +395,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Integrating:** bringing a village or city into your realm, with its residents. Three ways:
   **conquer** it (capture by force), **buy** it, or **persuade** it (with high standing and
   respect it asks to join).
+- **What joins with a city:** however a city joins a realm, its horses and carriages come with
+  it. An NPC city's are all its own, wherever they stand. A Player's aren't tied to one city, so
+  of those the ones in its area or at its stables join. Either way a horse a joining resident
+  rides, and a carriage one drives, joins with them, and a carriage's hitched horse with it.
 - **Buying a city:** an NPC city names a price in Coins from what it is worth (its residents and
   buildings). The buyer's residents carry the coins to its town hall; once they are all there,
   the city joins the buyer's realm with everything in it, and the coins are gone: they are used
@@ -539,6 +545,17 @@ The shared language of the game. Domain terms only — no implementation details
 - **Witness:** a resident who sees a crime (within sight range), or a victim who survives it. A
   crime only becomes known when a witness physically brings the news home. No witness, no
   consequences.
+- **Stealing a carriage or horse:** a grown resident on the tile of another organization's
+  carriage or free horse can take it, by driving the carriage off, by mounting the horse, or by
+  hitching the horse when they drive off in a carriage with none hitched. It joins the thief's
+  realm at once, a carriage with its load and hitched horse, and from then on is an ordinary
+  carriage or horse of that realm. It can't be taken while someone drives it, rides it or is
+  aboard, nor while an armed resident of its owner is on its tile and none of the thief's realm
+  is (guarded like an outpost storage). A stable doesn't protect a horse. A Down horse can't be
+  ridden or hitched, so it is Fed first. Each taking is one theft (Crime, Witness), worth the
+  carriage, the horse and the load together; taking back what was stolen from you is theft like
+  any other. The victim's realm log says at once that it is gone and where it was last; who took
+  it becomes known only through a witness. Taking one that belongs to nobody is no crime.
 - **Standing:** how one organization regards another. Known crimes lower it; trade and kept
   contracts raise it; it slowly drifts back to neutral. Standing is per organization, so allies
   don't suffer for each other's crimes. A Player sees their standing toward others but it does
@@ -720,8 +737,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Reviving:** any grown resident of any realm on or next to a Down resident's tile can **Feed**
   them (an order, queue step or script `feed(residentId, units)`), putting Food from their own
   hands into the Down resident's. Once their hunger meter isn't empty they wake at low health
-  and stand idle. A Down horse wakes the same way once it has eaten Food in reach (Horses have no
-  inventory), so a Player revives a horse by putting Food down by it.
+  and stand idle. A Down horse wakes the same way once it has eaten, from Food in reach (Horses
+  have no inventory) or when a resident Feeds it (Feeding a horse).
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
 - **Own food:** the Food a resident keeps on them for their own meals, about four game days of
@@ -782,7 +799,8 @@ The shared language of the game. Domain terms only — no implementation details
   and in the stable.
 - **Horses have no inventory:** a horse eats only what is in reach. At a stable it eats from the
   stable's storage; pulling a carriage, from the carriage's load; anywhere, from Food lying on the
-  ground on its tile or right next to it, so Players can feed a horse by putting food down by it.
+  ground on its tile or right next to it, so Players can also feed a horse by putting food down
+  by it (or Feed it directly, Feeding a horse).
   A ridden horse also eats from the Food its rider carries beyond the rider's own food, after
   Food in reach on the ground: the rider never goes without for the horse, and the realm log says
   when a ridden horse is hungry with nothing to spare.
@@ -817,14 +835,21 @@ The shared language of the game. Domain terms only — no implementation details
   with no horse hitched until it is first driven.
 - **Driving:** a grown-up resident on a carriage's tile drives it to another tile; the driver,
   the carriage and its horse move together. Driving teaches the Driving skill, and a more
-  skilled driver goes faster. Players drive only their own carriages, with their own horses.
+  skilled driver goes faster. Driving off in another organization's carriage steals it (Stealing
+  a carriage or horse).
+- **Feeding a horse:** a grown resident of any realm on or next to a horse's tile can **Feed** it
+  (an order, queue step or script), any horse that isn't full, Down or not. It eats Food from
+  their hands until its hunger meter is full, up to the units asked for; the rest stays with
+  them. A Down horse wakes as under Reviving.
 - **Hitched horse:** the one horse that pulls a carriage. A horse of the carriage's realm standing
-  with it is hitched when the carriage is first driven, and stays hitched until **unhitched**: a grown resident of the carriage's realm standing on its
+  with it is hitched when the carriage is first driven (another's is stolen by that: Stealing a
+  carriage or horse), and stays hitched until **unhitched**: a grown resident of the carriage's realm standing on its
   tile unhitches it (an order, as a script could do it); the horse stands free on the tile, and
   the carriage stands where it is until it is next driven. A carriage
   whose horse dies stands where it is until another horse is hitched.
-- **Riding:** a resident on a tile with a horse of their realm that pulls no carriage and nobody
-  rides mounts it, and dismounts anywhere; the horse stays on that tile. Riding is not an order:
+- **Riding:** a resident on a tile with a horse that pulls no carriage and nobody rides mounts
+  it (another organization's is stolen by that: Stealing a carriage or horse), and dismounts
+  anywhere; the horse stays on that tile. Riding is not an order:
   the rider goes on with what they do, and their walking goes at the horse's pace, as fast as it
   would pull a carriage there (fast on plains and roads, slower in forest and hills, never into
   mountains off a road or onto walls), slower while the horse is hungry. Gates and walls stop a rider as
