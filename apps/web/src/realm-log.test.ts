@@ -71,7 +71,7 @@ describe('realm log', () => {
     expect(describeEvent(starved).text).toBe('A horse starved to death.')
     const down = { kind: 'horseDown', horseId: 'h1', name: 'Ember', until: 7 + 23 * 3600 } as const
     expect(describeEvent({ ...down, seq: 7, ...at })).toEqual({
-      text: 'Your horse Ember is Down from hunger: about 23 h (58 game days) left. Put Food down by it.',
+      text: 'Your horse Ember is Down from hunger: about 23 h (58 game days) left. Feed it or put Food down by it.',
       tone: 'bad',
     })
     const foaled = { kind: 'foaled', horseId: 'h2', stableId: 's1', seq: 8, ...at } as const

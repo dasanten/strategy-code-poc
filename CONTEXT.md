@@ -735,7 +735,7 @@ The shared language of the game. Domain terms only — no implementation details
   die of hunger. Only hunger puts a resident Down: wounds kill as before. A Leader who is Down is
   not a Leader death. The realm log says when one of its residents goes Down, wakes or dies.
 - **Reviving:** any grown resident of any realm on or next to a Down resident's tile can **Feed**
-  them (an order, queue step or script `feed(residentId, units)`), putting Food from their own
+  them (an order, queue step or script `feed(targetId, units)`), putting Food from their own
   hands into the Down resident's. Once their hunger meter isn't empty they wake at low health
   and stand idle. A Down horse wakes the same way once it has eaten, from Food in reach (Horses
   have no inventory) or when a resident Feeds it (Feeding a horse).
