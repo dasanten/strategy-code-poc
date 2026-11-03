@@ -18,6 +18,7 @@ import type {
   SeenArmy,
   SeenCaravan,
   SeenResident,
+  WorkplaceSettings,
 } from './world.js'
 
 /** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
@@ -155,6 +156,11 @@ export type ServerMessage =
       horseOffer: boolean
       /** The Player's first-day card (`CONTEXT.md`: First day). */
       firstDay: FirstDay
+      /**
+       * The realm's Workplace settings (`CONTEXT.md`), by building id; only its own, never
+       * another realm's.
+       */
+      workSettings: Record<string, WorkplaceSettings>
     }
   /**
    * Every tick: entities in sight that changed, ids that left sight, the Player's Last seen out
@@ -165,7 +171,8 @@ export type ServerMessage =
    * again (all of it) or their explored terrain grew (the grown chunks), and the realm's Leader
    * when the Player handed the realm to another (`CONTEXT.md`: Leader handover), and the
    * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer: false` once
-   * they claimed their Horse offer (`CONTEXT.md`: Horse offer).
+   * they claimed their Horse offer (`CONTEXT.md`: Horse offer), and all the realm's Workplace
+   * settings whenever they changed.
    */
   | {
       type: 'tick'
@@ -180,6 +187,7 @@ export type ServerMessage =
       leaderId?: string
       realmName?: string
       horseOffer?: false
+      workSettings?: Record<string, WorkplaceSettings>
     }
   /**
    * The memory of the script run by a resident or army whose Script tab the Player has open

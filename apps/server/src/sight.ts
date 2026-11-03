@@ -296,6 +296,7 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
     ...(line ? { line } : {}),
     ...(script.waitingSince !== undefined ? { waiting: true as const } : {}),
     ...(memory.workplaceId === target?.id && target?.site ? { site: true as const } : {}),
+    ...(script.settingsFrom !== undefined ? { settingsFrom: script.settingsFrom } : {}),
   }
 }
 

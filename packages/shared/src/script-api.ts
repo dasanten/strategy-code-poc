@@ -269,6 +269,15 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     description: 'How many units of a good still fit in my hands.',
   },
   {
+    name: 'inputToFetch',
+    is: 'query',
+    params: ['workplace', 'makes?'],
+    returns: { list: { view: 'material' } },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'At a smelter, mint or smithy I see, the goods it lacks for a batch of its recipe (the one making `makes`, else its only one) in its pile and its workers’ hands: of each, as many batches’ worth as fit in my hands, as a list like [{good: "ironOre", units: 24}]; empty while it has a batch’s, when none fits, and for any other building.',
+  },
+  {
     name: 'breedingPair',
     is: 'query',
     params: ['stable'],

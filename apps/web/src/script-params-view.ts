@@ -100,10 +100,11 @@ export function paramNote(description: string | undefined): { purpose?: string; 
 
 /**
  * What a param field shows as the value the script uses (`CONTEXT.md`: Script parameter): the one
- * picked, else what the script uses with it unset. A number's default ("1, the default"); a
- * default script's target param the one on the resident's tile ("Farm at 10, 5, on their tile");
- * any other what its comment says after "none:", else "none picked". `set` is whether the
- * Player picked it.
+ * picked, else what the script uses with it unset. Working by a workplace's settings
+ * (`CONTEXT.md`: Workplace settings), the workplace's value ("4, from the workplace"); else a
+ * number's default ("1, the default"); a default script's target param the one on the resident's
+ * tile ("Farm at 10, 5, on their tile"); any other what its comment says after "none:", else
+ * "none picked". `set` is whether the Player picked it for the resident.
  */
 export function effectiveParam(
   p: Pick<ScriptParam, 'name' | 'type' | 'default' | 'description'>,
@@ -115,8 +116,17 @@ export function effectiveParam(
     target?: string
     /** For the target param, what on their tile it would be, named; null for nothing that fits. */
     onTile?: string | null
+    /** The workplace's value, working by its settings. */
+    workplace?: ScriptParamValue
   },
 ): { text: string; set: boolean } {
+  const from = at.workplace
+  if (value === undefined && from !== undefined) {
+    if (p.type === 'number' && typeof from === 'number')
+      return { text: `${from}, from the workplace`, set: false }
+    if (p.type !== 'number' && typeof from === 'string')
+      return { text: `${at.label(from) ?? 'out of sight'}, from the workplace`, set: false }
+  }
   if (p.type === 'number') {
     if (typeof value === 'number') return { text: String(value), set: true }
     if (p.default !== undefined) return { text: `${p.default}, the default`, set: false }

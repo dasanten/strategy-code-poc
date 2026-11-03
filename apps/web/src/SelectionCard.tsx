@@ -492,6 +492,7 @@ export function TileCard({
   onSelectResident,
   onOpenHorse,
   onUnhitch,
+  workSettings,
   mapSize,
   onFeed,
   onPickUp,
@@ -499,6 +500,8 @@ export function TileCard({
   card: TileCardData
   /** The building the card is named after, for its icon. */
   building: Building | undefined
+  /** The Work settings panel of a workplace or site of one (`WorkSettings`), if any. */
+  workSettings?: ReactNode
   nodeKind: keyof typeof NODE_ART | undefined
   /** The node under the building's footprint, which picks what a mine yields. */
   buildingNode?: ResourceKind
@@ -635,6 +638,7 @@ export function TileCard({
           site={building.site ? building : undefined}
         />
       )}
+      {card.what === 'building' && workSettings}
       {actions.length > 0 && (
         <ActionRows
           actions={actions}

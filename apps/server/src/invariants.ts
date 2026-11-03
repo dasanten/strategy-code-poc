@@ -118,8 +118,14 @@ import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
+import { workplaceSettingsSound } from './workplace-settings.js'
 import { cityGameNamesUnique, gameNamesUnique } from './names.js'
-import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
+import {
+  defaultsHaveATarget,
+  oneCarrierAtATime,
+  oneFetcherAtATime,
+  oneInputFetcherAtATime,
+} from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
 import { defenceScriptSound, interruptedSound } from './defence.js'
@@ -1928,6 +1934,16 @@ export const gameDefaultFetchers: Invariant = {
 }
 
 /**
+ * At most one resident of a smelter, mint or smithy away fetching its inputs at once
+ * (`CONTEXT.md`: Fetching inputs), among NPC cities' residents running the game's own Work
+ * default; a Player's are checked where their scripts run.
+ */
+export const gameDefaultInputFetchers: Invariant = {
+  name: 'one-input-fetcher-at-a-time',
+  check: (world) => oneInputFetcherAtATime(world, (r) => r.script?.scriptId === 0),
+}
+
+/**
  * Nobody runs Work, Build or Haul for longer than a tick without its target (`CONTEXT.md`:
  * Default script, Started directly; `defaultsHaveATarget`), among NPC cities' residents running
  * the game's own defaults, whose city names the target when it puts them to the task; a
@@ -1955,6 +1971,7 @@ export const worldInvariants: Invariant[] = [
   gameNamesUnique,
   cityGameNamesUnique,
   horseOffersOnce,
+  workplaceSettingsSound,
   buildingsInPlace,
   citiesFromBuildings,
   outpostStorageRealms,
@@ -2038,6 +2055,7 @@ export const worldInvariants: Invariant[] = [
   pathsAreSteps,
   gameDefaultCarriers,
   gameDefaultFetchers,
+  gameDefaultInputFetchers,
   gameDefaultTargets,
   queuesSound,
   interruptedSound,

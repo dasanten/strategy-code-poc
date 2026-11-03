@@ -140,8 +140,14 @@ describe('params in a script', () => {
     w.scriptParams = { [SCRIPT]: { store: 's1' } }
     const task = taskOrder({ defaultScript: () => SCRIPT })
     const sender = { userId: MARA, account: { name: 'Mara', isAdmin: false } }
-    task.apply(world, sender, { kind: 'task', task: 'work', residentId: 'w1', workplaceId: 'farm' })
-    expect(w.script).toMatchObject({ scriptId: SCRIPT, memory: { workplaceId: 'farm' } })
+    // Work starts over from the workplace's settings instead (`workplace-settings.test.ts`).
+    task.apply(world, sender, {
+      kind: 'task',
+      task: 'tearDown',
+      residentId: 'w1',
+      buildingId: 'farm',
+    })
+    expect(w.script).toMatchObject({ scriptId: SCRIPT, memory: { buildingId: 'farm' } })
     expect(w.scriptParams).toEqual({ [SCRIPT]: { store: 's1' } })
   })
 

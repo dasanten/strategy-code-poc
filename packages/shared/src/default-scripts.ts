@@ -19,6 +19,7 @@ import {
 } from './balance.js'
 import type { BuildLine } from './building.js'
 import { FOOTPRINT } from './footprint.js'
+import type { ScriptParam } from './script-api.js'
 
 /**
  * The tasks that run a default script. Defend is never given: being struck starts it
@@ -56,6 +57,17 @@ export const TARGET_PARAMS: Partial<Readonly<Record<Task, string>>> = {
 /** The target param of a script (`TARGET_PARAMS`), if it is the default of a task with one. */
 export function targetParam(script: { task?: Task | null }): string | undefined {
   return script.task ? TARGET_PARAMS[script.task] : undefined
+}
+
+/** The param a work script is given its workplace in: the Work default's target param. */
+export const WORKPLACE_PARAM = 'workplace'
+
+/**
+ * Whether a script's `param` lines make it a work script (`CONTEXT.md`: Workplace settings): it
+ * declares `param workplace: building`, as the Work default does.
+ */
+export function isWorkScript(params: readonly Pick<ScriptParam, 'name' | 'type'>[]): boolean {
+  return params.some((p) => p.name === WORKPLACE_PARAM && p.type === 'building')
 }
 
 /** What giving a task from the UI writes into the script's memory. */
@@ -327,21 +339,32 @@ export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
     name: 'Work',
     source: `// Work (default): work params.workplace, or while none is picked the
 // workplace on my tile when I start, kept in memory.workplaceId; with none I
-// end. Once its pile holds a full load, one of us, picked at random, stores
-// it in params.storage, or the nearest storage of my realm while none is
-// picked, brings back the Food the pile lacks of params.crewFood for the
-// crew's meals (none to a farm, whose pile keeps its own; crewFood 0 brings
-// none) and comes back. At a smithy, memory.makes says what to make. Meals
-// come from the workplace's pile on their own, without an order. Below
+// end. params.storage is my main storage: params.output, params.input and
+// params.food each take its place for one use while picked. Once the pile
+// holds a full load, one of us, picked at random, stores it in
+// params.output, else params.storage, else the nearest storage of my realm,
+// brings back the Food the pile lacks of params.crewFood for the crew's
+// meals from params.food, else params.storage, else the nearest storage with
+// Food (none to a farm, whose pile keeps its own; crewFood 0 brings none)
+// and comes back. At a smelter, mint or smithy lacking the input for a
+// batch, one of us, picked at random, fetches a load at params.input, else
+// params.storage, while it holds some, else at the nearest storage of my
+// realm holding it, and puts it on the pile; not while one of us carries the
+// output, and with none anywhere we stand idle. At a smithy, memory.makes
+// says what to make. Meals come from the workplace's pile on their own,
+// without an order. Below
 // params.foodAt units of Food on me, while the pile holds none, I get Food
-// up to params.foodTake at params.storage, or the nearest storage of my
-// realm with Food, and come back; storing a load tops my food up to foodTake
-// too. foodAt 0 turns getting food off. At the workplace we stand spread over
+// up to params.foodTake at params.food, else params.storage, else the
+// nearest storage of my realm with Food, and come back; storing a load tops
+// my food up to foodTake too. foodAt 0 turns getting food off. At the workplace we stand spread over
 // its footprint. A workplace still being built I build first, as Build would,
 // with materials from the nearest storage of my realm holding them, then work
 // it once it is finished.
 param workplace: building // the workplace to work; none: the one I stand on
-param storage: storage // where the output goes; none: the nearest storage of my realm
+param storage: storage // my main storage, for output, inputs and Food; none: the nearest storage of my realm
+param output: storage // where the output goes; none: my storage, else the nearest storage of my realm
+param input: storage // where inputs come from; none: my storage, else the nearest storage holding them
+param food: storage // where Food comes from; a carriage too; none: my storage, else the nearest storage with Food
 ${FOOD_PARAMS}
 param crewFood: number = ${CREW_FOOD} // Food the pile keeps for the crew's meals; 0 none
 let keepFood = ${WORK_FOOD_KEPT} // Food a farm's pile keeps for our refills
@@ -356,7 +379,7 @@ if (memory.siteId != null && buildFirst(workplace)) { return }
 // Already at work there, I keep the tile I stand on.
 if (memory.at == null && me.order != null && me.order.kind == "workAt") {
   memory.at = {x: me.x, y: me.y}
-} else if (me.order == null && workplace != null && memory.carry == null && memory.food == null) {
+} else if (me.order == null && workplace != null && memory.carry == null && memory.food == null && memory.input == null) {
   memory.at = crewTile(workplace)
 }
 if (memory.at == null && params.workplace != null) {
@@ -375,13 +398,17 @@ if (workplace == null) { // here, and it isn't: torn down
   return
 }
 // With Food on the pile my meals come from there; with none anywhere, I work on.
-let food = me.carried.food
-if (food == null) { food = 0 }
-if (food < params.foodAt && !pileHoldsFood(workplace) && getFoodIfLow(params.storage, workplace)) {
+let food = me.carried.food || 0
+if (food < params.foodAt && !pileHoldsFood(workplace) && getFoodIfLow(params.food || params.storage, workplace)) {
   memory.food = {walked: false}
   return
 }
 if (me.order == null) {
+  if (memory.input != null) { // back with inputs: onto the pile
+    let load = carriedOf(me, memory.input.missing)
+    memory.input = null
+    if (load != null && drop({kind: "ground"}, load) == null) { return }
+  }
   if (workAt(memory.makes) != null && heldBySomeoneElse(workplace)) {
     end("the " + workplace.kind + " is held by someone else")
   }
@@ -456,7 +483,7 @@ fn buildFirst(site) {
   if (memory.fetch != null) { memory.fetch = null } // back with it
   if (bringCarried(site)) { return true }
   // With no Food anywhere, I build on.
-  if (getFoodIfLow(params.storage, site)) {
+  if (getFoodIfLow(params.food || params.storage, site)) {
     memory.food = {walked: false}
     return true
   }
@@ -501,8 +528,9 @@ fn storeLoad() {
 }
 
 // Crew food: with the load stored, I fetch the Food the pile lacks
-// (carry.crewFood) at the same storage before I walk back, once, as much as
-// fits. True once I set off, which I log.
+// (carry.crewFood) at params.food, else params.storage, while it holds Food,
+// else at the nearest storage of my realm with Food, before I walk back,
+// once, as much as fits. True once I set off, which I log.
 fn bringCrewFood(carry) {
   if (carry.fetched) { return false }
   carry.fetched = true
@@ -511,11 +539,14 @@ fn bringCrewFood(carry) {
   let fit = fits("food")
   if (units > fit) { units = fit }
   if (units < 1) { return false }
-  if (fetch({food: units}, carry.storageId) != null) { return false }
-  let from = building(carry.storageId)
-  let where = "the storage"
-  if (from != null) { where = placeName(from) }
-  log("fetching " + units + " Food for the crew at " + where)
+  let from = params.food || params.storage
+  if (from == null || !holdsFood(from)) {
+    from = null
+    let stores = storages(me, ["food"]) // nearest first, holding some
+    if (stores.length > 0) { from = stores[0] }
+  }
+  if (from == null || fetch({food: units}, from.id) != null) { return false }
+  log("fetching " + units + " Food for the crew at " + placeName(from))
   return true
 }
 
@@ -535,8 +566,9 @@ fn dropCrewFood() {
   return true
 }
 
-// Away carrying a load off, fetching materials or getting food: walk back to
-// the workplace, once; with no way back I stay put. True until I am there.
+// Away carrying a load off, fetching inputs or materials or getting food:
+// walk back to the workplace, once; with no way back I stay put. True until
+// I am there.
 fn walkBack() {
   if (me.x == memory.at.x && me.y == memory.at.y) {
     if (memory.carry != null) {
@@ -548,6 +580,7 @@ fn walkBack() {
   }
   let away = memory.carry
   if (away == null) { away = memory.food }
+  if (away == null) { away = memory.input }
   if (away == null) { away = memory.fetch }
   if (away != null && away.walked) {
     memory.stuck = true
@@ -559,12 +592,16 @@ fn walkBack() {
   return true
 }
 
-// Once the pile holds a full load, one of us carries it off to params.storage,
-// or the nearest storage of my realm while none is picked.
+// Once the pile holds a full load, one of us carries it off to params.output,
+// else params.storage, else the nearest storage of my realm. Until it does,
+// we fetch inputs we lack.
 fn carryLoadOffIfFull(workplace) {
   let found = fullLoad(workplace)
-  if (found == null) { return }
-  let to = params.storage
+  if (found == null) {
+    fetchInputIfShort(workplace)
+    return
+  }
+  let to = params.output || params.storage
   if (to == null) {
     let stores = storages(workplace) // nearest first
     if (stores.length == 0) { return } // none in reach: the pile grows
@@ -576,6 +613,44 @@ fn carryLoadOffIfFull(workplace) {
     storageId: to.id, goods: found.goods, load: found.load,
     crewFood: crewFoodToBring(workplace, found.goods),
   }
+}
+
+// Fetching inputs: lacking the input for a batch of my recipe, one of us,
+// picked at random, fetches a load at params.input, else params.storage,
+// while it holds some, else at the nearest storage of my realm holding it,
+// kept in memory.input until back, when I put it on the pile. With none
+// anywhere we stand idle.
+fn fetchInputIfShort(workplace) {
+  let missing = inputToFetch(workplace, memory.makes)
+  if (missing.length == 0) { return }
+  let goods = goodsOf(missing)
+  let from = null
+  if (params.input != null) { from = materialsFrom(workplace, goods, params.input) }
+  if (from == null && params.storage != null) {
+    from = materialsFrom(workplace, goods, params.storage)
+  }
+  if (from == null) { from = materialsFrom(workplace, goods, null) }
+  if (from == null || pickInputFetcher(workplace) != me.id) { return }
+  let load = {}
+  for (m of missing) { load[m.good] = m.units }
+  if (fetch(load, from.id) != null) { return }
+  wait() // until I have it
+  memory.input = {missing: missing}
+  log("fetching " + goodsText(load, goods) + " from " + placeName(from))
+}
+
+// Who fetches inputs: one of us at work here, picked at random, so we all
+// pick the same one. Null while one of us fetches some or carries a load.
+fn pickInputFetcher(workplace) {
+  let workers = []
+  for (r of withMemory("workplaceId", workplace.id)) {
+    let m = r.script.memory
+    if (m.input != null || m.carry != null) { return null }
+    if (r.order != null && r.order.kind == "workAt") { workers[workers.length] = r }
+  }
+  let fetcher = pickRandom(workers)
+  if (fetcher == null) { return null }
+  return fetcher.id
 }
 
 // The Food the pile lacks of params.crewFood, which I bring back for the
@@ -639,6 +714,7 @@ ${BUILD_MATERIALS}
 
 ${GET_FOOD}
 
+
 ${LOG_TEXT}
 `,
   },
@@ -652,12 +728,13 @@ ${LOG_TEXT}
 // fetches a load of what is missing from params.source, or the nearest
 // storage of my realm that holds it while none is picked, and brings it
 // back. With none there we just build. Below params.foodAt units of Food on
-// me I get Food up to params.foodTake at params.source, or the nearest
-// storage of my realm with Food, and come back; fetching materials tops my
-// food up to foodTake too. foodAt 0 turns getting food off. At the site we
-// stand spread over its footprint.
+// me I get Food up to params.foodTake at params.food, else params.source,
+// else the nearest storage of my realm with Food, and come back; fetching
+// materials tops my food up to foodTake too. foodAt 0 turns getting food
+// off. At the site we stand spread over its footprint.
 param site: building // the construction site to join; none: the one I stand on
 param source: storage // where materials come from; a carriage too; none: the nearest storage holding some
+param food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food
 ${FOOD_PARAMS}
 
 if (!pickSite()) { return }
@@ -674,7 +751,7 @@ spreadOut(site)
 if (walkBack()) { return }
 if (site != null && bringCarried(site)) { return }
 // With no Food anywhere, I build on.
-if (getFoodIfLow(params.source, me)) {
+if (getFoodIfLow(params.food || params.source, me)) {
   memory.food = {walked: false}
   return
 }
@@ -764,6 +841,7 @@ ${BUILD_MATERIALS}
 
 ${GET_FOOD}
 
+
 ${LOG_TEXT}
 `,
   },
@@ -782,9 +860,11 @@ ${LOG_TEXT}
 // up to params.foodTake there. With none in any storage I
 // lay out each tile's site and go on to the next; once all are laid out I
 // end, saying why. Below params.foodAt units of Food on me I get Food up to
-// params.foodTake at params.source, or the nearest storage of my realm with
-// Food, and come back. foodAt 0 turns getting food off.
+// params.foodTake at params.food, else params.source, else the nearest
+// storage of my realm with Food, and come back. foodAt 0 turns getting food
+// off.
 param source: storage // where materials come from; a carriage too; none: the nearest storage holding some
+param food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food
 ${FOOD_PARAMS}
 
 if (memory.line == null) {
@@ -808,14 +888,14 @@ if (me.order == null) {
   memory.waiting = null
   if (walkThere(tile)) { return }
   // With no Food anywhere, I build on.
-  if (getFoodIfLow(params.source, me)) { return }
+  if (getFoodIfLow(params.food || params.source, me)) { return }
   startBuilding(tile)
   return
 }
 if (me.order.siteId == null) { return } // laid out at the end of the tick
 let site = building(me.order.siteId)
 if (site == null || bringCarried(site)) { return }
-if (getFoodIfLow(params.source, me)) { return }
+if (getFoodIfLow(params.food || params.source, me)) { return }
 fetchMissing(site, tiles, crew, taken)
 
 // The tiles others of us on this line have taken, by "x,y".
@@ -997,6 +1077,7 @@ fn goodsNames(goods) {
 
 ${GET_FOOD}
 
+
 ${LOG_TEXT}
 `,
   },
@@ -1068,10 +1149,11 @@ fn logLeg() {
 // the building or site on my tile when I start, kept in memory.buildingId,
 // until it is gone; then end. With none I end. Away from it, I walk there
 // first. Below params.foodAt units of Food on me I get Food up to
-// params.foodTake at params.source, or the nearest storage of my realm with
-// Food, and come back. foodAt 0 turns it off.
+// params.foodTake at params.food, else params.source, else the nearest
+// storage of my realm with Food, and come back. foodAt 0 turns it off.
 param building: building // the building or site to tear down; none: the one I stand on
-param source: storage // where Food comes from; a carriage too; none: the nearest storage with Food
+param source: storage // my main storage, for Food; a carriage too; none: the nearest storage with Food
+param food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food
 ${FOOD_PARAMS}
 
 if (memory.stuck) { return }
@@ -1084,7 +1166,7 @@ if (walkBack()) { return }
 // With no Food anywhere, I tear down on.
 let x = me.x
 let y = me.y
-if (getFoodIfLow(params.source, me)) {
+if (getFoodIfLow(params.food || params.source, me)) {
   memory.food = {walked: false, x: x, y: y}
   return
 }
@@ -1147,6 +1229,7 @@ fn startTearingDown() {
 }
 
 ${GET_FOOD}
+
 
 ${LOG_TEXT}
 `,
