@@ -656,8 +656,13 @@ function residentActions(
 ): Record<string, (args: Value[]) => Value> {
   return {
     walkTo: ([x, y]) => request('walkTo', { x: plain(x), y: plain(y) }),
-    drive: ([carriageId, x, y]) =>
-      request('drive', { carriageId: plain(carriageId), x: plain(x), y: plain(y) }),
+    drive: ([carriageId, x, y, horseId]) =>
+      request('drive', {
+        carriageId: plain(carriageId),
+        x: plain(x),
+        y: plain(y),
+        ...(horseId !== undefined && { horseId: plain(horseId) }),
+      }),
     haul: ([carriageId, x, y, goods, returnGoods, keepFood]) =>
       request('haul', {
         carriageId: plain(carriageId),

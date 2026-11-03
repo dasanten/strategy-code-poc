@@ -66,6 +66,8 @@ const props = {
   onOpenHorse: () => {},
   onUnhitch: () => {},
   onDriveOff: () => {},
+  onHitchOff: () => {},
+  onStealHorse: () => {},
   tile: { x: 10, y: 10 },
   waypoints: [],
   mapSize: 512,
@@ -133,6 +135,33 @@ describe('the tile card of another realm’s carriage (`CONTEXT.md`: Stealing a 
     const html = driveOff('an armed resident guards that carriage')
     expect(html).toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Drive off/)
     expect(html).toContain('an armed resident guards that carriage')
+  })
+})
+
+describe('the tile card of another realm’s free horse (`CONTEXT.md`: Stealing a carriage or horse)', () => {
+  const stealHorse = (problem: string | undefined) =>
+    renderToStaticMarkup(
+      createElement(TileCard, {
+        ...props,
+        card: {
+          title: 'Horses',
+          what: 'horses',
+          lines: [],
+          stealHorse: { horseId: 'h1', residents: [{ id: 'ana', name: 'Ana', problem }] },
+        },
+      }),
+    )
+
+  it('offers Mount, saying it is theft', () => {
+    const html = stealHorse(undefined)
+    expect(html).toContain('Mount their horse (theft)')
+    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Mount their/)
+  })
+
+  it('greys it with the reason while it can’t be taken', () => {
+    const html = stealHorse('an armed resident guards that horse')
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Mount their/)
+    expect(html).toContain('an armed resident guards that horse')
   })
 })
 

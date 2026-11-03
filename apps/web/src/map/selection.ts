@@ -105,7 +105,8 @@ export interface PickWorld {
  * wins: the token clicked, or else the ones on the tile. Several on one token (or on the tile)
  * are a stack, picked as a group, unless someone else's resident is among them: then the tile
  * card lists them. A click beside the Player's tokens on a tile with another realm's carriage is
- * for the carriage: its tile card can drive it off (`CONTEXT.md`: Stealing a carriage or horse).
+ * for the carriage, and so with another's free horse: its tile card can drive the one off and
+ * mount the other (`CONTEXT.md`: Stealing a carriage or horse).
  * Next comes a building on the tile, then a carriage or loose horse of the Player's, then the bare
  * tile. Passengers are inside their carriage, so a click there is the carriage's. `own` is
  * `pickables`.
@@ -134,14 +135,23 @@ export function mapPickAt(
     (r) => r.aboard === undefined && wrap(r.x, size) === x && wrap(r.y, size) === y,
   )
   const ours = here.filter((r) => r.owner === realmId)
-  const theirs = world.carriages.some(
-    (k) => k.realmId !== realmId && wrap(k.x, size) === x && wrap(k.y, size) === y,
-  )
+  const onThisTile = (e: { x: number; y: number }) => wrap(e.x, size) === x && wrap(e.y, size) === y
+  const theirs =
+    world.carriages.some((k) => k.realmId !== realmId && onThisTile(k)) ||
+    world.horses.some((h) => h.realmId !== realmId && !busyHorses(world).has(h.id) && onThisTile(h))
   if (theirs) return tilePick(x, y, world)
   if (ours.length === 1 && here.length === 1) return { kind: 'resident', id: ours[0]!.id }
   if (ours.length > 1 && ours.length === here.length)
     return { kind: 'group', ids: ours.map((r) => r.id) }
   return tilePick(x, y, world)
+}
+
+/** The horses that show as something else: a hitched one as its carriage, a ridden one as its rider. */
+function busyHorses(world: PickWorld): Set<string | null | undefined> {
+  return new Set([
+    ...world.carriages.map((k) => k.horseId),
+    ...world.residents.map((r) => r.riding),
+  ])
 }
 
 /** A tile's card, with what on it the click stands for. */
@@ -155,11 +165,7 @@ function tilePick(tx: number, ty: number, world: PickWorld): MapPick {
   if (building) return { kind: 'tile', x, y, on: { kind: 'building', building } }
   const carriage = world.carriages.find((k) => k.realmId === realmId && at(k))
   if (carriage) return { kind: 'tile', x, y, on: { kind: 'carriage', id: carriage.id } }
-  // A hitched horse shows as its carriage, a ridden one as its rider.
-  const busy = new Set<string | null | undefined>([
-    ...world.carriages.map((k) => k.horseId),
-    ...world.residents.map((r) => r.riding),
-  ])
+  const busy = busyHorses(world)
   const horse = world.horses.find((h) => h.realmId === realmId && !busy.has(h.id) && at(h))
   if (horse) return { kind: 'tile', x, y, on: { kind: 'horse', id: horse.id } }
   return { kind: 'tile', x, y }

@@ -312,7 +312,16 @@ const workSpan = (ticks: number) => {
  */
 /** What the map waits for a tile for: a Build line's start, then its end (`CONTEXT.md`: Build line). */
 export type Picking =
-  false | 'walk' | 'drive' | 'driveOff' | 'haul' | 'roadFrom' | 'roadTo' | 'wallFrom' | 'wallTo'
+  | false
+  | 'walk'
+  | 'drive'
+  | 'driveOff'
+  | 'hitchOff'
+  | 'haul'
+  | 'roadFrom'
+  | 'roadTo'
+  | 'wallFrom'
+  | 'wallTo'
 
 /** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
 export interface HaulSetup {
@@ -1659,6 +1668,10 @@ export function ResidentCard({
   onDriveTo,
   driveOff,
   onDriveOff,
+  hitchOff,
+  onHitchOff,
+  stealHorse,
+  onStealHorse,
   onHaulTo,
   onRoadTo,
   onWallTo,
@@ -1724,6 +1737,17 @@ export function ResidentCard({
   driveOff?: { problem: string | undefined }
   /** Starts (or cancels) picking a tile to drive that carriage off to. */
   onDriveOff?: () => void
+  /**
+   * The realm's carriage on their tile with no horse of the realm's and another organization's
+   * horse to steal for it, and why it can't be taken now, if so.
+   */
+  hitchOff?: { problem: string | undefined }
+  /** Starts (or cancels) picking a tile to drive that carriage to with that horse. */
+  onHitchOff?: () => void
+  /** Another organization's free horse on their tile, and why it can't be taken now, if so. */
+  stealHorse?: { problem: string | undefined }
+  /** Orders them to steal that horse by mounting it. */
+  onStealHorse?: () => void
   /** Starts (or cancels) picking the other stop of a haul route carrying these goods. */
   onHaulTo: (setup: HaulSetup) => void
   /** Starts (or cancels) picking the two ends of a road to build along a line (Build line). */
@@ -1934,6 +1958,8 @@ export function ResidentCard({
     carriageHorseDown: horses.some((h) => h.id === carriage?.horseId && isDown(h)),
     ...(carriageTheirs ? { carriageTheirs } : {}),
     ...(driveOff ? { driveOff } : {}),
+    ...(hitchOff ? { hitchOff } : {}),
+    ...(stealHorse ? { stealHorse } : {}),
     pile,
     storage,
     building,
@@ -1973,6 +1999,8 @@ export function ResidentCard({
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
     if (a.id === 'driveOff') onDriveOff?.()
+    if (a.id === 'hitchOff') onHitchOff?.()
+    if (a.id === 'stealHorse') onStealHorse?.()
     if (a.id === 'roadTo') onRoadTo()
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
