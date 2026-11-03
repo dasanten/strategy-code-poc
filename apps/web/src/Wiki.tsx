@@ -2048,6 +2048,15 @@ export function Wiki() {
           remembered in Last seen. Scripts see it as <code>city.occupation</code>: who occupies a
           town hall in sight, and the ticks left.
         </p>
+        <h3>What joins with a city</h3>
+        <p>
+          However a city joins a realm, captured, bought or persuaded, its horses and carriages come
+          with it. An NPC city's are all its own, wherever they stand, at a stable or on the road. A
+          Player's aren't tied to one city, so of those the ones in its area or at its stables join,
+          and the rest stay with their realm. Either way a horse a joining resident rides and a
+          carriage one drives join with them, and a carriage's hitched horse with it. Another NPC
+          city's or realm's that happen to stand there don't.
+        </p>
       </Section>
 
       <Section id="territory">

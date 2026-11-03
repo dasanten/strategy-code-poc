@@ -886,7 +886,8 @@ export const refilledWhenLow: Invariant = {
  * Carriages keep to the rules of `CONTEXT.md` (Carriage): on Mountain only on a finished road, never loaded
  * past what the strongest horse lets one hold (`CARRIAGE_MAX_CAPACITY`: a carriage loaded behind
  * a strong horse keeps its load when the horse dies), and a hitched horse exists, stands with its
- * carriage, is of its realm and pulls no other one.
+ * carriage, is of its realm or NPC city (`CONTEXT.md`: What joins with a city) and pulls no other
+ * one.
  */
 export const carriagesInPlace: Invariant = {
   name: 'carriages-in-place',
@@ -912,8 +913,8 @@ export const carriagesInPlace: Invariant = {
           horse.id,
         ])
       }
-      if (horse && horse.realmId !== k.realmId) {
-        fail(k.id, `is of realm ${k.realmId} but its horse of ${horse.realmId}`, [k.id, horse.id])
+      if (horse && (horse.realmId !== k.realmId || horse.cityId !== k.cityId)) {
+        fail(k.id, `is hitched to ${horse.id}, not its own realm's or city's`, [k.id, horse.id])
       }
       const other = pulling.get(k.horseId)
       if (other) fail(k.id, `shares horse ${k.horseId} with ${other}`, [k.id, other, k.horseId])
@@ -1218,7 +1219,9 @@ export const npcCityResidentsUnowned: Invariant = {
 /**
  * Everything belongs to a realm that exists, an NPC city that exists, or nobody (`CONTEXT.md`:
  * Leader death, Self-managed city): once a Leader has died, nothing belongs to their ended realm.
- * A horse or carriage of an NPC city belongs to no realm.
+ * A horse or carriage of an NPC city belongs to no realm, and when that city joins a realm it joins
+ * too, so none stays behind with the `cityId` of a city that has a realm (`CONTEXT.md`: What joins
+ * with a city).
  */
 export const ownersExist: Invariant = {
   name: 'owners-exist',

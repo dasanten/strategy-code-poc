@@ -18,7 +18,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 76
+export const WORLD_FORMAT_VERSION = 77
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -289,10 +289,26 @@ export const migrations: Record<number, MigrationStep> = {
   // Waypoints (`CONTEXT.md`: Waypoint) are kept per Player (`WorldState.waypoints`). Nobody could
   // put one down before, so every Player starts with none.
   74: (state) => ({ ...(state as object), waypoints: {} }),
+  // However a city joins a realm, its horses and carriages come with it (`CONTEXT.md`: What joins
+  // with a city). Those of an NPC city outside its area stayed behind, of no realm and with the id
+  // of a city that now has one, so nobody could command them; they go to that realm now. The Trade
+  // Organization's are of a city of no realm and stay. A Player's left behind in an earlier capture
+  // can't be told from their other horses, so they stay too.
+  75: (state) => {
+    const world = structuredClone(state) as WorldState
+    const realmOf = new Map(world.cities.map((c) => [c.id, c.realmId]))
+    for (const t of [...world.horses, ...world.carriages]) {
+      const realm = t.realmId === null && t.cityId !== null ? realmOf.get(t.cityId) : null
+      if (!realm) continue
+      t.realmId = realm
+      t.cityId = null
+    }
+    return world
+  },
   // Stealing a carriage (`CONTEXT.md`: Stealing a carriage or horse) adds `carriage` and `horse` to
   // a crime and its `crimeKnown`, and the realm log's `transportGone` and `transportTaken`. Nothing
   // was stolen that way before, so the step leaves every crime and log as they are.
-  75: (state) => state,
+  76: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

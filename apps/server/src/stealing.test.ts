@@ -16,7 +16,9 @@ import {
   type TerrainMap,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
+import { joinRealm } from './capture.js'
 import { defaultScripts } from './test-default-scripts.js'
+import { addCity } from './test-terrain.js'
 import { eventsFor } from './events.js'
 import { checkInvariants, carriagesInPlace, driversOnCarriages } from './invariants.js'
 import { OrderQueue, orderKinds } from './orders.js'
@@ -512,6 +514,49 @@ describe('never by accident', () => {
     expect(own.orderEnded).toMatchObject({ kind: 'fetch', reason: 'the carriage is gone' })
     expect(carriage.load).toEqual({ food: 5 })
     expect(world.crimes).toEqual([])
+  })
+})
+
+describe('a stolen carriage when a city joins a realm (`CONTEXT.md`: What joins with a city)', () => {
+  /** The carriage stolen from NPC city n1 and driven off by a thief of r1's city c1. */
+  const stolen = () => {
+    const s = setup()
+    const npc = addCity(s.world, { id: 'n1', realmId: null, x: 100, y: 100, name: 'Dunmere' })
+    const home = addCity(s.world, { id: 'c1', realmId: 'r1', x: 150, y: 150, name: 'Hartwell' })
+    s.carriage.realmId = null
+    s.carriage.cityId = 'n1'
+    s.horse.realmId = null
+    s.horse.cityId = 'n1'
+    // No Leader, who wouldn't join with a city.
+    const thief = s.person('t2', 'r1', 20, 20)
+    thief.cityId = 'c1'
+    s.driveOff('t2')
+    s.orders.applyAll(s.world)
+    expect(thief.order?.kind).toBe('drive')
+    return { ...s, npc, home, thief }
+  }
+  const sound = (world: ReturnType<typeof createWorld>) => {
+    expect(carriagesInPlace.check(world, terrain)).toEqual([])
+    expect(driversOnCarriages.check(world, terrain)).toEqual([])
+  }
+
+  it('stays the thief’s when the city it was stolen from joins another realm', () => {
+    const { world, npc, thief, carriage, horse } = stolen()
+    joinRealm(world, npc, 'r2', size)
+    expect(carriage).toMatchObject({ realmId: 'r1', cityId: null })
+    expect(horse).toMatchObject({ realmId: 'r1', cityId: null })
+    expect(thief.order?.kind).toBe('drive')
+    sound(world)
+  })
+
+  it('goes with the thief and its horse when the thief’s own city joins another realm', () => {
+    const { world, home, thief, carriage, horse } = stolen()
+    joinRealm(world, home, 'r2', size)
+    expect(thief.owner).toBe('r2')
+    expect(thief.order).toBeNull()
+    expect(carriage.realmId).toBe('r2')
+    expect(horse.realmId).toBe('r2')
+    sound(world)
   })
 })
 
