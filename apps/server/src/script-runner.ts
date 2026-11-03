@@ -10,6 +10,7 @@ import {
   canWork,
   DEFAULT_SCRIPTS,
   MAP_SIZE,
+  MAX_WORKERS,
   stableAt,
   commands,
   isTask,
@@ -363,11 +364,18 @@ function withKeptPair(
 }
 
 /** The memory a task's default script starts from (`TaskMemory`), for resident `r`. */
-function taskMemory(order: TaskRequest, r: { x: number; y: number }): ScriptMemory {
+function taskMemory(
+  world: WorldState,
+  order: TaskRequest,
+  r: { x: number; y: number },
+): ScriptMemory {
   switch (order.task) {
     case 'work': {
       const memory: TaskMemory['work'] = { workplaceId: order.workplaceId }
       if (order.makes !== undefined) memory.makes = order.makes
+      // Still being built, the Work default builds it first (`CONTEXT.md`: Working a site).
+      if (world.buildings.find((b) => b.id === order.workplaceId)?.site)
+        memory.siteId = order.workplaceId
       return { ...memory }
     }
     case 'build': {
@@ -447,7 +455,7 @@ export function taskOrder(host: DefaultScriptHost): OrderKind {
       if (!r) return
       r.order = null
       const scriptId = host.defaultScript(sender.userId, o.task)
-      r.script = { scriptId, memory: taskMemory(o, r) }
+      r.script = { scriptId, memory: taskMemory(world, o, r) }
       const source = host.script?.(scriptId)?.source
       const script = source === undefined ? undefined : { source, task: o.task }
       const target = taskTarget(world, realmId, o, r)
@@ -532,13 +540,28 @@ function taskProblem(
   }
   if (o.task === 'train' && o.subject !== undefined && !isTrainingSubject(o.subject))
     return 'train a stat or a skill'
-  const built = asOrder(withKeptPair(world, o, realm.id))
+  const built = workSiteOrder(world, o, r!) ?? asOrder(withKeptPair(world, o, realm.id))
   const problem = orderKinds[built.kind]!.validate(world, sender, built, terrain)
   // Working there by a bare work-at order, as the starting residents do, they can still be
   // given the task; already running it there, they can't.
   if ((problem === 'already working here' || problem === 'already training here') && !r.script)
     return undefined
   return problem
+}
+
+/**
+ * Work on a workplace still being built (`CONTEXT.md`: Working a site), checked as joining its
+ * site: the Work default builds it first.
+ */
+function workSiteOrder(
+  world: WorldState,
+  o: Partial<TaskRequest>,
+  r: Resident,
+): OrderRequest | undefined {
+  if (o.task !== 'work') return undefined
+  const here = buildingAt(world, r.x, r.y)
+  if (!here?.site || MAX_WORKERS[here.kind] === undefined) return undefined
+  return { kind: 'build', residentId: r.id, building: here.kind }
 }
 
 const isTile = (t: unknown): t is { x: number; y: number } =>

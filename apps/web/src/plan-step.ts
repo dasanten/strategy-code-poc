@@ -297,7 +297,8 @@ export function planPickAt(
       return { ...tile, spot: { kind: 'ground' } }
     }
     case 'workplace': {
-      const b = here.find((x) => !x.site && MAX_WORKERS[x.kind] !== undefined)
+      // A site of a workplace too: Work builds it first (`CONTEXT.md`: Working a site).
+      const b = here.find((x) => MAX_WORKERS[x.kind] !== undefined)
       return b ? named(b) : 'no workplace there'
     }
     case 'building':
