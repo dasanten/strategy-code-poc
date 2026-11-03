@@ -57,7 +57,7 @@ export function carriageOrganization(k: Carriage): string | null {
 }
 
 /** An Organization's name for the log: a realm by its realm name, a city by its own. */
-function organizationName(world: WorldState, org: string): string {
+export function organizationName(world: WorldState, org: string): string {
   const realm = world.realms.find((x) => x.id === org)
   if (realm) {
     const name = realm.name ?? world.residents.find((x) => x.id === realm.leaderId)?.name
@@ -71,6 +71,8 @@ interface CrimeAgainst {
   victimOrg: string | null
   victim?: Resident
   goods?: Stock
+  carriage?: true
+  horse?: string
   building?: BuildingKind
 }
 
@@ -78,8 +80,9 @@ interface CrimeAgainst {
  * Notes a crime by `culprit` (`CONTEXT.md`: Crime, Witness), on a map of `size` tiles. It is one
  * only against another Organization. Its witnesses are the living residents of any other
  * Organization than the culprit's within sight range of the culprit, the victim among them while
- * they live. Thefts by the same resident from the same Organization on the same tile, not yet
- * known to it, add up into one crime.
+ * they live. Thefts of goods by the same resident from the same Organization on the same tile, not
+ * yet known to it, add up into one crime; each taking of a carriage or horse is one of its own
+ * (`CONTEXT.md`: Stealing a carriage or horse).
  */
 export function commitCrime(
   world: WorldState,
@@ -89,7 +92,7 @@ export function commitCrime(
   against: CrimeAgainst,
 ): void {
   const org = organizationOf(culprit)
-  const { victimOrg, victim, goods, building } = against
+  const { victimOrg, victim, goods, carriage, horse, building } = against
   if (org === null || victimOrg === null || victimOrg === org) return
   // The Trade Organization's cities are one Organization: a caravan moving its stock steals nothing.
   if (isTradeOrgCity(world, org) && isTradeOrgCity(world, victimOrg)) return
@@ -100,10 +103,12 @@ export function commitCrime(
       return theirs !== null && theirs !== org
     })
     .map((r) => r.id)
-  if (kind === 'theft') {
+  if (kind === 'theft' && !carriage && horse === undefined) {
     const open = world.crimes.find(
       (c) =>
         c.kind === 'theft' &&
+        !c.carriage &&
+        c.horse === undefined &&
         c.culprit.residentId === culprit.id &&
         c.victimOrg === victimOrg &&
         c.x === culprit.x &&
@@ -136,6 +141,8 @@ export function commitCrime(
   }
   if (victim) crime.victim = { residentId: victim.id, name: victim.name }
   if (goods) crime.goods = { ...goods }
+  if (carriage) crime.carriage = true
+  if (horse !== undefined) crime.horse = horse
   if (building) crime.building = building
   world.crimes.push(crime)
 }
@@ -209,6 +216,8 @@ function learn(world: WorldState, crime: Crime, org: string): void {
     culpritOrg: crime.culprit.orgName,
     ...(crime.victim && { victim: crime.victim.name }),
     ...(crime.goods && { goods: { ...crime.goods } }),
+    ...(crime.carriage && { carriage: true as const }),
+    ...(crime.horse !== undefined && { horse: crime.horse }),
     ...(crime.building && { building: crime.building }),
   })
 }

@@ -24,6 +24,19 @@ export interface EventLine {
   places?: EventPlace[]
 }
 
+/** Goods as the log names them: "5 Food, 2 Iron Ore". */
+function goodsLine(goods: Partial<Record<string, number>> | undefined): string {
+  return Object.entries(goods ?? {})
+    .map(([g, n]) => `${n} ${g[0]!.toUpperCase()}${g.slice(1).replace(/[A-Z]/g, (c) => ` ${c}`)}`)
+    .join(', ')
+}
+
+/** A stolen carriage or horse as the log names it: "a carriage with Rowan", "Rowan". */
+function transportLine(e: { carriage?: true; horse?: string }): string {
+  if (!e.carriage) return e.horse ?? 'a horse'
+  return `a carriage${e.horse === undefined ? '' : ` with ${e.horse}`}`
+}
+
 /**
  * One line of the realm log, in the game's words (`CONTEXT.md`). `realmId` is the Player's realm,
  * so alliance events about it say so.
@@ -55,13 +68,12 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         ? { text: `${e.name} attacked ${e.other}.`, tone: 'info' }
         : { text: `${e.name} was attacked by ${e.other}.`, tone: 'warn' }
     case 'crimeKnown': {
-      const goods = Object.entries(e.goods ?? {})
-        .map(
-          ([g, n]) => `${n} ${g[0]!.toUpperCase()}${g.slice(1).replace(/[A-Z]/g, (c) => ` ${c}`)}`,
-        )
-        .join(', ')
+      const goods = goodsLine(e.goods)
+      const transport = e.carriage || e.horse !== undefined
       const did = {
-        theft: `stole ${goods || 'goods'}${e.victim ? ` from ${e.victim}` : ''}`,
+        theft: transport
+          ? `stole ${transportLine(e)}${goods ? `, loaded with ${goods}` : ''}`
+          : `stole ${goods || 'goods'}${e.victim ? ` from ${e.victim}` : ''}`,
         attack: `attacked ${e.victim ?? 'one of your residents'}`,
         killing: `killed ${e.victim ?? 'one of your residents'}`,
         tearDown: `tore down your ${e.building ? BUILDING_NAMES[e.building] : 'building'}`,
@@ -69,6 +81,27 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return {
         text: `A witness got home: ${e.culprit} of ${e.culpritOrg} ${did} at (${e.x}, ${e.y}).`,
         tone: 'bad',
+      }
+    }
+    case 'transportGone': {
+      const place = `(${e.x}, ${e.y})`
+      const what = e.carriage
+        ? `Your carriage${e.horse === undefined ? '' : `, with ${e.horse},`}`
+        : (e.horse ?? 'Your horse')
+      return {
+        text: `${what} is gone. It was last at ${place}.`,
+        tone: 'bad',
+        places: [{ name: place, x: e.x, y: e.y }],
+      }
+    }
+    case 'transportTaken': {
+      const place = `(${e.x}, ${e.y})`
+      const goods = goodsLine(e.goods)
+      const owner = e.from === null ? 'nobody' : e.from
+      return {
+        text: `${e.name} took ${transportLine(e)}${goods ? `, loaded with ${goods},` : ''} from ${owner} at ${place}. It is yours now.`,
+        tone: 'info',
+        places: [{ name: place, x: e.x, y: e.y }],
       }
     }
     case 'punished':

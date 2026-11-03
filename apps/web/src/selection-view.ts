@@ -11,6 +11,7 @@ import {
   PASSENGER_WEIGHT,
   carriageCapacity,
   isDown,
+  driveOffProblem,
   feedProblem,
   MAP_SIZE,
   NO_CHILD_FEEDS,
@@ -111,6 +112,7 @@ export type ActionId =
   | 'board'
   | 'unhitch'
   | 'drive'
+  | 'driveOff'
   | 'haul'
   | 'explore'
   | 'build'
@@ -147,6 +149,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   board: 'K',
   unhitch: 'U',
   drive: 'D',
+  driveOff: 'D',
   haul: 'H',
   explore: 'Z',
   build: 'B',
@@ -202,6 +205,13 @@ export interface ResidentHere {
   carriage?: Carriage
   /** The horse hitched to that carriage is Down (`CONTEXT.md`: Down), so it can't be driven. */
   carriageHorseDown?: boolean
+  /** That carriage is another organization's: not theirs to drive or haul with. */
+  carriageTheirs?: boolean
+  /**
+   * Another organization's carriage on their tile, to drive off, and why it can't be taken now, if
+   * so (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  driveOff?: { problem: string | undefined }
   pile?: Pile
   storage?: Building
   /** The building or construction site on their tile, not a road. */
@@ -280,6 +290,33 @@ export function residentActions(h: ResidentHere): CardAction[] {
 /** Why a carriage whose horse is Down can't be driven (`CONTEXT.md`: Down). */
 export const HORSE_DOWN_NO_DRIVE = 'its horse is Down'
 
+/** The action that steals a carriage, which says so (`CONTEXT.md`: Stealing a carriage or horse). */
+export const DRIVE_OFF_LABEL = 'Drive off (theft)'
+
+/**
+ * The carriages of the alliance army a realm commands as its leader (`CONTEXT.md`: Alliance army):
+ * another realm's, but no theft to drive.
+ */
+export function commandedCarriages(
+  alliance: { leaderId: string; army: readonly { is: string; id: string }[] } | null | undefined,
+  realmId: string | undefined,
+): ReadonlySet<string> {
+  if (!alliance || alliance.leaderId !== realmId) return new Set()
+  return new Set(alliance.army.filter((p) => p.is === 'carriage').map((p) => p.id))
+}
+
+/**
+ * Whether a carriage is another organization's as the Player sees it (`stealsCarriage`): driving
+ * it off would be theft. `commanded` is `commandedCarriages`.
+ */
+export function strangersCarriage(
+  k: { id: string; realmId: string | null },
+  realmId: string | undefined,
+  commanded: ReadonlySet<string> = new Set(),
+): boolean {
+  return k.realmId !== realmId && !commanded.has(k.id)
+}
+
 /** Why a Down resident's card offers no orders (`CONTEXT.md`: Down). */
 export const DOWN_NO_ORDERS = 'Down: takes no orders'
 
@@ -345,7 +382,8 @@ function ordersOffered(h: ResidentHere): {
   } else miss('board', 'no carriage of yours here')
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
-  if (h.carriage && h.adult) {
+  const drivable = h.carriage && !h.carriageTheirs
+  if (drivable && h.adult) {
     // A rider doesn't drive (`CONTEXT.md`: Riding), and a Down horse pulls nothing (Down).
     const refused = (reason: string) => ({ disabled: true as const, reason })
     const unable = h.riding
@@ -360,9 +398,24 @@ function ordersOffered(h: ResidentHere): {
       add(row('haul', label, { opens: true }))
     } else miss('haul', CARRYING_A_CHILD)
   } else {
-    miss('drive', h.carriage ? 'children can’t drive' : 'no carriage here')
-    miss('haul', h.carriage ? 'children can’t drive' : 'no carriage here')
+    const why = h.carriageTheirs
+      ? 'no carriage of yours here'
+      : h.carriage
+        ? 'children can’t drive'
+        : 'no carriage here'
+    miss('drive', why)
+    miss('haul', why)
   }
+  // Only ever on its own row, saying what it is (`CONTEXT.md`: Stealing a carriage or horse).
+  if (h.driveOff) {
+    const { problem } = h.driveOff
+    add(
+      row('driveOff', '', {
+        ...picks('driveOff', DRIVE_OFF_LABEL),
+        ...(problem ? { disabled: true as const, reason: problem } : {}),
+      }),
+    )
+  } else miss('driveOff', 'no carriage of another realm here')
   // Into the unknown and back for Food (`CONTEXT.md`: Explore).
   if (h.adult) add(row('explore', 'Explore'))
   else miss('explore', 'children can’t explore')
@@ -471,6 +524,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   board: 'move',
   unhitch: 'move',
   drive: 'move',
+  driveOff: 'move',
   haul: 'move',
   explore: 'move',
   work: 'work',
@@ -717,6 +771,14 @@ export interface TileCard {
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
   /**
+   * Another organization's carriage on the tile and the Player's residents on it, who may drive it
+   * off, each with why they can't now, if so (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  driveOff?: {
+    carriageId: string
+    residents: { id: string; name: string; problem: string | undefined }[]
+  }
+  /**
    * The construction sites on the tile, the building's own and a carriage's on a stable, as a work
    * meter and a row per material (`CONTEXT.md`: Goods on cards).
    */
@@ -864,6 +926,10 @@ export interface TileThings {
   arrivesIn?: (r: SeenResident) => number | undefined
   /** The armies the Player knows, by name, for a haul route to one (`CONTEXT.md`: Supply line). */
   armies?: readonly { id: string; name: string }[]
+  /** The caravans the Player sees, whose carriages can't be driven off yet. */
+  caravans?: readonly { carriageId: string }[]
+  /** The alliance army's carriages the Player commands (`commandedCarriages`). */
+  commandedCarriages?: ReadonlySet<string>
   /** The buildings the Player remembers out of sight, and the tick now (`CONTEXT.md`: Last seen). */
   lastSeen?: { buildings: LastSeenBuilding[]; tick: number }
   /** Where the node's workplace fits on what the Player knows (`nodeFit`), if anywhere. */
@@ -1327,6 +1393,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
   let unhitch: TileCard['unhitch']
+  let driveOff: TileCard['driveOff']
   let carriageView: CarriageView | undefined
   if (building) {
     const city = cityOf(building)
@@ -1425,6 +1492,30 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       unhitch = { carriageId: carriage.id, residents: own.map(({ id, name }) => ({ id, name })) }
     }
   }
+  const stealable = here(t.carriages).find((k) =>
+    strangersCarriage(k, t.viewer.realmId, t.commandedCarriages),
+  )
+  const realmId = t.viewer.realmId
+  const thieves = here(t.residents ?? []).filter(
+    (r) => !t.strangers.some((s) => s.id === r.id) && !isDown(r),
+  )
+  if (stealable && realmId && thieves.length > 0) {
+    const seen = {
+      tick: t.tick ?? 0,
+      residents: t.residents ?? [],
+      horses: t.horses,
+      carriages: t.carriages,
+      caravans: t.caravans ?? [],
+    }
+    driveOff = {
+      carriageId: stealable.id,
+      residents: thieves.map(({ id, name }, i) => ({
+        id,
+        name,
+        problem: driveOffProblem(seen, thieves[i]!, stealable, realmId),
+      })),
+    }
+  }
   if (pile) {
     card ??= { title: 'Goods on the ground', what: 'pile' }
     // At a building it is the building's pile (`CONTEXT.md`: A building's pile).
@@ -1489,6 +1580,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(buildHere ? { buildHere } : {}),
     ...(carriageView ? { carriage: carriageView } : {}),
     ...(unhitch ? { unhitch } : {}),
+    ...(driveOff ? { driveOff } : {}),
     ...(downGoods.length > 0 ? { downGoods } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
     ...(sites.length > 0 ? { sites } : {}),
@@ -1866,6 +1958,15 @@ export function tileActions(
   }
   if (card.unhitch)
     actions.push({ id: 'unhitch', label: 'Unhitch horse', key: ACTION_KEYS.unhitch })
+  const thief = thiefOf(card, actor)
+  if (thief) {
+    actions.push({
+      id: 'driveOff',
+      label: DRIVE_OFF_LABEL,
+      key: ACTION_KEYS.driveOff,
+      ...(thief.problem ? { disabled: true as const, reason: thief.problem } : {}),
+    })
+  }
   if (card.gate)
     actions.push({
       id: 'gate',
@@ -1907,6 +2008,20 @@ export function tileActions(
 export function unhitcherOf(card: TileCard, actor: { id: string } | undefined): string | undefined {
   const residents = card.unhitch?.residents ?? []
   return (residents.find((r) => r.id === actor?.id) ?? residents[0])?.id
+}
+
+/**
+ * Who drives off the tile card's carriage (`TileCard.driveOff`): the resident picked last when they
+ * stand on its tile, or else the first of the Player's there who can, or else the first of them.
+ */
+export function thiefOf(
+  card: TileCard,
+  actor: { id: string } | undefined,
+): { id: string; problem: string | undefined } | undefined {
+  const residents = card.driveOff?.residents ?? []
+  return (
+    residents.find((r) => r.id === actor?.id) ?? residents.find((r) => !r.problem) ?? residents[0]
+  )
 }
 
 /**

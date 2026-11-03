@@ -696,6 +696,7 @@ export const GROUP_COUNTERPARTS: Record<
   board: ['board', 'getOff'],
   unhitch: ['unhitch'],
   drive: ['drive'],
+  driveOff: { none: 'one resident steals one carriage' },
   haul: ['haul'],
   explore: ['explore'],
   work: ['work'],

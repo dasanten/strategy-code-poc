@@ -104,9 +104,11 @@ export interface PickWorld {
  * Picking on the map), the same at every zoom tier that draws tokens. A resident of the Player's
  * wins: the token clicked, or else the ones on the tile. Several on one token (or on the tile)
  * are a stack, picked as a group, unless someone else's resident is among them: then the tile
- * card lists them. Next comes a building on the tile, then a carriage or loose horse of the
- * Player's, then the bare tile. Passengers are inside their carriage, so a click there is the
- * carriage's. `own` is `pickables`.
+ * card lists them. A click beside the Player's tokens on a tile with another realm's carriage is
+ * for the carriage: its tile card can drive it off (`CONTEXT.md`: Stealing a carriage or horse).
+ * Next comes a building on the tile, then a carriage or loose horse of the Player's, then the bare
+ * tile. Passengers are inside their carriage, so a click there is the carriage's. `own` is
+ * `pickables`.
  */
 export function mapPickAt(
   own: readonly Pickable[],
@@ -132,6 +134,10 @@ export function mapPickAt(
     (r) => r.aboard === undefined && wrap(r.x, size) === x && wrap(r.y, size) === y,
   )
   const ours = here.filter((r) => r.owner === realmId)
+  const theirs = world.carriages.some(
+    (k) => k.realmId !== realmId && wrap(k.x, size) === x && wrap(k.y, size) === y,
+  )
+  if (theirs) return tilePick(x, y, world)
   if (ours.length === 1 && here.length === 1) return { kind: 'resident', id: ours[0]!.id }
   if (ours.length > 1 && ours.length === here.length)
     return { kind: 'group', ids: ours.map((r) => r.id) }

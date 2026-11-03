@@ -310,9 +310,11 @@ export class QueueRunner {
       // Own entries only, as `orderKindOf` (not imported: `orders.ts` imports this module): a kept
       // step named `"constructor"` must not find a function inherited from `Object.prototype`.
       const kind = Object.hasOwn(this.kinds, order.kind) ? this.kinds[order.kind] : undefined
-      const reason = kind
-        ? kind.validate(world, sender, order, this.terrain)
-        : `unknown order: ${order.kind}`
+      // What was the realm's when planned may be stolen by now, and a step never steals it back.
+      const realm = realmOf(world, sender.userId)
+      const reason =
+        (realm && stepPlaceProblem(world, realm.id, order, this.terrain?.size)) ||
+        (kind ? kind.validate(world, sender, order, this.terrain) : `unknown order: ${order.kind}`)
       if (reason === undefined) {
         stopStep(r)
         // How their last store or fetch ended is kept until their next order, as for the UI's.

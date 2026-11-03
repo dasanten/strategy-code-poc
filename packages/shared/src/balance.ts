@@ -1331,6 +1331,19 @@ export const TRADE_ORG_LOSS: Record<Exclude<CrimeKind, 'theft'>, number> = {
 }
 
 /**
+ * What a stolen carriage is worth in Coins (`CONTEXT.md`: Stealing a carriage or horse), besides
+ * its load: about its materials at their warehouse base price (`BUILD_MATERIALS.carriage`, 110
+ * Coins) and two game days of a builder's work.
+ */
+export const CARRIAGE_STOLEN_WORTH = 150
+
+/**
+ * What a stolen horse is worth in Coins (`CONTEXT.md`: Stealing a carriage or horse): less than a
+ * carriage, as it takes only two horses and a resident's time to breed one.
+ */
+export const HORSE_STOLEN_WORTH = 100
+
+/**
  * How the Trade Organization's army punishes (`CONTEXT.md`: Trade Org reaction): it takes back
  * `times` what it lost, sends at most `soldiers` of its spare soldiers, and gives up and goes
  * home after `giveUpDays` game days out if it can't get it all.

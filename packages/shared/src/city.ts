@@ -27,6 +27,7 @@ import {
   type City,
   type Resident,
   type WorldState,
+  isDown,
 } from './world.js'
 
 /** World queries about cities (ADR 0002: the game API orders and scripts share). */
@@ -267,11 +268,36 @@ export function outpostStorageGuarded(
   size = MAP_SIZE,
 ): boolean {
   if (!isOutpostStorage(b) || !b.realmId) return false
+  return guardedBy(
+    world.residents,
+    (r) => nearFootprint(b, r, 1, size),
+    (r) => r.owner === b.realmId,
+    (r) => r.owner !== b.realmId,
+  )
+}
+
+/** What of a resident guarding looks at: all a Player sees of anyone in sight. */
+export type GuardResident = Pick<Resident, 'carried'> & {
+  health?: number
+  downUntil?: number
+  down?: true
+}
+
+/**
+ * Whether a place is guarded (`CONTEXT.md`: Outpost storage, Stealing a carriage or horse): of the
+ * armed residents who are up and `here`, one `guards` it and none `breaks` the guard.
+ */
+export function guardedBy<R extends GuardResident>(
+  residents: readonly R[],
+  here: (r: R) => boolean,
+  guards: (r: R) => boolean,
+  breaks: (r: R) => boolean,
+): boolean {
   let guarded = false
-  for (const r of world.residents) {
-    if (r.health <= 0 || !isArmed(r) || !nearFootprint(b, r, 1, size)) continue
-    if (r.owner !== b.realmId) return false
-    guarded = true
+  for (const r of residents) {
+    if ((r.health ?? 1) <= 0 || isDown(r) || !isArmed(r) || !here(r)) continue
+    if (breaks(r)) return false
+    if (guards(r)) guarded = true
   }
   return guarded
 }

@@ -140,7 +140,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(75)
+    expect(WORLD_FORMAT_VERSION).toBe(76)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -477,6 +477,13 @@ describe('world saves', () => {
     delete old.waypoints
     const migrated = migrateWorld(old, 74, { terrain }, migrations, 75)
     expect(migrated).toEqual({ ...world, waypoints: {} })
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('leaves crimes and logs as they are for stealing carriages (migration 75 → 76)', () => {
+    const { world, terrain } = worldWithCity()
+    const migrated = migrateWorld(structuredClone(world), 75, { terrain }, migrations, 76)
+    expect(migrated).toEqual(world)
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

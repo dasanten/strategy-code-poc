@@ -65,6 +65,7 @@ const props = {
   onSelectResident: () => {},
   onOpenHorse: () => {},
   onUnhitch: () => {},
+  onDriveOff: () => {},
   tile: { x: 10, y: 10 },
   waypoints: [],
   mapSize: 512,
@@ -105,6 +106,33 @@ describe('the tile card of a stable', () => {
     expect(html.match(/aria-label="Health 100%"/g)).toHaveLength(3)
     expect(html.match(/aria-label="Hunger 100%"/g)).toHaveLength(3)
     expect(html).toContain('Speed 12, Strength 8, Endurance 10 · 0 game days old')
+  })
+})
+
+describe('the tile card of another realm’s carriage (`CONTEXT.md`: Stealing a carriage or horse)', () => {
+  const driveOff = (problem: string | undefined) =>
+    renderToStaticMarkup(
+      createElement(TileCard, {
+        ...props,
+        card: {
+          title: 'Carriage',
+          what: 'carriage',
+          lines: ['Another realm'],
+          driveOff: { carriageId: 'k1', residents: [{ id: 'ana', name: 'Ana', problem }] },
+        },
+      }),
+    )
+
+  it('offers Drive off, saying it is theft', () => {
+    const html = driveOff(undefined)
+    expect(html).toContain('Drive off (theft)')
+    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Drive off/)
+  })
+
+  it('greys it with the reason while it can’t be taken', () => {
+    const html = driveOff('an armed resident guards that carriage')
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Drive off/)
+    expect(html).toContain('an armed resident guards that carriage')
   })
 })
 

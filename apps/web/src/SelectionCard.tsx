@@ -34,6 +34,7 @@ import {
   actionForKey,
   keepRows,
   tileActions,
+  thiefOf,
   unhitcherOf,
   type CardAction,
   type CarriageView,
@@ -504,6 +505,7 @@ export function TileCard({
   onSelectResident,
   onOpenHorse,
   onUnhitch,
+  onDriveOff,
   tile,
   waypoints,
   workSettings,
@@ -541,6 +543,11 @@ export function TileCard({
   onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
+  /**
+   * Has a resident on the tile start driving off in the carriage there, by picking where to
+   * (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  onDriveOff: (residentId: string) => void
   /** The tile the card is for. */
   tile: { x: number; y: number }
   /** The Player's waypoints, for a new one's name and the cap (`CONTEXT.md`: Waypoint). */
@@ -676,6 +683,8 @@ export function TileCard({
             const unhitcher = unhitcherOf(card, actor)
             if (a.id === 'unhitch' && card.unhitch && unhitcher)
               onUnhitch(card.unhitch.carriageId, unhitcher)
+            const thief = thiefOf(card, actor)
+            if (a.id === 'driveOff' && thief) onDriveOff(thief.id)
           }}
         />
       )}
