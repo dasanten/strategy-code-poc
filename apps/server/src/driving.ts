@@ -1,9 +1,15 @@
 import {
+  MAP_SIZE,
   carriageCanGoTo,
+  commanderOf,
   commands,
   commandsCarriage,
+  driveOffProblem,
   driveProblem,
   driverOf,
+  hitchOffProblem,
+  horseToSteal,
+  stealsCarriage,
   unhitchProblem,
   type Army,
   type OrderRequest,
@@ -12,6 +18,7 @@ import {
 import type { OrderKind } from './orders.js'
 import { orderedResident } from './order-sender.js'
 import { realmOf } from './starting-city.js'
+import { takeOver } from './stealing.js'
 
 /**
  * The input of a drive order: which resident drives which carriage, and the tile to go to, or
@@ -24,6 +31,13 @@ interface DriveRequest extends OrderRequest {
   x?: number
   y?: number
   armyId?: string
+  /**
+   * The other organization's horse to steal and hitch, if the realm's own carriage has no horse of
+   * the realm's to pull it (`CONTEXT.md`: Stealing a carriage or horse). Only an order that names
+   * one steals one, so nothing that drives by itself does, and a queue step naming one is refused
+   * (`stepPlaceProblem`).
+   */
+  horseId?: string
 }
 
 /** The realm's army a carriage goes after, or why it can't (`CONTEXT.md`: Supply line). */
@@ -44,7 +58,11 @@ export function armyStart(world: WorldState, army: Army): { x: number; y: number
  * walking, it only sets the order; the path, which keeps out of mountains, is found and the
  * carriage driven along it in later ticks (`Walking`). With an army of the Player's instead of a
  * tile, the carriage follows that army as its supply wagon for as long as it exists
- * (`CONTEXT.md`: Supply line).
+ * (`CONTEXT.md`: Supply line). Naming another organization's carriage steals it (`CONTEXT.md`:
+ * Stealing a carriage or horse): it joins the realm that commands the driver when the order is
+ * applied. Only this order, which names the carriage, does. With no horse hitched and none of that
+ * realm's there, a free horse of another organization on the tile is stolen with it; for the
+ * realm's own carriage only one the order names (`horseId`). A taking from each owner is one theft.
  */
 export const drive: OrderKind = {
   validate(world, sender, order, terrain) {
@@ -53,7 +71,9 @@ export const drive: OrderKind = {
     const r = world.residents.find((x) => x.id === o.residentId)
     if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     const carriage = world.carriages.find((k) => k.id === o.carriageId)
-    if (!commandsCarriage(world, realm.id, carriage)) return 'not one of your carriages'
+    if (!carriage) return 'not one of your carriages'
+    const steals = stealsCarriage(world, realm.id, carriage)
+    if (!steals && !commandsCarriage(world, realm.id, carriage)) return 'not one of your carriages'
     if (o.armyId !== undefined) {
       const army = armyToSupply(world, realm.id, o.armyId)
       if (typeof army === 'string') return army
@@ -63,22 +83,49 @@ export const drive: OrderKind = {
         return 'a carriage can’t go there'
       }
     }
+    if (steals) return driveOffProblem(world, r, carriage, realm.id, terrain?.size)
+    if (typeof o.horseId === 'string' && carriage.realmId === realm.id) {
+      return hitchOffProblem(world, r, { ...carriage, realmId: realm.id }, o.horseId)
+    }
     return driveProblem(world, r, carriage)
   },
-  apply(world, _sender, order) {
-    const { residentId, carriageId, x, y, armyId } = order as DriveRequest
+  apply(world, _sender, order, terrain) {
+    const { residentId, carriageId, x, y, armyId, horseId } = order as DriveRequest
     const r = world.residents.find((x) => x.id === residentId)
     const carriage = world.carriages.find((k) => k.id === carriageId)
-    // Two drivers ordered onto one carriage in the same tick: the first one drives it.
-    if (!r || !carriage || driveProblem(world, r, carriage)) return
+    if (!r || !carriage) return
+    const army = armyId === undefined ? undefined : world.armies.find((a) => a.id === armyId)
+    if (armyId !== undefined && !army) return
+    const realmId = commanderOf(world, r)
+    if (realmId !== null && stealsCarriage(world, realmId, carriage)) {
+      // Taken or driven by someone else since the order came: it goes no further.
+      if (driveOffProblem(world, r, carriage, realmId, terrain?.size)) return
+      const size = terrain?.size ?? MAP_SIZE
+      const hitched = world.horses.find((h) => h.id === carriage.horseId)
+      const stolen = horseToSteal(world, r, carriage, realmId)
+      const horse = hitched ?? stolen
+      // A taking from each owner is one theft, so a stranger's horse is one of its own.
+      const together =
+        horse && horse.realmId === carriage.realmId && horse.cityId === carriage.cityId
+      takeOver(world, r, realmId, { carriage, ...(together && { horse }) }, size)
+      if (stolen && !together) takeOver(world, r, realmId, { horse: stolen }, size)
+      if (stolen) carriage.horseId = stolen.id
+    } else if (realmId !== null && typeof horseId === 'string' && carriage.realmId === realmId) {
+      const own = { ...carriage, realmId }
+      if (hitchOffProblem(world, r, own, horseId)) return
+      const stolen = horseToSteal(world, r, own, realmId, horseId)
+      if (stolen) {
+        takeOver(world, r, realmId, { horse: stolen }, terrain?.size ?? MAP_SIZE)
+        carriage.horseId = stolen.id
+      }
+      // Two drivers ordered onto one carriage in the same tick: the first one drives it.
+    } else if (driveProblem(world, r, carriage)) return
     if (armyId === undefined) {
       r.order = { kind: 'drive', carriageId, target: { x: x!, y: y! }, path: null, progress: 0 }
       return
     }
-    const army = world.armies.find((a) => a.id === armyId)
-    if (!army) return
-    const target = armyStart(world, army)
-    r.order = { kind: 'drive', carriageId, target, path: null, progress: 0, army: army.id }
+    const target = armyStart(world, army!)
+    r.order = { kind: 'drive', carriageId, target, path: null, progress: 0, army: army!.id }
   },
 }
 

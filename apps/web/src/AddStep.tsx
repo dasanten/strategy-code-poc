@@ -168,7 +168,7 @@ export function AddStep({
   )
 }
 
-/** How many units of Food to Feed someone Down with (`CONTEXT.md`: Reviving). */
+/** How many units of Food to Feed with (`CONTEXT.md`: Reviving, Feeding a horse). */
 function UnitsAsk({ onAnswer }: { onAnswer: (units: number) => void }) {
   const [units, setUnits] = useState(FEED_UNITS)
   return (

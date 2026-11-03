@@ -6,7 +6,12 @@ import {
   carriagePulledBy,
   holdersOf,
   carriageOfResident,
+  driveOffProblem,
+  hitchOffProblem,
+  horseToSteal,
+  mountOffProblem,
   horseOfResident,
+  horseFull,
   isDown,
   riderOf,
   seatsLeft,
@@ -146,6 +151,8 @@ import {
   makeLeaderProblem,
   nodeFit,
   type ActionId,
+  commandedCarriages,
+  strangersCarriage,
 } from './selection-view.js'
 import {
   groupRelocateActionProblem,
@@ -219,8 +226,15 @@ function targetOnTile(
 
 /** What the queue planner's map picks need of the world (`plan-step`). */
 function planWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): PlanWorld {
-  // Anyone Down in sight, of any realm, to Feed (`CONTEXT.md`: Reviving).
-  return { ...paramWorld(world), horses: world.horses, down: world.residents.filter(isDown) }
+  return { ...paramWorld(world), horses: world.horses, toFeed: toFeed(world) }
+}
+
+/**
+ * Anyone Down in sight and any horse that isn't full as far as the Player knows, of any realm, to
+ * Feed (`CONTEXT.md`: Reviving, Feeding a horse).
+ */
+function toFeed(world: NonNullable<ReturnType<typeof useWorld>['world']>) {
+  return [...world.residents.filter(isDown), ...world.horses.filter((h) => !horseFull(h))]
 }
 
 export function App() {
@@ -363,8 +377,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         ),
         carriages: world.carriages.filter((k) => k.realmId === world.home.realmId),
         buildings: world.buildings,
-        // Anyone Down in sight, of any realm, to Feed (`CONTEXT.md`: Reviving).
-        down: world.residents.filter((r) => isDown(r)),
+        toFeed: toFeed(world),
       }
     : {}
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
@@ -656,10 +669,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (!selected) return
-    const carriage = onTile(world?.carriages)
-    if (mode === 'drive' && carriage) {
-      const order = { kind: 'drive', residentId: selected.id, carriageId: carriage.id, x, y }
+    // Driving and hauling keep to the realm's; only Drive off takes another's (`CONTEXT.md`:
+    // Stealing a carriage or horse), whatever else stands on the tile.
+    const carriage = ownCarriageHere
+    const driven = mode === 'driveOff' ? stealableHere : mode === 'drive' ? carriage : undefined
+    if (driven) {
+      const order = { kind: 'drive', residentId: selected.id, carriageId: driven.id, x, y }
       setOrderError(await giveOrder(order))
+      return
+    }
+    // Only this names a stranger's horse, so only this steals one to pull the realm's carriage.
+    if (mode === 'hitchOff' && unhorsedHere && horseToHitch) {
+      const order = {
+        kind: 'drive',
+        residentId: selected.id,
+        carriageId: unhorsedHere.id,
+        horseId: horseToHitch.id,
+        x,
+        y,
+      }
+      setOrderError(await giveOrder(order, false))
       return
     }
     if (mode === 'haul' && carriage && haulSetup) {
@@ -1085,7 +1114,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'attack', residentId: selected.id, targetId }))
   }
-  /** Orders the picked resident to Feed someone Down next to them (`CONTEXT.md`: Reviving). */
+  /** Orders the picked resident to Feed someone Down or a horse next to them. */
   async function feed(targetId: string, units: number) {
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'feed', residentId: selected.id, targetId, units }))
@@ -1154,6 +1183,25 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     selected && world?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && isAt(selected, b))
   const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
   const carriageSiteHere = onTile(world?.buildings.filter((b) => b.kind === 'carriage'))
+  const armyCarriages = commandedCarriages(world?.diplomacy.alliance, world?.home.realmId)
+  const isStrangers = (k: { id: string; realmId: string | null }) =>
+    strangersCarriage(k, world?.home.realmId, armyCarriages)
+  const ownCarriageHere = onTile(world?.carriages.filter((k) => !isStrangers(k)))
+  const stealableHere = onTile(world?.carriages.filter(isStrangers))
+  // Another organization's horses for the picked resident (`CONTEXT.md`: Stealing a carriage or
+  // horse): a free one to mount, and one to pull the realm's own carriage that has none of its own.
+  const unhorsedHere = onTile(
+    world?.carriages.filter((k) => k.realmId === world.home.realmId && !k.horseId),
+  )
+  const horseToHitch =
+    world && selected && unhorsedHere
+      ? horseToSteal(world, selected, unhorsedHere, world.home.realmId)
+      : undefined
+  const looseStrangers = onTile(
+    world?.horses.filter(
+      (h) => h.realmId !== world.home.realmId && !carriagePulledBy(world, h) && !riderOf(world, h),
+    ),
+  )
   // What the pick waiting for a tile would do under the pointer, or at the tile tapped on a touch
   // screen (`CONTEXT.md`: Picking a target).
   const preview = (() => {
@@ -1195,7 +1243,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     })
     // A drive or haul goes from those standing on a carriage of the realm.
     const carriageAt = (r: Resident) =>
-      world.carriages.find((k) => k.x === r.x && k.y === r.y && k.realmId === world.home.realmId)
+      world.carriages.find(
+        (k) =>
+          k.x === r.x &&
+          k.y === r.y &&
+          (picking === 'driveOff' ? isStrangers(k) : k.realmId === world.home.realmId),
+      )
     const going = what.kind === 'way' && what.goer === 'carriage'
     const goers = group
       .filter((r) => !going || carriageAt(r))
@@ -1597,6 +1650,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   return mine && arrivesIn ? arrivesIn(mine) : undefined
                 },
                 armies: world.armies,
+                caravans: world.caravans,
+                mapSize: world.map.size,
+                commandedCarriages: armyCarriages,
                 nodeFit: (() => {
                   const node = nodeAt?.(selectedTile.x, selectedTile.y)
                   if (!node || !terrainAt) return undefined
@@ -1651,6 +1707,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             )}
             actor={selected}
             onUnhitch={(carriageId, residentId) => void unhitch(carriageId, residentId)}
+            onDriveOff={(residentId) => {
+              select([residentId])
+              setPicking('driveOff')
+            }}
+            onHitchOff={(residentId) => {
+              select([residentId])
+              setPicking('hitchOff')
+            }}
+            onStealHorse={(horseId, residentId) =>
+              void giveOrder({ kind: 'mount', residentId, horseId }, false).then(setOrderError)
+            }
             mapSize={world.map.size}
             onFeed={(targetId, units) => void feed(targetId, units)}
             onPickUp={async (residentId, spot, goods) =>
@@ -1721,8 +1788,46 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             tick={world.tick}
             picking={picking}
             onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
-            carriage={onTile(world.carriages.filter(loadKnown))}
+            carriage={
+              onTile(world.carriages.filter(loadKnown).filter((k) => !isStrangers(k))) ??
+              onTile(world.carriages.filter(loadKnown))
+            }
+            carriageTheirs={!ownCarriageHere && !!stealableHere}
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
+            {...(stealableHere && {
+              driveOff: {
+                problem: driveOffProblem(
+                  world,
+                  selected,
+                  stealableHere,
+                  world.home.realmId,
+                  world.map.size,
+                ),
+              },
+              onDriveOff: () => setPicking((p) => (p === 'driveOff' ? false : 'driveOff')),
+            })}
+            {...(unhorsedHere &&
+              horseToHitch && {
+                hitchOff: {
+                  problem: hitchOffProblem(
+                    world,
+                    selected,
+                    { ...unhorsedHere, realmId: world.home.realmId },
+                    horseToHitch.id,
+                  ),
+                },
+                onHitchOff: () => setPicking((p) => (p === 'hitchOff' ? false : 'hitchOff')),
+              })}
+            {...(looseStrangers && {
+              stealHorse: {
+                problem: mountOffProblem(world, selected, looseStrangers, world.home.realmId),
+              },
+              onStealHorse: () =>
+                void giveOrder(
+                  { kind: 'mount', residentId: selected.id, horseId: looseStrangers.id },
+                  false,
+                ).then(setOrderError),
+            })}
             onRoadTo={() =>
               setPicking((p) => (p === 'roadFrom' || p === 'roadTo' ? false : 'roadFrom'))
             }

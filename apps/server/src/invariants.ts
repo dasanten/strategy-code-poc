@@ -86,7 +86,10 @@ import {
   besideStep,
   stepLength,
   tileIndex,
+  carriageCommanderOf,
+  commanderOf,
 } from '@csp/shared'
+import { carriageOrganization, organizationOf } from './crimes.js'
 import { tallyGoods } from './goods-made.js'
 import { awakeAlive, downDoNothing, refillSource, refillTarget } from './survival.js'
 import { horsesDownLieStill } from './horses.js'
@@ -883,7 +886,8 @@ export const refilledWhenLow: Invariant = {
  * Carriages keep to the rules of `CONTEXT.md` (Carriage): on Mountain only on a finished road, never loaded
  * past what the strongest horse lets one hold (`CARRIAGE_MAX_CAPACITY`: a carriage loaded behind
  * a strong horse keeps its load when the horse dies), and a hitched horse exists, stands with its
- * carriage and pulls no other one.
+ * carriage, is of its realm or NPC city (`CONTEXT.md`: What joins with a city) and pulls no other
+ * one.
  */
 export const carriagesInPlace: Invariant = {
   name: 'carriages-in-place',
@@ -908,6 +912,9 @@ export const carriagesInPlace: Invariant = {
           k.id,
           horse.id,
         ])
+      }
+      if (horse && (horse.realmId !== k.realmId || horse.cityId !== k.cityId)) {
+        fail(k.id, `is hitched to ${horse.id}, not its own realm's or city's`, [k.id, horse.id])
       }
       const other = pulling.get(k.horseId)
       if (other) fail(k.id, `shares horse ${k.horseId} with ${other}`, [k.id, other, k.horseId])
@@ -1009,7 +1016,9 @@ export const passengersAboard: Invariant = {
 
 /**
  * After a tick, a driver stands on the carriage they drive, which exists, and is grown up; no
- * carriage has two drivers (`CONTEXT.md`: Carriage, `Walking.resolve` moves them together).
+ * carriage has two drivers (`CONTEXT.md`: Carriage, `Walking.resolve` moves them together), and
+ * nobody drives a carriage of another organization unless they command it (`CONTEXT.md`: Stealing
+ * a carriage or horse: taking it makes it theirs first; Alliance army, Mercenary contract).
  */
 export const driversOnCarriages: Invariant = {
   name: 'drivers-on-carriages',
@@ -1028,6 +1037,13 @@ export const driversOnCarriages: Invariant = {
       const k = world.carriages.find((c) => c.id === id)
       if (!k) fail(`drives ${id}, which doesn't exist`)
       else if (k.x !== r.x || k.y !== r.y) fail(`drives ${k.id} but isn't on its tile`)
+      if (
+        k &&
+        organizationOf(r) !== carriageOrganization(k) &&
+        commanderOf(world, r) !== carriageCommanderOf(world, k)
+      ) {
+        fail(`drives ${k.id} of another organization without commanding it`)
+      }
       if (!canWork(r, world.tick)) fail('drives as a child')
       const other = driven.get(id)
       if (other) fail(`drives ${id} together with ${other}`)
@@ -1203,7 +1219,9 @@ export const npcCityResidentsUnowned: Invariant = {
 /**
  * Everything belongs to a realm that exists, an NPC city that exists, or nobody (`CONTEXT.md`:
  * Leader death, Self-managed city): once a Leader has died, nothing belongs to their ended realm.
- * A horse or carriage of an NPC city belongs to no realm.
+ * A horse or carriage of an NPC city belongs to no realm, and when that city joins a realm it joins
+ * too, so none stays behind with the `cityId` of a city that has a realm (`CONTEXT.md`: What joins
+ * with a city).
  */
 export const ownersExist: Invariant = {
   name: 'owners-exist',

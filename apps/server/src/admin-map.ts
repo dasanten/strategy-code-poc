@@ -27,6 +27,7 @@ import {
   type Stock,
   type Territory,
   type WorldState,
+  crewIdsOf,
 } from '@csp/shared'
 
 /*
@@ -164,7 +165,7 @@ export function adminWorldView(
     }
     const carriageHere = new Set(world.carriages.filter(here).map((k) => k.id))
     for (const c of world.caravans) {
-      const crew = [c.driverId, ...c.escortIds]
+      const crew = crewIdsOf(c)
       if (!carriageHere.has(c.carriageId) && !crew.some((id) => residentHere.has(id))) continue
       out.push({ is: 'caravan', ...c, org: TRADE_ORGANIZATION })
     }
@@ -216,7 +217,7 @@ export function adminPlaces(world: WorldState, lookups: AdminLookups): AdminPlac
   const carriages = new Map(world.carriages.map((k) => [k.id, k]))
   const caravans = world.caravans
     .flatMap((c) => {
-      const at = carriages.get(c.carriageId) ?? residents.get(c.driverId)
+      const at = carriages.get(c.carriageId) ?? (c.driverId ? residents.get(c.driverId) : undefined)
       if (!at) return []
       const name = world.cities.find((p) => p.id === c.postId)?.name ?? 'a lost post'
       return [{ id: c.id, name, x: at.x, y: at.y, postId: c.postId, heading: c.heading }]
@@ -347,7 +348,7 @@ export function adminInspection(
         org: org(caravan ? TRADE_ORGANIZATION : (k.realmId ?? cityOrg(k.cityId))),
         is: 'carriage',
         carriage: k,
-        driver: named(driver) ?? (caravan ? residentNamed(caravan.driverId) : null),
+        driver: named(driver) ?? (caravan?.driverId ? residentNamed(caravan.driverId) : null),
         caravan: caravanNamed(caravan),
       }
     }
@@ -381,7 +382,7 @@ export function adminInspection(
         caravan: c,
         post: named(cityById(c.postId)),
         carriage: world.carriages.find((k) => k.id === c.carriageId) ?? null,
-        crew: [c.driverId, ...c.escortIds].flatMap((m) => residentNamed(m) ?? []),
+        crew: crewIdsOf(c).flatMap((m) => residentNamed(m) ?? []),
       }
     }
   }

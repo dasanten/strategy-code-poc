@@ -732,9 +732,9 @@ export interface RelocateOrder {
 }
 
 /**
- * Feeding (`CONTEXT.md`: Reviving): the resident puts up to `units` of the Food in their hands
- * into those of `targetId`, a Down resident on or next to their tile, who eats at once and wakes.
- * Done within the tick.
+ * Feeding (`CONTEXT.md`: Reviving, Feeding a horse): the resident gives up to `units` of the Food
+ * in their hands to `targetId`, on or next to their tile: a Down resident, who eats at once and
+ * wakes, or a horse with room for a whole unit, which eats until it has none. Done within the tick.
  */
 export interface FeedOrder {
   kind: 'feed'
@@ -972,8 +972,11 @@ export interface Caravan {
   /** The trading post at the far end of its route; the other end is the HQ. */
   postId: string
   carriageId: string
-  /** The resident who drives the carriage. */
-  driverId: string
+  /**
+   * The resident who drives the carriage; null with no crew left, until the HQ has someone to send
+   * (`CONTEXT.md`: Caravan crew lost).
+   */
+  driverId: string | null
   /** The residents who walk along with it (the escort). */
   escortIds: string[]
   /** The end of the route it stands at or is driving to. */
@@ -1289,8 +1292,12 @@ export interface Crime {
   victimOrg: string
   /** The resident attacked or killed. */
   victim?: { residentId: string; name: string }
-  /** What was stolen. */
+  /** What was stolen, a stolen carriage's load included. */
   goods?: Stock
+  /** A carriage was stolen (`CONTEXT.md`: Stealing a carriage or horse). */
+  carriage?: true
+  /** The name of the horse that was stolen, alone or hitched to the stolen carriage. */
+  horse?: string
   /** What was torn down. */
   building?: BuildingKind
   /**
@@ -1387,8 +1394,8 @@ export type RealmEventWhat =
     }
   /**
    * A witness brought home news of a crime against the realm (`CONTEXT.md`: Crime, Witness):
-   * `culprit` of `culpritOrg` did `crime` at tick `at`, to `victim`, taking `goods` or tearing
-   * down `building`.
+   * `culprit` of `culpritOrg` did `crime` at tick `at`, to `victim`, taking `goods`, a `carriage`
+   * or a `horse` by name, or tearing down `building`.
    */
   | {
       kind: 'crimeKnown'
@@ -1402,7 +1409,31 @@ export type RealmEventWhat =
       culpritOrg: string
       victim?: string
       goods?: Stock
+      carriage?: true
+      horse?: string
       building?: BuildingKind
+    }
+  /**
+   * The realm's carriage, with its `horse` by name, or a horse alone, was stolen (`CONTEXT.md`:
+   * Stealing a carriage or horse): said at once, with where it was last and not who took it, which
+   * only a witness brings home (`crimeKnown`).
+   */
+  | { kind: 'transportGone'; x: number; y: number; carriage?: true; horse?: string }
+  /**
+   * The realm's resident took a carriage or horse at (x, y) (`CONTEXT.md`: Stealing a carriage or
+   * horse): `from` the Organization it belonged to, by name, or from nobody when null, with the
+   * `goods` loaded on it.
+   */
+  | {
+      kind: 'transportTaken'
+      residentId: string
+      name: string
+      x: number
+      y: number
+      from: string | null
+      carriage?: true
+      horse?: string
+      goods?: Stock
     }
   /**
    * The Trade Organization punishes the realm (`CONTEXT.md`: Trade Org reaction): its army is

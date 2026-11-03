@@ -118,7 +118,7 @@ export function commanderOf(
 /** The realm whose orders the carriage takes, as `commanderOf` for a resident. */
 export function carriageCommanderOf(
   world: Pick<WorldState, 'alliances'>,
-  k: Carriage,
+  k: Pick<Carriage, 'id' | 'realmId'>,
 ): string | null {
   return handedOverTo(world, k.id)?.leaderId ?? k.realmId
 }
@@ -139,6 +139,18 @@ export function commandsCarriage(
   k: Carriage | undefined,
 ): k is Carriage {
   return k !== undefined && carriageCommanderOf(world, k) === realmId
+}
+
+/**
+ * Whether the realm driving the carriage off would steal it (`CONTEXT.md`: Stealing a carriage or
+ * horse): it is another organization's, and not one of the alliance army the realm commands.
+ */
+export function stealsCarriage(
+  world: Pick<WorldState, 'alliances'>,
+  realmId: string,
+  k: Pick<Carriage, 'id' | 'realmId'>,
+): boolean {
+  return k.realmId !== realmId && carriageCommanderOf(world, k) !== realmId
 }
 
 /** The alliance the realm is a member of, if any (`CONTEXT.md`: Alliance: at most one). */

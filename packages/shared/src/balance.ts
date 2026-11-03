@@ -930,6 +930,9 @@ export const MEAL_UNITS = 1
  */
 export const HUNGER_DAYS = 3
 
+/** How far one unit of food fills a horse's hunger meter: a full meter holds `HUNGER_DAYS` of food. */
+export const HORSE_FILL_PER_FOOD = MAX_HUNGER / (HUNGER_DAYS * HORSE_FOOD_PER_DAY)
+
 /** Game days an empty hunger meter takes to cost a resident all their health and put them Down. */
 export const STARVE_DAYS = 2
 
@@ -1329,6 +1332,19 @@ export const TRADE_ORG_LOSS: Record<Exclude<CrimeKind, 'theft'>, number> = {
   killing: 200,
   tearDown: 150,
 }
+
+/**
+ * What a stolen carriage is worth in Coins (`CONTEXT.md`: Stealing a carriage or horse), besides
+ * its load: about its materials at their warehouse base price (`BUILD_MATERIALS.carriage`, 110
+ * Coins) and two game days of a builder's work.
+ */
+export const CARRIAGE_STOLEN_WORTH = 150
+
+/**
+ * What a stolen horse is worth in Coins (`CONTEXT.md`: Stealing a carriage or horse): less than a
+ * carriage, as it takes only two horses and a resident's time to breed one.
+ */
+export const HORSE_STOLEN_WORTH = 100
 
 /**
  * How the Trade Organization's army punishes (`CONTEXT.md`: Trade Org reaction): it takes back

@@ -1,5 +1,7 @@
 import {
+  MAP_SIZE,
   carriagePulledBy,
+  commanderOf,
   horseOfResident,
   horseRidden,
   isDown,
@@ -10,6 +12,7 @@ import {
 } from '@csp/shared'
 import type { OrderKind } from './orders.js'
 import { orderedResident } from './order-sender.js'
+import { takeOver } from './stealing.js'
 
 /** The input of a mount order: which resident mounts which horse. */
 interface MountRequest extends OrderRequest {
@@ -38,7 +41,9 @@ function freshPath(r: Resident): void {
 /**
  * The mount order (`CONTEXT.md`: Riding): one of the Player's residents gets on a horse of their
  * realm on their tile that pulls no carriage. Riding is no order: they go on with what they do,
- * from the next tick at the horse's pace (`Walking`).
+ * from the next tick at the horse's pace (`Walking`). Naming another organization's free horse
+ * steals it (`CONTEXT.md`: Stealing a carriage or horse): it joins the rider's realm when the order
+ * is applied. Only this order, which names the horse, does.
  */
 export const mount: OrderKind = {
   validate(world, sender, order, terrain) {
@@ -50,14 +55,20 @@ export const mount: OrderKind = {
       r,
       world.horses.find((h) => h.id === o.horseId),
       terrain,
+      commanderOf(world, r),
     )
   },
   apply(world, _sender, order, terrain) {
     const { residentId, horseId } = order as MountRequest
     const r = world.residents.find((x) => x.id === residentId)
     const horse = world.horses.find((h) => h.id === horseId)
+    if (!r || !horse) return
     // Two riders ordered onto one horse in the same tick: the first one rides it.
-    if (!r || mountProblem(world, r, horse, terrain)) return
+    const commander = commanderOf(world, r)
+    if (mountProblem(world, r, horse, terrain, commander)) return
+    if (commander && !horseOfResident(horse, r)) {
+      takeOver(world, r, commander, { horse }, terrain?.size ?? MAP_SIZE)
+    }
     r.riding = horseId
     freshPath(r)
   },

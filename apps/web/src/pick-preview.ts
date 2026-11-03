@@ -41,6 +41,8 @@ export type PreviewPick =
 const RESIDENT_PREVIEWS = {
   walk: { kind: 'way', goer: 'foot' },
   drive: { kind: 'way', goer: 'carriage' },
+  driveOff: { kind: 'way', goer: 'carriage' },
+  hitchOff: { kind: 'way', goer: 'carriage' },
   haul: { kind: 'way', goer: 'carriage' },
   roadFrom: { kind: 'lineStart', building: 'road' },
   wallFrom: { kind: 'lineStart', building: 'wall' },

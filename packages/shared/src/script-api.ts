@@ -378,11 +378,15 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   },
 
   action('walkTo', ['x', 'y'], 'Walk to a tile.'),
-  action('drive', ['carriageId', 'x', 'y'], 'Drive the carriage on my tile to a tile.'),
+  action(
+    'drive',
+    ['carriageId', 'x', 'y', 'horseId'],
+    'Drive the carriage on my tile to a tile. Another realm’s carriage is stolen by that: it joins my realm at once, which is theft (see Standing). A carriage of mine with no horse of my realm there takes another realm’s only if I name it as `horseId`, which steals it too.',
+  ),
   action(
     'mount',
     ['horseId'],
-    'Get on a horse of my realm on my tile that pulls no carriage, and ride it.',
+    'Get on a horse on my tile that pulls no carriage, and ride it. Another realm’s horse is stolen by that: it joins my realm at once, which is theft (see Standing).',
   ),
   action('dismount', [], 'Get off the horse I ride; it stays on my tile.'),
   action(
@@ -468,8 +472,8 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   ),
   action(
     'feed',
-    ['residentId', 'units'],
-    'Feed a resident who is Down, of any realm, on or next to my tile: put up to that many units of the Food in my hands into theirs. They eat at once and wake at low health.',
+    ['targetId', 'units'],
+    'Feed a resident who is Down or a horse that isn’t full, of any realm, on or next to my tile, with up to that many units of the Food in my hands. A resident gets it in their hands, eats at once and wakes at low health. A horse eats until it is full, and wakes if it was Down; the rest stays with me.',
   ),
   action('climb', ['wallId'], 'Climb over the wall or gate of another realm next to me.'),
   action(

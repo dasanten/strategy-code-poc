@@ -130,8 +130,11 @@ export interface GroupSeen {
   carriages?: readonly (Pick<Carriage, 'id' | 'x' | 'y'> & Partial<Pick<Carriage, 'horseId'>>)[]
   /** The buildings in sight, to find the stable each one stands in. */
   buildings?: readonly Pick<Building, 'id' | 'kind' | 'x' | 'y' | 'site'>[]
-  /** Residents in sight who are Down, of any realm, to Feed (`CONTEXT.md`: Reviving). */
-  down?: readonly { id: string; x: number; y: number }[]
+  /**
+   * Residents in sight who are Down and horses that aren't full, of any realm, to Feed (`CONTEXT.md`:
+   * Reviving, Feeding a horse).
+   */
+  toFeed?: readonly { id: string; x: number; y: number }[]
 }
 
 /**
@@ -207,9 +210,9 @@ function groundOf(r: GroupResident, seen: GroupSeen, size: number) {
   )
 }
 
-/** Those Down in sight on or next to a resident's tile, but the resident. */
-function downNear(r: GroupResident, seen: GroupSeen, size: number) {
-  return seen.down?.filter((d) => d.id !== r.id && inContact(size, r, d)) ?? []
+/** Those to Feed in sight on or next to a resident's tile, but the resident. */
+function toFeedNear(r: GroupResident, seen: GroupSeen, size: number) {
+  return seen.toFeed?.filter((d) => d.id !== r.id && inContact(size, r, d)) ?? []
 }
 
 /** The finished stable a resident stands in, if they stand in one. */
@@ -278,7 +281,7 @@ export function groupSkip(
       if (carriedGoods(r.carried).length === 0) return 'carries nothing'
       break
     case 'feed':
-      if (downNear(r, seen, size).length === 0) return 'nobody Down nearby'
+      if (toFeedNear(r, seen, size).length === 0) return 'nobody to feed nearby'
       if ((r.carried.food ?? 0) < 1) return NO_FOOD_TO_FEED
       break
   }
@@ -531,12 +534,12 @@ export function groupRequests(
         send(r, { kind: 'relocate', cityId: order.cityId, group: going.map((x) => x.id) })
         break
       case 'feed': {
-        // One of them for each one Down: the first next to them feeds them.
-        const down = downNear(r, seen, size).find((d) => !taken.has(d.id))
-        if (!down) skip(r, 'another of them feeds them')
+        // One of them for each one to Feed: the first next to them feeds them.
+        const target = toFeedNear(r, seen, size).find((d) => !taken.has(d.id))
+        if (!target) skip(r, 'another of them feeds them')
         else {
-          taken.add(down.id)
-          send(r, { kind: 'feed', targetId: down.id, units: order.units })
+          taken.add(target.id)
+          send(r, { kind: 'feed', targetId: target.id, units: order.units })
         }
         break
       }
@@ -696,6 +699,9 @@ export const GROUP_COUNTERPARTS: Record<
   board: ['board', 'getOff'],
   unhitch: ['unhitch'],
   drive: ['drive'],
+  driveOff: { none: 'one resident steals one carriage' },
+  hitchOff: { none: 'one resident steals one horse' },
+  stealHorse: { none: 'one resident steals one horse' },
   haul: ['haul'],
   explore: ['explore'],
   work: ['work'],
@@ -787,7 +793,7 @@ const GROUP_REASONS: Record<string, string> = {
   'not at a stable': 'none of them is in a stable',
   'carries nothing': 'none of them carries anything',
   'not aboard': 'none of them is aboard a carriage',
-  'nobody Down nearby': 'nobody Down next to them',
+  'nobody to feed nearby': 'nobody to feed next to them',
   [NO_FOOD_TO_FEED]: 'none of them has Food in hand',
 }
 

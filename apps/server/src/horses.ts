@@ -1,7 +1,7 @@
 import {
   DOWN_DAYS,
   HEAL_DAYS,
-  HORSE_FOOD_PER_DAY,
+  HORSE_FILL_PER_FOOD,
   HORSE_HUNGRY_SHARE,
   HORSE_WAKE_HEALTH,
   HORSE_START_AGE_MAX,
@@ -19,6 +19,7 @@ import {
   driverOf,
   horseFood,
   horseFoodFactor,
+  horseFull,
   riderOf,
   type Horse,
   type HorseStats,
@@ -28,9 +29,6 @@ import {
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import type { Invariant } from './invariants.js'
-
-/** How far one unit of food fills a horse's hunger meter: a full meter holds `HUNGER_DAYS` of food. */
-const FILL_PER_FOOD = MAX_HUNGER / (HUNGER_DAYS * HORSE_FOOD_PER_DAY)
 
 /**
  * Given names for new horses (`CONTEXT.md`: Horse name), a pool apart from the residents'
@@ -147,23 +145,20 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
     const left = food.food! - 1
     if (left > 0) food.food = left
     else delete food.food
-    h.hunger = Math.min(MAX_HUNGER, h.hunger + FILL_PER_FOOD)
+    horseEats(h, 1)
     ate = true
     return true
   }
 
   for (const h of world.horses) {
     if (h.downUntil !== undefined) {
-      if (eat(h)) {
-        delete h.downUntil
-        h.health = HORSE_WAKE_HEALTH
-      } else if (world.tick >= h.downUntil) died.push(h)
+      if (!eat(h) && world.tick >= h.downUntil) died.push(h)
       continue
     }
     const wasFed = h.hunger >= hungry
     // Endurance sets how fast the meter runs down, so how much Food the horse needs.
     h.hunger = Math.max(0, h.hunger - drain * horseFoodFactor(h))
-    if (h.hunger <= MAX_HUNGER - FILL_PER_FOOD) eat(h)
+    if (h.hunger <= MAX_HUNGER - HORSE_FILL_PER_FOOD) eat(h)
     // Going hungry with nothing in reach: a rider has no Food to spare for it (`CONTEXT.md`: Riding).
     const rider = wasFed && h.hunger < hungry ? riders.get(h.id) : undefined
     if (rider) {
@@ -188,6 +183,24 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
       recordEvent(world, h.realmId, { kind: 'horseDied', horseId: h.id, name: h.name })
   }
   return died
+}
+
+/**
+ * A horse eats up to `units` whole units of Food, stopping once its hunger meter has no room for
+ * another (`horseFull`), and returns how many it ate. Having eaten, a Down horse wakes at
+ * `HORSE_WAKE_HEALTH` (`CONTEXT.md`: Reviving). The caller takes the Food from wherever it came.
+ */
+export function horseEats(h: Horse, units: number): number {
+  let eaten = 0
+  while (eaten < units && !horseFull(h)) {
+    h.hunger = Math.min(MAX_HUNGER, h.hunger + HORSE_FILL_PER_FOOD)
+    eaten++
+  }
+  if (eaten > 0 && h.downUntil !== undefined) {
+    delete h.downUntil
+    h.health = HORSE_WAKE_HEALTH
+  }
+  return eaten
 }
 
 /**

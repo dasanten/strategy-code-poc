@@ -40,6 +40,7 @@ import {
   type Resident,
   type SeenResident,
   type SeenHorse,
+  AVERAGE_HORSE_STATS,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 import {
@@ -59,11 +60,17 @@ import {
   HORSE_DOWN_NO_DRIVE,
   riddenHorseLine,
   rowGroups,
+  feedTargets,
   tileActions,
+  commandedCarriages,
+  strangersCarriage,
+  thiefAmong,
+  thiefOf,
   unhitcherOf,
   type ActionId,
   type CardAction,
   type ResidentHere,
+  type TileCard,
   type TileThings,
 } from './selection-view.js'
 import { GOOD_LABELS } from './Residents.js'
@@ -274,6 +281,49 @@ describe('the actions on a resident’s card', () => {
     expect(off.map((a) => a.label)).toEqual(['Dismount'])
     const drive = residentActions(here({ riding: true, carriage })).find((a) => a.id === 'drive')
     expect(drive).toMatchObject({ disabled: true, reason: 'dismount first to drive' })
+  })
+
+  it('never offers driving or hauling another realm’s carriage, only Drive off on its own row', () => {
+    const theirs = here({ carriage, carriageTheirs: true })
+    expect(ids(theirs)).not.toContain('drive')
+    expect(ids(theirs)).not.toContain('haul')
+    expect(residentOrders(theirs).missing.drive).toBe('no carriage of yours here')
+    const off = here({ carriage, carriageTheirs: true, driveOff: { problem: undefined } })
+    expect(residentActions(off).find((a) => a.id === 'driveOff')).toEqual({
+      id: 'driveOff',
+      label: 'Drive off (theft)',
+      key: 'D',
+    })
+    const refused = here({ carriageTheirs: true, driveOff: { problem: 'guarded' } })
+    expect(residentActions(refused).find((a) => a.id === 'driveOff')).toMatchObject({
+      disabled: true,
+      reason: 'guarded',
+    })
+    const picking = here({ driveOff: { problem: undefined }, picking: 'driveOff' })
+    expect(residentActions(picking).find((a) => a.id === 'driveOff')).toMatchObject({
+      label: 'Pick a tile…',
+      active: true,
+    })
+    expect(residentOrders(here()).missing.driveOff).toBe('no carriage of another realm here')
+    const mount = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'stealHorse')
+    expect(mount(here({ stealHorse: { problem: undefined } }))).toEqual({
+      id: 'stealHorse',
+      label: 'Mount their horse (theft)',
+      key: 'M',
+    })
+    expect(mount(here({ stealHorse: { problem: 'guarded' } }))).toMatchObject({
+      disabled: true,
+      reason: 'guarded',
+    })
+    expect(residentOrders(here()).missing.stealHorse).toBe('no free horse of another realm here')
+    const hitch = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'hitchOff')
+    expect(hitch(here({ hitchOff: { problem: undefined } }))).toMatchObject({
+      label: 'Drive with their horse (theft)',
+    })
+    expect(hitch(here({ hitchOff: { problem: 'guarded' } }))).toMatchObject({
+      disabled: true,
+      reason: 'guarded',
+    })
   })
 
   it('offers unhitching a hitched carriage of the realm on their tile to grown-ups', () => {
@@ -563,19 +613,22 @@ describe('the rows of a card that stays open', () => {
 
   it('offer Feed with someone Down nearby, greyed for a child or without Food (`CONTEXT.md`: Reviving)', () => {
     const feed = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'feed')
-    expect(feed(here({ downNear: 1, carriesFood: true }))).toEqual({
+    expect(feed(here({ toFeedNear: 1, carriesFood: true }))).toEqual({
       id: 'feed',
       label: 'Feed…',
       key: ACTION_KEYS.feed,
       opens: true,
     })
-    expect(feed(here({ downNear: 1 }))).toMatchObject({ disabled: true, reason: 'no Food in hand' })
-    expect(feed(here({ downNear: 1, carriesFood: true, adult: false }))).toMatchObject({
+    expect(feed(here({ toFeedNear: 1 }))).toMatchObject({
+      disabled: true,
+      reason: 'no Food in hand',
+    })
+    expect(feed(here({ toFeedNear: 1, carriesFood: true, adult: false }))).toMatchObject({
       disabled: true,
       reason: 'children can’t feed others',
     })
     expect(feed(here({ carriesFood: true }))).toBeUndefined()
-    expect(residentOrders(here()).missing.feed).toBe('nobody Down nearby')
+    expect(residentOrders(here()).missing.feed).toBe('nobody to feed nearby')
   })
 
   it('say why for every order a resident card can leave out', () => {
@@ -1032,7 +1085,7 @@ describe('horses on the tile card', () => {
     const ridden = horse({ id: 'h2', hunger: 10, health: MAX_HEALTH - 5 })
     const horses = [horse(), ridden]
     expect(riddenHorseLine({ riding: 'h2' }, horses, at)).toBe(
-      'Horse: Rowan · Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt · eats from your spare Food',
+      'Horse: Rowan · Speed 12, Strength 8, Endurance 10 · 5 years old · hungry, hurt · a resident with Food can Feed it · eats from your spare Food',
     )
     expect(riddenHorseLine({}, horses, at)).toBeUndefined()
     // A horse not in sight shows nothing.
@@ -1047,7 +1100,8 @@ describe('horses on the tile card', () => {
       {
         id: 'h1',
         name: 'Rowan',
-        detail: 'Speed 9, Strength 15, Endurance 13 · 5 years old',
+        detail:
+          'Hungry · a resident with Food can Feed it · Speed 9, Strength 15, Endurance 13 · 5 years old',
         shares: [1, 10 / MAX_HUNGER],
         opens: 'horse',
       },
@@ -1089,18 +1143,68 @@ describe('horses on the tile card', () => {
     const card = tile({ horses: [horse(), { ...down, down: true }], tick })
     expect(card.lists?.[0]).toMatchObject({ title: 'Horses (yours)', count: '2 · 1 Down' })
     expect(card.lists?.[0]?.rows[1]?.detail).toBe(
-      `Down from hunger: ${timeLeft(23 * 3600)} · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
+      `Down from hunger: ${timeLeft(23 * 3600)} · a resident with Food can Feed it · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
     )
     // As sight sends a stranger's Down horse: Down, but not when it dies.
     const seen = unknown({ ...down, realmId: 'r-other' })
     delete seen.downUntil
     const theirs = tile({ horses: [{ ...seen, down: true }], tick })
-    expect(theirs.lists?.[0]?.rows[0]?.detail).toMatch(/^Down from hunger · Speed 12/)
+    expect(theirs.lists?.[0]?.rows[0]?.detail).toMatch(
+      /^Down from hunger · a resident with Food can Feed it · Speed 12/,
+    )
     // Hitched, the carriage's horse row says so too.
     const hitched = tile({ carriages: [{ ...carriage, horseId: 'h2' }], horses: [down], tick })
     expect(hitched.carriage?.horse?.rows[0]?.detail).toBe(
-      `Down from hunger: ${timeLeft(23 * 3600)} · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
+      `Down from hunger: ${timeLeft(23 * 3600)} · a resident with Food can Feed it · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
     )
+  })
+
+  it('offers the resident picked last to Feed a horse that isn’t full (`CONTEXT.md`: Feeding a horse)', () => {
+    const tick = 100 * TICKS_PER_GAME_YEAR
+    const feeder = (more: object) =>
+      ({ id: 'r1', name: 'Ada', x: 6, y: 5, bornAt: 0, carried: { food: 2 }, ...more }) as Resident
+    const down = horse({
+      id: 'h2',
+      name: 'Star',
+      x: 5,
+      y: 5,
+      hunger: 0,
+      health: 0,
+      downUntil: tick,
+    })
+    const card = tile({ horses: [down], tick })
+    expect(card.horsesToFeed).toEqual([{ id: 'h2', name: 'Star', x: 5, y: 5 }])
+    const feed = (r: Resident) => tileActions(card, r, tick, 64).find((a) => a.id === 'feed')
+    expect(feed(feeder({}))).toEqual({
+      id: 'feed',
+      label: 'Feed Star…',
+      key: ACTION_KEYS.feed,
+      opens: true,
+    })
+    expect(feed(feeder({ x: 9 }))).toMatchObject({
+      disabled: true,
+      reason: 'stand on or next to its tile to feed it',
+    })
+    expect(feed(feeder({ carried: {} }))).toMatchObject({ reason: 'no Food in hand' })
+    expect(feed(feeder({ bornAt: tick }))).toMatchObject({ reason: 'children can’t feed others' })
+    // A full horse is no one to feed; a stranger's, of unknown hunger, is offered.
+    const full = tile({ horses: [horse({ x: 5, y: 5, hunger: MAX_HUNGER })], tick })
+    expect(full.horsesToFeed).toBeUndefined()
+    // Nor is one with room for less than a whole unit (`CONTEXT.md`: Feeding a horse).
+    const nearlyFull = tile({ horses: [horse({ x: 5, y: 5, hunger: MAX_HUNGER - 1 })], tick })
+    expect(nearlyFull.horsesToFeed).toBeUndefined()
+    const theirs =tile({ horses: [unknown({ x: 5, y: 5, realmId: 'r-other' })], tick })
+    expect(theirs.horsesToFeed).toEqual([{ id: 'h1', name: 'Rowan', x: 5, y: 5 }])
+    // With more than one the row doesn't name them; the block lists them, Down residents first.
+    const ana = { id: 'ana', name: 'Ana', x: 5, y: 5, down: true as const }
+    const both = { ...card, downHere: [ana] }
+    expect(tileActions(both, feeder({}), tick, 64).find((a) => a.id === 'feed')?.label).toBe(
+      'Feed…',
+    )
+    expect(feedTargets(both, feeder({})).map((t) => [t.id, t.horse])).toEqual([
+      ['ana', undefined],
+      ['h2', true],
+    ])
   })
 
   it('offers renaming the Player’s own horses on the card, by name (`CONTEXT.md`: Renaming a horse)', () => {
@@ -1231,6 +1335,220 @@ describe('horses on the tile card', () => {
 
 describe('the actions on a tile’s card', () => {
   const actor = { id: 'r1', name: 'Ada' } as Resident
+
+  describe('another realm’s carriage on the tile (`CONTEXT.md`: Stealing a carriage or horse)', () => {
+    const tick = 100 * TICKS_PER_GAME_YEAR
+    const person = (id: string, more: object = {}) =>
+      ({
+        id,
+        name: id,
+        owner: 'me',
+        cityId: null,
+        x: 5,
+        y: 5,
+        bornAt: 0,
+        carried: {},
+        order: null,
+        ...more,
+      }) as unknown as SeenResident
+    const theirs = { ...carriage, realmId: 'them' }
+    const horse = {
+      id: 'h1',
+      realmId: 'them',
+      cityId: null,
+      x: 5,
+      y: 5,
+      name: 'Rowan',
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: 0,
+    } as unknown as SeenHorse
+    const thing = (residents: SeenResident[], more: Partial<TileThings> = {}) => {
+      const strangers = residents.filter((r) => r.owner !== 'me')
+      return tile({
+        carriages: [{ ...theirs, horseId: 'h1' }],
+        horses: [horse],
+        residents,
+        strangers,
+        tick,
+        ...more,
+      })
+    }
+    const row = (card: TileCard, actor?: { id: string }) =>
+      tileActions(card, actor as Resident).find((a) => a.id === 'driveOff')
+
+    it('offers Drive off, which says it is theft, with a resident of the Player’s there', () => {
+      const card = thing([person('ada')])
+      expect(card.driveOff).toEqual({
+        carriageId: 'k1',
+        residents: [{ id: 'ada', name: 'ada', problem: undefined }],
+      })
+      expect(row(card)).toEqual({ id: 'driveOff', label: 'Drive off (theft)', key: 'D' })
+    })
+
+    it('offers nothing with nobody of theirs on the tile, or on their own carriage', () => {
+      expect(thing([person('away', { x: 6 })]).driveOff).toBeUndefined()
+      expect(thing([person('st', { owner: 'them' })]).driveOff).toBeUndefined()
+      expect(thing([person('ada')], { carriages: [carriage] }).driveOff).toBeUndefined()
+    })
+
+    it('offers nothing on a carriage of the alliance army they command', () => {
+      const commanded = new Set(['k1'])
+      expect(thing([person('ada')], { commandedCarriages: commanded }).driveOff).toBeUndefined()
+      expect(
+        commandedCarriages({ leaderId: 'me', army: [{ is: 'carriage', id: 'k1' }] }, 'me'),
+      ).toEqual(commanded)
+      expect(
+        commandedCarriages({ leaderId: 'them', army: [{ is: 'carriage', id: 'k1' }] }, 'me').size,
+      ).toBe(0)
+    })
+
+    it('greys it with the reason while it can’t be taken', () => {
+      const reason = (...residents: SeenResident[]) => row(thing(residents))?.reason
+      const armed = person('st', { owner: 'them', carried: { spear: 1 } })
+      expect(reason(person('ada'), armed)).toBe('an armed resident guards that carriage')
+      expect(row(thing([person('ada'), armed]))?.disabled).toBe(true)
+      // One of theirs armed there too lifts the guard.
+      expect(reason(person('ada'), armed, person('bo', { carried: { sword: 1 } }))).toBeUndefined()
+      expect(reason(person('ada'), person('st', { owner: 'them', aboard: 'k1' }))).toBe(
+        'someone is aboard that carriage',
+      )
+      const driving = {
+        kind: 'drive',
+        carriageId: 'k1',
+        target: { x: 9, y: 5 },
+        path: null,
+        progress: 0,
+      }
+      expect(reason(person('ada'), person('st', { owner: 'them', order: driving }))).toBe(
+        'someone is driving that carriage',
+      )
+      expect(reason(person('kid', { bornAt: tick }))).toBe('children can’t steal')
+      const caravans = [{ carriageId: 'k1', driverId: 'drv', escortIds: ['esc'] }]
+      const crew = (id: string, carried = {}) => person(id, { owner: null, carried })
+      const offering = (...others: ReturnType<typeof person>[]) =>
+        row(thing([person('ada'), ...others], { caravans }))?.reason
+      expect(offering()).toBeUndefined()
+      expect(offering(crew('drv'))).toBe('its driver is still with that caravan’s carriage')
+      expect(offering(crew('esc'))).toBeUndefined()
+      expect(offering(crew('esc', { sword: 1 }))).toBe('its escort guards that caravan’s carriage')
+      const down = { ...horse, down: true as const }
+      expect(row(thing([person('ada')], { horses: [down] }))?.reason).toBe('its horse is Down')
+    })
+
+    it('goes by what strangers see, with no horse hitched or none free', () => {
+      const bare = { carriages: [{ ...theirs, horseId: null }] }
+      expect(row(thing([person('ada')], { ...bare, horses: [] }))?.reason).toBe(
+        'no horse here to pull that carriage',
+      )
+      // Their free horse goes with it, stolen too.
+      expect(row(thing([person('ada')], { ...bare, horses: [horse] }))?.reason).toBeUndefined()
+      const own = { ...horse, id: 'h2', realmId: 'me' }
+      expect(row(thing([person('ada')], { ...bare, horses: [horse, own] }))?.reason).toBeUndefined()
+    })
+
+    describe('another realm’s free horse', () => {
+      const loose = (residents: SeenResident[], more: Partial<TileThings> = {}) =>
+        thing(residents, { carriages: [], ...more })
+      const mount = (card: TileCard, actor?: { id: string }) =>
+        tileActions(card, actor as Resident).find((a) => a.id === 'stealHorse')
+
+      it('offers Mount, which says it is theft, with a resident of the Player’s there', () => {
+        const card = loose([person('ada')])
+        expect(card.stealHorse).toEqual({
+          horseId: 'h1',
+          residents: [{ id: 'ada', name: 'ada', problem: undefined }],
+        })
+        expect(mount(card)).toEqual({
+          id: 'stealHorse',
+          label: 'Mount their horse (theft)',
+          key: 'M',
+        })
+      })
+
+      it('offers nothing with nobody of theirs there, nor on their own or a hitched or ridden one', () => {
+        expect(loose([person('away', { x: 6 })]).stealHorse).toBeUndefined()
+        expect(loose([person('st', { owner: 'them' })]).stealHorse).toBeUndefined()
+        const own = { ...horse, realmId: 'me' }
+        expect(loose([person('ada')], { horses: [own] }).stealHorse).toBeUndefined()
+        expect(thing([person('ada')]).stealHorse).toBeUndefined()
+        const rider = person('st', { owner: 'them', riding: 'h1' })
+        expect(loose([person('ada'), rider]).stealHorse).toBeUndefined()
+      })
+
+      it('greys it with the reason while it can’t be taken', () => {
+        const reason = (card: TileCard) => mount(card)?.reason
+        const armed = person('st', { owner: 'them', carried: { spear: 1 } })
+        expect(reason(loose([person('ada'), armed]))).toBe('an armed resident guards that horse')
+        expect(mount(loose([person('ada'), armed]))?.disabled).toBe(true)
+        expect(
+          reason(loose([person('ada'), armed, person('bo', { carried: { sword: 1 } })])),
+        ).toBeUndefined()
+        const down = { ...horse, down: true as const }
+        expect(reason(loose([person('ada')], { horses: [down] }))).toBe('that horse is Down')
+        expect(reason(loose([person('kid', { bornAt: tick })]))).toBe('children can’t steal')
+      })
+
+      it('offers the one that can be taken of several, and the one picked last does it', () => {
+        const down = { ...horse, id: 'h9', down: true as const }
+        const card = loose([person('kid', { bornAt: tick }), person('ada')], {
+          horses: [down, horse],
+        })
+        expect(card.stealHorse?.horseId).toBe('h1')
+        expect(thiefAmong(card.stealHorse?.residents, { id: 'nobody' })?.id).toBe('ada')
+        expect(thiefAmong(card.stealHorse?.residents, { id: 'kid' })?.problem).toBe(
+          'children can’t steal',
+        )
+      })
+    })
+
+    describe('another realm’s horse by the Player’s own carriage', () => {
+      const mine = { carriages: [{ ...carriage, horseId: null }] }
+      const hitch = (card: TileCard) =>
+        tileActions(card, undefined).find((a) => a.id === 'hitchOff')
+
+      it('says it is theft before it steals', () => {
+        const card = thing([person('ada')], mine)
+        expect(card.hitchOff).toEqual({
+          carriageId: carriage.id,
+          horseId: 'h1',
+          residents: [{ id: 'ada', name: 'ada', problem: undefined }],
+        })
+        expect(hitch(card)).toEqual({
+          id: 'hitchOff',
+          label: 'Drive with their horse (theft)',
+          key: 'D',
+        })
+      })
+
+      it('offers nothing with a horse of their own there or hitched', () => {
+        const own = { ...horse, id: 'h2', realmId: 'me' }
+        expect(thing([person('ada')], { ...mine, horses: [horse, own] }).hitchOff).toBeUndefined()
+        const hitched = { carriages: [{ ...carriage, horseId: 'h2' }], horses: [horse, own] }
+        expect(thing([person('ada')], hitched).hitchOff).toBeUndefined()
+      })
+
+      it('greys it with the reason while the horse is guarded', () => {
+        const armed = person('st', { owner: 'them', carried: { spear: 1 } })
+        expect(hitch(thing([person('ada'), armed], mine))?.reason).toBe(
+          'an armed resident guards that horse',
+        )
+      })
+    })
+
+    it('has the resident picked last do it when they are there, else the first who can', () => {
+      const card = thing([person('kid', { bornAt: tick }), person('ada'), person('bo')])
+      expect(thiefOf(card, { id: 'bo' })?.id).toBe('bo')
+      expect(thiefOf(card, { id: 'nobody' })?.id).toBe('ada')
+      expect(thiefOf(card, { id: 'kid' })?.problem).toBe('children can’t steal')
+    })
+
+    it('tells a stranger’s carriage from the Player’s', () => {
+      expect(strangersCarriage(theirs, 'me')).toBe(true)
+      expect(strangersCarriage(carriage, 'me')).toBe(false)
+      expect(strangersCarriage(theirs, 'me', new Set(['k1']))).toBe(false)
+      expect(strangersCarriage({ id: 'k9', realmId: null }, 'me')).toBe(true)
+    })
+  })
 
   it('unhitches a carriage’s horse by a grown resident of the realm on its tile', () => {
     const grown = (id: string, more: object = {}) =>

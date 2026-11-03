@@ -416,7 +416,10 @@ describe('every resident order on the group card', () => {
     carries: true,
     carriageToBoard: true,
     carriageToUnhitch: true,
-    downNear: 1,
+    driveOff: { problem: undefined },
+    hitchOff: { problem: undefined },
+    stealHorse: { problem: undefined },
+    toFeedNear: 1,
     carriesFood: true,
   })
   const offered = [
@@ -435,7 +438,14 @@ describe('every resident order on the group card', () => {
       for (const b of counterpart) expect(buttons.has(b), `${id}: ${b}`).toBe(true)
     }
     const oneOnly = Object.entries(GROUP_COUNTERPARTS).filter(([, c]) => 'none' in c)
-    expect(oneOnly.map(([id]) => id).sort()).toEqual(['makeLeader', 'pair', 'rename'])
+    expect(oneOnly.map(([id]) => id).sort()).toEqual([
+      'driveOff',
+      'hitchOff',
+      'makeLeader',
+      'pair',
+      'rename',
+      'stealHorse',
+    ])
   })
 
   it('shows its orders as rows named by their labels, with keys, under the resident card’s kinds', () => {
@@ -481,7 +491,7 @@ const everyOrder = {
     resident('d', 4, 5),
   ],
   seen: {
-    down: [{ id: 'd', x: 4, y: 5 }],
+    toFeed: [{ id: 'd', x: 4, y: 5 }],
     horses: [{ id: 'h2', x: 4, y: 4 }],
     carriages: [{ id: 'k1', x: 4, y: 4, horseId: 'h1' }],
     buildings: [
@@ -820,15 +830,22 @@ describe('the group card’s other orders', () => {
       resident('d', 4, 5),
       resident('e', 20, 20, { bornAt: TICK, ...food }),
     ]
-    const seen = { down: [{ id: 'x1', x: 4, y: 5 }] }
+    const seen = { toFeed: [{ id: 'x1', x: 4, y: 5 }] }
     const fed = seenSend({ kind: 'feed', units: 2 }, rs, seen)
     expect(orders(fed)).toEqual([{ kind: 'feed', targetId: 'x1', units: 2, residentId: 'a' }])
     expect(why(fed)).toEqual([
-      ['c', 'nobody Down nearby'],
+      ['c', 'nobody to feed nearby'],
       ['d', 'no Food in hand'],
       ['e', 'a child'],
       ['b', 'another of them feeds them'],
     ])
+  })
+
+  it('feeds a horse in the list of those to Feed as anyone else (`CONTEXT.md`: Feeding a horse)', () => {
+    const food = { carried: { food: 3 } }
+    const seen = { toFeed: [{ id: 'horse-1', x: 4, y: 5 }] }
+    const fed = seenSend({ kind: 'feed', units: 2 }, [resident('a', 4, 4, food)], seen)
+    expect(orders(fed)).toEqual([{ kind: 'feed', targetId: 'horse-1', units: 2, residentId: 'a' }])
   })
 })
 

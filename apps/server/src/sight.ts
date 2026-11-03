@@ -34,6 +34,7 @@ import {
   type WorldState,
   FOOTPRINT,
   footprintTiles,
+  crewIdsOf,
 } from '@csp/shared'
 import type { ExploredTerrain } from './explored.js'
 import type { InvariantViolation } from './invariants.js'
@@ -654,7 +655,7 @@ function caravanSeen(
   caravan: Pick<Caravan, 'carriageId' | 'driverId' | 'escortIds'>,
   inSight: (at: Spot) => boolean,
 ): boolean {
-  const crew = [caravan.driverId, ...caravan.escortIds]
+  const crew = crewIdsOf(caravan)
   return (
     world.carriages.some((k) => k.id === caravan.carriageId && inSight(k)) ||
     world.residents.some((r) => crew.includes(r.id) && inSight(r))

@@ -1,6 +1,7 @@
 import {
   BUILD_MATERIALS,
   aboutTime,
+  horseFull,
   isDown,
   inContact,
   bornIn,
@@ -311,7 +312,16 @@ const workSpan = (ticks: number) => {
  */
 /** What the map waits for a tile for: a Build line's start, then its end (`CONTEXT.md`: Build line). */
 export type Picking =
-  false | 'walk' | 'drive' | 'haul' | 'roadFrom' | 'roadTo' | 'wallFrom' | 'wallTo'
+  | false
+  | 'walk'
+  | 'drive'
+  | 'driveOff'
+  | 'hitchOff'
+  | 'haul'
+  | 'roadFrom'
+  | 'roadTo'
+  | 'wallFrom'
+  | 'wallTo'
 
 /** What a haul route carries, picked before its other stop (`CONTEXT.md`: Haul route). */
 export interface HaulSetup {
@@ -900,7 +910,7 @@ export function orderDoing(
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
-  if (o?.kind === 'feed') return 'Feeding someone Down'
+  if (o?.kind === 'feed') return 'Feeding'
   if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
   if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
@@ -1314,8 +1324,9 @@ export function GroupCard({
             </button>
           </div>
           <p className="muted small">
-            Each with Food in hand next to someone Down feeds them, one for each one Down: a unit is
-            eaten at once and wakes them at low health.
+            Each with Food in hand next to someone Down or a horse that isn’t full feeds them, one
+            for each: someone Down eats a unit at once and wakes at low health, a horse eats until
+            it is full.
           </p>
         </section>
       )}
@@ -1653,7 +1664,14 @@ export function ResidentCard({
   walls,
   onClimb,
   carriage,
+  carriageTheirs,
   onDriveTo,
+  driveOff,
+  onDriveOff,
+  hitchOff,
+  onHitchOff,
+  stealHorse,
+  onStealHorse,
   onHaulTo,
   onRoadTo,
   onWallTo,
@@ -1708,8 +1726,28 @@ export function ResidentCard({
   onWalkTo: () => void
   /** A carriage on the resident's tile, if one is in sight. */
   carriage: Carriage | undefined
+  /** That carriage is another organization's, not theirs to drive or haul with. */
+  carriageTheirs?: boolean
   /** Starts (or cancels) picking a tile to drive the carriage to. */
   onDriveTo: () => void
+  /**
+   * Another organization's carriage on the resident's tile, and why it can't be taken now, if so
+   * (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  driveOff?: { problem: string | undefined }
+  /** Starts (or cancels) picking a tile to drive that carriage off to. */
+  onDriveOff?: () => void
+  /**
+   * The realm's carriage on their tile with no horse of the realm's and another organization's
+   * horse to steal for it, and why it can't be taken now, if so.
+   */
+  hitchOff?: { problem: string | undefined }
+  /** Starts (or cancels) picking a tile to drive that carriage to with that horse. */
+  onHitchOff?: () => void
+  /** Another organization's free horse on their tile, and why it can't be taken now, if so. */
+  stealHorse?: { problem: string | undefined }
+  /** Orders them to steal that horse by mounting it. */
+  onStealHorse?: () => void
   /** Starts (or cancels) picking the other stop of a haul route carrying these goods. */
   onHaulTo: (setup: HaulSetup) => void
   /** Starts (or cancels) picking the two ends of a road to build along a line (Build line). */
@@ -1809,7 +1847,7 @@ export function ResidentCard({
   mapSize: number
   /** Orders the resident to attack another realm's resident, or to break a wall or gate. */
   onAttack: (targetId: string) => void
-  /** Orders the resident to Feed someone Down next to them (`CONTEXT.md`: Reviving). */
+  /** Orders the resident to Feed someone Down or a horse next to them. */
   onFeed?: (targetId: string, units: number) => void
   /** Finished walls and gates in sight of other realms' cities, or of none. */
   walls: Building[]
@@ -1895,10 +1933,16 @@ export function ResidentCard({
   const roadSite = road?.site ? road : undefined
   const atRoadSite: GoodsSpot = { kind: 'site', siteId: roadSite?.id ?? '' }
   const roadNeeded = roadSite ? materialsNeeded(roadSite) : {}
-  // Anyone in sight Down on or next to their tile, of any realm, to Feed (`CONTEXT.md`: Reviving).
-  const downNear = [...residents, ...others].filter(
-    (x) => x.id !== r.id && isDown(x) && inContact(mapSize, r, x),
-  )
+  // Anyone in sight Down on or next to their tile, and any horse there that isn't full, of any
+  // realm, to Feed (`CONTEXT.md`: Reviving, Feeding a horse).
+  const toFeedNear = [
+    ...[...residents, ...others].filter(
+      (x) => x.id !== r.id && isDown(x) && inContact(mapSize, r, x),
+    ),
+    ...horses
+      .filter((h) => !horseFull(h) && inContact(mapSize, r, h))
+      .map((h) => ({ id: h.id, name: h.name, horse: true as const })),
+  ]
   const atCarriageSite: GoodsSpot = { kind: 'site', siteId: carriageSite?.id ?? '' }
   const carriageNeeded = carriageSite ? materialsNeeded(carriageSite) : {}
   // Anyone Down on their tile, whose goods they can take as from a pile (`CONTEXT.md`: Down).
@@ -1912,6 +1956,10 @@ export function ResidentCard({
     inCity: r.cityId !== null,
     carriage,
     carriageHorseDown: horses.some((h) => h.id === carriage?.horseId && isDown(h)),
+    ...(carriageTheirs ? { carriageTheirs } : {}),
+    ...(driveOff ? { driveOff } : {}),
+    ...(hitchOff ? { hitchOff } : {}),
+    ...(stealHorse ? { stealHorse } : {}),
     pile,
     storage,
     building,
@@ -1933,7 +1981,7 @@ export function ResidentCard({
     carrying: !!r.carrying,
     carries: carried.length > 0,
     down: isDown(r),
-    downNear: downNear.length,
+    toFeedNear: toFeedNear.length,
     carriesFood: (r.carried.food ?? 0) > 0,
     downCarrying: downHere.map((d) => d.carried),
   })
@@ -1950,6 +1998,9 @@ export function ResidentCard({
     }
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
+    if (a.id === 'driveOff') onDriveOff?.()
+    if (a.id === 'hitchOff') onHitchOff?.()
+    if (a.id === 'stealHorse') onStealHorse?.()
     if (a.id === 'roadTo') onRoadTo()
     if (a.id === 'wallTo') onWallTo()
     if (a.id === 'stop') onStop()
@@ -2200,7 +2251,7 @@ export function ResidentCard({
       )}
       {shown === 'feed' && onFeed && (
         <FeedBlock
-          targets={downNear}
+          targets={toFeedNear}
           food={r.carried.food ?? 0}
           onFeed={(targetId, units) => {
             setPanel(undefined)

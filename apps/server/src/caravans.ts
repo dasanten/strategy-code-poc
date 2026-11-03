@@ -12,7 +12,9 @@ import {
   caravanOf,
   canWork,
   contractOf,
+  crewIdsOf,
   inContact,
+  isDown,
   isArmed,
   owedBy,
   punishers,
@@ -124,6 +126,27 @@ export function leaveTradeOrg(world: WorldState, post: City): void {
 }
 
 /**
+ * A new carriage of the Trade Org HQ `hq` at (x, y), with a new horse hitched to it, drawn from
+ * `seed`. Returns its id.
+ */
+function newCaravanCarriage(
+  world: WorldState,
+  hq: City,
+  x: number,
+  y: number,
+  seed: string,
+): string {
+  const horseId = newId(world, 'horse')
+  const rand = mulberry32(hash(seed))
+  world.horses.push(
+    newHorse(rand, { id: horseId, realmId: null, cityId: hq.id, x, y, tick: world.tick }),
+  )
+  const carriageId = newId(world, 'carriage')
+  world.carriages.push({ id: carriageId, realmId: null, cityId: hq.id, x, y, horseId, load: {} })
+  return carriageId
+}
+
+/**
  * Gives the Trade Org HQ a caravan for every trading post that has none (`CONTEXT.md`: Caravan):
  * a carriage with a horse hitched to it, a driver and `CARAVAN_ESCORTS` escorts, new residents
  * of the HQ, all standing at its goods warehouse. Each starts by topping up its Food at the HQ.
@@ -140,13 +163,8 @@ export function placeCaravans(world: WorldState): Caravan[] {
   for (const post of tradingPosts(world)) {
     if (served.has(post.id)) continue
     const rand = mulberry32(hash(`${world.seed}:caravan:${post.id}`))
-    const horseId = newId(world, 'horse')
-    const horseRand = mulberry32(hash(`${world.seed}:caravan-horse:${post.id}`))
-    world.horses.push(
-      newHorse(horseRand, { id: horseId, realmId: null, cityId: hq.id, x, y, tick: world.tick }),
-    )
-    const carriageId = newId(world, 'carriage')
-    world.carriages.push({ id: carriageId, realmId: null, cityId: hq.id, x, y, horseId, load: {} })
+    const horseSeed = `${world.seed}:caravan-horse:${post.id}`
+    const carriageId = newCaravanCarriage(world, hq, x, y, horseSeed)
     const names = residentNamesTaken(world, null, hq.id)
     const crew = Array.from({ length: 1 + CARAVAN_ESCORTS }, () => {
       const r = newResident(
@@ -179,7 +197,77 @@ export function placeCaravans(world: WorldState): Caravan[] {
 
 /** Everyone on a caravan, by id. */
 export function caravanCrew(world: WorldState): Set<string> {
-  return new Set(world.caravans.flatMap((c) => [c.driverId, ...c.escortIds]))
+  return new Set(world.caravans.flatMap(crewIdsOf))
+}
+
+/**
+ * Resident `residentId` is gone from the caravans they were on (`CONTEXT.md`: Caravan crew lost): an
+ * escort leaves it, and a driver is replaced (`replaceDriver`).
+ */
+export function leaveCaravans(world: WorldState, residentId: string): void {
+  for (const caravan of world.caravans) {
+    caravan.escortIds = caravan.escortIds.filter((id) => id !== residentId)
+    if (caravan.driverId === residentId) replaceDriver(world, caravan)
+  }
+}
+
+/**
+ * A surviving escort takes over from the driver who is gone, one who is up if any is, or there is
+ * no driver for now (`CONTEXT.md`: Caravan crew lost). What the old driver held for the caravan is
+ * gone with them.
+ */
+function replaceDriver(world: WorldState, caravan: Caravan): void {
+  const escorts = caravan.escortIds.flatMap((id) => world.residents.find((r) => r.id === id) ?? [])
+  const next = escorts.find((r) => !isDown(r)) ?? escorts[0]
+  caravan.holding = null
+  caravan.driverId = next?.id ?? null
+  if (!next) return
+  caravan.escortIds = caravan.escortIds.filter((id) => id !== next.id)
+  // They go on driving, out of whatever they were doing as an escort.
+  next.order = null
+}
+
+/**
+ * The adults of the HQ `hqId` who can be taken on for a caravan (`CONTEXT.md`: Caravan, Caravan
+ * crew lost): unarmed and up, idle or at work, not on another caravan, punishing, or hired out.
+ */
+function freeHands(world: WorldState, hqId: string | null): Resident[] {
+  const crew = caravanCrew(world)
+  const away = punishers(world)
+  return world.residents.filter(
+    (r) =>
+      r.owner === null &&
+      r.cityId === hqId &&
+      r.health > 0 &&
+      !isDown(r) &&
+      canWork(r, world.tick) &&
+      !isArmed(r) &&
+      (r.order === null || r.order.kind === 'workAt') &&
+      !crew.has(r.id) &&
+      !away.has(r.id) &&
+      !contractOf(world, r.id),
+  )
+}
+
+/**
+ * The HQ sends a caravan with no crew left a new driver on foot, the nearest to its carriage of
+ * those free, once it has one (`CONTEXT.md`: Caravan crew lost). They walk out to it as any driver
+ * parted from their carriage does.
+ */
+function sendDriver(
+  world: WorldState,
+  caravan: Caravan,
+  carriage: Carriage,
+  hq: City,
+  size: number,
+): void {
+  const free = freeHands(world, hq.id)
+  if (free.length === 0) return
+  const nearest = free.reduce((a, b) =>
+    wrapDistance(size, b, carriage) < wrapDistance(size, a, carriage) ? b : a,
+  )
+  nearest.order = null
+  caravan.driverId = nearest.id
 }
 
 /**
@@ -232,7 +320,7 @@ export function caravanThreats(
   carriage: Carriage,
   size: number,
 ): Resident[] {
-  const crew = new Set([caravan.driverId, ...caravan.escortIds])
+  const crew = new Set(crewIdsOf(caravan))
   return world.residents.filter((r) => {
     if (r.health <= 0 || crew.has(r.id)) return false
     if (wrapDistance(size, r, carriage) > CARAVAN_GUARD_RANGE) return false
@@ -281,20 +369,7 @@ function manEscort(world: WorldState, caravan: Caravan, carriage: Carriage, size
   if (!warehouse || !isAt(carriage, warehouse, size)) return false
   const wanted = caravanEscortsWanted(world, caravan.postId)
   if (caravan.escortIds.length < wanted) {
-    const crew = caravanCrew(world)
-    const away = punishers(world)
-    const joining = world.residents.filter(
-      (r) =>
-        r.owner === null &&
-        r.cityId === warehouse.cityId &&
-        r.health > 0 &&
-        canWork(r, world.tick) &&
-        !isArmed(r) &&
-        (r.order === null || r.order.kind === 'workAt') &&
-        !crew.has(r.id) &&
-        !away.has(r.id) &&
-        !contractOf(world, r.id),
-    )
+    const joining = freeHands(world, warehouse.cityId)
     // The nearest come, so the caravan waits for them least.
     joining.sort((a, b) => wrapDistance(size, a, warehouse) - wrapDistance(size, b, warehouse))
     for (const r of joining.slice(0, wanted - caravan.escortIds.length)) {
@@ -442,11 +517,12 @@ function runCaravan(
 
 /**
  * One tick of the Trade Org's caravans (`CONTEXT.md`: Caravan), run before the actions are
- * requested: escorts who are gone leave their caravan; a caravan whose driver, carriage, post or
- * HQ is gone breaks up, its crew left to the HQ; the escort defends it (`guardCaravan`), is made
- * up and armed at the HQ (`manEscort`), which the caravan waits for, and walks after the
- * carriage; and a caravan whose driver is idle goes on with its route (`runCaravan`). A driver parted from the
- * carriage walks back to it. `size` is the map's.
+ * requested: escorts who are gone leave their caravan; a caravan whose carriage, post or HQ is gone
+ * breaks up, its crew left to the HQ; one whose driver is gone gets another (`CONTEXT.md`: Caravan
+ * crew lost: `replaceDriver`, `sendDriver`), its carriage standing while it has none; the escort
+ * defends it (`guardCaravan`), is made up and armed at the HQ (`manEscort`), which the caravan
+ * waits for, and walks after the carriage; and a caravan whose driver is idle goes on with its
+ * route (`runCaravan`). A driver parted from the carriage walks back to it. `size` is the map's.
  */
 export function stepCaravans(world: WorldState, size: number): void {
   const hq = tradeOrgHq(world)
@@ -454,14 +530,19 @@ export function stepCaravans(world: WorldState, size: number): void {
     // Asked for each caravan: the last one breaking up may have changed the world.
     const index = worldIndex(world)
     caravan.escortIds = caravan.escortIds.filter((id) => index.residentById(id) !== undefined)
-    const driver = index.residentById(caravan.driverId)
     const carriage = index.carriageById(caravan.carriageId)
     const post = world.cities.find((c) => c.id === caravan.postId && c.tradeOrg === 'post')
-    if (!hq || !driver || !carriage || !post) {
+    if (!hq || !carriage || !post) {
       releaseDelivery(world, caravan)
       releaseTransfer(world, caravan)
       return false
     }
+    if (caravan.driverId !== null && !index.residentById(caravan.driverId)) {
+      replaceDriver(world, caravan)
+    }
+    if (caravan.driverId === null) sendDriver(world, caravan, carriage, hq, size)
+    const driver = caravan.driverId === null ? undefined : index.residentById(caravan.driverId)
+    if (!driver) return true
     guardCaravan(world, caravan, carriage, size)
     const arming = manEscort(world, caravan, carriage, size)
     followCarriage(world, caravan, carriage, size)
@@ -481,7 +562,7 @@ export function waitingForEscort(world: WorldState, size: number): Set<string> {
   const waiting = new Set<string>()
   const index = worldIndex(world)
   for (const caravan of world.caravans) {
-    const driver = index.residentById(caravan.driverId)
+    const driver = caravan.driverId === null ? undefined : index.residentById(caravan.driverId)
     if (driver?.order?.kind !== 'drive') continue
     const behind = caravan.escortIds.some((id) => {
       const r = index.residentById(id)
@@ -510,24 +591,59 @@ export function caravanFood(world: WorldState, r: Resident, size: number): Stock
  * is a caravan's and they aren't of the Trade Organization, they robbed it. Its route counts the
  * robbery, once a tick however many take from it (`robbed` holds the caravans robbed this tick),
  * and the Trade Organization makes good what was taken of its delivery or transfer
- * (`deliveryRobbed`, `transferRobbed`).
+ * (`deliveryRobbed`, `transferRobbed`). With `whole`, the carriage itself was taken, so all its
+ * load counts as taken, though it is still on it.
  */
 export function robCaravan(
   world: WorldState,
   r: Resident,
   carriageId: string,
   robbed: Set<string>,
+  whole = false,
 ): void {
   const caravan = world.caravans.find((c) => c.carriageId === carriageId)
   const carriage = world.carriages.find((k) => k.id === carriageId)
   if (!caravan || !carriage) return
-  if (ofTradeOrg(world, r)) return
+  // One of the Trade Org's own, hired out to a realm, robs it too by taking the whole carriage.
+  if (ofTradeOrg(world, r) && !whole) return
   if (!robbed.has(caravan.id)) {
     robbed.add(caravan.id)
     world.routeRobberies[caravan.postId] = (world.routeRobberies[caravan.postId] ?? 0) + 1
   }
-  deliveryRobbed(caravan, carriage)
-  transferRobbed(caravan, carriage)
+  const left = whole ? { ...carriage, load: {} } : carriage
+  deliveryRobbed(caravan, left)
+  transferRobbed(caravan, left)
+}
+
+/**
+ * `thief` stole a carriage (`CONTEXT.md`: Guaranteed carriage, Caravan crew lost): when it was a
+ * caravan's that robs the caravan, its whole load counting as taken, and the same caravan gets a
+ * new carriage and horse at the HQ's goods warehouse, where it starts its route over and any
+ * surviving crew walk back to it. With no HQ left to give them, the caravan ends.
+ */
+export function caravanCarriageStolen(
+  world: WorldState,
+  thief: Resident,
+  carriage: Carriage,
+): void {
+  const caravan = world.caravans.find((c) => c.carriageId === carriage.id)
+  if (!caravan) return
+  robCaravan(world, thief, carriage.id, new Set(), true)
+  const hq = tradeOrgHq(world)
+  const hall = hq && townHallOf(world, hq)
+  if (!hq || !hall) {
+    releaseDelivery(world, caravan)
+    releaseTransfer(world, caravan)
+    world.caravans = world.caravans.filter((c) => c !== caravan)
+    return
+  }
+  const middle = middleOf(hall)
+  const [x, y] = hqLayout(middle.x, middle.y).goodsWarehouse
+  const seed = `${world.seed}:caravan-horse:${caravan.postId}:${carriage.id}`
+  caravan.carriageId = newCaravanCarriage(world, hq, x, y, seed)
+  caravan.heading = 'hq'
+  caravan.stop = 'storage'
+  caravan.toLoad = null
 }
 
 /**
@@ -551,10 +667,11 @@ export const routeRobberiesSound: Invariant = {
 }
 
 /**
- * Caravans hold together (`CONTEXT.md`: Caravan; ADR 0004): each runs to a trading post that
- * exists, at most one to each; its carriage, driver and escorts exist and are the HQ's (of no
- * realm, of the HQ city); nobody is on two caravans or both drives and escorts; the driver drives
- * only the caravan's carriage; it walks with no more escorts than its route gets
+ * Caravans hold together (`CONTEXT.md`: Caravan, Caravan crew lost; ADR 0004): each runs to a
+ * trading post that exists, at most one to each; its carriage, of the Trade Organization or it
+ * ends, and its crew exist and are the HQ's (of no realm, of the HQ city); it has no driver only
+ * with no crew left; nobody is on two caravans or both drives and escorts; the driver drives only
+ * the caravan's carriage; it walks with no more escorts than its route gets
  * (`caravanEscortsWanted`); and the Food it is set to load fits on a carriage.
  */
 export const caravansSound: Invariant = {
@@ -581,7 +698,10 @@ export const caravansSound: Invariant = {
       else if (k.realmId !== null || k.cityId !== hq?.id) {
         fail(c, `has carriage ${k.id}, which isn't the Trade Org HQ's`, [k.id])
       }
-      for (const id of [c.driverId, ...c.escortIds]) {
+      if (c.driverId === null && c.escortIds.length > 0) {
+        fail(c, 'has no driver, though an escort could take over')
+      }
+      for (const id of crewIdsOf(c)) {
         const r = world.residents.find((x) => x.id === id)
         if (!r) fail(c, `has crew ${id}, who doesn't exist`)
         else if (r.owner !== null || r.cityId !== hq?.id) {
@@ -596,8 +716,8 @@ export const caravansSound: Invariant = {
       }
       const driver = world.residents.find((x) => x.id === c.driverId)
       const o = driver?.order
-      if (o?.kind === 'drive' && o.carriageId !== c.carriageId) {
-        fail(c, `has its driver driving ${o.carriageId}`, [c.driverId])
+      if (driver && o?.kind === 'drive' && o.carriageId !== c.carriageId) {
+        fail(c, `has its driver driving ${o.carriageId}`, [driver.id])
       }
       const holds = k ? carriageCapacity(world, k) : CARRIAGE_CAPACITY
       if (c.toLoad && stockWeight(c.toLoad) > holds + 1e-9) {

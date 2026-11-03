@@ -39,7 +39,9 @@ screens (59: unique game-given names, the minimap, structured cards and forms, t
 scripting entry), both ahead of Bandits. Agreed with Daniel later on 2026-11-02, from his list of
 that day: Quick wins 5 (Epic 60: roads and ways far out, Work on a site), Workplace settings (61,
 ADR 0020), Readable cards (62: goods icons, facts as rows), Down, not dead (63, ADR 0021) and
-Waypoints and exploring (64), in that order, all ahead of Bandits.
+Waypoints and exploring (64), in that order, all ahead of Bandits. Agreed with Daniel on
+2026-11-03, from his list of horse bugs: Horses and stealing (Epic 65, ADR 0022: a joining city
+brings its horses, Feed a horse, stealing carriages and horses) next, ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -108,6 +110,7 @@ I sleep.
 | 62  | [Readable cards](https://github.com/dasanten/strategy-code-poc/issues/719)                      | ticketed                |
 | 63  | [Down, not dead](https://github.com/dasanten/strategy-code-poc/issues/720)                      | ticketed                |
 | 64  | [Waypoints and exploring](https://github.com/dasanten/strategy-code-poc/issues/721)             | ticketed                |
+| 65  | [Horses and stealing](https://github.com/dasanten/strategy-code-poc/issues/769)                 | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
