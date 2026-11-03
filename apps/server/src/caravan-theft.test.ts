@@ -264,6 +264,65 @@ describe('stealing a caravan’s carriage', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
+  it('steals a stranger’s free horse with a horseless carriage: two thefts, one robbery', () => {
+    const { world, caravan, hq, killCrew, driveOff, realm, p1 } = outInTheOpen()
+    const stolen = carriageOf(world, caravan)
+    const dead = world.horses.find((h) => h.id === stolen.horseId)!
+    // The caravan's horse died; another Player's stands free on the tile.
+    world.horses = world.horses.filter((h) => h !== dead)
+    stolen.horseId = null
+    const other = { ...dead, id: 'stranger-horse', name: 'Stray', realmId: 'r9', cityId: null }
+    world.realms.push({ id: 'r9', userId: 99, leaderId: 'nobody' } as WorldState['realms'][0])
+    world.horses.push(other)
+    killCrew()
+    expect(driveOff()).toBe('ack')
+    expect(p1.order).toMatchObject({ kind: 'drive', carriageId: stolen.id })
+    expect(stolen).toMatchObject({ realmId: realm.id, horseId: other.id })
+    expect(other).toMatchObject({ realmId: realm.id, cityId: null })
+    expect(world.crimes.map((c) => c.victimOrg).sort()).toEqual([hq.id, 'r9'].sort())
+    expect(world.routeRobberies).toEqual({ [caravan.postId]: 1 })
+    // The new carriage has a horse of its own, not the stolen one.
+    const fresh = carriageOf(world, caravan)
+    expect(fresh.horseId).not.toBe(other.id)
+    expect(world.horses.find((h) => h.id === fresh.horseId)).toMatchObject({ cityId: hq.id })
+  })
+
+  it('steals a horseless carriage with the Trade Org’s free horse as one theft', () => {
+    const { world, caravan, hq, killCrew, driveOff, realm } = outInTheOpen()
+    const stolen = carriageOf(world, caravan)
+    const horse = world.horses.find((h) => h.id === stolen.horseId)!
+    stolen.horseId = null
+    killCrew()
+    expect(driveOff()).toBe('ack')
+    expect(stolen).toMatchObject({ realmId: realm.id, horseId: horse.id })
+    expect(horse).toMatchObject({ realmId: realm.id })
+    expect(world.crimes).toEqual([
+      expect.objectContaining({ victimOrg: hq.id, carriage: true, horse: horse.name }),
+    ])
+    expect(world.routeRobberies).toEqual({ [caravan.postId]: 1 })
+  })
+
+  it('gives the new carriage a horse that can’t be taken off it by mounting or hitching', () => {
+    const { world, caravan, queue, killCrew, driveOff, p1 } = outInTheOpen()
+    killCrew()
+    const stolen = carriageOf(world, caravan)
+    driveOff()
+    const fresh = carriageOf(world, caravan)
+    const horse = world.horses.find((h) => h.id === fresh.horseId)!
+    p1.order = null
+    p1.x = fresh.x
+    p1.y = fresh.y
+    expect(order(world, queue, { kind: 'mount', horseId: horse.id })).not.toBe('ack')
+    // Her own carriage, with none hitched, brought beside it: its horse pulls another carriage.
+    stolen.x = fresh.x
+    stolen.y = fresh.y
+    stolen.horseId = null
+    const hitching = { kind: 'drive', carriageId: stolen.id, x: fresh.x + 3, y: fresh.y }
+    expect(order(world, queue, { ...hitching, horseId: horse.id })).not.toBe('ack')
+    expect(horse).toMatchObject({ realmId: null })
+    expect(fresh.horseId).toBe(horse.id)
+  })
+
   it('ends the caravan when there is no HQ left to replace it', () => {
     const { world, terrain, caravan, hq, killCrew, driveOff } = outInTheOpen()
     killCrew()

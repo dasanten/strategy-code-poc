@@ -273,11 +273,9 @@ describe('driving off in another organization’s carriage', () => {
     expect(driveOff()).toMatchObject({ reason: 'children can’t steal' })
   })
 
-  it('needs its hitched horse, or a free horse of the thief’s own, and hitches that one', () => {
+  it('hitches a free horse of the thief’s own before stealing one', () => {
     const { world, horse, carriage, horseOf, thief, orders, driveOff } = setup()
     carriage.horseId = null
-    // Someone else's free horse is for later (T65.4).
-    expect(driveOff()).toMatchObject({ reason: 'no horse here to pull that carriage' })
     const own = horseOf('h1', 'r1')
     expect(driveOff()).toMatchObject({ type: 'ack' })
     orders.applyAll(world)

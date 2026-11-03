@@ -7,6 +7,9 @@ import {
   holdersOf,
   carriageOfResident,
   driveOffProblem,
+  hitchOffProblem,
+  horseToSteal,
+  mountOffProblem,
   horseOfResident,
   horseFull,
   isDown,
@@ -675,6 +678,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setOrderError(await giveOrder(order))
       return
     }
+    // Only this names a stranger's horse, so only this steals one to pull the realm's carriage.
+    if (mode === 'hitchOff' && unhorsedHere && horseToHitch) {
+      const order = {
+        kind: 'drive',
+        residentId: selected.id,
+        carriageId: unhorsedHere.id,
+        horseId: horseToHitch.id,
+        x,
+        y,
+      }
+      setOrderError(await giveOrder(order, false))
+      return
+    }
     if (mode === 'haul' && carriage && haulSetup) {
       // The Haul task: they run the Player's Haul (default) script (`CONTEXT.md`: Default script).
       const order = { kind: 'task', task: 'haul', residentId: selected.id, carriageId: carriage.id }
@@ -1172,6 +1188,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     strangersCarriage(k, world?.home.realmId, armyCarriages)
   const ownCarriageHere = onTile(world?.carriages.filter((k) => !isStrangers(k)))
   const stealableHere = onTile(world?.carriages.filter(isStrangers))
+  // Another organization's horses for the picked resident (`CONTEXT.md`: Stealing a carriage or
+  // horse): a free one to mount, and one to pull the realm's own carriage that has none of its own.
+  const unhorsedHere = onTile(
+    world?.carriages.filter((k) => k.realmId === world.home.realmId && !k.horseId),
+  )
+  const horseToHitch =
+    world && selected && unhorsedHere
+      ? horseToSteal(world, selected, unhorsedHere, world.home.realmId)
+      : undefined
+  const looseStrangers = onTile(
+    world?.horses.filter(
+      (h) => h.realmId !== world.home.realmId && !carriagePulledBy(world, h) && !riderOf(world, h),
+    ),
+  )
   // What the pick waiting for a tile would do under the pointer, or at the tile tapped on a touch
   // screen (`CONTEXT.md`: Picking a target).
   const preview = (() => {
@@ -1681,6 +1711,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               select([residentId])
               setPicking('driveOff')
             }}
+            onHitchOff={(residentId) => {
+              select([residentId])
+              setPicking('hitchOff')
+            }}
+            onStealHorse={(horseId, residentId) =>
+              void giveOrder({ kind: 'mount', residentId, horseId }, false).then(setOrderError)
+            }
             mapSize={world.map.size}
             onFeed={(targetId, units) => void feed(targetId, units)}
             onPickUp={async (residentId, spot, goods) =>
@@ -1768,6 +1805,28 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 ),
               },
               onDriveOff: () => setPicking((p) => (p === 'driveOff' ? false : 'driveOff')),
+            })}
+            {...(unhorsedHere &&
+              horseToHitch && {
+                hitchOff: {
+                  problem: hitchOffProblem(
+                    world,
+                    selected,
+                    { ...unhorsedHere, realmId: world.home.realmId },
+                    horseToHitch.id,
+                  ),
+                },
+                onHitchOff: () => setPicking((p) => (p === 'hitchOff' ? false : 'hitchOff')),
+              })}
+            {...(looseStrangers && {
+              stealHorse: {
+                problem: mountOffProblem(world, selected, looseStrangers, world.home.realmId),
+              },
+              onStealHorse: () =>
+                void giveOrder(
+                  { kind: 'mount', residentId: selected.id, horseId: looseStrangers.id },
+                  false,
+                ).then(setOrderError),
             })}
             onRoadTo={() =>
               setPicking((p) => (p === 'roadFrom' || p === 'roadTo' ? false : 'roadFrom'))

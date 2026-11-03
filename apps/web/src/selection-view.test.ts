@@ -64,6 +64,7 @@ import {
   tileActions,
   commandedCarriages,
   strangersCarriage,
+  thiefAmong,
   thiefOf,
   unhitcherOf,
   type ActionId,
@@ -304,6 +305,25 @@ describe('the actions on a resident’s card', () => {
       active: true,
     })
     expect(residentOrders(here()).missing.driveOff).toBe('no carriage of another realm here')
+    const mount = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'stealHorse')
+    expect(mount(here({ stealHorse: { problem: undefined } }))).toEqual({
+      id: 'stealHorse',
+      label: 'Mount their horse (theft)',
+      key: 'M',
+    })
+    expect(mount(here({ stealHorse: { problem: 'guarded' } }))).toMatchObject({
+      disabled: true,
+      reason: 'guarded',
+    })
+    expect(residentOrders(here()).missing.stealHorse).toBe('no free horse of another realm here')
+    const hitch = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'hitchOff')
+    expect(hitch(here({ hitchOff: { problem: undefined } }))).toMatchObject({
+      label: 'Drive with their horse (theft)',
+    })
+    expect(hitch(here({ hitchOff: { problem: 'guarded' } }))).toMatchObject({
+      disabled: true,
+      reason: 'guarded',
+    })
   })
 
   it('offers unhitching a hitched carriage of the realm on their tile to grown-ups', () => {
@@ -1412,11 +1432,104 @@ describe('the actions on a tile’s card', () => {
       expect(row(thing([person('ada')], { horses: [down] }))?.reason).toBe('its horse is Down')
     })
 
-    it('goes by what strangers see, with no horse hitched or none of theirs free', () => {
-      const bare = { carriages: [{ ...theirs, horseId: null }], horses: [horse] }
-      expect(row(thing([person('ada')], bare))?.reason).toBe('no horse here to pull that carriage')
+    it('goes by what strangers see, with no horse hitched or none free', () => {
+      const bare = { carriages: [{ ...theirs, horseId: null }] }
+      expect(row(thing([person('ada')], { ...bare, horses: [] }))?.reason).toBe(
+        'no horse here to pull that carriage',
+      )
+      // Their free horse goes with it, stolen too.
+      expect(row(thing([person('ada')], { ...bare, horses: [horse] }))?.reason).toBeUndefined()
       const own = { ...horse, id: 'h2', realmId: 'me' }
       expect(row(thing([person('ada')], { ...bare, horses: [horse, own] }))?.reason).toBeUndefined()
+    })
+
+    describe('another realm’s free horse', () => {
+      const loose = (residents: SeenResident[], more: Partial<TileThings> = {}) =>
+        thing(residents, { carriages: [], ...more })
+      const mount = (card: TileCard, actor?: { id: string }) =>
+        tileActions(card, actor as Resident).find((a) => a.id === 'stealHorse')
+
+      it('offers Mount, which says it is theft, with a resident of the Player’s there', () => {
+        const card = loose([person('ada')])
+        expect(card.stealHorse).toEqual({
+          horseId: 'h1',
+          residents: [{ id: 'ada', name: 'ada', problem: undefined }],
+        })
+        expect(mount(card)).toEqual({
+          id: 'stealHorse',
+          label: 'Mount their horse (theft)',
+          key: 'M',
+        })
+      })
+
+      it('offers nothing with nobody of theirs there, nor on their own or a hitched or ridden one', () => {
+        expect(loose([person('away', { x: 6 })]).stealHorse).toBeUndefined()
+        expect(loose([person('st', { owner: 'them' })]).stealHorse).toBeUndefined()
+        const own = { ...horse, realmId: 'me' }
+        expect(loose([person('ada')], { horses: [own] }).stealHorse).toBeUndefined()
+        expect(thing([person('ada')]).stealHorse).toBeUndefined()
+        const rider = person('st', { owner: 'them', riding: 'h1' })
+        expect(loose([person('ada'), rider]).stealHorse).toBeUndefined()
+      })
+
+      it('greys it with the reason while it can’t be taken', () => {
+        const reason = (card: TileCard) => mount(card)?.reason
+        const armed = person('st', { owner: 'them', carried: { spear: 1 } })
+        expect(reason(loose([person('ada'), armed]))).toBe('an armed resident guards that horse')
+        expect(mount(loose([person('ada'), armed]))?.disabled).toBe(true)
+        expect(
+          reason(loose([person('ada'), armed, person('bo', { carried: { sword: 1 } })])),
+        ).toBeUndefined()
+        const down = { ...horse, down: true as const }
+        expect(reason(loose([person('ada')], { horses: [down] }))).toBe('that horse is Down')
+        expect(reason(loose([person('kid', { bornAt: tick })]))).toBe('children can’t steal')
+      })
+
+      it('offers the one that can be taken of several, and the one picked last does it', () => {
+        const down = { ...horse, id: 'h9', down: true as const }
+        const card = loose([person('kid', { bornAt: tick }), person('ada')], {
+          horses: [down, horse],
+        })
+        expect(card.stealHorse?.horseId).toBe('h1')
+        expect(thiefAmong(card.stealHorse?.residents, { id: 'nobody' })?.id).toBe('ada')
+        expect(thiefAmong(card.stealHorse?.residents, { id: 'kid' })?.problem).toBe(
+          'children can’t steal',
+        )
+      })
+    })
+
+    describe('another realm’s horse by the Player’s own carriage', () => {
+      const mine = { carriages: [{ ...carriage, horseId: null }] }
+      const hitch = (card: TileCard) =>
+        tileActions(card, undefined).find((a) => a.id === 'hitchOff')
+
+      it('says it is theft before it steals', () => {
+        const card = thing([person('ada')], mine)
+        expect(card.hitchOff).toEqual({
+          carriageId: carriage.id,
+          horseId: 'h1',
+          residents: [{ id: 'ada', name: 'ada', problem: undefined }],
+        })
+        expect(hitch(card)).toEqual({
+          id: 'hitchOff',
+          label: 'Drive with their horse (theft)',
+          key: 'D',
+        })
+      })
+
+      it('offers nothing with a horse of their own there or hitched', () => {
+        const own = { ...horse, id: 'h2', realmId: 'me' }
+        expect(thing([person('ada')], { ...mine, horses: [horse, own] }).hitchOff).toBeUndefined()
+        const hitched = { carriages: [{ ...carriage, horseId: 'h2' }], horses: [horse, own] }
+        expect(thing([person('ada')], hitched).hitchOff).toBeUndefined()
+      })
+
+      it('greys it with the reason while the horse is guarded', () => {
+        const armed = person('st', { owner: 'them', carried: { spear: 1 } })
+        expect(hitch(thing([person('ada'), armed], mine))?.reason).toBe(
+          'an armed resident guards that horse',
+        )
+      })
     })
 
     it('has the resident picked last do it when they are there, else the first who can', () => {
