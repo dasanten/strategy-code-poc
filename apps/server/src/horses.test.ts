@@ -2,6 +2,7 @@ import {
   AVERAGE_HORSE_STATS,
   BUILD_MATERIALS,
   BUILD_WORK,
+  DOWN_DAYS,
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
   HORSE_START_AGE_MAX,
@@ -163,19 +164,30 @@ describe('horse hunger', () => {
     expect(h.health).toBe(MAX_HEALTH)
   })
 
-  it('starves a horse with nothing in reach like a resident, and logs its death', () => {
+  it('starves a horse with nothing in reach like a resident, Down and then dead, and logs both', () => {
     const { world } = setup()
     const h = horse(world, 'h1', 2, 2)
-    // A full meter lasts HUNGER_DAYS; then it loses health for STARVE_DAYS.
+    // A full meter lasts HUNGER_DAYS; then it loses health for STARVE_DAYS and goes Down.
     run(world, HUNGER_DAYS - 0.01)
     expect(h.hunger).toBeGreaterThan(0)
     expect(h.health).toBe(MAX_HEALTH)
-    const died = run(world, STARVE_DAYS + 0.02)
+    expect(run(world, STARVE_DAYS + 0.02)).toEqual([])
+    expect(h.downUntil).toBeDefined()
+    expect(eventsFor(world, 7)).toEqual([
+      expect.objectContaining({
+        kind: 'horseDown',
+        horseId: 'h1',
+        name: 'Rowan',
+        until: h.downUntil,
+      }),
+    ])
+    // Nobody puts Food by it before its time is up (`CONTEXT.md`: Down).
+    const died = run(world, DOWN_DAYS)
     expect(died).toEqual([h])
     expect(world.horses).toEqual([])
-    expect(eventsFor(world, 7)).toEqual([
+    expect(eventsFor(world, 7)).toContainEqual(
       expect.objectContaining({ kind: 'horseDied', horseId: 'h1', name: 'Rowan' }),
-    ])
+    )
   })
 
   it('has no inventory: carried food and food in another stable are out of reach', () => {
@@ -190,7 +202,7 @@ describe('horse hunger', () => {
       y: 0,
       stock: { food: 50 },
     })
-    run(world, HUNGER_DAYS + STARVE_DAYS + 0.02)
+    run(world, HUNGER_DAYS + STARVE_DAYS + DOWN_DAYS + 0.02)
     expect(world.horses).not.toContain(h)
     expect(w1.carried.food).toBe(5)
     expect(world.buildings.find((b) => b.id === 's2')!.stock).toEqual({ food: 50 })

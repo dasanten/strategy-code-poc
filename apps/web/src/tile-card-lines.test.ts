@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BUILD_MATERIALS,
   BUILD_WORK,
   FOOD_PER_DAY,
+  GOODS,
   HOUSING_ROOM,
   MOUNTAIN_ROAD_WORK_FACTOR,
   TICKS_PER_GAME_YEAR,
@@ -9,6 +11,7 @@ import {
   UNEXPLORED,
   hungerFactor,
   teardownWork,
+  type Good,
   type Pile,
   type Resident,
   type SeenBuilding,
@@ -89,31 +92,56 @@ describe('the terrain on a tile’s card', () => {
 })
 
 describe('buildings on a tile’s card', () => {
-  it('says what a construction site still needs', () => {
-    const mine = (delivered: SeenBuilding['stock'] & object) =>
-      building({ kind: 'mine', site: { work: 0, delivered } })
-    expect(linesOf({ buildings: [mine({ wood: 10 })] })).toContain('Still needs 30 wood, 20 stone')
-    expect(linesOf({ buildings: [mine({ wood: 40, stone: 20 })] })).toContain(
-      'All materials delivered',
-    )
-    const farm = building({ kind: 'farm', site: { work: 0, delivered: {} } })
-    expect(linesOf({ buildings: [farm] })).toContain('Needs no materials, only work')
+  it('shows what a construction site has against what it needs, per good', () => {
+    const mine = (delivered: SeenBuilding['stock'] & object, work = 0) =>
+      building({ kind: 'mine', site: { work, delivered } })
+    const half = tile({ buildings: [mine({ wood: 10 }, (BUILD_WORK.mine ?? 0) / 2)] })
+    expect(half.sites).toEqual([
+      {
+        work: { text: '50%', share: 0.5 },
+        materials: [
+          { good: 'wood', have: 10, need: 40 },
+          { good: 'stone', have: 0, need: 20 },
+        ],
+      },
+    ])
+    expect(half.lines.some((l) => /wood|work done|delivered/.test(l))).toBe(false)
+    expect(half.lists).toBeUndefined()
+    const full = tile({ buildings: [mine({ wood: 40, stone: 20 })] })
+    expect(full.sites?.[0]?.materials.every((m) => m.have === m.need)).toBe(true)
+    const farm = tile({ buildings: [building({ kind: 'farm', site: { work: 0, delivered: {} } })] })
+    expect(farm.sites?.[0]?.materials).toEqual([])
   })
 
-  it('says what a workplace makes and how much lies in its pile', () => {
-    const farm = building({ kind: 'farm', cityId: 'c-me' })
-    expect(linesOf({ buildings: [farm], piles: [pile({ food: 7 })] })).toContain(
-      'Makes food · 7 in its pile',
+  it('shows a carriage site under a head of its own on its stable’s card', () => {
+    const stable = building({ kind: 'stable', cityId: 'c-me', stock: {} })
+    const carriage = building({ id: 'k', kind: 'carriage', site: { work: 0, delivered: {} } })
+    const card = tile({ buildings: [stable, carriage] })
+    expect(card.title).toBe('Eastmere stable')
+    expect(card.sites).toEqual([
+      expect.objectContaining({ title: 'Carriage site', work: { text: '0%', share: 0 } }),
+    ])
+    expect(card.sites?.[0]?.materials.map((m) => m.good)).toEqual(
+      Object.keys(BUILD_MATERIALS.carriage ?? {}).sort(
+        (a, b) => GOODS.indexOf(a as Good) - GOODS.indexOf(b as Good),
+      ),
     )
+    // On a card of its own, the card's head names it.
+    const alone = tile({ buildings: [carriage] })
+    expect(alone.title).toBe('Carriage site')
+    expect(alone.sites?.[0]?.title).toBeUndefined()
+  })
+
+  it('says what a workplace makes, and shows its pile as a goods grid', () => {
+    const farm = building({ kind: 'farm', cityId: 'c-me' })
+    const card = tile({ buildings: [farm], piles: [pile({ food: 7 })] })
+    expect(card.lines).toContain('Makes food')
+    expect(card.lists?.find((l) => l.title === 'Pile')?.goods).toEqual({ food: 7 })
     // A mine's node lies on one tile of its footprint, not necessarily the one clicked.
     const nodeAt = (x: number, y: number) =>
       x === 6 && y === 6 ? { kind: 'goldOre' as const, x, y } : undefined
-    expect(linesOf({ buildings: [building({ kind: 'mine' })], nodeAt })).toContain(
-      'Makes gold ore · 0 in its pile',
-    )
-    expect(linesOf({ buildings: [building({ kind: 'smelter' })] })).toContain(
-      'Makes iron · 0 in its pile',
-    )
+    expect(linesOf({ buildings: [building({ kind: 'mine' })], nodeAt })).toContain('Makes gold ore')
+    expect(linesOf({ buildings: [building({ kind: 'smelter' })] })).toContain('Makes iron')
     const house = linesOf({ buildings: [building({ kind: 'house', cityId: 'c-me' })] })
     expect(house.some((l) => l.startsWith('Makes'))).toBe(false)
   })
@@ -130,10 +158,9 @@ describe('buildings on a tile’s card', () => {
       residents: [at('a', 'sword'), at('b', 'sword'), at('c', 'shield')],
       piles: [pile({ sword: 3, iron: 5 })],
     })
-    expect(card.lines).toContain('Its workers make sword (2), shield (1) · in its pile: 3 sword')
-    expect(linesOf({ buildings: [smithy] })).toContain(
-      'Makes weapons and armour, nobody at it · in its pile: nothing made',
-    )
+    expect(card.lines).toContain('Its workers make sword (2), shield (1)')
+    expect(card.lists?.find((l) => l.title === 'Pile')?.goods).toEqual({ sword: 3, iron: 5 })
+    expect(linesOf({ buildings: [smithy] })).toContain('Makes weapons and armour, nobody at it')
   })
 
   it('says nobody teaches at a finished training ground yet, and nothing of the kind at its site', () => {
@@ -367,6 +394,163 @@ describe('buildings on a tile’s card', () => {
     expect(linesOf({ buildings: [house] }).some((l) => l.startsWith('Being torn'))).toBe(false)
     const road = building({ kind: 'road', teardown: teardownWork(building({ kind: 'road' })) })
     expect(linesOf({ buildings: [road] })).toContain('Being torn down · 100% done')
+  })
+})
+
+describe('who is on the way to a storage or stable (CONTEXT.md: Goods on cards)', () => {
+  const storage = building({ kind: 'storage', cityId: 'c-me', stock: { wood: 3 } })
+  const place = { kind: 'storage' as const, storageId: storage.id }
+  const way: [number, number][] = [
+    [6, 5],
+    [5, 5],
+  ]
+  const ben = resident({
+    id: 'ben',
+    name: 'Ben',
+    owner: 'me',
+    order: {
+      kind: 'store',
+      goods: { wood: null },
+      to: place,
+      phase: 'walking',
+      path: way,
+      progress: 0,
+    },
+  })
+  const cara = resident({
+    id: 'cara',
+    name: 'Cara',
+    owner: 'me',
+    order: {
+      kind: 'fetch',
+      goods: { stone: 10 },
+      from: place,
+      phase: 'walking',
+      path: way,
+      progress: 0,
+    },
+  })
+  const onTheWay = (residents: Resident[], more: Partial<TileThings> = {}) =>
+    tile({
+      buildings: [storage],
+      residents,
+      strangers: residents.filter((r) => r.owner !== 'me'),
+      arrivesIn: (r) => (r.id === 'ben' ? 300 : r.id === 'cara' ? 60 : undefined),
+      ...more,
+    }).lists?.find((l) => l.title === 'On the way')
+
+  it('lists the Player’s residents storing and fetching there, soonest first, to pick', () => {
+    const list = onTheWay([ben, cara])!
+    expect(list.count).toBe('2')
+    expect(list.rows.map((r) => [r.name, r.detail, r.opens])).toEqual([
+      ['Cara', 'Fetch · 10 stone · about 1 min (a game hour)', 'resident'],
+      ['Ben', 'Store · wood · about 5 min (5 game hours)', 'resident'],
+    ])
+  })
+
+  it('says Getting food for a fetch of Food alone, and tiles or the search without an estimate', () => {
+    const hungry = resident({
+      id: 'dag',
+      name: 'Dag',
+      owner: 'me',
+      order: {
+        kind: 'fetch',
+        goods: { food: 6 },
+        from: place,
+        phase: 'walking',
+        path: way,
+        progress: 0,
+      },
+    })
+    const lost = resident({
+      id: 'eli',
+      name: 'Eli',
+      owner: 'me',
+      order: {
+        kind: 'store',
+        goods: { iron: 2 },
+        to: place,
+        phase: 'walking',
+        path: null,
+        progress: 0,
+      },
+    })
+    expect(onTheWay([hungry, lost])!.rows.map((r) => r.detail)).toEqual([
+      'Getting food · 2 tiles to go',
+      'Store · 2 iron · finding the way',
+    ])
+  })
+
+  it('lists a haul route’s driver heading there, with what the carriage brings and takes', () => {
+    const haul = (stop: 'from' | 'to', phase: 'driving' | 'loading') =>
+      resident({
+        id: `fen-${stop}`,
+        name: 'Fen',
+        owner: 'me',
+        order: {
+          kind: 'haul',
+          carriageId: 'k1',
+          from: { x: 5, y: 5 },
+          to: { x: 20, y: 20 },
+          goods: ['wood'],
+          returnGoods: ['iron'],
+          keepFood: 0,
+          stop,
+          phase,
+          path: way,
+          progress: 0,
+          moving: null,
+        },
+      })
+    expect(onTheWay([haul('from', 'driving')])!.rows[0]!.detail).toBe(
+      'Haul · brings iron · takes wood · 2 tiles to go',
+    )
+    // Driving to the other stop, or loading here already, is not on the way.
+    expect(onTheWay([haul('to', 'driving'), haul('from', 'loading')])).toBeUndefined()
+  })
+
+  it('leaves out strangers, those there already, and those going elsewhere', () => {
+    const stranger = { ...ben, id: 'x', owner: 'them' }
+    const there = resident({
+      id: 'gil',
+      owner: 'me',
+      order: { kind: 'store', goods: {}, to: place, phase: 'putting', path: null, progress: 0 },
+    })
+    const elsewhere = resident({
+      id: 'hal',
+      owner: 'me',
+      order: {
+        kind: 'store',
+        goods: {},
+        to: { kind: 'storage', storageId: 'other' },
+        phase: 'walking',
+        path: way,
+        progress: 0,
+      },
+    })
+    expect(onTheWay([stranger, there, elsewhere])).toBeUndefined()
+  })
+
+  it('lists who comes to a stable too, not to another building', () => {
+    const stable = building({ kind: 'stable', cityId: 'c-me', stock: { food: 0 } })
+    const feeding = resident({
+      id: 'ida',
+      name: 'Ida',
+      owner: 'me',
+      order: {
+        kind: 'store',
+        goods: { food: 10 },
+        to: { kind: 'storage', storageId: stable.id },
+        phase: 'walking',
+        path: way,
+        progress: 0,
+      },
+    })
+    expect(onTheWay([feeding], { buildings: [stable] })!.rows[0]!.detail).toBe(
+      'Store · 10 food · 2 tiles to go',
+    )
+    const house = building({ kind: 'house', cityId: 'c-me', id: stable.id })
+    expect(onTheWay([feeding], { buildings: [house] })).toBeUndefined()
   })
 })
 

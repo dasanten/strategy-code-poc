@@ -443,8 +443,8 @@
   font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
-/* Who and what a tile holds (`CardList`): its horses, workers or goods as rows, meters on the
-   right as the resident card has them; a row the Player can open is a button. */
+/* Who and what a tile holds (`CardList`): its horses or workers as rows, meters on the right as
+   the resident card has them, a row the Player can open is a button; its goods as the goods grid. */
 .card-list {
   display: grid;
   gap: 2px;
@@ -502,5 +502,161 @@ button.card-list-row:hover {
 }
 /* Run script's button keeps its label on one line beside the picker. */
 .run-script .order-buttons button {
+  white-space: nowrap;
+}
+/* The goods grid (`CONTEXT.md`: Goods on cards): icon and amount per good, the name on hover or
+   long-press; a resident's own food apart at the end. */
+.goods-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.goods-cell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 4px;
+  border-radius: 6px;
+  background: var(--ui-raised);
+  color: var(--ui-text);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.goods-own {
+  margin-left: 6px;
+  background: none;
+  outline: 1px dashed var(--ui-muted);
+  outline-offset: -1px;
+}
+.goods-own.warn {
+  color: var(--ui-warn);
+  outline-color: var(--ui-warn);
+}
+.goods-own-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ui-muted);
+}
+.goods-name {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ui-ink);
+  color: var(--ui-text);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.goods-cell.named .goods-name {
+  display: block;
+}
+@media (hover: hover) {
+  .goods-cell:hover .goods-name {
+    display: block;
+  }
+}
+/* The resident card's header line: what they carry, then its weight against what they can. */
+.carried-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+}
+/* An inventory on the tile card, such as a carriage's load, under a small heading. */
+.card-goods {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* A carriage on the tile card (`CarriageView`): its load bar and goods, then labelled rows. */
+.card-carriage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-carriage .panel-head h3 {
+  margin: 0;
+}
+.card-load .vital-head {
+  margin-bottom: 4px;
+}
+.card-rows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 10px;
+  margin: 0;
+  font-size: 0.8rem;
+}
+.card-rows dt {
+  color: var(--ui-muted);
+}
+.card-rows dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.card-rows dd small {
+  display: block;
+  font-size: 0.72rem;
+}
+.card-rows button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* A construction site on the tile card (`SiteView`): its work meter, then a row per material with
+   its icon and name, what was delivered against what it needs, and a small bar. */
+.card-site {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-site .panel-head h3 {
+  margin: 0;
+}
+.card-work .meter {
+  margin-bottom: 4px;
+}
+.site-materials {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+.site-materials li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto 56px;
+  gap: 8px;
+  align-items: center;
+}
+.site-material-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -13,6 +13,8 @@ import {
   MAX_HEALTH,
   MAX_HUNGER,
   STARVE_DAYS,
+  DOWN_DAYS,
+  WAKE_HEALTH,
   TICKS_PER_GAME_DAY,
   TRADE_ORG,
   contractOf,
@@ -49,7 +51,9 @@ import { endContractsOnLeaderDeath } from './contracts.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
 import { caravanFood } from './caravans.js'
 import { countSoldiersKilled } from './directives.js'
+import { leaveArmies } from './armies.js'
 import { worldIndex } from './world-index.js'
+import type { Invariant } from './invariants.js'
 
 /** How far one unit of food fills the hunger meter: a full meter holds `HUNGER_DAYS` of meals. */
 const FILL_PER_FOOD = MAX_HUNGER / (HUNGER_DAYS * FOOD_PER_DAY)
@@ -63,12 +67,14 @@ export interface SurvivalResult {
 }
 
 /**
- * One tick of survival (`CONTEXT.md`: Hunger, Eating, Leader death): the hunger meter runs down
- * (faster on hard terrain, slower with high Endurance; on a road as on Plains); a resident eats a unit of food when there
- * is room for it, only from what they carry, also at home. An empty meter costs health; a
- * meter with anything in it slowly gives health back. A resident with no health left dies and
- * drops what they carried in a pile. When a Leader dies, their realm ends. A meter running
- * empty and a death go in the Player's realm log.
+ * One tick of survival (`CONTEXT.md`: Hunger, Eating, Down, Leader death): the hunger meter runs
+ * down (faster on hard terrain, slower with high Endurance; on a road as on Plains); a resident
+ * eats a unit of food when there is room for it, only from what they carry, also at home. An
+ * empty meter costs health; a meter with anything in it slowly gives health back. A resident
+ * whose health hunger used up goes Down (`goDown`); Down, they don't eat and lose no more health,
+ * and when their time is up they die of hunger and drop what they carried in a pile. When a
+ * Leader dies, their realm ends; a Leader who is Down still leads. A meter running empty, going
+ * Down and a death go in the Player's realm log.
  */
 export function stepSurvival(world: WorldState, terrain: TerrainMap): SurvivalResult {
   const drain = MAX_HUNGER / (HUNGER_DAYS * TICKS_PER_GAME_DAY)
@@ -78,6 +84,10 @@ export function stepSurvival(world: WorldState, terrain: TerrainMap): SurvivalRe
   const roads = worldIndex(world).roads(terrain.size)
 
   for (const r of world.residents) {
+    if (r.downUntil !== undefined) {
+      if (world.tick >= r.downUntil) died.push(r)
+      continue
+    }
     const wasFed = r.hunger > 0
     const ground = groundAt(terrain, roads, r.x, r.y)
     r.hunger = Math.max(0, r.hunger - drain * foodUse(r, ground, world.tick))
@@ -90,9 +100,120 @@ export function stepSurvival(world: WorldState, terrain: TerrainMap): SurvivalRe
     }
     if (r.hunger <= 0) r.health = Math.max(0, r.health - starve)
     else r.health = Math.min(MAX_HEALTH, r.health + heal)
-    if (r.health <= 0) died.push(r)
+    if (r.health <= 0) goDown(world, r)
   }
   return { died, ended: dieAll(world, died, 'starved', terrain.size) }
+}
+
+/** Ticks a resident lies Down before they die of hunger (`DOWN_DAYS`). */
+export const DOWN_TICKS = DOWN_DAYS * TICKS_PER_GAME_DAY
+
+/**
+ * Puts a resident whose health hunger used up Down (`CONTEXT.md`: Down) until `DOWN_TICKS` from
+ * now: lying on their tile, so off any horse or carriage, their order, script and queue end, a
+ * defence script and what it interrupted too, and they leave any army, taking no orders. Their
+ * Player's realm log says so, with when they die.
+ */
+export function goDown(world: WorldState, r: Resident): void {
+  r.health = 0
+  r.downUntil = world.tick + DOWN_TICKS
+  holdStill(r)
+  delete r.riding
+  delete r.aboard
+  leaveArmies(world, new Set([r.id]))
+  recordEvent(world, r.owner, { kind: 'down', residentId: r.id, name: r.name, until: r.downUntil })
+}
+
+/**
+ * Wakes a Down resident (`CONTEXT.md`: Reviving) who has Food in their hands: they eat a unit at
+ * once, so their hunger meter isn't empty, and stand idle at `WAKE_HEALTH`. Their Player's realm
+ * log says so, with `by`, who fed them. Returns whether they woke.
+ */
+export function wake(world: WorldState, r: Resident, by: string): boolean {
+  if (r.downUntil === undefined || (r.carried.food ?? 0) < 1) return false
+  take(r.carried, 'food', 1)
+  r.hunger = Math.min(MAX_HUNGER, r.hunger + FILL_PER_FOOD)
+  r.health = WAKE_HEALTH
+  delete r.downUntil
+  recordEvent(world, r.owner, { kind: 'woke', residentId: r.id, name: r.name, by })
+  return true
+}
+
+/** Ends whatever a resident was doing: their order, script, queue and defence script. */
+function holdStill(r: Resident): void {
+  r.order = null
+  delete r.script
+  delete r.queue
+  delete r.interrupted
+}
+
+/**
+ * Down residents do nothing (`CONTEXT.md`: Down): whatever the game's own cities, armies or a
+ * fight gave them since they went Down ends before it turns into anything they do.
+ */
+export function keepDownStill(world: WorldState): void {
+  for (const r of world.residents) if (r.downUntil !== undefined) holdStill(r)
+}
+
+/**
+ * Down residents do nothing (`CONTEXT.md`: Down): one who is Down has no order, script, queue or
+ * defence script, rides no horse or carriage and is in no army; their health stays at 0; and
+ * they die within `DOWN_TICKS` of going Down, not before the tick they are due.
+ */
+export const downDoNothing: Invariant = {
+  name: 'down-do-nothing',
+  check(world) {
+    const inArmy = new Set(world.armies.flatMap((a) => a.memberIds))
+    return world.residents.flatMap((r) => {
+      const until = r.downUntil
+      if (until === undefined) return []
+      const problems = [
+        r.order !== null && `has a ${r.order.kind} order`,
+        r.script !== undefined && 'runs a script',
+        r.queue !== undefined && 'has a queue',
+        r.interrupted !== undefined && 'was interrupted by a defence script',
+        r.riding !== undefined && 'rides a horse',
+        r.aboard !== undefined && 'is aboard a carriage',
+        inArmy.has(r.id) && 'is in an army',
+        r.health !== 0 && `has health ${r.health}`,
+        !(until >= world.tick && until <= world.tick + DOWN_TICKS) && `is due to die at ${until}`,
+      ].filter((p): p is string => typeof p === 'string')
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `resident ${r.id} is Down but ${p}`,
+        entityIds: [r.id],
+      }))
+    })
+  },
+}
+
+/**
+ * Woken, they are fed and alive (`CONTEXT.md`: Reviving): a resident who woke in the tick just
+ * stepped is no longer Down, has health above zero and a hunger meter that isn't empty. Anyone
+ * else at no health who isn't Down is `deadLeaveLoot`'s.
+ */
+export const awakeAlive: Invariant = {
+  name: 'awake-alive',
+  check(world) {
+    const wokeIds = new Set(
+      world.events.flatMap((e) =>
+        e.kind === 'woke' && e.tick >= world.tick - 1 ? [e.residentId] : [],
+      ),
+    )
+    return world.residents.flatMap((r) => {
+      if (!wokeIds.has(r.id)) return []
+      const problems = [
+        r.downUntil !== undefined && 'woke but is still Down',
+        r.health <= 0 && `woke with health ${r.health}`,
+        r.hunger <= 0 && 'woke with an empty hunger meter',
+      ].filter((p): p is string => typeof p === 'string')
+      return problems.map((p) => ({
+        invariant: this.name,
+        message: `resident ${r.id} ${p}`,
+        entityIds: [r.id],
+      }))
+    })
+  },
 }
 
 /**
@@ -338,13 +459,15 @@ const whole = (stock: Stock | undefined): RefillSource | undefined =>
  * carriage close by (`caravanFood`); driving a carriage of their realm, that carriage, but not
  * the horse's share of what a haul route keeps on board (`driversFood`); in an army or aboard a
  * carriage as a passenger, a carriage of their realm on or next to their tile, but not the Food
- * a haul route keeps on board (`spareFood`). Elsewhere nowhere. `size` is the map's.
+ * a haul route keeps on board (`spareFood`). Elsewhere nowhere, and nowhere for a resident who is
+ * Down (`CONTEXT.md`: Down), who does nothing. `size` is the map's.
  */
 export function refillSource(
   world: WorldState,
   r: Resident,
   size: number,
 ): RefillSource | undefined {
+  if (r.downUntil !== undefined) return undefined
   const home =
     homeStorage(world, r, size) ?? hirersStorage(world, r, size) ?? outpostStorage(world, r, size)
   if (home) return whole(home.stock)

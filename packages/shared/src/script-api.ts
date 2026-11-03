@@ -269,6 +269,15 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     description: 'How many units of a good still fit in my hands.',
   },
   {
+    name: 'inputToFetch',
+    is: 'query',
+    params: ['workplace', 'makes?'],
+    returns: { list: { view: 'material' } },
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'At a smelter, mint or smithy I see, the goods it lacks for a batch of its recipe (the one making `makes`, else its only one) in its pile and its workers’ hands: of each, as many batches’ worth as fit in my hands, as a list like [{good: "ironOre", units: 24}]; empty while it has a batch’s, when none fits, and for any other building.',
+  },
+  {
     name: 'breedingPair',
     is: 'query',
     params: ['stable'],
@@ -354,7 +363,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'pickUp',
     ['spot', 'goods'],
-    'Take goods from a spot on my tile: {kind: "ground"}, {kind: "storage", storageId}, {kind: "site", siteId} or {kind: "carriage", carriageId}; goods like {food: 3}.',
+    'Take goods from a spot on my tile: {kind: "ground"}, {kind: "storage", storageId}, {kind: "site", siteId}, {kind: "carriage", carriageId} or a Down resident lying there, {kind: "resident", residentId}; goods like {food: 3}.',
   ),
   action('drop', ['spot', 'goods'], 'Put carried goods down at a spot on my tile.'),
   action(
@@ -390,6 +399,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'attack',
     ['targetId'],
     'Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls.',
+  ),
+  action(
+    'feed',
+    ['residentId', 'units'],
+    'Feed a resident who is Down, of any realm, on or next to my tile: put up to that many units of the Food in my hands into theirs. They eat at once and wake at low health.',
   ),
   action('climb', ['wallId'], 'Climb over the wall or gate of another realm next to me.'),
   action(

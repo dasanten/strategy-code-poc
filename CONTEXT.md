@@ -74,13 +74,19 @@ The shared language of the game. Domain terms only — no implementation details
     farm has a cap. A farm belongs to the city of the resident who laid it out.
   - **Smelter / Mint:** a smelter turns ore into metal (Iron ore → Iron), a mint Gold ore into
     Coins, at fixed conversion rates. Anyone can build either. They have no storage: the ore
-    they use is what their workers carry, then what lies in the pile on their tile; without it
-    the workers stand idle. Both teach Smelting.
+    they use is what their workers carry, then what lies in the pile on their tile; the Work
+    default fetches more (Fetching inputs), and without any the workers stand idle. Both teach
+    Smelting.
 - **Carrying the output:** working a workplace includes getting its output home. Once the
   workplace's pile holds a full load, one of the residents working there, picked at random,
-  takes a load (beside their own food; a farm keeps some Food for refills) to the nearest storage
-  of their realm, stores it and comes back to work; only one carries at a time. With no storage
-  in reach the pile just grows.
+  takes a load (beside their own food; a farm keeps some Food for refills) to the Work default's
+  `output` param, else its `storage`, else the nearest storage of their realm, stores it and comes
+  back to work; only one carries at a time. With no storage in reach the pile just grows.
+- **Fetching inputs:** at a smelter, mint or smithy whose pile and workers lack what it uses (ore,
+  or a recipe's Iron and Wood), one of the residents working there, picked at random, fetches a
+  load of it from the Work default's `input` param, else its `storage`, else the nearest storage
+  of their realm holding it, puts it on the pile and goes back to work; only one fetches at a
+  time, and not while someone carries the output. With none anywhere they stand idle, as before.
 - **Crew food:** on the way back from storing a load, the carrier brings Food for the whole crew
   and puts it on the workplace's pile, where the workers take their meals (Refilling at a
   workplace). So a far-off crew keeps working while one of them walks, and nobody else goes
@@ -700,9 +706,22 @@ The shared language of the game. Domain terms only — no implementation details
   (4 real hours), so a child is grown after about 140 game days (~56 real hours); from 14 on, a
   year of age is a game year.
 - **Hunger:** each resident eats a fixed amount of Food per game day, more on hard terrain and
-  less with high Endurance. An empty hunger meter costs health; without food a resident dies
-  after about 5 game days (2 real hours). While the meter isn't empty, lost health slowly comes
-  back.
+  less with high Endurance. An empty hunger meter costs health; without food a resident goes
+  Down after about 5 game days (2 real hours), and dies if nobody revives them. While the meter
+  isn't empty, lost health slowly comes back.
+- **Down:** a resident whose health hunger has used up doesn't die at once but lies unconscious
+  on their tile for a while (a balance number, about one real day). Down, they do nothing: their
+  order, script and queue end, they take no orders (the card says Down and how long is left),
+  don't eat and lose no more health. Anyone in sight sees that they are Down. Anyone on their
+  tile can take the goods they carry, as from a pile; from another realm's resident that is
+  theft. Attacked, they die like anyone. When the time is up and nobody has revived them, they
+  die of hunger. Only hunger puts a resident Down: wounds kill as before. A Leader who is Down is
+  not a Leader death. The realm log says when one of its residents goes Down, wakes or dies.
+- **Reviving:** any grown resident of any realm on or next to a Down resident's tile can **Feed**
+  them (an order, queue step or script `feed(residentId, units)`), putting Food from their own
+  hands into the Down resident's. Once their hunger meter isn't empty they wake at low health
+  and stand idle. A Down horse wakes the same way once it has eaten Food in reach (Horses have no
+  inventory), so a Player revives a horse by putting Food down by it.
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
 - **Own food:** the Food a resident keeps on them for their own meals, about four game days of
@@ -717,9 +736,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Refilling from a carriage:** a resident of an army, a passenger, or the driver, running low on food
   takes a meal from a carriage of their own realm on or next to their tile, like refilling at
   home.
-- **Getting food:** in the Work, Build and Tear down defaults, a resident whose `foodAt` param is
-  set and who carries less Food than that many units stops, walks to their `storage` (Work) or
-  `source` (Build, Tear down) param, or else the nearest storage of their realm with Food, takes
+- **Getting food:** in the Work, Build, Build line and Tear down defaults, a resident whose
+  `foodAt` param is set and who carries less Food than that many units stops, walks to their
+  `food` param, else their `storage` (Work) or `source` (Build, Build line, Tear down) param, or
+  else the nearest storage of their realm with Food, takes
   Food there up to `foodTake` units on them, and goes back. Whenever they are at a storage anyway
   (carrying the output, fetching materials), their own food is topped up to `foodTake` instead of
   the usual own food. The game's defaults give both params a default (about a day of Food for
@@ -730,7 +750,8 @@ The shared language of the game. Domain terms only — no implementation details
 ## Transport
 
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
-  hunger meter costs health, and a horse without food dies after about 5 game days. Bred by a
+  hunger meter costs health, and a horse without food goes Down after about 5 game days (Down,
+  Reviving) and dies if it eats nothing before its time is up. Bred by a
   resident at a stable, or bought from the Trade Organization.
 - **Horse grant:** a one-time gift, given once when it ships: every Player realm with a living
   Leader and no horse at all (in a stable, hitched or ridden) gets two new horses with stats drawn
@@ -877,9 +898,11 @@ The shared language of the game. Domain terms only — no implementation details
   line anywhere else is a syntax error. A `building` param holds a building the Player knows: a workplace or construction site
   anywhere in sight or last seen, whoever built it (a workplace has no owner), or any other
   building of the realm's own; a `storage` param one of its storages, stables or carriages; a `number`
-  param a whole number of zero or more, typed into a number field. A `number` param may declare a
-  **default** (`param foodAt: number = 3`); `building` and `storage` params can't. The values
-  are kept for each resident and each script: giving the task again keeps them, a param removed
+  param a whole number of zero or more, typed into a number field; a `choice` param one of the
+  words its line lists (`param toward: choice(north, east, south, west)`), picked from a list;
+  a `waypoint` param one of the Player's waypoints. A `number` or `choice` param may declare a
+  **default** (`param foodAt: number = 3`); `building`, `storage` and `waypoint` params can't. The values
+  are kept for each resident and each script (at a workplace, see Workplace settings): giving the task again keeps them, a param removed
   from the script is dropped, a new one starts unset. Unset, or once the one picked is gone (or no
   longer the realm's), it reads its default, or `null` without one; clearing a field goes back to
   the default. **Before it starts:** giving a task or Run script whose script declares params
@@ -890,11 +913,14 @@ The shared language of the game. Domain terms only — no implementation details
   line says what the param is for and, after `none:`, what the script uses while none is picked;
   each field shows it and the value the script uses: the one picked, else a `number` param's
   default, a default script's target the one on the resident's tile, or what the comment says
-  after `none:`. The Work default declares `storage` (where the output goes) and the Build default
-  `source` (where materials come from, a carriage too), each falling back to the nearest storage
-  while unset; a source picked that holds none of what the site lacks is left alone, and they
-  just build. Work, Build and Tear down also declare the `number` params `foodAt` and `foodTake`
-  (Getting food).
+  after `none:`. The Work default declares `storage`, its main storage, and three `storage` params
+  that, when set, take its place for one use: `output` (where the output goes, Carrying the
+  output), `input` (where a smelter's, mint's or smithy's inputs come from, Fetching inputs) and
+  `food` (where Food comes from, Getting food and Crew food). The Build default declares `source`
+  (where materials come from, a carriage too); a source picked that holds none of what the site
+  lacks is left alone, and they just build. Unset, each falls back to the main one, then to the
+  nearest storage. Work, Build, Build line and Tear down also declare `food` and the `number`
+  params `foodAt` and `foodTake` (Getting food).
 - **Store:** a built-in order a script can hand over to: the resident walks to a storage,
   stable or carriage of their own (by default the nearest storage of their realm), puts down the
   chosen goods there (Food only beyond their own food, unless asked for exact units) and, at a
@@ -926,6 +952,36 @@ The shared language of the game. Domain terms only — no implementation details
   target param: its line comes only from the order, so it ends without one too. The target param is
   never kept: each start fills it (the task order, or what the Player picks before it starts) or
   leaves it unset; the script's other params are kept as usual.
+- **Working a site:** Work's `workplace` may also be a construction site of a workplace kind
+  (farm, mine, smelter, …), so Work can be given or queued for a workplace still being built.
+  At a site the Work default first builds it as the Build default would (fetching materials from
+  the nearest storage of the realm holding them), then works it once it is finished, with no new
+  order. The planner's Work step can be picked on such a site.
+- **Workplace settings:** for each workplace, or construction site of a workplace kind, it knows,
+  a realm keeps its own settings, set on the building's card and never seen by other realms: the
+  **work script** (the Work default, or one of the Player's scripts that declares
+  `param workplace: building`) and values for that script's params. Giving a resident Work there
+  (card, group card, queue step) runs the work script; the Before-it-starts form shows its params
+  filled with the workplace's values, and a value the Player changes there becomes that
+  resident's **override**; their earlier kept values for that script don't carry over. While they
+  work there, a param reads the resident's override, else the workplace's setting, else the
+  script's default. Changing a workplace's setting changes it at once for everyone working there
+  without an override; clearing an override goes back to the workplace's value. Changing the work
+  script switches everyone working there by it to the new one, as if given Work again. A script
+  given by hand with Run script stays the resident's own choice. NPC cities keep no settings and
+  run the game's defaults.
+- **Explore:** a task (default script "Explore") for a grown resident, on foot or riding, to go
+  into the unknown. Its params: `find`, a `choice` of a resource node kind (forest, stone, iron
+  ore, gold ore) or none to just explore; `toward`, a `choice` of compass direction, and
+  `waypoint`, a waypoint to head for instead, both unset meaning the nearest unexplored tiles
+  first; and `food`, where to refill (else the nearest storage of the realm with Food). They set
+  out with as much Food as they can carry and walk toward unexplored tiles that way. They turn
+  back when the Food on them, a rider's horse's included (Horses have no inventory), just covers
+  the way back to that storage plus a margin (a balance number), refill there and go back out to
+  where they turned. Once a node of the kind `find` asks for comes into sight that none of the
+  Player's waypoints marks, they put a waypoint on it named after it ("Gold ore node"), note it in
+  the realm log, walk back to the storage and end. Without `find` they go on until stopped. With
+  no unexplored tile left in reach, they end saying so.
 - **Defence script:** the script a resident runs when struck: the game's **Defend** default (armed,
   attack the attacker until they are dead, gone or out of sight; unarmed, walk home to the town
   hall; it ends once no blow has landed for a while) unless the Player picked one of their own
@@ -1033,6 +1089,14 @@ The shared language of the game. Domain terms only — no implementation details
   becomes possible is added at the end of its group, and the rows are sorted afresh only when
   something else is picked (ADR 0019). A group card has the same rows, with the group's own
   reasons.
+- **Goods on cards:** each kind of good has one icon. Every inventory a card or drawer shows
+  (what a resident carries, a carriage's load, a storage's or stable's stock, a workplace's pile,
+  a site's materials, trade lists) is a compact grid of icon and amount, the name on hover or
+  long-press; a resident's own food shows apart from the rest. Cards give facts as labelled rows
+  and meters, not sentences: a carriage its load against capacity, its horse with hunger, driver
+  and passengers, and its route as "A → B" with the current leg and arrival; a storage or stable
+  its stock and who is on the way to it; a workplace its pile and crew; a site what it has
+  against what it needs, per good. Doing lines and the realm log stay sentences.
 - **Motion on the map:** the world moves once a tick, but the map shows it smoothly. A token on
   its way (walking, driving, riding along a path it was sent) moves steadily along that path at
   its current pace between ticks, across tile edges, without stopping at each tile, however many
@@ -1044,7 +1108,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Way on the map:** while residents are picked (one, or each member of a group), the map draws
   the way each is going for any order that goes along a path: walk to, drive, haul, Store, Fetch,
   a road or wall line, going after someone. So a script that hands over to Fetch to get food
-  shows its way too. A passenger's way is the carriage's they are aboard.
+  shows its way too. A passenger's way is the carriage's they are aboard. It is drawn at every
+  zoom tier; at the far tier as a thin line with its end marked.
 - **Places of the picked:** while residents are picked, the buildings their script's params point
   at (workplace, storage, source, site, …) and the place their current order heads for (the
   storage a Fetch goes to) are outlined on the map in the way's colour. Pure drawing.
@@ -1085,3 +1150,13 @@ The shared language of the game. Domain terms only — no implementation details
   the far zoom tier's look and comes on there by itself; at the middle and close tiers only
   territory borders are drawn, so the terrain stays readable. The Region map button forces the
   overlay on at any tier and shows that it is on.
+- **Roads far out:** at the far zoom tier the map draws the roads the Player knows (in sight or
+  last seen) as thin lines over the terrain, so the way between cities stays readable however far
+  out; road sites are left out there.
+- **Waypoint:** a named marker the Player puts on a tile (from the map's right-click or
+  long-press, or a script's `addWaypoint`), seen only by that Player: on the map at every zoom
+  tier, on the minimap, and in the Waypoints drawer, where it can be renamed, centred on or
+  removed. Kept in the world per Player, not per realm, so it survives a Leader death. A waypoint
+  is a place like a tile: a walk-to target, a queue step's place, a `waypoint` script param.
+  Scripts see their Player's waypoints and can add and remove them. A Player holds at most so
+  many (a balance number); Explore marks its finds with them.

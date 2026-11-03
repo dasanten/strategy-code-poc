@@ -88,7 +88,8 @@ import {
   tileIndex,
 } from '@csp/shared'
 import { tallyGoods } from './goods-made.js'
-import { refillSource, refillTarget } from './survival.js'
+import { awakeAlive, downDoNothing, refillSource, refillTarget } from './survival.js'
+import { horsesDownLieStill } from './horses.js'
 import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
@@ -117,8 +118,14 @@ import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
+import { workplaceSettingsSound } from './workplace-settings.js'
 import { cityGameNamesUnique, gameNamesUnique } from './names.js'
-import { defaultsHaveATarget, oneCarrierAtATime, oneFetcherAtATime } from './script-runner.js'
+import {
+  defaultsHaveATarget,
+  oneCarrierAtATime,
+  oneFetcherAtATime,
+  oneInputFetcherAtATime,
+} from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
 import { defenceScriptSound, interruptedSound } from './defence.js'
@@ -1443,6 +1450,7 @@ const ADULT_ORDERS = new Set([
   'train',
   'breed',
   'drive',
+  'feed',
 ])
 
 /** Children don't work until they are grown (`CONTEXT.md`: Child, Aging). */
@@ -1489,14 +1497,14 @@ export const childrenCarryOnlyFood: Invariant = {
 /**
  * Dead residents leave their goods as loot (`CONTEXT.md`: Loot): a resident with no health left
  * is gone from the world by the end of the tick, killed, starved or not, so nobody keeps holding
- * goods once dead. Dying (`die`) is the only way out, and it drops all they carried in the pile
+ * goods once dead. One who is Down (`CONTEXT.md`: Down) isn't dead yet (`downDoNothing`). Dying (`die`) is the only way out, and it drops all they carried in the pile
  * on their tile.
  */
 export const deadLeaveLoot: Invariant = {
   name: 'dead-leave-loot',
   check(world) {
     return world.residents
-      .filter((r) => !(r.health > 0))
+      .filter((r) => !(r.health > 0) && r.downUntil === undefined)
       .map((r) => ({
         invariant: this.name,
         message: `resident ${r.id} has no health left but is still in the world, holding ${JSON.stringify(r.carried)}`,
@@ -1926,6 +1934,16 @@ export const gameDefaultFetchers: Invariant = {
 }
 
 /**
+ * At most one resident of a smelter, mint or smithy away fetching its inputs at once
+ * (`CONTEXT.md`: Fetching inputs), among NPC cities' residents running the game's own Work
+ * default; a Player's are checked where their scripts run.
+ */
+export const gameDefaultInputFetchers: Invariant = {
+  name: 'one-input-fetcher-at-a-time',
+  check: (world) => oneInputFetcherAtATime(world, (r) => r.script?.scriptId === 0),
+}
+
+/**
  * Nobody runs Work, Build or Haul for longer than a tick without its target (`CONTEXT.md`:
  * Default script, Started directly; `defaultsHaveATarget`), among NPC cities' residents running
  * the game's own defaults, whose city names the target when it puts them to the task; a
@@ -1953,6 +1971,7 @@ export const worldInvariants: Invariant[] = [
   gameNamesUnique,
   cityGameNamesUnique,
   horseOffersOnce,
+  workplaceSettingsSound,
   buildingsInPlace,
   citiesFromBuildings,
   outpostStorageRealms,
@@ -1992,6 +2011,9 @@ export const worldInvariants: Invariant[] = [
   alliancesSound,
   territorySound,
   deadLeaveLoot,
+  downDoNothing,
+  awakeAlive,
+  horsesDownLieStill,
   attackOrdersSound,
   armiesSound,
   contractsSound,
@@ -2033,6 +2055,7 @@ export const worldInvariants: Invariant[] = [
   pathsAreSteps,
   gameDefaultCarriers,
   gameDefaultFetchers,
+  gameDefaultInputFetchers,
   gameDefaultTargets,
   queuesSound,
   interruptedSound,

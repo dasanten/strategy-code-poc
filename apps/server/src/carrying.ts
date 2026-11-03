@@ -2,6 +2,7 @@ import {
   GOODS,
   MAP_SIZE,
   canHandle,
+  downOn,
   goodsAtSpot,
   materialsNeeded,
   outpostStorageGuarded,
@@ -20,7 +21,12 @@ import {
 import { finishSite } from './building.js'
 import { updateCityMembership } from './cities.js'
 import { robCaravan } from './caravans.js'
-import { buildingOrganization, carriageOrganization, commitCrime } from './crimes.js'
+import {
+  buildingOrganization,
+  carriageOrganization,
+  commitCrime,
+  organizationOf,
+} from './crimes.js'
 import { collectsFrom } from './deliveries.js'
 import { collectsTransferFrom } from './transfers.js'
 import { orderedResident } from './order-sender.js'
@@ -64,8 +70,12 @@ function readSpot(spot: unknown): GoodsSpot | undefined {
     storageId: unknown
     siteId: unknown
     carriageId: unknown
+    residentId: unknown
   }> | null
   if (s?.kind === 'ground') return { kind: 'ground' }
+  if (s?.kind === 'resident' && typeof s.residentId === 'string') {
+    return { kind: 'resident', residentId: s.residentId }
+  }
   if (s?.kind === 'carriage' && typeof s.carriageId === 'string') {
     return { kind: 'carriage', carriageId: s.carriageId }
   }
@@ -82,7 +92,8 @@ function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   const r = orderedResident(world, sender, o.residentId)
   if (!r) return 'not one of your residents'
   const spot = readSpot(o.spot)
-  if (!spot) return 'the spot must be the ground, a storage, a construction site or a carriage'
+  if (!spot)
+    return 'the spot must be the ground, a storage, a construction site, a carriage or a Down resident'
   const goods = readGoods(o.goods)
   if (!goods) return 'goods must be whole units of known goods'
   if (!canHandle(r, world.tick, Object.keys(goods)))
@@ -96,6 +107,9 @@ function check(world: WorldState, sender: OrderSender, order: OrderRequest) {
   if (spot.kind === 'carriage' && !goodsAtSpot(world, r.x, r.y, spot)) {
     return 'that carriage is not on the resident’s tile'
   }
+  if (spot.kind === 'resident' && !downOn(world, r.x, r.y, spot.residentId)) {
+    return 'nobody of that id lies Down on the resident’s tile'
+  }
   return { r, spot, goods }
 }
 
@@ -104,8 +118,9 @@ const has = (stock: Stock | undefined, goods: Stock) =>
 
 /**
  * The pick-up order (`CONTEXT.md`: Core rule): one of the Player's residents takes goods from the
- * pile, a storage, a construction site or a carriage on their tile. Nothing is protected yet, so anyone's
- * goods can be taken.
+ * pile, a storage, a construction site or a carriage on their tile, or from what a Down resident
+ * lying there carries (`CONTEXT.md`: Down). Nothing is protected yet, so anyone's goods can be
+ * taken.
  */
 export const pickUp: OrderKind = {
   validate(world, sender, order) {
@@ -130,6 +145,8 @@ export const drop: OrderKind = {
     const c = check(world, sender, order)
     if (typeof c === 'string') return c
     if (!has(c.r.carried, c.goods)) return 'not carrying any of those goods'
+    // Food goes into a Down resident's hands by feeding them (`CONTEXT.md`: Reviving).
+    if (c.spot.kind === 'resident') return 'goods can’t be put down on a resident'
     if (
       c.spot.kind === 'site' &&
       !has(materialsNeeded(siteAt(world, c.r.x, c.r.y, c.spot.siteId)!), c.goods)
@@ -172,8 +189,8 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * same goods. A take gets what is still at the spot on the resident's own tile, whole units that
  * fit their carry capacity; a put puts down what they still carry. A spot that is gone means
  * nothing happens. Either way the order is done; a store or fetch order goes on or ends
- * (`carriedForOrder`). Taking from another Organization's storage or
- * carriage is theft (`CONTEXT.md`: Crime), on a map of `size` tiles, and taking from a caravan's
+ * (`carriedForOrder`). Taking from another Organization's storage, carriage or Down resident is
+ * theft (`CONTEXT.md`: Crime, Down), on a map of `size` tiles, and taking from a caravan's
  * carriage robs it (`robCaravan`). Nobody but its realm takes from a guarded outpost storage.
  */
 export function resolveCarrying(world: WorldState, actions: CarryAction[], size = MAP_SIZE): void {
@@ -212,7 +229,9 @@ function take(
     a.spot.kind === 'storage' &&
     (collectsFrom(world, r, a.spot.storageId) || collectsTransferFrom(world, r, a.spot.storageId))
   if (victimOrg !== null && !sold && Object.keys(taken).length > 0) {
-    commitCrime(world, size, 'theft', r, { victimOrg, goods: taken })
+    const victim =
+      a.spot.kind === 'resident' ? downOn(world, r.x, r.y, a.spot.residentId) : undefined
+    commitCrime(world, size, 'theft', r, { victimOrg, goods: taken, ...(victim && { victim }) })
   }
   if (a.spot.kind === 'carriage' && Object.keys(taken).length > 0) {
     robCaravan(world, r, a.spot.carriageId, robbed)
@@ -230,10 +249,14 @@ function guardedFrom(world: WorldState, r: Resident, spot: GoodsSpot, size: numb
 }
 
 /**
- * Whose goods a spot holds: a storage's city's Organization, or a carriage's. Piles on the ground
- * and construction sites belong to nobody.
+ * Whose goods a spot holds: a storage's city's Organization, a carriage's, or a Down resident's.
+ * Piles on the ground and construction sites belong to nobody.
  */
 function spotOrganization(world: WorldState, spot: GoodsSpot): string | null {
+  if (spot.kind === 'resident') {
+    const d = world.residents.find((x) => x.id === spot.residentId)
+    return d ? organizationOf(d) : null
+  }
   if (spot.kind === 'storage') {
     const b = world.buildings.find((x) => x.id === spot.storageId)
     return b ? buildingOrganization(world, b) : null
@@ -250,7 +273,9 @@ function spotOrganization(world: WorldState, spot: GoodsSpot): string | null {
  * (`finishSite`).
  */
 function put(world: WorldState, r: Resident, a: CarryAction, size: number): void {
-  // On the ground the goods go in the tile's pile; a storage or site that is gone takes nothing.
+  // On the ground the goods go in the tile's pile; a storage or site that is gone takes nothing,
+  // nor does a Down resident: Food goes into their hands by feeding (`CONTEXT.md`: Reviving).
+  if (a.spot.kind === 'resident') return
   const target = a.spot.kind === 'ground' ? {} : spotStock(world, r, a.spot)
   if (!target) return
   // A construction site takes only the materials it still needs, a carriage what fits on it.
@@ -272,11 +297,12 @@ function carriageOf(world: WorldState, spot: { carriageId: string }) {
 }
 
 /**
- * The goods of the named storage or construction site, or the load of the named carriage, if it
- * stands on the resident's tile.
+ * The goods of the named storage or construction site, the load of the named carriage, or what
+ * the named Down resident carries, if it stands or they lie on the resident's tile.
  */
 function spotStock(world: WorldState, r: Resident, spot: GoodsSpot): Stock | undefined {
-  if (spot.kind === 'carriage') return goodsAtSpot(world, r.x, r.y, spot)
+  if (spot.kind === 'carriage' || spot.kind === 'resident')
+    return goodsAtSpot(world, r.x, r.y, spot)
   if (spot.kind === 'site') {
     return siteAt(world, r.x, r.y, spot.siteId)?.site!.delivered
   }

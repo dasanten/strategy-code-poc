@@ -9,6 +9,11 @@ const resident = (
 ): Pick<Resident, 'order' | 'carried' | 'x' | 'y'> => ({ order, carried, x: 3, y: 4 })
 
 describe('residentActivity', () => {
+  it('shows nothing for someone Down, whatever they hold (`CONTEXT.md`: Down)', () => {
+    expect(residentActivity({ ...resident(null, { wood: 5 }), down: true })).toBeUndefined()
+    expect(residentActivity(resident(null, { wood: 5 }))).toBe('carrying')
+  })
+
   it('reads fighting from an attack, whatever else they do', () => {
     const attack: ResidentOrder = {
       kind: 'attack',

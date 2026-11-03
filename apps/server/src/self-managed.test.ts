@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
 import { checkInvariants, ownersExist } from './invariants.js'
 import { runByNpcCity } from './npc-behaviour.js'
 import { mulberry32, newResident } from './residents.js'
-import { endRealm } from './survival.js'
+import { endRealm, goDown } from './survival.js'
 import { addCity, worldWithCity } from './test-terrain.js'
 import { Walking } from './walking.js'
 import { stepWorld } from './world.js'
@@ -173,9 +173,11 @@ describe('a dead Leader’s cities become self-managed', () => {
   it('a Leader dying in the world leaves nothing belonging to the ended realm', () => {
     const { world, terrain, realm } = twoCities()
     const leader = world.residents.find((r) => r.id === realm.leaderId)!
-    leader.health = 0
     leader.hunger = 0
     leader.carried = {}
+    // Down from hunger, and their time is up (`CONTEXT.md`: Down).
+    goDown(world, leader)
+    leader.downUntil = world.tick
     stepWorld(world, terrain)
     expect(world.realms).toEqual([])
     expect(ownersExist.check(world, terrain)).toEqual([])

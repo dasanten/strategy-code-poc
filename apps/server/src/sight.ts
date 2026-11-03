@@ -273,7 +273,8 @@ function seenCarriage(world: WorldState, insight: Insight, k: Carriage): SeenCar
  * What a Player sees of the script a resident runs (`SeenScript`): which one, and for the owning
  * Player (`own`) what goes into the resident's Doing line (`CONTEXT.md`: Doing): the task, the
  * kind of building the task is about, as its memory names it (`TaskMemory`), the text the
- * script gave `doing()`, and whether it waits (`CONTEXT.md`: Running a script, Waiting).
+ * script gave `doing()`, whether it waits (`CONTEXT.md`: Running a script, Waiting), and whether
+ * Work's workplace is still a construction site it builds first (`CONTEXT.md`: Working a site).
  */
 export function seenScript(world: WorldState, script: RunningScript, own: boolean): SeenScript {
   if (!own) return { scriptId: script.scriptId }
@@ -282,10 +283,11 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
   // Build line's kind is its line's (`TaskMemory`).
   const line = buildLineOf(memory.line)
   const kind = memory.building ?? line?.building
+  const target = world.buildings.find((b) => typeof id === 'string' && b.id === id)
   const building =
     typeof kind === 'string' && Object.hasOwn(FOOTPRINT, kind)
       ? (kind as BuildingKind)
-      : world.buildings.find((b) => typeof id === 'string' && b.id === id)?.kind
+      : target?.kind
   return {
     scriptId: script.scriptId,
     ...(script.task ? { task: script.task } : {}),
@@ -293,6 +295,8 @@ export function seenScript(world: WorldState, script: RunningScript, own: boolea
     ...(typeof memory.doing === 'string' && memory.doing ? { doing: memory.doing } : {}),
     ...(line ? { line } : {}),
     ...(script.waitingSince !== undefined ? { waiting: true as const } : {}),
+    ...(memory.workplaceId === target?.id && target?.site ? { site: true as const } : {}),
+    ...(script.settingsFrom !== undefined ? { settingsFrom: script.settingsFrom } : {}),
   }
 }
 
@@ -378,10 +382,13 @@ function everythingSeen(
           }
         : {}),
     }
+    // Anyone in sight sees that they are Down; when it ends goes with how they fare.
+    if (r.downUntil !== undefined) shown.down = true
     if (!insight.fares(r)) {
       delete shown.hunger
       delete shown.health
       delete shown.struck
+      delete shown.downUntil
     }
     out.push(shown)
   }
@@ -389,9 +396,12 @@ function everythingSeen(
   for (const h of world.horses) {
     if (!inSight(h)) continue
     const shown: SeenEntity = { is: 'horse', ...h }
+    // Anyone in sight sees that it is Down; when it ends goes with how it fares.
+    if (h.downUntil !== undefined) shown.down = true
     if (!insight.ours(h.realmId, h.cityId)) {
       delete shown.hunger
       delete shown.health
+      delete shown.downUntil
     }
     out.push(shown)
   }
@@ -713,12 +723,16 @@ export function sentInsideUnseen(
         return hasStock(e.trade) && !insight.insideCity(e.id)
       case 'resident': {
         const r = byId(world.residents, e.id)
-        const told = e.hunger !== undefined || e.health !== undefined || e.struck !== undefined
+        const told =
+          e.hunger !== undefined ||
+          e.health !== undefined ||
+          e.struck !== undefined ||
+          e.downUntil !== undefined
         return told && !(r && insight.fares(r))
       }
       case 'horse': {
         const h = byId(world.horses, e.id)
-        const told = e.hunger !== undefined || e.health !== undefined
+        const told = e.hunger !== undefined || e.health !== undefined || e.downUntil !== undefined
         return told && !(h && insight.ours(h.realmId, h.cityId))
       }
       default:

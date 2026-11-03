@@ -21,6 +21,7 @@ import { attachRealtime } from './realtime.js'
 import { SightTracker } from './sight.js'
 import { Walking } from './walking.js'
 import { setScriptParamOrder } from './script-params.js'
+import { setWorkSettingsOrder } from './workplace-settings.js'
 import { WorldSaver, loadOrCreateWorld, saveWorld } from './saves.js'
 import {
   ScriptRunner,
@@ -99,6 +100,10 @@ const kinds = {
   armyRunScript: armyRunScriptOrder(scriptHost),
   setScriptParam: setScriptParamOrder(scriptHost),
   setDefenceScript: setDefenceScriptOrder(scriptHost),
+  setWorkSettings: setWorkSettingsOrder({
+    script: (id) => runnableScript(db, id),
+    defaultScript: (userId, task) => defaultScriptId(db, userId, task),
+  }),
   task: taskOrder({
     defaultScript: (userId, task) => defaultScriptId(db, userId, task),
     script: (id) => runnableScript(db, id),

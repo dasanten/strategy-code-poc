@@ -14,6 +14,7 @@ import {
   type Horse,
   type TerrainMap,
   type WorldState,
+  isDown,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { supplyLinesSound } from './armies.js'
@@ -221,9 +222,9 @@ describe('supply lines', () => {
     // The driver is killed on the way: nothing comes any more.
     run(cut.world, cut.walking, 0.05)
     die(cut.world, find(cut.world, 'd1')!)
-    // What they carried, then a full meter, then starving.
+    // What they carried, then a full meter, then starving: they lie Down (`CONTEXT.md`: Down).
     run(cut.world, cut.walking, HOME_FOOD_LOW / FOOD_PER_DAY + HUNGER_DAYS + STARVE_DAYS + 0.5)
-    expect(soldiers(cut.world)).toEqual([undefined, undefined])
+    expect(soldiers(cut.world).map((s) => s && isDown(s))).toEqual([true, true])
   })
 
   it('breaks the invariant when a supply line goes to no army of the realm', () => {

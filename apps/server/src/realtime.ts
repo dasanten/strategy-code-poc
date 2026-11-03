@@ -228,6 +228,8 @@ interface Client {
   realmName: string | null
   /** Whether the Player could still claim their Horse offer when last sent (`CONTEXT.md`). */
   horseOffer: boolean
+  /** The realm's Workplace settings last sent, as JSON, so a tick sends them only when they changed. */
+  lastWorkSettings: string
 }
 
 /**
@@ -422,6 +424,7 @@ export function attachRealtime(
       leaderId: realm.leaderId,
       realmName: realm.name ?? null,
       horseOffer: !world.horseOffersClaimed.includes(user.id),
+      lastWorkSettings: '',
     }
     clients.set(socket, client)
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
@@ -442,6 +445,8 @@ export function attachRealtime(
     client.lastEventSeq = events.at(-1)?.seq ?? 0
     const diplomacy = diplomacyFor(world, realm.id, realmsSeen(entities))
     client.lastDiplomacy = JSON.stringify(diplomacy)
+    const workSettings = world.workplaceSettings[realm.id] ?? {}
+    client.lastWorkSettings = JSON.stringify(workSettings)
     send(socket, {
       type: 'welcome',
       account: client.account,
@@ -463,6 +468,7 @@ export function attachRealtime(
       region: regionFor(client, []) ?? null,
       horseOffer: client.horseOffer,
       firstDay: readFirstDay(opts.db, user.id),
+      workSettings,
     })
   }
 
@@ -626,6 +632,10 @@ export function attachRealtime(
       if (named) client.realmName = realmName
       const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
       if (claimed) client.horseOffer = false
+      const workSettings = world.workplaceSettings[client.realmId] ?? {}
+      const settingsJson = JSON.stringify(workSettings)
+      const settingsChanged = settingsJson !== client.lastWorkSettings
+      client.lastWorkSettings = settingsJson
       const tick = {
         type: 'tick' as const,
         tick: world.tick,
@@ -637,6 +647,7 @@ export function attachRealtime(
         ...(newLeader ? { leaderId } : {}),
         ...(named ? { realmName } : {}),
         ...(claimed ? { horseOffer: false as const } : {}),
+        ...(settingsChanged ? { workSettings } : {}),
       }
       // `changed` and `gone` go last, as the JSON the realm's sockets in step share.
       const rest = JSON.stringify(tick satisfies Omit<TickMessage, 'changed' | 'gone'>)

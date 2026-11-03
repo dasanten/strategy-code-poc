@@ -387,6 +387,10 @@ describe('script bindings', () => {
       { kind: 'pickUp', spot: { kind: 'ground' }, goods: { iron: 2 } },
     ],
     [
+      'pickUp({ kind: "resident", residentId: "a9" }, { food: 2 })',
+      { kind: 'pickUp', spot: { kind: 'resident', residentId: 'a9' }, goods: { food: 2 } },
+    ],
+    [
       'drop({ kind: "ground" }, { food: 1 })',
       { kind: 'drop', spot: { kind: 'ground' }, goods: { food: 1 } },
     ],
@@ -406,6 +410,7 @@ describe('script bindings', () => {
     ['attack("b1")', { kind: 'attack', targetId: 'b1' }],
     ['attack("b2")', { kind: 'attack', targetId: 'b2' }],
     ['attack("a1")', { kind: 'attack', targetId: 'a1' }],
+    ['feed("b1", 2)', { kind: 'feed', targetId: 'b1', units: 2 }],
     ['climb("w1")', { kind: 'climb', wallId: 'w1' }],
     ['pay("contract9", 1)', { kind: 'pay', contractId: 'contract9', weeks: 1 }],
     ['buyCity("city4")', { kind: 'buyCity', cityId: 'city4' }],

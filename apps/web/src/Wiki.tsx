@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import {
   PARAM_DESCRIPTIONS,
+  WORKPLACE_PARAM,
   QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_MAX_STEPS,
   SCRIPT_PARAM_TYPES,
@@ -53,6 +54,9 @@ import {
   DRIVING_SKILL_LIMIT,
   DRIVING_SKILL_PER_DAY,
   STARVE_DAYS,
+  DOWN_DAYS,
+  FEED_UNITS,
+  WAKE_HEALTH,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
   GET_FOOD_AT,
@@ -64,6 +68,7 @@ import {
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HORSE_WAKE_HEALTH,
   HORSE_GRANT_FOOD,
   HQ_FLOOR_FACTOR,
   HORSE_GRANT_HORSES,
@@ -208,6 +213,7 @@ import {
 } from '@csp/shared'
 import { BUILDING_NAMES } from './map/palette.js'
 import { GOOD_LABELS } from './Residents.js'
+import { GoodIcon } from './GoodsGrid.js'
 import {
   AVERAGE,
   AVERAGE_CARRY,
@@ -484,7 +490,8 @@ export function Wiki() {
           While residents are picked, the map draws the way each of them is going, as a line ending
           in a dot: walking, driving or hauling somewhere, storing or fetching, walking to the next
           tile of a road or wall line, or going after someone. So a script that fetches food shows
-          its way to the storage too. A passenger’s way is the carriage’s.
+          its way to the storage too. A passenger’s way is the carriage’s. Ways show at every zoom;
+          far out as a thin line with a ringed dot at its end.
         </p>
         <p>
           In the same colour the map outlines the places they are set on: the buildings and
@@ -510,14 +517,15 @@ export function Wiki() {
           elsewhere moves the preview.
         </p>
         <p>
-          The map has three zoom tiers: far shows terrain, territory and one emblem per city; middle
-          adds buildings, nodes and residents; close shows each figure. Far out territory is filled
-          in its owner’s colour, nearer in only its borders are drawn; the Region map button fills
-          it at every zoom. The readout bottom right names the terrain, the tile and the tier under
-          the pointer. Above it the minimap shows the terrain you explored, your cities, your
-          residents and carriages away from them, and the cities you know, with the part on screen
-          as a rectangle; click it to look there. The minimap and the legend fold to buttons, and
-          your browser remembers how you left them.
+          The map has three zoom tiers: far shows terrain, territory, the finished roads you see or
+          last saw as thin lines, and one emblem per city; middle adds buildings, nodes and
+          residents; close shows each figure. Far out territory is filled in its owner’s colour,
+          nearer in only its borders are drawn; the Region map button fills it at every zoom. The
+          readout bottom right names the terrain, the tile and the tier under the pointer. Above it
+          the minimap shows the terrain you explored, your cities, your residents and carriages away
+          from them, and the cities you know, with the part on screen as a rectangle; click it to
+          look there. The minimap and the legend fold to buttons, and your browser remembers how you
+          left them.
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
@@ -844,8 +852,8 @@ export function Wiki() {
           realm of its own); a name it gives a city is one no city in the world has. Once its list
           of names runs dry it adds a numeral, as in “Edda II”. Renaming is free: you can rename any
           resident or city of your realm, and your names may repeat. Names from before this rule
-          stay as they were, so where a list holds two residents of one name it adds their age,
-          and their city when they live in different ones.
+          stay as they were, so where a list holds two residents of one name it adds their age, and
+          their city when they live in different ones.
         </p>
         <p>
           A resident lives in one city, wherever they stand. One who lives in none is{' '}
@@ -934,26 +942,48 @@ export function Wiki() {
         <p>
           Far from home, a resident working, building or tearing down goes and gets food on their
           own. Below <code>foodAt</code> units of Food on them ({num(GET_FOOD_AT)} unless you set it
-          on their card), they walk to their storage (or the nearest one of your realm with Food),
-          take Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and go back.
-          Whenever they are at a storage anyway, their own food is topped up to{' '}
-          <code>foodTake</code> instead of {num(OWN_FOOD)}. With <code>foodAt</code> set to 0 they
-          don't go on their own and rely on refilling.
+          on their card), they walk to their <code>food</code> storage, else their main storage (
+          <code>storage</code> for Work, <code>source</code> for Build, Build line and Tear down),
+          else the nearest one of your realm with Food, take Food up to <code>foodTake</code> (
+          {num(GET_FOOD_TAKE)} unless set) and go back. Whenever they are at a storage anyway, their
+          own food is topped up to <code>foodTake</code> instead of {num(OWN_FOOD)}. With{' '}
+          <code>foodAt</code> set to 0 they don't go on their own and rely on refilling.
         </p>
         <p>
           A crew at a far workplace is fed by its carrier: the worker who carries a load to the
           storage brings back the Food the workplace's pile lacks of <code>crewFood</code> (
-          {num(CREW_FOOD)} unless set) and puts it on the pile, where the crew takes its meals, so
-          nobody else leaves for Food while the pile holds some. A farm's pile keeps its own Food
-          instead. <code>crewFood</code> 0 brings none. A resident an NPC city sends to a workplace
-          sets out with Food for the walk there and back plus {days(SET_OUT_WORK_DAYS)} of work, not
-          a fixed amount, so they last until the carrier's first round trip.
+          {num(CREW_FOOD)} unless set), from their <code>food</code> storage, else their{' '}
+          <code>storage</code>, else the nearest one with Food, and puts it on the pile, where the
+          crew takes its meals, so nobody else leaves for Food while the pile holds some. A farm's
+          pile keeps its own Food instead. <code>crewFood</code> 0 brings none. A resident an NPC
+          city sends to a workplace sets out with Food for the walk there and back plus{' '}
+          {days(SET_OUT_WORK_DAYS)} of work, not a fixed amount, so they last until the carrier's
+          first round trip.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
-          health in {days(STARVE_DAYS)}, so a resident without food dies{' '}
-          {days(HUNGER_DAYS + STARVE_DAYS)} after their last meal. Fed again, they heal from nothing
-          to full in {days(HEAL_DAYS)}.
+          health in {days(STARVE_DAYS)}, so a resident without food goes <b>Down</b>{' '}
+          {days(HUNGER_DAYS + STARVE_DAYS)} after their last meal. Fed again before that, they heal
+          from nothing to full in {days(HEAL_DAYS)}.
+        </p>
+        <p>
+          Down, a resident lies unconscious on their tile for {days(DOWN_DAYS)}: their order, script
+          and queue end, they get off any horse or carriage and leave their army, take no orders,
+          don't eat and lose no more health. Anyone in sight sees that they are Down: their token
+          lies on its side, and their own Player's card says how long is left. Down is not safe:
+          anyone on their tile can pick up what they carry, as from a pile (from another realm's
+          resident that is theft), and a blow kills them, as they can't dodge. When the time is up
+          they die of hunger. Only hunger puts a resident Down: wounds kill as before, and a Leader
+          who is Down still leads. The realm log says when one goes Down, wakes or dies.
+        </p>
+        <p>
+          <b>Reviving:</b> any grown resident of any realm on or next to a Down resident's tile can{' '}
+          <b>Feed</b> them: the Feed row on their card (or on the Down resident's tile card), a
+          queue step, or <code>feed(residentId, units)</code> in a script. It puts up to that many
+          units of the Food in their own hands into the Down resident's ({num(FEED_UNITS)} unless
+          set). One unit is eaten at once, and they wake idle with {num(WAKE_HEALTH)} of{' '}
+          {num(MAX_HEALTH)} health, which comes back while their hunger meter isn't empty; the rest
+          stays in their hands to eat later.
         </p>
         <p>
           Food spoils: {pct(FOOD_SPOIL_PER_DAY)} of every stock goes bad each game day, half of it
@@ -971,17 +1001,33 @@ export function Wiki() {
         <p>
           Workers make goods in proportion to their Strength, plus {pct(WORK_SKILL_EFFECT)} for each
           point of the workplace's skill. Output lands in the workplace's pile; one worker at a time
-          carries a full load to the nearest storage of their realm.
+          carries a full load to their <code>output</code> storage, else their <code>storage</code>,
+          else the nearest storage of their realm.
+        </p>
+        <p>
+          A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
+          its pile. Once they lack the input for a batch (Iron ore, Gold ore, or the Iron and Wood
+          of what a smith makes), one worker at a time, picked at random, fetches a load of what is
+          missing from their <code>input</code> storage, else their <code>storage</code>, else the
+          nearest storage of their realm holding it, puts it on the pile and goes back to work; not
+          while someone carries the output. With none anywhere they stand idle.
+        </p>
+        <p>
+          Work's params on the card: <code>storage</code> is the main storage, used for the output,
+          the inputs and Food alike. <code>output</code> (where the output goes), <code>input</code>{' '}
+          (where inputs come from) and <code>food</code> (where Food comes from) each take its place
+          for that one use when picked; unset, they use <code>storage</code>, and with that unset
+          too, the nearest storage of your realm.
         </p>
         <p>
           A worker who carries less Food than <code>foodAt</code> ({num(GET_FOOD_AT)} unless set)
-          leaves work for their <code>storage</code>, or the nearest storage of your realm with
-          Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes
-          back. With no Food anywhere they work on. Carrying a load tops their food up to{' '}
-          <code>foodTake</code> too, and the carrier brings back what the workplace's pile lacks of{' '}
-          <code>crewFood</code> ({num(CREW_FOOD)} unless set) for the crew's meals, so a worker with
-          Food on the pile stays. <code>foodAt</code> 0 turns getting food off,{' '}
-          <code>crewFood</code> 0 the crew's Food.
+          leaves work for their <code>food</code> storage, else their <code>storage</code>, else the
+          nearest storage of your realm with Food, takes Food up to <code>foodTake</code> (
+          {num(GET_FOOD_TAKE)} unless set) and comes back. With no Food anywhere they work on.
+          Carrying a load tops their food up to <code>foodTake</code> too, and the carrier brings
+          back what the workplace's pile lacks of <code>crewFood</code> ({num(CREW_FOOD)} unless
+          set) for the crew's meals, so a worker with Food on the pile stays. <code>foodAt</code> 0
+          turns getting food off, <code>crewFood</code> 0 the crew's Food.
         </p>
         <p>
           Work can be run directly too, with Run script or as a queue step: they work the workplace
@@ -991,6 +1037,12 @@ export function Wiki() {
           there. The workplace can be anyone's you know, out of sight too: they walk to where you
           last saw it. With no workplace there, once theirs is gone, or when they find it held by
           another realm's workers with no room left, Work ends and your realm log says why.
+        </p>
+        <p>
+          Work on a workplace that is still a construction site builds it first, as Build would,
+          with materials from the nearest storage of your realm that holds them, and once it is
+          finished they work it without another order. Pick the site for Work on the card or as a
+          queue step.
         </p>
         <table>
           <thead>
@@ -1137,11 +1189,11 @@ export function Wiki() {
         </p>
         <p>
           A resident building or tearing down who carries less Food than <code>foodAt</code> (
-          {num(GET_FOOD_AT)} unless set) goes to their <code>source</code>, or the nearest storage
-          of your realm with Food, takes Food up to <code>foodTake</code> ({num(GET_FOOD_TAKE)}{' '}
-          unless set) and comes back to the site. With no Food anywhere they work on. Fetching
-          materials tops their food up to <code>foodTake</code> too, before the materials.{' '}
-          <code>foodAt</code> 0 turns this off.
+          {num(GET_FOOD_AT)} unless set) goes to their <code>food</code> storage, else their{' '}
+          <code>source</code>, else the nearest storage of your realm with Food, takes Food up to{' '}
+          <code>foodTake</code> ({num(GET_FOOD_TAKE)} unless set) and comes back to the site. With
+          no Food anywhere they work on. Fetching materials tops their food up to{' '}
+          <code>foodTake</code> too, before the materials. <code>foodAt</code> 0 turns this off.
         </p>
         <p>
           Build can be run directly too, with Run script or as a queue step: they join the
@@ -1222,12 +1274,24 @@ export function Wiki() {
           there until it is next driven, when a free horse of the realm standing with it is hitched
           again. A carriage whose horse dies waits the same way.
         </p>
+        <p>
+          A carriage's card shows its load as a bar against what it holds (its passengers counted
+          in) over its goods, its driver and passengers by name, the haul route it drives as “first
+          stop → second stop” with the leg it is on and about when it arrives, and its horse with
+          its health and hunger and how long the Food on board feeds it. Another realm's carriage
+          shows only how heavily it is loaded, and its horse without how it fares.
+        </p>
         <table>
           <thead>
             <tr>
               <th>Goods</th>
               {(Object.keys(GOOD_WEIGHT) as Good[]).map((g) => (
-                <th key={g}>{goodName(g)}</th>
+                <th key={g}>
+                  <span className="good-label">
+                    <GoodIcon good={g} />
+                    {goodName(g)}
+                  </span>
+                </th>
               ))}
             </tr>
           </thead>
@@ -1240,6 +1304,17 @@ export function Wiki() {
             </tr>
           </tbody>
         </table>
+        <p>
+          Cards show goods as these icons, each with its amount; hover over one, or press and hold
+          it on a phone, for its name. That goes for every inventory: what a resident carries, a
+          carriage's load, a storage's or stable's goods and a pile; a trade's prices name each good
+          beside its icon. On a resident's card their own food (up to {num(OWN_FOOD)} Food) shows
+          apart at the end, marked <em>own</em>. A construction site's card shows its work done as a
+          bar with about how long is left at the pace of those building it, then a row per material:
+          what was delivered against what it needs, with a small bar. A workplace's card shows its
+          pile and its crew, one row each with what they are doing: working, carrying a load,
+          fetching, or on the way.
+        </p>
         <h3>Moving goods, per game hour</h3>
         <table>
           <thead>
@@ -1292,6 +1367,19 @@ export function Wiki() {
           The route (where to, which goods) comes only from the Haul order, which also fills the
           Haul default's <code>carriage</code> param. Run directly, with Run script or as a queue
           step, Haul has no route: it ends at once and your realm log says “no route given”.
+        </p>
+        <h3>A horse going Down</h3>
+        <p>
+          A horse goes hungry like a resident: with nothing in reach it goes <b>Down</b>{' '}
+          {days(HUNGER_DAYS + STARVE_DAYS)} after its last meal and lies there for{' '}
+          {days(DOWN_DAYS)}. Down, it doesn't move: its rider is on foot again, and the carriage it
+          pulls stands where it is, its drive or haul route ending; nobody can mount or drive it.
+          It still eats Food in reach, so put Food down on its tile or right next to it (horses
+          have no inventory: Food in someone's hands doesn't count). Once it has eaten, it gets up
+          with {num(HORSE_WAKE_HEALTH)} health of {num(MAX_HEALTH)} and heals from there. When the
+          time is up first, it dies. Its token lies on its side, the Horses drawer, the stable and
+          the tile card say it is Down and how long is left, and your realm log says when one of
+          your horses goes Down and when one dies.
         </p>
         <h3>Breeding</h3>
         <p>
@@ -1627,10 +1715,10 @@ export function Wiki() {
           So it builds the whole chain its land allows, from the node up: weapons short wants a
           smithy, which wants Iron, so a smelter, which wants Iron ore, so a mine first, and the
           Wood and Stone the mine is built of before that. A smelter or smithy is worked only while
-          the storage holds the input for a batch, which its workers take with them; once the city
-          isn't short of what it makes, they stop. A good with no node in reach stays short: a
-          village with no ore in reach forges no weapons, and a mint is built only with Gold ore in
-          reach.
+          the storage holds the input for a batch, which its workers take with them, and one of them
+          fetches more when it runs out, as yours do; once the city isn't short of what it makes,
+          they stop. A good with no node in reach stays short: a village with no ore in reach forges
+          no weapons, and a mint is built only with Gold ore in reach.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
@@ -1697,7 +1785,8 @@ export function Wiki() {
           lowers the victim's standing toward the culprit; standing drifts back toward neutral by{' '}
           {num(STANDING_DRIFT_PER_DAY)} a game day. A crime is remembered for{' '}
           {days(CRIME_MEMORY_DAYS)} after the news stops spreading. Taking from or tearing down
-          another realm's outpost storage counts the same as its city storage.
+          another realm's outpost storage counts the same as its city storage, and taking what
+          another realm's Down resident carries is theft too.
         </p>
         <table>
           <thead>
@@ -2074,22 +2163,78 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             The Work default has <code>workplace</code>: the workplace to work, the one they stand
             on while none is picked; it is never kept between starts, so the form before it starts
             shows it empty, and giving Work on a workplace fills it without asking. It also has{' '}
-            <code>storage</code>: where the output goes. The Build default has <code>site</code>:
-            the construction site to join; and <code>source</code>: where materials come from, a
-            carriage too. Unset, each uses the nearest storage; a source picked that holds none of
-            what the site lacks is left alone, and they just build. The Haul default has{' '}
-            <code>carriage</code>: the carriage to drive. The Tear down default has{' '}
-            <code>building</code>, the Breed horses and Feed the stable defaults <code>stable</code>
-            . Like Work's <code>workplace</code>, each of these is the one they stand on while none
-            is picked, never kept between starts, and filled by giving the task. Feed the stable
-            also has <code>source</code>: where the Food comes from. The Tear down default has{' '}
-            <code>source</code>: where Food comes from. The Work, Build and Tear down defaults also
-            have the <code>number</code> params <code>foodAt</code> (default {num(GET_FOOD_AT)}; 0
-            turns it off) and <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting food,
-            in units of Food (a resident eats about {num(foodEatenPerDay())} a game day). Work also
-            has <code>crewFood</code> (default {num(CREW_FOOD)}; 0 brings none): the Food the
+            <code>storage</code>: the main storage, for the output, inputs and Food; and{' '}
+            <code>output</code>, <code>input</code> and <code>food</code>, each taking its place for
+            that one use when picked. The Build default has <code>site</code>: the construction site
+            to join; and <code>source</code>: where materials come from, a carriage too. Unset, each
+            uses the nearest storage; a source picked that holds none of what the site lacks is left
+            alone, and they just build. The Haul default has <code>carriage</code>: the carriage to
+            drive. The Tear down default has <code>building</code>, the Breed horses and Feed the
+            stable defaults <code>stable</code>. Like Work's <code>workplace</code>, each of these
+            is the one they stand on while none is picked, never kept between starts, and filled by
+            giving the task. Feed the stable also has <code>source</code>: where the Food comes
+            from. The Tear down default has <code>source</code>: where Food comes from. The Build,
+            Build line and Tear down defaults also have <code>food</code>: where Food comes from,
+            their <code>source</code> while none is picked. The Work, Build and Tear down defaults
+            also have the <code>number</code> params <code>foodAt</code> (default {num(GET_FOOD_AT)}
+            ; 0 turns it off) and <code>foodTake</code> (default {num(GET_FOOD_TAKE)}) for getting
+            food, in units of Food (a resident eats about {num(foodEatenPerDay())} a game day). Work
+            also has <code>crewFood</code> (default {num(CREW_FOOD)}; 0 brings none): the Food the
             workplace's pile keeps for the crew, which the carrier tops up on the way back from the
             storage.
+          </li>
+        </ul>
+        <h3>Workplace settings</h3>
+        <p>
+          How a workplace is worked belongs to the workplace, not to each worker. On the card of a
+          workplace, or of a construction site of one, open Work settings: pick its work script and
+          set that script's params there, once for the whole crew.
+        </p>
+        <ul>
+          <li>
+            The work script is your Work default, or any script of yours that declares{' '}
+            <code>param {WORKPLACE_PARAM}: building</code>. Switching to another one starts its
+            values over, and everyone working there by the settings switches to it, as if given Work
+            again.
+          </li>
+          <li>
+            Each of its params but <code>{WORKPLACE_PARAM}</code>, which is the workplace itself,
+            has a field as on a resident's card: pick it on the map or type a number, and clear it.
+            Each shows its comment and the value it uses.
+          </li>
+          <li>
+            You can set them for any workplace your realm knows: your own, or anyone's in sight or
+            last seen. Two realms working the same farm each keep their own, and neither sees the
+            other's. NPC cities keep none.
+          </li>
+          <li>
+            Your scripts read them on a building as <code>workSettings</code>: the work script's id
+            (<code>null</code> for the Work default) and the values set by name.
+          </li>
+          <li>Settings of a workplace that is gone go with it.</li>
+        </ul>
+        <h4>Working by the settings</h4>
+        <ul>
+          <li>
+            Giving a resident Work at a workplace, from their card, a group card or a queue step,
+            runs its work script. The form before it starts is filled with the workplace's values.
+          </li>
+          <li>
+            A value you change in that form becomes that resident's own, an override. What they kept
+            for that script before doesn't carry over.
+          </li>
+          <li>
+            While they work there, each param reads their override, else the workplace's value, else
+            the script's default. Their card says which: a value "from the workplace", or "their
+            own" with a button back to the workplace's.
+          </li>
+          <li>
+            Changing a value on the workplace's card reaches everyone working there without an
+            override at once, from their next use of it.
+          </li>
+          <li>
+            A script you give by hand with Run script stays the resident's own choice and reads only
+            their own values.
           </li>
         </ul>
       </Section>
