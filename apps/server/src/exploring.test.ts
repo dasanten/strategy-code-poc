@@ -258,11 +258,11 @@ describe('exploring', { timeout: 60_000 }, () => {
   })
 
   describe('with find', () => {
-    const gold = { id: 'n1', kind: 'goldOre', x: 500, y: 820 } as const
+    const gold = { id: 'n1', kind: 'goldOre', x: 500, y: 840 } as const
     const events = (s: Setup) => s.world.events.map((e) => e.kind)
     // Gold ore lies in hills: a hill on each tile a node is put on.
     const hilly = plains(1000)
-    for (const y of [820, 900]) hilly.tiles[y * 1000 + 500] = Terrain.Hills
+    for (const y of [840, 900]) hilly.tiles[y * 1000 + 500] = Terrain.Hills
 
     /** Explores north for gold ore till they end, noting the northmost tile they reached. */
     function explore(s: Setup) {
@@ -279,16 +279,17 @@ describe('exploring', { timeout: 60_000 }, () => {
       const s = setup(hilly, home, 26)
       s.world.nodes.push({ ...gold })
       const northmost = explore(s)
-      // Seen on the way out, so they turned for home there, without going on to the edge.
-      expect(northmost).toBeGreaterThanOrEqual(gold.y - SIGHT_RANGE - 2)
+      // Seen on the way out, the tick it came into sight: they turned for home there, without
+      // going on to the edge they were walking to.
+      expect(northmost).toBeGreaterThanOrEqual(gold.y + SIGHT_RANGE - 2)
       expect(s.world.waypoints[7]).toEqual([
-        { id: expect.any(String), name: 'Gold ore node', x: 500, y: 820 },
+        { id: expect.any(String), name: 'Gold ore node', x: 500, y: 840 },
       ])
       expect([s.w1.x, s.w1.y]).toEqual([home.x, home.y])
       expect(logged(s.w1).slice(-3)).toEqual([
-        'found a Gold ore node at 500,820',
+        'found a Gold ore node at 500,840',
         'done: walking back to the storage at 500,960',
-        'found a Gold ore node at 500,820',
+        'found a Gold ore node at 500,840',
       ])
       // The realm log says so when they find it, and again as they end.
       expect(events(s)).toEqual(['waypointAdded', 'scriptStopped'])
@@ -302,7 +303,7 @@ describe('exploring', { timeout: 60_000 }, () => {
       expect(explore(s)).toBeLessThan(900)
       expect(s.world.waypoints[7]!.map((w) => [w.name, w.y])).toEqual([
         ['Gold', 900],
-        ['Gold ore node', 820],
+        ['Gold ore node', 840],
       ])
     })
 
@@ -322,7 +323,7 @@ describe('exploring', { timeout: 60_000 }, () => {
       expect(logged(s.w1)).toContain(
         `no waypoint: you hold ${WAYPOINTS_MAX} waypoints already, the most`,
       )
-      expect(logged(s.w1).at(-1)).toBe('found a Gold ore node at 500,820, no waypoint added')
+      expect(logged(s.w1).at(-1)).toBe('found a Gold ore node at 500,840, no waypoint added')
       expect(events(s)).toEqual(['scriptStopped'])
     })
   })

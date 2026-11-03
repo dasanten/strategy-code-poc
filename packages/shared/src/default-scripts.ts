@@ -1479,7 +1479,7 @@ fn walkOut(edge) {
   memory.target = {x: edge.x, y: edge.y}
   memory.out = true
   memory.full = null
-  wait() // until I am there
+  waitOut() // until I am there
 }
 
 // Fetch as much Food as fits where I refill: setting out, or turning back
@@ -1499,6 +1499,12 @@ fn turnBack(from) {
     log("setting out: fetching " + units + " Food at " + placeName(from))
   }
   wait() // until I have it
+}
+
+// On my way out: with params.find I run each tick to look about, else I
+// wait till I am there.
+fn waitOut() {
+  if (params.find == null) { wait() }
 }
 
 // A node of the kind params.find asks for that my Player sees and none of
@@ -1583,7 +1589,7 @@ fn goBackOut(from) {
   memory.target = {x: at.x, y: at.y}
   memory.full = null
   log("going back out to " + at.x + "," + at.y)
-  wait() // until I am there
+  waitOut() // until I am there
   return true
 }
 
