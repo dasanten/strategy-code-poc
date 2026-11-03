@@ -292,6 +292,8 @@ describe('alliances', () => {
       standings: [],
       joinRequests: [],
       directives: [],
+      // This test world has no Trade Org HQ.
+      noCaravans: true,
     })
     expect(diplomacyFor(world, realm(ash), [])).toEqual({
       alliance: null,
@@ -302,6 +304,8 @@ describe('alliances', () => {
       standings: [],
       joinRequests: [],
       directives: [],
+      // This test world has no Trade Org HQ.
+      noCaravans: true,
     })
   })
 

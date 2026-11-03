@@ -203,7 +203,9 @@ export function CityInspector({
                     goods={tradedGoods(w, tradeLists(w, { buildings }))}
                     traders={tradersAt(w, { residents, carriages }, realmId)}
                     sending={sending(w)}
-                    deliveryCities={noCaravans ? [] : deliveryCities({ cities, buildings }, realmId)}
+                    deliveryCities={
+                      noCaravans ? [] : deliveryCities({ cities, buildings }, realmId)
+                    }
                     preview={(resident, carriage, good, units) =>
                       previewTrade(
                         { cities, buildings },

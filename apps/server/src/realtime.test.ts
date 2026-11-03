@@ -970,6 +970,8 @@ describe('realtime', () => {
       standings: [],
       joinRequests: [],
       directives: [],
+      // These test worlds have no Trade Org HQ.
+      noCaravans: true,
     })
     socket.send(
       JSON.stringify({
