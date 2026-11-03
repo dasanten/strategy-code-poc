@@ -115,7 +115,8 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * (`stepFounders`), apart from everyone else; stops workers who run low on food where there is
  * none, carriers home with their load stored, builders stuck or out of materials (with no
  * storage yet, everyone builds, `npcBuilders`), breeders who are done and workers at a smelter or
- * smithy with nothing left to process, so they get their next job; moves a worker whose plan puts
+ * smithy with nothing left to process and none in the store, so they get their next job (with
+ * some there, one of them fetches it by the Work default); moves a worker whose plan puts
  * them elsewhere, or nowhere; then gives each idle adult what comes first: its trader goes on with
  * their run (`runTrader`); a resident carrying a child stays at home; one
  * carrying materials the project needs takes them to its site; a load of goods goes into the
@@ -203,9 +204,13 @@ function runCity(
     const moved =
       job !== undefined && job.kind !== 'soldier' && at !== undefined && at !== job.buildingId
     if (moved && !r.carrying && plan?.plannedAt === world.tick) stopWork(r)
-    // At a workplace that processes goods with nothing left to process, they fetch more.
+    // At a workplace that processes goods with nothing left to process, one of them fetches more
+    // by the Work default (`CONTEXT.md`: Fetching inputs) while the store holds a batch; with
+    // none there, they get their next job.
     const place = at !== undefined && r.order?.kind === 'workAt' ? buildings.get(at) : undefined
-    if (place && RECIPES[place.kind] && !inputLeft(world, place, r)) stopWork(r)
+    if (place && RECIPES[place.kind] && !inputLeft(world, place, r) && !inputIn(place, store)) {
+      stopWork(r)
+    }
   }
 
   const home = npcHome(world, city)
@@ -404,6 +409,12 @@ function inputLeft(world: WorldState, place: Building, r: Resident): boolean {
   const recipe = recipeFor(place.kind, place.kind === 'smithy' ? NPC_SMITHY_WEAPON : undefined)
   if (!recipe || hasInput(world, place, recipe)) return true
   return Object.keys(recipe.input).some((g) => (r.carried[g as Good] ?? 0) > 0)
+}
+
+/** Whether a store holds a batch of what a workplace that processes goods uses up. */
+function inputIn(place: Building, store: Building | undefined): boolean {
+  const recipe = recipeFor(place.kind, place.kind === 'smithy' ? NPC_SMITHY_WEAPON : undefined)
+  return recipe !== undefined && holdsBatch(store?.stock, recipe.input)
 }
 
 /**

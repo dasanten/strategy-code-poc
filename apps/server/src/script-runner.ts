@@ -798,6 +798,7 @@ export class ScriptRunner {
       const unedited = (r: Resident) =>
         r.script!.scriptId !== 0 && this.host.script(r.script!.scriptId)?.followsDefault === true
       out.push(...oneCarrierAtATime(world, unedited), ...oneFetcherAtATime(world, unedited))
+      out.push(...oneInputFetcherAtATime(world, unedited))
       const taskOf = (r: Resident) =>
         ran.has(r.id) && unedited(r) ? this.host.script(r.script!.scriptId)?.task : undefined
       out.push(...defaultsHaveATarget(world, taskOf))
@@ -1426,6 +1427,22 @@ export function oneFetcherAtATime(
     invariant: 'one-fetcher-at-a-time',
     message: `${ids.length} residents fetch materials for ${site} at once: ${ids.join(', ')}`,
     entityIds: [site, ...ids],
+  }))
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Fetching inputs): at most one resident of a smelter, mint
+ * or smithy is away fetching its inputs at once, among those running the Work default as the game
+ * ships it (`counts`).
+ */
+export function oneInputFetcherAtATime(
+  world: WorldState,
+  counts: (r: Resident) => boolean,
+): InvariantViolation[] {
+  return oneAwayAtATime(world, counts, 'workplaceId', 'input').map(([place, ids]) => ({
+    invariant: 'one-input-fetcher-at-a-time',
+    message: `${ids.length} residents fetch ${place}'s inputs at once: ${ids.join(', ')}`,
+    entityIds: [place, ...ids],
   }))
 }
 

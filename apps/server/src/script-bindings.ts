@@ -23,6 +23,8 @@ import {
   crewTile,
   directivesFor,
   materialsNeeded,
+  inputToFetch,
+  recipeFor,
   organizationLabel,
   pileAt,
   queueView,
@@ -411,6 +413,15 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         throw new ScriptRuntimeError(`"fits" needs a good, not ${String(good)}`)
       }
       return unitsThatFit(resident, good as Good, world.tick)
+    }
+    queries.inputToFetch = ([workplace, makes]) => {
+      const id = (workplace as Record<string, Value> | null)?.id
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
+      if (!b || b.site || !(ownBuilding(b) || inSight(b))) return []
+      const recipe = recipeFor(b.kind, typeof makes === 'string' ? (makes as Good) : undefined)
+      if (!recipe) return []
+      const load = inputToFetch(world, b, recipe, resident)
+      return Object.entries(load).map(([good, units]) => ({ good, units }))
     }
     queries.breedingPair = ([stable]) => {
       const id = (stable as Record<string, Value> | null)?.id

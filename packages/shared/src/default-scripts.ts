@@ -346,8 +346,13 @@ export const DEFAULT_SCRIPTS: Readonly<Record<Task, DefaultScript>> = {
 // brings back the Food the pile lacks of params.crewFood for the crew's
 // meals from params.food, else params.storage, else the nearest storage with
 // Food (none to a farm, whose pile keeps its own; crewFood 0 brings none)
-// and comes back. At a smithy, memory.makes says what to make. Meals come
-// from the workplace's pile on their own, without an order. Below
+// and comes back. At a smelter, mint or smithy lacking the input for a
+// batch, one of us, picked at random, fetches a load at params.input, else
+// params.storage, while it holds some, else at the nearest storage of my
+// realm holding it, and puts it on the pile; not while one of us carries the
+// output, and with none anywhere we stand idle. At a smithy, memory.makes
+// says what to make. Meals come from the workplace's pile on their own,
+// without an order. Below
 // params.foodAt units of Food on me, while the pile holds none, I get Food
 // up to params.foodTake at params.food, else params.storage, else the
 // nearest storage of my realm with Food, and come back; storing a load tops
@@ -374,7 +379,7 @@ if (memory.siteId != null && buildFirst(workplace)) { return }
 // Already at work there, I keep the tile I stand on.
 if (memory.at == null && me.order != null && me.order.kind == "workAt") {
   memory.at = {x: me.x, y: me.y}
-} else if (me.order == null && workplace != null && memory.carry == null && memory.food == null) {
+} else if (me.order == null && workplace != null && memory.carry == null && memory.food == null && memory.input == null) {
   memory.at = crewTile(workplace)
 }
 if (memory.at == null && params.workplace != null) {
@@ -399,6 +404,11 @@ if (food < params.foodAt && !pileHoldsFood(workplace) && getFoodIfLow(params.foo
   return
 }
 if (me.order == null) {
+  if (memory.input != null) { // back with inputs: onto the pile
+    let load = carriedOf(me, memory.input.missing)
+    memory.input = null
+    if (load != null && drop({kind: "ground"}, load) == null) { return }
+  }
   if (workAt(memory.makes) != null && heldBySomeoneElse(workplace)) {
     end("the " + workplace.kind + " is held by someone else")
   }
@@ -556,8 +566,9 @@ fn dropCrewFood() {
   return true
 }
 
-// Away carrying a load off, fetching materials or getting food: walk back to
-// the workplace, once; with no way back I stay put. True until I am there.
+// Away carrying a load off, fetching inputs or materials or getting food:
+// walk back to the workplace, once; with no way back I stay put. True until
+// I am there.
 fn walkBack() {
   if (me.x == memory.at.x && me.y == memory.at.y) {
     if (memory.carry != null) {
@@ -569,6 +580,7 @@ fn walkBack() {
   }
   let away = memory.carry
   if (away == null) { away = memory.food }
+  if (away == null) { away = memory.input }
   if (away == null) { away = memory.fetch }
   if (away != null && away.walked) {
     memory.stuck = true
@@ -581,10 +593,14 @@ fn walkBack() {
 }
 
 // Once the pile holds a full load, one of us carries it off to params.output,
-// else params.storage, else the nearest storage of my realm.
+// else params.storage, else the nearest storage of my realm. Until it does,
+// we fetch inputs we lack.
 fn carryLoadOffIfFull(workplace) {
   let found = fullLoad(workplace)
-  if (found == null) { return }
+  if (found == null) {
+    fetchInputIfShort(workplace)
+    return
+  }
   let to = params.output || params.storage
   if (to == null) {
     let stores = storages(workplace) // nearest first
@@ -597,6 +613,44 @@ fn carryLoadOffIfFull(workplace) {
     storageId: to.id, goods: found.goods, load: found.load,
     crewFood: crewFoodToBring(workplace, found.goods),
   }
+}
+
+// Fetching inputs: lacking the input for a batch of my recipe, one of us,
+// picked at random, fetches a load at params.input, else params.storage,
+// while it holds some, else at the nearest storage of my realm holding it,
+// kept in memory.input until back, when I put it on the pile. With none
+// anywhere we stand idle.
+fn fetchInputIfShort(workplace) {
+  let missing = inputToFetch(workplace, memory.makes)
+  if (missing.length == 0) { return }
+  let goods = goodsOf(missing)
+  let from = null
+  if (params.input != null) { from = materialsFrom(workplace, goods, params.input) }
+  if (from == null && params.storage != null) {
+    from = materialsFrom(workplace, goods, params.storage)
+  }
+  if (from == null) { from = materialsFrom(workplace, goods, null) }
+  if (from == null || pickInputFetcher(workplace) != me.id) { return }
+  let load = {}
+  for (m of missing) { load[m.good] = m.units }
+  if (fetch(load, from.id) != null) { return }
+  wait() // until I have it
+  memory.input = {missing: missing}
+  log("fetching " + goodsText(load, goods) + " from " + placeName(from))
+}
+
+// Who fetches inputs: one of us at work here, picked at random, so we all
+// pick the same one. Null while one of us fetches some or carries a load.
+fn pickInputFetcher(workplace) {
+  let workers = []
+  for (r of withMemory("workplaceId", workplace.id)) {
+    let m = r.script.memory
+    if (m.input != null || m.carry != null) { return null }
+    if (r.order != null && r.order.kind == "workAt") { workers[workers.length] = r }
+  }
+  let fetcher = pickRandom(workers)
+  if (fetcher == null) { return null }
+  return fetcher.id
 }
 
 // The Food the pile lacks of params.crewFood, which I bring back for the
