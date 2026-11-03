@@ -36,7 +36,10 @@ and wall lines as a task for a crew), both ahead of Bandits. Agreed with Daniel 
 from the UX review of that day: Clearer play (Epic 58, ADR 0019: order rows keep their slot,
 predictable picking, previewed picks, one lane for notices, a first-day card), then Clearer
 screens (59: unique game-given names, the minimap, structured cards and forms, the phone layout,
-scripting entry), both ahead of Bandits.
+scripting entry), both ahead of Bandits. Agreed with Daniel later on 2026-11-02, from his list of
+that day: Quick wins 5 (Epic 60: roads and ways far out, Work on a site), Workplace settings (61,
+ADR 0020), Readable cards (62: goods icons, facts as rows), Down, not dead (63, ADR 0021) and
+Waypoints and exploring (64), in that order, all ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -100,6 +103,11 @@ I sleep.
 | 57  | [Build line](https://github.com/dasanten/strategy-code-poc/issues/660)                          | ticketed                |
 | 58  | [Clearer play](https://github.com/dasanten/strategy-code-poc/issues/687)                        | ticketed                |
 | 59  | [Clearer screens](https://github.com/dasanten/strategy-code-poc/issues/693)                     | ticketed                |
+| 60  | [Quick wins 5](https://github.com/dasanten/strategy-code-poc/issues/717)                        | ticketed                |
+| 61  | [Workplace settings](https://github.com/dasanten/strategy-code-poc/issues/718)                  | ticketed                |
+| 62  | [Readable cards](https://github.com/dasanten/strategy-code-poc/issues/719)                      | ticketed                |
+| 63  | [Down, not dead](https://github.com/dasanten/strategy-code-poc/issues/720)                      | ticketed                |
+| 64  | [Waypoints and exploring](https://github.com/dasanten/strategy-code-poc/issues/721)             | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
