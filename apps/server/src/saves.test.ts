@@ -140,7 +140,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(74)
+    expect(WORLD_FORMAT_VERSION).toBe(75)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -468,6 +468,15 @@ describe('world saves', () => {
     const migrated = migrateWorld(structuredClone(world), 73, { terrain }, migrations, 74)
     expect(migrated).toEqual(world)
     expect(migrated.residents[0]!.script?.settingsFrom).toBeUndefined()
+    expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('migrates a format 74 world: every Player starts with no waypoints (migration 74 → 75)', () => {
+    const { world, terrain } = worldWithCity()
+    const old: Partial<typeof world> = structuredClone(world)
+    delete old.waypoints
+    const migrated = migrateWorld(old, 74, { terrain }, migrations, 75)
+    expect(migrated).toEqual({ ...world, waypoints: {} })
     expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 

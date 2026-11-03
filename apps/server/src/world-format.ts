@@ -18,7 +18,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 74
+export const WORLD_FORMAT_VERSION = 75
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -286,6 +286,9 @@ export const migrations: Record<number, MigrationStep> = {
   // `RunningScript.settingsFrom`. Scripts running from before were given without settings, so
   // they stay the residents' own, unmarked: the step leaves every resident as they are.
   73: (state) => state,
+  // Waypoints (`CONTEXT.md`: Waypoint) are kept per Player (`WorldState.waypoints`). Nobody could
+  // put one down before, so every Player starts with none.
+  74: (state) => ({ ...(state as object), waypoints: {} }),
 }
 
 export class WorldFormatError extends Error {}

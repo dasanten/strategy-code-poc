@@ -239,6 +239,7 @@ describe('buildings on a tile’s card', () => {
     expect(card.tradeHere).toEqual({ cityId: 'c-post', buildingId: 'b-warehouse' })
     expect(tileActions(card, undefined).map((a) => [a.id, a.label, a.key])).toEqual([
       ['tradeHere', 'Trade here', 'T'],
+      ['addWaypoint', 'Add waypoint…', 'J'],
     ])
     const npc = tile({ buildings: [building({ kind: 'storage', cityId: 'c-npc' })], cities })
     expect(npc.tradeHere).toEqual({ cityId: 'c-npc', buildingId: 'b-storage' })

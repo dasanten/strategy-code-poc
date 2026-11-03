@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ScriptParam, ScriptSummary, WorkplaceSettings } from '@csp/shared'
+import type { ScriptParam, ScriptSummary, Waypoint, WorkplaceSettings } from '@csp/shared'
 import { ScriptParamFields } from './ScriptParams.js'
 import { workScriptOf, workScripts, workSettingsParams } from './work-settings-view.js'
 
@@ -34,10 +34,12 @@ export function WorkSettings({
   scripts,
   settings,
   label,
+  waypoints,
   picking,
   onScript,
   onPick,
   onNumber,
+  onChoose,
   onClear,
 }: {
   /** The Player's script library. */
@@ -46,6 +48,8 @@ export function WorkSettings({
   settings: WorkplaceSettings | undefined
   /** How a picked value is named; null when it is out of sight. */
   label: (id: string) => string | null
+  /** The Player's waypoints, which a `waypoint` param picks from. */
+  waypoints: readonly Waypoint[]
   /** The param whose value the map is waiting for, if any. */
   picking: string | undefined
   /** Switches the work script: its id, or null for the Work default. */
@@ -53,6 +57,8 @@ export function WorkSettings({
   /** Starts (or cancels) picking a param's value on the map. */
   onPick: (param: ScriptParam) => void
   onNumber: (name: string, value: number) => void
+  /** Sets a `choice` param to the word chosen, or a `waypoint` param to the waypoint's id. */
+  onChoose: (param: ScriptParam, value: string) => void
   onClear: (name: string) => void
 }) {
   const [open, setOpen] = useState(remembered)
@@ -102,9 +108,11 @@ export function WorkSettings({
               params={params}
               values={settings?.params ?? {}}
               label={label}
+              waypoints={waypoints}
               picking={picking}
               onPick={onPick}
               onNumber={onNumber}
+              onChoose={onChoose}
               onClear={onClear}
             />
           ) : (

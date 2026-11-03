@@ -119,6 +119,7 @@ import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
 import { horseOffersOnce } from './horse-grant.js'
 import { workplaceSettingsSound } from './workplace-settings.js'
+import { waypointsSound } from './waypoints.js'
 import { cityGameNamesUnique, gameNamesUnique } from './names.js'
 import {
   defaultsHaveATarget,
@@ -1972,6 +1973,7 @@ export const worldInvariants: Invariant[] = [
   cityGameNamesUnique,
   horseOffersOnce,
   workplaceSettingsSound,
+  waypointsSound,
   buildingsInPlace,
   citiesFromBuildings,
   outpostStorageRealms,

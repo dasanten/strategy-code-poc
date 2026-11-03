@@ -141,3 +141,33 @@ describe('the form before a script starts', () => {
     expect(startValuesValid(PARAMS, { take: 1.5 })).toBe(false)
   })
 })
+
+describe('the form with choice and waypoint params', () => {
+  const CHOSEN: ScriptParam[] = [
+    { name: 'toward', type: 'choice', choices: ['north', 'south'], default: 'north' },
+    { name: 'pace', type: 'choice', choices: ['slow', 'fast'] },
+    { name: 'to', type: 'waypoint' },
+  ]
+
+  it('starts from a kept word still listed and a kept waypoint, else the default', () => {
+    expect(startValues(CHOSEN, { toward: 'south', pace: 'fast', to: 'wp1' })).toEqual({
+      toward: 'south',
+      pace: 'fast',
+      to: 'wp1',
+    })
+    expect(startValues(CHOSEN, { toward: 'west', pace: 3 })).toEqual({
+      toward: 'north',
+      pace: undefined,
+      to: undefined,
+    })
+  })
+
+  it('gives the word and waypoint, null for empty fields and for a choice’s default', () => {
+    expect(startParamValues(CHOSEN, { toward: 'north', pace: 'slow', to: 'wp1' })).toEqual({
+      toward: null,
+      pace: 'slow',
+      to: 'wp1',
+    })
+    expect(startValuesValid(CHOSEN, { toward: 'south', pace: undefined })).toBe(true)
+  })
+})

@@ -1,11 +1,15 @@
 import {
   DOING_MAX_LENGTH,
+  EXPLORED_EDGE_RANGE,
+  EXPLORE_SKIP_RANGE,
   SCRIPT_ACTION_COST,
   SCRIPT_HELPER_COST,
   SCRIPT_LIST_QUERY_COST,
   SCRIPT_LOG_LINES,
   SCRIPT_TILE_QUERY_COST,
   TRAINING_GROUND_MAX_TRAINEES,
+  WAYPOINTS_MAX,
+  WAYPOINT_NAME_MAX_LENGTH,
 } from './balance.js'
 import type { ScriptType, ScriptViewName } from './script-views.js'
 
@@ -109,6 +113,12 @@ const SHARED: readonly ScriptBinding[] = [
   list('piles', 'pile', 'The piles of goods the Player sees.'),
   list('nodes', 'node', 'The resource nodes on terrain the Player has explored.'),
   list(
+    'nodesInSight',
+    'node',
+    'The resource nodes the Player sees now; with `kind` ("forest", "stone", "ironOre" or "goldOre"), only those of that kind.',
+    ['kind?'],
+  ),
+  list(
     'lastSeen',
     'lastSeen',
     'The buildings, construction sites and cities the Player has seen and that are out of their sight now, as they last saw them: each with `is` ("building" or "city") and `seenAt`, the tick they were last seen.',
@@ -117,6 +127,11 @@ const SHARED: readonly ScriptBinding[] = [
     'directives',
     'directive',
     'The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).',
+  ),
+  list(
+    'waypoints',
+    'waypoint',
+    'My Player’s waypoints, oldest first: the named markers they put on the map, which only they see.',
   ),
   list(
     'withMemory',
@@ -215,16 +230,36 @@ const SHARED: readonly ScriptBinding[] = [
 ]
 
 /**
+ * The actions every script gets for its Player's waypoints (`CONTEXT.md`: Waypoint): the orders
+ * of the same name, free and at once, which leave the script running.
+ */
+const WAYPOINT_ACTIONS: readonly ScriptBinding[] = [
+  action(
+    'addWaypoint',
+    ['x', 'y', 'name'],
+    `Put a waypoint named \`name\` on tile (x, y) for my Player, after those they hold: free and at once, from anywhere. Refused once they hold ${WAYPOINTS_MAX}, counting those this run added (one removed makes room from the next run), or for a name longer than ${WAYPOINT_NAME_MAX_LENGTH} characters.`,
+  ),
+  action(
+    'removeWaypoint',
+    ['waypoint'],
+    'Remove one of my Player’s waypoints, by it or its id: free and at once.',
+  ),
+]
+
+/**
  * What a script's `param` line can hold (`CONTEXT.md`: Script parameter): `param name: type`
  * at the top of a script, read as `params.name`, picked per resident on their card. The same
  * types as `PARAM_TYPES` in `@csp/lang`.
  */
-export const SCRIPT_PARAM_TYPES = ['building', 'storage', 'number'] as const
+export const SCRIPT_PARAM_TYPES = ['building', 'storage', 'number', 'choice', 'waypoint'] as const
 export type ScriptParamType = (typeof SCRIPT_PARAM_TYPES)[number]
 
 export function isScriptParamType(value: unknown): value is ScriptParamType {
   return (SCRIPT_PARAM_TYPES as readonly unknown[]).includes(value)
 }
+
+/** The param types whose value is picked on the map: one building, carriage or waypoint. */
+export type PickedParamType = Exclude<ScriptParamType, 'number' | 'choice'>
 
 /** What each param type accepts, for the Wiki and the editor. */
 export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
@@ -232,6 +267,10 @@ export const PARAM_DESCRIPTIONS: Readonly<Record<ScriptParamType, string>> = {
     'One of my realm’s buildings, or a workplace or construction site of anyone’s I know: in sight, or as last seen.',
   storage: 'One of my realm’s storages or stables, or one of its carriages.',
   number: 'A whole number of zero or more, typed in; `= n` after the type gives it a default.',
+  choice:
+    'One of the words its line lists, `choice(north, east, south, west)`, picked from a list and read as that word; `= north` after the list gives it a default.',
+  waypoint:
+    'One of my waypoints, picked from a list or on the map, read as its `id`, `name`, `x` and `y`; unset once it is removed.',
 }
 
 /** Whether a value fits a `number` param: a whole number of zero or more. */
@@ -239,12 +278,22 @@ export function isParamNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
+/** Whether a value fits a `choice` param: one of the words its line lists. */
+export function isParamChoice(param: Pick<ScriptParam, 'choices'>, value: unknown): boolean {
+  return typeof value === 'string' && (param.choices?.includes(value) ?? false)
+}
+
 /** A script's `param` line. */
 export interface ScriptParam {
   name: string
   type: ScriptParamType
-  /** A `number` param's default (`param name: number = 3`), read while none is set. */
-  default?: number
+  /** The words a `choice` param is one of (`param toward: choice(north, south)`), in order. */
+  choices?: string[]
+  /**
+   * A `number` param's default (`param name: number = 3`), or a `choice` param's word
+   * (`= north`), read while none is set.
+   */
+  default?: number | string
   /**
    * The `//` comment at the end of its line: what the param is for, and after "none:" what the
    * script uses while none is picked (`CONTEXT.md`: Script parameter). The resident card shows it.
@@ -300,6 +349,23 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     cost: SCRIPT_LIST_QUERY_COST,
     description:
       'About how many ticks I take to walk from one thing with `x` and `y` to another: the straight way across the terrain, diagonally where it slants, roads and walls left out.',
+  },
+  {
+    name: 'wayFood',
+    is: 'query',
+    params: ['a', 'b'],
+    returns: 'number',
+    cost: SCRIPT_LIST_QUERY_COST,
+    description:
+      'About how many units of Food I eat on the way from one thing with `x` and `y` to another, the way `walkTime` reckons it, at what each tile’s terrain costs me; riding, my horse’s too, which it eats from the Food I carry.',
+  },
+  {
+    name: 'exploredEdge',
+    is: 'query',
+    params: ['from', 'toward?', 'skip?'],
+    returns: { view: 'tile' },
+    cost: SCRIPT_LIST_QUERY_COST,
+    description: `The nearest tile to \`from\`, something with \`x\` and \`y\`, at the edge of my Player’s explored terrain: one they explored that I can go onto now (riding, one my horse can), beside one they haven’t. With \`toward\`, a compass direction ("north", "northeast", "east", "southeast", "south", "southwest", "west" or "northwest"), only tiles that way from \`from\`, at most 45° off it, the straightest first. With \`skip\`, a list of things with \`x\` and \`y\`, none within ${EXPLORE_SKIP_RANGE} tiles of them. Null with none within ${EXPLORED_EDGE_RANGE} tiles.`,
   },
   {
     name: 'crewTile',
@@ -476,6 +542,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     ['x', 'y'],
     'Build wall on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped.',
   ),
+  ...WAYPOINT_ACTIONS,
 ]
 
 /**
@@ -495,4 +562,5 @@ export const ARMY_SCRIPT_API: readonly ScriptBinding[] = [
   action('attack', ['targetId'], 'The army goes after a resident of another realm in sight.'),
   action('follow', ['targetId'], 'The army keeps in contact with a resident in sight.'),
   action('stop', [], 'The army stops: its order ends.'),
+  ...WAYPOINT_ACTIONS,
 ]

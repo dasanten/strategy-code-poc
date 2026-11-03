@@ -60,6 +60,7 @@ export type ScriptViewName =
   | 'material'
   | 'lineTile'
   | 'workSettings'
+  | 'waypoint'
 
 const field = (
   name: string,
@@ -758,6 +759,15 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'The construction site of the line’s road or wall on it.',
         'while none is laid out there',
       ),
+    ],
+  },
+  waypoint: {
+    description: 'One of the Player’s waypoints: a named marker on a tile that only they see.',
+    fields: [
+      id('waypoint'),
+      field('name', 'string', 'Its name; others may have the same.'),
+      field('x', 'number', 'From west to east.'),
+      field('y', 'number', 'From north to south.'),
     ],
   },
 }

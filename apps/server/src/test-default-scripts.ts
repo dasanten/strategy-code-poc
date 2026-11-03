@@ -9,11 +9,13 @@ import { ScriptRunner, runScriptOrder, setDefenceScriptOrder, taskOrder } from '
  * game's default scripts unedited (`CONTEXT.md`: Default script). A Player's version of a task's
  * default has the id `userId * 100` plus the task's place in `TASKS`, from 1; Run script runs it
  * by that id. Other scripts of theirs go in `library`, by id; deleting one there deletes it.
+ * Every Player has explored the whole map, unless `explored` says otherwise.
  */
 export function defaultScripts(
   terrain: TerrainMap,
   senders: OrderSender[],
   library: Map<number, RunnableScript> = new Map(),
+  explored: (userId: number, x: number, y: number) => boolean = () => true,
 ) {
   const defaultScript = (userId: number, task: Task) => userId * 100 + TASKS.indexOf(task) + 1
   const host = {
@@ -32,7 +34,7 @@ export function defaultScripts(
       }
     },
     sender: (userId: number) => senders.find((s) => s.userId === userId),
-    explored: () => true,
+    explored,
     defaultScript,
   }
   const kinds: Record<string, OrderKind> = {

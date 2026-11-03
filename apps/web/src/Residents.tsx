@@ -75,6 +75,7 @@ import {
   type Stock,
   type SeenResident,
   type SeenHorse,
+  type Waypoint,
   FOAL_STAT_SPREAD,
   STABLE_BREED_DAYS,
   STABLE_BREED_TICKS,
@@ -394,6 +395,7 @@ export function QueueBlock({
   scripts,
   buildings,
   lastSeen,
+  waypoints,
   cities,
   onEdit,
   title = 'Queue',
@@ -407,6 +409,8 @@ export function QueueBlock({
   buildings: Building[]
   /** The buildings remembered out of sight, to name steps acting there. */
   lastSeen?: Building[]
+  /** The Player's waypoints, to name steps at one (`CONTEXT.md`: Waypoint). */
+  waypoints?: readonly Waypoint[]
   /** The cities the Player knows, to name where a Relocate step goes. */
   cities?: readonly Pick<City, 'id' | 'name'>[]
   onEdit: (items: PlanItem[], loop?: boolean) => void
@@ -418,7 +422,7 @@ export function QueueBlock({
   // The steps and blocks picked for the clipboard, by id; one removed since drops out.
   const [pickedIds, setPicked] = useState<number[]>([])
   const clipboardEmpty = useClipboardEmpty()
-  const names = { scripts, buildings, lastSeen, cities }
+  const names = { scripts, buildings, lastSeen, cities, waypoints }
   const rows = planRows(q.items)
   const ids = rows.map((row) => row.id)
   const picked = pickedIds.filter((id) => ids.includes(id))
@@ -1218,6 +1222,7 @@ export function GroupCard({
     dismount: { kind: 'dismount' },
     feedStable: { kind: 'feedStable' },
     train: { kind: 'train' },
+    explore: { kind: 'explore' },
     store: { kind: 'store' },
     drop: { kind: 'drop' },
     getOff: { kind: 'getOff' },
@@ -1634,6 +1639,7 @@ export function ResidentCard({
   onWork,
   onFeedStable,
   onTrain,
+  onExplore,
   onTeach,
   onTearDown,
   horses,
@@ -1661,6 +1667,7 @@ export function ResidentCard({
   scripts,
   buildings = [],
   lastSeen,
+  waypoints,
   onRunScript,
   onSetDefenceScript,
   onEditScript,
@@ -1735,6 +1742,8 @@ export function ResidentCard({
   buildings?: Building[]
   /** The buildings remembered out of sight, to name queue steps acting there. */
   lastSeen?: Building[]
+  /** The Player's waypoints, to name steps at one (`CONTEXT.md`: Waypoint). */
+  waypoints?: readonly Waypoint[]
   /** Orders the resident to run a script (`CONTEXT.md`: Running a script). */
   onRunScript: (scriptId: number) => void
   /**
@@ -1780,6 +1789,8 @@ export function ResidentCard({
   onFeedStable: (stableId: string) => void
   /** Gives the resident the Train task for the training ground they stand on. */
   onTrain: (groundId: string) => void
+  /** Gives the resident the Explore task. */
+  onExplore: () => void
   /** Orders the resident to teach `subject` at the training ground they stand on. */
   onTeach: (groundId: string, subject: TrainingSubject) => void
   /** Orders the resident to tear down the building or site on their tile. */
@@ -1947,6 +1958,7 @@ export function ResidentCard({
     if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
     if (a.id === 'train' && building) onTrain(building.id)
+    if (a.id === 'explore') onExplore()
   }
   useActionKeys(rows, act)
   // Run script later starts on the script they were last seen running (`runScriptPick`).
@@ -2366,6 +2378,7 @@ export function ResidentCard({
               scripts={scripts}
               buildings={buildings}
               lastSeen={lastSeen}
+              waypoints={waypoints}
               cities={cities}
               onEdit={(items, loop) => onPlanQueue(editPlan(queuePlan, items, loop))}
               realm={realmId}
@@ -2386,6 +2399,7 @@ export function ResidentCard({
             scripts={scripts}
             buildings={buildings}
             lastSeen={lastSeen}
+            waypoints={waypoints}
             cities={cities}
             onEdit={onEditQueue}
             realm={realmId}

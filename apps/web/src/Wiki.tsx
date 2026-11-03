@@ -74,6 +74,11 @@ import {
   HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
   HORSE_NAME_MAX_LENGTH,
+  WAYPOINTS_MAX,
+  EXPLORE_FOOD_MARGIN,
+  EXPLORE_SKIP_RANGE,
+  EXPLORED_EDGE_RANGE,
+  WAYPOINT_NAME_MAX_LENGTH,
   HUNGRY_HORSE_PACE,
   HORSE_ENDURANCE_EFFECT,
   HORSE_ENDURANCE_LIMIT,
@@ -254,7 +259,12 @@ import {
 import { GROUP_SLOTS } from './saved-groups.js'
 import { realMinutes } from './queue-view.js'
 import { DEFAULT_REPEAT } from './plan-blocks.js'
-import { PARAM_COMMENT_EXAMPLE, PARAM_DEFAULT_EXAMPLE, SCRIPT_LANGUAGE } from './wiki-scripting.js'
+import {
+  PARAM_CHOICE_EXAMPLE,
+  PARAM_COMMENT_EXAMPLE,
+  PARAM_DEFAULT_EXAMPLE,
+  SCRIPT_LANGUAGE,
+} from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
@@ -262,6 +272,8 @@ export const WIKI_TOPICS = [
   { id: 'controls', title: 'Controls' },
   { id: 'queues', title: 'Queues' },
   { id: 'time', title: 'Time & map' },
+  { id: 'waypoints', title: 'Waypoints' },
+  { id: 'exploring', title: 'Exploring' },
   { id: 'terrain', title: 'Terrain & walking' },
   { id: 'residents', title: 'Residents & stats' },
   { id: 'training', title: 'Training' },
@@ -763,6 +775,78 @@ export function Wiki() {
           brought up to date once every {duration(LAST_SEEN_EVERY_TICKS)}, so a building that leaves
           your sight in between is remembered as it was up to that long before. What is in sight now
           is always shown as it is.
+        </p>
+      </Section>
+
+      <Section id="waypoints">
+        <p>
+          A waypoint is a named marker you put on a tile: a mountain pass, a node you mean to come
+          back to, where your residents meet. Right-click a tile on the map, or long-press it on a
+          touch screen, while no resident is picked and choose Add waypoint here; the card of any
+          tile you click has Add waypoint too. Only you see your waypoints: on the map at every
+          zoom, on the minimap, and in the Waypoints drawer on the tool rail, where you can rename
+          one, centre the map on it or remove it. All of that is free and at once.
+        </p>
+        <p>
+          You hold at most {num(WAYPOINTS_MAX)} waypoints, each with a name of up to{' '}
+          {num(WAYPOINT_NAME_MAX_LENGTH)} characters that need not be unique. They are kept with
+          you, not your realm, so they are still there if your Leader dies and you found a new
+          realm.
+        </p>
+        <p>
+          A waypoint is a place like a tile. While an order waits for where to go or act (Walk to on
+          a resident or group card, a place for a step in the queue planner), click a waypoint’s pin
+          on the map, or open the Waypoints drawer from the banner and press Pick beside it: the
+          order gets the waypoint’s tile. A queue step keeps that tile, so it still goes there if
+          you remove the waypoint later, and the queue names the waypoint while it is there.
+        </p>
+        <p>
+          Scripts see your waypoints with <code>waypoints()</code> and can put one down with{' '}
+          <code>addWaypoint(x, y, name)</code> or take one away with{' '}
+          <code>removeWaypoint(waypoint)</code>, free and at once, without stopping the script. The
+          same cap counts there too.
+        </p>
+      </Section>
+
+      <Section id="exploring">
+        <p>
+          Give a grown resident <strong>Explore</strong> on their card, on foot or riding, and they
+          go into the unknown on their own. Before they start, pick <code>find</code>, a kind of
+          resource node to look for (forest, stone, iron ore or gold ore), or none to just explore
+          until you stop them; <code>toward</code>, a compass
+          direction, or a <code>waypoint</code> to head for instead; with neither they take the
+          nearest unexplored land first. <code>food</code> is where they refill; with none picked,
+          the nearest storage of your realm with Food.
+        </p>
+        <p>
+          They set out with as much Food as they can carry and walk to the edge of what you have
+          explored, that way: the nearest tile you have explored that they can go onto, beside one
+          you haven't, within 45° of the direction. Standing there they see {num(SIGHT_RANGE)} tiles
+          past it, and walk on to the next edge. A rider looks only where their horse can go.
+        </p>
+        <p>
+          Before each way out they check that the Food on them covers it and the way back to where
+          they refill, plus {num(EXPLORE_FOOD_MARGIN)} units to spare (their own food and one more).
+          A walker eats {num(FOOD_PER_DAY)} Food a game day, more on hills and mountains; riding,
+          their horse eats {num(HORSE_FOOD_PER_DAY)} a day too, from the Food they carry. Once it no
+          longer covers it they turn back, refill, and go back out to where they turned if a full
+          load still covers that way and back; otherwise they head for the nearest edge from there.
+        </p>
+        <p>
+          Land they can see but find no way to, across a lake, say, they leave out from then on,
+          with the edge within {num(EXPLORE_SKIP_RANGE)} tiles of it. With no edge within{' '}
+          {num(EXPLORED_EDGE_RANGE)} tiles, or none their Food takes them to and back even with a
+          full load, they walk back to where they refill and end, and your realm log says why.
+          Scripts find the edge with <code>exploredEdge(from, toward, skip)</code> and the Food a
+          way takes with <code>wayFood(a, b)</code>.
+        </p>
+        <p>
+          With <code>find</code> picked they look about every tick on their way out. Once you see a
+          node of that kind that none of your waypoints marks, they put a waypoint on it named after
+          it (“Gold ore node”), walk back to where they refill and end; your realm log notes the
+          waypoint, and the find as they end. Holding {num(WAYPOINTS_MAX)} waypoints already, they
+          still walk back and end, saying no waypoint was added. Scripts see the nodes you have in
+          sight with <code>nodesInSight(kind)</code>.
         </p>
       </Section>
 
@@ -2123,7 +2207,9 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
-            number of zero or more and press Enter. Neither stops the script.
+            number of zero or more and press Enter. A <code>choice</code> param has a list of its
+            words, and a <code>waypoint</code> param a list of your waypoints (or pick its marker on
+            the map); the first entry in either list leaves it unset. None of them stops the script.
           </li>
           <li>
             The comment at the end of a <code>param</code> line is what the card shows: what the
@@ -2148,15 +2234,29 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
             know, in sight or last seen; out of sight the card names it with "(last seen)" and the
             script reads it as you last saw it. A param reads <code>null</code> while none is
             picked, and once the one picked is gone or no longer one it may name. A{' '}
-            <code>number</code> param reads the number typed, or <code>null</code> while unset.
+            <code>number</code> param reads the number typed, or <code>null</code> while unset. A{' '}
+            <code>choice</code> param reads the word picked as a string; a word the script no longer
+            lists is dropped. A <code>waypoint</code> param reads the waypoint, with its{' '}
+            <code>id</code>, <code>name</code>, <code>x</code> and <code>y</code>; once you remove
+            the waypoint it reads as unset.
           </li>
           <li>
             A <code>number</code> param may have a default: <code>= n</code> after its type, a whole
             number of zero or more. Unset, it reads the default; the number typed wins over it, and
             clearing the field goes back to it. Its field shows the default while unset. A{' '}
-            <code>building</code> or <code>storage</code> param can't have one.
+            <code>choice</code> param may have one too, one of its words: <code>= north</code> after
+            its list. A <code>building</code>, <code>storage</code> or <code>waypoint</code> param
+            can't have one.
             <pre>
               <code>{PARAM_DEFAULT_EXAMPLE}</code>
+            </pre>
+          </li>
+          <li>
+            A <code>choice</code> param lists the words it can be in brackets after its type, each
+            once; a default that is not one of them is a syntax error. A <code>waypoint</code> param
+            is one of your waypoints.
+            <pre>
+              <code>{PARAM_CHOICE_EXAMPLE}</code>
             </pre>
           </li>
           <li>

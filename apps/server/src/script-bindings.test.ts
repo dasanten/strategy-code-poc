@@ -104,7 +104,8 @@ describe('script bindings', () => {
     const { globals } = runAs(world, explored, '')
     expect(Object.keys(globals).sort()).toEqual(SCRIPT_API.map((b) => b.name).sort())
     // Alliance, army, contract and persuasion orders, the gate order and the transfer order are
-    // the realm's, not a resident's; queues only the Player gives (`CONTEXT.md`: Queue).
+    // the realm's, not a resident's; queues only the Player gives (`CONTEXT.md`: Queue), and
+    // renaming a waypoint too: scripts add and remove them (Waypoint).
     const residentOrders = Object.keys(orderKinds).filter(
       (k) =>
         !(k in allianceOrders) &&
@@ -113,7 +114,8 @@ describe('script bindings', () => {
         !(k in persuasionOrders) &&
         !(k in queueOrders) &&
         k !== 'setGate' &&
-        k !== 'transfer',
+        k !== 'transfer' &&
+        k !== 'renameWaypoint',
     )
     expect([...SCRIPT_ORDER_KINDS].sort()).toEqual(residentOrders.sort())
   })
@@ -442,6 +444,8 @@ describe('script bindings', () => {
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],
     ['wallLine(12, 12)', { kind: 'wallLine', from: { x: 10, y: 10 }, to: { x: 12, y: 12 } }],
+    ['addWaypoint(3, 4, "Pass")', { kind: 'addWaypoint', x: 3, y: 4, name: 'Pass' }],
+    ['removeWaypoint("wp9")', { kind: 'removeWaypoint', waypointId: 'wp9' }],
   ]
 
   it.each(actions)('request %s exactly as the UI order would be', (call, order) => {

@@ -24,11 +24,81 @@ describe('param lines', () => {
 
   it('need a known type and a name only once', () => {
     expect(checkScript('param a: horse')[0]?.message).toBe(
-      'Expected "building" or "storage" or "number" after "param a:" but found the name "horse"',
+      'Expected "building" or "storage" or "number" or "choice" or "waypoint" after "param a:" but found the name "horse"',
     )
     expect(checkScript('param a: building\nparam a: storage')[0]?.message).toBe(
       'The param "a" appears twice',
     )
+  })
+
+  it('read a choice param with its words, and a waypoint param', () => {
+    const program = parse(
+      'param toward: choice(north, east, south, west)\nparam to: waypoint;\nparam one: choice(only);',
+    )
+    expect(program.params).toEqual([
+      {
+        name: 'toward',
+        type: 'choice',
+        choices: ['north', 'east', 'south', 'west'],
+        line: 1,
+        column: 1,
+      },
+      { name: 'to', type: 'waypoint', line: 2, column: 1 },
+      { name: 'one', type: 'choice', choices: ['only'], line: 3, column: 1 },
+    ])
+    expect(scriptParams('param go: choice(in, out) = out // which way; none: in')).toEqual([
+      {
+        name: 'go',
+        type: 'choice',
+        choices: ['in', 'out'],
+        default: 'out',
+        description: 'which way; none: in',
+        line: 1,
+        column: 1,
+      },
+    ])
+  })
+
+  it('need a choice param to list its words, each once, and its default among them', () => {
+    expect(checkScript('param toward: choice')[0]?.message).toBe(
+      'Expected "(" after "param toward: choice" but found the end of the script',
+    )
+    expect(checkScript('param toward: choice()')[0]?.message).toBe(
+      'Expected a word to choose for "param toward" but found ")"',
+    )
+    expect(checkScript('param toward: choice(north, "east")')[0]?.message).toBe(
+      'Expected a word to choose for "param toward" but found a string',
+    )
+    expect(checkScript('param toward: choice(north east)')[0]?.message).toBe(
+      'Expected ")" to close the words of "param toward" but found the name "east"',
+    )
+    expect(checkScript('param toward: choice(north, south, north)')).toEqual([
+      { message: 'The word "north" appears twice in "param toward"', line: 1, column: 36 },
+    ])
+    expect(checkScript('param toward: choice(north, south) = west')).toEqual([
+      {
+        message:
+          'The default of "param toward" must be "north" or "south" but found the name "west"',
+        line: 1,
+        column: 38,
+      },
+    ])
+    expect(checkScript('param toward: choice(north, south) = 1')[0]?.message).toBe(
+      'The default of "param toward" must be "north" or "south" but found the number 1',
+    )
+    expect(checkScript('param toward: choice(north, south) = "north"')[0]?.message).toBe(
+      'The default of "param toward" must be "north" or "south" but found a string',
+    )
+  })
+
+  it('give no default to a waypoint param', () => {
+    expect(checkScript('param to: waypoint = home')).toEqual([
+      {
+        message: 'A "waypoint" param can\'t have a default, only a "number" or "choice" param',
+        line: 1,
+        column: 20,
+      },
+    ])
   })
 
   it('may give a number param a default, a whole number of zero or more', () => {
@@ -44,13 +114,13 @@ describe('param lines', () => {
   it('give no default to a building or storage param, nor one that is no whole number', () => {
     expect(checkScript('param home: building = 3')).toEqual([
       {
-        message: 'A "building" param can\'t have a default, only a "number" param',
+        message: 'A "building" param can\'t have a default, only a "number" or "choice" param',
         line: 1,
         column: 22,
       },
     ])
     expect(checkScript('param s: storage = 1')[0]?.message).toBe(
-      'A "storage" param can\'t have a default, only a "number" param',
+      'A "storage" param can\'t have a default, only a "number" or "choice" param',
     )
     expect(checkScript('param n: number = -1')).toEqual([
       {
