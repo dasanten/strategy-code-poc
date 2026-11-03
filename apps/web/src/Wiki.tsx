@@ -803,7 +803,9 @@ export function Wiki() {
       <Section id="exploring">
         <p>
           Give a grown resident <strong>Explore</strong> on their card, on foot or riding, and they
-          go into the unknown on their own. Before they start, pick <code>toward</code>, a compass
+          go into the unknown on their own. Before they start, pick <code>find</code>, a kind of
+          resource node to look for (forest, stone, iron ore or gold ore), or none to just explore
+          until you stop them; <code>toward</code>, a compass
           direction, or a <code>waypoint</code> to head for instead; with neither they take the
           nearest unexplored land first. <code>food</code> is where they refill; with none picked,
           the nearest storage of your realm with Food.
@@ -829,6 +831,14 @@ export function Wiki() {
           full load, they walk back to where they refill and end, and your realm log says why.
           Scripts find the edge with <code>exploredEdge(from, toward, skip)</code> and the Food a
           way takes with <code>wayFood(a, b)</code>.
+        </p>
+        <p>
+          With <code>find</code> picked they look about every tick on their way out. Once you see a
+          node of that kind that none of your waypoints marks, they put a waypoint on it named after
+          it (“Gold ore node”), walk back to where they refill and end; your realm log notes the
+          waypoint, and the find as they end. Holding {num(WAYPOINTS_MAX)} waypoints already, they
+          still walk back and end, saying no waypoint was added. Scripts see the nodes you have in
+          sight with <code>nodesInSight(kind)</code>.
         </p>
       </Section>
 

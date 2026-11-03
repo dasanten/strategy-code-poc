@@ -3,6 +3,7 @@ import {
   ARMY_SCRIPT_API,
   GOODS,
   HAUL_KEEP_FOOD,
+  NODE_KINDS,
   ROAD_LINE_MAX_TILES,
   RECIPES,
   SCRIPT_ACTION_VALUE_MAX,
@@ -251,6 +252,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     carriages: () => seenOf('carriage'),
     piles: () => seenOf('pile'),
     nodes: exploredNodes,
+    nodesInSight: ([kind]) => {
+      if (kind != null && !(NODE_KINDS as readonly unknown[]).includes(kind)) {
+        throw new ScriptRuntimeError(`"nodesInSight" needs a node kind, not ${String(kind)}`)
+      }
+      return world.nodes.filter((n) => (kind == null || n.kind === kind) && inSight(n))
+    },
     // A Player's memory, apart from what is in sight (`CONTEXT.md`: Last seen); an NPC city has none.
     lastSeen: () =>
       sender.npcCityId !== undefined ? [] : lastSeenOutOfSight(world, terrain.size, sender.userId),

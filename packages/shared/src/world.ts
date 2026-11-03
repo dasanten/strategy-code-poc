@@ -1729,6 +1729,17 @@ export type RealmEventWhat =
       reason: string
     } & ScriptRunBy)
   /**
+   * A resident's or army's script put a waypoint named `waypoint` on tile (x, y) (`CONTEXT.md`:
+   * Waypoint, Explore), so the Player learns of a mark they didn't make by hand.
+   */
+  | ({
+      kind: 'waypointAdded'
+      name: string
+      waypoint: string
+      x: number
+      y: number
+    } & ScriptRunBy)
+  /**
    * A field the Player's active scripts read was renamed or removed from its script view
    * (`CONTEXT.md`: Script view), as `view.field`; it reads `null` from now on. `scripts` are
    * those that read it, by name.

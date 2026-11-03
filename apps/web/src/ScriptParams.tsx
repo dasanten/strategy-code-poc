@@ -1,6 +1,6 @@
 import type { PickedParamType, ScriptParam, ScriptParamValue, Waypoint } from '@csp/shared'
 import { useRef } from 'react'
-import { effectiveParam, paramNote, waypointLabel } from './script-params-view.js'
+import { choiceLabel, effectiveParam, paramNote, waypointLabel } from './script-params-view.js'
 import { foodEatenPerDay, num } from './wiki-view.js'
 
 /**
@@ -42,12 +42,12 @@ function ParamSelect({
 }) {
   const options =
     param.type === 'choice'
-      ? (param.choices ?? []).map((c) => ({ value: c, label: c }))
+      ? (param.choices ?? []).map((c) => ({ value: c, label: choiceLabel(c) }))
       : waypoints.map((wp) => ({ value: wp.id, label: waypointLabel(wp) }))
   const unset =
     param.default === undefined
       ? (paramNote(param.description).unset ?? 'none')
-      : `the default, ${param.default}`
+      : `the default, ${typeof param.default === 'string' ? choiceLabel(param.default) : param.default}`
   return (
     <select
       aria-label={param.name}

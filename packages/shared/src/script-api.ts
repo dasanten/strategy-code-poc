@@ -113,6 +113,12 @@ const SHARED: readonly ScriptBinding[] = [
   list('piles', 'pile', 'The piles of goods the Player sees.'),
   list('nodes', 'node', 'The resource nodes on terrain the Player has explored.'),
   list(
+    'nodesInSight',
+    'node',
+    'The resource nodes the Player sees now; with `kind` ("forest", "stone", "ironOre" or "goldOre"), only those of that kind.',
+    ['kind?'],
+  ),
+  list(
     'lastSeen',
     'lastSeen',
     'The buildings, construction sites and cities the Player has seen and that are out of their sight now, as they last saw them: each with `is` ("building" or "city") and `seenAt`, the tick they were last seen.',
