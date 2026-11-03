@@ -1,4 +1,4 @@
-import type { SeenCaravan, SeenCarriage, SeenResident } from '@csp/shared'
+import { crewIdsOf, type SeenCaravan, type SeenCarriage, type SeenResident } from '@csp/shared'
 
 /** What of the Trade Org's caravans is in sight (`CONTEXT.md`: Caravan): their carriages and crew, by id. */
 export interface CaravanParts {
@@ -10,7 +10,7 @@ export interface CaravanParts {
 export function caravanParts(caravans: readonly SeenCaravan[]): CaravanParts {
   return {
     carriages: new Set(caravans.map((c) => c.carriageId)),
-    crew: new Set(caravans.flatMap((c) => [c.driverId, ...c.escortIds])),
+    crew: new Set(caravans.flatMap(crewIdsOf)),
   }
 }
 

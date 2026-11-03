@@ -289,13 +289,10 @@ describe('driving off in another organization’s carriage', () => {
     expect(carriage.horseId).toBe(own.id)
   })
 
-  it('refuses a Down hitched horse and a caravan’s carriage', () => {
+  it('refuses a Down hitched horse', () => {
     const { world, horse, driveOff } = setup()
     horse.downUntil = world.tick + 100
     expect(driveOff()).toMatchObject({ reason: 'its horse is Down' })
-    delete horse.downUntil
-    world.caravans.push({ carriageId: 'k2' } as never)
-    expect(driveOff()).toMatchObject({ reason: 'a caravan’s carriage can’t be driven off' })
   })
 
   it('lets the first of two thieves in a tick have it', () => {

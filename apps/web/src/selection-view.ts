@@ -61,6 +61,7 @@ import {
   type Diplomacy,
   type MercenaryContract,
   type SeenResident,
+  type SeenCaravan,
   type SeenCarriage,
   type HaulOrder,
   type GoodsPlace,
@@ -936,8 +937,10 @@ export interface TileThings {
   arrivesIn?: (r: SeenResident) => number | undefined
   /** The armies the Player knows, by name, for a haul route to one (`CONTEXT.md`: Supply line). */
   armies?: readonly { id: string; name: string }[]
-  /** The caravans the Player sees, whose carriages can't be driven off yet. */
-  caravans?: readonly { carriageId: string }[]
+  /** The caravans the Player sees, whose crew keep their carriages from being driven off. */
+  caravans?: readonly Pick<SeenCaravan, 'carriageId' | 'driverId' | 'escortIds'>[]
+  /** The map's size, for how near a caravan's crew are to its carriage. */
+  mapSize?: number
   /** The alliance army's carriages the Player commands (`commandedCarriages`). */
   commandedCarriages?: ReadonlySet<string>
   /** The buildings the Player remembers out of sight, and the tick now (`CONTEXT.md`: Last seen). */
@@ -1521,7 +1524,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       residents: thieves.map(({ id, name }, i) => ({
         id,
         name,
-        problem: driveOffProblem(seen, thieves[i]!, stealable, realmId),
+        problem: driveOffProblem(seen, thieves[i]!, stealable, realmId, t.mapSize),
       })),
     }
   }

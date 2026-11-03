@@ -72,7 +72,9 @@ export const drive: OrderKind = {
         return 'a carriage can’t go there'
       }
     }
-    return steals ? driveOffProblem(world, r, carriage, realm.id) : driveProblem(world, r, carriage)
+    return steals
+      ? driveOffProblem(world, r, carriage, realm.id, terrain?.size)
+      : driveProblem(world, r, carriage)
   },
   apply(world, _sender, order, terrain) {
     const { residentId, carriageId, x, y, armyId } = order as DriveRequest
@@ -84,7 +86,7 @@ export const drive: OrderKind = {
     const realmId = commanderOf(world, r)
     if (realmId !== null && stealsCarriage(world, realmId, carriage)) {
       // Taken or driven by someone else since the order came: it goes no further.
-      if (driveOffProblem(world, r, carriage, realmId)) return
+      if (driveOffProblem(world, r, carriage, realmId, terrain?.size)) return
       const horse = world.horses.find((h) => h.id === carriage.horseId)
       takeOver(world, r, realmId, { carriage, ...(horse && { horse }) }, terrain?.size ?? MAP_SIZE)
       // Two drivers ordered onto one carriage in the same tick: the first one drives it.

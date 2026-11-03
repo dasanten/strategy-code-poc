@@ -18,6 +18,7 @@ import {
   BUY_SHARE,
   CARAVAN_ESCORTS,
   CARAVAN_ESCORTS_MAX,
+  CARAVAN_GUARD_RANGE,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
   PASSENGER_WEIGHT,
@@ -1367,11 +1368,12 @@ export function Wiki() {
           once, with its load and hitched horse; with no horse hitched, a free horse of yours on the
           tile pulls it. It can't be taken while someone drives it or anyone is aboard, nor while an
           armed resident of its owner stands on the tile and none of your realm does. A caravan's
-          carriage can't be driven off. Nothing that picks a carriage by itself ever does this, and
-          a queue step keeps to your own carriages, as do hauling and group orders. Its owner's
-          realm log says at once that it is gone and where it was last; who took it they learn only
-          from a witness (see Standing). One that belongs to nobody is simply yours. A carriage
-          handed over to an alliance army is its commander's to drive, which is no theft.
+          carriage also can't be driven off while its crew hold it (see Deliveries and transfers).
+          Nothing that picks a carriage by itself ever does this, and a queue step keeps to your own
+          carriages, as do hauling and group orders. Its owner's realm log says at once that it is
+          gone and where it was last; who took it they learn only from a witness (see Standing). One
+          that belongs to nobody is simply yours. A carriage handed over to an alliance army is its
+          commander's to drive, which is no theft.
         </p>
         <p>
           A carriage's card shows its load as a bar against what it holds (its passengers counted
@@ -1672,6 +1674,16 @@ export function Wiki() {
           Caravans walk with {num(CARAVAN_ESCORTS)} escorts, one more for every{' '}
           {num(CARAVAN_ROBBERIES_PER_ESCORT)} robberies of their route, at most{' '}
           {num(CARAVAN_ESCORTS_MAX)}.
+        </p>
+        <p>
+          A caravan outlives its crew. When its driver dies a surviving escort takes over driving.
+          With no crew left its carriage stands where it is, and the HQ sends a new driver on foot
+          once it has an adult free. Stealing a caravan's carriage takes beating its crew first: it
+          can't be driven off while its driver or an armed escort is up and within{' '}
+          {num(CARAVAN_GUARD_RANGE)} tiles of it, so one still walking out doesn't stop you. It is
+          one theft from the Trade Organization, worth the carriage, horse and load, and robs the
+          caravan: its route counts the robbery and the delivery or transfer goes again. The same
+          caravan gets a new carriage and horse at the HQ, and any surviving crew walk back to it.
         </p>
       </Section>
 
