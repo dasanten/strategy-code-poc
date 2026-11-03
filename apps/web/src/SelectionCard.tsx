@@ -22,6 +22,7 @@ import {
   type Resident,
   type ResourceKind,
   type Stock,
+  type Waypoint,
 } from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
 import { GoodIcon, GoodsGrid } from './GoodsGrid.js'
@@ -44,6 +45,8 @@ import {
   type TileCard as TileCardData,
 } from './selection-view.js'
 import { Meter, meterClass, pct } from './Horses.js'
+import { WaypointNameForm, addProblem } from './Waypoints.js'
+import { suggestedWaypointName } from './waypoints-view.js'
 import { SHEET_OPENS_AT, nextSheet, snapSheet, stepSheet, type SheetHeight } from './sheet-view.js'
 import './selection-card.css'
 
@@ -264,13 +267,15 @@ export function CardSheet({
  * The banner over the map while an order waits for its target (ADR 0012; `CONTEXT.md`: Picking a
  * target): what to pick, what is under the pointer and what the pick would do there (or else
  * more on what picking does), and Cancel, which Escape does too. On a touch screen, once a tap
- * has shown the preview, Confirm picks that tile.
+ * has shown the preview, Confirm picks that tile. Waypoints opens the drawer to pick one of the
+ * Player's waypoints instead (`CONTEXT.md`: Waypoint).
  */
 export function PickBanner({
   prompt,
   hint,
   under,
   onConfirm,
+  onWaypoints,
   onCancel,
 }: {
   prompt: string
@@ -279,6 +284,8 @@ export function PickBanner({
   under?: string
   /** Picks the tile previewed by a tap, on a touch screen. */
   onConfirm?: () => void
+  /** Opens the Waypoints drawer; absent while the Player holds none or it is open. */
+  onWaypoints?: () => void
   onCancel: () => void
 }) {
   const line = under ?? hint
@@ -291,6 +298,11 @@ export function PickBanner({
       {onConfirm && (
         <button type="button" className="primary" onClick={onConfirm}>
           Confirm
+        </button>
+      )}
+      {onWaypoints && (
+        <button type="button" onClick={onWaypoints}>
+          Waypoints
         </button>
       )}
       <button type="button" onClick={onCancel}>
@@ -492,8 +504,11 @@ export function TileCard({
   onSelectResident,
   onOpenHorse,
   onUnhitch,
+  tile,
+  waypoints,
   workSettings,
   mapSize,
+  onAddWaypoint,
   onFeed,
   onPickUp,
 }: {
@@ -526,8 +541,14 @@ export function TileCard({
   onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
+  /** The tile the card is for. */
+  tile: { x: number; y: number }
+  /** The Player's waypoints, for a new one's name and the cap (`CONTEXT.md`: Waypoint). */
+  waypoints: readonly Waypoint[]
   /** Tiles along each side of the map, to tell who is next to whom. */
-  mapSize?: number
+  mapSize: number
+  /** Puts a waypoint named `name` on the tile; resolves with why it was turned down, if it was. */
+  onAddWaypoint: (name: string) => Promise<string | undefined>
   /** Orders the actor to Feed someone Down on the tile (`CONTEXT.md`: Reviving). */
   onFeed?: (targetId: string, units: number) => void
   /** Orders one of the Player's residents to take goods from a spot on their tile. */
@@ -689,6 +710,26 @@ export function TileCard({
             onRenameHorse(horseId, name)
           }}
         />
+      )}
+      {shown === 'addWaypoint' && (
+        <section className="inspector-block" aria-label="Add a waypoint">
+          <div className="panel-head">
+            <h3>Add a waypoint here</h3>
+            <span className="small muted">only you see it</span>
+          </div>
+          <WaypointNameForm
+            // Starts again for the next one once a waypoint is added.
+            key={waypoints.length}
+            initial={suggestedWaypointName(waypoints)}
+            submitLabel="Add waypoint"
+            problem={addProblem(waypoints, tile.x, tile.y, mapSize)}
+            onSubmit={async (name) => {
+              const turnedDown = await onAddWaypoint(name)
+              if (!turnedDown) setOpen(undefined)
+              return turnedDown
+            }}
+          />
+        </section>
       )}
       <p className="muted small" role="status">
         {orderError

@@ -85,21 +85,57 @@ class Parser {
       )
     }
     this.advance()
-    const declared = this.isPunctuator('=') ? this.paramDefault(name, type) : undefined
+    const choices = type === 'choice' ? this.paramChoices(name) : undefined
+    const declared = this.isPunctuator('=') ? this.paramDefault(name, type, choices) : undefined
     this.matchPunctuator(';')
     return {
       name,
       type: type as ParamType,
+      ...(choices === undefined ? {} : { choices }),
       ...(declared === undefined ? {} : { default: declared }),
       ...at(start),
     }
   }
 
-  /** The `= n` of a param line: only a `number` param has one, a whole number of zero or more. */
-  private paramDefault(name: string, type: string): number {
+  /** The `(north, south)` of a `choice` param: one or more words, each once. */
+  private paramChoices(name: string): string[] {
+    this.expectPunctuator('(', `after "param ${name}: choice"`)
+    const choices: string[] = []
+    do {
+      const token = this.peek()
+      const word = this.expectIdentifier(`a word to choose for "param ${name}"`)
+      if (choices.includes(word)) {
+        throw this.error(token, `The word "${word}" appears twice in "param ${name}"`)
+      }
+      choices.push(word)
+    } while (this.matchPunctuator(','))
+    this.expectPunctuator(')', `to close the words of "param ${name}"`)
+    return choices
+  }
+
+  /**
+   * The `= n` of a param line: a `number` param's, a whole number of zero or more, or a `choice`
+   * param's, one of its words. No other param has one.
+   */
+  private paramDefault(name: string, type: string, choices?: string[]): number | string {
     const equals = this.advance()
+    if (choices) {
+      const token = this.peek()
+      if (token.type !== 'identifier' || !choices.includes(token.value)) {
+        const words = choices.map((c) => `"${c}"`).join(' or ')
+        throw this.error(
+          token,
+          `The default of "param ${name}" must be ${words} but found ${describe(token)}`,
+        )
+      }
+      this.advance()
+      return token.value
+    }
     if (type !== 'number') {
-      throw this.error(equals, `A "${type}" param can't have a default, only a "number" param`)
+      throw this.error(
+        equals,
+        `A "${type}" param can't have a default, only a "number" or "choice" param`,
+      )
     }
     const token = this.peek()
     if (token.type !== 'number' || !Number.isSafeInteger(token.value)) {

@@ -1,9 +1,13 @@
 import {
   ADULT_AGE,
   CARRYING_TICKS,
+  FOOD_PER_DAY,
+  HORSE_FOOD_PER_DAY,
   MAX_HUNGER,
   PAIRING_WAIT_TICKS,
   driveSpeed,
+  foodUse,
+  horseFoodFactor,
   rideSpeed,
   ticksForAge,
   walkSpeed,
@@ -81,6 +85,22 @@ export function arrivalTicks(world: ArrivalWorld, r: Resident): number | undefin
     pace = horse ? (g) => driveSpeed(r, horse, g) : () => 1
   }
   return wayTicks(world.size, r, o.path, o.progress, (x, y) => pace(world.ground(x, y)), slowest)
+}
+
+/**
+ * About how much Food a resident eats a tick on `terrain` (`CONTEXT.md`: Hunger, Terrain), with
+ * the horse they ride, which eats from the Food they carry (`CONTEXT.md`: Riding): what the
+ * hunger meters drain a tick, in units of Food. A way's Food is planned by it (`wayFood`).
+ */
+export function foodPerTick(
+  r: Resident,
+  terrain: number,
+  tick: number,
+  horse?: Pick<Horse, 'stats'>,
+): number {
+  const own = (FOOD_PER_DAY * foodUse(r, terrain, tick)) / TICKS_PER_GAME_DAY
+  if (!horse) return own
+  return own + (HORSE_FOOD_PER_DAY * horseFoodFactor(horse)) / TICKS_PER_GAME_DAY
 }
 
 /**

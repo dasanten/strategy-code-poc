@@ -99,8 +99,8 @@ const here = (more: Partial<ResidentHere> = {}): ResidentHere => ({
 const ids = (h: ResidentHere) => residentActions(h).map((a) => a.id)
 
 describe('the actions on a resident’s card', () => {
-  it('offers walking, building, a road, a wall, pairing and scripts to an idle adult on open ground', () => {
-    expect(ids(here())).toEqual(['walk', 'build', 'roadTo', 'wallTo', 'pair', 'script'])
+  it('offers walking, exploring, building, a road, a wall, pairing and scripts to an idle adult on open ground', () => {
+    expect(ids(here())).toEqual(['walk', 'explore', 'build', 'roadTo', 'wallTo', 'pair', 'script'])
   })
 
   it('offers stop only while they have an order or run a script', () => {
@@ -228,7 +228,7 @@ describe('the actions on a resident’s card', () => {
       carries: true,
       building: building({ kind: 'farm' }),
     })
-    expect(ids(carrying)).toEqual(['walk', 'drive', 'goods', 'script'])
+    expect(ids(carrying)).toEqual(['walk', 'drive', 'explore', 'goods', 'script'])
   })
 
   it('shows a grown resident every order that fits their tile', () => {
@@ -237,6 +237,7 @@ describe('the actions on a resident’s card', () => {
       'walk',
       'drive',
       'haul',
+      'explore',
       'feedStable',
       'build',
       'roadTo',
@@ -444,7 +445,7 @@ describe('keys', () => {
     expect(actionForKey(a, 'w')?.id).toBe('walk')
     expect(actionForKey(a, 'W')?.id).toBe('walk')
     expect(actionForKey(a, 'd')).toBeUndefined()
-    expect(actionForKey(a, 'z')).toBeUndefined()
+    expect(actionForKey(a, 'j')).toBeUndefined()
   })
 })
 
@@ -454,7 +455,7 @@ describe('the Orders tab', () => {
       here({ busy: true, carriage, carries: true, othersInSight: 1, renamable: true }),
     )
     expect(groupOrders(a).map((g) => [g.label, g.actions.map((x) => x.id)])).toEqual([
-      ['Move', ['walk', 'stop', 'drive', 'haul']],
+      ['Move', ['walk', 'stop', 'drive', 'haul', 'explore']],
       ['Work & build', ['build', 'roadTo', 'wallTo']],
       ['Goods', ['goods']],
       ['Scripts', ['script']],
@@ -509,7 +510,7 @@ describe('the rows of a card that stays open', () => {
     const before = here()
     const rows = keep(before, here({ busy: true, building: farm }))
     expect(rowGroups(rows, orderGroupOf).map((g) => [g.group, ids(g.actions)])).toEqual([
-      ['move', ['walk', 'stop']],
+      ['move', ['walk', 'explore', 'stop']],
       ['work', ['build', 'roadTo', 'wallTo', 'work', 'tearDown']],
       ['scripts', ['script']],
       ['other', ['pair']],
@@ -583,8 +584,16 @@ describe('the rows of a card that stays open', () => {
     for (const id of Object.keys(ACTION_KEYS) as ActionId[]) {
       if (offered.has(id)) continue
       // The tile card's actions and the own resident's orders never come and go on a card.
-      if (['sendHere', 'gate', 'openCity', 'tradeHere', 'renameCity', 'renameHorse'].includes(id))
-        continue
+      const tileCard = [
+        'sendHere',
+        'gate',
+        'openCity',
+        'tradeHere',
+        'renameCity',
+        'renameHorse',
+        'addWaypoint',
+      ]
+      if (tileCard.includes(id)) continue
       if (['relocate', 'makeLeader', 'rename'].includes(id)) continue
       expect(missing[id], id).toBeTruthy()
     }
@@ -1251,7 +1260,10 @@ describe('the actions on a tile’s card', () => {
         { id: 'bo', name: 'bo' },
       ],
     })
-    expect(tileActions(card, undefined).map((a) => a.label)).toEqual(['Unhitch horse'])
+    expect(tileActions(card, undefined).map((a) => a.label)).toEqual([
+      'Unhitch horse',
+      'Add waypoint…',
+    ])
     // The resident picked last when they may, else the first who may.
     expect(unhitcherOf(card, bo)).toBe('bo')
     expect(unhitcherOf(card, kid)).toBe('ada')
@@ -1308,21 +1320,24 @@ describe('the actions on a tile’s card', () => {
 
   it('sends the resident picked last there', () => {
     const card = tile()
-    expect(tileActions(card, actor).map((a) => a.label)).toEqual(['Send Ada here'])
-    expect(tileActions(card, undefined)).toEqual([])
+    expect(tileActions(card, actor).map((a) => a.label)).toEqual(['Send Ada here', 'Add waypoint…'])
+    expect(tileActions(card, undefined).map((a) => a.id)).toEqual(['addWaypoint'])
   })
 
   it('opens or closes a gate of the Player’s own city, not another’s', () => {
     const own = tile({ buildings: [building({ kind: 'gate', cityId: 'c-me', closed: true })] })
-    expect(tileActions(own, undefined).map((a) => a.label)).toEqual(['Open the gate'])
+    expect(tileActions(own, undefined).map((a) => a.label)).toEqual([
+      'Open the gate',
+      'Add waypoint…',
+    ])
     const theirs = tile({ buildings: [building({ kind: 'gate', cityId: 'c-npc' })] })
-    expect(tileActions(theirs, undefined)).toEqual([])
+    expect(tileActions(theirs, undefined).map((a) => a.id)).toEqual(['addWaypoint'])
   })
 
   it('offers nothing to do with a building only remembered, but still sends there', () => {
     const gate = { ...building({ kind: 'gate', cityId: 'c-me', closed: true }), seenAt: 0 }
     const card = tile({ lastSeen: { buildings: [gate], tick: 10 } })
-    expect(tileActions(card, actor).map((a) => a.label)).toEqual(['Send Ada here'])
+    expect(tileActions(card, actor).map((a) => a.label)).toEqual(['Send Ada here', 'Add waypoint…'])
   })
 })
 

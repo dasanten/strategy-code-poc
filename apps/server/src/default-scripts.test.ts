@@ -92,6 +92,7 @@ describe('a Player’s default scripts', () => {
       ['Build (default)', 'build', true],
       ['Build line (default)', 'buildLine', true],
       ['Defend (default)', 'defend', true],
+      ['Explore (default)', 'explore', true],
       ['Feed the stable (default)', 'feedStable', true],
       ['Haul (default)', 'haul', true],
       ['Tear down (default)', 'tearDown', true],
@@ -401,6 +402,8 @@ function withCarriage(world: WorldState) {
 interface Case {
   memory: ScriptMemory
   prepare: (world: WorldState) => void
+  /** What the Player has explored; all of the map without it. */
+  explored?: (x: number, y: number) => boolean
 }
 
 describe('Haul and Tear down from the UI', () => {
@@ -592,7 +595,7 @@ describe('the step budget', () => {
   }
 
   /** Steps a default script takes in one run for w1 of `farmWorld`, as it finds the world. */
-  function steps(task: Task, { memory, prepare }: Case): number {
+  function steps(task: Task, { memory, prepare, explored = () => true }: Case): number {
     const world = farmWorld()
     prepare(world)
     const program = parse(DEFAULT_SCRIPTS[task].source)
@@ -604,7 +607,7 @@ describe('the step budget', () => {
       // A copy: the run changes it, and cases share theirs.
       memory: structuredClone(memory),
       seen: seenAll(world),
-      explored: () => true,
+      explored,
       // Nothing picked: every param reads its default.
       params: program.params,
     })
@@ -706,6 +709,9 @@ describe('the step budget', () => {
       if (building)
         w1.order = { kind: 'build', building: 'road', at: { x: 4, y: 10 }, siteId: 'rd4' }
     }
+    /** Explore's: the south half of the map explored, and ten tiles there with no way to them. */
+    const southHalf = (_x: number, y: number) => y >= 8
+    const noWay = Array.from({ length: 10 }, (_, i) => ({ x: i, y: 8 }))
     const cases: Record<Task, Case[]> = {
       buildLine: [
         // Starting: walking to the nearest tile.
@@ -924,6 +930,34 @@ describe('the step budget', () => {
           },
         },
       ],
+      explore: [
+        // The south half explored, a storage with Food: setting out, out with Food to the edge
+        // past ten tiles with no way, refilled and going back out, and short of the tile walked
+        // to. With all explored: walking back to end.
+        { memory: {}, prepare: stocked, explored: southHalf },
+        {
+          memory: { out: true, skip: noWay },
+          prepare: (world) => {
+            stocked(world)
+            world.residents[0]!.carried = { food: 20 }
+          },
+          explored: southHalf,
+        },
+        {
+          memory: { out: true, fetching: true, turnedAt: { x: 3, y: 9 }, skip: [] },
+          prepare: (world) => {
+            stocked(world)
+            world.residents[0]!.carried = { food: 20 }
+          },
+          explored: southHalf,
+        },
+        {
+          memory: { out: true, target: { x: 5, y: 8 }, skip: noWay, skipNext: 4 },
+          prepare: stocked,
+          explored: southHalf,
+        },
+        { memory: { out: true, skip: [] }, prepare: stocked },
+      ],
       defend: [
         // Struck by Tobin's t1: armed, fighting back; unarmed, fleeing home; calm again.
         {
@@ -942,6 +976,17 @@ describe('the step budget', () => {
           prepare: (world) => void (world.residents[0]!.struck = { by: 't1', tick: -1000 }),
         },
       ],
+    }
+    /** A storage of Mara's with Food, away from the farm. */
+    function stocked(world: WorldState) {
+      world.buildings.push({
+        id: 's9',
+        kind: 'storage',
+        cityId: 'c1',
+        x: 12,
+        y: 12,
+        stock: { food: 50 },
+      })
     }
     for (const task of TASKS) {
       for (const c of cases[task]) {

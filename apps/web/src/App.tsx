@@ -39,6 +39,7 @@ import {
   Terrain,
   roadTiles,
   tileIndex,
+  wrap,
 } from '@csp/shared'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
@@ -46,6 +47,7 @@ import { commandsSeen } from './alliance-army.js'
 import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { ContractsPanel } from './Contracts.js'
 import { StandingPanel } from './Standing.js'
+import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import { keyGoods, showBeside, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
@@ -195,9 +197,9 @@ interface Starting {
 
 /** What the resident card's script param fields need of the world (`script-params-view`). */
 function paramWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): ParamWorld {
-  const { buildings, carriages, cities } = world
+  const { buildings, carriages, cities, waypoints } = world
   const [lastSeen, realmId] = [world.lastSeen.buildings, world.home.realmId]
-  return { buildings, lastSeen, carriages, cities, realmId, size: world.map.size }
+  return { buildings, lastSeen, carriages, cities, realmId, size: world.map.size, waypoints }
 }
 
 /**
@@ -264,6 +266,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A tile picked on the map with no resident of the Player's on it; its card shows over the
   // resident's, who stays picked to be sent there.
   const [selectedTile, setSelectedTile] = useState<{ x: number; y: number }>()
+  // The map's tile menu (`CONTEXT.md`: Waypoint): the tile right-clicked or long-pressed with
+  // nothing else to do there, and where in the window it was pressed.
+  const [tileMenu, setTileMenu] = useState<{ x: number; y: number; at: { x: number; y: number } }>()
+  const closeTileMenu = useCallback(() => setTileMenu(undefined), [])
   // The horse last picked in the Horses drawer, to mark its row among others on the same tile.
   const [pickedHorseId, setPickedHorseId] = useState<string>()
   // The resident card's open tab and panel, kept here so they stay as the Player picks others;
@@ -439,9 +445,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   useEffect(() => setPickAt(undefined), [pickKey])
   /**
    * A tile clicked or tapped while picking (`pickTap`): a click picks it; a tap on a touch screen
-   * previews it first, and a second tap there or Confirm picks it.
+   * previews it first, and a second tap there or Confirm picks it. A right-click or long-press
+   * (`pressed`) with nothing picked and nobody to send opens the tile menu there instead.
    */
-  const pickTile = (x: number, y: number, tap?: { touch: boolean }) => {
+  const pickTile = (
+    x: number,
+    y: number,
+    tap?: { touch: boolean },
+    pressed?: { x: number; y: number },
+  ) => {
+    if (pressed && world && !pick && !starting?.picking && !selected && group.length <= 1) {
+      const size = world.map.size
+      setSelectedTile(undefined)
+      return setTileMenu({ x: wrap(x, size), y: wrap(y, size), at: pressed })
+    }
     if (tap && pick) {
       const next = pickTap(pickAt?.tapped ? pickAt : undefined, { x, y }, tap.touch)
       if ('preview' in next) return setPickAt({ ...next.preview, tapped: true })
@@ -611,7 +628,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       if (!world) return
       const picked = paramPickAt(paramWorld(world), paramPick.type, { x, y })
       if (typeof picked === 'string') setOrderError(picked)
-      else await setScriptParam(paramPick.name, picked.id)
+      else await setScriptParam(paramPick.name, { targetId: picked.id })
       return
     }
     if (workPick) {
@@ -844,7 +861,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const starts =
       order.kind === 'runScript' || order.kind === 'setDefenceScript'
         ? { kind: order.kind, scriptId: order.scriptId }
-        : order.kind === 'work' || order.kind === 'build'
+        : order.kind === 'work' || order.kind === 'build' || order.kind === 'explore'
           ? { kind: 'task', task: order.kind }
           : undefined
     const given = 'params' in order && order.params !== undefined
@@ -972,6 +989,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await giveOrder(order, false))
   }
   /**
+   * Gives the picked resident the Explore task: they run the Player's Explore (default) script,
+   * its params picked first (`CONTEXT.md`: Explore); with Shift held it goes in their queue.
+   */
+  async function explore() {
+    if (!selected) return
+    setOrderError(await giveOrder({ kind: 'task', task: 'explore', residentId: selected.id }))
+  }
+  /**
    * Orders the picked resident to teach `subject` at the training ground they stand on
    * (`CONTEXT.md`: Teacher); with Shift held it goes in their queue.
    */
@@ -997,15 +1022,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await giveOrder(order, false))
   }
   /**
-   * Picks, or clears with null, the value of a param of the script the picked resident runs
-   * (`CONTEXT.md`: Script parameter): the building or carriage's id, or the number typed for a
-   * number param. It leaves the script running.
+   * Picks, or clears with a null `targetId`, the value of a param of the script the picked
+   * resident runs (`CONTEXT.md`: Script parameter): the building, carriage or waypoint's id, or
+   * the number typed for a number param or the word chosen for a choice param. It leaves the
+   * script running.
    */
-  async function setScriptParam(name: string, picked: string | number | null) {
+  async function setScriptParam(
+    name: string,
+    picked: { targetId: string | null } | { value: number | string },
+  ) {
     if (!selected?.script) return
     const { scriptId } = selected.script
-    const value = typeof picked === 'number' ? { value: picked } : { targetId: picked }
-    const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, ...value }
+    const order = { kind: 'setScriptParam', residentId: selected.id, scriptId, name, ...picked }
     setOrderError(await giveOrder(order))
   }
   /**
@@ -1350,6 +1378,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       {world &&
         drawer(
+          'waypoints',
+          <WaypointsPanel
+            waypoints={world.waypoints}
+            onCentre={(w) => showOnMap(w.x, w.y)}
+            onRename={(w, name) => sendOrder({ kind: 'renameWaypoint', waypointId: w.id, name })}
+            onRemove={(w) => sendOrder({ kind: 'removeWaypoint', waypointId: w.id })}
+            // A waypoint is a place like a tile: picked, it is its tile (`CONTEXT.md`: Waypoint).
+            onPick={pick ? (w) => pickTile(w.x, w.y) : undefined}
+          />,
+        )}
+      {world &&
+        drawer(
           'armies',
           <ArmiesPanel
             armies={world.armies}
@@ -1483,6 +1523,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               hint={pickHint(pick)}
               under={pick.kind === 'plan' && pick.error ? undefined : preview?.label}
               onConfirm={pickAt?.tapped ? () => pickTile(pickAt.x, pickAt.y) : undefined}
+              onWaypoints={
+                world && world.waypoints.length > 0 && openDrawer !== 'waypoints'
+                  ? () => setOpenDrawer('waypoints')
+                  : undefined
+              }
               onCancel={cancelPick}
             />
           ) : kind === 'horseOffer' ? (
@@ -1507,6 +1552,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           ) : null,
         )}
       </NoticeLane>
+      {world && tileMenu && (
+        <TileMenu
+          at={tileMenu.at}
+          tile={tileMenu}
+          held={world.waypoints}
+          size={world.map.size}
+          onAdd={(name) => sendOrder({ kind: 'addWaypoint', x: tileMenu.x, y: tileMenu.y, name })}
+          onClose={closeTileMenu}
+        />
+      )}
       {world && selectedTile && (
         <CardSheet
           phone={phone}
@@ -1561,6 +1616,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   scripts={scripts}
                   settings={world.workSettings[tileBuilding.id]}
                   label={(id) => paramValueLabel(paramWorld(world), id)}
+                  waypoints={world.waypoints}
                   picking={
                     workPick?.buildingId === tileBuilding.id ? workPick.param.name : undefined
                   }
@@ -1578,6 +1634,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   }}
                   onNumber={(name, value) =>
                     void setWorkSettings(tileBuilding.id, { [name]: value })
+                  }
+                  onChoose={(param, value) =>
+                    void setWorkSettings(tileBuilding.id, { [param.name]: value })
                   }
                   onClear={(name) => void setWorkSettings(tileBuilding.id, { [name]: null })}
                 />
@@ -1641,6 +1700,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPickedHorseId(id)
               setOpenDrawer('horses')
             }}
+            tile={selectedTile}
+            waypoints={world.waypoints}
+            onAddWaypoint={(name) => sendOrder({ kind: 'addWaypoint', ...selectedTile, name })}
           />
         </CardSheet>
       )}
@@ -1691,6 +1753,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             scripts={scripts}
             buildings={world.buildings}
             lastSeen={world.lastSeen.buildings}
+            waypoints={world.waypoints}
             onRunScript={runScript}
             onSetDefenceScript={setDefenceScript}
             onEditScript={(id) => openScript(id)}
@@ -1728,6 +1791,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onWork={work}
             onFeedStable={feedStable}
             onTrain={train}
+            onExplore={explore}
             onTeach={teach}
             onTearDown={tearDown}
             horses={world.horses}
@@ -1801,13 +1865,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                     scripts.find((s) => s.id === selected.script!.scriptId),
                     selected,
                   )}
+                  waypoints={world.waypoints}
                   picking={paramPick?.name}
                   onPick={(p) => {
                     setPicking(false)
                     setParamPick((now) => (now?.name === p.name ? undefined : p))
                   }}
-                  onNumber={(name, value) => void setScriptParam(name, value)}
-                  onClear={(name) => void setScriptParam(name, null)}
+                  onNumber={(name, value) => void setScriptParam(name, { value })}
+                  onChoose={(p, value) =>
+                    void setScriptParam(
+                      p.name,
+                      p.type === 'choice' ? { value } : { targetId: value },
+                    )
+                  }
+                  onClear={(name) => void setScriptParam(name, { targetId: null })}
                 />
               )
             }
@@ -1912,6 +1983,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 scripts={scripts}
                 buildings={world.buildings}
                 lastSeen={world.lastSeen.buildings}
+                waypoints={world.waypoints}
                 realm={world.home.realmId}
               />
             }
@@ -1927,6 +1999,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           values={starting.values}
           fromWorkplace={starting.base !== undefined}
           label={(id) => paramValueLabel(paramWorld(world), id)}
+          waypoints={world.waypoints}
           canStart={startValuesValid(starting.params, starting.values)}
           error={starting.error}
           onPick={(p) => {

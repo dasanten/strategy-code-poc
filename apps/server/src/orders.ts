@@ -38,6 +38,7 @@ import { rename, renameCity, renameHorse } from './renaming.js'
 import { claimHorses } from './horse-grant.js'
 import { queueOrders } from './queues.js'
 import { feed } from './reviving.js'
+import { waypointOrders } from './waypoints.js'
 
 /** Who sent an order: the Player's account and id. */
 export interface OrderSender {
@@ -127,6 +128,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     ...contractOrders,
     ...persuasionOrders,
     ...queueOrders,
+    ...waypointOrders,
   }).map(([name, kind]) => [name, GETS_OFF_FIRST.includes(name) ? getsOffFirst(kind) : kind]),
 )
 
@@ -191,7 +193,8 @@ export class OrderQueue {
       // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
       // script). Pairing, the Leader handover, renaming and claiming the Horse offer change
       // nobody's order, so they leave scripts running too, as do picking a param value and a
-      // defence script (`CONTEXT.md`: Script parameter, Defence script).
+      // defence script (`CONTEXT.md`: Script parameter, Defence script), and putting down, renaming
+      // and removing waypoints (Waypoint).
       // Editing a queue keeps its current step going (`CONTEXT.md`: Queue).
       const keeps = [
         'runScript',
@@ -204,6 +207,7 @@ export class OrderQueue {
         'setScriptParam',
         'setDefenceScript',
         'editQueue',
+        ...Object.keys(waypointOrders),
       ]
       const r = world.residents.find((x) => x.id === order.residentId)
       if (r && !keeps.includes(order.kind)) {

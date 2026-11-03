@@ -109,3 +109,6 @@ export const CARAVAN_COLOR = RELATIONSHIP_COLORS.tradeOrg
 export const PILE_COLOR = 0xd9c27a
 
 export const css = (color: number) => `#${color.toString(16).padStart(6, '0')}`
+
+/** The Player's waypoints (`CONTEXT.md`: Waypoint), on the map and the minimap: no relationship's colour. */
+export const WAYPOINT_COLOR = 0xd36cf0

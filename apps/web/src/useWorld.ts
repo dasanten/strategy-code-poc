@@ -23,6 +23,7 @@ import {
   type ScriptRunSeen,
   type ServerMessage,
   type WorkplaceSettings,
+  type Waypoint,
 } from '@csp/shared'
 import { api } from './api.js'
 import { appendEvents } from './realm-log.js'
@@ -69,6 +70,8 @@ export interface ClientWorld {
   region: RegionState | null
   /** Whether the Player may still claim their Horse offer (`CONTEXT.md`: Horse offer). */
   horseOffer: boolean
+  /** The Player's waypoints, oldest first (`CONTEXT.md`: Waypoint). */
+  waypoints: Waypoint[]
   /** The Player's first-day card (`CONTEXT.md`: First day). */
   firstDay: FirstDay
   /** The realm's Workplace settings (`CONTEXT.md`), by building id. */
@@ -168,6 +171,7 @@ export function useWorld(onLoggedOut: () => void) {
             diplomacy: msg.diplomacy,
             region: msg.region && applyRegionMap(null, msg.region, msg.map.size),
             horseOffer: msg.horseOffer,
+            waypoints: msg.waypoints,
             firstDay: msg.firstDay,
             workSettings: msg.workSettings,
             ...byKind(entities.values()),
@@ -222,6 +226,7 @@ export function useWorld(onLoggedOut: () => void) {
               region,
               horseOffer: msg.horseOffer ?? w.horseOffer,
               workSettings: msg.workSettings ?? w.workSettings,
+              waypoints: msg.waypoints ?? w.waypoints,
             }
           })
         }

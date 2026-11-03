@@ -112,6 +112,7 @@ export type ActionId =
   | 'unhitch'
   | 'drive'
   | 'haul'
+  | 'explore'
   | 'build'
   | 'roadTo'
   | 'wallTo'
@@ -135,6 +136,7 @@ export type ActionId =
   | 'tradeHere'
   | 'renameCity'
   | 'renameHorse'
+  | 'addWaypoint'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -146,6 +148,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   unhitch: 'U',
   drive: 'D',
   haul: 'H',
+  explore: 'Z',
   build: 'B',
   roadTo: 'R',
   wallTo: 'Q',
@@ -169,6 +172,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   tradeHere: 'T',
   renameCity: 'N',
   renameHorse: 'N',
+  addWaypoint: 'J',
 }
 
 /**
@@ -359,6 +363,9 @@ function ordersOffered(h: ResidentHere): {
     miss('drive', h.carriage ? 'children can’t drive' : 'no carriage here')
     miss('haul', h.carriage ? 'children can’t drive' : 'no carriage here')
   }
+  // Into the unknown and back for Food (`CONTEXT.md`: Explore).
+  if (h.adult) add(row('explore', 'Explore'))
+  else miss('explore', 'children can’t explore')
   if (works && isWorkable(h.building, h.node)) {
     add(
       row('work', `Work at the ${BUILDING_NAMES[h.building!.kind].toLowerCase()}…`, {
@@ -465,6 +472,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   unhitch: 'move',
   drive: 'move',
   haul: 'move',
+  explore: 'move',
   work: 'work',
   feedStable: 'work',
   teach: 'work',
@@ -1882,6 +1890,13 @@ export function tileActions(
       key: ACTION_KEYS.renameHorse,
       opens: true,
     })
+  // Any tile can carry a waypoint (`CONTEXT.md`: Waypoint).
+  actions.push({
+    id: 'addWaypoint',
+    label: 'Add waypoint…',
+    key: ACTION_KEYS.addWaypoint,
+    opens: true,
+  })
   return actions
 }
 

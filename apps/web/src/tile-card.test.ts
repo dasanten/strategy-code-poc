@@ -65,6 +65,10 @@ const props = {
   onSelectResident: () => {},
   onOpenHorse: () => {},
   onUnhitch: () => {},
+  tile: { x: 10, y: 10 },
+  waypoints: [],
+  mapSize: 512,
+  onAddWaypoint: () => Promise.resolve(undefined),
   onPickUp: () => {},
 }
 

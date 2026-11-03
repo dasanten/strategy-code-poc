@@ -34,6 +34,12 @@ const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
       <circle cx="10" cy="8" r="0.8" fill="currentColor" />
     </>
   ),
+  waypoints: (
+    <>
+      <path d="M12 22s-7-7.5-7-13a7 7 0 0 1 14 0c0 5.5-7 13-7 13z" />
+      <circle cx="12" cy="9" r="2.5" fill="currentColor" />
+    </>
+  ),
   armies: (
     <>
       <path d="M6 22V2" />

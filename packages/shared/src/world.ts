@@ -841,6 +841,12 @@ export interface WorldState {
    */
   horseOffersClaimed: number[]
   /**
+   * Each Player's waypoints by their account id, oldest first (`CONTEXT.md`: Waypoint): kept with
+   * the Player, not the realm, so they outlive a Leader death. A Player with none may have no
+   * entry.
+   */
+  waypoints: Record<number, Waypoint[]>
+  /**
    * The plan of each city the game runs, by city id (`CONTEXT.md`: NPC city; ADR 0016): what its
    * residents do until its next planning pass. A city without one has not planned yet.
    */
@@ -1811,6 +1817,17 @@ export type RealmEventWhat =
       reason: string
     } & ScriptRunBy)
   /**
+   * A resident's or army's script put a waypoint named `waypoint` on tile (x, y) (`CONTEXT.md`:
+   * Waypoint, Explore), so the Player learns of a mark they didn't make by hand.
+   */
+  | ({
+      kind: 'waypointAdded'
+      name: string
+      waypoint: string
+      x: number
+      y: number
+    } & ScriptRunBy)
+  /**
    * A field the Player's active scripts read was renamed or removed from its script view
    * (`CONTEXT.md`: Script view), as `view.field`; it reads `null` from now on. `scripts` are
    * those that read it, by name.
@@ -1872,6 +1889,17 @@ export type RealmEvent = RealmEventWhat & {
   tick: number
   /** The Player's account. */
   userId: number
+}
+
+/**
+ * A named marker a Player put on a tile (`CONTEXT.md`: Waypoint), seen only by that Player and
+ * kept with them, not their realm.
+ */
+export interface Waypoint {
+  id: string
+  name: string
+  x: number
+  y: number
 }
 
 /** Goods lying on the ground on one tile, for anyone to take (`CONTEXT.md`: Pile). */

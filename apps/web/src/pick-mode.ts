@@ -74,8 +74,10 @@ const ARMY_PROMPTS: Record<ArmyPick['kind'], string> = {
 const PARAM_PROMPTS: Record<ScriptParam['type'], string> = {
   building: 'the building',
   storage: 'the storage, stable or carriage',
-  // Typed into its field, never picked on the map.
+  waypoint: 'the waypoint',
+  // Typed or chosen in their fields, never picked on the map.
   number: 'the number',
+  choice: 'the word',
 }
 
 /** What picking a tile does for the picked resident, said under the banner where it needs more. */

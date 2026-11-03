@@ -73,6 +73,7 @@ import {
   TERRAIN_NAMES,
   LOADING_COLOR,
   VOID_COLOR,
+  WAYPOINT_COLOR,
   css,
 } from './map/palette.js'
 import {
@@ -92,6 +93,7 @@ import {
   farMarkers,
   type CityEmblem,
 } from './map/far.js'
+import { PIN_HEIGHT, PIN_RADIUS, pinAt } from './map/pins.js'
 import { LabelLayer } from './map/labels.js'
 import { destroyAtlas, loadAtlas, type Atlas } from './map/atlas.js'
 import {
@@ -156,7 +158,8 @@ type MapMode = 'terrain' | 'region'
  * The admin map (`world.admin`) draws the whole world the same way, coloured by Organization, with
  * its far tier from the terrain overview and territory only when toggled on.
  * Territory fills the far tier and shows as borders nearer in (`regionLook`). Bottom right a
- * minimap shows the Player's explored terrain; the legend and the minimap fold to buttons.
+ * minimap shows the Player's explored terrain; the legend and the minimap fold to buttons. The
+ * Player's waypoints show at every tier and on the minimap (`CONTEXT.md`: Waypoint).
  */
 export function MapView({
   world,
@@ -199,9 +202,15 @@ export function MapView({
   picking?: boolean
   /**
    * Called with a tile picked by click (while `picking`) or by right-click or long-press; a click
-   * while picking says whether it was a finger's tap.
+   * while picking says whether it was a finger's tap, a right-click or long-press where in the
+   * window it was pressed (`pressed`), for a menu there.
    */
-  onPickTile?: (x: number, y: number, tap?: { touch: boolean }) => void
+  onPickTile?: (
+    x: number,
+    y: number,
+    tap?: { touch: boolean },
+    pressed?: { x: number; y: number },
+  ) => void
   /** What the pick waiting for a tile would do there, drawn while `picking` (`pickPreview`). */
   preview?: PickPreview
   /** Called while `picking` with the tile a mouse or pen hovers over, undefined once off the map. */
@@ -583,12 +592,18 @@ export function MapView({
         ctx.globalAlpha = d.remembered ? LAST_SEEN_FADE + 0.2 : 1
         ctx.beginPath()
         if (d.kind === 'carriage') ctx.rect(x - r, y - r, 2 * r, 2 * r)
-        else ctx.arc(x, y, r, 0, Math.PI * 2)
-        ctx.fillStyle = css(relationshipColor(d.rel))
+        else if (d.kind === 'waypoint') {
+          ctx.moveTo(x, y - r - 1)
+          ctx.lineTo(x + r, y)
+          ctx.lineTo(x, y + r + 1)
+          ctx.lineTo(x - r, y)
+          ctx.closePath()
+        } else ctx.arc(x, y, r, 0, Math.PI * 2)
+        ctx.fillStyle = css(d.kind === 'waypoint' ? WAYPOINT_COLOR : relationshipColor(d.rel))
         ctx.fill()
         if (d.kind !== 'resident') {
-          ctx.lineWidth = d.kind === 'home' ? 2 : 1
-          ctx.strokeStyle = d.kind === 'home' ? '#ffffff' : '#0e1419'
+          ctx.lineWidth = d.kind === 'home' || d.kind === 'waypoint' ? 2 : 1
+          ctx.strokeStyle = d.kind === 'home' || d.kind === 'waypoint' ? '#ffffff' : '#0e1419'
           ctx.stroke()
         }
       }
@@ -624,6 +639,7 @@ export function MapView({
       labels.begin()
       if (zoomTier(cam.scale) === 'far') drawFar(g, cam, view)
       else drawMiddle(g, cam, view, onScreen)
+      drawWaypoints(g, cam, view)
       labels.end()
       tokens.end()
       badges.end()
@@ -681,6 +697,24 @@ export function MapView({
           width: 2,
           color: relationshipColor(hovered.rel),
         })
+      }
+    }
+
+    /**
+     * The Player's waypoints (`CONTEXT.md`: Waypoint) at every tier: a pin whose point is on the
+     * tile's centre, with the name above it.
+     */
+    function drawWaypoints(g: Graphics, cam: Camera, view: Size) {
+      for (const w of worldRef.current.waypoints ?? []) {
+        const [sx, sy] = tileToScreen(cam, view, mapSize, w.x + 0.5, w.y + 0.5)
+        if (sx < -80 || sy < -8 || sx > view.width + 80 || sy > view.height + 40) continue
+        const head = sy - PIN_HEIGHT
+        g.poly([sx, sy, sx - PIN_RADIUS * 0.8, head + 2, sx + PIN_RADIUS * 0.8, head + 2])
+          .fill(WAYPOINT_COLOR)
+          .stroke({ width: 1.5, color: 0x0e1419 })
+        g.circle(sx, head, PIN_RADIUS).fill(WAYPOINT_COLOR).stroke({ width: 1.5, color: 0x0e1419 })
+        g.circle(sx, head, PIN_RADIUS * 0.35).fill(0x0e1419)
+        labels.place(w.name, sx, head - PIN_RADIUS - 10)
       }
     }
 
@@ -874,7 +908,16 @@ export function MapView({
       })
       pointer = { x: sx, y: sy }
       updateHover()
-      pointTo(pickingRef.current ? { x: wx, y: wy } : undefined)
+      pointTo(pickingRef.current ? pickedTile(sx, sy, wx, wy) : undefined)
+    }
+
+    /**
+     * The tile a click at a screen point picks while picking: the waypoint's whose pin it falls on
+     * (`CONTEXT.md`: Waypoint, a place like a tile), else the tile under it.
+     */
+    function pickedTile(sx: number, sy: number, tx: number, ty: number) {
+      const pinned = pinAt(worldRef.current.waypoints ?? [], cam, size(), mapSize, sx, sy)
+      return pinned ? { x: pinned.x, y: pinned.y } : { x: wrap(tx, mapSize), y: wrap(ty, mapSize) }
     }
 
     // The tile last said to be under the hovering pointer while picking (`onPointerTile`).
@@ -926,7 +969,8 @@ export function MapView({
         number,
         number,
       ]
-      onPickTileRef.current?.(tx, ty)
+      const rect = app.canvas.getBoundingClientRect()
+      onPickTileRef.current?.(tx, ty, undefined, { x: at.x + rect.left, y: at.y + rect.top })
     }
     const local = (e: PointerEvent | WheelEvent) => {
       const rect = app.canvas.getBoundingClientRect()
@@ -1019,10 +1063,11 @@ export function MapView({
           number,
           number,
         ]
-        if (e.button === 2) return onPickTileRef.current?.(tx, ty)
+        if (e.button === 2)
+          return onPickTileRef.current?.(tx, ty, undefined, { x: e.clientX, y: e.clientY })
         if (pickingRef.current) {
-          const [wx, wy] = [wrap(tx, mapSize), wrap(ty, mapSize)]
-          return onPickTileRef.current?.(wx, wy, { touch: e.pointerType === 'touch' })
+          const at = pickedTile(p.x, p.y, tx, ty)
+          return onPickTileRef.current?.(at.x, at.y, { touch: e.pointerType === 'touch' })
         }
         // Far out, a click picks the city whose emblem it falls on.
         if (zoomTier(cam.scale) === 'far') {
@@ -1299,6 +1344,7 @@ const MINIMAP_DOT_RADIUS: Record<MinimapDot['kind'], number> = {
   carriage: 2.5,
   city: 3,
   home: 4.5,
+  waypoint: 3.5,
 }
 
 function Legend() {

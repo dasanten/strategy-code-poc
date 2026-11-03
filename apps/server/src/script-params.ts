@@ -1,6 +1,7 @@
 import { scriptParams } from '@csp/lang'
 import {
   commands,
+  isParamChoice,
   isParamNumber,
   isScriptParamType,
   targetParam,
@@ -10,9 +11,9 @@ import {
   type OrderRequest,
   type Resident,
   type ScriptParam,
-  type ScriptParamType,
   type ScriptParamValue,
   type StartParamValues,
+  type Waypoint,
   type WorldState,
 } from '@csp/shared'
 import { buildingOrganization, carriageOrganization } from './crimes.js'
@@ -20,6 +21,7 @@ import type { InvariantViolation } from './invariants.js'
 import type { OrderKind } from './orders.js'
 import type { RunnableScript } from './scripts.js'
 import { realmOf } from './starting-city.js'
+import { waypointsOf } from './waypoints.js'
 
 /**
  * Script parameters (`CONTEXT.md`: Script parameter): a script's `param name: type` lines, read
@@ -50,7 +52,7 @@ function knows(world: WorldState, realmId: string, b: Building): boolean {
 export function paramTarget(
   world: WorldState,
   side: string | undefined,
-  type: Exclude<ScriptParamType, 'number'>,
+  type: 'building' | 'storage',
   id: string,
 ): { is: 'building'; building: Building } | { is: 'carriage'; carriage: Carriage } | undefined {
   if (side === undefined) return undefined
@@ -69,10 +71,47 @@ export function paramTarget(
 }
 
 /**
+ * The waypoint a `waypoint` param holding `id` names for the realm `side`: one of its Player's
+ * (`CONTEXT.md`: Waypoint). Undefined once it is removed, and for a side without a Player.
+ */
+export function paramWaypoint(
+  world: WorldState,
+  side: string | undefined,
+  id: string,
+): Waypoint | undefined {
+  const userId = world.realms.find((x) => x.id === side)?.userId
+  return userId === undefined ? undefined : waypointsOf(world, userId).find((w) => w.id === id)
+}
+
+/** Whether a value kept for `param` still fits it: by its type, and naming what is still there. */
+function stillFits(
+  world: WorldState,
+  r: Resident,
+  param: ScriptParam | undefined,
+  value: ScriptParamValue,
+): boolean {
+  switch (param?.type) {
+    case undefined:
+      return false
+    case 'number':
+      return isParamNumber(value)
+    case 'choice':
+      return isParamChoice(param, value)
+    case 'waypoint':
+      return typeof value === 'string' && !!paramWaypoint(world, r.owner ?? undefined, value)
+    default:
+      return (
+        typeof value === 'string' &&
+        (world.buildings.some((b) => b.id === value) || world.carriages.some((k) => k.id === value))
+      )
+  }
+}
+
+/**
  * The values picked for a resident's script as the script reads them, by the script's `param`
- * lines: the id or number picked for each, or none. Picked values of a param the script no
- * longer has, those that no longer fit its type, and ids naming something gone from the world
- * are dropped from the resident.
+ * lines: the id, number or word picked for each, or none. Picked values of a param the script no
+ * longer has, those that no longer fit its type or among its words, ids naming something gone
+ * from the world and waypoints their Player removed are dropped from the resident.
  */
 export function paramValues(
   world: WorldState,
@@ -84,14 +123,7 @@ export function paramValues(
   if (picked) {
     for (const [name, value] of Object.entries(picked)) {
       const param = params.find((p) => p.name === name)
-      const fits =
-        param?.type === 'number'
-          ? isParamNumber(value)
-          : param !== undefined &&
-            typeof value === 'string' &&
-            (world.buildings.some((b) => b.id === value) ||
-              world.carriages.some((k) => k.id === value))
-      if (!fits) delete picked[name]
+      if (!stillFits(world, r, param, value)) delete picked[name]
     }
     if (Object.keys(picked).length === 0) delete r.scriptParams![scriptId]
     if (Object.keys(r.scriptParams!).length === 0) delete r.scriptParams
@@ -112,6 +144,14 @@ function valueProblem(
   if (!isScriptParamType(param.type)) return 'the script has no such param'
   if (param.type === 'number')
     return isParamNumber(value) ? undefined : 'must be a whole number of zero or more'
+  if (param.type === 'choice')
+    return isParamChoice(param, value)
+      ? undefined
+      : `must be one of ${(param.choices ?? []).join(', ')}`
+  if (param.type === 'waypoint')
+    return typeof value === 'string' && paramWaypoint(world, realmId, value)
+      ? undefined
+      : 'must be one of your waypoints'
   if (typeof value !== 'string' || !paramTarget(world, realmId, param.type, value))
     return param.type === 'storage'
       ? 'must be a storage, a stable or a carriage of yours'
@@ -190,18 +230,18 @@ interface SetScriptParamRequest extends OrderRequest {
   residentId: string
   scriptId: number
   name: string
-  /** The building or carriage picked; null clears it, for a `number` param too. */
+  /** The building, carriage or waypoint picked; null clears it, for any param. */
   targetId?: string | null
-  /** The whole number typed for a `number` param. */
-  value?: number
+  /** The whole number typed for a `number` param, or the word picked for a `choice` param. */
+  value?: number | string
 }
 
 /**
  * The set-script-param order (`CONTEXT.md`: Script parameter): the Player picks, or clears with
  * a null `targetId`, the value of a `param` of the script one of their residents runs. Free and
  * instant, from anywhere. The script must be the one the resident runs and have the param; the
- * target must fit its type and be the Player's, and a `number` param's `value` be a whole number
- * of zero or more.
+ * target must fit its type and be the Player's, a `number` param's `value` be a whole number
+ * of zero or more, and a `choice` param's one of its words.
  */
 export function setScriptParamOrder(host: {
   script(scriptId: number): Pick<RunnableScript, 'userId' | 'source'> | undefined
@@ -218,11 +258,13 @@ export function setScriptParamOrder(host: {
       const param = scriptParams(script.source).find((p) => p.name === o.name)
       if (!param || !isScriptParamType(param.type)) return 'the script has no such param'
       if (o.targetId === null && o.value === undefined) return undefined
-      if (param.type === 'number')
+      if (param.type === 'number' || param.type === 'choice')
         return o.targetId === undefined
           ? valueProblem(world, realm.id, param, o.value)
-          : 'must be a whole number of zero or more'
-      if (o.value !== undefined) return 'takes no number'
+          : param.type === 'number'
+            ? 'must be a whole number of zero or more'
+            : 'takes a word, not a pick'
+      if (o.value !== undefined) return 'takes no number or word'
       return valueProblem(world, realm.id, param, o.targetId)
     },
     apply(world, _sender, order) {
@@ -234,7 +276,7 @@ export function setScriptParamOrder(host: {
 }
 
 /**
- * Invariant (ADR 0004): every resident's picked script param values are plain ids or whole
+ * Invariant (ADR 0004): every resident's picked script param values are plain ids, words or whole
  * numbers of zero or more, kept by a whole positive script id, with no empty group left behind.
  */
 export function scriptParamsSound(world: WorldState): InvariantViolation[] {
@@ -254,7 +296,7 @@ export function scriptParamsSound(world: WorldState): InvariantViolation[] {
       const values = Object.values(picked)
       if (values.length === 0) fail(`keeps an empty group of params for script ${scriptId}`)
       if (values.some((v) => typeof v !== 'string' && !isParamNumber(v)))
-        fail(`keeps a param value of script ${scriptId} that is no id or whole number`)
+        fail(`keeps a param value of script ${scriptId} that is no id, word or whole number`)
     }
   }
   return out

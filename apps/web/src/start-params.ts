@@ -1,5 +1,6 @@
 import {
   WORKPLACE_PARAM,
+  isParamChoice,
   isParamNumber,
   isWorkScript,
   targetParam,
@@ -68,9 +69,14 @@ export function startFormParams(order: OrderRequest, script: ScriptSummary): Scr
   return order.kind === 'task' ? script.params.filter((p) => p.name !== target) : script.params
 }
 
-/** A kept value that still fits the param's type: a number for a `number` param, else an id. */
+/**
+ * A kept value that still fits the param: a number for a `number` param, one of its words for a
+ * `choice` param, else an id.
+ */
 function fits(param: ScriptParam, value: ScriptParamValue | undefined): boolean {
-  return param.type === 'number' ? typeof value === 'number' : typeof value === 'string'
+  if (param.type === 'number') return typeof value === 'number'
+  if (param.type === 'choice') return isParamChoice(param, value)
+  return typeof value === 'string'
 }
 
 /**

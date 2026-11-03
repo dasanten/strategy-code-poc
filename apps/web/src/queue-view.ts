@@ -11,6 +11,7 @@ import {
   type Building,
   type BuildingKind,
   type City,
+  type Waypoint,
   type Good,
   type OrderRequest,
   type Queue,
@@ -299,6 +300,8 @@ export interface StepNames {
   buildings?: readonly Pick<Building, 'id' | 'kind'>[]
   lastSeen?: readonly Pick<Building, 'id' | 'kind'>[]
   cities?: readonly Pick<City, 'id' | 'name'>[]
+  /** The Player's waypoints: a step at one's tile names it (`CONTEXT.md`: Waypoint). */
+  waypoints?: readonly Pick<Waypoint, 'name' | 'x' | 'y'>[]
 }
 
 /**
@@ -334,11 +337,12 @@ export const realMinutes = (minutes: number) => realTimeOf(minutes * TICKS_PER_G
 /** What a queue step does, as the card lists it: "Work the farm", "Walk to 12, 6". */
 export function stepLabel(
   order: OrderRequest,
-  { scripts = [], buildings = [], lastSeen = [], cities = [] }: StepNames,
+  { scripts = [], buildings = [], lastSeen = [], cities = [], waypoints = [] }: StepNames,
 ): string {
   const at = (p: unknown) => {
     const { x, y } = p as { x: number; y: number }
-    return `${x}, ${y}`
+    const marked = waypoints.find((w) => w.x === x && w.y === y)
+    return marked ? `${marked.name} (${x}, ${y})` : `${x}, ${y}`
   }
   const building = (id: unknown) => {
     const kind = buildings.find((b) => b.id === id)?.kind
@@ -411,6 +415,7 @@ export function stepLabel(
       if (order.task === 'feedStable') return `Feed ${building(order.stableId)}`
       if (order.task === 'breed') return `Breed horses at ${building(order.stableId)}`
       if (order.task === 'train') return `Train at ${building(order.groundId)}`
+      if (order.task === 'explore') return 'Explore'
       if (order.task === 'buildLine') {
         const line = stepLine(order)
         if (!line) return 'Build a line'

@@ -123,7 +123,7 @@ function aboardLine(
   return to ? `Aboard a carriage · heading to ${to.x}, ${to.y}` : 'Aboard a carriage'
 }
 
-/** The order a task's default script gives for the task itself; Feed the stable has none. */
+/** The order a task's default script gives for the task itself; Feed the stable and Explore have none. */
 const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   work: 'workAt',
   build: 'build',
@@ -134,6 +134,7 @@ const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   feedStable: undefined,
   train: 'train',
   defend: undefined,
+  explore: undefined,
 }
 
 /**
@@ -162,6 +163,7 @@ function taskLine(task: Task, building: SeenScript['building'], site?: true): st
   if (task === 'defend') return 'Defending'
   if (task === 'breed') return 'Breeding horses'
   if (task === 'haul') return 'Hauling'
+  if (task === 'explore') return 'Exploring'
   return task satisfies never
 }
 
