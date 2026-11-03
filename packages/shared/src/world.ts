@@ -734,7 +734,7 @@ export interface RelocateOrder {
 /**
  * Feeding (`CONTEXT.md`: Reviving, Feeding a horse): the resident gives up to `units` of the Food
  * in their hands to `targetId`, on or next to their tile: a Down resident, who eats at once and
- * wakes, or a horse that isn't full, which eats until it is. Done within the tick.
+ * wakes, or a horse with room for a whole unit, which eats until it has none. Done within the tick.
  */
 export interface FeedOrder {
   kind: 'feed'

@@ -930,6 +930,9 @@ export const MEAL_UNITS = 1
  */
 export const HUNGER_DAYS = 3
 
+/** How far one unit of food fills a horse's hunger meter: a full meter holds `HUNGER_DAYS` of food. */
+export const HORSE_FILL_PER_FOOD = MAX_HUNGER / (HUNGER_DAYS * HORSE_FOOD_PER_DAY)
+
 /** Game days an empty hunger meter takes to cost a resident all their health and put them Down. */
 export const STARVE_DAYS = 2
 
