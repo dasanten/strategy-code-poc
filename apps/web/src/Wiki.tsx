@@ -813,10 +813,10 @@ export function Wiki() {
           Give a grown resident <strong>Explore</strong> on their card, on foot or riding, and they
           go into the unknown on their own. Before they start, pick <code>find</code>, a kind of
           resource node to look for (forest, stone, iron ore or gold ore), or none to just explore
-          until you stop them; <code>toward</code>, a compass
-          direction, or a <code>waypoint</code> to head for instead; with neither they take the
-          nearest unexplored land first. <code>food</code> is where they refill; with none picked,
-          the nearest storage of your realm with Food.
+          until you stop them; <code>toward</code>, a compass direction, or a <code>waypoint</code>{' '}
+          to head for instead; with neither they take the nearest unexplored land first.{' '}
+          <code>food</code> is where they refill; with none picked, the nearest storage of your
+          realm with Food.
         </p>
         <p>
           They set out with as much Food as they can carry and walk to the edge of what you have
@@ -1455,15 +1455,15 @@ export function Wiki() {
         <h3>A horse going Down</h3>
         <p>
           A horse goes hungry like a resident: with nothing in reach it goes <b>Down</b>{' '}
-          {days(HUNGER_DAYS + STARVE_DAYS)} after its last meal and lies there for{' '}
-          {days(DOWN_DAYS)}. Down, it doesn't move: its rider is on foot again, and the carriage it
-          pulls stands where it is, its drive or haul route ending; nobody can mount or drive it.
-          It still eats Food in reach, so put Food down on its tile or right next to it (horses
-          have no inventory: Food in someone's hands doesn't count). Once it has eaten, it gets up
-          with {num(HORSE_WAKE_HEALTH)} health of {num(MAX_HEALTH)} and heals from there. When the
-          time is up first, it dies. Its token lies on its side, the Horses drawer, the stable and
-          the tile card say it is Down and how long is left, and your realm log says when one of
-          your horses goes Down and when one dies.
+          {days(HUNGER_DAYS + STARVE_DAYS)} after its last meal and lies there for {days(DOWN_DAYS)}
+          . Down, it doesn't move: its rider is on foot again, and the carriage it pulls stands
+          where it is, its drive or haul route ending; nobody can mount or drive it. It still eats
+          Food in reach, so put Food down on its tile or right next to it (horses have no inventory:
+          Food in someone's hands doesn't count). Once it has eaten, it gets up with{' '}
+          {num(HORSE_WAKE_HEALTH)} health of {num(MAX_HEALTH)} and heals from there. When the time
+          is up first, it dies. Its token lies on its side, the Horses drawer, the stable and the
+          tile card say it is Down and how long is left, and your realm log says when one of your
+          horses goes Down and when one dies.
         </p>
         <h3>Breeding</h3>
         <p>
@@ -2029,6 +2029,15 @@ export function Wiki() {
           city inspector, a warning when it is your city. Out of sight it isn't shown, nor
           remembered in Last seen. Scripts see it as <code>city.occupation</code>: who occupies a
           town hall in sight, and the ticks left.
+        </p>
+        <h3>What joins with a city</h3>
+        <p>
+          However a city joins a realm, captured, bought or persuaded, its horses and carriages come
+          with it. An NPC city's are all its own, wherever they stand, at a stable or on the road. A
+          Player's aren't tied to one city, so of those the ones in its area or at its stables join,
+          and the rest stay with their realm. Either way a horse a joining resident rides and a
+          carriage one drives join with them, and a carriage's hitched horse with it. Another NPC
+          city's or realm's that happen to stand there don't.
         </p>
       </Section>
 
