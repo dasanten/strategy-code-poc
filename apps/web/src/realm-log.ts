@@ -339,6 +339,19 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       }[e.why]
       return { text, tone: e.why === 'turnedBack' || e.why === 'robbed' ? 'warn' : 'bad' }
     }
+    case 'orderEndedWithHq': {
+      const what = `${e.units} ${goodText(e.good)}`
+      const order = {
+        delivery: `delivery of ${what} to ${e.city}`,
+        pickUp: `pick-up of ${what} from ${e.city}`,
+        transfer: `transfer of ${what} to ${e.city}`,
+      }[e.order]
+      const refund = e.order === 'pickUp' ? '' : ', with nothing refunded'
+      return {
+        text: `The Trade Org HQ has fallen and no caravans run: your ${order} is cancelled${refund}.`,
+        tone: 'bad',
+      }
+    }
     case 'selfManaged': {
       if (e.cities.length === 0) return { text: 'Your realm had no city left.', tone: 'bad' }
       const each = e.cities.map((c) => `${c.name} (${residentsText(c.residents)})`)

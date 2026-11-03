@@ -1871,6 +1871,12 @@ export function Wiki() {
           while it is too weak. Neither sends a trader or founds a city.
         </p>
         <p>
+          The Trade Organization lives on in its trading posts should its HQ ever fall: they keep
+          their warehouses, prices, stock floor and soldiers and go on trading in person. What only
+          the HQ gave it is gone for good, though: no caravans, so no deliveries or transfers, no
+          army to hire and nobody sent out to punish. See "The fall of the HQ" for what that costs.
+        </p>
+        <p>
           Once one good's surplus makes a full load for one of its spare hands (beside the Food for
           the walk) and a Trade Org warehouse lies within {num(NPC_TRADER_REACH)} tiles, an NPC city
           sends that spare hand, never a soldier, as its trader: they carry the load and the coins
@@ -2089,6 +2095,20 @@ export function Wiki() {
           city inspector, a warning when it is your city. Out of sight it isn't shown, nor
           remembered in Last seen. Scripts see it as <code>city.occupation</code>: who occupies a
           town hall in sight, and the ticks left.
+        </p>
+        <h3>The fall of the HQ</h3>
+        <p>
+          Taking the Trade Org HQ is hopeless in practice but not forbidden, and it changes the
+          world for good: nothing ever takes its place. The captor gets the city with its people,
+          wherever they stand, and its warehouses as storages with everything in them, coins
+          included. Caravans end at once: their crew join the captor where they stand, each
+          carriage, horse and load going with them. Deliveries and transfers still open are
+          cancelled with a line in your realm log and nothing refunded, and trading posts take no
+          new ones. Every contract with the Trade Organization ends at once, with no refund and no
+          loss of standing: soldiers you hired from it are the captor's where they stand, and your
+          mercenaries guarding the HQ walk home. Its punishments end, and admin directives stay in
+          force and can be bought off at a post, but it sends nobody out for them. When the last
+          trading post falls too, the Trade Organization is gone.
         </p>
         <h3>What joins with a city</h3>
         <p>

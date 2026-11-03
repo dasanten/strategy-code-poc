@@ -1687,6 +1687,18 @@ export type RealmEventWhat =
       city: string
     }
   /**
+   * The Trade Org HQ fell (`CONTEXT.md`: Fall of the HQ), so no caravan will ever carry out the
+   * realm's `order` of `units` of `good` to or from `city`: it is cancelled and nothing refunded.
+   */
+  | {
+      kind: 'orderEndedWithHq'
+      order: Delivery['kind'] | 'transfer'
+      good: Good
+      units: number
+      cityId: string
+      city: string
+    }
+  /**
    * The realm's Leader died and the realm ended (`CONTEXT.md`: Leader death): each of its
    * `cities` became a self-managed city, with the residents living there, its town hall at
    * (`x`, `y`) so the Player can find it again.

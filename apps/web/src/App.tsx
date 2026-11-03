@@ -1538,6 +1538,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             arrivesIn={arrivesIn || undefined}
             directives={world.diplomacy.directives}
+            noCaravans={world.diplomacy.noCaravans === true}
             openId={openCityId}
             onOpen={setOpenCityId}
             scrollTo={tradeAt}

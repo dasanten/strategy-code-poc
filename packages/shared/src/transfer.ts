@@ -2,6 +2,7 @@ import { commandsCarriage } from './alliance.js'
 import { DELIVERY_LOAD, GOOD_WEIGHT, TRANSFER_FEE_FACTOR, canWork } from './balance.js'
 import { isAt } from './footprint.js'
 import { tradeOrgRefuses } from './standing.js'
+import { NO_CARAVANS, tradeOrgHq } from './trade-org.js'
 import { wrapDistance } from './terrain.js'
 import {
   deliveryFee,
@@ -97,9 +98,9 @@ export function quoteTransfer(
 
 /**
  * Why `realmId` can't send a transfer of `units` of `good` to the city `toCityId` (`CONTEXT.md`:
- * Transfer), or undefined when it can: the Trade Organization doesn't refuse it, the good is one
- * that exists, `units` whole, positive and within one load, and the city is another realm's,
- * with a storage.
+ * Transfer), or undefined when it can: caravans still run (`CONTEXT.md`: Fall of the HQ), the
+ * Trade Organization doesn't refuse it, the good is one that exists, `units` whole, positive and
+ * within one load, and the city is another realm's, with a storage.
  */
 export function transferProblem(
   world: WorldState,
@@ -108,6 +109,7 @@ export function transferProblem(
   units: unknown,
   toCityId: unknown,
 ): string | undefined {
+  if (!tradeOrgHq(world)) return NO_CARAVANS
   if (tradeOrgRefuses(world, realmId)) return 'the Trade Organization won’t carry for you'
   if (!(GOODS as readonly unknown[]).includes(good)) return 'not a good'
   if (!Number.isInteger(units) || (units as number) <= 0) return 'units must be a whole number'

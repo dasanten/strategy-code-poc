@@ -311,6 +311,25 @@ describe('realm log', () => {
       seq: 11,
       ...at,
     } as const
+    const lost = {
+      kind: 'orderEndedWithHq',
+      good: 'iron',
+      units: 4,
+      cityId: 'c2',
+      city: 'Yonder',
+      seq: 12,
+      ...at,
+    } as const
+    expect(describeEvent({ ...lost, order: 'delivery' })).toEqual({
+      text: 'The Trade Org HQ has fallen and no caravans run: your delivery of 4 iron to Yonder is cancelled, with nothing refunded.',
+      tone: 'bad',
+    })
+    expect(describeEvent({ ...lost, order: 'pickUp' }).text).toBe(
+      'The Trade Org HQ has fallen and no caravans run: your pick-up of 4 iron from Yonder is cancelled.',
+    )
+    expect(describeEvent({ ...lost, order: 'transfer' }).text).toBe(
+      'The Trade Org HQ has fallen and no caravans run: your transfer of 4 iron to Yonder is cancelled, with nothing refunded.',
+    )
     expect(describeEvent({ ...stuck, why: 'turnedBack' }).tone).toBe('warn')
     expect(describeEvent({ ...stuck, why: 'robbed' }).text).toBe(
       'Robbers took 4 iron of your transfer to Yonder off a caravan; the Trade Organization sends them again.',
