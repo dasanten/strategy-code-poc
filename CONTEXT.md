@@ -233,6 +233,12 @@ The shared language of the game. Domain terms only — no implementation details
   warehouse and loads what evens out the two warehouses' stock (half the difference of each good,
   not Food or coins). The escort walks along with the carriage, which waits for it; the crew
   refill from the carriage like an army.
+- **Caravan crew lost:** a caravan outlives its crew. When its driver dies, a surviving escort
+  takes over driving. With no crew left, its carriage stands where it is and the HQ sends a new
+  driver on foot, from the same adults it makes up escorts from, once it has one free. A caravan's
+  carriage counts as driven or guarded only while its driver or an armed escort is up and near it,
+  so one still walking out doesn't stop a theft. Once stolen (Guaranteed carriage), the same
+  caravan gets a new carriage and horse at the HQ, and any surviving crew walk back to it.
 - **Delivery:** a caravan brings goods bought from the Trade Organization to the storage of a
   city the buyer names, or picks up goods sold to it from the seller's city, for a fee. Anyone
   can instead carry the goods to or from the warehouse themselves, for free and at their own
