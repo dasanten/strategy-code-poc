@@ -980,7 +980,9 @@ The shared language of the game. Domain terms only — no implementation details
   the way back to that storage plus a margin (a balance number), refill there and go back out to
   where they turned. Once a node of the kind `find` asks for comes into sight that none of the
   Player's waypoints marks, they put a waypoint on it named after it ("Gold ore node"), note it in
-  the realm log, walk back to the storage and end. Without `find` they go on until stopped. With
+  the realm log, walk back to the storage and end; holding the most waypoints already, they still
+  walk back and end, saying no waypoint was added. In sight means the Player's sight, checked
+  each tick on the way out. Without `find` they go on until stopped. With
   no unexplored tile left in reach, they walk back to the storage and end saying so.
 - **Defence script:** the script a resident runs when struck: the game's **Defend** default (armed,
   attack the attacker until they are dead, gone or out of sight; unarmed, walk home to the town
@@ -1158,5 +1160,6 @@ The shared language of the game. Domain terms only — no implementation details
   tier, on the minimap, and in the Waypoints drawer, where it can be renamed, centred on or
   removed. Kept in the world per Player, not per realm, so it survives a Leader death. A waypoint
   is a place like a tile: a walk-to target, a queue step's place, a `waypoint` script param.
-  Scripts see their Player's waypoints and can add and remove them. A Player holds at most so
-  many (a balance number); Explore marks its finds with them.
+  Scripts see their Player's waypoints and can add and remove them; a waypoint a script adds is
+  noted in the realm log (who put it, its name and tile). A Player holds at most so many (a
+  balance number); Explore marks its finds with them.

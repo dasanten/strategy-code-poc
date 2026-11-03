@@ -2,6 +2,7 @@ import { DEFAULT_SCRIPTS, type Building } from '@csp/shared'
 import { scriptParams } from '@csp/lang'
 import { describe, expect, it } from 'vitest'
 import {
+  choiceLabel,
   effectiveParam,
   paramNote,
   paramOnTile,
@@ -164,6 +165,10 @@ describe('choice and waypoint params', () => {
       set: false,
     })
     expect(effectiveParam(toward, undefined, { label }).text).toBe('none picked')
+    // A word joined in camel case reads as words: Explore's find param.
+    const find = { name: 'find', type: 'choice' as const, choices: ['ironOre', 'goldOre'] }
+    expect(effectiveParam(find, 'goldOre', { label }).text).toBe('gold ore')
+    expect(choiceLabel('ironOre')).toBe('iron ore')
   })
 
   it('names the waypoint picked, or says it was removed', () => {

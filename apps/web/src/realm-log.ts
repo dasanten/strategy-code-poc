@@ -410,6 +410,12 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       }
     case 'scriptStopped':
       return { text: `${e.name} stopped ${e.script}: ${e.reason}`, tone: 'info' }
+    case 'waypointAdded':
+      return {
+        text: `${e.name} put a waypoint “${e.waypoint}” at (${e.x}, ${e.y}).`,
+        tone: 'info',
+        places: [{ name: e.waypoint, x: e.x, y: e.y }],
+      }
     case 'scriptFieldDropped': {
       const names = e.scripts.map((s) => `“${s.name}”`).join(', ')
       const scripts =

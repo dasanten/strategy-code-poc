@@ -99,6 +99,10 @@ export function paramValueLabel(w: ParamWorld, id: string): string | null {
 export const waypointLabel = (wp: Pick<Waypoint, 'name' | 'x' | 'y'>) =>
   `${wp.name} at ${wp.x}, ${wp.y}`
 
+/** How a `choice` param's word reads in its list: "goldOre" as "gold ore". */
+export const choiceLabel = (word: string) =>
+  word.replace(/(?<=[a-z])(?=[A-Z])/g, ' ').toLowerCase()
+
 /**
  * What a param's `//` comment says (`CONTEXT.md`: Script parameter): what it is for, and after
  * "none:" what the script uses while none is picked. "where the output goes; none: the nearest
@@ -134,8 +138,9 @@ export function effectiveParam(
 ): { text: string; set: boolean } {
   if (p.type === 'number' || p.type === 'choice') {
     const typed = p.type === 'number' ? typeof value === 'number' : typeof value === 'string'
-    if (typed) return { text: String(value), set: true }
-    if (p.default !== undefined) return { text: `${p.default}, the default`, set: false }
+    const shown = (v: unknown) => (typeof v === 'string' ? choiceLabel(v) : String(v))
+    if (typed) return { text: shown(value), set: true }
+    if (p.default !== undefined) return { text: `${shown(p.default)}, the default`, set: false }
   } else if (typeof value === 'string') {
     const gone = p.type === 'waypoint' ? 'removed' : 'out of sight'
     return { text: at.label(value) ?? gone, set: true }

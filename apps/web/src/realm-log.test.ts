@@ -85,6 +85,12 @@ describe('realm log', () => {
       text: 'Mara stopped Work: no workplace here',
       tone: 'info',
     })
+    const marked = { kind: 'waypointAdded', ...who, waypoint: 'Gold ore node', x: 4, y: 9 } as const
+    expect(describeEvent(marked)).toEqual({
+      text: 'Mara put a waypoint “Gold ore node” at (4, 9).',
+      tone: 'info',
+      places: [{ name: 'Gold ore node', x: 4, y: 9 }],
+    })
     const dropped = { kind: 'scriptFieldDropped', field: 'resident.plan', seq: 9, ...at } as const
     expect(describeEvent({ ...dropped, scripts: [{ scriptId: 3, name: 'feeder' }] }).text).toBe(
       'Your script “feeder” reads resident.plan, which scripts no longer see: it is null from now on.',

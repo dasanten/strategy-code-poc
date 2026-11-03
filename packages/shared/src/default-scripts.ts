@@ -1412,13 +1412,20 @@ ${LOG_TEXT}
 // way back to that storage, plus margin units; riding, my horse eats from
 // it too. Once it doesn't, I turn back, refill there and go back out to
 // where I turned. With no edge left in reach, I walk back there and end.
+// With params.find, I look about each tick on my way out, and at every
+// stop: once my Player sees a node of that kind that none of their
+// waypoints marks, I put a waypoint on it ("Gold ore node"), walk back to
+// where I refill and end. Without it I go on until stopped.
+param find: choice(forest, stone, ironOre, goldOre) // the node to find; none: just explore
 param toward: choice(north, northeast, east, southeast, south, southwest, west, northwest) // the way to go; none: the nearest unexplored tiles first
 param waypoint: waypoint // a waypoint to head for instead; none: go by toward
 param food: storage // where to refill; a carriage too; none: the nearest storage with Food
 let margin = ${EXPLORE_FOOD_MARGIN} // units of Food kept beyond the way back
 let skipMax = 10 // tiles with no way there that I keep leaving out
 
+if (params.find != null && memory.ending == null && found()) { return }
 if (me.order != null) { // on my way
+  if (params.find != null && memory.target != null) { return } // out: I look about each tick
   wait()
   return
 }
@@ -1472,7 +1479,7 @@ fn walkOut(edge) {
   memory.target = {x: edge.x, y: edge.y}
   memory.out = true
   memory.full = null
-  wait() // until I am there
+  waitOut() // until I am there
 }
 
 // Fetch as much Food as fits where I refill: setting out, or turning back
@@ -1492,6 +1499,58 @@ fn turnBack(from) {
     log("setting out: fetching " + units + " Food at " + placeName(from))
   }
   wait() // until I have it
+}
+
+// On my way out: with params.find I run each tick to look about, else I
+// wait till I am there.
+fn waitOut() {
+  if (params.find == null) { wait() }
+}
+
+// A node of the kind params.find asks for that my Player sees and none of
+// their waypoints marks: I put a waypoint on it and walk back to end. True
+// once I found one.
+fn found() {
+  let node = unmarked(nodesInSight(params.find))
+  if (node == null) { return false }
+  let name = nodeName(node.kind)
+  let reason = "found a " + name + " at " + node.x + "," + node.y
+  let problem = addWaypoint(node.x, node.y, name)
+  if (problem != null) {
+    log("no waypoint: " + problem)
+    reason = reason + ", no waypoint added"
+  }
+  log(reason)
+  memory.target = null
+  memory.fetching = null
+  memory.turnedAt = null
+  let from = foodFrom()
+  if (from == null) {
+    end(reason)
+  } else {
+    endBack(reason, from)
+  }
+  return true
+}
+
+// The first of nodes with none of my Player's waypoints on its tile; null
+// with none.
+fn unmarked(nodes) {
+  if (nodes.length == 0) { return null }
+  let marked = {}
+  for (w of waypoints()) { marked[w.x + "," + w.y] = true }
+  for (n of nodes) {
+    if (marked[n.x + "," + n.y] == null) { return n }
+  }
+  return null
+}
+
+// A waypoint's name for a node: "Gold ore node".
+fn nodeName(kind) {
+  if (kind == "ironOre") { return "Iron ore node" }
+  if (kind == "goldOre") { return "Gold ore node" }
+  if (kind == "forest") { return "Forest node" }
+  return "Stone node"
 }
 
 // Done: back where I refill first, so I never end out in the wild, then
@@ -1530,7 +1589,7 @@ fn goBackOut(from) {
   memory.target = {x: at.x, y: at.y}
   memory.full = null
   log("going back out to " + at.x + "," + at.y)
-  wait() // until I am there
+  waitOut() // until I am there
   return true
 }
 
