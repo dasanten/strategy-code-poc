@@ -6,14 +6,18 @@ import {
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_HALF_LOAD,
   CARRIAGE_LIGHT_LOAD,
+  CARAVAN_GUARD_RANGE,
   GOOD_WEIGHT,
+  MAP_SIZE,
   PASSENGER_WEIGHT,
   canWork,
   carriageCapacityWith,
+  isArmed,
   stockWeight,
 } from './balance.js'
 import { guardedBy, type GuardResident } from './city.js'
 import { storageAt } from './goods.js'
+import { wrapDistance } from './terrain.js'
 import {
   type Caravan,
   type Carriage,
@@ -34,6 +38,13 @@ export function caravanOf(
   residentId: string,
 ): Caravan | undefined {
   return world.caravans.find((c) => c.driverId === residentId || c.escortIds.includes(residentId))
+}
+
+/** Everyone on a caravan, by id: its driver, if it has one, and its escort. */
+export function crewIdsOf(caravan: Pick<Caravan, 'driverId' | 'escortIds'>): string[] {
+  return caravan.driverId === null
+    ? [...caravan.escortIds]
+    : [caravan.driverId, ...caravan.escortIds]
 }
 
 /**
@@ -249,11 +260,40 @@ export function hitchOffProblem<R extends StealingResident>(
 }
 
 /**
+ * Why a caravan's crew keep its carriage from being taken, on a map of `size` tiles (`CONTEXT.md`:
+ * Caravan crew lost): its driver or an armed escort is up and within `CARAVAN_GUARD_RANGE` of it.
+ * They have to be beaten or gone, however many of the thief's realm stand there; one still walking
+ * out doesn't count until they are that near.
+ */
+function crewHolds<R extends StealingResident>(
+  residents: readonly R[],
+  caravan: Pick<Caravan, 'driverId' | 'escortIds'>,
+  carriage: Pick<Carriage, 'x' | 'y'>,
+  size: number,
+): string | undefined {
+  const near = (id: string | null, armed: boolean) =>
+    residents.some(
+      (r) =>
+        r.id === id &&
+        (r.health ?? 1) > 0 &&
+        !isDown(r) &&
+        (!armed || isArmed(r)) &&
+        wrapDistance(size, r, carriage) <= CARAVAN_GUARD_RANGE,
+    )
+  if (near(caravan.driverId, false)) return 'its driver is still with that caravan’s carriage'
+  if (caravan.escortIds.some((id) => near(id, true))) {
+    return 'its escort guards that caravan’s carriage'
+  }
+  return undefined
+}
+
+/**
  * Why a resident can't drive off in another organization's carriage for the realm `realmId` now,
  * or undefined when they can (`CONTEXT.md`: Stealing a carriage or horse): nobody may drive it or
- * be aboard, it mustn't be guarded (`takeProblem`), and they must be able to drive it as if it
- * were their realm's already, so with its hitched horse, a free one of that realm on its tile, or
- * else one they steal with it (`hitchOffProblem`). A caravan's carriage can't be taken yet.
+ * be aboard, a caravan's crew mustn't hold it (`crewHolds`), it mustn't be guarded
+ * (`takeProblem`), and they must be able to drive it as if it were their realm's already, so with
+ * its hitched horse, a free one of that realm on its tile, or else one they steal with it
+ * (`hitchOffProblem`). `size` is the map's.
  */
 export function driveOffProblem<R extends StealingResident>(
   world: {
@@ -261,17 +301,18 @@ export function driveOffProblem<R extends StealingResident>(
     residents: readonly R[]
     horses: readonly CarriageHorse[]
     carriages: readonly CarriagePlace[]
-    caravans: readonly Pick<Caravan, 'carriageId'>[]
+    caravans: readonly Pick<Caravan, 'carriageId' | 'driverId' | 'escortIds'>[]
   },
   thief: R,
   carriage: CarriagePlace & Pick<Carriage, 'id'>,
   realmId: string,
+  size = MAP_SIZE,
 ): string | undefined {
-  if (world.caravans.some((c) => c.carriageId === carriage.id)) {
-    return 'a caravan’s carriage can’t be driven off'
-  }
   if (driverOf(world, carriage)) return 'someone is driving that carriage'
   if (passengersOf(world, carriage).length > 0) return 'someone is aboard that carriage'
+  const caravan = world.caravans.find((c) => c.carriageId === carriage.id)
+  const held = caravan && crewHolds(world.residents, caravan, carriage, size)
+  if (held) return held
   return (
     takeProblem(world, thief, carriage, realmId, 'carriage') ??
     hitchOffProblem(world, thief, { ...carriage, realmId, cityId: null })

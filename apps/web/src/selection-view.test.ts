@@ -1420,10 +1420,14 @@ describe('the actions on a tile’s card', () => {
         'someone is driving that carriage',
       )
       expect(reason(person('kid', { bornAt: tick }))).toBe('children can’t steal')
-      const caravans = [{ carriageId: 'k1' }]
-      expect(row(thing([person('ada')], { caravans }))?.reason).toBe(
-        'a caravan’s carriage can’t be driven off',
-      )
+      const caravans = [{ carriageId: 'k1', driverId: 'drv', escortIds: ['esc'] }]
+      const crew = (id: string, carried = {}) => person(id, { owner: null, carried })
+      const offering = (...others: ReturnType<typeof person>[]) =>
+        row(thing([person('ada'), ...others], { caravans }))?.reason
+      expect(offering()).toBeUndefined()
+      expect(offering(crew('drv'))).toBe('its driver is still with that caravan’s carriage')
+      expect(offering(crew('esc'))).toBeUndefined()
+      expect(offering(crew('esc', { sword: 1 }))).toBe('its escort guards that caravan’s carriage')
       const down = { ...horse, down: true as const }
       expect(row(thing([person('ada')], { horses: [down] }))?.reason).toBe('its horse is Down')
     })

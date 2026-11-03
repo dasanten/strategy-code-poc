@@ -1651,6 +1651,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 },
                 armies: world.armies,
                 caravans: world.caravans,
+                mapSize: world.map.size,
                 commandedCarriages: armyCarriages,
                 nodeFit: (() => {
                   const node = nodeAt?.(selectedTile.x, selectedTile.y)
@@ -1795,7 +1796,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
             {...(stealableHere && {
               driveOff: {
-                problem: driveOffProblem(world, selected, stealableHere, world.home.realmId),
+                problem: driveOffProblem(
+                  world,
+                  selected,
+                  stealableHere,
+                  world.home.realmId,
+                  world.map.size,
+                ),
               },
               onDriveOff: () => setPicking((p) => (p === 'driveOff' ? false : 'driveOff')),
             })}

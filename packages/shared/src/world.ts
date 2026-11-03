@@ -972,8 +972,11 @@ export interface Caravan {
   /** The trading post at the far end of its route; the other end is the HQ. */
   postId: string
   carriageId: string
-  /** The resident who drives the carriage. */
-  driverId: string
+  /**
+   * The resident who drives the carriage; null with no crew left, until the HQ has someone to send
+   * (`CONTEXT.md`: Caravan crew lost).
+   */
+  driverId: string | null
   /** The residents who walk along with it (the escort). */
   escortIds: string[]
   /** The end of the route it stands at or is driving to. */

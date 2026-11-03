@@ -6,6 +6,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { caravanCarriageStolen } from './caravans.js'
 import { commitCrime, organizationName } from './crimes.js'
 import { recordEvent } from './events.js'
 
@@ -28,7 +29,8 @@ function goodsOf(load: Stock | undefined): Stock | undefined {
  * (`driveOffProblem`, `takeProblem`). It joins that realm at once, a carriage with its load and
  * hitched horse, and leaves any alliance army. One theft, known through a witness; none when it
  * belonged to nobody. The owner's log says at once that it is gone and where it was last, without
- * the thief, and the thief's realm's log says what they took.
+ * the thief, and the thief's realm's log says what they took. A caravan's carriage robs the caravan
+ * and is replaced (`caravanCarriageStolen`).
  */
 export function takeOver(
   world: WorldState,
@@ -65,4 +67,5 @@ export function takeOver(
     ...what,
     ...(goods && { goods }),
   })
+  if (carriage) caravanCarriageStolen(world, thief, carriage)
 }

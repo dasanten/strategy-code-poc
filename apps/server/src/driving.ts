@@ -83,7 +83,7 @@ export const drive: OrderKind = {
         return 'a carriage can’t go there'
       }
     }
-    if (steals) return driveOffProblem(world, r, carriage, realm.id)
+    if (steals) return driveOffProblem(world, r, carriage, realm.id, terrain?.size)
     if (typeof o.horseId === 'string' && carriage.realmId === realm.id) {
       return hitchOffProblem(world, r, { ...carriage, realmId: realm.id }, o.horseId)
     }
@@ -99,7 +99,7 @@ export const drive: OrderKind = {
     const realmId = commanderOf(world, r)
     if (realmId !== null && stealsCarriage(world, realmId, carriage)) {
       // Taken or driven by someone else since the order came: it goes no further.
-      if (driveOffProblem(world, r, carriage, realmId)) return
+      if (driveOffProblem(world, r, carriage, realmId, terrain?.size)) return
       const size = terrain?.size ?? MAP_SIZE
       const hitched = world.horses.find((h) => h.id === carriage.horseId)
       const stolen = horseToSteal(world, r, carriage, realmId)

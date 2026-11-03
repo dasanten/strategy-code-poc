@@ -202,7 +202,7 @@ describe('caravans carrying out deliveries', () => {
     const { world, terrain, city, caravan, queue } = setup()
     order(world, queue, { kind: 'buy', good: 'iron', units: 3, cityId: city.id })
     runUntil(world, terrain, () => caravan.job !== null)
-    world.residents = world.residents.filter((r) => r.id !== caravan.driverId)
+    world.carriages = world.carriages.filter((k) => k.id !== caravan.carriageId)
     stepWorld(world, terrain)
     expect(world.caravans).toEqual([])
     expect(world.deliveries).toEqual([expect.objectContaining({ caravanId: null })])
