@@ -5,10 +5,12 @@ import {
   townHallOf,
   drivenCarriageId,
   inCityArea,
+  isAt,
   realmName,
   type Carriage,
   type City,
   type Horse,
+  type Resident,
   type WorldState,
 } from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
@@ -80,7 +82,7 @@ function occupationLogged(
 /**
  * A city joins the realm `captor` with everything in it (`CONTEXT.md`: Capturing a city,
  * Integrating): its buildings, the residents who live there, wherever they stand, loyal at once,
- * and the horses and carriages of its former owner standing in its area. A Leader is never
+ * and its horses and carriages (`comesWithCity`). A Leader is never
  * captured: one who lived there stays in their realm and is homeless. Those who join drop the
  * orders their former owner gave them, and their pair unless the partner joins too; whoever else
  * drove a carriage that joins stops driving it, and nobody keeps attacking their own realm. Both
@@ -101,10 +103,11 @@ export function captureCity(world: WorldState, city: City, captor: string, size:
  * (`leaveTradeOrg`). Returns how many of its residents joined.
  */
 export function joinRealm(world: WorldState, city: City, captor: string, size: number): number {
-  const from = city.realmId
   const leaders = new Set(world.realms.map((r) => r.leaderId))
   const joining = world.residents.filter((r) => r.cityId === city.id && !leaders.has(r.id))
   const joined = new Set(joining.map((r) => r.id))
+  // Asked before those who join drop their orders, a drive or haul among them.
+  const comesAlong = comesWithCity(world, city, joining, size)
   const names = residentNamesTaken(world, captor, null)
   for (const r of world.residents) {
     if (r.cityId !== city.id) continue
@@ -119,23 +122,19 @@ export function joinRealm(world: WorldState, city: City, captor: string, size: n
       delete r.pair
     }
   }
-  const inArea = (t: { x: number; y: number }) => inCityArea(world, city, t.x, t.y, size)
-  // Its former owner's: of its realm, or for an NPC city, of the city itself.
-  const fromOwner = (t: Horse | Carriage) =>
-    t.realmId === from && (from !== null || t.cityId === city.id) && inArea(t)
   const join = (t: Horse | Carriage) => {
     t.realmId = captor
     t.cityId = null
   }
   const carriages = new Set<string>()
   for (const k of world.carriages) {
-    if (!fromOwner(k)) continue
+    if (!comesAlong(k)) continue
     join(k)
     carriages.add(k.id)
     const horse = world.horses.find((h) => h.id === k.horseId)
     if (horse) join(horse)
   }
-  for (const h of world.horses) if (fromOwner(h)) join(h)
+  for (const h of world.horses) if (comesAlong(h)) join(h)
   const owners = new Map(world.residents.map((r) => [r.id, r.owner]))
   for (const r of world.residents) {
     const driven = drivenCarriageId(r)
@@ -147,4 +146,29 @@ export function joinRealm(world: WorldState, city: City, captor: string, size: n
   city.realmId = captor
   leaveTradeOrg(world, city)
   return joining.length
+}
+
+/**
+ * Which horses and carriages join with a city (`CONTEXT.md`: What joins with a city). An NPC
+ * city's are all its own, wherever they stand. A Player's aren't tied to one city, so of those the
+ * ones in its area or at its stables; a stable is no city building, so it isn't in the area by
+ * itself. Either way a horse one of the `joining` residents rides and a carriage one drives.
+ */
+function comesWithCity(
+  world: WorldState,
+  city: City,
+  joining: Resident[],
+  size: number,
+): (t: Horse | Carriage) => boolean {
+  const from = city.realmId
+  const along = new Set(joining.flatMap((r) => [r.riding, drivenCarriageId(r)]))
+  const stables = world.buildings.filter(
+    (b) => b.kind === 'stable' && !b.site && b.cityId === city.id,
+  )
+  return (t) => {
+    if (along.has(t.id)) return true
+    if (from === null) return t.realmId === null && t.cityId === city.id
+    if (t.realmId !== from) return false
+    return inCityArea(world, city, t.x, t.y, size) || stables.some((s) => isAt(t, s, size))
+  }
 }

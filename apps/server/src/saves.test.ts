@@ -12,6 +12,7 @@ import {
   HORSE_START_AGE_MIN,
   horseAgeInYears,
   horsesIn,
+  tradeOrgHq,
   type TerrainMap,
 } from '@csp/shared'
 import { createAdmin } from './auth.js'
@@ -140,7 +141,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(75)
+    expect(WORLD_FORMAT_VERSION).toBe(76)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
@@ -478,6 +479,45 @@ describe('world saves', () => {
     const migrated = migrateWorld(old, 74, { terrain }, migrations, 75)
     expect(migrated).toEqual({ ...world, waypoints: {} })
     expect(checkInvariants(migrated, terrain)).toEqual([])
+  })
+
+  it('gives horses and carriages left behind to the realm their city joined (migration 75 → 76)', () => {
+    const { world, terrain } = worldWithPost()
+    const realm = world.realms[0]!
+    const home = world.cities.find((c) => c.realmId === realm.id)!
+    const hq = tradeOrgHq(world)!
+    const post = world.cities.find((c) => c.tradeOrg === 'post')!
+    const horse = (id: string, realmId: string | null, cityId: string | null) => ({
+      ...world.horses[0]!,
+      id,
+      realmId,
+      cityId,
+    })
+    const carriage = { ...world.carriages[0]!, horseId: 'hitched', load: {} }
+    const old = structuredClone(world)
+    const hqHorses = old.horses.filter((h) => h.cityId === hq.id).map((h) => h.id)
+    expect(hqHorses.length).toBeGreaterThan(0)
+    old.horses.push(
+      horse('stranded', null, home.id),
+      { ...horse('hitched', null, home.id), x: carriage.x, y: carriage.y },
+      horse('atPost', null, post.id),
+      horse('ofNobody', null, null),
+      horse('ofTheRealm', realm.id, null),
+    )
+    old.carriages.push({ ...carriage, id: 'kStranded', realmId: null, cityId: home.id })
+    const before = old.horses.filter((h) => hqHorses.includes(h.id))
+    const migrated = migrateWorld(structuredClone(old), 75, { terrain }, migrations, 76)
+    const owner = (id: string) => {
+      const t = [...migrated.horses, ...migrated.carriages].find((x) => x.id === id)!
+      return [t.realmId, t.cityId]
+    }
+    for (const id of ['stranded', 'hitched', 'kStranded'])
+      expect(owner(id), id).toEqual([realm.id, null])
+    expect(owner('atPost')).toEqual([null, post.id])
+    expect(owner('ofNobody')).toEqual([null, null])
+    expect(owner('ofTheRealm')).toEqual([realm.id, null])
+    // The Trade Organization keeps its own.
+    expect(migrated.horses.filter((h) => hqHorses.includes(h.id))).toEqual(before)
   })
 
   it('names every horse from before horses had names, alike on every server (migration 65 → 66)', () => {
