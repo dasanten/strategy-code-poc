@@ -2,6 +2,8 @@ import {
   FOOD_PER_DAY,
   HOME_FOOD_LOW,
   HUNGER_DAYS,
+  DOWN_DAYS,
+  isDown,
   MEAL_UNITS,
   OWN_FOOD,
   ticksForAge,
@@ -30,8 +32,16 @@ import { cityTerrain, worldWithCity } from './test-terrain.js'
 
 const terrain = cityTerrain()
 
-/** Game days from a full hunger meter with no food to death, at average Endurance. */
+/** Game days from a full hunger meter with no food to going Down, at average Endurance. */
 const DEATH_DAYS = HUNGER_DAYS + STARVE_DAYS
+
+/** Runs survival on to the tick the last of those Down is due to die; returns who died then. */
+function untilDue(world: WorldState): Resident[] {
+  world.tick = Math.max(...world.residents.flatMap((r) => r.downUntil ?? []))
+  const { died } = stepSurvival(world, terrain)
+  world.tick++
+  return died
+}
 
 /** Runs survival for some game days; returns everyone who died, in order. */
 function live(world: WorldState, days: number): Resident[] {
@@ -100,17 +110,26 @@ describe('stepSurvival', () => {
       Object.assign(r, { x: storageOf(world).x, y: storageOf(world).y, order: null, carried: {} })
       expect(inCityArea(world, city, r.x, r.y, terrain.size)).toBe(true)
     }
-    expect(live(world, DEATH_DAYS + 0.5)).toHaveLength(8)
+    expect(live(world, DEATH_DAYS + 0.5)).toEqual([])
+    expect(world.residents.every((r) => isDown(r))).toBe(true)
     expect(storageOf(world).stock).toEqual(before)
   })
 
-  it('starves a city without food in about 5 game days', () => {
+  it('puts a city without food Down in about 5 game days, and they die `DOWN_DAYS` later', () => {
     const { world } = worldWithCity()
     averageEndurance(world)
     for (const r of world.residents) r.carried = {}
     expect(live(world, DEATH_DAYS - 0.5)).toEqual([])
-    const died = live(world, 1)
-    expect(died).toHaveLength(8)
+    expect(world.residents.some((r) => isDown(r))).toBe(false)
+    expect(live(world, 1)).toEqual([])
+    expect(world.residents.every((r) => isDown(r) && r.health === 0)).toBe(true)
+    const wentDown = world.tick - TICKS_PER_GAME_DAY
+    for (const r of world.residents) {
+      expect(r.downUntil! - wentDown).toBeGreaterThan(DOWN_DAYS * TICKS_PER_GAME_DAY)
+      expect(r.downUntil! - wentDown).toBeLessThanOrEqual((DOWN_DAYS + 1) * TICKS_PER_GAME_DAY)
+    }
+    expect(checkInvariants(world, terrain)).toEqual([])
+    expect(untilDue(world)).toHaveLength(8)
     expect(world.residents).toEqual([])
   })
 
@@ -132,6 +151,9 @@ describe('stepSurvival', () => {
     Object.assign(r, { ...awayFrom(world, city), carried: { stone: 4 } })
     world.piles.push({ id: 'p0', x: r.x, y: r.y, goods: { stone: 1, wood: 2 } })
     live(world, DEATH_DAYS + 0.5)
+    // Down, they still hold it.
+    expect(r.carried).toEqual({ stone: 4 })
+    expect(untilDue(world)).toEqual([r])
     expect(world.piles).toEqual([{ id: 'p0', x: r.x, y: r.y, goods: { stone: 5, wood: 2 } }])
     expect(checkInvariants(world, terrain)).toEqual([])
   })
@@ -148,6 +170,14 @@ describe('stepSurvival', () => {
       ended.push(...stepSurvival(world, terrain).ended.map((x) => x.id))
       world.tick++
     }
+    // Down is not a Leader death.
+    expect(isDown(leader)).toBe(true)
+    expect(ended).toEqual([])
+    expect(world.realms).toEqual([realm])
+    expect(checkInvariants(world, terrain)).toEqual([])
+    world.tick = leader.downUntil!
+    ended.push(...stepSurvival(world, terrain).ended.map((x) => x.id))
+    world.tick++
     expect(ended).toEqual([realm.id])
     expect(world.realms).toEqual([])
     expect(world.residents.every((r) => r.owner === null)).toBe(true)

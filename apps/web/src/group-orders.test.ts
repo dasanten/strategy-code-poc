@@ -416,6 +416,8 @@ describe('every resident order on the group card', () => {
     carries: true,
     carriageToBoard: true,
     carriageToUnhitch: true,
+    downNear: 1,
+    carriesFood: true,
   })
   const offered = [
     ...residentActions(everything(farm)),
@@ -475,9 +477,11 @@ const everyOrder = {
   residents: [
     resident('a', 5, 5, { riding: 'h0', order: { kind: 'workAt' }, carried: { wood: 2 } }),
     resident('b', 20, 20, { aboard: 'k1' }),
-    resident('c', 4, 4),
+    resident('c', 4, 4, { carried: { food: 3 } }),
+    resident('d', 4, 5),
   ],
   seen: {
+    down: [{ id: 'd', x: 4, y: 5 }],
     horses: [{ id: 'h2', x: 4, y: 4 }],
     carriages: [{ id: 'k1', x: 4, y: 4, horseId: 'h1' }],
     buildings: [
@@ -805,6 +809,26 @@ describe('the group card’s other orders', () => {
       { kind: 'climb', wallId: 'w1', residentId: 'c' },
     ])
     expect(why(climb)).toEqual([['b', 'not next to the wall']])
+  })
+
+  it('feeds each one Down with the first of them next to them who has Food', () => {
+    const food = { carried: { food: 3 } }
+    const rs = [
+      resident('a', 4, 4, food),
+      resident('b', 5, 5, food),
+      resident('c', 9, 9, food),
+      resident('d', 4, 5),
+      resident('e', 20, 20, { bornAt: TICK, ...food }),
+    ]
+    const seen = { down: [{ id: 'x1', x: 4, y: 5 }] }
+    const fed = seenSend({ kind: 'feed', units: 2 }, rs, seen)
+    expect(orders(fed)).toEqual([{ kind: 'feed', targetId: 'x1', units: 2, residentId: 'a' }])
+    expect(why(fed)).toEqual([
+      ['c', 'nobody Down nearby'],
+      ['d', 'no Food in hand'],
+      ['e', 'a child'],
+      ['b', 'another of them feeds them'],
+    ])
   })
 })
 

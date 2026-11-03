@@ -1,9 +1,19 @@
-import { createElement, isValidElement, type ReactNode } from 'react'
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { MAX_HEALTH, MAX_HUNGER, type Building, type Horse, type SeenResident } from '@csp/shared'
+import {
+  MAX_HEALTH,
+  MAX_HUNGER,
+  TICKS_PER_GAME_YEAR,
+  type Building,
+  type GoodsSpot,
+  type Horse,
+  type Resident,
+  type SeenResident,
+  type Stock,
+} from '@csp/shared'
 import { describeTile } from './selection-view.js'
-import { GOOD_LABELS } from './Residents.js'
+import { GOOD_LABELS, TileGoods } from './Residents.js'
 import { TileCard } from './SelectionCard.js'
 import { PriceList } from './CityInspector.js'
 
@@ -55,6 +65,7 @@ const props = {
   onSelectResident: () => {},
   onOpenHorse: () => {},
   onUnhitch: () => {},
+  onPickUp: () => {},
 }
 
 /** The keys that two siblings in a list share, anywhere in the tree. */
@@ -192,3 +203,87 @@ describe('trade prices (`CONTEXT.md`: Goods on cards)', () => {
     expect(html).toContain('Iron')
   })
 })
+describe('the tile card of someone Down (`CONTEXT.md`: Down)', () => {
+  const at = (id: string, name: string, more: object = {}) =>
+    ({
+      id,
+      name,
+      owner: 'me',
+      cityId: null,
+      x: 5,
+      y: 5,
+      bornAt: 0,
+      carried: {},
+      ...more,
+    }) as Resident
+  const ana = at('ana', 'Ana', { owner: 'them', down: true, carried: { stone: 3 } })
+  const card = (residents: Resident[]) => describeTile(tileOf(residents), GOOD_LABELS)
+  const tileOf = (residents: Resident[]) => ({
+    x: 5,
+    y: 5,
+    buildings: [],
+    carriages: [],
+    horses: [],
+    piles: [],
+    node: undefined,
+    strangers: residents.filter((r) => r.owner !== 'me'),
+    residents,
+    cities: [],
+    viewer: { realmId: 'me', allies: new Set<string>() },
+    workers: () => 0,
+    tick: 100 * TICKS_PER_GAME_YEAR,
+  })
+  const render = (residents: Resident[], more: Partial<Parameters<typeof TileCard>[0]> = {}) => {
+    let tree: ReactNode
+    const html = renderToStaticMarkup(
+      createElement(() => {
+        tree = TileCard({
+          ...props,
+          card: card(residents),
+          tick: 100 * TICKS_PER_GAME_YEAR,
+          ...more,
+        })
+        return tree
+      }),
+    )
+    return { html, tree }
+  }
+
+  it('shows what they carry, picked up by one of the realm’s residents on the tile', () => {
+    const mara = at('mara', 'Mara')
+    const bo = at('bo', 'Bo')
+    const picked: unknown[] = []
+    const { html, tree } = render([ana, mara, bo], {
+      actor: bo,
+      onPickUp: (...args) => picked.push(args),
+    })
+    expect(html).toContain('Carried by Ana, Down · Bo picks up')
+    expect(html).toMatch(/<button type="button">Pick up<\/button>/)
+    const goods = findTileGoods(tree)!
+    goods.props.onPickUp({ kind: 'resident', residentId: 'ana' }, { stone: 2 })
+    expect(picked).toEqual([['bo', { kind: 'resident', residentId: 'ana' }, { stone: 2 }]])
+  })
+
+  it('shows them with nobody of the realm there to pick it up', () => {
+    const { html } = render([ana])
+    expect(html).toContain('Carried by Ana, Down')
+    expect(html).toContain('Anyone of yours on this tile can pick it up.')
+    expect(html).toMatch(/<button type="button" disabled="">Pick up<\/button>/)
+  })
+})
+
+/** The first `TileGoods` element in the tree the card renders. */
+function findTileGoods(
+  node: ReactNode,
+): ReactElement<{ onPickUp: (from: GoodsSpot, goods: Stock) => void }> | undefined {
+  if (Array.isArray(node)) {
+    for (const n of node) {
+      const found = findTileGoods(n)
+      if (found) return found
+    }
+    return undefined
+  }
+  if (!isValidElement(node)) return undefined
+  if (node.type === TileGoods) return node as ReturnType<typeof findTileGoods>
+  return findTileGoods((node.props as { children?: ReactNode }).children)
+}

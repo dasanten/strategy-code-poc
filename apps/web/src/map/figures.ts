@@ -1,4 +1,4 @@
-import { PROTECTION, WEAPONS, isLineOrder, type Good, type Resident } from '@csp/shared'
+import { PROTECTION, WEAPONS, isDown, isLineOrder, type Good, type Resident } from '@csp/shared'
 import { isLeader, rankedAs, type Leaders, type Relationship, type Tone } from './tokens.js'
 
 /**
@@ -11,14 +11,16 @@ export type Activity = 'fighting' | 'working' | 'riding' | 'carrying' | 'walking
 const NOT_A_LOAD: ReadonlySet<Good> = new Set<Good>(['food', ...WEAPONS, ...PROTECTION])
 
 /**
- * A resident's activity from their order and what they hold: attacking is fighting; working a
+ * A resident's activity from their order and what they hold: someone Down (`CONTEXT.md`: Down)
+ * does nothing; attacking is fighting; working a
  * workplace, building, tearing down or laying a road is working; otherwise a rider on the way
  * somewhere is riding (`CONTEXT.md`: Riding), holding goods beyond their food and gear is
  * carrying, and being on the way somewhere is walking.
  */
 export function residentActivity(
-  r: Pick<Resident, 'order' | 'carried' | 'x' | 'y' | 'riding'>,
+  r: Pick<Resident, 'order' | 'carried' | 'x' | 'y' | 'riding' | 'downUntil'> & { down?: true },
 ): Activity | undefined {
+  if (isDown(r)) return undefined
   const o = r.order
   if (o?.kind === 'attack') return 'fighting'
   if (

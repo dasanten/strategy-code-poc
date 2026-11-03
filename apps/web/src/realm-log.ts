@@ -1,4 +1,10 @@
-import { REALM_LOG_LENGTH, TRADE_ORG_NAME, type DeliveryView, type RealmEvent } from '@csp/shared'
+import {
+  REALM_LOG_LENGTH,
+  TRADE_ORG_NAME,
+  timeLeft,
+  type DeliveryView,
+  type RealmEvent,
+} from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
 
 /** How bad an event is, for its colour in the log. */
@@ -26,6 +32,13 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
   switch (e.kind) {
     case 'hungry':
       return { text: `${e.name} has nothing to eat and is starving.`, tone: 'warn' }
+    case 'down':
+      return {
+        text: `${e.name} is Down from hunger: ${timeLeft(e.until - e.tick)}.`,
+        tone: 'bad',
+      }
+    case 'woke':
+      return { text: `${e.by} fed ${e.name}, who is awake again at low health.`, tone: 'info' }
     case 'died': {
       const how = {
         starved: 'starved to death',
@@ -48,7 +61,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         )
         .join(', ')
       const did = {
-        theft: `stole ${goods || 'goods'}`,
+        theft: `stole ${goods || 'goods'}${e.victim ? ` from ${e.victim}` : ''}`,
         attack: `attacked ${e.victim ?? 'one of your residents'}`,
         killing: `killed ${e.victim ?? 'one of your residents'}`,
         tearDown: `tore down your ${e.building ? BUILDING_NAMES[e.building] : 'building'}`,
@@ -327,6 +340,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       // Entries from before horses had names (`CONTEXT.md`: Horse name) say "a horse".
       return {
         text: e.name ? `Your horse ${e.name} starved to death.` : 'A horse starved to death.',
+        tone: 'bad',
+      }
+    case 'horseDown':
+      return {
+        text: `Your horse ${e.name} is Down from hunger: ${timeLeft(e.until - e.tick)}. Put Food down by it.`,
         tone: 'bad',
       }
     case 'horseHungry':
