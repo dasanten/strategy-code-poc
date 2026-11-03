@@ -22,6 +22,7 @@ import {
   type ScriptMemory,
   type ScriptRunSeen,
   type ServerMessage,
+  type WorkplaceSettings,
   type Waypoint,
 } from '@csp/shared'
 import { api } from './api.js'
@@ -73,6 +74,8 @@ export interface ClientWorld {
   waypoints: Waypoint[]
   /** The Player's first-day card (`CONTEXT.md`: First day). */
   firstDay: FirstDay
+  /** The realm's Workplace settings (`CONTEXT.md`), by building id. */
+  workSettings: Readonly<Record<string, WorkplaceSettings>>
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -170,6 +173,7 @@ export function useWorld(onLoggedOut: () => void) {
             horseOffer: msg.horseOffer,
             waypoints: msg.waypoints,
             firstDay: msg.firstDay,
+            workSettings: msg.workSettings,
             ...byKind(entities.values()),
             lastSeen: lastSeenByKind(remembered.values()),
           })
@@ -221,6 +225,7 @@ export function useWorld(onLoggedOut: () => void) {
               diplomacy,
               region,
               horseOffer: msg.horseOffer ?? w.horseOffer,
+              workSettings: msg.workSettings ?? w.workSettings,
               waypoints: msg.waypoints ?? w.waypoints,
             }
           })

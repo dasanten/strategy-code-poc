@@ -18,6 +18,7 @@ import type {
   SeenArmy,
   SeenCaravan,
   SeenResident,
+  WorkplaceSettings,
   Waypoint,
 } from './world.js'
 
@@ -68,8 +69,15 @@ export type Shown<P extends { stock: number }> = Omit<P, 'stock'> & { stock?: nu
  */
 export type SeenBuilding = Building & { prices?: Shown<WarehousePrice>[] }
 
-/** A horse as Players see it: its hunger and health only for its own realm and allies. */
-export type SeenHorse = Omit<Horse, 'hunger' | 'health'> & Partial<Pick<Horse, 'hunger' | 'health'>>
+/**
+ * A horse as Players see it: its hunger and health, and when it dies if it is Down, only for its
+ * own realm and allies.
+ */
+export type SeenHorse = Omit<Horse, 'hunger' | 'health' | 'downUntil'> &
+  Partial<Pick<Horse, 'hunger' | 'health' | 'downUntil'>> & {
+    /** Set while it is Down (`CONTEXT.md`: Down), which anyone in sight sees. */
+    down?: true
+  }
 
 /**
  * A carriage as Players see it (`CONTEXT.md`: Seeing inside a storage): how heavily it is loaded,
@@ -151,6 +159,11 @@ export type ServerMessage =
       waypoints: Waypoint[]
       /** The Player's first-day card (`CONTEXT.md`: First day). */
       firstDay: FirstDay
+      /**
+       * The realm's Workplace settings (`CONTEXT.md`), by building id; only its own, never
+       * another realm's.
+       */
+      workSettings: Record<string, WorkplaceSettings>
     }
   /**
    * Every tick: entities in sight that changed, ids that left sight, the Player's Last seen out
@@ -161,8 +174,9 @@ export type ServerMessage =
    * again (all of it) or their explored terrain grew (the grown chunks), and the realm's Leader
    * when the Player handed the realm to another (`CONTEXT.md`: Leader handover), and the
    * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer: false` once
-   * they claimed their Horse offer (`CONTEXT.md`: Horse offer), and all their waypoints when
-   * they changed (`CONTEXT.md`: Waypoint).
+   * they claimed their Horse offer (`CONTEXT.md`: Horse offer), all the realm's Workplace
+   * settings whenever they changed, and all their waypoints when they changed (`CONTEXT.md`:
+   * Waypoint).
    */
   | {
       type: 'tick'
@@ -177,6 +191,7 @@ export type ServerMessage =
       leaderId?: string
       realmName?: string
       horseOffer?: false
+      workSettings?: Record<string, WorkplaceSettings>
       waypoints?: Waypoint[]
     }
   /**

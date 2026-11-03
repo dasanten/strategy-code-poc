@@ -1,5 +1,6 @@
 import {
   BUILD_MATERIALS,
+  GOOD_WEIGHT,
   MAP_SIZE,
   BUILD_WORK,
   MOUNTAIN_ROAD_WORK_FACTOR,
@@ -11,6 +12,8 @@ import {
   buildWork,
   canWork,
   carriageCanEnter,
+  carryCapacity,
+  stockWeight,
   type Recipe,
 } from './balance.js'
 import { citiesAt } from './city.js'
@@ -444,6 +447,14 @@ export function nodeCorner(
 /** Most workers each kind of workplace takes, for the kinds residents can work so far. */
 export const MAX_WORKERS: Partial<Record<BuildingKind, number>> = WORKPLACE_MAX_WORKERS
 
+/**
+ * Whether a realm can keep Workplace settings for the building (`CONTEXT.md`: Workplace
+ * settings): a workplace, or a construction site of a workplace kind.
+ */
+export function takesWorkSettings(b: Pick<Building, 'kind'>): boolean {
+  return WORKPLACE_MAX_WORKERS[b.kind] !== undefined
+}
+
 /** The good each kind of node yields once worked (`CONTEXT.md`: Resource node). */
 export const NODE_GOOD: Record<ResourceKind, Good> = {
   forest: 'wood',
@@ -494,6 +505,29 @@ export function inputAt(world: WorldState, workplace: Building): Stock {
 export function hasInput(world: WorldState, workplace: Building, recipe: Recipe): boolean {
   const at = inputAt(world, workplace)
   return (Object.entries(recipe.input) as [Good, number][]).every(([g, n]) => (at[g] ?? 0) >= n)
+}
+
+/**
+ * The input a resident working a workplace that processes goods fetches for it (`CONTEXT.md`:
+ * Fetching inputs): of each good of `recipe`'s input it lacks for a batch (`inputAt`), as many
+ * batches' worth as fit in the resident's hands beside what they carry, so a smithy with Wood
+ * enough gets only Iron; empty while it has a batch's input, or none fits.
+ */
+export function inputToFetch(
+  world: WorldState,
+  workplace: Building,
+  recipe: Recipe,
+  resident: Resident,
+): Stock {
+  const at = inputAt(world, workplace)
+  const short = (Object.entries(recipe.input) as [Good, number][]).filter(
+    ([g, n]) => (at[g] ?? 0) < n,
+  )
+  const room = carryCapacity(resident, world.tick) - stockWeight(resident.carried)
+  const batch = short.reduce((kg, [g, n]) => kg + n * GOOD_WEIGHT[g], 0)
+  const batches = batch > 0 ? Math.floor(room / batch + 1e-9) : 0
+  if (batches < 1) return {}
+  return Object.fromEntries(short.map(([g, n]) => [g, n * batches]))
 }
 
 /** The residents working a workplace: holding a work-at order for it and standing at it. */

@@ -11,6 +11,7 @@ import {
   SCRIPT_VIEWS,
   Terrain,
   DOING_MAX_LENGTH,
+  isDown,
   ageInYears,
   occupationTicksLeft,
   breedingPair,
@@ -26,6 +27,8 @@ import {
   crewTile,
   directivesFor,
   materialsNeeded,
+  inputToFetch,
+  recipeFor,
   organizationLabel,
   pileAt,
   queueView,
@@ -220,17 +223,33 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       ? { teacher: teacher.id, subject: o.subject, trainees }
       : { trainees }
   }
+  // The realm's own Workplace settings for a building (`CONTEXT.md`), never another realm's; an
+  // NPC city keeps none.
+  const settingsAt = (id: string) => {
+    const settings =
+      side === undefined || sender.npcCityId !== undefined
+        ? undefined
+        : world.workplaceSettings[side]?.[id]
+    return settings && { workSettings: settings }
+  }
+  const buildingExtras = (id: string) => ({ ...teachingAt(id), ...settingsAt(id) })
   const asSeenBuilding = (b: Building) => {
-    if (ownBuilding(b)) return b
+    if (ownBuilding(b)) {
+      const settings = settingsAt(b.id)
+      return settings ? { ...b, ...settings } : b
+    }
     seen ??= context.seen()
     const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
-    return shown ? { ...untagged(shown), ...teachingAt(b.id) } : null
+    return shown ? { ...untagged(shown), ...buildingExtras(b.id) } : null
   }
   // The building as the Player remembers it (`CONTEXT.md`: Last seen); an NPC city has no memory.
-  const lastSaw = (b: Building) =>
-    sender.npcCityId !== undefined
-      ? undefined
-      : world.lastSeen[sender.userId]?.find((e) => e.id === b.id && e.is === 'building')
+  const lastSaw = (b: Building) => {
+    if (sender.npcCityId !== undefined) return undefined
+    const remembered = world.lastSeen[sender.userId]?.find(
+      (e) => e.id === b.id && e.is === 'building',
+    )
+    return remembered && { ...remembered, ...settingsAt(b.id) }
+  }
   // Who occupies a seen city's town hall and the ticks left (`CONTEXT.md`: Occupying a town
   // hall), only with the hall in sight, as the Player sees it.
   const occupationSeen = (id: string) => {
@@ -246,7 +265,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   // query returns (`viewValue`).
   const queries: Record<string, (args: Value[]) => unknown> = {
     residents: () => seenOf('resident', ownMemory),
-    buildings: () => seenOf('building', teachingAt),
+    buildings: () => seenOf('building', buildingExtras),
     cities: () => seenOf('city', occupationSeen),
     horses: () => seenOf('horse'),
     carriages: () => seenOf('carriage'),
@@ -412,6 +431,15 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         throw new ScriptRuntimeError(`"fits" needs a good, not ${String(good)}`)
       }
       return unitsThatFit(resident, good as Good, world.tick)
+    }
+    queries.inputToFetch = ([workplace, makes]) => {
+      const id = (workplace as Record<string, Value> | null)?.id
+      const b = typeof id === 'string' ? worldIndex(world).buildingById(id) : undefined
+      if (!b || b.site || !(ownBuilding(b) || inSight(b))) return []
+      const recipe = recipeFor(b.kind, typeof makes === 'string' ? (makes as Good) : undefined)
+      if (!recipe) return []
+      const load = inputToFetch(world, b, recipe, resident)
+      return Object.entries(load).map(([good, units]) => ({ good, units }))
     }
     queries.breedingPair = ([stable]) => {
       const id = (stable as Record<string, Value> | null)?.id
@@ -664,6 +692,8 @@ function residentActions(
       request('breed', { stableId: plain(stableId), horseIds: plain(horseIds) }),
     pair: ([partnerId]) => request('pair', { partnerId: plain(partnerId) }),
     attack: ([targetId]) => request('attack', { targetId: plain(targetId) }),
+    feed: ([residentId, units]) =>
+      request('feed', { targetId: plain(residentId), units: plain(units) }),
     climb: ([wallId]) => request('climb', { wallId: plain(wallId) }),
     pay: ([contractId, weeks]) =>
       request('pay', { contractId: plain(contractId), weeks: plain(weeks) }),
@@ -780,9 +810,10 @@ function requestsSound(
 }
 
 /**
- * A resident as its script view shows it: its queue as `queueView`, not its steps, and who last
+ * A resident as its script view shows it: its queue as `queueView`, not its steps, who last
  * struck them as `struckBy` and `struckAt`, while that attacker is still there (`CONTEXT.md`:
- * Combat, Under attack). Anything else passes as it is.
+ * Combat, Under attack), and whether they are Down (`CONTEXT.md`: Down) as `down`. Anything
+ * else passes as it is.
  */
 function asView(world: WorldState, r: object): object {
   const { queue, struck, defenceScriptId } = r as {
@@ -792,6 +823,7 @@ function asView(world: WorldState, r: object): object {
   }
   return {
     ...r,
+    down: isDown(r as { downUntil?: number; down?: true }),
     ...(queue ? { queue: queueView(queue) } : {}),
     ...(struck ? struckView(world, struck) : {}),
     ...(defenceScriptId !== undefined ? { defenceScript: defenceScriptId } : {}),

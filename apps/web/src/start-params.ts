@@ -1,6 +1,8 @@
 import {
+  WORKPLACE_PARAM,
   isParamChoice,
   isParamNumber,
+  isWorkScript,
   targetParam,
   type OrderRequest,
   type ScriptParam,
@@ -8,6 +10,7 @@ import {
   type ScriptParamValues,
   type ScriptSummary,
   type StartParamValues,
+  type WorkplaceSettings,
 } from '@csp/shared'
 
 /**
@@ -22,26 +25,47 @@ export type StartValues = Record<string, ScriptParamValue | undefined>
 
 /**
  * The script an order starts, from the Player's library: the one Run script names, the defence
- * script picked (`CONTEXT.md`: Defence script), whose params are picked then, or the
- * Player's version of a task's default script. Undefined for an order that starts none.
+ * script picked (`CONTEXT.md`: Defence script), whose params are picked then, the work script of
+ * the workplace Work is given at (`workScriptOf`), or the Player's version of any other task's
+ * default script. Undefined for an order that starts none.
  */
 export function startedScript(
   order: OrderRequest,
   scripts: readonly ScriptSummary[],
+  workSettings: Readonly<Record<string, WorkplaceSettings>> = {},
 ): ScriptSummary | undefined {
   if (order.kind === 'runScript' || order.kind === 'setDefenceScript')
     return scripts.find((s) => s.id === order.scriptId)
+  if (isWorkTask(order)) return workScriptOf(scripts, workSettings[order.workplaceId as string])
   if (order.kind === 'task') return scripts.find((s) => s.task === order.task)
   return undefined
+}
+
+/** Whether the order gives Work at a workplace, which runs by its settings. */
+export function isWorkTask(order: OrderRequest): boolean {
+  return order.kind === 'task' && order.task === 'work' && typeof order.workplaceId === 'string'
+}
+
+/**
+ * The work script a workplace's settings name (`CONTEXT.md`: Workplace settings), while it is
+ * still one of the Player's work scripts, else their Work default; as the server picks it.
+ */
+export function workScriptOf(
+  scripts: readonly ScriptSummary[],
+  settings: WorkplaceSettings | undefined,
+): ScriptSummary | undefined {
+  const picked = scripts.find((s) => s.id === settings?.scriptId)
+  if (picked && isWorkScript(picked.params)) return picked
+  return scripts.find((s) => s.task === 'work')
 }
 
 /**
  * The params the form shows for an order starting `script`: its `param` lines, but for a task
  * not the script's target param (`targetParam`; `CONTEXT.md`: Started directly), which the task
- * fills itself.
+ * fills itself; for Work, `workplace`, whatever the work script.
  */
 export function startFormParams(order: OrderRequest, script: ScriptSummary): ScriptParam[] {
-  const target = targetParam(script)
+  const target = isWorkTask(order) ? WORKPLACE_PARAM : targetParam(script)
   return order.kind === 'task' ? script.params.filter((p) => p.name !== target) : script.params
 }
 
@@ -90,6 +114,25 @@ export function groupStartValues(
       return [p.name, values.size === 1 && shared !== undefined ? shared : p.default]
     }),
   )
+}
+
+/**
+ * The values Work gives with the form filled from the workplace's settings (`CONTEXT.md`:
+ * Workplace settings): only those the Player changed from what the form started with, which
+ * become the resident's overrides. Those left as they were read the workplace's, live; one
+ * emptied too.
+ */
+export function overrideParamValues(
+  params: readonly ScriptParam[],
+  base: StartValues,
+  values: StartValues,
+): StartParamValues {
+  const changed: StartParamValues = {}
+  for (const p of params) {
+    const value = values[p.name]
+    if (value !== undefined && value !== base[p.name]) changed[p.name] = value
+  }
+  return changed
 }
 
 /** Whether Start can give the values: every number typed is whole and zero or more. */

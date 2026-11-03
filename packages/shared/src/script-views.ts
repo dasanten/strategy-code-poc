@@ -59,6 +59,7 @@ export type ScriptViewName =
   | 'directiveGoal'
   | 'material'
   | 'lineTile'
+  | 'workSettings'
   | 'waypoint'
 
 const field = (
@@ -208,6 +209,17 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'number',
         'Fully fed is 100, empty 0.',
         'for a resident of another realm that isn’t allied',
+      ),
+      field(
+        'down',
+        'boolean',
+        'Whether they are Down: lying unconscious from hunger, doing nothing and taking no orders.',
+      ),
+      field(
+        'downUntil',
+        'number',
+        'The tick at which they die of hunger unless revived.',
+        'unless they are Down, and for a resident of another realm that isn’t allied',
       ),
       field(
         'struckBy',
@@ -538,6 +550,28 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'The residents training at a training ground; empty while nobody trains there.',
         'for any other building',
       ),
+      field(
+        'workSettings',
+        view('workSettings'),
+        'My realm’s Workplace settings for a workplace, or a construction site of a workplace kind, set on its card; never another realm’s.',
+        'for any other building, and while my realm has set none there',
+      ),
+    ],
+  },
+  workSettings: {
+    description: 'How my realm has a workplace worked (Workplace settings).',
+    fields: [
+      field(
+        'scriptId',
+        'number',
+        'The work script: one of my Player’s scripts declaring `param workplace: building`.',
+        'for the Work default',
+      ),
+      field(
+        'params',
+        'any',
+        'Values set for the work script’s params, by name: a building’s or carriage’s id, or a number, like {storage: "b12", foodTake: 5}; a param not set is left out.',
+      ),
     ],
   },
   site: {
@@ -596,6 +630,17 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'number',
         '0 is dead; full is 100.',
         'for one of another realm that isn’t allied',
+      ),
+      field(
+        'down',
+        'boolean',
+        'Whether it is Down: lying unconscious from hunger until it eats Food in reach.',
+      ),
+      field(
+        'downUntil',
+        'number',
+        'The tick at which it dies of hunger unless it eats first.',
+        'unless it is Down, and for one of another realm that isn’t allied',
       ),
       field('stats', view('horseStats'), 'Speed, strength and endurance.'),
       field('bornAt', 'number', 'The tick it was born; may be before the world began.'),

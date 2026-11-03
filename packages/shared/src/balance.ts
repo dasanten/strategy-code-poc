@@ -137,7 +137,11 @@ export const CHILD_GOODS: readonly Good[] = ['food']
  * Whether a resident may pick up, put down, Fetch or Store these goods: anyone grown up, a child
  * only `CHILD_GOODS` (`CONTEXT.md`: Child).
  */
-export function canHandle(resident: Resident, tick: number, goods: readonly string[]): boolean {
+export function canHandle(
+  resident: Pick<Resident, 'bornAt'>,
+  tick: number,
+  goods: readonly string[],
+): boolean {
   return (
     canWork(resident, tick) || goods.every((g) => (CHILD_GOODS as readonly string[]).includes(g))
   )
@@ -237,6 +241,12 @@ export const HORSE_REACH = 1
  * at 0 it is starving.
  */
 export const HORSE_HUNGRY_SHARE = 0.25
+
+/**
+ * Health a Down horse wakes with once it has eaten (`CONTEXT.md`: Reviving): low, out of
+ * `MAX_HEALTH`, so a fed horse takes most of `HEAL_DAYS` to be well again.
+ */
+export const HORSE_WAKE_HEALTH = 20
 
 /**
  * Game days of Food for the horses standing in it that the Feed the stable task keeps in a stable
@@ -916,12 +926,30 @@ export const MEAL_UNITS = 1
 /**
  * Game days a full hunger meter lasts without eating, at average Endurance. A unit of food fills
  * two thirds of it, so a fed resident's meter never drops below a third. With `STARVE_DAYS`, a
- * resident dies about 5 game days (2 real hours) after their last meal.
+ * resident goes Down about 5 game days (2 real hours) after their last meal.
  */
 export const HUNGER_DAYS = 3
 
-/** Game days an empty hunger meter takes to cost a resident all their health. */
+/** Game days an empty hunger meter takes to cost a resident all their health and put them Down. */
 export const STARVE_DAYS = 2
+
+/**
+ * Game days a resident lies Down before they die of hunger, unless revived (`CONTEXT.md`: Down):
+ * one real day, the window in which a Player can notice and act (ADR 0021).
+ */
+export const DOWN_DAYS = 60
+
+/**
+ * The health a Down resident wakes with once fed (`CONTEXT.md`: Reviving), of `MAX_HEALTH`: low,
+ * coming back while their hunger meter isn't empty.
+ */
+export const WAKE_HEALTH = 10
+
+/**
+ * Units of Food the Feed row suggests giving (`CONTEXT.md`: Reviving): one eaten at once to wake,
+ * one more to go on with, about four game days of eating.
+ */
+export const FEED_UNITS = 2
 
 /** Game days a fed resident takes to heal from no health back to full. */
 export const HEAL_DAYS = 3

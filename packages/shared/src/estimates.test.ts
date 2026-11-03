@@ -143,6 +143,31 @@ describe('arrival estimates (CONTEXT.md: Doing, Estimates)', () => {
     expect(arrivalTicks(w, resident(drive, { skills: { driving: 20 } }))!).toBeLessThan(driven)
   })
 
+  it('times a store or fetch order while it walks to its place, as a walk', () => {
+    const walked = arrivalTicks(world(), resident(walk))!
+    const place = { kind: 'storage' as const, storageId: 's1' }
+    const store: ResidentOrder = {
+      kind: 'store',
+      goods: { wood: null },
+      to: place,
+      phase: 'walking',
+      path,
+      progress: 0,
+    }
+    const fetch: ResidentOrder = {
+      kind: 'fetch',
+      goods: { food: 4 },
+      from: place,
+      phase: 'walking',
+      path,
+      progress: 0,
+    }
+    expect(arrivalTicks(world(), resident(store))).toBeCloseTo(walked)
+    expect(arrivalTicks(world(), resident(fetch))).toBeCloseTo(walked)
+    // There already, putting or taking: nowhere to go.
+    expect(arrivalTicks(world(), resident({ ...store, phase: 'putting' }))).toBeUndefined()
+  })
+
   it('says nothing while the way is still being found or they go nowhere', () => {
     expect(arrivalTicks(world(), resident({ ...walk, path: null }))).toBeUndefined()
     expect(arrivalTicks(world(), resident(null))).toBeUndefined()

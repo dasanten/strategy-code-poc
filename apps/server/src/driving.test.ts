@@ -24,7 +24,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { stepHorses } from './horses.js'
+import { HORSE_DOWN_TICKS, stepHorses } from './horses.js'
 import { checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -208,18 +208,27 @@ describe('driving a carriage', () => {
     expect(checkInvariants(world, map)).toEqual([])
   })
 
-  it('stops when the horse is gone, and a dead horse is unhitched', () => {
+  it('stands when its horse goes Down, and a dead horse is unhitched (`CONTEXT.md`: Down)', () => {
     const { world, w1, horse, carriage } = setup(open)
     carriage.horseId = 'h1'
     drive(w1, 'k1', 6, 2)
     horse.health = 0.0001
     horse.hunger = 0
     stepHorses(world, open)
-    expect(world.horses).toEqual([])
-    expect(carriage.horseId).toBeNull()
+    // Down, it stays hitched, and the drive ends where the carriage stands.
+    expect(horse.downUntil).toBe(world.tick + HORSE_DOWN_TICKS)
+    expect(carriage.horseId).toBe('h1')
+    expect(w1.order).toBeNull()
+    drive(w1, 'k1', 6, 2)
     driveOut(world, open, w1)
     expect([carriage.x, w1.x]).toEqual([2, 2])
     expect(w1.order).toBeNull()
+    expect(checkInvariants(world, open)).toEqual([])
+    // Nobody feeds it: its time runs out.
+    world.tick = horse.downUntil!
+    stepHorses(world, open)
+    expect(world.horses).toEqual([])
+    expect(carriage.horseId).toBeNull()
   })
 })
 

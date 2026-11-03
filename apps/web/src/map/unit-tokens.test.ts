@@ -11,6 +11,7 @@ interface Placed {
   y: number
   size: number
   tint?: number
+  rotation?: number
 }
 
 const view = { width: 800, height: 600 }
@@ -25,27 +26,38 @@ const walkTo = (x: number, y: number): ResidentOrder => ({
 const resident = (
   id: string,
   owner: string,
-  more: { riding?: string; order?: ResidentOrder } = {},
+  more: { riding?: string; order?: ResidentOrder; down?: true } = {},
 ): SeenResident =>
   ({ id, owner, cityId: null, x: 10, y: 10, carried: {}, order: null, ...more }) as SeenResident
 
 /**
  * Draws the residents at a zoom and returns every sprite placed, in drawing order; `where` puts
- * tokens on their way between tiles (`Motion`), by default in place.
+ * tokens on their way between tiles (`Motion`), by default in place. `loose` horses stand on
+ * their own, besides the riders'.
  */
-function draw(residents: SeenResident[], scale: number, where?: Where) {
+function draw(residents: SeenResident[], scale: number, where?: Where, loose: object[] = []) {
   const placed: Placed[] = []
   const tokens = {
-    place: (file: string, x: number, y: number, size: number, tint?: number) =>
-      placed.push({ file, x, y, size, tint }),
+    place: (
+      file: string,
+      x: number,
+      y: number,
+      size: number,
+      tint?: number,
+      _alpha?: number,
+      rotation?: number,
+    ) => placed.push({ file, x, y, size, tint, ...(rotation ? { rotation } : {}) }),
   } as unknown as TokenLayer
   const badges = { place: () => {} } as unknown as BadgeLayer
   const world: UnitWorld = {
     map: { size: 64 },
     residents,
-    horses: residents.flatMap((r) =>
-      r.riding ? [{ id: r.riding, realmId: r.owner, cityId: null, x: r.x, y: r.y }] : [],
-    ) as unknown as UnitWorld['horses'],
+    horses: [
+      ...residents.flatMap((r) =>
+        r.riding ? [{ id: r.riding, realmId: r.owner, cityId: null, x: r.x, y: r.y }] : [],
+      ),
+      ...loose,
+    ] as unknown as UnitWorld['horses'],
     carriages: [],
     armies: [],
     caravans: [],
@@ -65,6 +77,39 @@ const ringTint = (placed: Placed[], p: Placed) => placed[placed.indexOf(p) - 1]!
 
 const MIDDLE = (FAR_SCALE + CLOSE_SCALE) / 2
 const CLOSE = 30
+
+describe('drawUnits: Down (CONTEXT.md: Down)', () => {
+  it('lays a Down resident’s figure on its side, up close and as a token of their own', () => {
+    for (const scale of [MIDDLE, CLOSE]) {
+      const { placed } = draw([resident('a', 'r1', { down: true })], scale)
+      const figure = placed.find((p) => p.file === PERSON)!
+      expect(figure.rotation, `${scale}`).toBe(-Math.PI / 2)
+    }
+  })
+
+  it('lays a Down horse on its side, and keeps a standing one upright', () => {
+    const loose = (id: string, more: object = {}) => ({
+      id,
+      realmId: 'r1',
+      cityId: null,
+      x: 12,
+      y: 10,
+      ...more,
+    })
+    const { placed } = draw([], CLOSE, undefined, [loose('h1', { down: true }), loose('h2')])
+    expect(horses(placed).map((p) => p.rotation)).toEqual([-Math.PI / 2, undefined])
+  })
+
+  it('keeps standing figures upright, and a group token upright unless all of them are Down', () => {
+    const close = draw([resident('a', 'r1', { down: true }), resident('b', 'r1')], CLOSE).placed
+    expect(close.filter((p) => p.file === PERSON).map((p) => p.rotation)).toEqual([
+      -Math.PI / 2,
+      undefined,
+    ])
+    const middle = draw([resident('a', 'r1', { down: true }), resident('b', 'r1')], MIDDLE).placed
+    expect(middle.find((p) => p.file === PERSON)!.rotation).toBeUndefined()
+  })
+})
 
 describe('drawUnits: riders (CONTEXT.md: Riding)', () => {
   it('draws no horse under a walker, at any zoom', () => {

@@ -13,6 +13,7 @@ import {
   type Resident,
   type Stock,
   type WorldState,
+  isDown,
 } from './world.js'
 
 /** World queries about horses and stables (ADR 0002: the game API orders and scripts share). */
@@ -213,7 +214,8 @@ export function horseOfResident(
 
 /**
  * Why a resident can't mount a horse now, or undefined when they can (`CONTEXT.md`: Riding): the
- * horse must be of their realm and on their tile, pull no carriage, and nobody may ride it; the
+ * horse must be of their realm and on their tile, pull no carriage, not be Down (`CONTEXT.md`:
+ * Down), and nobody may ride it; the
  * resident must ride no other horse and drive no carriage. A horse left on Mountain whose road was
  * torn down can't be ridden there (`CONTEXT.md`: Road).
  */
@@ -231,6 +233,7 @@ export function mountProblem(
     return 'that horse is not on the resident’s tile'
   }
   if (carriagePulledBy(world, horse)) return 'that horse is hitched to a carriage'
+  if (isDown(horse)) return 'that horse is Down'
   if (riderOf(world, horse)) return 'someone else rides that horse'
   if (drivenCarriageId(resident) !== undefined) return 'a driver can’t ride'
   if (terrain && !carriageCanGoTo(world, terrain, horse.x, horse.y))

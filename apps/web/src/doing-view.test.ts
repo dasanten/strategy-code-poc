@@ -75,6 +75,15 @@ const haul: ResidentOrder = {
 const line = (r: DoingOf) => doingLine(r, { scripts, buildings })
 
 describe('doingLine', () => {
+  it('says someone is Down, and how long is left when that is seen (`CONTEXT.md`: Down)', () => {
+    const until = 5000 + 23 * 3600
+    expect(doingLine({ order: null, downUntil: until }, { tick: 5000 })).toBe(
+      'Down from hunger: about 23 h (58 game days) left',
+    )
+    // Another realm's resident: Down is seen, when it ends isn't.
+    expect(doingLine({ order: null, down: true }, { tick: 5000 })).toBe('Down from hunger')
+  })
+
   it('names the city a resident relocates to (`CONTEXT.md`: Relocate)', () => {
     const order: ResidentOrder = {
       kind: 'relocate',
@@ -180,6 +189,18 @@ describe('doingLine', () => {
     expect(line({ order: breed, script: breeder })).toBe('Breeding horses')
     expect(line({ order: { ...fetch, goods: { food: 10 } }, script: breeder })).toBe(
       'Breeding horses: fetching 10 food from the storage',
+    )
+  })
+
+  it('says Work builds its workplace first while it is still a site', () => {
+    // `CONTEXT.md`: Working a site.
+    const first = { scriptId: 0, task: 'work', building: 'farm', site: true } as const
+    expect(line({ order: build, script: first })).toBe('Building the farm (to work it)')
+    expect(line({ order: { ...fetch, goods: { wood: 10 } }, script: first })).toBe(
+      'Building the farm (to work it): fetching 10 wood from the storage',
+    )
+    expect(line({ order: work, script: { scriptId: 0, task: 'work', building: 'farm' } })).toBe(
+      'Working the farm',
     )
   })
 

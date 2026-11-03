@@ -229,6 +229,8 @@ interface Client {
   realmName: string | null
   /** Whether the Player could still claim their Horse offer when last sent (`CONTEXT.md`). */
   horseOffer: boolean
+  /** The realm's Workplace settings last sent, as JSON, so a tick sends them only when they changed. */
+  lastWorkSettings: string
   /** The Player's waypoints last sent, as JSON, so a tick sends them only when they changed. */
   lastWaypoints: string
 }
@@ -425,6 +427,7 @@ export function attachRealtime(
       leaderId: realm.leaderId,
       realmName: realm.name ?? null,
       horseOffer: !world.horseOffersClaimed.includes(user.id),
+      lastWorkSettings: '',
       lastWaypoints: JSON.stringify(waypointsOf(world, user.id)),
     }
     clients.set(socket, client)
@@ -446,6 +449,8 @@ export function attachRealtime(
     client.lastEventSeq = events.at(-1)?.seq ?? 0
     const diplomacy = diplomacyFor(world, realm.id, realmsSeen(entities))
     client.lastDiplomacy = JSON.stringify(diplomacy)
+    const workSettings = world.workplaceSettings[realm.id] ?? {}
+    client.lastWorkSettings = JSON.stringify(workSettings)
     send(socket, {
       type: 'welcome',
       account: client.account,
@@ -468,6 +473,7 @@ export function attachRealtime(
       horseOffer: client.horseOffer,
       waypoints: [...waypointsOf(world, user.id)],
       firstDay: readFirstDay(opts.db, user.id),
+      workSettings,
     })
   }
 
@@ -631,6 +637,10 @@ export function attachRealtime(
       if (named) client.realmName = realmName
       const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
       if (claimed) client.horseOffer = false
+      const workSettings = world.workplaceSettings[client.realmId] ?? {}
+      const settingsJson = JSON.stringify(workSettings)
+      const settingsChanged = settingsJson !== client.lastWorkSettings
+      client.lastWorkSettings = settingsJson
       // Only the Player's own waypoints, only when they changed (`CONTEXT.md`: Waypoint).
       const waypoints = waypointsOf(world, client.userId)
       const waypointsJson = JSON.stringify(waypoints)
@@ -647,6 +657,7 @@ export function attachRealtime(
         ...(newLeader ? { leaderId } : {}),
         ...(named ? { realmName } : {}),
         ...(claimed ? { horseOffer: false as const } : {}),
+        ...(settingsChanged ? { workSettings } : {}),
         ...(movedWaypoints ? { waypoints: [...waypoints] } : {}),
       }
       // `changed` and `gone` go last, as the JSON the realm's sockets in step share.

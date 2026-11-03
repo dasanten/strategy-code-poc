@@ -33,7 +33,7 @@ import {
   type Size,
 } from './map/camera.js'
 import { ChunkStore } from './map/chunks.js'
-import { selectedWay, wayInView } from './map/way.js'
+import { selectedWay, wayInView, wayLine } from './map/way.js'
 import { TerrainLayer } from './map/terrain-layer.js'
 import {
   holderAt,
@@ -113,7 +113,14 @@ import { Motion, motionTokens, workSway } from './map/motion.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
-import { roadJoins, roadWidth, wallWidths } from './map/roads.js'
+import {
+  FAR_ROAD_WIDTH,
+  farRoadRuns,
+  roadJoins,
+  roadWidth,
+  wallWidths,
+  type RoadRun,
+} from './map/roads.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
 import { drawPickPreview } from './map/preview-draw.js'
@@ -352,6 +359,8 @@ export function MapView({
     let miniDots: { world: MapWorld; dots: MinimapDot[] } | undefined
     // The admin map's far terrain: the overview, repeated so the map's sides join.
     let overviewSprite: TilingSprite | undefined
+    // The far tier's road lines, for the buildings in sight and last seen they were found from.
+    let farRoads: { buildings: unknown; seen: unknown; runs: RoadRun[] } | undefined
     // Under the tokens: grid, city areas, roads and walls; over them: piles, carts and residents.
     const under = new Graphics()
     const tokens = new TokenLayer()
@@ -643,9 +652,22 @@ export function MapView({
       }
     }
 
-    /** Far out: an emblem with a name per city, armies and caravans as small markers. */
+    /**
+     * Far out: the known roads as thin lines, an emblem with a name per city, armies and caravans
+     * as small markers, and the picked residents' ways.
+     */
     function drawFar(g: Graphics, cam: Camera, view: Size) {
       const world = worldRef.current
+      const seen = world.lastSeen?.buildings
+      if (farRoads?.buildings !== world.buildings || farRoads.seen !== seen) {
+        const known = [...world.buildings, ...(seen ?? [])]
+        farRoads = { buildings: world.buildings, seen, runs: farRoadRuns(known, mapSize) }
+      }
+      drawFarRoads(under, cam, view, mapSize, farRoads.runs)
+      for (const id of selectedRef.current) {
+        const r = world.residents.find((u) => u.id === id)
+        if (r) drawPath(g, cam, view, mapSize, r, world.residents)
+      }
       for (const m of world.admin?.markers ?? farMarkers(world)) {
         const [sx, sy] = tileToScreen(cam, view, mapSize, m.x + 0.5, m.y + 0.5)
         g.circle(sx, sy, MARKER_RADIUS)
@@ -1386,7 +1408,8 @@ function RegionLegend({ region }: { region: RegionState | null }) {
 
 /**
  * The selected resident's way ahead, as a line to the target (design: Main Game Screen); a
- * passenger's is the carriage's they are aboard (`selectedWay`).
+ * passenger's is the carriage's they are aboard (`selectedWay`). Far out the line is thin and its
+ * end a ringed dot, so it reads over the terrain (`CONTEXT.md`: Way on the map).
  */
 function drawPath(
   g: Graphics,
@@ -1399,20 +1422,57 @@ function drawPath(
   const way = selectedWay(r, residents)
   // Drawn wherever the resident is, as long as some of the way shows (they may be off screen).
   if (!way || !wayInView(cam, view, size, r, way)) return
-  const [tx, ty] = tileToScreen(cam, view, size, way.target.x + 0.5, way.target.y + 0.5)
-  if (way.path) {
-    let [px, py] = tileToScreen(cam, view, size, r.x + 0.5, r.y + 0.5)
-    g.moveTo(px, py)
-    for (const [x, y] of way.path) {
-      const [nx, ny] = tileToScreen(cam, view, size, x + 0.5, y + 0.5)
-      // A step across a join shows up far away on screen; don't draw a line across the map.
-      if (Math.hypot(nx - px, ny - py) < cam.scale * 1.5) g.lineTo(nx, ny)
-      else g.moveTo(nx, ny)
-      ;[px, py] = [nx, ny]
-    }
-    g.stroke({ width: 2.5, color: LEADER_COLOR, cap: 'round', join: 'round' })
+  const { lines, end } = wayLine(cam, view, size, r, way)
+  const far = zoomTier(cam.scale) === 'far'
+  for (const line of lines) {
+    g.moveTo(...line[0]!)
+    for (const p of line.slice(1)) g.lineTo(...p)
   }
-  g.circle(tx, ty, 5).fill(LEADER_COLOR)
+  if (lines.length > 0)
+    g.stroke({ width: far ? 1.5 : 2.5, color: LEADER_COLOR, cap: 'round', join: 'round' })
+  if (far)
+    g.circle(...end, FAR_WAY_END_RADIUS)
+      .fill(LEADER_COLOR)
+      .stroke({ width: 1.5, color: 0xffffff })
+  else g.circle(...end, 5).fill(LEADER_COLOR)
+}
+
+/** The end of a way far out: a dot in the way's colour with a white ring, in screen pixels. */
+const FAR_WAY_END_RADIUS = 4
+
+/**
+ * The far tier's road lines (`CONTEXT.md`: Roads far out): thin, the same width at every far zoom,
+ * under the emblems and markers. Runs wholly off screen are skipped.
+ */
+function drawFarRoads(
+  under: Graphics,
+  cam: Camera,
+  view: Size,
+  size: number,
+  runs: readonly RoadRun[],
+) {
+  const pad = FAR_ROAD_WIDTH
+  const off = (x0: number, y0: number, x1: number, y1: number) =>
+    Math.max(x0, x1) < -pad ||
+    Math.max(y0, y1) < -pad ||
+    Math.min(x0, x1) > view.width + pad ||
+    Math.min(y0, y1) > view.height + pad
+  let lines = false
+  let dots = false
+  for (const r of runs) {
+    const [sx, sy] = tileToScreen(cam, view, size, r.x + 0.5, r.y + 0.5)
+    const [ex, ey] = [sx + r.dx * r.n * cam.scale, sy + r.dy * r.n * cam.scale]
+    if (off(sx, sy, ex, ey)) continue
+    if (r.n === 0) {
+      under.circle(sx, sy, FAR_ROAD_WIDTH / 2)
+      dots = true
+    } else {
+      under.moveTo(sx, sy).lineTo(ex, ey)
+      lines = true
+    }
+  }
+  if (dots) under.fill(ROAD_COLOR)
+  if (lines) under.stroke({ width: FAR_ROAD_WIDTH, color: ROAD_COLOR, cap: 'round' })
 }
 
 /** Where the view starts and re-centres: the middle of the Player's home city. */

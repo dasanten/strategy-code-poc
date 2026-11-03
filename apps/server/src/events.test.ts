@@ -21,7 +21,7 @@ const terrain = cityTerrain()
 const storageOf = (world: WorldState) => world.buildings.find((b) => b.kind === 'storage')!
 
 describe('realm events', () => {
-  it('logs each resident going hungry once, then deaths until the Leader’s ends the realm', () => {
+  it('logs each resident going hungry once and Down once, then deaths until the Leader’s ends the realm', () => {
     const { world } = worldWithCity()
     const realm = world.realms[0]!
     const people = world.residents.map((r) => r.id)
@@ -33,9 +33,15 @@ describe('realm events', () => {
       for (const r of stepSurvival(world, terrain).died) deaths.push({ id: r.id, tick: world.tick })
       world.tick++
     }
+    // Everyone is Down; on to when the last of them is due.
+    expect(deaths).toEqual([])
+    world.tick = Math.max(...world.residents.map((r) => r.downUntil!))
+    for (const r of stepSurvival(world, terrain).died) deaths.push({ id: r.id, tick: world.tick })
     const log = eventsFor(world, realm.userId)
     const hungry = log.filter((e) => e.kind === 'hungry')
     expect(hungry.map((e) => e.kind === 'hungry' && e.residentId).sort()).toEqual(people.sort())
+    const down = log.filter((e) => e.kind === 'down')
+    expect(down.map((e) => e.kind === 'down' && e.residentId).sort()).toEqual(people.sort())
     // Deaths reach the Player until their Leader's, those on the same tick included; after it
     // the residents belong to nobody.
     const leaderDied = deaths.find((d) => d.id === realm.leaderId)!.tick

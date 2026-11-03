@@ -209,6 +209,7 @@ describe('script views', () => {
       floor: 'floor(2.5)',
       pickRandom: 'pickRandom(["food"])',
       fits: 'fits("food")',
+      inputToFetch: 'inputToFetch(building("s1"))',
       breedingPair: 'breedingPair(building("s1"))',
       storages: 'storages()',
       walkTime: 'walkTime(me, building("s1"))',

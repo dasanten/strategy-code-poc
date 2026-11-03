@@ -323,6 +323,7 @@ describe('Work from the UI', () => {
     expect(world.residents[0]!.script).toEqual({
       scriptId: workId(),
       memory: { workplaceId: 'farm' },
+      settingsFrom: 'farm',
     })
   })
 

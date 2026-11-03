@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  FEED_UNITS,
   GOODS,
   HAUL_KEEP_FOOD,
   type BuildingKind,
@@ -121,6 +122,7 @@ export function AddStep({
           <HorsesAsk horses={horses} onAnswer={(horseIds) => onAnswer({ ask, horseIds })} />
         )}
         {ask === 'haul' && <HaulAsk onAnswer={(setup) => onAnswer({ ask, setup })} />}
+        {ask === 'units' && <UnitsAsk onAnswer={(units) => onAnswer({ ask, units })} />}
         {ask === 'subject' && (
           <SubjectPicker action="Add" onPick={(subject) => onAnswer({ ask, subject })} />
         )}
@@ -163,6 +165,32 @@ export function AddStep({
         </>
       )}
     </section>
+  )
+}
+
+/** How many units of Food to Feed someone Down with (`CONTEXT.md`: Reviving). */
+function UnitsAsk({ onAnswer }: { onAnswer: (units: number) => void }) {
+  const [units, setUnits] = useState(FEED_UNITS)
+  return (
+    <div className="order-buttons">
+      <input
+        type="number"
+        min={1}
+        step={1}
+        value={units}
+        aria-label="Units of Food"
+        onChange={(e) => setUnits(Number(e.target.value))}
+        style={{ width: '5em' }}
+      />
+      <button
+        type="button"
+        className="primary"
+        disabled={!Number.isInteger(units) || units < 1}
+        onClick={() => onAnswer(units)}
+      >
+        Add
+      </button>
+    </div>
   )
 }
 

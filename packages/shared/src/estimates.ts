@@ -58,8 +58,9 @@ export interface ArrivalWorld {
 /**
  * About how many ticks until a walking, riding or driving resident arrives (`CONTEXT.md`: Doing,
  * Estimates): their way still to go, at the pace that applies on each tile today, from the same
- * rules the server moves them by (`walkSpeed`, `rideSpeed`, `driveSpeed`). Undefined while
- * they go nowhere or their way is still being found.
+ * rules the server moves them by (`walkSpeed`, `rideSpeed`, `driveSpeed`). A store or fetch order
+ * counts while it walks to its place. Undefined while they go nowhere or their way is still being
+ * found.
  */
 export function arrivalTicks(world: ArrivalWorld, r: Resident): number | undefined {
   const o = r.order
@@ -67,11 +68,12 @@ export function arrivalTicks(world: ArrivalWorld, r: Resident): number | undefin
     o?.kind === 'walkTo' ||
     o?.kind === 'relocate' ||
     o?.kind === 'drive' ||
-    (o?.kind === 'haul' && o.phase === 'driving')
+    (o?.kind === 'haul' && o.phase === 'driving') ||
+    ((o?.kind === 'store' || o?.kind === 'fetch') && o.phase === 'walking')
   if (!moving || !o.path) return undefined
   const slowest = walkSpeed(r, Terrain.Mountain, world.tick)
   let pace: (g: Terrain) => number
-  if (o.kind === 'walkTo' || o.kind === 'relocate') {
+  if (o.kind !== 'drive' && o.kind !== 'haul') {
     const horse = horseRidden(world, r)
     pace = horse
       ? (g) => rideSpeed(r, { stats: horse.stats, hunger: horse.hunger ?? MAX_HUNGER }, g)

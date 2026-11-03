@@ -10,6 +10,11 @@ import {
   HORSE_HUNGRY_SHARE,
   PASSENGER_WEIGHT,
   carriageCapacity,
+  isDown,
+  feedProblem,
+  MAP_SIZE,
+  NO_CHILD_FEEDS,
+  NO_FOOD_TO_FEED,
   horseAgeInYears,
   horseFoodFactor,
   MAX_HEALTH,
@@ -54,6 +59,12 @@ import {
   type MercenaryContract,
   type SeenResident,
   type SeenCarriage,
+  type HaulOrder,
+  type GoodsPlace,
+  type GoodsWanted,
+  aboutTime,
+  drivenCarriageId,
+  workLeft,
   type LoadLevel,
   type Horse,
   type SeenHorse,
@@ -80,6 +91,7 @@ import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
+import { horseDownLine } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
 import type { Picking } from './Residents.js'
@@ -113,6 +125,7 @@ export type ActionId =
   | 'goods'
   | 'pair'
   | 'attack'
+  | 'feed'
   | 'walls'
   | 'script'
   | 'makeLeader'
@@ -148,6 +161,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   goods: 'G',
   pair: 'P',
   attack: 'A',
+  feed: 'O',
   walls: 'C',
   script: 'X',
   makeLeader: 'L',
@@ -186,6 +200,8 @@ export interface ResidentHere {
   /** They belong to a city, so they can pair. */
   inCity: boolean
   carriage?: Carriage
+  /** The horse hitched to that carriage is Down (`CONTEXT.md`: Down), so it can't be driven. */
+  carriageHorseDown?: boolean
   pile?: Pile
   storage?: Building
   /** The building or construction site on their tile, not a road. */
@@ -230,6 +246,14 @@ export interface ResidentHere {
   carrying?: boolean
   /** They carry goods, so there is something to drop or store. */
   carries?: boolean
+  /** What anyone Down on their tile carries, which they can take (`CONTEXT.md`: Down). */
+  downCarrying?: Stock[]
+  /** They are Down (`CONTEXT.md`: Down) and take no orders. */
+  down?: boolean
+  /** Others in sight who are Down on or next to their tile, whom they could Feed (`CONTEXT.md`: Reviving). */
+  downNear?: number
+  /** They have Food in their hands, to Feed someone Down with. */
+  carriesFood?: boolean
 }
 
 /**
@@ -253,11 +277,29 @@ export function residentActions(h: ResidentHere): CardAction[] {
   return residentOrders(h).actions
 }
 
+/** Why a carriage whose horse is Down can't be driven (`CONTEXT.md`: Down). */
+export const HORSE_DOWN_NO_DRIVE = 'its horse is Down'
+
+/** Why a Down resident's card offers no orders (`CONTEXT.md`: Down). */
+export const DOWN_NO_ORDERS = 'Down: takes no orders'
+
 /**
  * The actions a resident's card offers (`residentActions`), and why each order left out can't be
- * given now: the reason its row shows greyed while the card stays open (ADR 0019).
+ * given now: the reason its row shows greyed while the card stays open (ADR 0019). Someone Down
+ * gets none (`CONTEXT.md`: Down).
  */
 export function residentOrders(h: ResidentHere): {
+  actions: CardAction[]
+  missing: Partial<Record<ActionId, string>>
+} {
+  const orders = ordersOffered(h)
+  if (!h.down) return orders
+  const ids = [...orders.actions.map((a) => a.id), ...(Object.keys(orders.missing) as ActionId[])]
+  return { actions: [], missing: Object.fromEntries(ids.map((id) => [id, DOWN_NO_ORDERS])) }
+}
+
+/** The orders a resident's card offers while they aren't Down (`residentOrders`). */
+function ordersOffered(h: ResidentHere): {
   actions: CardAction[]
   missing: Partial<Record<ActionId, string>>
 } {
@@ -304,10 +346,16 @@ export function residentOrders(h: ResidentHere): {
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
   if (h.carriage && h.adult) {
-    // A rider doesn't drive (`CONTEXT.md`: Riding).
-    const riding = h.riding ? { disabled: true as const, reason: 'dismount first to drive' } : {}
-    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...riding }))
-    if (!h.carrying) {
+    // A rider doesn't drive (`CONTEXT.md`: Riding), and a Down horse pulls nothing (Down).
+    const refused = (reason: string) => ({ disabled: true as const, reason })
+    const unable = h.riding
+      ? refused('dismount first to drive')
+      : h.carriageHorseDown
+        ? refused(HORSE_DOWN_NO_DRIVE)
+        : {}
+    add(row('drive', '', { ...picks('drive', 'Drive carriage to'), ...unable }))
+    if (h.carriageHorseDown) miss('haul', HORSE_DOWN_NO_DRIVE)
+    else if (!h.carrying) {
       const label = h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…'
       add(row('haul', label, { opens: true }))
     } else miss('haul', CARRYING_A_CHILD)
@@ -360,6 +408,11 @@ export function residentOrders(h: ResidentHere): {
   if (h.carries || goodsOnTile(h, h.adult ? GOODS : CHILD_GOODS)) {
     add(row('goods', 'Goods…', { opens: true }))
   } else miss('goods', 'nothing carried or here to pick up')
+  // Anyone Down nearby, of any realm (`CONTEXT.md`: Reviving).
+  if (h.downNear) {
+    const reason = !h.adult ? NO_CHILD_FEEDS : !h.carriesFood ? NO_FOOD_TO_FEED : undefined
+    add(row('feed', 'Feed…', { opens: true, ...(reason ? { disabled: true, reason } : {}) }))
+  } else miss('feed', 'nobody Down nearby')
   if (works && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   else miss('pair', works ? 'homeless' : unfit('pair'))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
@@ -382,7 +435,7 @@ export function residentOrders(h: ResidentHere): {
 
 /**
  * Whether there are some of `goods` on a resident's tile to pick up: on the ground, stored, at a
- * site or on a carriage.
+ * site, on a carriage or carried by someone Down there.
  */
 function goodsOnTile(h: ResidentHere, goods: readonly Good[]): boolean {
   const some = (stock: Stock | undefined) => !!stock && goods.some((g) => (stock[g] ?? 0) > 0)
@@ -392,7 +445,8 @@ function goodsOnTile(h: ResidentHere, goods: readonly Good[]): boolean {
     some(h.building?.site?.delivered) ||
     some(h.carriageSite?.site?.delivered) ||
     some(h.road?.site?.delivered) ||
-    some(h.carriage?.load)
+    some(h.carriage?.load) ||
+    (h.downCarrying ?? []).some(some)
   )
 }
 
@@ -429,6 +483,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   tearDown: 'work',
   breed: 'work',
   goods: 'goods',
+  feed: 'goods',
   script: 'scripts',
 }
 
@@ -644,28 +699,36 @@ export interface TileCard {
    */
   renameHorses?: { id: string; name: string }[]
   /**
-   * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
-   * and what they saw of it then, shown apart from the lines about what is there now.
+   * Residents in sight lying Down on the tile, of any realm, whom the resident picked last may
+   * Feed (`CONTEXT.md`: Reviving).
    */
-  lastSeen?: { when: string; lines: string[] }
+  downHere?: { id: string; name: string; x: number; y: number; down: true }[]
   /**
-   * The carriage's passengers (`CONTEXT.md`: Passenger), written out on `lines[line]`: each by
-   * name, a link that picks them when they are the Player's to command (`pick`), and what they
-   * weigh together of what it holds.
+   * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
+   * and what they saw of it then (what it held, a site's materials, as lists), shown apart from
+   * the lines and lists about what is there now.
    */
-  passengers?: {
-    line: number
-    residents: { id: string; name: string; pick: boolean }[]
-    weight: string
-  }
+  lastSeen?: { when: string; lines: string[]; lists: CardList[]; sites?: SiteView[] }
+  /** The carriage on the tile, as rows and meters (`CONTEXT.md`: Goods on cards). */
+  carriage?: CarriageView
   /**
    * The carriage on the tile with a horse hitched, and the Player's residents on it who may
    * unhitch the horse (`unhitchProblem`), when there are any (`CONTEXT.md`: Hitched horse).
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
   /**
-   * Who and what the tile holds, as rows under the card's lines: the horses in a stable or on the
-   * tile, a workplace's workers, the goods in a storage.
+   * The construction sites on the tile, the building's own and a carriage's on a stable, as a work
+   * meter and a row per material (`CONTEXT.md`: Goods on cards).
+   */
+  sites?: SiteView[]
+  /**
+   * Each Down resident on the tile who carries anything, with what they carry, and the Player's
+   * residents on the tile who may take it, as from a pile (`CONTEXT.md`: Down).
+   */
+  downGoods?: { residentId: string; name: string; goods: Stock; takers: SeenResident[] }[]
+  /**
+   * Who and what the tile holds, under the card's lines: the horses in a stable or on the tile and
+   * a workplace's crew as rows; the goods in a storage and a pile as goods grids.
    */
   lists?: CardList[]
   /**
@@ -675,26 +738,79 @@ export interface TileCard {
   stableFood?: { units: number; share: number; lasts: string }
 }
 
+/** Someone the card names, a link that picks them when they are the Player's to command. */
+export interface NamedResident {
+  id: string
+  name: string
+  pick: boolean
+}
+
+/**
+ * A carriage on the tile card (`CONTEXT.md`: Goods on cards): its load against what it holds, its
+ * horse with hunger, its driver and passengers, and its haul route. Only what the Player may see
+ * (`CONTEXT.md`: Seeing inside a storage, Seeing how someone fares).
+ */
+export interface CarriageView {
+  /** Its section's head: "Carriage (yours)". */
+  title: string
+  /**
+   * How full it is: "40 / 60 kg" with the share for a meter when the Player sees inside, else
+   * only how heavily it is loaded ("half loaded"), with no meter.
+   */
+  load: { text: string; share?: number }
+  /** What it holds, for the goods grid, when the Player sees inside. */
+  goods?: Stock
+  /** Its horse as a row of its own, with health and hunger where the Player knows them. */
+  horse?: CardList
+  /** Said instead of a horse row: "No horse hitched", or "Horse hitched" with it out of sight. */
+  noHorse?: string
+  driver?: NamedResident
+  /** Its passengers in sight, and what they weigh of what it holds: "160 kg of it people". */
+  passengers?: { residents: NamedResident[]; weight: string }
+  /**
+   * The haul route its driver drives, when that driver is the Player's (`CONTEXT.md`: Haul route,
+   * Estimates): "Eastmere storage → Eastmere mine", and the leg it is on or what it does at a
+   * stop: "Leg 1 of 2 · about 3 min (3 game hours)", "Loading at Eastmere storage".
+   */
+  route?: { stops: string; leg: string }
+}
+
+/**
+ * A construction site on the tile card (`CONTEXT.md`: Goods on cards, Construction site): its work
+ * done as a meter with how long is left, and what it has against what it needs, per good.
+ */
+export interface SiteView {
+  /** Its section's head, where the card is named after something else: "Carriage site". */
+  title?: string
+  /**
+   * The work done: "40%", the share for its meter, and about how long is left at the pace of
+   * those building it now (`workLeft`); no estimate for a site only remembered.
+   */
+  work: { text: string; share: number; left?: string }
+  /** Each material it takes, in the usual order: what was delivered against what it needs. */
+  materials: { good: Good; have: number; need: number }[]
+}
+
 /** A list of rows on the tile card (`TileCard.lists`), its head with a count on the right. */
 export interface CardList {
   title: string
   /** On the right of the title: "2 · 1 hungry", "7 / 10". */
   count: string
-  /** What shows with no rows. */
+  /** What shows with no rows (or no goods). */
   empty?: string
   /** The meters each row has, by name, as the resident card shows them: Health, Hunger. */
   meters: readonly string[]
   rows: CardRow[]
+  /** An inventory, shown as the goods grid in place of rows (`CONTEXT.md`: Goods on cards). */
+  goods?: Stock
 }
 
-/** One row of a `CardList`: a horse, a worker or a good. */
+/** One row of a `CardList`: a horse or one of a workplace's crew. */
 export interface CardRow {
   id: string
   name: string
-  /** Under the name: a horse's stats and age, whose a worker is. */
+  /** Under the name: a horse's stats and age, what one of a crew is doing and whose they are. */
   detail?: string
-  /** How much of a good. */
-  amount?: number
   /**
    * Each of the list's meters filled to this share, undefined where the Player doesn't know how
    * they fare (`CONTEXT.md`: Seeing how someone fares).
@@ -741,6 +857,13 @@ export interface TileThings {
   tick?: number
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
+  /**
+   * About how many ticks until one of the Player's residents arrives where they drive
+   * (`arrivalTicks`), for a haul route's leg.
+   */
+  arrivesIn?: (r: SeenResident) => number | undefined
+  /** The armies the Player knows, by name, for a haul route to one (`CONTEXT.md`: Supply line). */
+  armies?: readonly { id: string; name: string }[]
   /** The buildings the Player remembers out of sight, and the tick now (`CONTEXT.md`: Last seen). */
   lastSeen?: { buildings: LastSeenBuilding[]; tick: number }
   /** Where the node's workplace fits on what the Player knows (`nodeFit`), if anywhere. */
@@ -883,11 +1006,13 @@ export function horseAgeText(h: SeenHorse, tick: number): string {
 
 /**
  * A horse's stats and age, and how it fares where the Player knows it (`CONTEXT.md`: Horse stats,
- * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy".
+ * Seeing how someone fares): "Speed 12, Strength 8, Endurance 10 · 5 years old · fed, healthy",
+ * or for a Down horse that it is Down and how long it has left (`horseDownLine`).
  */
 export function horseDetail(h: SeenHorse, tick: number | undefined): string {
   const parts = [horseStatsText(h, tick)]
-  if (horseFaresKnown(h)) {
+  if (isDown(h)) parts.push(horseDownLine(h, tick))
+  else if (horseFaresKnown(h)) {
     const fares = horseFares(h)
     parts.push(`${fares.hunger}, ${fares.health}`)
   }
@@ -918,7 +1043,8 @@ export function riddenHorseLine(
 
 /**
  * Lists for horses standing together, one per owner: "Horses (yours)" with "2 · 1 hungry" on the
- * right, then a row for each with its stats and age (`horseStatsText`) and its health and hunger
+ * right, then a row for each with its stats and age (`horseStatsText`), led for a Down horse by
+ * that it is Down and how long it has left (`horseDownLine`), and its health and hunger
  * meters where the Player knows how it fares (`CONTEXT.md`: Seeing how someone fares). A click on
  * one of the Player's own opens it in the Horses drawer.
  */
@@ -936,9 +1062,14 @@ function horseLists(
     const r = rel(group[0]!)
     const owner = r ? RELATIONSHIP_NAMES[r].toLowerCase() : 'nobody’s'
     const parts = [`${group.length}`]
-    const known = group.filter(horseFaresKnown).map(horseFares)
+    const down = group.filter(isDown).length
+    const known = group
+      .filter(horseFaresKnown)
+      .filter((h) => !isDown(h))
+      .map(horseFares)
     const hungry = known.filter((f) => f.hunger !== 'fed').length
     const hurt = known.filter((f) => f.health === 'hurt').length
+    if (down > 0) parts.push(`${down} Down`)
     if (hungry > 0) parts.push(`${hungry} hungry`)
     if (hurt > 0) parts.push(`${hurt} hurt`)
     return {
@@ -950,7 +1081,9 @@ function horseLists(
         return {
           id: h.id,
           name: h.name,
-          detail: horseStatsText(h, tick),
+          detail: isDown(h)
+            ? `${horseDownLine(h, tick)} · ${horseStatsText(h, tick)}`
+            : horseStatsText(h, tick),
           ...(shares ? { shares } : {}),
           ...(r === 'own' ? { opens: 'horse' as const } : {}),
         }
@@ -960,27 +1093,36 @@ function horseLists(
 }
 
 /**
- * A workplace's workers in sight (`CONTEXT.md`: Workplace): "Workers" with "7 / 10" on the right,
- * then a row for each with their health and hunger where the Player knows them. A click on one of
- * the Player's own opens their card.
+ * A workplace's crew in sight (`CONTEXT.md`: Workplace, Goods on cards): "Crew" with "2 / 10" at
+ * work on the right and how many are away, then a row for each with what they are doing (working,
+ * carrying a load, fetching) and their health and hunger where the Player knows them. The crew
+ * are those working it, and the Player's own whose script works it (its `workplace` param) while
+ * they are away carrying its output, fetching or on their way. A click on one of the Player's
+ * own opens their card.
  */
-function workerList(b: Building, max: number, t: TileThings): CardList {
-  const working = (t.residents ?? []).filter(
-    (r) => r.order?.kind === 'workAt' && r.order.buildingId === b.id,
-  )
+function crewList(
+  b: Building,
+  max: number,
+  t: TileThings,
+  labels: Record<string, string>,
+): CardList {
+  const working = (r: SeenResident) => r.order?.kind === 'workAt' && r.order.buildingId === b.id
+  const crew = (t.residents ?? []).filter((r) => working(r) || r.script?.params?.workplace === b.id)
+  const away = crew.filter((r) => !working(r)).length
   return {
-    title: 'Workers',
-    count: `${t.workers(b)} / ${max}`,
+    title: 'Crew',
+    count: `${t.workers(b)} / ${max}${away > 0 ? ` · ${away} away` : ''}`,
     empty: 'Nobody works here',
     meters: FARES_METERS,
-    rows: working.map((r) => {
+    rows: crew.map((r) => {
       const stranger = t.strangers.some((s) => s.id === r.id)
       const rel = stranger ? realmRelationship(r.owner, r.cityId, t.cities, t.viewer) : 'own'
       const shares = faresShares(r)
+      const whose = stranger ? ` · ${rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s'}` : ''
       return {
         id: r.id,
         name: r.name,
-        ...(stranger ? { detail: rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s' } : {}),
+        detail: `${crewDoing(r, b, labels)}${whose}`,
         ...(shares ? { shares } : {}),
         ...(stranger ? {} : { opens: 'resident' as const }),
       }
@@ -988,19 +1130,106 @@ function workerList(b: Building, max: number, t: TileThings): CardList {
   }
 }
 
-/** A storage's goods, one row each as the Goods panel lists them, and what they weigh. */
-function goodsList(stock: Stock, labels: Record<string, string>): CardList {
+/**
+ * What one of a workplace's crew is doing, by their order: "Working", "Carrying a load" (storing
+ * its output), "Fetching iron ore" (inputs, or Food), "On the way", else "Idle".
+ */
+function crewDoing(r: SeenResident, b: Building, labels: Record<string, string>): string {
+  const o = r.order
+  if (o?.kind === 'workAt' && o.buildingId === b.id) return 'Working'
+  if (o?.kind === 'store') return 'Carrying a load'
+  if (o?.kind === 'fetch') {
+    const goods = GOODS.filter((g) => g in o.goods).map((g) => labels[g]!.toLowerCase())
+    return goods.length > 0 ? `Fetching ${goods.join(', ')}` : 'Fetching'
+  }
+  return o ? 'On the way' : 'Idle'
+}
+
+/**
+ * Who of the Player's own residents is on the way to a storage or stable (`CONTEXT.md`: Goods on
+ * cards): walking there to store or fetch, getting food there, or driving a haul route's carriage
+ * to it as the next stop; each with what for and about when they arrive, soonest first. Undefined
+ * while nobody is.
+ */
+export function onTheWayList(
+  b: Building,
+  t: TileThings,
+  goodLabels: Record<string, string>,
+): CardList | undefined {
+  const label = (g: string) => (goodLabels[g] ?? g).toLowerCase()
+  const named = (goods: readonly Good[]) => goods.map(label).join(', ')
+  // "10 wood, stone": units where the order names them.
+  const wanted = (goods: GoodsWanted) =>
+    Object.entries(goods)
+      .map(([g, n]) => (n == null ? label(g) : `${n} ${label(g)}`))
+      .join(', ')
+  const coming = (t.residents ?? []).flatMap((r) => {
+    if (t.strangers.some((s) => s.id === r.id)) return []
+    const o = r.order
+    let what: string | undefined
+    let path: readonly unknown[] | null = null
+    if (o?.kind === 'store' && o.phase === 'walking' && storageIs(o.to, b)) {
+      what = `Store · ${wanted(o.goods)}`
+      path = o.path
+    } else if (o?.kind === 'fetch' && o.phase === 'walking' && storageIs(o.from, b)) {
+      // Getting food hands over to Fetch for Food alone (`CONTEXT.md`: Getting food).
+      const food = Object.keys(o.goods).every((g) => g === 'food')
+      what = food ? 'Getting food' : `Fetch · ${wanted(o.goods)}`
+      path = o.path
+    } else if (o?.kind === 'haul' && o.phase === 'driving' && covers(b, o[o.stop].x, o[o.stop].y)) {
+      // At `to` the hauled goods come off and the return goods go on; at `from` the other way.
+      const [brings, takes] = o.stop === 'to' ? [o.goods, o.returnGoods] : [o.returnGoods, o.goods]
+      what = [
+        'Haul',
+        ...(brings.length > 0 ? [`brings ${named(brings)}`] : []),
+        ...(takes.length > 0 ? [`takes ${named(takes)}`] : []),
+      ].join(' · ')
+      path = o.path
+    }
+    if (!what) return []
+    const ticks = path ? t.arrivesIn?.(r) : undefined
+    return [{ r, what, ticks, eta: wayLeft(path, ticks) }]
+  })
+  if (coming.length === 0) return undefined
+  coming.sort((x, y) => (x.ticks ?? Infinity) - (y.ticks ?? Infinity))
   return {
-    title: 'Goods',
-    count: `${Math.round(stockWeight(stock))} kg`,
-    empty: 'Nothing in it',
+    title: 'On the way',
+    count: `${coming.length}`,
     meters: [],
-    rows: GOODS.filter((g) => (stock[g] ?? 0) > 0).map((g) => ({
-      id: g,
-      name: labels[g]!,
-      amount: stock[g]!,
+    rows: coming.map(({ r, what, eta }) => ({
+      id: r.id,
+      name: r.name,
+      detail: `${what} · ${eta}`,
+      opens: 'resident' as const,
     })),
   }
+}
+
+/** Whether a store or fetch order's place is the storage or stable `b`. */
+function storageIs(place: GoodsPlace, b: Building): boolean {
+  return place.kind === 'storage' && place.storageId === b.id
+}
+
+/**
+ * How much of a way is left (`CONTEXT.md`: Estimates): about when they arrive, else how many
+ * tiles there are still to go, or that the way is still being found.
+ */
+function wayLeft(path: readonly unknown[] | null, ticks: number | undefined): string {
+  if (!path) return 'finding the way'
+  return ticks === undefined ? `${path.length} tiles to go` : aboutTime(ticks)
+}
+
+/**
+ * An inventory on the card as the goods grid (`CONTEXT.md`: Goods on cards): a storage's goods, a
+ * pile, a site's materials; by default with what they weigh on the right.
+ */
+function goodsList(
+  title: string,
+  stock: Stock,
+  empty: string,
+  count = `${Math.round(stockWeight(stock))} kg`,
+): CardList {
+  return { title, count, empty, meters: [], rows: [], goods: stock }
 }
 
 /**
@@ -1093,11 +1322,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     .map(({ id, name }) => ({ id, name }))
   const lines: string[] = []
   const lists: CardList[] = []
+  const sites: SiteView[] = []
   let stableFood: TileCard['stableFood']
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
-  let passengers: TileCard['passengers']
   let unhitch: TileCard['unhitch']
+  let carriageView: CarriageView | undefined
   if (building) {
     const city = cityOf(building)
     // An outpost storage goes by its own realm (`CONTEXT.md`: Outpost storage).
@@ -1114,16 +1344,10 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
           : undefined,
     }
     lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
-    if (building.site) {
-      const work = BUILD_WORK[building.kind] ?? 0
-      const done = work > 0 ? Math.floor((building.site.work / work) * 100) : 100
-      lines.push(
-        `${done}% of the work done · delivered ${goodsText(building.site.delivered, goodLabels)}`,
-      )
-      lines.push(stillNeeded(building, goodLabels))
-    } else {
+    if (building.site) sites.push(describeSite(building, live ? t : undefined))
+    else {
       const max = MAX_WORKERS[building.kind]
-      if (max !== undefined && live) lists.push(workerList(live, max, t))
+      if (max !== undefined && live) lists.push(crewList(live, max, t, goodLabels))
       // A house's room (`CONTEXT.md`: House), and how its city is housed where the Player may know.
       const room = HOUSING_ROOM[building.kind]
       if (room !== undefined) {
@@ -1137,18 +1361,19 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         lists.push(...horseLists(horsesHere, horseRel, t.tick))
         lines.push(`Room for ${Math.max(0, STABLE_CAPACITY - horsesHere.length)} more horses`)
       }
-      const makes = live && makesLine(live, t, pile, goodLabels)
+      const makes = live && makesLine(live, t, goodLabels)
       if (makes) lines.push(makes)
       // A finished training ground teaches what its teacher set, and nothing while nobody
       // teaches there (`CONTEXT.md`: Training ground, Teacher).
       if (building.kind === 'trainingGround') lines.push(...trainingLines(building, t))
-      // What is inside a building in sight as rows, a stable's Food as a meter; as last seen, a line.
-      if (building.stock && !live) lines.push(`Holds ${goodsText(building.stock, goodLabels)}`)
-      else if (building.stock && stable) {
+      // What is inside a building as the goods grid, a stable's Food as a meter.
+      if (building.stock && stable) {
         stableFood = stableFoodMeter(building.stock.food ?? 0, horsesHere)
         const rest: Stock = { ...building.stock, food: 0 }
-        if (GOODS.some((g) => (rest[g] ?? 0) > 0)) lists.push(goodsList(rest, goodLabels))
-      } else if (building.stock) lists.push(goodsList(building.stock, goodLabels))
+        if (GOODS.some((g) => (rest[g] ?? 0) > 0)) lists.push(goodsList('Goods', rest, ''))
+      } else if (building.stock) lists.push(goodsList('Goods', building.stock, 'Nothing in it'))
+      const coming = live?.stock && onTheWayList(live, t, goodLabels)
+      if (coming) lists.push(coming)
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
@@ -1172,78 +1397,38 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       card.lastSeen = {
         when: lastSeenText(remembered.seenAt, t.lastSeen.tick),
         lines: lines.splice(0),
+        lists: lists.splice(0),
+        ...(sites.length > 0 ? { sites: sites.splice(0) } : {}),
       }
     }
   }
   if (carriageSite?.site) {
     // A carriage site has no owner (`CONTEXT.md`: Construction site), even on a stable.
+    // On a stable's card under a head of its own.
+    const head = card ? { title: 'Carriage site' } : {}
     card ??= { title: 'Carriage site', what: 'building' }
-    const work = BUILD_WORK.carriage ?? 0
-    const done = work > 0 ? Math.floor((carriageSite.site.work / work) * 100) : 100
-    lines.push(
-      `Carriage site · ${done}% of the work done · delivered ${goodsText(carriageSite.site.delivered, goodLabels)}`,
-    )
-    lines.push(stillNeeded(carriageSite, goodLabels))
+    sites.push({ ...head, ...describeSite(carriageSite, t) })
     if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
   }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
-    card ??= { title: 'Carriage', rel, what: 'carriage' }
-    // Its passengers, as many as are in sight (they are on its tile, `CONTEXT.md`: Passenger).
-    const aboard = (carriage.passengerIds ?? []).flatMap((id) => {
-      const r = t.residents?.find((x) => x.id === id)
-      return r ? [{ id, name: r.name, pick: !t.strangers.some((s) => s.id === id) }] : []
-    })
-    const people = aboard.length * PASSENGER_WEIGHT
-    // Its load only when the Player sees inside (`CONTEXT.md`: Seeing inside a storage), its
-    // passengers counted in.
-    const capacity = carriageCapacity(t, carriage)
-    const load = carriage.load
-      ? `${Math.round(stockWeight(carriage.load) + people)} / ${Math.round(capacity)} kg`
-      : LOAD_LEVEL_NAMES[carriage.loadLevel]
-    // How its horse fares only for the Player's own and allies' (`CONTEXT.md`: Seeing how someone fares).
-    const horse = t.horses.find((h) => h.id === carriage.horseId)
-    const fares = horse && horseFaresKnown(horse) ? horseFares(horse) : undefined
-    const ours = rel === 'own' || rel === 'alliance'
-    // Who pulls it, by name, when the horse is in sight (`CONTEXT.md`: Horse name).
-    const horseText = !carriage.horseId
-      ? ours
-        ? ' · no horse hitched'
-        : ' · no horse'
-      : horse
-        ? ` · pulled by ${horse.name}`
-        : ' · horse hitched'
-    lines.push(
-      `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''} · ${load}${horseText}`,
-    )
-    if (aboard.length > 0) {
-      const weight = `${Math.round(people)} kg of it people`
-      passengers = { line: lines.length, residents: aboard, weight }
-      lines.push(`Passengers: ${aboard.map((p) => p.name).join(', ')} · ${weight}`)
+    // On a card of its own, its owner is the card's first line, as a building's.
+    if (!card) {
+      card = { title: 'Carriage', rel, what: 'carriage' }
+      lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
     }
+    carriageView = describeCarriage(carriage, rel, t)
     const own = (t.residents ?? []).filter(
       (r) => !t.strangers.some((s) => s.id === r.id) && !unhitchProblem(r, carriage, t.tick ?? 0),
     )
     if (own.length > 0) {
       unhitch = { carriageId: carriage.id, residents: own.map(({ id, name }) => ({ id, name })) }
     }
-    if (horse) {
-      const parts = [`Horse: ${horse.name} · ${horseDetail(horse, t.tick)}`]
-      if (fares) {
-        const food = carriage.load?.food ?? 0
-        const days = Math.floor(food / (HORSE_FOOD_PER_DAY * horseFoodFactor(horse)) + 1e-9)
-        const feeds =
-          days <= 0
-            ? 'Food on board for less than a game day'
-            : `Food on board for ${days} game ${days === 1 ? 'day' : 'days'}`
-        parts.push(food > 0 ? feeds : 'no Food on board')
-      }
-      lines.push(parts.join(' · '))
-    }
   }
   if (pile) {
     card ??= { title: 'Goods on the ground', what: 'pile' }
-    lines.push(`On the ground: ${goodsText(pile.goods, goodLabels)}`)
+    // At a building it is the building's pile (`CONTEXT.md`: A building's pile).
+    lists.push(goodsList(building ? 'Pile' : 'On the ground', pile.goods, 'Nothing'))
   }
   if (t.node) {
     const kindName = nodeKindName(t.node)
@@ -1266,10 +1451,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (t.strangers.length === 1) {
       const gear = gearText(r, goodLabels)
       lines.push(
-        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${gear ? ` · ${gear}` : ''}`,
+        `${r.name}${rel ? ` · ${RELATIONSHIP_NAMES[rel]}` : ''}${isDown(r) ? ' · Down' : ''}${gear ? ` · ${gear}` : ''}`,
       )
     } else lines.push(...strangersLines(t.strangers))
   }
+  // Anyone Down here, own or not, for the Feed row (`CONTEXT.md`: Reviving).
+  const downHere = here(t.residents ?? t.strangers)
+    .filter((r) => isDown(r))
+    .map((r) => ({ id: r.id, name: r.name, x: r.x, y: r.y, down: true as const }))
   if (!stable && horsesHere.length > 0) {
     card ??= {
       title: horsesHere.length === 1 ? 'Horse' : `${horsesHere.length} horses`,
@@ -1285,6 +1474,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
   lines.push(`Tile ${t.x}, ${t.y}`)
+  // Anyone on a Down resident's tile can take what they carry (`CONTEXT.md`: Down).
+  const onTile = here(t.residents ?? [])
+  const takers = onTile.filter((r) => !isDown(r) && !t.strangers.some((s) => s.id === r.id))
+  const downGoods = onTile
+    .filter((r) => isDown(r) && Object.values(r.carried).some((n) => n > 0))
+    .map((r) => ({ residentId: r.id, name: r.name, goods: r.carried, takers }))
   return {
     ...(card ?? {
       title: road && !road.site ? 'Road' : (groundName(t.terrain) ?? 'Open ground'),
@@ -1292,12 +1487,136 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     }),
     lines,
     ...(buildHere ? { buildHere } : {}),
-    ...(passengers ? { passengers } : {}),
+    ...(carriageView ? { carriage: carriageView } : {}),
     ...(unhitch ? { unhitch } : {}),
+    ...(downGoods.length > 0 ? { downGoods } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
+    ...(sites.length > 0 ? { sites } : {}),
+    ...(downHere.length > 0 ? { downHere } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
   }
+}
+
+/**
+ * A carriage as rows and meters (`CONTEXT.md`: Goods on cards): its load against what it holds,
+ * its passengers counted in, and its goods, when the Player sees inside, else only how heavily it
+ * is loaded (`CONTEXT.md`: Seeing inside a storage); its horse as a row with its meters where the
+ * Player knows how it fares, and how long the Food on board feeds it; its driver and passengers in
+ * sight by name; and the haul route its driver drives, when the driver is the Player's.
+ */
+export function describeCarriage(
+  carriage: SeenCarriage,
+  rel: Relationship | undefined,
+  t: TileThings,
+): CarriageView {
+  const pick = (r: SeenResident): NamedResident => ({
+    id: r.id,
+    name: r.name,
+    pick: !t.strangers.some((s) => s.id === r.id),
+  })
+  // Its passengers, as many as are in sight (they are on its tile, `CONTEXT.md`: Passenger).
+  const aboard = (carriage.passengerIds ?? []).flatMap((id) => {
+    const r = t.residents?.find((x) => x.id === id)
+    return r ? [pick(r)] : []
+  })
+  const people = aboard.length * PASSENGER_WEIGHT
+  const capacity = carriageCapacity(t, carriage)
+  const weight = carriage.load ? stockWeight(carriage.load) + people : 0
+  const load = carriage.load
+    ? { text: `${Math.round(weight)} / ${Math.round(capacity)} kg`, share: weight / capacity }
+    : { text: capital(LOAD_LEVEL_NAMES[carriage.loadLevel]) }
+  const view: CarriageView = {
+    title: `Carriage${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''}`,
+    load,
+    ...(carriage.load ? { goods: carriage.load } : {}),
+  }
+  // Who pulls it, by name, when the horse is in sight (`CONTEXT.md`: Horse name), and how it
+  // fares only for the Player's own and allies' (`CONTEXT.md`: Seeing how someone fares).
+  const horse = t.horses.find((h) => h.id === carriage.horseId)
+  if (horse) {
+    const shares = faresShares(horse)
+    let count = ''
+    if (horseFaresKnown(horse)) {
+      const food = carriage.load?.food ?? 0
+      const days = Math.floor(food / (HORSE_FOOD_PER_DAY * horseFoodFactor(horse)) + 1e-9)
+      count =
+        food <= 0
+          ? 'No Food on board'
+          : days <= 0
+            ? 'Food on board for less than a game day'
+            : `Food on board for ${days} game ${days === 1 ? 'day' : 'days'}`
+    }
+    view.horse = {
+      title: 'Horse',
+      count,
+      meters: FARES_METERS,
+      rows: [
+        {
+          id: horse.id,
+          name: horse.name,
+          // A Down horse says so, as in a stable (`CONTEXT.md`: Down).
+          detail: isDown(horse)
+            ? `${horseDownLine(horse, t.tick)} · ${horseStatsText(horse, t.tick)}`
+            : horseStatsText(horse, t.tick),
+          ...(shares ? { shares } : {}),
+          ...(rel === 'own' ? { opens: 'horse' as const } : {}),
+        },
+      ],
+    }
+  } else {
+    const ours = rel === 'own' || rel === 'alliance'
+    view.noHorse = carriage.horseId ? 'Horse hitched' : ours ? 'No horse hitched' : 'No horse'
+  }
+  const driver = t.residents?.find((r) => drivenCarriageId(r) === carriage.id)
+  if (driver) view.driver = pick(driver)
+  if (aboard.length > 0) {
+    view.passengers = { residents: aboard, weight: `${Math.round(people)} kg of it people` }
+  }
+  // A route as the Doing line says it, only for the Player's own driver (`CONTEXT.md`: Doing).
+  const o = driver?.order
+  if (driver && view.driver?.pick && o?.kind === 'haul') view.route = haulRoute(driver, o, t)
+  return view
+}
+
+/**
+ * A haul route's stops by name and where along it the carriage is (`CONTEXT.md`: Haul route,
+ * Estimates): leg 1 drives to the second stop, leg 2 back to the first, each with about when it
+ * arrives; at a stop, what is done there.
+ */
+function haulRoute(driver: SeenResident, o: HaulOrder, t: TileThings): CarriageView['route'] {
+  const from = stopName(o.from, t)
+  const to = o.toArmy
+    ? (t.armies?.find((a) => a.id === o.toArmy)?.name ?? 'the army')
+    : stopName(o.to, t)
+  const at = o.stop === 'from' ? from : to
+  let leg: string
+  if (o.phase === 'loading') {
+    const both = o.returnGoods.length > 0
+    leg = both
+      ? `Unloading and loading at ${at}`
+      : o.stop === 'from'
+        ? `Loading at ${at}`
+        : `Unloading at ${at}`
+  } else {
+    const ticks = o.path ? t.arrivesIn?.(driver) : undefined
+    leg = `Leg ${o.stop === 'to' ? 1 : 2} of 2 · ${wayLeft(o.path, ticks)}`
+  }
+  return { stops: `${from} → ${to}`, leg }
+}
+
+/**
+ * A haul route's stop by what stands there, as its card is named: "Eastmere storage", "Outpost
+ * storage", "Mine"; else by its tile: "12, 40".
+ */
+function stopName(at: { x: number; y: number }, t: TileThings): string {
+  const b = t.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && covers(b, at.x, at.y))
+  if (!b) return `${at.x}, ${at.y}`
+  const name = BUILDING_NAMES[b.kind]
+  const city = t.cities.find((c) => c.id === b.cityId)
+  if (b.site) return `${name} site`
+  if (city) return `${city.name} ${name.toLowerCase()}`
+  return isOutpostStorage(b) ? `Outpost ${name.toLowerCase()}` : name
 }
 
 /**
@@ -1337,33 +1656,36 @@ function terrainLine(terrain: number | undefined, road: Building | undefined): s
     : `${name} · ${speed(s)} · ${food(f)}`
 }
 
-/** What a construction site still lacks of its materials (`CONTEXT.md`: Construction site). */
-function stillNeeded(site: Building, labels: Record<string, string>): string {
-  const needs = BUILD_MATERIALS[site.kind] ?? {}
-  if (Object.keys(needs).length === 0) return 'Needs no materials, only work'
-  const left: Stock = {}
-  for (const [good, units] of Object.entries(needs) as [Good, number][]) {
-    const missing = units - (site.site?.delivered[good] ?? 0)
-    if (missing > 0) left[good] = missing
+/**
+ * A construction site as a work meter and a row per material (`SiteView`). With `t`, what is in
+ * sight now, it says how long the work is left at the pace of those building it; a site only
+ * remembered has none.
+ */
+function describeSite(site: Building, t: TileThings | undefined): SiteView {
+  const work = BUILD_WORK[site.kind] ?? 0
+  const share = work > 0 ? Math.min(1, (site.site?.work ?? 0) / work) : 1
+  const need = BUILD_MATERIALS[site.kind] ?? {}
+  const left =
+    t?.tick === undefined
+      ? undefined
+      : workLeft(site, (t.residents ?? []) as Resident[], t.tick, { under: t.terrain })
+  return {
+    work: { text: `${Math.floor(share * 100)}%`, share, ...(left ? { left } : {}) },
+    materials: GOODS.filter((g) => (need[g] ?? 0) > 0).map((good) => ({
+      good,
+      have: site.site?.delivered[good] ?? 0,
+      need: need[good]!,
+    })),
   }
-  return Object.keys(left).length === 0
-    ? 'All materials delivered'
-    : `Still needs ${goodsText(left, labels)}`
 }
 
 /**
- * What a workplace makes and how much of it lies in its pile (`CONTEXT.md`: Workplace); at a
- * smithy, what its workers in sight are making (`CONTEXT.md`: Smithy).
+ * What a workplace makes (`CONTEXT.md`: Workplace); at a smithy, what its workers in sight are
+ * making (`CONTEXT.md`: Smithy). Its pile shows as a goods grid of its own.
  */
-function makesLine(
-  b: Building,
-  t: TileThings,
-  pile: Pile | undefined,
-  labels: Record<string, string>,
-): string | undefined {
+function makesLine(b: Building, t: TileThings, labels: Record<string, string>): string | undefined {
   if (MAX_WORKERS[b.kind] === undefined || !WORKPLACE_SKILL[b.kind]) return undefined
   const label = (g: Good) => labels[g]!.toLowerCase()
-  const inPile = (g: Good) => pile?.goods[g] ?? 0
   if ((RECIPES[b.kind]?.length ?? 0) > 1) {
     const making = new Map<Good, number>()
     for (const r of t.residents ?? []) {
@@ -1372,12 +1694,9 @@ function makesLine(
       const recipe = recipeFor(b.kind, o.makes)
       if (recipe) making.set(recipeGood(recipe), (making.get(recipeGood(recipe)) ?? 0) + 1)
     }
-    const made = RECIPES[b.kind]!.map(recipeGood)
-    const piled = made.filter((g) => inPile(g) > 0).map((g) => `${inPile(g)} ${label(g)}`)
-    const pileText = ` · in its pile: ${piled.length > 0 ? piled.join(', ') : 'nothing made'}`
-    if (making.size === 0) return `Makes weapons and armour, nobody at it${pileText}`
+    if (making.size === 0) return 'Makes weapons and armour, nobody at it'
     const list = [...making].map(([g, n]) => `${label(g)} (${n})`).join(', ')
-    return `Its workers make ${list}${pileText}`
+    return `Its workers make ${list}`
   }
   const node =
     NODE_WORKPLACE_KINDS.has(b.kind) && t.nodeAt
@@ -1389,7 +1708,7 @@ function makesLine(
   const good: Good | undefined =
     b.kind === 'farm' ? 'food' : node ? NODE_GOOD[node.kind] : recipe && recipeGood(recipe)
   if (!good) return undefined
-  return `Makes ${label(good)} · ${inPile(good)} in its pile`
+  return `Makes ${label(good)}`
 }
 
 /** The kinds of workplace built on a resource node. */
@@ -1433,8 +1752,10 @@ function strangersLines(strangers: SeenResident[]): string[] {
   })
   if (rest.length > 0) {
     const n = armed(rest)
+    // Anyone in sight sees who is Down (`CONTEXT.md`: Down).
+    const down = rest.filter((r) => isDown(r)).length
     lines.push(
-      `${plural(rest.length, 'resident', 'residents')} of other realms${n > 0 ? ` · ${n} armed` : ''}`,
+      `${plural(rest.length, 'resident', 'residents')} of other realms${n > 0 ? ` · ${n} armed` : ''}${down > 0 ? ` · ${down} Down` : ''}`,
     )
   }
   return lines
@@ -1503,13 +1824,32 @@ function teardownLine(b: Building): string {
 /**
  * The actions a tile's card offers: send the resident picked last there, or have them build an
  * unbuilt node's workplace there (`buildHere`), open or close an own gate, open the city
- * inspector at the city the card links to, and trade at a warehouse or storage (`tradeHere`). Everything else a resident does on the tile is on
- * their own card once they stand there. `tick` tells whether the resident is still a child.
+ * inspector at the city the card links to, and trade at a warehouse or storage (`tradeHere`), and
+ * have them Feed someone Down there (`downHere`), greyed with the reason while they can't
+ * (`feedProblem`). Everything else a resident does on the tile is on
+ * their own card once they stand there. `tick` tells whether the resident is still a child;
+ * `size` is the map's.
  */
-export function tileActions(card: TileCard, actor: Resident | undefined, tick = 0): CardAction[] {
+export function tileActions(
+  card: TileCard,
+  actor: Resident | undefined,
+  tick = 0,
+  size = MAP_SIZE,
+): CardAction[] {
   const actions: CardAction[] = []
   if (actor)
     actions.push({ id: 'sendHere', label: `Send ${actor.name} here`, key: ACTION_KEYS.sendHere })
+  const down = card.downHere?.filter((r) => r.id !== actor?.id) ?? []
+  if (actor && down.length > 0) {
+    const reason = feedProblem(actor, down[0], tick, size)
+    actions.push({
+      id: 'feed',
+      label: down.length === 1 ? `Feed ${down[0]!.name}…` : 'Feed someone Down…',
+      key: ACTION_KEYS.feed,
+      opens: true,
+      ...(reason ? { disabled: true as const, reason } : {}),
+    })
+  }
   if (actor && card.buildHere) {
     const name = BUILDING_NAMES[card.buildHere.kind].toLowerCase()
     const reason = !card.buildHere.at

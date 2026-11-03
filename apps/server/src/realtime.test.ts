@@ -856,6 +856,27 @@ describe('realtime', () => {
     expect(await again.next('welcome')).toMatchObject({ horseOffer: false })
   })
 
+  it('sends the realm its own Workplace settings, and again only when they changed', async () => {
+    const { url, token, world, realtime } = await start()
+    const { next } = connect(url, token)
+    expect(await next('welcome')).toMatchObject({ workSettings: {} })
+    const realmId = world.realms[0]!.id
+    world.workplaceSettings[realmId] = { farm: { params: { foodTake: 2 } } }
+    // Another realm's are never sent.
+    world.workplaceSettings.other = { farm: { scriptId: 7 } }
+    realtime.broadcastTick()
+    expect(await next('tick')).toMatchObject({
+      workSettings: { farm: { params: { foodTake: 2 } } },
+    })
+    world.workplaceSettings.other = { farm: { scriptId: 8 } }
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('workSettings')
+    const again = connect(url, token)
+    expect((await again.next('welcome')).workSettings).toEqual({
+      farm: { params: { foodTake: 2 } },
+    })
+  })
+
   it('sends each Player only their own waypoints, on connect and when they change (Waypoint)', async () => {
     const { url, token, db, userId, world, realtime } = await start()
     const other = await signUp(db, {

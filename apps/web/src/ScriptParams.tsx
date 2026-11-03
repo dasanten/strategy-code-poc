@@ -1,4 +1,10 @@
-import type { PickedParamType, ScriptParam, ScriptParamValue, Waypoint } from '@csp/shared'
+import {
+  WORKPLACE_PARAM,
+  type PickedParamType,
+  type ScriptParam,
+  type ScriptParamValue,
+  type Waypoint,
+} from '@csp/shared'
 import { useRef } from 'react'
 import { choiceLabel, effectiveParam, paramNote, waypointLabel } from './script-params-view.js'
 import { foodEatenPerDay, num } from './wiki-view.js'
@@ -83,7 +89,9 @@ function ParamName({ param }: { param: ScriptParam }) {
  * filtered by the param's type, and one to clear it; a number field for a `number` param, set
  * once typed; a list of words for a `choice` param and of the Player's waypoints for a `waypoint`
  * param, which may be picked on the map too. Each says what it is for from its comment. Shown on
- * the resident card under the script they run.
+ * the resident card under the script they run. Working by a workplace's settings (`CONTEXT.md`:
+ * Workplace settings), a value not picked for them shows as the workplace's, and one picked is
+ * marked as their own, an override, its button going back to the workplace's.
  */
 export function ScriptParamFields({
   params,
@@ -97,11 +105,14 @@ export function ScriptParamFields({
   onNumber,
   onChoose,
   onClear,
+  workplace,
 }: {
   /** The running script's `param` lines. */
   params: readonly ScriptParam[]
   /** What is picked for this resident, by param name. */
   values: Readonly<Record<string, ScriptParamValue>>
+  /** The workplace's values by param name, while they work by its settings. */
+  workplace?: Readonly<Record<string, ScriptParamValue>>
   /** How a picked value is named; null when it is out of sight. */
   label: (id: string) => string | null
   /** The script's target param (`targetParam`), which unset is the one they stand on. */
@@ -128,14 +139,25 @@ export function ScriptParamFields({
     <div className="script-params" aria-label="Script parameters">
       {params.map((p) => {
         const value = values[p.name]
-        const uses = effectiveParam(p, value, { label, target, onTile })
+        const uses = effectiveParam(p, value, {
+          label,
+          target,
+          onTile,
+          workplace: workplace?.[p.name],
+        })
+        // Their own value against the workplace's; the workplace itself is never one.
+        const override = workplace !== undefined && uses.set && p.name !== WORKPLACE_PARAM
         const shown = (
           <span className={uses.set ? 'small' : 'muted small'} aria-label={`${p.name} uses`}>
             {uses.text}
+            {override && <span className="muted">, their own</span>}
           </span>
         )
+        const clear = override ? 'Workplace’s' : 'Clear'
+        const clearTitle = override ? 'Back to the workplace’s value' : undefined
         if (p.type === 'number') {
           const n = typeof value === 'number' ? value : undefined
+          const from = workplace?.[p.name]
           return (
             <div key={p.name} className="goods-row">
               <ParamName param={p} />
@@ -146,11 +168,23 @@ export function ScriptParamFields({
                   key={n ?? 'unset'}
                   name={p.name}
                   value={n}
-                  fallback={typeof p.default === 'number' ? p.default : undefined}
+                  fallback={
+                    typeof from === 'number'
+                      ? from
+                      : typeof p.default === 'number'
+                        ? p.default
+                        : undefined
+                  }
+                  fallbackIs={typeof from === 'number' ? 'The workplace’s' : undefined}
                   onSet={(v) => (v === undefined ? onClear(p.name) : onNumber(p.name, v))}
                 />
-                <button type="button" onClick={() => onClear(p.name)} disabled={n === undefined}>
-                  Clear
+                <button
+                  type="button"
+                  title={clearTitle}
+                  onClick={() => onClear(p.name)}
+                  disabled={n === undefined}
+                >
+                  {clear}
                 </button>
               </span>
             </div>
@@ -185,8 +219,13 @@ export function ScriptParamFields({
             {shown}
             <span className="buttons">
               {pick}
-              <button type="button" onClick={() => onClear(p.name)} disabled={id === undefined}>
-                Clear
+              <button
+                type="button"
+                title={clearTitle}
+                onClick={() => onClear(p.name)}
+                disabled={id === undefined}
+              >
+                {clear}
               </button>
             </span>
           </div>
@@ -211,12 +250,15 @@ export function NumberField({
   name,
   value,
   fallback,
+  fallbackIs = 'Default',
   onSet,
 }: {
   name: string
   value: number | undefined
   /** The param's default (`param name: number = 3`), shown while unset. */
   fallback?: number
+  /** What the fallback is, for its tooltip: the default, or the workplace's value. */
+  fallbackIs?: string
   onSet: (value: number | undefined) => void
 }) {
   // What went out last, so Enter and then leaving the field don't send it twice.
@@ -236,7 +278,7 @@ export function NumberField({
       className="amount"
       aria-label={name}
       placeholder={fallback === undefined ? 'unset' : String(fallback)}
-      title={fallback === undefined ? undefined : `Default ${fallback}`}
+      title={fallback === undefined ? undefined : `${fallbackIs} ${fallback}`}
       defaultValue={value ?? ''}
       onBlur={(e) => commit(e.currentTarget.value)}
       onKeyDown={(e) => {
@@ -267,9 +309,15 @@ export function StartParamsForm({
   onChange,
   onStart,
   onCancel,
+  fromWorkplace,
 }: {
   /** The name of the script about to start. */
   script: string
+  /**
+   * Filled with a workplace's settings, for Work (`CONTEXT.md`: Workplace settings): what the
+   * Player changes becomes the resident's own.
+   */
+  fromWorkplace?: boolean
   params: readonly ScriptParam[]
   /** What each param is set to now, by name; none while empty. */
   values: Readonly<Record<string, ScriptParamValue | undefined>>
@@ -307,6 +355,12 @@ export function StartParamsForm({
         }}
       >
         <h2>Start {script}</h2>
+        {fromWorkplace && (
+          <p className="muted small">
+            Filled in from the workplace’s Work settings. What you change here is this resident’s
+            own and stays when the workplace’s settings change.
+          </p>
+        )}
         <div className="script-params" aria-label="Script parameters">
           {params.map((p) => {
             const value = values[p.name]

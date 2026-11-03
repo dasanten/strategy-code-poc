@@ -5,6 +5,8 @@ import {
   canHandle,
   canWork,
   covers,
+  inContact,
+  NO_FOOD_TO_FEED,
   isAt,
   wrap,
   wrapDelta,
@@ -108,6 +110,11 @@ export type GroupOrder =
    * one's request names the whole group, so the server checks room for all of them.
    */
   | { kind: 'relocate'; cityId: string }
+  /**
+   * Those with Food in hand next to someone Down in sight Feed them (`CONTEXT.md`: Reviving), up
+   * to `units` each, one of them for each one Down.
+   */
+  | { kind: 'feed'; units: number }
 
 /** A storage, stable or carriage picked on the map to store at or fetch from. */
 export interface Place {
@@ -123,6 +130,8 @@ export interface GroupSeen {
   carriages?: readonly (Pick<Carriage, 'id' | 'x' | 'y'> & Partial<Pick<Carriage, 'horseId'>>)[]
   /** The buildings in sight, to find the stable each one stands in. */
   buildings?: readonly Pick<Building, 'id' | 'kind' | 'x' | 'y' | 'site'>[]
+  /** Residents in sight who are Down, of any realm, to Feed (`CONTEXT.md`: Reviving). */
+  down?: readonly { id: string; x: number; y: number }[]
 }
 
 /**
@@ -174,6 +183,7 @@ const ADULTS_ONLY: GroupOrder['kind'][] = [
   'drive',
   'haul',
   'unhitch',
+  'feed',
   'explore',
 ]
 
@@ -195,6 +205,11 @@ function groundOf(r: GroupResident, seen: GroupSeen, size: number) {
   return seen.buildings?.find(
     (b) => b.kind === 'trainingGround' && !b.site && covers(b, r.x, r.y, size),
   )
+}
+
+/** Those Down in sight on or next to a resident's tile, but the resident. */
+function downNear(r: GroupResident, seen: GroupSeen, size: number) {
+  return seen.down?.filter((d) => d.id !== r.id && inContact(size, r, d)) ?? []
 }
 
 /** The finished stable a resident stands in, if they stand in one. */
@@ -261,6 +276,10 @@ export function groupSkip(
       break
     case 'drop':
       if (carriedGoods(r.carried).length === 0) return 'carries nothing'
+      break
+    case 'feed':
+      if (downNear(r, seen, size).length === 0) return 'nobody Down nearby'
+      if ((r.carried.food ?? 0) < 1) return NO_FOOD_TO_FEED
       break
   }
   if (queued) return undefined
@@ -511,6 +530,16 @@ export function groupRequests(
       case 'relocate':
         send(r, { kind: 'relocate', cityId: order.cityId, group: going.map((x) => x.id) })
         break
+      case 'feed': {
+        // One of them for each one Down: the first next to them feeds them.
+        const down = downNear(r, seen, size).find((d) => !taken.has(d.id))
+        if (!down) skip(r, 'another of them feeds them')
+        else {
+          taken.add(down.id)
+          send(r, { kind: 'feed', targetId: down.id, units: order.units })
+        }
+        break
+      }
     }
   }
   // Setting a param is no step: it is given as it is, queued or not.
@@ -607,6 +636,7 @@ export type GroupButton =
   | 'attack'
   | 'climb'
   | 'relocate'
+  | 'feed'
   | 'script'
 
 /**
@@ -639,6 +669,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'storeAt', label: 'Store at…', group: 'goods' },
   { id: 'fetch', label: 'Fetch…', group: 'goods' },
   { id: 'drop', label: 'Drop all', group: 'goods' },
+  { id: 'feed', label: 'Feed…', group: 'goods' },
   { id: 'script', label: 'Run script…', group: 'scripts' },
   { id: 'attack', label: 'Attack', group: 'other' },
   { id: 'climb', label: 'Climb a wall', group: 'other' },
@@ -684,6 +715,7 @@ export const GROUP_COUNTERPARTS: Record<
   makeLeader: { none: 'the realm has one Leader' },
   rename: { none: 'names one resident' },
   relocate: ['relocate'],
+  feed: ['feed'],
 }
 
 /**
@@ -719,6 +751,7 @@ export const GROUP_KEYS: Record<GroupButton, string> = {
   script: ACTION_KEYS.script,
   attack: ACTION_KEYS.attack,
   climb: ACTION_KEYS.walls,
+  feed: ACTION_KEYS.feed,
 }
 
 /** The kind each of the group card's orders is grouped under (`GROUP_BUTTONS`). */
@@ -726,7 +759,7 @@ export const groupButtonGroup = (id: GroupButton): OrderGroup =>
   GROUP_BUTTONS.find((b) => b.id === id)?.group ?? 'other'
 
 /** The group card's orders that open a panel below the rows with what they need. */
-const GROUP_PANELS: readonly GroupButton[] = ['haul', 'relocate', 'teach', 'breed', 'fetch']
+const GROUP_PANELS: readonly GroupButton[] = ['haul', 'relocate', 'teach', 'breed', 'fetch', 'feed']
 
 /** What the group card's rows need to know about the group and where they stand. */
 export interface GroupHere {
@@ -754,6 +787,8 @@ const GROUP_REASONS: Record<string, string> = {
   'not at a stable': 'none of them is in a stable',
   'carries nothing': 'none of them carries anything',
   'not aboard': 'none of them is aboard a carriage',
+  'nobody Down nearby': 'nobody Down next to them',
+  [NO_FOOD_TO_FEED]: 'none of them has Food in hand',
 }
 
 /**
@@ -807,6 +842,7 @@ export function groupRows(h: GroupHere): {
     store: { order: { kind: 'store' } },
     storeAt: { order: { kind: 'store' } },
     drop: { order: { kind: 'drop' } },
+    feed: { order: { kind: 'feed', units: 1 } },
   }
   for (const { id, label } of GROUP_BUTTONS) {
     const row: CardAction<GroupButton> = {

@@ -100,8 +100,7 @@ export const waypointLabel = (wp: Pick<Waypoint, 'name' | 'x' | 'y'>) =>
   `${wp.name} at ${wp.x}, ${wp.y}`
 
 /** How a `choice` param's word reads in its list: "goldOre" as "gold ore". */
-export const choiceLabel = (word: string) =>
-  word.replace(/(?<=[a-z])(?=[A-Z])/g, ' ').toLowerCase()
+export const choiceLabel = (word: string) => word.replace(/(?<=[a-z])(?=[A-Z])/g, ' ').toLowerCase()
 
 /**
  * What a param's `//` comment says (`CONTEXT.md`: Script parameter): what it is for, and after
@@ -119,10 +118,11 @@ export function paramNote(description: string | undefined): { purpose?: string; 
 
 /**
  * What a param field shows as the value the script uses (`CONTEXT.md`: Script parameter): the one
- * picked, else what the script uses with it unset. A number's or choice's default ("1, the
- * default"); a default script's target param the one on the resident's tile ("Farm at 10, 5, on
- * their tile"); any other what its comment says after "none:", else "none picked". `set` is
- * whether the Player picked it.
+ * picked, else what the script uses with it unset. Working by a workplace's settings
+ * (`CONTEXT.md`: Workplace settings), the workplace's value ("4, from the workplace"); else a
+ * number's or choice's default ("1, the default"); a default script's target param the one on the
+ * resident's tile ("Farm at 10, 5, on their tile"); any other what its comment says after
+ * "none:", else "none picked". `set` is whether the Player picked it for the resident.
  */
 export function effectiveParam(
   p: Pick<ScriptParam, 'name' | 'type' | 'default' | 'description'>,
@@ -134,11 +134,22 @@ export function effectiveParam(
     target?: string
     /** For the target param, what on their tile it would be, named; null for nothing that fits. */
     onTile?: string | null
+    /** The workplace's value, working by its settings. */
+    workplace?: ScriptParamValue
   },
 ): { text: string; set: boolean } {
+  const shown = (v: unknown) => (typeof v === 'string' ? choiceLabel(v) : String(v))
+  const from = at.workplace
+  if (value === undefined && from !== undefined) {
+    if (p.type === 'number' && typeof from === 'number')
+      return { text: `${from}, from the workplace`, set: false }
+    if (p.type === 'choice' && typeof from === 'string')
+      return { text: `${shown(from)}, from the workplace`, set: false }
+    if (p.type !== 'number' && p.type !== 'choice' && typeof from === 'string')
+      return { text: `${at.label(from) ?? 'out of sight'}, from the workplace`, set: false }
+  }
   if (p.type === 'number' || p.type === 'choice') {
     const typed = p.type === 'number' ? typeof value === 'number' : typeof value === 'string'
-    const shown = (v: unknown) => (typeof v === 'string' ? choiceLabel(v) : String(v))
     if (typed) return { text: shown(value), set: true }
     if (p.default !== undefined) return { text: `${shown(p.default)}, the default`, set: false }
   } else if (typeof value === 'string') {
