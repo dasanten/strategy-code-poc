@@ -1087,9 +1087,11 @@ describe('horses on the tile card', () => {
     delete seen.downUntil
     const theirs = tile({ horses: [{ ...seen, down: true }], tick })
     expect(theirs.lists?.[0]?.rows[0]?.detail).toMatch(/^Down from hunger · Speed 12/)
-    // Hitched, the carriage's horse line says so too.
+    // Hitched, the carriage's horse row says so too.
     const hitched = tile({ carriages: [{ ...carriage, horseId: 'h2' }], horses: [down], tick })
-    expect(horseLine(hitched.lines)).toContain(`· Down from hunger: ${timeLeft(23 * 3600)}`)
+    expect(hitched.carriage?.horse?.rows[0]?.detail).toBe(
+      `Down from hunger: ${timeLeft(23 * 3600)} · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
+    )
   })
 
   it('offers renaming the Player’s own horses on the card, by name (`CONTEXT.md`: Renaming a horse)', () => {

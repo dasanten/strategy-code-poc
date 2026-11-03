@@ -1547,7 +1547,10 @@ export function describeCarriage(
         {
           id: horse.id,
           name: horse.name,
-          detail: horseStatsText(horse, t.tick),
+          // A Down horse says so, as in a stable (`CONTEXT.md`: Down).
+          detail: isDown(horse)
+            ? `${horseDownLine(horse, t.tick)} · ${horseStatsText(horse, t.tick)}`
+            : horseStatsText(horse, t.tick),
           ...(shares ? { shares } : {}),
           ...(rel === 'own' ? { opens: 'horse' as const } : {}),
         },
