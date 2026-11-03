@@ -417,6 +417,8 @@ describe('every resident order on the group card', () => {
     carriageToBoard: true,
     carriageToUnhitch: true,
     driveOff: { problem: undefined },
+    hitchOff: { problem: undefined },
+    stealHorse: { problem: undefined },
     toFeedNear: 1,
     carriesFood: true,
   })
@@ -436,7 +438,14 @@ describe('every resident order on the group card', () => {
       for (const b of counterpart) expect(buttons.has(b), `${id}: ${b}`).toBe(true)
     }
     const oneOnly = Object.entries(GROUP_COUNTERPARTS).filter(([, c]) => 'none' in c)
-    expect(oneOnly.map(([id]) => id).sort()).toEqual(['driveOff', 'makeLeader', 'pair', 'rename'])
+    expect(oneOnly.map(([id]) => id).sort()).toEqual([
+      'driveOff',
+      'hitchOff',
+      'makeLeader',
+      'pair',
+      'rename',
+      'stealHorse',
+    ])
   })
 
   it('shows its orders as rows named by their labels, with keys, under the resident card’s kinds', () => {

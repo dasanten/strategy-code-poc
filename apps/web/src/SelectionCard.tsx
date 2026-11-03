@@ -35,6 +35,7 @@ import {
   feedTargets,
   keepRows,
   tileActions,
+  thiefAmong,
   thiefOf,
   unhitcherOf,
   type CardAction,
@@ -507,6 +508,8 @@ export function TileCard({
   onOpenHorse,
   onUnhitch,
   onDriveOff,
+  onHitchOff,
+  onStealHorse,
   tile,
   waypoints,
   workSettings,
@@ -549,6 +552,13 @@ export function TileCard({
    * (`CONTEXT.md`: Stealing a carriage or horse).
    */
   onDriveOff: (residentId: string) => void
+  /**
+   * Has a resident on the tile start driving the realm's carriage there off with another
+   * organization's horse, by picking where to.
+   */
+  onHitchOff: (residentId: string) => void
+  /** Orders a resident on the tile to steal the horse there by mounting it. */
+  onStealHorse: (horseId: string, residentId: string) => void
   /** The tile the card is for. */
   tile: { x: number; y: number }
   /** The Player's waypoints, for a new one's name and the cap (`CONTEXT.md`: Waypoint). */
@@ -686,6 +696,11 @@ export function TileCard({
               onUnhitch(card.unhitch.carriageId, unhitcher)
             const thief = thiefOf(card, actor)
             if (a.id === 'driveOff' && thief) onDriveOff(thief.id)
+            const hitcher = thiefAmong(card.hitchOff?.residents, actor)
+            if (a.id === 'hitchOff' && hitcher) onHitchOff(hitcher.id)
+            const rider = thiefAmong(card.stealHorse?.residents, actor)
+            if (a.id === 'stealHorse' && rider && card.stealHorse)
+              onStealHorse(card.stealHorse.horseId, rider.id)
           }}
         />
       )}

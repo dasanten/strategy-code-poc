@@ -380,13 +380,13 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action('walkTo', ['x', 'y'], 'Walk to a tile.'),
   action(
     'drive',
-    ['carriageId', 'x', 'y'],
-    'Drive the carriage on my tile to a tile. Another realm’s carriage is stolen by that: it joins my realm at once, which is theft (see Standing).',
+    ['carriageId', 'x', 'y', 'horseId'],
+    'Drive the carriage on my tile to a tile. Another realm’s carriage is stolen by that: it joins my realm at once, which is theft (see Standing). A carriage of mine with no horse of my realm there takes another realm’s only if I name it as `horseId`, which steals it too.',
   ),
   action(
     'mount',
     ['horseId'],
-    'Get on a horse of my realm on my tile that pulls no carriage, and ride it.',
+    'Get on a horse on my tile that pulls no carriage, and ride it. Another realm’s horse is stolen by that: it joins my realm at once, which is theft (see Standing).',
   ),
   action('dismount', [], 'Get off the horse I ride; it stays on my tile.'),
   action(
