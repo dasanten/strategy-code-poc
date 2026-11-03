@@ -656,8 +656,13 @@ function residentActions(
 ): Record<string, (args: Value[]) => Value> {
   return {
     walkTo: ([x, y]) => request('walkTo', { x: plain(x), y: plain(y) }),
-    drive: ([carriageId, x, y]) =>
-      request('drive', { carriageId: plain(carriageId), x: plain(x), y: plain(y) }),
+    drive: ([carriageId, x, y, horseId]) =>
+      request('drive', {
+        carriageId: plain(carriageId),
+        x: plain(x),
+        y: plain(y),
+        ...(horseId !== undefined && { horseId: plain(horseId) }),
+      }),
     haul: ([carriageId, x, y, goods, returnGoods, keepFood]) =>
       request('haul', {
         carriageId: plain(carriageId),
@@ -692,8 +697,8 @@ function residentActions(
       request('breed', { stableId: plain(stableId), horseIds: plain(horseIds) }),
     pair: ([partnerId]) => request('pair', { partnerId: plain(partnerId) }),
     attack: ([targetId]) => request('attack', { targetId: plain(targetId) }),
-    feed: ([residentId, units]) =>
-      request('feed', { targetId: plain(residentId), units: plain(units) }),
+    feed: ([targetId, units]) =>
+      request('feed', { targetId: plain(targetId), units: plain(units) }),
     climb: ([wallId]) => request('climb', { wallId: plain(wallId) }),
     pay: ([contractId, weeks]) =>
       request('pay', { contractId: plain(contractId), weeks: plain(weeks) }),

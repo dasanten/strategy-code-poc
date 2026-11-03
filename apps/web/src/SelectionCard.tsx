@@ -32,8 +32,11 @@ import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
   actionForKey,
+  feedTargets,
   keepRows,
   tileActions,
+  thiefAmong,
+  thiefOf,
   unhitcherOf,
   type CardAction,
   type CarriageView,
@@ -504,6 +507,9 @@ export function TileCard({
   onSelectResident,
   onOpenHorse,
   onUnhitch,
+  onDriveOff,
+  onHitchOff,
+  onStealHorse,
   tile,
   waypoints,
   workSettings,
@@ -541,6 +547,18 @@ export function TileCard({
   onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
+  /**
+   * Has a resident on the tile start driving off in the carriage there, by picking where to
+   * (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  onDriveOff: (residentId: string) => void
+  /**
+   * Has a resident on the tile start driving the realm's carriage there off with another
+   * organization's horse, by picking where to.
+   */
+  onHitchOff: (residentId: string) => void
+  /** Orders a resident on the tile to steal the horse there by mounting it. */
+  onStealHorse: (horseId: string, residentId: string) => void
   /** The tile the card is for. */
   tile: { x: number; y: number }
   /** The Player's waypoints, for a new one's name and the cap (`CONTEXT.md`: Waypoint). */
@@ -549,7 +567,7 @@ export function TileCard({
   mapSize: number
   /** Puts a waypoint named `name` on the tile; resolves with why it was turned down, if it was. */
   onAddWaypoint: (name: string) => Promise<string | undefined>
-  /** Orders the actor to Feed someone Down on the tile (`CONTEXT.md`: Reviving). */
+  /** Orders the actor to Feed someone Down or a horse on the tile. */
   onFeed?: (targetId: string, units: number) => void
   /** Orders one of the Player's residents to take goods from a spot on their tile. */
   onPickUp: (residentId: string, from: GoodsSpot, goods: Stock) => void
@@ -676,6 +694,13 @@ export function TileCard({
             const unhitcher = unhitcherOf(card, actor)
             if (a.id === 'unhitch' && card.unhitch && unhitcher)
               onUnhitch(card.unhitch.carriageId, unhitcher)
+            const thief = thiefOf(card, actor)
+            if (a.id === 'driveOff' && thief) onDriveOff(thief.id)
+            const hitcher = thiefAmong(card.hitchOff?.residents, actor)
+            if (a.id === 'hitchOff' && hitcher) onHitchOff(hitcher.id)
+            const rider = thiefAmong(card.stealHorse?.residents, actor)
+            if (a.id === 'stealHorse' && rider && card.stealHorse)
+              onStealHorse(card.stealHorse.horseId, rider.id)
           }}
         />
       )}
@@ -690,9 +715,9 @@ export function TileCard({
           }}
         />
       )}
-      {shown === 'feed' && actor && card.downHere && onFeed && (
+      {shown === 'feed' && actor && onFeed && (
         <FeedBlock
-          targets={card.downHere.filter((r) => r.id !== actor.id)}
+          targets={feedTargets(card, actor)}
           food={actor.carried.food ?? 0}
           onFeed={(targetId, units) => {
             setOpen(undefined)
@@ -1065,15 +1090,15 @@ function CityRenameBlock({ name, onRename }: { name: string; onRename: (name: st
 }
 
 /**
- * Feeding someone Down (`CONTEXT.md`: Reviving): whom, when there is more than one, and how many
- * units of the Food in the resident's hands to put in theirs; they eat at once and wake.
+ * Feeding someone Down or a horse (`CONTEXT.md`: Reviving, Feeding a horse): whom, when there is
+ * more than one, and how many units of the Food in the resident's hands to give them.
  */
 export function FeedBlock({
   targets,
   food,
   onFeed,
 }: {
-  targets: { id: string; name: string }[]
+  targets: { id: string; name: string; horse?: true }[]
   /** The Food in the feeding resident's hands. */
   food: number
   onFeed: (targetId: string, units: number) => void
@@ -1102,7 +1127,7 @@ export function FeedBlock({
             >
               {targets.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
+                  {t.horse ? `${t.name} (horse)` : t.name}
                 </option>
               ))}
             </select>
@@ -1121,7 +1146,9 @@ export function FeedBlock({
           </button>
         </div>
         <p className="small muted">
-          One unit is eaten at once and wakes them at low health; the rest goes in their hands.
+          {target?.horse
+            ? 'It eats until it is full, up to that many units, and gets up if it was Down; the rest stays in hand.'
+            : 'One unit is eaten at once and wakes them at low health; the rest goes in their hands.'}
         </p>
       </form>
     </section>

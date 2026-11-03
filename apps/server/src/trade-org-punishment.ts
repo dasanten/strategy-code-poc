@@ -1,4 +1,6 @@
 import {
+  CARRIAGE_STOLEN_WORTH,
+  HORSE_STOLEN_WORTH,
   TICKS_PER_GAME_DAY,
   DIRECTIVE_PUNISH_WORTH,
   TRADE_ORG,
@@ -51,9 +53,15 @@ export function worthOf(stock: Stock): number {
   return worth
 }
 
-/** What a crime cost the Trade Organization in Coins (`TRADE_ORG_LOSS`, stolen goods' worth). */
+/**
+ * What a crime cost the Trade Organization in Coins (`TRADE_ORG_LOSS`): for a theft, the worth of
+ * the goods and of a carriage and horse (`CONTEXT.md`: Stealing a carriage or horse).
+ */
 export function lossOf(crime: Crime): number {
-  return crime.kind === 'theft' ? worthOf(crime.goods ?? {}) : TRADE_ORG_LOSS[crime.kind]
+  if (crime.kind !== 'theft') return TRADE_ORG_LOSS[crime.kind]
+  const carriage = crime.carriage ? CARRIAGE_STOLEN_WORTH : 0
+  const horse = crime.horse !== undefined ? HORSE_STOLEN_WORTH : 0
+  return worthOf(crime.goods ?? {}) + carriage + horse
 }
 
 /** What a member carries above what they set out with: what they took. */

@@ -49,7 +49,7 @@ import { rememberFormerPlayer } from './standing.js'
 import { leaveOnLeaderDeath } from './alliances.js'
 import { endContractsOnLeaderDeath } from './contracts.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
-import { caravanFood } from './caravans.js'
+import { caravanFood, leaveCaravans } from './caravans.js'
 import { countSoldiersKilled } from './directives.js'
 import { leaveArmies } from './armies.js'
 import { worldIndex } from './world-index.js'
@@ -262,10 +262,11 @@ function take(stock: Stock, good: Good, units: number): void {
 
 /**
  * Removes a dead resident; what they carried drops in a pile on their tile (`CONTEXT.md`: Loot).
- * Their pair ends with them.
+ * Their pair ends with them, and they leave any caravan (`CONTEXT.md`: Caravan crew lost).
  */
 export function die(world: WorldState, r: Resident): void {
   world.residents = world.residents.filter((x) => x !== r)
+  leaveCaravans(world, r.id)
   dropGoods(world, r.x, r.y, r.carried)
   const partner = r.pair && world.residents.find((x) => x.id === r.pair!.partnerId)
   if (partner?.pair?.partnerId === r.id) delete partner.pair

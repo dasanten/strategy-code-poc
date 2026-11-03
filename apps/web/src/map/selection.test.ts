@@ -80,6 +80,45 @@ describe('what a click on the map picks (CONTEXT.md: Picking on the map)', () =>
   /** A click at a pixel, on the tile under it. */
   const click = (w: PickWorld, spots: Map<string, Spot>, sx: number, sy: number) =>
     mapPickAt(own(w, spots), sx, sy, Math.floor(sx / 10), Math.floor(sy / 10), w)
+
+  it('shows the tile card beside the Player’s tokens on another realm’s free horse', () => {
+    const h = { id: 'h', realmId: 'them', x: 8, y: 8 }
+    const ana = { id: 'ana', owner: 'me', x: 8, y: 8 }
+    const spots = new Map<string, Spot>([['ana', { x: 89, y: 89, r: 2 }]])
+    const w = world({ buildings: [], horses: [h], residents: [ana] })
+    expect(click(w, spots, 81, 81)).toEqual({ kind: 'tile', x: 8, y: 8 })
+    expect(click(w, spots, 89, 89)).toEqual({ kind: 'resident', id: 'ana' })
+    // Ridden, it shows as its rider, and there is nothing to take.
+    const rode = world({
+      buildings: [],
+      horses: [h],
+      residents: [ana, { id: 'st', owner: 'them', x: 7, y: 7, riding: 'h' }],
+    })
+    expect(click(rode, spots, 81, 81)).toEqual({ kind: 'resident', id: 'ana' })
+    const hitched = world({
+      buildings: [],
+      horses: [h],
+      residents: [ana],
+      carriages: [{ id: 'k', realmId: 'me', x: 7, y: 7, horseId: 'h' }],
+    })
+    expect(click(hitched, spots, 81, 81)).toEqual({ kind: 'resident', id: 'ana' })
+  })
+
+  it('shows the tile card beside the Player’s tokens on another realm’s carriage', () => {
+    const k = { id: 'k', realmId: 'them', x: 8, y: 8, horseId: null }
+    const ana = { id: 'ana', owner: 'me', x: 8, y: 8 }
+    const bo = { id: 'bo', owner: 'me', x: 8, y: 8 }
+    const spots = new Map<string, Spot>([['ana', { x: 89, y: 89, r: 2 }]])
+    const w = world({ carriages: [k], residents: [ana] })
+    expect(click(w, spots, 81, 81)).toEqual({ kind: 'tile', x: 8, y: 8 })
+    // The token itself still picks the resident, whose card offers it too.
+    expect(click(w, spots, 89, 89)).toEqual({ kind: 'resident', id: 'ana' })
+    const two = world({ carriages: [k], residents: [ana, bo] })
+    expect(click(two, new Map(), 81, 81)).toEqual({ kind: 'tile', x: 8, y: 8 })
+    // Beside them on the Player's own carriage, they are picked as ever.
+    const mine = world({ carriages: [{ ...k, realmId: 'me' }], residents: [ana] })
+    expect(click(mine, new Map(), 81, 81)).toEqual({ kind: 'resident', id: 'ana' })
+  })
   const horse = { id: 'h', realmId: 'me', x: 5, y: 5 }
 
   it('on a tile with a resident, a building and a horse, the resident wins', () => {

@@ -42,6 +42,8 @@ export function pickTarget(state: {
 const RESIDENT_PROMPTS: Record<Exclude<Picking, false>, string> = {
   walk: 'where to walk',
   drive: 'where to drive the carriage',
+  driveOff: 'where to drive the carriage off to',
+  hitchOff: 'where to drive the carriage',
   haul: 'where the haul route’s other stop is',
   roadFrom: 'where the road starts',
   roadTo: 'where the road ends',
@@ -82,6 +84,8 @@ const PARAM_PROMPTS: Record<ScriptParam['type'], string> = {
 
 /** What picking a tile does for the picked resident, said under the banner where it needs more. */
 const RESIDENT_HINTS: Partial<Record<Exclude<Picking, false>, string>> = {
+  driveOff: 'This is theft: the carriage, its load and its horse join your realm at once.',
+  hitchOff: 'This is theft: the horse joins your realm at once and is hitched to your carriage.',
   roadFrom: 'Then where it ends; the resident walks there and builds along the line.',
   roadTo: `Builds road along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, fetching stone from storage; with none, the sites are laid out for later.`,
   wallFrom: 'Then where it ends; the resident walks there and builds along the line.',

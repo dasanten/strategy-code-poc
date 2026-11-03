@@ -175,9 +175,9 @@ describe('caravans on their route', () => {
     },
   )
 
-  it('breaks up when its driver is gone, leaving the escort to the HQ', () => {
+  it('breaks up when its carriage is gone, leaving the crew to the HQ', () => {
     const { world, terrain, caravan } = route()
-    world.residents = world.residents.filter((r) => r.id !== caravan.driverId)
+    world.carriages = world.carriages.filter((k) => k.id !== caravan.carriageId)
     stepWorld(world, terrain, new Walking(terrain))
     expect(world.caravans).toEqual([])
     expect(checkInvariants(world, terrain)).toEqual([])

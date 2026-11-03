@@ -373,6 +373,7 @@ describe('script bindings', () => {
       { kind: 'haul', carriageId: 'c9', x: 20, y: 10, goods: ['wood'], keepFood: HAUL_KEEP_FOOD },
     ],
     ['stop()', { kind: 'stop' }],
+    ['drive("k1", 3, 4, "h9")', { kind: 'drive', carriageId: 'k1', x: 3, y: 4, horseId: 'h9' }],
     ['mount("h9")', { kind: 'mount', horseId: 'h9' }],
     ['dismount()', { kind: 'dismount' }],
     ['unhitch("k9")', { kind: 'unhitch', carriageId: 'k9' }],

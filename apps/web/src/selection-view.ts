@@ -11,7 +11,15 @@ import {
   PASSENGER_WEIGHT,
   carriageCapacity,
   isDown,
+  carriagePulledBy,
+  driveOffProblem,
+  riderOf,
+  hitchOffProblem,
+  horseToSteal,
+  mountOffProblem,
+  feedHorseProblem,
   feedProblem,
+  horseFull,
   MAP_SIZE,
   NO_CHILD_FEEDS,
   NO_FOOD_TO_FEED,
@@ -58,6 +66,7 @@ import {
   type Diplomacy,
   type MercenaryContract,
   type SeenResident,
+  type SeenCaravan,
   type SeenCarriage,
   type HaulOrder,
   type GoodsPlace,
@@ -91,7 +100,7 @@ import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
-import { horseDownLine } from './horses-view.js'
+import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
 import type { Picking } from './Residents.js'
@@ -111,6 +120,9 @@ export type ActionId =
   | 'board'
   | 'unhitch'
   | 'drive'
+  | 'driveOff'
+  | 'hitchOff'
+  | 'stealHorse'
   | 'haul'
   | 'explore'
   | 'build'
@@ -147,6 +159,9 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   board: 'K',
   unhitch: 'U',
   drive: 'D',
+  driveOff: 'D',
+  hitchOff: 'D',
+  stealHorse: 'M',
   haul: 'H',
   explore: 'Z',
   build: 'B',
@@ -202,6 +217,24 @@ export interface ResidentHere {
   carriage?: Carriage
   /** The horse hitched to that carriage is Down (`CONTEXT.md`: Down), so it can't be driven. */
   carriageHorseDown?: boolean
+  /** That carriage is another organization's: not theirs to drive or haul with. */
+  carriageTheirs?: boolean
+  /**
+   * Another organization's carriage on their tile, to drive off, and why it can't be taken now, if
+   * so (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  driveOff?: { problem: string | undefined }
+  /**
+   * Their realm's carriage on their tile with no horse of the realm's to pull it, and another
+   * organization's free horse there to steal for it, and why they can't now, if so (`CONTEXT.md`:
+   * Stealing a carriage or horse).
+   */
+  hitchOff?: { problem: string | undefined }
+  /**
+   * Another organization's free horse on their tile, to mount, and why it can't be taken now, if
+   * so (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  stealHorse?: { problem: string | undefined }
   pile?: Pile
   storage?: Building
   /** The building or construction site on their tile, not a road. */
@@ -250,9 +283,12 @@ export interface ResidentHere {
   downCarrying?: Stock[]
   /** They are Down (`CONTEXT.md`: Down) and take no orders. */
   down?: boolean
-  /** Others in sight who are Down on or next to their tile, whom they could Feed (`CONTEXT.md`: Reviving). */
-  downNear?: number
-  /** They have Food in their hands, to Feed someone Down with. */
+  /**
+   * Others in sight on or next to their tile whom they could Feed: anyone Down, any horse that isn't
+   * full (`CONTEXT.md`: Reviving, Feeding a horse).
+   */
+  toFeedNear?: number
+  /** They have Food in their hands, to Feed with. */
   carriesFood?: boolean
 }
 
@@ -279,6 +315,39 @@ export function residentActions(h: ResidentHere): CardAction[] {
 
 /** Why a carriage whose horse is Down can't be driven (`CONTEXT.md`: Down). */
 export const HORSE_DOWN_NO_DRIVE = 'its horse is Down'
+
+/** The action that steals a carriage, which says so (`CONTEXT.md`: Stealing a carriage or horse). */
+export const DRIVE_OFF_LABEL = 'Drive off (theft)'
+
+/** The action that steals a horse by driving off with it hitched, which says so. */
+export const HITCH_OFF_LABEL = 'Drive with their horse (theft)'
+
+/** The action that steals a horse by mounting it, which says so. */
+export const STEAL_HORSE_LABEL = 'Mount their horse (theft)'
+
+/**
+ * The carriages of the alliance army a realm commands as its leader (`CONTEXT.md`: Alliance army):
+ * another realm's, but no theft to drive.
+ */
+export function commandedCarriages(
+  alliance: { leaderId: string; army: readonly { is: string; id: string }[] } | null | undefined,
+  realmId: string | undefined,
+): ReadonlySet<string> {
+  if (!alliance || alliance.leaderId !== realmId) return new Set()
+  return new Set(alliance.army.filter((p) => p.is === 'carriage').map((p) => p.id))
+}
+
+/**
+ * Whether a carriage is another organization's as the Player sees it (`stealsCarriage`): driving
+ * it off would be theft. `commanded` is `commandedCarriages`.
+ */
+export function strangersCarriage(
+  k: { id: string; realmId: string | null },
+  realmId: string | undefined,
+  commanded: ReadonlySet<string> = new Set(),
+): boolean {
+  return k.realmId !== realmId && !commanded.has(k.id)
+}
 
 /** Why a Down resident's card offers no orders (`CONTEXT.md`: Down). */
 export const DOWN_NO_ORDERS = 'Down: takes no orders'
@@ -345,7 +414,8 @@ function ordersOffered(h: ResidentHere): {
   } else miss('board', 'no carriage of yours here')
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
-  if (h.carriage && h.adult) {
+  const drivable = h.carriage && !h.carriageTheirs
+  if (drivable && h.adult) {
     // A rider doesn't drive (`CONTEXT.md`: Riding), and a Down horse pulls nothing (Down).
     const refused = (reason: string) => ({ disabled: true as const, reason })
     const unable = h.riding
@@ -360,9 +430,43 @@ function ordersOffered(h: ResidentHere): {
       add(row('haul', label, { opens: true }))
     } else miss('haul', CARRYING_A_CHILD)
   } else {
-    miss('drive', h.carriage ? 'children can’t drive' : 'no carriage here')
-    miss('haul', h.carriage ? 'children can’t drive' : 'no carriage here')
+    const why = h.carriageTheirs
+      ? 'no carriage of yours here'
+      : h.carriage
+        ? 'children can’t drive'
+        : 'no carriage here'
+    miss('drive', why)
+    miss('haul', why)
   }
+  // Only ever on its own row, saying what it is (`CONTEXT.md`: Stealing a carriage or horse).
+  if (h.driveOff) {
+    const { problem } = h.driveOff
+    add(
+      row('driveOff', '', {
+        ...picks('driveOff', DRIVE_OFF_LABEL),
+        ...(problem ? { disabled: true as const, reason: problem } : {}),
+      }),
+    )
+  } else miss('driveOff', 'no carriage of another realm here')
+  if (h.hitchOff) {
+    const { problem } = h.hitchOff
+    add(
+      row('hitchOff', '', {
+        ...picks('hitchOff', HITCH_OFF_LABEL),
+        ...(problem ? { disabled: true as const, reason: problem } : {}),
+      }),
+    )
+  } else miss('hitchOff', 'no horse of another realm to hitch here')
+  if (h.stealHorse) {
+    const { problem } = h.stealHorse
+    add(
+      row(
+        'stealHorse',
+        STEAL_HORSE_LABEL,
+        problem ? { disabled: true as const, reason: problem } : {},
+      ),
+    )
+  } else miss('stealHorse', 'no free horse of another realm here')
   // Into the unknown and back for Food (`CONTEXT.md`: Explore).
   if (h.adult) add(row('explore', 'Explore'))
   else miss('explore', 'children can’t explore')
@@ -408,11 +512,11 @@ function ordersOffered(h: ResidentHere): {
   if (h.carries || goodsOnTile(h, h.adult ? GOODS : CHILD_GOODS)) {
     add(row('goods', 'Goods…', { opens: true }))
   } else miss('goods', 'nothing carried or here to pick up')
-  // Anyone Down nearby, of any realm (`CONTEXT.md`: Reviving).
-  if (h.downNear) {
+  // Anyone Down or a horse that isn't full nearby, of any realm (`CONTEXT.md`: Reviving, Feeding a horse).
+  if (h.toFeedNear) {
     const reason = !h.adult ? NO_CHILD_FEEDS : !h.carriesFood ? NO_FOOD_TO_FEED : undefined
     add(row('feed', 'Feed…', { opens: true, ...(reason ? { disabled: true, reason } : {}) }))
-  } else miss('feed', 'nobody Down nearby')
+  } else miss('feed', 'nobody to feed nearby')
   if (works && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   else miss('pair', works ? 'homeless' : unfit('pair'))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
@@ -471,6 +575,9 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   board: 'move',
   unhitch: 'move',
   drive: 'move',
+  driveOff: 'move',
+  hitchOff: 'move',
+  stealHorse: 'move',
   haul: 'move',
   explore: 'move',
   work: 'work',
@@ -704,6 +811,11 @@ export interface TileCard {
    */
   downHere?: { id: string; name: string; x: number; y: number; down: true }[]
   /**
+   * Horses on the tile that aren't full as far as the Player knows, of any realm, which the resident
+   * picked last may Feed (`CONTEXT.md`: Feeding a horse).
+   */
+  horsesToFeed?: { id: string; name: string; x: number; y: number }[]
+  /**
    * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
    * and what they saw of it then (what it held, a site's materials, as lists), shown apart from
    * the lines and lists about what is there now.
@@ -716,6 +828,31 @@ export interface TileCard {
    * unhitch the horse (`unhitchProblem`), when there are any (`CONTEXT.md`: Hitched horse).
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
+  /**
+   * Another organization's carriage on the tile and the Player's residents on it, who may drive it
+   * off, each with why they can't now, if so (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  driveOff?: {
+    carriageId: string
+    residents: { id: string; name: string; problem: string | undefined }[]
+  }
+  /**
+   * The realm's carriage on the tile with no horse of the realm's to pull it, another organization's
+   * free horse to steal for it, and who may drive off with it, as `driveOff`.
+   */
+  hitchOff?: {
+    carriageId: string
+    horseId: string
+    residents: { id: string; name: string; problem: string | undefined }[]
+  }
+  /**
+   * Another organization's free horse on the tile and the Player's residents on it, who may mount
+   * it, each with why they can't now, if so (`CONTEXT.md`: Stealing a carriage or horse).
+   */
+  stealHorse?: {
+    horseId: string
+    residents: { id: string; name: string; problem: string | undefined }[]
+  }
   /**
    * The construction sites on the tile, the building's own and a carriage's on a stable, as a work
    * meter and a row per material (`CONTEXT.md`: Goods on cards).
@@ -864,6 +1001,12 @@ export interface TileThings {
   arrivesIn?: (r: SeenResident) => number | undefined
   /** The armies the Player knows, by name, for a haul route to one (`CONTEXT.md`: Supply line). */
   armies?: readonly { id: string; name: string }[]
+  /** The caravans the Player sees, whose crew keep their carriages from being driven off. */
+  caravans?: readonly Pick<SeenCaravan, 'carriageId' | 'driverId' | 'escortIds'>[]
+  /** The map's size, for how near a caravan's crew are to its carriage. */
+  mapSize?: number
+  /** The alliance army's carriages the Player commands (`commandedCarriages`). */
+  commandedCarriages?: ReadonlySet<string>
   /** The buildings the Player remembers out of sight, and the tick now (`CONTEXT.md`: Last seen). */
   lastSeen?: { buildings: LastSeenBuilding[]; tick: number }
   /** Where the node's workplace fits on what the Player knows (`nodeFit`), if anywhere. */
@@ -1015,6 +1158,7 @@ export function horseDetail(h: SeenHorse, tick: number | undefined): string {
   else if (horseFaresKnown(h)) {
     const fares = horseFares(h)
     parts.push(`${fares.hunger}, ${fares.health}`)
+    if (fares.hunger !== 'fed') parts.push(FEED_HORSE_HINT)
   }
   return parts.join(' · ')
 }
@@ -1081,9 +1225,7 @@ function horseLists(
         return {
           id: h.id,
           name: h.name,
-          detail: isDown(h)
-            ? `${horseDownLine(h, tick)} · ${horseStatsText(h, tick)}`
-            : horseStatsText(h, tick),
+          detail: [horseNeed(h, tick), horseStatsText(h, tick)].filter(Boolean).join(' · '),
           ...(shares ? { shares } : {}),
           ...(r === 'own' ? { opens: 'horse' as const } : {}),
         }
@@ -1327,6 +1469,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
   let unhitch: TileCard['unhitch']
+  let driveOff: TileCard['driveOff']
+  let hitchOff: TileCard['hitchOff']
+  let stealHorse: TileCard['stealHorse']
   let carriageView: CarriageView | undefined
   if (building) {
     const city = cityOf(building)
@@ -1425,6 +1570,52 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       unhitch = { carriageId: carriage.id, residents: own.map(({ id, name }) => ({ id, name })) }
     }
   }
+  const stealable = here(t.carriages).find((k) =>
+    strangersCarriage(k, t.viewer.realmId, t.commandedCarriages),
+  )
+  const realmId = t.viewer.realmId
+  const thieves = here(t.residents ?? []).filter(
+    (r) => !t.strangers.some((s) => s.id === r.id) && !isDown(r),
+  )
+  if (realmId && thieves.length > 0) {
+    const seen = {
+      tick: t.tick ?? 0,
+      residents: t.residents ?? [],
+      horses: t.horses,
+      carriages: t.carriages,
+      caravans: t.caravans ?? [],
+    }
+    /** Each of them with why they can't, by `problem`. */
+    const each = (problem: (thief: (typeof thieves)[number]) => string | undefined) =>
+      thieves.map((r) => ({ id: r.id, name: r.name, problem: problem(r) }))
+    if (stealable) {
+      driveOff = {
+        carriageId: stealable.id,
+        residents: each((r) => driveOffProblem(seen, r, stealable, realmId, t.mapSize)),
+      }
+    }
+    const own = here(t.carriages).find((k) => k.realmId === realmId && !k.horseId)
+    const hitched = own && horseToSteal(seen, thieves[0]!, own, realmId)
+    if (own && hitched) {
+      const carriage = { ...own, realmId }
+      hitchOff = {
+        carriageId: own.id,
+        horseId: hitched.id,
+        residents: each((r) => hitchOffProblem(seen, r, carriage, hitched.id)),
+      }
+    }
+    // Only what's free: a hitched horse shows as its carriage, a ridden one as its rider.
+    const loose = here(t.horses).filter(
+      (h) => h.realmId !== realmId && !carriagePulledBy(seen, h) && !riderOf(seen, h),
+    )
+    const horse = loose.find((h) => !isDown(h)) ?? loose[0]
+    if (horse) {
+      stealHorse = {
+        horseId: horse.id,
+        residents: each((r) => mountOffProblem(seen, r, horse, realmId)),
+      }
+    }
+  }
   if (pile) {
     card ??= { title: 'Goods on the ground', what: 'pile' }
     // At a building it is the building's pile (`CONTEXT.md`: A building's pile).
@@ -1459,6 +1650,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const downHere = here(t.residents ?? t.strangers)
     .filter((r) => isDown(r))
     .map((r) => ({ id: r.id, name: r.name, x: r.x, y: r.y, down: true as const }))
+  const horsesToFeed = horsesHere
+    .filter((h) => !horseFull(h))
+    .map((h) => ({ id: h.id, name: h.name, x: h.x, y: h.y }))
   if (!stable && horsesHere.length > 0) {
     card ??= {
       title: horsesHere.length === 1 ? 'Horse' : `${horsesHere.length} horses`,
@@ -1489,10 +1683,14 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(buildHere ? { buildHere } : {}),
     ...(carriageView ? { carriage: carriageView } : {}),
     ...(unhitch ? { unhitch } : {}),
+    ...(driveOff ? { driveOff } : {}),
+    ...(hitchOff ? { hitchOff } : {}),
+    ...(stealHorse ? { stealHorse } : {}),
     ...(downGoods.length > 0 ? { downGoods } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
     ...(sites.length > 0 ? { sites } : {}),
     ...(downHere.length > 0 ? { downHere } : {}),
+    ...(horsesToFeed.length > 0 ? { horsesToFeed } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
   }
@@ -1821,12 +2019,22 @@ function teardownLine(b: Building): string {
   return `Being torn down · ${done}% done`
 }
 
+/** Whom a resident can Feed on a tile, from its card: anyone Down but them, then the horses. */
+export function feedTargets(
+  card: Pick<TileCard, 'downHere' | 'horsesToFeed'>,
+  actor: Pick<Resident, 'id'>,
+): { id: string; name: string; x: number; y: number; horse?: true }[] {
+  const down = card.downHere?.filter((r) => r.id !== actor.id) ?? []
+  const horses = card.horsesToFeed?.map((h) => ({ ...h, horse: true as const })) ?? []
+  return [...down, ...horses]
+}
+
 /**
  * The actions a tile's card offers: send the resident picked last there, or have them build an
  * unbuilt node's workplace there (`buildHere`), open or close an own gate, open the city
  * inspector at the city the card links to, and trade at a warehouse or storage (`tradeHere`), and
- * have them Feed someone Down there (`downHere`), greyed with the reason while they can't
- * (`feedProblem`). Everything else a resident does on the tile is on
+ * have them Feed someone Down there or a horse that isn't full (`feedTargets`), greyed with the
+ * reason while they can't (`feedProblem`, `feedHorseProblem`). Everything else a resident does on the tile is on
  * their own card once they stand there. `tick` tells whether the resident is still a child;
  * `size` is the map's.
  */
@@ -1839,12 +2047,15 @@ export function tileActions(
   const actions: CardAction[] = []
   if (actor)
     actions.push({ id: 'sendHere', label: `Send ${actor.name} here`, key: ACTION_KEYS.sendHere })
-  const down = card.downHere?.filter((r) => r.id !== actor?.id) ?? []
-  if (actor && down.length > 0) {
-    const reason = feedProblem(actor, down[0], tick, size)
+  const toFeed = actor ? feedTargets(card, actor) : []
+  if (actor && toFeed.length > 0) {
+    const first = toFeed[0]!
+    const reason = first.horse
+      ? feedHorseProblem(actor, first, tick, size)
+      : feedProblem(actor, { ...first, down: true }, tick, size)
     actions.push({
       id: 'feed',
-      label: down.length === 1 ? `Feed ${down[0]!.name}…` : 'Feed someone Down…',
+      label: toFeed.length === 1 ? `Feed ${first.name}…` : 'Feed…',
       key: ACTION_KEYS.feed,
       opens: true,
       ...(reason ? { disabled: true as const, reason } : {}),
@@ -1866,6 +2077,33 @@ export function tileActions(
   }
   if (card.unhitch)
     actions.push({ id: 'unhitch', label: 'Unhitch horse', key: ACTION_KEYS.unhitch })
+  const thief = thiefOf(card, actor)
+  if (thief) {
+    actions.push({
+      id: 'driveOff',
+      label: DRIVE_OFF_LABEL,
+      key: ACTION_KEYS.driveOff,
+      ...(thief.problem ? { disabled: true as const, reason: thief.problem } : {}),
+    })
+  }
+  const hitcher = thiefAmong(card.hitchOff?.residents, actor)
+  if (hitcher) {
+    actions.push({
+      id: 'hitchOff',
+      label: HITCH_OFF_LABEL,
+      key: ACTION_KEYS.hitchOff,
+      ...(hitcher.problem ? { disabled: true as const, reason: hitcher.problem } : {}),
+    })
+  }
+  const rider = thiefAmong(card.stealHorse?.residents, actor)
+  if (rider) {
+    actions.push({
+      id: 'stealHorse',
+      label: STEAL_HORSE_LABEL,
+      key: ACTION_KEYS.stealHorse,
+      ...(rider.problem ? { disabled: true as const, reason: rider.problem } : {}),
+    })
+  }
   if (card.gate)
     actions.push({
       id: 'gate',
@@ -1907,6 +2145,30 @@ export function tileActions(
 export function unhitcherOf(card: TileCard, actor: { id: string } | undefined): string | undefined {
   const residents = card.unhitch?.residents ?? []
   return (residents.find((r) => r.id === actor?.id) ?? residents[0])?.id
+}
+
+/**
+ * Who drives off the tile card's carriage (`TileCard.driveOff`): the resident picked last when they
+ * stand on its tile, or else the first of the Player's there who can, or else the first of them.
+ */
+export function thiefOf(
+  card: TileCard,
+  actor: { id: string } | undefined,
+): { id: string; problem: string | undefined } | undefined {
+  return thiefAmong(card.driveOff?.residents, actor)
+}
+
+/**
+ * Who of those on the tile takes what the card offers: the resident picked last when they stand on
+ * its tile, or else the first of the Player's there who can, or else the first of them.
+ */
+export function thiefAmong(
+  residents: readonly { id: string; problem: string | undefined }[] = [],
+  actor: { id: string } | undefined,
+): { id: string; problem: string | undefined } | undefined {
+  return (
+    residents.find((r) => r.id === actor?.id) ?? residents.find((r) => !r.problem) ?? residents[0]
+  )
 }
 
 /**

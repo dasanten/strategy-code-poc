@@ -102,7 +102,7 @@ describe('the mount and dismount orders', () => {
     expect([w1.x, horse.x]).toEqual([10, 8])
   })
 
-  it('turn down a horse elsewhere, of another realm, hitched, or ridden by someone else', () => {
+  it('turn down a horse elsewhere, hitched, or ridden by someone else', () => {
     const { world, w1, horse } = setup(open)
     const mount = () => order(world, open, { kind: 'mount', residentId: 'w1', horseId: 'h1' })
     expect(order(world, open, { kind: 'dismount', residentId: 'w1' })).toMatchObject({
@@ -114,9 +114,6 @@ describe('the mount and dismount orders', () => {
     horse.x = 3
     expect(mount()).toMatchObject({ reason: 'that horse is not on the resident’s tile' })
     horse.x = 2
-    horse.realmId = 'r2'
-    expect(mount()).toMatchObject({ reason: 'not a horse of your realm' })
-    horse.realmId = 'r1'
     const cart: Carriage = {
       id: 'k1',
       realmId: 'r1',

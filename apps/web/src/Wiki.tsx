@@ -18,6 +18,7 @@ import {
   BUY_SHARE,
   CARAVAN_ESCORTS,
   CARAVAN_ESCORTS_MAX,
+  CARAVAN_GUARD_RANGE,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
   PASSENGER_WEIGHT,
@@ -77,6 +78,8 @@ import {
   WAYPOINTS_MAX,
   EXPLORE_FOOD_MARGIN,
   EXPLORE_SKIP_RANGE,
+  CARRIAGE_STOLEN_WORTH,
+  HORSE_STOLEN_WORTH,
   EXPLORED_EDGE_RANGE,
   WAYPOINT_NAME_MAX_LENGTH,
   HUNGRY_HORSE_PACE,
@@ -813,10 +816,10 @@ export function Wiki() {
           Give a grown resident <strong>Explore</strong> on their card, on foot or riding, and they
           go into the unknown on their own. Before they start, pick <code>find</code>, a kind of
           resource node to look for (forest, stone, iron ore or gold ore), or none to just explore
-          until you stop them; <code>toward</code>, a compass
-          direction, or a <code>waypoint</code> to head for instead; with neither they take the
-          nearest unexplored land first. <code>food</code> is where they refill; with none picked,
-          the nearest storage of your realm with Food.
+          until you stop them; <code>toward</code>, a compass direction, or a <code>waypoint</code>{' '}
+          to head for instead; with neither they take the nearest unexplored land first.{' '}
+          <code>food</code> is where they refill; with none picked, the nearest storage of your
+          realm with Food.
         </p>
         <p>
           They set out with as much Food as they can carry and walk to the edge of what you have
@@ -1063,7 +1066,7 @@ export function Wiki() {
         <p>
           <b>Reviving:</b> any grown resident of any realm on or next to a Down resident's tile can{' '}
           <b>Feed</b> them: the Feed row on their card (or on the Down resident's tile card), a
-          queue step, or <code>feed(residentId, units)</code> in a script. It puts up to that many
+          queue step, or <code>feed(targetId, units)</code> in a script. It puts up to that many
           units of the Food in their own hands into the Down resident's ({num(FEED_UNITS)} unless
           set). One unit is eaten at once, and they wake idle with {num(WAKE_HEALTH)} of{' '}
           {num(MAX_HEALTH)} health, which comes back while their hunger meter isn't empty; the rest
@@ -1359,6 +1362,21 @@ export function Wiki() {
           again. A carriage whose horse dies waits the same way.
         </p>
         <p>
+          A grown resident on the tile of another realm's or city's carriage can steal it: its card,
+          or the resident's, offers <strong>Drive off (theft)</strong>, and a script's{' '}
+          <code>drive</code> naming that carriage does the same. The carriage joins your realm at
+          once, with its load and hitched horse; with no horse hitched, a free horse of yours on the
+          tile pulls it, or else a free horse of someone else's there, stolen with it. It can't be
+          taken while someone drives it or anyone is aboard, nor while an armed resident of its
+          owner stands on the tile and none of your realm does. A caravan's carriage also can't be
+          driven off while its crew hold it (see Deliveries and transfers). Nothing that picks a
+          carriage by itself ever does this, and a queue step keeps to your own carriages, as do
+          hauling and group orders. Its owner's realm log says at once that it is gone and where it
+          was last; who took it they learn only from a witness (see Standing). One that belongs to
+          nobody is simply yours. A carriage handed over to an alliance army is its commander's to
+          drive, which is no theft.
+        </p>
+        <p>
           A carriage's card shows its load as a bar against what it holds (its passengers counted
           in) over its goods, its driver and passengers by name, the haul route it drives as “first
           stop → second stop” with the leg it is on and about when it arrives, and its horse with
@@ -1455,15 +1473,26 @@ export function Wiki() {
         <h3>A horse going Down</h3>
         <p>
           A horse goes hungry like a resident: with nothing in reach it goes <b>Down</b>{' '}
-          {days(HUNGER_DAYS + STARVE_DAYS)} after its last meal and lies there for{' '}
-          {days(DOWN_DAYS)}. Down, it doesn't move: its rider is on foot again, and the carriage it
-          pulls stands where it is, its drive or haul route ending; nobody can mount or drive it.
-          It still eats Food in reach, so put Food down on its tile or right next to it (horses
-          have no inventory: Food in someone's hands doesn't count). Once it has eaten, it gets up
-          with {num(HORSE_WAKE_HEALTH)} health of {num(MAX_HEALTH)} and heals from there. When the
-          time is up first, it dies. Its token lies on its side, the Horses drawer, the stable and
-          the tile card say it is Down and how long is left, and your realm log says when one of
-          your horses goes Down and when one dies.
+          {days(HUNGER_DAYS + STARVE_DAYS)} after its last meal and lies there for {days(DOWN_DAYS)}
+          . Down, it doesn't move: its rider is on foot again, and the carriage it pulls stands
+          where it is, its drive or haul route ending; nobody can mount or drive it. It still eats
+          Food in reach, so put Food down on its tile or right next to it, or Feed it (below). Once
+          it has eaten, it gets up with {num(HORSE_WAKE_HEALTH)} health of {num(MAX_HEALTH)} and
+          heals from there. When the time is up first, it dies. Its token lies on its side, the
+          Horses drawer, the stable and the tile card say it is Down and how long is left, and your
+          realm log says when one of your horses goes Down and when one dies.
+        </p>
+        <h3>Feeding a horse</h3>
+        <p>
+          Any grown resident of any realm on or next to a horse's tile can <b>Feed</b> it, whoever's
+          it is and Down or not, as long as it isn't full: the Feed row on their card (or on the
+          horse's tile card), a queue step, or <code>feed(targetId, units)</code> in a script.
+          Horses have no inventory, so it eats from their hands at once, a whole unit at a time,
+          until its hunger meter is full, up to the units asked for ({num(FEED_UNITS)} unless set);
+          the rest stays with them. A full meter holds {num(HUNGER_DAYS * HORSE_FOOD_PER_DAY)}{' '}
+          units. Feeding another realm's horse is no crime. Another realm's horse doesn't show how
+          it fares, so the card offers it unless it is known to be full, and the order says so if it
+          is.
         </p>
         <h3>Breeding</h3>
         <p>
@@ -1542,23 +1571,39 @@ export function Wiki() {
         </table>
         <h3>Riding</h3>
         <p>
-          A resident on a tile with a free horse of their realm can mount it, and dismount anywhere;
-          the horse stays where they get off. A rider goes wherever they walk at the speed the horse
-          would pull a carriage there (the carriage column above), never up onto walls, and into
-          mountains only along a finished road, like a carriage. A horse with less than{' '}
-          {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes at {pct(HUNGRY_HORSE_PACE)} of its
-          pace. Riding trains Driving like driving does, and Driving makes riding faster. A rider
-          carries no more than on foot, and can't drive a carriage; a ridden horse is never hitched.
-          A hungry ridden horse eats Food on the ground in reach first, then what its rider carries
-          beyond their own {num(OWN_FOOD)} Food: the rider never goes without for the horse, so give
-          a rider extra Food for a long ride. When a ridden horse goes hungry with nothing to spare,
-          your realm log says so. On the map a rider sits on a horse token, and up close their
-          activity icon is a horseshoe while they ride somewhere.
+          A resident on a tile with a free horse can mount it, and dismount anywhere; the horse
+          stays where they get off. Another realm's or city's is stolen by that (below). A rider
+          goes wherever they walk at the speed the horse would pull a carriage there (the carriage
+          column above), never up onto walls, and into mountains only along a finished road, like a
+          carriage. A horse with less than {pct(HORSE_HUNGRY_SHARE)} of its hunger meter left goes
+          at {pct(HUNGRY_HORSE_PACE)} of its pace. Riding trains Driving like driving does, and
+          Driving makes riding faster. A rider carries no more than on foot, and can't drive a
+          carriage; a ridden horse is never hitched. A hungry ridden horse eats Food on the ground
+          in reach first, then what its rider carries beyond their own {num(OWN_FOOD)} Food: the
+          rider never goes without for the horse, so give a rider extra Food for a long ride. When a
+          ridden horse goes hungry with nothing to spare, your realm log says so. On the map a rider
+          sits on a horse token, and up close their activity icon is a horseshoe while they ride
+          somewhere.
         </p>
         <p>
           A rider’s Doing line says <em>Riding to …</em> where it would say <em>Walking to …</em>,
           and their card shows the horse they ride: its stats, age, health and hunger, and that it
           eats from their spare Food, with <strong>Dismount</strong> under Orders.
+        </p>
+        <p>
+          A grown resident on the tile of another realm's or city's free horse can steal it: its
+          card, or the resident's, offers <strong>Mount their horse (theft)</strong>, and a script's{' '}
+          <code>mount</code> naming that horse does the same. A carriage of yours with no horse of
+          yours there can take it too: <strong>Drive with their horse (theft)</strong> hitches it,
+          and a script's <code>drive</code> does so if it names the horse. A horse of yours on the
+          tile always goes first and nothing is stolen. Either way the horse joins your realm at
+          once. It can't be taken while someone rides it or it pulls a carriage, nor while an armed
+          resident of its owner stands on the tile and none of your realm does; a stable doesn't
+          protect it. A Down horse can't be ridden or hitched, so Feed it first. Nothing that picks
+          a horse by itself ever does this: default scripts, Breed horses, group orders and queue
+          steps keep to your own. Its owner's realm log says at once that it is gone and where it
+          was last; who took it they learn only from a witness (see Standing). One that belongs to
+          nobody is simply yours. Someone on loan to your realm steals none to ride.
         </p>
         <h3>Passengers</h3>
         <p>
@@ -1646,6 +1691,16 @@ export function Wiki() {
           Caravans walk with {num(CARAVAN_ESCORTS)} escorts, one more for every{' '}
           {num(CARAVAN_ROBBERIES_PER_ESCORT)} robberies of their route, at most{' '}
           {num(CARAVAN_ESCORTS_MAX)}.
+        </p>
+        <p>
+          A caravan outlives its crew. When its driver dies a surviving escort takes over driving.
+          With no crew left its carriage stands where it is, and the HQ sends a new driver on foot
+          once it has an adult free. Stealing a caravan's carriage takes beating its crew first: it
+          can't be driven off while its driver or an armed escort is up and within{' '}
+          {num(CARAVAN_GUARD_RANGE)} tiles of it, so one still walking out doesn't stop you. It is
+          one theft from the Trade Organization, worth the carriage, horse and load, and robs the
+          caravan: its route counts the robbery and the delivery or transfer goes again. The same
+          caravan gets a new carriage and horse at the HQ, and any surviving crew walk back to it.
         </p>
       </Section>
 
@@ -1870,7 +1925,12 @@ export function Wiki() {
           {num(STANDING_DRIFT_PER_DAY)} a game day. A crime is remembered for{' '}
           {days(CRIME_MEMORY_DAYS)} after the news stops spreading. Taking from or tearing down
           another realm's outpost storage counts the same as its city storage, and taking what
-          another realm's Down resident carries is theft too.
+          another realm's Down resident carries is theft too. So is driving off in another's
+          carriage (see Transport): one theft, worth {num(CARRIAGE_STOLEN_WORTH)} coins for the
+          carriage, {num(HORSE_STOLEN_WORTH)} for its horse, and the load. So is mounting another's
+          horse or hitching it (see Riding): one theft, worth {num(HORSE_STOLEN_WORTH)} coins. A
+          carriage driven off with a horse of a different owner is a theft from each. Taking back
+          what was stolen from you is theft like any other.
         </p>
         <table>
           <thead>
@@ -1915,7 +1975,7 @@ export function Wiki() {
             you; below {signed(TRADE_ORG_PUNISHES_BELOW)} its army (up to{' '}
             {num(TRADE_ORG_PUNISH.soldiers)} soldiers) comes to take {num(TRADE_ORG_PUNISH.times)}{' '}
             times what it lost, giving up after {days(TRADE_ORG_PUNISH.giveUpDays)}. Besides stolen
-            goods it counts{' '}
+            goods, carriages and horses it counts{' '}
             {(Object.entries(TRADE_ORG_LOSS) as [CrimeKind, number][])
               .map(([c, n]) => `${CRIME_NAMES[c].toLowerCase()} as ${num(n)} coins`)
               .join(', ')}
@@ -2029,6 +2089,15 @@ export function Wiki() {
           city inspector, a warning when it is your city. Out of sight it isn't shown, nor
           remembered in Last seen. Scripts see it as <code>city.occupation</code>: who occupies a
           town hall in sight, and the ticks left.
+        </p>
+        <h3>What joins with a city</h3>
+        <p>
+          However a city joins a realm, captured, bought or persuaded, its horses and carriages come
+          with it. An NPC city's are all its own, wherever they stand, at a stable or on the road. A
+          Player's aren't tied to one city, so of those the ones in its area or at its stables join,
+          and the rest stay with their realm. Either way a horse a joining resident rides and a
+          carriage one drives join with them, and a carriage's hitched horse with it. Another NPC
+          city's or realm's that happen to stand there don't.
         </p>
       </Section>
 
