@@ -627,3 +627,36 @@ button.card-list-row:hover {
   text-decoration: underline;
   cursor: pointer;
 }
+/* A construction site on the tile card (`SiteView`): its work meter, then a row per material with
+   its icon and name, what was delivered against what it needs, and a small bar. */
+.card-site {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-site .panel-head h3 {
+  margin: 0;
+}
+.card-work .meter {
+  margin-bottom: 4px;
+}
+.site-materials {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+.site-materials li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto 56px;
+  gap: 8px;
+  align-items: center;
+}
+.site-material-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -59,6 +59,7 @@ import {
   type GoodsWanted,
   aboutTime,
   drivenCarriageId,
+  workLeft,
   type LoadLevel,
   type Horse,
   type SeenHorse,
@@ -645,7 +646,7 @@ export interface TileCard {
    * and what they saw of it then (what it held, a site's materials, as lists), shown apart from
    * the lines and lists about what is there now.
    */
-  lastSeen?: { when: string; lines: string[]; lists: CardList[] }
+  lastSeen?: { when: string; lines: string[]; lists: CardList[]; sites?: SiteView[] }
   /** The carriage on the tile, as rows and meters (`CONTEXT.md`: Goods on cards). */
   carriage?: CarriageView
   /**
@@ -654,9 +655,13 @@ export interface TileCard {
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
   /**
+   * The construction sites on the tile, the building's own and a carriage's on a stable, as a work
+   * meter and a row per material (`CONTEXT.md`: Goods on cards).
+   */
+  sites?: SiteView[]
+  /**
    * Who and what the tile holds, under the card's lines: the horses in a stable or on the tile and
-   * a workplace's workers as rows; the goods in a storage, a pile and a site's materials as goods
-   * grids.
+   * a workplace's crew as rows; the goods in a storage and a pile as goods grids.
    */
   lists?: CardList[]
   /**
@@ -703,6 +708,22 @@ export interface CarriageView {
   route?: { stops: string; leg: string }
 }
 
+/**
+ * A construction site on the tile card (`CONTEXT.md`: Goods on cards, Construction site): its work
+ * done as a meter with how long is left, and what it has against what it needs, per good.
+ */
+export interface SiteView {
+  /** Its section's head, where the card is named after something else: "Carriage site". */
+  title?: string
+  /**
+   * The work done: "40%", the share for its meter, and about how long is left at the pace of
+   * those building it now (`workLeft`); no estimate for a site only remembered.
+   */
+  work: { text: string; share: number; left?: string }
+  /** Each material it takes, in the usual order: what was delivered against what it needs. */
+  materials: { good: Good; have: number; need: number }[]
+}
+
 /** A list of rows on the tile card (`TileCard.lists`), its head with a count on the right. */
 export interface CardList {
   title: string
@@ -717,11 +738,11 @@ export interface CardList {
   goods?: Stock
 }
 
-/** One row of a `CardList`: a horse or a worker. */
+/** One row of a `CardList`: a horse or one of a workplace's crew. */
 export interface CardRow {
   id: string
   name: string
-  /** Under the name: a horse's stats and age, whose a worker is. */
+  /** Under the name: a horse's stats and age, what one of a crew is doing and whose they are. */
   detail?: string
   /**
    * Each of the list's meters filled to this share, undefined where the Player doesn't know how
@@ -995,32 +1016,56 @@ function horseLists(
 }
 
 /**
- * A workplace's workers in sight (`CONTEXT.md`: Workplace): "Workers" with "7 / 10" on the right,
- * then a row for each with their health and hunger where the Player knows them. A click on one of
- * the Player's own opens their card.
+ * A workplace's crew in sight (`CONTEXT.md`: Workplace, Goods on cards): "Crew" with "2 / 10" at
+ * work on the right and how many are away, then a row for each with what they are doing (working,
+ * carrying a load, fetching) and their health and hunger where the Player knows them. The crew
+ * are those working it, and the Player's own whose script works it (its `workplace` param) while
+ * they are away carrying its output, fetching or on their way. A click on one of the Player's
+ * own opens their card.
  */
-function workerList(b: Building, max: number, t: TileThings): CardList {
-  const working = (t.residents ?? []).filter(
-    (r) => r.order?.kind === 'workAt' && r.order.buildingId === b.id,
-  )
+function crewList(
+  b: Building,
+  max: number,
+  t: TileThings,
+  labels: Record<string, string>,
+): CardList {
+  const working = (r: SeenResident) => r.order?.kind === 'workAt' && r.order.buildingId === b.id
+  const crew = (t.residents ?? []).filter((r) => working(r) || r.script?.params?.workplace === b.id)
+  const away = crew.filter((r) => !working(r)).length
   return {
-    title: 'Workers',
-    count: `${t.workers(b)} / ${max}`,
+    title: 'Crew',
+    count: `${t.workers(b)} / ${max}${away > 0 ? ` · ${away} away` : ''}`,
     empty: 'Nobody works here',
     meters: FARES_METERS,
-    rows: working.map((r) => {
+    rows: crew.map((r) => {
       const stranger = t.strangers.some((s) => s.id === r.id)
       const rel = stranger ? realmRelationship(r.owner, r.cityId, t.cities, t.viewer) : 'own'
       const shares = faresShares(r)
+      const whose = stranger ? ` · ${rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s'}` : ''
       return {
         id: r.id,
         name: r.name,
-        ...(stranger ? { detail: rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s' } : {}),
+        detail: `${crewDoing(r, b, labels)}${whose}`,
         ...(shares ? { shares } : {}),
         ...(stranger ? {} : { opens: 'resident' as const }),
       }
     }),
   }
+}
+
+/**
+ * What one of a workplace's crew is doing, by their order: "Working", "Carrying a load" (storing
+ * its output), "Fetching iron ore" (inputs, or Food), "On the way", else "Idle".
+ */
+function crewDoing(r: SeenResident, b: Building, labels: Record<string, string>): string {
+  const o = r.order
+  if (o?.kind === 'workAt' && o.buildingId === b.id) return 'Working'
+  if (o?.kind === 'store') return 'Carrying a load'
+  if (o?.kind === 'fetch') {
+    const goods = GOODS.filter((g) => g in o.goods).map((g) => labels[g]!.toLowerCase())
+    return goods.length > 0 ? `Fetching ${goods.join(', ')}` : 'Fetching'
+  }
+  return o ? 'On the way' : 'Idle'
 }
 
 /**
@@ -1200,6 +1245,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     .map(({ id, name }) => ({ id, name }))
   const lines: string[] = []
   const lists: CardList[] = []
+  const sites: SiteView[] = []
   let stableFood: TileCard['stableFood']
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
@@ -1221,16 +1267,10 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
           : undefined,
     }
     lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
-    if (building.site) {
-      const work = BUILD_WORK[building.kind] ?? 0
-      const done = work > 0 ? Math.floor((building.site.work / work) * 100) : 100
-      lines.push(`${done}% of the work done`)
-      lists.push(...siteLists(building))
-      const left = stillNeededLine(building)
-      if (left) lines.push(left)
-    } else {
+    if (building.site) sites.push(describeSite(building, live ? t : undefined))
+    else {
       const max = MAX_WORKERS[building.kind]
-      if (max !== undefined && live) lists.push(workerList(live, max, t))
+      if (max !== undefined && live) lists.push(crewList(live, max, t, goodLabels))
       // A house's room (`CONTEXT.md`: House), and how its city is housed where the Player may know.
       const room = HOUSING_ROOM[building.kind]
       if (room !== undefined) {
@@ -1281,18 +1321,16 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         when: lastSeenText(remembered.seenAt, t.lastSeen.tick),
         lines: lines.splice(0),
         lists: lists.splice(0),
+        ...(sites.length > 0 ? { sites: sites.splice(0) } : {}),
       }
     }
   }
   if (carriageSite?.site) {
     // A carriage site has no owner (`CONTEXT.md`: Construction site), even on a stable.
+    // On a stable's card under a head of its own.
+    const head = card ? { title: 'Carriage site' } : {}
     card ??= { title: 'Carriage site', what: 'building' }
-    const work = BUILD_WORK.carriage ?? 0
-    const done = work > 0 ? Math.floor((carriageSite.site.work / work) * 100) : 100
-    lines.push(`Carriage site · ${done}% of the work done`)
-    lists.push(...siteLists(carriageSite, 'Carriage'))
-    const left = stillNeededLine(carriageSite)
-    if (left) lines.push(`Carriage site · ${left.toLowerCase()}`)
+    sites.push({ ...head, ...describeSite(carriageSite, t) })
     if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
   }
   if (carriage) {
@@ -1365,6 +1403,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(carriageView ? { carriage: carriageView } : {}),
     ...(unhitch ? { unhitch } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
+    ...(sites.length > 0 ? { sites } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
   }
@@ -1525,36 +1564,27 @@ function terrainLine(terrain: number | undefined, road: Building | undefined): s
     : `${name} · ${speed(s)} · ${food(f)}`
 }
 
-/** What a construction site still lacks of its materials (`CONTEXT.md`: Construction site). */
-function stillNeededLine(site: Building): string | undefined {
-  if (Object.keys(BUILD_MATERIALS[site.kind] ?? {}).length === 0)
-    return 'Needs no materials, only work'
-  return Object.keys(materialsLeft(site)).length === 0 ? 'All materials delivered' : undefined
-}
-
-/** What a construction site still needs of each of its materials. */
-function materialsLeft(site: Building): Stock {
-  const left: Stock = {}
-  const needs = Object.entries(BUILD_MATERIALS[site.kind] ?? {}) as [Good, number][]
-  for (const [good, units] of needs) {
-    const missing = units - (site.site?.delivered[good] ?? 0)
-    if (missing > 0) left[good] = missing
-  }
-  return left
-}
-
 /**
- * A construction site's materials as goods grids (`CONTEXT.md`: Goods on cards): what was
- * delivered, and what it still needs while it needs any. `of` names whose site it is ("Carriage").
+ * A construction site as a work meter and a row per material (`SiteView`). With `t`, what is in
+ * sight now, it says how long the work is left at the pace of those building it; a site only
+ * remembered has none.
  */
-function siteLists(site: Building, of?: string): CardList[] {
-  if (Object.keys(BUILD_MATERIALS[site.kind] ?? {}).length === 0) return []
-  const title = (t: string) => (of ? `${of}: ${t.toLowerCase()}` : t)
-  const left = materialsLeft(site)
-  const delivered = goodsList(title('Delivered'), site.site?.delivered ?? {}, 'Nothing yet', '')
-  return Object.keys(left).length === 0
-    ? [delivered]
-    : [delivered, goodsList(title('Still needs'), left, '', '')]
+function describeSite(site: Building, t: TileThings | undefined): SiteView {
+  const work = BUILD_WORK[site.kind] ?? 0
+  const share = work > 0 ? Math.min(1, (site.site?.work ?? 0) / work) : 1
+  const need = BUILD_MATERIALS[site.kind] ?? {}
+  const left =
+    t?.tick === undefined
+      ? undefined
+      : workLeft(site, (t.residents ?? []) as Resident[], t.tick, { under: t.terrain })
+  return {
+    work: { text: `${Math.floor(share * 100)}%`, share, ...(left ? { left } : {}) },
+    materials: GOODS.filter((g) => (need[g] ?? 0) > 0).map((good) => ({
+      good,
+      have: site.site?.delivered[good] ?? 0,
+      need: need[good]!,
+    })),
+  }
 }
 
 /**

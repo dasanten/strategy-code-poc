@@ -608,10 +608,10 @@ describe('the card for a tile', () => {
   it('is named after a building on it, in its owner’s colour', () => {
     const card = tile({ buildings: [building({ kind: 'farm', cityId: 'c-me' })] })
     expect(card).toMatchObject({ title: 'Eastmere farm', rel: 'own', what: 'building' })
-    expect(card.lists?.[0]).toMatchObject({ title: 'Workers', count: `1 / ${MAX_WORKERS.farm}` })
+    expect(card.lists?.[0]).toMatchObject({ title: 'Crew', count: `1 / ${MAX_WORKERS.farm}` })
   })
 
-  it('lists a farm’s workers in sight as rows with their meters, the Player’s own to open', () => {
+  it('lists a farm’s crew in sight as rows with their meters, the Player’s own to open', () => {
     const farm = building({ kind: 'farm', cityId: 'c-me' })
     const working = { kind: 'workAt', buildingId: farm.id }
     const ana = {
@@ -634,13 +634,13 @@ describe('the card for a tile', () => {
     })
     expect(card.lists).toEqual([
       {
-        title: 'Workers',
+        title: 'Crew',
         count: `2 / ${MAX_WORKERS.farm}`,
         empty: 'Nobody works here',
         meters: ['Health', 'Hunger'],
         rows: [
-          { id: 'ana', name: 'Ana', shares: [1, 0.5], opens: 'resident' },
-          { id: 'cid', name: 'Cid', detail: 'Another realm' },
+          { id: 'ana', name: 'Ana', detail: 'Working', shares: [1, 0.5], opens: 'resident' },
+          { id: 'cid', name: 'Cid', detail: 'Working · Another realm' },
         ],
       },
     ])
@@ -648,6 +648,40 @@ describe('the card for a tile', () => {
     const none = tile({ buildings: [farm], workers: () => 0 })
     expect(none.lists?.[0]).toMatchObject({ count: `0 / ${MAX_WORKERS.farm}`, rows: [] })
     expect(card.lines.some((l) => l.includes('workers'))).toBe(false)
+  })
+
+  it('counts the Player’s own away for the workplace among its crew, saying what they do', () => {
+    const smelter = building({ kind: 'smelter', cityId: 'c-me' })
+    const crew = (id: string, order: unknown) =>
+      ({
+        id,
+        name: id,
+        owner: 'me',
+        cityId: 'c-me',
+        order,
+        script: { scriptId: 1, params: { workplace: smelter.id } },
+      }) as unknown as SeenResident
+    const walk = { kind: 'walkTo', target: { x: 0, y: 0 }, path: null, progress: 0 }
+    const fetching = { ...walk, kind: 'fetch', goods: { ironOre: 10 }, phase: 'walking' }
+    const residents = [
+      crew('Ana', { kind: 'workAt', buildingId: smelter.id }),
+      crew('Bo', { ...walk, kind: 'store', goods: { iron: null }, phase: 'walking' }),
+      crew('Cy', fetching),
+      crew('Di', walk),
+      crew('Ed', null),
+      // Working elsewhere, by another script: not of its crew.
+      { ...crew('Fy', walk), script: { scriptId: 2, params: { workplace: 'b-farm' } } },
+    ]
+    const card = tile({ buildings: [smelter], residents, workers: () => 1 })
+    const list = card.lists?.find((l) => l.title === 'Crew')
+    expect(list?.count).toBe(`1 / ${MAX_WORKERS.smelter} · 4 away`)
+    expect(list?.rows.map((r) => [r.name, r.detail])).toEqual([
+      ['Ana', 'Working'],
+      ['Bo', 'Carrying a load'],
+      ['Cy', 'Fetching iron ore'],
+      ['Di', 'On the way'],
+      ['Ed', 'Idle'],
+    ])
   })
 
   it('shows a storage’s goods as the goods grid, and what they weigh', () => {
@@ -686,8 +720,32 @@ describe('the card for a tile', () => {
     const site = building({ kind: 'house', site: { work: 0, delivered: { wood: 2 } } })
     const card = tile({ buildings: [site] })
     expect(card.title).toBe('House site')
-    expect(card.lines).toContain('0% of the work done')
-    expect(card.lists?.[0]).toMatchObject({ title: 'Delivered', goods: { wood: 2 } })
+    expect(card.sites).toEqual([
+      {
+        work: { text: '0%', share: 0 },
+        materials: [{ good: 'wood', have: 2, need: BUILD_MATERIALS.house!.wood }],
+      },
+    ])
+    expect(card.lists).toBeUndefined()
+  })
+
+  it('says how long a site’s work is left at the pace of those building it', () => {
+    const site = building({ kind: 'house', site: { work: 0, delivered: {} } })
+    expect(tile({ buildings: [site], tick: 0 }).sites?.[0]?.work.left).toBe('nobody is building')
+    const builder = {
+      id: 'ana',
+      name: 'Ana',
+      owner: 'me',
+      cityId: 'c-me',
+      x: 5,
+      y: 5,
+      bornAt: -ticksForAge(30),
+      stats: { strength: { base: 10, trained: 0 } },
+      skills: {},
+      order: { kind: 'build', building: 'house', at: { x: 5, y: 5 }, siteId: site.id },
+    } as unknown as SeenResident
+    const left = tile({ buildings: [site], residents: [builder], tick: 0 }).sites?.[0]?.work.left
+    expect(left).toMatch(/ left$/)
   })
 
   it('shows a carriage, a pile and a node when there is no building', () => {
