@@ -19,7 +19,7 @@ import {
   mountOffProblem,
   feedHorseProblem,
   feedProblem,
-  horseFull,
+  horsesInNeed,
   MAP_SIZE,
   NO_CHILD_FEEDS,
   NO_FOOD_TO_FEED,
@@ -812,9 +812,9 @@ export interface TileCard {
   downHere?: { id: string; name: string; x: number; y: number; down: true }[]
   /**
    * Horses on the tile that aren't full as far as the Player knows, of any realm, which the resident
-   * picked last may Feed (`CONTEXT.md`: Feeding a horse).
+   * picked last may Feed, most in need first (`CONTEXT.md`: Feeding a horse).
    */
-  horsesToFeed?: { id: string; name: string; x: number; y: number }[]
+  horsesToFeed?: { id: string; name: string; x: number; y: number; down?: true }[]
   /**
    * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
    * and what they saw of it then (what it held, a site's materials, as lists), shown apart from
@@ -1650,9 +1650,13 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const downHere = here(t.residents ?? t.strangers)
     .filter((r) => isDown(r))
     .map((r) => ({ id: r.id, name: r.name, x: r.x, y: r.y, down: true as const }))
-  const horsesToFeed = horsesHere
-    .filter((h) => !horseFull(h))
-    .map((h) => ({ id: h.id, name: h.name, x: h.x, y: h.y }))
+  const horsesToFeed = horsesInNeed(horsesHere).map((h) => ({
+    id: h.id,
+    name: h.name,
+    x: h.x,
+    y: h.y,
+    ...(isDown(h) ? { down: true as const } : {}),
+  }))
   if (!stable && horsesHere.length > 0) {
     card ??= {
       title: horsesHere.length === 1 ? 'Horse' : `${horsesHere.length} horses`,
@@ -2023,10 +2027,16 @@ function teardownLine(b: Building): string {
 export function feedTargets(
   card: Pick<TileCard, 'downHere' | 'horsesToFeed'>,
   actor: Pick<Resident, 'id'>,
-): { id: string; name: string; x: number; y: number; horse?: true }[] {
+): { id: string; name: string; x: number; y: number; horse?: true; down?: true }[] {
   const down = card.downHere?.filter((r) => r.id !== actor.id) ?? []
   const horses = card.horsesToFeed?.map((h) => ({ ...h, horse: true as const })) ?? []
   return [...down, ...horses]
+}
+
+/** How the Feed block names whom to Feed: a horse says so, and says when it is Down. */
+export function feedTargetLabel(t: { name: string; horse?: true; down?: true }): string {
+  if (!t.horse) return t.name
+  return t.down ? `${t.name} (horse, Down)` : `${t.name} (horse)`
 }
 
 /**

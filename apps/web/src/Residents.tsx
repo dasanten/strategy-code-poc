@@ -1,7 +1,7 @@
 import {
   BUILD_MATERIALS,
   aboutTime,
-  horseFull,
+  horsesInNeed,
   isDown,
   inContact,
   bornIn,
@@ -1939,9 +1939,12 @@ export function ResidentCard({
     ...[...residents, ...others].filter(
       (x) => x.id !== r.id && isDown(x) && inContact(mapSize, r, x),
     ),
-    ...horses
-      .filter((h) => !horseFull(h) && inContact(mapSize, r, h))
-      .map((h) => ({ id: h.id, name: h.name, horse: true as const })),
+    ...horsesInNeed(horses.filter((h) => inContact(mapSize, r, h))).map((h) => ({
+      id: h.id,
+      name: h.name,
+      horse: true as const,
+      ...(isDown(h) ? { down: true as const } : {}),
+    })),
   ]
   const atCarriageSite: GoodsSpot = { kind: 'site', siteId: carriageSite?.id ?? '' }
   const carriageNeeded = carriageSite ? materialsNeeded(carriageSite) : {}

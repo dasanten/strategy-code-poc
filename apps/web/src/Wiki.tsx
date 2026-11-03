@@ -1493,7 +1493,8 @@ export function Wiki() {
           the rest stays with them. A full meter holds {num(HUNGER_DAYS * HORSE_FOOD_PER_DAY)}{' '}
           units. Feeding another realm's horse is no crime. Another realm's horse doesn't show how
           it fares, so the card offers it unless it is known to be full, and the order says so if it
-          is.
+          is. With more than one to choose from, those Down come first and say so, then those known
+          to be hungry.
         </p>
         <h3>Breeding</h3>
         <p>

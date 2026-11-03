@@ -11,7 +11,7 @@ import {
   horseToSteal,
   mountOffProblem,
   horseOfResident,
-  horseFull,
+  horsesInNeed,
   isDown,
   riderOf,
   seatsLeft,
@@ -231,10 +231,10 @@ function planWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): Pl
 
 /**
  * Anyone Down in sight and any horse that isn't full as far as the Player knows, of any realm, to
- * Feed (`CONTEXT.md`: Reviving, Feeding a horse).
+ * Feed, most in need first (`CONTEXT.md`: Reviving, Feeding a horse).
  */
 function toFeed(world: NonNullable<ReturnType<typeof useWorld>['world']>) {
-  return [...world.residents.filter(isDown), ...world.horses.filter((h) => !horseFull(h))]
+  return [...world.residents.filter(isDown), ...horsesInNeed(world.horses)]
 }
 
 export function App() {
