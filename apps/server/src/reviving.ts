@@ -75,7 +75,7 @@ export function stepFeeding(world: WorldState, size = MAP_SIZE): void {
 }
 
 /**
- * A horse eats from the feeder's hands until its hunger meter is full, up to `units`, whole units
+ * A horse eats from the feeder's hands until it is full (`horseFull`), up to `units`, whole units
  * only; the rest stays with the feeder (`CONTEXT.md`: Feeding a horse).
  */
 function feedHorse(

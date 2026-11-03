@@ -1190,7 +1190,10 @@ describe('horses on the tile card', () => {
     // A full horse is no one to feed; a stranger's, of unknown hunger, is offered.
     const full = tile({ horses: [horse({ x: 5, y: 5, hunger: MAX_HUNGER })], tick })
     expect(full.horsesToFeed).toBeUndefined()
-    const theirs = tile({ horses: [unknown({ x: 5, y: 5, realmId: 'r-other' })], tick })
+    // Nor is one with room for less than a whole unit (`CONTEXT.md`: Feeding a horse).
+    const nearlyFull = tile({ horses: [horse({ x: 5, y: 5, hunger: MAX_HUNGER - 1 })], tick })
+    expect(nearlyFull.horsesToFeed).toBeUndefined()
+    const theirs =tile({ horses: [unknown({ x: 5, y: 5, realmId: 'r-other' })], tick })
     expect(theirs.horsesToFeed).toEqual([{ id: 'h1', name: 'Rowan', x: 5, y: 5 }])
     // With more than one the row doesn't name them; the block lists them, Down residents first.
     const ana = { id: 'ana', name: 'Ana', x: 5, y: 5, down: true as const }

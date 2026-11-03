@@ -1,4 +1,5 @@
 import {
+  HORSE_FILL_PER_FOOD,
   HORSE_WAKE_HEALTH,
   MAX_HUNGER,
   Terrain,
@@ -108,10 +109,23 @@ describe('feeding a horse', () => {
     s.rowan.hunger = 10
     s.give(feedRowan(50))
     s.tick()
-    // 90 of the meter to fill at about 44 a unit: three units, the last not all of it needed.
-    expect(s.ben.carried).toEqual({ food: 3 })
-    expect(s.rowan.hunger).toBeGreaterThan(MAX_HUNGER - 1)
+    // 90 of the meter to fill at about 44 a unit: two units fit, a third would be partly wasted.
+    expect(s.ben.carried).toEqual({ food: 4 })
+    expect(s.rowan.hunger).toBeCloseTo(10 + 2 * HORSE_FILL_PER_FOOD, 0)
     expect(s.rowan.hunger).toBeLessThanOrEqual(MAX_HUNGER)
+  })
+
+  it('wastes no Food: a horse with room for just a whole unit eats it, with less it is full', () => {
+    const s = setup()
+    s.rowan.hunger = MAX_HUNGER - HORSE_FILL_PER_FOOD
+    s.give(feedRowan())
+    s.tick()
+    expect(s.ben.carried).toEqual({ food: 5 })
+    expect(s.rowan.hunger).toBeCloseTo(MAX_HUNGER, 0)
+
+    const t = setup()
+    t.rowan.hunger = MAX_HUNGER - HORSE_FILL_PER_FOOD + 1
+    expect(t.give(feedRowan())).toMatchObject({ type: 'rejected', reason: 'that horse is full' })
   })
 
   it('eats only the units asked for', () => {
@@ -171,7 +185,7 @@ describe('feeding a horse', () => {
     t.give({ kind: 'feed', residentId: 'a4', targetId: 'h1', units: 50 })
     t.tick()
     // Whoever goes first fills it; the other keeps all their Food.
-    expect(t.ben.carried.food! + cid.carried.food!).toBe(9)
+    expect(t.ben.carried.food! + cid.carried.food!).toBe(10)
   })
 
   it('can feed another realm’s horse, and that is no crime', () => {
