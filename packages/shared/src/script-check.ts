@@ -106,6 +106,6 @@ export function scriptCheckEnv(options: { defaultScript: boolean }): ScriptCheck
     shapes,
     describeShape: (shape) => NOUNS[shape] ?? `a ${shape as ScriptViewName}`,
     // A storage param may hold a carriage as well, so only a building one is certain.
-    paramTypes: { building: { shape: 'building' } },
+    paramTypes: { building: { shape: 'building' }, waypoint: { shape: 'waypoint' } },
   }
 }

@@ -68,6 +68,7 @@ export type PlanStepId =
   | 'getOff'
   | 'unhitch'
   | 'relocate'
+  | 'explore'
   | 'runScript'
 
 /** One kind of step Add step offers. */
@@ -191,6 +192,7 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     label: 'Relocate',
     picks: [{ pick: 'city', prompt: 'the city of yours to relocate to' }],
   },
+  { id: 'explore', label: 'Explore', picks: [] },
   { id: 'runScript', label: 'Run script', picks: [], ask: 'script' },
 ]
 
@@ -409,6 +411,8 @@ export function planOrder(
       return { order: { kind: 'board', carriageId: p.id }, at }
     case 'getOff':
       return { order: { kind: 'getOff' } }
+    case 'explore':
+      return { order: { kind: 'task', task: 'explore' } }
     case 'unhitch':
       return { order: { kind: 'unhitch', carriageId: p.id }, at }
     case 'work': {

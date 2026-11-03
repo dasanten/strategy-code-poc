@@ -14,6 +14,8 @@ import {
   occupationTicksLeft,
   breedingPair,
   buildingAt,
+  carriageCanGoTo,
+  isPassableTerrain,
   teacherAt,
   traineesOf,
   buildingRealm,
@@ -60,7 +62,8 @@ import { lastSeenOutOfSight } from './last-seen.js'
 import { plainValue, type PlainValue } from './plain-value.js'
 import { paramTarget, paramWaypoint } from './script-params.js'
 import { realmOf } from './starting-city.js'
-import { walkTime } from './walk-time.js'
+import { walkTime, wayFood } from './walk-time.js'
+import { COMPASS, exploredEdge } from './explored-edge.js'
 import { waypointsOf } from './waypoints.js'
 
 /** Re-exported for the callers that reckon walks like scripts do. */
@@ -415,6 +418,31 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const time = (a: { x: number; y: number }, b: { x: number; y: number }) =>
       walkTime(world, terrain, context.explored, resident, a, b)
     queries.walkTime = ([a, b]) => time(spot(a, 'walkTime'), spot(b, 'walkTime'))
+    queries.wayFood = ([a, b]) =>
+      wayFood(world, terrain, context.explored, resident, spot(a, 'wayFood'), spot(b, 'wayFood'))
+    // Only tiles I could be sent to now: a rider where a horse can go (`walkTo`).
+    queries.exploredEdge = ([from, toward, skip]) => {
+      if (toward != null && !(typeof toward === 'string' && toward in COMPASS)) {
+        throw new ScriptRuntimeError(
+          `"exploredEdge" needs a compass direction, not ${String(toward)}`,
+        )
+      }
+      const skipped = skip == null ? [] : skip
+      if (!Array.isArray(skipped)) throw new ScriptRuntimeError('"exploredEdge" skips a list')
+      const canEnter =
+        resident.riding !== undefined
+          ? (x: number, y: number) => carriageCanGoTo(world, terrain, x, y)
+          : (x: number, y: number) => isPassableTerrain(terrainAt(terrain, x, y))
+      const edge = exploredEdge({
+        size: terrain.size,
+        explored: context.explored,
+        canEnter,
+        from: spot(from, 'exploredEdge'),
+        toward: toward ?? undefined,
+        skip: skipped.map((s) => spot(s, 'exploredEdge')),
+      })
+      return edge ?? null
+    }
     queries.crewTile = ([building]) => {
       const id = (building as Record<string, Value> | null)?.id
       const b = typeof id === 'string' ? world.buildings.find((x) => x.id === id) : undefined
@@ -490,7 +518,9 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     }
     const id = typeof p.value === 'string' ? p.value : undefined
     if (p.type === 'waypoint') {
-      params[p.name] = viewValue(id === undefined ? null : paramWaypoint(world, side, id), 'any')
+      params[p.name] = viewValue(id === undefined ? null : paramWaypoint(world, side, id), {
+        view: 'waypoint',
+      })
       continue
     }
     const target = id === undefined ? undefined : paramTarget(world, side, p.type, id)

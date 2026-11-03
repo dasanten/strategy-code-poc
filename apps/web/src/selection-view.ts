@@ -100,6 +100,7 @@ export type ActionId =
   | 'unhitch'
   | 'drive'
   | 'haul'
+  | 'explore'
   | 'build'
   | 'roadTo'
   | 'wallTo'
@@ -134,6 +135,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   unhitch: 'U',
   drive: 'D',
   haul: 'H',
+  explore: 'Z',
   build: 'B',
   roadTo: 'R',
   wallTo: 'Q',
@@ -313,6 +315,9 @@ export function residentOrders(h: ResidentHere): {
     miss('drive', h.carriage ? 'children can’t drive' : 'no carriage here')
     miss('haul', h.carriage ? 'children can’t drive' : 'no carriage here')
   }
+  // Into the unknown and back for Food (`CONTEXT.md`: Explore).
+  if (h.adult) add(row('explore', 'Explore'))
+  else miss('explore', 'children can’t explore')
   if (works && isWorkable(h.building, h.node)) {
     add(
       row('work', `Work at the ${BUILDING_NAMES[h.building!.kind].toLowerCase()}…`, {
@@ -413,6 +418,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   unhitch: 'move',
   drive: 'move',
   haul: 'move',
+  explore: 'move',
   work: 'work',
   feedStable: 'work',
   teach: 'work',

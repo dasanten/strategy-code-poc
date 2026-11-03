@@ -818,7 +818,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const starts =
       order.kind === 'runScript' || order.kind === 'setDefenceScript'
         ? { kind: order.kind, scriptId: order.scriptId }
-        : order.kind === 'work' || order.kind === 'build'
+        : order.kind === 'work' || order.kind === 'build' || order.kind === 'explore'
           ? { kind: 'task', task: order.kind }
           : undefined
     const given = 'params' in order && order.params !== undefined
@@ -936,6 +936,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     const order = { kind: 'task', task: 'train', residentId: selected.id, groundId }
     setOrderError(await giveOrder(order, false))
+  }
+  /**
+   * Gives the picked resident the Explore task: they run the Player's Explore (default) script,
+   * its params picked first (`CONTEXT.md`: Explore); with Shift held it goes in their queue.
+   */
+  async function explore() {
+    if (!selected) return
+    setOrderError(await giveOrder({ kind: 'task', task: 'explore', residentId: selected.id }))
   }
   /**
    * Orders the picked resident to teach `subject` at the training ground they stand on
@@ -1663,6 +1671,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onWork={work}
             onFeedStable={feedStable}
             onTrain={train}
+            onExplore={explore}
             onTeach={teach}
             onTearDown={tearDown}
             horses={world.horses}

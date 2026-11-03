@@ -211,6 +211,8 @@ describe('script views', () => {
       breedingPair: 'breedingPair(building("s1"))',
       storages: 'storages()',
       walkTime: 'walkTime(me, building("s1"))',
+      wayFood: 'wayFood(me, building("s1"))',
+      exploredEdge: 'exploredEdge(me, "north")',
       crewTile: 'crewTile(building("s1"))',
       lineTiles: 'lineTiles({building: "road", from: {x: 10, y: 12}, to: {x: 13, y: 12}}, me)',
       tick: 'tick',

@@ -75,6 +75,8 @@ export type GroupOrder =
   | { kind: 'feedStable' }
   /** Each trains at the training ground they stand on (`CONTEXT.md`: Trainee). */
   | { kind: 'train' }
+  /** Each goes exploring from where they stand (`CONTEXT.md`: Explore). */
+  | ({ kind: 'explore' } & Starts)
   /**
    * The first of them on each training ground teaches the subject there (`CONTEXT.md`: Teacher):
    * one teacher per ground.
@@ -172,6 +174,7 @@ const ADULTS_ONLY: GroupOrder['kind'][] = [
   'drive',
   'haul',
   'unhitch',
+  'explore',
 ]
 
 /** Orders one carrying a child can't take (`CONTEXT.md`: Carrying). */
@@ -465,6 +468,9 @@ export function groupRequests(
       case 'train':
         send(r, { kind: 'task', task: 'train', groundId: groundOf(r, seen, size)!.id })
         break
+      case 'explore':
+        send(r, { kind: 'task', task: 'explore', ...params })
+        break
       case 'teach': {
         // One teacher per ground: the first of them there teaches, the rest are skipped.
         const ground = groundOf(r, seen, size)!
@@ -584,6 +590,7 @@ export type GroupButton =
   | 'unhitch'
   | 'drive'
   | 'haul'
+  | 'explore'
   | 'work'
   | 'feedStable'
   | 'teach'
@@ -618,6 +625,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'drive', label: 'Drive carriages to', group: 'move' },
   { id: 'haul', label: 'Haul route…', group: 'move' },
   { id: 'relocate', label: 'Relocate…', group: 'move' },
+  { id: 'explore', label: 'Explore', group: 'move' },
   { id: 'work', label: 'Work', group: 'work' },
   { id: 'feedStable', label: 'Feed the stable', group: 'work' },
   { id: 'teach', label: 'Teach…', group: 'work' },
@@ -658,6 +666,7 @@ export const GROUP_COUNTERPARTS: Record<
   unhitch: ['unhitch'],
   drive: ['drive'],
   haul: ['haul'],
+  explore: ['explore'],
   work: ['work'],
   feedStable: ['feedStable'],
   teach: ['teach'],
@@ -692,6 +701,7 @@ export const GROUP_KEYS: Record<GroupButton, string> = {
   drive: ACTION_KEYS.drive,
   haul: ACTION_KEYS.haul,
   relocate: ACTION_KEYS.relocate,
+  explore: ACTION_KEYS.explore,
   work: ACTION_KEYS.work,
   feedStable: ACTION_KEYS.feedStable,
   teach: ACTION_KEYS.teach,
@@ -702,7 +712,7 @@ export const GROUP_KEYS: Record<GroupButton, string> = {
   tearDown: ACTION_KEYS.tearDown,
   breed: ACTION_KEYS.breed,
   store: ACTION_KEYS.goods,
-  storeAt: 'Z',
+  storeAt: 'L',
   fetch: 'J',
   // Put down.
   drop: 'P',
@@ -783,6 +793,7 @@ export function groupRows(h: GroupHere): {
     },
     work: { order: { kind: 'work', workplace: somewhere, name: '' }, queued: true },
     feedStable: { order: { kind: 'feedStable' } },
+    explore: { order: { kind: 'explore' } },
     teach: { order: { kind: 'train' } },
     train: { order: { kind: 'train' } },
     build: { order: { kind: 'build', building: 'farm', at: somewhere }, queued: true },
