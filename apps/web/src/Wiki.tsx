@@ -53,6 +53,9 @@ import {
   DRIVING_SKILL_LIMIT,
   DRIVING_SKILL_PER_DAY,
   STARVE_DAYS,
+  DOWN_DAYS,
+  FEED_UNITS,
+  WAKE_HEALTH,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
   GET_FOOD_AT,
@@ -64,6 +67,7 @@ import {
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HORSE_WAKE_HEALTH,
   HORSE_GRANT_FOOD,
   HQ_FLOOR_FACTOR,
   HORSE_GRANT_HORSES,
@@ -953,9 +957,28 @@ export function Wiki() {
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
-          health in {days(STARVE_DAYS)}, so a resident without food dies{' '}
-          {days(HUNGER_DAYS + STARVE_DAYS)} after their last meal. Fed again, they heal from nothing
-          to full in {days(HEAL_DAYS)}.
+          health in {days(STARVE_DAYS)}, so a resident without food goes <b>Down</b>{' '}
+          {days(HUNGER_DAYS + STARVE_DAYS)} after their last meal. Fed again before that, they heal
+          from nothing to full in {days(HEAL_DAYS)}.
+        </p>
+        <p>
+          Down, a resident lies unconscious on their tile for {days(DOWN_DAYS)}: their order, script
+          and queue end, they get off any horse or carriage and leave their army, take no orders,
+          don't eat and lose no more health. Anyone in sight sees that they are Down: their token
+          lies on its side, and their own Player's card says how long is left. Down is not safe:
+          anyone on their tile can pick up what they carry, as from a pile (from another realm's
+          resident that is theft), and a blow kills them, as they can't dodge. When the time is up
+          they die of hunger. Only hunger puts a resident Down: wounds kill as before, and a Leader
+          who is Down still leads. The realm log says when one goes Down, wakes or dies.
+        </p>
+        <p>
+          <b>Reviving:</b> any grown resident of any realm on or next to a Down resident's tile can{' '}
+          <b>Feed</b> them: the Feed row on their card (or on the Down resident's tile card), a
+          queue step, or <code>feed(residentId, units)</code> in a script. It puts up to that many
+          units of the Food in their own hands into the Down resident's ({num(FEED_UNITS)} unless
+          set). One unit is eaten at once, and they wake idle with {num(WAKE_HEALTH)} of{' '}
+          {num(MAX_HEALTH)} health, which comes back while their hunger meter isn't empty; the rest
+          stays in their hands to eat later.
         </p>
         <p>
           Food spoils: {pct(FOOD_SPOIL_PER_DAY)} of every stock goes bad each game day, half of it
@@ -1300,6 +1323,19 @@ export function Wiki() {
           The route (where to, which goods) comes only from the Haul order, which also fills the
           Haul default's <code>carriage</code> param. Run directly, with Run script or as a queue
           step, Haul has no route: it ends at once and your realm log says “no route given”.
+        </p>
+        <h3>A horse going Down</h3>
+        <p>
+          A horse goes hungry like a resident: with nothing in reach it goes <b>Down</b>{' '}
+          {days(HUNGER_DAYS + STARVE_DAYS)} after its last meal and lies there for{' '}
+          {days(DOWN_DAYS)}. Down, it doesn't move: its rider is on foot again, and the carriage it
+          pulls stands where it is, its drive or haul route ending; nobody can mount or drive it.
+          It still eats Food in reach, so put Food down on its tile or right next to it (horses
+          have no inventory: Food in someone's hands doesn't count). Once it has eaten, it gets up
+          with {num(HORSE_WAKE_HEALTH)} health of {num(MAX_HEALTH)} and heals from there. When the
+          time is up first, it dies. Its token lies on its side, the Horses drawer, the stable and
+          the tile card say it is Down and how long is left, and your realm log says when one of
+          your horses goes Down and when one dies.
         </p>
         <h3>Breeding</h3>
         <p>
@@ -1705,7 +1741,8 @@ export function Wiki() {
           lowers the victim's standing toward the culprit; standing drifts back toward neutral by{' '}
           {num(STANDING_DRIFT_PER_DAY)} a game day. A crime is remembered for{' '}
           {days(CRIME_MEMORY_DAYS)} after the news stops spreading. Taking from or tearing down
-          another realm's outpost storage counts the same as its city storage.
+          another realm's outpost storage counts the same as its city storage, and taking what
+          another realm's Down resident carries is theft too.
         </p>
         <table>
           <thead>

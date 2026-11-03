@@ -7,6 +7,7 @@ import {
   holdersOf,
   carriageOfResident,
   horseOfResident,
+  isDown,
   riderOf,
   seatsLeft,
   KEEPS_GOODS,
@@ -207,7 +208,8 @@ function targetOnTile(
 
 /** What the queue planner's map picks need of the world (`plan-step`). */
 function planWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): PlanWorld {
-  return { ...paramWorld(world), horses: world.horses }
+  // Anyone Down in sight, of any realm, to Feed (`CONTEXT.md`: Reviving).
+  return { ...paramWorld(world), horses: world.horses, down: world.residents.filter(isDown) }
 }
 
 export function App() {
@@ -342,6 +344,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         ),
         carriages: world.carriages.filter((k) => k.realmId === world.home.realmId),
         buildings: world.buildings,
+        // Anyone Down in sight, of any realm, to Feed (`CONTEXT.md`: Reviving).
+        down: world.residents.filter((r) => isDown(r)),
       }
     : {}
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
@@ -995,6 +999,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'attack', residentId: selected.id, targetId }))
   }
+  /** Orders the picked resident to Feed someone Down next to them (`CONTEXT.md`: Reviving). */
+  async function feed(targetId: string, units: number) {
+    if (!selected) return
+    setOrderError(await giveOrder({ kind: 'feed', residentId: selected.id, targetId, units }))
+  }
   /** Orders the picked resident to mount a horse on their tile, or with none to dismount. */
   async function ride(horseId?: string) {
     if (!selected) return
@@ -1487,6 +1496,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             )}
             actor={selected}
             onUnhitch={(carriageId, residentId) => void unhitch(carriageId, residentId)}
+            mapSize={world.map.size}
+            onFeed={(targetId, units) => void feed(targetId, units)}
+            onPickUp={async (residentId, spot, goods) =>
+              setOrderError(await giveOrder({ kind: 'pickUp', residentId, spot, goods }))
+            }
             orderError={orderError}
             onClose={() => setSelectedTile(undefined)}
             onSendHere={async () => {
@@ -1562,7 +1576,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             horseToRide={onTile(
               world.horses.filter(
                 (h) =>
-                  horseOfResident(h, selected) && !carriagePulledBy(world, h) && !riderOf(world, h),
+                  horseOfResident(h, selected) &&
+                  !carriagePulledBy(world, h) &&
+                  !riderOf(world, h) &&
+                  !isDown(h),
               ),
             )}
             onRide={ride}
@@ -1621,6 +1638,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             others={world.residents.filter((r) => !own.some((o) => o.id === r.id))}
             mapSize={world.map.size}
             onAttack={attack}
+            onFeed={(targetId, units) => void feed(targetId, units)}
             walls={world.buildings.filter(
               (b) =>
                 isWallOrGate(b) &&

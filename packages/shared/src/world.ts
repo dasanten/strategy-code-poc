@@ -149,6 +149,20 @@ export interface Resident {
    * aboard one. Not an order: they move with the carriage and don't walk on their own.
    */
   aboard?: string
+  /**
+   * Set while the resident is Down (`CONTEXT.md`: Down): the tick at which they die of hunger
+   * unless revived. Down, they have no order, script or queue, and their health stays at 0.
+   * Absent while they are not Down.
+   */
+  downUntil?: number
+}
+
+/**
+ * Whether a resident or horse is Down (`CONTEXT.md`: Down), lying unconscious and doing nothing:
+ * from the world, or as a Player sees them (`SeenResident.down`, `SeenHorse.down`).
+ */
+export function isDown(r: { downUntil?: number; down?: true }): boolean {
+  return r.downUntil !== undefined || r.down === true
 }
 
 /**
@@ -344,6 +358,11 @@ export type SeenResident = Omit<
   Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & {
     script?: SeenScript
     interrupted?: SeenInterrupted
+    /**
+     * Set while they are Down (`CONTEXT.md`: Down), which anyone in sight sees; when it ends
+     * (`downUntil`) is seen only with their hunger and health.
+     */
+    down?: true
   }
 
 /**
@@ -372,14 +391,16 @@ export interface WalkOrder {
 
 /**
  * A place on the resident's own tile that goods are taken from or put: the pile on the ground,
- * a storage standing there, the materials delivered to a construction site there, or the load
- * of a carriage standing there.
+ * a storage standing there, the materials delivered to a construction site there, the load
+ * of a carriage standing there, or what a Down resident lying there carries (only taken from,
+ * `CONTEXT.md`: Down).
  */
 export type GoodsSpot =
   | { kind: 'ground' }
   | { kind: 'storage'; storageId: string }
   | { kind: 'site'; siteId: string }
   | { kind: 'carriage'; carriageId: string }
+  | { kind: 'resident'; residentId: string }
 
 /**
  * Picking up goods on the resident's tile (`CONTEXT.md`: Core rule, whatever isn't protected can
@@ -680,6 +701,17 @@ export interface RelocateOrder {
   progress: number
 }
 
+/**
+ * Feeding (`CONTEXT.md`: Reviving): the resident puts up to `units` of the Food in their hands
+ * into those of `targetId`, a Down resident on or next to their tile, who eats at once and wakes.
+ * Done within the tick.
+ */
+export interface FeedOrder {
+  kind: 'feed'
+  targetId: string
+  units: number
+}
+
 /** Any order a resident can hold. */
 export type ResidentOrder =
   | WalkOrder
@@ -704,6 +736,7 @@ export type ResidentOrder =
   | HandInOrder
   | BuyOffOrder
   | RelocateOrder
+  | FeedOrder
 
 /** A stat's effective value: base and trained bonus together. */
 export function effective(stat: Stat): number {
@@ -1279,6 +1312,16 @@ export type DeathCause = 'starved' | 'oldAge' | 'killed'
 export type RealmEventWhat =
   /** A resident's hunger meter ran empty: they have nothing to eat and lose health. */
   | { kind: 'hungry'; residentId: string; name: string }
+  /**
+   * Hunger used up a resident's health and they went Down (`CONTEXT.md`: Down): unless revived,
+   * they die of hunger at tick `until`.
+   */
+  | { kind: 'down'; residentId: string; name: string; until: number }
+  /**
+   * A Down resident woke up at low health (`CONTEXT.md`: Reviving): `by`, a resident of any
+   * realm, fed them.
+   */
+  | { kind: 'woke'; residentId: string; name: string; by: string }
   /** A resident died; `leader` when it was the Leader, whose death ended the realm. */
   | {
       kind: 'died'
@@ -1619,6 +1662,11 @@ export type RealmEventWhat =
    * horses had names (`CONTEXT.md`: Horse name) have none.
    */
   | { kind: 'horseDied'; horseId: string; name?: string }
+  /**
+   * A horse of the realm went Down from hunger (`CONTEXT.md`: Down): unless it eats Food in
+   * reach, it dies at tick `until`.
+   */
+  | { kind: 'horseDown'; horseId: string; name: string; until: number }
   /**
    * A ridden horse of the realm, `horseName`, went hungry and its rider, `name`, carries no Food
    * to spare for it (`CONTEXT.md`: Riding). Entries from before horses had names have no `horseName`.
@@ -2066,6 +2114,12 @@ export interface Horse {
   stats: HorseStats
   /** The tick it was born; its age is counted from it (`horseAgeInYears`). */
   bornAt: number
+  /**
+   * Set while the horse is Down (`CONTEXT.md`: Down, Reviving): the tick at which it dies of
+   * hunger unless it eats Food in reach first. Down, it stands still, nobody rides it, and its
+   * hunger and health stay at 0. Absent while it is not Down.
+   */
+  downUntil?: number
 }
 
 /** A horse-drawn cart (`CONTEXT.md`: Carriage). */

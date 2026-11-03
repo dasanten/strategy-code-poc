@@ -381,10 +381,13 @@ function everythingSeen(
           }
         : {}),
     }
+    // Anyone in sight sees that they are Down; when it ends goes with how they fare.
+    if (r.downUntil !== undefined) shown.down = true
     if (!insight.fares(r)) {
       delete shown.hunger
       delete shown.health
       delete shown.struck
+      delete shown.downUntil
     }
     out.push(shown)
   }
@@ -392,9 +395,12 @@ function everythingSeen(
   for (const h of world.horses) {
     if (!inSight(h)) continue
     const shown: SeenEntity = { is: 'horse', ...h }
+    // Anyone in sight sees that it is Down; when it ends goes with how it fares.
+    if (h.downUntil !== undefined) shown.down = true
     if (!insight.ours(h.realmId, h.cityId)) {
       delete shown.hunger
       delete shown.health
+      delete shown.downUntil
     }
     out.push(shown)
   }
@@ -716,12 +722,16 @@ export function sentInsideUnseen(
         return hasStock(e.trade) && !insight.insideCity(e.id)
       case 'resident': {
         const r = byId(world.residents, e.id)
-        const told = e.hunger !== undefined || e.health !== undefined || e.struck !== undefined
+        const told =
+          e.hunger !== undefined ||
+          e.health !== undefined ||
+          e.struck !== undefined ||
+          e.downUntil !== undefined
         return told && !(r && insight.fares(r))
       }
       case 'horse': {
         const h = byId(world.horses, e.id)
-        const told = e.hunger !== undefined || e.health !== undefined
+        const told = e.hunger !== undefined || e.health !== undefined || e.downUntil !== undefined
         return told && !(h && insight.ours(h.realmId, h.cityId))
       }
       default:
