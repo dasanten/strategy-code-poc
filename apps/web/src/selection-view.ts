@@ -12,7 +12,9 @@ import {
   carriageCapacity,
   isDown,
   driveOffProblem,
+  feedHorseProblem,
   feedProblem,
+  horseFull,
   MAP_SIZE,
   NO_CHILD_FEEDS,
   NO_FOOD_TO_FEED,
@@ -92,7 +94,7 @@ import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
-import { horseDownLine } from './horses-view.js'
+import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
 import type { Picking } from './Residents.js'
@@ -260,9 +262,12 @@ export interface ResidentHere {
   downCarrying?: Stock[]
   /** They are Down (`CONTEXT.md`: Down) and take no orders. */
   down?: boolean
-  /** Others in sight who are Down on or next to their tile, whom they could Feed (`CONTEXT.md`: Reviving). */
-  downNear?: number
-  /** They have Food in their hands, to Feed someone Down with. */
+  /**
+   * Others in sight on or next to their tile whom they could Feed: anyone Down, any horse that isn't
+   * full (`CONTEXT.md`: Reviving, Feeding a horse).
+   */
+  toFeedNear?: number
+  /** They have Food in their hands, to Feed with. */
   carriesFood?: boolean
 }
 
@@ -461,11 +466,11 @@ function ordersOffered(h: ResidentHere): {
   if (h.carries || goodsOnTile(h, h.adult ? GOODS : CHILD_GOODS)) {
     add(row('goods', 'Goods…', { opens: true }))
   } else miss('goods', 'nothing carried or here to pick up')
-  // Anyone Down nearby, of any realm (`CONTEXT.md`: Reviving).
-  if (h.downNear) {
+  // Anyone Down or a horse that isn't full nearby, of any realm (`CONTEXT.md`: Reviving, Feeding a horse).
+  if (h.toFeedNear) {
     const reason = !h.adult ? NO_CHILD_FEEDS : !h.carriesFood ? NO_FOOD_TO_FEED : undefined
     add(row('feed', 'Feed…', { opens: true, ...(reason ? { disabled: true, reason } : {}) }))
-  } else miss('feed', 'nobody Down nearby')
+  } else miss('feed', 'nobody to feed nearby')
   if (works && h.inCity) add(row('pair', 'Pair…', { opens: true }))
   else miss('pair', works ? 'homeless' : unfit('pair'))
   if (h.othersInSight > 0) add(row('attack', 'Attack…', { opens: true }))
@@ -757,6 +762,11 @@ export interface TileCard {
    * Feed (`CONTEXT.md`: Reviving).
    */
   downHere?: { id: string; name: string; x: number; y: number; down: true }[]
+  /**
+   * Horses on the tile that aren't full as far as the Player knows, of any realm, which the resident
+   * picked last may Feed (`CONTEXT.md`: Feeding a horse).
+   */
+  horsesToFeed?: { id: string; name: string; x: number; y: number }[]
   /**
    * For a building the Player only remembers (`CONTEXT.md`: Last seen): when they last saw it,
    * and what they saw of it then (what it held, a site's materials, as lists), shown apart from
@@ -1081,6 +1091,7 @@ export function horseDetail(h: SeenHorse, tick: number | undefined): string {
   else if (horseFaresKnown(h)) {
     const fares = horseFares(h)
     parts.push(`${fares.hunger}, ${fares.health}`)
+    if (fares.hunger !== 'fed') parts.push(FEED_HORSE_HINT)
   }
   return parts.join(' · ')
 }
@@ -1147,9 +1158,7 @@ function horseLists(
         return {
           id: h.id,
           name: h.name,
-          detail: isDown(h)
-            ? `${horseDownLine(h, tick)} · ${horseStatsText(h, tick)}`
-            : horseStatsText(h, tick),
+          detail: [horseNeed(h, tick), horseStatsText(h, tick)].filter(Boolean).join(' · '),
           ...(shares ? { shares } : {}),
           ...(r === 'own' ? { opens: 'horse' as const } : {}),
         }
@@ -1550,6 +1559,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const downHere = here(t.residents ?? t.strangers)
     .filter((r) => isDown(r))
     .map((r) => ({ id: r.id, name: r.name, x: r.x, y: r.y, down: true as const }))
+  const horsesToFeed = horsesHere
+    .filter((h) => !horseFull(h))
+    .map((h) => ({ id: h.id, name: h.name, x: h.x, y: h.y }))
   if (!stable && horsesHere.length > 0) {
     card ??= {
       title: horsesHere.length === 1 ? 'Horse' : `${horsesHere.length} horses`,
@@ -1585,6 +1597,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
     ...(sites.length > 0 ? { sites } : {}),
     ...(downHere.length > 0 ? { downHere } : {}),
+    ...(horsesToFeed.length > 0 ? { horsesToFeed } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
   }
@@ -1913,12 +1926,22 @@ function teardownLine(b: Building): string {
   return `Being torn down · ${done}% done`
 }
 
+/** Whom a resident can Feed on a tile, from its card: anyone Down but them, then the horses. */
+export function feedTargets(
+  card: Pick<TileCard, 'downHere' | 'horsesToFeed'>,
+  actor: Pick<Resident, 'id'>,
+): { id: string; name: string; x: number; y: number; horse?: true }[] {
+  const down = card.downHere?.filter((r) => r.id !== actor.id) ?? []
+  const horses = card.horsesToFeed?.map((h) => ({ ...h, horse: true as const })) ?? []
+  return [...down, ...horses]
+}
+
 /**
  * The actions a tile's card offers: send the resident picked last there, or have them build an
  * unbuilt node's workplace there (`buildHere`), open or close an own gate, open the city
  * inspector at the city the card links to, and trade at a warehouse or storage (`tradeHere`), and
- * have them Feed someone Down there (`downHere`), greyed with the reason while they can't
- * (`feedProblem`). Everything else a resident does on the tile is on
+ * have them Feed someone Down there or a horse that isn't full (`feedTargets`), greyed with the
+ * reason while they can't (`feedProblem`, `feedHorseProblem`). Everything else a resident does on the tile is on
  * their own card once they stand there. `tick` tells whether the resident is still a child;
  * `size` is the map's.
  */
@@ -1931,12 +1954,15 @@ export function tileActions(
   const actions: CardAction[] = []
   if (actor)
     actions.push({ id: 'sendHere', label: `Send ${actor.name} here`, key: ACTION_KEYS.sendHere })
-  const down = card.downHere?.filter((r) => r.id !== actor?.id) ?? []
-  if (actor && down.length > 0) {
-    const reason = feedProblem(actor, down[0], tick, size)
+  const toFeed = actor ? feedTargets(card, actor) : []
+  if (actor && toFeed.length > 0) {
+    const first = toFeed[0]!
+    const reason = first.horse
+      ? feedHorseProblem(actor, first, tick, size)
+      : feedProblem(actor, { ...first, down: true }, tick, size)
     actions.push({
       id: 'feed',
-      label: down.length === 1 ? `Feed ${down[0]!.name}…` : 'Feed someone Down…',
+      label: toFeed.length === 1 ? `Feed ${first.name}…` : 'Feed…',
       key: ACTION_KEYS.feed,
       opens: true,
       ...(reason ? { disabled: true as const, reason } : {}),

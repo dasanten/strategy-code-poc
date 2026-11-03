@@ -243,9 +243,9 @@ describe('Add step', () => {
   })
 
   it('feeds someone Down picked on the map, after a walk to their tile (`CONTEXT.md`: Reviving)', () => {
-    const seen: PlanWorld = { ...w, down: [{ id: 'ana', x: 12, y: 12 }] }
+    const seen: PlanWorld = { ...w, toFeed: [{ id: 'ana', x: 12, y: 12 }] }
     const nobody = pickInto(seen, { kind: 'feed', picked: [] }, { x: 13, y: 12 })
-    expect(nobody.error).toBe('nobody Down there')
+    expect(nobody.error).toBe('nobody to feed there')
     const plan = pickInto(seen, { kind: 'feed', picked: [] }, { x: 12, y: 12 })
     expect(planAsk(plan)).toBe('units')
     const feed = planOrder(plan, { ask: 'units', units: 3 })!

@@ -42,7 +42,7 @@ export type PlanPick =
   | 'carriage'
   | 'horse'
   | 'city'
-  | 'down'
+  | 'toFeed'
 
 /** What a planned step asks for on the card once its places are picked. */
 export type PlanAsk =
@@ -184,8 +184,8 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   },
   {
     id: 'feed',
-    label: 'Feed someone Down',
-    picks: [{ pick: 'down', prompt: 'the resident lying Down to feed' }],
+    label: 'Feed someone Down or a horse',
+    picks: [{ pick: 'toFeed', prompt: 'the resident lying Down or the horse to feed' }],
     ask: 'units',
   },
   {
@@ -262,7 +262,7 @@ export interface PlanWorld {
   realmId: string
   size: number
   /** Residents in sight who are Down, of any realm, to Feed (`CONTEXT.md`: Reviving). */
-  down?: readonly { id: string; x: number; y: number }[]
+  toFeed?: readonly { id: string; x: number; y: number }[]
 }
 
 /**
@@ -335,9 +335,9 @@ export function planPickAt(
       )
       return c ? { ...tile, id: c.id } : 'no city of yours there'
     }
-    case 'down': {
-      const r = w.down?.find((x) => x.x === at.x && x.y === at.y)
-      return r ? { ...tile, id: r.id } : 'nobody Down there'
+    case 'toFeed': {
+      const r = w.toFeed?.find((x) => x.x === at.x && x.y === at.y)
+      return r ? { ...tile, id: r.id } : 'nobody to feed there'
     }
   }
 }

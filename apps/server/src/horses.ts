@@ -147,17 +147,14 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
     const left = food.food! - 1
     if (left > 0) food.food = left
     else delete food.food
-    h.hunger = Math.min(MAX_HUNGER, h.hunger + FILL_PER_FOOD)
+    horseEats(h, 1)
     ate = true
     return true
   }
 
   for (const h of world.horses) {
     if (h.downUntil !== undefined) {
-      if (eat(h)) {
-        delete h.downUntil
-        h.health = HORSE_WAKE_HEALTH
-      } else if (world.tick >= h.downUntil) died.push(h)
+      if (!eat(h) && world.tick >= h.downUntil) died.push(h)
       continue
     }
     const wasFed = h.hunger >= hungry
@@ -188,6 +185,24 @@ export function stepHorses(world: WorldState, terrain: TerrainMap): Horse[] {
       recordEvent(world, h.realmId, { kind: 'horseDied', horseId: h.id, name: h.name })
   }
   return died
+}
+
+/**
+ * A horse eats up to `units` whole units of Food, stopping once its hunger meter is full, and
+ * returns how many it ate. Having eaten, a Down horse wakes at `HORSE_WAKE_HEALTH` (`CONTEXT.md`:
+ * Reviving). The caller takes the Food from wherever it came.
+ */
+export function horseEats(h: Horse, units: number): number {
+  let eaten = 0
+  while (eaten < units && h.hunger < MAX_HUNGER) {
+    h.hunger = Math.min(MAX_HUNGER, h.hunger + FILL_PER_FOOD)
+    eaten++
+  }
+  if (eaten > 0 && h.downUntil !== undefined) {
+    delete h.downUntil
+    h.health = HORSE_WAKE_HEALTH
+  }
+  return eaten
 }
 
 /**

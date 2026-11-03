@@ -8,6 +8,7 @@ import {
   carriageOfResident,
   driveOffProblem,
   horseOfResident,
+  horseFull,
   isDown,
   riderOf,
   seatsLeft,
@@ -222,8 +223,15 @@ function targetOnTile(
 
 /** What the queue planner's map picks need of the world (`plan-step`). */
 function planWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): PlanWorld {
-  // Anyone Down in sight, of any realm, to Feed (`CONTEXT.md`: Reviving).
-  return { ...paramWorld(world), horses: world.horses, down: world.residents.filter(isDown) }
+  return { ...paramWorld(world), horses: world.horses, toFeed: toFeed(world) }
+}
+
+/**
+ * Anyone Down in sight and any horse that isn't full as far as the Player knows, of any realm, to
+ * Feed (`CONTEXT.md`: Reviving, Feeding a horse).
+ */
+function toFeed(world: NonNullable<ReturnType<typeof useWorld>['world']>) {
+  return [...world.residents.filter(isDown), ...world.horses.filter((h) => !horseFull(h))]
 }
 
 export function App() {
@@ -366,8 +374,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         ),
         carriages: world.carriages.filter((k) => k.realmId === world.home.realmId),
         buildings: world.buildings,
-        // Anyone Down in sight, of any realm, to Feed (`CONTEXT.md`: Reviving).
-        down: world.residents.filter((r) => isDown(r)),
+        toFeed: toFeed(world),
       }
     : {}
   const homeCity = world?.cities.find((c) => c.id === world.home.cityId)
@@ -1091,7 +1098,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'attack', residentId: selected.id, targetId }))
   }
-  /** Orders the picked resident to Feed someone Down next to them (`CONTEXT.md`: Reviving). */
+  /** Orders the picked resident to Feed someone Down or a horse next to them. */
   async function feed(targetId: string, units: number) {
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'feed', residentId: selected.id, targetId, units }))

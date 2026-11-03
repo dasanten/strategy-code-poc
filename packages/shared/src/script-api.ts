@@ -472,8 +472,8 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   ),
   action(
     'feed',
-    ['residentId', 'units'],
-    'Feed a resident who is Down, of any realm, on or next to my tile: put up to that many units of the Food in my hands into theirs. They eat at once and wake at low health.',
+    ['targetId', 'units'],
+    'Feed a resident who is Down or a horse that isn’t full, of any realm, on or next to my tile, with up to that many units of the Food in my hands. A resident gets it in their hands, eats at once and wakes at low health. A horse eats until it is full, and wakes if it was Down; the rest stays with me.',
   ),
   action('climb', ['wallId'], 'Climb over the wall or gate of another realm next to me.'),
   action(

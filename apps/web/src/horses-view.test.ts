@@ -8,7 +8,7 @@ import {
   type SeenHorse,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { groupHorses, horseLines } from './horses-view.js'
+import { FEED_HORSE_HINT, groupHorses, horseLines } from './horses-view.js'
 
 const h = (id: string, x: number, y: number) => ({ id, x, y })
 // Stables are 2 by 2 (`FOOTPRINT`); the one at 10, 10 covers 10–11.
@@ -51,8 +51,22 @@ describe('groupHorses', () => {
     const seen = { ...h('b', 3, 3), down: true as const }
     const groups = groupHorses([down, seen], [stable('s', 10, 10)], [], [], cities, 100)
     expect(groups.flatMap((g) => g.rows.map((r) => r.place))).toEqual([
-      `Down from hunger: ${timeLeft(23 * 3600)} · In the stable`,
-      'Down from hunger · Loose at 3, 3',
+      `Down from hunger: ${timeLeft(23 * 3600)} · ${FEED_HORSE_HINT} · In the stable`,
+      `Down from hunger · ${FEED_HORSE_HINT} · Loose at 3, 3`,
+    ])
+  })
+
+  it('says first that a hungry horse can be Fed, where the Player knows how it fares (`CONTEXT.md`: Feeding a horse)', () => {
+    const hungry = { ...h('a', 3, 3), hunger: 10 }
+    const starving = { ...h('b', 3, 3), hunger: 0 }
+    const fed = { ...h('c', 3, 3), hunger: 60 }
+    const unknown = h('d', 3, 3)
+    const groups = groupHorses([hungry, starving, fed, unknown], [], [], [], cities, 100)
+    expect(groups.flatMap((g) => g.rows.map((r) => r.place))).toEqual([
+      `Hungry · ${FEED_HORSE_HINT} · Loose at 3, 3`,
+      `Starving · ${FEED_HORSE_HINT} · Loose at 3, 3`,
+      'Loose at 3, 3',
+      'Loose at 3, 3',
     ])
   })
 

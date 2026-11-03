@@ -377,7 +377,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       }
     case 'horseDown':
       return {
-        text: `Your horse ${e.name} is Down from hunger: ${timeLeft(e.until - e.tick)}. Put Food down by it.`,
+        text: `Your horse ${e.name} is Down from hunger: ${timeLeft(e.until - e.tick)}. Feed it or put Food down by it.`,
         tone: 'bad',
       }
     case 'horseHungry':
