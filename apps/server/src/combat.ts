@@ -32,7 +32,7 @@ import {
 } from '@csp/shared'
 import { updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime, knownThieves, organizationOf } from './crimes.js'
-import { defendsByScript, startDefence } from './defence.js'
+import { defendsByScript, endHoldIfOver, startDefence } from './defence.js'
 import { recordEvent } from './events.js'
 import { noteMade } from './goods-made.js'
 import type { OrderKind } from './orders.js'
@@ -257,6 +257,7 @@ export function resolveStrikes(
         commitCrime(world, size, 'attack', a, { victimOrg: organizationOf(t), victim: t })
       }
     }
+    endHoldIfOver(world, t)
     t.struck = { by: a.id, tick: world.tick }
     a.skills.combat = (a.skills.combat ?? 0) + combatLearned(a, world.tick)
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
@@ -306,7 +307,8 @@ function breakWall(world: WorldState, a: Resident, b: Building, size: number): b
 
 /**
  * A resident `t` hit by `a` and still alive (`CONTEXT.md`: Combat, Under attack): a Player's
- * resident runs their defence script (`startDefence`). Others react as the game's Defend does, by
+ * resident runs their defence script (`startDefence`), unless what the Player gave them under
+ * attack holds. Others react as the game's Defend does, by
  * built-in orders: armed, they fight back unless they are already attacking someone; unarmed,
  * they flee home, walking to their city's town hall.
  */

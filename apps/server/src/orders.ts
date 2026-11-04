@@ -24,6 +24,7 @@ import { climb } from './climbing.js'
 import { dismount, mount } from './riding.js'
 import { GETS_OFF_FIRST, board, getOff, getsOffFirst } from './passengers.js'
 import { attack } from './combat.js'
+import { noteGiven, underAttack } from './defence.js'
 import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
 import { roadLine, wallLine } from './road-line.js'
@@ -210,6 +211,11 @@ export class OrderQueue {
         ...Object.keys(waypointOrders),
       ]
       const r = world.residents.find((x) => x.id === order.residentId)
+      // An order replacing what they do, given under attack, stands against further blows
+      // (`CONTEXT.md`: A Player's order under attack). What a script or queue requests itself
+      // doesn't come through here.
+      const replaces = r && (order.kind === 'runScript' || !keeps.includes(order.kind))
+      const given = replaces ? { attacked: underAttack(world, r), order: r.order } : undefined
       if (r && !keeps.includes(order.kind)) {
         delete r.script
         // How their last store or fetch ended is kept until their next order.
@@ -218,7 +224,7 @@ export class OrderQueue {
       // Any order that isn't a step of it ends the resident's queue, running a script too; a new
       // queue replaces it. It ends a defence script and what it interrupted too (`CONTEXT.md`:
       // Defence script).
-      if (r && (order.kind === 'runScript' || !keeps.includes(order.kind))) {
+      if (replaces) {
         delete r.queue
         if (r.interrupted) {
           delete r.interrupted
@@ -234,6 +240,7 @@ export class OrderQueue {
       // Accepted by `receive`, so the kind exists.
       orderKindOf(this.kinds, order.kind)!.apply(world, sender, order, this.terrain)
       if (before) leaveOnOwnOrders(world, before)
+      if (r && given) noteGiven(world, r, given.attacked, given.order)
     }
   }
 

@@ -1,19 +1,24 @@
 import {
+  AVERAGE_HORSE_STATS,
   DEFEND_CALM_TICKS,
+  MAX_HEALTH,
+  MAX_HUNGER,
   OWN_FOOD,
   Terrain,
+  dodgeChance,
   type Building,
   type OrderRequest,
   type TerrainMap,
 } from '@csp/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { attackOrder, resolveStrikes } from './combat.js'
-import { defenceScriptSound, interruptedSound } from './defence.js'
+import { defenceScriptSound, givenUnderAttackSound, interruptedSound } from './defence.js'
+import { goDown } from './survival.js'
 import { checkInvariants } from './invariants.js'
 import type { RunnableScript } from './scripts.js'
 import { OrderQueue, orderKinds } from './orders.js'
 import { QueueRunner } from './queues.js'
-import { mulberry32, newResident } from './residents.js'
+import { hash, mulberry32, newResident } from './residents.js'
 import { entitiesInSight } from './sight.js'
 import { defaultScripts } from './test-default-scripts.js'
 import { addCity } from './test-terrain.js'
@@ -347,7 +352,357 @@ describe('a defence script picked', () => {
   })
 })
 
+/**
+ * Blows land on w1 every `STRIKE_TICKS`, x1 staying on their tile, and they don't die of it, for
+ * at most `limit` ticks. Stops at `done`, and answers whether it came; `each` looks after each tick
+ * before that one (a blow on the tick it comes is after it, and starts their defence script).
+ */
+function underBlows(
+  s: ReturnType<typeof setup>,
+  done: () => boolean,
+  limit = 200,
+  each: () => void = () => {},
+) {
+  for (let i = 0; i < limit && !done(); i++) {
+    s.x1.x = s.r.x
+    s.x1.y = s.r.y
+    if (s.x1.order?.kind !== 'attack') s.strike()
+    s.r.health = MAX_HEALTH
+    s.tick()
+    if (!done()) each()
+  }
+  return done()
+}
+
+/** w1 is struck, and their defence script runs. */
+function attacked(s: ReturnType<typeof setup>) {
+  expect(underBlows(s, () => s.r.interrupted !== undefined)).toBe(true)
+  expect(s.r.script?.task).toBe('defend')
+}
+
+/** Mara's own script 760: it walks w1 to (20, 20), step by step, for as long as it runs. */
+const wander = (): RunnableScript => ({
+  userId: 7,
+  name: 'Wander',
+  version: 1,
+  followsDefault: false,
+  source: 'if (me.order == null && me.x != 20) { walkTo(20, 20) }',
+})
+
+describe('a Player’s order under attack', () => {
+  const home = { x: 9, y: 3 }
+
+  it('a walk given under attack gets there through constant blows', () => {
+    const s = setup()
+    attacked(s)
+    expect(s.give({ kind: 'walkTo', x: 6, y: 20 })).toMatchObject({ type: 'ack' })
+    const struckFrom = s.r.struck!.tick
+    const arrived = () => s.r.x === 6 && s.r.y === 20
+    const walking = underBlows(s, arrived, 200, () => {
+      expect(s.r.interrupted).toBeUndefined()
+      expect(s.r.script).toBeUndefined()
+    })
+    expect(walking).toBe(true)
+    expect(s.r.struck!.tick).toBeGreaterThan(struckFrom)
+  })
+
+  it('a walk given under attack gets there with a Player-picked defence script too', () => {
+    const walker = { ...shout(), source: 'walkTo(1, 1)' }
+    const s = setup(new Map([[750, walker]]))
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.tick()
+    attacked(s)
+    expect(s.r.script).toMatchObject({ scriptId: 750 })
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    const arrived = () => s.r.x === 6 && s.r.y === 20
+    expect(underBlows(s, arrived, 200, () => expect(s.r.interrupted).toBeUndefined())).toBe(true)
+  })
+
+  it('a walk given just after a blow, with no defence script running, stands too', () => {
+    const s = setup()
+    s.r.struck = { by: 'x1', tick: s.world.tick }
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    s.tick()
+    expect(s.r.givenUnderAttack).toBe('untilDone')
+    const arrived = () => s.r.x === 6 && s.r.y === 20
+    expect(underBlows(s, arrived, 200, () => expect(s.r.interrupted).toBeUndefined())).toBe(true)
+  })
+
+  it('a walk stands however long it takes, calm or not', () => {
+    const s = setup()
+    attacked(s)
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    s.x1.order = null
+    s.tick()
+    // Calm for longer than Defend waits, still on the way: the next blow doesn't stop them.
+    s.world.tick += DEFEND_CALM_TICKS
+    expect(s.r.order).toMatchObject({ kind: 'walkTo' })
+    expect(underBlows(s, () => s.r.x === 6 && s.r.y === 20)).toBe(true)
+    expect(s.r.interrupted).toBeUndefined()
+  })
+
+  it('a blow after it is done runs the defence script', () => {
+    const s = setup()
+    attacked(s)
+    s.give({ kind: 'walkTo', x: 6, y: 10 })
+    expect(underBlows(s, () => s.r.x === 6 && s.r.y === 10 && s.r.order === null)).toBe(true)
+    expect(s.r.interrupted).toBeUndefined()
+    attacked(s)
+    expect(s.r.givenUnderAttack).toBeUndefined()
+  })
+
+  it('a drive given under attack gets the carriage there through constant blows', () => {
+    const s = setup()
+    s.world.horses.push({
+      id: 'h1',
+      realmId: 'r1',
+      cityId: null,
+      x: 6,
+      y: 6,
+      hunger: MAX_HUNGER,
+      health: MAX_HEALTH,
+      name: 'Rowan',
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: 0,
+    })
+    s.world.carriages.push({
+      id: 'k1',
+      realmId: 'r1',
+      cityId: null,
+      x: 6,
+      y: 6,
+      horseId: null,
+      load: {},
+    })
+    attacked(s)
+    expect(s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })).toMatchObject({ type: 'ack' })
+    const k1 = s.world.carriages[0]!
+    const there = () => k1.x === 6 && k1.y === 24
+    const start = s.world.tick
+    const drove = underBlows(s, there, 200, () => {
+      expect(s.r.interrupted).toBeUndefined()
+      s.world.horses[0]!.hunger = MAX_HUNGER
+    })
+    expect(drove).toBe(true)
+    expect(s.r).toMatchObject({ x: 6, y: 24 })
+    expect(s.world.tick - start).toBeLessThan(200)
+  })
+
+  it('Work given under attack holds during it, and a blow after the calm time interrupts', () => {
+    const s = setup()
+    attacked(s)
+    s.give({ kind: 'task', task: 'work', workplaceId: 'f1' })
+    s.tick()
+    const work = s.r.script!
+    expect(work.scriptId).toBe(701)
+    expect(s.r.givenUnderAttack).toBe('untilCalm')
+    let ticks = 0
+    const held = underBlows(
+      s,
+      () => ticks >= DEFEND_CALM_TICKS * 2,
+      DEFEND_CALM_TICKS * 2,
+      () => {
+        ticks++
+        expect(s.r.interrupted).toBeUndefined()
+        expect(s.r.script?.scriptId).toBe(work.scriptId)
+        expect(s.r.order).toMatchObject({ kind: 'workAt', buildingId: 'f1' })
+      },
+    )
+    expect(held).toBe(true)
+
+    s.x1.order = null
+    for (let i = 0; i < DEFEND_CALM_TICKS + 1; i++) s.tick()
+    expect(s.r.interrupted).toBeUndefined()
+    attacked(s)
+    expect(s.r.interrupted).toMatchObject({ order: { kind: 'workAt' } })
+    expect(s.r.givenUnderAttack).toBeUndefined()
+  })
+
+  it('a dodged blow after the calm time ends the hold too, and the next one interrupts', () => {
+    const s = setup()
+    attacked(s)
+    s.give({ kind: 'task', task: 'work', workplaceId: 'f1' })
+    s.tick()
+    s.x1.order = null
+    for (let i = 0; i < DEFEND_CALM_TICKS + 1; i++) s.tick()
+    expect(s.r.givenUnderAttack).toBe('untilCalm')
+    // A tick on which x1's blow is dodged, as `resolveStrikes` rolls it.
+    const dodged = (t: number) =>
+      mulberry32(hash(`${s.world.seed}:${t}:x1:strike`))() < dodgeChance(s.r, t)
+    while (!dodged(s.world.tick)) s.world.tick++
+    const health = s.r.health
+    s.x1.x = s.r.x
+    s.x1.y = s.r.y
+    s.x1.order = attackOrder('w1', true)
+    resolveStrikes(s.world, [{ attackerId: 'x1', targetId: 'w1' }], SIZE)
+    expect(s.r.health).toBe(health)
+    expect(s.r.struck!.tick).toBe(s.world.tick)
+    expect(s.r.interrupted).toBeUndefined()
+    expect(s.r.givenUnderAttack).toBeUndefined()
+    attacked(s)
+  })
+
+  it('a script given under attack holds during it, and a blow after the calm time interrupts', () => {
+    const s = setup(new Map([[760, { ...wander(), source: 'let quiet = 1' }]]))
+    attacked(s)
+    s.give({ kind: 'runScript', scriptId: 760 })
+    s.tick()
+    expect(s.r.script?.scriptId).toBe(760)
+    expect(s.r.givenUnderAttack).toBe('untilCalm')
+    let ticks = 0
+    underBlows(
+      s,
+      () => ticks >= DEFEND_CALM_TICKS,
+      DEFEND_CALM_TICKS,
+      () => {
+        ticks++
+        expect(s.r.interrupted).toBeUndefined()
+        expect(s.r.script?.scriptId).toBe(760)
+      },
+    )
+    s.x1.order = null
+    for (let i = 0; i < DEFEND_CALM_TICKS + 1; i++) s.tick()
+    attacked(s)
+    expect(s.r.interrupted).toMatchObject({ script: { scriptId: 760 } })
+  })
+
+  it('a queue given under attack holds, its own steps too, and once done the next blow counts', () => {
+    const s = setup()
+    attacked(s)
+    const walk = (x: number, y: number) => ({ order: { kind: 'walkTo', x, y } })
+    s.give({ kind: 'queue', steps: [walk(6, 8), walk(6, 10)] })
+    const arrived = () => s.r.queue === undefined && s.r.x === 6 && s.r.y === 10
+    expect(underBlows(s, arrived, 200, () => expect(s.r.interrupted).toBeUndefined())).toBe(true)
+    attacked(s)
+  })
+
+  it('an order given before any blow is still interrupted', () => {
+    const s = setup()
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    s.tick()
+    expect(s.r.givenUnderAttack).toBeUndefined()
+    attacked(s)
+    expect(s.r.interrupted).toMatchObject({ order: { kind: 'walkTo', target: { x: 6, y: 20 } } })
+  })
+
+  it('an order given once it has been calm for the calm time is interrupted as usual', () => {
+    const s = setup()
+    s.r.struck = { by: 'x1', tick: s.world.tick - DEFEND_CALM_TICKS }
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    s.tick()
+    expect(s.r.givenUnderAttack).toBeUndefined()
+    attacked(s)
+  })
+
+  it('a later order out of the fight replaces the mark', () => {
+    const s = setup()
+    attacked(s)
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    s.tick()
+    expect(s.r.givenUnderAttack).toBe('untilDone')
+    s.x1.order = null
+    s.world.tick += DEFEND_CALM_TICKS
+    s.give({ kind: 'walkTo', x: 3, y: 20 })
+    s.tick()
+    expect(s.r.givenUnderAttack).toBeUndefined()
+    attacked(s)
+  })
+
+  it('what a script requests itself doesn’t count as given by the Player', () => {
+    const s = setup(new Map([[760, wander()]]))
+    s.r.carried.spear = 1
+    s.give({ kind: 'runScript', scriptId: 760 })
+    s.tick()
+    attacked(s)
+    expect(s.r.interrupted).toMatchObject({ script: { scriptId: 760 } })
+    // The attacker gone, the script goes on and walks again, a blow only just past.
+    const foe = s.x1
+    s.gone()
+    expect(s.until(() => s.r.script?.scriptId === 760 && s.r.order?.kind === 'walkTo')).toBe(true)
+    expect(s.world.tick - s.r.struck!.tick).toBeLessThan(DEFEND_CALM_TICKS)
+    expect(s.r.givenUnderAttack).toBeUndefined()
+    s.world.residents.push(foe)
+    attacked(s)
+  })
+
+  it('what the defence script requests itself doesn’t count either', () => {
+    const s = setup()
+    attacked(s)
+    s.tick()
+    expect(s.r.order).toMatchObject({ kind: 'walkTo', target: home })
+    expect(s.r.givenUnderAttack).toBeUndefined()
+    expect(s.r.script?.task).toBe('defend')
+  })
+
+  it('an order that replaces nothing leaves things as they were', () => {
+    const s = setup(new Map([[750, shout()]]))
+    attacked(s)
+    const defence = s.r.script
+    s.give({ kind: 'rename', name: 'Bo' })
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.tick()
+    expect(s.r.interrupted).toBeDefined()
+    expect(s.r.script?.scriptId).toBe(defence?.scriptId)
+    expect(s.r.givenUnderAttack).toBeUndefined()
+
+    // A walk standing keeps its mark through such an order.
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    s.tick()
+    s.give({ kind: 'rename', name: 'Cy' })
+    s.tick()
+    expect(s.r.givenUnderAttack).toBe('untilDone')
+  })
+
+  it('stopping leaves nothing to hold: the next blow runs the defence script', () => {
+    const s = setup()
+    attacked(s)
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    s.tick()
+    s.give({ kind: 'stop' })
+    s.tick()
+    expect(s.r.order).toBeNull()
+    expect(s.r.givenUnderAttack).toBeUndefined()
+    attacked(s)
+  })
+
+  it('going Down ends it', () => {
+    const s = setup()
+    attacked(s)
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    s.tick()
+    goDown(s.world, s.r)
+    expect(s.r.givenUnderAttack).toBeUndefined()
+  })
+
+  it('isn’t seen by anyone', () => {
+    const s = setup()
+    attacked(s)
+    s.give({ kind: 'walkTo', x: 6, y: 20 })
+    s.tick()
+    expect(s.r.givenUnderAttack).toBe('untilDone')
+    for (const realmId of ['r1', 'r2']) {
+      const seen = entitiesInSight(s.world, terrain, realmId).find((e) => e.id === 'w1')!
+      expect(seen).not.toHaveProperty('givenUnderAttack')
+    }
+  })
+})
+
 describe('defence invariant', () => {
+  it('flags an order standing with a defence script running or anything interrupted (ADR 0004)', () => {
+    const s = setup()
+    s.r.givenUnderAttack = 'untilDone'
+    expect(givenUnderAttackSound.check(s.world, terrain)).toEqual([])
+    s.r.script = { scriptId: 0, task: 'defend', memory: {} }
+    expect(givenUnderAttackSound.check(s.world, terrain)).toMatchObject([
+      { invariant: 'given-under-attack-sound', entityIds: ['w1'] },
+    ])
+    delete s.r.script
+    s.r.interrupted = { order: null }
+    expect(givenUnderAttackSound.check(s.world, terrain)).toMatchObject([
+      { invariant: 'given-under-attack-sound', entityIds: ['w1'] },
+    ])
+  })
+
   it('flags something interrupted with no defence script running (ADR 0004)', () => {
     const s = setup()
     s.r.interrupted = { order: null }
