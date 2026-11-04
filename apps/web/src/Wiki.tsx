@@ -490,6 +490,25 @@ export function Wiki() {
           the same order.
         </p>
         <p>
+          The Residents drawer’s Open full list button opens the list across the screen, with
+          everyone’s age, city, stats, skills, gear, what they carry, hunger, health and what they
+          are doing. On a phone each resident is a small card. Tap one to open that resident’s card,
+          which closes the full list. Stats there are what they count for now, old age included.
+        </p>
+        <p>
+          Search the full list by name, filter it by weapons (has any, has none, or fights with a
+          certain one), by whether they are idle, by children or the grown up, by city and by a
+          skill they have learned, and sort it by any column: tap a heading, and tap it again to
+          turn the order round; on a phone the sort has its own menu. Whoever has nothing in the
+          column comes last either way. This browser remembers your choice.
+        </p>
+        <p>
+          Pick these makes a group on the map of everyone the full list shows, or of those you
+          ticked among them, ready for one order, and closes the full list so the group card shows.
+          Someone ticked whom the search or a filter hides isn’t picked. Ticks last only while the
+          full list is open.
+        </p>
+        <p>
           The card and the residents list say what each resident is doing. Walking, riding or
           driving somewhere, they also say about when they arrive, and the card’s meters and
           countdowns (building, tearing down, breeding, carrying, pairing, growing up) say about how
@@ -680,8 +699,10 @@ export function Wiki() {
           lists every kind of step. One that acts on a place (work a workplace, build, store at or
           fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
           map, anywhere, not only where the resident stands now; one that needs more (which goods,
-          what to build, what a smithy makes, which script) asks for it on the card after. A step
-          that has to be done on its tile goes after a walk there, unless the step before already
+          what to build, what a smithy makes, which script) asks for it on the card after. What to
+          build is the same Build menu as on the card; a kind dimmed because the tile lacks
+          something today, such as a city's area, can still be added, for a step before it may
+          bring that. A step that has to be done on its tile goes after a walk there, unless the step before already
           walks there. It works on a resident with no queue too, and starts one. Adding a step only
           checks that it could make sense (the place is there as you last knew it, and a carriage or
           horse is yours). A workplace or construction site can be anyone's, in sight or as last
@@ -1508,8 +1529,8 @@ export function Wiki() {
         <h3>Breeding</h3>
         <p>
           Horses don't breed on their own. A grown resident standing at a finished stable is given
-          Breed horses and picks two fed horses of their realm in it; they tend them for{' '}
-          {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
+          Breed horses and picks two fed horses of their realm in it, each shown with its name and
+          stats; they tend them for {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
           its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. The progress
           belongs to the two horses, and the stable keeps it: breeding pauses when the resident
           leaves or is given another order, or while the stable has no room left for the foal, and
@@ -2060,7 +2081,14 @@ export function Wiki() {
             Below {signed(TRADE_ORG_REFUSES_TRADE_BELOW)} the Trade Organization won't trade with
             you; below {signed(TRADE_ORG_PUNISHES_BELOW)} its army (up to{' '}
             {num(TRADE_ORG_PUNISH.soldiers)} soldiers) comes to take {num(TRADE_ORG_PUNISH.times)}{' '}
-            times what it lost, giving up after {days(TRADE_ORG_PUNISH.giveUpDays)}. Besides stolen
+            times what it lost. It walks to your city however far that is and gives up{' '}
+            {days(TRADE_ORG_PUNISH.giveUpDays)} after it arrives; it looks in your storages when it
+            arrives, so emptying them in time works, though you still see it come. It turns back on
+            the road if the city stops being yours. Its soldiers pack Food at the HQ for the way
+            there and back, keeping {num(TRADE_ORG_PUNISH.packRoom)} kg free for what they carry
+            home; they refill at trading posts they pass and may take Food from your storage for the
+            way back, apart from what they came to take. Your realm log says when it is coming, when
+            it arrives, what it left with, why it turned back, or that it was lost. Besides stolen
             goods, carriages and horses it counts{' '}
             {(Object.entries(TRADE_ORG_LOSS) as [CrimeKind, number][])
               .map(([c, n]) => `${CRIME_NAMES[c].toLowerCase()} as ${num(n)} coins`)
@@ -2387,12 +2415,24 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         </table>
         <ul>
           <li>
-            Before it starts: giving a task or Run script whose script has params first shows them,
-            filled with the values the resident keeps or the defaults. Change what you like and
-            press Start; Cancel gives nothing. A script without params starts at once. For a group
-            the form shows once, and each of them gets the same values. With Shift held the step
-            added to the queue keeps the values.
+            Starting at once: giving a task or Run script starts it in one tap, with the values the
+            resident keeps or the defaults; in a group each one goes on with their own.
           </li>
+          <li>
+            Before it starts: a Customise button beside the order, on the resident card, the group
+            card and in Add step, shows its params, filled with those values. Change what you like
+            and press Start; Cancel gives nothing. Each param's <code>?</code> says what it is for.
+            On a phone the form rises from the bottom of the screen, with Start and Cancel always in
+            view. For a group the form shows once, and each of them gets the same values. With Shift
+            held the step added to the queue keeps the values. An order whose script has no params
+            to show has no Customise.
+          </li>
+          <li>
+            The form opens by itself only when a param has no default and no <code>none:</code> in
+            its comment, since the script has nothing to go on without it. Give each param one or
+            the other to start your script in one tap.
+          </li>
+          <li>A defence script starts nothing, so its params are still shown when you pick it.</li>
           <li>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
@@ -2450,7 +2490,7 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           </li>
           <li>
             The Work default has <code>workplace</code>: the workplace to work, the one they stand
-            on while none is picked; it is never kept between starts, so the form before it starts
+            on while none is picked; it is never kept between starts, so Customise on Run script
             shows it empty, and giving Work on a workplace fills it without asking. It also has{' '}
             <code>storage</code>: the main storage, for the output, inputs and Food; and{' '}
             <code>output</code>, <code>input</code> and <code>food</code>, each taking its place for
@@ -2506,11 +2546,12 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         <ul>
           <li>
             Giving a resident Work at a workplace, from their card, a group card or a queue step,
-            runs its work script. The form before it starts is filled with the workplace's values.
+            runs its work script, at once. Customise shows its params filled with the workplace's
+            values.
           </li>
           <li>
             A value you change in that form becomes that resident's own, an override. What they kept
-            for that script before doesn't carry over.
+            for that script before doesn't carry over, with Customise or without.
           </li>
           <li>
             While they work there, each param reads their override, else the workplace's value, else

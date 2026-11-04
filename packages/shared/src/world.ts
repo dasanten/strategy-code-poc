@@ -1374,6 +1374,14 @@ export interface Standing {
 export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
 
 /**
+ * Why a punishment headed home (`CONTEXT.md`: Punishment trip): `enough`, it got what it came for;
+ * `empty`, the city's storages held nothing; `gaveUp`, its time there ran out; `cityLost`, the city
+ * is no longer the culprit's; `directiveLifted`, the admin directive it came for was lifted;
+ * `noWay`, it couldn't get there.
+ */
+export type PunishmentEnd = 'enough' | 'empty' | 'gaveUp' | 'cityLost' | 'directiveLifted' | 'noWay'
+
+/**
  * The Trade Org army out to punish an Organization for crimes against the Trade Organization
  * (`CONTEXT.md`: Trade Org reaction): its soldiers go to the culprit's city nearest the crime,
  * take back `worth` Coins' worth from its storages and carry it home. Plain data (ADR 0002).
@@ -1388,14 +1396,20 @@ export interface Punishment {
   worth: number
   /**
    * Its soldiers, each with what they carried as they set out: anything they carry above that is
-   * what they took.
+   * what they took. `packed` once they have seen to their Food at the HQ (`CONTEXT.md`: Punishment
+   * trip), so that they set out.
    */
-  members: { residentId: string; own: Stock }[]
+  members: { residentId: string; own: Stock; packed?: true }[]
   /** Out to the city while it hasn't got what it came for; home once it has or gives up. */
   heading: 'out' | 'home'
   /** The Coins' worth it took, as it stood when it headed home. */
   took: number
   startedAt: number
+  /**
+   * The tick it reached the city (`CONTEXT.md`: Punishment trip), its time there counting from it.
+   * None while it is on the way, and for good if it turned back without getting there.
+   */
+  arrivedAt?: number
   /**
    * The admin directive it was sent for (`CONTEXT.md`: Admin directive) rather than crimes; it
    * heads home once that directive is lifted.
@@ -1563,16 +1577,20 @@ export type RealmEventWhat =
       goods?: Stock
     }
   /**
-   * The Trade Organization punishes the realm (`CONTEXT.md`: Trade Org reaction): its army is
-   * `coming` to `city` to take back `worth` Coins' worth, or `left` it having taken `took`.
+   * The Trade Organization punishes the realm (`CONTEXT.md`: Trade Org reaction, Punishment trip):
+   * its army is `coming` to `city` to take back `worth` Coins' worth; it `arrived`; it `left` having
+   * taken `took`, and `why`; it `turnedBack` without reaching it, and `why`; or it was `lost`,
+   * `where` it was by then.
    */
   | {
       kind: 'punished'
-      what: 'coming' | 'left'
+      what: 'coming' | 'arrived' | 'left' | 'turnedBack' | 'lost'
       cityId: string
       city: string
       worth: number
       took?: number
+      why?: PunishmentEnd
+      where?: 'wayThere' | 'atCity' | 'wayHome'
       /** Sent for an admin directive, with its reason, rather than for crimes. */
       directive?: string
     }

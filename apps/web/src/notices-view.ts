@@ -21,11 +21,11 @@ export function laneNotices(wanted: Partial<Record<NoticeKind, boolean>>): Notic
 }
 
 /**
- * Whether the selection card is hidden: the wide Scripts drawer leaves no room for it. It stays
- * as it was, and closing the drawer brings it back.
+ * Whether the selection card is hidden: the wide Scripts drawer and the full Residents list
+ * (`fullList`) leave no room for it. It stays as it was, and closing them brings it back.
  */
-export function cardHidden(open: OpenDrawer): boolean {
-  return open !== undefined && isWide(open)
+export function cardHidden(open: OpenDrawer, fullList = false): boolean {
+  return open !== undefined && (isWide(open) || fullList)
 }
 
 /** The least width, in pixels, the lane needs over the map between the drawer and the card. */
