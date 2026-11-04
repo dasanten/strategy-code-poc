@@ -163,3 +163,14 @@ export interface AdminDirectives {
   directives: AdminDirectiveView[]
   targets: DirectiveTarget[]
 }
+
+/** An admin offers horses again (`CONTEXT.md`: Horse offer). */
+export interface ReopenHorseOffersRequest {
+  /** The one account to re-open it for; without one, every Player. */
+  name?: string
+}
+
+/** How many Horse offers an admin's offering again re-opened. */
+export interface HorseOffersReopened {
+  reopened: number
+}

@@ -21,10 +21,12 @@ import {
   type DirectivePriceRequest,
   type FirstDay,
   type GiveDirectiveRequest,
+  type HorseOffersReopened,
   type InviteCreated,
   type LoginRequest,
   type MapInfo,
   type RegionMap,
+  type ReopenHorseOffersRequest,
   type ResetPasswordRequest,
   type ScriptDetail,
   type ScriptSummary,
@@ -99,6 +101,9 @@ export const api = {
   setDirectivePrice: (id: string, req: DirectivePriceRequest) =>
     call<AdminDirectiveView>('PATCH', `/api/admin/directives/${id}`, req),
   liftDirective: (id: string) => call<void>('DELETE', `/api/admin/directives/${id}`),
+  // Offering horses again (`CONTEXT.md`: Horse offer).
+  reopenHorseOffers: (req: ReopenHorseOffersRequest) =>
+    call<HorseOffersReopened>('POST', '/api/admin/horse-offers/reopen', req),
   // The script library: saving keeps every version; one without syntax errors becomes active.
   scripts: () => call<ScriptSummary[]>('GET', '/api/scripts'),
   script: (id: number) => call<ScriptDetail>('GET', `/api/scripts/${id}`),

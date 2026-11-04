@@ -837,7 +837,8 @@ export interface WorldState {
   scriptViewChanges: number
   /**
    * The account ids of the Players who claimed their Horse offer (`CONTEXT.md`: Horse offer):
-   * kept with the Player, not the realm, so a claim outlives a Leader death.
+   * kept with the Player, not the realm, so a claim outlives a Leader death. Offering horses
+   * again takes them out.
    */
   horseOffersClaimed: number[]
   /**

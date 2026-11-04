@@ -1654,13 +1654,16 @@ export function Wiki() {
         </p>
         <h3>Horse offer</h3>
         <p>
-          Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, ever, whenever they
-          choose and whether or not they have horses: a notice at the top of the screen has a Claim
-          button until they do. The horses get new stats and ages and go in your finished stable
+          Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, whenever they choose and
+          whether or not they have horses: a notice at the top of the screen has a Claim button
+          until they do. The horses get new stats and ages and go in your finished stable
           nearest your Leader's city; with no stable, they stand next to that city's storage (or
           next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
-          realm log says where they are. Once claimed the offer is gone for good, also after your
-          Leader dies and you found a new realm; while you have no living Leader you can't claim it.
+          realm log says where they are. Once claimed the offer is gone, also after your Leader dies
+          and you found a new realm; while you have no living Leader you can't claim it. An admin
+          can offer horses again, to every Player or to one: if you had claimed, the notice comes
+          back and you may claim once more, whether or not you still have horses. If you hadn't, you
+          still have just the one claim.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>

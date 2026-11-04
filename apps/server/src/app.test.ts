@@ -132,6 +132,57 @@ describe('admin', () => {
     expect((await loginAs('Mara', 'a new password'))[SESSION_COOKIE]).toBeTruthy()
   })
 
+  it('lets admins offer horses again, to all or by name, and no one else', async () => {
+    const world = createWorld({ size: 64, tiles: new Uint8Array(64 * 64) })
+    await app.close()
+    app = await buildApp({ ...appOpts, world })
+    await createAdmin(opened.db, 'Daniel', 'admin password')
+    const cookies = await loginAs('Daniel', 'admin password')
+    const newPlayer = async (name: string) => {
+      const invite = await app.inject({ method: 'POST', url: '/api/admin/invites', cookies })
+      await signUp(name, invite.json().code)
+      const login = await loginAs(name, 'correct horse')
+      return { cookies: login, id: getSessionUser(opened.db, login[SESSION_COOKIE])!.id }
+    }
+    const mara = await newPlayer('Mara')
+    const tobin = await newPlayer('Tobin')
+    await newPlayer('Ilse')
+    const reopen = (payload: object, as: Record<string, string> = cookies) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/admin/horse-offers/reopen',
+        cookies: as,
+        payload,
+      })
+    world.horseOffersClaimed = [mara.id, tobin.id]
+
+    const refused = await reopen({ name: 'Mara' }, mara.cookies)
+    expect(refused.statusCode).toBe(403)
+    expect(refused.json().error).toBe('not-admin')
+    expect(world.horseOffersClaimed).toEqual([mara.id, tobin.id])
+
+    for (const name of ['Nobody', '', 7]) {
+      const unknown = await reopen({ name })
+      expect(unknown.statusCode).toBe(404)
+      expect(unknown.json().message).toBe('No account with that name.')
+    }
+    expect(world.horseOffersClaimed).toEqual([mara.id, tobin.id])
+
+    // A Player who hasn't claimed is no error, and nothing to re-open.
+    const none = await reopen({ name: 'Ilse' })
+    expect(none.statusCode).toBe(200)
+    expect(none.json()).toEqual({ reopened: 0 })
+    expect(world.horseOffersClaimed).toEqual([mara.id, tobin.id])
+
+    expect((await reopen({ name: 'mara' })).json()).toEqual({ reopened: 1 })
+    expect(world.horseOffersClaimed).toEqual([tobin.id])
+
+    world.horseOffersClaimed = [mara.id, tobin.id]
+    expect((await reopen({})).json()).toEqual({ reopened: 2 })
+    expect(world.horseOffersClaimed).toEqual([])
+    expect((await reopen({})).json()).toEqual({ reopened: 0 })
+  })
+
   it('lets admins give and lift directives, and no one else', async () => {
     const world = createWorld({ size: 64, tiles: new Uint8Array(64 * 64) })
     await app.close()

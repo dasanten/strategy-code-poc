@@ -83,7 +83,7 @@ function validatePassword(password: unknown): string {
   return password
 }
 
-function findUserByName(db: Db, name: string) {
+export function findUserByName(db: Db, name: string) {
   return db
     .select()
     .from(schema.users)
