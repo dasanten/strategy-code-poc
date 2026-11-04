@@ -399,9 +399,10 @@ describe('a wandering trader at a post', () => {
       const i = trader.loop.indexOf(start)
       const inOrder = trader.loop.map((_, n) => trader.loop[(i + n) % trader.loop.length])
       expect(reached).toEqual([...inOrder, start])
-      // What it took at the HQ has reached every post, Food and Coins too.
+      // What it took at the HQ has reached every post, Food and Coins too: Gold ore for a good, as
+      // a post with nothing of anything spends the Wood and Stone it gets on its chain.
       for (const w of warehouses) {
-        expect(w.stock?.wood ?? 0).toBeGreaterThan(0)
+        expect(w.stock?.goldOre ?? 0).toBeGreaterThan(0)
         expect(w.stock?.coins ?? 0).toBeGreaterThan(0)
         expect(w.stock?.food ?? 0).toBeGreaterThan(0)
       }
