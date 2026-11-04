@@ -1886,6 +1886,8 @@ export type RealmEventWhat =
       good: Good
       units: number
       fee: number
+      /** One of a carried Direct offer's: its fee may be shared, so the line names no sum. */
+      carried?: boolean
       fromRealmId: string
       fromRealm: string
       toRealmId: string

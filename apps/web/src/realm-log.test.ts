@@ -698,6 +698,31 @@ describe('realm log', () => {
     ).toBe('A caravan found no stone to bring Oakford for a carried direct offer.')
   })
 
+  it('names no sum for a carried Transfer that arrived, whose fee may be shared', () => {
+    const arrived = {
+      kind: 'transferred',
+      good: 'stone',
+      units: 10,
+      fee: 27,
+      carried: true,
+      fromRealmId: 'r2',
+      fromRealm: 'Boland',
+      toRealmId: 'r1',
+      toRealm: 'Marland',
+      back: false,
+      cityId: 'c1',
+      city: 'Brackenholt',
+      x: 1,
+      y: 2,
+      seq: 1,
+      tick: 0,
+      userId: 8,
+    } as RealmEvent
+    expect(describeEvent(arrived, 'r2').text).toBe(
+      'A caravan brought the 10 stone you sent to Brackenholt of Marland, as your carried direct offer agreed.',
+    )
+  })
+
   it('tells both sides of a direct offer, with its place', () => {
     const terms = {
       gives: 'wood',

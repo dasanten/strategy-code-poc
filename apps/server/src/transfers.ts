@@ -601,6 +601,7 @@ function logArrived(
     good: t.good,
     units,
     fee: t.fee,
+    ...(t.carriedOffer && { carried: true }),
     fromRealmId: t.realmId,
     fromRealm: realmName(world, t.realmId),
     toRealmId: t.toRealmId,

@@ -427,10 +427,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           places: [place],
         }
       }
+      const paid = e.carried ? ', as your carried direct offer agreed' : ` (a ${e.fee}-coin fee)`
       const text =
         e.toRealmId === realmId
           ? `A caravan brought ${what} from ${e.fromRealm} to ${e.city}.`
-          : `A caravan brought the ${what} you sent to ${e.city} of ${e.toRealm} (a ${e.fee}-coin fee).`
+          : `A caravan brought the ${what} you sent to ${e.city} of ${e.toRealm}${paid}.`
       return { text, tone: 'info', places: [place] }
     }
     case 'transferStuck': {
