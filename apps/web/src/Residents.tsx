@@ -187,8 +187,8 @@ import {
   useEscapeClosesPanel,
   useKeptRows,
 } from './SelectionCard.js'
+import { HorsePick } from './HorsePick.js'
 import {
-  horseDetail,
   orderGroupOf,
   residentOrders,
   DOWN_NO_ORDERS,
@@ -3169,15 +3169,14 @@ function BreedBlock({
       </p>
       {own.length === 0 && <p className="muted small">No horses of yours in this stable.</p>}
       {own.map((h) => (
-        <label key={h.id} className="small" style={{ display: 'block' }}>
-          <input
-            type="checkbox"
-            checked={chosen.includes(h.id)}
-            onChange={() => toggle(h.id)}
-            disabled={!!breeding || !!kept}
-          />{' '}
-          {h.name} · {horseDetail(h, tick)}
-        </label>
+        <HorsePick
+          key={h.id}
+          horse={h}
+          tick={tick}
+          checked={chosen.includes(h.id)}
+          disabled={!!breeding || !!kept}
+          onToggle={() => toggle(h.id)}
+        />
       ))}
       <div className="order-buttons">
         <button
@@ -3220,10 +3219,13 @@ function GroupBreed({
         Stable at {stable.x}, {stable.y} · {horses.length} of yours
       </span>
       {horses.map((h) => (
-        <label key={h.id} className="small" style={{ display: 'block' }}>
-          <input type="checkbox" checked={picked.includes(h.id)} onChange={() => toggle(h.id)} />{' '}
-          {h.name} · {horseDetail(h, tick)}
-        </label>
+        <HorsePick
+          key={h.id}
+          horse={h}
+          tick={tick}
+          checked={picked.includes(h.id)}
+          onToggle={() => toggle(h.id)}
+        />
       ))}
       <div className="order-buttons">
         <button
