@@ -213,7 +213,7 @@ const stockText = (stock: Stock, times = 1) =>
     .map(([g, n]) => `${n * times} ${GOOD_LABELS[g].toLowerCase()}`)
     .join(', ')
 
-const STAT_LABELS: Record<StatName, string> = {
+export const STAT_LABELS: Record<StatName, string> = {
   strength: 'Strength',
   endurance: 'Endurance',
   agility: 'Agility',

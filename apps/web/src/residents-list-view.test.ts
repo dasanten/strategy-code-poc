@@ -31,9 +31,9 @@ describe('the residents of the full list', () => {
       { key: 'hired', label: 'Hired', residents: ['c'] },
     ])
     expect(listed).toEqual([
-      { resident: 'a', city: 'Oakford' },
-      { resident: 'b', city: 'Oakford' },
-      { resident: 'c', city: 'Hired' },
+      { resident: 'a', city: 'Oakford', group: 'c1' },
+      { resident: 'b', city: 'Oakford', group: 'c1' },
+      { resident: 'c', city: 'Hired', group: 'hired' },
     ])
   })
 })
